@@ -19,6 +19,20 @@ function criarCliente(overrides: Record<string, unknown>) {
   };
 }
 
+function configEtapa(etapaId: string, patch: Record<string, unknown> = {}) {
+  return {
+    etapaId,
+    visivel: true,
+    editavel: true,
+    somenteLeitura: false,
+    obrigatorio: false,
+    obrigatorioEntrada: false,
+    obrigatorioSaida: false,
+    ordem: 0,
+    ...patch,
+  };
+}
+
 describe("campos aplicáveis por etapa", () => {
   it("retorna somente campos diretos e globais explicitamente associados", async () => {
     const client = criarCliente({
@@ -33,22 +47,18 @@ describe("campos aplicáveis por etapa", () => {
             opcoesJson: null,
             obrigatorio: false,
             ordem: 2,
+            etapaConfiguracoes: [configEtapa("etapa-2", { ordem: 2 })],
           },
-        ]),
-      },
-      bpmCampoObrigatorioEtapa: {
-        findMany: vi.fn().mockResolvedValue([
           {
-            campo: {
-              id: "campo-global-associado",
-              pipelineId: "pipeline-1",
-              etapaId: null,
-              nome: "Campo global associado",
-              tipo: "numero",
-              opcoesJson: null,
-              obrigatorio: false,
-              ordem: 1,
-            },
+            id: "campo-global-associado",
+            pipelineId: "pipeline-1",
+            etapaId: null,
+            nome: "Campo global associado",
+            tipo: "numero",
+            opcoesJson: null,
+            obrigatorio: false,
+            ordem: 1,
+            etapaConfiguracoes: [configEtapa("etapa-2", { ordem: 1, obrigatorio: true })],
           },
         ]),
       },
@@ -69,8 +79,9 @@ describe("campos aplicáveis por etapa", () => {
     expect(client.bpmCampo.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
         ativo: true,
+        etapaConfiguracoes: { some: { etapaId: "etapa-2" } },
         OR: expect.arrayContaining([
-          { pipelineId: "pipeline-1", OR: [{ etapaId: "etapa-2" }, { etapaId: null }] },
+          { pipelineId: "pipeline-1" },
         ]),
       }),
     }));
@@ -127,7 +138,7 @@ describe("campos aplicáveis por etapa", () => {
     });
   });
 
-  it("inclui campo com etapaId null (\"Todas as etapas\" no admin) mesmo sem vínculo em BpmCampoObrigatorioEtapa — RM-2026-04C4B0", async () => {
+  it("inclui campo base global somente quando há configuração canônica na etapa", async () => {
     const client = criarCliente({
       bpmCampo: {
         findMany: vi.fn().mockResolvedValue([
@@ -140,6 +151,7 @@ describe("campos aplicáveis por etapa", () => {
             opcoesJson: null,
             obrigatorio: false,
             ordem: 1,
+            etapaConfiguracoes: [configEtapa("etapa-qualquer", { ordem: 1 })],
           },
         ]),
       },
@@ -161,8 +173,9 @@ describe("campos aplicáveis por etapa", () => {
     expect(client.bpmCampo.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
         ativo: true,
+        etapaConfiguracoes: { some: { etapaId: "etapa-qualquer" } },
         OR: expect.arrayContaining([
-          { pipelineId: "pipeline-1", OR: [{ etapaId: "etapa-qualquer" }, { etapaId: null }] },
+          { pipelineId: "pipeline-1" },
         ]),
       }),
     }));
@@ -184,6 +197,7 @@ describe("campos aplicáveis por etapa", () => {
       opcoesJson: null,
       obrigatorio: false,
       ordem: 1,
+      etapaConfiguracoes: [configEtapa("etapa-2", { ordem: 1, obrigatorio: true })],
     };
     const client = criarCliente({
       bpmCampo: { findMany: vi.fn().mockResolvedValue([campo]) },
@@ -213,6 +227,7 @@ describe("campos aplicáveis por etapa", () => {
       opcoesJson: null,
       obrigatorio: false,
       ordem: 2,
+      etapaConfiguracoes: [configEtapa("etapa-2", { ordem: 2, obrigatorio: true })],
     };
     const client = criarCliente({
       bpmCampo: {
@@ -227,23 +242,18 @@ describe("campos aplicáveis por etapa", () => {
             opcoesJson: null,
             obrigatorio: false,
             ordem: 2,
+            etapaConfiguracoes: [configEtapa("etapa-2", { ordem: 2 })],
           },
-        ]),
-      },
-      bpmCampoObrigatorioEtapa: {
-        findMany: vi.fn().mockResolvedValue([
-          { campo: campoRepetido },
           {
-            campo: {
-              id: "campo-primeiro",
-              pipelineId: "pipeline-1",
-              etapaId: null,
-              nome: "Obrigatório primeiro",
-              tipo: "texto",
-              opcoesJson: null,
-              obrigatorio: false,
-              ordem: 1,
-            },
+            id: "campo-primeiro",
+            pipelineId: "pipeline-1",
+            etapaId: null,
+            nome: "Obrigatório primeiro",
+            tipo: "texto",
+            opcoesJson: null,
+            obrigatorio: false,
+            ordem: 1,
+            etapaConfiguracoes: [configEtapa("etapa-2", { ordem: 1, obrigatorio: true })],
           },
         ]),
       },
@@ -282,6 +292,7 @@ describe("campos aplicáveis por etapa", () => {
             opcoesJson: null,
             obrigatorio: false,
             ordem: 1,
+            etapaConfiguracoes: [configEtapa("etapa-qualquer", { ordem: 1 })],
           },
         ]),
       },
@@ -300,7 +311,7 @@ describe("campos aplicáveis por etapa", () => {
     expect(campos[0]).toMatchObject({ id: "campo-global-vazio", valor: null });
   });
 
-  it("oculta o campo apenas na etapa configurada, mesmo se houver associação obrigatória", async () => {
+  it("ignora ocultação legada quando a configuração canônica deixa o campo visível", async () => {
     const campo = {
       id: "confirmar-servico",
       pipelineId: "pipeline-1",
@@ -310,6 +321,7 @@ describe("campos aplicáveis por etapa", () => {
       opcoesJson: null,
       obrigatorio: false,
       ordem: 4,
+      etapaConfiguracoes: [configEtapa("novos-leads", { ordem: 4 })],
     };
     const client = criarCliente({
       bpmCampo: { findMany: vi.fn().mockResolvedValue([campo]) },
@@ -328,7 +340,8 @@ describe("campos aplicáveis por etapa", () => {
       client as never,
     );
 
-    expect(campos).toEqual([]);
+    expect(campos).toHaveLength(1);
+    expect(campos[0].id).toBe(campo.id);
   });
 
   it("aplica visibilidade e somente leitura do perfil no servidor", async () => {
@@ -342,6 +355,7 @@ describe("campos aplicáveis por etapa", () => {
       visivel: true,
       editavel: true,
       somenteLeitura: false,
+      etapaConfiguracoes: [configEtapa("etapa-2", { ordem: 1 })],
     };
     const client = criarCliente({
       bpmCampo: {
@@ -390,6 +404,7 @@ describe("campos aplicáveis por etapa", () => {
         opcoesJson: null,
         obrigatorio: false,
         ordem: 1,
+        etapaConfiguracoes: [configEtapa("novos-leads", { ordem: 1 })],
       },
       {
         id: "responsavel",
@@ -400,6 +415,7 @@ describe("campos aplicáveis por etapa", () => {
         opcoesJson: null,
         obrigatorio: false,
         ordem: 2,
+        etapaConfiguracoes: [configEtapa("novos-leads", { ordem: 2 })],
       },
       {
         id: "email",
@@ -410,6 +426,7 @@ describe("campos aplicáveis por etapa", () => {
         opcoesJson: null,
         obrigatorio: false,
         ordem: 3,
+        etapaConfiguracoes: [configEtapa("novos-leads", { ordem: 3 })],
       },
     ];
     const client = criarCliente({
@@ -453,7 +470,7 @@ describe("campos aplicáveis por etapa", () => {
 });
 
 describe("campos obrigatórios por etapa (validação de transição)", () => {
-  it("RM-2026-04C4B0: inclui campo global (etapaId null) marcado como obrigatório, sem depender de BpmCampoObrigatorioEtapa", async () => {
+  it("inclui campo global marcado como obrigatório na configuração canônica", async () => {
     const client = criarCliente({
       bpmCampo: {
         findMany: vi.fn().mockResolvedValue([
@@ -464,8 +481,9 @@ describe("campos obrigatórios por etapa (validação de transição)", () => {
             nome: "CNPJ",
             tipo: "texto",
             opcoesJson: null,
-            obrigatorio: true,
+            obrigatorio: false,
             ordem: 1,
+            etapaConfiguracoes: [configEtapa("etapa-2", { ordem: 1, obrigatorio: true })],
           },
         ]),
       },
@@ -480,8 +498,9 @@ describe("campos obrigatórios por etapa (validação de transição)", () => {
     expect(client.bpmCampo.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
         ativo: true,
+        etapaConfiguracoes: { some: { etapaId: "etapa-2" } },
         OR: expect.arrayContaining([
-          { pipelineId: "pipeline-1", OR: [{ etapaId: "etapa-2" }, { etapaId: null }] },
+          { pipelineId: "pipeline-1" },
         ]),
       }),
     }));
@@ -498,6 +517,7 @@ describe("campos obrigatórios por etapa (validação de transição)", () => {
       opcoesJson: null,
       obrigatorio: false,
       ordem: 1,
+      etapaConfiguracoes: [configEtapa("novos-leads", { ordem: 1, obrigatorio: true })],
     };
     const client = criarCliente({
       bpmCampo: { findMany: vi.fn().mockResolvedValue([campo]) },

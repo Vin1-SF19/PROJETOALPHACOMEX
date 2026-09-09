@@ -710,8 +710,10 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
   }, [recarregarCards]);
 
   useEffect(() => {
+    const client = pusherClient;
+    if (!client) return;
     const canal = canalPipelineBpm(pipeline.id);
-    const channel = pusherClient.subscribe(canal);
+    const channel = client.subscribe(canal);
 
     const onAtualizado = (payload: BpmRealtimePayload) => {
       if (payload.pipelineId !== pipeline.id) return;
@@ -737,7 +739,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
       }
       ultimaRequisicaoRef.current += 1;
       channel.unbind(BPM_PIPELINE_EVENT, onAtualizado);
-      pusherClient.unsubscribe(canal);
+      client.unsubscribe(canal);
     };
   }, [pipeline.id, recarregarCards, router]);
 

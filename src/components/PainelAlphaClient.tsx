@@ -53,8 +53,11 @@ export default function PainelAlphaClient({ session, chamadosIniciais, configBan
 
   useEffect(() => {
     if (!mounted || !chamadosIniciais?.length) return;
-    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
-      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+    const pusherKey = process.env.NEXT_PUBLIC_PUSHER_KEY?.trim();
+    const pusherCluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER?.trim();
+    if (!pusherKey || !pusherCluster) return;
+    const pusher = new Pusher(pusherKey, {
+      cluster: pusherCluster,
       forceTLS: true,
     });
     chamadosIniciais.forEach((c: any) => {

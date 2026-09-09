@@ -1,21 +1,61 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import type { TemaAlpha } from "@/lib/temas";
 import { CheckCircle2, Sparkles } from "lucide-react";
 
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 
 import { DetalhePopover } from "./DetalhePopover";
 import { formatarDiaSemanaCurto, formatarHora, mesmodia } from "./lib/datas";
 import { calcularPosicoesEventosDoDia, eventosDiaInteiroDoDia } from "./lib/layout-eventos";
-import { corDoItemAgenda, type EventoExibicao } from "./lib/tipos";
+import { corDoItemAgenda, COR_CALENDARIO_PADRAO, type EventoExibicao } from "./lib/tipos";
 
 const ALTURA_HORA_PX = 64;
 const HORAS = Array.from({ length: 24 }, (_, i) => i);
 
-/** Grade horária compartilhada — 1 coluna (Dia) ou 7 colunas (Semana). */
+function iniciaisDoNome(nome: string): string {
+  return nome
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((parte) => parte.charAt(0))
+    .join("")
+    .toUpperCase() || "?";
+}
+
+interface GrupoCalendario {
+  calendarioId: string;
+  nome: string;
+  cor: string;
+}
+
+/** Uma coluna por calendário (agenda própria, colega ou lista de tarefas) presente nos eventos do dia — na ordem em que aparecem. */
+function agruparPorCalendario(eventos: EventoExibicao[]): GrupoCalendario[] {
+  const grupos = new Map<string, GrupoCalendario>();
+  for (const evento of eventos) {
+    if (!grupos.has(evento.calendarioId)) {
+      grupos.set(evento.calendarioId, {
+        calendarioId: evento.calendarioId,
+        nome: evento.calendarioNome || evento.calendarioGoogleId,
+        cor: evento.calendarioCorHex ?? COR_CALENDARIO_PADRAO,
+      });
+    }
+  }
+  return [...grupos.values()];
+}
+
+interface ColunaGrade {
+  chave: string;
+  dia: Date;
+  eventosColuna: EventoExibicao[];
+  header: ReactNode;
+  cor?: string;
+}
+
+/** Grade horária compartilhada — colunas por dia (Dia/Semana) ou, na Dia com mais de um calendário, uma coluna por calendário/pessoa. */
 export function GradeHoraria({
   dias,
   eventos,
@@ -35,6 +75,8 @@ export function GradeHoraria({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const hoje = new Date();
+  const gruposCalendario = dias.length === 1 ? agruparPorCalendario(eventos) : [];
+  const modoPessoas = gruposCalendario.length > 1;
 
   useEffect(() => {
     // Abre a grade já rolada para perto da hora atual — sem isso o usuário cai no topo (meia-noite).
@@ -45,17 +87,33 @@ export function GradeHoraria({
     }
   }, []);
 
-  return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[1.75rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.10),transparent_30%),linear-gradient(145deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))] shadow-2xl shadow-slate-950/20">
-      <div
-        className="grid shrink-0 border-b border-white/10 bg-slate-950/20"
-        style={{ gridTemplateColumns: `4rem repeat(${dias.length}, 1fr)` }}
-      >
-        <div />
-        {dias.map((dia) => {
-          const ehHoje = mesmodia(dia, hoje);
-          return (
-            <div key={dia.toISOString()} className="px-2 py-2.5 text-center border-l border-white/5">
+  const colunas: ColunaGrade[] = modoPessoas
+    ? gruposCalendario.map((grupo) => ({
+        chave: grupo.calendarioId,
+        dia: dias[0],
+        eventosColuna: eventos.filter((evento) => evento.calendarioId === grupo.calendarioId),
+        cor: grupo.cor,
+        header: (
+          <div className="flex flex-col items-center gap-1 px-1 py-2">
+            <Avatar size="sm" className="shadow-[0_2px_8px_rgba(0,0,0,0.35)] ring-2" style={{ ["--tw-ring-color" as string]: grupo.cor }}>
+              <AvatarFallback className="text-[11px] font-black text-white" style={{ background: grupo.cor }}>
+                {iniciaisDoNome(grupo.nome)}
+              </AvatarFallback>
+            </Avatar>
+            <span className="max-w-full truncate text-[10px] font-bold text-slate-300" title={grupo.nome}>
+              {grupo.nome}
+            </span>
+          </div>
+        ),
+      }))
+    : dias.map((dia) => {
+        const ehHoje = mesmodia(dia, hoje);
+        return {
+          chave: dia.toISOString(),
+          dia,
+          eventosColuna: eventos,
+          header: (
+            <div className="px-2 py-2.5 text-center">
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
                 {formatarDiaSemanaCurto(dia)}
               </p>
@@ -63,16 +121,41 @@ export function GradeHoraria({
                 {dia.getDate()}
               </p>
             </div>
-          );
-        })}
+          ),
+        };
+      });
+
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[1.75rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.10),transparent_30%),linear-gradient(145deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))] shadow-2xl shadow-slate-950/20">
+      {modoPessoas && (
+        <div className="px-3 pt-2 text-center">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+            {formatarDiaSemanaCurto(dias[0])} · {dias[0].getDate()}
+          </p>
+        </div>
+      )}
+      <div
+        className="grid shrink-0 border-b border-white/10 bg-slate-950/20"
+        style={{ gridTemplateColumns: `4rem repeat(${colunas.length}, 1fr)` }}
+      >
+        <div />
+        {colunas.map((coluna) => (
+          <div
+            key={coluna.chave}
+            className="border-l border-white/5"
+            style={coluna.cor ? { borderTopWidth: 3, borderTopColor: coluna.cor } : undefined}
+          >
+            {coluna.header}
+          </div>
+        ))}
       </div>
 
-      {dias.some((dia) => eventosDiaInteiroDoDia(dia, eventos).length > 0) && (
-        <div className="grid max-h-28 shrink-0 overflow-y-auto border-b border-white/5" style={{ gridTemplateColumns: `4rem repeat(${dias.length}, 1fr)` }}>
+      {colunas.some((coluna) => eventosDiaInteiroDoDia(coluna.dia, coluna.eventosColuna).length > 0) && (
+        <div className="grid max-h-28 shrink-0 overflow-y-auto border-b border-white/5" style={{ gridTemplateColumns: `4rem repeat(${colunas.length}, 1fr)` }}>
           <div className="flex items-center justify-end pr-2 text-[9px] font-bold uppercase text-slate-600">Dia todo</div>
-          {dias.map((dia) => (
-            <div key={dia.toISOString()} className="border-l border-white/[0.07] p-1 space-y-1 min-h-[2rem]">
-              {eventosDiaInteiroDoDia(dia, eventos).map((evento) => evento.tipo === "tarefa" ? (
+          {colunas.map((coluna) => (
+            <div key={coluna.chave} className="border-l border-white/[0.07] p-1 space-y-1 min-h-[2rem]">
+              {eventosDiaInteiroDoDia(coluna.dia, coluna.eventosColuna).map((evento) => evento.tipo === "tarefa" ? (
                 <div key={evento.id} className="group/task flex w-full items-center gap-1.5 overflow-hidden rounded-lg border border-emerald-200/20 bg-emerald-500/15 py-1 pr-1 text-[10px] font-bold text-emerald-50 shadow-[0_5px_14px_rgba(16,185,129,0.14)] transition-all hover:-translate-y-px hover:bg-emerald-400/25" style={{ borderLeftColor: corDoItemAgenda(evento), borderLeftWidth: 3 }}>
                   <button type="button" onClick={() => evento.tarefaCacheId && onConcluirTarefa(evento.tarefaCacheId)} className="ml-1 flex size-4 shrink-0 items-center justify-center rounded-full border border-emerald-100/80 bg-emerald-950/30 transition-colors hover:bg-emerald-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white" aria-label={`Concluir tarefa: ${evento.titulo || "sem título"}`} title="Concluir tarefa">
                     <CheckCircle2 className="size-3 text-emerald-100 group-hover/task:text-emerald-600" aria-hidden="true" />
@@ -95,7 +178,7 @@ export function GradeHoraria({
       )}
 
       <div ref={containerRef} className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <div className="grid" style={{ gridTemplateColumns: `4rem repeat(${dias.length}, 1fr)` }}>
+        <div className="grid" style={{ gridTemplateColumns: `4rem repeat(${colunas.length}, 1fr)` }}>
           <div>
             {HORAS.map((hora) => (
               <div key={hora} style={{ height: ALTURA_HORA_PX }} className="pr-2 text-right text-[10px] text-slate-600 -translate-y-2">
@@ -104,21 +187,24 @@ export function GradeHoraria({
             ))}
           </div>
 
-          {dias.map((dia) => {
-            const posicoes = calcularPosicoesEventosDoDia(dia, eventos);
-            const ehHoje = mesmodia(dia, hoje);
+          {colunas.map((coluna) => {
+            const posicoes = calcularPosicoesEventosDoDia(coluna.dia, coluna.eventosColuna);
+            const ehHoje = mesmodia(coluna.dia, hoje);
             return (
               <div
-                key={dia.toISOString()}
+                key={coluna.chave}
                 className="relative border-l border-white/[0.07]"
-                style={{ height: ALTURA_HORA_PX * 24 }}
+                style={{
+                  height: ALTURA_HORA_PX * 24,
+                  background: coluna.cor ? `color-mix(in srgb, ${coluna.cor} 5%, transparent)` : undefined,
+                }}
               >
                 {HORAS.map((hora) => (
                   <button
                     key={hora}
                     type="button"
                     onClick={() => {
-                      const dataHorario = new Date(dia);
+                      const dataHorario = new Date(coluna.dia);
                       dataHorario.setHours(hora, 0, 0, 0);
                       onSelecionarHorario(dataHorario);
                     }}
@@ -137,14 +223,14 @@ export function GradeHoraria({
                   </div>
                 )}
 
-                {posicoes.map(({ evento, topoPercentual, alturaPercentual, coluna, totalColunas }) => evento.tipo === "tarefa" ? (
+                {posicoes.map(({ evento, topoPercentual, alturaPercentual, coluna: colunaIndice, totalColunas }) => evento.tipo === "tarefa" ? (
                   <div
                     key={evento.id}
                     className="group/task absolute z-20 overflow-hidden rounded-xl border border-white/15 border-l-[3px] px-2 py-1.5 text-left text-[10px] font-bold text-white shadow-[0_10px_22px_rgba(15,23,42,0.30)] transition-all duration-150 hover:z-30 hover:-translate-y-px hover:brightness-110 hover:shadow-xl"
                     style={{
                       top: `${topoPercentual}%`,
                       height: `${alturaPercentual}%`,
-                      left: `${(coluna / totalColunas) * 100}%`,
+                      left: `${(colunaIndice / totalColunas) * 100}%`,
                       width: `${100 / totalColunas}%`,
                       background: `linear-gradient(135deg, ${corDoItemAgenda(evento)}f5, ${corDoItemAgenda(evento)}bc)`,
                       borderLeftColor: "rgba(255,255,255,0.8)",
@@ -170,7 +256,7 @@ export function GradeHoraria({
                       style={{
                         top: `${topoPercentual}%`,
                         height: `${alturaPercentual}%`,
-                        left: `${(coluna / totalColunas) * 100}%`,
+                        left: `${(colunaIndice / totalColunas) * 100}%`,
                         width: `${100 / totalColunas}%`,
                         background: evento.compartilhadoComUsuario ? "rgba(15,23,42,0.88)" : `linear-gradient(135deg, ${corDoItemAgenda(evento)}f5, ${corDoItemAgenda(evento)}bc)`,
                         borderColor: evento.compartilhadoComUsuario ? corDoItemAgenda(evento) : undefined,

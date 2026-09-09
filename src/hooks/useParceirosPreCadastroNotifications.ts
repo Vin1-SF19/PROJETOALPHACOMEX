@@ -16,11 +16,12 @@ export function useParceirosPreCadastroNotifications(
 
   useEffect(() => {
     if (!habilitado) return;
-    if (!pusherClient) return;
+    const client = pusherClient;
+    if (!client) return;
     if (subscribedRef.current) return;
 
     subscribedRef.current = true;
-    const channel = pusherClient.subscribe(CHANNEL);
+    const channel = client.subscribe(CHANNEL);
 
     channel.bind(EVENT, (payload: PreCadastroNotificacao) => {
       onNovoPreCadastro(payload);
@@ -29,7 +30,7 @@ export function useParceirosPreCadastroNotifications(
     return () => {
       try {
         channel.unbind(EVENT);
-        pusherClient.unsubscribe(CHANNEL);
+        client.unsubscribe(CHANNEL);
       } catch {
         // ignore cleanup errors on closed connection
       }

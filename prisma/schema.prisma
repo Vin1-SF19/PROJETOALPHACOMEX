@@ -3874,23 +3874,25 @@ model BpmEtapa {
   campos   BpmCampo[]
   cards    BpmCard[]
 
-  transicoesOrigem          BpmEtapaTransicaoPermitida[] @relation("TransicaoOrigem")
-  transicoesDestino         BpmEtapaTransicaoPermitida[] @relation("TransicaoDestino")
-  transicoesEtapaOrigem     BpmTransicaoEtapa[]          @relation("BpmTransicaoEtapaOrigem")
-  transicoesEtapaDestino    BpmTransicaoEtapa[]          @relation("BpmTransicaoEtapaDestino")
-  camposObrigatorios        BpmCampoObrigatorioEtapa[]
-  camposOcultos             BpmCampoOcultoEtapa[]
-  visibilidades             BpmEtapaVisibilidade[]
-  automacoes                BpmAutomacao[]
-  subStatus                 BpmSubStatus[]
-  cadencias                 BpmCadencia[]
-  checklistTemplates        BpmChecklistTemplate[]
-  slaConfigs                BpmSlaConfig[]
-  campoConfiguracoes        BpmCampoEtapaConfig[]
-  formulario                BpmEtapaFormulario?
-  requisitos                BpmRequisito[]
-  execucoesTransicaoOrigem  BpmTransicaoExecucao[]       @relation("BpmTransicaoExecucaoOrigem")
-  execucoesTransicaoDestino BpmTransicaoExecucao[]       @relation("BpmTransicaoExecucaoDestino")
+  transicoesOrigem             BpmEtapaTransicaoPermitida[] @relation("TransicaoOrigem")
+  transicoesDestino            BpmEtapaTransicaoPermitida[] @relation("TransicaoDestino")
+  transicoesEtapaOrigem        BpmTransicaoEtapa[]          @relation("BpmTransicaoEtapaOrigem")
+  transicoesEtapaDestino       BpmTransicaoEtapa[]          @relation("BpmTransicaoEtapaDestino")
+  camposObrigatorios           BpmCampoObrigatorioEtapa[]
+  camposOcultos                BpmCampoOcultoEtapa[]
+  visibilidades                BpmEtapaVisibilidade[]
+  automacoes                   BpmAutomacao[]
+  subStatus                    BpmSubStatus[]
+  cadencias                    BpmCadencia[]
+  cadenciaAssociacoes          BpmCadenciaEtapa[]
+  checklistTemplates           BpmChecklistTemplate[]
+  checklistTemplateAssociacoes BpmChecklistTemplateEtapa[]
+  slaConfigs                   BpmSlaConfig[]
+  campoConfiguracoes           BpmCampoEtapaConfig[]
+  formulario                   BpmEtapaFormulario?
+  requisitos                   BpmRequisito[]
+  execucoesTransicaoOrigem     BpmTransicaoExecucao[]       @relation("BpmTransicaoExecucaoOrigem")
+  execucoesTransicaoDestino    BpmTransicaoExecucao[]       @relation("BpmTransicaoExecucaoDestino")
 
   @@unique([pipelineId, chave])
   @@index([pipelineId])
@@ -4699,6 +4701,7 @@ model BpmChecklistTemplate {
   itens      BpmChecklistTemplateItem[]
   instancias BpmCardChecklist[]
   requisitos BpmRequisito[]
+  etapas     BpmChecklistTemplateEtapa[]
 
   @@index([ativo])
   @@index([pipelineId])
@@ -4707,6 +4710,22 @@ model BpmChecklistTemplate {
   @@index([tipoProcesso])
   @@index([cardId])
   @@index([criadoPorId])
+}
+
+// Escopo normalizado de etapas do template. Zero associações significa todas
+// as etapas; `BpmChecklistTemplate.etapaId` permanece como shadow legado.
+model BpmChecklistTemplateEtapa {
+  id         String   @id @default(cuid())
+  templateId String
+  etapaId    String
+  createdAt  DateTime @default(now())
+
+  template BpmChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  etapa    BpmEtapa             @relation(fields: [etapaId], references: [id], onDelete: Restrict)
+
+  @@unique([templateId, etapaId])
+  @@index([templateId])
+  @@index([etapaId])
 }
 
 model BpmChecklistTemplateItem {
@@ -4843,7 +4862,7 @@ model BpmTarefa {
   responsavel      usuarios?                 @relation(fields: [responsavelId], references: [id])
   preset           BpmTarefaPreset?          @relation(fields: [presetId], references: [id])
   cadenciaExecucao BpmCadenciaPassoExecucao? @relation(fields: [cadenciaExecucaoId], references: [id], onDelete: SetNull)
-  cardChecklist     BpmCardChecklist?          @relation(fields: [cardChecklistId], references: [id], onDelete: Restrict)
+  cardChecklist    BpmCardChecklist?         @relation(fields: [cardChecklistId], references: [id], onDelete: Restrict)
   slaInstancias    BpmSlaInstancia[]
 
   @@index([cardId])
@@ -4891,9 +4910,25 @@ model BpmCadencia {
 
   passos   BpmCadenciaPasso[]
   vinculos BpmCardCadencia[]
+  etapas   BpmCadenciaEtapa[]
 
   @@index([pipelineId])
   @@index([etapaId])
+}
+
+// Associação canônica multicoluna da cadência. `BpmCadencia.etapaId` permanece
+// como shadow legado da primeira etapa para rollback seguro, mas o runtime novo
+// resolve o escopo por esta relação. A unicidade garante uma cadência por coluna.
+model BpmCadenciaEtapa {
+  id         String   @id @default(cuid())
+  cadenciaId String
+  etapaId    String   @unique
+  createdAt  DateTime @default(now())
+
+  cadencia BpmCadencia @relation(fields: [cadenciaId], references: [id], onDelete: Cascade)
+  etapa    BpmEtapa    @relation(fields: [etapaId], references: [id], onDelete: Restrict)
+
+  @@index([cadenciaId])
 }
 
 // Passo ordenado de uma cadência: intervalo relativo ao passo anterior, tipo/prazo/prioridade

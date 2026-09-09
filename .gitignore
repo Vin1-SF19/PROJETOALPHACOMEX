@@ -15,6 +15,7 @@
 
 # next.js
 /.next/
+/.next-alpha-dev/
 /out/
 
 # production

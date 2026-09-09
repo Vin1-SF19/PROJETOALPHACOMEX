@@ -18,7 +18,8 @@ export function useChamadosNotifications(role: string | undefined, userId: numbe
   const subscribedRef = useRef(false);
 
   useEffect(() => {
-    if (!pusherClient) return;
+    const client = pusherClient;
+    if (!client) return;
     if (!Number.isSafeInteger(userId) || userId <= 0) return;
     if (subscribedRef.current) return;
 
@@ -38,7 +39,7 @@ export function useChamadosNotifications(role: string | undefined, userId: numbe
     };
 
     if (podeReceberNovosChamados(role)) {
-      const channel = pusherClient.subscribe(CHAMADOS_ADMIN_CHANNEL);
+      const channel = client.subscribe(CHAMADOS_ADMIN_CHANNEL);
       const handler = (payload: NovoChamadoPayload) => {
         adicionarNotificacao({
           chamadoId: payload.chamadoId,
@@ -53,12 +54,12 @@ export function useChamadosNotifications(role: string | undefined, userId: numbe
       channel.bind(NOVO_CHAMADO_EVENT, handler);
       cleanups.push(() => {
         channel.unbind(NOVO_CHAMADO_EVENT, handler);
-        pusherClient.unsubscribe(CHAMADOS_ADMIN_CHANNEL);
+        client.unsubscribe(CHAMADOS_ADMIN_CHANNEL);
       });
     }
 
     const userChannelName = canalChamadosDoUsuario(userId);
-    const userChannel = pusherClient.subscribe(userChannelName);
+    const userChannel = client.subscribe(userChannelName);
     const concluidoHandler = (payload: ChamadoConcluidoPayload) => {
       adicionarNotificacao({
         chamadoId: payload.chamadoId,
@@ -73,7 +74,7 @@ export function useChamadosNotifications(role: string | undefined, userId: numbe
     userChannel.bind(CHAMADO_CONCLUIDO_EVENT, concluidoHandler);
     cleanups.push(() => {
       userChannel.unbind(CHAMADO_CONCLUIDO_EVENT, concluidoHandler);
-      pusherClient.unsubscribe(userChannelName);
+      client.unsubscribe(userChannelName);
     });
 
     return () => {

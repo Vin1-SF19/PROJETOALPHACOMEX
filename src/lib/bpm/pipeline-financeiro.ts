@@ -98,11 +98,11 @@ export const FINANCIAL_FIELDS: readonly FinancialFieldDefinition[] = [
 
 export const LEGACY_FINANCIAL_STAGE_LABELS = ["Ativo", "Em Cobrança", "Encerrado"] as const;
 interface FinancialPipelineStage { nome: string; ordem: number }
-interface FinancialPipelineField { nome: string }
+interface FinancialPipelineField { nome: string; etapaConfiguracoes?: readonly unknown[] }
 function labelsOrdenados(etapas: readonly FinancialPipelineStage[]) { return etapas.slice().sort((a, b) => a.ordem - b.ordem).map((etapa) => etapa.nome) }
 export function hasLegacyFinancialStages(etapas: readonly FinancialPipelineStage[]) { const labels = labelsOrdenados(etapas); return labels.length === LEGACY_FINANCIAL_STAGE_LABELS.length && labels.every((label, index) => label === LEGACY_FINANCIAL_STAGE_LABELS[index]) }
 export function hasConfiguredFinancialStages(etapas: readonly FinancialPipelineStage[]) { const labels = labelsOrdenados(etapas); return labels.length === FINANCIAL_STAGES.length && labels.every((label, index) => label === FINANCIAL_STAGES[index]?.label) }
-export function hasConfiguredFinancialPipeline(etapas: readonly FinancialPipelineStage[], campos: readonly FinancialPipelineField[]) { const nomes = new Set(campos.map((campo) => campo.nome)); return hasConfiguredFinancialStages(etapas) && FINANCIAL_FIELDS.every((campo) => nomes.has(campo.label)) }
+export function hasConfiguredFinancialPipeline(etapas: readonly FinancialPipelineStage[], campos: readonly FinancialPipelineField[]) { const porNome = new Map(campos.map((campo) => [campo.nome, campo])); return hasConfiguredFinancialStages(etapas) && FINANCIAL_FIELDS.every((campo) => (porNome.get(campo.label)?.etapaConfiguracoes?.length ?? 0) > 0) }
 export function campoFinanceiroSomenteLeitura(nome: string) { return FINANCIAL_FIELDS.some((campo) => campo.label === nome && campo.category === "AUTOMATICO_CALCULADO") }
 export function etapaFinanceiraValida(nome: string) { return FINANCIAL_STAGES.some((etapa) => etapa.label === nome) }
 

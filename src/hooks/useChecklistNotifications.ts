@@ -26,11 +26,12 @@ export function useChecklistNotifications(role: string | undefined) {
 
   useEffect(() => {
     if (!role || (!isAdminRole(role) && !CHECKLIST_ROLES.includes(role))) return;
-    if (!pusherClient) return;
+    const client = pusherClient;
+    if (!client) return;
     if (subscribedRef.current) return;
 
     subscribedRef.current = true;
-    const channel = pusherClient.subscribe(CHANNEL);
+    const channel = client.subscribe(CHANNEL);
 
     channel.bind(EVENT, (payload: NovoDocumentoPayload) => {
       adicionarNotificacao({
@@ -55,7 +56,7 @@ export function useChecklistNotifications(role: string | undefined) {
     return () => {
       try {
         channel.unbind(EVENT);
-        pusherClient.unsubscribe(CHANNEL);
+        client.unsubscribe(CHANNEL);
       } catch {
         // ignore cleanup errors
       }

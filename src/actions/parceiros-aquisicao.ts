@@ -25,30 +25,30 @@ const ETAPAS_ATIVAS = [
   "PRE_CADASTRO",
 ] as const;
 
-const SAIDAS_LATERAIS = ["STANDBY", "SEM_PERFIL", "PERDIDO"] as const;
+// "CADASTRADO" entra como mais uma saída lateral (RM: card manual "Cadastro completo"),
+// além de continuar atingível via `PromoverLeadParaParceiro` (promoção formal, com
+// criação de Parceiro real). Os dois caminhos levam ao mesmo status; a diferença é que
+// a saída lateral não exige documento/e-mail nem cria o Parceiro — só sinaliza o card.
+const SAIDAS_LATERAIS = ["STANDBY", "SEM_PERFIL", "PERDIDO", "CADASTRADO"] as const;
 
-// "CADASTRADO" é terminal e só é atingido via `PromoverLeadParaParceiro` (tem efeitos
-// colaterais — cria o Parceiro real — que `MoverLeadAquisicaoParceiro` não deve disparar).
 type EtapaAtiva = (typeof ETAPAS_ATIVAS)[number];
 
 function podeMoverPara(statusAtual: string, statusDestino: string): boolean {
-  if (statusDestino === "CADASTRADO") return false; // só via promoção
   if (statusAtual === "CADASTRADO") return false; // terminal
 
   const isDestinoLateral = (SAIDAS_LATERAIS as readonly string[]).includes(statusDestino);
   if (isDestinoLateral) {
-    // Qualquer etapa ativa pode sair lateralmente.
+    // Qualquer etapa ativa pode sair lateralmente (inclui ir direto pra "Cadastro completo").
     return (ETAPAS_ATIVAS as readonly string[]).includes(statusAtual);
   }
 
   if (!(ETAPAS_ATIVAS as readonly string[]).includes(statusDestino)) return false;
 
   // De uma saída lateral, pode retomar para qualquer etapa ativa (reingresso manual).
+  // "CADASTRADO" é exceção: é terminal (bloqueado acima), não reingressa no funil.
   if ((SAIDAS_LATERAIS as readonly string[]).includes(statusAtual)) return true;
 
-  // Drag-and-drop permite escolher qualquer etapa ativa. A validação de
-  // negócio continua impedindo CADASTRADO (promoção explícita), mas não deve
-  // bloquear o usuário ao reorganizar um card no funil.
+  // Drag-and-drop permite escolher qualquer etapa ativa dentro do funil principal.
   const idxAtual = ETAPAS_ATIVAS.indexOf(statusAtual as EtapaAtiva);
   const idxDestino = ETAPAS_ATIVAS.indexOf(statusDestino as EtapaAtiva);
   if (idxAtual === -1 || idxDestino === -1) return false;
@@ -295,11 +295,18 @@ export async function MoverLeadAquisicaoParceiro(input: z.input<typeof MoverLead
 
 // ─── Saída lateral ────────────────────────────────────────────────────────────
 
-const SaidaLateralSchema = z.object({
-  leadId: z.string().cuid(),
-  status: z.enum([...SAIDAS_LATERAIS] as [string, ...string[]]),
-  motivo: z.string().min(3, "Descreva o motivo da saída"),
-});
+const SaidaLateralSchema = z
+  .object({
+    leadId: z.string().cuid(),
+    status: z.enum([...SAIDAS_LATERAIS] as [string, ...string[]]),
+    motivo: z.string().optional(),
+  })
+  // "CADASTRADO" é a única saída lateral que não exige motivo — é um desfecho
+  // positivo (marca o card como concluído), não uma saída que precisa de explicação.
+  .refine((data) => data.status === "CADASTRADO" || (data.motivo?.trim().length ?? 0) >= 3, {
+    message: "Descreva o motivo da saída",
+    path: ["motivo"],
+  });
 
 export async function RegistrarSaidaLateralLeadAquisicao(input: z.input<typeof SaidaLateralSchema>) {
   const ctx = await getCtx();
@@ -308,6 +315,7 @@ export async function RegistrarSaidaLateralLeadAquisicao(input: z.input<typeof S
   const parsed = SaidaLateralSchema.safeParse(input);
   if (!parsed.success) return { success: false as const, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
   const { leadId, status, motivo } = parsed.data;
+  const motivoFinal = motivo?.trim() || null;
 
   const lead = await db.parceiroLead.findUnique({ where: { id: leadId } });
   if (!lead) return { success: false as const, error: "Lead não encontrado" };
@@ -316,13 +324,13 @@ export async function RegistrarSaidaLateralLeadAquisicao(input: z.input<typeof S
   }
 
   await db.$transaction([
-    db.parceiroLead.update({ where: { id: leadId }, data: { status, motivoSaidaLateral: motivo } }),
+    db.parceiroLead.update({ where: { id: leadId }, data: { status, motivoSaidaLateral: motivoFinal } }),
     db.parceiroLeadHistorico.create({
       data: {
         leadId,
-        acao: "SAIDA_LATERAL",
+        acao: status === "CADASTRADO" ? "CADASTRO_COMPLETO_MANUAL" : "SAIDA_LATERAL",
         valorAnteriorJson: JSON.stringify({ status: lead.status }),
-        valorNovoJson: JSON.stringify({ status, motivo }),
+        valorNovoJson: JSON.stringify({ status, motivo: motivoFinal }),
         usuarioId: ctx.userId,
       },
     }),

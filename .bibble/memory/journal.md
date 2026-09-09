@@ -1,5 +1,105 @@
 # JOURNAL — Histórico Cronológico de Sessões
 
+## 2026-09-08 — Kowalski — RM-2026-3D529D (ChatBotX = Chatbot Alpha — Replicar o Frontend) — CLOSURE
+
+**Tags:** #chatbot #chatbotx #frontend #proxy #inbox #mensagens #sem-migration #concluido
+
+**Data:** 2026-09-08
+**Objetivo:** replicar o frontend do ChatbotX (sistema self-hosted externo) dentro do módulo `/PainelAlpha/ChatBotAlpha` do Painel Alpha, substituindo o hub de infraestrutura (iframes) por uma interface nativa de chat com lista de conversas, mensagens e envio, preservando o hub original na aba Infra.
+
+**Agentes envolvidos:**
+- Scout (Fase 0) — auditoria de entregabilidade, identificação da lacuna crítica (código-fonte ausente)
+- PM (Fase 1) — blueprint de integração, padrões, estrutura de arquivos
+- PM (Fase 2) — criação da story com bloqueio documentado
+- Scout (Fase 3) — especificação com referência real (`/home/ialpha/projetos/ChatbotX-main`), contrato de API confirmado
+- Vault (Fase 4) — veredito `DATABASE_CHANGE_NOT_REQUIRED`
+- Vault (Fase 5) — não aplicável (Fase 4 registrou `DATABASE_CHANGE_NOT_REQUIRED`)
+- Echo (Fase 6) — implementação do proxy server-side, contrato real `GET /v1/contacts`, `GET/POST /v1/contacts/{id}/messages`, CLI, doctor, observabilidade
+- Nova (Fase 7) — veredito `AI_RUNTIME_CHANGE_NOT_REQUIRED` (nenhum runtime de IA no ChatbotX)
+- Echo (Fase 8) — observabilidade operacional (logs estruturados, correlationId, métricas, erros UI-safe)
+- Nova (Fase 9) — retomada da interface validada após correção do contrato
+- Forge (Fase 10) — gate técnico real: 0 erros novos nos arquivos do módulo; baseline global pré-existente documentado
+- Probe (Fase 11) — 8/8 pontos de integração aprovados; paridade funcional confirmada
+- Anubis (Fase 12) — auditoria de segurança: nenhum achado reportável; tokens nunca expostos ao cliente
+- Lens (Fase 13) — revisão de qualidade, arquitetura e manutenibilidade: aprovado sem achados bloqueantes
+- Sage (Fase 14) — validação de cenários extremos: cobertura ampliada para 124 testes aprovados e 1 `it.todo` (401/403, cursor, lista vazia, perPage, trim)
+- Scribe (Fase 15) — consolidação de arquitetura, integrações e story; memória atualizada
+- Kowalski (Fase 16, esta) — arquivamento da sessão no journal
+
+**Arquivos tocados (entrega completa):**
+- `src/app/PainelAlpha/ChatBotAlpha/page.tsx` (adaptado — auth + permissão + MailHog server-side)
+- `src/components/ChatBotAlpha/ChatBotAlphaClient.tsx` (adaptado — tabs Chat/Infra, sidebar de conversas)
+- `src/components/ChatBotAlpha/ChatConversa.tsx` (novo — mensagens, input, estados)
+- `src/components/ChatBotAlpha/SeletorSistemaChatBot.tsx` (preservado — aba Infra)
+- `src/components/ChatBotAlpha/IframeChatBotAlpha.tsx` (preservado — aba Infra)
+- `src/actions/ChatBotAlpha.ts` (adaptado — `ObterUrlSistemaChatBot` + observabilidade)
+- `src/actions/ChatBotAlphaChat.ts` (novo — `ListarConversasChatbotx`, `ListarMensagensChatbotx`, `EnviarMensagemChatbotx`)
+- `src/lib/chatbot-alpha/chat-api.ts` (novo — proxy server-side, Zod, timeout 30s, correlationId)
+- `src/lib/chatbot-alpha/contracts.ts` (novo — schemas Zod, error codes, capability registry)
+- `src/lib/chatbot-alpha/observability.ts` (novo — logs estruturados, sanitização, métricas)
+- `src/lib/chatbot-alpha/formatters.ts` (novo — formatação de datas/textos)
+- `src/lib/chatbot-alpha/doctor.ts` (novo — checks de config/safety/contract/observability)
+- `scripts/chatbot-alpha.mjs` (novo — CLI: doctor, capabilities, list-conversations, list-messages, send-message)
+- `tests/chatbot-alpha/` (novo — 7 arquivos, 124 testes aprovados e 1 `it.todo`)
+- `docs/stories/story-rm-2026-3d529d-chatbot-alpha-replicar-frontend.md` (novo)
+- `.bibble/memory/architecture.md` (entrada RM-2026-3D529D)
+- `.bibble/memory/codebase-map.md` (atualizado)
+- `.bibble/memory/integration-points.md` (atualizado)
+- `.bibble/memory/decisions.md` (3 decisões técnicas)
+- `package.json` (scripts `chatbot-alpha:*`)
+
+**Resumo da implementação:**
+O módulo `/PainelAlpha/ChatBotAlpha` foi reestruturado de hub de infraestrutura (3 iframes) para um módulo com duas abas: **Chat** (novo) e **Infra** (preservado). O backend ChatbotX é consumido via proxy server-side (`CHATBOTX_API_URL`/`CHATBOTX_API_KEY`), sem persistência local e sem runtime de IA. A interface replica o inbox do ChatbotX: lista de conversas (via `GET /v1/contacts`, filtrando contatos com `conversation`), busca com debounce, mensagens (`GET/POST /v1/contacts/{id}/messages`, sucesso 204), estados de UI completos (loading/erro/vazio/sucesso) e observabilidade operacional.
+
+**Decisões técnicas:**
+1. Sem migration — dados pertencem ao serviço externo (ChatbotX self-hosted).
+2. Sem runtime de IA — nenhuma capacidade de streaming, tools, memória ou modelos no ChatbotX.
+3. Infra preservada — Adminer/Redis/MailHog continuam funcionais na aba Infra.
+4. Observabilidade — todas as actions instrumentadas com correlationId, logs sanitizados e erros operacionais UI-safe.
+5. Segurança — tokens nunca expostos ao cliente; Zod em todas as actions; `auth()` antes de qualquer operação.
+
+**Problemas encontrados e correções:**
+- Código-fonte ChatbotX ausente no repositório (Fases 0–3) → resolvido quando administrador forneceu referência em `/home/ialpha/projetos/ChatbotX-main`.
+- Contrato de API inicialmente incorreto (`/v1/conversations`) → corrigido para `GET /v1/contacts` (Fase 6, retomada).
+- Filtros de status/tags não suportados pelo contrato real → removidos da UI e do contrato.
+- CLI falhava por IPC (`node --import tsx` ausente) → corrigido em `package.json`.
+- Dois imports não usados geravam warnings de ESLint → removidos (Fase 8).
+
+**Resultados dos gates:**
+| Gate | Resultado |
+|------|-----------|
+| Forge (Fase 10) | 0 erros novos nos arquivos do módulo; baseline global pré-existente (2.484 ESLint, 34 typecheck, 50 testes) |
+| Probe (Fase 11) | 8/8 pontos aprovados |
+| Anubis (Fase 12) | Nenhum achado de segurança reportável; revisão formal dos 12 arquivos de produção do escopo |
+| Lens (Fase 13) | Aprovado sem achados bloqueantes |
+| Sage (Fase 14) | Suíte final com 124 testes aprovados e 1 `it.todo`; cobertura dos cenários extremos exigidos |
+| Scribe (Fase 15) | Memória e story consolidadas |
+
+**Pendências operacionais (não bloqueantes):**
+1. Smoke real de chat: `CHATBOTX_API_URL`/`CHATBOTX_API_KEY` não configurados no ambiente de desenvolvimento.
+2. Uploads/anexos: `PENDING_REFERENCE` — contrato suporta, implementação pendente.
+3. Scroll infinito: paginação simples funcional, sem virtualização.
+4. Validação em navegador real (teclado/foco/responsividade): sem Playwright/RTL no projeto.
+5. Ownership entre usuários: `it.todo` documentado — depende de evolução do contrato workspace-token.
+
+**Caminho final de consumo do usuário:**
+```
+Sidebar → "ChatBot Alpha" → /PainelAlpha/ChatBotAlpha
+  → aba Chat → lista de conversas (busca + paginação)
+  → clique em conversa → mensagens + composer (envio)
+  → aba Infra → seletor (Adminer/Redis/MailHog) → iframe (comportamento original)
+```
+
+**Como o frontend replica o ChatbotX:**
+O frontend consome as APIs reais do backend ChatbotX (self-hosted externo) via proxy server-side. O contrato é:
+- `GET /v1/contacts` → lista contatos com conversa (busca por `keyword`, paginação por `page`/`perPage`)
+- `GET /v1/contacts/{identifier}/messages` → lista mensagens da conversa
+- `POST /v1/contacts/{identifier}/messages` → envia mensagem (corpo `{text}`, sucesso `204`)
+
+Nenhum dado é persistido localmente; o Painel Alpha atua como camada de apresentação autenticada sobre o serviço externo.
+
+**Resultado final:** `DELIVERY_READY` — todas as 16 fases concluídas com PASS.
+
 ## 2026-09-08 — Codex — RM-2026-E4849C (Cadência por coluna sem bloqueio)
 
 **Tags:** #crm #bpm #cadencia #pipeline #idempotencia #sem-migration #em-testes
@@ -4994,3 +5094,9 @@ Não houve mudança de banco nem worker do roadmap. Os 49 testes direcionados, o
 O pipeline Revisão de Radar recebeu diagnóstico CLI sanitizado e somente leitura, gate real das nove estruturas canônicas, publicação de snapshot completo com CAS/auditoria e simulação de SLA pelo mesmo resolvedor operacional. O workspace mantém rascunho descartável, saúde, versão, conflito explícito e oito áreas. A correção aprovada desativa apenas `Radar atual` e `Status da sede` quando um administrador autenticado publica, preservando `Regime tributário`, etapas e 72 transições.
 
 Não houve migration, escrita direta de configuração pelo terminal, worker do Roadmap ou promoção de ambiente. Os 86 testes focados, ESLint direcionado, diff-check, build de 78 páginas, gate de schema e smoke HTTP passaram. A suíte global aprovou 2.512/2.566 testes; os débitos restantes são externos/concorrentes e estão registrados em `known-errors.md`.
+
+## 2026-09-08 — Codex — RM-2026-6F3C54 concluída
+
+Cadências agora aceitam zero, uma ou várias colunas ativas do mesmo pipeline por multiselect. A associação normalizada tem FK e unicidade por etapa, foi retroalimentada de modo idempotente e mantém `etapaId` apenas como shadow de rollback. O runtime ativa somente nas colunas selecionadas; entrada no pipeline permanece explícita e ciclos já iniciados não são reprocessados.
+
+O checkpoint Vault foi aprovado pelo administrador. O dump de 106.125.243 bytes foi restaurado e conferido antes da migration; a pós-validação terminou sem vínculo inválido, duplicidade ou violação de FK. Os 40 testes focados, E2E isolado, lint direcionado, diff-check, build de 78 páginas e smoke HTTP passaram. Os débitos dos gates globais são externos e estão registrados em `known-errors.md`. Nenhum worker foi iniciado nem houve promoção para produção.

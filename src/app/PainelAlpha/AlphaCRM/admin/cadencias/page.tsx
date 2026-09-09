@@ -19,7 +19,15 @@ export default async function CadenciasBpmPage() {
     db.bpmPipeline.findMany({
       where: { ativo: true },
       orderBy: { nome: "asc" },
-      select: { id: true, nome: true, etapas: { orderBy: { ordem: "asc" }, select: { id: true, nome: true } } },
+      select: {
+        id: true,
+        nome: true,
+        etapas: {
+          where: { ativo: true },
+          orderBy: { ordem: "asc" },
+          select: { id: true, nome: true },
+        },
+      },
     }),
   ]);
   const temaNome = (session.user as { tema_interface?: string }).tema_interface || "blue";

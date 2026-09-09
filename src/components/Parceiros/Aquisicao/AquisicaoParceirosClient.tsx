@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Star, CalendarClock, Building2, MapPin, ArrowLeftRight, Handshake, LogOut, Pencil, Target, Search, X } from "lucide-react";
+import { ArrowLeft, Plus, Star, CalendarClock, Building2, MapPin, ArrowLeftRight, Handshake, LogOut, Pencil, Target, Search, X, CheckCircle2 } from "lucide-react";
 import {
   DndContext, type DragEndEvent, DragOverlay, type DragStartEvent,
   PointerSensor, useSensor, useSensors, closestCorners, useDroppable,
@@ -50,17 +50,18 @@ const ETAPAS: { status: string; label: string }[] = [
 
 // Saídas laterais têm cor semântica própria (não a paleta cíclica do funil principal) —
 // reforça visualmente que são desvios do fluxo, não etapas de progresso.
+// "CADASTRADO" (Cadastro completo) é uma saída lateral como as outras — só que
+// positiva: não exige motivo (ver SEM_MOTIVO_OBRIGATORIO) nem cria um Parceiro
+// real (isso continua exclusivo do botão "Cadastrar parceiro" em Pré-cadastro).
 const SAIDAS: { status: string; label: string; cor: string }[] = [
   { status: "STANDBY", label: "Stand-by", cor: "251,191,36" }, // âmbar — pausado, pode voltar
   { status: "SEM_PERFIL", label: "Sem Perfil", cor: "148,163,184" }, // slate — neutro/encerrado
   { status: "PERDIDO", label: "Perdido", cor: "248,113,113" }, // vermelho — encerrado negativo
+  { status: "CADASTRADO", label: "Cadastro completo", cor: "57,255,20" }, // verde neon — desfecho positivo
 ];
 
-// 4ª coluna de saída: mostra o status terminal "CADASTRADO", só atingido via
-// PromoverLeadParaParceiro (botão "Cadastrar parceiro" no card, na etapa
-// Pré-cadastro) — por isso não entra em SAIDAS/podeMoverPara: não é um destino
-// válido de arraste, é só a vitrine dos leads já promovidos a parceiro.
-const SAIDA_CADASTRO_COMPLETO = { status: "CADASTRADO", label: "Cadastro completo", cor: "57,255,20" }; // verde neon
+// Saídas cujo motivo é opcional (desfecho positivo, não precisa de explicação).
+const SAIDAS_SEM_MOTIVO_OBRIGATORIO = new Set(["CADASTRADO"]);
 
 const PARTICULAS_FUNDO_AQUISICAO = [
   { x: 10, y: 18, duracao: 5.6, delay: 0 },
@@ -130,6 +131,8 @@ const LABEL_ACAO_HISTORICO: Record<string, string> = {
   POTENCIAL_ALTERADO: "Potencial de recorrência atualizado",
   PROXIMA_ACAO_REGISTRADA: "Próxima ação registrada",
   SAIDA_LATERAL: "Saída lateral registrada",
+  CADASTRO_COMPLETO_MANUAL: "Marcado como cadastro completo",
+  PROMOVIDO_A_PARCEIRO: "Promovido a parceiro",
 };
 
 function labelHistorico(acao: string): string {
@@ -142,7 +145,6 @@ function labelDoStatus(status: string): string {
   return (
     ETAPAS.find((e) => e.status === status)?.label ??
     SAIDAS.find((s) => s.status === status)?.label ??
-    (status === SAIDA_CADASTRO_COMPLETO.status ? SAIDA_CADASTRO_COMPLETO.label : undefined) ??
     status.replaceAll("_", " ")
   );
 }
@@ -339,11 +341,6 @@ export default function AquisicaoParceirosClient({
     return SAIDAS.map((col) => ({ ...col, itens: leads.filter((l) => l.status === col.status) }));
   }, [leads]);
 
-  const colunaCadastroCompleto = useMemo(
-    () => ({ ...SAIDA_CADASTRO_COMPLETO, itens: leads.filter((l) => l.status === SAIDA_CADASTRO_COMPLETO.status) }),
-    [leads],
-  );
-
   // Drag-and-drop — mesmo padrão de BlueprintKanban.tsx: PointerSensor só (sem teclado,
   // consistente com os outros 2 Kanbans do projeto), optimistic update local, servidor
   // valida a transição (podeMoverPara em parceiros-aquisicao.ts) e recusa se inválida.
@@ -367,19 +364,13 @@ export default function AquisicaoParceirosClient({
     if (!leadAtual) return;
 
     const overId = String(over.id);
-    const todosStatus = [...ETAPAS.map((e) => e.status), ...SAIDAS.map((s) => s.status), SAIDA_CADASTRO_COMPLETO.status];
+    const todosStatus = [...ETAPAS.map((e) => e.status), ...SAIDAS.map((s) => s.status)];
     const novoStatus = todosStatus.includes(overId) ? overId : leads.find((l) => l.id === overId)?.status;
     if (!novoStatus || novoStatus === leadAtual.status) return;
 
-    // "Cadastro completo" só é atingido pela promoção (botão "Cadastrar parceiro" no
-    // card, na etapa Pré-cadastro) — arrastar pra lá não é um destino válido.
-    if (novoStatus === SAIDA_CADASTRO_COMPLETO.status) {
-      toast.error('Para completar o cadastro, abra o lead em "Pré-cadastro" e use o botão "Cadastrar parceiro".');
-      return;
-    }
-
-    // Saídas laterais exigem motivo (RegistrarSaidaLateralLeadAquisicao) — abre modal em vez
-    // de mover direto, mesmo espírito do card noloss no Pipeline BPM (PipelineBoardClient.tsx).
+    // Saídas laterais (incl. "Cadastro completo") abrem modal em vez de mover direto —
+    // mesmo espírito do card noloss no Pipeline BPM (PipelineBoardClient.tsx). O modal só
+    // exige motivo para as saídas negativas (SAIDAS_SEM_MOTIVO_OBRIGATORIO).
     if (statusSaidaLateral.has(novoStatus)) {
       setSaidaLateralPendente({ leadId, status: novoStatus });
       return;
@@ -464,16 +455,6 @@ export default function AquisicaoParceirosClient({
           {colunasSaida.map((col) => (
             <KanbanColuna key={col.status} status={col.status} label={col.label} cor={col.cor} itens={col.itens} onAbrirLead={setLeadFoco} tracejada />
           ))}
-
-          <KanbanColuna
-            key={colunaCadastroCompleto.status}
-            status={colunaCadastroCompleto.status}
-            label={colunaCadastroCompleto.label}
-            cor={colunaCadastroCompleto.cor}
-            itens={colunaCadastroCompleto.itens}
-            onAbrirLead={setLeadFoco}
-            tracejada
-          />
         </div>
 
         <DragOverlay>
@@ -516,6 +497,7 @@ export default function AquisicaoParceirosClient({
       {saidaLateralPendente && (
         <SaidaLateralDragDialog
           accent={accent}
+          status={saidaLateralPendente.status}
           statusLabel={SAIDAS.find((s) => s.status === saidaLateralPendente.status)?.label ?? saidaLateralPendente.status}
           onCancelar={() => setSaidaLateralPendente(null)}
           onConfirmar={async (motivo) => {
@@ -523,7 +505,7 @@ export default function AquisicaoParceirosClient({
             setSaidaLateralPendente(null);
             const res = await RegistrarSaidaLateralLeadAquisicao({ leadId, status, motivo });
             if (!res.success) { toast.error(res.error ?? "Não foi possível registrar a saída lateral"); return; }
-            toast.success("Saída lateral registrada");
+            toast.success(status === "CADASTRADO" ? "Cadastro marcado como completo" : "Saída lateral registrada");
             startTransition(() => void recarregar());
           }}
         />
@@ -538,55 +520,64 @@ export default function AquisicaoParceirosClient({
   );
 }
 
-/** Arrastar um lead pra uma coluna de saída lateral (Stand-by/Sem Perfil/Perdido) exige motivo
- * — a Server Action rejeita sem isso. Abre este modal em vez de mover direto, mesmo espírito do
- * card noloss no Pipeline BPM (PipelineBoardClient.tsx). */
+/** Arrastar um lead pra uma saída lateral negativa (Stand-by/Sem Perfil/Perdido) exige
+ * motivo — a Server Action rejeita sem isso. Abre este modal em vez de mover direto,
+ * mesmo espírito do card noloss no Pipeline BPM (PipelineBoardClient.tsx). "Cadastro
+ * completo" é a exceção: desfecho positivo, confirma direto sem pedir motivo. */
 function SaidaLateralDragDialog({
   accent,
+  status,
   statusLabel,
   onCancelar,
   onConfirmar,
 }: {
   accent: string;
+  status: string;
   statusLabel: string;
   onCancelar: () => void;
-  onConfirmar: (motivo: string) => Promise<void>;
+  onConfirmar: (motivo?: string) => Promise<void>;
 }) {
   const [motivo, setMotivo] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const exigeMotivo = !SAIDAS_SEM_MOTIVO_OBRIGATORIO.has(status);
+  const corIcone = exigeMotivo ? "239,68,68" : "57,255,20";
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "rgba(2,6,23,0.85)", backdropFilter: "blur(6px)" }} onClick={() => !salvando && onCancelar()}>
       <div className="w-full max-w-md rounded-3xl p-5" style={{ background: "#0a1020", border: `1px solid rgba(${accent},0.3)` }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start gap-3 mb-3">
-          <div className="w-9 h-9 rounded-xl grid place-items-center shrink-0" style={{ background: "rgba(239,68,68,0.12)" }}>
-            <LogOut size={17} className="text-red-400" />
+          <div className="w-9 h-9 rounded-xl grid place-items-center shrink-0" style={{ background: `rgba(${corIcone},0.12)` }}>
+            {exigeMotivo ? <LogOut size={17} style={{ color: `rgb(${corIcone})` }} /> : <CheckCircle2 size={17} style={{ color: `rgb(${corIcone})` }} />}
           </div>
           <div>
             <h3 className="text-[14px] font-black text-white">Mover para &ldquo;{statusLabel}&rdquo;</h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">Descreva o motivo da saída lateral antes de confirmar.</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              {exigeMotivo ? "Descreva o motivo da saída lateral antes de confirmar." : "Isso só atualiza a etiqueta do lead — não cria um parceiro real."}
+            </p>
           </div>
         </div>
-        <textarea
-          value={motivo}
-          onChange={(e) => setMotivo(e.target.value)}
-          placeholder="Descreva o motivo..."
-          autoFocus
-          className="w-full min-h-20 rounded-xl px-3 py-2 text-[12px] outline-none text-slate-200 resize-none"
-          style={{ background: "rgba(15,23,42,0.6)", border: `1px solid rgba(${accent},0.2)` }}
-        />
+        {exigeMotivo && (
+          <textarea
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            placeholder="Descreva o motivo..."
+            autoFocus
+            className="w-full min-h-20 rounded-xl px-3 py-2 text-[12px] outline-none text-slate-200 resize-none"
+            style={{ background: "rgba(15,23,42,0.6)", border: `1px solid rgba(${accent},0.2)` }}
+          />
+        )}
         <div className="flex justify-end gap-2 mt-3">
           <button onClick={onCancelar} disabled={salvando} className="px-4 py-2 rounded-xl text-[12px] font-bold text-slate-400 hover:text-white">Cancelar</button>
           <button
             onClick={async () => {
-              if (!motivo.trim()) { toast.error("Descreva o motivo"); return; }
+              if (exigeMotivo && !motivo.trim()) { toast.error("Descreva o motivo"); return; }
               setSalvando(true);
-              await onConfirmar(motivo.trim());
+              await onConfirmar(exigeMotivo ? motivo.trim() : undefined);
               setSalvando(false);
             }}
             disabled={salvando}
-            className="flex items-center gap-2 px-5 py-2 rounded-xl text-[12px] font-black uppercase tracking-wider text-red-300 disabled:opacity-60"
-            style={{ background: "rgba(239,68,68,0.15)" }}
+            className="flex items-center gap-2 px-5 py-2 rounded-xl text-[12px] font-black uppercase tracking-wider disabled:opacity-60"
+            style={{ background: `rgba(${corIcone},0.15)`, color: `rgb(${corIcone})` }}
           >
             Confirmar
           </button>
@@ -655,13 +646,14 @@ function LeadDetalheDialog({
   }
 
   async function registrarSaida() {
-    if (!saidaSelecionada) return toast.error("Selecione o motivo da saída lateral");
-    if (!motivoSaida.trim()) return toast.error("Descreva o motivo");
+    if (!saidaSelecionada) return toast.error("Selecione a saída lateral");
+    const exigeMotivo = !SAIDAS_SEM_MOTIVO_OBRIGATORIO.has(saidaSelecionada);
+    if (exigeMotivo && !motivoSaida.trim()) return toast.error("Descreva o motivo");
     setSalvando(true);
-    const r = await RegistrarSaidaLateralLeadAquisicao({ leadId: lead.id, status: saidaSelecionada, motivo: motivoSaida.trim() });
+    const r = await RegistrarSaidaLateralLeadAquisicao({ leadId: lead.id, status: saidaSelecionada, motivo: exigeMotivo ? motivoSaida.trim() : undefined });
     setSalvando(false);
     if (!r.success) return toast.error(r.error);
-    toast.success("Saída lateral registrada");
+    toast.success(saidaSelecionada === "CADASTRADO" ? "Cadastro marcado como completo" : "Saída lateral registrada");
     onAtualizado();
   }
 
@@ -766,15 +758,32 @@ function LeadDetalheDialog({
           </section>
 
           <aside className="min-h-0 space-y-4 overflow-y-auto rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-            {lead.status === SAIDA_CADASTRO_COMPLETO.status ? (
-              <p className="rounded-xl border px-3 py-3 text-[11px] font-bold" style={{ borderColor: `rgba(${SAIDA_CADASTRO_COMPLETO.cor},0.35)`, background: `rgba(${SAIDA_CADASTRO_COMPLETO.cor},0.1)`, color: `rgb(${SAIDA_CADASTRO_COMPLETO.cor})` }}>
-                Cadastro completo — este lead já foi promovido a parceiro e não muda mais de etapa.
+            {lead.status === "CADASTRADO" ? (
+              <p className="rounded-xl border px-3 py-3 text-[11px] font-bold" style={{ borderColor: "rgba(57,255,20,0.35)", background: "rgba(57,255,20,0.1)", color: "rgb(57,255,20)" }}>
+                Cadastro completo — este lead não muda mais de etapa.
+                {lead.promovidoParceiroId ? " Foi promovido a parceiro." : " Marcado manualmente, sem criar um parceiro real."}
               </p>
             ) : (
               <>
                 <div className="space-y-2">{ETAPAS.filter((e) => e.status !== lead.status).map((e) => <button key={e.status} type="button" onClick={() => setStatusDestino(e.status)} className={cn("block w-full rounded-xl border px-3 py-2 text-left text-[11px] font-bold transition-colors", statusDestino === e.status ? "border-cyan-300/60 bg-cyan-300/20 text-cyan-100" : "border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.1]")}>{e.label}</button>)}</div>
                 <button type="button" onClick={() => void mover()} disabled={salvando || statusDestino === lead.status} className="h-10 w-full rounded-xl text-[10px] font-black uppercase tracking-wider text-black disabled:opacity-40" style={{ background: `rgba(${accent},1)` }}>Mover para etapa selecionada</button>
-                {podeEditar && <><div className="border-t border-white/[0.07] pt-4"><Select value={saidaSelecionada} onValueChange={setSaidaSelecionada}><SelectTrigger className={inputCls} style={inputStyle}><SelectValue placeholder="Saída lateral" /></SelectTrigger><SelectContent>{SAIDAS.map((s) => <SelectItem key={s.status} value={s.status}>{s.label}</SelectItem>)}</SelectContent></Select><textarea value={motivoSaida} onChange={(e) => setMotivoSaida(e.target.value)} placeholder="Motivo da saída..." className="mt-2 min-h-16 w-full rounded-xl px-3 py-2 text-[12px] text-slate-200" style={inputStyle} /><button onClick={() => void registrarSaida()} disabled={salvando} className="mt-2 h-9 w-full rounded-xl text-[11px] font-bold text-red-300 disabled:opacity-40" style={{ background: "rgba(239,68,68,0.15)" }}>Registrar saída</button></div>{lead.status === "PRE_CADASTRO" && <div className="space-y-2 border-t border-white/[0.07] pt-4"><input value={docPromocao} onChange={(e) => setDocPromocao(e.target.value)} placeholder="CPF/CNPJ *" className={inputCls} style={inputStyle} /><input value={emailPromocao} onChange={(e) => setEmailPromocao(e.target.value)} placeholder="E-mail *" className={inputCls} style={inputStyle} /><button onClick={() => void promover()} disabled={salvando} className="h-10 w-full rounded-xl text-[10px] font-black uppercase text-white disabled:opacity-40" style={{ background: "rgb(16,185,129)" }}>Cadastrar parceiro</button></div>}</>}
+                {podeEditar && <>
+                  <div className="border-t border-white/[0.07] pt-4">
+                    <Select value={saidaSelecionada} onValueChange={setSaidaSelecionada}><SelectTrigger className={inputCls} style={inputStyle}><SelectValue placeholder="Saída lateral" /></SelectTrigger><SelectContent>{SAIDAS.map((s) => <SelectItem key={s.status} value={s.status}>{s.label}</SelectItem>)}</SelectContent></Select>
+                    {saidaSelecionada && !SAIDAS_SEM_MOTIVO_OBRIGATORIO.has(saidaSelecionada) && (
+                      <textarea value={motivoSaida} onChange={(e) => setMotivoSaida(e.target.value)} placeholder="Motivo da saída..." className="mt-2 min-h-16 w-full rounded-xl px-3 py-2 text-[12px] text-slate-200" style={inputStyle} />
+                    )}
+                    <button
+                      onClick={() => void registrarSaida()}
+                      disabled={salvando}
+                      className="mt-2 h-9 w-full rounded-xl text-[11px] font-bold disabled:opacity-40"
+                      style={saidaSelecionada === "CADASTRADO" ? { background: "rgba(57,255,20,0.15)", color: "rgb(57,255,20)" } : { background: "rgba(239,68,68,0.15)", color: "rgb(252,165,165)" }}
+                    >
+                      {saidaSelecionada === "CADASTRADO" ? "Marcar cadastro completo" : "Registrar saída"}
+                    </button>
+                  </div>
+                  {lead.status === "PRE_CADASTRO" && <div className="space-y-2 border-t border-white/[0.07] pt-4"><input value={docPromocao} onChange={(e) => setDocPromocao(e.target.value)} placeholder="CPF/CNPJ *" className={inputCls} style={inputStyle} /><input value={emailPromocao} onChange={(e) => setEmailPromocao(e.target.value)} placeholder="E-mail *" className={inputCls} style={inputStyle} /><button onClick={() => void promover()} disabled={salvando} className="h-10 w-full rounded-xl text-[10px] font-black uppercase text-white disabled:opacity-40" style={{ background: "rgb(16,185,129)" }}>Cadastrar parceiro</button></div>}
+                </>}
               </>
             )}
           </aside>

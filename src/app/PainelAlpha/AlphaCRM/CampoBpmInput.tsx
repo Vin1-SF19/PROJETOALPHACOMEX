@@ -13,6 +13,8 @@ export interface CampoBpmEditavel {
   obrigatorio: boolean;
   opcoesJson: string | null;
   escopo?: string;
+  fonteEntidade?: string | null;
+  fonteAtributo?: string | null;
   editavel?: boolean;
   somenteLeitura?: boolean;
 }
@@ -59,6 +61,23 @@ export function CampoBpmInput({
   const opcoes = campo.tipo === "booleano"
     ? ["Sim", "Não"]
     : lerOpcoes(campo.opcoesJson);
+
+  if ((campo.tipo === "selecao" || campo.tipo === "multiselecao") && campo.fonteEntidade) {
+    return (
+      <input
+        id={`campo-bpm-${campo.id}`}
+        className={className}
+        type="text"
+        value={value}
+        disabled={disabled}
+        readOnly
+        aria-readonly="true"
+        aria-invalid={invalid || undefined}
+        aria-describedby={describedBy}
+        title={`Valor canônico de ${campo.fonteEntidade}.${campo.fonteAtributo ?? "atributo"}`}
+      />
+    );
+  }
 
   if (campo.tipo === "selecao" || campo.tipo === "booleano") {
     return (

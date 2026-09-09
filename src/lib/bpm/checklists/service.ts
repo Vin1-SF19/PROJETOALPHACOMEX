@@ -3,7 +3,7 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 
 import db from "@/lib/prisma";
-import { calcularResumoChecklist } from "@/lib/bpm/checklists/leitura";
+import { calcularResumoChecklist, filtroEtapaTemplateChecklist } from "@/lib/bpm/checklists/leitura";
 import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import { reconciliarTarefaChecklist } from "@/lib/bpm/checklists/reconciliacao-tarefa";
@@ -74,7 +74,7 @@ export async function materializarChecklistsAplicaveisCard(params: {
         ativo: true,
         AND: [
           { OR: [{ pipelineId: null }, { pipelineId: card.pipelineId }] },
-          { OR: [{ etapaId: null }, { etapaId: card.etapaId }] },
+          filtroEtapaTemplateChecklist(card.etapaId),
           { OR: [{ cardId: null }, { cardId: card.id }] },
         ],
       },

@@ -20,9 +20,10 @@ export function PusherGlobal() {
   const setUsuariosOnline = usePresence((state) => state.setUsuariosOnline);
 
   useEffect(() => {
-    if (!session?.user?.id) return;
+    const client = pusherClient;
+    if (!session?.user?.id || !client) return;
 
-    const presenceChannel = pusherClient.subscribe("presence-alpha-comm");
+    const presenceChannel = client.subscribe("presence-alpha-comm");
 
     presenceChannel.bind("pusher:subscription_succeeded", (members: any) => {
       const ids: number[] = [];
@@ -40,12 +41,12 @@ export function PusherGlobal() {
 
     return () => {
       try {
-        pusherClient.unsubscribe("presence-alpha-comm");
+        client.unsubscribe("presence-alpha-comm");
       } catch {
         // ignore cleanup errors on closed connection
       }
     };
-  }, [session]);
+  }, [session, setUsuariosOnline]);
 
   return null; // Este componente não renderiza nada, apenas gerencia o socket
 }

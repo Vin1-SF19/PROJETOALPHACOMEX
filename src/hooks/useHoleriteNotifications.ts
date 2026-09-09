@@ -31,10 +31,11 @@ export function useHoleriteNotifications(authenticated: boolean) {
   const subscribedRef = useRef(false);
 
   useEffect(() => {
-    if (!authenticated || !pusherClient || subscribedRef.current) return;
+    const client = pusherClient;
+    if (!authenticated || !client || subscribedRef.current) return;
 
     subscribedRef.current = true;
-    const channel = pusherClient.subscribe(CHANNEL);
+    const channel = client.subscribe(CHANNEL);
 
     channel.bind(EVENT, (payload: HoleriteAlertaPayload) => {
       setAlerta(payload);
@@ -44,7 +45,7 @@ export function useHoleriteNotifications(authenticated: boolean) {
     return () => {
       try {
         channel.unbind(EVENT);
-        pusherClient.unsubscribe(CHANNEL);
+        client.unsubscribe(CHANNEL);
       } catch {
         // ignore cleanup errors on closed connection
       }

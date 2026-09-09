@@ -21,7 +21,8 @@ export function useCalendarioAlphaNotifications(userId: number) {
   const subscribedRef = useRef(false);
 
   useEffect(() => {
-    if (!pusherClient) return;
+    const client = pusherClient;
+    if (!client) return;
     if (!Number.isSafeInteger(userId) || userId <= 0) return;
     if (subscribedRef.current) return;
     subscribedRef.current = true;
@@ -38,7 +39,7 @@ export function useCalendarioAlphaNotifications(userId: number) {
       }
     };
 
-    const canal = pusherClient.subscribe(canalCalendarioAlphaDoUsuario(userId));
+    const canal = client.subscribe(canalCalendarioAlphaDoUsuario(userId));
 
     const handlerCompromisso = (payload: CalendarioAlphaCompromissoPayload) => {
       adicionarCompromisso(payload);
@@ -61,7 +62,7 @@ export function useCalendarioAlphaNotifications(userId: number) {
       canal.unbind(CALENDARIO_ALPHA_COMPROMISSO_EVENT, handlerCompromisso);
       canal.unbind(CALENDARIO_ALPHA_SOLICITACAO_RECEBIDA_EVENT, handlerSolicitacaoRecebida);
       canal.unbind(CALENDARIO_ALPHA_SOLICITACAO_RESPONDIDA_EVENT, handlerSolicitacaoRespondida);
-      pusherClient.unsubscribe(canalCalendarioAlphaDoUsuario(userId));
+      client.unsubscribe(canalCalendarioAlphaDoUsuario(userId));
       subscribedRef.current = false;
     };
   }, [userId, adicionarCompromisso, adicionarSolicitacaoRecebida, adicionarSolicitacaoRespondida]);

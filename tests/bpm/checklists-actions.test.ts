@@ -6,8 +6,10 @@ const revalidateMock = vi.hoisted(() => vi.fn());
 const prismaMock = vi.hoisted(() => ({
   bpmChecklistTemplate: { create: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
   bpmChecklistTemplateItem: { create: vi.fn(), update: vi.fn(), deleteMany: vi.fn() },
+  bpmChecklistTemplateEtapa: { findMany: vi.fn(), createMany: vi.fn(), deleteMany: vi.fn() },
+  bpmPipelineConfigAuditoria: { create: vi.fn() },
   bpmPipeline: { findUnique: vi.fn(), findMany: vi.fn() },
-  bpmEtapa: { findUnique: vi.fn() },
+  bpmEtapa: { findUnique: vi.fn(), findMany: vi.fn() },
   bpmCard: { findUnique: vi.fn(), findMany: vi.fn() },
   $transaction: vi.fn(),
 }));
@@ -28,6 +30,7 @@ describe("Checklists.ts — Server Actions administrativas", () => {
     authMock.mockResolvedValue({ user: { id: "7", role: "Admin" } });
     acessoConfigMock.mockResolvedValue(undefined);
     prismaMock.$transaction.mockImplementation(async (operacao) => operacao(prismaMock));
+    prismaMock.bpmChecklistTemplateEtapa.findMany.mockResolvedValue([]);
   });
 
   it("autentica antes de listar", async () => {

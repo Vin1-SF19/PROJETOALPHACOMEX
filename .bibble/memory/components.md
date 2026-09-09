@@ -686,6 +686,15 @@ Campos são agrupados pelas configurações de etapa, podem aparecer em várias 
 
 **Última atualização:** 2026-09-08 por Codex (RM-2026-296ECE)
 
+### EtapasMultiSelect — escopo de checklist por colunas
+
+**Arquivo:** `src/components/bpm/checklists/EtapasMultiSelect.tsx`
+**Tipo:** Client Component controlado
+**Uso:** aba **Vínculos** de `ChecklistsWorkspace`; alterna de forma exclusiva entre todas as etapas e uma seleção de etapas ativas do pipeline.
+**Notas:** usa rádios nativos, `Checkbox`, resumo responsivo em badges e remoção individual. Expõe loading, vazio, erro/retry, disabled e validação de legado indisponível; a regra de aplicabilidade permanece exclusivamente no backend.
+
+**Última atualização:** 2026-09-09 por Nova (RM-2026-457A31, Fase 6)
+
 ### Regras Financeiras — componentes descontinuados (RM-2026-DBEF25)
 
 `RegrasFinanceirasWorkspace` e `PainelCalculoFinanceiro` foram removidos. A
@@ -707,3 +716,11 @@ preservados.
 `AdminPipelineClient` apresenta versão, saúde, pendências e oito áreas administrativas. A ativação de campos é rascunho local: descartar restaura o snapshot confirmado e publicar executa CAS. `SlaConfigSection` inclui simulação somente leitura por card/tarefa e informa a configuração canônica selecionada sem criar estado operacional.
 
 **Última atualização:** 2026-09-08 por Codex (RM-2026-8C3862)
+
+### CadenciaFormDialog / CadenciaEtapasSection — RM-2026-6F3C54
+
+O editor principal apresenta as etapas ativas como checkboxes multiselect acessíveis, resume a seleção e limpa etapas ao trocar o pipeline. Nenhuma seleção mantém o escopo explícito de entrada no pipeline. Listagens e painel do card exibem todas as etapas associadas.
+
+Na configuração por pipeline, a mesma cadência pode ser escolhida em várias linhas; remover uma linha exclui somente aquele vínculo. Falha mantém/restaura o snapshot confirmado pelo servidor.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-6F3C54)

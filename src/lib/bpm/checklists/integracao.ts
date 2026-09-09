@@ -5,6 +5,7 @@ import type { Prisma } from "@prisma/client";
 import db from "@/lib/prisma";
 import {
   calcularResumoChecklist,
+  filtroEtapaTemplateChecklist,
   type ContextoCardChecklist,
   type InstanciaEstadoChecklist,
   type ResumoChecklistCard,
@@ -30,7 +31,7 @@ async function listarTemplatesAplicaveis(card: ContextoCardChecklist, client: Cl
         ativo: true,
         AND: [
           { OR: [{ pipelineId: null }, { pipelineId: card.pipelineId }] },
-          { OR: [{ etapaId: null }, { etapaId: card.etapaId }] },
+          filtroEtapaTemplateChecklist(card.etapaId),
           { OR: [{ cardId: null }, { cardId: card.id }] },
         ],
       },

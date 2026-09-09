@@ -22,18 +22,17 @@ export function CadenciaEtapasSection({
   const [pendente, startTransition] = useTransition();
   const iniciais = useMemo(() => Object.fromEntries(etapas.map((etapa) => [
     etapa.id,
-    cadencias.find((cadencia) => cadencia.ativa && cadencia.pipelineId === pipelineId && cadencia.etapaId === etapa.id)?.id ?? SEM_CADENCIA,
+    cadencias.find((cadencia) => cadencia.ativa
+      && cadencia.pipelineId === pipelineId
+      && cadencia.etapas.some((associacao) => associacao.etapaId === etapa.id))?.id ?? SEM_CADENCIA,
   ])), [cadencias, etapas, pipelineId]);
   const [selecoes, setSelecoes] = useState<Record<string, string>>(iniciais);
   const candidatas = cadencias.filter((cadencia) => !cadencia.pipelineId || cadencia.pipelineId === pipelineId);
-  const legadas = candidatas.filter((cadencia) => !cadencia.etapaId);
+  const legadas = candidatas.filter((cadencia) => cadencia.etapaId && cadencia.etapas.length === 0);
 
   function configurar(etapaId: string, valor: string) {
     const selecoesAnteriores = selecoes;
-    setSelecoes((atual) => Object.fromEntries(Object.entries(atual).map(([id, selecao]) => [
-      id,
-      id !== etapaId && selecao === valor && valor !== SEM_CADENCIA ? SEM_CADENCIA : (id === etapaId ? valor : selecao),
-    ])));
+    setSelecoes((atual) => ({ ...atual, [etapaId]: valor }));
     startTransition(async () => {
       const resposta = await ConfigurarCadenciaEtapaBpm({
         pipelineId,
@@ -75,7 +74,7 @@ export function CadenciaEtapasSection({
                 <SelectItem value={SEM_CADENCIA}>Nenhuma cadência</SelectItem>
                 {candidatas.map((cadencia) => (
                   <SelectItem key={cadencia.id} value={cadencia.id}>
-                    {cadencia.nome}{!cadencia.etapaId ? " — legado sem coluna" : cadencia.etapaId !== etapa.id ? ` — atualmente em ${cadencia.etapa?.nome ?? "outra coluna"}` : ""}
+                    {cadencia.nome}{cadencia.etapas.length > 0 ? ` — ${cadencia.etapas.length} coluna(s)` : " — entrada no pipeline"}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -91,7 +90,7 @@ export function CadenciaEtapasSection({
       )}
       {legadas.length > 0 && (
         <p className="rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-3 py-2 text-xs text-amber-200/80" role="status">
-          {legadas.length} cadência(s) legada(s) sem coluna estão inertes. Associe-as acima ou desative-as na área Cadências.
+          {legadas.length} cadência(s) legada(s) ainda não possuem associação normalizada. Revise-as na área Cadências.
         </p>
       )}
     </section>

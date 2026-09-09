@@ -6,13 +6,18 @@ import { criarCadenciaSchema, configurarCadenciaEtapaSchema } from "@/lib/bpm/ca
 const ler = (caminho: string) => readFileSync(caminho, "utf8");
 
 describe("cadência por coluna", () => {
-  it("rejeita criação universal e aceita associação explícita", () => {
-    expect(criarCadenciaSchema.safeParse({ nome: "Contato", pipelineId: "clw0000000000000pipeline" }).success).toBe(false);
+  it("aceita escopo de pipeline e múltiplas associações explícitas", () => {
+    expect(criarCadenciaSchema.safeParse({ nome: "Contato", pipelineId: "clw0000000000000pipeline" }).success).toBe(true);
     expect(criarCadenciaSchema.safeParse({
       nome: "Contato",
       pipelineId: "clw0000000000000pipeline",
-      etapaId: "clw000000000000000etapa",
+      etapaIds: ["clw000000000000000etapa", "clw00000000000000etapa2"],
     }).success).toBe(true);
+    expect(criarCadenciaSchema.safeParse({
+      nome: "Contato",
+      pipelineId: "clw0000000000000pipeline",
+      etapaIds: ["clw000000000000000etapa", "clw000000000000000etapa"],
+    }).success).toBe(false);
     expect(configurarCadenciaEtapaSchema.safeParse({
       pipelineId: "clw0000000000000pipeline",
       etapaId: "clw000000000000000etapa",
@@ -41,11 +46,11 @@ describe("cadência por coluna", () => {
     expect(secao).toContain("nunca impedem o avanço do card");
   });
 
-  it("não mantém fallback universal no resolvedor operacional", () => {
+  it("resolve associação normalizada e mantém entrada de pipeline explícita", () => {
     const resolvedor = ler("src/lib/bpm/cadencias/ativacao-automatica.ts");
     expect(resolvedor).toContain("pipelineId: input.pipelineDestinoId");
-    expect(resolvedor).toContain("etapaId: input.etapaDestinoId");
-    expect(resolvedor).not.toContain("etapaId: null");
+    expect(resolvedor).toContain("etapas: { some: { etapaId: input.etapaDestinoId } }");
+    expect(resolvedor).toContain("{ etapaId: null, etapas: { none: {} } }");
     expect(resolvedor).not.toContain("pipelineId: null");
   });
 });

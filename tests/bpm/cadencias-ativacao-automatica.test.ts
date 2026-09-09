@@ -9,23 +9,17 @@ vi.mock("@/lib/prisma", () => ({ default: { $transaction: vi.fn() } }));
 import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import { ativarCadenciasNaEntradaBpm, chaveExecucaoCicloCadencia } from "@/lib/bpm/cadencias/ativacao-automatica";
 
-function criarTx(params?: {
-  cadencias?: Array<{ id: string; nome: string; passos: Array<{ ordem: number; intervaloDias: number }> }>;
-  vinculos?: Array<
-    | { id: string; cadencia: { pipelineId: string | null; etapaId: string | null; nome: string } }
-    | { id: string; cadenciaId: string; status: string; passoAtualOrdem: number }
-  >;
-  existente?: { id: string; status: string } | null;
-}) {
+type Cadencia = { id: string; nome: string; passos: Array<{ ordem: number; intervaloDias: number }> };
+type Vinculo = { id: string; cadenciaId: string; status: string };
+
+function criarTx(params?: { cadencias?: Cadencia[]; vinculos?: Vinculo[] }) {
   return {
     bpmEtapa: { findFirst: vi.fn().mockResolvedValue({ id: "etapa-destino" }) },
     bpmCard: { findFirst: vi.fn().mockResolvedValue({ id: "card-1" }) },
     bpmCadencia: { findMany: vi.fn().mockResolvedValue(params?.cadencias ?? []) },
     bpmCardCadencia: {
       findMany: vi.fn().mockResolvedValue(params?.vinculos ?? []),
-      findUnique: vi.fn().mockResolvedValue(params?.existente ?? null),
       create: vi.fn().mockResolvedValue({ id: "vinculo-novo" }),
-      update: vi.fn().mockResolvedValue({}),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
   };
@@ -44,78 +38,87 @@ const entradaEtapa = {
 beforeEach(() => vi.clearAllMocks());
 
 describe("ativarCadenciasNaEntradaBpm", () => {
-  it("resolve somente a única cadência ativa da etapa exata", async () => {
-    const tx = criarTx({ cadencias: [{ id: "cad-1", nome: "Cadência 1", passos: [{ ordem: 1, intervaloDias: 2 }] }] });
-    const resultado = await ativarCadenciasNaEntradaBpm(entradaEtapa, tx as never);
-    expect(resultado).toMatchObject({ alteradas: 1, criadas: 1, reativadas: 0 });
-    expect(tx.bpmCadencia.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ pipelineId: "pipeline-1", etapaId: "etapa-destino", ativa: true }),
-      take: 2,
-    }));
-    expect(tx.bpmCardCadencia.create).toHaveBeenCalledWith({ data: expect.objectContaining({
-      cardId: "card-1", cadenciaId: "cad-1", proximaExecucaoEm: new Date("2026-09-10T12:00:00.000Z"),
-    }) });
-  });
-
-  it("aceita coluna sem cadência como estado normal", async () => {
-    const tx = criarTx();
-    const resultado = await ativarCadenciasNaEntradaBpm(entradaEtapa, tx as never);
-    expect(resultado).toMatchObject({ alteradas: 0, criadas: 0 });
-    expect(tx.bpmCardCadencia.create).not.toHaveBeenCalled();
-  });
-
-  it("cancela vínculo legado sem etapa e não o usa como fallback", async () => {
-    const tx = criarTx({ vinculos: [{ id: "v-legado", cadencia: { pipelineId: "pipeline-1", etapaId: null, nome: "Legada" } }] });
-    const resultado = await ativarCadenciasNaEntradaBpm(entradaEtapa, tx as never);
-    expect(resultado).toMatchObject({ alteradas: 1, canceladas: 1, criadas: 0 });
-    expect(tx.bpmCardCadencia.updateMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ id: "v-legado" }),
-      data: expect.objectContaining({ status: "CANCELADA", proximaExecucaoEm: null }),
-    }));
-    expect(registrarHistoricoCard).toHaveBeenCalledTimes(1);
-  });
-
-  it("não escolhe silenciosamente quando há duas cadências ativas na coluna", async () => {
+  it("ativa todas as cadências da etapa e agenda o primeiro passo", async () => {
     const tx = criarTx({ cadencias: [
-      { id: "cad-1", nome: "Cadência 1", passos: [{ ordem: 1, intervaloDias: 1 }] },
-      { id: "cad-2", nome: "Cadência 2", passos: [{ ordem: 1, intervaloDias: 1 }] },
+      { id: "cad-1", nome: "Cadência 1", passos: [{ ordem: 1, intervaloDias: 2 }] },
+      { id: "cad-2", nome: "Cadência 2", passos: [{ ordem: 3, intervaloDias: 0 }] },
     ] });
+
     const resultado = await ativarCadenciasNaEntradaBpm(entradaEtapa, tx as never);
-    expect(resultado.criadas).toBe(0);
+
+    expect(resultado).toMatchObject({ alteradas: 2, criadas: 2, reativadas: 0, cadenciaIds: ["cad-1", "cad-2"] });
+    expect(tx.bpmCadencia.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        pipelineId: "pipeline-1",
+        OR: [{ etapas: { some: { etapaId: "etapa-destino" } } }],
+      }),
+    }));
+    expect(tx.bpmCardCadencia.create).toHaveBeenNthCalledWith(1, { data: expect.objectContaining({
+      cadenciaId: "cad-1", proximaExecucaoEm: new Date("2026-09-10T12:00:00.000Z"),
+    }) });
+    expect(registrarHistoricoCard).toHaveBeenCalledTimes(2);
+  });
+
+  it("inclui cadência de pipeline somente numa entrada real no pipeline", async () => {
+    const tx = criarTx({ cadencias: [{ id: "cad-pipeline", nome: "Pipeline", passos: [{ ordem: 1, intervaloDias: 1 }] }] });
+    await ativarCadenciasNaEntradaBpm({ ...entradaEtapa, pipelineAnteriorId: "pipeline-anterior" }, tx as never);
+    expect(tx.bpmCadencia.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        OR: [
+          { etapas: { some: { etapaId: "etapa-destino" } } },
+          { etapaId: null, etapas: { none: {} } },
+        ],
+      }),
+    }));
+  });
+
+  it("ignora atualização sem entrada em uma nova etapa", async () => {
+    const tx = criarTx();
+    const resultado = await ativarCadenciasNaEntradaBpm({ ...entradaEtapa, etapaAnteriorId: "etapa-destino" }, tx as never);
+    expect(resultado.alteradas).toBe(0);
+    expect(tx.bpmEtapa.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("reativa apenas vínculo pausado e preserva ativo, concluído e cancelado", async () => {
+    const cadencias = ["pausada", "ativa", "concluida", "cancelada"].map((id) => ({
+      id, nome: id, passos: [{ ordem: 1, intervaloDias: 1 }],
+    }));
+    const tx = criarTx({
+      cadencias,
+      vinculos: [
+        { id: "v-p", cadenciaId: "pausada", status: "PAUSADA" },
+        { id: "v-a", cadenciaId: "ativa", status: "ATIVA" },
+        { id: "v-c", cadenciaId: "concluida", status: "CONCLUIDA" },
+        { id: "v-x", cadenciaId: "cancelada", status: "CANCELADA" },
+      ],
+    });
+
+    const resultado = await ativarCadenciasNaEntradaBpm(entradaEtapa, tx as never);
+
+    expect(resultado).toMatchObject({ alteradas: 1, criadas: 0, reativadas: 1, cadenciaIds: ["pausada"] });
+    expect(tx.bpmCardCadencia.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "v-p", status: "PAUSADA" }, data: expect.objectContaining({ status: "ATIVA" }),
+    }));
     expect(tx.bpmCardCadencia.create).not.toHaveBeenCalled();
   });
 
-  it("revalida o card na etapa para tolerar corrida pós-movimento", async () => {
+  it("revalida destino e estado atual do card dentro da transação", async () => {
     const tx = criarTx();
     tx.bpmCard.findFirst.mockResolvedValue(null);
     const resultado = await ativarCadenciasNaEntradaBpm(entradaEtapa, tx as never);
     expect(resultado.alteradas).toBe(0);
     expect(tx.bpmCadencia.findMany).not.toHaveBeenCalled();
-  });
 
-  it("reativa apenas legado pausado e preserva estados ativos ou terminais", async () => {
-    const tx = criarTx({
-      cadencias: [{ id: "cad-pausada", nome: "Pausada", passos: [{ ordem: 2, intervaloDias: 4 }] }],
-      existente: { id: "v-1", status: "PAUSADA" },
-    });
-
-    const resultado = await ativarCadenciasNaEntradaBpm(entradaEtapa, tx as never);
-
-    expect(resultado).toMatchObject({ alteradas: 1, criadas: 0, reativadas: 1 });
-    expect(tx.bpmCardCadencia.update).toHaveBeenCalledTimes(1);
-    expect(tx.bpmCardCadencia.create).not.toHaveBeenCalled();
-    expect(registrarHistoricoCard).toHaveBeenCalledWith(expect.objectContaining({ acao: "CADENCIA_REATIVADA" }), tx);
+    tx.bpmEtapa.findFirst.mockResolvedValue(null);
+    await expect(ativarCadenciasNaEntradaBpm(entradaEtapa, tx as never)).rejects.toThrow("CADENCIA_DESTINO_INVALIDO");
   });
 
   it("trata P2002 tipado como retry idempotente sem histórico duplicado", async () => {
     const tx = criarTx({ cadencias: [{ id: "cad-1", nome: "Cadência", passos: [{ ordem: 1, intervaloDias: 1 }] }] });
     tx.bpmCardCadencia.create.mockRejectedValue(new Prisma.PrismaClientKnownRequestError("duplicado", {
-      code: "P2002",
-      clientVersion: "test",
+      code: "P2002", clientVersion: "test",
     }));
-
     const resultado = await ativarCadenciasNaEntradaBpm(entradaEtapa, tx as never);
-
     expect(resultado.alteradas).toBe(0);
     expect(registrarHistoricoCard).not.toHaveBeenCalled();
   });

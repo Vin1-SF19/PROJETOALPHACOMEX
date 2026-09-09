@@ -19,12 +19,13 @@ export function useNotasNotifications(userId: number) {
   const subscribedRef = useRef(false);
 
   useEffect(() => {
-    if (!pusherClient) return;
+    const client = pusherClient;
+    if (!client) return;
     if (!Number.isSafeInteger(userId) || userId <= 0) return;
     if (subscribedRef.current) return;
     subscribedRef.current = true;
 
-    const canal = pusherClient.subscribe(canalNotasDoUsuario(userId));
+    const canal = client.subscribe(canalNotasDoUsuario(userId));
     const eventos = [
       NOTA_COMPARTILHADA_EVENT,
       NOTA_MENCAO_EVENT,
@@ -39,7 +40,7 @@ export function useNotasNotifications(userId: number) {
 
     return () => {
       for (const evento of eventos) canal.unbind(evento, handler);
-      pusherClient.unsubscribe(canalNotasDoUsuario(userId));
+      client.unsubscribe(canalNotasDoUsuario(userId));
     };
   }, [userId, adicionarNotificacao]);
 }

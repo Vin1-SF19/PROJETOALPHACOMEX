@@ -1356,3 +1356,13 @@ O catálogo 3D ganhou `containerCarga`, adaptação procedural do container da s
 - `tests/bpm/pipeline-config-{diagnostico,publicacao,workspace}.test.ts`: contratos específicos.
 
 **Última atualização:** 2026-09-08 por Codex (RM-2026-8C3862)
+
+## Cadência multicoluna — RM-2026-6F3C54
+
+- `prisma/schema.prisma` e `prisma/migrations/20260908205000_bpm_cadencia_multiplas_etapas/migration.sql`: relação normalizada, unicidade e backfill legado.
+- `src/actions/bpm/Cadencias.ts`: validação de escopo, diff transacional, shadow e projeções completas.
+- `src/lib/bpm/cadencias/{schemas,ativacao-automatica}.ts`: contrato `etapaIds[]` e seleção operacional exata.
+- `src/components/bpm/cadencias/*` e `CadenciaEtapasSection.tsx`: edição, visualização e configuração multicoluna.
+- `scripts/verificar-migration-cadencia-multicoluna.mjs` e `scripts/verificar-cadencia-multicoluna-e2e.ts`: preflight/pós-validação e consumo ponta a ponta isolado.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-6F3C54)

@@ -6,15 +6,16 @@ export type EtapaParaAgrupamento = {
 
 export type CampoParaAgrupamento = {
   id: string;
-  etapaId: string | null;
+  etapaId?: string | null;
   nome: string;
   ordem: number;
+  etapaConfiguracoes?: ReadonlyArray<{ etapaId: string; ordem?: number }>;
 };
 
 export type GrupoCamposPorColuna<TCampo extends CampoParaAgrupamento> = {
   id: string;
   nome: string;
-  tipo: "GERAL" | "ETAPA" | "INDISPONIVEL";
+  tipo: "ETAPA" | "SEM_CONFIGURACAO" | "ASSOCIADO_SEM_ETAPA";
   campos: TCampo[];
 };
 
@@ -27,10 +28,7 @@ function ordenarCampos<TCampo extends CampoParaAgrupamento>(
   );
 }
 
-/**
- * Organiza todos os campos do admin sem alterar a semântica de etapaId:
- * null continua significando um campo geral, aplicável a todas as etapas.
- */
+/** Projeta a mesma aplicabilidade por etapa usada pelo runtime moderno. */
 export function agruparCamposPorColuna<TCampo extends CampoParaAgrupamento>(
   campos: readonly TCampo[],
   etapas: readonly EtapaParaAgrupamento[],
@@ -40,21 +38,24 @@ export function agruparCamposPorColuna<TCampo extends CampoParaAgrupamento>(
   );
   const idsEtapas = new Set(etapasOrdenadas.map((etapa) => etapa.id));
   const camposPorEtapa = new Map<string, TCampo[]>();
+  const semConfiguracao: TCampo[] = [];
+  const associadosSemEtapa: TCampo[] = [];
 
   for (const campo of campos) {
-    const chave = campo.etapaId ?? "GERAL";
-    const grupo = camposPorEtapa.get(chave) ?? [];
-    grupo.push(campo);
-    camposPorEtapa.set(chave, grupo);
+    const configuracoes = campo.etapaConfiguracoes ?? [];
+    const aplicaveis = configuracoes.filter((config) => idsEtapas.has(config.etapaId));
+    if (aplicaveis.length === 0) {
+      (configuracoes.length === 0 ? semConfiguracao : associadosSemEtapa).push(campo);
+      continue;
+    }
+    for (const config of aplicaveis) {
+      const grupo = camposPorEtapa.get(config.etapaId) ?? [];
+      grupo.push({ ...campo, ordem: config.ordem ?? campo.ordem });
+      camposPorEtapa.set(config.etapaId, grupo);
+    }
   }
 
   const grupos: GrupoCamposPorColuna<TCampo>[] = [
-    {
-      id: "GERAL",
-      nome: "Todas as etapas",
-      tipo: "GERAL",
-      campos: ordenarCampos(camposPorEtapa.get("GERAL") ?? []),
-    },
     ...etapasOrdenadas.map((etapa) => ({
       id: etapa.id,
       nome: etapa.nome,
@@ -63,15 +64,20 @@ export function agruparCamposPorColuna<TCampo extends CampoParaAgrupamento>(
     })),
   ];
 
-  const indisponiveis = campos.filter(
-    (campo) => campo.etapaId !== null && !idsEtapas.has(campo.etapaId),
-  );
-  if (indisponiveis.length > 0) {
+  if (semConfiguracao.length > 0) {
     grupos.push({
-      id: "INDISPONIVEL",
-      nome: "Etapa inativa ou indisponível",
-      tipo: "INDISPONIVEL",
-      campos: ordenarCampos(indisponiveis),
+      id: "SEM_CONFIGURACAO",
+      nome: "Sem configuração por etapa",
+      tipo: "SEM_CONFIGURACAO",
+      campos: ordenarCampos(semConfiguracao),
+    });
+  }
+  if (associadosSemEtapa.length > 0) {
+    grupos.push({
+      id: "ASSOCIADO_SEM_ETAPA",
+      nome: "Compartilhados sem etapa neste pipeline",
+      tipo: "ASSOCIADO_SEM_ETAPA",
+      campos: ordenarCampos(associadosSemEtapa),
     });
   }
 

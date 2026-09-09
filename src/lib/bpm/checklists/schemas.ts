@@ -2,6 +2,10 @@ import { z } from "zod";
 
 const idSchema = z.string().cuid();
 const textoOpcional = (maximo: number) => z.string().trim().max(maximo).nullable().optional();
+const etapaIdsSchema = z.array(idSchema).max(100).refine(
+  (ids) => new Set(ids).size === ids.length,
+  "Etapas duplicadas",
+);
 
 export const itemTemplateChecklistSchema = z.object({
   nome: z.string().trim().min(1).max(200),
@@ -15,6 +19,8 @@ const dadosTemplateSchema = z.object({
   descricao: textoOpcional(4000),
   ativo: z.boolean().default(true),
   pipelineId: idSchema.nullable().optional(),
+  etapaIds: etapaIdsSchema.optional(),
+  // Compatibilidade temporária com clientes ainda no contrato singular.
   etapaId: idSchema.nullable().optional(),
   cardId: idSchema.nullable().optional(),
 });
@@ -25,6 +31,7 @@ export const criarTemplateChecklistSchema = dadosTemplateSchema.extend({
 export const atualizarTemplateChecklistSchema = dadosTemplateSchema.extend({ id: idSchema });
 export const salvarTemplateChecklistSchema = dadosTemplateSchema.extend({
   id: idSchema,
+  updatedAt: z.coerce.date().optional(),
   itens: z.array(itemTemplateChecklistSchema.extend({ id: idSchema.optional() })).max(200),
 }).superRefine((dados, contexto) => {
   const ids = dados.itens.flatMap((item) => item.id ? [item.id] : []);

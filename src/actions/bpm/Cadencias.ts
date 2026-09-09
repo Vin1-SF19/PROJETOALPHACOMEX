@@ -1,4 +1,5 @@
 "use server";
+import { Prisma } from "@prisma/client";
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
@@ -23,11 +24,123 @@ import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import {
   CADENCIA_MANUAL_DESABILITADA,
-  validarEscopoCadenciaBpm,
 } from "@/lib/bpm/cadencias/ativacao-automatica";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 const ROTA_ADMIN_CADENCIAS = `${ROTA_BASE}/admin/cadencias`;
+
+const cadenciaInclude = {
+  pipeline: { select: { id: true, nome: true } },
+  etapa: { select: { id: true, nome: true } },
+  etapas: {
+    include: { etapa: { select: { id: true, nome: true, pipelineId: true, ordem: true } } },
+  },
+  passos: { orderBy: { ordem: "asc" as const } },
+  _count: { select: { vinculos: true } },
+} satisfies Prisma.BpmCadenciaInclude;
+
+type CadenciaTx = Pick<
+  Prisma.TransactionClient,
+  "bpmPipeline" | "bpmEtapa" | "bpmCadencia" | "bpmCadenciaEtapa" | "bpmPipelineConfigAuditoria"
+>;
+
+async function validarEtapasCadencia(
+  input: { pipelineId: string | null | undefined; etapaIds: string[]; cadenciaId?: string },
+  tx: CadenciaTx,
+) {
+  if (!input.pipelineId) throw new Error("CADENCIA_PIPELINE_OBRIGATORIO");
+  const pipeline = await tx.bpmPipeline.findFirst({
+    where: { id: input.pipelineId, ativo: true },
+    select: { id: true },
+  });
+  if (!pipeline) throw new Error("CADENCIA_PIPELINE_INVALIDO");
+  if (new Set(input.etapaIds).size !== input.etapaIds.length) {
+    throw new Error("CADENCIA_ETAPAS_DUPLICADAS");
+  }
+  if (input.etapaIds.length === 0) return [];
+
+  const etapas = await tx.bpmEtapa.findMany({
+    where: { id: { in: input.etapaIds }, pipelineId: input.pipelineId, ativo: true },
+    select: { id: true, ordem: true },
+    orderBy: [{ ordem: "asc" }, { id: "asc" }],
+  });
+  if (etapas.length !== input.etapaIds.length) throw new Error("CADENCIA_ETAPA_FORA_PIPELINE");
+  const encontrados = new Set(etapas.map((etapa) => etapa.id));
+  if (input.etapaIds.some((id) => !encontrados.has(id))) throw new Error("CADENCIA_ETAPA_FORA_PIPELINE");
+
+  const ocupada = await tx.bpmCadenciaEtapa.findFirst({
+    where: {
+      etapaId: { in: input.etapaIds },
+      ...(input.cadenciaId ? { cadenciaId: { not: input.cadenciaId } } : {}),
+    },
+    select: { etapaId: true },
+  });
+  if (ocupada) throw new Error("CADENCIA_ETAPA_AMBIGUA");
+  return etapas;
+}
+
+async function salvarAssociacoesCadencia(
+  cadenciaId: string,
+  etapaIds: string[],
+  tx: CadenciaTx,
+) {
+  const atuais = await tx.bpmCadenciaEtapa.findMany({
+    where: { cadenciaId },
+    select: { etapaId: true },
+  });
+  const atuaisIds = atuais.map((item) => item.etapaId);
+  const proxima = new Set(etapaIds);
+  const anterior = new Set(atuaisIds);
+  const removidas = atuaisIds.filter((id) => !proxima.has(id));
+  const adicionadas = etapaIds.filter((id) => !anterior.has(id));
+
+  if (removidas.length > 0) {
+    await tx.bpmCadenciaEtapa.deleteMany({ where: { cadenciaId, etapaId: { in: removidas } } });
+  }
+  if (adicionadas.length > 0) {
+    await tx.bpmCadenciaEtapa.createMany({
+      data: adicionadas.map((etapaId) => ({ cadenciaId, etapaId })),
+    });
+  }
+  return { atuaisIds, adicionadas, removidas };
+}
+
+async function atualizarShadowLegado(cadenciaId: string, tx: CadenciaTx, desativarSemEtapa = false) {
+  const associacoes = await tx.bpmCadenciaEtapa.findMany({
+    where: { cadenciaId },
+    include: { etapa: { select: { ordem: true } } },
+  });
+  associacoes.sort((a, b) => a.etapa.ordem - b.etapa.ordem || a.etapaId.localeCompare(b.etapaId));
+  const primeiraEtapaId = associacoes[0]?.etapaId ?? null;
+  await tx.bpmCadencia.update({
+    where: { id: cadenciaId },
+    data: {
+      etapaId: primeiraEtapaId,
+      ...(desativarSemEtapa && !primeiraEtapaId ? { ativa: false } : {}),
+    },
+  });
+  return primeiraEtapaId;
+}
+
+function erroCadencia(error: unknown, fallback: string) {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    return "Uma das colunas já pertence a outra cadência.";
+  }
+  if (!(error instanceof Error)) return fallback;
+  if (error.message === "Não autorizado — apenas administradores configuram pipelines") return error.message;
+  if (error.message === "CADENCIA_PIPELINE_OBRIGATORIO" || error.message === "CADENCIA_PIPELINE_INVALIDO") return "Selecione um pipeline válido.";
+  if (error.message === "CADENCIA_ETAPA_FORA_PIPELINE") return "Uma das colunas não está ativa ou não pertence ao pipeline informado.";
+  if (error.message === "CADENCIA_ETAPA_AMBIGUA") return "Uma das colunas já pertence a outra cadência.";
+  if (error.message === "CADENCIA_NAO_ENCONTRADA") return "Cadência não encontrada.";
+  return fallback;
+}
+
+function registrarErroCadencia(operacao: string, error: unknown) {
+  const codigo = error instanceof Prisma.PrismaClientKnownRequestError
+    ? error.code
+    : error instanceof Error ? error.name : "ERRO_DESCONHECIDO";
+  console.error(`[${operacao}]`, codigo);
+}
 
 // ─── CRUD de Cadências ───────────────────────────────────────────────────────
 
@@ -43,33 +156,38 @@ export async function CriarCadenciaBpm(input: unknown) {
 
     const cadencia = await db.$transaction(async (tx) => {
       await exigirAcessoConfigPipeline(userId, "configurarCadencias", tx);
-      await validarEscopoCadenciaBpm(parsed.data, tx);
-      return tx.bpmCadencia.create({
+      const etapas = await validarEtapasCadencia(parsed.data, tx);
+      const criada = await tx.bpmCadencia.create({
         data: {
           nome: parsed.data.nome,
           descricao: parsed.data.descricao,
           pipelineId: parsed.data.pipelineId,
-          etapaId: parsed.data.etapaId,
+          etapaId: etapas[0]?.id ?? null,
           ativa: parsed.data.ativa,
           criadoPorId: userId,
         },
       });
+      if (etapas.length > 0) {
+        await tx.bpmCadenciaEtapa.createMany({
+          data: etapas.map((etapa) => ({ cadenciaId: criada.id, etapaId: etapa.id })),
+        });
+      }
+      await tx.bpmPipelineConfigAuditoria.create({
+        data: {
+          pipelineId: parsed.data.pipelineId,
+          adminId: userId,
+          campoAlterado: "cadencia_criada",
+          valorNovoJson: JSON.stringify({ cadenciaId: criada.id, etapaIds: etapas.map((etapa) => etapa.id) }),
+        },
+      });
+      return tx.bpmCadencia.findUniqueOrThrow({ where: { id: criada.id }, include: cadenciaInclude });
     }, { isolationLevel: "Serializable" });
 
     revalidatePath(ROTA_ADMIN_CADENCIAS);
     return { success: true, data: cadencia };
   } catch (error) {
-    console.error("[CriarCadenciaBpm]", error);
-    const msg = error instanceof Error && error.message === "Não autorizado — apenas administradores configuram pipelines"
-      ? error.message
-      : error instanceof Error && error.message === "CADENCIA_ESCOPO_OBRIGATORIO"
-        ? "Selecione o pipeline e a coluna da cadência."
-        : error instanceof Error && error.message === "CADENCIA_ETAPA_FORA_PIPELINE"
-          ? "A etapa selecionada não pertence ao pipeline informado."
-          : error instanceof Error && error.message === "CADENCIA_ETAPA_AMBIGUA"
-            ? "Esta coluna já possui uma cadência ativa. Selecione-a no editor do pipeline ou desative-a antes de criar outra."
-          : "Erro ao criar cadência";
-    return { success: false, error: msg };
+    registrarErroCadencia("CriarCadenciaBpm", error);
+    return { success: false, error: erroCadencia(error, "Erro ao criar cadência") };
   }
 }
 
@@ -83,34 +201,42 @@ export async function AtualizarCadenciaBpm(input: unknown) {
     const parsed = atualizarCadenciaSchema.safeParse(input);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
 
-    const { id, ...data } = parsed.data;
+    const { id, etapaIds: etapaIdsInformadas, ...data } = parsed.data;
     const cadencia = await db.$transaction(async (tx) => {
       await exigirAcessoConfigPipeline(userId, "configurarCadencias", tx);
       const atual = await tx.bpmCadencia.findUnique({
         where: { id },
-        select: { pipelineId: true, etapaId: true, ativa: true },
+        include: { etapas: { select: { etapaId: true } } },
       });
       if (!atual) throw new Error("CADENCIA_NAO_ENCONTRADA");
       const pipelineId = data.pipelineId === undefined ? atual.pipelineId : data.pipelineId;
-      const etapaId = data.etapaId === undefined ? atual.etapaId : data.etapaId;
-      await validarEscopoCadenciaBpm({ pipelineId, etapaId }, tx);
-      return tx.bpmCadencia.update({ where: { id }, data });
+      const etapaIds = etapaIdsInformadas
+        ?? (atual.etapas.length > 0 ? atual.etapas.map((item) => item.etapaId) : atual.etapaId ? [atual.etapaId] : []);
+      const etapas = await validarEtapasCadencia({ pipelineId, etapaIds, cadenciaId: id }, tx);
+      const diff = await salvarAssociacoesCadencia(id, etapas.map((etapa) => etapa.id), tx);
+      await tx.bpmCadencia.update({
+        where: { id },
+        data: { ...data, pipelineId, etapaId: etapas[0]?.id ?? null },
+      });
+      if (pipelineId && (diff.adicionadas.length > 0 || diff.removidas.length > 0)) {
+        await tx.bpmPipelineConfigAuditoria.create({
+          data: {
+            pipelineId,
+            adminId: userId,
+            campoAlterado: "cadencia_etapas",
+            valorAnteriorJson: JSON.stringify({ cadenciaId: id, etapaIds: diff.atuaisIds }),
+            valorNovoJson: JSON.stringify({ cadenciaId: id, etapaIds: etapas.map((etapa) => etapa.id) }),
+          },
+        });
+      }
+      return tx.bpmCadencia.findUniqueOrThrow({ where: { id }, include: cadenciaInclude });
     }, { isolationLevel: "Serializable" });
 
     revalidatePath(ROTA_ADMIN_CADENCIAS);
     return { success: true, data: cadencia };
   } catch (error) {
-    console.error("[AtualizarCadenciaBpm]", error);
-    const msg = error instanceof Error && error.message === "CADENCIA_ESCOPO_OBRIGATORIO"
-      ? "Selecione o pipeline e a coluna da cadência."
-      : error instanceof Error && error.message === "CADENCIA_ETAPA_FORA_PIPELINE"
-        ? "A etapa selecionada não pertence ao pipeline informado."
-        : error instanceof Error && error.message === "CADENCIA_ETAPA_AMBIGUA"
-          ? "Esta coluna já possui outra cadência ativa."
-        : error instanceof Error && error.message === "CADENCIA_NAO_ENCONTRADA"
-          ? "Cadência não encontrada."
-          : "Erro ao atualizar cadência";
-    return { success: false, error: msg };
+    registrarErroCadencia("AtualizarCadenciaBpm", error);
+    return { success: false, error: erroCadencia(error, "Erro ao atualizar cadência") };
   }
 }
 
@@ -127,26 +253,27 @@ export async function AtivarDesativarCadenciaBpm(input: unknown) {
       await exigirAcessoConfigPipeline(userId, "configurarCadencias", tx);
       const atual = await tx.bpmCadencia.findUnique({
         where: { id: parsed.data.id },
-        select: { id: true, pipelineId: true, etapaId: true },
+        include: { etapas: { select: { etapaId: true } } },
       });
       if (!atual) throw new Error("CADENCIA_NAO_ENCONTRADA");
-      if (parsed.data.ativa) await validarEscopoCadenciaBpm(atual, tx);
-      return tx.bpmCadencia.update({
+      if (parsed.data.ativa) {
+        const etapaIds = atual.etapas.length > 0
+          ? atual.etapas.map((item) => item.etapaId)
+          : atual.etapaId ? [atual.etapaId] : [];
+        await validarEtapasCadencia({ pipelineId: atual.pipelineId, etapaIds, cadenciaId: atual.id }, tx);
+      }
+      await tx.bpmCadencia.update({
         where: { id: parsed.data.id },
         data: { ativa: parsed.data.ativa },
       });
+      return tx.bpmCadencia.findUniqueOrThrow({ where: { id: parsed.data.id }, include: cadenciaInclude });
     }, { isolationLevel: "Serializable" });
 
     revalidatePath(ROTA_ADMIN_CADENCIAS);
     return { success: true, data: cadencia };
   } catch (error) {
-    console.error("[AtivarDesativarCadenciaBpm]", error);
-    const msg = error instanceof Error && error.message === "CADENCIA_ESCOPO_OBRIGATORIO"
-      ? "Associe a cadência a uma coluna antes de ativá-la."
-      : error instanceof Error && error.message === "CADENCIA_ETAPA_AMBIGUA"
-        ? "Esta coluna já possui outra cadência ativa."
-        : "Erro ao ativar/desativar cadência";
-    return { success: false, error: msg };
+    registrarErroCadencia("AtivarDesativarCadenciaBpm", error);
+    return { success: false, error: erroCadencia(error, "Erro ao ativar/desativar cadência") };
   }
 }
 
@@ -162,11 +289,19 @@ export async function ConfigurarCadenciaEtapaBpm(input: unknown) {
     const { pipelineId, etapaId, cadenciaId } = parsed.data;
     const resultado = await db.$transaction(async (tx) => {
       await exigirAcessoConfigPipeline(userId, "configurarCadencias", tx);
-      await validarEscopoCadenciaBpm({ pipelineId, etapaId }, tx);
+      const associacaoAtual = await tx.bpmCadenciaEtapa.findUnique({
+        where: { etapaId },
+        select: { cadenciaId: true },
+      });
+      await validarEtapasCadencia({
+        pipelineId,
+        etapaIds: [etapaId],
+        cadenciaId: associacaoAtual?.cadenciaId,
+      }, tx);
       const selecionada = cadenciaId
         ? await tx.bpmCadencia.findUnique({
             where: { id: cadenciaId },
-            select: { id: true, pipelineId: true, etapaId: true },
+            select: { id: true, pipelineId: true },
           })
         : null;
       if (cadenciaId && !selecionada) throw new Error("CADENCIA_NAO_ENCONTRADA");
@@ -174,32 +309,38 @@ export async function ConfigurarCadenciaEtapaBpm(input: unknown) {
         throw new Error("CADENCIA_FORA_PIPELINE");
       }
 
-      if (!selecionada) {
-        await tx.bpmCadencia.updateMany({
-          where: { pipelineId, etapaId, ativa: true },
-          data: { ativa: false },
-        });
-        return { cadenciaId: null };
+      if (associacaoAtual?.cadenciaId === selecionada?.id) {
+        return { cadenciaId: selecionada?.id ?? null };
       }
-      const cadencia = await tx.bpmCadencia.update({
-        where: { id: selecionada.id },
-        data: { pipelineId, etapaId, ativa: true },
+      if (associacaoAtual) {
+        await tx.bpmCadenciaEtapa.delete({ where: { etapaId } });
+        await atualizarShadowLegado(associacaoAtual.cadenciaId, tx, true);
+      }
+      if (selecionada) {
+        await tx.bpmCadencia.update({ where: { id: selecionada.id }, data: { pipelineId, ativa: true } });
+        await tx.bpmCadenciaEtapa.create({ data: { cadenciaId: selecionada.id, etapaId } });
+        await atualizarShadowLegado(selecionada.id, tx);
+      }
+      await tx.bpmPipelineConfigAuditoria.create({
+        data: {
+          pipelineId,
+          adminId: userId,
+          campoAlterado: "cadencia_etapa",
+          valorAnteriorJson: JSON.stringify({ etapaId, cadenciaId: associacaoAtual?.cadenciaId ?? null }),
+          valorNovoJson: JSON.stringify({ etapaId, cadenciaId: selecionada?.id ?? null }),
+        },
       });
-      return { cadenciaId: cadencia.id };
+      return { cadenciaId: selecionada?.id ?? null };
     }, { isolationLevel: "Serializable" });
 
     revalidatePath(`${ROTA_BASE}/admin/pipelines/${pipelineId}`);
     revalidatePath(ROTA_ADMIN_CADENCIAS);
     return { success: true, data: resultado };
   } catch (error) {
-    console.error("[ConfigurarCadenciaEtapaBpm]", error);
+    registrarErroCadencia("ConfigurarCadenciaEtapaBpm", error);
     const msg = error instanceof Error && error.message === "CADENCIA_FORA_PIPELINE"
       ? "A cadência selecionada pertence a outro pipeline."
-      : error instanceof Error && error.message === "CADENCIA_NAO_ENCONTRADA"
-        ? "Cadência não encontrada."
-        : error instanceof Error && error.message === "CADENCIA_ETAPA_FORA_PIPELINE"
-          ? "A coluna não pertence ao pipeline informado."
-          : "Erro ao configurar a cadência da coluna";
+      : erroCadencia(error, "Erro ao configurar a cadência da coluna");
     return { success: false, error: msg };
   }
 }
@@ -216,6 +357,9 @@ export async function ListarCadenciasBpm() {
       include: {
         pipeline: { select: { id: true, nome: true } },
         etapa: { select: { id: true, nome: true } },
+        etapas: {
+          include: { etapa: { select: { id: true, nome: true, pipelineId: true, ordem: true } } },
+        },
         passos: { orderBy: { ordem: "asc" } },
         _count: { select: { vinculos: true } },
       },
@@ -241,6 +385,11 @@ export async function ObterCadenciaBpm(cadenciaId: string) {
     const cadencia = await db.bpmCadencia.findUnique({
       where: { id: parsedId.data },
       include: {
+        pipeline: { select: { id: true, nome: true } },
+        etapa: { select: { id: true, nome: true } },
+        etapas: {
+          include: { etapa: { select: { id: true, nome: true, pipelineId: true, ordem: true } } },
+        },
         passos: { orderBy: { ordem: "asc" } },
         vinculos: {
           where: { status: "ATIVA" },
@@ -500,6 +649,9 @@ export async function ListarCadenciasDoCardBpm(cardId: string) {
           include: {
             pipeline: { select: { id: true, nome: true } },
             etapa: { select: { id: true, nome: true } },
+            etapas: {
+              include: { etapa: { select: { id: true, nome: true, pipelineId: true } } },
+            },
             passos: { where: { ativo: true }, orderBy: { ordem: "asc" } },
           },
         },

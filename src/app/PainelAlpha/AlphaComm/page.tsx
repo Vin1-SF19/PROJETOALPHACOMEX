@@ -60,9 +60,10 @@ export default function AlphaCommPage() {
   }, []);
 
   useEffect(() => {
-    if (!meuId) return;
+    const client = pusherClient;
+    if (!meuId || !client) return;
     
-    const notifyChannel = pusherClient.subscribe(`user-notifications-${meuId}`);
+    const notifyChannel = client.subscribe(`user-notifications-${meuId}`);
     
     notifyChannel.bind("atualizar-lista", (data: any) => {
       if (!isMuted && data.remetenteId !== meuId) audioRef.current?.play().catch(() => {});
@@ -96,7 +97,7 @@ export default function AlphaCommPage() {
   
     return () => {
       try {
-        pusherClient.unsubscribe(`user-notifications-${meuId}`);
+        client.unsubscribe(`user-notifications-${meuId}`);
       } catch {
         // ignore cleanup errors on closed connection
       }
@@ -104,7 +105,8 @@ export default function AlphaCommPage() {
   }, [meuId, agenteAtivo, isMuted]);
 
   useEffect(() => {
-    if (!agenteAtivo || !meuId) return;
+    const client = pusherClient;
+    if (!agenteAtivo || !meuId || !client) return;
 
     const carregarChat = async () => {
       const historico = await getHistoricoMensagens(Number(agenteAtivo.id));
@@ -120,7 +122,7 @@ export default function AlphaCommPage() {
     carregarChat();
 
     const canalId = `chat-${[meuId, Number(agenteAtivo.id)].sort((a, b) => a - b).join("-")}`;
-    const channel = pusherClient.subscribe(canalId);
+    const channel = client.subscribe(canalId);
 
     channel.bind("nova-mensagem", (data: any) => {
       setMensagens((prev) => (prev.find((m) => m.id === data.id) ? prev : [...prev, data]));
@@ -131,7 +133,7 @@ export default function AlphaCommPage() {
 
     return () => {
       try {
-        pusherClient.unsubscribe(canalId);
+        client.unsubscribe(canalId);
       } catch {
         // ignore cleanup errors on closed connection
       }

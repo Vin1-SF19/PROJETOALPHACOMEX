@@ -23,7 +23,6 @@ type ClienteRequisitosEtapa = Pick<
   typeof db,
   | "bpmCampo"
   | "bpmCampoObrigatorioEtapa"
-  | "bpmCampoOcultoEtapa"
   | "bpmCardCampoValor"
   | "bpmCard"
   | "bpmCampoMapeamento"
@@ -184,41 +183,29 @@ export async function carregarCamposAplicaveisEtapa(
     acessos: { select: { perfil: true, visivel: true, editavel: true, somenteLeitura: true, obrigatorio: true } },
   } as const;
 
-  const [diretos, associados, ocultos] = await Promise.all([
-    // etapaId: null é "todas as etapas" (rótulo exibido no admin de pipeline,
-    // AdminPipelineClient.tsx) — precisa entrar aqui junto com os campos da
-    // etapa específica, não só os de etapaId igual.
-    client.bpmCampo.findMany({
-      where: {
-        ativo: true,
-        OR: [
-          { pipelineId, OR: [{ etapaId }, { etapaId: null }] },
-          { pipelinesAssociados: { some: { pipelineId } } },
-        ],
-      },
-      select: selectCampo,
-    }),
-    client.bpmCampoObrigatorioEtapa.findMany({
-      where: { etapaId, campo: { pipelineId, ativo: true } },
-      select: { campo: { select: selectCampo } },
-    }),
-    client.bpmCampoOcultoEtapa.findMany({
-      where: { etapaId, campo: { pipelineId } },
-      select: { campoId: true },
-    }),
-  ]);
-  const idsOcultos = new Set(ocultos.map((item) => item.campoId));
+  // BpmCampoEtapaConfig é a fonte canônica de aplicabilidade. As colunas e
+  // tabelas legadas continuam legíveis, mas não incluem nem ocultam campos no runtime.
+  const diretos = await client.bpmCampo.findMany({
+    where: {
+      ativo: true,
+      etapaConfiguracoes: { some: { etapaId } },
+      OR: [
+        { pipelineId },
+        { pipelinesAssociados: { some: { pipelineId } } },
+      ],
+    },
+    select: selectCampo,
+  });
 
   const porId = new Map<
     string,
     Omit<CampoAplicavelEtapaBpm, "valor">
   >();
   for (const campo of diretos) {
-    if (idsOcultos.has(campo.id)) continue;
     const configsEtapa = campo.etapaConfiguracoes ?? [];
     const opcoes = campo.opcoes ?? [];
     const configEtapa = configsEtapa.find((config) => config.etapaId === etapaId);
-    if (configsEtapa.length > 0 && !configEtapa) continue;
+    if (!configEtapa) continue;
     const acesso = resolverConfiguracaoAcessoCampo(campo, configEtapa, perfilAcesso);
     if (!acesso.visivel) continue;
     porId.set(campo.id, {
@@ -247,45 +234,6 @@ export async function carregarCamposAplicaveisEtapa(
       condicaoObrigatoriedadeJson: configEtapa?.condicaoObrigatoriedadeJson ?? null,
     });
   }
-  for (const item of associados) {
-    if (idsOcultos.has(item.campo.id)) continue;
-    const campo = item.campo;
-    const configsEtapa = campo.etapaConfiguracoes ?? [];
-    const opcoes = campo.opcoes ?? [];
-    const configEtapa = configsEtapa.find((config) => config.etapaId === etapaId);
-    const acesso = resolverConfiguracaoAcessoCampo(campo, configEtapa, perfilAcesso);
-    if (!acesso.visivel) continue;
-    porId.set(campo.id, {
-      id: campo.id,
-      pipelineId: campo.pipelineId,
-      etapaId: campo.etapaId,
-      nome: campo.nome,
-      tipo: campo.tipo,
-      opcoesJson: opcoes.length ? JSON.stringify(opcoes.map((opcao) => opcao.rotulo)) : campo.opcoesJson,
-      // BpmCampoObrigatorioEtapa continua sendo o fallback para cadastros
-      // legados. Quando a etapa já possui a configuração nova, ela é a fonte
-      // autoritativa da obrigatoriedade e não pode ser sobrescrita pelo vínculo
-      // legado que permaneceu no banco após a migração.
-      obrigatorio: configEtapa ? acesso.obrigatorio : true,
-      obrigatorioEntrada: configEtapa?.obrigatorioEntrada ?? false,
-      obrigatorioSaida: configEtapa?.obrigatorioSaida ?? false,
-      ordem: configEtapa?.ordem ?? campo.ordem,
-      grupo: configEtapa?.grupo ?? null,
-      ativo: campo.ativo ?? true,
-      escopo: campo.escopo ?? "CARD",
-      valorPadrao: configEtapa?.valorPadrao ?? campo.valorPadrao ?? null,
-      fonteEntidade: campo.fonteEntidade ?? null,
-      fonteAtributo: campo.fonteAtributo ?? null,
-      entidadeGlobal: campo.entidadeGlobal ?? null,
-      visivel: acesso.visivel,
-      editavel: acesso.editavel,
-      somenteLeitura: acesso.somenteLeitura,
-      configVersao: campo.configVersao ?? 1,
-      condicaoVisibilidadeJson: configEtapa?.condicaoVisibilidadeJson ?? null,
-      condicaoObrigatoriedadeJson: configEtapa?.condicaoObrigatoriedadeJson ?? null,
-    });
-  }
-
   const campos = [...porId.values()].sort(
     (a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome),
   );

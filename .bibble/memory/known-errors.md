@@ -673,3 +673,9 @@ Para casos de leitura síncrona de layout do DOM (ex: `getBoundingClientRect()` 
 Em 2026-09-08, a suíte global aprovou 2.512/2.566 testes e manteve 54 falhas em módulos concorrentes (calendário, documentos, card, CS/NPS e mocks legados). Em BPM, `kanban-transicao-integracao.test.ts` ainda exige o comportamento antigo fail-open e não simula o comando canônico atual; o runtime deve continuar fail-closed. O lint global reporta 3.044 erros, em grande parte sob `.aiox-core`/`.agents` e arquivos preexistentes, e o typecheck global mantém erros externos à entrega. O typecheck com 4 GB sofreu OOM; com 8 GB concluiu. Testes, lint e typecheck direcionados da RM passaram.
 
 **Adicionado em:** 2026-09-08 por Codex (RM-2026-8C3862)
+
+## Gates globais concorrentes durante RM-2026-6F3C54
+
+Em 2026-09-08, a suíte global aprovou 2.588/2.638 testes, com 49 falhas e 1 todo em módulos externos/concorrentes; os 40 testes direcionados de cadência passaram. O lint global reportou 3.702 erros, principalmente em `.aiox-core`, `.agents` e componentes legados, enquanto o lint do escopo ficou limpo. O typecheck manteve diagnósticos em Exclusão Fiscal, Gerador de Documentos, Calendário e testes legados, sem apontar arquivos desta RM. O build de produção e o smoke HTTP passaram.
+
+**Adicionado em:** 2026-09-08 por Codex (RM-2026-6F3C54)

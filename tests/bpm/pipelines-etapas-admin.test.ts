@@ -10,7 +10,10 @@ const mocks = vi.hoisted(() => ({
   pipelineSetorDeleteMany: vi.fn(),
   pipelineSetorCreateMany: vi.fn(),
   etapaFindUnique: vi.fn(),
+  etapaFindFirst: vi.fn(),
   etapaFindMany: vi.fn(),
+  etapaCount: vi.fn(),
+  etapaCreate: vi.fn(),
   etapaUpdate: vi.fn(),
   etapaUpdateMany: vi.fn(),
   subStatusFindUnique: vi.fn(),
@@ -19,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   transicaoUpsert: vi.fn(),
   transicaoUpdate: vi.fn(),
   transicaoDelete: vi.fn(),
+  transicaoCreateMany: vi.fn(),
   auditoriaCreate: vi.fn(),
   transaction: vi.fn(),
 }));
@@ -67,6 +71,7 @@ import {
 } from "@/actions/bpm/Pipelines";
 import {
   AtivarDesativarEtapaBpm,
+  CriarEtapaBpm,
   DefinirEtapaInicialBpm,
   DefinirEtapasFinaisBpm,
 } from "@/actions/bpm/Etapas";
@@ -101,9 +106,19 @@ function mockClienteTx() {
       deleteMany: mocks.pipelineSetorDeleteMany,
       createMany: mocks.pipelineSetorCreateMany,
     },
-    bpmEtapa: { update: mocks.etapaUpdate, updateMany: mocks.etapaUpdateMany },
-    bpmSubStatus: { update: mocks.subStatusUpdate },
+    bpmEtapa: {
+      findUnique: mocks.etapaFindUnique,
+      findFirst: mocks.etapaFindFirst,
+      findMany: mocks.etapaFindMany,
+      count: mocks.etapaCount,
+      create: mocks.etapaCreate,
+      update: mocks.etapaUpdate,
+      updateMany: mocks.etapaUpdateMany,
+    },
+    bpmSubStatus: { findUnique: mocks.subStatusFindUnique, update: mocks.subStatusUpdate },
     bpmTransicaoEtapa: {
+      findUnique: mocks.transicaoFindUnique,
+      createMany: mocks.transicaoCreateMany,
       upsert: mocks.transicaoUpsert,
       update: mocks.transicaoUpdate,
       delete: mocks.transicaoDelete,
@@ -117,6 +132,11 @@ describe("Pipelines admin — ativar/desativar e reordenar", () => {
     vi.clearAllMocks();
     mocks.auth.mockResolvedValue({ user: { id: "7", role: "Admin" } });
     mocks.exigirConfig.mockResolvedValue(undefined);
+    mocks.etapaUpdate.mockResolvedValue({ id: ETAPA_A });
+    mocks.etapaUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.etapaFindFirst.mockImplementation(async ({ where }: { where: { id: string; pipelineId: string } }) =>
+      where.id === ETAPA_A && where.pipelineId === PIPELINE_ID ? { id: ETAPA_A } : null,
+    );
     mockTransactionPassThrough();
   });
 
@@ -157,6 +177,8 @@ describe("Etapas admin — ativar/desativar, inicial e finais", () => {
     vi.clearAllMocks();
     mocks.auth.mockResolvedValue({ user: { id: "7", role: "Admin" } });
     mocks.exigirConfig.mockResolvedValue(undefined);
+    mocks.etapaUpdate.mockResolvedValue({ id: ETAPA_A });
+    mocks.etapaUpdateMany.mockResolvedValue({ count: 1 });
     mockTransactionPassThrough();
   });
 
@@ -166,6 +188,56 @@ describe("Etapas admin — ativar/desativar, inicial e finais", () => {
     const result = await AtivarDesativarEtapaBpm({ etapaId: ETAPA_A, ativo: false });
     expect(result).toMatchObject({ success: true });
     expect(mocks.etapaUpdate).toHaveBeenCalledWith({ where: { id: ETAPA_A }, data: { ativo: false } });
+  });
+
+  it("cria etapa com arestas explícitas bloqueadas nos dois sentidos", async () => {
+    mocks.etapaFindMany.mockResolvedValue([{ id: ETAPA_A }, { id: ETAPA_B }]);
+    mocks.etapaCreate.mockResolvedValue({ id: "clw00000000000000etapan", pipelineId: PIPELINE_ID, nome: "Nova" });
+    const result = await CriarEtapaBpm({ pipelineId: PIPELINE_ID, nome: "Nova", ordem: 2 });
+    expect(result).toMatchObject({ success: true });
+    expect(mocks.transicaoCreateMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({ etapaOrigemId: "clw00000000000000etapan", etapaDestinoId: ETAPA_A, permitida: false }),
+        expect.objectContaining({ etapaOrigemId: ETAPA_A, etapaDestinoId: "clw00000000000000etapan", permitida: false }),
+      ]),
+    });
+  });
+
+  it("reverte a alteração inteira quando a auditoria obrigatória falha", async () => {
+    let persistido = { ativo: true };
+    const auditorias: string[] = [];
+    mocks.transaction.mockImplementationOnce(async (callback: (tx: ReturnType<typeof mockClienteTx>) => unknown) => {
+      let proximoAtivo = persistido.ativo;
+      const tx = mockClienteTx();
+      tx.bpmEtapa.findUnique = vi.fn().mockResolvedValue({ id: ETAPA_A, pipelineId: PIPELINE_ID, ativo: true });
+      tx.bpmEtapa.update = vi.fn().mockImplementation(async ({ data }: { data: { ativo: boolean } }) => {
+        proximoAtivo = data.ativo;
+        return { id: ETAPA_A, ativo: data.ativo };
+      });
+      tx.bpmPipelineConfigAuditoria.create = vi.fn().mockRejectedValue(new Error("falha de auditoria"));
+      try {
+        const resultado = await callback(tx);
+        persistido = { ativo: proximoAtivo };
+        auditorias.push("commit");
+        return resultado;
+      } catch (error) {
+        throw error;
+      }
+    });
+    const result = await AtivarDesativarEtapaBpm({ etapaId: ETAPA_A, ativo: false });
+    expect(result.success).toBe(false);
+    expect(persistido.ativo).toBe(true);
+    expect(auditorias).toEqual([]);
+    expect(mocks.notificar).not.toHaveBeenCalled();
+  });
+
+  it("não produz auditoria quando a mutação falha", async () => {
+    mocks.etapaFindUnique.mockResolvedValue({ id: ETAPA_A, pipelineId: PIPELINE_ID, ativo: true });
+    mocks.etapaUpdate.mockRejectedValue(new Error("falha de domínio"));
+    const result = await AtivarDesativarEtapaBpm({ etapaId: ETAPA_A, ativo: false });
+    expect(result.success).toBe(false);
+    expect(mocks.auditoriaCreate).not.toHaveBeenCalled();
+    expect(mocks.notificar).not.toHaveBeenCalled();
   });
 
   it("define etapa inicial garantindo unicidade no pipeline", async () => {
@@ -180,7 +252,7 @@ describe("Etapas admin — ativar/desativar, inicial e finais", () => {
   });
 
   it("rejeita etapa inicial de outro pipeline", async () => {
-    mocks.etapaFindUnique.mockResolvedValue({ id: ETAPA_A, pipelineId: "outro-pipeline" });
+    mocks.etapaFindFirst.mockResolvedValue(null);
     const result = await DefinirEtapaInicialBpm({ pipelineId: PIPELINE_ID, etapaId: ETAPA_A });
     expect(result.success).toBe(false);
     expect(mocks.etapaUpdate).not.toHaveBeenCalled();
@@ -222,6 +294,7 @@ describe("SubStatus admin — CRUD escopado por etapa", () => {
     mocks.etapaFindUnique.mockResolvedValue({ pipelineId: PIPELINE_ID });
     mocks.transaction.mockImplementation(async (callback: (tx: unknown) => unknown) =>
       callback({
+        bpmEtapa: { findUnique: vi.fn().mockResolvedValue({ pipelineId: PIPELINE_ID }) },
         bpmSubStatus: {
           create: vi.fn().mockResolvedValue({ id: SUBSTATUS_ID, nome: "Aguardando" }),
         },
@@ -240,7 +313,7 @@ describe("SubStatus admin — CRUD escopado por etapa", () => {
   });
 
   it("atualiza substatus existente", async () => {
-    mocks.subStatusFindUnique.mockResolvedValue({ id: SUBSTATUS_ID, etapaId: ETAPA_A, nome: "Aguardando" });
+    mocks.subStatusFindUnique.mockResolvedValue({ id: SUBSTATUS_ID, etapaId: ETAPA_A, nome: "Aguardando", etapa: { pipelineId: PIPELINE_ID } });
     mocks.etapaFindUnique.mockResolvedValue({ pipelineId: PIPELINE_ID });
     mocks.subStatusUpdate.mockResolvedValue({ id: SUBSTATUS_ID, nome: "Aguardando Doc" });
     const result = await AtualizarSubStatusBpm({ subStatusId: SUBSTATUS_ID, nome: "Aguardando Doc" });
@@ -257,9 +330,7 @@ describe("Transições admin — CRUD e regra de origem/destino", () => {
   });
 
   it("cria transição válida entre etapas do mesmo pipeline", async () => {
-    mocks.etapaFindUnique
-      .mockResolvedValueOnce({ pipelineId: PIPELINE_ID })
-      .mockResolvedValueOnce({ pipelineId: PIPELINE_ID });
+    mocks.etapaCount.mockResolvedValue(2);
     mocks.transicaoUpsert.mockResolvedValue({ id: TRANSICAO_ID });
     const result = await CriarTransicaoEtapaBpm({
       pipelineId: PIPELINE_ID,
@@ -272,9 +343,7 @@ describe("Transições admin — CRUD e regra de origem/destino", () => {
   });
 
   it("rejeita transição com etapas de pipelines diferentes", async () => {
-    mocks.etapaFindUnique
-      .mockResolvedValueOnce({ pipelineId: PIPELINE_ID })
-      .mockResolvedValueOnce({ pipelineId: "outro-pipeline" });
+    mocks.etapaCount.mockResolvedValue(1);
     const result = await CriarTransicaoEtapaBpm({
       pipelineId: PIPELINE_ID,
       etapaOrigemId: ETAPA_A,
@@ -324,10 +393,10 @@ describe("verificarTransicaoPermitidaBpm — engine de movimentação", () => {
     expect(findUnique).not.toHaveBeenCalled();
   });
 
-  it("permite quando não há regra explícita (regressão dos pipelines legados)", async () => {
+  it("bloqueia quando não há regra explícita", async () => {
     findUnique.mockResolvedValue(null);
     const resultado = await verificarTransicaoPermitidaBpm(ETAPA_A, ETAPA_B, "MANUAL", client);
-    expect(resultado.permitida).toBe(true);
+    expect(resultado).toEqual({ permitida: false, motivo: "Esta transição não está definida no pipeline." });
   });
 
   it("bloqueia quando o admin desativou explicitamente a transição", async () => {

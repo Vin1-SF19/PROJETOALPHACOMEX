@@ -10,8 +10,6 @@ export const SLA_INICIOS = [
   "CRIACAO_TAREFA",
   "PRIMEIRA_VISUALIZACAO",
   "TAREFA_CONCLUIDA",
-  "MANUAL",
-  "CUSTOM",
 ] as const;
 export const SLA_TIPOS_LIMITE = ["PERCENTUAL_CONSUMIDO", "TEMPO_RESTANTE", "ATRASO"] as const;
 export const SLA_REGRAS_PAUSA = ["NUNCA", "STANDBY"] as const;
@@ -33,6 +31,7 @@ export const slaConfiguracaoAdminSchema = z.object({
   inicioMomento: z.enum(SLA_INICIOS),
   pausaRegra: z.enum(SLA_REGRAS_PAUSA),
   ativa: z.boolean(),
+  prioridade: z.number().int().min(0).max(10_000),
   amareloTipo: z.enum(SLA_TIPOS_LIMITE),
   amareloValor: z.number().min(0).max(100_000),
   amareloUnidade: z.enum(SLA_UNIDADES).nullable(),
@@ -50,9 +49,31 @@ export const slaConfiguracaoAdminSchema = z.object({
   if (!requisitos[dados.escopo]) {
     context.addIssue({ code: "custom", path: ["escopo"], message: "Preencha o detalhe do escopo selecionado." });
   }
+  if (
+    dados.escopo === "TAREFA"
+    && !["CRIACAO_TAREFA", "TAREFA_CONCLUIDA"].includes(dados.inicioMomento)
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["inicioMomento"],
+      message: "SLA de tarefa deve iniciar na criação ou conclusão de uma tarefa.",
+    });
+  }
   for (const prefixo of ["amarelo", "vermelho"] as const) {
     if (dados[`${prefixo}Tipo`] !== "PERCENTUAL_CONSUMIDO" && !dados[`${prefixo}Unidade`]) {
       context.addIssue({ code: "custom", path: [`${prefixo}Unidade`], message: "Selecione a unidade do limite." });
+    }
+  }
+  if (dados.amareloTipo === dados.vermelhoTipo) {
+    const ordemValida = dados.amareloTipo === "TEMPO_RESTANTE"
+      ? dados.amareloValor >= dados.vermelhoValor
+      : dados.amareloValor <= dados.vermelhoValor;
+    if (!ordemValida) {
+      context.addIssue({
+        code: "custom",
+        path: ["vermelhoValor"],
+        message: "O limite vermelho deve ocorrer depois do limite amarelo.",
+      });
     }
   }
 });
@@ -86,8 +107,9 @@ export interface SlaConfiguracaoAdmin {
   servicoNome: string | null;
   quantidade: number;
   unidade: (typeof SLA_UNIDADES)[number];
-  inicioMomento: (typeof SLA_INICIOS)[number];
+  inicioMomento: (typeof SLA_INICIOS)[number] | "MANUAL" | "CUSTOM";
   pausaRegra: (typeof SLA_REGRAS_PAUSA)[number];
   ativa: boolean;
+  prioridade: number;
   alertaLimites: SlaAlertaAdmin[];
 }

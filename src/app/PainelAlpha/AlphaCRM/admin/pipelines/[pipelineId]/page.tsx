@@ -7,7 +7,6 @@ import { ListarConfiguracoesSlaBpm } from "@/actions/bpm/Sla";
 import { ListarCadenciasBpm } from "@/actions/bpm/Cadencias";
 import { getServicosComerciais } from "@/actions/ContratoComercial";
 import { isAdminRole } from "@/lib/bpm/ownership";
-import { garantirSchemaFinanceiro } from "@/lib/bpm/pipeline-financeiro-migration";
 import AdminPipelineClient from "./AdminPipelineClient";
 import type { TransicaoBpm } from "./EtapaAvancadaSection";
 
@@ -27,12 +26,6 @@ export default async function AdminPipelinePage({
 
   const temaNome = (session.user as { tema_interface?: string })?.tema_interface || "blue";
   const visual = getTema(temaNome);
-
-  try {
-    await garantirSchemaFinanceiro(pipelineId);
-  } catch (error) {
-    console.error("[AdminPipelinePage] garantirSchemaFinanceiro", error);
-  }
 
   const [pipelineResult, pipelinesResult, transicoesResult, slaResult, servicosResult, cadenciasResult] = await Promise.all([
     ObterPipelineBpm(pipelineId, true),

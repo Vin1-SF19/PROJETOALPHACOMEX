@@ -1,6 +1,9 @@
+import type { Prisma } from "@prisma/client";
+
 export type EscopoTemplateChecklist = {
   pipelineId: string | null;
   etapaId: string | null;
+  etapaIds?: string[];
   cardId: string | null;
 };
 
@@ -28,9 +31,25 @@ export type InstanciaEstadoChecklist = {
 export type ResumoChecklistCard = ReturnType<typeof calcularResumoChecklist>;
 
 export function templateChecklistCompativel(escopo: EscopoTemplateChecklist, card: ContextoCardChecklist): boolean {
+  const etapaIds = escopo.etapaIds ?? (escopo.etapaId ? [escopo.etapaId] : []);
   return (!escopo.pipelineId || escopo.pipelineId === card.pipelineId)
-    && (!escopo.etapaId || escopo.etapaId === card.etapaId)
+    && (etapaIds.length === 0 || etapaIds.includes(card.etapaId))
     && (!escopo.cardId || escopo.cardId === card.id);
+}
+
+/** Filtro único do escopo de etapa, com fallback para registros singulares legados. */
+export function filtroEtapaTemplateChecklist(etapaId: string): Prisma.BpmChecklistTemplateWhereInput {
+  return {
+    OR: [
+      { etapas: { some: { etapaId } } },
+      {
+        AND: [
+          { etapas: { none: {} } },
+          { OR: [{ etapaId: null }, { etapaId }] },
+        ],
+      },
+    ],
+  };
 }
 
 export function calcularResumoChecklist(instancias: InstanciaEstadoChecklist[]) {

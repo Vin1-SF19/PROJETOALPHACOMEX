@@ -971,15 +971,16 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
     // Real-time: atualiza sozinho quando um closer confirma uma venda (venda-confirmada
     // disparado por confirmarFechamento em ContratoComercial.ts), sem depender de refresh manual.
     useEffect(() => {
-        if (!pusherClient) return;
-        const channel = pusherClient.subscribe("private-metas-alpha");
+        const client = pusherClient;
+        if (!client) return;
+        const channel = client.subscribe("private-metas-alpha");
         channel.bind("venda-confirmada", () => {
             void atualizar();
         });
         return () => {
             try {
                 channel.unbind("venda-confirmada");
-                pusherClient.unsubscribe("private-metas-alpha");
+                client.unsubscribe("private-metas-alpha");
             } catch {
                 // ignore cleanup errors on closed connection
             }

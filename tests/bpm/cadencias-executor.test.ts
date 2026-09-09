@@ -1,306 +1,140 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mock prisma before importing executor
-vi.mock("@/lib/prisma", () => {
-  const mockTx = {
-    bpmCadenciaPassoExecucao: {
-      create: vi.fn(),
-      update: vi.fn(),
-      updateMany: vi.fn(),
-    },
-    bpmTarefa: {
-      create: vi.fn(),
-    },
-    bpmCardCadencia: {
-      update: vi.fn(),
-    },
-    bpmCardHistorico: {
-      create: vi.fn(),
-    },
-  };
-  const mockDb = {
-    bpmCardCadencia: {
-      findMany: vi.fn(),
-      update: vi.fn(),
-    },
-    bpmCadenciaPassoExecucao: {
-      create: vi.fn(),
-      update: vi.fn(),
-      updateMany: vi.fn(),
-    },
-    bpmTarefa: {
-      create: vi.fn(),
-    },
-    bpmCardHistorico: {
-      create: vi.fn(),
-    },
-    $transaction: vi.fn((fn: (tx: unknown) => Promise<void>) => fn(mockTx)),
-  };
-  return { default: mockDb };
-});
-
-vi.mock("@/lib/bpm/historico-server", () => ({
-  registrarHistoricoCard: vi.fn(),
+vi.mock("@/lib/prisma", () => ({
+  default: {
+    bpmCardCadencia: { findMany: vi.fn(), update: vi.fn() },
+    bpmCadenciaPassoExecucao: { updateMany: vi.fn() },
+    $transaction: vi.fn(),
+  },
 }));
-
-vi.mock("@/lib/bpm/realtime-server", () => ({
-  notificarPipelineBpm: vi.fn(),
-}));
+vi.mock("@/lib/bpm/historico-server", () => ({ registrarHistoricoCard: vi.fn() }));
+vi.mock("@/lib/bpm/realtime-server", () => ({ notificarPipelineBpm: vi.fn() }));
 
 import db from "@/lib/prisma";
-import { processarCadenciasBpm } from "@/lib/bpm/cadencias/executor";
 import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { processarCadenciasBpm } from "@/lib/bpm/cadencias/executor";
 
 const mockDb = db as unknown as {
   bpmCardCadencia: { findMany: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> };
-  bpmCadenciaPassoExecucao: { create: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn>; updateMany: ReturnType<typeof vi.fn> };
-  bpmTarefa: { create: ReturnType<typeof vi.fn> };
+  bpmCadenciaPassoExecucao: { updateMany: ReturnType<typeof vi.fn> };
   $transaction: ReturnType<typeof vi.fn>;
 };
 
-function makeVinculo(overrides: Record<string, unknown> = {}) {
+function vinculo(overrides: Record<string, unknown> = {}) {
   return {
-    id: "vinculo1",
-    cardId: "card1",
-    cadenciaId: "cad1",
-    status: "ATIVA",
-    passoAtualOrdem: 1,
-    proximaExecucaoEm: new Date("2026-01-01"),
-    iniciadaEm: new Date("2026-01-01T00:00:00.000Z"),
-    createdAt: new Date("2026-01-01T00:00:00.000Z"),
-    card: { id: "card1", pipelineId: "pipe1", etapaId: "et1", status: "ATIVO", responsavelId: 1 },
+    id: "v-1", cardId: "card-1", cadenciaId: "cad-1", status: "ATIVA",
+    passoAtualOrdem: 1, proximaExecucaoEm: new Date("2026-01-01"),
+    iniciadaEm: new Date("2026-01-01T00:00:00.000Z"), createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    card: { id: "card-1", pipelineId: "pipe-1", etapaId: "etapa-atual", status: "ATIVO", responsavelId: 1 },
     cadencia: {
-      id: "cad1",
-      nome: "Cadência Teste",
-      ativa: true,
-      pipelineId: "pipe1",
-      etapaId: "et1",
+      id: "cad-1", nome: "Cadência", ativa: true, pipelineId: "pipe-1", etapaId: "etapa-entrada",
       passos: [
-        { id: "passo1", ordem: 1, intervaloDias: 7, titulo: "Passo 1", tipoTarefa: "TAREFA", prioridade: "NORMAL", ativo: true },
-        { id: "passo2", ordem: 2, intervaloDias: 14, titulo: "Passo 2", tipoTarefa: "EMAIL", prioridade: "ALTA", ativo: true },
+        { id: "p-1", ordem: 1, intervaloDias: 0, titulo: "Contato", tipoTarefa: "TAREFA", prioridade: "NORMAL", ativo: true },
+        { id: "p-2", ordem: 2, intervaloDias: 2, titulo: "Retorno", tipoTarefa: "EMAIL", prioridade: "NORMAL", ativo: true },
       ],
     },
     ...overrides,
   };
 }
 
+function executarTx(v: ReturnType<typeof vinculo>, opcoes?: { p2002?: boolean; falhaTarefa?: boolean; cadenciaAtiva?: boolean }) {
+  const tarefa = { id: "tarefa-1" };
+  const tx = {
+    bpmCard: { findUnique: vi.fn().mockResolvedValue(v.card) },
+    bpmCadencia: { findUnique: vi.fn().mockResolvedValue({ ativa: opcoes?.cadenciaAtiva ?? true }) },
+    bpmCadenciaPassoExecucao: {
+      create: opcoes?.p2002
+        ? vi.fn().mockRejectedValue(Object.assign(new Error("duplicada"), { code: "P2002" }))
+        : vi.fn().mockResolvedValue({ id: "exec-1" }),
+      update: vi.fn().mockResolvedValue({}),
+    },
+    bpmTarefa: {
+      create: opcoes?.falhaTarefa ? vi.fn().mockRejectedValue(new Error("DB error")) : vi.fn().mockResolvedValue(tarefa),
+    },
+    bpmCardCadencia: { update: vi.fn().mockResolvedValue({}) },
+  };
+  mockDb.$transaction.mockImplementation(async (fn: (client: unknown) => Promise<void>) => fn(tx));
+  return tx;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  mockDb.bpmCardCadencia.findMany.mockResolvedValue([]);
 });
 
 describe("processarCadenciasBpm", () => {
-  it("processa vínculo vencido: cria tarefa, avança passo, registra histórico", async () => {
-    const vinculo = makeVinculo();
-    mockDb.bpmCardCadencia.findMany.mockResolvedValue([vinculo]);
+  it("busca apenas vínculos de definições ativas", async () => {
+    await processarCadenciasBpm();
+    expect(mockDb.bpmCardCadencia.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ status: "ATIVA", cadencia: { ativa: true } }),
+    }));
+    expect(mockDb.bpmCardCadencia.update).not.toHaveBeenCalled();
+  });
 
-    const execucao = { id: "exec1" };
-    const tarefa = { id: "tarefa1" };
-
-    // $transaction calls the fn with a mock tx
-    mockDb.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
-      const tx = {
-        bpmCard: { findUnique: vi.fn().mockResolvedValue(vinculo.card) },
-        bpmCadencia: { findUnique: vi.fn().mockResolvedValue({ pipelineId: "pipe1", etapaId: "et1", ativa: true }) },
-        bpmCadenciaPassoExecucao: {
-          create: vi.fn().mockResolvedValue(execucao),
-          update: vi.fn().mockResolvedValue({}),
-        },
-        bpmTarefa: { create: vi.fn().mockResolvedValue(tarefa) },
-        bpmCardCadencia: { update: vi.fn().mockResolvedValue({}) },
-        bpmCardHistorico: { create: vi.fn().mockResolvedValue({}) },
-      };
-      return fn(tx);
-    });
+  it("continua a cadência depois que o card sai da etapa de entrada", async () => {
+    const v = vinculo();
+    mockDb.bpmCardCadencia.findMany.mockResolvedValue([v]);
+    const tx = executarTx(v);
 
     const resultado = await processarCadenciasBpm();
 
-    expect(resultado.processadas).toBe(1);
-    expect(resultado.falhas).toBe(0);
-    expect(mockDb.$transaction).toHaveBeenCalled();
-    expect(registrarHistoricoCard).toHaveBeenCalledWith(
-      expect.objectContaining({
-        cardId: "card1",
-        acao: "CADENCIA_PASSO_EXECUTADO",
-        automacaoOrigem: "Motor de Cadências",
-      }),
-      expect.anything(),
-    );
-    expect(notificarPipelineBpm).toHaveBeenCalledWith({ pipelineId: "pipe1", tipo: "TAREFA_ALTERADA" });
+    expect(resultado).toMatchObject({ processadas: 1, falhas: 0 });
+    expect(tx.bpmTarefa.create).toHaveBeenCalledTimes(1);
+    expect(mockDb.bpmCardCadencia.update).not.toHaveBeenCalled();
+    expect(registrarHistoricoCard).toHaveBeenCalledWith(expect.objectContaining({ acao: "CADENCIA_PASSO_EXECUTADO" }), tx);
+    expect(notificarPipelineBpm).toHaveBeenCalledWith({ pipelineId: "pipe-1", tipo: "TAREFA_ALTERADA" });
   });
 
-  it("idempotência: P2002 (unique constraint) não duplica tarefa", async () => {
-    const vinculo = makeVinculo();
-    mockDb.bpmCardCadencia.findMany.mockResolvedValue([vinculo]);
-
-    // Simulate P2002 on execution create
-    const p2002Error = Object.assign(new Error("Unique constraint"), { code: "P2002" });
-    mockDb.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
-      const tx = {
-        bpmCard: { findUnique: vi.fn().mockResolvedValue(vinculo.card) },
-        bpmCadencia: { findUnique: vi.fn().mockResolvedValue({ pipelineId: "pipe1", etapaId: "et1", ativa: true }) },
-        bpmCadenciaPassoExecucao: {
-          create: vi.fn().mockRejectedValue(p2002Error),
-          update: vi.fn(),
-        },
-        bpmTarefa: { create: vi.fn() },
-        bpmCardCadencia: { update: vi.fn() },
-        bpmCardHistorico: { create: vi.fn() },
-      };
-      return fn(tx);
-    });
-
+  it("trata retry P2002 como idempotente sem duplicar tarefa", async () => {
+    const v = vinculo();
+    mockDb.bpmCardCadencia.findMany.mockResolvedValue([v]);
+    const tx = executarTx(v, { p2002: true });
     const resultado = await processarCadenciasBpm();
-
-    // Should be counted as processed (idempotent), not as failure
-    expect(resultado.processadas).toBe(1);
-    expect(resultado.falhas).toBe(0);
-    expect(resultado.avisos.some((a) => a.includes("idempotente"))).toBe(true);
+    expect(resultado).toMatchObject({ processadas: 1, falhas: 0 });
+    expect(tx.bpmTarefa.create).not.toHaveBeenCalled();
+    expect(resultado.avisos.join(" ")).toContain("idempotente");
   });
 
-  it("falha intermediária: execução não fica EM_EXECUCAO órfã", async () => {
-    const vinculo = makeVinculo();
-    mockDb.bpmCardCadencia.findMany.mockResolvedValue([vinculo]);
-
-    // Execution creates OK but tarefa.create throws
-    mockDb.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
-      const tx = {
-        bpmCard: { findUnique: vi.fn().mockResolvedValue(vinculo.card) },
-        bpmCadencia: { findUnique: vi.fn().mockResolvedValue({ pipelineId: "pipe1", etapaId: "et1", ativa: true }) },
-        bpmCadenciaPassoExecucao: {
-          create: vi.fn().mockResolvedValue({ id: "exec1" }),
-          update: vi.fn(),
-        },
-        bpmTarefa: { create: vi.fn().mockRejectedValue(new Error("DB error")) },
-        bpmCardCadencia: { update: vi.fn() },
-        bpmCardHistorico: { create: vi.fn() },
-      };
-      return fn(tx);
-    });
-
-    // Cleanup: updateMany should be called to mark EM_EXECUCAO → FALHA
+  it("marca execução intermediária como falha", async () => {
+    const v = vinculo();
+    mockDb.bpmCardCadencia.findMany.mockResolvedValue([v]);
+    executarTx(v, { falhaTarefa: true });
     mockDb.bpmCadenciaPassoExecucao.updateMany.mockResolvedValue({ count: 1 });
-
     const resultado = await processarCadenciasBpm();
-
     expect(resultado.falhas).toBe(1);
-    expect(mockDb.bpmCadenciaPassoExecucao.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { vinculoId: "vinculo1", status: "EM_EXECUCAO" },
-        data: expect.objectContaining({ status: "FALHA" }),
-      }),
-    );
-  });
-
-  it("card não ATIVO: vínculo é cancelado", async () => {
-    const vinculo = makeVinculo({ card: { id: "card1", pipelineId: "pipe1", etapaId: "et1", status: "FECHADO", responsavelId: 1 } });
-    mockDb.bpmCardCadencia.findMany.mockResolvedValue([vinculo]);
-    mockDb.bpmCardCadencia.update.mockResolvedValue({});
-
-    const resultado = await processarCadenciasBpm();
-
-    expect(mockDb.bpmCardCadencia.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "vinculo1" },
-        data: expect.objectContaining({ status: "CANCELADA" }),
-      }),
-    );
-    expect(resultado.processadas).toBe(0);
-    expect(resultado.falhas).toBe(0);
-  });
-
-  it("cadência inativa é pausada sem criar tarefa", async () => {
-    mockDb.bpmCardCadencia.findMany.mockResolvedValue([makeVinculo({
-      cadencia: { ...makeVinculo().cadencia, ativa: false },
-    })]);
-    mockDb.bpmCardCadencia.update.mockResolvedValue({});
-
-    const resultado = await processarCadenciasBpm();
-
-    expect(mockDb.bpmCardCadencia.update).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ status: "PAUSADA", proximaExecucaoEm: null }),
+    expect(mockDb.bpmCadenciaPassoExecucao.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { vinculoId: "v-1", status: "EM_EXECUCAO" }, data: expect.objectContaining({ status: "FALHA" }),
     }));
-    expect(resultado.processadas).toBe(0);
   });
 
-  it.each([
-    ["legado sem etapa", { pipelineId: "pipe1", etapaId: null }],
-    ["outra etapa", { pipelineId: "pipe1", etapaId: "et2" }],
-    ["outro pipeline", { pipelineId: "pipe2", etapaId: "et1" }],
-  ])("%s é cancelado antes de criar tarefa", async (_caso, escopo) => {
-    mockDb.bpmCardCadencia.findMany.mockResolvedValue([makeVinculo({
-      cadencia: { ...makeVinculo().cadencia, ...escopo },
-    })]);
+  it("cancela somente quando o card deixou de estar ativo", async () => {
+    const v = vinculo({ card: { id: "card-1", pipelineId: "pipe-1", etapaId: "outra", status: "FECHADO", responsavelId: 1 } });
+    mockDb.bpmCardCadencia.findMany.mockResolvedValue([v]);
     mockDb.bpmCardCadencia.update.mockResolvedValue({});
-
     const resultado = await processarCadenciasBpm();
-
-    expect(mockDb.bpmCardCadencia.update).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ status: "CANCELADA", proximaExecucaoEm: null }),
-    }));
-    expect(mockDb.$transaction).not.toHaveBeenCalled();
-    expect(resultado.falhas).toBe(0);
+    expect(resultado).toMatchObject({ processadas: 0, falhas: 0 });
+    expect(mockDb.bpmCardCadencia.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "CANCELADA" }) }));
   });
 
-  it("revalidação transacional impede tarefa se o card mudar durante o processamento", async () => {
-    const vinculo = makeVinculo();
-    mockDb.bpmCardCadencia.findMany.mockResolvedValue([vinculo]);
-    mockDb.bpmCardCadencia.update.mockResolvedValue({});
-    mockDb.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => fn({
-      bpmCard: { findUnique: vi.fn().mockResolvedValue({ ...vinculo.card, etapaId: "et2" }) },
-      bpmCadencia: { findUnique: vi.fn().mockResolvedValue({ pipelineId: "pipe1", etapaId: "et1", ativa: true }) },
-      bpmCadenciaPassoExecucao: { create: vi.fn() },
-      bpmTarefa: { create: vi.fn() },
-    }));
-
+  it("ignora definição desativada durante a transação sem pausar o vínculo", async () => {
+    const v = vinculo();
+    mockDb.bpmCardCadencia.findMany.mockResolvedValue([v]);
+    executarTx(v, { cadenciaAtiva: false });
     const resultado = await processarCadenciasBpm();
-
-    expect(mockDb.bpmCardCadencia.update).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ status: "CANCELADA" }),
-    }));
-    expect(resultado.falhas).toBe(0);
+    expect(resultado).toMatchObject({ processadas: 0, falhas: 0 });
+    expect(resultado.avisos.join(" ")).toContain("definição inativa");
+    expect(mockDb.bpmCardCadencia.update).not.toHaveBeenCalled();
   });
 
-  it("último passo: vínculo é concluído", async () => {
-    const vinculo = makeVinculo({
-      passoAtualOrdem: 2,
-      cadencia: {
-        id: "cad1",
-        nome: "Cad",
-        ativa: true,
-        pipelineId: "pipe1",
-        etapaId: "et1",
-        passos: [
-          { id: "passo1", ordem: 1, intervaloDias: 7, titulo: "P1", tipoTarefa: "TAREFA", prioridade: "NORMAL", ativo: true },
-          { id: "passo2", ordem: 2, intervaloDias: 14, titulo: "P2", tipoTarefa: "TAREFA", prioridade: "NORMAL", ativo: true },
-        ],
-      },
-    });
-    mockDb.bpmCardCadencia.findMany.mockResolvedValue([vinculo]);
-
-    const execucao = { id: "exec1" };
-    const tarefa = { id: "tarefa1" };
-    mockDb.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
-      const tx = {
-        bpmCard: { findUnique: vi.fn().mockResolvedValue(vinculo.card) },
-        bpmCadencia: { findUnique: vi.fn().mockResolvedValue({ pipelineId: "pipe1", etapaId: "et1", ativa: true }) },
-        bpmCadenciaPassoExecucao: {
-          create: vi.fn().mockResolvedValue(execucao),
-          update: vi.fn().mockResolvedValue({}),
-        },
-        bpmTarefa: { create: vi.fn().mockResolvedValue(tarefa) },
-        bpmCardCadencia: { update: vi.fn().mockResolvedValue({}) },
-        bpmCardHistorico: { create: vi.fn().mockResolvedValue({}) },
-      };
-      return fn(tx);
-    });
-
+  it("conclui o vínculo no último passo", async () => {
+    const base = vinculo();
+    const v = vinculo({ passoAtualOrdem: 2, cadencia: { ...base.cadencia } });
+    mockDb.bpmCardCadencia.findMany.mockResolvedValue([v]);
+    const tx = executarTx(v);
     const resultado = await processarCadenciasBpm();
-
     expect(resultado.processadas).toBe(1);
-    expect(registrarHistoricoCard).toHaveBeenCalledWith(
-      expect.objectContaining({ acao: "CADENCIA_CONCLUIDA" }),
-      expect.anything(),
-    );
+    expect(tx.bpmCardCadencia.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "CONCLUIDA" }) }));
+    expect(registrarHistoricoCard).toHaveBeenCalledWith(expect.objectContaining({ acao: "CADENCIA_CONCLUIDA" }), tx);
   });
 });

@@ -1,5 +1,17 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-09-09 — RM-2026-457A31 — associação normalizada com shadow legado
+
+**Decisão:** representar várias etapas por `BpmChecklistTemplateEtapa`, usando zero vínculos como global e mantendo `BpmChecklistTemplate.etapaId` como primeira etapa canônica para rollback. A leitura usa uma função única e preserva fallback singular legado; snapshots materializados não são reescritos.
+
+**Consequência:** materialização, bloqueio, Regras e Automações compartilham o mesmo escopo, e a seleção administrativa pode ser reconciliada atomicamente sem remover compatibilidade de leitura.
+
+### 2026-09-08 — RM-2026-3D529D — inbox por contatos na API workspace-token
+
+**Decisão:** usar `GET /v1/contacts` como única origem do inbox no proxy workspace-token, mantendo apenas contatos com `conversation` não nula. Busca e paginação seguem o contrato por página; filtros de status/tags e ações que exigem sessão interna não são expostos. `CHATBOTX_API_KEY` é o segredo canônico, com `CHATBOTX_API_TOKEN` apenas como fallback legado.
+
+**Consequência:** o Painel Alpha não chama a rota de conversas que depende de usuário interno do ChatbotX e não apresenta controles sem operação real. Mensagens continuam por identificador de contato, sem persistência local.
+
 ### 2026-09-08 — RM-2026-3D529D — proxy server-side e nenhuma persistência local
 
 **Decisão:** integrar o ChatBot Alpha ao serviço ChatbotX por server actions autenticadas e pelo cliente HTTP server-only `src/lib/chatbot-alpha/chat-api.ts`. Credenciais externas não chegam ao bundle do cliente, respostas são validadas por Zod e falhas são transformadas em erros operacionais sanitizados. Os dados continuam pertencendo ao ChatbotX; não foi criada migration, tabela ou cache persistente local.
@@ -1422,3 +1434,9 @@ de segurança.
 **Decisão:** preservar `Novos leads` como inicial, `Fechado`/`Lost`/`Sem viabilidade` como finais e as 52 arestas permitidas/20 bloqueadas; novas etapas criam arestas bloqueadas. `Regime tributário` permanece canônico e somente leitura. `Radar atual` e `Status da sede` são desativados por publicação autenticada, aceitando o impacto compartilhado no Operacional.
 
 **Consequências:** a correção não é escrita pelo terminal, pois a auditoria precisa do administrador real. O workspace prepara o rascunho aprovado e o publica com CAS; testes garantem que nenhum outro campo, etapa ou transição é alterado. Sem migration ou backfill.
+
+### 2026-09-08 — RM-2026-6F3C54: associação normalizada de cadência e etapa
+
+**Decisão:** criar `BpmCadenciaEtapa` com FK para cadência/etapa e unicidade global de `etapaId`. A coleção é a fonte canônica; `BpmCadencia.etapaId` guarda somente a primeira etapa como shadow compatível. Coleção vazia continua significando entrada no pipeline, nunca aplicação universal.
+
+**Consequências:** uma definição e seus passos podem ser reutilizados em várias colunas sem duplicação. As mutations fazem diff transacional, validam pipeline/atividade e recusam colisões também no banco. Remover uma coluna não altera vínculos já iniciados. A atomicidade de ativação com criação/movimento definida no RM-2026-55E27D é preservada; apenas realtime pós-commit é best-effort.

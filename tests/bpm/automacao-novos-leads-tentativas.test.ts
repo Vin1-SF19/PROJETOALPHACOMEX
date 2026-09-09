@@ -11,6 +11,7 @@ const transactionMock = vi.hoisted(() => vi.fn());
 const notificarMock = vi.hoisted(() => vi.fn());
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/bpm/cadencias/ativacao-automatica", () => ({ ativarCadenciasNaEntradaBpm: vi.fn().mockResolvedValue({ alteradas: 0 }) }));
 vi.mock("@/lib/prisma", () => ({
   default: {
     bpmPipeline: { findFirst: pipelineFindFirstMock },

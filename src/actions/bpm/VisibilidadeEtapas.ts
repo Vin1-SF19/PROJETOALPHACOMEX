@@ -10,6 +10,14 @@ import db from "@/lib/prisma";
 import { isAdminRole, normalizeRole } from "@/lib/roles";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
+
+async function notificarVisibilidadeConfirmada(pipelineId: string) {
+  try {
+    await notificarPipelineBpm({ pipelineId, tipo: "PIPELINE_ALTERADO" });
+  } catch (error) {
+    console.error("[VisibilidadeEtapas:notificacao_pos_commit]", error);
+  }
+}
 const pipelineIdSchema = z.string().cuid();
 
 const perfilSchema = z
@@ -200,10 +208,7 @@ export async function SalvarVisibilidadeEtapaBpm(dados: unknown) {
 
     revalidatePath(`${ROTA_BASE}/admin/pipelines/${etapa.pipelineId}`);
     revalidatePath(`${ROTA_BASE}/pipeline/${etapa.pipelineId}`);
-    await notificarPipelineBpm({
-      pipelineId: etapa.pipelineId,
-      tipo: "PIPELINE_ALTERADO",
-    });
+    await notificarVisibilidadeConfirmada(etapa.pipelineId);
     return { success: true, data: atualizadas };
   } catch (error) {
     console.error("[SalvarVisibilidadeEtapaBpm]", error);

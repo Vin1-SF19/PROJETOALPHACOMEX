@@ -20,6 +20,10 @@ export type CadenciaView = {
   ativa: boolean;
   pipeline?: { id: string; nome: string } | null;
   etapa?: { id: string; nome: string } | null;
+  etapas: Array<{
+    etapaId: string;
+    etapa: { id: string; nome: string; pipelineId: string };
+  }>;
   passos: PassoCadenciaView[];
   _count?: { vinculos: number };
 };

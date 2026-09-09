@@ -79,8 +79,12 @@ export async function ativarCadenciasNaEntradaBpm(
   if (!destino) throw new Error("CADENCIA_DESTINO_INVALIDO");
   if (!card) return resultado;
 
-  const escopos: Array<{ etapaId: string | null }> = [{ etapaId: input.etapaDestinoId }];
-  if (entradaPipeline) escopos.push({ etapaId: null });
+  const escopos = [
+    { etapas: { some: { etapaId: input.etapaDestinoId } } },
+    ...(entradaPipeline
+      ? [{ etapaId: null, etapas: { none: {} } }]
+      : []),
+  ];
   const cadencias = await tx.bpmCadencia.findMany({
     where: {
       ativa: true,
@@ -191,17 +195,4 @@ export async function sincronizarCadenciasNaEntradaBpm(
     });
   }
   return resultado;
-}
-
-export async function validarEscopoCadenciaBpm(
-  input: { pipelineId: string | null | undefined; etapaId?: string | null | undefined },
-  tx: Pick<Tx, "bpmEtapa">,
-): Promise<void> {
-  if (!input.pipelineId) throw new Error("CADENCIA_PIPELINE_OBRIGATORIO");
-  if (!input.etapaId) return;
-  const etapa = await tx.bpmEtapa.findFirst({
-    where: { id: input.etapaId, pipelineId: input.pipelineId, ativo: true },
-    select: { id: true },
-  });
-  if (!etapa) throw new Error("CADENCIA_ETAPA_FORA_PIPELINE");
 }

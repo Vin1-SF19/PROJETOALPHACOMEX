@@ -16,6 +16,7 @@ import {
 } from "@/actions/bpm/Cadencias";
 import { BPM_TAREFA_TIPOS, criarCadenciaSchema } from "@/lib/bpm/cadencias/schemas";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -33,8 +34,6 @@ type Props = {
 const TIPO_LABEL: Record<string, string> = {
   CHECKLIST: "Checklist", LIGACAO: "Ligação", WHATSAPP: "WhatsApp", EMAIL: "E-mail", TAREFA: "Tarefa", LEMBRETE_RAPIDO: "Lembrete rápido",
 };
-const ESCOPO_PIPELINE = "__pipeline__";
-
 export function CadenciaFormDialog({ cadencia, pipelines, onClose, onSaved, onCreated }: Props) {
   const [ativa, setAtiva] = useState(cadencia?.ativa ?? true);
   const [passos, setPassos] = useState(cadencia?.passos ?? []);
@@ -50,11 +49,12 @@ export function CadenciaFormDialog({ cadencia, pipelines, onClose, onSaved, onCr
       nome: cadencia?.nome ?? "",
       descricao: cadencia?.descricao ?? "",
       pipelineId: cadencia?.pipelineId ?? "",
-      etapaId: cadencia?.etapaId ?? undefined,
+      etapaIds: cadencia?.etapas?.map((item) => item.etapaId)
+        ?? (cadencia?.etapaId ? [cadencia.etapaId] : []),
     },
   });
   const pipelineId = useWatch({ control, name: "pipelineId" });
-  const etapaId = useWatch({ control, name: "etapaId" });
+  const etapaIds = useWatch({ control, name: "etapaIds" }) ?? [];
   const etapasDisponiveis = pipelines.find((pipeline) => pipeline.id === pipelineId)?.etapas ?? [];
 
   const salvarMetadados = handleSubmit((dados) => {
@@ -63,7 +63,7 @@ export function CadenciaFormDialog({ cadencia, pipelines, onClose, onSaved, onCr
         nome: dados.nome.trim(),
         descricao: dados.descricao?.trim() || undefined,
         pipelineId: dados.pipelineId,
-        etapaId: dados.etapaId,
+        etapaIds: dados.etapaIds,
         ativa,
       };
       const resposta = cadencia
@@ -138,7 +138,7 @@ export function CadenciaFormDialog({ cadencia, pipelines, onClose, onSaved, onCr
       <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{cadencia ? "Editar cadência" : "Nova cadência"}</DialogTitle>
-          <DialogDescription>Orientação de tarefas e alertas vinculada a uma coluna específica, sem bloquear o avanço do card.</DialogDescription>
+          <DialogDescription>Orientação de tarefas e alertas vinculada a uma ou várias colunas, sem bloquear o avanço do card.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 py-2">
@@ -147,21 +147,14 @@ export function CadenciaFormDialog({ cadencia, pipelines, onClose, onSaved, onCr
             {errors.nome && <p className="mt-1 text-xs text-rose-300">{errors.nome.message}</p>}
           </div>
           <Input aria-label="Descrição da cadência" placeholder="Descrição (opcional)" {...register("descricao")} />
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
             <Select value={pipelineId || undefined} onValueChange={(valor) => {
               setValue("pipelineId", valor, { shouldValidate: true });
-              setValue("etapaId", undefined, { shouldValidate: true });
+              setValue("etapaIds", [], { shouldValidate: true, shouldDirty: true });
             }}>
               <SelectTrigger aria-label="Pipeline da cadência"><SelectValue placeholder="Selecione o pipeline" /></SelectTrigger>
               <SelectContent>
                 {pipelines.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={etapaId ?? ESCOPO_PIPELINE} onValueChange={(valor) => setValue("etapaId", valor === ESCOPO_PIPELINE ? undefined : valor, { shouldValidate: true })} disabled={!pipelineId}>
-              <SelectTrigger aria-label="Etapa da cadência"><SelectValue placeholder={pipelineId ? "Entrada no pipeline" : "Escolha o pipeline"} /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ESCOPO_PIPELINE}>Entrada no pipeline</SelectItem>
-                {etapasDisponiveis.map((etapa) => <SelectItem key={etapa.id} value={etapa.id}>{etapa.nome}</SelectItem>)}
               </SelectContent>
             </Select>
             <div className="flex items-center justify-between rounded-xl border border-white/10 px-3">
@@ -169,10 +162,45 @@ export function CadenciaFormDialog({ cadencia, pipelines, onClose, onSaved, onCr
               <Switch aria-label="Cadência ativa" checked={ativa} onCheckedChange={setAtiva} />
             </div>
           </div>
-          {(errors.pipelineId || errors.etapaId) && (
-            <p className="text-xs text-rose-300">Selecione um pipeline e, se desejar, uma etapa válida.</p>
+          {errors.pipelineId && (
+            <p className="text-xs text-rose-300">Selecione um pipeline válido.</p>
           )}
-          <p className="text-xs text-slate-500">A cadência será iniciada automaticamente quando o card entrar no pipeline ou na coluna selecionada.</p>
+          <fieldset className="space-y-2 rounded-xl border border-white/10 bg-white/[0.02] p-3" disabled={!pipelineId || salvando}>
+            <legend className="px-1 text-xs font-semibold text-slate-300">Colunas da cadência</legend>
+            <p className="text-[11px] text-slate-500">
+              Selecione uma ou mais colunas. Sem seleção, a cadência será iniciada somente na entrada do pipeline.
+            </p>
+            <div className="grid max-h-48 gap-1.5 overflow-y-auto sm:grid-cols-2" aria-label="Seleção de colunas da cadência">
+              {etapasDisponiveis.map((etapa) => {
+                const checked = etapaIds.includes(etapa.id);
+                return (
+                  <label key={etapa.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/5 px-2.5 py-2 text-xs text-slate-300 hover:bg-white/[0.04] focus-within:ring-2 focus-within:ring-cyan-400/60">
+                    <Checkbox
+                      aria-label={`Selecionar coluna ${etapa.nome}`}
+                      checked={checked}
+                      onCheckedChange={(value) => {
+                        const next = value
+                          ? [...etapaIds, etapa.id]
+                          : etapaIds.filter((id) => id !== etapa.id);
+                        setValue("etapaIds", next, { shouldValidate: true, shouldDirty: true });
+                      }}
+                    />
+                    <span>{etapa.nome}</span>
+                  </label>
+                );
+              })}
+            </div>
+            {pipelineId && etapasDisponiveis.length === 0 && (
+              <p className="text-xs text-amber-200" role="status">Este pipeline não possui colunas disponíveis.</p>
+            )}
+            <p className="text-[11px] text-cyan-200/80" role="status" aria-live="polite">
+              {etapaIds.length === 0
+                ? "Escopo atual: entrada no pipeline."
+                : `${etapaIds.length} coluna(s) selecionada(s).`}
+            </p>
+            {errors.etapaIds && <p className="text-xs text-rose-300">{errors.etapaIds.message}</p>}
+          </fieldset>
+          <p className="text-xs text-slate-500">A configuração gera tarefas e alertas, mas nunca bloqueia o avanço do card.</p>
           <Button onClick={salvarMetadados} disabled={salvando} variant="outline" className="w-full">
             {cadencia ? "Salvar alterações" : "Criar cadência"}
           </Button>

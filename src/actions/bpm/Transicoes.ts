@@ -14,6 +14,14 @@ import { registrarAuditoriaPipeline } from "@/actions/bpm/Etapas";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
+async function notificarTransicaoConfirmada(pipelineId: string) {
+  try {
+    await notificarPipelineBpm({ pipelineId, tipo: "ETAPA_ALTERADA" });
+  } catch (error) {
+    console.error("[Transicoes:notificacao_pos_commit]", error);
+  }
+}
+
 export async function ListarTransicoesDoPipelineBpm(pipelineId: string) {
   try {
     const session = await auth();
@@ -52,21 +60,18 @@ export async function CriarTransicaoEtapaBpm(dados: unknown) {
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
     const { pipelineId, etapaOrigemId, etapaDestinoId, permitida, origem } = parsed.data;
 
-    const [etapaOrigem, etapaDestino] = await Promise.all([
-      db.bpmEtapa.findUnique({ where: { id: etapaOrigemId }, select: { pipelineId: true } }),
-      db.bpmEtapa.findUnique({ where: { id: etapaDestinoId }, select: { pipelineId: true } }),
-    ]);
-    if (!etapaOrigem || !etapaDestino || etapaOrigem.pipelineId !== pipelineId || etapaDestino.pipelineId !== pipelineId) {
-      return { success: false, error: "Etapas de origem/destino devem pertencer ao pipeline informado" };
-    }
-
     const transicao = await db.$transaction(async (tx) => {
+      await exigirAcessoConfigPipeline(userId, "configurarEtapas", tx);
+      const etapas = await tx.bpmEtapa.count({
+        where: { id: { in: [etapaOrigemId, etapaDestinoId] }, pipelineId },
+      });
+      if (etapas !== 2) throw new Error("TRANSICAO_ESCOPO_INVALIDO");
       const criada = await tx.bpmTransicaoEtapa.upsert({
         where: { etapaOrigemId_etapaDestinoId: { etapaOrigemId, etapaDestinoId } },
         create: { pipelineId, etapaOrigemId, etapaDestinoId, permitida, origem },
         update: { permitida, origem },
       });
-      await registrarAuditoriaPipeline({
+      await registrarAuditoriaPipeline(tx, {
         pipelineId,
         adminId: userId,
         campoAlterado: "transicao_criada",
@@ -77,11 +82,13 @@ export async function CriarTransicaoEtapaBpm(dados: unknown) {
 
     revalidatePath(`${ROTA_BASE}/admin/pipelines/${pipelineId}`);
     revalidatePath(`${ROTA_BASE}/pipeline/${pipelineId}`);
-    await notificarPipelineBpm({ pipelineId, tipo: "ETAPA_ALTERADA" });
+    await notificarTransicaoConfirmada(pipelineId);
     return { success: true, data: transicao };
   } catch (error) {
     console.error("[CriarTransicaoEtapaBpm]", error);
-    const msg = error instanceof Error && error.message.includes("administradores") ? error.message : "Erro ao criar transição";
+    const msg = error instanceof Error && error.message === "TRANSICAO_ESCOPO_INVALIDO"
+      ? "Etapas de origem/destino devem pertencer ao pipeline informado"
+      : error instanceof Error && error.message.includes("administradores") ? error.message : "Erro ao criar transição";
     return { success: false, error: msg };
   }
 }
@@ -98,28 +105,30 @@ export async function AtualizarTransicaoEtapaBpm(dados: unknown) {
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
     const { transicaoId, ...campos } = parsed.data;
 
-    const anterior = await db.bpmTransicaoEtapa.findUnique({ where: { id: transicaoId } });
-    if (!anterior) return { success: false, error: "Transição não encontrada" };
-
-    const transicao = await db.$transaction(async (tx) => {
+    const { transicao, pipelineId } = await db.$transaction(async (tx) => {
+      await exigirAcessoConfigPipeline(userId, "configurarEtapas", tx);
+      const anterior = await tx.bpmTransicaoEtapa.findUnique({ where: { id: transicaoId } });
+      if (!anterior) throw new Error("TRANSICAO_NAO_ENCONTRADA");
       const atualizada = await tx.bpmTransicaoEtapa.update({ where: { id: transicaoId }, data: campos });
-      await registrarAuditoriaPipeline({
+      await registrarAuditoriaPipeline(tx, {
         pipelineId: anterior.pipelineId,
         adminId: userId,
         campoAlterado: "transicao_atualizada",
         valorAnteriorJson: JSON.stringify(anterior),
         valorNovoJson: JSON.stringify(campos),
       });
-      return atualizada;
+      return { transicao: atualizada, pipelineId: anterior.pipelineId };
     });
 
-    revalidatePath(`${ROTA_BASE}/admin/pipelines/${anterior.pipelineId}`);
-    revalidatePath(`${ROTA_BASE}/pipeline/${anterior.pipelineId}`);
-    await notificarPipelineBpm({ pipelineId: anterior.pipelineId, tipo: "ETAPA_ALTERADA" });
+    revalidatePath(`${ROTA_BASE}/admin/pipelines/${pipelineId}`);
+    revalidatePath(`${ROTA_BASE}/pipeline/${pipelineId}`);
+    await notificarTransicaoConfirmada(pipelineId);
     return { success: true, data: transicao };
   } catch (error) {
     console.error("[AtualizarTransicaoEtapaBpm]", error);
-    const msg = error instanceof Error && error.message.includes("administradores") ? error.message : "Erro ao atualizar transição";
+    const msg = error instanceof Error && error.message === "TRANSICAO_NAO_ENCONTRADA"
+      ? "Transição não encontrada"
+      : error instanceof Error && error.message.includes("administradores") ? error.message : "Erro ao atualizar transição";
     return { success: false, error: msg };
   }
 }
@@ -136,26 +145,29 @@ export async function RemoverTransicaoEtapaBpm(dados: unknown) {
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
     const { transicaoId } = parsed.data;
 
-    const anterior = await db.bpmTransicaoEtapa.findUnique({ where: { id: transicaoId } });
-    if (!anterior) return { success: false, error: "Transição não encontrada" };
-
-    await db.$transaction(async (tx) => {
+    const pipelineId = await db.$transaction(async (tx) => {
+      await exigirAcessoConfigPipeline(userId, "configurarEtapas", tx);
+      const anterior = await tx.bpmTransicaoEtapa.findUnique({ where: { id: transicaoId } });
+      if (!anterior) throw new Error("TRANSICAO_NAO_ENCONTRADA");
       await tx.bpmTransicaoEtapa.delete({ where: { id: transicaoId } });
-      await registrarAuditoriaPipeline({
+      await registrarAuditoriaPipeline(tx, {
         pipelineId: anterior.pipelineId,
         adminId: userId,
         campoAlterado: "transicao_removida",
         valorAnteriorJson: JSON.stringify(anterior),
       });
+      return anterior.pipelineId;
     });
 
-    revalidatePath(`${ROTA_BASE}/admin/pipelines/${anterior.pipelineId}`);
-    revalidatePath(`${ROTA_BASE}/pipeline/${anterior.pipelineId}`);
-    await notificarPipelineBpm({ pipelineId: anterior.pipelineId, tipo: "ETAPA_ALTERADA" });
+    revalidatePath(`${ROTA_BASE}/admin/pipelines/${pipelineId}`);
+    revalidatePath(`${ROTA_BASE}/pipeline/${pipelineId}`);
+    await notificarTransicaoConfirmada(pipelineId);
     return { success: true };
   } catch (error) {
     console.error("[RemoverTransicaoEtapaBpm]", error);
-    const msg = error instanceof Error && error.message.includes("administradores") ? error.message : "Erro ao remover transição";
+    const msg = error instanceof Error && error.message === "TRANSICAO_NAO_ENCONTRADA"
+      ? "Transição não encontrada"
+      : error instanceof Error && error.message.includes("administradores") ? error.message : "Erro ao remover transição";
     return { success: false, error: msg };
   }
 }

@@ -28,6 +28,7 @@ export function VisibilidadeEtapasSection({
 }) {
   const [perfis, setPerfis] = useState<Perfil[]>([]);
   const [regras, setRegras] = useState<RegrasPorEtapa>({});
+  const [regrasConfirmadas, setRegrasConfirmadas] = useState<RegrasPorEtapa>({});
   const [carregando, setCarregando] = useState(true);
   const [salvandoEtapa, setSalvandoEtapa] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -43,8 +44,7 @@ export function VisibilidadeEtapasSection({
     }
 
     setPerfis(result.data.perfis);
-    setRegras(
-      Object.fromEntries(
+    const regrasCarregadas = Object.fromEntries(
         result.data.etapas.map((etapa) => [
           etapa.id,
           Object.fromEntries(
@@ -54,8 +54,9 @@ export function VisibilidadeEtapasSection({
             ]),
           ),
         ]),
-      ),
-    );
+      );
+    setRegras(regrasCarregadas);
+    setRegrasConfirmadas(regrasCarregadas);
     setCarregando(false);
   }, [pipelineId]);
 
@@ -92,6 +93,7 @@ export function VisibilidadeEtapasSection({
   }
 
   async function salvar(etapaId: string) {
+    if (salvandoEtapa) return;
     setSalvandoEtapa(etapaId);
     setErro(null);
     setSucessoEtapa(null);
@@ -105,18 +107,21 @@ export function VisibilidadeEtapasSection({
     });
     setSalvandoEtapa(null);
     if (!result.success || !result.data) {
+      setRegras((atuais) => ({
+        ...atuais,
+        [etapaId]: regrasConfirmadas[etapaId] ?? {},
+      }));
       setErro(mensagemErro(result.error, "Erro ao salvar visibilidade"));
       return;
     }
-    setRegras((atuais) => ({
-      ...atuais,
-      [etapaId]: Object.fromEntries(
+    const regrasSalvas = Object.fromEntries(
         result.data.map((regra) => [
           regra.perfil,
           { podeVer: regra.podeVer, podeAgir: regra.podeAgir },
         ]),
-      ),
-    }));
+      );
+    setRegras((atuais) => ({ ...atuais, [etapaId]: regrasSalvas }));
+    setRegrasConfirmadas((atuais) => ({ ...atuais, [etapaId]: regrasSalvas }));
     setSucessoEtapa(etapaId);
   }
 
@@ -202,6 +207,7 @@ export function VisibilidadeEtapasSection({
                                 <input
                                   type="checkbox"
                                   checked={regra.podeVer}
+                                  disabled={Boolean(salvandoEtapa)}
                                   onChange={(event) => alterarRegra(etapa.id, perfil, "podeVer", event.target.checked)}
                                   aria-label={`${nome} pode visualizar cards em ${etapa.nome}`}
                                   className="size-4 accent-cyan-400"
@@ -211,7 +217,7 @@ export function VisibilidadeEtapasSection({
                                 <input
                                   type="checkbox"
                                   checked={regra.podeAgir}
-                                  disabled={!regra.podeVer}
+                                  disabled={!regra.podeVer || Boolean(salvandoEtapa)}
                                   onChange={(event) => alterarRegra(etapa.id, perfil, "podeAgir", event.target.checked)}
                                   aria-label={`${nome} pode agir em cards de ${etapa.nome}`}
                                   className="size-4 accent-cyan-400 disabled:opacity-40"
@@ -230,7 +236,7 @@ export function VisibilidadeEtapasSection({
                     <button
                       type="button"
                       onClick={() => void salvar(etapa.id)}
-                      disabled={salvando}
+                      disabled={Boolean(salvandoEtapa)}
                       className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
                       style={{ background: `rgba(${accent},0.85)` }}
                     >

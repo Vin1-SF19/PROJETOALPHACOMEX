@@ -14,8 +14,12 @@ import { registrarAuditoriaPipeline } from "@/actions/bpm/Etapas";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
-async function carregarEtapaComPipeline(etapaId: string) {
-  return db.bpmEtapa.findUnique({ where: { id: etapaId }, select: { pipelineId: true } });
+async function notificarSubStatusConfirmado(pipelineId: string) {
+  try {
+    await notificarPipelineBpm({ pipelineId, tipo: "ETAPA_ALTERADA" });
+  } catch (error) {
+    console.error("[SubStatus:notificacao_pos_commit]", error);
+  }
 }
 
 export async function CriarSubStatusBpm(dados: unknown) {
@@ -30,26 +34,28 @@ export async function CriarSubStatusBpm(dados: unknown) {
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
     const { etapaId, nome, cor, ordem } = parsed.data;
 
-    const etapa = await carregarEtapaComPipeline(etapaId);
-    if (!etapa) return { success: false, error: "Etapa não encontrada" };
-
-    const subStatus = await db.$transaction(async (tx) => {
+    const { subStatus, pipelineId } = await db.$transaction(async (tx) => {
+      await exigirAcessoConfigPipeline(userId, "configurarEtapas", tx);
+      const etapa = await tx.bpmEtapa.findUnique({ where: { id: etapaId }, select: { pipelineId: true } });
+      if (!etapa) throw new Error("ETAPA_NAO_ENCONTRADA");
       const criado = await tx.bpmSubStatus.create({ data: { etapaId, nome, cor, ordem } });
-      await registrarAuditoriaPipeline({
+      await registrarAuditoriaPipeline(tx, {
         pipelineId: etapa.pipelineId,
         adminId: userId,
         campoAlterado: "substatus_criado",
         valorNovoJson: JSON.stringify({ etapaId, nome, cor, ordem }),
       });
-      return criado;
+      return { subStatus: criado, pipelineId: etapa.pipelineId };
     });
 
-    revalidatePath(`${ROTA_BASE}/admin/pipelines/${etapa.pipelineId}`);
-    await notificarPipelineBpm({ pipelineId: etapa.pipelineId, tipo: "ETAPA_ALTERADA" });
+    revalidatePath(`${ROTA_BASE}/admin/pipelines/${pipelineId}`);
+    await notificarSubStatusConfirmado(pipelineId);
     return { success: true, data: subStatus };
   } catch (error) {
     console.error("[CriarSubStatusBpm]", error);
-    const msg = error instanceof Error && error.message.includes("administradores") ? error.message : "Erro ao criar substatus";
+    const msg = error instanceof Error && error.message === "ETAPA_NAO_ENCONTRADA"
+      ? "Etapa não encontrada"
+      : error instanceof Error && error.message.includes("administradores") ? error.message : "Erro ao criar substatus";
     return { success: false, error: msg };
   }
 }
@@ -66,29 +72,32 @@ export async function AtualizarSubStatusBpm(dados: unknown) {
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
     const { subStatusId, ...campos } = parsed.data;
 
-    const anterior = await db.bpmSubStatus.findUnique({ where: { id: subStatusId } });
-    if (!anterior) return { success: false, error: "Substatus não encontrado" };
-    const etapa = await carregarEtapaComPipeline(anterior.etapaId);
-    if (!etapa) return { success: false, error: "Etapa não encontrada" };
-
-    const subStatus = await db.$transaction(async (tx) => {
+    const { subStatus, pipelineId } = await db.$transaction(async (tx) => {
+      await exigirAcessoConfigPipeline(userId, "configurarEtapas", tx);
+      const anterior = await tx.bpmSubStatus.findUnique({
+        where: { id: subStatusId },
+        include: { etapa: { select: { pipelineId: true } } },
+      });
+      if (!anterior) throw new Error("SUBSTATUS_NAO_ENCONTRADO");
       const atualizado = await tx.bpmSubStatus.update({ where: { id: subStatusId }, data: campos });
-      await registrarAuditoriaPipeline({
-        pipelineId: etapa.pipelineId,
+      await registrarAuditoriaPipeline(tx, {
+        pipelineId: anterior.etapa.pipelineId,
         adminId: userId,
         campoAlterado: "substatus_atualizado",
         valorAnteriorJson: JSON.stringify(anterior),
         valorNovoJson: JSON.stringify(campos),
       });
-      return atualizado;
+      return { subStatus: atualizado, pipelineId: anterior.etapa.pipelineId };
     });
 
-    revalidatePath(`${ROTA_BASE}/admin/pipelines/${etapa.pipelineId}`);
-    await notificarPipelineBpm({ pipelineId: etapa.pipelineId, tipo: "ETAPA_ALTERADA" });
+    revalidatePath(`${ROTA_BASE}/admin/pipelines/${pipelineId}`);
+    await notificarSubStatusConfirmado(pipelineId);
     return { success: true, data: subStatus };
   } catch (error) {
     console.error("[AtualizarSubStatusBpm]", error);
-    const msg = error instanceof Error && error.message.includes("administradores") ? error.message : "Erro ao atualizar substatus";
+    const msg = error instanceof Error && error.message === "SUBSTATUS_NAO_ENCONTRADO"
+      ? "Substatus não encontrado"
+      : error instanceof Error && error.message.includes("administradores") ? error.message : "Erro ao atualizar substatus";
     return { success: false, error: msg };
   }
 }
@@ -110,27 +119,40 @@ export async function ReordenarSubStatusBpm(dados: unknown) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
-    await exigirAcessoConfigPipeline(Number(session.user.id), "configurarEtapas");
+    const userId = Number(session.user.id);
+    await exigirAcessoConfigPipeline(userId, "configurarEtapas");
 
     const parsed = reordenarSubStatusSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
     const { etapaId, ordem } = parsed.data;
 
-    const etapa = await carregarEtapaComPipeline(etapaId);
-    if (!etapa) return { success: false, error: "Etapa não encontrada" };
+    const pipelineId = await db.$transaction(async (tx) => {
+      await exigirAcessoConfigPipeline(userId, "configurarEtapas", tx);
+      const etapa = await tx.bpmEtapa.findUnique({ where: { id: etapaId }, select: { pipelineId: true } });
+      if (!etapa) throw new Error("ETAPA_NAO_ENCONTRADA");
+      const ids = ordem.map(({ subStatusId }) => subStatusId);
+      const pertencentes = await tx.bpmSubStatus.count({ where: { etapaId, id: { in: ids } } });
+      if (pertencentes !== new Set(ids).size) throw new Error("SUBSTATUS_FORA_ETAPA");
+      for (const { subStatusId, ordem: novaOrdem } of ordem) {
+        await tx.bpmSubStatus.update({ where: { id: subStatusId }, data: { ordem: novaOrdem } });
+      }
+      await registrarAuditoriaPipeline(tx, {
+        pipelineId: etapa.pipelineId,
+        adminId: userId,
+        campoAlterado: "substatus_reordenados",
+        valorNovoJson: JSON.stringify({ etapaId, ordem }),
+      });
+      return etapa.pipelineId;
+    });
 
-    await db.$transaction(
-      ordem.map(({ subStatusId, ordem: novaOrdem }) =>
-        db.bpmSubStatus.update({ where: { id: subStatusId }, data: { ordem: novaOrdem } }),
-      ),
-    );
-
-    revalidatePath(`${ROTA_BASE}/admin/pipelines/${etapa.pipelineId}`);
-    await notificarPipelineBpm({ pipelineId: etapa.pipelineId, tipo: "ETAPA_ALTERADA" });
+    revalidatePath(`${ROTA_BASE}/admin/pipelines/${pipelineId}`);
+    await notificarSubStatusConfirmado(pipelineId);
     return { success: true };
   } catch (error) {
     console.error("[ReordenarSubStatusBpm]", error);
-    const msg = error instanceof Error && error.message.includes("administradores") ? error.message : "Erro ao reordenar substatus";
+    const msg = error instanceof Error && error.message === "ETAPA_NAO_ENCONTRADA"
+      ? "Etapa não encontrada"
+      : error instanceof Error && error.message.includes("administradores") ? error.message : "Erro ao reordenar substatus";
     return { success: false, error: msg };
   }
 }

@@ -7,24 +7,30 @@ export const CADENCIA_PASSO_EXECUCAO_STATUS = ["PENDENTE", "EM_EXECUCAO", "CONCL
 export const BPM_TAREFA_TIPOS = ["CHECKLIST", "LIGACAO", "WHATSAPP", "EMAIL", "TAREFA", "LEMBRETE_RAPIDO"] as const;
 export const BPM_PRIORIDADES = ["BAIXA", "NORMAL", "ALTA"] as const;
 
+const etapaIdsSchema = z.array(z.string().cuid()).max(100).superRefine((ids, context) => {
+  if (new Set(ids).size !== ids.length) {
+    context.addIssue({ code: "custom", message: "Não repita a mesma coluna." });
+  }
+});
+
 // ─── Schemas de criação/edição ───────────────────────────────────────────────
 
 export const criarCadenciaSchema = z.object({
   nome: z.string().min(1).max(200),
   descricao: z.string().max(2000).optional(),
   pipelineId: z.string().cuid(),
-  etapaId: z.string().cuid().optional(),
+  etapaIds: etapaIdsSchema.default([]),
   ativa: z.boolean().default(true),
-});
+}).strict();
 
 export const atualizarCadenciaSchema = z.object({
   id: z.string().cuid(),
   nome: z.string().min(1).max(200).optional(),
   descricao: z.string().max(2000).nullable().optional(),
   pipelineId: z.string().cuid().optional(),
-  etapaId: z.string().cuid().nullable().optional(),
+  etapaIds: etapaIdsSchema.optional(),
   ativa: z.boolean().optional(),
-});
+}).strict();
 
 export const alternarCadenciaSchema = z.object({
   id: z.string().cuid(),
@@ -35,7 +41,7 @@ export const configurarCadenciaEtapaSchema = z.object({
   pipelineId: z.string().cuid(),
   etapaId: z.string().cuid(),
   cadenciaId: z.string().cuid().nullable(),
-});
+}).strict();
 
 export const cadenciaIdSchema = z.string().cuid();
 export const passoCadenciaIdSchema = z.string().cuid();

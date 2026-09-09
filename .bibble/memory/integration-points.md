@@ -4,13 +4,13 @@
 
 **Entrada do usuário:** sidebar → `/PainelAlpha/ChatBotAlpha` → `page.tsx`, que exige sessão e a permissão `chatBotAlpha` (ou perfil administrativo) antes de renderizar `ChatBotAlphaClient`.
 
-**Fluxo de chat:** aba **Chat** → `ChatBotAlphaClient`/`ChatConversa` → `ListarConversasChatbotx`, `ListarMensagensChatbotx` ou `EnviarMensagemChatbotx` → validação Zod e autorização nas server actions → `src/lib/chatbot-alpha/chat-api.ts` → backend externo configurado por `CHATBOTX_API_URL` e `CHATBOTX_API_TOKEN`. O token permanece exclusivamente no servidor; respostas externas são validadas antes de chegar à UI e erros são sanitizados com identificador de suporte.
+**Fluxo de chat:** aba **Chat** → `ChatBotAlphaClient`/`ChatConversa` → `ListarConversasChatbotx`, `ListarMensagensChatbotx` ou `EnviarMensagemChatbotx` → validação Zod e autorização nas server actions → `src/lib/chatbot-alpha/chat-api.ts` → backend externo configurado por `CHATBOTX_API_URL` e `CHATBOTX_API_KEY` (`CHATBOTX_API_TOKEN` é apenas fallback legado). A chave permanece exclusivamente no servidor; respostas externas são validadas antes de chegar à UI e erros são sanitizados com identificador de suporte.
 
 **Fluxo de infraestrutura preservado:** aba **Infra** → `SeletorSistemaChatBot` → `ObterUrlSistemaChatBot` → `IframeChatBotAlpha` para Adminer, RedisInsight ou MailHog. A integração anterior continua na rota principal e não foi substituída por mocks.
 
 **Operação e diagnóstico:** `npm run chatbot-alpha:doctor` valida os contratos disponíveis e `npm run chatbot-alpha:capabilities` lista capacidades implementadas ou `PENDING_REFERENCE`. Não existe persistência local nem runtime de IA para o chat nesta revisão.
 
-**Limite externo:** sem o código-fonte e a documentação da API do ChatbotX, a integração implementa apenas o contrato HTTP mínimo de conversas/mensagens/envio. Paridade item a item, ownership, streaming e upload não podem ser declarados concluídos.
+**Limite externo:** a referência foi auditada em `/home/ialpha/projetos/ChatbotX-main`. A entrega cobre a superfície workspace-token real de contatos com conversa, mensagens e envio; recursos do inbox interno dependentes de sessão, ownership individual, streaming e upload não fazem parte desta entrega.
 
 **Última atualização:** 2026-09-08 por Codex (recuperação da Fase 15 da RM-2026-3D529D)
 
@@ -2587,3 +2587,11 @@ Composição segue `FormularioEtapaWorkspace` → `SalvarFormularioEtapaBpm` →
 `AdminPipelineClient` → `PublicarConfiguracaoPipelineBpm` → autorização administrativa repetida dentro da transação → validação integral/ownership → CAS de `updatedAt` → diffs mínimos + auditoria → revalidate/realtime pós-commit. `SlaConfigSection` → `SimularConfiguracaoSlaBpm` → acesso ao card/tarefa → mesmo resolvedor de `sla.ts`, sem persistência.
 
 **Última atualização:** 2026-09-08 por Codex (RM-2026-8C3862)
+
+### Cadência multicoluna — RM-2026-6F3C54
+
+`CadenciaFormDialog` envia `etapaIds[]` → schemas Zod normalizam/limitam → `CriarCadenciaBpm`/`AtualizarCadenciaBpm` validam sessão, papel, pipeline, etapas e ocupação dentro da transação → diff em `BpmCadenciaEtapa` + shadow legado + auditoria → agregado confirmado retorna à UI.
+
+Nos produtores de card, `ativarCadenciasNaEntradaBpm(..., tx)` encontra escopo de coluna por `etapas.some({ etapaId })` e escopo de entrada por `etapas.none + etapaId null`. O executor e os vínculos existentes não mudam; uma remoção afeta somente futuras entradas.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-6F3C54)

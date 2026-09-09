@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -19,9 +23,15 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"],
-      ".prisma/client": ["./node_modules/.prisma/client/index"],
-      ".prisma/client/default": ["./node_modules/.prisma/client/index"]
+      "@/*": [
+        "./src/*"
+      ],
+      ".prisma/client": [
+        "./node_modules/.prisma/client/index"
+      ],
+      ".prisma/client/default": [
+        "./node_modules/.prisma/client/index"
+      ]
     }
   },
   "include": [
@@ -30,7 +40,12 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
-, "src/actions/ComersialControle.js"  ],
-  "exclude": ["node_modules"]
+    "**/*.mts",
+    "src/actions/ComersialControle.js",
+    ".next-alpha-dev/types/**/*.ts",
+    ".next-alpha-dev/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }

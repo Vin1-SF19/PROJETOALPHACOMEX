@@ -288,6 +288,11 @@ export const atualizarCampoSchema = z.object({
   pipelineIds: z.array(z.string().cuid()).max(50).optional(),
   etapaConfiguracoes: z.array(campoEtapaConfigSchema).max(200).optional(),
   acessos: z.array(campoAcessoSchema).max(10).optional(),
+  mapeamento: z.object({
+    campoOrigemId: z.string().cuid(),
+    modo: z.enum(BPM_CAMPO_MAPEAMENTO_MODO),
+    ativo: z.boolean().default(true),
+  }).nullable().optional(),
 }).superRefine(validarConfiguracaoCampo);
 
 export const excluirCampoSchema = z.object({

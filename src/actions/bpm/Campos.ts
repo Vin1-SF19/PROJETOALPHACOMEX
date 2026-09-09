@@ -18,6 +18,7 @@ import {
   type MapeamentoCampo,
 } from "@/lib/bpm/campos-configuraveis";
 import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
+import type { Prisma } from "@prisma/client";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -30,6 +31,20 @@ type OpcaoEntrada = string | {
 };
 
 const PERFIS_CAMPO = ["ADMIN", "RESPONSAVEL", "MEMBRO"] as const;
+
+const campoAdminInclude = {
+  pipeline: { select: { id: true, nome: true } },
+  opcoes: { orderBy: { ordem: "asc" as const } },
+  pipelinesAssociados: {
+    include: { pipeline: { select: { id: true, nome: true } } },
+  },
+  etapaConfiguracoes: {
+    include: { etapa: { select: { id: true, nome: true, pipelineId: true } } },
+    orderBy: { ordem: "asc" as const },
+  },
+  acessos: { orderBy: { perfil: "asc" as const } },
+  mapeamentoDestino: true,
+} satisfies Prisma.BpmCampoInclude;
 
 function acessosPadrao({
   visivel,
@@ -70,6 +85,34 @@ function opcoesEstruturadas(opcoes: readonly OpcaoEntrada[] = []) {
   });
 }
 
+function validarCatalogoSelecao(params: {
+  tipo: string;
+  opcoes: readonly { ativo: boolean }[];
+  fonteEntidade: string | null | undefined;
+  ativo: boolean;
+  possuiOpcoesLegadas?: boolean;
+}) {
+  if (
+    params.ativo
+    && ["selecao", "multiselecao"].includes(params.tipo)
+    && !params.fonteEntidade
+    && !params.opcoes.some((opcao) => opcao.ativo)
+    && !params.possuiOpcoesLegadas
+  ) {
+    throw new Error("CAMPO_SELECAO_SEM_OPCOES: Campo de seleção customizado precisa ter ao menos uma opção ativa");
+  }
+}
+
+function possuiOpcoesJsonValidas(opcoesJson: string | null | undefined) {
+  if (!opcoesJson) return false;
+  try {
+    const opcoes: unknown = JSON.parse(opcoesJson);
+    return Array.isArray(opcoes) && opcoes.some((opcao) => typeof opcao === "string" && opcao.trim());
+  } catch {
+    return false;
+  }
+}
+
 function mensagemErro(error: unknown, fallback: string) {
   if (!(error instanceof Error)) return fallback;
   if (error.message.includes("administradores") || error.message.startsWith("CAMPO_")) {
@@ -106,7 +149,11 @@ function validarCondicoesEtapas(
 async function notificarPipelines(pipelineIds: readonly string[]) {
   for (const pipelineId of [...new Set(pipelineIds)]) {
     revalidatePath(`${ROTA_BASE}/admin/pipelines/${pipelineId}`);
-    await notificarPipelineBpm({ pipelineId, tipo: "CAMPO_ALTERADO" });
+    try {
+      await notificarPipelineBpm({ pipelineId, tipo: "CAMPO_ALTERADO" });
+    } catch (error) {
+      console.error("[Campos:notificacao_pos_commit]", error);
+    }
   }
 }
 
@@ -170,24 +217,29 @@ export async function CriarCampoBpm(dados: unknown) {
     const parsed = criarCampoSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
     const entrada = parsed.data;
+    if (entrada.etapaId || entrada.obrigatorio) {
+      return { success: false, error: "Use a configuração por etapa para aplicabilidade e obrigatoriedade" };
+    }
     validarCondicoesEtapas(entrada.etapaConfiguracoes);
     if (entrada.escopo === "GLOBAL" && entrada.fonteEntidade && !fonteCampoPermitida(entrada.fonteEntidade, entrada.fonteAtributo)) {
       return { success: false, error: "Fonte ou atributo canônico não permitido" };
     }
     const opcoes = opcoesEstruturadas(entrada.opcoes);
-    const etapaIds = [entrada.etapaId, ...(entrada.etapaConfiguracoes ?? []).map((item) => item.etapaId)].filter((id): id is string => Boolean(id));
+    validarCatalogoSelecao({ tipo: entrada.tipo, opcoes, fonteEntidade: entrada.fonteEntidade, ativo: entrada.ativo });
+    const etapaIds = (entrada.etapaConfiguracoes ?? []).map((item) => item.etapaId);
 
     const { campo, pipelineIds } = await db.$transaction(async (tx) => {
+      await exigirAcessoConfigPipeline(userId, "configurarCampos", tx);
       const todosPipelines = await validarDimensoesCampo(tx as typeof db, entrada.pipelineId, entrada.pipelineIds ?? [], etapaIds);
       const criado = await tx.bpmCampo.create({
         data: {
           pipelineId: entrada.pipelineId,
           chave: entrada.chave,
-          etapaId: entrada.etapaId,
+          etapaId: null,
           nome: entrada.nome,
           tipo: entrada.tipo,
           opcoesJson: opcoes.length ? JSON.stringify(opcoes.filter((item) => item.ativo).map((item) => item.rotulo)) : null,
-          obrigatorio: entrada.obrigatorio,
+          obrigatorio: false,
           ordem: entrada.ordem,
           ativo: entrada.ativo,
           escopo: entrada.escopo,
@@ -217,7 +269,7 @@ export async function CriarCampoBpm(dados: unknown) {
             visivel: entrada.visivel,
             editavel: entrada.editavel,
             somenteLeitura: entrada.somenteLeitura,
-            obrigatorio: entrada.obrigatorio,
+            obrigatorio: false,
           });
       await tx.bpmCampoAcesso.createMany({ data: acessos.map((item) => ({ ...item, campoId: criado.id, editavel: item.somenteLeitura ? false : item.editavel })) });
       await tx.bpmPipelineConfigAuditoria.create({
@@ -228,7 +280,11 @@ export async function CriarCampoBpm(dados: unknown) {
           valorNovoJson: JSON.stringify({ campoId: criado.id, tipo: entrada.tipo, escopo: entrada.escopo, pipelineIds: todosPipelines }),
         },
       });
-      return { campo: criado, pipelineIds: todosPipelines };
+      const agregado = await tx.bpmCampo.findUniqueOrThrow({
+        where: { id: criado.id },
+        include: campoAdminInclude,
+      });
+      return { campo: agregado, pipelineIds: todosPipelines };
     });
 
     await notificarPipelines(pipelineIds);
@@ -258,11 +314,21 @@ export async function AtualizarCampoBpm(dados: unknown) {
     const parsed = atualizarCampoSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
     const entrada = parsed.data;
+    if (entrada.etapaId || entrada.obrigatorio) {
+      return { success: false, error: "Use a configuração por etapa para aplicabilidade e obrigatoriedade" };
+    }
     validarCondicoesEtapas(entrada.etapaConfiguracoes);
 
     const anterior = await db.bpmCampo.findUnique({
       where: { id: entrada.campoId },
-      include: { valores: { select: { valor: true } }, opcoes: true, pipelinesAssociados: true },
+      include: {
+        valores: { select: { valor: true } },
+        opcoes: true,
+        pipelinesAssociados: true,
+        etapaConfiguracoes: true,
+        acessos: true,
+        mapeamentoDestino: true,
+      },
     });
     if (!anterior) return { success: false, error: "Campo não encontrado" };
     const escopoFinal = entrada.escopo ?? anterior.escopo;
@@ -285,9 +351,22 @@ export async function AtualizarCampoBpm(dados: unknown) {
       }
     }
 
+    const tipoFinal = entrada.tipo ?? anterior.tipo;
+    const fonteFinal = escopoFinal === "GLOBAL" ? entidadeFinal : null;
+    const ativoFinal = entrada.ativo ?? anterior.ativo;
+    const opcoesFinais = novasOpcoes ?? anterior.opcoes;
+    validarCatalogoSelecao({
+      tipo: tipoFinal,
+      opcoes: opcoesFinais,
+      fonteEntidade: fonteFinal,
+      ativo: ativoFinal,
+      possuiOpcoesLegadas: novasOpcoes === undefined && possuiOpcoesJsonValidas(anterior.opcoesJson),
+    });
+
     const pipelineIdsEntrada = entrada.pipelineIds ?? anterior.pipelinesAssociados.map((item) => item.pipelineId);
-    const etapaIds = [entrada.etapaId, ...(entrada.etapaConfiguracoes ?? []).map((item) => item.etapaId)].filter((id): id is string => Boolean(id));
+    const etapaIds = (entrada.etapaConfiguracoes ?? anterior.etapaConfiguracoes).map((item) => item.etapaId);
     const resultado = await db.$transaction(async (tx) => {
+      await exigirAcessoConfigPipeline(userId, "configurarCampos", tx);
       const todosPipelines = await validarDimensoesCampo(tx as typeof db, anterior.pipelineId, pipelineIdsEntrada, etapaIds);
       const atualizado = await tx.bpmCampo.update({
         where: { id: entrada.campoId },
@@ -295,8 +374,8 @@ export async function AtualizarCampoBpm(dados: unknown) {
           chave: entrada.chave,
           nome: entrada.nome,
           tipo: entrada.tipo,
-          etapaId: entrada.etapaId,
-          obrigatorio: entrada.obrigatorio,
+          etapaId: entrada.etapaConfiguracoes ? null : entrada.etapaId,
+          obrigatorio: entrada.etapaConfiguracoes ? false : entrada.obrigatorio,
           ordem: entrada.ordem,
           ativo: entrada.ativo,
           escopo: entrada.escopo,
@@ -334,6 +413,46 @@ export async function AtualizarCampoBpm(dados: unknown) {
         await tx.bpmCampoAcesso.deleteMany({ where: { campoId: entrada.campoId } });
         if (entrada.acessos.length) await tx.bpmCampoAcesso.createMany({ data: entrada.acessos.map((item) => ({ ...item, campoId: entrada.campoId, editavel: item.somenteLeitura ? false : item.editavel })) });
       }
+      if (entrada.mapeamento !== undefined) {
+        if (entrada.mapeamento === null) {
+          await tx.bpmCampoMapeamento.updateMany({
+            where: { campoDestinoId: entrada.campoId, ativo: true },
+            data: { ativo: false },
+          });
+        } else {
+          if (entrada.mapeamento.campoOrigemId === entrada.campoId) {
+            throw new Error("CAMPO_MAPEAMENTO_CICLO: Um campo não pode mapear a si mesmo");
+          }
+          const origem = await tx.bpmCampo.findUnique({
+            where: { id: entrada.mapeamento.campoOrigemId },
+            select: { id: true, tipo: true },
+          });
+          if (!origem || origem.tipo !== tipoFinal) {
+            throw new Error("CAMPO_MAPEAMENTO_TIPO: O mapeamento exige um campo de origem do mesmo tipo");
+          }
+          const existentes = await tx.bpmCampoMapeamento.findMany({
+            select: { campoOrigemId: true, campoDestinoId: true, modo: true, ativo: true },
+          });
+          const candidato = {
+            campoOrigemId: entrada.mapeamento.campoOrigemId,
+            campoDestinoId: entrada.campoId,
+            modo: entrada.mapeamento.modo,
+            ativo: entrada.mapeamento.ativo,
+          };
+          if (mapeamentoCriariaCiclo(existentes as MapeamentoCampo[], candidato)) {
+            throw new Error("CAMPO_MAPEAMENTO_CICLO: O mapeamento criaria um ciclo");
+          }
+          await tx.bpmCampoMapeamento.upsert({
+            where: { campoDestinoId: entrada.campoId },
+            create: candidato,
+            update: {
+              campoOrigemId: candidato.campoOrigemId,
+              modo: candidato.modo,
+              ativo: candidato.ativo,
+            },
+          });
+        }
+      }
       await tx.bpmPipelineConfigAuditoria.create({
         data: {
           pipelineId: anterior.pipelineId,
@@ -343,7 +462,11 @@ export async function AtualizarCampoBpm(dados: unknown) {
           valorNovoJson: JSON.stringify(entrada),
         },
       });
-      return { atualizado, pipelineIds: todosPipelines };
+      const agregado = await tx.bpmCampo.findUniqueOrThrow({
+        where: { id: atualizado.id },
+        include: campoAdminInclude,
+      });
+      return { atualizado: agregado, pipelineIds: todosPipelines };
     });
 
     await notificarPipelines(resultado.pipelineIds);

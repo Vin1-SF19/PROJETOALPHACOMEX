@@ -13,11 +13,19 @@ describe("administração de SLA", () => {
       pipelineId: "cm12345678901234567890123", nome: "SLA comercial", escopo: "ETAPA",
       etapaId: null, tipoTarefa: null, tipoProcesso: null, servicoId: null,
       quantidade: 2, unidade: "DIAS", inicioMomento: "ENTRADA_ETAPA", pausaRegra: "STANDBY",
+      prioridade: 10,
       ativa: true, amareloTipo: "PERCENTUAL_CONSUMIDO", amareloValor: 75, amareloUnidade: null,
       vermelhoTipo: "ATRASO", vermelhoValor: 0, vermelhoUnidade: "MINUTOS",
     };
     expect(slaConfiguracaoAdminSchema.safeParse(base).success).toBe(false);
     expect(slaConfiguracaoAdminSchema.safeParse({ ...base, etapaId: "cm12345678901234567890124" }).success).toBe(true);
+    expect(slaConfiguracaoAdminSchema.safeParse({
+      ...base,
+      escopo: "TAREFA",
+      etapaId: null,
+      tipoTarefa: "FOLLOW_UP",
+      inicioMomento: "ENTRADA_ETAPA",
+    }).success).toBe(false);
   });
 
   it("integra a seção na rota protegida e expõe CRUD e preview", () => {
@@ -31,6 +39,8 @@ describe("administração de SLA", () => {
     expect(secao).toContain("SLA e Alertas");
     expect(formulario).toContain("zodResolver(slaConfiguracaoAdminSchema)");
     expect(formulario).toContain("Prévia dos estados do SLA");
+    expect(formulario).toContain("Prioridade");
+    expect(secao).toContain("maior prioridade, depois maior especificidade");
     expect(actions).toContain("SalvarConfiguracaoSlaBpm");
     expect(actions).toContain("AtivarDesativarConfiguracaoSlaBpm");
     expect(actions).toContain("ExcluirConfiguracaoSlaBpm");

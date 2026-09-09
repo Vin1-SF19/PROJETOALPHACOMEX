@@ -1,8 +1,22 @@
 # ARCHITECTURE — Mapa de Arquitetura do Projeto
 
+## Checklist em várias etapas — implementação local (RM-2026-457A31, 2026-09-09)
+
+`BpmChecklistTemplateEtapa` normaliza o escopo de etapas, preservando `BpmChecklistTemplate.etapaId` como shadow legado. Zero associações significa escopo global; uma ou mais associações restringem ao conjunto selecionado. `filtroEtapaTemplateChecklist` é compartilhado por materialização e resumo/motores, com fallback singular legado. As actions validam pipeline, etapas ativas e card, revalidam permissão em transação serializável, reconciliam metadados/itens/associações/auditoria e notificam após commit.
+
+DELIVERY_READY local: `Alpha CRM → Configurações → Checklists` consome as actions; pipeline → abrir card → aba **Checklist** usa a mesma resolução canônica. A UI multiselect pertence à fase frontend subsequente.
+
+**Estado remoto:** migration validada em restauração descartável; o preflight Turso falhou por DNS `EAI_AGAIN` antes de qualquer escrita.
+
+## ChatBot Alpha — contrato workspace-token corrigido (RM-2026-3D529D, retomada da Fase 6, 2026-09-08)
+
+O inbox usa `GET /v1/contacts` via `listContactsForAPI`, valida `{data,pageCount,totalCount,totalCountCapped}` e projeta somente contatos com `conversation`. Busca e página são os únicos controles de listagem expostos; filtros de status/tags foram removidos. Mensagens usam `GET/POST /v1/contacts/{identifier}/messages`, corpo `{text}` e sucesso `204`. A configuração exige `CHATBOTX_API_URL` + `CHATBOTX_API_KEY`, aceitando `CHATBOTX_API_TOKEN` somente como fallback legado. Toda action exige sessão; qualquer não-admin precisa de `chatBotAlpha` inclusive para MailHog, enquanto Adminer/Redis permanecem admin-only.
+
+DELIVERY_READY: `npm run chatbot-alpha:list-conversations -- --keyword <texto> --page <n>` → proxy workspace-token → contatos com conversa; na UI, `Sidebar → ChatBot Alpha → Chat` consome o mesmo contrato. `Infra → MailHog` passa pela autorização da própria Server Action.
+
 ## ChatBot Alpha — replicação do frontend ChatbotX (RM-2026-3D529D, concluída, 2026-09-08)
 
-O módulo `/PainelAlpha/ChatBotAlpha` foi reestruturado de hub de infraestrutura (3 iframes) para um módulo com **duas abas**: **Chat** (novo) e **Infra** (preservado). O backend ChatbotX é um serviço self-hosted externo consumido via proxy server-side (`CHATBOTX_API_URL`/`CHATBOTX_API_TOKEN`), sem persistência local (Fase 4: `DATABASE_CHANGE_NOT_REQUIRED`) e sem runtime de IA (Fase 7: `AI_RUNTIME_CHANGE_NOT_REQUIRED`).
+O módulo `/PainelAlpha/ChatBotAlpha` foi reestruturado de hub de infraestrutura (3 iframes) para um módulo com **duas abas**: **Chat** (novo) e **Infra** (preservado). O backend ChatbotX é um serviço self-hosted externo consumido via proxy server-side (`CHATBOTX_API_URL`/`CHATBOTX_API_KEY`, com `CHATBOTX_API_TOKEN` apenas como fallback legado), sem persistência local (Fase 4: `DATABASE_CHANGE_NOT_REQUIRED`) e sem runtime de IA (Fase 7: `AI_RUNTIME_CHANGE_NOT_REQUIRED`).
 
 ### Arquitetura final
 
@@ -30,14 +44,14 @@ O módulo `/PainelAlpha/ChatBotAlpha` foi reestruturado de hub de infraestrutura
 
 ### Limitações conhecidas
 
-- Código-fonte do ChatbotX-main ausente no repositório — matriz de paridade item a item não produzida (bloqueio persistente desde Fase 0).
-- `CHATBOTX_API_URL`/`CHATBOTX_API_TOKEN` não configurados no ambiente — smoke real de chat pendente.
-- Ownership de conversa não definido no contrato do backend — IDOR potencial (achado Anubis Fase 12).
+- A referência está disponível fora do repositório em `/home/ialpha/projetos/ChatbotX-main`; futuras revalidações dependem desse caminho local.
+- `CHATBOTX_API_URL`/`CHATBOTX_API_KEY` não configurados no ambiente — smoke real de chat pendente.
+- O contrato workspace-token é deliberadamente workspace-wide; qualquer usuário local com `chatBotAlpha` opera o workspace associado à chave. A auditoria da Fase 12 não encontrou IDOR no delta.
 - Validação em navegador real (teclado/foco/responsividade) pendente — sem RTL/Playwright no projeto.
 
 ### Validação
 
-- 85/85 testes do módulo passando (`tests/chatbot-alpha/`)
+- 7 arquivos de teste, 124 testes aprovados e 1 `it.todo` (`tests/chatbot-alpha/`)
 - Build Turbopack aprovado (78 páginas, rota gerada)
 - ESLint: 0 novos erros nos arquivos desta entrega
 - Typecheck: 0 novos erros nos arquivos desta entrega
@@ -2296,3 +2310,11 @@ O agregado administrativo pode ser inspecionado por CLI somente leitura e public
 Campos continuam em `BpmCampoEtapaConfig`, arestas em `BpmTransicaoEtapa` e SLA em `BpmSlaConfig`. A simulação de SLA reutiliza o resolvedor operacional sem materializar instâncias ou eventos. Nenhuma tabela, migration ou fonte paralela foi criada.
 
 **Última atualização:** 2026-09-08 por Codex (RM-2026-8C3862)
+
+## Cadência associada a múltiplas colunas — RM-2026-6F3C54
+
+`BpmCadenciaEtapa` é a relação canônica entre uma definição de cadência e zero, uma ou várias etapas do mesmo pipeline. A unicidade de `etapaId` mantém no máximo uma cadência por coluna. Ausência de associações representa exclusivamente entrada no pipeline; `BpmCadencia.etapaId` permanece como shadow da primeira etapa para rollback de código, sem autoridade no runtime novo.
+
+Criação, edição e configuração por coluna validam etapas ativas, ownership e colisões dentro de transação serializável. A ativação consulta a relação normalizada e continua na mesma transação do card, preservando atomicidade, idempotência e snapshots de ciclos existentes.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-6F3C54)

@@ -22,6 +22,7 @@ type Vinculo = {
     nome: string;
     pipeline: { id: string; nome: string } | null;
     etapa: { id: string; nome: string } | null;
+    etapas: Array<{ etapaId: string; etapa: { id: string; nome: string } }>;
     passos: { ordem: number; titulo: string }[];
   };
 };
@@ -70,8 +71,8 @@ export function PainelCadenciasCard({ cardId, accent }: { cardId: string; accent
       {vinculos.map((v) => {
         const meta = STATUS_LABEL[v.status] ?? STATUS_LABEL.ATIVA;
         const proximoPasso = v.cadencia.passos.find((passo) => passo.ordem === v.passoAtualOrdem);
-        const escopo = v.cadencia.pipeline && v.cadencia.etapa
-          ? `${v.cadencia.pipeline.nome} / ${v.cadencia.etapa.nome}`
+        const escopo = v.cadencia.pipeline && v.cadencia.etapas.length > 0
+          ? `${v.cadencia.pipeline.nome} / ${v.cadencia.etapas.map((item) => item.etapa.nome).join(", ")}`
           : v.cadencia.pipeline ? `Entrada no pipeline ${v.cadencia.pipeline.nome}` : "Sem pipeline configurado";
         return (
           <div key={v.id} className={`rounded-xl border px-3 py-2 text-xs ${meta.cor}`}>

@@ -62,6 +62,7 @@ function erroPublico(error: unknown): string {
     "Responsável não é membro válido do card",
     "A lista de ordenação não corresponde aos itens do template",
     "CONFLITO_CHECKLIST_ITEM",
+    "CONFLITO_CHECKLIST_TEMPLATE",
   ].includes(error.message)) return error.message;
   const codigo = typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
     ? error.code
@@ -80,20 +81,58 @@ function nuloSeVazio(valor: string | null | undefined) {
 async function validarEscopoTemplate(dados: {
   pipelineId?: string | null;
   etapaId?: string | null;
+  etapaIds?: string[];
   cardId?: string | null;
 }, client: Pick<Prisma.TransactionClient, "bpmPipeline" | "bpmEtapa" | "bpmCard"> = db) {
-  if (dados.etapaId && !dados.pipelineId) throw new Error("Etapa inválida para o pipeline");
-  const [pipeline, etapa, card] = await Promise.all([
+  const etapaIds = dados.etapaIds ?? (dados.etapaId ? [dados.etapaId] : []);
+  if (etapaIds.length > 0 && !dados.pipelineId) throw new Error("Etapa inválida para o pipeline");
+  const [pipeline, etapas, card] = await Promise.all([
     dados.pipelineId ? client.bpmPipeline.findUnique({ where: { id: dados.pipelineId }, select: { id: true } }) : null,
-    dados.etapaId ? client.bpmEtapa.findUnique({ where: { id: dados.etapaId }, select: { id: true, pipelineId: true } }) : null,
+    etapaIds.length > 0 ? client.bpmEtapa.findMany({
+      where: { id: { in: etapaIds }, pipelineId: dados.pipelineId ?? undefined, ativo: true },
+      orderBy: [{ ordem: "asc" }, { id: "asc" }],
+      select: { id: true, pipelineId: true, ordem: true },
+    }) : [],
     dados.cardId ? client.bpmCard.findUnique({ where: { id: dados.cardId }, select: { id: true, pipelineId: true, etapaId: true } }) : null,
   ]);
   if (dados.pipelineId && !pipeline) throw new Error("Pipeline inválido");
-  if (dados.etapaId && (!etapa || etapa.pipelineId !== dados.pipelineId)) throw new Error("Etapa inválida para o pipeline");
+  if (etapas.length !== etapaIds.length || etapas.some((etapa) => etapa.pipelineId !== dados.pipelineId)) {
+    throw new Error("Etapa inválida para o pipeline");
+  }
   if (dados.cardId && !card) throw new Error("Card não encontrado");
   if (card && ((dados.pipelineId && dados.pipelineId !== card.pipelineId)
-    || (dados.etapaId && dados.etapaId !== card.etapaId))) {
+    || (etapaIds.length > 0 && !etapaIds.includes(card.etapaId)))) {
     throw new Error("Card específico incompatível com os vínculos informados");
+  }
+  return etapas;
+}
+
+async function reconciliarEtapasTemplate(
+  templateId: string,
+  etapaIds: string[],
+  tx: Pick<Prisma.TransactionClient, "bpmChecklistTemplateEtapa">,
+) {
+  const atuais = await tx.bpmChecklistTemplateEtapa.findMany({ where: { templateId }, select: { etapaId: true } });
+  const anteriores = atuais.map((item) => item.etapaId);
+  const desejadas = new Set(etapaIds);
+  const existentes = new Set(anteriores);
+  const removidas = anteriores.filter((id) => !desejadas.has(id));
+  const adicionadas = etapaIds.filter((id) => !existentes.has(id));
+  if (removidas.length > 0) {
+    await tx.bpmChecklistTemplateEtapa.deleteMany({ where: { templateId, etapaId: { in: removidas } } });
+  }
+  if (adicionadas.length > 0) {
+    await tx.bpmChecklistTemplateEtapa.createMany({ data: adicionadas.map((etapaId) => ({ templateId, etapaId })) });
+  }
+  return anteriores;
+}
+
+async function notificarTemplateConfirmado(pipelineId: string | null | undefined) {
+  if (!pipelineId) return;
+  try {
+    await notificarPipelineBpm({ pipelineId, tipo: "ETAPA_ALTERADA" });
+  } catch (error) {
+    console.error("[ChecklistsBpm:notificacao_pos_commit]", { tipo: error instanceof Error ? error.name : typeof error });
   }
 }
 
@@ -106,6 +145,7 @@ export async function ListarTemplatesChecklistBpm() {
       select: {
         id: true, nome: true, descricao: true, ativo: true,
         pipelineId: true, etapaId: true, cardId: true,
+        etapas: { orderBy: [{ etapa: { ordem: "asc" } }, { etapaId: "asc" }], select: { etapaId: true, etapa: { select: { id: true, nome: true } } } },
         createdAt: true, updatedAt: true,
         pipeline: { select: { id: true, nome: true } },
         etapa: { select: { id: true, nome: true } },
@@ -131,6 +171,7 @@ export async function ListarWorkspaceChecklistsBpm() {
         select: {
           id: true, nome: true, descricao: true, ativo: true,
           pipelineId: true, etapaId: true, cardId: true,
+          etapas: { orderBy: [{ etapa: { ordem: "asc" } }, { etapaId: "asc" }], select: { etapaId: true, etapa: { select: { id: true, nome: true } } } },
           createdAt: true, updatedAt: true,
           pipeline: { select: { id: true, nome: true } },
           etapa: { select: { id: true, nome: true } },
@@ -176,20 +217,34 @@ export async function CriarTemplateChecklistBpm(payload: unknown) {
     const { userId } = await exigirAdminChecklist();
     const dados = criarTemplateChecklistSchema.parse(payload);
     await validarEscopoTemplate(dados);
-    const template = await db.bpmChecklistTemplate.create({
-      data: {
-        nome: dados.nome,
-        descricao: nuloSeVazio(dados.descricao),
-        ativo: dados.ativo,
-        pipelineId: dados.pipelineId ?? null,
-        etapaId: dados.etapaId ?? null,
-        cardId: dados.cardId ?? null,
-        criadoPorId: userId,
-        itens: { create: dados.itens.map((item) => ({ ...item, descricao: nuloSeVazio(item.descricao) })) },
-      },
-      select: { id: true },
-    });
+    const template = await db.$transaction(async (tx) => {
+      await exigirAcessoConfigPipeline(userId, "configurarChecklists", tx);
+      const etapas = await validarEscopoTemplate(dados, tx);
+      const etapaIds = etapas.map((etapa) => etapa.id);
+      const criado = await tx.bpmChecklistTemplate.create({
+        data: {
+          nome: dados.nome,
+          descricao: nuloSeVazio(dados.descricao),
+          ativo: dados.ativo,
+          pipelineId: dados.pipelineId ?? null,
+          etapaId: etapaIds[0] ?? null,
+          cardId: dados.cardId ?? null,
+          criadoPorId: userId,
+          itens: { create: dados.itens.map((item) => ({ ...item, descricao: nuloSeVazio(item.descricao) })) },
+          ...(etapaIds.length > 0 ? { etapas: { create: etapaIds.map((etapaId) => ({ etapaId })) } } : {}),
+        },
+        select: { id: true },
+      });
+      if (dados.pipelineId) {
+        await tx.bpmPipelineConfigAuditoria.create({ data: {
+          pipelineId: dados.pipelineId, adminId: userId, campoAlterado: "checklist_template_criado",
+          valorNovoJson: JSON.stringify({ templateId: criado.id, etapaIds }),
+        } });
+      }
+      return criado;
+    }, { isolationLevel: "Serializable" });
     revalidatePath(ROTA_ADMIN);
+    await notificarTemplateConfirmado(dados.pipelineId);
     return { success: true as const, data: template };
   } catch (error) {
     return { success: false as const, error: erroPublico(error) };
@@ -222,15 +277,18 @@ export async function AtualizarTemplateChecklistBpm(payload: unknown) {
 /** Salva metadados e reconcilia todos os itens do editor em uma única transação. */
 export async function SalvarTemplateChecklistBpm(payload: unknown) {
   try {
-    await exigirAdminChecklist();
+    const { userId } = await exigirAdminChecklist();
     const dados = salvarTemplateChecklistSchema.parse(payload);
-    await db.$transaction(async (tx) => {
-      await validarEscopoTemplate(dados, tx);
+    const pipelineId = await db.$transaction(async (tx) => {
+      await exigirAcessoConfigPipeline(userId, "configurarChecklists", tx);
+      const etapas = await validarEscopoTemplate(dados, tx);
+      const etapaIds = etapas.map((etapa) => etapa.id);
       const existente = await tx.bpmChecklistTemplate.findUnique({
         where: { id: dados.id },
-        select: { id: true, itens: { select: { id: true } } },
+        select: { id: true, pipelineId: true, etapaId: true, updatedAt: true, itens: { select: { id: true } }, etapas: { select: { etapaId: true } } },
       });
       if (!existente) throw new Error("Template não encontrado");
+      if (dados.updatedAt && existente.updatedAt.getTime() !== dados.updatedAt.getTime()) throw new Error("CONFLITO_CHECKLIST_TEMPLATE");
       const idsExistentes = new Set(existente.itens.map((item) => item.id));
       const idsRecebidos = dados.itens.flatMap((item) => item.id ? [item.id] : []);
       if (idsRecebidos.some((id) => !idsExistentes.has(id))) throw new Error("Item não encontrado");
@@ -242,11 +300,12 @@ export async function SalvarTemplateChecklistBpm(payload: unknown) {
           descricao: nuloSeVazio(dados.descricao),
           ativo: dados.ativo,
           pipelineId: dados.pipelineId ?? null,
-          etapaId: dados.etapaId ?? null,
+          etapaId: etapaIds[0] ?? null,
           cardId: dados.cardId ?? null,
         },
         select: { id: true },
       });
+      const etapaIdsAnteriores = await reconciliarEtapasTemplate(dados.id, etapaIds, tx);
       await tx.bpmChecklistTemplateItem.deleteMany({
         where: { templateId: dados.id, ...(idsRecebidos.length > 0 ? { id: { notIn: idsRecebidos } } : {}) },
       });
@@ -263,8 +322,17 @@ export async function SalvarTemplateChecklistBpm(payload: unknown) {
           await tx.bpmChecklistTemplateItem.create({ data: { ...data, templateId: dados.id }, select: { id: true } });
         }
       }
-    });
+      if (dados.pipelineId) {
+        await tx.bpmPipelineConfigAuditoria.create({ data: {
+          pipelineId: dados.pipelineId, adminId: userId, campoAlterado: "checklist_template_atualizado",
+          valorAnteriorJson: JSON.stringify({ templateId: dados.id, pipelineId: existente.pipelineId, etapaIds: etapaIdsAnteriores }),
+          valorNovoJson: JSON.stringify({ templateId: dados.id, etapaIds }),
+        } });
+      }
+      return dados.pipelineId ?? null;
+    }, { isolationLevel: "Serializable" });
     revalidatePath(ROTA_ADMIN);
+    await notificarTemplateConfirmado(pipelineId);
     return { success: true as const };
   } catch (error) {
     return { success: false as const, error: erroPublico(error) };

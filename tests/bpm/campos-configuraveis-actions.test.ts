@@ -6,7 +6,10 @@ const mocks = vi.hoisted(() => ({
   notificar: vi.fn(),
   revalidatePath: vi.fn(),
   campoCreate: vi.fn(),
+  campoUpdate: vi.fn(),
+  campoFindUniqueOrThrow: vi.fn(),
   campoFindUnique: vi.fn(),
+  etapaFindMany: vi.fn(),
   pipelineFindMany: vi.fn(),
   opcaoCreateMany: vi.fn(),
   campoPipelineCreateMany: vi.fn(),
@@ -35,6 +38,7 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 import {
+  AtualizarCampoBpm,
   ConfigurarMapeamentoCampoBpm,
   CriarCampoBpm,
   DesativarMapeamentoCampoBpm,
@@ -44,12 +48,13 @@ const PIPELINE_ID = "clw0000000000000pipeline";
 const OUTRO_PIPELINE_ID = "clw000000000000pipeline2";
 const CAMPO_ORIGEM_ID = "clw00000000000000origem";
 const CAMPO_DESTINO_ID = "clw0000000000000destino";
+const ETAPA_ID = "clw000000000000000etapa1";
 
 function clienteTx() {
   return {
     bpmPipeline: { findMany: mocks.pipelineFindMany },
-    bpmEtapa: { findMany: vi.fn() },
-    bpmCampo: { create: mocks.campoCreate },
+    bpmEtapa: { findMany: mocks.etapaFindMany },
+    bpmCampo: { create: mocks.campoCreate, update: mocks.campoUpdate, findUniqueOrThrow: mocks.campoFindUniqueOrThrow },
     bpmCampoOpcao: { createMany: mocks.opcaoCreateMany },
     bpmCampoPipeline: { createMany: mocks.campoPipelineCreateMany },
     bpmCampoEtapaConfig: { createMany: vi.fn() },
@@ -70,7 +75,17 @@ describe("ações de gestão configurável de campos", () => {
     mocks.exigirConfig.mockResolvedValue(undefined);
     mocks.notificar.mockResolvedValue(undefined);
     mocks.pipelineFindMany.mockResolvedValue([{ id: PIPELINE_ID }]);
+    mocks.etapaFindMany.mockResolvedValue([{ id: ETAPA_ID, pipelineId: PIPELINE_ID }]);
     mocks.campoCreate.mockResolvedValue({ id: CAMPO_DESTINO_ID, pipelineId: PIPELINE_ID });
+    mocks.campoFindUniqueOrThrow.mockResolvedValue({
+      id: CAMPO_DESTINO_ID,
+      pipelineId: PIPELINE_ID,
+      opcoes: [],
+      pipelinesAssociados: [{ pipelineId: PIPELINE_ID }],
+      etapaConfiguracoes: [],
+      acessos: [],
+      mapeamentoDestino: null,
+    });
     mocks.mapeamentoUpsert.mockResolvedValue({ id: "clw000000000000000mapa" });
     mocks.transaction.mockImplementation(async (callback: (tx: ReturnType<typeof clienteTx>) => unknown) => callback(clienteTx()));
   });
@@ -92,18 +107,85 @@ describe("ações de gestão configurável de campos", () => {
       pipelineId: PIPELINE_ID,
       nome: "E-mail principal",
       tipo: "email",
-      obrigatorio: true,
+      obrigatorio: false,
       somenteLeitura: true,
       editavel: false,
     });
     expect(resultado.success).toBe(true);
     expect(mocks.acessoCreateMany).toHaveBeenCalledWith({
       data: expect.arrayContaining([
-        expect.objectContaining({ campoId: CAMPO_DESTINO_ID, perfil: "ADMIN", somenteLeitura: true, editavel: false }),
+        expect.objectContaining({ campoId: CAMPO_DESTINO_ID, perfil: "ADMIN", somenteLeitura: true, editavel: false, obrigatorio: false }),
         expect.objectContaining({ campoId: CAMPO_DESTINO_ID, perfil: "RESPONSAVEL", somenteLeitura: true, editavel: false }),
         expect.objectContaining({ campoId: CAMPO_DESTINO_ID, perfil: "MEMBRO", somenteLeitura: true, editavel: false }),
       ]),
     });
+  });
+
+  it("preserva o agregado completo em dois saves consecutivos sem reload", async () => {
+    const agregado = {
+      id: CAMPO_DESTINO_ID,
+      pipelineId: PIPELINE_ID,
+      nome: "Receita anual",
+      tipo: "texto",
+      ativo: true,
+      escopo: "CARD",
+      fonteEntidade: null,
+      fonteAtributo: null,
+      entidadeGlobal: null,
+      valores: [],
+      opcoes: [{ id: "opcao-1", chave: "alto", rotulo: "Alto", ordem: 0, ativo: true }],
+      pipelinesAssociados: [{ pipelineId: PIPELINE_ID }],
+      etapaConfiguracoes: [{ etapaId: ETAPA_ID, ordem: 0, obrigatorio: true }],
+      acessos: [{ perfil: "ADMIN", visivel: true, editavel: true, somenteLeitura: false, obrigatorio: false }],
+      mapeamentoDestino: null,
+    };
+    mocks.campoFindUnique.mockResolvedValue(agregado);
+    mocks.campoUpdate.mockResolvedValue({ id: CAMPO_DESTINO_ID });
+    mocks.campoFindUniqueOrThrow
+      .mockResolvedValueOnce({ ...agregado, nome: "Receita 2026" })
+      .mockResolvedValueOnce({ ...agregado, nome: "Receita confirmada" });
+
+    const primeiro = await AtualizarCampoBpm({ campoId: CAMPO_DESTINO_ID, nome: "Receita 2026" });
+    expect(primeiro).toMatchObject({ success: true, data: { opcoes: agregado.opcoes, etapaConfiguracoes: agregado.etapaConfiguracoes } });
+
+    const segundo = await AtualizarCampoBpm({ campoId: CAMPO_DESTINO_ID, nome: "Receita confirmada" });
+    expect(segundo).toMatchObject({
+      success: true,
+      data: {
+        pipelinesAssociados: agregado.pipelinesAssociados,
+        etapaConfiguracoes: agregado.etapaConfiguracoes,
+        acessos: agregado.acessos,
+        opcoes: agregado.opcoes,
+      },
+    });
+  });
+
+  it("rejeita seleção customizada ativa sem opções e aceita fonte canônica", async () => {
+    const invalido = await CriarCampoBpm({
+      pipelineId: PIPELINE_ID,
+      nome: "Status da sede",
+      tipo: "selecao",
+      obrigatorio: false,
+      opcoes: [],
+      escopo: "GLOBAL",
+      fonteEntidade: null,
+    });
+    expect(invalido).toEqual({ success: false, error: "Campo de seleção customizado precisa ter ao menos uma opção ativa" });
+    expect(mocks.transaction).not.toHaveBeenCalled();
+
+    const canonico = await CriarCampoBpm({
+      pipelineId: PIPELINE_ID,
+      nome: "Regime tributário",
+      tipo: "selecao",
+      obrigatorio: false,
+      opcoes: [],
+      escopo: "GLOBAL",
+      fonteEntidade: "CLIENTE",
+      fonteAtributo: "regimeTributario",
+      somenteLeitura: true,
+      editavel: false,
+    });
+    expect(canonico.success).toBe(true);
   });
 
   it("rejeita mapeamento entre tipos diferentes antes da transação", async () => {

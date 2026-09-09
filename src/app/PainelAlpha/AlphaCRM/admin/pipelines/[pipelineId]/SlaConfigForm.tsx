@@ -43,6 +43,12 @@ function limite(config: SlaConfiguracaoAdmin | undefined, status: "PROXIMO_VENCI
   return config?.alertaLimites.find((item) => item.statusResultante === status);
 }
 
+function inicioEditavel(config?: SlaConfiguracaoAdmin): SlaConfiguracaoAdminInput["inicioMomento"] {
+  return config && SLA_INICIOS.includes(config.inicioMomento as (typeof SLA_INICIOS)[number])
+    ? config.inicioMomento as SlaConfiguracaoAdminInput["inicioMomento"]
+    : "ENTRADA_ETAPA";
+}
+
 export function SlaConfigForm({ pipelineId, etapas, servicos, inicial, isSaving, onCancel, onSave }: SlaConfigFormProps) {
   const amarelo = limite(inicial, "PROXIMO_VENCIMENTO");
   const vermelho = limite(inicial, "ATRASADO");
@@ -59,9 +65,10 @@ export function SlaConfigForm({ pipelineId, etapas, servicos, inicial, isSaving,
       servicoId: inicial?.servicoId ?? null,
       quantidade: inicial?.quantidade ?? 1,
       unidade: inicial?.unidade ?? "DIAS",
-      inicioMomento: inicial?.inicioMomento ?? "ENTRADA_ETAPA",
+      inicioMomento: inicioEditavel(inicial),
       pausaRegra: inicial?.pausaRegra ?? "STANDBY",
       ativa: inicial?.ativa ?? true,
+      prioridade: inicial?.prioridade ?? 0,
       amareloTipo: amarelo?.tipoLimite ?? "PERCENTUAL_CONSUMIDO",
       amareloValor: amarelo?.valor ?? 75,
       amareloUnidade: amarelo?.unidade ?? null,
@@ -94,6 +101,7 @@ export function SlaConfigForm({ pipelineId, etapas, servicos, inicial, isSaving,
         <label className="space-y-1 text-xs text-slate-400">Unidade<select {...register("unidade")} className={fieldClass}>{SLA_UNIDADES.map((item) => <option key={item} value={item}>{labels.unidade[item]}</option>)}</select></label>
         <label className="space-y-1 text-xs text-slate-400">Início da contagem<select {...register("inicioMomento")} className={fieldClass}>{SLA_INICIOS.map((item) => <option key={item} value={item}>{labels.inicio[item]}</option>)}</select></label>
         <label className="space-y-1 text-xs text-slate-400">Pausa e retomada<select {...register("pausaRegra")} className={fieldClass}><option value="STANDBY">Pausar em Standby e retomar ao sair</option><option value="NUNCA">Nunca pausar</option></select></label>
+        <label className="space-y-1 text-xs text-slate-400">Prioridade<input type="number" min={0} max={10000} {...register("prioridade", { valueAsNumber: true })} className={fieldClass} /><span className="block text-[10px] text-slate-500">Maior prioridade vence; em empate, o escopo mais específico e depois a configuração mais antiga.</span></label>
       </div>
 
       <fieldset className="grid gap-3 rounded-xl border border-white/5 bg-slate-950/40 p-3 md:grid-cols-2">
@@ -114,7 +122,7 @@ export function SlaConfigForm({ pipelineId, etapas, servicos, inicial, isSaving,
         <span className="flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-300"><AlertTriangle size={13} />Próximo do vencimento</span>
         <span className="flex items-center gap-1 rounded-full bg-rose-500/15 px-2.5 py-1 text-xs font-semibold text-rose-300"><XCircle size={13} />Vencido</span>
       </div>
-      {erro && <p className="text-xs text-rose-300" role="alert">{erro}</p>}
+      {(erro || errors.inicioMomento?.message || errors.vermelhoValor?.message) && <p className="text-xs text-rose-300" role="alert">{erro ?? errors.inicioMomento?.message ?? errors.vermelhoValor?.message}</p>}
       <div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button><Button type="submit" disabled={isSaving}>{isSaving && <Loader2 className="animate-spin" aria-hidden="true" />}{isSaving ? "Salvando..." : "Salvar SLA"}</Button></div>
     </form>
   );

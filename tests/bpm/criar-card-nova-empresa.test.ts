@@ -24,6 +24,7 @@ vi.mock("../../auth", () => ({ auth: authMock }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/bpm/cadencias/ativacao-automatica", () => ({ ativarCadenciasNaEntradaBpm: vi.fn().mockResolvedValue({ alteradas: 0 }) }));
 vi.mock("@/lib/bpm/realtime-server", () => ({ notificarPipelineBpm: notificarPipelineBpmMock }));
 vi.mock("@/lib/bpm/ownership", () => ({
   exigirAcessoBpmCard: vi.fn(),

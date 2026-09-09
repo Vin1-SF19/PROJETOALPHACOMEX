@@ -1,4 +1,14 @@
 const nextConfig = {
+  // Dev e builds de stage/produção podem coexistir 24/7 sem escrever no
+  // mesmo diretório. O serviço dev define NEXT_DIST_DIR=.next-alpha-dev.
+  distDir: process.env.NEXT_DIST_DIR?.trim() || ".next",
+  allowedDevOrigins: ["dev-painel.alpha-comex.com", "192.168.35.149"],
+  // Garante a substituição estática no bundle do cliente também no
+  // Turbopack/Next 16. O cliente ainda possui fallback seguro se faltar env.
+  env: {
+    NEXT_PUBLIC_PUSHER_KEY: process.env.NEXT_PUBLIC_PUSHER_KEY,
+    NEXT_PUBLIC_PUSHER_CLUSTER: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
+  },
   transpilePackages: ["pusher-js"],
   serverExternalPackages: ["@react-pdf/renderer", "pdf-parse"],
   // pdf-parse carrega o worker do pdfjs-dist (embutido, node_modules aninhado)

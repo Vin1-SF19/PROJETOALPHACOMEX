@@ -14,10 +14,11 @@ describe("interface de cadências automáticas", () => {
     expect(painel).toContain("Escopo:");
   });
 
-  it("oferece pipeline e etapa, limpando a etapa quando o pipeline muda", () => {
+  it("oferece pipeline e multiselect, limpando as colunas quando o pipeline muda", () => {
     expect(formulario).toContain('aria-label="Pipeline da cadência"');
-    expect(formulario).toContain('aria-label="Etapa da cadência"');
-    expect(formulario).toContain('setValue("etapaId", ""');
+    expect(formulario).toContain('aria-label="Seleção de colunas da cadência"');
+    expect(formulario).toContain('setValue("etapaIds", []');
+    expect(formulario).toContain("Sem seleção, a cadência será iniciada somente na entrada do pipeline");
     expect(formulario).toContain("criarCadenciaSchema");
   });
 });

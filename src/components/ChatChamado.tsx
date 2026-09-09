@@ -74,9 +74,10 @@ export default function ChatChamado({
   }, [chamadoId, contagem, mensagensIniciais]);
 
   useEffect(() => {
-    if (!mounted || !chamadoId || !pusherClient) return;
+    const client = pusherClient;
+    if (!mounted || !chamadoId || !client) return;
 
-    const channel = pusherClient.subscribe(`chat-${chamadoId}`);
+    const channel = client.subscribe(`chat-${chamadoId}`);
 
     channel.bind("nova-mensagem", (novaMsg: Mensagem) => {
       setMensagens((prev) => {
@@ -92,7 +93,7 @@ export default function ChatChamado({
     return () => {
       try {
         channel.unbind("nova-mensagem");
-        pusherClient.unsubscribe(`chat-${chamadoId}`);
+        client.unsubscribe(`chat-${chamadoId}`);
       } catch {
         // ignore cleanup errors on closed connection
       }

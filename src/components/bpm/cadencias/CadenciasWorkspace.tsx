@@ -34,7 +34,7 @@ export function CadenciasWorkspace({ cadencias, pipelines, erro, accent }: { cad
         </div>
         <Button onClick={() => setEditor({ mode: "create" })}><Plus size={15} className="mr-1" /> Nova cadência</Button>
       </div>
-      <p className="text-xs text-slate-400">Orientações configuráveis por coluna. Elas geram tarefas e alertas, sem bloquear a movimentação dos cards.</p>
+      <p className="text-xs text-slate-400">Orientações configuráveis por pipeline ou coluna. Elas geram tarefas e alertas, sem bloquear a movimentação dos cards.</p>
 
       {erro && <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-200">{erro}</div>}
 
@@ -49,12 +49,14 @@ export function CadenciasWorkspace({ cadencias, pipelines, erro, accent }: { cad
                 {c._count && c._count.vinculos > 0 && <Badge variant="outline" className="text-[10px]">{c._count.vinculos} card(s) vinculado(s)</Badge>}
               </div>
               {c.descricao && <p className="truncate text-[11px] text-slate-500">{c.descricao}</p>}
-              <p className={`truncate text-[11px] ${c.etapa ? "text-slate-400" : "text-amber-300"}`}>
-                {c.pipeline && c.etapa ? `Coluna: ${c.pipeline.nome} / ${c.etapa.nome}` : "Legado sem coluna — inerte até ser associado ou desativado"}
+              <p className="truncate text-[11px] text-slate-400">
+                {c.pipeline && c.etapas.length > 0
+                  ? `Colunas: ${c.pipeline.nome} / ${c.etapas.map((item) => item.etapa.nome).join(", ")}`
+                  : c.pipeline ? `Entrada no pipeline: ${c.pipeline.nome}` : "Sem pipeline configurado"}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Switch checked={c.ativa} onCheckedChange={(v) => alternar(c.id, v)} disabled={pendente || !c.pipelineId || !c.etapaId} />
+              <Switch checked={c.ativa} onCheckedChange={(v) => alternar(c.id, v)} disabled={pendente || !c.pipelineId} />
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditor({ mode: "edit", cadencia: c })}><Pencil size={14} /></Button>
             </div>
           </div>

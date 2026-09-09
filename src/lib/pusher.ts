@@ -1,13 +1,17 @@
 import Pusher from "pusher-js";
 
-// Guard against server-side evaluation — node build of pusher-js has no .default constructor
-export const pusherClient =
-  typeof window !== "undefined"
-    ? new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
-        cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+const pusherKey = process.env.NEXT_PUBLIC_PUSHER_KEY?.trim();
+const pusherCluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER?.trim();
+
+// Realtime é opcional para a renderização da aplicação. Uma configuração
+// ausente nunca pode derrubar a hidratação inteira do painel no navegador.
+export const pusherClient: Pusher | null =
+  typeof window !== "undefined" && pusherKey && pusherCluster
+    ? new Pusher(pusherKey, {
+        cluster: pusherCluster,
         channelAuthorization: {
           endpoint: "/api/pusher/auth",
           transport: "ajax",
         },
       })
-    : (null as unknown as Pusher);
+    : null;
