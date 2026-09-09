@@ -73,3 +73,44 @@ export function registrarEventoAgendaAlpha(
 ): void {
   escrever(serializarEventoAgendaAlpha(evento));
 }
+
+export type OperacaoPerformanceAgendaAlpha =
+  | "snapshot_intervalo"
+  | "criar_evento"
+  | "criar_tarefa";
+
+export interface MetricaPerformanceAgendaAlpha {
+  correlationId: string;
+  operation: OperacaoPerformanceAgendaAlpha;
+  outcome: "success" | "error";
+  latencyMs: number;
+  itemCount?: number;
+}
+
+/** Métrica técnica sem títulos, e-mails, IDs de usuário ou conteúdo da agenda. */
+export function serializarMetricaPerformanceAgendaAlpha(
+  metrica: MetricaPerformanceAgendaAlpha,
+): string {
+  return JSON.stringify({
+    timestamp: new Date().toISOString(),
+    scope: "agenda-alpha",
+    event: "performance",
+    metric: "agenda_alpha_operation_duration_ms",
+    correlationId: /^[a-f0-9-]{16,64}$/i.test(metrica.correlationId)
+      ? metrica.correlationId
+      : referenciaCanalAgendaAlpha(metrica.correlationId),
+    operation: metrica.operation,
+    outcome: metrica.outcome,
+    latencyMs: Math.max(0, Math.min(Math.trunc(metrica.latencyMs), 10 * 60 * 1000)),
+    ...(metrica.itemCount === undefined
+      ? {}
+      : { itemCount: Math.max(0, Math.min(Math.trunc(metrica.itemCount), 100_000)) }),
+  });
+}
+
+export function registrarMetricaPerformanceAgendaAlpha(
+  metrica: MetricaPerformanceAgendaAlpha,
+  escrever: (linha: string) => void = console.info,
+): void {
+  escrever(serializarMetricaPerformanceAgendaAlpha(metrica));
+}

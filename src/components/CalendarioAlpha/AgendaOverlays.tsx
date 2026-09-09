@@ -9,6 +9,7 @@ import type { TemaAlpha } from "@/lib/temas";
 
 import { AgendaModal3D } from "./AgendaModal3D";
 import { FormularioEvento } from "./FormularioEvento";
+import type { MutacaoOtimistaAgenda } from "./lib/useAgendaAlphaController";
 import type { CalendarioSelecionadoView, ColegaAgendaView, EventoExibicao, ListaTarefasAgendaView } from "./lib/tipos";
 import { PainelColegas, type SolicitacaoRecebidaView } from "./PainelColegas";
 import { PainelPermissoesColegas } from "./PainelPermissoesColegas";
@@ -44,6 +45,7 @@ interface AgendaOverlaysProps {
   onAtualizarColegas: () => void;
   onAtualizarPermissoes: () => void;
   onConfirmarDesativacao: () => void;
+  onSalvarOtimista: (mutacao: MutacaoOtimistaAgenda) => void;
 }
 
 export function AgendaOverlays(props: AgendaOverlaysProps) {
@@ -95,6 +97,7 @@ export function AgendaOverlays(props: AgendaOverlaysProps) {
           detalhesEvento={props.detalhesEvento}
           listasTarefas={props.listasTarefas}
           onSalvo={props.onAtualizar}
+          onSalvarOtimista={props.onSalvarOtimista}
         />
       )}
       <AgendaModal3D

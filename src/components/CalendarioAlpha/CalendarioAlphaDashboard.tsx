@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { Loader2 } from "lucide-react";
 
 import type { StatusConexaoCalendarioAlpha } from "@/actions/google-calendar-conexao";
 import { GuiaModuloTour } from "@/components/Guias/GuiaModuloTour";
@@ -10,6 +9,7 @@ import { marcarTutorialModuloComoVisto, tutorialModuloFoiVisto } from "@/lib/gui
 import { getTema } from "@/lib/temas";
 
 import { AgendaOverlays } from "./AgendaOverlays";
+import { AgendaFeedback } from "./AgendaFeedback";
 import { AgendaSidebar } from "./AgendaSidebar";
 import { ConteudoAgenda } from "./ConteudoAgenda";
 import { EstadoDesconectado } from "./EstadoDesconectado";
@@ -17,8 +17,7 @@ import { HeaderCalendario } from "./HeaderCalendario";
 import { StatusSincronizacao } from "./StatusSincronizacao";
 import { TutorialAgendaModal } from "./TutorialAgendaModal";
 import { dataAnterior, proximaData, type VisaoCalendario } from "./lib/datas";
-import { tarefasParaItensAgenda } from "./lib/itens-agenda";
-import type { CalendarioSelecionadoView, EventoExibicao, ListaTarefasAgendaView, TarefaAgendaExibicao } from "./lib/tipos";
+import type { CalendarioSelecionadoView, ListaTarefasAgendaView } from "./lib/tipos";
 import { concluirTarefaAgendaAlpha } from "@/actions/google-calendar-tarefas";
 import { toast } from "sonner";
 import { TUTORIAL_AGENDA } from "./lib/tutorial-agenda";
@@ -29,13 +28,10 @@ interface CalendarioAlphaDashboardProps {
   statusConexao: StatusConexaoCalendarioAlpha;
   conexaoId: string | null;
   calendarios: CalendarioSelecionadoView[];
-  eventos: EventoExibicao[];
-  tarefas: TarefaAgendaExibicao[];
   listasTarefas: ListaTarefasAgendaView[];
   isAdmin: boolean;
   visao: VisaoCalendario;
   dataReferenciaISO: string;
-  algumaFalhaSync: boolean;
 }
 
 function alvoDigitavel(target: EventTarget | null): boolean {
@@ -48,13 +44,10 @@ export function CalendarioAlphaDashboard({
   statusConexao,
   conexaoId,
   calendarios,
-  eventos,
-  tarefas,
   listasTarefas,
   isAdmin,
   visao,
   dataReferenciaISO,
-  algumaFalhaSync,
 }: CalendarioAlphaDashboardProps) {
   const tema = getTema(temaName);
   const accent = tema.accent;
@@ -63,23 +56,32 @@ export function CalendarioAlphaDashboard({
     conexaoId,
     visao,
     dataReferenciaISO,
-    algumaFalhaSync,
   });
 
   const { data: session } = useSession();
   const usuarioAtualId = Number((session?.user as { id?: string | number } | undefined)?.id ?? 0);
   const [tutorialAberto, setTutorialAberto] = useState(false);
   const [tourAberto, setTourAberto] = useState(false);
-  const tarefasNaGrade = tarefasParaItensAgenda(tarefas);
 
-  async function concluirTarefa(tarefaCacheId: string) {
-    const resultado = await concluirTarefaAgendaAlpha({ tarefaCacheId });
-    if (!resultado.success) {
-      toast.error(resultado.error);
+  function concluirTarefa(tarefaCacheId: string) {
+    const tarefa = agenda.itens.find(
+      (item) => item.tarefaCacheId === tarefaCacheId,
+    );
+    if (!tarefa) {
+      toast.error("Tarefa não encontrada neste período.");
       return;
     }
-    toast.success("Tarefa concluída.");
-    agenda.atualizarAgenda();
+    agenda.executarMutacaoOtimista({
+      item: { ...tarefa, status: "completed", calendarioCorHex: "#22c55e" },
+      executar: async () => {
+        const resultado = await concluirTarefaAgendaAlpha({ tarefaCacheId });
+        return resultado.success
+          ? { success: true }
+          : { success: false, error: resultado.error };
+      },
+      mensagemSalvando: "Concluindo tarefa…",
+      mensagemSucesso: "Tarefa concluída.",
+    });
   }
 
   useEffect(() => {
@@ -134,14 +136,14 @@ export function CalendarioAlphaDashboard({
       if (!["c", "t", "m", "w", "d"].includes(tecla)) return;
       evento.preventDefault();
       if (tecla === "c") agenda.abrirNovoEvento();
-      if (tecla === "t") agenda.navegarPara(visao, new Date());
+      if (tecla === "t") agenda.navegarPara(agenda.visaoAtual, new Date());
       if (tecla === "m") agenda.navegarPara("mes", agenda.dataReferencia);
       if (tecla === "w") agenda.navegarPara("semana", agenda.dataReferencia);
       if (tecla === "d") agenda.navegarPara("dia", agenda.dataReferencia);
     }
     window.addEventListener("keydown", atalhos);
     return () => window.removeEventListener("keydown", atalhos);
-  }, [agenda, visao]);
+  }, [agenda]);
 
   if (!statusConexao.conectado) {
     return (
@@ -171,18 +173,18 @@ export function CalendarioAlphaDashboard({
     <div className="mx-auto flex h-full min-h-0 max-w-[1800px] flex-col px-3 py-3 sm:px-4 xl:px-5">
       <HeaderCalendario
         tema={tema}
-        visao={visao}
+        visao={agenda.visaoAtual}
         dataReferencia={agenda.dataReferencia}
         status={status}
         onMudarVisao={(novaVisao) => agenda.navegarPara(novaVisao, agenda.dataReferencia)}
-        onHoje={() => agenda.navegarPara(visao, new Date())}
+        onHoje={() => agenda.navegarPara(agenda.visaoAtual, new Date())}
         onAnterior={() => agenda.navegarPara(
-          visao,
-          dataAnterior(visao, agenda.dataReferencia),
+          agenda.visaoAtual,
+          dataAnterior(agenda.visaoAtual, agenda.dataReferencia),
         )}
         onProximo={() => agenda.navegarPara(
-          visao,
-          proximaData(visao, agenda.dataReferencia),
+          agenda.visaoAtual,
+          proximaData(agenda.visaoAtual, agenda.dataReferencia),
         )}
         onNovoEvento={() => agenda.abrirNovoEvento()}
         onAbrirSidebar={() => agenda.setSidebarMobileAberta(true)}
@@ -209,38 +211,24 @@ export function CalendarioAlphaDashboard({
           footer={status}
         />
         <main className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden" aria-label="Grade da Agenda Alpha">
-          {agenda.carregandoEdicao && (
-            <div role="status" className="mb-3 flex items-center gap-2 rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs text-slate-300">
-              <Loader2 className="size-4 animate-spin" /> Carregando detalhes do evento…
-            </div>
-          )}
-          {agenda.erroEdicao && agenda.alvoEdicao && (
-            <div role="alert" className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
-              <span>{agenda.erroEdicao}</span>
-              <button type="button" onClick={() => void agenda.editarEvento(agenda.alvoEdicao!)} className="shrink-0 font-bold underline underline-offset-4">
-                Tentar novamente
-              </button>
-            </div>
-          )}
-          {agenda.compartilhadas.carregando && (
-            <div role="status" className="mb-3 flex items-center gap-2 rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs text-slate-300">
-              <Loader2 className="size-4 animate-spin" /> Atualizando agendas compartilhadas…
-            </div>
-          )}
-          {agenda.compartilhadas.erro && (
-            <div role="alert" className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-              <span>{agenda.compartilhadas.erro}</span>
-              <button type="button" onClick={() => void agenda.compartilhadas.carregar()} className="shrink-0 font-bold underline underline-offset-4">
-                Tentar novamente
-              </button>
-            </div>
-          )}
+          <AgendaFeedback
+            carregandoEdicao={agenda.carregandoEdicao}
+            carregandoPeriodo={agenda.carregandoPeriodo}
+            erroPeriodo={agenda.erroPeriodo}
+            erroEdicao={agenda.erroEdicao}
+            possuiAlvoEdicao={Boolean(agenda.alvoEdicao)}
+            carregandoCompartilhadas={agenda.compartilhadas.carregando}
+            erroCompartilhadas={agenda.compartilhadas.erro}
+            onRecarregarPeriodo={() => void agenda.recarregarPeriodoAtual()}
+            onRecarregarEdicao={() => void (agenda.alvoEdicao && agenda.editarEvento(agenda.alvoEdicao))}
+            onRecarregarCompartilhadas={() => void agenda.compartilhadas.carregar()}
+          />
           <div className="min-h-0 flex-1 overflow-hidden">
             <ConteudoAgenda
               tema={tema}
-              visao={visao}
+              visao={agenda.visaoAtual}
               dataReferencia={agenda.dataReferencia}
-              eventos={[...eventos, ...tarefasNaGrade, ...agenda.compartilhadas.eventos]}
+              eventos={[...agenda.itens, ...agenda.compartilhadas.eventos]}
               possuiCalendarios={calendarios.length > 0}
               onEditarEvento={agenda.editarEvento}
               onEventoCancelado={agenda.notificarAlteracaoAgenda}
@@ -284,6 +272,7 @@ export function CalendarioAlphaDashboard({
         onAtualizarColegas={agenda.abrirColegas}
         onAtualizarPermissoes={agenda.abrirPermissoes}
         onConfirmarDesativacao={agenda.confirmarDesativacao}
+        onSalvarOtimista={agenda.executarMutacaoOtimista}
       />
 
       <TutorialAgendaModal

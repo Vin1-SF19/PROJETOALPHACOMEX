@@ -2,7 +2,7 @@ import type { EventoExibicao, TarefaAgendaExibicao } from "./tipos";
 
 /** Converte tarefas Google em itens da grade; horários de chamados ficam no cache local. */
 export function tarefasParaItensAgenda(tarefas: TarefaAgendaExibicao[]): EventoExibicao[] {
-  return tarefas.flatMap((tarefa) => {
+  return tarefas.flatMap((tarefa): EventoExibicao[] => {
     const possuiHorarioAgendado = Boolean(tarefa.inicioAgendadoEm && tarefa.fimPlanejadoAgendadoEm);
     const possuiHorarioLocal = Boolean(tarefa.inicioLocalEm && tarefa.fimLocalEm);
     const concluidaAgendada = tarefa.status === "completed" && tarefa.statusAgendamento === "CONCLUIDO";
@@ -58,6 +58,7 @@ export function tarefasParaItensAgenda(tarefas: TarefaAgendaExibicao[]): EventoE
       }];
     }
 
+    if (!tarefa.vencimentoEm) return [];
     const vencimento = new Date(tarefa.vencimentoEm);
     const meioDiaUtc = new Date(Date.UTC(
       vencimento.getUTCFullYear(),

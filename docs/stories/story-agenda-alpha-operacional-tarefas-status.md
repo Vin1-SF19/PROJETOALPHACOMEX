@@ -45,6 +45,11 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - [x] Persistir a resposta do próprio participante no cache e riscar visualmente convites recusados em todas as visões da agenda.
 - [x] Exibir eventos organizados por outra pessoa em modo de contorno, com cor do calendário na borda e no texto.
 - [x] Abrir convites em painel detalhado com Meet, telefones, local, descrição, organizador e respostas dos convidados.
+- [x] Eliminar recargas de servidor na troca entre dia, semana, mês e ano usando navegação local, snapshot IndexedDB e revalidação em segundo plano.
+- [x] Exibir criação e conclusão imediatamente de forma otimista, reconciliando sucesso ou falha com o backend sem perder feedback para o usuário.
+- [x] Consolidar eventos e tarefas do período em uma leitura cache-only autorizada e instrumentada, sem consultar o Google no carregamento da tela.
+- [x] Cobrir snapshot, cache local, navegação, reconciliação otimista e métricas seguras com testes automatizados.
+- [x] Conectar o worker persistente da Agenda Alpha ao scheduler autenticado, com uma operação por minuto e proteção por claim/lease distribuído.
 
 ## File List
 
@@ -61,6 +66,32 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - `tests/google-calendar/{itens-agenda,layout-eventos,page-cache-wiring}.test.ts`
 - `tests/google-calendar/evento-resposta-usuario.test.ts`
 - `scripts/{turso-backup,apply-turso-migration}.mjs`
+- `src/actions/google-calendar-agenda.ts`
+- `src/lib/google-calendar/observability.ts`
+- `src/components/CalendarioAlpha/AgendaFeedback.tsx`
+- `src/components/CalendarioAlpha/AgendaOverlays.tsx`
+- `src/components/CalendarioAlpha/lib/cache-local.ts`
+- `src/app/api/calendario-alpha/jobs/worker/route.ts`
+- `tests/google-calendar/{agenda-snapshot,cache-local,observability,worker-route}.test.ts`
+- `vercel.json`
+- `plan/self-critique-agenda-alpha-performance.json`
+
+## Dev Agent Record
+
+### Completion Notes
+
+- A entrada da Agenda entrega o shell sem consultar eventos no SSR; o navegador usa o snapshot local disponível e atualiza os dados pelo backend em paralelo.
+- A troca de visão/data usa History API e estado local, mantendo suporte aos botões voltar/avançar.
+- Criações de evento/tarefa e conclusão de tarefa aparecem imediatamente; falhas removem o estado otimista com mensagem explícita e sucessos são reconciliados pelo snapshot remoto.
+- A sincronização manual de Calendar e Tasks passou a executar em paralelo.
+- A fila push ganhou consumidor serverless autenticado a cada minuto; cada invocação processa no máximo um job e preserva a exclusão mútua distribuída já existente.
+- Não houve mudança de schema, migration, backfill ou mutação em massa; o protocolo Vault não foi acionado.
+- Gates do recorte: ESLint sem ocorrências, 24/24 testes aprovados, typecheck filtrado sem erros e build de produção aprovado. Gates globais continuam bloqueados por dívida anterior fora deste escopo: typecheck com erros preexistentes, lint abrangendo milhares de arquivos legados e 49 testes falhando em 18 arquivos não relacionados.
+- CodeRabbit CLI não estava instalado no ambiente; revisão automatizada externa não pôde ser executada.
+
+### Change Log
+
+- 2026-09-09: carregamento cache-first, navegação sem round-trip de página, mutações otimistas, consulta consolidada e telemetria de latência da Agenda Alpha.
 
 ## Notas operacionais
 

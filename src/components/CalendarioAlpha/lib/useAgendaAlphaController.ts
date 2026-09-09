@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { carregarIntervaloAgendaAlpha } from "@/actions/google-calendar-agenda";
 import { carregarDetalhesEventoColegaParaEdicao } from "@/actions/google-calendar-admin";
 import {
   alternarVisibilidadeColega,
@@ -33,8 +34,24 @@ import {
 } from "@/lib/google-calendar/invalidation";
 import type { GoogleCalendarioDTO, GoogleEventoDTO } from "@/lib/google-calendar/types";
 
-import { formatarDataCivil, type VisaoCalendario } from "./datas";
-import type { CalendarioSelecionadoView, EventoExibicao } from "./tipos";
+import {
+  calcularIntervaloVisao,
+  formatarDataCivil,
+  parsearDataCivil,
+  type VisaoCalendario,
+} from "./datas";
+import {
+  chaveSnapshotAgenda,
+  lerSnapshotAgenda,
+  salvarSnapshotAgenda,
+  type SnapshotAgendaLocal,
+} from "./cache-local";
+import { tarefasParaItensAgenda } from "./itens-agenda";
+import type {
+  CalendarioSelecionadoView,
+  EventoExibicao,
+  TarefaAgendaExibicao,
+} from "./tipos";
 import { useAgendasCompartilhadas } from "./useAgendasCompartilhadas";
 import type { SolicitacaoRecebidaView } from "../PainelColegas";
 
@@ -43,12 +60,24 @@ interface UseAgendaAlphaControllerParams {
   conexaoId: string | null;
   visao: VisaoCalendario;
   dataReferenciaISO: string;
-  algumaFalhaSync: boolean;
+}
+
+const INTERVALO_REVALIDACAO_MS = 60_000;
+
+type ResultadoMutacaoOtimista =
+  | { success: true }
+  | { success: false; error: string };
+
+export interface MutacaoOtimistaAgenda {
+  item: EventoExibicao;
+  executar: () => Promise<ResultadoMutacaoOtimista>;
+  mensagemSalvando: string;
+  mensagemSucesso: string;
 }
 
 interface SessaoEdicao {
   evento: EventoExibicao;
-  detalhes: GoogleEventoDTO;
+  detalhes?: GoogleEventoDTO;
 }
 
 function chaveEvento(evento: EventoExibicao): string {
@@ -64,10 +93,25 @@ export function useAgendaAlphaController({
   conexaoId,
   visao,
   dataReferenciaISO,
-  algumaFalhaSync,
 }: UseAgendaAlphaControllerParams) {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const [visaoAtual, setVisaoAtual] = useState(visao);
+  const [dataReferenciaAtualISO, setDataReferenciaAtualISO] = useState(
+    dataReferenciaISO,
+  );
+  const [eventos, setEventos] = useState<EventoExibicao[]>([]);
+  const [tarefas, setTarefas] = useState<TarefaAgendaExibicao[]>([]);
+  const [itensOtimistas, setItensOtimistas] = useState<
+    Map<string, EventoExibicao>
+  >(() => new Map());
+  const [carregandoPeriodo, setCarregandoPeriodo] = useState(
+    statusConexao.conectado,
+  );
+  const [erroPeriodo, setErroPeriodo] = useState<string | null>(null);
+  const [snapshotCarregadoEm, setSnapshotCarregadoEm] = useState<string | null>(
+    null,
+  );
   const [formularioAberto, setFormularioAberto] = useState(false);
   const [sessaoEdicao, setSessaoEdicao] = useState<SessaoEdicao>();
   const [alvoEdicao, setAlvoEdicao] = useState<EventoExibicao>();
@@ -92,16 +136,134 @@ export function useAgendaAlphaController({
   const [ultimaSincronizacaoEm, setUltimaSincronizacaoEm] = useState(
     statusConexao.ultimaSincronizacaoEm,
   );
-  const [erroSincronizacao, setErroSincronizacao] = useState<string | null>(
-    algumaFalhaSync ? "Algumas agendas não puderam ser lidas do cache." : null,
-  );
+  const [erroSincronizacao, setErroSincronizacao] = useState<string | null>(null);
   const [resumoSincronizacao, setResumoSincronizacao] =
     useState<ResumoSincronizacaoAgenda | null>(null);
   const sequenciaEdicao = useRef(0);
   const chaveEdicaoAtual = useRef<string | null>(null);
-  const dataReferencia = new Date(dataReferenciaISO);
-  const compartilhadas = useAgendasCompartilhadas({ visao, dataReferenciaISO });
+  const sequenciaPeriodo = useRef(0);
+  const inicializouPeriodo = useRef(false);
+  const snapshotsMemoria = useRef(new Map<string, SnapshotAgendaLocal>());
+  const itensOtimistasConfirmados = useRef(new Set<string>());
+  const parametrosAtuais = useRef({
+    visao: visaoAtual,
+    dataReferenciaISO: dataReferenciaAtualISO,
+  });
+  const dataReferencia = new Date(dataReferenciaAtualISO);
+  const compartilhadas = useAgendasCompartilhadas({
+    visao: visaoAtual,
+    dataReferenciaISO: dataReferenciaAtualISO,
+  });
   const recarregarCompartilhadasSeAtivo = compartilhadas.recarregarSeAtivo;
+
+  useEffect(() => {
+    parametrosAtuais.current = {
+      visao: visaoAtual,
+      dataReferenciaISO: dataReferenciaAtualISO,
+    };
+  }, [dataReferenciaAtualISO, visaoAtual]);
+
+  const itens = useMemo(() => {
+    const mesclados = new Map(
+      [...eventos, ...tarefasParaItensAgenda(tarefas)].map((item) => [
+        item.id,
+        item,
+      ]),
+    );
+    for (const item of itensOtimistas.values()) mesclados.set(item.id, item);
+    return Array.from(mesclados.values());
+  }, [eventos, itensOtimistas, tarefas]);
+
+  const aplicarSnapshot = useCallback(
+    (snapshot: Pick<SnapshotAgendaLocal, "eventos" | "tarefas" | "carregadoEm">) => {
+      setEventos(snapshot.eventos);
+      setTarefas(snapshot.tarefas);
+      setSnapshotCarregadoEm(snapshot.carregadoEm);
+    },
+    [],
+  );
+
+  const carregarPeriodo = useCallback(async (
+    alvoVisao: VisaoCalendario,
+    alvoData: Date,
+    opcoes: { usarCacheLocal?: boolean; silencioso?: boolean } = {},
+  ): Promise<boolean> => {
+    if (!conexaoId) return false;
+
+    const sequencia = sequenciaPeriodo.current + 1;
+    sequenciaPeriodo.current = sequencia;
+    const chave = chaveSnapshotAgenda(conexaoId, alvoVisao, alvoData);
+    const { inicio, fim } = calcularIntervaloVisao(alvoVisao, alvoData);
+    const usarCacheLocal = opcoes.usarCacheLocal !== false;
+
+    if (!opcoes.silencioso) setCarregandoPeriodo(true);
+    setErroPeriodo(null);
+
+    const remoto = carregarIntervaloAgendaAlpha({
+      inicioISO: inicio.toISOString(),
+      fimISO: fim.toISOString(),
+    });
+
+    if (usarCacheLocal) {
+      const snapshotLocal =
+        snapshotsMemoria.current.get(chave) ?? await lerSnapshotAgenda(chave);
+      if (snapshotLocal && sequenciaPeriodo.current === sequencia) {
+        snapshotsMemoria.current.set(chave, snapshotLocal);
+        aplicarSnapshot(snapshotLocal);
+      }
+    }
+
+    let resultado: Awaited<ReturnType<typeof carregarIntervaloAgendaAlpha>>;
+    try {
+      resultado = await remoto;
+    } catch {
+      if (sequenciaPeriodo.current === sequencia) {
+        setErroPeriodo("Não foi possível atualizar a agenda agora.");
+        setCarregandoPeriodo(false);
+      }
+      return false;
+    }
+    if (!resultado.success) {
+      if (sequenciaPeriodo.current === sequencia) {
+        setErroPeriodo(resultado.error);
+        setCarregandoPeriodo(false);
+      }
+      return false;
+    }
+
+    const snapshot: SnapshotAgendaLocal = {
+      ...resultado.data,
+      chave,
+      conexaoId,
+      salvoEm: Date.now(),
+    };
+    snapshotsMemoria.current.set(chave, snapshot);
+    void salvarSnapshotAgenda(snapshot);
+
+    if (sequenciaPeriodo.current === sequencia) {
+      aplicarSnapshot(snapshot);
+      if (itensOtimistasConfirmados.current.size > 0) {
+        const confirmados = new Set(itensOtimistasConfirmados.current);
+        itensOtimistasConfirmados.current.clear();
+        setItensOtimistas((atuais) => {
+          const proximos = new Map(atuais);
+          for (const id of confirmados) proximos.delete(id);
+          return proximos;
+        });
+      }
+      setCarregandoPeriodo(false);
+    }
+    return true;
+  }, [aplicarSnapshot, conexaoId]);
+
+  const recarregarPeriodoAtual = useCallback((silencioso = false) => {
+    const parametros = parametrosAtuais.current;
+    return carregarPeriodo(
+      parametros.visao,
+      new Date(parametros.dataReferenciaISO),
+      { usarCacheLocal: false, silencioso },
+    );
+  }, [carregarPeriodo]);
 
   const atualizarAgenda = useCallback(() => {
     startTransition(() => router.refresh());
@@ -112,19 +274,78 @@ export function useAgendaAlphaController({
   }, []);
 
   const navegarPara = useCallback((novaVisao: VisaoCalendario, novaData: Date) => {
+    const novaDataISO = novaData.toISOString();
+    parametrosAtuais.current = {
+      visao: novaVisao,
+      dataReferenciaISO: novaDataISO,
+    };
+    setVisaoAtual(novaVisao);
+    setDataReferenciaAtualISO(novaDataISO);
     const params = new URLSearchParams({
       visao: novaVisao,
       data: formatarDataCivil(novaData),
     });
-    startTransition(() => {
-      router.push(`/PainelAlpha/CalendarioAlpha?${params.toString()}`);
-    });
-  }, [router]);
+    window.history.pushState(
+      null,
+      "",
+      `/PainelAlpha/CalendarioAlpha?${params.toString()}`,
+    );
+    void carregarPeriodo(novaVisao, novaData);
+  }, [carregarPeriodo]);
+
+  useEffect(() => {
+    if (!statusConexao.conectado || inicializouPeriodo.current) return;
+    inicializouPeriodo.current = true;
+    void carregarPeriodo(visao, new Date(dataReferenciaISO));
+  }, [carregarPeriodo, dataReferenciaISO, statusConexao.conectado, visao]);
+
+  useEffect(() => {
+    function aoVoltarOuAvancar() {
+      const params = new URLSearchParams(window.location.search);
+      const visaoUrl = params.get("visao");
+      const dataUrl = parsearDataCivil(params.get("data"));
+      const proximaVisao: VisaoCalendario =
+        visaoUrl === "dia" || visaoUrl === "semana" || visaoUrl === "mes" || visaoUrl === "ano"
+          ? visaoUrl
+          : "semana";
+      const proximaData = dataUrl ?? new Date();
+      parametrosAtuais.current = {
+        visao: proximaVisao,
+        dataReferenciaISO: proximaData.toISOString(),
+      };
+      setVisaoAtual(proximaVisao);
+      setDataReferenciaAtualISO(proximaData.toISOString());
+      void carregarPeriodo(proximaVisao, proximaData);
+    }
+
+    window.addEventListener("popstate", aoVoltarOuAvancar);
+    return () => window.removeEventListener("popstate", aoVoltarOuAvancar);
+  }, [carregarPeriodo]);
 
   useEffect(() => assinarInvalidacaoCalendarioAlpha(() => {
     void recarregarCompartilhadasSeAtivo();
-    startTransition(() => router.refresh());
-  }), [recarregarCompartilhadasSeAtivo, router]);
+    void recarregarPeriodoAtual(true);
+  }), [recarregarCompartilhadasSeAtivo, recarregarPeriodoAtual]);
+
+  useEffect(() => {
+    function aoRetomar() {
+      if (document.visibilityState === "visible") {
+        void recarregarPeriodoAtual(true);
+      }
+    }
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void recarregarPeriodoAtual(true);
+      }
+    }, INTERVALO_REVALIDACAO_MS);
+    window.addEventListener("focus", aoRetomar);
+    document.addEventListener("visibilitychange", aoRetomar);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", aoRetomar);
+      document.removeEventListener("visibilitychange", aoRetomar);
+    };
+  }, [recarregarPeriodoAtual]);
 
   async function abrirConfiguracoes() {
     setSidebarMobileAberta(false);
@@ -179,6 +400,10 @@ export function useAgendaAlphaController({
   }
 
   async function editarEvento(evento: EventoExibicao) {
+    if (evento.sincronizacaoPendente) {
+      toast.info("Este item ainda está sendo salvo no Google.");
+      return;
+    }
     if (evento.tipo === "tarefa") {
       invalidarEdicaoPendente();
       setAlvoEdicao(evento);
@@ -237,8 +462,10 @@ export function useAgendaAlphaController({
     sincronizacaoEmAndamento.current = true;
     setSincronizando(true);
     try {
-      const resultado = await sincronizarAgendaAlpha();
-      const resultadoTarefas = await sincronizarTarefasAgendaAlpha();
+      const [resultado, resultadoTarefas] = await Promise.all([
+        sincronizarAgendaAlpha(),
+        sincronizarTarefasAgendaAlpha(),
+      ]);
       await compartilhadas.carregar();
       if (!resultado.success) {
         setErroSincronizacao(resultado.error);
@@ -254,6 +481,7 @@ export function useAgendaAlphaController({
       setErroSincronizacao(primeiroErro ?? null);
       if (primeiroErro) toast.error("A sincronização terminou com pendências.");
       else toast.success("Agenda sincronizada.");
+      await recarregarPeriodoAtual(true);
       notificarAlteracaoAgenda();
     } finally {
       sincronizacaoEmAndamento.current = false;
@@ -270,7 +498,10 @@ export function useAgendaAlphaController({
       gravavel: calendario.gravavel,
     });
     if (!resultado.success) toast.error(resultado.error);
-    else atualizarAgenda();
+    else {
+      atualizarAgenda();
+      void recarregarPeriodoAtual(true);
+    }
   }
 
   async function alternarColega(colegaId: number, visivel: boolean) {
@@ -295,8 +526,51 @@ export function useAgendaAlphaController({
     });
   }
 
+  function executarMutacaoOtimista(mutacao: MutacaoOtimistaAgenda) {
+    setItensOtimistas((atuais) => {
+      const proximos = new Map(atuais);
+      proximos.set(mutacao.item.id, mutacao.item);
+      return proximos;
+    });
+    const toastId = toast.loading(mutacao.mensagemSalvando);
+
+    void (async () => {
+      try {
+        const resultado = await mutacao.executar();
+        if (!resultado.success) {
+          setItensOtimistas((atuais) => {
+            const proximos = new Map(atuais);
+            proximos.delete(mutacao.item.id);
+            return proximos;
+          });
+          toast.error(resultado.error, { id: toastId });
+          return;
+        }
+
+        itensOtimistasConfirmados.current.add(mutacao.item.id);
+        await recarregarPeriodoAtual(true);
+        toast.success(mutacao.mensagemSucesso, { id: toastId });
+        notificarAlteracaoAgenda();
+      } catch {
+        setItensOtimistas((atuais) => {
+          const proximos = new Map(atuais);
+          proximos.delete(mutacao.item.id);
+          return proximos;
+        });
+        toast.error("Não foi possível concluir a alteração. Tente novamente.", {
+          id: toastId,
+        });
+      }
+    })();
+  }
+
   return {
     dataReferencia,
+    visaoAtual,
+    itens,
+    carregandoPeriodo,
+    erroPeriodo,
+    snapshotCarregadoEm,
     formularioAberto,
     alterarFormularioAberto,
     sessaoEdicao,
@@ -328,6 +602,8 @@ export function useAgendaAlphaController({
     atualizarAgenda,
     notificarAlteracaoAgenda,
     navegarPara,
+    recarregarPeriodoAtual,
+    executarMutacaoOtimista,
     abrirConfiguracoes,
     abrirColegas,
     abrirPermissoes,

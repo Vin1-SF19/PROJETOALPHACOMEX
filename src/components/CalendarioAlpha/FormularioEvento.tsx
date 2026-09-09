@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { Bell, Clock3, Loader2, MapPin, UsersRound, Video } from "lucide-react";
 import { toast } from "sonner";
 
@@ -22,6 +22,7 @@ import type { AtualizarEventoParcialInput } from "@/lib/validations/google-calen
 
 import { AgendaModal3D } from "./AgendaModal3D";
 import type { CalendarioSelecionadoView, EventoExibicao, ListaTarefasAgendaView } from "./lib/tipos";
+import type { MutacaoOtimistaAgenda } from "./lib/useAgendaAlphaController";
 
 const TIMEZONE_PADRAO = "America/Sao_Paulo";
 const TIPOS_EVENTO = [
@@ -39,6 +40,7 @@ interface FormularioEventoProps {
   detalhesEvento?: GoogleEventoDTO;
   listasTarefas: ListaTarefasAgendaView[];
   onSalvo: () => void;
+  onSalvarOtimista: (mutacao: MutacaoOtimistaAgenda) => void;
 }
 
 function paraInputDatetimeLocal(data: Date): string {
@@ -80,12 +82,13 @@ export function FormularioEvento({
   detalhesEvento,
   listasTarefas,
   onSalvo,
+  onSalvarOtimista,
 }: FormularioEventoProps) {
   const calendariosGravaveis = calendarios.filter((calendario) => calendario.gravavel);
   const editandoEventoDeColega = Boolean(eventoParaEditar?.colegaId);
   const emEdicao = Boolean(eventoParaEditar);
   const editandoTarefa = eventoParaEditar?.tipo === "tarefa";
-  const [isPending, startTransition] = useTransition();
+  const [isPending, setIsPending] = useState(false);
   const inicioDetalhado = dataDoGoogle(detalhesEvento?.inicio);
   const fimDetalhado = dataDoGoogle(detalhesEvento?.fim);
   const inicioPadrao = inicioDetalhado ?? (eventoParaEditar?.inicioEm ? new Date(eventoParaEditar.inicioEm) : dataInicial);
@@ -117,22 +120,68 @@ export function FormularioEvento({
   const [lembreteMinutos, setLembreteMinutos] = useState("30");
   const [conflito, setConflito] = useState(false);
 
-  function handleSubmit(evento: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     if (eventType !== "task" && !calendarId) return toast.error("Selecione uma agenda.");
     if (!titulo.trim()) return toast.error("Título é obrigatório.");
+    if (eventType === "task" && !editandoTarefa && !taskListId) {
+      return toast.error("Sincronize as tarefas antes de criar a primeira tarefa.");
+    }
 
     const listaParticipantes = emailsNormalizados(participantes);
     const recorrenciaRegras = repeticao === "nunca" ? undefined : [
       repeticao === "diaria" ? "RRULE:FREQ=DAILY" : repeticao === "semanal" ? "RRULE:FREQ=WEEKLY" : repeticao === "mensal" ? "RRULE:FREQ=MONTHLY" : "RRULE:FREQ=YEARLY",
     ];
-    startTransition(async () => {
+    setIsPending(true);
+    try {
       if (eventType === "task") {
-        if (!editandoTarefa && !taskListId) {
-          toast.error("Sincronize as tarefas antes de criar a primeira tarefa.");
+        if (!editandoTarefa) {
+          const idOtimista = `tarefa-otimista-${crypto.randomUUID()}`;
+          const lista = listasTarefas.find(
+            (item) => item.googleTaskListId === taskListId,
+          );
+          onSalvarOtimista({
+            item: {
+              id: idOtimista,
+              googleEventId: idOtimista,
+              status: "needsAction",
+              titulo,
+              inicioEm: new Date(inicio).toISOString(),
+              fimEm: new Date(fim).toISOString(),
+              diaInteiro: false,
+              etag: "",
+              linkMeet: null,
+              eventType: "task",
+              tipo: "tarefa",
+              tarefaNotas: descricao || null,
+              calendarioId: "tarefas-google",
+              calendarioGoogleId: taskListId,
+              calendarioNome: lista?.titulo ?? "Google Tasks",
+              calendarioCorHex: null,
+              calendarioGravavel: false,
+              sincronizacaoPendente: true,
+            },
+            executar: async () => {
+              const resultado = await criarTarefaAgendaAlpha({
+                taskListId,
+                titulo,
+                notas: descricao || undefined,
+                vencimentoEm: new Date(`${inicio.slice(0, 10)}T12:00:00`),
+                inicioLocalEm: new Date(inicio),
+                fimLocalEm: new Date(fim),
+              });
+              return resultado.success
+                ? { success: true }
+                : { success: false, error: resultado.error };
+            },
+            mensagemSalvando: "Salvando tarefa no Google…",
+            mensagemSucesso: "Tarefa criada.",
+          });
+          onOpenChange(false);
           return;
         }
-        const resultado = editandoTarefa && eventoParaEditar?.tarefaCacheId
+
+        const resultado = eventoParaEditar?.tarefaCacheId
           ? await atualizarTarefaAgendaAlpha({
             tarefaCacheId: eventoParaEditar.tarefaCacheId,
             titulo,
@@ -141,19 +190,12 @@ export function FormularioEvento({
             inicioLocalEm: new Date(inicio),
             fimLocalEm: new Date(fim),
           })
-          : await criarTarefaAgendaAlpha({
-            taskListId,
-            titulo,
-            notas: descricao || undefined,
-            vencimentoEm: new Date(`${inicio.slice(0, 10)}T12:00:00`),
-            inicioLocalEm: new Date(inicio),
-            fimLocalEm: new Date(fim),
-          });
+          : { success: false as const, error: "Tarefa inválida para edição." };
         if (!resultado.success) {
           toast.error(resultado.error);
           return;
         }
-        toast.success(editandoTarefa ? "Tarefa atualizada." : "Tarefa criada.");
+        toast.success("Tarefa atualizada.");
         onSalvo();
         onOpenChange(false);
         return;
@@ -224,16 +266,47 @@ export function FormularioEvento({
         }
         toast.success("Evento atualizado.");
       } else {
-        const resultado = await criarEventoNoCalendario(payloadBase);
-        if (!resultado.success) {
-          toast.error(resultado.error);
-          return;
-        }
-        toast.success("Evento criado.");
+        const calendario = calendarios.find(
+          (item) => item.googleCalendarId === calendarId,
+        );
+        const idOtimista = `evento-otimista-${crypto.randomUUID()}`;
+        onSalvarOtimista({
+          item: {
+            id: idOtimista,
+            googleEventId: idOtimista,
+            status: "confirmed",
+            titulo,
+            inicioEm: new Date(inicio).toISOString(),
+            fimEm: new Date(fim).toISOString(),
+            diaInteiro,
+            etag: "",
+            linkMeet: null,
+            eventType,
+            tipo: "evento",
+            calendarioId: calendario?.id ?? "calendario-otimista",
+            calendarioGoogleId: calendarId,
+            calendarioNome: calendario?.nome ?? "Agenda",
+            calendarioCorHex: calendario?.corHex ?? null,
+            calendarioGravavel: false,
+            sincronizacaoPendente: true,
+          },
+          executar: async () => {
+            const resultado = await criarEventoNoCalendario(payloadBase);
+            return resultado.success
+              ? { success: true }
+              : { success: false, error: resultado.error };
+          },
+          mensagemSalvando: "Salvando evento no Google…",
+          mensagemSucesso: "Evento criado.",
+        });
+        onOpenChange(false);
+        return;
       }
       onSalvo();
       onOpenChange(false);
-    });
+    } finally {
+      setIsPending(false);
+    }
   }
 
   const footer = (

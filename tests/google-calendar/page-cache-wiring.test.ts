@@ -24,12 +24,50 @@ describe("Agenda Alpha cache e wiring", () => {
     expect(controller).not.toContain("novaData.toISOString().slice(0, 10)");
   });
 
-  it("não importa nem chama leitura ao vivo de agenda de colega na page SSR", () => {
+  it("entrega o shell sem bloquear o SSR na leitura dos eventos", () => {
     const source = ler("src", "app", "PainelAlpha", "CalendarioAlpha", "page.tsx");
 
     expect(source).not.toContain("listarEventosDeColega");
     expect(source).not.toContain('from "@/actions/google-calendar-colegas"');
-    expect(source).toContain("listarEventosCache");
+    expect(source).not.toContain("listarEventosCache");
+    expect(source).not.toContain("googleCalendarEventoCache.findMany");
+  });
+
+  it("troca a visão localmente e revalida o snapshot sem navegar pelo servidor", () => {
+    const controller = ler(
+      "src",
+      "components",
+      "CalendarioAlpha",
+      "lib",
+      "useAgendaAlphaController.ts",
+    );
+
+    expect(controller).toContain("window.history.pushState");
+    expect(controller).toContain("carregarIntervaloAgendaAlpha");
+    expect(controller).toContain("lerSnapshotAgenda");
+    expect(controller).not.toContain("router.push(`/PainelAlpha/CalendarioAlpha?");
+  });
+
+  it("cria eventos e tarefas otimisticamente e reconcilia com o backend", () => {
+    const formulario = ler(
+      "src",
+      "components",
+      "CalendarioAlpha",
+      "FormularioEvento.tsx",
+    );
+    const controller = ler(
+      "src",
+      "components",
+      "CalendarioAlpha",
+      "lib",
+      "useAgendaAlphaController.ts",
+    );
+
+    expect(formulario).toContain("onSalvarOtimista({");
+    expect(formulario).toContain("sincronizacaoPendente: true");
+    expect(controller).toContain("setItensOtimistas");
+    expect(controller).toContain("itensOtimistasConfirmados.current.add");
+    expect(controller).toContain("await recarregarPeriodoAtual(true)");
   });
 
   it("só ativa compartilhadas por ação explícita e recarrega se já estiverem ativas", () => {
@@ -60,7 +98,7 @@ describe("Agenda Alpha cache e wiring", () => {
     expect(controller).toContain("await compartilhadas.carregar()");
     expect(controller).toContain("void compartilhadas.carregar()");
     expect(controller).toMatch(
-      /assinarInvalidacaoCalendarioAlpha\(\(\) => \{[\s\S]*void recarregarCompartilhadasSeAtivo\(\);[\s\S]*router\.refresh\(\)/,
+      /assinarInvalidacaoCalendarioAlpha\(\(\) => \{[\s\S]*void recarregarCompartilhadasSeAtivo\(\);[\s\S]*void recarregarPeriodoAtual\(true\)/,
     );
   });
 

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { verificarAcessoCalendarioAlpha } from "@/lib/google-calendar/autorizacao";
+import { criarCorrelationIdAgendaAlpha, registrarMetricaPerformanceAgendaAlpha } from "@/lib/google-calendar/observability";
 import { atualizarTarefaGoogleTasks, criarTarefaGoogleTasks, concluirTarefaGoogleTasks, listarListasGoogleTasks, listarTarefasGoogleTasks } from "@/lib/google-calendar/tasks";
 import { obterUsuarioGoogleAtivo } from "@/lib/google-calendar/usuario-google";
 import db from "@/lib/prisma";
@@ -70,6 +71,8 @@ export async function criarTarefaAgendaAlpha(input: z.input<typeof tarefaSchema>
   if (!contexto.success) return contexto;
   const lista = await db.googleCalendarTaskListCache.findFirst({ where: { conexaoId: contexto.data.conexaoId, googleTaskListId: parsed.data.taskListId }, select: { id: true } });
   if (!lista) return { success: false, error: "Lista de tarefas não encontrada. Sincronize primeiro." };
+  const iniciadoEm = Date.now();
+  const correlationId = criarCorrelationIdAgendaAlpha();
   try {
     const { inicioLocalEm, fimLocalEm, ...dadosGoogle } = parsed.data;
     const tarefa = await criarTarefaGoogleTasks({ emailUsuario: contexto.data.emailUsuario, ...dadosGoogle });
@@ -79,9 +82,13 @@ export async function criarTarefaAgendaAlpha(input: z.input<typeof tarefaSchema>
       create: { taskListId: lista.id, ...tarefa, ...camposLocais },
       update: { ...tarefa, ...camposLocais },
     });
+    registrarMetricaPerformanceAgendaAlpha({ correlationId, operation: "criar_tarefa", outcome: "success", latencyMs: Date.now() - iniciadoEm, itemCount: 1 });
     revalidatePath("/PainelAlpha/CalendarioAlpha");
     return { success: true, data: { id: salva.id } };
-  } catch { return { success: false, error: "Não foi possível criar a tarefa no Google." }; }
+  } catch {
+    registrarMetricaPerformanceAgendaAlpha({ correlationId, operation: "criar_tarefa", outcome: "error", latencyMs: Date.now() - iniciadoEm });
+    return { success: false, error: "Não foi possível criar a tarefa no Google." };
+  }
 }
 
 export async function concluirTarefaAgendaAlpha(input: z.input<typeof concluirSchema>): Promise<Resultado<{ id: string }>> {

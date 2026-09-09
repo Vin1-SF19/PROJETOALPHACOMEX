@@ -129,6 +129,8 @@ export interface EventoExibicao {
   calendarioGravavel: boolean;
   recusadoPeloUsuario?: boolean;
   compartilhadoComUsuario?: boolean;
+  /** Item exibido imediatamente enquanto a criação é confirmada pelo Google. */
+  sincronizacaoPendente?: boolean;
   /** Presente quando o evento pertence à agenda de um colega (não do próprio usuário logado). */
   colegaId?: number;
 }

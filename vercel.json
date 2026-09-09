@@ -9,6 +9,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/calendario-alpha/jobs/worker",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/alpha-seo/cron/schedules",
       "schedule": "*/5 * * * *"
     },

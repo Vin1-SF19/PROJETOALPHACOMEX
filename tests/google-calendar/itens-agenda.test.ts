@@ -9,6 +9,7 @@ describe("tarefasParaItensAgenda", () => {
       taskListGoogleId: "lista-1",
       listaTitulo: "Minhas tarefas",
       titulo: "Enviar proposta",
+      notas: null,
       status: "needsAction",
       vencimentoEm: "2026-08-27T00:00:00.000Z",
     }]);
@@ -25,8 +26,8 @@ describe("tarefasParaItensAgenda", () => {
 
   it("não mostra tarefas concluídas ou sem data na grade", () => {
     expect(tarefasParaItensAgenda([
-      { id: "1", taskListGoogleId: "l", listaTitulo: "L", titulo: "Feita", status: "completed", vencimentoEm: "2026-08-27T00:00:00.000Z" },
-      { id: "2", taskListGoogleId: "l", listaTitulo: "L", titulo: "Sem data", status: "needsAction", vencimentoEm: null },
+      { id: "1", taskListGoogleId: "l", listaTitulo: "L", titulo: "Feita", notas: null, status: "completed", vencimentoEm: "2026-08-27T00:00:00.000Z" },
+      { id: "2", taskListGoogleId: "l", listaTitulo: "L", titulo: "Sem data", notas: null, status: "needsAction", vencimentoEm: null },
     ])).toEqual([]);
   });
 
@@ -36,6 +37,7 @@ describe("tarefasParaItensAgenda", () => {
       taskListGoogleId: "lista-1",
       listaTitulo: "Minhas tarefas",
       titulo: "Chamado #42 — Impressora",
+      notas: null,
       status: "completed",
       vencimentoEm: "2026-08-27T00:00:00.000Z",
       inicioAgendadoEm: "2026-08-27T12:00:00.000Z",

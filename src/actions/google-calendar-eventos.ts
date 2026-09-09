@@ -15,6 +15,10 @@ import {
   responderConvite as responderConviteGoogleApi,
 } from "@/lib/google-calendar/client";
 import { GoogleCalendarError } from "@/lib/google-calendar/errors";
+import {
+  criarCorrelationIdAgendaAlpha,
+  registrarMetricaPerformanceAgendaAlpha,
+} from "@/lib/google-calendar/observability";
 import type { GoogleCalendarioDTO, GoogleEventoDTO } from "@/lib/google-calendar/types";
 import { obterUsuarioGoogleAtivo } from "@/lib/google-calendar/usuario-google";
 import {
@@ -425,6 +429,8 @@ export async function criarEventoNoCalendario(input: CriarEventoInput): Promise<
   const usuarioGoogle = await obterUsuarioGoogleAtivo(acesso.userId);
   if (!usuarioGoogle.ok) return { success: false, error: erroMensagemAmigavel(usuarioGoogle.motivo) };
 
+  const iniciadoEm = Date.now();
+  const correlationId = criarCorrelationIdAgendaAlpha();
   try {
     const eventoCriado = await criarEventoGoogleApi({
       emailUsuario: usuarioGoogle.emailUsuario,
@@ -440,9 +446,22 @@ export async function criarEventoNoCalendario(input: CriarEventoInput): Promise<
       },
     });
 
+    registrarMetricaPerformanceAgendaAlpha({
+      correlationId,
+      operation: "criar_evento",
+      outcome: "success",
+      latencyMs: Date.now() - iniciadoEm,
+      itemCount: 1,
+    });
     revalidatePath("/PainelAlpha/CalendarioAlpha");
     return { success: true, data: { googleEventId: eventoCriado.googleEventId } };
   } catch {
+    registrarMetricaPerformanceAgendaAlpha({
+      correlationId,
+      operation: "criar_evento",
+      outcome: "error",
+      latencyMs: Date.now() - iniciadoEm,
+    });
     return { success: false, error: "Não foi possível criar o evento no Google Agenda." };
   }
 }

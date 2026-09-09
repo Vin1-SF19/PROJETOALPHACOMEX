@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   registrarEventoAgendaAlpha,
+  registrarMetricaPerformanceAgendaAlpha,
   serializarEventoAgendaAlpha,
+  serializarMetricaPerformanceAgendaAlpha,
 } from "@/lib/google-calendar/observability";
 
 describe("observabilidade segura da Agenda Alpha", () => {
@@ -70,6 +72,57 @@ describe("observabilidade segura da Agenda Alpha", () => {
       value: 1,
       outcome: "rejected",
       reason: "AUTH_FAILED",
+    });
+  });
+
+  it("serializa métricas de performance sem conteúdo da agenda e limita valores", () => {
+    const entrada = Object.assign(
+      {
+        correlationId: "019fb437-c332-7b10-a85a-edb5539f1680",
+        operation: "snapshot_intervalo" as const,
+        outcome: "success" as const,
+        latencyMs: 999_999,
+        itemCount: 999_999,
+      },
+      {
+        titulo: "Consulta médica",
+        email: "pessoa@alpha.com",
+        googleEventId: "evento-secreto",
+      },
+    );
+
+    const serializado = serializarMetricaPerformanceAgendaAlpha(entrada);
+    expect(JSON.parse(serializado)).toMatchObject({
+      scope: "agenda-alpha",
+      event: "performance",
+      metric: "agenda_alpha_operation_duration_ms",
+      operation: "snapshot_intervalo",
+      outcome: "success",
+      latencyMs: 600_000,
+      itemCount: 100_000,
+    });
+    expect(serializado).not.toContain("Consulta médica");
+    expect(serializado).not.toContain("pessoa@alpha.com");
+    expect(serializado).not.toContain("evento-secreto");
+  });
+
+  it("registra uma linha JSON por operação de performance", () => {
+    const escrever = vi.fn();
+    registrarMetricaPerformanceAgendaAlpha(
+      {
+        correlationId: "019fb437-c332-7b10-a85a-edb5539f1680",
+        operation: "criar_evento",
+        outcome: "error",
+        latencyMs: -5,
+      },
+      escrever,
+    );
+
+    expect(escrever).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(escrever.mock.calls[0]?.[0] ?? "{}")).toMatchObject({
+      operation: "criar_evento",
+      outcome: "error",
+      latencyMs: 0,
     });
   });
 });
