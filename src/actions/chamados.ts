@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { pusherServer } from "@/lib/pusher-server.ts";
 import {
   notificarAgendaChamadoAtualizada,
+  notificarChamadoAssumido,
   notificarChamadoConcluido,
   notificarNovoChamado,
 } from "@/lib/chamados/notificacoes-server";
@@ -231,6 +232,14 @@ export async function assumirChamado(id: number) {
     if (atribuicao.count === 0) {
       return { success: false, error: "Chamado já foi assumido por outro técnico" };
     }
+
+    const atendimentoIniciadoEm = new Date();
+    await notificarChamadoAssumido(chamado.usuarioId, {
+      chamadoId: id,
+      titulo: chamado.titulo,
+      tecnicoNome: session.user.nome?.trim() || "Equipe de TI",
+      createdAt: atendimentoIniciadoEm.toISOString(),
+    });
 
     let agendaAtualizadaEm = chamado.updatedAt;
     try {

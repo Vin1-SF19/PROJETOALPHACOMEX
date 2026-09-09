@@ -22,7 +22,7 @@ import { useNotasNotifications } from '@/hooks/useNotasNotifications';
 import { useNotasLembretesPendentes } from '@/hooks/useNotasLembretesPendentes';
 import { useCalendarioAlphaNotifications } from '@/hooks/useCalendarioAlphaNotifications';
 import { CompromissoNotificacaoToast } from '@/components/CalendarioAlpha/CompromissoNotificacaoToast';
-import { SinoNotificacoesCompromissos } from '@/components/CalendarioAlpha/SinoNotificacoesCompromissos';
+import { CentralNotificacoesPainel } from './CentralNotificacoesPainel';
 import { isAdminRole } from '@/lib/roles';
 import type { OnboardingVideo } from '@/lib/onboarding';
 import type { LinkExternoVisivel } from '@/actions/LinksExternos';
@@ -221,6 +221,10 @@ export default function PainelLayoutClient({
     window.requestAnimationFrame(() => entregarIntencaoAgenda(intencao));
   }, [entregarIntencaoAgenda, openTab]);
 
+  const abrirChamadosPorNotificacao = useCallback(() => {
+    openTab('/PainelAlpha/Chamados', 'Chamados');
+  }, [openTab]);
+
   useEffect(() => {
     const pendente = intencaoAgendaPendenteRef.current;
     if (pendente) entregarIntencaoAgenda(pendente);
@@ -316,7 +320,7 @@ export default function PainelLayoutClient({
 
   return (
     <>
-      <NotificationToast />
+      <NotificationToast onAbrirChamados={abrirChamadosPorNotificacao} />
       <ChecklistNotificationToast />
       <HoleriteNotificacaoGlobal authenticated />
       <NotaNotificacaoToast />
@@ -364,7 +368,10 @@ export default function PainelLayoutClient({
               />
             </div>
             <div className="shrink-0 flex items-center gap-2 pr-3">
-              {temAcessoCalendarioAlpha && <SinoNotificacoesCompromissos onAbrirAgenda={abrirAgendaPorNotificacao} />}
+              <CentralNotificacoesPainel
+                onAbrirAgenda={abrirAgendaPorNotificacao}
+                onAbrirModulo={openTab}
+              />
               <BibbleWeatherWidget />
             </div>
           </div>

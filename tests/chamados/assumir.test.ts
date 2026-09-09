@@ -5,6 +5,8 @@ const prismaMock = vi.hoisted(() => ({
   chamados: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
 }));
 const notificarAgendaMock = vi.hoisted(() => vi.fn());
+const notificarAssumidoMock = vi.hoisted(() => vi.fn());
+const criarTarefaMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../../auth", () => ({ auth: authMock }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -12,17 +14,18 @@ vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
 vi.mock("@/lib/pusher-server.ts", () => ({ pusherServer: { trigger: vi.fn().mockResolvedValue(undefined) } }));
 vi.mock("@/lib/chamados/notificacoes-server", () => ({
   notificarAgendaChamadoAtualizada: notificarAgendaMock,
+  notificarChamadoAssumido: notificarAssumidoMock,
   notificarChamadoConcluido: vi.fn(),
   notificarNovoChamado: vi.fn(),
 }));
 vi.mock("@/lib/chamados/tarefa-agendada", () => ({
   concluirTarefaAgendadaDoChamado: vi.fn(),
-  criarTarefaAgendadaParaChamado: vi.fn().mockResolvedValue(undefined),
+  criarTarefaAgendadaParaChamado: criarTarefaMock,
 }));
 
 import { assumirChamado } from "@/actions/chamados";
 
-const SESSION = { user: { id: "3", role: "TI" } };
+const SESSION = { user: { id: "3", role: "TI", nome: "Carlos Silva" } };
 
 function chamadoAberto(overrides: Record<string, unknown> = {}) {
   return {
@@ -42,6 +45,8 @@ describe("assumirChamado — fluxo 'Assumir Chamado'", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authMock.mockResolvedValue(SESSION);
+    criarTarefaMock.mockResolvedValue(undefined);
+    notificarAssumidoMock.mockResolvedValue(true);
   });
 
   it("bloqueia sem sessão autenticada", async () => {
@@ -102,6 +107,11 @@ describe("assumirChamado — fluxo 'Assumir Chamado'", () => {
         status: "EM_ATENDIMENTO",
       }),
     );
+    expect(notificarAssumidoMock).toHaveBeenCalledWith(1, expect.objectContaining({
+      chamadoId: 10,
+      titulo: "Falha no acesso",
+      tecnicoNome: "Carlos Silva",
+    }));
   });
 
   it("rejeita uma assunção concorrente sem sobrescrever o técnico vencedor", async () => {
@@ -112,5 +122,26 @@ describe("assumirChamado — fluxo 'Assumir Chamado'", () => {
 
     expect(resultado.success).toBe(false);
     expect(resultado.error).toMatch(/já foi assumido/i);
+    expect(notificarAssumidoMock).not.toHaveBeenCalled();
+  });
+
+  it("notifica o solicitante antes de aguardar a automação da Agenda Alpha", async () => {
+    let liberarAgenda!: () => void;
+    criarTarefaMock.mockImplementation(
+      () => new Promise<void>((resolve) => {
+        liberarAgenda = resolve;
+      }),
+    );
+    prismaMock.chamados.findUnique
+      .mockResolvedValueOnce(chamadoAberto())
+      .mockResolvedValueOnce(chamadoAberto());
+    prismaMock.chamados.updateMany.mockResolvedValue({ count: 1 });
+
+    const resultadoPendente = assumirChamado(10);
+    await vi.waitFor(() => expect(notificarAssumidoMock).toHaveBeenCalledTimes(1));
+    expect(criarTarefaMock).toHaveBeenCalledTimes(1);
+
+    liberarAgenda();
+    await expect(resultadoPendente).resolves.toMatchObject({ success: true });
   });
 });

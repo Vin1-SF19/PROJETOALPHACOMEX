@@ -1,0 +1,34 @@
+{
+  "subtaskId": "chamados-atendimento-central-notificacoes",
+  "critiquedAt": "2026-09-09T00:00:00Z",
+  "step5_5": {
+    "predictedBugs": [
+      "A notificação de atendimento poderia ser enviada por uma tentativa concorrente que perdeu a atribuição; o envio ocorre somente depois de updateMany retornar count igual a 1.",
+      "A automação da Agenda Alpha poderia atrasar o aviso instantâneo; o evento privado agora é publicado antes de aguardar a criação da tarefa.",
+      "Um nome de técnico vazio poderia produzir uma mensagem quebrada; o nome é normalizado com trim e usa Equipe de TI como fallback.",
+      "O sino global poderia abrir páginas fora do sistema de abas e desmontar o shell; todos os destinos novos usam o callback openTab já adotado pelo layout.",
+      "O polling legado poderia ignorar a primeira mensagem recebida depois de uma resposta inicial vazia; a carga inicial agora é encerrada mesmo quando a API responde nenhum."
+    ],
+    "edgeCases": [
+      "Uma central sem itens exibe estado vazio e badge zero, sem tentar acessar dados opcionais.",
+      "Notificações de cinco origens com horários diferentes são ordenadas pelo instante de criação e usam IDs prefixados para evitar colisões entre domínios.",
+      "Falha do Pusher retorna false no serviço e não desfaz a atribuição já persistida no banco.",
+      "Usuários sem acesso à Agenda Alpha continuam vendo a central geral, enquanto a assinatura específica da Agenda permanece condicionada à permissão existente.",
+      "Uma mensagem legada sem chamado válido é ignorada sem criar um item que navegue para um destino inexistente."
+    ],
+    "errorHandling": true,
+    "securityCheck": true,
+    "passed": true
+  },
+  "step6_5": {
+    "followsPatterns": true,
+    "noHardcoded": true,
+    "testsAdded": true,
+    "docsUpdated": true,
+    "noConsoleLogs": true,
+    "passed": true
+  },
+  "overallVerdict": "PASSED",
+  "skipped": false,
+  "skipWarning": null
+}

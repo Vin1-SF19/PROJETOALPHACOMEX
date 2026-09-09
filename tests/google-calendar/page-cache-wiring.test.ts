@@ -107,8 +107,8 @@ describe("Agenda Alpha cache e wiring", () => {
     const sino = ler(
       "src",
       "components",
-      "CalendarioAlpha",
-      "SinoNotificacoesCompromissos.tsx",
+      "layout",
+      "CentralNotificacoesPainel.tsx",
     );
 
     expect(layout).toContain("openTab(AGENDA_ALPHA_URL, AGENDA_ALPHA_LABEL)");

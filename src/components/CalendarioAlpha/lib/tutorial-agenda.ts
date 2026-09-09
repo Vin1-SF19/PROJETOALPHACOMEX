@@ -69,8 +69,8 @@ export const TUTORIAL_AGENDA: ConfigTutorialModulo = {
     {
       id: "sino-notificacoes",
       seletor: '[data-guia-agenda="sino-notificacoes"]',
-      titulo: "Notificações de compromisso",
-      descricao: "Fica na barra de abas do Painel, visível em qualquer módulo. Avisa 10 e 5 minutos antes de um compromisso, e também sobre pedidos de compartilhamento.",
+      titulo: "Notificações",
+      descricao: "Fica na barra de abas e reúne avisos de todo o Painel Alpha, incluindo compromissos, compartilhamentos, chamados, notas, checklists e holerites.",
     },
   ],
 };

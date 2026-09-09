@@ -3,6 +3,7 @@ import { isAdminRole } from "@/lib/roles";
 export const CHAMADOS_ADMIN_CHANNEL = "private-admin-chamados";
 export const NOVO_CHAMADO_EVENT = "novo-chamado";
 export const CHAMADO_CONCLUIDO_EVENT = "chamado-concluido";
+export const CHAMADO_ASSUMIDO_EVENT = "chamado-assumido";
 export const CHAMADO_USUARIO_CHANNEL_PREFIX = "private-chamados-usuario-";
 
 export interface NovoChamadoPayload {
@@ -18,6 +19,13 @@ export interface ChamadoConcluidoPayload {
   chamadoId: number;
   titulo: string;
   solucao?: string;
+  createdAt: string;
+}
+
+export interface ChamadoAssumidoPayload {
+  chamadoId: number;
+  titulo: string;
+  tecnicoNome: string;
   createdAt: string;
 }
 

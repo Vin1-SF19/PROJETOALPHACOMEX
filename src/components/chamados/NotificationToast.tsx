@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useRouter } from 'next/navigation';
-import { X, AlertTriangle, AlertCircle, CheckCircle2, Info } from 'lucide-react';
+import { X, AlertTriangle, AlertCircle, CheckCircle2, Clock3, Info, MessageSquare } from 'lucide-react';
 import { useChamadoNotificacoes, type ChamadoNotificacao } from '@/store/useChamadoNotificacoes';
 
 const URGENCIA_CONFIG = {
@@ -52,14 +51,35 @@ const URGENCIA_CONFIG = {
     iconColor: 'text-emerald-400',
     badge: 'bg-emerald-500/10 border-emerald-400/25 text-emerald-300',
   },
+  EM_ATENDIMENTO: {
+    icon: Clock3,
+    label: 'Chamado em atendimento',
+    border: 'border-sky-400/30',
+    bg: 'bg-[#07101a]',
+    glow: 'shadow-[0_0_18px_rgba(56,189,248,0.14)]',
+    iconColor: 'text-sky-400',
+    badge: 'bg-sky-500/10 border-sky-400/25 text-sky-300',
+  },
+  MENSAGEM: {
+    icon: MessageSquare,
+    label: 'Nova mensagem no chamado',
+    border: 'border-violet-400/30',
+    bg: 'bg-[#0d0a17]',
+    glow: 'shadow-[0_0_18px_rgba(167,139,250,0.14)]',
+    iconColor: 'text-violet-400',
+    badge: 'bg-violet-500/10 border-violet-400/25 text-violet-300',
+  },
 } as const;
 
 const FALLBACK = URGENCIA_CONFIG.MEDIA;
 
-export default function NotificationToast() {
+export default function NotificationToast({
+  onAbrirChamados,
+}: {
+  onAbrirChamados: () => void;
+}) {
   const notificacoes = useChamadoNotificacoes((s) => s.notificacoes);
   const removerNotificacao = useChamadoNotificacoes((s) => s.removerNotificacao);
-  const router = useRouter();
 
   const [visivel, setVisivel] = useState<ChamadoNotificacao | null>(null);
   const filaRef = useRef<ChamadoNotificacao[]>([]);
@@ -132,7 +152,7 @@ export default function NotificationToast() {
             `}
             onClick={() => {
               dispensar();
-              router.push('/PainelAlpha/Chamados');
+              onAbrirChamados();
             }}
           >
             <div className="flex items-start gap-3">

@@ -4,11 +4,13 @@ import { useEffect, useRef } from 'react';
 import { pusherClient } from '@/lib/pusher';
 import { useChamadoNotificacoes } from '@/store/useChamadoNotificacoes';
 import {
+  CHAMADO_ASSUMIDO_EVENT,
   CHAMADO_CONCLUIDO_EVENT,
   CHAMADOS_ADMIN_CHANNEL,
   NOVO_CHAMADO_EVENT,
   canalChamadosDoUsuario,
   podeReceberNovosChamados,
+  type ChamadoAssumidoPayload,
   type ChamadoConcluidoPayload,
   type NovoChamadoPayload,
 } from '@/lib/chamados/notificacoes';
@@ -72,8 +74,22 @@ export function useChamadosNotifications(role: string | undefined, userId: numbe
       playAudio();
     };
     userChannel.bind(CHAMADO_CONCLUIDO_EVENT, concluidoHandler);
+
+    const assumidoHandler = (payload: ChamadoAssumidoPayload) => {
+      adicionarNotificacao({
+        chamadoId: payload.chamadoId,
+        titulo: payload.titulo,
+        usuario: `${payload.tecnicoNome} assumiu seu chamado e já está resolvendo o problema.`,
+        setor: '',
+        urgencia: 'EM_ATENDIMENTO',
+        createdAt: payload.createdAt,
+      });
+      playAudio();
+    };
+    userChannel.bind(CHAMADO_ASSUMIDO_EVENT, assumidoHandler);
     cleanups.push(() => {
       userChannel.unbind(CHAMADO_CONCLUIDO_EVENT, concluidoHandler);
+      userChannel.unbind(CHAMADO_ASSUMIDO_EVENT, assumidoHandler);
       client.unsubscribe(userChannelName);
     });
 

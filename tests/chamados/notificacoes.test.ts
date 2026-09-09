@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  CHAMADO_ASSUMIDO_EVENT,
   CHAMADO_CONCLUIDO_EVENT,
   CHAMADOS_ADMIN_CHANNEL,
   NOVO_CHAMADO_EVENT,
@@ -68,6 +69,35 @@ describe("notificações de chamados", () => {
       CHAMADO_CONCLUIDO_EVENT,
       payload,
     );
+  });
+
+  it("publica o atendimento somente no canal privado do solicitante", async () => {
+    const { notificarChamadoAssumido } = await import("@/lib/chamados/notificacoes-server");
+    const payload = {
+      chamadoId: 15,
+      titulo: "Falha no acesso",
+      tecnicoNome: "Carlos Silva",
+      createdAt: "2026-09-09T18:00:00.000Z",
+    };
+
+    await expect(notificarChamadoAssumido(42, payload)).resolves.toBe(true);
+    expect(trigger).toHaveBeenCalledWith(
+      "private-chamados-usuario-42",
+      CHAMADO_ASSUMIDO_EVENT,
+      payload,
+    );
+  });
+
+  it("não desfaz a atribuição quando o aviso de atendimento falha", async () => {
+    trigger.mockRejectedValueOnce(new Error("indisponível"));
+    const { notificarChamadoAssumido } = await import("@/lib/chamados/notificacoes-server");
+
+    await expect(notificarChamadoAssumido(42, {
+      chamadoId: 15,
+      titulo: "Falha no acesso",
+      tecnicoNome: "Carlos Silva",
+      createdAt: "2026-09-09T18:00:00.000Z",
+    })).resolves.toBe(false);
   });
 
   it("invalida em tempo real as agendas do solicitante e do técnico", async () => {
