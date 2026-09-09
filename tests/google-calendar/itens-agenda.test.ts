@@ -47,7 +47,7 @@ describe("tarefasParaItensAgenda", () => {
       listaTitulo: "Minhas tarefas",
       titulo: "Chamado #42 — Impressora",
       notas: null,
-      status: "completed",
+      status: "needsAction",
       vencimentoEm: "2026-08-27T00:00:00.000Z",
       inicioAgendadoEm: "2026-08-27T12:00:00.000Z",
       fimPlanejadoAgendadoEm: "2026-08-27T13:00:00.000Z",

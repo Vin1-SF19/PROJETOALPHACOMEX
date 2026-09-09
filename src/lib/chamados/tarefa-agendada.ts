@@ -1,6 +1,7 @@
 import { atualizarTarefaGoogleTasks, concluirTarefaGoogleTasks, criarTarefaGoogleTasks, listarListasGoogleTasks } from "@/lib/google-calendar/tasks";
 import { obterUsuarioGoogleAtivo } from "@/lib/google-calendar/usuario-google";
 import db from "@/lib/prisma";
+import { isSameRole } from "@/lib/roles";
 
 type ChamadoParaAgenda = {
   id: number;
@@ -10,7 +11,7 @@ type ChamadoParaAgenda = {
 };
 
 function ehUsuarioTi(role: string | null | undefined): boolean {
-  return role?.trim().toUpperCase() === "TI";
+  return isSameRole(role, "TI");
 }
 
 function formatarHorario(data: Date): string {
@@ -128,8 +129,25 @@ export async function concluirTarefaAgendadaDoChamado(input: {
     where: { chamadoId: input.chamadoId },
     include: { tarefaCache: { include: { taskList: true } } },
   });
-  if (!agendamento || agendamento.status === "CONCLUIDO") return;
+  if (!agendamento) return;
   if (agendamento.usuarioAgendaId !== input.tecnicoId) return;
+
+  if (agendamento.status !== "CONCLUIDO") {
+    await db.$transaction([
+      db.googleCalendarTaskCache.update({
+        where: { id: agendamento.tarefaCacheId },
+        data: {
+          status: "completed",
+          concluidaEm: input.concluidoEm,
+          notas: notasComConclusao(agendamento.tarefaCache.notas, input.concluidoEm),
+        },
+      }),
+      db.googleCalendarTaskSchedule.update({
+        where: { id: agendamento.id },
+        data: { status: "CONCLUIDO", fimConcluidoEm: input.concluidoEm },
+      }),
+    ]);
+  }
 
   const usuario = await obterUsuarioGoogleAtivo(input.tecnicoId);
   if (!usuario.ok) throw new Error("Agenda Alpha do técnico não está ativa.");
@@ -148,14 +166,8 @@ export async function concluirTarefaAgendadaDoChamado(input: {
     vencimentoEm: tarefaConcluida.vencimentoEm ?? undefined,
   });
 
-  await db.$transaction([
-    db.googleCalendarTaskCache.update({
-      where: { id: agendamento.tarefaCacheId },
-      data: tarefaGoogle,
-    }),
-    db.googleCalendarTaskSchedule.update({
-      where: { id: agendamento.id },
-      data: { status: "CONCLUIDO", fimConcluidoEm: input.concluidoEm },
-    }),
-  ]);
+  await db.googleCalendarTaskCache.update({
+    where: { id: agendamento.tarefaCacheId },
+    data: tarefaGoogle,
+  });
 }

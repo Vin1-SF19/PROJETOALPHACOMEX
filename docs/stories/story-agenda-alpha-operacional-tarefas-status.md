@@ -65,6 +65,7 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - `src/lib/google-calendar/{client,types,cache-eventos,scopes,sync}.ts`
 - `src/lib/chamados/tarefa-agendada.ts`
 - `src/actions/chamados.ts`
+- `src/actions/protocolos.ts`
 - `src/actions/google-calendar-{eventos,sync,tarefas}.ts`
 - `src/components/CalendarioAlpha/{FormularioEvento,CalendarioAlphaDashboard,StatusSincronizacao,GradeHoraria,VisaoMes,VisaoAno,DiaEventosPopover}.tsx`
 - `src/components/CalendarioAlpha/lib/{tipos,itens-agenda,useAgendaAlphaController}.ts`
@@ -87,7 +88,9 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - `src/components/CalendarioAlpha/lib/{useAgendasCompartilhadas,tipos,itens-agenda}.ts`
 - `src/lib/google-calendar/navegacao.ts`
 - `tests/google-calendar/{compartilhamento-escrita,navegacao-notificacoes}.test.ts`
+- `tests/chamados/{finalizar-protocolo-agenda,tarefa-agendada}.test.ts`
 - `plan/self-critique-agenda-alpha-sharing.json`
+- `plan/self-critique-chamados-agenda-conclusao.json`
 
 ## Dev Agent Record
 
@@ -107,11 +110,14 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - O shell de abas mantém uma intenção pendente até receber confirmação do iframe da Agenda Alpha; convites abrem o painel que contém Aprovar/Recusar.
 - Nenhuma estrutura de banco, migration, backfill ou operação em massa foi necessária; Vault não foi acionado.
 - Gates do recorte: ESLint sem erros/avisos, 26/26 testes específicos aprovados e build de produção aprovado. Os gates globais continuam bloqueados pela linha de base do repositório: lint com 21.210 ocorrências, typecheck com erros preexistentes fora do recorte e suíte completa com 49 falhas em 18 arquivos; o primeiro `npm run typecheck` também excedeu o heap padrão antes da repetição com 8 GB.
+- O encerramento real por **Finalizar com Protocolo** agora aciona a tarefa vinculada ao técnico responsável, reutiliza exatamente o instante salvo em `closedAt`/`updatedAt` como fim real e invalida a Agenda Alpha. O alias legado `T.I` também é reconhecido; falha externa do Google permanece observável e não reabre nem bloqueia o chamado já concluído. O cache e o agendamento locais são concluídos antes da chamada externa, preservando o estado correto da Agenda Alpha mesmo durante indisponibilidade do Google.
+- Regressão da integração Chamados → Agenda: 20/20 testes direcionados aprovados, ESLint do recorte sem ocorrências e build de produção aprovado. Os gates globais mantêm a mesma linha de base externa ao ajuste: 21.210 ocorrências no lint, 49 falhas em 18 arquivos e erros de typecheck fora dos arquivos alterados; a execução padrão do typecheck excedeu o heap de 4 GB antes da repetição diagnóstica com 8 GB.
 
 ### Change Log
 
 - 2026-09-09: carregamento cache-first, navegação sem round-trip de página, mutações otimistas, consulta consolidada e telemetria de latência da Agenda Alpha.
 - 2026-09-09: permanência visual de tarefas concluídas, escrita em agendas compartilhadas Editor e correção do fluxo de notificações/convites nas abas internas.
+- 2026-09-09: correção do encerramento por protocolo para concluir a tarefa vinculada e usar o horário real do fechamento na Agenda Alpha.
 
 ## Notas operacionais
 

@@ -12,7 +12,7 @@ export function tarefasParaItensAgenda(tarefas: TarefaAgendaExibicao[]): EventoE
       return [{
         id: `tarefa-${tarefa.id}`,
         googleEventId: `tarefa-${tarefa.id}`,
-        status: tarefa.status,
+        status: tarefa.statusAgendamento === "CONCLUIDO" ? "completed" : tarefa.status,
         titulo: tarefa.titulo,
         inicioEm: tarefa.inicioAgendadoEm ?? null,
         fimEm: tarefa.fimConcluidoAgendadoEm ?? tarefa.fimPlanejadoAgendadoEm ?? null,

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "../../auth";
 import { isAdminRole } from "@/lib/roles";
 import { notificarChamadoConcluido } from "@/lib/chamados/notificacoes-server";
+import { concluirTarefaAgendadaDoChamado } from "@/lib/chamados/tarefa-agendada";
 
 // Prisma client types não incluem ProtocoloTemplate ainda.
 // Após parar dev server: `npx prisma generate` para remover os casts abaixo.
@@ -123,7 +124,13 @@ export async function finalizarComProtocolo(
 
     const chamado = await db.chamados.findUnique({
       where: { id: chamadoId },
-      select: { id: true, titulo: true, usuarioId: true },
+      select: {
+        id: true,
+        titulo: true,
+        usuarioId: true,
+        tecnicoId: true,
+        tecnico: { select: { role: true } },
+      },
     });
     if (!chamado) return { success: false, error: "Chamado não encontrado." };
 
@@ -140,6 +147,25 @@ export async function finalizarComProtocolo(
       chamadoId
     );
 
+    if (chamado.tecnicoId !== null) {
+      try {
+        await concluirTarefaAgendadaDoChamado({
+          chamadoId: chamado.id,
+          concluidoEm,
+          tecnicoId: chamado.tecnicoId,
+          tecnicoRole: chamado.tecnico?.role,
+        });
+      } catch (error) {
+        // O fechamento do chamado é a fonte de verdade e não pode ser revertido
+        // por uma indisponibilidade momentânea da API do Google Tasks.
+        console.error("[chamados] Falha ao concluir tarefa da Agenda Alpha pelo protocolo", {
+          chamadoId: chamado.id,
+          tecnicoId: chamado.tecnicoId,
+          message: error instanceof Error ? error.message : "erro desconhecido",
+        });
+      }
+    }
+
     await notificarChamadoConcluido(chamado.usuarioId, {
       chamadoId: chamado.id,
       titulo: chamado.titulo,
@@ -148,6 +174,7 @@ export async function finalizarComProtocolo(
     });
 
     revalidatePath("/PainelAlpha/Chamados");
+    revalidatePath("/PainelAlpha/CalendarioAlpha");
     return { success: true };
   } catch (e: unknown) {
     return { success: false, error: e instanceof Error ? e.message : "Erro ao finalizar chamado." };
