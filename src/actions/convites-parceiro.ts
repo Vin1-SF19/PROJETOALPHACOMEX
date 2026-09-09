@@ -2,7 +2,7 @@
 
 import db from "@/lib/prisma";
 import { auth } from "../../auth";
-import { isAdminRole } from "@/lib/roles";
+import { isParceirosAdminRole } from "@/lib/roles";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { randomUUID } from "crypto";
@@ -24,7 +24,7 @@ async function getCtx(): Promise<Ctx | null> {
   if (!session?.user) return null;
   const userId = Number((session.user as { id?: string | number }).id ?? 0);
   const role = (session.user as { role?: string }).role ?? "";
-  const isAdmin = isAdminRole(role);
+  const isAdmin = isParceirosAdminRole(role);
   // Acesso ao módulo: admin OU registro em ParceiroAcesso.
   let podeAcessarParceiros = isAdmin;
   let podeAprovar = isAdmin;

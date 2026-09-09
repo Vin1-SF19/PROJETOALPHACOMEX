@@ -2,7 +2,7 @@
 
 import db from "@/lib/prisma";
 import { auth } from "../../auth";
-import { isAdminRole } from "@/lib/roles";
+import { isParceirosAdminRole } from "@/lib/roles";
 import { hashSync } from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -574,7 +574,7 @@ export async function getCtx(): Promise<ParceiroCtx | null> {
   if (!session?.user) return null;
   const userId = Number((session.user as { id?: string | number }).id ?? 0);
   const role = (session.user as { role?: string }).role ?? "";
-  const isAdmin = isAdminRole(role);
+  const isAdmin = isParceirosAdminRole(role);
   let podeEditar = isAdmin;
   let podeExcluir = isAdmin;
   let podeAprovar = isAdmin;

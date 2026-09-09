@@ -27,6 +27,11 @@ export function isAdminRole(role?: string | null): boolean {
   return normalized === "ADMIN" || normalized === "CEO" || normalized === "TI";
 }
 
+/** Roles com acesso administrativo dentro do modulo Parceiros. */
+export function isParceirosAdminRole(role?: string | null): boolean {
+  return isAdminRole(role) || normalizeRole(role) === "LIDERCOMERCIAL";
+}
+
 /** Compara roles/setores tolerando caixa, acentos, espaços e pontuação. */
 export function isSameRole(left?: string | null, right?: string | null): boolean {
   const leftNormalized = normalizeRole(left);

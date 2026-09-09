@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAdminRole } from "@/lib/roles";
+import { isAdminRole, isParceirosAdminRole } from "@/lib/roles";
 import { auth } from "../../../../../auth";
 import { pusherServer } from "@/lib/pusher-server.ts";
 import {
@@ -18,7 +18,8 @@ import {
 } from "@/lib/bpm/realtime";
 import { checarAcessoRealtimeBpmPipeline } from "@/lib/bpm/ownership";
 
-const ADMIN_CHANNELS = ["private-admin-chamados", "private-parceiros-precadastros"];
+const ADMIN_CHANNELS = ["private-admin-chamados"];
+const PARCEIROS_PRECADASTROS_CHANNEL = "private-parceiros-precadastros";
 const ALL_USER_CHANNELS = ["private-holerite-alerts", "private-metas-alpha"];
 const CHECKLIST_ROLES = ["OPERACIONAL"];
 const CHECKLIST_CHANNELS = ["private-checklist-docs"];
@@ -56,6 +57,15 @@ export async function POST(req: Request) {
     if (ADMIN_CHANNELS.includes(channelName)) {
       const role = session.user.role ?? "";
       if (!podeReceberNovosChamados(role)) {
+        return new NextResponse("Proibido", { status: 403 });
+      }
+      const authResponse = pusherServer.authorizeChannel(socketId, channelName);
+      return NextResponse.json(authResponse);
+    }
+
+    if (channelName === PARCEIROS_PRECADASTROS_CHANNEL) {
+      const role = session.user.role ?? "";
+      if (!isParceirosAdminRole(role)) {
         return new NextResponse("Proibido", { status: 403 });
       }
       const authResponse = pusherServer.authorizeChannel(socketId, channelName);

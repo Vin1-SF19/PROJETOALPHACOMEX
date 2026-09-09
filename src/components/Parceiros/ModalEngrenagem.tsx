@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { X, Settings, Loader2, Pencil, Trash2, Shield, Link2, CheckCheck } from "lucide-react";
 import { listarAcessosParceiros, salvarAcessoParceiro } from "@/actions/parceiros";
 import { obterConfigParceiros, togglePermitirParceiroConvidar } from "@/actions/convites-parceiro";
-import { isAdminRole } from "@/lib/roles";
+import { isParceirosAdminRole } from "@/lib/roles";
 
 type Usuario = { id: number; nome: string; email: string; role: string };
 type Acesso = { userId: number; podeEditar: boolean; podeExcluir: boolean; podeAprovar: boolean };
@@ -111,7 +111,7 @@ export default function ModalEngrenagem({
           {loading ? (
             <div className="flex items-center justify-center py-10"><Loader2 size={22} className="animate-spin" style={{ color: `rgba(${accent},1)` }} /></div>
           ) : filtrados.map(u => {
-            const admin = isAdminRole(u.role);
+            const admin = isParceirosAdminRole(u.role);
             const a = acessos[u.id] ?? { userId: u.id, podeEditar: false, podeExcluir: false, podeAprovar: false };
             return (
               <div key={u.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ background: "rgba(15,23,42,0.5)", border: "1px solid rgba(99,102,241,0.12)" }}>

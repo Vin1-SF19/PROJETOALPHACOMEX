@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ADMIN_ACCESS_ROLES,
   isAdminRole,
+  isParceirosAdminRole,
   isSameRole,
   normalizeRole,
 } from "@/lib/roles";
@@ -40,6 +41,22 @@ describe("equivalência de acesso administrativo para TI", () => {
       (modulo) => modulo.allowedRoles?.includes("Admin") && !modulo.allowedRoles.includes("TI"),
     );
     expect(modulosAdminSemTi).toEqual([]);
+  });
+});
+
+describe("acesso administrativo de Lider Comercial em Parceiros", () => {
+  it.each(["Lider Comercial", "LÍDER COMERCIAL", "lider-comercial"])(
+    "reconhece %s dentro do modulo Parceiros",
+    (role) => expect(isParceirosAdminRole(role)).toBe(true),
+  );
+
+  it("nao amplia o acesso administrativo global", () => {
+    expect(isAdminRole("Lider Comercial")).toBe(false);
+  });
+
+  it("libera a entrada de Parceiros pela role", () => {
+    const parceiros = MODULOS_REGISTRY.find((modulo) => modulo.id === "parceiros");
+    expect(parceiros?.allowedRoles).toContain("Lider Comercial");
   });
 });
 
