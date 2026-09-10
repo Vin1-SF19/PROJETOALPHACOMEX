@@ -41,6 +41,13 @@ Como usuário do módulo de Chamados, quero receber os avisos de abertura e conc
   - [x] Transformar o sino da Agenda Alpha em “Notificações”, agregando os avisos gerais do Painel Alpha.
   - [x] Abrir os destinos pela navegação interna de abas do shell.
   - [x] Cobrir contrato, publicação, assinatura, agregação e navegação com testes direcionados.
+- [x] Task 6 — Entregar mensagens do chat na central global (correção 2026-09-09)
+  - [x] Publicar cada nova mensagem no canal privado do destinatário correto.
+  - [x] Notificar o técnico atribuído ou a equipe administrativa quando o solicitante responder.
+  - [x] Notificar o solicitante quando o técnico responder, sem eco para o autor.
+  - [x] Corrigir a recuperação legada para os status atuais e hidratar mensagens não lidas após recarregar.
+  - [x] Impedir pollings globais duplicados nos iframes do shell.
+  - [x] Cobrir envio, assinatura, recuperação e deduplicação com testes direcionados.
 
 ## Dev Notes
 
@@ -55,6 +62,7 @@ Como usuário do módulo de Chamados, quero receber os avisos de abertura e conc
 | 2026-07-30 | 1.0 | Story criada e investigação dos fluxos de notificação concluída. | Dex |
 | 2026-07-30 | 1.1 | Notificações de abertura centralizadas e conclusão individual implementada nos dois fluxos. | Dex |
 | 2026-09-09 | 1.2 | Aviso instantâneo de chamado assumido e central global de notificações implementados. | Dex |
+| 2026-09-09 | 1.3 | Mensagens do chat entregues em tempo real na central global, com recuperação após recarregar e deduplicação. | Dex |
 
 ## Dev Agent Record
 
@@ -78,6 +86,13 @@ GPT-5 Codex
 - `npm test` — 334 arquivos e 2.701 testes passaram; gate global segue bloqueado por 50 falhas preexistentes em 19 arquivos não relacionados.
 - `npm run lint` — gate global segue bloqueado por 3.702 erros preexistentes, sobretudo em `.aiox-core`, `.agents` e módulos legados; lint direcionado passou.
 - CodeRabbit CLI — indisponível no ambiente (`CODERABBIT_NOT_INSTALLED`).
+- Testes direcionados da entrega 1.3 — 35 verificações passaram, cobrindo destinatários, fallback administrativo, autorização, assinatura Pusher, recuperação via API e deduplicação no store.
+- Lint direcionado dos arquivos da entrega 1.3 — passou sem erros ou avisos.
+- Typecheck direcionado da entrega 1.3 — nenhum erro nos arquivos alterados.
+- `npm run build` — build de produção da entrega 1.3 passou.
+- `npm test` — 337 arquivos e 2.716 testes passaram; gate global segue bloqueado por 50 falhas preexistentes em 19 arquivos não relacionados.
+- `npm run typecheck -- --pretty false` — gate global segue bloqueado por erros preexistentes em Exclusão Fiscal, Gerador de Documentos, Agenda Alpha, Radar e testes antigos; nenhum aponta para a entrega 1.3.
+- `npm run lint` — gate global segue bloqueado por 3.699 erros preexistentes, principalmente em `.aiox-core`, `.agents` e módulos legados; lint direcionado passou.
 
 ### Completion Notes List
 
@@ -93,17 +108,25 @@ GPT-5 Codex
 - O sino do shell agora se chama “Notificações” e reúne Agenda Alpha, Chamados, Checklist, Notas e Holerites em ordem cronológica.
 - Os itens da central e o toast de Chamados usam `openTab`, preservando a navegação interna do Painel Alpha.
 - O polling legado de novas mensagens de chamados agora alimenta a central geral e não ignora a primeira mensagem recebida após uma carga inicialmente vazia.
+- Cada mensagem persistida publica `chamado-mensagem`: respostas do solicitante seguem para o técnico atribuído (ou para o canal administrativo quando ainda não há técnico) e respostas da equipe seguem para o solicitante.
+- O shell global assina o evento tanto no canal administrativo quanto no canal privado do usuário, ignora eco para o autor e reutiliza o áudio da central.
+- A recuperação por `/api/notificacoes` passou a consultar `ABERTO` e `EM_ATENDIMENTO`, retorna até 50 mensagens não lidas e hidrata a central mesmo após atualizar a página.
+- Pusher e recuperação usam o identificador persistente `mensagem-{id}`; o store elimina a duplicidade quando os dois caminhos entregam o mesmo aviso.
+- O polling de recuperação é executado somente pela janela principal, evitando uma requisição global repetida por iframe.
+- A Server Action de envio agora valida se o autor é o solicitante ou pertence à equipe administrativa antes de persistir a mensagem.
 
 ### File List
 
 - `docs/stories/story-chamados-notificacoes-abertura-conclusao.md`
 - `plan/self-critique-chamados-notificacoes.json`
 - `plan/self-critique-central-notificacoes-painel.json`
+- `plan/self-critique-chamados-mensagens-central.json`
 - `src/actions/chamados.ts`
 - `src/actions/protocolos.ts`
 - `src/app/PainelAlpha/layout.tsx`
 - `src/app/api/ChatBot/AbrirChamado/route.ts`
 - `src/app/api/pusher/auth/route.ts`
+- `src/app/api/notificacoes/route.ts`
 - `src/components/chamados/NotificationCard.tsx`
 - `src/components/chamados/NotificationToast.tsx`
 - `src/components/NotificacaoFlutuante.tsx`
@@ -117,8 +140,12 @@ GPT-5 Codex
 - `src/lib/chamados/notificacoes-server.ts`
 - `src/lib/pusher.ts`
 - `src/store/useHoleriteNotificacoes.ts`
+- `src/store/useChamadoNotificacoes.ts`
 - `tests/chamados/assumir.test.ts`
 - `tests/chamados/central-notificacoes-painel.test.ts`
+- `tests/chamados/mensagens-central.test.ts`
+- `tests/chamados/notificacoes-api.test.ts`
+- `tests/chamados/notificacoes-store.test.ts`
 - `tests/chamados/notificacoes.test.ts`
 - `tests/google-calendar/page-cache-wiring.test.ts`
 

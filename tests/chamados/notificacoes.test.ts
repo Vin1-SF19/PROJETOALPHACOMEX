@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CHAMADO_ASSUMIDO_EVENT,
   CHAMADO_CONCLUIDO_EVENT,
+  CHAMADO_MENSAGEM_EVENT,
   CHAMADOS_ADMIN_CHANNEL,
   NOVO_CHAMADO_EVENT,
   canalChamadosDoUsuario,
   extrairUsuarioIdDoCanalChamados,
   podeReceberNovosChamados,
+  resumirMensagemChamado,
 } from "@/lib/chamados/notificacoes";
 import {
   CALENDARIO_ALPHA_CHAMADO_ATUALIZADO_EVENT,
@@ -37,6 +39,12 @@ describe("notificações de chamados", () => {
     expect(extrairUsuarioIdDoCanalChamados("private-chamados-usuario-0")).toBeNull();
     expect(extrairUsuarioIdDoCanalChamados("private-chamados-usuario-42-outro")).toBeNull();
     expect(() => canalChamadosDoUsuario(0)).toThrow(/inválido/i);
+  });
+
+  it("gera um resumo legível para texto e anexos", () => {
+    expect(resumirMensagemChamado("  Pode verificar?  ")).toBe("Pode verificar?");
+    expect(resumirMensagemChamado("", "pdf")).toBe("Enviou um arquivo PDF.");
+    expect(resumirMensagemChamado(null, null)).toBe("Enviou uma nova mensagem.");
   });
 
   it("publica novos chamados no canal administrativo", async () => {
@@ -97,6 +105,61 @@ describe("notificações de chamados", () => {
       titulo: "Falha no acesso",
       tecnicoNome: "Carlos Silva",
       createdAt: "2026-09-09T18:00:00.000Z",
+    })).resolves.toBe(false);
+  });
+
+  it("publica mensagem nos canais privados deduplicados do destinatário", async () => {
+    const { notificarMensagemChamado } = await import("@/lib/chamados/notificacoes-server");
+    const payload = {
+      mensagemId: 91,
+      chamadoId: 15,
+      titulo: "Falha no acesso",
+      autorId: 42,
+      autorNome: "Ana",
+      texto: "Consegue verificar?",
+      createdAt: "2026-09-09T20:00:00.000Z",
+    };
+
+    await expect(notificarMensagemChamado({ usuarioIds: [8, 8, 0] }, payload)).resolves.toBe(true);
+    expect(trigger).toHaveBeenCalledWith(
+      "private-chamados-usuario-8",
+      CHAMADO_MENSAGEM_EVENT,
+      payload,
+    );
+  });
+
+  it("publica mensagem sem técnico no canal administrativo", async () => {
+    const { notificarMensagemChamado } = await import("@/lib/chamados/notificacoes-server");
+    const payload = {
+      mensagemId: 92,
+      chamadoId: 16,
+      titulo: "Sem responsável",
+      autorId: 42,
+      autorNome: "Ana",
+      texto: "Preciso de ajuda",
+      createdAt: "2026-09-09T20:01:00.000Z",
+    };
+
+    await expect(notificarMensagemChamado({ administradores: true }, payload)).resolves.toBe(true);
+    expect(trigger).toHaveBeenCalledWith(
+      CHAMADOS_ADMIN_CHANNEL,
+      CHAMADO_MENSAGEM_EVENT,
+      payload,
+    );
+  });
+
+  it("isola falha do Pusher ao notificar uma mensagem", async () => {
+    trigger.mockRejectedValueOnce(new Error("indisponível"));
+    const { notificarMensagemChamado } = await import("@/lib/chamados/notificacoes-server");
+
+    await expect(notificarMensagemChamado({ usuarioIds: [8] }, {
+      mensagemId: 93,
+      chamadoId: 16,
+      titulo: "Falha no acesso",
+      autorId: 42,
+      autorNome: "Ana",
+      texto: "Teste",
+      createdAt: "2026-09-09T20:02:00.000Z",
     })).resolves.toBe(false);
   });
 

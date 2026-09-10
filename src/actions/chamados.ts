@@ -9,8 +9,11 @@ import {
   notificarAgendaChamadoAtualizada,
   notificarChamadoAssumido,
   notificarChamadoConcluido,
+  notificarMensagemChamado,
   notificarNovoChamado,
 } from "@/lib/chamados/notificacoes-server";
+import { resumirMensagemChamado } from "@/lib/chamados/notificacoes";
+import { isAdminRole } from "@/lib/roles";
 import {
   concluirTarefaAgendadaDoChamado,
   criarTarefaAgendadaParaChamado,
@@ -194,18 +197,50 @@ export async function enviarMensagemAction(
   if (!session) return { error: "Não autorizado" };
 
   try {
+    const autorId = Number(session.user.id);
+    const chamado = await db.chamados.findUnique({
+      where: { id: Number(chamadoId) },
+      select: { id: true, titulo: true, usuarioId: true, tecnicoId: true },
+    });
+    if (!chamado) return { error: "Chamado não encontrado" };
+
+    const autorEhSolicitante = chamado.usuarioId === autorId;
+    if (!autorEhSolicitante && !isAdminRole(session.user.role)) {
+      return { error: "Você não tem acesso a este chamado" };
+    }
+
     const novaMsg = await db.mensagensChamado.create({
       data: {
         texto: texto || "",
-        chamadoId: Number(chamadoId),
-        autorId: Number(session.user.id),
+        chamadoId: chamado.id,
+        autorId,
         arquivoUrl: arquivoUrl || null,
         arquivoTipo: arquivoTipo || null,
       },
       include: { autor: true },
     });
 
-    await pusherServer.trigger(`chat-${chamadoId}`, "nova-mensagem", novaMsg);
+    try {
+      await pusherServer.trigger(`chat-${chamado.id}`, "nova-mensagem", novaMsg);
+    } catch (error) {
+      console.error("[Pusher] Falha ao atualizar o chat do chamado:", error);
+    }
+
+    const destino = autorEhSolicitante
+      ? chamado.tecnicoId && chamado.tecnicoId !== autorId
+        ? { usuarioIds: [chamado.tecnicoId] }
+        : { administradores: true }
+      : { usuarioIds: [chamado.usuarioId] };
+
+    await notificarMensagemChamado(destino, {
+      mensagemId: novaMsg.id,
+      chamadoId: chamado.id,
+      titulo: chamado.titulo,
+      autorId,
+      autorNome: novaMsg.autor.nome,
+      texto: resumirMensagemChamado(novaMsg.texto, novaMsg.arquivoTipo),
+      createdAt: novaMsg.createdAt.toISOString(),
+    });
     return { success: true };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Erro desconhecido";

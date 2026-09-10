@@ -6,12 +6,14 @@ import { useChamadoNotificacoes } from '@/store/useChamadoNotificacoes';
 import {
   CHAMADO_ASSUMIDO_EVENT,
   CHAMADO_CONCLUIDO_EVENT,
+  CHAMADO_MENSAGEM_EVENT,
   CHAMADOS_ADMIN_CHANNEL,
   NOVO_CHAMADO_EVENT,
   canalChamadosDoUsuario,
   podeReceberNovosChamados,
   type ChamadoAssumidoPayload,
   type ChamadoConcluidoPayload,
+  type ChamadoMensagemPayload,
   type NovoChamadoPayload,
 } from '@/lib/chamados/notificacoes';
 
@@ -40,6 +42,20 @@ export function useChamadosNotifications(role: string | undefined, userId: numbe
       }
     };
 
+    const mensagemHandler = (payload: ChamadoMensagemPayload) => {
+      if (payload.autorId === userId) return;
+      adicionarNotificacao({
+        id: `mensagem-${payload.mensagemId}`,
+        chamadoId: payload.chamadoId,
+        titulo: payload.titulo,
+        usuario: `${payload.autorNome}: ${payload.texto}`,
+        setor: '',
+        urgencia: 'MENSAGEM',
+        createdAt: payload.createdAt,
+      });
+      playAudio();
+    };
+
     if (podeReceberNovosChamados(role)) {
       const channel = client.subscribe(CHAMADOS_ADMIN_CHANNEL);
       const handler = (payload: NovoChamadoPayload) => {
@@ -54,8 +70,10 @@ export function useChamadosNotifications(role: string | undefined, userId: numbe
         playAudio();
       };
       channel.bind(NOVO_CHAMADO_EVENT, handler);
+      channel.bind(CHAMADO_MENSAGEM_EVENT, mensagemHandler);
       cleanups.push(() => {
         channel.unbind(NOVO_CHAMADO_EVENT, handler);
+        channel.unbind(CHAMADO_MENSAGEM_EVENT, mensagemHandler);
         client.unsubscribe(CHAMADOS_ADMIN_CHANNEL);
       });
     }
@@ -87,9 +105,11 @@ export function useChamadosNotifications(role: string | undefined, userId: numbe
       playAudio();
     };
     userChannel.bind(CHAMADO_ASSUMIDO_EVENT, assumidoHandler);
+    userChannel.bind(CHAMADO_MENSAGEM_EVENT, mensagemHandler);
     cleanups.push(() => {
       userChannel.unbind(CHAMADO_CONCLUIDO_EVENT, concluidoHandler);
       userChannel.unbind(CHAMADO_ASSUMIDO_EVENT, assumidoHandler);
+      userChannel.unbind(CHAMADO_MENSAGEM_EVENT, mensagemHandler);
       client.unsubscribe(userChannelName);
     });
 

@@ -50,14 +50,27 @@ describe("central geral de notificações do Painel Alpha", () => {
     expect(hook).toContain("userChannel.unbind(CHAMADO_ASSUMIDO_EVENT, assumidoHandler)");
   });
 
-  it("leva novas mensagens legadas de chamados para a central em vez de navegar por router", () => {
+  it("recupera mensagens não lidas apenas no shell principal e deduplica pelo ID persistido", () => {
     const polling = ler("src/components/NotificacaoFlutuante.tsx");
     const toastChamados = ler("src/components/chamados/NotificationToast.tsx");
 
     expect(polling).toContain("adicionarNotificacao({");
     expect(polling).toContain('urgencia: "MENSAGEM"');
-    expect(polling).toContain("primeiraCarga.current = false");
+    expect(polling).toContain("window !== window.top");
+    expect(polling).toContain("idsEntreguesRef.current.has(msg.mensagemId)");
+    expect(polling).toContain("`mensagem-${msg.mensagemId}`");
+    expect(polling).toContain("mensagensDaMaisAntigaParaNova");
     expect(polling).not.toContain("router.push");
     expect(toastChamados).toContain("Nova mensagem no chamado");
+  });
+
+  it("assina mensagens no canal administrativo e no canal privado do usuário", () => {
+    const hook = ler("src/hooks/useAdminChamadosNotifications.ts");
+
+    expect(hook).toContain("channel.bind(CHAMADO_MENSAGEM_EVENT, mensagemHandler)");
+    expect(hook).toContain("userChannel.bind(CHAMADO_MENSAGEM_EVENT, mensagemHandler)");
+    expect(hook).toContain("channel.unbind(CHAMADO_MENSAGEM_EVENT, mensagemHandler)");
+    expect(hook).toContain("userChannel.unbind(CHAMADO_MENSAGEM_EVENT, mensagemHandler)");
+    expect(hook).toContain("if (payload.autorId === userId) return");
   });
 });

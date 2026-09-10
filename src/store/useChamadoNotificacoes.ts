@@ -13,7 +13,9 @@ export interface ChamadoNotificacao {
 
 interface ChamadoNotificacoesStore {
   notificacoes: ChamadoNotificacao[];
-  adicionarNotificacao: (n: Omit<ChamadoNotificacao, 'id' | 'lida'>) => void;
+  adicionarNotificacao: (
+    n: Omit<ChamadoNotificacao, 'id' | 'lida'> & { id?: string },
+  ) => void;
   marcarTodasLidas: () => void;
   removerNotificacao: (id: string) => void;
 }
@@ -21,12 +23,16 @@ interface ChamadoNotificacoesStore {
 export const useChamadoNotificacoes = create<ChamadoNotificacoesStore>((set) => ({
   notificacoes: [],
   adicionarNotificacao: (n) =>
-    set((state) => ({
-      notificacoes: [
-        { ...n, id: `${Date.now()}-${n.chamadoId}`, lida: false },
-        ...state.notificacoes,
-      ].slice(0, 50),
-    })),
+    set((state) => {
+      const id = n.id ?? `${Date.now()}-${n.chamadoId}`;
+      if (state.notificacoes.some((notificacao) => notificacao.id === id)) return state;
+      return {
+        notificacoes: [
+          { ...n, id, lida: false },
+          ...state.notificacoes,
+        ].slice(0, 50),
+      };
+    }),
   marcarTodasLidas: () =>
     set((state) => ({
       notificacoes: state.notificacoes.map((n) => ({ ...n, lida: true })),

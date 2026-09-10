@@ -1,19 +1,21 @@
 status:
   branch: main
   modifiedFiles:
-    - .bibble/memory/architecture.md
-    - .bibble/memory/codebase-map.md
-    - .bibble/memory/decisions.md
-    - .bibble/memory/integration-points.md
-    - .bibble/memory/journal.md
-  modifiedFilesTotalCount: 30
+    - .aiox/project-status.yaml
+    - docs/stories/story-chamados-notificacoes-abertura-conclusao.md
+    - src/actions/chamados.ts
+    - src/app/api/notificacoes/route.ts
+    - src/components/NotificacaoFlutuante.tsx
+  modifiedFilesTotalCount: 16
   recentCommits:
-    - 'feat(agenda-alpha): reformula visual da visão mensal'
-    - 'fix(agenda-alpha): encerra loading de agendas compartilhadas'
+    - 'feat(notificacoes): unifica central e avisa chamados assumidos'
+    - >-
+      Lider comercial agora com todas as permissoes de Admin no modulo de
+      parceiros
   currentEpic: Agenda Alpha
   currentStory: story-agenda-alpha-operacional-tarefas-status
-  lastUpdate: '2026-09-09T18:47:23.815Z'
+  lastUpdate: '2026-09-10T12:17:04.066Z'
   isGitRepo: true
-timestamp: 1788979643816
+timestamp: 1789042624067
 ttl: 60
-gitFingerprint: 1788020233312.24:1788979548372.783
+gitFingerprint: 1788020233312.24:1788985486594.3223

@@ -2,11 +2,13 @@ import { pusherServer } from "@/lib/pusher-server.ts";
 import {
   CHAMADO_ASSUMIDO_EVENT,
   CHAMADO_CONCLUIDO_EVENT,
+  CHAMADO_MENSAGEM_EVENT,
   CHAMADOS_ADMIN_CHANNEL,
   NOVO_CHAMADO_EVENT,
   canalChamadosDoUsuario,
   type ChamadoAssumidoPayload,
   type ChamadoConcluidoPayload,
+  type ChamadoMensagemPayload,
   type NovoChamadoPayload,
 } from "@/lib/chamados/notificacoes";
 import {
@@ -55,6 +57,31 @@ export async function notificarChamadoAssumido(
     return true;
   } catch (error) {
     console.error("[Pusher] Falha ao notificar atendimento do chamado:", error);
+    return false;
+  }
+}
+
+export async function notificarMensagemChamado(
+  destino: { usuarioIds?: number[]; administradores?: boolean },
+  payload: ChamadoMensagemPayload,
+): Promise<boolean> {
+  const canaisUsuarios = [...new Set(destino.usuarioIds ?? [])]
+    .filter((usuarioId) => Number.isSafeInteger(usuarioId) && usuarioId > 0)
+    .map(canalChamadosDoUsuario);
+  const canais = destino.administradores
+    ? [...canaisUsuarios, CHAMADOS_ADMIN_CHANNEL]
+    : canaisUsuarios;
+  if (canais.length === 0) return false;
+
+  try {
+    await pusherServer.trigger(
+      canais.length === 1 ? canais[0] : canais,
+      CHAMADO_MENSAGEM_EVENT,
+      payload,
+    );
+    return true;
+  } catch (error) {
+    console.error("[Pusher] Falha ao notificar mensagem do chamado:", error);
     return false;
   }
 }

@@ -4,6 +4,7 @@ export const CHAMADOS_ADMIN_CHANNEL = "private-admin-chamados";
 export const NOVO_CHAMADO_EVENT = "novo-chamado";
 export const CHAMADO_CONCLUIDO_EVENT = "chamado-concluido";
 export const CHAMADO_ASSUMIDO_EVENT = "chamado-assumido";
+export const CHAMADO_MENSAGEM_EVENT = "chamado-mensagem";
 export const CHAMADO_USUARIO_CHANNEL_PREFIX = "private-chamados-usuario-";
 
 export interface NovoChamadoPayload {
@@ -27,6 +28,27 @@ export interface ChamadoAssumidoPayload {
   titulo: string;
   tecnicoNome: string;
   createdAt: string;
+}
+
+export interface ChamadoMensagemPayload {
+  mensagemId: number;
+  chamadoId: number;
+  titulo: string;
+  autorId: number;
+  autorNome: string;
+  texto: string;
+  createdAt: string;
+}
+
+export function resumirMensagemChamado(
+  texto: string | null | undefined,
+  arquivoTipo?: string | null,
+): string {
+  const textoNormalizado = texto?.trim();
+  if (textoNormalizado) return textoNormalizado;
+
+  const tipoNormalizado = arquivoTipo?.trim().toUpperCase();
+  return tipoNormalizado ? `Enviou um arquivo ${tipoNormalizado}.` : "Enviou uma nova mensagem.";
 }
 
 export function podeReceberNovosChamados(role: string | null | undefined): boolean {

@@ -16,6 +16,7 @@ vi.mock("@/lib/chamados/notificacoes-server", () => ({
   notificarAgendaChamadoAtualizada: notificarAgendaMock,
   notificarChamadoAssumido: notificarAssumidoMock,
   notificarChamadoConcluido: vi.fn(),
+  notificarMensagemChamado: vi.fn(),
   notificarNovoChamado: vi.fn(),
 }));
 vi.mock("@/lib/chamados/tarefa-agendada", () => ({
