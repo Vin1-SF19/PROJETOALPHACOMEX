@@ -229,15 +229,19 @@ describe("automações configuráveis do BPM", () => {
   });
 });
 describe("integração da aba Automações", () => {
-  it("mantém rota, menu, cron e hook de movimento ligados", async () => {
+  it("centraliza a rota nas configurações e mantém cron e hook de movimento ligados", async () => {
     const fs = await import("node:fs/promises");
-    const [layout, cards, vercel, rota] = await Promise.all([
+    const [layout, tabs, pagina, cards, vercel, rota] = await Promise.all([
       fs.readFile("src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx", "utf8"),
+      fs.readFile("src/app/PainelAlpha/AlphaCRM/admin/AdminConfigTabs.tsx", "utf8"),
+      fs.readFile("src/app/PainelAlpha/AlphaCRM/admin/automacoes/page.tsx", "utf8"),
       fs.readFile("src/actions/bpm/Cards.ts", "utf8"),
       fs.readFile("vercel.json", "utf8"),
       fs.readFile("src/app/api/bpm/jobs/automacoes/route.ts", "utf8"),
     ]);
-    expect(layout).toContain("/PainelAlpha/AlphaCRM/automacoes");
+    expect(layout).not.toContain('href: "/PainelAlpha/AlphaCRM/automacoes"');
+    expect(tabs).toContain("/PainelAlpha/AlphaCRM/admin/automacoes");
+    expect(pagina).toContain("<AutomacoesWorkspace");
     expect(cards).toContain("enfileirarAutomacoesMovimentoBpm");
     expect(vercel).toContain("/api/bpm/jobs/automacoes");
     expect(rota).toContain("autorizarCron");

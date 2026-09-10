@@ -11,6 +11,7 @@ import type {
 export type FormularioEtapaRendererBindings = {
   renderCampos: (params: {
     campoIds: string[];
+    campoLabels: Record<string, string>;
     secaoId: string;
     secaoTitulo: string;
     runKey: string;
@@ -21,21 +22,53 @@ export type FormularioEtapaRendererBindings = {
 function agruparComponentes(
   componentes: ComponenteFormularioResolvido[],
 ): Array<
-  | { tipo: "CAMPOS"; key: string; campoIds: string[] }
-  | { tipo: "COMPONENTE"; key: string; componente: ComponenteFormularioResolvido }
+  | {
+      tipo: "CAMPOS";
+      key: string;
+      campoIds: string[];
+      campoLabels: Record<string, string>;
+    }
+  | {
+      tipo: "COMPONENTE";
+      key: string;
+      componente: ComponenteFormularioResolvido;
+    }
 > {
   const grupos: Array<
-    | { tipo: "CAMPOS"; key: string; campoIds: string[] }
-    | { tipo: "COMPONENTE"; key: string; componente: ComponenteFormularioResolvido }
+    | {
+        tipo: "CAMPOS";
+        key: string;
+        campoIds: string[];
+        campoLabels: Record<string, string>;
+      }
+    | {
+        tipo: "COMPONENTE";
+        key: string;
+        componente: ComponenteFormularioResolvido;
+      }
   > = [];
   for (const componente of componentes) {
-    if (componente.tipo === "CAMPO" && componente.campoId && componente.valido) {
+    if (
+      componente.tipo === "CAMPO" &&
+      componente.campoId &&
+      componente.valido
+    ) {
       if (!componente.visivel) continue;
       const anterior = grupos.at(-1);
+      const label =
+        typeof componente.config.label === "string"
+          ? componente.config.label
+          : undefined;
       if (anterior?.tipo === "CAMPOS") {
         anterior.campoIds.push(componente.campoId);
+        if (label) anterior.campoLabels[componente.campoId] = label;
       } else {
-        grupos.push({ tipo: "CAMPOS", key: componente.id, campoIds: [componente.campoId] });
+        grupos.push({
+          tipo: "CAMPOS",
+          key: componente.id,
+          campoIds: [componente.campoId],
+          campoLabels: label ? { [componente.campoId]: label } : {},
+        });
       }
       continue;
     }
@@ -70,15 +103,27 @@ export function FormularioEtapaRenderer({
   return (
     <div data-form-renderer-mode={mode} className="space-y-4">
       {formulario.diagnosticos.length > 0 && (
-        <div role="alert" className="rounded-xl border border-amber-300/25 bg-amber-300/[0.05] p-3 text-xs text-amber-100">
-          <AlertTriangle size={14} className="mr-1.5 inline" aria-hidden="true" />
-          A composição possui {formulario.diagnosticos.length} item(ns) inválido(s). Eles foram isolados e não receberam fallback implícito.
+        <div
+          role="alert"
+          className="rounded-xl border border-amber-300/25 bg-amber-300/[0.05] p-3 text-xs text-amber-100"
+        >
+          <AlertTriangle
+            size={14}
+            className="mr-1.5 inline"
+            aria-hidden="true"
+          />
+          A composição possui {formulario.diagnosticos.length} item(ns)
+          inválido(s). Eles foram isolados e não receberam fallback implícito.
         </div>
       )}
       {formulario.secoes.map((secao) => {
         const grupos = agruparComponentes(secao.componentes);
         return (
-          <section key={secao.id} data-form-section={secao.chave} className="space-y-3">
+          <section
+            key={secao.id}
+            data-form-section={secao.chave}
+            className="space-y-3"
+          >
             <h2 className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
               {secao.titulo}
             </h2>
@@ -88,6 +133,7 @@ export function FormularioEtapaRenderer({
                   <div key={grupo.key} data-form-field-run={grupo.key}>
                     {bindings.renderCampos({
                       campoIds: grupo.campoIds,
+                      campoLabels: grupo.campoLabels,
                       secaoId: secao.id,
                       secaoTitulo: secao.titulo,
                       runKey: grupo.key,
@@ -97,12 +143,34 @@ export function FormularioEtapaRenderer({
               }
               if (!grupo.componente.valido) {
                 return (
-                  <div key={grupo.key} role="alert" className="rounded-xl border border-rose-400/20 bg-rose-400/[0.05] p-3 text-xs text-rose-200">
-                    Componente indisponível: {grupo.componente.motivo ?? "referência inválida"}
+                  <div
+                    key={grupo.key}
+                    role="alert"
+                    className="rounded-xl border border-rose-400/20 bg-rose-400/[0.05] p-3 text-xs text-rose-200"
+                  >
+                    Componente indisponível:{" "}
+                    {grupo.componente.motivo ?? "referência inválida"}
                   </div>
                 );
               }
-              return <div key={grupo.key} data-form-component={grupo.componente.rendererId ?? "unknown"}>{bindings.renderComponente(grupo.componente)}</div>;
+              const label =
+                typeof grupo.componente.config.label === "string"
+                  ? grupo.componente.config.label
+                  : null;
+              return (
+                <div
+                  key={grupo.key}
+                  data-form-component={grupo.componente.rendererId ?? "unknown"}
+                  className="space-y-2"
+                >
+                  {label && (
+                    <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                      {label}
+                    </h3>
+                  )}
+                  {bindings.renderComponente(grupo.componente)}
+                </div>
+              );
             })}
           </section>
         );

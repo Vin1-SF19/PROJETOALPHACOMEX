@@ -188,11 +188,13 @@ describe("Integração — wiring dos consumidores visuais", () => {
     expect(source).toContain("normalizarCNPJ(event.target.value)");
   });
 
-  it("AdminPipelineClient oferece o tipo CNPJ no seletor", () => {
+  it("AdminPipelineClient entrega os campos CNPJ ao formulário canônico sem editor paralelo", () => {
     const source = ler(
       "src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/AdminPipelineClient.tsx",
     );
-    expect(source).toContain('{ value: "cnpj", label: "CNPJ" }');
+    expect(source).toContain("<FormularioEtapaWorkspace");
+    expect(source).toContain("campos={campos}");
+    expect(source).not.toContain('{ value: "cnpj", label: "CNPJ" }');
   });
 
   it("NovoCardModal usa o utilitário compartilhado (sem máscara local duplicada)", () => {

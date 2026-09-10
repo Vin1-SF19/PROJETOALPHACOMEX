@@ -69,6 +69,39 @@ function mover<T>(itens: T[], indice: number, direcao: -1 | 1): T[] {
   return copia;
 }
 
+function configComponente(
+  componente: ComponenteFormulario,
+): Record<string, unknown> {
+  if (!componente.configJson) return {};
+  try {
+    const config: unknown = JSON.parse(componente.configJson);
+    return config && typeof config === "object" && !Array.isArray(config)
+      ? (config as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function rotuloPersonalizado(componente: ComponenteFormulario): string {
+  const label = configComponente(componente).label;
+  return typeof label === "string" ? label : "";
+}
+
+function aplicarRotulo(
+  componente: ComponenteFormulario,
+  label: string,
+): ComponenteFormulario {
+  const config = configComponente(componente);
+  const normalizado = label.slice(0, 120);
+  if (normalizado.trim()) config.label = normalizado;
+  else delete config.label;
+  return {
+    ...componente,
+    configJson: Object.keys(config).length ? JSON.stringify(config) : null,
+  };
+}
+
 export function FormularioEtapaWorkspace({
   pipelineId,
   etapas,
@@ -157,14 +190,19 @@ export function FormularioEtapaWorkspace({
   }
 
   function adicionarComponente(indiceSecao: number, target: string) {
-    const definicao = catalogoComponentes.find((item) => item.target === target);
+    const definicao = catalogoComponentes.find(
+      (item) => item.target === target,
+    );
     if (!definicao) return;
     if (
       !definicao.multiple &&
       secoes.some((secao) =>
-        secao.componentes.some((componente) => componente.capability === target),
+        secao.componentes.some(
+          (componente) => componente.capability === target,
+        ),
       )
-    ) return;
+    )
+      return;
     alterarSecao(indiceSecao, {
       componentes: [
         ...secoes[indiceSecao].componentes,
@@ -177,6 +215,28 @@ export function FormularioEtapaWorkspace({
         },
       ],
     });
+  }
+
+  function moverComponenteParaSecao(
+    indiceSecao: number,
+    indiceComponente: number,
+    indiceDestino: number,
+  ) {
+    if (indiceSecao === indiceDestino) return;
+    setSecoes((atuais) => {
+      const copia = atuais.map((secao) => ({
+        ...secao,
+        componentes: [...secao.componentes],
+      }));
+      const [componente] = copia[indiceSecao].componentes.splice(
+        indiceComponente,
+        1,
+      );
+      if (!componente || !copia[indiceDestino]) return atuais;
+      copia[indiceDestino].componentes.push(componente);
+      return copia;
+    });
+    setSujo(true);
   }
 
   async function salvar() {
@@ -300,7 +360,10 @@ export function FormularioEtapaWorkspace({
         </div>
 
         {publicationBlocked && (
-          <p className="text-xs text-amber-200" role="status">Publique ou descarte o rascunho principal antes de publicar o formulário.</p>
+          <p className="text-xs text-amber-200" role="status">
+            Publique ou descarte o rascunho principal antes de publicar o
+            formulário.
+          </p>
         )}
 
         {secoes.length === 0 ? (
@@ -368,66 +431,114 @@ export function FormularioEtapaWorkspace({
                         componente.id ??
                         `${componente.chave}-${indiceComponente}`
                       }
-                      className="flex items-center gap-2 rounded-lg bg-white/[0.03] px-3 py-2 text-sm"
+                      className="grid gap-2 rounded-lg bg-white/[0.03] px-3 py-2 text-sm sm:grid-cols-[auto_minmax(140px,1fr)_minmax(150px,0.8fr)_auto] sm:items-center"
                     >
                       <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-500">
                         {componente.tipo}
                       </span>
-                      <span className="min-w-0 flex-1 truncate text-slate-200">
-                        {componente.campo?.nome ??
-                          componente.capability ??
-                          componente.chave}
-                      </span>
-                      <button
-                        type="button"
-                        aria-label="Mover componente para cima"
-                        disabled={indiceComponente === 0}
-                        onClick={() =>
-                          alterarSecao(indiceSecao, {
-                            componentes: mover(
-                              secao.componentes,
-                              indiceComponente,
-                              -1,
-                            ),
-                          })
+                      <div className="min-w-0">
+                        <input
+                          aria-label={`Rótulo de ${componente.campo?.nome ?? componente.capability ?? componente.chave}`}
+                          value={rotuloPersonalizado(componente)}
+                          placeholder={
+                            componente.campo?.nome ??
+                            componente.capability ??
+                            componente.chave
+                          }
+                          maxLength={120}
+                          onChange={(event) =>
+                            alterarSecao(indiceSecao, {
+                              componentes: secao.componentes.map(
+                                (item, atual) =>
+                                  atual === indiceComponente
+                                    ? aplicarRotulo(item, event.target.value)
+                                    : item,
+                              ),
+                            })
+                          }
+                          className="min-h-9 w-full rounded-lg border border-white/10 bg-slate-900 px-2 text-xs text-white placeholder:text-slate-500"
+                        />
+                        <span className="mt-0.5 block truncate text-[10px] text-slate-600">
+                          {componente.campo?.nome ??
+                            componente.capability ??
+                            componente.chave}
+                        </span>
+                      </div>
+                      <select
+                        aria-label="Mover componente para outra seção"
+                        value={indiceSecao}
+                        onChange={(event) =>
+                          moverComponenteParaSecao(
+                            indiceSecao,
+                            indiceComponente,
+                            Number(event.target.value),
+                          )
                         }
-                        className="p-1 text-slate-500 disabled:opacity-30"
+                        className="min-h-9 min-w-0 rounded-lg border border-white/10 bg-slate-900 px-2 text-xs text-slate-300"
                       >
-                        <ChevronUp size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label="Mover componente para baixo"
-                        disabled={
-                          indiceComponente === secao.componentes.length - 1
-                        }
-                        onClick={() =>
-                          alterarSecao(indiceSecao, {
-                            componentes: mover(
-                              secao.componentes,
-                              indiceComponente,
-                              1,
-                            ),
-                          })
-                        }
-                        className="p-1 text-slate-500 disabled:opacity-30"
-                      >
-                        <ChevronDown size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label="Remover componente da apresentação"
-                        onClick={() =>
-                          alterarSecao(indiceSecao, {
-                            componentes: secao.componentes.filter(
-                              (_, atual) => atual !== indiceComponente,
-                            ),
-                          })
-                        }
-                        className="p-1 text-rose-300"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                        {secoes.map((secaoDestino, indiceDestino) => (
+                          <option
+                            key={secaoDestino.id ?? secaoDestino.chave}
+                            value={indiceDestino}
+                          >
+                            {indiceDestino === indiceSecao
+                              ? "Nesta seção"
+                              : `Mover para ${secaoDestino.titulo}`}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          aria-label="Mover componente para cima"
+                          disabled={indiceComponente === 0}
+                          onClick={() =>
+                            alterarSecao(indiceSecao, {
+                              componentes: mover(
+                                secao.componentes,
+                                indiceComponente,
+                                -1,
+                              ),
+                            })
+                          }
+                          className="p-1 text-slate-500 disabled:opacity-30"
+                        >
+                          <ChevronUp size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Mover componente para baixo"
+                          disabled={
+                            indiceComponente === secao.componentes.length - 1
+                          }
+                          onClick={() =>
+                            alterarSecao(indiceSecao, {
+                              componentes: mover(
+                                secao.componentes,
+                                indiceComponente,
+                                1,
+                              ),
+                            })
+                          }
+                          className="p-1 text-slate-500 disabled:opacity-30"
+                        >
+                          <ChevronDown size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Remover componente da apresentação"
+                          onClick={() =>
+                            alterarSecao(indiceSecao, {
+                              componentes: secao.componentes.filter(
+                                (_, atual) => atual !== indiceComponente,
+                              ),
+                            })
+                          }
+                          className="p-1 text-rose-300"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                   <label className="flex items-center gap-2 text-xs text-slate-500">
@@ -446,8 +557,7 @@ export function FormularioEtapaWorkspace({
                           (campo) =>
                             !secoes.some((secaoAtual) =>
                               secaoAtual.componentes.some(
-                                (componente) =>
-                                  componente.campoId === campo.id,
+                                (componente) => componente.campoId === campo.id,
                               ),
                             ),
                         )
@@ -475,7 +585,8 @@ export function FormularioEtapaWorkspace({
                             item.multiple ||
                             !secoes.some((secaoAtual) =>
                               secaoAtual.componentes.some(
-                                (componente) => componente.capability === item.target,
+                                (componente) =>
+                                  componente.capability === item.target,
                               ),
                             ),
                         )

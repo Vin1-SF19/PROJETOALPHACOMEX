@@ -47,15 +47,13 @@ describe("integração com a aba Configurações", () => {
     "utf8",
   );
 
-  it("expõe aplicabilidade, compartilhamento e obrigatoriedade contextual sem controles legados", () => {
-    expect(admin).toContain("agruparCamposPorColuna(filtrados, etapas)");
-    expect(admin).toContain("Campos aplicáveis nesta etapa");
-    expect(admin).toContain("Compartilhado ·");
-    expect(admin).toContain("Obrigatório por etapa");
-    expect(admin).toContain("Nenhum campo configurado nesta coluna");
-    expect(admin).toContain("handleCriarCampo");
-    expect(admin).toContain("salvarEdicao(campo.id)");
-    expect(admin).not.toContain("handleToggleObrigatorio");
-    expect(admin).not.toContain("editCampoEtapaId");
+  it("mantém somente o formulário canônico e não reintroduz o editor legado de campos", () => {
+    expect(admin).toContain("<FormularioEtapaWorkspace");
+    expect(admin).toContain("campos={campos}");
+    expect(admin).not.toContain("Campos Personalizados");
+    expect(admin).not.toContain("Campos aplicáveis nesta etapa");
+    expect(admin).not.toContain("agruparCamposPorColuna");
+    expect(admin).not.toContain("handleCriarCampo");
+    expect(admin).not.toContain("salvarEdicao(campo.id)");
   });
 });

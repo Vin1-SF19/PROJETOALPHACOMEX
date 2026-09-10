@@ -66,25 +66,55 @@ const formulario: FormularioEtapaPersistido = {
 };
 
 const campos = [
-  { id: "field-1", chave: "stable.one", nome: "Nome um", tipo: "texto", visivel: true },
-  { id: "field-2", chave: "stable.two", nome: "Nome dois", tipo: "texto", visivel: true },
+  {
+    id: "field-1",
+    chave: "stable.one",
+    nome: "Nome um",
+    tipo: "texto",
+    visivel: true,
+  },
+  {
+    id: "field-2",
+    chave: "stable.two",
+    nome: "Nome dois",
+    tipo: "texto",
+    visivel: true,
+  },
 ];
 
 describe("P0-3 - resolver canônico do formulário de etapa", () => {
   it("preserva ordem de seções/componentes e resolve campos somente da configuração canônica", () => {
-    const resultado = resolverFormularioEtapa({ formulario, camposCanonicos: campos });
+    const resultado = resolverFormularioEtapa({
+      formulario,
+      camposCanonicos: campos,
+    });
 
     expect(resultado.status).toBe("READY");
-    expect(resultado.secoes.map((secao) => secao.chave)).toEqual(["dados", "especializados"]);
-    expect(resultado.secoes[0].componentes.map((item) => item.campoId)).toEqual(["field-1", "field-2"]);
+    expect(resultado.secoes.map((secao) => secao.chave)).toEqual([
+      "dados",
+      "especializados",
+    ]);
+    expect(resultado.secoes[0].componentes.map((item) => item.campoId)).toEqual(
+      ["field-1", "field-2"],
+    );
   });
 
   it("não cria fallback quando um campo do formulário não pertence à etapa", () => {
-    const resultado = resolverFormularioEtapa({ formulario, camposCanonicos: [campos[0]] });
+    const resultado = resolverFormularioEtapa({
+      formulario,
+      camposCanonicos: [campos[0]],
+    });
 
     expect(resultado.status).toBe("INVALID");
-    expect(resultado.diagnosticos).toContainEqual(expect.objectContaining({ code: "CAMPO_FORA_ETAPA", componenteId: "campo-2" }));
-    expect(resultado.secoes[0].componentes[1]).toEqual(expect.objectContaining({ tipo: "INVALIDO", valido: false }));
+    expect(resultado.diagnosticos).toContainEqual(
+      expect.objectContaining({
+        code: "CAMPO_FORA_ETAPA",
+        componenteId: "campo-2",
+      }),
+    );
+    expect(resultado.secoes[0].componentes[1]).toEqual(
+      expect.objectContaining({ tipo: "INVALIDO", valido: false }),
+    );
   });
 
   it("distingue campo canônico condicionalmente oculto de campo inválido", () => {
@@ -97,26 +127,77 @@ describe("P0-3 - resolver canônico do formulário de etapa", () => {
     expect(resultado.status).toBe("READY");
     expect(resultado.diagnosticos).toHaveLength(0);
     expect(resultado.secoes[0].componentes[1]).toEqual(
-      expect.objectContaining({ campoId: "field-2", valido: true, visivel: false }),
+      expect.objectContaining({
+        campoId: "field-2",
+        valido: true,
+        visivel: false,
+      }),
     );
   });
 
   it("trata formulário ausente/inativo explicitamente sem herdar campos do pipeline", () => {
-    const ausente = resolverFormularioEtapa({ formulario: null, camposCanonicos: campos });
-    const inativo = resolverFormularioEtapa({ formulario: { ...formulario, ativo: false }, camposCanonicos: campos });
+    const ausente = resolverFormularioEtapa({
+      formulario: null,
+      camposCanonicos: campos,
+    });
+    const inativo = resolverFormularioEtapa({
+      formulario: { ...formulario, ativo: false },
+      camposCanonicos: campos,
+    });
 
-    expect(ausente).toEqual(expect.objectContaining({ status: "MISSING", secoes: [] }));
-    expect(inativo).toEqual(expect.objectContaining({ status: "INACTIVE", secoes: [] }));
+    expect(ausente).toEqual(
+      expect.objectContaining({ status: "MISSING", secoes: [] }),
+    );
+    expect(inativo).toEqual(
+      expect.objectContaining({ status: "INACTIVE", secoes: [] }),
+    );
   });
 
   it("seleciona componente por target estável mesmo quando labels são renomeadas", () => {
     const resultado = resolverFormularioEtapa({
       formulario,
-      camposCanonicos: campos.map((campo) => ({ ...campo, nome: `Renomeado ${campo.id}` })),
+      camposCanonicos: campos.map((campo) => ({
+        ...campo,
+        nome: `Renomeado ${campo.id}`,
+      })),
     });
 
-    expect(formularioPossuiTarget(resultado, BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER)).toBe(true);
-    expect(resultado.secoes[1].componentes[0].rendererId).toBe("follow-up-scheduler");
+    expect(
+      formularioPossuiTarget(resultado, BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER),
+    ).toBe(true);
+    expect(resultado.secoes[1].componentes[0].rendererId).toBe(
+      "follow-up-scheduler",
+    );
+  });
+
+  it("preserva rótulo visual sem trocar a identidade do campo ou capability", () => {
+    const comRotulos = structuredClone(formulario);
+    comRotulos.secoes[0].componentes[0].configJson =
+      '{"label":"Próximo atendimento"}';
+    const campoUm = comRotulos.secoes[1].componentes.find(
+      (componente) => componente.id === "campo-1",
+    );
+    if (!campoUm) throw new Error("Fixture campo-1 ausente");
+    campoUm.configJson = '{"label":"Razão social exibida"}';
+
+    const resultado = resolverFormularioEtapa({
+      formulario: comRotulos,
+      camposCanonicos: campos,
+    });
+
+    expect(resultado.status).toBe("READY");
+    expect(resultado.secoes[1].componentes[0]).toEqual(
+      expect.objectContaining({
+        capability: BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER,
+        config: { label: "Próximo atendimento" },
+      }),
+    );
+    expect(resultado.secoes[0].componentes[0]).toEqual(
+      expect.objectContaining({
+        campoId: "field-1",
+        config: { label: "Razão social exibida" },
+      }),
+    );
   });
 
   it("isola target desconhecido e config fora do schema", () => {
@@ -136,8 +217,18 @@ describe("P0-3 - resolver canônico do formulário de etapa", () => {
       configJson: '{"arbitrario":true}',
     };
 
-    expect(resolverFormularioEtapa({ formulario: desconhecido, camposCanonicos: campos }).diagnosticos[0].code).toBe("TARGET_DESCONHECIDO");
-    expect(resolverFormularioEtapa({ formulario: configInvalida, camposCanonicos: campos }).diagnosticos[0].code).toBe("CONFIG_INVALIDA");
+    expect(
+      resolverFormularioEtapa({
+        formulario: desconhecido,
+        camposCanonicos: campos,
+      }).diagnosticos[0].code,
+    ).toBe("TARGET_DESCONHECIDO");
+    expect(
+      resolverFormularioEtapa({
+        formulario: configInvalida,
+        camposCanonicos: campos,
+      }).diagnosticos[0].code,
+    ).toBe("CONFIG_INVALIDA");
   });
 
   it("recusa target singular duplicado no save e isola duplicata persistida", () => {
@@ -148,7 +239,10 @@ describe("P0-3 - resolver canônico do formulário de etapa", () => {
       chave: "proximo-contato-duplicado",
       ordem: 1,
     });
-    const resolvido = resolverFormularioEtapa({ formulario: duplicado, camposCanonicos: campos });
+    const resolvido = resolverFormularioEtapa({
+      formulario: duplicado,
+      camposCanonicos: campos,
+    });
     const payload = {
       pipelineId: "pipeline-1",
       etapaId: "etapa-1",
@@ -171,17 +265,22 @@ describe("P0-3 - resolver canônico do formulário de etapa", () => {
 
     expect(resolvido.status).toBe("INVALID");
     expect(resolvido.diagnosticos).toContainEqual(
-      expect.objectContaining({ code: "TARGET_DUPLICADO", componenteId: "cap-2" }),
+      expect.objectContaining({
+        code: "TARGET_DUPLICADO",
+        componenteId: "cap-2",
+      }),
     );
     expect(salvarFormularioEtapaSchema.safeParse(payload).success).toBe(false);
   });
 
   it("builder e save derivam suas referências do mesmo registry", () => {
-    const catalogo = listarCatalogoComponentesFormulario(JSON.stringify([
-      BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER,
-    ]));
+    const catalogo = listarCatalogoComponentesFormulario(
+      JSON.stringify([BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER]),
+    );
 
-    expect(Object.keys(BPM_FORM_COMPONENT_REGISTRY)).toContain(BPM_CAPABILITIES.STAGE_CHECKLIST);
+    expect(Object.keys(BPM_FORM_COMPONENT_REGISTRY)).toContain(
+      BPM_CAPABILITIES.STAGE_CHECKLIST,
+    );
     expect(catalogo.map((item) => item.target)).toEqual([
       BPM_CAPABILITIES.STAGE_CHECKLIST,
       BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER,
@@ -190,9 +289,24 @@ describe("P0-3 - resolver canônico do formulário de etapa", () => {
 
   it("card e preview usam o renderer compartilhado; preview permanece inerte", () => {
     const raiz = process.cwd();
-    const slot = readFileSync(resolve(raiz, "src/app/PainelAlpha/AlphaCRM/CardModal/CardOpenFormSlot.tsx"), "utf8");
-    const preview = readFileSync(resolve(raiz, "src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/PipelineWorkspaceSections.tsx"), "utf8");
-    const cards = readFileSync(resolve(raiz, "src/actions/bpm/Cards.ts"), "utf8");
+    const slot = readFileSync(
+      resolve(
+        raiz,
+        "src/app/PainelAlpha/AlphaCRM/CardModal/CardOpenFormSlot.tsx",
+      ),
+      "utf8",
+    );
+    const preview = readFileSync(
+      resolve(
+        raiz,
+        "src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/PipelineWorkspaceSections.tsx",
+      ),
+      "utf8",
+    );
+    const cards = readFileSync(
+      resolve(raiz, "src/actions/bpm/Cards.ts"),
+      "utf8",
+    );
 
     expect(slot).toContain("<FormularioEtapaRenderer");
     expect(preview).toContain("<FormularioEtapaRenderer");

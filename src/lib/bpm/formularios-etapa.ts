@@ -4,8 +4,10 @@ import { BPM_CAPABILITIES, parseBpmCapabilities } from "@/lib/bpm/ontology";
 
 export const BPM_STAGE_CHECKLIST_TARGET = BPM_CAPABILITIES.STAGE_CHECKLIST;
 
-const emptyConfigSchema = z.object({}).strict();
-export const BPM_FORM_FIELD_CONFIG_SCHEMA = emptyConfigSchema;
+const presentationConfigSchema = z.object({
+  label: z.string().trim().min(1).max(120).optional(),
+}).strict();
+export const BPM_FORM_FIELD_CONFIG_SCHEMA = presentationConfigSchema;
 
 /**
  * Registry único dos componentes especializados que podem ser persistidos no
@@ -20,7 +22,7 @@ export const BPM_FORM_COMPONENT_REGISTRY = {
     description: "Checklists aplicáveis ao card na etapa atual.",
     rendererId: "stage-checklist",
     multiple: false,
-    configSchema: emptyConfigSchema,
+    configSchema: presentationConfigSchema,
   },
   [BPM_CAPABILITIES.MEETING_SCHEDULER]: {
     tipo: "CAPABILITY",
@@ -29,7 +31,7 @@ export const BPM_FORM_COMPONENT_REGISTRY = {
     description: "Agenda uma reunião com os contatos do card.",
     rendererId: "meeting-scheduler",
     multiple: false,
-    configSchema: emptyConfigSchema,
+    configSchema: presentationConfigSchema,
   },
   [BPM_CAPABILITIES.MEETING_TRANSCRIPT]: {
     tipo: "CAPABILITY",
@@ -38,7 +40,7 @@ export const BPM_FORM_COMPONENT_REGISTRY = {
     description: "Exibe e processa a transcrição vinculada ao card.",
     rendererId: "meeting-transcript",
     multiple: false,
-    configSchema: emptyConfigSchema,
+    configSchema: presentationConfigSchema,
   },
   [BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER]: {
     tipo: "CAPABILITY",
@@ -47,7 +49,7 @@ export const BPM_FORM_COMPONENT_REGISTRY = {
     description: "Agenda o próximo contato do card.",
     rendererId: "follow-up-scheduler",
     multiple: false,
-    configSchema: emptyConfigSchema,
+    configSchema: presentationConfigSchema,
   },
   [BPM_CAPABILITIES.FOLLOW_UP_CHECKLIST]: {
     tipo: "CAPABILITY",
@@ -56,7 +58,7 @@ export const BPM_FORM_COMPONENT_REGISTRY = {
     description: "Acompanha as ações de follow-up da etapa.",
     rendererId: "follow-up-checklist",
     multiple: false,
-    configSchema: emptyConfigSchema,
+    configSchema: presentationConfigSchema,
   },
   [BPM_CAPABILITIES.STANDBY_FOLLOW_UP]: {
     tipo: "CAPABILITY",
@@ -65,7 +67,7 @@ export const BPM_FORM_COMPONENT_REGISTRY = {
     description: "Gerencia o acompanhamento do card em standby.",
     rendererId: "standby-follow-up",
     multiple: false,
-    configSchema: emptyConfigSchema,
+    configSchema: presentationConfigSchema,
   },
   [BPM_CAPABILITIES.COMMERCIAL_POST_CLOSING]: {
     tipo: "CAPABILITY",
@@ -74,7 +76,7 @@ export const BPM_FORM_COMPONENT_REGISTRY = {
     description: "Registra o estado operacional após o fechamento.",
     rendererId: "commercial-post-closing",
     multiple: false,
-    configSchema: emptyConfigSchema,
+    configSchema: presentationConfigSchema,
   },
 } as const;
 

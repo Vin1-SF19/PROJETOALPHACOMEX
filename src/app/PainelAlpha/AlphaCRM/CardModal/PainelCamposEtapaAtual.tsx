@@ -22,6 +22,7 @@ type CamposEtapaCard = CardDetalhe["camposEtapa"];
 interface Props {
   card: CardDetalhe;
   campoIds: string[];
+  campoLabels?: Record<string, string>;
   instanceKey: string;
   titulo?: string;
   accent: string;
@@ -35,6 +36,7 @@ interface Props {
 export function PainelCamposEtapaAtual({
   card,
   campoIds,
+  campoLabels = {},
   instanceKey,
   titulo = "Campos da etapa atual",
   accent,
@@ -232,7 +234,7 @@ export function PainelCamposEtapaAtual({
             return (
               <div key={campo.id} className="space-y-1.5">
                 <label htmlFor={`campo-bpm-${campo.id}`} className="text-[11px] font-medium text-slate-400">
-                  {campo.nome}{campo.obrigatorio ? " *" : ""}{campo.obrigatorioEntrada ? " · exigido na entrada" : ""}{campo.obrigatorioSaida ? " · exigido na saída" : ""}{somenteLeitura ? " · automático" : ""}
+                  {campoLabels[campo.id] ?? campo.nome}{campo.obrigatorio ? " *" : ""}{campo.obrigatorioEntrada ? " · exigido na entrada" : ""}{campo.obrigatorioSaida ? " · exigido na saída" : ""}{somenteLeitura ? " · automático" : ""}
                 </label>
                 {campo.chave === BPM_FIELD_KEYS.MEETING_SUMMARY && (
                   <button

@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Settings2, ArrowRight, Pencil, ArrowUp, ArrowDown, ListChecks } from "lucide-react";
+import { Plus, Settings2, ArrowRight, Pencil, ArrowUp, ArrowDown } from "lucide-react";
 import type { TemaAlpha } from "@/lib/temas";
 import {
   CriarPipelineBpm,
@@ -171,29 +171,6 @@ export default function AdminPipelinesListClient({ pipelines: pipelinesIniciais,
           <Plus size={15} /> Novo Pipeline
         </button>
       </div>
-
-      <Link
-        href="/PainelAlpha/AlphaCRM/admin/checklists"
-        className="group flex min-h-11 items-center gap-3 rounded-2xl border border-white/5 bg-slate-900/60 p-4 transition-colors duration-150 hover:bg-slate-900/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
-      >
-        <div
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl"
-          style={{ background: `rgba(${accent},0.15)` }}
-        >
-          <ListChecks size={18} aria-hidden="true" style={{ color: `rgb(${accent})` }} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-white">Checklists</p>
-          <p className="text-xs text-slate-400">
-            Configure templates e vínculos para os cards do CRM.
-          </p>
-        </div>
-        <ArrowRight
-          size={17}
-          aria-hidden="true"
-          className="shrink-0 text-slate-500 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-slate-300"
-        />
-      </Link>
 
       {mostrarForm && (
         <div className="bg-slate-900/60 border border-white/5 rounded-2xl p-5 space-y-3">

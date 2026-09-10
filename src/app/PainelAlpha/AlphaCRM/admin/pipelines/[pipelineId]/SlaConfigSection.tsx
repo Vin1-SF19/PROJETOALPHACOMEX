@@ -4,7 +4,7 @@ import { Pencil, Plus, ShieldAlert, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { AtivarDesativarConfiguracaoSlaBpm, ExcluirConfiguracaoSlaBpm, SalvarConfiguracaoSlaBpm, SimularConfiguracaoSlaBpm } from "@/actions/bpm/Sla";
+import { AtivarDesativarConfiguracaoSlaBpm, ExcluirConfiguracaoSlaBpm, SalvarConfiguracaoSlaBpm } from "@/actions/bpm/Sla";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { obterConfigTipoTarefa } from "@/lib/bpm/tarefas-tipo";
@@ -42,10 +42,6 @@ export function SlaConfigSection({ pipelineId, pipelineNome, etapas, servicos, c
   const [editando, setEditando] = useState<SlaConfiguracaoAdmin | null | "novo">(null);
   const [isSaving, setIsSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [cardSimulacao, setCardSimulacao] = useState("");
-  const [tarefaSimulacao, setTarefaSimulacao] = useState("");
-  const [gatilhoSimulacao, setGatilhoSimulacao] = useState<keyof typeof inicioLabel>("ENTRADA_ETAPA");
-  const [resultadoSimulacao, setResultadoSimulacao] = useState<string | null>(null);
   const sobreposicoes = configuracoes.filter((config, indice) => config.ativa && configuracoes.some((outra, outroIndice) =>
     outroIndice !== indice
     && outra.ativa
@@ -109,29 +105,6 @@ export function SlaConfigSection({ pipelineId, pipelineNome, etapas, servicos, c
     }
   }
 
-  async function simular() {
-    if (!cardSimulacao.trim() || isSaving || busyId) return;
-    setBusyId("simulacao");
-    setResultadoSimulacao(null);
-    try {
-      const resultado = await SimularConfiguracaoSlaBpm({
-        pipelineId,
-        cardId: cardSimulacao.trim(),
-        tarefaId: tarefaSimulacao.trim() || undefined,
-        gatilho: gatilhoSimulacao,
-      });
-      if (!resultado.success) {
-        toast.error(erroMensagem(resultado.error, "Não foi possível simular o SLA."));
-        return;
-      }
-      setResultadoSimulacao(resultado.data
-        ? `${resultado.data.nome} · prioridade ${resultado.data.prioridade} · ${resultado.data.quantidade} ${unidadeLabel[resultado.data.unidade]}`
-        : "Nenhuma configuração aplicável ao cenário informado.");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
   return (
     <section className="space-y-4" aria-labelledby="sla-alertas-title">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -144,18 +117,6 @@ export function SlaConfigSection({ pipelineId, pipelineNome, etapas, servicos, c
       {publicationBlocked && <p className="text-xs text-amber-200" role="status">Publique ou descarte o rascunho principal antes de publicar SLA.</p>}
 
       {sobreposicoes > 0 && <p className="rounded-xl border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-xs text-amber-200" role="status">Há {sobreposicoes} configurações ativas com o mesmo escopo e gatilho. O runtime aplica maior prioridade, depois maior especificidade e, por fim, a mais antiga.</p>}
-
-      <fieldset className="rounded-2xl border border-white/10 bg-slate-900/35 p-4">
-        <legend className="px-1 text-xs font-bold uppercase tracking-wide text-slate-400">Simulação real do runtime</legend>
-        <p className="mb-3 text-xs text-slate-500">Executa a seleção canônica em modo somente leitura; nenhuma instância ou evento é criado.</p>
-        <div className="grid gap-2 lg:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_220px_auto]">
-          <input aria-label="ID do card para simulação" value={cardSimulacao} onChange={(event) => setCardSimulacao(event.target.value)} placeholder="ID do card" className="min-h-10 rounded-lg border border-white/10 bg-slate-800 px-3 text-sm text-white" />
-          <input aria-label="ID opcional da tarefa para simulação" value={tarefaSimulacao} onChange={(event) => setTarefaSimulacao(event.target.value)} placeholder="ID da tarefa (opcional)" className="min-h-10 rounded-lg border border-white/10 bg-slate-800 px-3 text-sm text-white" />
-          <select aria-label="Gatilho da simulação" value={gatilhoSimulacao} onChange={(event) => setGatilhoSimulacao(event.target.value as keyof typeof inicioLabel)} className="min-h-10 rounded-lg border border-white/10 bg-slate-800 px-3 text-sm text-white">{Object.entries(inicioLabel).map(([valor, rotulo]) => <option key={valor} value={valor}>{rotulo}</option>)}</select>
-          <Button type="button" disabled={!cardSimulacao.trim() || isSaving || Boolean(busyId)} onClick={() => void simular()}>{busyId === "simulacao" ? "Simulando…" : "Simular"}</Button>
-        </div>
-        {resultadoSimulacao && <p className="mt-3 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.05] px-3 py-2 text-xs text-cyan-100" role="status">{resultadoSimulacao}</p>}
-      </fieldset>
 
       {configuracoes.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-white/10 bg-slate-900/30 px-5 py-10 text-center"><p className="text-sm font-medium text-slate-300">Nenhum SLA configurado</p><p className="mt-1 text-xs text-slate-500">Crie o primeiro prazo para este pipeline.</p></div>

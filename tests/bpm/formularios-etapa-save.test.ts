@@ -201,6 +201,26 @@ describe("contrato e salvamento diferencial do formulário de etapa", () => {
     expect(parsed.secoes[0].componentes[2].capability).toBe("FOLLOW_UP_SCHEDULER");
   });
 
+  it("aceita e preserva rótulo visual sem alterar a identidade do componente", async () => {
+    const changed = input("Dados principais");
+    changed.secoes[0].componentes[0].configJson =
+      '{"label":"Documento da empresa"}';
+    mocks.formFindUniqueOrThrow.mockResolvedValue(persistedForm(2));
+
+    expect(salvarFormularioEtapaSchema.safeParse(changed).success).toBe(true);
+    const result = await SalvarFormularioEtapaBpm(changed);
+
+    expect(result.success).toBe(true);
+    expect(mocks.componentUpdate).toHaveBeenCalledWith({
+      where: { id: FIELD_COMPONENT_ID },
+      data: expect.objectContaining({
+        campoId: FIELD_ID,
+        capability: null,
+        configJson: '{"label":"Documento da empresa"}',
+      }),
+    });
+  });
+
   it("rejeita capability inexistente e campo duplicado", () => {
     const invalidCapability = input();
     invalidCapability.secoes[0].componentes[2].capability = "ARBITRARY_STRING";

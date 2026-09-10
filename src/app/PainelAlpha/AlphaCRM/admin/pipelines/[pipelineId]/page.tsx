@@ -1,7 +1,7 @@
 import { auth } from "../../../../../../../auth";
 import { redirect, notFound } from "next/navigation";
 import { getTema } from "@/lib/temas";
-import { ListarPipelinesBpm, ObterPipelineBpm } from "@/actions/bpm/Pipelines";
+import { ObterPipelineBpm } from "@/actions/bpm/Pipelines";
 import { ListarTransicoesDoPipelineBpm } from "@/actions/bpm/Transicoes";
 import { ListarConfiguracoesSlaBpm } from "@/actions/bpm/Sla";
 import { ListarCadenciasBpm } from "@/actions/bpm/Cadencias";
@@ -27,9 +27,8 @@ export default async function AdminPipelinePage({
   const temaNome = (session.user as { tema_interface?: string })?.tema_interface || "blue";
   const visual = getTema(temaNome);
 
-  const [pipelineResult, pipelinesResult, transicoesResult, slaResult, servicosResult, cadenciasResult] = await Promise.all([
+  const [pipelineResult, transicoesResult, slaResult, servicosResult, cadenciasResult] = await Promise.all([
     ObterPipelineBpm(pipelineId, true),
-    ListarPipelinesBpm(true),
     ListarTransicoesDoPipelineBpm(pipelineId),
     ListarConfiguracoesSlaBpm(pipelineId),
     getServicosComerciais(),
@@ -54,7 +53,6 @@ export default async function AdminPipelinePage({
     ? servicosResult.servicos.map(({ id, nome }) => ({ id, nome }))
     : null;
   const falhasRelacionadas = [
-    !pipelinesResult.success ? "catálogo de pipelines" : null,
     !transicoesResult.success ? "transições" : null,
     !slaResult.success ? "SLA" : null,
     !servicosComerciais ? "serviços comerciais" : null,
@@ -78,7 +76,6 @@ export default async function AdminPipelinePage({
       transicoesIniciais={(transicoesResult.data ?? []) as TransicaoBpm[]}
       configuracoesSlaIniciais={slaResult.data ?? []}
       servicosComerciais={servicosComerciais!}
-      pipelinesDisponiveis={pipelinesResult.data.map(({ id, nome }) => ({ id, nome }))}
       cadenciasIniciais={cadenciasResult.data}
       visual={visual}
     />

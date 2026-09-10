@@ -36,10 +36,11 @@ export function CardOpenFormSlot({
       formulario={card.formularioEtapa}
       mode="runtime"
       bindings={{
-        renderCampos: ({ campoIds, secaoTitulo, runKey }) => (
+        renderCampos: ({ campoIds, campoLabels, secaoTitulo, runKey }) => (
           <PainelCamposEtapaAtual
             card={card}
             campoIds={campoIds}
+            campoLabels={campoLabels}
             instanceKey={runKey}
             titulo={secaoTitulo}
             accent={accent}

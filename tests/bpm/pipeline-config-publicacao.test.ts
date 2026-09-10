@@ -85,6 +85,7 @@ describe("publicação versionada da configuração", () => {
     expect(action).toContain('await exigirAcessoConfigPipeline(userId, "configurarEtapas", tx)');
     expect(action).not.toContain("valorAnteriorJson: JSON.stringify(proposta)");
     expect(ui).toContain("conflitoPublicacao");
-    expect(ui).toContain("Aplicar {selecoesAtivasSemCatalogo.length} correção(ões) ao rascunho");
+    expect(ui).toContain("A configuração mudou desde que este workspace foi aberto");
+    expect(ui).not.toContain("selecoesAtivasSemCatalogo");
   });
 });

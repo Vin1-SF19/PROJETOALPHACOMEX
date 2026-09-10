@@ -77,17 +77,6 @@ type TabWorkspace =
   | "permissions"
   | "history";
 
-function possuiOpcoesLegadas(campo: CampoWorkspace): boolean {
-  try {
-    return (
-      Array.isArray(campo.opcoesJson ? JSON.parse(campo.opcoesJson) : []) &&
-      JSON.parse(campo.opcoesJson ?? "[]").length > 0
-    );
-  } catch {
-    return false;
-  }
-}
-
 function chaveSla(config: SlaConfiguracaoAdmin): string {
   return [
     config.etapaId,
@@ -119,14 +108,6 @@ export function PipelineHealthOverview({
   const iniciais = ativas.filter((etapa) => etapa.ehInicial);
   const inicial = iniciais.length === 1 ? iniciais[0] : undefined;
   const finais = ativas.filter((etapa) => etapa.ehFinal);
-  const selecoesInvalidas = campos.filter(
-    (campo) =>
-      campo.ativo !== false &&
-      ["selecao", "multiselecao"].includes(campo.tipo) &&
-      !campo.fonteEntidade &&
-      !campo.opcoes?.some((opcao) => opcao.ativo) &&
-      !possuiOpcoesLegadas(campo),
-  );
   const slaAtivos = slas.filter((sla) => sla.ativa);
   const gruposSla = new Map<string, number>();
   for (const sla of slaAtivos)
@@ -143,12 +124,14 @@ export function PipelineHealthOverview({
           idsAtivos.has(transicao.etapaDestinoId),
       )
       .map(
-        (transicao) =>
-          `${transicao.etapaOrigemId}:${transicao.etapaDestinoId}`,
+        (transicao) => `${transicao.etapaOrigemId}:${transicao.etapaDestinoId}`,
       ),
   );
   const arestasEsperadas = ativas.length * Math.max(0, ativas.length - 1);
-  const arestasAusentes = Math.max(0, arestasEsperadas - paresConfigurados.size);
+  const arestasAusentes = Math.max(
+    0,
+    arestasEsperadas - paresConfigurados.size,
+  );
 
   const visitadas = new Set<string>();
   if (inicial) {
@@ -168,16 +151,13 @@ export function PipelineHealthOverview({
     : [];
   const problemas = [
     iniciais.length !== 1
-      ? { texto: `É necessária uma etapa inicial; encontrado: ${iniciais.length}`, tab: "stages" as const }
+      ? {
+          texto: `É necessária uma etapa inicial; encontrado: ${iniciais.length}`,
+          tab: "stages" as const,
+        }
       : null,
     finais.length === 0
       ? { texto: "Nenhuma etapa final configurada", tab: "stages" as const }
-      : null,
-    selecoesInvalidas.length
-      ? {
-          texto: `${selecoesInvalidas.length} campo(s) de seleção sem fonte válida`,
-          tab: "fields" as const,
-        }
       : null,
     sobrepostos
       ? {
@@ -407,11 +387,15 @@ export function KanbanCardPreview({
             ...secao,
             id: secao.id ?? `preview-section-${secao.chave}`,
             ordem: secao.ordem ?? ordem,
-            componentes: secao.componentes.map((componente, ordemComponente) => ({
-              ...componente,
-              id: componente.id ?? `preview-component-${secao.chave}-${componente.chave}`,
-              ordem: componente.ordem ?? ordemComponente,
-            })),
+            componentes: secao.componentes.map(
+              (componente, ordemComponente) => ({
+                ...componente,
+                id:
+                  componente.id ??
+                  `preview-component-${secao.chave}-${componente.chave}`,
+                ordem: componente.ordem ?? ordemComponente,
+              }),
+            ),
           })),
         }
       : null,
@@ -481,15 +465,23 @@ export function KanbanCardPreview({
               formulario={formulario}
               mode="preview"
               bindings={{
-                renderCampos: ({ campoIds }) => (
+                renderCampos: ({ campoIds, campoLabels }) => (
                   <div className="space-y-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
                     {campoIds.map((campoId) => {
                       const campo = campoPorId.get(campoId);
                       if (!campo) return null;
-                      const config = campo.etapaConfiguracoes?.find((item) => item.etapaId === etapaId);
+                      const config = campo.etapaConfiguracoes?.find(
+                        (item) => item.etapaId === etapaId,
+                      );
                       return (
-                        <label key={campo.id} className="block space-y-1 text-xs text-slate-400">
-                          <span>{campo.nome}{config?.obrigatorio ? " *" : ""}</span>
+                        <label
+                          key={campo.id}
+                          className="block space-y-1 text-xs text-slate-400"
+                        >
+                          <span>
+                            {campoLabels[campo.id] ?? campo.nome}
+                            {config?.obrigatorio ? " *" : ""}
+                          </span>
                           <input
                             aria-label={`Preview de ${campo.nome}`}
                             readOnly
@@ -504,11 +496,19 @@ export function KanbanCardPreview({
                   </div>
                 ),
                 renderComponente: (componente) => {
-                  const definicao = obterDefinicaoComponenteFormulario(componente.capability);
+                  const definicao = obterDefinicaoComponenteFormulario(
+                    componente.capability,
+                  );
                   return (
                     <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
-                      <p className="text-xs font-semibold text-slate-200">{definicao?.label ?? componente.chave}</p>
-                      <p className="mt-1 text-[11px] text-slate-500">{definicao?.description}</p>
+                      {typeof componente.config.label !== "string" && (
+                        <p className="text-xs font-semibold text-slate-200">
+                          {definicao?.label ?? componente.chave}
+                        </p>
+                      )}
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        {definicao?.description}
+                      </p>
                     </div>
                   );
                 },
@@ -538,7 +538,7 @@ export function AutomationsOverview({
           </p>
         </div>
         <Link
-          href="/PainelAlpha/AlphaCRM/automacoes"
+          href="/PainelAlpha/AlphaCRM/admin/automacoes"
           className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 px-3 text-xs font-bold text-slate-200 hover:bg-white/5"
         >
           Abrir Motor Central <ExternalLink size={14} />
