@@ -143,9 +143,11 @@ function CartaoCentral({
 export function CentralNotificacoesPainel({
   onAbrirAgenda,
   onAbrirModulo,
+  onAbrirNota,
 }: {
   onAbrirAgenda: (intencao: IntencaoAgendaAlpha) => void;
   onAbrirModulo: (url: string, label: string) => void;
+  onAbrirNota: (noteId: string) => void;
 }) {
   const [aberto, setAberto] = useState(false);
   const [pulsar, setPulsar] = useState(false);
@@ -212,7 +214,7 @@ export function CentralNotificacoesPainel({
       cor: "#a78bfa",
       lida: notificacao.lida,
       Icone: NotebookPen,
-      abrir: () => onAbrirModulo(`/PainelAlpha/Notas?id=${notificacao.noteId}`, "Notas"),
+      abrir: () => onAbrirNota(notificacao.noteId),
       remover: () => notas.removerNotificacao(notificacao.id),
     })),
     ...(holerite.alertaAtivo ? [{

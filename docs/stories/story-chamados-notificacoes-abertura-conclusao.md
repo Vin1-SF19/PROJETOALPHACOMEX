@@ -48,6 +48,12 @@ Como usuário do módulo de Chamados, quero receber os avisos de abertura e conc
   - [x] Corrigir a recuperação legada para os status atuais e hidratar mensagens não lidas após recarregar.
   - [x] Impedir pollings globais duplicados nos iframes do shell.
   - [x] Cobrir envio, assinatura, recuperação e deduplicação com testes direcionados.
+- [x] Task 7 — Integrar notificações do Bloco de notas ALpha à central global (pedido 2026-09-10)
+  - [x] Entregar compartilhamentos diretos e por equipe pelo contrato oficial de notificações de notas.
+  - [x] Assinar eventos de notas somente no shell principal e restaurar corretamente a assinatura após cleanup.
+  - [x] Exibir compartilhamentos, comentários, menções, permissões, versões e lembretes na central global.
+  - [x] Abrir o Bloco de notas ALpha pela navegação interna do Painel Alpha, inclusive pelo toast.
+  - [x] Cobrir publicação, assinatura, agregação e navegação com testes direcionados.
 
 ## Dev Notes
 
@@ -63,6 +69,7 @@ Como usuário do módulo de Chamados, quero receber os avisos de abertura e conc
 | 2026-07-30 | 1.1 | Notificações de abertura centralizadas e conclusão individual implementada nos dois fluxos. | Dex |
 | 2026-09-09 | 1.2 | Aviso instantâneo de chamado assumido e central global de notificações implementados. | Dex |
 | 2026-09-09 | 1.3 | Mensagens do chat entregues em tempo real na central global, com recuperação após recarregar e deduplicação. | Dex |
+| 2026-09-10 | 1.4 | Notificações do Bloco de notas ALpha integradas de forma confiável à central global e à navegação interna. | Dex |
 
 ## Dev Agent Record
 
@@ -93,6 +100,14 @@ GPT-5 Codex
 - `npm test` — 337 arquivos e 2.716 testes passaram; gate global segue bloqueado por 50 falhas preexistentes em 19 arquivos não relacionados.
 - `npm run typecheck -- --pretty false` — gate global segue bloqueado por erros preexistentes em Exclusão Fiscal, Gerador de Documentos, Agenda Alpha, Radar e testes antigos; nenhum aponta para a entrega 1.3.
 - `npm run lint` — gate global segue bloqueado por 3.699 erros preexistentes, principalmente em `.aiox-core`, `.agents` e módulos legados; lint direcionado passou.
+- Testes direcionados da entrega 1.4 — 23 verificações passaram, cobrindo publicação privada, falha do realtime, compartilhamento direto/equipe, contrato de eventos, assinatura no shell e navegação interna.
+- Lint direcionado dos arquivos da entrega 1.4 — passou sem erros ou avisos.
+- Typecheck direcionado da entrega 1.4 — nenhum erro nos arquivos alterados após incluir `EQUIPE` no contrato oficial.
+- `npm run build` — build de produção da entrega 1.4 passou.
+- `npm test` — 349 arquivos e 2.763 testes passaram; gate global segue bloqueado por 28 falhas preexistentes em 15 arquivos não relacionados.
+- `npm run typecheck -- --pretty false` — gate global segue bloqueado por erros preexistentes em Exclusão Fiscal, Gerador de Documentos, Agenda Alpha, Radar e testes antigos; nenhum permanece nos arquivos da entrega 1.4.
+- `npm run lint` — gate global segue bloqueado por 3.699 erros preexistentes, principalmente em `.aiox-core`, `.agents` e módulos legados; lint direcionado passou.
+- CodeRabbit CLI — indisponível no ambiente (`CODERABBIT_NOT_INSTALLED`).
 
 ### Completion Notes List
 
@@ -114,6 +129,11 @@ GPT-5 Codex
 - Pusher e recuperação usam o identificador persistente `mensagem-{id}`; o store elimina a duplicidade quando os dois caminhos entregam o mesmo aviso.
 - O polling de recuperação é executado somente pela janela principal, evitando uma requisição global repetida por iframe.
 - A Server Action de envio agora valida se o autor é o solicitante ou pertence à equipe administrativa antes de persistir a mensagem.
+- Compartilhamentos diretos e por equipe agora usam um único serviço tipado e tolerante a falhas para publicar no canal privado do destinatário.
+- O contrato oficial passou a reconhecer o tipo `EQUIPE`, que já era produzido pelo compartilhamento coletivo sem estar declarado no payload.
+- A assinatura das notas ocorre somente no shell principal; iframes não duplicam eventos e o cleanup libera a trava para uma reassinatura futura.
+- Compartilhamentos, comentários, menções, alterações de permissão, restaurações e lembretes continuam agregados no mesmo sino global.
+- O botão “Abrir” do toast e o item da central usam `openTab`, preservando o sistema interno de abas do Painel Alpha.
 
 ### File List
 
@@ -121,6 +141,9 @@ GPT-5 Codex
 - `plan/self-critique-chamados-notificacoes.json`
 - `plan/self-critique-central-notificacoes-painel.json`
 - `plan/self-critique-chamados-mensagens-central.json`
+- `plan/self-critique-notas-central-notificacoes.json`
+- `src/actions/NotasColaboracao.ts`
+- `src/actions/NotasEquipes.ts`
 - `src/actions/chamados.ts`
 - `src/actions/protocolos.ts`
 - `src/app/PainelAlpha/layout.tsx`
@@ -130,14 +153,18 @@ GPT-5 Codex
 - `src/components/chamados/NotificationCard.tsx`
 - `src/components/chamados/NotificationToast.tsx`
 - `src/components/NotificacaoFlutuante.tsx`
+- `src/components/Notas/NotaNotificacaoToast.tsx`
 - `src/components/CalendarioAlpha/lib/tutorial-agenda.ts`
 - `src/components/CalendarioAlpha/SinoNotificacoesCompromissos.tsx` (removido)
 - `src/components/layout/CentralNotificacoesPainel.tsx`
 - `src/components/layout/PainelLayoutClient.tsx`
 - `src/hooks/useAdminChamadosNotifications.ts`
+- `src/hooks/useNotasNotifications.ts`
 - `src/lib/bibble/tool-executor.ts`
 - `src/lib/chamados/notificacoes.ts`
 - `src/lib/chamados/notificacoes-server.ts`
+- `src/lib/notas/notificacoes.ts`
+- `src/lib/notas/notificacoes-server.ts`
 - `src/lib/pusher.ts`
 - `src/store/useHoleriteNotificacoes.ts`
 - `src/store/useChamadoNotificacoes.ts`
@@ -147,6 +174,7 @@ GPT-5 Codex
 - `tests/chamados/notificacoes-api.test.ts`
 - `tests/chamados/notificacoes-store.test.ts`
 - `tests/chamados/notificacoes.test.ts`
+- `tests/notas/notificacoes-central.test.ts`
 - `tests/google-calendar/page-cache-wiring.test.ts`
 
 ## QA Results

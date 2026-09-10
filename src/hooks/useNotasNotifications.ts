@@ -5,12 +5,7 @@ import { pusherClient } from "@/lib/pusher";
 import { useNotasNotificacoes } from "@/store/useNotasNotificacoes";
 import {
   canalNotasDoUsuario,
-  NOTA_COMPARTILHADA_EVENT,
-  NOTA_MENCAO_EVENT,
-  NOTA_COMENTARIO_EVENT,
-  NOTA_PERMISSAO_ALTERADA_EVENT,
-  NOTA_VERSAO_RESTAURADA_EVENT,
-  NOTA_LEMBRETE_EVENT,
+  NOTA_NOTIFICACAO_EVENTS,
   type NotaNotificacaoPayload,
 } from "@/lib/notas/notificacoes";
 
@@ -22,25 +17,25 @@ export function useNotasNotifications(userId: number) {
     const client = pusherClient;
     if (!client) return;
     if (!Number.isSafeInteger(userId) || userId <= 0) return;
+    try {
+      if (window !== window.top) return;
+    } catch {
+      return;
+    }
     if (subscribedRef.current) return;
     subscribedRef.current = true;
 
     const canal = client.subscribe(canalNotasDoUsuario(userId));
-    const eventos = [
-      NOTA_COMPARTILHADA_EVENT,
-      NOTA_MENCAO_EVENT,
-      NOTA_COMENTARIO_EVENT,
-      NOTA_PERMISSAO_ALTERADA_EVENT,
-      NOTA_VERSAO_RESTAURADA_EVENT,
-      NOTA_LEMBRETE_EVENT,
-    ];
-
     const handler = (payload: NotaNotificacaoPayload) => adicionarNotificacao(payload);
-    for (const evento of eventos) canal.bind(evento, handler);
+    for (const evento of NOTA_NOTIFICACAO_EVENTS) canal.bind(evento, handler);
 
     return () => {
-      for (const evento of eventos) canal.unbind(evento, handler);
-      client.unsubscribe(canalNotasDoUsuario(userId));
+      try {
+        for (const evento of NOTA_NOTIFICACAO_EVENTS) canal.unbind(evento, handler);
+        client.unsubscribe(canalNotasDoUsuario(userId));
+      } finally {
+        subscribedRef.current = false;
+      }
     };
   }, [userId, adicionarNotificacao]);
 }

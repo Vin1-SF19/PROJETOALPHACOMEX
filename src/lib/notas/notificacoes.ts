@@ -7,11 +7,23 @@ export const NOTA_PERMISSAO_ALTERADA_EVENT = "nota-permissao-alterada";
 export const NOTA_VERSAO_RESTAURADA_EVENT = "nota-versao-restaurada";
 export const NOTA_LEMBRETE_EVENT = "nota-lembrete";
 
+export const NOTA_NOTIFICACAO_EVENTS = [
+  NOTA_COMPARTILHADA_EVENT,
+  NOTA_MENCAO_EVENT,
+  NOTA_COMENTARIO_EVENT,
+  NOTA_PERMISSAO_ALTERADA_EVENT,
+  NOTA_VERSAO_RESTAURADA_EVENT,
+  NOTA_LEMBRETE_EVENT,
+] as const;
+
+export type NotaNotificacaoEvento = (typeof NOTA_NOTIFICACAO_EVENTS)[number];
+
 export interface NotaNotificacaoPayload {
   noteId: string;
   noteTitle: string;
   tipo:
     | "COMPARTILHADA"
+    | "EQUIPE"
     | "MENCAO"
     | "COMENTARIO"
     | "PERMISSAO_ALTERADA"

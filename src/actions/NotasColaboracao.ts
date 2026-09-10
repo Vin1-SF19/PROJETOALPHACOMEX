@@ -2,7 +2,6 @@
 import db from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { auth } from "../../auth";
-import { pusherServer } from "@/lib/pusher-server.ts";
 import {
   compartilharNotaSchema,
   removerAcessoNotaSchema,
@@ -17,21 +16,19 @@ import {
   podeRestaurarVersaoNota,
   podeVisualizarNota,
 } from "@/lib/notas/permissoes";
-import { canalNotasDoUsuario } from "@/lib/notas/notificacoes";
+import {
+  NOTA_COMENTARIO_EVENT,
+  NOTA_COMPARTILHADA_EVENT,
+  NOTA_MENCAO_EVENT,
+  NOTA_VERSAO_RESTAURADA_EVENT,
+} from "@/lib/notas/notificacoes";
+import { notificarUsuarioNota } from "@/lib/notas/notificacoes-server";
 import { z } from "zod";
 
 async function sessaoUsuario() {
   const session = await auth();
   if (!session?.user?.id) return null;
   return { id: Number(session.user.id), role: session.user.role ?? "", nome: session.user.nome ?? "Alguém" };
-}
-
-async function notificar(userId: number, evento: string, payload: object) {
-  try {
-    await pusherServer.trigger(canalNotasDoUsuario(userId), evento, payload);
-  } catch (error) {
-    console.error("Falha ao enviar notificação de nota:", error);
-  }
 }
 
 export async function CompartilharNota(input: CompartilharNotaInput) {
@@ -73,7 +70,7 @@ export async function CompartilharNota(input: CompartilharNotaInput) {
   if (dados.subjectType === "USUARIO") {
     const destinatarioId = Number(dados.subjectId);
     if (Number.isSafeInteger(destinatarioId) && destinatarioId !== usuario.id) {
-      await notificar(destinatarioId, "nota-compartilhada", {
+      await notificarUsuarioNota(destinatarioId, NOTA_COMPARTILHADA_EVENT, {
         noteId: dados.noteId,
         noteTitle: nota.title,
         tipo: "COMPARTILHADA",
@@ -193,7 +190,7 @@ export async function CriarComentarioNota(input: CriarComentarioInput) {
   });
 
   if (nota.ownerId !== usuario.id) {
-    await notificar(nota.ownerId, "nota-comentario", {
+    await notificarUsuarioNota(nota.ownerId, NOTA_COMENTARIO_EVENT, {
       noteId: dados.noteId,
       noteTitle: nota.title,
       tipo: "COMENTARIO",
@@ -214,7 +211,7 @@ export async function CriarComentarioNota(input: CriarComentarioInput) {
     const temAcesso = await podeVisualizarNota({ id: mencionadoId, role: mencionado.role }, dados.noteId);
     if (!temAcesso) continue;
 
-    await notificar(mencionadoId, "nota-mencao", {
+    await notificarUsuarioNota(mencionadoId, NOTA_MENCAO_EVENT, {
       noteId: dados.noteId,
       noteTitle: nota.title,
       tipo: "MENCAO",
@@ -338,7 +335,7 @@ export async function RestaurarVersaoNota(input: { noteId: string; version: numb
   ]);
 
   if (notaAtual.ownerId !== usuario.id) {
-    await notificar(notaAtual.ownerId, "nota-versao-restaurada", {
+    await notificarUsuarioNota(notaAtual.ownerId, NOTA_VERSAO_RESTAURADA_EVENT, {
       noteId: parsed.data.noteId,
       noteTitle: notaAtual.title,
       tipo: "VERSAO_RESTAURADA",

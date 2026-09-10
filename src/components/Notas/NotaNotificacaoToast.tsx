@@ -2,11 +2,11 @@
 
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 import { useNotasNotificacoes } from "@/store/useNotasNotificacoes";
 
 const TITULOS: Record<string, string> = {
   COMPARTILHADA: "Nota compartilhada com você",
+  EQUIPE: "Nota compartilhada com sua equipe",
   MENCAO: "Você foi mencionado em uma nota",
   COMENTARIO: "Novo comentário em uma nota",
   PERMISSAO_ALTERADA: "Sua permissão em uma nota mudou",
@@ -19,9 +19,12 @@ const TITULOS: Record<string, string> = {
  * de Chamados), mas via `sonner` — mesma lib já usada extensivamente pelo Sistema de Notas,
  * evitando duplicar um componente visual custom de Framer Motion para este caso mais simples.
  */
-export function NotaNotificacaoToast() {
+export function NotaNotificacaoToast({
+  onAbrirNota,
+}: {
+  onAbrirNota: (noteId: string) => void;
+}) {
   const notificacoes = useNotasNotificacoes((s) => s.notificacoes);
-  const router = useRouter();
   const exibidasRef = useRef(new Set<string>());
 
   useEffect(() => {
@@ -33,11 +36,11 @@ export function NotaNotificacaoToast() {
         description: `${notificacao.autorNome} — ${notificacao.mensagem}`,
         action: {
           label: "Abrir",
-          onClick: () => router.push(`/PainelAlpha/Notas?id=${notificacao.noteId}`),
+          onClick: () => onAbrirNota(notificacao.noteId),
         },
       });
     }
-  }, [notificacoes, router]);
+  }, [notificacoes, onAbrirNota]);
 
   return null;
 }

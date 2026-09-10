@@ -225,6 +225,10 @@ export default function PainelLayoutClient({
     openTab('/PainelAlpha/Chamados', 'Chamados');
   }, [openTab]);
 
+  const abrirNotasPorNotificacao = useCallback((noteId: string) => {
+    openTab(`/PainelAlpha/Notas?id=${encodeURIComponent(noteId)}`, 'Bloco de notas ALpha');
+  }, [openTab]);
+
   useEffect(() => {
     const pendente = intencaoAgendaPendenteRef.current;
     if (pendente) entregarIntencaoAgenda(pendente);
@@ -323,7 +327,7 @@ export default function PainelLayoutClient({
       <NotificationToast onAbrirChamados={abrirChamadosPorNotificacao} />
       <ChecklistNotificationToast />
       <HoleriteNotificacaoGlobal authenticated />
-      <NotaNotificacaoToast />
+      <NotaNotificacaoToast onAbrirNota={abrirNotasPorNotificacao} />
       {temAcessoCalendarioAlpha && <CompromissoNotificacaoToast onAbrirAgenda={abrirAgendaPorNotificacao} />}
 
       {!tvMode && (
@@ -371,6 +375,7 @@ export default function PainelLayoutClient({
               <CentralNotificacoesPainel
                 onAbrirAgenda={abrirAgendaPorNotificacao}
                 onAbrirModulo={openTab}
+                onAbrirNota={abrirNotasPorNotificacao}
               />
               <BibbleWeatherWidget />
             </div>

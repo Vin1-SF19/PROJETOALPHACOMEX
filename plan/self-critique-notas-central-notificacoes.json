@@ -1,0 +1,32 @@
+{
+  "subtaskId": "notas-central-notificacoes",
+  "critiquedAt": "2026-09-10T00:00:00Z",
+  "step5_5": {
+    "predictedBugs": [
+      "O hook poderia assinar o mesmo canal dentro de cada iframe do Painel Alpha e multiplicar a entrega; a assinatura agora encerra imediatamente quando window não é window.top.",
+      "O cleanup poderia cancelar o canal mas manter subscribedRef travado em true, impedindo nova assinatura após remount ou troca de usuário; o finally agora libera a trava.",
+      "O toast poderia continuar usando router.push e desmontar o shell de abas; ele recebe o mesmo callback interno usado pela central global.",
+      "Uma falha do Pusher poderia fazer o compartilhamento já persistido parecer malsucedido; o serviço captura a falha e devolve false sem lançar para a action de origem."
+    ],
+    "edgeCases": [
+      "Um ID de destinatário zero, negativo ou não inteiro não publica em canal algum e retorna false.",
+      "Acesso a window.top bloqueado pelo navegador é tratado de forma segura e não inicia assinatura no contexto duvidoso.",
+      "Compartilhamento por equipe remove o próprio autor e deduplica owner/membros antes de publicar.",
+      "O ID da nota é codificado antes de compor a URL interna da aba, inclusive quando contém caracteres especiais."
+    ],
+    "errorHandling": true,
+    "securityCheck": true,
+    "passed": true
+  },
+  "step6_5": {
+    "followsPatterns": true,
+    "noHardcoded": true,
+    "testsAdded": true,
+    "docsUpdated": true,
+    "noConsoleLogs": true,
+    "passed": true
+  },
+  "overallVerdict": "PASSED",
+  "skipped": false,
+  "skipWarning": null
+}

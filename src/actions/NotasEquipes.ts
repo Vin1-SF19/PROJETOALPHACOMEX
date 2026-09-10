@@ -3,8 +3,8 @@
 import { Prisma } from "@prisma/client";
 import { auth } from "../../auth";
 import db from "@/lib/prisma";
-import { pusherServer } from "@/lib/pusher-server.ts";
-import { canalNotasDoUsuario } from "@/lib/notas/notificacoes";
+import { NOTA_COMPARTILHADA_EVENT } from "@/lib/notas/notificacoes";
+import { notificarUsuarioNota } from "@/lib/notas/notificacoes-server";
 import { normalizarChaveNomeEquipe } from "@/lib/notas/equipes";
 import {
   podeAlterarPermissoesNota,
@@ -310,20 +310,16 @@ export async function CompartilharNotaComEquipe(input: CompartilharNotaComEquipe
   ids.delete(undefined);
   ids.delete(usuario.id);
   await Promise.all(
-    [...ids].map(async (userId) => {
-      try {
-        await pusherServer.trigger(canalNotasDoUsuario(userId as number), "nota-compartilhada", {
-          noteId: parsed.data.noteId,
-          noteTitle: nota.title,
-          tipo: "EQUIPE",
-          mensagem: `compartilhou a nota "${nota.title || "Sem título"}" com a equipe ${equipe.name}`,
-          autorNome: usuario.nome,
-          createdAt: new Date().toISOString(),
-        });
-      } catch (error) {
-        console.error("Falha ao notificar membro da equipe de notas:", error);
-      }
-    }),
+    [...ids].map((userId) =>
+      notificarUsuarioNota(userId as number, NOTA_COMPARTILHADA_EVENT, {
+        noteId: parsed.data.noteId,
+        noteTitle: nota.title,
+        tipo: "EQUIPE",
+        mensagem: `compartilhou a nota "${nota.title || "Sem título"}" com a equipe ${equipe.name}`,
+        autorNome: usuario.nome,
+        createdAt: new Date().toISOString(),
+      }),
+    ),
   );
   return { success: true as const };
 }
