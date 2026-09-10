@@ -813,12 +813,12 @@ export function HabilitacaoRadarClient() {
           </div>
 
           <a
-            href="https://servicos.receita.fazenda.gov.br/servicos/radar/consultaSituacaoCpfCnpj.asp"
+            href="https://portalunico.siscomex.gov.br/cint/#/habilitacao-situacao?perfil=publico"
             target="_blank"
             rel="noopener noreferrer"
             className="h-11 px-4 rounded-xl border border-white/10 bg-white/5 text-[9px] font-black uppercase tracking-widest text-slate-400 hover:bg-white/10 hover:text-white transition-all flex items-center gap-2"
           >
-            🌐 Receita Federal
+            🌐 Portal Siscomex
           </a>
 
           <div className="ml-auto flex items-center gap-2 bg-black/20 px-3 h-9 rounded-xl border border-white/5">

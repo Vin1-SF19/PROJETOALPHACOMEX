@@ -1,0 +1,30 @@
+{
+  "subtaskId": "radar-portal-siscomex",
+  "critiquedAt": "2026-09-10T20:45:00Z",
+  "step5_5": {
+    "predictedBugs": [
+      "O rótulo poderia ser alterado sem trocar o href, mantendo o usuário no portal antigo.",
+      "A URL poderia perder o fragmento #/habilitacao-situacao ou o parâmetro perfil=publico durante a edição.",
+      "Outra ocorrência do endereço legado poderia continuar sendo usada pela Consulta Radar."
+    ],
+    "edgeCases": [
+      "A URL contém # e ? e precisa permanecer literal no atributo href.",
+      "O link externo deve continuar abrindo em nova aba com noopener e noreferrer.",
+      "Textos legítimos sobre Receita Federal em outros módulos não devem ser renomeados."
+    ],
+    "errorHandling": true,
+    "securityCheck": true,
+    "passed": true
+  },
+  "step6_5": {
+    "followsPatterns": true,
+    "noHardcoded": true,
+    "testsAdded": true,
+    "docsUpdated": true,
+    "noConsoleLogs": true,
+    "passed": true
+  },
+  "overallVerdict": "PASSED",
+  "skipped": false,
+  "skipWarning": null
+}
