@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   pipelineUpdate: vi.fn(),
   opcaoCreateMany: vi.fn(),
   campoPipelineCreateMany: vi.fn(),
+  campoEtapaConfigCreateMany: vi.fn(),
   acessoCreateMany: vi.fn(),
   auditoriaCreate: vi.fn(),
   mapeamentoFindMany: vi.fn(),
@@ -58,7 +59,7 @@ function clienteTx() {
     bpmCampo: { create: mocks.campoCreate, update: mocks.campoUpdate, findUniqueOrThrow: mocks.campoFindUniqueOrThrow },
     bpmCampoOpcao: { createMany: mocks.opcaoCreateMany },
     bpmCampoPipeline: { createMany: mocks.campoPipelineCreateMany },
-    bpmCampoEtapaConfig: { createMany: vi.fn() },
+    bpmCampoEtapaConfig: { createMany: mocks.campoEtapaConfigCreateMany },
     bpmCampoAcesso: { createMany: mocks.acessoCreateMany },
     bpmCampoMapeamento: {
       findMany: mocks.mapeamentoFindMany,
@@ -121,6 +122,60 @@ describe("ações de gestão configurável de campos", () => {
         expect.objectContaining({ campoId: CAMPO_DESTINO_ID, perfil: "MEMBRO", somenteLeitura: true, editavel: false }),
       ]),
     });
+  });
+
+  it("cria campo novo já vinculado somente à etapa escolhida pela configuração canônica", async () => {
+    mocks.campoFindUniqueOrThrow.mockResolvedValue({
+      id: CAMPO_DESTINO_ID,
+      pipelineId: PIPELINE_ID,
+      nome: "Número do processo",
+      tipo: "texto",
+      ativo: true,
+      opcoes: [],
+      pipelinesAssociados: [],
+      etapaConfiguracoes: [
+        { etapaId: ETAPA_ID, visivel: true, editavel: true, obrigatorio: true },
+      ],
+      acessos: [],
+      mapeamentoDestino: null,
+    });
+
+    const resultado = await CriarCampoBpm({
+      pipelineId: PIPELINE_ID,
+      nome: "Número do processo",
+      tipo: "texto",
+      etapaConfiguracoes: [
+        {
+          etapaId: ETAPA_ID,
+          visivel: true,
+          editavel: true,
+          somenteLeitura: false,
+          obrigatorio: true,
+          obrigatorioEntrada: false,
+          obrigatorioSaida: false,
+          ordem: 2,
+        },
+      ],
+    });
+
+    expect(resultado).toMatchObject({
+      success: true,
+      data: {
+        id: CAMPO_DESTINO_ID,
+        etapaConfiguracoes: [{ etapaId: ETAPA_ID, obrigatorio: true }],
+      },
+    });
+    expect(mocks.campoEtapaConfigCreateMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          campoId: CAMPO_DESTINO_ID,
+          etapaId: ETAPA_ID,
+          visivel: true,
+          obrigatorio: true,
+        }),
+      ],
+    });
+    expect(mocks.campoPipelineCreateMany).not.toHaveBeenCalled();
   });
 
   it("preserva o agregado completo em dois saves consecutivos sem reload", async () => {

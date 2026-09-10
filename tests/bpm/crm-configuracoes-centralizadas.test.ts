@@ -63,9 +63,17 @@ describe("CRM - configurações centralizadas e card editável", () => {
     expect(builder).toContain("Mover componente para outra seção");
     expect(builder).toContain("Remover componente da apresentação");
     expect(builder).toContain("Publicar composição");
-    expect(builder).toContain("Editar card do Kanban");
+    expect(builder).toContain("Preview do card");
+    expect(builder).toContain("Configuração — ${etapa.nome}");
+    expect(builder).toContain("formulario={formularioPreview}");
+    expect(builder).toContain("Prévia com alterações ainda não salvas");
+    expect(builder).toContain(
+      "xl:grid-cols-[220px_minmax(280px,0.8fr)_minmax(320px,1.2fr)]",
+    );
     expect(builder).toContain("Salvar card");
-    expect(builder).toContain("!editandoCard");
+    expect(builder).toContain("descartarAlteracoesFormulario");
+    expect(builder).toContain("Salve ou descarte as alterações antes de trocar de etapa");
+    expect(builder).not.toContain("Etapa exibida");
   });
 
   it("remove somente a simulação visual de SLA", () => {

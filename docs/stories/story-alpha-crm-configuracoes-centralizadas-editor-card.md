@@ -54,6 +54,7 @@ O pedido aprovado é simplificar essa experiência sem alterar schema ou dados: 
 - [x] Remover a simulação da tela de SLA (AC5).
 - [x] Centralizar rotas administrativas e limpar a sidebar (AC6–AC7).
 - [x] Adicionar/ajustar testes e executar quality gates (AC9).
+- [x] Restaurar o layout visual original do preview na aba Card, mantendo a edição funcional e a prévia ao vivo (AC2–AC4).
 
 ## Dev Notes
 
@@ -96,16 +97,19 @@ O pedido aprovado é simplificar essa experiência sem alterar schema ou dados: 
 - O builder canônico agora edita títulos de seções, rótulos visuais, ordem, exclusão e movimento de componentes entre seções; o save diferencial e o CAS existentes foram preservados.
 - Rótulos são validados em `configJson` e atravessam o renderer compartilhado até o preview e o card real.
 - Automações, Checklists, Base de Conhecimento e Cadências foram integrados à mesma barra de abas interna da configuração do pipeline; a navegação global superior criada na primeira implementação foi removida.
-- A aba Card do Kanban agora abre o editor diretamente, sem a coluna “Pipeline → etapa” e sem o bloco “Pré-visualização publicada” somente leitura; a etapa é escolhida em um seletor compacto dentro do próprio editor.
+- A aba Card do Kanban voltou ao layout visual de três colunas do preview original: etapas, configuração editável e card de exemplo. A prévia da direita reage ao rascunho em tempo real, enquanto a coluna central mantém criação, renomeação, exclusão e movimentação antes do salvamento.
 - SLA manteve CRUD/ativação/exclusão e perdeu apenas a simulação administrativa solicitada.
 - Testes da correção: 50/50 verdes. Suíte BPM: 909/915 verdes; as 6 falhas restantes estão em três arquivos não alterados por esta story. ESLint do escopo: verde e sem erro de typecheck nos arquivos modificados.
 - Gates globais permanecem bloqueados por baseline externo: lint (21.203 ocorrências no repositório), typecheck (rotas/Agenda/Radar/testes fora do escopo), testes (28 falhas em 14 arquivos) e build (download da fonte Google Geist).
 - CodeRabbit não executado porque o CLI não está instalado neste ambiente; revisão manual do diff concluída sem finding crítico.
 - Nenhuma migration, seed, backfill ou mutation em massa foi criada ou executada.
+- Correção visual final: o Card do Kanban preserva novamente o preview original em três colunas, mas a configuração central agora edita o rascunho e atualiza o card de exemplo ao vivo. A troca de etapa protege alterações não salvas e as ações assíncronas sempre liberam o estado de carregamento.
+- Validação da correção final: 65/65 testes focados verdes e ESLint do escopo verde. A suíte global repetiu o baseline de 2.782 testes verdes, 1 todo e 28 falhas externas em 14 arquivos; typecheck e lint globais também repetiram apenas falhas preexistentes fora do escopo.
 
 ### File List
 
 - [x] `docs/stories/story-alpha-crm-configuracoes-centralizadas-editor-card.md`
+- [x] `plan/self-critique-crm-kanban-card-preview-editor.json`
 - [x] `src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx`
 - [x] `src/app/PainelAlpha/AlphaCRM/CardModal/CardOpenFormSlot.tsx`
 - [x] `src/app/PainelAlpha/AlphaCRM/CardModal/FormularioEtapaRenderer.tsx`
@@ -136,3 +140,4 @@ O pedido aprovado é simplificar essa experiência sem alterar schema ou dados: 
 - 2026-09-10: story criada e aprovada a partir da solicitação direta do usuário.
 - 2026-09-10: implementação concluída e movida para Review, sem alterações de banco.
 - 2026-09-10: navegação corrigida para usar as abas internas existentes e Card do Kanban convertido de preview bloqueado para editor direto.
+- 2026-09-10: Card do Kanban corrigido novamente para preservar o layout original do preview, agora conectado ao editor e à prévia ao vivo.

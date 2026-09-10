@@ -80,6 +80,15 @@ describe("CRM - formulário unificado por etapa", () => {
   });
 
 
+  it("permite criar um campo customizado diretamente na seção atual", () => {
+    expect(builder).toContain("Criar novo campo");
+    expect(builder).toContain("CriarCampoBpm({");
+    expect(builder).toContain("etapaConfiguracoes: [");
+    expect(builder).toContain("etapaId: etapa.id");
+    expect(builder).toContain("Criar e adicionar");
+    expect(builder).toContain("Obrigatório nesta etapa");
+  });
+
   it("remove o bloco Tentando contato do painel esquerdo", () => {
     expect(historico).not.toContain("Tentando contato");
   });
