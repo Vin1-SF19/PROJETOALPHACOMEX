@@ -95,9 +95,10 @@ O pedido aprovado é simplificar essa experiência sem alterar schema ou dados: 
 - Removido o editor concorrente de Campos Personalizados sem excluir campos, formulários ou valores persistidos.
 - O builder canônico agora edita títulos de seções, rótulos visuais, ordem, exclusão e movimento de componentes entre seções; o save diferencial e o CAS existentes foram preservados.
 - Rótulos são validados em `configJson` e atravessam o renderer compartilhado até o preview e o card real.
-- Automações, Checklists, Base de Conhecimento e Cadências foram centralizados nas abas de Configurações; a URL antiga de Automações redireciona para a nova rota.
+- Automações, Checklists, Base de Conhecimento e Cadências foram integrados à mesma barra de abas interna da configuração do pipeline; a navegação global superior criada na primeira implementação foi removida.
+- A aba Card do Kanban agora abre o editor diretamente, sem a coluna “Pipeline → etapa” e sem o bloco “Pré-visualização publicada” somente leitura; a etapa é escolhida em um seletor compacto dentro do próprio editor.
 - SLA manteve CRUD/ativação/exclusão e perdeu apenas a simulação administrativa solicitada.
-- Testes focados: 109/109 verdes. Suíte BPM: 909/915 verdes; as 6 falhas restantes estão em três arquivos não alterados por esta story. ESLint do escopo: verde.
+- Testes da correção: 50/50 verdes. Suíte BPM: 909/915 verdes; as 6 falhas restantes estão em três arquivos não alterados por esta story. ESLint do escopo: verde e sem erro de typecheck nos arquivos modificados.
 - Gates globais permanecem bloqueados por baseline externo: lint (21.203 ocorrências no repositório), typecheck (rotas/Agenda/Radar/testes fora do escopo), testes (28 falhas em 14 arquivos) e build (download da fonte Google Geist).
 - CodeRabbit não executado porque o CLI não está instalado neste ambiente; revisão manual do diff concluída sem finding crítico.
 - Nenhuma migration, seed, backfill ou mutation em massa foi criada ou executada.
@@ -109,10 +110,10 @@ O pedido aprovado é simplificar essa experiência sem alterar schema ou dados: 
 - [x] `src/app/PainelAlpha/AlphaCRM/CardModal/CardOpenFormSlot.tsx`
 - [x] `src/app/PainelAlpha/AlphaCRM/CardModal/FormularioEtapaRenderer.tsx`
 - [x] `src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx`
-- [x] `src/app/PainelAlpha/AlphaCRM/admin/AdminConfigTabs.tsx`
+- [x] `src/app/PainelAlpha/AlphaCRM/admin/AdminConfigTabs.tsx` — removido na correção da navegação.
 - [x] `src/app/PainelAlpha/AlphaCRM/admin/AdminPipelinesListClient.tsx`
 - [x] `src/app/PainelAlpha/AlphaCRM/admin/automacoes/page.tsx`
-- [x] `src/app/PainelAlpha/AlphaCRM/admin/layout.tsx`
+- [x] `src/app/PainelAlpha/AlphaCRM/admin/layout.tsx` — removido na correção da navegação.
 - [x] `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/AdminPipelineClient.tsx`
 - [x] `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/FormularioEtapaWorkspace.tsx`
 - [x] `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/PipelineWorkspaceSections.tsx`
@@ -134,3 +135,4 @@ O pedido aprovado é simplificar essa experiência sem alterar schema ou dados: 
 
 - 2026-09-10: story criada e aprovada a partir da solicitação direta do usuário.
 - 2026-09-10: implementação concluída e movida para Review, sem alterações de banco.
+- 2026-09-10: navegação corrigida para usar as abas internas existentes e Card do Kanban convertido de preview bloqueado para editor direto.

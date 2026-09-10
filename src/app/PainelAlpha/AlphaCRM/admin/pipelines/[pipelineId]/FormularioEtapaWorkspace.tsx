@@ -107,6 +107,7 @@ export function FormularioEtapaWorkspace({
   etapas,
   campos,
   onFormularioAtualizado,
+  modo = "formulario",
   publicationBlocked = false,
   onPublished,
 }: {
@@ -117,6 +118,7 @@ export function FormularioEtapaWorkspace({
     etapaId: string,
     formulario: FormularioEtapaAdmin,
   ) => void;
+  modo?: "formulario" | "card";
   publicationBlocked?: boolean;
   onPublished?: () => void;
 }) {
@@ -144,6 +146,7 @@ export function FormularioEtapaWorkspace({
     () => listarCatalogoComponentesFormulario(etapa?.capabilitiesJson),
     [etapa?.capabilitiesJson],
   );
+  const editandoCard = modo === "card";
 
   function selecionar(id: string) {
     const proxima = etapas.find((item) => item.id === id);
@@ -280,7 +283,9 @@ export function FormularioEtapaWorkspace({
     );
     setAtivo(confirmado.ativo);
     setSujo(false);
-    toast.success("Composição do formulário publicada");
+    toast.success(
+      editandoCard ? "Card do Kanban atualizado" : "Composição do formulário publicada",
+    );
     onPublished?.();
   }
 
@@ -293,45 +298,75 @@ export function FormularioEtapaWorkspace({
 
   return (
     <section
-      className="grid gap-4 xl:grid-cols-[240px_minmax(0,1fr)]"
+      className={
+        editandoCard
+          ? "space-y-4"
+          : "grid gap-4 xl:grid-cols-[240px_minmax(0,1fr)]"
+      }
       aria-labelledby="formulario-etapa-title"
     >
-      <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-2">
-        <h3
-          id="formulario-etapa-title"
-          className="px-2 pb-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-500"
-        >
-          Pipeline → etapa
-        </h3>
-        <div className="space-y-1">
-          {etapas.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => selecionar(item.id)}
-              className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm ${item.id === etapaId ? "bg-cyan-400/10 text-cyan-100" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}
-            >
-              <span className="truncate">{item.nome}</span>
-              <span className="text-[10px]">
-                {item.formulario?.secoes.length ?? 0} seções
-              </span>
-            </button>
-          ))}
+      {!editandoCard && (
+        <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-2">
+          <h3
+            id="formulario-etapa-title"
+            className="px-2 pb-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-500"
+          >
+            Pipeline → etapa
+          </h3>
+          <div className="space-y-1">
+            {etapas.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => selecionar(item.id)}
+                className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm ${item.id === etapaId ? "bg-cyan-400/10 text-cyan-100" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}
+              >
+                <span className="truncate">{item.nome}</span>
+                <span className="text-[10px]">
+                  {item.formulario?.secoes.length ?? 0} seções
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="space-y-4 rounded-2xl border border-white/10 bg-slate-900/35 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="flex items-center gap-2 font-bold text-white">
-              <FileText size={17} /> Formulário — {etapa.nome}
+            <h3
+              id={editandoCard ? "formulario-etapa-title" : undefined}
+              className="flex items-center gap-2 font-bold text-white"
+            >
+              <FileText size={17} />{" "}
+              {editandoCard
+                ? `Editar card do Kanban — ${etapa.nome}`
+                : `Formulário — ${etapa.nome}`}
             </h3>
             <p className="mt-1 text-xs text-slate-500">
-              Composição visual. Valores, regras e permissões continuam em seus
-              domínios canônicos.
+              {editandoCard
+                ? "Edite diretamente a estrutura exibida no card desta etapa."
+                : "Composição visual. Valores, regras e permissões continuam em seus domínios canônicos."}
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {editandoCard && (
+              <label className="flex items-center gap-2 text-xs text-slate-300">
+                <span>Etapa exibida</span>
+                <select
+                  aria-label="Etapa do card"
+                  value={etapaId}
+                  onChange={(event) => selecionar(event.target.value)}
+                  className="min-h-10 rounded-lg border border-white/10 bg-slate-950 px-3 text-xs text-white"
+                >
+                  {etapas.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.nome}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <label className="flex items-center gap-2 text-xs text-slate-300">
               <input
                 type="checkbox"
@@ -354,7 +389,7 @@ export function FormularioEtapaWorkspace({
               ) : (
                 <Save size={14} />
               )}{" "}
-              Publicar composição
+              {editandoCard ? "Salvar card" : "Publicar composição"}
             </button>
           </div>
         </div>
@@ -368,7 +403,8 @@ export function FormularioEtapaWorkspace({
 
         {secoes.length === 0 ? (
           <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-slate-500">
-            Nenhuma seção. Adicione a primeira seção para compor o formulário.
+            Nenhuma seção. Adicione a primeira seção para compor{" "}
+            {editandoCard ? "o card" : "o formulário"}.
           </div>
         ) : (
           <div className="space-y-3">

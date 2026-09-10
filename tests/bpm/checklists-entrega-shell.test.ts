@@ -11,11 +11,17 @@ function ler(caminho: string): string {
 
 describe("autoajuste de entrega do Checklist Builder", () => {
   it("expõe a ação Checklists dentro da configuração existente", () => {
-    const tabs = ler("src/app/PainelAlpha/AlphaCRM/admin/AdminConfigTabs.tsx");
+    const tabs = ler(
+      "src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/AdminPipelineClient.tsx",
+    );
+    const pagina = ler(
+      "src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/page.tsx",
+    );
     const menu = ler("src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx");
 
-    expect(tabs).toContain('href: "/PainelAlpha/AlphaCRM/admin/checklists"');
-    expect(tabs).toContain('label: "Checklists"');
+    expect(tabs).toContain('<TabsTrigger value="checklists">');
+    expect(tabs).toContain('<TabsContent value="checklists">');
+    expect(pagina).toContain("<ChecklistsWorkspace");
     expect(menu).not.toContain('label: "Checklists"');
     expect(menu).toContain('label: "Configurações"');
   });

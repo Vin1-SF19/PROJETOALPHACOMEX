@@ -5,19 +5,21 @@ const ler = (arquivo: string) => readFileSync(arquivo, "utf8");
 
 describe("CRM - configurações centralizadas e card editável", () => {
   it("centraliza módulos administrativos em abas e simplifica a sidebar", () => {
-    const tabs = ler("src/app/PainelAlpha/AlphaCRM/admin/AdminConfigTabs.tsx");
+    const tabs = ler(
+      "src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/AdminPipelineClient.tsx",
+    );
     const layout = ler("src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx");
 
-    for (const [label, rota] of [
-      ["Pipelines", "/PainelAlpha/AlphaCRM/admin"],
-      ["Automações", "/PainelAlpha/AlphaCRM/admin/automacoes"],
-      ["Checklists", "/PainelAlpha/AlphaCRM/admin/checklists"],
-      ["Base de Conhecimento", "/PainelAlpha/AlphaCRM/admin/conhecimento"],
-      ["Cadências", "/PainelAlpha/AlphaCRM/admin/cadencias"],
+    for (const label of [
+      "Automações",
+      "Checklists",
+      "Base de Conhecimento",
+      "Cadências",
     ]) {
-      expect(tabs).toContain(`label: "${label}"`);
-      expect(tabs).toContain(`href: "${rota}"`);
+      expect(tabs).toContain(label);
     }
+    expect(tabs).toContain('<TabsTrigger value="checklists">');
+    expect(tabs).toContain('<TabsContent value="checklists">');
     expect(layout).toContain('label: "Configurações"');
     expect(layout).not.toContain('label: "Automações"');
     expect(layout).not.toContain('label: "Checklists"');
@@ -46,7 +48,8 @@ describe("CRM - configurações centralizadas e card editável", () => {
     expect(admin).not.toContain("Campos aplicáveis nesta etapa");
     expect(admin).not.toContain("Criar e publicar campo");
     expect(admin).toContain("<FormularioEtapaWorkspace");
-    expect(admin).toContain("Pré-visualização publicada");
+    expect(admin).not.toContain("Pré-visualização publicada");
+    expect(admin).toContain('modo="card"');
   });
 
   it("oferece edição, exclusão, ordem e movimento entre seções", () => {
@@ -60,6 +63,9 @@ describe("CRM - configurações centralizadas e card editável", () => {
     expect(builder).toContain("Mover componente para outra seção");
     expect(builder).toContain("Remover componente da apresentação");
     expect(builder).toContain("Publicar composição");
+    expect(builder).toContain("Editar card do Kanban");
+    expect(builder).toContain("Salvar card");
+    expect(builder).toContain("!editandoCard");
   });
 
   it("remove somente a simulação visual de SLA", () => {

@@ -233,14 +233,15 @@ describe("integração da aba Automações", () => {
     const fs = await import("node:fs/promises");
     const [layout, tabs, pagina, cards, vercel, rota] = await Promise.all([
       fs.readFile("src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx", "utf8"),
-      fs.readFile("src/app/PainelAlpha/AlphaCRM/admin/AdminConfigTabs.tsx", "utf8"),
-      fs.readFile("src/app/PainelAlpha/AlphaCRM/admin/automacoes/page.tsx", "utf8"),
+      fs.readFile("src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/AdminPipelineClient.tsx", "utf8"),
+      fs.readFile("src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/page.tsx", "utf8"),
       fs.readFile("src/actions/bpm/Cards.ts", "utf8"),
       fs.readFile("vercel.json", "utf8"),
       fs.readFile("src/app/api/bpm/jobs/automacoes/route.ts", "utf8"),
     ]);
     expect(layout).not.toContain('href: "/PainelAlpha/AlphaCRM/automacoes"');
-    expect(tabs).toContain("/PainelAlpha/AlphaCRM/admin/automacoes");
+    expect(tabs).toContain('<TabsTrigger value="automations">');
+    expect(tabs).toContain("{automacoesContent}");
     expect(pagina).toContain("<AutomacoesWorkspace");
     expect(cards).toContain("enfileirarAutomacoesMovimentoBpm");
     expect(vercel).toContain("/api/bpm/jobs/automacoes");

@@ -1,13 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
   Bot,
+  BookOpen,
+  CalendarClock,
   Check,
   CircleDot,
   Clock3,
+  ClipboardCheck,
   Columns3,
   FileText,
   GitBranch,
@@ -61,8 +64,6 @@ import {
   type FormularioEtapaAdmin,
 } from "./FormularioEtapaWorkspace";
 import {
-  AutomationsOverview,
-  KanbanCardPreview,
   PipelineHealthOverview,
   PipelineHistory,
   TransitionMatrix,
@@ -170,6 +171,10 @@ export default function AdminPipelineClient({
   transicoesIniciais,
   configuracoesSlaIniciais,
   servicosComerciais,
+  automacoesContent,
+  checklistsContent,
+  conhecimentoContent,
+  cadenciasContent,
   cadenciasIniciais,
   visual,
 }: {
@@ -177,6 +182,10 @@ export default function AdminPipelineClient({
   transicoesIniciais: TransicaoBpm[];
   configuracoesSlaIniciais: SlaConfiguracaoAdmin[];
   servicosComerciais: { id: number; nome: string }[];
+  automacoesContent: ReactNode;
+  checklistsContent: ReactNode;
+  conhecimentoContent: ReactNode;
+  cadenciasContent: ReactNode;
   cadenciasIniciais: CadenciaView[];
   visual: TemaAlpha;
 }) {
@@ -544,6 +553,15 @@ export default function AdminPipelineClient({
             <TabsTrigger value="automations">
               <Bot size={14} /> Automações
             </TabsTrigger>
+            <TabsTrigger value="checklists">
+              <ClipboardCheck size={14} /> Checklists
+            </TabsTrigger>
+            <TabsTrigger value="knowledge">
+              <BookOpen size={14} /> Base de Conhecimento
+            </TabsTrigger>
+            <TabsTrigger value="cadences">
+              <CalendarClock size={14} /> Cadências
+            </TabsTrigger>
             <TabsTrigger value="permissions">
               <ShieldCheck size={14} /> Permissões
             </TabsTrigger>
@@ -903,8 +921,14 @@ export default function AdminPipelineClient({
           />
         </TabsContent>
 
-        <TabsContent value="automations" className="space-y-7">
-          <AutomationsOverview automacoes={automacoes} />
+        <TabsContent value="automations">{automacoesContent}</TabsContent>
+
+        <TabsContent value="checklists">{checklistsContent}</TabsContent>
+
+        <TabsContent value="knowledge">{conhecimentoContent}</TabsContent>
+
+        <TabsContent value="cadences" className="space-y-7">
+          {cadenciasContent}
           <div className="border-t border-white/10 pt-6">
             <CadenciaEtapasSection
               pipelineId={pipeline.id}
@@ -916,26 +940,16 @@ export default function AdminPipelineClient({
           </div>
         </TabsContent>
 
-        <TabsContent value="card" className="space-y-8">
+        <TabsContent value="card">
           <FormularioEtapaWorkspace
             pipelineId={pipeline.id}
             etapas={etapas}
             campos={campos}
             onFormularioAtualizado={handleFormularioAtualizado}
+            modo="card"
             publicationBlocked={alteracoesPendentes > 0}
             onPublished={() => router.refresh()}
           />
-          <section className="space-y-3 border-t border-white/10 pt-7">
-            <div>
-              <h2 className="text-sm font-bold uppercase tracking-wide text-white">
-                Pré-visualização publicada
-              </h2>
-              <p className="mt-1 text-xs text-slate-500">
-                Confirme como a composição salva será apresentada em cada etapa.
-              </p>
-            </div>
-            <KanbanCardPreview etapas={etapas} campos={campos} />
-          </section>
         </TabsContent>
 
         <TabsContent value="history">

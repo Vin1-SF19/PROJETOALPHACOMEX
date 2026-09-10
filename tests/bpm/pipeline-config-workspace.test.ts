@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 const ler = (arquivo: string) => readFileSync(arquivo, "utf8");
 
 describe("workspace integral de configuração", () => {
-  it("expõe as seis áreas obrigatórias e estados de publicação", () => {
+  it("expõe as áreas de configuração na mesma barra interna e os estados de publicação", () => {
     const ui = ler(
       "src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/AdminPipelineClient.tsx",
     );
@@ -13,6 +13,10 @@ describe("workspace integral de configuração", () => {
       "Etapas e fluxo",
       "Campos e formulários",
       "SLA",
+      "Automações",
+      "Checklists",
+      "Base de Conhecimento",
+      "Cadências",
       "Permissões",
       "Histórico",
     ]) {
@@ -104,9 +108,8 @@ describe("workspace integral de configuração", () => {
     );
     expect(pagina).toContain("A configuração não foi carregada por completo");
     expect(pagina).toMatch(/Nenhuma coleção\s+vazia foi usada como substituta/);
-    expect(pagina).not.toContain(
-      "cadenciasResult.success ? cadenciasResult.data : []",
-    );
+    expect(pagina).toContain("<CadenciasWorkspace");
+    expect(pagina).toContain('"Erro ao carregar cadências"');
     expect(pagina).not.toContain(
       "servicosResult.success ? servicosResult.servicos",
     );
