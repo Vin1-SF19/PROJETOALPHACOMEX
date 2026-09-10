@@ -132,12 +132,13 @@ describe("Standby - Follow Up", () => {
   });
 
   it("mantém o controle somente no formulário central da etapa Standby", () => {
-    const registrar = readFileSync(resolve("src/app/PainelAlpha/AlphaCRM/CardModal/PainelRegistrar.tsx"), "utf8");
+    const slot = readFileSync(resolve("src/app/PainelAlpha/AlphaCRM/CardModal/CardOpenFormSlot.tsx"), "utf8");
     const painel = readFileSync(resolve("src/app/PainelAlpha/AlphaCRM/CardModal/PainelStandbyFollowUp.tsx"), "utf8");
     const modal = readFileSync(resolve("src/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal.tsx"), "utf8");
 
-    expect(registrar).toContain("<PainelStandbyFollowUp");
-    expect(registrar).toContain("etapaEhStandbyFollowUp(card.etapa.nome)");
+    expect(slot).toContain("<PainelStandbyFollowUp");
+    expect(slot).toContain('case "standby-follow-up"');
+    expect(slot).not.toContain("etapaEhStandbyFollowUp");
     expect(painel).toContain("InterromperStandbyFollowUpBpm");
     expect(painel).toContain("NoLoss");
     expect(modal).not.toContain("PainelStandbyFollowUp");

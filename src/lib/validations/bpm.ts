@@ -98,7 +98,6 @@ export const criarEtapaSchema = z.object({
   pipelineId: z.string().cuid(),
   nome: z.string().trim().min(1, "Nome da etapa é obrigatório").max(MAX_NOME),
   ordem: z.number().int().min(0).default(0),
-  slaDias: z.number().int().positive().optional(),
   cor: corBpmSchema,
 });
 
@@ -106,7 +105,6 @@ export const atualizarEtapaSchema = z.object({
   etapaId: z.string().cuid(),
   nome: z.string().trim().min(1).max(MAX_NOME).optional(),
   ordem: z.number().int().min(0).optional(),
-  slaDias: z.number().int().positive().nullable().optional(),
   script: z.string().trim().max(8000).nullable().optional(),
   ativo: z.boolean().optional(),
   cor: corBpmSchema,
@@ -259,11 +257,9 @@ function validarConfiguracaoCampo(
 
 export const criarCampoSchema = z.object({
   pipelineId: z.string().cuid(),
-  etapaId: z.string().cuid().optional(),
   nome: z.string().trim().min(1, "Nome do campo é obrigatório").max(MAX_NOME),
   tipo: z.enum(BPM_CAMPO_TIPO),
   opcoes: z.array(campoOpcaoSchema).max(50).optional(),
-  obrigatorio: z.boolean().default(false),
   ordem: z.number().int().min(0).default(0),
 }).merge(campoConfiguracaoBaseSchema).superRefine(validarConfiguracaoCampo);
 
@@ -272,8 +268,6 @@ export const atualizarCampoSchema = z.object({
   nome: z.string().trim().min(1).max(MAX_NOME).optional(),
   tipo: z.enum(BPM_CAMPO_TIPO).optional(),
   opcoes: z.array(campoOpcaoSchema).max(50).nullable().optional(),
-  etapaId: z.string().cuid().nullable().optional(),
-  obrigatorio: z.boolean().optional(),
   ordem: z.number().int().min(0).optional(),
   chave: z.string().trim().min(1).max(120).regex(/^[a-z0-9_.-]+$/i).nullable().optional(),
   escopo: z.enum(BPM_CAMPO_ESCOPO).optional(),

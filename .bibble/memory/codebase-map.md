@@ -1,5 +1,7 @@
 # CODEBASE MAP — Mapa Estrutural do Projeto
 
+- Consistência de publicação CRM (RM-2026-EB2898): contador em `BpmPipeline.configVersion`; migration `20260909211000_bpm_pipeline_config_version`; CAS/agregado em `src/actions/bpm/ConfiguracaoPipeline.ts`; validação/diff em `src/lib/bpm/pipeline-config-publicacao.ts`; invalidação de escritores em `src/lib/bpm/config-version.ts`; UI/estados em `admin/pipelines/[pipelineId]/{page,AdminPipelineClient,EtapaAvancadaSection,CadenciaEtapasSection,FormularioEtapaWorkspace,SlaConfigSection,VisibilidadeEtapasSection}.tsx`; provas em `tests/bpm/{configuracao-pipeline-publicacao-action,pipeline-config-publicacao,pipeline-config-workspace,pipeline-config-version-transaction}.test.ts`.
+- Formulários canônicos por etapa (RM-2026-045CC0): composição em `BpmEtapaFormulario`/`BpmFormularioSecao`/`BpmFormularioComponente`; contrato e allowlists em `src/lib/bpm/formularios-etapa.ts`; classificação/dry-run em `src/lib/bpm/formularios-etapa-migration.ts`; save diferencial em `src/actions/bpm/FormulariosEtapa.ts`; UI administrativa em `FormularioEtapaWorkspace.tsx`; CLI auditável em `scripts/bpm-stage-form-migration.mjs`; relatório em `docs/reports/crm-stage-form-migration-p0-2.md`.
 - Checklist Builder: models Prisma `BpmChecklistTemplate*`/`BpmChecklistTemplateEtapa`/`BpmCardChecklist*`; domínio em `src/lib/bpm/checklists/{schemas,leitura,service,integracao}.ts` (`leitura.ts` expõe `filtroEtapaTemplateChecklist`, fonte única de aplicabilidade de etapa, RM-2026-457A31); actions em `src/actions/bpm/Checklists.ts`; workspace em `src/components/bpm/checklists/{ChecklistsWorkspace,EtapasMultiSelect}.tsx` + `checklist-editor-state.ts` (multiselect de etapas, RM-2026-457A31); painel em `CardModal/PainelChecklistsCard.tsx`, montado em `PainelHistorico.tsx` (aba Checklist); alerta/navegação em `PainelProximaEtapa.tsx` + `PainelRegistrar.tsx`; ação automática `MATERIALIZAR_CHECKLIST` em `src/lib/bpm/automacoes/{schemas,executor}.ts`.
 - SLA BPM: cálculo, provisionamento idempotente, pausa/retomada, recálculo on-read e sincronização de movimento em `src/lib/bpm/sla.ts`; fachada autenticada em `src/actions/bpm/Sla.ts`; `Cards.ts` sincroniza a saída/entrada de etapa e o standby na mesma transação do movimento.
 - ChatBot Alpha: rota em `src/app/PainelAlpha/ChatBotAlpha/page.tsx`; client em `src/components/ChatBotAlpha/{ChatBotAlphaClient,ChatConversa,SeletorSistemaChatBot,IframeChatBotAlpha}.tsx`; actions em `src/actions/{ChatBotAlpha,ChatBotAlphaChat}.ts`; domínio em `src/lib/chatbot-alpha/{contracts,doctor,observability,chat-api}.ts`; CLI em `scripts/chatbot-alpha.mjs`; testes em `tests/chatbot-alpha/{contracts,observability,chat-api,actions}.test.ts`.
@@ -8,7 +10,7 @@
 
 > Mantido por: Scribe (cartógrafo)
 > Atualizar após TODA sessão significativa de desenvolvimento.
-> Última atualização: 2026-09-09 por Scribe (RM-2026-457A31 — referências e integrações conferidas).
+> Última atualização: 2026-09-10 (integração RM-2026-457A31 e sequência CRM P0-1→P0-4)
 
 ---
 
@@ -1370,3 +1372,16 @@ O catálogo 3D ganhou `containerCarga`, adaptação procedural do container da s
 - `scripts/verificar-migration-cadencia-multicoluna.mjs` e `scripts/verificar-cadencia-multicoluna-e2e.ts`: preflight/pós-validação e consumo ponta a ponta isolado.
 
 **Última atualização:** 2026-09-08 por Codex (RM-2026-6F3C54)
+
+## Renderer canônico do CRM — RM-2026-40526E
+
+- `src/lib/bpm/formularios-etapa.ts`: registry único de targets especializados, schema de configuração e catálogo do builder; também classifica o shell fixo do card.
+- `src/lib/bpm/formulario-renderer.ts`: resolver puro da composição publicada, ordem, visibilidade dinâmica e diagnósticos fail-closed.
+- `src/app/PainelAlpha/AlphaCRM/CardModal/FormularioEtapaRenderer.tsx`: renderer estrutural compartilhado por runtime e preview.
+- `src/actions/bpm/Cards.ts`: aggregate autenticado do card inclui formulário e resolve a árvore contra `BpmCampoEtapaConfig`.
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardOpenFormSlot.tsx`: bindings dos painéis reais por `rendererId`, sem predicados de label.
+- `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/{FormularioEtapaWorkspace,PipelineWorkspaceSections}.tsx`: catálogo derivado do registry e preview inerte.
+- `tests/bpm/formulario-renderer.test.ts`: contrato de ordem, invalidade, labels, registry e compartilhamento card/preview.
+- `docs/reports/crm-canonical-renderer-p0-3.md`: inventário, prova em produção, hardcodes restantes e gates.
+
+**Última atualização:** 2026-09-09 por Codex (RM-2026-40526E)

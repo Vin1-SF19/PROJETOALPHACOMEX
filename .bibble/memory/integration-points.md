@@ -1,5 +1,31 @@
 # INTEGRATION POINTS — Pontos de Integração
 
+## Alpha CRM — publicação versionada da configuração (RM-2026-EB2898)
+
+**Fluxo principal:** `/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]` carrega configuração + `configVersion` → `AdminPipelineClient` mantém snapshot publicado e rascunho → `PublicarConfiguracaoPipelineBpm({ baseVersion, etapas, transicoes, campos })` → Zod + autorização externa/interna → validação do conjunto completo → CAS → filhos + auditoria → commit → revalidate/realtime.
+
+**Concorrência:** todos os escritores de etapa, transição, substatus, campo, formulário, SLA, visibilidade, cadência e metadados de pipeline chamam `avancarConfigVersionBpm` na mesma transação. Uma publicação independente torna qualquer workspace anterior obsoleto; o próximo publish principal retorna conflito sem escrita.
+
+**UX:** “Descartar alterações” restaura apenas `etapasConfirmadas`, `transicoesConfirmadas` e `camposConfirmados`. Formulário, SLA, permissões, cadência, substatus e edição estrutural de campo têm publicação explícita própria; não podem publicar enquanto o rascunho principal estiver pendente. Falha em qualquer leitura relacionada impede a montagem do editor.
+
+**Ao estender:** toda nova escrita que altere configuração operacional de um pipeline deve incrementar `configVersion` dentro da mesma transação. Nunca use `updatedAt` como CAS, nunca incremente antes/fora da transação e nunca converta erro de carregamento em coleção vazia.
+
+**Última atualização:** 2026-09-09 por Codex (RM-2026-EB2898)
+
+## Alpha CRM — formulário canônico por etapa (RM-2026-045CC0)
+
+**Caminho administrativo:** sidebar CRM → **Configurações** → `/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]` → aba de campos/formulário → `FormularioEtapaWorkspace` → `SalvarFormularioEtapaBpm`.
+
+**Contrato de campo:** a UI oferece somente campo ativo cuja configuração `BpmCampoEtapaConfig` da etapa esteja visível. O backend revalida etapa/pipeline, catálogo proprietário ou compartilhamento real e a mesma configuração canônica. `BpmCampoPipeline` nunca implica presença em todas as etapas.
+
+**Contrato de composição:** a UI envia IDs persistidos e `versaoEsperada`; a action usa CAS e reconciliação diferencial, preservando IDs e targets. `CHECKLIST` exige `STAGE_CHECKLIST`; `CAPABILITY` exige registry canônico e habilitação em `BpmEtapa.capabilitiesJson`. Read → save sem mudança é no-op.
+
+**Operação:** `npm run bpm:stage-forms` produz dry-run/snapshot por padrão. Apply e rollback exigem ambiente, confirmação literal e hash/arquivo explícito. A P0-2 aplicada deixou 32 formulários, 180 campos válidos, 32 checklists, 37 capabilities e zero incompatíveis.
+
+**Ao estender:** primeiro crie/edite a configuração campo-etapa; só depois inclua o campo no formulário da etapa. Não recoloque campos no formulário usando apenas propriedade/associação de pipeline. O renderer compartilhado pertence à P0-3.
+
+**Última atualização:** 2026-09-09 por Codex (RM-2026-045CC0)
+
 ## ChatBot Alpha → backend ChatbotX externo (RM-2026-3D529D)
 
 **Entrada do usuário:** sidebar → `/PainelAlpha/ChatBotAlpha` → `page.tsx`, que exige sessão e a permissão `chatBotAlpha` (ou perfil administrativo) antes de renderizar `ChatBotAlphaClient`.
@@ -2618,3 +2644,13 @@ Composição segue `FormularioEtapaWorkspace` → `SalvarFormularioEtapaBpm` →
 Nos produtores de card, `ativarCadenciasNaEntradaBpm(..., tx)` encontra escopo de coluna por `etapas.some({ etapaId })` e escopo de entrada por `etapas.none + etapaId null`. O executor e os vínculos existentes não mudam; uma remoção afeta somente futuras entradas.
 
 **Última atualização:** 2026-09-08 por Codex (RM-2026-6F3C54)
+
+### Formulário canônico → card real e preview — RM-2026-40526E
+
+`/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]` → `ObterPipelineBpm` carrega a composição → `FormularioEtapaWorkspace` oferece campos/capabilities do registry → `SalvarFormularioEtapaBpm` valida sessão, permissão, etapa, `BpmCampoEtapaConfig`, capability, identidade e CAS → diff transacional + auditoria → aggregate confirmado.
+
+`/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → card → `ObterCardBpm` carrega formulário e campos canônicos → `resolverFormularioEtapa` → `CardFullViewModal` → `CardOpenFormSlot` → `FormularioEtapaRenderer` → painéis reais por `rendererId`.
+
+Na administração, `KanbanCardPreview` passa o mesmo formulário resolvido ao mesmo `FormularioEtapaRenderer`, com inputs desabilitados e componentes especializados apenas descritivos. Formulário ausente/inativo ou referência inválida produz fallback explícito; não há retorno para o catálogo inteiro do pipeline.
+
+**Última atualização:** 2026-09-09 por Codex (RM-2026-40526E)

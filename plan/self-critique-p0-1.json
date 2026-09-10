@@ -1,0 +1,32 @@
+{
+  "subtaskId": "P0-1-CRM-CONFIG-CANONICAL-SOURCES",
+  "critiquedAt": "2026-09-09T17:24:00Z",
+  "step5_5": {
+    "predictedBugs": [
+      "Desativar BpmRequisito antes de materializar obrigatoriedade de entrada/saída poderia remover uma trava operacional; corrigido com atualização e precondição canônica antes da desativação.",
+      "Uma relação BpmCampoPipeline do pipeline proprietário poderia ser confundida com compartilhamento real; corrigido classificando pelo pipeline proprietário e preservando somente relações cruzadas.",
+      "Ausência de aresta canônica poderia reabrir o antigo fail-open; corrigido com decisão fail-closed em runtime e UI.",
+      "A ocultação legada poderia sobrescrever configuração canônica divergente; corrigido aplicando precedência explícita da configuração canônica existente."
+    ],
+    "edgeCases": [
+      "Fonte legada sem correspondente canônico: dry-run lista e a migração cria apenas relações válidas.",
+      "Requisito global de campo com múltiplas configurações: todas as etapas já configuradas recebem obrigatoriedade, sem propagar o campo para outras etapas.",
+      "Cadência sem associações de etapa: representa entrada no pipeline e não consulta o campo singular legado.",
+      "Segunda execução da migração: produz zero novas alterações."
+    ],
+    "errorHandling": true,
+    "securityCheck": true,
+    "passed": true
+  },
+  "step6_5": {
+    "followsPatterns": true,
+    "noHardcoded": true,
+    "testsAdded": true,
+    "docsUpdated": true,
+    "noConsoleLogs": true,
+    "passed": true
+  },
+  "overallVerdict": "PASSED",
+  "skipped": false,
+  "skipWarning": null
+}

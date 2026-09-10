@@ -8,10 +8,11 @@ describe("configuração funcional do pipeline", () => {
     const admin = ler("src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/AdminPipelineClient.tsx");
     const visibilidade = ler("src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/VisibilidadeEtapasSection.tsx");
     expect(admin).toContain("etapasConfirmadas");
-    expect(admin).toContain("setEtapas(anteriores)");
+    expect(admin).toContain("setEtapas(etapasConfirmadas)");
+    expect(admin).toContain("setTransicoes(transicoesConfirmadas)");
     expect(admin).toContain("etapaConfirmadaSelecionada");
     expect(admin).toContain("onClick={descartarEtapa}");
-    expect(admin).toContain("handleSalvarEtapa");
+    expect(admin).toContain("publicarConfiguracaoVersionada");
     expect(admin).not.toContain("handleAlterarCorEtapa");
     expect(visibilidade).toContain("regrasConfirmadas");
     expect(visibilidade).toContain("[etapaId]: regrasConfirmadas[etapaId] ?? {}");

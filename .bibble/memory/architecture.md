@@ -1,5 +1,27 @@
 # ARCHITECTURE — Mapa de Arquitetura do Projeto
 
+## Publicação consistente da configuração CRM — P0-4 (RM-2026-EB2898, 2026-09-09)
+
+`BpmPipeline.configVersion` é o contador inteiro do agregado administrativo. O read model carrega a versão junto da configuração; `PublicarConfiguracaoPipelineBpm` recebe `baseVersion`, revalida autorização e snapshot, executa CAS por `updateMany(id + configVersion)`, aplica etapas/transições/ativação de campos e auditoria na mesma transação serializável e só então dispara revalidação/realtime. Falha ou CAS perdido desfaz todo o lote; `updatedAt` deixou de ser autoridade de concorrência.
+
+A central distingue o rascunho principal (etapas, fluxo e ativação de campos) de publicações independentes e explicitamente rotuladas para campo, formulário, substatus, SLA, visibilidade e cadência. Escritores desses domínios incrementam o mesmo contador dentro de suas transações, invalidando workspaces antigos. Cadência e substatus deixaram de gravar silenciosamente em `onChange`/`onBlur`. Erros de carga relacionados bloqueiam o editor em vez de serem convertidos em listas vazias.
+
+DELIVERY_READY: `Alpha CRM → Configurações → pipeline` → editar rascunho → **Publicar rascunho principal** → CAS/validação/transação/auditoria → versão incrementada. Migration aditiva aplicada no Turso com backup validado.
+
+**Última atualização:** 2026-09-09 por Codex (RM-2026-EB2898).
+
+## Formulários canônicos por etapa — P0-2 concluída (RM-2026-045CC0, 2026-09-09)
+
+`BpmCampoEtapaConfig` é a única autoridade de aplicabilidade/visibilidade de campo na etapa. `BpmEtapaFormulario` e filhos são apenas composição visual e não concedem presença por pipeline. A reconciliação de produção removeu 1.043 cópias v1 de campos pertencentes a outras etapas e 14 componentes contrários a `visivel=false`: 1.237 componentes CAMPO/1.057 incompatíveis passaram a 180/zero. Os 32 CHECKLIST e 37 CAPABILITY permaneceram intactos.
+
+`src/lib/bpm/formularios-etapa.ts` centraliza Zod, registry de capabilities e comparação semântica. `SalvarFormularioEtapaBpm` revalida auth/permissão na transação, pipeline/etapa, catálogo e configuração canônica, preserva IDs por diff, recusa troca de identidade/target e usa `versaoEsperada` como CAS. A UI envia IDs/versão, oferece somente configurações visíveis da etapa e impede o mesmo campo em seções diferentes.
+
+`npm run bpm:stage-forms` executa inventário/snapshot/dry-run por padrão; apply exige hash, ambiente e confirmação, reconsulta dentro da transação e produz rollback. O backup completo e o rollback ficam em `database-backups/pre-change/`. Fingerprints dos cards, valores, checklists, históricos e anexos foram idênticos antes/depois. Não houve alteração de schema. Renderer compartilhado, preview real, painéis hardcoded e Draft/PUBLISHED seguem para P0-3/P0-4.
+
+DELIVERY_READY: CRM → Configurações → pipeline → composição do formulário → save diferencial canônico. Operação: `npm run bpm:stage-forms -- --dry-run`.
+
+**Última atualização:** 2026-09-09 por Codex (RM-2026-045CC0).
+
 ## Checklist em várias etapas — concluído no escopo (RM-2026-457A31, 2026-09-09)
 
 **Estado: PASS — Fase 12 consolidada com isolamento dos gates conforme feedback administrativo.** Os bloqueios globais da retomada anterior foram superados para esta RM pelas evidências de Forge, Probe, Anubis, Lens e Sage fornecidas pelo pipeline; isso não constitui aprovação global do repositório.
@@ -2336,3 +2358,13 @@ Campos continuam em `BpmCampoEtapaConfig`, arestas em `BpmTransicaoEtapa` e SLA 
 Criação, edição e configuração por coluna validam etapas ativas, ownership e colisões dentro de transação serializável. A ativação consulta a relação normalizada e continua na mesma transação do card, preservando atomicidade, idempotência e snapshots de ciclos existentes.
 
 **Última atualização:** 2026-09-08 por Codex (RM-2026-6F3C54)
+
+## Renderer canônico do formulário de etapa — RM-2026-40526E
+
+`BpmEtapaFormulario` passou a ser a autoridade da composição visual do card. `BPM_FORM_COMPONENT_REGISTRY` descreve os targets persistíveis e `resolverFormularioEtapa` combina a árvore publicada com os campos válidos de `BpmCampoEtapaConfig`, sem inferência por nome de pipeline, etapa ou campo. Formulário ausente/inativo e referências inválidas são fail-closed e observáveis.
+
+`FormularioEtapaRenderer` preserva seções, ordem e blocos e é compartilhado pelo card real e pelo preview administrativo. Os bindings de runtime montam os painéis especializados existentes; os de preview são inertes. Tarefas, anexos, histórico, timeline, cadências, SLA, navegação e scripts permanecem no shell global do card.
+
+O aggregate autenticado `ObterCardBpm` inclui formulário/seções/componentes e reutiliza a consulta canônica de campos na avaliação dinâmica, sem N+1. Restrições por perfil ocultam campos sem invalidar a estrutura publicada. Nenhuma migration ou escrita de dados foi necessária.
+
+**Última atualização:** 2026-09-09 por Codex (RM-2026-40526E)

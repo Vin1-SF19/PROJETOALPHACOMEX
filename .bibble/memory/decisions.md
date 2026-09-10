@@ -1,5 +1,35 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-09-09 — RM-2026-EB2898 — contador simples no agregado, sem revisões persistidas
+
+**Decisão:** adicionar `BpmPipeline.configVersion Int @default(1)` e usar CAS por `pipelineId + baseVersion` na publicação principal. O contador, os filhos e a auditoria participam da mesma transação; efeitos externos ficam após o commit. Não criar tabela de revisão, snapshot persistido, checksum ou camada Draft/PUBLISHED.
+
+**Consequência:** duas sessões abertas na mesma versão produzem um vencedor e um conflito explícito; `updatedAt` não decide concorrência. Qualquer falha intermediária reverte filhos, auditoria e contador.
+
+### 2026-09-09 — RM-2026-EB2898 — publicações independentes precisam ser explícitas e invalidar o agregado
+
+**Decisão:** o cabeçalho publica somente o rascunho principal claramente nomeado (etapas, fluxo e ativação de campos). Editores com contratos transacionais próprios continuam como publicações delimitadas, porém usam rótulo “Publicar”, nunca autosave silencioso, e incrementam `configVersion` na mesma transação. Enquanto há rascunho principal, essas publicações ficam bloqueadas para impedir perda local em refresh.
+
+**Consequência:** o menor desenho seguro preserva actions canônicas de formulário/SLA/cadência/permissão sem construir revisão universal; toda escrita relevante invalida workspaces antigos e “Descartar” afeta apenas o estado local ainda não publicado.
+
+### 2026-09-09 — RM-2026-045CC0 — composição não concede aplicabilidade de campo
+
+**Decisão:** `BpmCampoEtapaConfig` é autoridade para presença/visibilidade de campo na etapa; o formulário apenas referencia e ordena. Componentes gerados em massa pelo contrato antigo foram removidos quando seus IDs v1 determinísticos e a configuração em outras etapas provaram a cópia indevida. Configuração ausente não foi criada sem evidência específica da etapa.
+
+**Consequência:** o pipeline continua sendo apenas catálogo/união e compartilhamento. Uma etapa não herda campos das demais e os formulários podem ficar sem `CAMPO` quando essa é a configuração canônica atual, preservando checklist/capability.
+
+### 2026-09-09 — RM-2026-045CC0 — save diferencial com identidade e CAS
+
+**Decisão:** substituir o replace-all por reconciliação diferencial. A UI envia IDs e versão; a action recusa IDs externos ou mudança de chave/tipo/target, atualiza componentes existentes, cria apenas novos, remove apenas omitidos e usa CAS de `BpmEtapaFormulario.versao`. Save semanticamente idêntico é no-op.
+
+**Consequência:** CHECKLIST/CAPABILITY não perdem referências, IDs estáveis sobrevivem à edição e duas sessões não sobrescrevem silenciosamente uma à outra. Draft/PUBLISHED permanece fora deste contrato e segue para P0-4.
+
+### 2026-09-09 — RM-2026-045CC0 — migração operacional planejada, reversível e sem schema
+
+**Decisão:** executar a reconciliação por CLI dry-run-first com snapshot lógico, fingerprint histórico, hash de plano, detecção de drift, transação e rollback condicionado à versão aplicada. Nenhuma migration Prisma foi criada.
+
+**Consequência:** a mesma transformação foi ensaiada com apply/rollback/reapply em cópia restaurada e aplicada no Turso. Os 1.057 componentes incompatíveis saíram da composição sem tocar valores/históricos de cards; reaplicação não produz mudanças.
+
 ### 2026-09-09 — RM-2026-457A31 — associação normalizada com shadow legado
 
 **Reinspeção Scribe, Fase 12:** semântica conferida no código atual. Isolamento dos gates aplicado por requisito administrativo: débitos externos e smoke remoto pendente não bloqueiam a RM sem regressão atribuível ao checklist.
@@ -1454,3 +1484,9 @@ de segurança.
 **Decisão:** criar `BpmCadenciaEtapa` com FK para cadência/etapa e unicidade global de `etapaId`. A coleção é a fonte canônica; `BpmCadencia.etapaId` guarda somente a primeira etapa como shadow compatível. Coleção vazia continua significando entrada no pipeline, nunca aplicação universal.
 
 **Consequências:** uma definição e seus passos podem ser reutilizados em várias colunas sem duplicação. As mutations fazem diff transacional, validam pipeline/atividade e recusam colisões também no banco. Remover uma coluna não altera vínculos já iniciados. A atomicidade de ativação com criação/movimento definida no RM-2026-55E27D é preservada; apenas realtime pós-commit é best-effort.
+
+### 2026-09-09 — RM-2026-40526E: composição publicada controla o card real
+
+**Decisão:** usar `BpmEtapaFormulario` como única autoridade de composição visual e um registry de targets estáveis como contrato comum de save, builder, resolver, preview e runtime. `BpmCampoEtapaConfig` continua autoridade de aplicabilidade e comportamento de campos. Labels nunca selecionam componentes; ausência ou referência inválida não recebe fallback implícito.
+
+**Consequências:** card e preview compartilham a mesma árvore estrutural, enquanto bindings distintos mantêm o preview inerte. Painéis especializados existentes são preservados por `rendererId`. Elementos invariantes do card permanecem no shell global. Restrição de acesso por perfil oculta sem corromper o diagnóstico estrutural. Draft/PUBLISHED e histórico editorial seguem para P0-4; não houve migration.

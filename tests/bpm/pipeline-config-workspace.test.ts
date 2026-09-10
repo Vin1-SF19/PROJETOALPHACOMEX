@@ -12,6 +12,37 @@ describe("workspace integral de configuração", () => {
     expect(ui).toContain("Alteração adicionada ao rascunho");
     expect(ui).toContain("Conflito — recarregue");
     expect(ui).toContain("Descartar alterações");
+    expect(ui).toContain("Publicar rascunho principal");
+    expect(ui).toContain("Rascunho principal: etapas, fluxo e ativação de campos");
+  });
+
+  it("não confunde editores independentes com publicação parcial do rascunho principal", () => {
+    const admin = ler("src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/AdminPipelineClient.tsx");
+    const cadencia = ler("src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/CadenciaEtapasSection.tsx");
+    const formulario = ler("src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/FormularioEtapaWorkspace.tsx");
+    const visibilidade = ler("src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/VisibilidadeEtapasSection.tsx");
+    expect(admin).not.toContain("if (editandoCampoId) {\n      void salvarEdicao");
+    expect(admin).toContain("Publicar campo");
+    expect(cadencia).toContain("A seleção fica pendente até a publicação explícita");
+    expect(cadencia).toContain("onClick={() => void publicar(etapa.id)}");
+    expect(formulario).toContain("Publicar composição");
+    expect(visibilidade).toContain("Publicar etapa");
+  });
+
+  it("invalida versões abertas quando outro escritor de configuração publica", () => {
+    for (const arquivo of [
+      "Cadencias",
+      "Campos",
+      "Etapas",
+      "FormulariosEtapa",
+      "Pipelines",
+      "Sla",
+      "SubStatus",
+      "Transicoes",
+      "VisibilidadeEtapas",
+    ]) {
+      expect(ler(`src/actions/bpm/${arquivo}.ts`)).toContain("avancarConfigVersionBpm");
+    }
   });
 
   it("usa simulação read-only do mesmo resolvedor do runtime", () => {
@@ -32,5 +63,13 @@ describe("workspace integral de configuração", () => {
     expect(bloco).not.toContain("valorAnteriorJson");
     expect(bloco).not.toContain("valorNovoJson");
     expect(history).not.toContain("resumirValor");
+  });
+
+  it("não converte falha de carregamento de domínios relacionados em arrays vazios", () => {
+    const pagina = ler("src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/page.tsx");
+    expect(pagina).toContain("A configuração não foi carregada por completo");
+    expect(pagina).toContain("Nenhuma coleção vazia foi usada como substituta");
+    expect(pagina).not.toContain("cadenciasResult.success ? cadenciasResult.data : []");
+    expect(pagina).not.toContain("servicosResult.success ? servicosResult.servicos");
   });
 });

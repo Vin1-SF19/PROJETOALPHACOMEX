@@ -4,6 +4,7 @@ vi.mock("server-only", () => ({}));
 
 import {
   carregarCamposAplicaveisCardEtapa,
+  carregarCamposAplicaveisEtapa,
   carregarCamposFaltantesCardEtapa,
   carregarCamposObrigatoriosEtapa,
 } from "@/lib/bpm/requisitos-etapa-server";
@@ -34,6 +35,54 @@ function configEtapa(etapaId: string, patch: Record<string, unknown> = {}) {
 }
 
 describe("campos aplicáveis por etapa", () => {
+  it("mantém campo canônico no diagnóstico estrutural mesmo quando o perfil não pode vê-lo", async () => {
+    const client = criarCliente({
+      bpmCampo: {
+        findMany: vi.fn().mockResolvedValue([{
+          id: "campo-restrito",
+          chave: "campo.restrito",
+          pipelineId: "pipeline-1",
+          etapaId: null,
+          nome: "Campo restrito",
+          tipo: "texto",
+          opcoesJson: null,
+          obrigatorio: false,
+          ordem: 1,
+          ativo: true,
+          etapaConfiguracoes: [configEtapa("etapa-2")],
+          acessos: [{
+            perfil: "MEMBRO",
+            visivel: false,
+            editavel: false,
+            somenteLeitura: false,
+            obrigatorio: false,
+          }],
+        }]),
+      },
+    });
+
+    const estruturais = await carregarCamposAplicaveisEtapa(
+      "pipeline-1",
+      "etapa-2",
+      client as never,
+      "MEMBRO",
+      { incluirRestritosAoPerfil: true },
+    );
+    const visiveis = await carregarCamposAplicaveisCardEtapa(
+      "card-1",
+      "pipeline-1",
+      "etapa-2",
+      client as never,
+      "MEMBRO",
+      estruturais,
+    );
+
+    expect(estruturais).toEqual([
+      expect.objectContaining({ id: "campo-restrito", visivel: false }),
+    ]);
+    expect(visiveis).toEqual([]);
+  });
+
   it("retorna somente campos diretos e globais explicitamente associados", async () => {
     const client = criarCliente({
       bpmCampo: {

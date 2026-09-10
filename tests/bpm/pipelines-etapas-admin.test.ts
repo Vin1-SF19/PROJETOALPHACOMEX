@@ -134,6 +134,7 @@ describe("Pipelines admin — ativar/desativar e reordenar", () => {
     mocks.exigirConfig.mockResolvedValue(undefined);
     mocks.etapaUpdate.mockResolvedValue({ id: ETAPA_A });
     mocks.etapaUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.pipelineUpdate.mockResolvedValue({ id: PIPELINE_ID, configVersion: 2 });
     mocks.etapaFindFirst.mockImplementation(async ({ where }: { where: { id: string; pipelineId: string } }) =>
       where.id === ETAPA_A && where.pipelineId === PIPELINE_ID ? { id: ETAPA_A } : null,
     );
@@ -294,6 +295,7 @@ describe("SubStatus admin — CRUD escopado por etapa", () => {
     mocks.etapaFindUnique.mockResolvedValue({ pipelineId: PIPELINE_ID });
     mocks.transaction.mockImplementation(async (callback: (tx: unknown) => unknown) =>
       callback({
+        bpmPipeline: { update: mocks.pipelineUpdate },
         bpmEtapa: { findUnique: vi.fn().mockResolvedValue({ pipelineId: PIPELINE_ID }) },
         bpmSubStatus: {
           create: vi.fn().mockResolvedValue({ id: SUBSTATUS_ID, nome: "Aguardando" }),

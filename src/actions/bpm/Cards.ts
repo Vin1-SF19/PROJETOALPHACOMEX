@@ -38,6 +38,7 @@ import { buscarServicosContratados } from "@/actions/Clientes";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import {
   carregarCamposAplicaveisCardEtapa,
+  carregarCamposAplicaveisEtapa,
   carregarSnapshotsCopiaCamposCard,
   verificarTransicaoPermitidaBpm,
   type PerfilAcessoCampoBpm,
@@ -58,7 +59,6 @@ import {
 } from "@/lib/bpm/boas-vindas";
 import {
   obterErroDataReuniaoParaMovimento,
-  etapaEhAgendarReuniao,
 } from "@/lib/bpm/agendar-reuniao";
 import { obterErroTranscricaoParaMovimento } from "@/lib/bpm/reuniao-agendada";
 import {
@@ -102,6 +102,11 @@ import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automa
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { obterErroChecklistParaMovimento } from "@/lib/bpm/checklists/integracao";
 import { selecionarEmailClienteReuniao } from "@/lib/bpm/email-reuniao";
+import { BPM_CAPABILITIES, BPM_STAGE_KEYS } from "@/lib/bpm/ontology";
+import {
+  formularioPossuiTarget,
+  resolverFormularioEtapa,
+} from "@/lib/bpm/formulario-renderer";
 import {
   criarSlaInstancia,
   obterStatusSlaCards,
@@ -146,7 +151,7 @@ async function destinoEhEtapaCanonicaNovosLeads(
 
 type ClienteConfiguracaoLost = Pick<
   typeof db,
-  "bpmCampo" | "bpmCampoObrigatorioEtapa" | "bpmCardCampoValor"
+  "bpmCampo" | "bpmCardCampoValor"
 >;
 
 type CampoLostCarregado = CampoConfiguracaoLost & { valor: string | null };
@@ -159,32 +164,44 @@ async function carregarConfiguracaoLost(params: {
   configuracao: ConfiguracaoLost;
   campos: CampoLostCarregado[];
 }> {
-  const [camposPipeline, associados] = await Promise.all([
-    client.bpmCampo.findMany({
-      where: { pipelineId: params.pipelineId },
+  const camposCanonicos = await client.bpmCampo.findMany({
+      where: {
+        ativo: true,
+        etapaConfiguracoes: { some: { etapaId: params.etapaLostId, visivel: true } },
+        OR: [
+          { pipelineId: params.pipelineId },
+          { pipelinesAssociados: { some: { pipelineId: params.pipelineId } } },
+        ],
+      },
       select: {
         id: true,
         pipelineId: true,
-        etapaId: true,
         nome: true,
         tipo: true,
         opcoesJson: true,
-        obrigatorio: true,
-        ordem: true,
+        etapaConfiguracoes: {
+          where: { etapaId: params.etapaLostId },
+          select: { etapaId: true, obrigatorio: true, ordem: true },
+          take: 1,
+        },
       },
-    }),
-    client.bpmCampoObrigatorioEtapa.findMany({
-      where: {
-        etapaId: params.etapaLostId,
-        campo: { pipelineId: params.pipelineId },
-      },
-      select: { campoId: true },
-    }),
-  ]);
+    });
+  const camposPipeline = camposCanonicos.flatMap((campo) => {
+    const config = campo.etapaConfiguracoes[0];
+    return config ? [{
+      id: campo.id,
+      pipelineId: campo.pipelineId,
+      etapaId: config.etapaId,
+      nome: campo.nome,
+      tipo: campo.tipo,
+      opcoesJson: campo.opcoesJson,
+      obrigatorio: config.obrigatorio,
+      ordem: config.ordem,
+    }] : [];
+  });
   const resultado = resolverConfiguracaoLost({
     camposPipeline,
     etapaLostId: params.etapaLostId,
-    campoIdsObrigatoriosEtapa: associados.map((item) => item.campoId),
   });
   if (!resultado.success) throw new Error("CONFIGURACAO_LOST_INVALIDA");
 
@@ -524,14 +541,32 @@ export async function ObterCardBpm(cardId: string) {
         pipeline: { select: { id: true, nome: true } },
         etapa: {
           include: {
-            // Transições permitidas a partir da etapa ATUAL — usado pela UI para mostrar só
-            // os destinos alcançáveis (PainelProximaEtapa). Vazio = qualquer destino permitido
-            // (mesmo fallback de MoverCardBpm).
-            transicoesOrigem: { select: { etapaDestinoId: true } },
+            formulario: {
+              include: {
+                secoes: {
+                  orderBy: { ordem: "asc" },
+                  include: {
+                    componentes: { orderBy: { ordem: "asc" } },
+                  },
+                },
+              },
+            },
+            transicoesEtapaOrigem: {
+              where: { permitida: true, origem: { in: ["MANUAL", "AMBOS"] } },
+              select: { etapaDestinoId: true },
+            },
           },
         },
         responsavel: { select: { id: true, nome: true } },
-        campoValores: { include: { campo: true } },
+        campoValores: {
+          include: {
+            campo: {
+              include: {
+                etapaConfiguracoes: { select: { etapaId: true } },
+              },
+            },
+          },
+        },
         membros: {
           select: {
             userId: true,
@@ -554,23 +589,6 @@ export async function ObterCardBpm(cardId: string) {
 
     if (!card) return { success: false, error: "Card não encontrado" };
 
-    const LIMITE_CONTATOS_EMAIL = 100;
-    const vinculosEmail = etapaEhAgendarReuniao(card.etapa.nome)
-      ? await db.pessoaClienteVinculo.findMany({
-          where: { clienteId: card.empresa.id, ativo: true },
-          select: {
-            ativo: true,
-            principal: true,
-            pessoa: { select: { email: true } },
-          },
-          orderBy: [{ principal: "desc" }, { criadoEm: "asc" }],
-          take: LIMITE_CONTATOS_EMAIL + 1,
-        })
-      : [];
-    const emailClienteReuniao = vinculosEmail.length <= LIMITE_CONTATOS_EMAIL
-      ? selecionarEmailClienteReuniao(vinculosEmail)
-      : null;
-
     const podeVerVinculado = async (id: string) => {
       try {
         await exigirAcessoBpmCard(id, userId, session.user.role ?? null, "visualizar");
@@ -587,14 +605,22 @@ export async function ObterCardBpm(cardId: string) {
     card.vinculosOrigem = card.vinculosOrigem.filter(() => visibilidadeVinculos[indiceVinculo++]);
     card.vinculosDestino = card.vinculosDestino.filter(() => visibilidadeVinculos[indiceVinculo++]);
 
+    const camposConfiguradosEtapa = await carregarCamposAplicaveisEtapa(
+      card.pipelineId,
+      card.etapaId,
+      db,
+      resolverPerfilAcessoCampo(acessoCard),
+      { incluirRestritosAoPerfil: true },
+    );
     let camposEtapa = await carregarCamposAplicaveisCardEtapa(
       card.id,
       card.pipelineId,
       card.etapaId,
       db,
       resolverPerfilAcessoCampo(acessoCard),
+      camposConfiguradosEtapa,
     );
-    if (etapaEhLost(card.etapa.nome)) {
+    if (card.etapa.chave === BPM_STAGE_KEYS.LOST) {
       const contextoLost = await carregarConfiguracaoLost({
         pipelineId: card.pipelineId,
         etapaLostId: card.etapaId,
@@ -602,6 +628,39 @@ export async function ObterCardBpm(cardId: string) {
       });
       camposEtapa = mesclarCamposPorId(camposEtapa, contextoLost.campos);
     }
+
+    const formularioEtapa = resolverFormularioEtapa({
+      formulario: card.etapa.formulario,
+      camposCanonicos: camposConfiguradosEtapa,
+      campoIdsVisiveis: camposEtapa.map((campo) => campo.id),
+    });
+    if (formularioEtapa.diagnosticos.length) {
+      console.warn("[ObterCardBpm] formulário canônico com diagnóstico", {
+        cardId: card.id,
+        etapaId: card.etapaId,
+        diagnosticos: formularioEtapa.diagnosticos.map((item) => item.code),
+      });
+    }
+
+    const LIMITE_CONTATOS_EMAIL = 100;
+    const vinculosEmail = formularioPossuiTarget(
+      formularioEtapa,
+      BPM_CAPABILITIES.MEETING_SCHEDULER,
+    )
+      ? await db.pessoaClienteVinculo.findMany({
+          where: { clienteId: card.empresa.id, ativo: true },
+          select: {
+            ativo: true,
+            principal: true,
+            pessoa: { select: { email: true } },
+          },
+          orderBy: [{ principal: "desc" }, { criadoEm: "asc" }],
+          take: LIMITE_CONTATOS_EMAIL + 1,
+        })
+      : [];
+    const emailClienteReuniao = vinculosEmail.length <= LIMITE_CONTATOS_EMAIL
+      ? selecionarEmailClienteReuniao(vinculosEmail)
+      : null;
 
     // Indicador "nunca acessado" — primeiro acesso por QUALQUER usuário apaga a marcação.
     if (!card.primeiraVisualizacaoEm) {
@@ -633,6 +692,7 @@ export async function ObterCardBpm(cardId: string) {
         emailClienteReuniao,
         anexos: card.anexos.map((anexo) => ({ ...anexo, url: `/api/bpm/anexos/${anexo.id}` })),
         camposEtapa,
+        formularioEtapa,
         permissaoEtapa: {
           podeVer: true,
           podeAgir: acessoCard.podeAgirEtapa,
@@ -1220,7 +1280,7 @@ type DadosMovimentoComRequisitos = {
 
 type ClienteContextoMovimento = Pick<
   typeof db,
-  "bpmCard" | "bpmEtapa" | "bpmEtapaTransicaoPermitida"
+  "bpmCard" | "bpmEtapa" | "bpmTransicaoEtapa"
 >;
 
 async function carregarContextoMovimento(
@@ -1250,14 +1310,16 @@ async function carregarContextoMovimento(
     return { error: "Etapa não pertence ao pipeline do card" } as const;
   }
 
-  const transicoes = await client.bpmEtapaTransicaoPermitida.findMany({
-    where: { etapaOrigemId: card.etapaId },
-    select: { etapaDestinoId: true },
+  const transicao = await client.bpmTransicaoEtapa.findUnique({
+    where: {
+      etapaOrigemId_etapaDestinoId: {
+        etapaOrigemId: card.etapaId,
+        etapaDestinoId,
+      },
+    },
+    select: { permitida: true, origem: true },
   });
-  if (
-    transicoes.length > 0
-    && !transicoes.some((transicao) => transicao.etapaDestinoId === etapaDestinoId)
-  ) {
+  if (!transicao?.permitida || !["MANUAL", "AMBOS"].includes(transicao.origem)) {
     return {
       error: `Não é possível mover diretamente desta etapa para "${etapaDestino.nome}" — verifique as etapas permitidas.`,
     } as const;

@@ -123,7 +123,7 @@ export function SlaConfigForm({ pipelineId, etapas, servicos, inicial, isSaving,
         <span className="flex items-center gap-1 rounded-full bg-rose-500/15 px-2.5 py-1 text-xs font-semibold text-rose-300"><XCircle size={13} />Vencido</span>
       </div>
       {(erro || errors.inicioMomento?.message || errors.vermelhoValor?.message) && <p className="text-xs text-rose-300" role="alert">{erro ?? errors.inicioMomento?.message ?? errors.vermelhoValor?.message}</p>}
-      <div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button><Button type="submit" disabled={isSaving}>{isSaving && <Loader2 className="animate-spin" aria-hidden="true" />}{isSaving ? "Salvando..." : "Salvar SLA"}</Button></div>
+      <div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button><Button type="submit" disabled={isSaving}>{isSaving && <Loader2 className="animate-spin" aria-hidden="true" />}{isSaving ? "Publicando..." : "Publicar SLA"}</Button></div>
     </form>
   );
 }

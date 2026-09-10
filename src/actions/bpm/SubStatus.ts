@@ -11,6 +11,7 @@ import {
 import { exigirAcessoConfigPipeline } from "@/lib/bpm/ownership";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import { registrarAuditoriaPipeline } from "@/actions/bpm/Etapas";
+import { avancarConfigVersionBpm } from "@/lib/bpm/config-version";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -45,6 +46,7 @@ export async function CriarSubStatusBpm(dados: unknown) {
         campoAlterado: "substatus_criado",
         valorNovoJson: JSON.stringify({ etapaId, nome, cor, ordem }),
       });
+      await avancarConfigVersionBpm(tx, etapa.pipelineId);
       return { subStatus: criado, pipelineId: etapa.pipelineId };
     });
 
@@ -87,6 +89,7 @@ export async function AtualizarSubStatusBpm(dados: unknown) {
         valorAnteriorJson: JSON.stringify(anterior),
         valorNovoJson: JSON.stringify(campos),
       });
+      await avancarConfigVersionBpm(tx, anterior.etapa.pipelineId);
       return { subStatus: atualizado, pipelineId: anterior.etapa.pipelineId };
     });
 
@@ -142,6 +145,7 @@ export async function ReordenarSubStatusBpm(dados: unknown) {
         campoAlterado: "substatus_reordenados",
         valorNovoJson: JSON.stringify({ etapaId, ordem }),
       });
+      await avancarConfigVersionBpm(tx, etapa.pipelineId);
       return etapa.pipelineId;
     });
 

@@ -8,16 +8,12 @@ import { CampoBpmInput } from "../CampoBpmInput";
 import { MOTIVO_LOST_OUTRO_OBRIGATORIO_MENSAGEM } from "@/lib/bpm/lost";
 import {
   montarPayloadCamposDestino,
-  prepararCamposMotivoLostUi,
+  prepararCamposMotivoLostUiCanonico,
   resolverSnapshotCamposRealtime,
   type SnapshotCamposRealtime,
 } from "@/lib/bpm/card-modal-ui";
-import {
-  campoEhResumoAlinhamento,
-  etapaEhAlinhamentoEstrategico,
-  TEMPLATE_RESUMO_ALINHAMENTO,
-} from "@/lib/bpm/alinhamento-estrategico";
-import { campoFinanceiroSomenteLeitura } from "@/lib/bpm/pipeline-financeiro";
+import { TEMPLATE_RESUMO_ALINHAMENTO } from "@/lib/bpm/alinhamento-estrategico";
+import { BPM_FIELD_KEYS, BPM_STAGE_KEYS } from "@/lib/bpm/ontology";
 import { useCardSave } from "./CardSaveContext";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
@@ -25,6 +21,9 @@ type CamposEtapaCard = CardDetalhe["camposEtapa"];
 
 interface Props {
   card: CardDetalhe;
+  campoIds: string[];
+  instanceKey: string;
+  titulo?: string;
   accent: string;
   podeEditar: boolean;
   realtimeRevision: number;
@@ -35,23 +34,31 @@ interface Props {
  * "Formulário da Etapa", jamais no modal de criação ou no painel direito. */
 export function PainelCamposEtapaAtual({
   card,
+  campoIds,
+  instanceKey,
+  titulo = "Campos da etapa atual",
   accent,
   podeEditar,
   realtimeRevision,
   onAtualizado,
 }: Props) {
+  const idInstancia = `${card.id}-${instanceKey}`;
+  const ordemCampos = new Map(campoIds.map((id, indice) => [id, indice]));
+  const camposDoComponente = card.camposEtapa
+    .filter((campo) => ordemCampos.has(campo.id))
+    .sort((a, b) => (ordemCampos.get(a.id) ?? 0) - (ordemCampos.get(b.id) ?? 0));
   const [revisaoInicial] = useState(realtimeRevision);
   const [valoresCamposAtuais, setValoresCamposAtuais] = useState<Record<string, string>>(() =>
-    Object.fromEntries(card.camposEtapa.map((campo) => [campo.id, campo.valor ?? ""])),
+    Object.fromEntries(camposDoComponente.map((campo) => [campo.id, campo.valor ?? ""])),
   );
   const [baseCamposAtuais, setBaseCamposAtuais] = useState<Record<string, string>>(() =>
-    Object.fromEntries(card.camposEtapa.map((campo) => [campo.id, campo.valor ?? ""])),
+    Object.fromEntries(camposDoComponente.map((campo) => [campo.id, campo.valor ?? ""])),
   );
-  const [camposEtapaBase, setCamposEtapaBase] = useState(card.camposEtapa);
+  const [camposEtapaBase, setCamposEtapaBase] = useState(camposDoComponente);
   const [versaoBaseCampos, setVersaoBaseCampos] = useState(() => new Date(card.updatedAt).toISOString());
   const versaoBaseCamposRef = useRef(versaoBaseCampos);
   const snapshotAtivoRef = useRef<SnapshotCamposRealtime>({
-    valores: Object.fromEntries(card.camposEtapa.map((campo) => [campo.id, campo.valor ?? ""])),
+    valores: Object.fromEntries(camposDoComponente.map((campo) => [campo.id, campo.valor ?? ""])),
     versao: new Date(card.updatedAt).toISOString(),
   });
   const [snapshotRemotoPendente, setSnapshotRemotoPendente] = useState<SnapshotCamposRealtime | null>(null);
@@ -61,30 +68,25 @@ export function PainelCamposEtapaAtual({
   const [salvandoCamposAtuais, setSalvandoCamposAtuais] = useState(false);
   const { registerSave } = useCardSave();
 
-  const configuracaoLostUi = prepararCamposMotivoLostUi(
-    card.etapa.nome,
+  const configuracaoLostUi = prepararCamposMotivoLostUiCanonico(
+    card.etapa.chave,
     camposEtapaBase,
     valoresCamposAtuais,
   );
   const camposAtuaisVisiveis = configuracaoLostUi.camposVisiveis;
-  const camposPorGrupo = camposAtuaisVisiveis.reduce<Record<string, CamposEtapaCard>>((grupos, campo) => {
-    const grupo = campo.grupo?.trim() || "Informações gerais";
-    (grupos[grupo] ??= []).push(campo);
-    return grupos;
-  }, {});
   const complementoLostPendente = Boolean(
     configuracaoLostUi.exigeComplemento
     && configuracaoLostUi.campoComplementoId
     && !valoresCamposAtuais[configuracaoLostUi.campoComplementoId]?.trim(),
   );
-  const resumoAlinhamento = camposEtapaBase.find((campo) => campoEhResumoAlinhamento(campo.nome));
-  const alertaAlinhamento = etapaEhAlinhamentoEstrategico(card.etapa.nome)
+  const resumoAlinhamento = camposEtapaBase.find((campo) => campo.chave === BPM_FIELD_KEYS.MEETING_SUMMARY);
+  const alertaAlinhamento = card.etapa.chave === BPM_STAGE_KEYS.ALINHAMENTO_ESTRATEGICO
     && Boolean(resumoAlinhamento)
     && !(valoresCamposAtuais[resumoAlinhamento?.id ?? ""] ?? "").trim();
   const camposAtuaisAlterados = camposAtuaisVisiveis.some(
     (campo) => (valoresCamposAtuais[campo.id] ?? "") !== (baseCamposAtuais[campo.id] ?? ""),
   );
-  const snapshotCamposEtapa = JSON.stringify(card.camposEtapa);
+  const snapshotCamposEtapa = JSON.stringify(camposDoComponente);
   const versaoRemotaCampos = new Date(card.updatedAt).toISOString();
 
   useEffect(() => {
@@ -181,10 +183,10 @@ export function PainelCamposEtapaAtual({
 
   return (
     <section
-      id={`campos-etapa-atual-${card.id}`}
+      id={`campos-etapa-atual-${idInstancia}`}
       tabIndex={-1}
       className="space-y-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 outline-none focus-visible:ring-2 focus-visible:ring-white/30"
-      aria-labelledby={`campos-etapa-atual-titulo-${card.id}`}
+      aria-labelledby={`campos-etapa-atual-titulo-${idInstancia}`}
     >
       {realtimeRevision !== revisaoInicial && (
         <div className="rounded-xl border border-sky-500/25 bg-sky-500/[0.07] p-3 text-xs text-sky-200">
@@ -196,7 +198,7 @@ export function PainelCamposEtapaAtual({
           <SlidersHorizontal size={13} style={{ color: `rgb(${accent})` }} />
         </div>
         <div>
-          <h3 id={`campos-etapa-atual-titulo-${card.id}`} className="text-xs font-bold uppercase tracking-wide text-white">Campos da etapa atual</h3>
+          <h3 id={`campos-etapa-atual-titulo-${idInstancia}`} className="text-xs font-bold uppercase tracking-wide text-white">{titulo}</h3>
           <p className="mt-0.5 text-[11px] text-slate-500">{card.etapa.nome} · campos obrigatórios e opcionais.</p>
         </div>
       </div>
@@ -220,13 +222,10 @@ export function PainelCamposEtapaAtual({
               </button>
             </div>
           )}
-          {Object.entries(camposPorGrupo).map(([grupo, camposGrupo]) => (
-            <fieldset key={grupo} className="space-y-3 rounded-xl border border-white/[0.06] p-3">
-              <legend className="px-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">{grupo}</legend>
-              {camposGrupo.map((campo) => {
+          <fieldset className="space-y-3 rounded-xl border border-white/[0.06] p-3">
+              {camposAtuaisVisiveis.map((campo) => {
             const complementoPendente = campo.id === configuracaoLostUi.campoComplementoId && complementoLostPendente;
-            const somenteLeitura = campoFinanceiroSomenteLeitura(campo.nome)
-              || campo.somenteLeitura
+            const somenteLeitura = campo.somenteLeitura
               || (campo.escopo === "GLOBAL" && Boolean(campo.fonteEntidade))
               || campo.editavel === false;
             const descricaoId = complementoPendente ? `campo-bpm-${campo.id}-erro` : undefined;
@@ -235,7 +234,7 @@ export function PainelCamposEtapaAtual({
                 <label htmlFor={`campo-bpm-${campo.id}`} className="text-[11px] font-medium text-slate-400">
                   {campo.nome}{campo.obrigatorio ? " *" : ""}{campo.obrigatorioEntrada ? " · exigido na entrada" : ""}{campo.obrigatorioSaida ? " · exigido na saída" : ""}{somenteLeitura ? " · automático" : ""}
                 </label>
-                {campoEhResumoAlinhamento(campo.nome) && (
+                {campo.chave === BPM_FIELD_KEYS.MEETING_SUMMARY && (
                   <button
                     type="button"
                     disabled={!podeEditar || Boolean(valoresCamposAtuais[campo.id]?.trim())}
@@ -272,7 +271,6 @@ export function PainelCamposEtapaAtual({
             );
               })}
             </fieldset>
-          ))}
           {salvandoCamposAtuais && <p className="flex items-center gap-2 text-[11px] text-slate-500"><Loader2 size={13} className="animate-spin" /> Salvando alterações...</p>}
           {!podeEditar && <p className="text-[11px] text-slate-500">Somente o responsável ou um administrador pode editar estes campos.</p>}
         </div>

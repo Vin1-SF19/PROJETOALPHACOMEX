@@ -72,7 +72,6 @@ interface EtapaBpm {
   id: string;
   nome: string;
   ordem: number;
-  slaDias: number | null;
   automacoes?: AutomacaoBoard[];
 }
 
@@ -512,9 +511,6 @@ function KanbanColumn({
           </button>
         )}
       </div>
-      {etapa.slaDias && (
-        <p className="text-[10px] text-slate-500 mb-2 px-1">SLA: {etapa.slaDias}d</p>
-      )}
       {(etapa.automacoes?.length ?? 0) > 0 && (
         <details className="group mb-2 rounded-lg border border-cyan-400/10 bg-cyan-400/[0.035] px-2 py-1.5">
           <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[10px] font-semibold text-cyan-300">

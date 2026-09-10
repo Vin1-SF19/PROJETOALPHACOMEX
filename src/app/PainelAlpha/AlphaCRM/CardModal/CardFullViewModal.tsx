@@ -24,12 +24,14 @@ import {
 
 
 import { toast } from "sonner";
-import { followUpBloqueiaFechamento, type EstadoFollowUpModal } from "@/lib/bpm/card-modal-ui";
-import { resolveCardAbertoLayout } from "./pipelines";
+import { type EstadoFollowUpModal } from "@/lib/bpm/card-modal-ui";
+import { formularioPossuiTarget } from "@/lib/bpm/formulario-renderer";
+import { BPM_CAPABILITIES } from "@/lib/bpm/ontology";
+import { CardAbertoLayout } from "./CardAbertoLayout";
 import { CardSaveProvider, useCardSave } from "./CardSaveContext";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
-type EtapaOpcao = { id: string; nome: string; ordem: number; script: string | null };
+type EtapaOpcao = { id: string; chave?: string | null; nome: string; ordem: number; script: string | null };
 type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
 
 function resultadoRevogaAcessoCard(resultado: Awaited<ReturnType<typeof ObterCardBpm>>) {
@@ -158,19 +160,16 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
     || meuVinculo?.role === "ADMINISTRADOR";
   const etapaAtual = card ? etapas.find((e) => e.id === card.etapa.id) ?? null : null;
 
-  // Máquina de estado (BpmEtapaTransicaoPermitida, ver plano-novos-leads-bpm.md): se a etapa
-  // atual tem QUALQUER transição cadastrada, só os destinos permitidos + a própria etapa atual
-  // (referência visual) aparecem. Sem nenhuma transição cadastrada, mostra todas — mesmo
-  // fallback já aplicado em MoverCardBpm, para não quebrar pipelines sem essa restrição.
-  const transicoesDaEtapaAtual = card?.etapa.transicoesOrigem ?? [];
-  const etapasParaMover =
-    transicoesDaEtapaAtual.length > 0
-      ? etapas.filter(
-          (e) => e.id === card?.etapa.id || transicoesDaEtapaAtual.some((t) => t.etapaDestinoId === e.id),
-        )
-      : etapas;
+  const transicoesDaEtapaAtual = card?.etapa.transicoesEtapaOrigem ?? [];
+  const etapasParaMover = etapas.filter(
+    (e) => e.id === card?.etapa.id || transicoesDaEtapaAtual.some((t) => t.etapaDestinoId === e.id),
+  );
   const estadoFollowUpAtual = card ? estadoFollowUpPorCard[card.id] ?? "CARREGANDO" : "CARREGANDO";
-  const deveBloquearFechamento = followUpBloqueiaFechamento(card?.etapa.nome, estadoFollowUpAtual);
+  const deveBloquearFechamento = Boolean(
+    card &&
+    formularioPossuiTarget(card.formularioEtapa, BPM_CAPABILITIES.FOLLOW_UP_CHECKLIST) &&
+    ["CARREGANDO", "ERRO", "EM_ANDAMENTO"].includes(estadoFollowUpAtual),
+  );
 
   async function solicitarFechamento() {
     if (deveBloquearFechamento && card) {
@@ -217,26 +216,20 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
             <div className="p-8 text-sm text-rose-300">{erro || "Card não encontrado"}</div>
           </>
         ) : (
-          (() => {
-            const Layout = resolveCardAbertoLayout(card.pipeline.nome);
-            return (
-              <Layout
+              <CardAbertoLayout
                 card={card} etapas={etapas} interacoes={interacoes}
                 accent={accent} currentUserId={currentUserId} currentUserRole={currentUserRole}
                 realtimeRevision={realtimeRevision} onClose={onClose}
                 onAtualizado={handleAtualizado}
                 onAbrirCard={onAbrirCard}
                 onInteracaoCriada={(nova) => setInteracoes((prev) => [nova, ...prev])}
-                onEstadoFollowUpChange={atualizarEstadoFollowUp}
-                estadoFollowUpAtual={estadoFollowUpAtual}
               >
                 <PainelRegistrar card={card} etapaAtual={etapaAtual} accent={accent}
                   podeEditar={podeEditar} realtimeRevision={realtimeRevision}
-                  onAtualizado={handleAtualizado}
-                  />
-              </Layout>
-            );
-          })()
+                   onAtualizado={handleAtualizado}
+                   onEstadoFollowUpChange={atualizarEstadoFollowUp}
+                   />
+              </CardAbertoLayout>
         )}
       </SheetContent>
     </Sheet>

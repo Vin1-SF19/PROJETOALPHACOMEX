@@ -49,8 +49,7 @@ export function CadenciaFormDialog({ cadencia, pipelines, onClose, onSaved, onCr
       nome: cadencia?.nome ?? "",
       descricao: cadencia?.descricao ?? "",
       pipelineId: cadencia?.pipelineId ?? "",
-      etapaIds: cadencia?.etapas?.map((item) => item.etapaId)
-        ?? (cadencia?.etapaId ? [cadencia.etapaId] : []),
+      etapaIds: cadencia?.etapas?.map((item) => item.etapaId) ?? [],
     },
   });
   const pipelineId = useWatch({ control, name: "pipelineId" });

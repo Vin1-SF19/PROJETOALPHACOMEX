@@ -22,12 +22,6 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
-import {
-  CriarEtapaBpm,
-  AtualizarEtapaBpm,
-  ReordenarEtapasBpm,
-  AtivarDesativarEtapaBpm,
-} from "@/actions/bpm/Etapas";
 import { CriarCampoBpm, AtualizarCampoBpm } from "@/actions/bpm/Campos";
 import { PublicarConfiguracaoPipelineBpm } from "@/actions/bpm/ConfiguracaoPipeline";
 import type { TemaAlpha } from "@/lib/temas";
@@ -83,13 +77,14 @@ import {
 
 interface EtapaBpm {
   id: string;
+  chave?: string | null;
   nome: string;
   ordem: number;
-  slaDias: number | null;
   cor: string | null;
   ativo: boolean;
   ehInicial: boolean;
   ehFinal: boolean;
+  capabilitiesJson?: string | null;
   subStatus: SubStatusBpm[];
   formulario?: FormularioEtapaAdmin | null;
   automacoes?: AutomacaoWorkspace[];
@@ -179,6 +174,7 @@ interface PipelineBpm {
   id: string;
   nome: string;
   ativo?: boolean;
+  configVersion: number;
   updatedAt: string | Date;
   etapas: EtapaBpm[];
   campos: CampoBpm[];
@@ -292,9 +288,9 @@ export default function AdminPipelineClient({
   const [campos, setCampos] = useState(pipeline.campos);
   const [camposConfirmados, setCamposConfirmados] = useState(pipeline.campos);
   const [transicoes, setTransicoes] = useState(transicoesIniciais);
-  const [versao, setVersao] = useState(() =>
-    new Date(pipeline.updatedAt).toISOString(),
-  );
+  const [transicoesConfirmadas, setTransicoesConfirmadas] =
+    useState(transicoesIniciais);
+  const [baseVersion, setBaseVersion] = useState(pipeline.configVersion);
   const [conflitoPublicacao, setConflitoPublicacao] = useState(false);
   const [novaEtapaNome, setNovaEtapaNome] = useState("");
   const [novoCampoNome, setNovoCampoNome] = useState("");
@@ -389,12 +385,24 @@ export default function AdminPipelineClient({
   }, [camposFiltrados, etapas]);
   const etapaConfirmadaSelecionada =
     etapasConfirmadas.find((etapa) => etapa.id === etapaSelecionadaId) ?? null;
+  const etapasComRascunho = etapas.filter((etapa) => {
+    const confirmada = etapasConfirmadas.find((item) => item.id === etapa.id);
+    return !confirmada || Boolean(
+      etapa.nome !== confirmada.nome ||
+      etapa.cor !== confirmada.cor ||
+      etapa.ordem !== confirmada.ordem ||
+      etapa.ativo !== confirmada.ativo ||
+      etapa.ehInicial !== confirmada.ehInicial ||
+      etapa.ehFinal !== confirmada.ehFinal,
+    );
+  });
   const etapaComRascunho = Boolean(
-    etapaSelecionada &&
-    etapaConfirmadaSelecionada &&
-    (etapaSelecionada.nome !== etapaConfirmadaSelecionada.nome ||
-      etapaSelecionada.cor !== etapaConfirmadaSelecionada.cor),
+    etapaSelecionada && etapasComRascunho.some((item) => item.id === etapaSelecionada.id),
   );
+  const transicoesComRascunho = transicoes.filter((transicao) => {
+    const confirmada = transicoesConfirmadas.find((item) => item.id === transicao.id);
+    return !confirmada || confirmada.permitida !== transicao.permitida || confirmada.origem !== transicao.origem;
+  });
   const camposComAtivacaoPendente = campos.filter((campo) => {
     const confirmado = camposConfirmados.find((item) => item.id === campo.id);
     return Boolean(
@@ -402,8 +410,8 @@ export default function AdminPipelineClient({
     );
   });
   const alteracoesPendentes =
-    Number(etapaComRascunho) +
-    Number(Boolean(editandoCampoId)) +
+    etapasComRascunho.length +
+    transicoesComRascunho.length +
     camposComAtivacaoPendente.length;
   const selecoesAtivasSemCatalogo = campos.filter((campo) => {
     if (campo.ativo === false || !TIPOS_COM_OPICOES.has(campo.tipo))
@@ -447,23 +455,25 @@ export default function AdminPipelineClient({
   }
 
   function descartarAlteracoes() {
-    descartarEtapa();
-    cancelarEdicao();
+    setEtapas(etapasConfirmadas);
+    setTransicoes(transicoesConfirmadas);
     setCampos(camposConfirmados);
     setConflitoPublicacao(false);
     setErro(null);
   }
 
   async function publicarConfiguracaoVersionada() {
-    if (operacao || camposComAtivacaoPendente.length === 0) return;
+    if (operacao || alteracoesPendentes === 0) return;
     setOperacao("publicar-configuracao");
     setConflitoPublicacao(false);
     setErro(null);
     const resultado = await PublicarConfiguracaoPipelineBpm({
       pipelineId: pipeline.id,
-      versaoEsperada: versao,
-      etapas: etapas.map(({ id, ordem, ativo, ehInicial, ehFinal }) => ({
+      baseVersion,
+      etapas: etapas.map(({ id, nome, cor, ordem, ativo, ehInicial, ehFinal }) => ({
         id,
+        nome,
+        cor,
         ordem,
         ativo,
         ehInicial,
@@ -482,8 +492,10 @@ export default function AdminPipelineClient({
     });
     setOperacao(null);
     if (resultado.success) {
-      setVersao(resultado.data.versao);
+      setBaseVersion(resultado.data.configVersion);
       setCamposConfirmados(campos);
+      setEtapasConfirmadas(etapas);
+      setTransicoesConfirmadas(transicoes);
       toast.success("Configuração publicada, versionada e auditada");
       router.refresh();
       return;
@@ -500,80 +512,45 @@ export default function AdminPipelineClient({
   }
 
   function publicarAlteracoes() {
-    if (editandoCampoId) {
-      void salvarEdicao(editandoCampoId);
-      return;
-    }
-    if (etapaComRascunho) {
-      void handleSalvarEtapa();
-      return;
-    }
     void publicarConfiguracaoVersionada();
   }
 
-  async function handleCriarEtapa() {
+  function handleCriarEtapa() {
     if (!novaEtapaNome.trim() || operacao) return;
-    setOperacao("criar-etapa");
     setErro(null);
-    try {
-      const res = await CriarEtapaBpm({
-        pipelineId: pipeline.id,
-        nome: novaEtapaNome,
-        ordem: etapas.length,
-      });
-      if (res.success && res.data) {
-        const nova = { ...res.data, subStatus: [] };
-        setEtapas((prev) => [...prev, nova]);
-        setEtapasConfirmadas((prev) => [...prev, nova]);
-        setNovaEtapaNome("");
-        toast.success("Etapa criada com transições bloqueadas por padrão");
-        router.refresh();
-      } else {
-        setErro(
-          typeof res.error === "string" ? res.error : "Erro ao criar etapa",
-        );
-      }
-    } finally {
-      setOperacao(null);
-    }
-  }
-
-  async function handleSalvarEtapa() {
-    const rascunho = etapaSelecionada;
-    const anterior = etapaConfirmadaSelecionada;
-    if (
-      !rascunho ||
-      !anterior ||
-      !rascunho.nome.trim() ||
-      operacao ||
-      !etapaComRascunho
-    )
-      return;
-    setOperacao(`etapa:${rascunho.id}`);
-    setErro(null);
-    const res = await AtualizarEtapaBpm({
-      etapaId: rascunho.id,
-      nome: rascunho.nome.trim(),
-      cor: rascunho.cor,
-    });
-    if (res.success && res.data) {
-      const confirmada = { ...anterior, ...res.data };
-      setEtapas((prev) =>
-        prev.map((etapa) => (etapa.id === rascunho.id ? confirmada : etapa)),
-      );
-      setEtapasConfirmadas((prev) =>
-        prev.map((etapa) => (etapa.id === rascunho.id ? confirmada : etapa)),
-      );
-      toast.success("Alterações da etapa publicadas");
-    } else {
-      setEtapas((prev) =>
-        prev.map((etapa) => (etapa.id === rascunho.id ? anterior : etapa)),
-      );
-      setErro(
-        typeof res.error === "string" ? res.error : "Erro ao publicar etapa",
-      );
-    }
-    setOperacao(null);
+    const id = `draft-stage-${crypto.randomUUID()}`;
+    const nova: EtapaBpm = {
+      id,
+      nome: novaEtapaNome.trim(),
+      ordem: etapas.length,
+      cor: null,
+      ativo: true,
+      ehInicial: false,
+      ehFinal: false,
+      subStatus: [],
+      formulario: null,
+    };
+    const bloqueadas: TransicaoBpm[] = etapas.flatMap((etapa) => [
+      {
+        id: `draft-${crypto.randomUUID()}`,
+        etapaOrigemId: id,
+        etapaDestinoId: etapa.id,
+        permitida: false,
+        origem: "AMBOS",
+      },
+      {
+        id: `draft-${crypto.randomUUID()}`,
+        etapaOrigemId: etapa.id,
+        etapaDestinoId: id,
+        permitida: false,
+        origem: "AMBOS",
+      },
+    ]);
+    setEtapas((prev) => [...prev, nova]);
+    setTransicoes((prev) => [...prev, ...bloqueadas]);
+    setNovaEtapaNome("");
+    setConflitoPublicacao(false);
+    toast.success("Etapa adicionada ao rascunho; configure o fluxo e publique");
   }
 
   function descartarEtapa() {
@@ -587,11 +564,10 @@ export default function AdminPipelineClient({
     );
   }
 
-  async function handleMoverEtapa(index: number, direcao: -1 | 1) {
+  function handleMoverEtapa(index: number, direcao: -1 | 1) {
     const novoIndex = index + direcao;
     if (novoIndex < 0 || novoIndex >= etapas.length || operacao) return;
 
-    const anteriores = etapas;
     const reordenadas = etapas.slice();
     [reordenadas[index], reordenadas[novoIndex]] = [
       reordenadas[novoIndex],
@@ -599,54 +575,21 @@ export default function AdminPipelineClient({
     ];
     const comOrdemAtualizada = reordenadas.map((e, i) => ({ ...e, ordem: i }));
     setEtapas(comOrdemAtualizada);
-    setOperacao("reordenar-etapas");
-    const resultado = await ReordenarEtapasBpm({
-      pipelineId: pipeline.id,
-      ordem: comOrdemAtualizada.map((e) => ({ etapaId: e.id, ordem: e.ordem })),
-    });
-    if (resultado.success) {
-      setEtapasConfirmadas(comOrdemAtualizada);
-      toast.success("Ordem das etapas salva");
-      router.refresh();
-    } else {
-      setEtapas(anteriores);
-      setErro(
-        typeof resultado.error === "string"
-          ? resultado.error
-          : "Erro ao reordenar etapas",
-      );
-    }
-    setOperacao(null);
+    setConflitoPublicacao(false);
+    toast.success("Nova ordem adicionada ao rascunho");
   }
 
-  async function handleToggleAtivoEtapa(etapaId: string, ativo: boolean) {
+  function handleToggleAtivoEtapa(etapaId: string, ativo: boolean) {
     if (operacao) return;
-    setOperacao(`etapa:${etapaId}`);
-    const res = await AtivarDesativarEtapaBpm({ etapaId, ativo });
-    if (res.success) {
-      setEtapas((prev) =>
-        prev.map((e) => (e.id === etapaId ? { ...e, ativo } : e)),
-      );
-      setEtapasConfirmadas((prev) =>
-        prev.map((e) => (e.id === etapaId ? { ...e, ativo } : e)),
-      );
-      toast.success(ativo ? "Etapa ativada" : "Etapa desativada");
-      router.refresh();
-    } else {
-      toast.error(
-        typeof res.error === "string"
-          ? res.error
-          : "Erro ao atualizar status da etapa",
-      );
-    }
-    setOperacao(null);
+    setEtapas((prev) =>
+      prev.map((e) => (e.id === etapaId ? { ...e, ativo } : e)),
+    );
+    setConflitoPublicacao(false);
+    toast.success("Alteração adicionada ao rascunho");
   }
 
   function handleEtapasAtualizadas(patch: Record<string, Partial<EtapaBpm>>) {
     setEtapas((prev) =>
-      prev.map((e) => (patch[e.id] ? { ...e, ...patch[e.id] } : e)),
-    );
-    setEtapasConfirmadas((prev) =>
       prev.map((e) => (patch[e.id] ? { ...e, ...patch[e.id] } : e)),
     );
   }
@@ -699,7 +642,7 @@ export default function AdminPipelineClient({
   }
 
   async function handleCriarCampo() {
-    if (!novoCampoNome.trim() || operacao) return;
+    if (!novoCampoNome.trim() || alteracoesPendentes > 0 || operacao) return;
     const opcoes = TIPOS_COM_OPICOES.has(novoCampoTipo)
       ? novoCampoOpcoes
           .split("\n")
@@ -721,7 +664,6 @@ export default function AdminPipelineClient({
       pipelineId: pipeline.id,
       nome: novoCampoNome,
       tipo: novoCampoTipo,
-      obrigatorio: false,
       opcoes,
       ordem: campos.length,
       escopo: novoCampoEscopo,
@@ -849,7 +791,7 @@ export default function AdminPipelineClient({
   }
 
   async function salvarEdicao(campoId: string) {
-    if (operacao) return;
+    if (alteracoesPendentes > 0 || operacao) return;
     if (!editCampoNome.trim()) {
       setErro("Nome do campo é obrigatório");
       return;
@@ -868,8 +810,6 @@ export default function AdminPipelineClient({
       campoId,
       nome: editCampoNome.trim(),
       tipo: editCampoTipo,
-      etapaId: null,
-      obrigatorio: false,
       opcoes,
       escopo: editCampoEscopo,
       valorPadrao: editCampoValorPadrao || null,
@@ -915,7 +855,7 @@ export default function AdminPipelineClient({
       setCamposConfirmados((prev) =>
         prev.map((c) => (c.id === campoId ? res.data : c)),
       );
-      toast.success("Campo salvo");
+      toast.success("Campo publicado");
       cancelarEdicao();
       router.refresh();
     } else {
@@ -964,9 +904,9 @@ export default function AdminPipelineClient({
             </span>
           </div>
           <p className="mt-1 text-xs text-slate-500">
-            Workspace administrativo · publicação atômica e auditada
+            Rascunho principal: etapas, fluxo e ativação de campos
           </p>
-          <p className="mt-1 font-mono text-[10px] text-slate-600">Versão {versao}</p>
+          <p className="mt-1 font-mono text-[10px] text-slate-600">Versão de configuração {baseVersion}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span
@@ -987,8 +927,8 @@ export default function AdminPipelineClient({
               : operacao
                 ? "Publicando…"
                 : alteracoesPendentes
-                  ? `${alteracoesPendentes} alteração(ões) não publicada(s)`
-                  : "Salvo"}
+                  ? `${alteracoesPendentes} alteração(ões) no rascunho principal`
+                  : "Publicado"}
           </span>
           <button
             type="button"
@@ -1005,7 +945,7 @@ export default function AdminPipelineClient({
             className="inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-xs font-bold text-white disabled:opacity-35"
             style={{ background: `rgba(${accent},0.85)` }}
           >
-            <Save size={14} /> Publicar alterações
+            <Save size={14} /> Publicar rascunho principal
           </button>
         </div>
       </header>
@@ -1365,15 +1305,10 @@ export default function AdminPipelineClient({
                         <button
                           type="button"
                           disabled={!etapaComRascunho || Boolean(operacao)}
-                          onClick={() => void handleSalvarEtapa()}
+                          onClick={() => setEtapaSelecionadaId(null)}
                           className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-cyan-400 px-3 text-xs font-bold text-slate-950 disabled:opacity-35"
                         >
-                          {operacao === `etapa:${etapaSelecionada.id}` ? (
-                            <Loader2 size={14} className="animate-spin" />
-                          ) : (
-                            <Save size={14} />
-                          )}{" "}
-                          Salvar geral
+                          <Save size={14} /> Manter no rascunho
                         </button>
                       </div>
                     </section>
@@ -1388,6 +1323,8 @@ export default function AdminPipelineClient({
                         onEtapasAtualizadas={handleEtapasAtualizadas}
                         onSubStatusAtualizado={handleSubStatusAtualizado}
                         onTransicaoAtualizada={handleTransicaoAtualizada}
+                        publicationBlocked={alteracoesPendentes > 0}
+                        onPublished={() => router.refresh()}
                       />
                     </div>
                   </div>
@@ -1402,6 +1339,8 @@ export default function AdminPipelineClient({
             pipelineId={pipeline.id}
             etapas={etapas}
             accent={accent}
+            publicationBlocked={alteracoesPendentes > 0}
+            onPublished={() => router.refresh()}
           />
         </TabsContent>
 
@@ -1412,6 +1351,8 @@ export default function AdminPipelineClient({
             etapas={etapas}
             servicos={servicosComerciais}
             configuracoesIniciais={configuracoesSlaIniciais}
+            publicationBlocked={alteracoesPendentes > 0}
+            onPublished={() => router.refresh()}
           />
         </TabsContent>
 
@@ -1422,6 +1363,8 @@ export default function AdminPipelineClient({
               pipelineId={pipeline.id}
               etapas={etapas}
               cadencias={cadenciasIniciais}
+              publicationBlocked={alteracoesPendentes > 0}
+              onPublished={() => router.refresh()}
             />
           </div>
         </TabsContent>
@@ -2564,7 +2507,7 @@ export default function AdminPipelineClient({
                                 </div>
                                 <div className="flex gap-2">
                                   <button
-                                    disabled={Boolean(operacao)}
+                                    disabled={alteracoesPendentes > 0 || Boolean(operacao)}
                                     onClick={() => void salvarEdicao(campo.id)}
                                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-white disabled:opacity-40"
                                     style={{
@@ -2577,7 +2520,7 @@ export default function AdminPipelineClient({
                                         className="animate-spin"
                                       />
                                     )}{" "}
-                                    Salvar
+                                    Publicar campo
                                   </button>
                                   <button
                                     disabled={Boolean(operacao)}
@@ -2742,7 +2685,7 @@ export default function AdminPipelineClient({
               </label>
               <button
                 onClick={handleCriarCampo}
-                disabled={Boolean(operacao) || !novoCampoNome.trim()}
+                disabled={alteracoesPendentes > 0 || Boolean(operacao) || !novoCampoNome.trim()}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-white disabled:opacity-40"
                 style={{ background: `rgba(${accent},0.85)` }}
               >
@@ -2751,7 +2694,7 @@ export default function AdminPipelineClient({
                 ) : (
                   <Plus size={14} />
                 )}{" "}
-                Adicionar
+                Criar e publicar campo
               </button>
             </div>
           </section>
@@ -2761,6 +2704,8 @@ export default function AdminPipelineClient({
               etapas={etapas}
               campos={campos}
               onFormularioAtualizado={handleFormularioAtualizado}
+              publicationBlocked={alteracoesPendentes > 0}
+              onPublished={() => router.refresh()}
             />
           </div>
         </TabsContent>

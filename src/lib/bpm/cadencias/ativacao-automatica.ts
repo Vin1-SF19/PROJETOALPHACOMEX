@@ -82,7 +82,7 @@ export async function ativarCadenciasNaEntradaBpm(
   const escopos = [
     { etapas: { some: { etapaId: input.etapaDestinoId } } },
     ...(entradaPipeline
-      ? [{ etapaId: null, etapas: { none: {} } }]
+      ? [{ etapas: { none: {} } }]
       : []),
   ];
   const cadencias = await tx.bpmCadencia.findMany({

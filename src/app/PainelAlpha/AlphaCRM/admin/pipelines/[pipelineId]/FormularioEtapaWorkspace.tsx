@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 
 import { SalvarFormularioEtapaBpm } from "@/actions/bpm/FormulariosEtapa";
+import { listarCatalogoComponentesFormulario } from "@/lib/bpm/formularios-etapa";
 
 type CampoFormulario = { id: string; nome: string; tipo: string };
 type ComponenteFormulario = {
@@ -22,12 +23,14 @@ type ComponenteFormulario = {
   campoId: string | null;
   capability: string | null;
   configJson: string | null;
+  ordem?: number;
   campo?: CampoFormulario | null;
 };
 type SecaoFormulario = {
   id?: string;
   chave: string;
   titulo: string;
+  ordem?: number;
   componentes: ComponenteFormulario[];
 };
 export type FormularioEtapaAdmin = {
@@ -41,12 +44,14 @@ type EtapaFormulario = {
   id: string;
   nome: string;
   ativo: boolean;
+  chave?: string | null;
+  capabilitiesJson?: string | null;
   formulario?: FormularioEtapaAdmin | null;
 };
 
 type CampoAplicavel = CampoFormulario & {
   ativo?: boolean;
-  etapaConfiguracoes?: Array<{ etapaId: string }>;
+  etapaConfiguracoes?: Array<{ etapaId: string; visivel: boolean }>;
 };
 
 function secoesDaEtapa(etapa: EtapaFormulario | undefined): SecaoFormulario[] {
@@ -69,6 +74,8 @@ export function FormularioEtapaWorkspace({
   etapas,
   campos,
   onFormularioAtualizado,
+  publicationBlocked = false,
+  onPublished,
 }: {
   pipelineId: string;
   etapas: EtapaFormulario[];
@@ -77,6 +84,8 @@ export function FormularioEtapaWorkspace({
     etapaId: string,
     formulario: FormularioEtapaAdmin,
   ) => void;
+  publicationBlocked?: boolean;
+  onPublished?: () => void;
 }) {
   const primeiraEtapa = etapas[0];
   const [etapaId, setEtapaId] = useState(primeiraEtapa?.id ?? "");
@@ -93,10 +102,14 @@ export function FormularioEtapaWorkspace({
         (campo) =>
           campo.ativo !== false &&
           campo.etapaConfiguracoes?.some(
-            (config) => config.etapaId === etapaId,
+            (config) => config.etapaId === etapaId && config.visivel,
           ),
       ),
     [campos, etapaId],
+  );
+  const catalogoComponentes = useMemo(
+    () => listarCatalogoComponentesFormulario(etapa?.capabilitiesJson),
+    [etapa?.capabilitiesJson],
   );
 
   function selecionar(id: string) {
@@ -143,17 +156,43 @@ export function FormularioEtapaWorkspace({
     });
   }
 
+  function adicionarComponente(indiceSecao: number, target: string) {
+    const definicao = catalogoComponentes.find((item) => item.target === target);
+    if (!definicao) return;
+    if (
+      !definicao.multiple &&
+      secoes.some((secao) =>
+        secao.componentes.some((componente) => componente.capability === target),
+      )
+    ) return;
+    alterarSecao(indiceSecao, {
+      componentes: [
+        ...secoes[indiceSecao].componentes,
+        {
+          chave: `componente-${target.toLocaleLowerCase("pt-BR").replaceAll("_", "-")}`,
+          tipo: definicao.tipo,
+          campoId: null,
+          capability: definicao.target,
+          configJson: null,
+        },
+      ],
+    });
+  }
+
   async function salvar() {
-    if (!etapa || salvando) return;
+    if (!etapa || publicationBlocked || salvando) return;
     setSalvando(true);
     const resposta = await SalvarFormularioEtapaBpm({
       pipelineId,
       etapaId: etapa.id,
+      versaoEsperada: etapa.formulario?.versao ?? null,
       ativo,
       secoes: secoes.map((secao) => ({
+        id: secao.id,
         chave: secao.chave,
         titulo: secao.titulo,
         componentes: secao.componentes.map((componente) => ({
+          id: componente.id,
           chave: componente.chave,
           tipo: componente.tipo,
           campoId: componente.campoId,
@@ -182,6 +221,7 @@ export function FormularioEtapaWorkspace({
     setAtivo(confirmado.ativo);
     setSujo(false);
     toast.success("Composição do formulário publicada");
+    onPublished?.();
   }
 
   if (!etapa)
@@ -245,7 +285,7 @@ export function FormularioEtapaWorkspace({
             </label>
             <button
               type="button"
-              disabled={!sujo || salvando}
+              disabled={!sujo || publicationBlocked || salvando}
               onClick={() => void salvar()}
               className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-cyan-400 px-3 text-xs font-bold text-slate-950 disabled:opacity-40"
             >
@@ -254,10 +294,14 @@ export function FormularioEtapaWorkspace({
               ) : (
                 <Save size={14} />
               )}{" "}
-              Salvar composição
+              Publicar composição
             </button>
           </div>
         </div>
+
+        {publicationBlocked && (
+          <p className="text-xs text-amber-200" role="status">Publique ou descarte o rascunho principal antes de publicar o formulário.</p>
+        )}
 
         {secoes.length === 0 ? (
           <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-slate-500">
@@ -400,13 +444,44 @@ export function FormularioEtapaWorkspace({
                       {camposAplicaveis
                         .filter(
                           (campo) =>
-                            !secao.componentes.some(
-                              (componente) => componente.campoId === campo.id,
+                            !secoes.some((secaoAtual) =>
+                              secaoAtual.componentes.some(
+                                (componente) =>
+                                  componente.campoId === campo.id,
+                              ),
                             ),
                         )
                         .map((campo) => (
                           <option key={campo.id} value={campo.id}>
                             {campo.nome} · {campo.tipo}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-slate-500">
+                    <Plus size={14} />
+                    <select
+                      aria-label={`Adicionar componente à seção ${secao.titulo}`}
+                      value=""
+                      onChange={(event) =>
+                        adicionarComponente(indiceSecao, event.target.value)
+                      }
+                      className="min-h-9 flex-1 rounded-lg border border-white/10 bg-slate-900 px-2 text-xs text-slate-300"
+                    >
+                      <option value="">Adicionar componente compatível…</option>
+                      {catalogoComponentes
+                        .filter(
+                          (item) =>
+                            item.multiple ||
+                            !secoes.some((secaoAtual) =>
+                              secaoAtual.componentes.some(
+                                (componente) => componente.capability === item.target,
+                              ),
+                            ),
+                        )
+                        .map((item) => (
+                          <option key={item.target} value={item.target}>
+                            {item.label}
                           </option>
                         ))}
                     </select>

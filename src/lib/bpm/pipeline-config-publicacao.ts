@@ -1,5 +1,7 @@
 export type EtapaPublicacao = {
   id: string;
+  nome: string;
+  cor: string | null;
   ordem: number;
   ativo: boolean;
   ehInicial: boolean;
@@ -37,6 +39,23 @@ function mesmosIds(atuais: readonly { id: string }[], recebidos: readonly { id: 
   return ids.size === recebidos.length && atuais.every(({ id }) => ids.has(id));
 }
 
+function conjuntoCompletoComNovos(
+  atuais: readonly { id: string }[],
+  recebidos: readonly { id: string }[],
+): boolean {
+  const ids = new Set(recebidos.map(({ id }) => id));
+  return ids.size === recebidos.length && atuais.every(({ id }) => ids.has(id));
+}
+
+function transicoesCompletas(
+  atuais: readonly TransicaoPublicacao[],
+  recebidas: readonly TransicaoPublicacao[],
+): boolean {
+  const idsRecebidos = new Set(recebidas.map(({ id }) => id));
+  return idsRecebidos.size === recebidas.length
+    && atuais.every(({ id }) => idsRecebidos.has(id));
+}
+
 function possuiCatalogoLegado(valor: string | null): boolean {
   if (!valor) return false;
   try {
@@ -52,13 +71,27 @@ export function validarSnapshotPublicacao(params: {
   proposto: SnapshotPublicacao;
 }): string[] {
   const erros: string[] = [];
-  if (!mesmosIds(params.atual.etapas, params.proposto.etapas)) erros.push("O rascunho não contém o conjunto atual completo de etapas.");
-  if (!mesmosIds(params.atual.transicoes, params.proposto.transicoes)) erros.push("O rascunho não contém o conjunto atual completo de transições.");
+  if (!conjuntoCompletoComNovos(params.atual.etapas, params.proposto.etapas)) erros.push("O rascunho não contém o conjunto atual completo de etapas.");
+  if (!transicoesCompletas(params.atual.transicoes, params.proposto.transicoes)) erros.push("O rascunho não contém o conjunto atual completo de transições.");
   if (!mesmosIds(params.atual.campos, params.proposto.campos)) erros.push("O rascunho não contém o conjunto atual completo de campos.");
   if (erros.length) return erros;
 
+  if (params.proposto.etapas.some((etapa) =>
+    !params.atual.etapas.some((atual) => atual.id === etapa.id)
+    && !etapa.id.startsWith("draft-stage-"))) {
+    erros.push("Uma etapa nova possui identidade de rascunho inválida.");
+  }
+  if (params.proposto.transicoes.some((transicao) =>
+    !params.atual.transicoes.some((atual) => atual.id === transicao.id)
+    && !transicao.id.startsWith("draft-"))) {
+    erros.push("Uma transição nova possui identidade de rascunho inválida.");
+  }
+
   const etapasAtivas = params.proposto.etapas.filter((etapa) => etapa.ativo);
   const idsAtivos = new Set(etapasAtivas.map((etapa) => etapa.id));
+  const idsEtapasPropostas = new Set(params.proposto.etapas.map((etapa) => etapa.id));
+  const transicoesAtuaisPorId = new Map(params.atual.transicoes.map((item) => [item.id, item]));
+  const camposAtuaisPorId = new Map(params.atual.campos.map((item) => [item.id, item]));
   const iniciais = etapasAtivas.filter((etapa) => etapa.ehInicial);
   if (iniciais.length !== 1) erros.push("A publicação exige exatamente uma etapa inicial ativa.");
   if (!etapasAtivas.some((etapa) => etapa.ehFinal)) erros.push("A publicação exige ao menos uma etapa final ativa.");
@@ -68,28 +101,42 @@ export function validarSnapshotPublicacao(params: {
 
   const pares = new Set<string>();
   for (const transicao of params.proposto.transicoes) {
-    const atual = params.atual.transicoes.find((item) => item.id === transicao.id)!;
-    if (atual.etapaOrigemId !== transicao.etapaOrigemId || atual.etapaDestinoId !== transicao.etapaDestinoId) {
+    if (!idsEtapasPropostas.has(transicao.etapaOrigemId) || !idsEtapasPropostas.has(transicao.etapaDestinoId)) {
+      erros.push("Toda transição precisa pertencer às etapas do pipeline publicado.");
+      continue;
+    }
+    const atual = transicoesAtuaisPorId.get(transicao.id);
+    if (atual && (atual.etapaOrigemId !== transicao.etapaOrigemId || atual.etapaDestinoId !== transicao.etapaDestinoId)) {
       erros.push("A origem ou destino de uma transição não pode ser alterado pelo rascunho.");
       break;
     }
     const par = `${transicao.etapaOrigemId}:${transicao.etapaDestinoId}`;
     if (pares.has(par)) erros.push("O rascunho contém transição duplicada.");
     pares.add(par);
-    if (transicao.permitida && (!idsAtivos.has(transicao.etapaOrigemId) || !idsAtivos.has(transicao.etapaDestinoId))) {
+    const passouALigarEtapaInativa = transicao.permitida
+      && (!atual || !atual.permitida)
+      && (!idsAtivos.has(transicao.etapaOrigemId) || !idsAtivos.has(transicao.etapaDestinoId));
+    if (passouALigarEtapaInativa) {
       erros.push("Transições permitidas só podem conectar etapas ativas.");
     }
   }
 
   if (iniciais.length === 1) {
+    const destinosPorOrigem = new Map<string, string[]>();
+    for (const transicao of params.proposto.transicoes) {
+      if (!transicao.permitida || !idsAtivos.has(transicao.etapaDestinoId)) continue;
+      const destinos = destinosPorOrigem.get(transicao.etapaOrigemId) ?? [];
+      destinos.push(transicao.etapaDestinoId);
+      destinosPorOrigem.set(transicao.etapaOrigemId, destinos);
+    }
     const visitadas = new Set([iniciais[0].id]);
     const fila = [iniciais[0].id];
     while (fila.length) {
       const origemId = fila.shift()!;
-      for (const transicao of params.proposto.transicoes) {
-        if (!transicao.permitida || transicao.etapaOrigemId !== origemId || !idsAtivos.has(transicao.etapaDestinoId) || visitadas.has(transicao.etapaDestinoId)) continue;
-        visitadas.add(transicao.etapaDestinoId);
-        fila.push(transicao.etapaDestinoId);
+      for (const destinoId of destinosPorOrigem.get(origemId) ?? []) {
+        if (visitadas.has(destinoId)) continue;
+        visitadas.add(destinoId);
+        fila.push(destinoId);
       }
     }
     if (etapasAtivas.some((etapa) => !visitadas.has(etapa.id))) erros.push("Todas as etapas ativas precisam ser alcançáveis a partir da etapa inicial.");
@@ -97,7 +144,7 @@ export function validarSnapshotPublicacao(params: {
 
   for (const campoProposto of params.proposto.campos) {
     if (!campoProposto.ativo) continue;
-    const campo = params.atual.campos.find((item) => item.id === campoProposto.id)!;
+    const campo = camposAtuaisPorId.get(campoProposto.id)!;
     if (!["selecao", "multiselecao"].includes(campo.tipo.toLocaleLowerCase("pt-BR"))) continue;
     const possuiFonte = Boolean(campo.fonteEntidade && campo.fonteAtributo);
     const possuiCatalogo = campo.opcoes.some((opcao) => opcao.ativo) || possuiCatalogoLegado(campo.opcoesJson);
@@ -111,15 +158,18 @@ export function resumirAlteracoesPublicacao(params: {
   atual: { etapas: EtapaPublicacao[]; transicoes: TransicaoPublicacao[]; campos: CampoAtualPublicacao[] };
   proposto: SnapshotPublicacao;
 }) {
+  const etapasAtuaisPorId = new Map(params.atual.etapas.map((item) => [item.id, item]));
+  const transicoesAtuaisPorId = new Map(params.atual.transicoes.map((item) => [item.id, item]));
+  const camposAtuaisPorId = new Map(params.atual.campos.map((item) => [item.id, item]));
   const mudouEtapa = params.proposto.etapas.filter((item) => {
-    const atual = params.atual.etapas.find((valor) => valor.id === item.id)!;
-    return item.ordem !== atual.ordem || item.ativo !== atual.ativo || item.ehInicial !== atual.ehInicial || item.ehFinal !== atual.ehFinal;
+    const atual = etapasAtuaisPorId.get(item.id);
+    return !atual || item.nome !== atual.nome || item.cor !== atual.cor || item.ordem !== atual.ordem || item.ativo !== atual.ativo || item.ehInicial !== atual.ehInicial || item.ehFinal !== atual.ehFinal;
   });
   const mudouTransicao = params.proposto.transicoes.filter((item) => {
-    const atual = params.atual.transicoes.find((valor) => valor.id === item.id)!;
-    return item.permitida !== atual.permitida || item.origem !== atual.origem;
+    const atual = transicoesAtuaisPorId.get(item.id);
+    return !atual || item.permitida !== atual.permitida || item.origem !== atual.origem;
   });
-  const mudouCampo = params.proposto.campos.filter((item) => params.atual.campos.find((valor) => valor.id === item.id)!.ativo !== item.ativo);
+  const mudouCampo = params.proposto.campos.filter((item) => camposAtuaisPorId.get(item.id)!.ativo !== item.ativo);
   return {
     etapas: mudouEtapa.map(({ id }) => id),
     transicoes: mudouTransicao.map(({ id }) => id),

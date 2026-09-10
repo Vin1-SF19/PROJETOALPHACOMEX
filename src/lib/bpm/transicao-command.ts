@@ -105,14 +105,6 @@ function requisitoAplica(
   return !requisito.etapaId || requisito.etapaId === etapaOrigemId || requisito.etapaId === etapaDestinoId;
 }
 
-function campoAplica(
-  campo: { etapaConfiguracoes: Array<{ etapaId: string }> },
-  etapaOrigemId: string,
-  etapaDestinoId: string,
-): boolean {
-  return campo.etapaConfiguracoes.some((config) => config.etapaId === etapaOrigemId || config.etapaId === etapaDestinoId);
-}
-
 function vazio(valor: string | null | undefined): boolean {
   return !valor?.trim();
 }
@@ -217,6 +209,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     where: {
       pipelineId: card.pipelineId,
       ativo: true,
+      campoId: null,
       OR: [
         { transicaoId: transicao.id },
         { etapaId: null },
@@ -235,13 +228,45 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     orderBy: [{ ordem: "asc" }, { chave: "asc" }],
   });
   const requisitosAplicaveis = requisitos.filter((item) =>
-    requisitoAplica(item, transicao.id, card.etapaId, destino.id)
-    && (!item.campo || campoAplica(item.campo, card.etapaId, destino.id)),
+    requisitoAplica(item, transicao.id, card.etapaId, destino.id),
   );
-  const camposRequisito = requisitosAplicaveis.flatMap((item) => item.campo ? [item.campo] : []);
+  const camposRequisito = await tx.bpmCampo.findMany({
+    where: {
+      ativo: true,
+      OR: [
+        { pipelineId: card.pipelineId },
+        { pipelinesAssociados: { some: { pipelineId: card.pipelineId } } },
+      ],
+      etapaConfiguracoes: {
+        some: {
+          etapaId: { in: [card.etapaId, destino.id] },
+          visivel: true,
+          OR: [
+            { obrigatorio: true },
+            { obrigatorioEntrada: true },
+            { obrigatorioSaida: true },
+            { condicaoObrigatoriedadeJson: { not: null } },
+          ],
+        },
+      },
+    },
+    include: {
+      opcoes: { where: { ativo: true }, orderBy: { ordem: "asc" } },
+      etapaConfiguracoes: { where: { etapaId: { in: [card.etapaId, destino.id] } } },
+      acessos: perfilCampo ? { where: { perfil: perfilCampo } } : false,
+    },
+  });
   const camposSubmetidos = campoIdsSubmetidos.length
     ? await tx.bpmCampo.findMany({
-        where: { id: { in: campoIdsSubmetidos }, ativo: true },
+        where: {
+          id: { in: campoIdsSubmetidos },
+          ativo: true,
+          OR: [
+            { pipelineId: card.pipelineId },
+            { pipelinesAssociados: { some: { pipelineId: card.pipelineId } } },
+          ],
+          etapaConfiguracoes: { some: { etapaId: { in: [card.etapaId, destino.id] } } },
+        },
         include: {
           opcoes: { where: { ativo: true }, orderBy: { ordem: "asc" } },
           etapaConfiguracoes: { where: { etapaId: { in: [card.etapaId, destino.id] } } },
@@ -249,6 +274,9 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
         },
       })
     : [];
+  if (camposSubmetidos.length !== campoIdsSubmetidos.length) {
+    erro("FIELD_OUTSIDE_STAGE_CONFIG", "Um ou mais campos não possuem configuração canônica para esta transição.");
+  }
   const camposPorId = new Map([...camposRequisito, ...camposSubmetidos].map((campo) => [campo.id, campo]));
 
   for (const campo of camposSubmetidos) {
@@ -310,6 +338,32 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     }
     if (requisito.alvoTipo === "CAMPO" && requisito.campoId && vazio(valoresEfetivosPorId.get(requisito.campoId))) {
       pendencias.push(requisito.campo?.nome ?? requisito.alvoChave ?? requisito.mensagem);
+    }
+  }
+  for (const campo of camposRequisito) {
+    for (const config of campo.etapaConfiguracoes) {
+      const aplicaNaOrigem = config.etapaId === card.etapaId
+        && (config.obrigatorio || config.obrigatorioSaida || Boolean(config.condicaoObrigatoriedadeJson));
+      const aplicaNoDestino = config.etapaId === destino.id
+        && (config.obrigatorio || config.obrigatorioEntrada || Boolean(config.condicaoObrigatoriedadeJson));
+      if (!config.visivel || (!aplicaNaOrigem && !aplicaNoDestino)) continue;
+      if (config.condicaoVisibilidadeJson) {
+        let parsed: unknown;
+        try { parsed = JSON.parse(config.condicaoVisibilidadeJson); } catch { erro("INVALID_FIELD_CONFIG", `Configuração inválida do campo ${campo.nome}.`); }
+        const validada = grupoCondicaoSchema.safeParse(parsed);
+        if (!validada.success || !avaliarGrupo(validada.data, contextoRegra)) continue;
+      }
+      let obrigatorio = config.obrigatorio
+        || (config.etapaId === card.etapaId && config.obrigatorioSaida)
+        || (config.etapaId === destino.id && config.obrigatorioEntrada);
+      if (config.condicaoObrigatoriedadeJson) {
+        let parsed: unknown;
+        try { parsed = JSON.parse(config.condicaoObrigatoriedadeJson); } catch { erro("INVALID_FIELD_CONFIG", `Configuração inválida do campo ${campo.nome}.`); }
+        const validada = grupoCondicaoSchema.safeParse(parsed);
+        if (!validada.success) erro("INVALID_FIELD_CONFIG", `Configuração inválida do campo ${campo.nome}.`);
+        obrigatorio = obrigatorio || avaliarGrupo(validada.data, contextoRegra);
+      }
+      if (obrigatorio && vazio(valoresEfetivosPorId.get(campo.id))) pendencias.push(campo.nome);
     }
   }
 

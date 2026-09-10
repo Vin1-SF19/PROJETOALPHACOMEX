@@ -4,7 +4,7 @@ const prismaMock = vi.hoisted(() => ({
   bpmCard: { findMany: vi.fn() },
   bpmTarefa: { findMany: vi.fn() },
   bpmCardChecklist: { findMany: vi.fn() },
-  bpmCampo: { findMany: vi.fn() },
+  bpmCampoEtapaConfig: { findMany: vi.fn() },
   bpmCardCampoValor: { findMany: vi.fn() },
   bpmSlaInstancia: { findMany: vi.fn() },
 }));
@@ -29,7 +29,7 @@ describe("listarPendenciasBpm", () => {
     vi.clearAllMocks();
     prismaMock.bpmTarefa.findMany.mockResolvedValue([]);
     prismaMock.bpmCardChecklist.findMany.mockResolvedValue([]);
-    prismaMock.bpmCampo.findMany.mockResolvedValue([]);
+    prismaMock.bpmCampoEtapaConfig.findMany.mockResolvedValue([]);
     prismaMock.bpmCardCampoValor.findMany.mockResolvedValue([]);
     prismaMock.bpmSlaInstancia.findMany.mockResolvedValue([]);
   });
@@ -103,8 +103,8 @@ describe("listarPendenciasBpm", () => {
 
   it("detecta campo obrigatório da etapa atual sem valor preenchido", async () => {
     prismaMock.bpmCard.findMany.mockResolvedValue([CARD_BASE]);
-    prismaMock.bpmCampo.findMany.mockResolvedValue([
-      { id: "campo1", pipelineId: CARD_BASE.pipelineId, etapaId: null, nome: "Origem do lead" },
+    prismaMock.bpmCampoEtapaConfig.findMany.mockResolvedValue([
+      { etapaId: CARD_BASE.etapaId, campo: { id: "campo1", pipelineId: CARD_BASE.pipelineId, nome: "Origem do lead", pipelinesAssociados: [] } },
     ]);
     prismaMock.bpmCardCampoValor.findMany.mockResolvedValue([]);
 
@@ -117,8 +117,8 @@ describe("listarPendenciasBpm", () => {
 
   it("não sinaliza campo obrigatório já preenchido", async () => {
     prismaMock.bpmCard.findMany.mockResolvedValue([CARD_BASE]);
-    prismaMock.bpmCampo.findMany.mockResolvedValue([
-      { id: "campo1", pipelineId: CARD_BASE.pipelineId, etapaId: null, nome: "Origem do lead" },
+    prismaMock.bpmCampoEtapaConfig.findMany.mockResolvedValue([
+      { etapaId: CARD_BASE.etapaId, campo: { id: "campo1", pipelineId: CARD_BASE.pipelineId, nome: "Origem do lead", pipelinesAssociados: [] } },
     ]);
     prismaMock.bpmCardCampoValor.findMany.mockResolvedValue([{ cardId: CARD_BASE.id, campoId: "campo1", valor: "Indicação" }]);
 
@@ -129,8 +129,8 @@ describe("listarPendenciasBpm", () => {
 
   it("ignora campo obrigatório de outra etapa (etapaId não nulo e diferente da etapa atual do card)", async () => {
     prismaMock.bpmCard.findMany.mockResolvedValue([CARD_BASE]);
-    prismaMock.bpmCampo.findMany.mockResolvedValue([
-      { id: "campo1", pipelineId: CARD_BASE.pipelineId, etapaId: "outra-etapa", nome: "Campo de outra etapa" },
+    prismaMock.bpmCampoEtapaConfig.findMany.mockResolvedValue([
+      { etapaId: "outra-etapa", campo: { id: "campo1", pipelineId: CARD_BASE.pipelineId, nome: "Campo de outra etapa", pipelinesAssociados: [] } },
     ]);
 
     const itens = await listarPendenciasBpm(1, false);

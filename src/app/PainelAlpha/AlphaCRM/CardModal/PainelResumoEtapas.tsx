@@ -58,7 +58,10 @@ export function PainelResumoEtapas({ card, etapas, accent, ocultarTitulo }: Prop
           ),
         );
         const camposPreenchidos = card.campoValores.filter(
-          (campoValor) => campoValor.campo.etapaId === etapa.id && Boolean(campoValor.valor?.trim()),
+          (campoValor) => (
+            campoValor.campo.etapaConfiguracoes.some((config) => config.etapaId === etapa.id)
+            && Boolean(campoValor.valor?.trim())
+          ),
         );
         return (
           <div key={etapa.id} className="overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] transition-colors hover:border-white/10">

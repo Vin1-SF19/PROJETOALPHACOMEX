@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   associacaoFindFirst: vi.fn(), associacaoFindUnique: vi.fn(), associacaoFindMany: vi.fn(), associacaoCreate: vi.fn(),
   associacaoCreateMany: vi.fn(), associacaoDelete: vi.fn(), associacaoDeleteMany: vi.fn(), auditoriaCreate: vi.fn(),
   transaction: vi.fn(), revalidatePath: vi.fn(),
+  pipelineUpdate: vi.fn(),
 }));
 
 vi.mock("../../auth", () => ({ auth: mocks.auth }));
@@ -26,7 +27,7 @@ const CADENCIA_ID = "clw0000000000000cadencia";
 
 function txMock() {
   return {
-    bpmPipeline: { findFirst: mocks.pipelineFindFirst },
+    bpmPipeline: { findFirst: mocks.pipelineFindFirst, update: mocks.pipelineUpdate },
     bpmEtapa: { findMany: mocks.etapaFindMany },
     bpmCadencia: { findUnique: mocks.cadenciaFindUnique, findUniqueOrThrow: mocks.cadenciaFindUniqueOrThrow, create: mocks.cadenciaCreate, update: mocks.cadenciaUpdate },
     bpmCadenciaEtapa: {
@@ -43,6 +44,7 @@ describe("actions de cadência multicoluna", () => {
     mocks.auth.mockResolvedValue({ user: { id: "7", role: "Admin" } });
     mocks.exigirConfig.mockResolvedValue(undefined);
     mocks.pipelineFindFirst.mockResolvedValue({ id: PIPELINE_ID });
+    mocks.pipelineUpdate.mockResolvedValue({ configVersion: 2 });
     mocks.etapaFindMany.mockImplementation(({ where }: { where: { id: { in: string[] } } }) => where.id.in.map((id, index) => ({ id, ordem: index + 1 })));
     mocks.associacaoFindFirst.mockResolvedValue(null);
     mocks.associacaoFindUnique.mockResolvedValue(null);
@@ -67,9 +69,9 @@ describe("actions de cadência multicoluna", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
-  it("cria uma cadência em duas colunas e espelha a primeira no legado", async () => {
+  it("cria uma cadência em duas colunas sem escrever o vínculo singular legado", async () => {
     expect((await CriarCadenciaBpm({ nome: "Contato", pipelineId: PIPELINE_ID, etapaIds: [ETAPA_1, ETAPA_2] })).success).toBe(true);
-    expect(mocks.cadenciaCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ pipelineId: PIPELINE_ID, etapaId: ETAPA_1 }) });
+    expect(mocks.cadenciaCreate).toHaveBeenCalledWith({ data: expect.not.objectContaining({ etapaId: expect.anything() }) });
     expect(mocks.associacaoCreateMany).toHaveBeenCalledWith({ data: [
       { cadenciaId: CADENCIA_ID, etapaId: ETAPA_1 }, { cadenciaId: CADENCIA_ID, etapaId: ETAPA_2 },
     ] });
@@ -105,16 +107,16 @@ describe("actions de cadência multicoluna", () => {
     expect(mocks.associacaoCreateMany).not.toHaveBeenCalled();
     expect(mocks.cadenciaUpdate).toHaveBeenCalledWith({
       where: { id: CADENCIA_ID },
-      data: { pipelineId: PIPELINE_ID, etapaId: ETAPA_2 },
+      data: { pipelineId: PIPELINE_ID },
     });
   });
 
-  it("remove só a associação e desativa a cadência que ficou sem coluna", async () => {
+  it("remove só a associação e preserva a definição como cadência de entrada do pipeline", async () => {
     mocks.associacaoFindUnique.mockResolvedValue({ cadenciaId: CADENCIA_ID });
     const resultado = await ConfigurarCadenciaEtapaBpm({ pipelineId: PIPELINE_ID, etapaId: ETAPA_1, cadenciaId: null });
     expect(resultado).toEqual({ success: true, data: { cadenciaId: null } });
     expect(mocks.associacaoDelete).toHaveBeenCalledWith({ where: { etapaId: ETAPA_1 } });
-    expect(mocks.cadenciaUpdate).toHaveBeenCalledWith({ where: { id: CADENCIA_ID }, data: { etapaId: null, ativa: false } });
+    expect(mocks.cadenciaUpdate).not.toHaveBeenCalled();
   });
 
   it("adiciona a mesma cadência a outra coluna sem remover as existentes", async () => {

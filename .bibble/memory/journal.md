@@ -10,6 +10,17 @@ DELIVERY_READY: Alpha CRM → Checklists → criar/editar → Vínculos → Etap
 
 Arquivos desta fase: story RM-2026-457A31; memórias architecture, codebase-map, integration-points, decisions e journal; logs locais. Autoajuste documental concluído, sem novo defeito funcional resolvido.
 
+## 2026-09-09 — Codex — RM-2026-EB2898 (CRM Config Save Consistency — P0-4)
+
+**Tags:** #crm #bpm #config-version #concorrencia #transacao #turso #concluido
+
+Implementada em branch/worktree isolado a publicação consistente da configuração. A migration aditiva criou `BpmPipeline.configVersion`; o Turso de produção recebeu a coluna após backup completo verificado e autorização explícita pelos hashes. A publicação principal passou a usar CAS e transação serializável para etapas, transições, ativação de campos e auditoria. Escritores administrativos relacionados invalidam a versão dentro das próprias transações.
+
+A UI separa e nomeia o rascunho principal, restaura o último snapshot publicado ao descartar, mostra estados publicado/pendente/publicando/erro/conflito e bloqueia editores independentes enquanto o rascunho principal está aberto. Cadência e substatus deixaram de persistir silenciosamente em seleção/blur. Erros de carga não viram arrays vazios.
+
+Validação: P0-4 26/26; regressão P0-1/P0-2/P0-3 172/172; suíte BPM 876/882 com as mesmas seis falhas basais externas; build aprovado; ESLint escopado e `git diff --check` aprovados. Gates globais mantêm débitos preexistentes fora do delta. Anubis: aprovado sem crítico após reforço de ownership de endpoints de transição e complexidade linear do validador. CodeRabbit indisponível no ambiente.
+
+**Arquivos centrais:** `prisma/schema.prisma`, migration `20260909211000_bpm_pipeline_config_version`, `ConfiguracaoPipeline.ts`, `config-version.ts`, `pipeline-config-publicacao.ts`, workspace administrativo, testes e relatório `crm-config-save-consistency-p0-4.md`.
 
 ## 2026-09-08 — Kowalski — RM-2026-3D529D (ChatBotX = Chatbot Alpha — Replicar o Frontend) — CLOSURE
 
@@ -5112,7 +5123,6 @@ Cadências agora aceitam zero, uma ou várias colunas ativas do mesmo pipeline p
 
 O checkpoint Vault foi aprovado pelo administrador. O dump de 106.125.243 bytes foi restaurado e conferido antes da migration; a pós-validação terminou sem vínculo inválido, duplicidade ou violação de FK. Os 40 testes focados, E2E isolado, lint direcionado, diff-check, build de 78 páginas e smoke HTTP passaram. Os débitos dos gates globais são externos e estão registrados em `known-errors.md`. Nenhum worker foi iniciado nem houve promoção para produção.
 
-
 ## 2026-09-09 — Forge RM-2026-457A31, retomada
 Build real exit 0 (78 páginas); checklist 48/48 e lint escopado exit 0. Typechecks: 20 diagnósticos externos; lint global: 3.702 erros/17.508 avisos; suíte: 2.635 passando, 50 falhando, 1 todo. Prisma validate aprovado com URL SQLite fictícia após ausência de DATABASE_URL. Nenhuma alteração de fonte/banco. PASS no escopo, Lens liberado; smoke autenticado pendente para Probe. Relatório completo na story e logs locais em forge-457a31-ztlbhr9a/.
 
@@ -5289,3 +5299,85 @@ AUTO_ADJUSTMENT_ACCEPTANCE: apendar encerramento com fonte dos pareceres, cobert
 RESULT: PASS — encerramento local conforme isolamento administrativo; pendências globais/remotas não bloqueantes.
 
 Validação documental: `git diff --check` nos dois documentos alterados aprovado (exit 0).
+---
+
+## 2026-09-09 18:32 — P0-2 reconciliou formulários canônicos por etapa
+
+**Tags:** #refactor #migration #integrity #nextjs #prisma #critical
+**Agentes envolvidos:** Scout, Echo, Nova, Vault, Sage, Forge, Probe, Anubis, Lens, Scribe, Kowalski
+**Arquivos tocados:** `src/lib/bpm/formularios-etapa*.ts`, `src/actions/bpm/FormulariosEtapa.ts`, `FormularioEtapaWorkspace.tsx`, `scripts/bpm-stage-form-migration.mjs`, testes e documentação RM-2026-045CC0.
+
+### Contexto
+
+Os 32 formulários v1 haviam sido gerados copiando o catálogo de cada pipeline para todas as etapas. Após a P0-1, 1.057 dos 1.237 componentes CAMPO divergiam de `BpmCampoEtapaConfig`.
+
+### O que foi feito
+
+- Classificados 1.043 componentes como cópias de outra etapa e 14 como contrários a `visivel=false`; zero casos ambíguos.
+- Implementados save diferencial com IDs estáveis/CAS, targets estritos de CHECKLIST/CAPABILITY e prevenção canônica na UI.
+- Criada CLI com snapshot, dry-run, hash de plano, drift guard, apply e rollback.
+- Ensaio em backup restaurado passou por apply, rollback, reaplicação e no-op; produção terminou com 180 campos válidos e zero incompatíveis.
+
+### Decisões tomadas
+
+- Composição visual não concede aplicabilidade; somente `BpmCampoEtapaConfig` decide presença na etapa.
+- Configuração ausente não é criada sem evidência específica; associação de pipeline não significa todas as etapas.
+- Valores históricos permanecem intactos mesmo quando um campo sai da composição.
+
+### Problemas encontrados / resolvidos
+
+- Replace-all apagava identidades e o target de CHECKLIST: substituído por reconciliação diferencial e validação de identidade.
+- Last-write-wins: eliminado por `versaoEsperada` e CAS transacional.
+- Turbopack recusou `node_modules` symlink do worktree: gate repetido com árvore local de hardlinks; build aprovado.
+
+### Pendências
+
+- P0-3 deve unificar builder, preview e card real no mesmo renderer.
+- P0-4 deve tratar Draft/PUBLISHED; débitos globais preexistentes permanecem fora desta RM.
+
+### Refletido também em
+
+- `decisions.md`: autoridade campo-etapa, save diferencial e migração reversível.
+- `architecture.md`: contrato final e CLI operacional.
+- `codebase-map.md` e `integration-points.md`: arquivos e fluxo administrativo.
+
+---
+
+## 2026-09-09 19:50 — P0-3 tornou o formulário publicado o renderer do card
+
+**Tags:** #refactor #renderer #crm #nextjs #integrity
+**Agentes envolvidos:** Scout, Vault, Echo, Nova, Sage, Forge, Probe, Anubis, Lens, Scribe, Kowalski
+**Arquivos tocados:** `src/lib/bpm/formulario-renderer.ts`, `src/lib/bpm/formularios-etapa.ts`, `src/actions/bpm/Cards.ts`, `CardModal/*`, workspace administrativo, testes e documentação RM-2026-40526E.
+
+### Contexto
+
+Embora a P0-2 tivesse reconciliado os 32 formulários, o card real ainda selecionava painéis por nomes de etapas e o preview usava uma lista independente. A composição persistida não controlava nenhuma das duas superfícies.
+
+### O que foi feito
+
+- Criado registry canônico para checklist e seis capabilities especializadas.
+- Criado resolver puro, ordenado e fail-closed e um renderer estrutural compartilhado por runtime e preview.
+- Ligados os painéis reais aos targets estáveis, removidos o seletor por nome do pipeline e os predicados visuais por nome de etapa.
+- Builder passou a consumir o registry; preview ficou inerte; campo por etapa continua vindo de `BpmCampoEtapaConfig`.
+- Restrição de campo por perfil foi separada de invalidade estrutural e os IDs de múltiplos blocos ficaram únicos.
+
+### Decisões tomadas
+
+- Composição ausente ou inválida nunca recorre a todos os campos do pipeline.
+- Labels são apresentação; targets, chaves e IDs estáveis controlam comportamento.
+- Tarefas, anexos, histórico, timeline, cadências, SLA, navegação e scripts permanecem no shell global.
+
+### Validação
+
+Produção foi consultada somente para leitura: 32/32 formulários `READY`, 249 componentes e zero diagnóstico em quatro pipelines. Testes focados, lint escopado, build e smoke de proteção de rotas passaram; débitos globais preexistentes foram separados. Nenhuma alteração de banco foi executada.
+
+### Pendências
+
+- P0-4: Draft/PUBLISHED, revisão e histórico editorial.
+- CodeRabbit CLI não está instalado neste ambiente; revisão manual de qualidade e segurança foi concluída.
+
+### Refletido também em
+
+- `decisions.md`: autoridade visual e política fail-closed.
+- `architecture.md`: registry, resolver e renderer compartilhado.
+- `codebase-map.md` e `integration-points.md`: arquivos e fluxo ponta a ponta.

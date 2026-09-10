@@ -122,7 +122,7 @@ export async function processarCadenciasBpm(): Promise<{
           }),
           tx.bpmCadencia.findUnique({
             where: { id: vinculo.cadenciaId },
-            select: { pipelineId: true, etapaId: true, ativa: true },
+            select: { pipelineId: true, ativa: true },
           }),
         ]);
         if (!cardAtual || cardAtual.status !== "ATIVO") throw new Error("CADENCIA_CARD_INATIVO");

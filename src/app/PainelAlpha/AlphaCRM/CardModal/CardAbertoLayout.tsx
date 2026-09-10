@@ -36,7 +36,7 @@ import { SeletorMembrosCard } from "./SeletorMembrosCard";
 import { PainelSlaCard } from "./PainelSlaCard";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
-type EtapaOpcao = { id: string; nome: string; ordem: number; script: string | null };
+type EtapaOpcao = { id: string; chave?: string | null; nome: string; ordem: number; script: string | null };
 type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
 
 export interface CardAbertoLayoutProps {
@@ -51,8 +51,6 @@ export interface CardAbertoLayoutProps {
   onAtualizado: () => void;
   onAbrirCard: (cardId: string) => void;
   onInteracaoCriada: (interacao: Interacao) => void;
-  onEstadoFollowUpChange: (estado: "CARREGANDO" | "ERRO" | "NAO_INICIADO" | "EM_ANDAMENTO" | "CONCLUIDO") => void;
-  estadoFollowUpAtual: "CARREGANDO" | "ERRO" | "NAO_INICIADO" | "EM_ANDAMENTO" | "CONCLUIDO";
   /** Slot: formulário da etapa ativa (renderizado pelo CardOpenFormSlot ou equivalente) */
   children: ReactNode;
 }
@@ -82,8 +80,6 @@ export function CardAbertoLayout({
   onAtualizado,
   onAbrirCard,
   onInteracaoCriada,
-  onEstadoFollowUpChange,
-  estadoFollowUpAtual,
   children,
 }: CardAbertoLayoutProps) {
   const [abaAtiva, setAbaAtiva] = useState<string>(card.pipeline.id);
@@ -117,13 +113,10 @@ export function CardAbertoLayout({
     ));
   const etapaAtual = etapas.find((e) => e.id === card.etapa.id) ?? null;
 
-  const transicoesDaEtapaAtual = card.etapa.transicoesOrigem ?? [];
-  const etapasParaMover =
-    transicoesDaEtapaAtual.length > 0
-      ? etapas.filter(
-          (e) => e.id === card.etapa.id || transicoesDaEtapaAtual.some((t) => t.etapaDestinoId === e.id),
-        )
-      : etapas;
+  const transicoesDaEtapaAtual = card.etapa.transicoesEtapaOrigem ?? [];
+  const etapasParaMover = etapas.filter(
+    (e) => e.id === card.etapa.id || transicoesDaEtapaAtual.some((t) => t.etapaDestinoId === e.id),
+  );
 
   return (
     <div className="flex flex-col h-full">

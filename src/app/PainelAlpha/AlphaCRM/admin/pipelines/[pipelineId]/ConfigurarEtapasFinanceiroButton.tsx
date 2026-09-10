@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { ConfigurarPipelineFinanceiro } from "@/actions/bpm/PipelineFinanceiro";
-interface ConfiguracaoFinanceira { etapas: Array<{ id: string; nome: string; ordem: number; slaDias: number | null; ativo: boolean }>; campos: Array<{ id: string; pipelineId: string; etapaId: string | null; nome: string; tipo: string; obrigatorio: boolean; ordem: number }> }
+interface ConfiguracaoFinanceira { etapas: Array<{ id: string; nome: string; ordem: number; ativo: boolean }>; campos: Array<{ id: string; pipelineId: string; etapaId: string | null; nome: string; tipo: string; obrigatorio: boolean; ordem: number }> }
 interface Props { pipelineId: string; accent: string; onConfigured: (data: ConfiguracaoFinanceira) => void }
 export function ConfigurarEtapasFinanceiroButton({ pipelineId, accent, onConfigured }: Props) {
   const [isApplying, setIsApplying] = useState(false); const [feedback, setFeedback] = useState<string | null>(null);

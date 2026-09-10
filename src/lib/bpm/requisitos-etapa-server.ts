@@ -22,7 +22,6 @@ import type { ContextoAvaliacao } from "@/lib/bpm/regras/types";
 type ClienteRequisitosEtapa = Pick<
   typeof db,
   | "bpmCampo"
-  | "bpmCampoObrigatorioEtapa"
   | "bpmCardCampoValor"
   | "bpmCard"
   | "bpmCampoMapeamento"
@@ -69,6 +68,7 @@ export async function verificarTransicaoPermitidaBpm(
 
 export type CampoAplicavelEtapaBpm = {
   id: string;
+  chave?: string | null;
   pipelineId: string;
   etapaId: string | null;
   nome: string;
@@ -107,10 +107,6 @@ type ConfiguracaoAcessoCampo = {
 
 function resolverConfiguracaoAcessoCampo(
   campo: {
-    visivel?: boolean;
-    editavel?: boolean;
-    somenteLeitura?: boolean;
-    obrigatorio: boolean;
     acessos?: Array<ConfiguracaoAcessoCampo & { perfil: string }>;
   },
   configEtapa: ConfiguracaoAcessoCampo | undefined,
@@ -119,15 +115,12 @@ function resolverConfiguracaoAcessoCampo(
   const acesso = perfilAcesso
     ? campo.acessos?.find((item) => item.perfil === perfilAcesso)
     : undefined;
-  const visivel = campo.visivel !== false
-    && configEtapa?.visivel !== false
+  const visivel = configEtapa?.visivel === true
     && acesso?.visivel !== false;
-  const somenteLeitura = campo.somenteLeitura === true
-    || configEtapa?.somenteLeitura === true
+  const somenteLeitura = configEtapa?.somenteLeitura === true
     || acesso?.somenteLeitura === true;
   const editavel = visivel
-    && campo.editavel !== false
-    && configEtapa?.editavel !== false
+    && configEtapa?.editavel === true
     && acesso?.editavel !== false
     && !somenteLeitura;
   return {
@@ -135,7 +128,7 @@ function resolverConfiguracaoAcessoCampo(
     editavel,
     somenteLeitura,
     // BpmCampoAcesso controla apresentação/autorização, jamais requisito de negócio.
-    obrigatorio: configEtapa?.obrigatorio ?? campo.obrigatorio,
+    obrigatorio: configEtapa?.obrigatorio === true,
   };
 }
 
@@ -144,9 +137,11 @@ export async function carregarCamposAplicaveisEtapa(
   etapaId: string,
   client: ClienteRequisitosEtapa = db,
   perfilAcesso?: PerfilAcessoCampoBpm,
+  opcoes: { incluirRestritosAoPerfil?: boolean } = {},
 ): Promise<Array<Omit<CampoAplicavelEtapaBpm, "valor">>> {
   const selectCampo = {
     id: true,
+    chave: true,
     pipelineId: true,
     etapaId: true,
     nome: true,
@@ -203,18 +198,23 @@ export async function carregarCamposAplicaveisEtapa(
   >();
   for (const campo of diretos) {
     const configsEtapa = campo.etapaConfiguracoes ?? [];
-    const opcoes = campo.opcoes ?? [];
+    const opcoesCampo = campo.opcoes ?? [];
     const configEtapa = configsEtapa.find((config) => config.etapaId === etapaId);
     if (!configEtapa) continue;
+    // Configuração invisível não integra o formulário publicado. Restrição por
+    // perfil, por outro lado, apenas oculta o campo daquele usuário e não torna
+    // a composição estruturalmente inválida.
+    if (!configEtapa.visivel) continue;
     const acesso = resolverConfiguracaoAcessoCampo(campo, configEtapa, perfilAcesso);
-    if (!acesso.visivel) continue;
+    if (!acesso.visivel && !opcoes.incluirRestritosAoPerfil) continue;
     porId.set(campo.id, {
       id: campo.id,
+      chave: campo.chave,
       pipelineId: campo.pipelineId,
-      etapaId: campo.etapaId,
+      etapaId: configEtapa.etapaId,
       nome: campo.nome,
       tipo: campo.tipo,
-      opcoesJson: opcoes.length ? JSON.stringify(opcoes.map((opcao) => opcao.rotulo)) : campo.opcoesJson,
+      opcoesJson: opcoesCampo.length ? JSON.stringify(opcoesCampo.map((opcao) => opcao.rotulo)) : campo.opcoesJson,
       obrigatorio: acesso.obrigatorio,
       obrigatorioEntrada: configEtapa?.obrigatorioEntrada ?? false,
       obrigatorioSaida: configEtapa?.obrigatorioSaida ?? false,
@@ -222,7 +222,7 @@ export async function carregarCamposAplicaveisEtapa(
       grupo: configEtapa?.grupo ?? null,
       ativo: campo.ativo ?? true,
       escopo: campo.escopo ?? "CARD",
-      valorPadrao: configEtapa?.valorPadrao ?? campo.valorPadrao ?? null,
+      valorPadrao: configEtapa?.valorPadrao ?? null,
       fonteEntidade: campo.fonteEntidade ?? null,
       fonteAtributo: campo.fonteAtributo ?? null,
       entidadeGlobal: campo.entidadeGlobal ?? null,
@@ -246,8 +246,12 @@ export async function carregarCamposAplicaveisCardEtapa(
   etapaId: string,
   client: ClienteRequisitosEtapa = db,
   perfilAcesso?: PerfilAcessoCampoBpm,
+  camposBase?: Array<Omit<CampoAplicavelEtapaBpm, "valor">>,
 ): Promise<CampoAplicavelEtapaBpm[]> {
-  let campos = await carregarCamposAplicaveisEtapa(pipelineId, etapaId, client, perfilAcesso);
+  let campos = camposBase
+    ? [...camposBase]
+    : await carregarCamposAplicaveisEtapa(pipelineId, etapaId, client, perfilAcesso);
+  campos = campos.filter((campo) => campo.visivel);
   if (campos.length === 0) return [];
 
   const possuiCondicao = campos.some((campo) => campo.condicaoVisibilidadeJson || campo.condicaoObrigatoriedadeJson);

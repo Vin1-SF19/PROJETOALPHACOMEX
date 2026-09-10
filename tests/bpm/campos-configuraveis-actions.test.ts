@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   campoFindUnique: vi.fn(),
   etapaFindMany: vi.fn(),
   pipelineFindMany: vi.fn(),
+  pipelineUpdate: vi.fn(),
   opcaoCreateMany: vi.fn(),
   campoPipelineCreateMany: vi.fn(),
   acessoCreateMany: vi.fn(),
@@ -52,7 +53,7 @@ const ETAPA_ID = "clw000000000000000etapa1";
 
 function clienteTx() {
   return {
-    bpmPipeline: { findMany: mocks.pipelineFindMany },
+    bpmPipeline: { findMany: mocks.pipelineFindMany, update: mocks.pipelineUpdate },
     bpmEtapa: { findMany: mocks.etapaFindMany },
     bpmCampo: { create: mocks.campoCreate, update: mocks.campoUpdate, findUniqueOrThrow: mocks.campoFindUniqueOrThrow },
     bpmCampoOpcao: { createMany: mocks.opcaoCreateMany },
@@ -75,6 +76,7 @@ describe("ações de gestão configurável de campos", () => {
     mocks.exigirConfig.mockResolvedValue(undefined);
     mocks.notificar.mockResolvedValue(undefined);
     mocks.pipelineFindMany.mockResolvedValue([{ id: PIPELINE_ID }]);
+    mocks.pipelineUpdate.mockResolvedValue({ configVersion: 2 });
     mocks.etapaFindMany.mockResolvedValue([{ id: ETAPA_ID, pipelineId: PIPELINE_ID }]);
     mocks.campoCreate.mockResolvedValue({ id: CAMPO_DESTINO_ID, pipelineId: PIPELINE_ID });
     mocks.campoFindUniqueOrThrow.mockResolvedValue({

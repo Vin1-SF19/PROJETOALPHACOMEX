@@ -20,7 +20,7 @@ import { ConteudoScriptEtapa } from "@/app/PainelAlpha/AlphaCRM/CardModal/Conteu
 
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
-type EtapaOpcao = { id: string; nome: string; ordem: number; script: string | null };
+type EtapaOpcao = { id: string; chave?: string | null; nome: string; ordem: number; script: string | null };
 
 interface Props {
   card: CardDetalhe;
@@ -29,10 +29,12 @@ interface Props {
   podeEditar: boolean;
   realtimeRevision: number;
   onAtualizado: () => void;
-
+  onEstadoFollowUpChange?: (
+    estado: "CARREGANDO" | "ERRO" | "NAO_INICIADO" | "EM_ANDAMENTO" | "CONCLUIDO",
+  ) => void;
 }
 
-export default function PainelRegistrar({ card, etapaAtual, accent, podeEditar, realtimeRevision, onAtualizado }: Props) {
+export default function PainelRegistrar({ card, etapaAtual, accent, podeEditar, realtimeRevision, onAtualizado, onEstadoFollowUpChange }: Props) {
   const [abaAtiva, setAbaAtiva] = useState("formulario-etapa");
 
   return (
@@ -60,6 +62,7 @@ export default function PainelRegistrar({ card, etapaAtual, accent, podeEditar, 
             podeEditar={podeEditar}
             realtimeRevision={realtimeRevision}
             onAtualizado={onAtualizado}
+            onEstadoFollowUpChange={onEstadoFollowUpChange}
           />
         </TabsContent>
 

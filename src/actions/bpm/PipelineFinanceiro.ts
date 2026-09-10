@@ -46,11 +46,9 @@ export async function ConfigurarPipelineFinanceiro(pipelineId: string) {
         if (!etapa) throw new Error("Etapa financeira não configurada");
         const existing = pipeline.campos.find((campo) => campo.nome === definition.label);
         const data = {
-          etapaId: null,
           nome: definition.label,
           tipo: definition.type,
           opcoesJson: definition.options ? JSON.stringify(definition.options) : null,
-          obrigatorio: false,
           ordem,
         };
         const campo = existing
@@ -71,7 +69,6 @@ export async function ConfigurarPipelineFinanceiro(pipelineId: string) {
         });
         fields.push(campo);
       }
-      for (let index = 0; index < FINANCIAL_STAGES.length - 1; index += 1) await tx.bpmEtapaTransicaoPermitida.upsert({ where: { etapaOrigemId_etapaDestinoId: { etapaOrigemId: etapas[index].id, etapaDestinoId: etapas[index + 1].id } }, create: { etapaOrigemId: etapas[index].id, etapaDestinoId: etapas[index + 1].id }, update: {} });
       for (const origem of etapas) {
         for (const destino of etapas) {
           if (origem.id === destino.id) continue;

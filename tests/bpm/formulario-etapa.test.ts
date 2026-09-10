@@ -18,6 +18,8 @@ const proximoContato = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximo
 const statusPosFechamento = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelStatusPosFechamento.tsx");
 const checklistFollowUp = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelChecklistFollowUp.tsx");
 const proximaEtapa = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa.tsx");
+const builder = ler("src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/FormularioEtapaWorkspace.tsx");
+const saveAction = ler("src/actions/bpm/FormulariosEtapa.ts");
 
 describe("CRM - formulário unificado por etapa", () => {
   it("centraliza os campos dinâmicos atuais na aba Formulário da Etapa", () => {
@@ -28,11 +30,11 @@ describe("CRM - formulário unificado por etapa", () => {
   });
 
   it("coloca os controles nativos de cada etapa no formulário central", () => {
-    expect(slotFormulario).toContain("etapaEhFechado(card.etapa.nome)");
+    expect(slotFormulario).toContain('case "commercial-post-closing"');
     expect(slotFormulario).toContain("<PainelStatusPosFechamento");
     expect(slotFormulario).toContain("<PainelProximoContato");
     expect(slotFormulario).not.toContain("etapaExigeProximoContato(card.etapa.nome)");
-    expect(slotFormulario).toContain("etapaEhEmTratativa(card.etapa.nome)");
+    expect(slotFormulario).toContain('case "follow-up-checklist"');
     expect(slotFormulario).toContain("<PainelChecklistFollowUp");
     expect(historico).not.toContain("<PainelStatusPosFechamento");
     expect(historico).not.toContain("<PainelProximoContato");
@@ -40,7 +42,7 @@ describe("CRM - formulário unificado por etapa", () => {
   });
 
   it("oferece criação ou reagendamento do Meet somente em Agendar Reunião", () => {
-    expect(slotFormulario).toContain("if (etapaEhAgendarReuniao(card.etapa.nome))");
+    expect(slotFormulario).toContain('case "meeting-scheduler"');
     expect(slotFormulario).toContain("<PainelReuniao");
     expect(modal).not.toContain("<PainelReuniao");
     expect(modal).not.toContain("destinoEhReuniaoAgendada");
@@ -48,26 +50,33 @@ describe("CRM - formulário unificado por etapa", () => {
   });
 
   it("mostra acompanhamento e resumo em Reunião Agendada sem reabrir o agendamento", () => {
-    expect(slotFormulario).toContain("etapaEhReuniaoAgendada(card.etapa.nome)");
+    expect(slotFormulario).toContain('case "meeting-transcript"');
     expect(slotFormulario).toContain("mostrarFormulario={false}");
     expect(reuniao).toContain('aria-label="Resumo da reunião"');
   });
 
-  it("renderiza exclusivamente o painel de reunião nessa etapa", () => {
-    const ramoAgendar = slotFormulario.slice(
-      slotFormulario.indexOf("if (etapaEhAgendarReuniao(card.etapa.nome))"),
-      slotFormulario.indexOf("\n  return (", slotFormulario.indexOf("if (etapaEhAgendarReuniao(card.etapa.nome))") + 1),
-    );
-
-    expect(ramoAgendar).toContain("<PainelReuniao");
-    expect(ramoAgendar).not.toContain("<PainelCamposEtapaAtual");
-    expect(ramoAgendar).not.toContain("<PainelProximoContato");
+  it("delega a exclusividade visual à composição publicada", () => {
+    expect(slotFormulario).toContain("formulario={card.formularioEtapa}");
+    expect(slotFormulario).toContain("componente.rendererId");
+    expect(slotFormulario).not.toMatch(/etapaEh[A-Z]/);
+    expect(slotFormulario).not.toContain("card.etapa.nome");
     expect(slotFormulario).toContain("<PainelCamposEtapaAtual");
     expect(slotFormulario).toContain("<PainelProximoContato");
   });
 
   it("mantém a ação de mover no painel direito", () => {
     expect(layoutCard).toContain("<PainelProximaEtapa");
+  });
+
+  it("impede o builder de recriar campo fora da configuração canônica da etapa", () => {
+    expect(builder).toContain("config.etapaId === etapaId && config.visivel");
+    expect(builder).toContain("versaoEsperada: etapa.formulario?.versao ?? null");
+    expect(builder).toContain("id: secao.id");
+    expect(builder).toContain("id: componente.id");
+    expect(builder).toContain("!secoes.some((secaoAtual)");
+    expect(saveAction).toContain("etapaConfiguracoes[0]");
+    expect(saveAction).toContain("CONFLITO_VERSAO_FORMULARIO");
+    expect(saveAction).not.toContain("bpmFormularioSecao.deleteMany({\n        where: { formularioId");
   });
 
 

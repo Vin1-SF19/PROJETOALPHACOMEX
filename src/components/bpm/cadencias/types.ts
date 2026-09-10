@@ -16,10 +16,8 @@ export type CadenciaView = {
   nome: string;
   descricao: string | null;
   pipelineId: string | null;
-  etapaId: string | null;
   ativa: boolean;
   pipeline?: { id: string; nome: string } | null;
-  etapa?: { id: string; nome: string } | null;
   etapas: Array<{
     etapaId: string;
     etapa: { id: string; nome: string; pipelineId: string };

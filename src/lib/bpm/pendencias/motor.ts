@@ -111,9 +111,24 @@ export async function listarPendenciasBpm(
       where: { cardId: { in: cardIds }, status: { not: "CONCLUIDO" } },
       select: { id: true, cardId: true, templateNome: true },
     }),
-    client.bpmCampo.findMany({
-      where: { pipelineId: { in: cards.map((c) => c.pipelineId) }, obrigatorio: true },
-      select: { id: true, pipelineId: true, etapaId: true, nome: true },
+    client.bpmCampoEtapaConfig.findMany({
+      where: {
+        etapaId: { in: [...new Set(cards.map((card) => card.etapaId))] },
+        obrigatorio: true,
+        visivel: true,
+        campo: { ativo: true },
+      },
+      select: {
+        etapaId: true,
+        campo: {
+          select: {
+            id: true,
+            pipelineId: true,
+            nome: true,
+            pipelinesAssociados: { select: { pipelineId: true } },
+          },
+        },
+      },
     }),
     client.bpmCardCampoValor.findMany({
       where: { cardId: { in: cardIds } },
@@ -150,16 +165,20 @@ export async function listarPendenciasBpm(
 
   const valorPorCardCampo = new Map(valoresCampos.map((v) => [`${v.cardId}:${v.campoId}`, v.valor]));
   for (const card of cards) {
-    const camposDaEtapa = camposObrigatorios.filter(
-      (campo) => campo.pipelineId === card.pipelineId && (campo.etapaId === null || campo.etapaId === card.etapaId),
+    const camposDaEtapa = camposObrigatorios.filter((config) =>
+      config.etapaId === card.etapaId
+      && (
+        config.campo.pipelineId === card.pipelineId
+        || config.campo.pipelinesAssociados.some((item) => item.pipelineId === card.pipelineId)
+      ),
     );
-    for (const campo of camposDaEtapa) {
-      const valor = valorPorCardCampo.get(`${card.id}:${campo.id}`);
+    for (const config of camposDaEtapa) {
+      const valor = valorPorCardCampo.get(`${card.id}:${config.campo.id}`);
       if (!valor || !valor.trim()) {
         itens.push({
           ...base(card.id),
           tipo: "CAMPO_OBRIGATORIO_FALTANTE",
-          titulo: `Campo obrigatório faltando — ${campo.nome}`,
+          titulo: `Campo obrigatório faltando — ${config.campo.nome}`,
           prazo: null,
         });
       }

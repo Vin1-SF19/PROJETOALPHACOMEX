@@ -10,9 +10,9 @@ import {
 } from "../../src/lib/bpm/pipeline-config-publicacao";
 
 const etapas: EtapaPublicacao[] = [
-  { id: "e1", ordem: 0, ativo: true, ehInicial: true, ehFinal: false },
-  { id: "e2", ordem: 1, ativo: true, ehInicial: false, ehFinal: false },
-  { id: "e3", ordem: 2, ativo: true, ehInicial: false, ehFinal: true },
+  { id: "e1", nome: "Entrada", cor: null, ordem: 0, ativo: true, ehInicial: true, ehFinal: false },
+  { id: "e2", nome: "Análise", cor: null, ordem: 1, ativo: true, ehInicial: false, ehFinal: false },
+  { id: "e3", nome: "Fim", cor: null, ordem: 2, ativo: true, ehInicial: false, ehFinal: true },
 ];
 const transicoes: TransicaoPublicacao[] = [
   { id: "t12", etapaOrigemId: "e1", etapaDestinoId: "e2", permitida: true, origem: "AMBOS" },
@@ -49,10 +49,38 @@ describe("publicação versionada da configuração", () => {
     expect(validarSnapshotPublicacao({ atual: { etapas, transicoes, campos }, proposto: { ...base, transicoes: bloqueadas, campos: base.campos.map((item) => ({ ...item, ativo: item.id === "regime" })) } }).join(" ")).toContain("alcançáveis");
   });
 
+  it("preserva transição publicada para etapa inativa sem reabrir decisão histórica", () => {
+    const etapasAtuais = etapas.map((item) => ({ ...item, ativo: item.id === "e2" ? false : item.ativo }));
+    const proposto = {
+      etapas: etapasAtuais.map((item) => ({ ...item })),
+      transicoes: transicoes.map((item) => ({ ...item })),
+      campos: campos.map(({ id }) => ({ id, ativo: id === "regime" })),
+    };
+
+    expect(validarSnapshotPublicacao({ atual: { etapas: etapasAtuais, transicoes, campos }, proposto }))
+      .not.toContain("Transições permitidas só podem conectar etapas ativas.");
+  });
+
+  it("rejeita até transição bloqueada que referencie etapa fora do pipeline", () => {
+    const proposto = {
+      etapas: etapas.map((item) => ({ ...item })),
+      transicoes: [
+        ...transicoes.map((item) => ({ ...item })),
+        { id: "draft-externa", etapaOrigemId: "e1", etapaDestinoId: "etapa-outro-pipeline", permitida: false, origem: "AMBOS" as const },
+      ],
+      campos: campos.map(({ id }) => ({ id, ativo: id === "regime" })),
+    };
+
+    expect(validarSnapshotPublicacao({ atual: { etapas, transicoes, campos }, proposto }))
+      .toContain("Toda transição precisa pertencer às etapas do pipeline publicado.");
+  });
+
   it("mantém CAS, autorização transacional, auditoria sanitizada e UX de conflito", () => {
     const action = readFileSync("src/actions/bpm/ConfiguracaoPipeline.ts", "utf8");
     const ui = readFileSync("src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/AdminPipelineClient.tsx", "utf8");
-    expect(action).toContain('where: { id: proposta.pipelineId, updatedAt: pipeline.updatedAt }');
+    expect(action).toContain("configVersion: proposta.baseVersion");
+    expect(action).toContain("configVersion: { increment: 1 }");
+    expect(action).not.toContain("updatedAt: pipeline.updatedAt");
     expect(action).toContain('campoAlterado: "configuracao_publicada"');
     expect(action).toContain('await exigirAcessoConfigPipeline(userId, "configurarEtapas", tx)');
     expect(action).not.toContain("valorAnteriorJson: JSON.stringify(proposta)");

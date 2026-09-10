@@ -7,18 +7,26 @@ const CUID2 = "cfakecuidqrstuvwxyz12345";
 const PIPE = "cpipelinefakeabcdefghij12";
 
 describe("schema de campos BPM (CRUD completo)", () => {
-  it("permite atualizar nome, tipo, etapaId e obrigatorio", () => {
+  it("permite atualizar comportamento por etapa apenas pela configuração canônica", () => {
     const r = atualizarCampoSchema.safeParse({
       campoId: CUID,
       nome: "Novo nome",
       tipo: "selecao",
-      etapaId: CUID2,
-      obrigatorio: true,
+      etapaConfiguracoes: [{
+        etapaId: CUID2,
+        obrigatorio: true,
+        visivel: true,
+        editavel: true,
+        somenteLeitura: false,
+        ordem: 0,
+      }],
     });
     expect(r.success).toBe(true);
     if (r.success) {
       expect(r.data.tipo).toBe("selecao");
-      expect(r.data.etapaId).toBe(CUID2);
+      expect(r.data.etapaConfiguracoes?.[0]).toMatchObject({ etapaId: CUID2, obrigatorio: true });
+      expect(r.data).not.toHaveProperty("etapaId");
+      expect(r.data).not.toHaveProperty("obrigatorio");
     }
   });
 
