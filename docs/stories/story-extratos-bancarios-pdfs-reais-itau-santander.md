@@ -110,9 +110,18 @@ quality_gate_tools: ["lint", "typecheck", "test", "build", "coderabbit"]
   - [ ] Executar `npm run lint`.
   - [ ] Executar `npm run typecheck`.
   - [ ] Executar `npm test`.
-  - [ ] Executar `npm run build`.
+  - [x] Executar `npm run build`.
   - [x] Executar a revisão CodeRabbit quando disponível e tratar qualquer issue `CRITICAL`.
   - [x] Atualizar as tarefas, o Dev Agent Record e a File List desta story antes de encaminhar para revisão.
+- [x] Task 7 — Corrigir a regressão do extrato real da CAIXA reportada em 2026-09-10
+  - [x] Validar localmente a camada de texto das seis páginas sem versionar o PDF real nem seus dados cadastrais/financeiros.
+  - [x] Substituir o fallback genérico de `parserCaixa` por um parser determinístico para o layout `Extrato — Lançamentos` validado na amostra.
+  - [x] Recompor lançamentos quebrados entre linhas, preservar sinais e descartar saldos, cabeçalhos, rodapés e metadados.
+  - [x] Autodetectar a assinatura da CAIXA antes do fallback por agentes, preservando o fluxo Onyx para layouts desconhecidos.
+- [x] Task 8 — Proteger a correção da CAIXA com regressão automatizada
+  - [x] Adicionar fixture inline sanitizada que cubra crédito, débito, descrição multilinha, valor quebrado e `SALDO DIA`.
+  - [x] Validar resultado completo, autodetecção inequívoca e ausência de alteração no fallback de textos desconhecidos.
+  - [x] Executar o parser contra o PDF local e conferir quantidade, primeira/última movimentação e reconciliação financeira sem registrar dados sensíveis.
 
 ## Dev Notes
 
@@ -155,6 +164,7 @@ quality_gate_tools: ["lint", "typecheck", "test", "build", "coderabbit"]
 |---|---:|---|---|
 | 2026-08-04 | 1.0 | Story criada para validar e ajustar os parsers determinísticos de Itaú e Santander contra os dois PDFs reais fornecidos. | River |
 | 2026-08-04 | 1.1 | Parsers dedicados, autodetecção no fluxo de upload, regressão sintética e validação financeira dos PDFs reais implementados; gates globais preexistentes documentados. | Dex |
+| 2026-09-10 | 1.2 | Parser determinístico e autodetecção do layout real `Extrato — Lançamentos` da CAIXA adicionados, com regressão sanitizada e validação das seis páginas fornecidas. | Dex |
 
 ## Story Draft Checklist Validation
 
@@ -186,6 +196,12 @@ GPT-5 Codex
 - `npm run lint` — bloqueado por milhares de erros preexistentes porque a configuração varre `.agents`, `.aiox-core` e `.claude/worktrees`; lint direcionado passou.
 - `npm run build` — bloqueado no `prisma generate` por `EPERM` no DLL local em uso; `npx next build` passou completamente.
 - CodeRabbit — indisponível porque o WSL não está instalado nesta máquina.
+- `npx vitest run tests/extratos/parsers-extratos-reais.test.ts` — 5 testes passaram após incluir a regressão sanitizada da CAIXA.
+- `npx vitest run tests/extratos` — 6 arquivos e 27 testes passaram.
+- Lint direcionado de `caixa.ts`, `index.ts` e do teste alterado — passou sem erros ou warnings.
+- Validação ponta a ponta com o PDF CAIXA fornecido — 6 páginas, autodetecção `caixa`, 99 transações, zero páginas com erro e reconciliação exata entre movimentações e saldos; o arquivo real não foi modificado nem versionado.
+- `npm run build` — passou; o Next.js compilou e gerou as 78 páginas estáticas.
+- Gates globais em 2026-09-10: `npm run typecheck` segue bloqueado por erros preexistentes fora de Extratos; `npm test` teve 351 arquivos aprovados e 14 arquivos com falhas preexistentes; `npm run lint` segue bloqueado pela varredura de `.agents`/`.aiox-core` e código legado.
 
 ### Completion Notes List
 
@@ -194,11 +210,16 @@ GPT-5 Codex
 - O upload autodetecta esses dois layouts pelo conteúdo e usa o parser local antes da IA; layouts não reconhecidos ou sem resultado determinístico mantêm o fallback existente.
 - Não foi necessário criar um novo banco, dependência, configuração, migration ou qualquer alteração de dados.
 - A autocrítica passou; o DoD permanece parcial apenas pelos gates globais e pela indisponibilidade do CodeRabbit descritos acima.
+- A CAIXA agora é resolvida localmente antes do Onyx: o layout fornecido deixa de depender da resposta JSON do agente e não produz mais as seis páginas com erro.
+- O parser da CAIXA recompõe históricos/valores quebrados, usa o valor anterior a `R$` como movimentação, preserva débitos e remove `SALDO DIA`.
+- O fallback por agentes permanece inalterado para layouts que não correspondem às assinaturas determinísticas conhecidas.
 
 ### File List
 
 - `docs/stories/story-extratos-bancarios-pdfs-reais-itau-santander.md`
 - `plan/self-critique-extratos-pdfs-reais.json`
+- `plan/self-critique-extratos-caixa.json`
+- `src/lib/extrato/parsers/caixa.ts`
 - `src/lib/extrato/parsers/index.ts`
 - `src/lib/extrato/parsers/itau.ts`
 - `src/lib/extrato/parsers/santander.ts`

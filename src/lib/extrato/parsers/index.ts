@@ -19,7 +19,7 @@ import { parserGenerico } from "./generico";
 export type { ParserExtrato } from "./types";
 
 export interface ParserDetectado {
-  bancoId: "itau" | "santander" | "mercadoPago";
+  bancoId: "itau" | "santander" | "mercadoPago" | "caixa";
   parser: ParserExtrato;
 }
 
@@ -53,7 +53,18 @@ export function detectarParserExtrato(texto: string): ParserDetectado | null {
   const normalizado = texto
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+
+  if (
+    normalizado.includes("sac caixa") &&
+    normalizado.includes("extrato lancamentos de") &&
+    normalizado.includes("data de lancamento data de movimento documento historico") &&
+    normalizado.includes("valor(r$)") &&
+    normalizado.includes("saldo(r$)")
+  ) {
+    return { bancoId: "caixa", parser: parserCaixa };
+  }
 
   if (
     normalizado.includes("lancamentos do periodo") &&

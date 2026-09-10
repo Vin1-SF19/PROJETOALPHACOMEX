@@ -62,6 +62,34 @@ Conta Corrente | Aplicações Automáticas
 06/07 239,88 0,00 0,00 0,00 0,00 0,00 239,88
 `;
 
+const CAIXA_LANCAMENTOS = `
+EMPRESA EXEMPLO LTDA
+CNPJ: 00.000.000/0001-00
+Agência: 0000 Produto: 0000 Conta: 000000-0
+Emitido em
+02/09/2026 16:59:41
+Extrato Lançamentos de 01/08/2026 à 31/08/2026
+Data de
+lançamento
+Data de
+movimento Documento Histórico Valor(R$) Saldo(R$)
+31/07/2026 31/07/2026 111111 AZCX MC CD 193,76 R$ 38.308,57
+31/07/2026 31/07/2026 222222 DEB PIX CHAVE - 3.405,00 R$ 34.903,57
+31/07/2026 31/07/2026 0 SALDO DIA 0,00 R$ 34.903,57
+03/08/2026 03/08/2026 333333 DEB PIX CHAVE -
+12.990,70 R$ 21.912,87
+Data de
+lançamento
+Data de
+movimento Documento Histórico Valor(R$) Saldo(R$)
+05/08/2026 05/08/2026 444444 PIX RECEBIDO DADOS
+CONTA 40.532,86 R$ 62.445,73
+10/08/2026 10/08/2026 555555 PAGAMENTO ORGAO
+GOVERNO - 988,94 R$ 61.456,79
+SAC CAIXA
+0800 726 0101
+`;
+
 describe("parsers de extratos validados contra PDFs reais", () => {
   it("recompõe linhas e quebras de página do Itaú simplificado", () => {
     expect(obterParser("itau").parse(ITAU_SIMPLIFICADO)).toEqual([
@@ -120,10 +148,21 @@ describe("parsers de extratos validados contra PDFs reais", () => {
     ]);
   });
 
+  it("lê o extrato de lançamentos da CAIXA sem confundir valor e saldo", () => {
+    expect(obterParser("caixa").parse(CAIXA_LANCAMENTOS)).toEqual([
+      { data: "31/07/2026", descricao: "AZCX MC CD", valor: 193.76 },
+      { data: "31/07/2026", descricao: "DEB PIX CHAVE", valor: -3_405 },
+      { data: "03/08/2026", descricao: "DEB PIX CHAVE", valor: -12_990.7 },
+      { data: "05/08/2026", descricao: "PIX RECEBIDO DADOS CONTA", valor: 40_532.86 },
+      { data: "10/08/2026", descricao: "PAGAMENTO ORGAO GOVERNO", valor: -988.94 },
+    ]);
+  });
+
   it("autodetecta apenas as assinaturas validadas e preserva o fallback", () => {
     expect(detectarParserExtrato(ITAU_SIMPLIFICADO)?.bancoId).toBe("itau");
     expect(detectarParserExtrato(ITAU_MENSAL)?.bancoId).toBe("itau");
     expect(detectarParserExtrato(SANTANDER_CONSOLIDADO)?.bancoId).toBe("santander");
+    expect(detectarParserExtrato(CAIXA_LANCAMENTOS)?.bancoId).toBe("caixa");
     expect(detectarParserExtrato("extrato de outro banco sem assinatura")).toBeNull();
     expect(obterParser("banco-inexistente").parse("texto sem transações")).toEqual([]);
   });

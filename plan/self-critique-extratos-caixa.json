@@ -1,0 +1,32 @@
+{
+  "subtaskId": "extratos-caixa",
+  "critiquedAt": "2026-09-10T20:30:00Z",
+  "step5_5": {
+    "predictedBugs": [
+      "A data poderia ser zerada junto com o estado do registro antes de ser adicionada à transação; a implementação preserva uma cópia local antes da limpeza.",
+      "Cabeçalhos da página seguinte poderiam ser anexados ao último lançamento da página anterior; registros completos são concluídos assim que o par valor e saldo é encontrado.",
+      "O sinal de débito poderia ser perdido quando o hífen e o valor aparecem em linhas físicas diferentes; a expressão considera espaço e quebra recomposta entre o sinal e o número.",
+      "O saldo acumulado poderia ser importado como valor da movimentação; o parser captura explicitamente o primeiro valor do par final e ignora o número depois de R$."
+    ],
+    "edgeCases": [
+      "Registro SALDO DIA com valor zero deve ser descartado mesmo contendo data e saldo acumulado.",
+      "Histórico e valor quebrados em uma linha seguinte devem formar uma única transação.",
+      "Cabeçalhos e rodapés entre registros completos devem ser ignorados quando não há registro em montagem.",
+      "Registro incompleto no final do texto deve ser descartado sem lançar exceção nem contaminar o registro anterior."
+    ],
+    "errorHandling": true,
+    "securityCheck": true,
+    "passed": true
+  },
+  "step6_5": {
+    "followsPatterns": true,
+    "noHardcoded": true,
+    "testsAdded": true,
+    "docsUpdated": true,
+    "noConsoleLogs": true,
+    "passed": true
+  },
+  "overallVerdict": "PASSED",
+  "skipped": false,
+  "skipWarning": null
+}
