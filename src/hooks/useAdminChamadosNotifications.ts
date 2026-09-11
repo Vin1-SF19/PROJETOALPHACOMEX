@@ -7,6 +7,7 @@ import {
   CHAMADO_ASSUMIDO_EVENT,
   CHAMADO_CONCLUIDO_EVENT,
   CHAMADO_MENSAGEM_EVENT,
+  CHAMADOS_OPERACIONAIS_ATUALIZAR_EVENT,
   CHAMADOS_ADMIN_CHANNEL,
   NOVO_CHAMADO_EVENT,
   canalChamadosDoUsuario,
@@ -54,6 +55,7 @@ export function useChamadosNotifications(role: string | undefined, userId: numbe
         urgencia: 'MENSAGEM',
         createdAt: payload.createdAt,
       });
+      window.dispatchEvent(new Event(CHAMADOS_OPERACIONAIS_ATUALIZAR_EVENT));
       playAudio();
     };
 
@@ -68,6 +70,7 @@ export function useChamadosNotifications(role: string | undefined, userId: numbe
           urgencia: payload.urgencia,
           createdAt: payload.createdAt,
         });
+        window.dispatchEvent(new Event(CHAMADOS_OPERACIONAIS_ATUALIZAR_EVENT));
         playAudio();
       };
       channel.bind(NOVO_CHAMADO_EVENT, handler);

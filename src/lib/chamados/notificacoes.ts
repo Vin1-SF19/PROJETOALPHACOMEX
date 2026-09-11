@@ -5,6 +5,7 @@ export const NOVO_CHAMADO_EVENT = "novo-chamado";
 export const CHAMADO_CONCLUIDO_EVENT = "chamado-concluido";
 export const CHAMADO_ASSUMIDO_EVENT = "chamado-assumido";
 export const CHAMADO_MENSAGEM_EVENT = "chamado-mensagem";
+export const CHAMADOS_OPERACIONAIS_ATUALIZAR_EVENT = "chamados:operacionais-atualizar";
 export const CHAMADO_USUARIO_CHANNEL_PREFIX = "private-chamados-usuario-";
 
 export interface NovoChamadoPayload {

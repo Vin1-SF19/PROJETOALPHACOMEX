@@ -28,6 +28,99 @@ import {
   ErroConclusaoChamado,
 } from "@/lib/chamados/conclusao";
 
+export interface ChamadoOperacionalTI {
+  id: number;
+  titulo: string;
+  descricao: string;
+  categoria: string;
+  prioridade: string;
+  status: "ABERTO" | "EM_ATENDIMENTO";
+  tecnicoId: number | null;
+  tecnicoSolicitadoId: number | null;
+  createdAt: string;
+  updatedAt: string;
+  solicitante: { nome: string; usuario: string };
+  tecnico: { id: number; nome: string } | null;
+  tecnicoSolicitado: { id: number; nome: string } | null;
+  mensagens: Array<{
+    id: number;
+    texto: string | null;
+    createdAt: string;
+    autorId: number;
+    arquivoUrl: string | null;
+    arquivoTipo: string | null;
+    autor: { id: number; nome: string; usuario: string };
+  }>;
+}
+
+export async function listarChamadosAtivosTIAction(): Promise<{
+  success: boolean;
+  chamados: ChamadoOperacionalTI[];
+  error?: string;
+}> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, chamados: [], error: "Não autorizado" };
+  }
+  if (!isSameRole(session.user.role, "TI")) {
+    return { success: false, chamados: [], error: "Permissão insuficiente" };
+  }
+
+  try {
+    const chamados = await db.chamados.findMany({
+      where: { status: { in: ["ABERTO", "EM_ATENDIMENTO"] } },
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      select: {
+        id: true,
+        titulo: true,
+        descricao: true,
+        categoria: true,
+        prioridade: true,
+        status: true,
+        tecnicoId: true,
+        tecnicoSolicitadoId: true,
+        createdAt: true,
+        updatedAt: true,
+        solicitante: { select: { nome: true, usuario: true } },
+        tecnico: { select: { id: true, nome: true } },
+        tecnicoSolicitado: { select: { id: true, nome: true } },
+        mensagens: {
+          take: 20,
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            texto: true,
+            createdAt: true,
+            autorId: true,
+            arquivoUrl: true,
+            arquivoTipo: true,
+            autor: { select: { id: true, nome: true, usuario: true } },
+          },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      chamados: chamados.map((chamado) => ({
+        ...chamado,
+        status: chamado.status as ChamadoOperacionalTI["status"],
+        createdAt: chamado.createdAt.toISOString(),
+        updatedAt: chamado.updatedAt.toISOString(),
+        mensagens: chamado.mensagens.toReversed().map((mensagem) => ({
+          ...mensagem,
+          createdAt: mensagem.createdAt.toISOString(),
+        })),
+      })),
+    };
+  } catch (error) {
+    console.error("[chamados] Falha ao listar painel operacional de TI", {
+      message: error instanceof Error ? error.message : "erro desconhecido",
+    });
+    return { success: false, chamados: [], error: "Não foi possível carregar os chamados." };
+  }
+}
+
 export async function updateChamadosStatus(id: number, novoStatus: string, solucao?: string) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: "Não autorizado" };
@@ -279,6 +372,42 @@ export async function enviarMensagemAction(
     console.error("Erro no Prisma:", msg);
     return { error: "Erro interno no banco de dados" };
   }
+}
+
+export async function enviarMensagemChamadoAtendidoTIAction(chamadoId: number, texto: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+  if (!isSameRole(session.user.role, "TI")) {
+    return { success: false, error: "Permissão insuficiente" };
+  }
+
+  const tecnicoId = Number(session.user.id);
+  const chamadoIdNormalizado = Number(chamadoId);
+  const textoNormalizado = texto.trim();
+  if (
+    !Number.isInteger(tecnicoId)
+    || tecnicoId <= 0
+    || !Number.isInteger(chamadoIdNormalizado)
+    || chamadoIdNormalizado <= 0
+    || textoNormalizado.length === 0
+    || textoNormalizado.length > 1000
+  ) {
+    return { success: false, error: "Dados inválidos" };
+  }
+
+  const chamado = await db.chamados.findUnique({
+    where: { id: chamadoIdNormalizado },
+    select: { status: true, tecnicoId: true },
+  });
+  if (!chamado) return { success: false, error: "Chamado não encontrado" };
+  if (chamado.status !== "EM_ATENDIMENTO" || chamado.tecnicoId !== tecnicoId) {
+    return {
+      success: false,
+      error: "Somente o técnico responsável pode responder por este painel.",
+    };
+  }
+
+  return enviarMensagemAction(chamadoIdNormalizado, textoNormalizado);
 }
 
 export async function assumirChamado(id: number) {

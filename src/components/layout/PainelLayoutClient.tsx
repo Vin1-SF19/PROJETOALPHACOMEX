@@ -24,7 +24,8 @@ import { useNotasLembretesPendentes } from '@/hooks/useNotasLembretesPendentes';
 import { useCalendarioAlphaNotifications } from '@/hooks/useCalendarioAlphaNotifications';
 import { CompromissoNotificacaoToast } from '@/components/CalendarioAlpha/CompromissoNotificacaoToast';
 import { CentralNotificacoesPainel } from './CentralNotificacoesPainel';
-import { isAdminRole } from '@/lib/roles';
+import { ChamadosOperacionaisPainel } from '@/components/chamados/ChamadosOperacionaisPainel';
+import { isAdminRole, isSameRole } from '@/lib/roles';
 import type { OnboardingVideo } from '@/lib/onboarding';
 import type { LinkExternoVisivel } from '@/actions/LinksExternos';
 import {
@@ -381,6 +382,12 @@ export default function PainelLayoutClient({
                 onAbrirModulo={openTab}
                 onAbrirNota={abrirNotasPorNotificacao}
               />
+              {isSameRole(role, 'TI') && (
+                <ChamadosOperacionaisPainel
+                  usuarioAtualId={userId}
+                  onAbrirModulo={() => openTab('/PainelAlpha/Chamados', 'Chamados')}
+                />
+              )}
               <BibbleWeatherWidget />
             </div>
           </div>
