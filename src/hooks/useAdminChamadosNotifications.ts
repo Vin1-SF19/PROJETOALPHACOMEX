@@ -19,6 +19,7 @@ import {
 
 export function useChamadosNotifications(role: string | undefined, userId: number) {
   const adicionarNotificacao = useChamadoNotificacoes((s) => s.adicionarNotificacao);
+  const adicionarFeedbackPendente = useChamadoNotificacoes((s) => s.adicionarFeedbackPendente);
   const subscribedRef = useRef(false);
 
   useEffect(() => {
@@ -89,6 +90,11 @@ export function useChamadosNotifications(role: string | undefined, userId: numbe
         urgencia: 'CONCLUIDO',
         createdAt: payload.createdAt,
       });
+      adicionarFeedbackPendente({
+        chamadoId: payload.chamadoId,
+        titulo: payload.titulo,
+        closedAt: payload.createdAt,
+      });
       playAudio();
     };
     userChannel.bind(CHAMADO_CONCLUIDO_EVENT, concluidoHandler);
@@ -123,5 +129,5 @@ export function useChamadosNotifications(role: string | undefined, userId: numbe
       });
       subscribedRef.current = false;
     };
-  }, [role, userId, adicionarNotificacao]);
+  }, [role, userId, adicionarFeedbackPendente, adicionarNotificacao]);
 }

@@ -13,87 +13,87 @@ import {
   notificarNovoChamado,
 } from "@/lib/chamados/notificacoes-server";
 import { resumirMensagemChamado } from "@/lib/chamados/notificacoes";
-import { isAdminRole } from "@/lib/roles";
+import { isAdminRole, isSameRole } from "@/lib/roles";
 import {
   concluirTarefaAgendadaDoChamado,
   criarTarefaAgendadaParaChamado,
 } from "@/lib/chamados/tarefa-agendada";
+import {
+  atualizarChamadoStatusSchema,
+  criarChamadoSchema,
+  primeiraMensagemZod,
+} from "@/lib/chamados/schemas";
+import {
+  concluirChamadoComFeedback,
+  ErroConclusaoChamado,
+} from "@/lib/chamados/conclusao";
 
 export async function updateChamadosStatus(id: number, novoStatus: string, solucao?: string) {
   const session = await auth();
-  if (!session) return { success: false, error: "Não autorizado" };
+  if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+
+  const parsed = atualizarChamadoStatusSchema.safeParse({ chamadoId: id, novoStatus, solucao });
+  if (!parsed.success) return { success: false, error: primeiraMensagemZod(parsed.error) };
+  if (parsed.data.novoStatus === "EM_ATENDIMENTO") return assumirChamado(parsed.data.chamadoId);
+  if (!isAdminRole(session.user.role)) return { success: false, error: "Permissão insuficiente" };
+
+  const tecnicoId = Number(session.user.id);
+  if (!Number.isInteger(tecnicoId) || tecnicoId <= 0) {
+    return { success: false, error: "Sessão inválida" };
+  }
 
   try {
-    const chamadoAtualizado = await db.chamados.update({
-      where: { id },
-      data: {
-        status: novoStatus,
-        ...(solucao && { solucao }),
-      },
-      select: {
-        id: true,
-        titulo: true,
-        descricao: true,
-        usuarioId: true,
-        tecnicoId: true,
-        solucao: true,
-        updatedAt: true,
-      },
+    const concluidoEm = new Date();
+    const chamadoAtualizado = await concluirChamadoComFeedback({
+      chamadoId: parsed.data.chamadoId,
+      tecnicoId,
+      concluidoEm,
+      solucao: parsed.data.solucao,
     });
 
-    if (novoStatus === "CONCLUIDO") {
-      await notificarChamadoConcluido(chamadoAtualizado.usuarioId, {
-        chamadoId: chamadoAtualizado.id,
-        titulo: chamadoAtualizado.titulo,
-        solucao: chamadoAtualizado.solucao ?? undefined,
-        createdAt: chamadoAtualizado.updatedAt.toISOString(),
-      });
-    }
+    await notificarChamadoConcluido(chamadoAtualizado.usuarioId, {
+      chamadoId: chamadoAtualizado.id,
+      titulo: chamadoAtualizado.titulo,
+      solucao: chamadoAtualizado.solucao ?? undefined,
+      createdAt: chamadoAtualizado.closedAt.toISOString(),
+    });
 
     try {
-      const tecnicoId = Number(session.user.id);
-      if (novoStatus === "EM_ATENDIMENTO") {
-        await criarTarefaAgendadaParaChamado({
-          chamado: chamadoAtualizado,
-          tecnicoId,
-          tecnicoRole: session.user.role,
-        });
-      }
-      if (novoStatus === "CONCLUIDO") {
-        await concluirTarefaAgendadaDoChamado({
-          chamadoId: chamadoAtualizado.id,
-          concluidoEm: chamadoAtualizado.updatedAt,
-          tecnicoId,
-          tecnicoRole: session.user.role,
-        });
-      }
+      await concluirTarefaAgendadaDoChamado({
+        chamadoId: chamadoAtualizado.id,
+        concluidoEm,
+        tecnicoId,
+        tecnicoRole: chamadoAtualizado.tecnicoRole,
+      });
     } catch (error) {
       // A mudança de status não pode deixar o chamado preso se o Google falhar.
       console.error("[chamados] Falha na automação da Agenda Alpha", {
         chamadoId: chamadoAtualizado.id,
-        status: novoStatus,
+        status: "CONCLUIDO",
         message: error instanceof Error ? error.message : "erro desconhecido",
       });
     }
 
-    if (novoStatus === "EM_ATENDIMENTO" || novoStatus === "CONCLUIDO") {
-      await notificarAgendaChamadoAtualizada(
-        [
-          chamadoAtualizado.usuarioId,
-          chamadoAtualizado.tecnicoId ?? Number(session.user.id),
-        ],
-        {
-          chamadoId: chamadoAtualizado.id,
-          status: novoStatus,
-          updatedAt: chamadoAtualizado.updatedAt.toISOString(),
-        },
-      );
-    }
+    await notificarAgendaChamadoAtualizada(
+      [chamadoAtualizado.usuarioId, tecnicoId],
+      {
+        chamadoId: chamadoAtualizado.id,
+        status: "CONCLUIDO",
+        updatedAt: chamadoAtualizado.updatedAt.toISOString(),
+      },
+    );
 
     revalidatePath("/PainelAlpha/Chamados");
     revalidatePath("/PainelAlpha/CalendarioAlpha");
     return { success: true };
-  } catch {
+  } catch (error) {
+    if (error instanceof ErroConclusaoChamado) {
+      return { success: false, error: error.message };
+    }
+    console.error("[chamados] Falha ao finalizar chamado", {
+      chamadoId: parsed.data.chamadoId,
+      message: error instanceof Error ? error.message : "erro desconhecido",
+    });
     return { success: false, error: "Erro ao atualizar status." };
   }
 }
@@ -123,21 +123,38 @@ async function avisarNoZap(titulo: string, quem: string, urgencia: string, data:
 
 export async function createChamadoAction(formData: FormData) {
   const session = await auth();
-  if (!session) return { error: "Sessão expirada. Refaça o login." };
+  if (!session?.user?.id) return { error: "Sessão expirada. Refaça o login." };
 
-  const titulo = (formData.get("titulo") as string).trim();
-  const categoria = formData.get("categoria") as string;
-  const prioridade = formData.get("prioridade") as string;
-  const descricao = (formData.get("descricao") as string).trim();
+  const parsed = criarChamadoSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: primeiraMensagemZod(parsed.error) };
+
+  const usuarioId = Number(session.user.id);
+  if (!Number.isInteger(usuarioId) || usuarioId <= 0) return { error: "Sessão inválida." };
+  const { titulo, categoria, prioridade, descricao, tecnicoSolicitadoId, dataDesejadaConclusao } = parsed.data;
 
   try {
+    if (tecnicoSolicitadoId !== null) {
+      const tecnicoSolicitado = await db.usuarios.findUnique({
+        where: { id: tecnicoSolicitadoId },
+        select: { id: true, role: true, status: true },
+      });
+      if (
+        !tecnicoSolicitado ||
+        tecnicoSolicitado.status !== "ATIVO" ||
+        !isSameRole(tecnicoSolicitado.role, "TI")
+      ) {
+        return { error: "O técnico solicitado não está disponível para receber chamados." };
+      }
+    }
+
     const cincoMinutosAtras = new Date(Date.now() - 5 * 60 * 1000);
     const duplicado = await db.chamados.findFirst({
       where: {
-        usuarioId: Number(session.user.id),
+        usuarioId,
         titulo,
         createdAt: { gte: cincoMinutosAtras },
       },
+      select: { id: true },
     });
 
     if (duplicado) {
@@ -150,8 +167,16 @@ export async function createChamadoAction(formData: FormData) {
         categoria,
         prioridade,
         descricao,
-        usuarioId: Number(session.user.id),
+        usuarioId,
+        tecnicoSolicitadoId,
+        dataDesejadaConclusao,
         status: "ABERTO",
+      },
+      select: {
+        id: true,
+        titulo: true,
+        prioridade: true,
+        createdAt: true,
       },
     });
 
@@ -200,7 +225,13 @@ export async function enviarMensagemAction(
     const autorId = Number(session.user.id);
     const chamado = await db.chamados.findUnique({
       where: { id: Number(chamadoId) },
-      select: { id: true, titulo: true, usuarioId: true, tecnicoId: true },
+      select: {
+        id: true,
+        titulo: true,
+        usuarioId: true,
+        tecnicoId: true,
+        tecnicoSolicitadoId: true,
+      },
     });
     if (!chamado) return { error: "Chamado não encontrado" };
 
@@ -226,9 +257,10 @@ export async function enviarMensagemAction(
       console.error("[Pusher] Falha ao atualizar o chat do chamado:", error);
     }
 
+    const destinatarioAtendimentoId = chamado.tecnicoId ?? chamado.tecnicoSolicitadoId;
     const destino = autorEhSolicitante
-      ? chamado.tecnicoId && chamado.tecnicoId !== autorId
-        ? { usuarioIds: [chamado.tecnicoId] }
+      ? destinatarioAtendimentoId && destinatarioAtendimentoId !== autorId
+        ? { usuarioIds: [destinatarioAtendimentoId] }
         : { administradores: true }
       : { usuarioIds: [chamado.usuarioId] };
 
@@ -251,17 +283,49 @@ export async function enviarMensagemAction(
 
 export async function assumirChamado(id: number) {
   const session = await auth();
-  if (!session) return { success: false, error: "Não autorizado" };
+  if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+  if (!isAdminRole(session.user.role)) return { success: false, error: "Permissão insuficiente" };
+
+  const chamadoId = Number(id);
+  const tecnicoId = Number(session.user.id);
+  if (!Number.isInteger(chamadoId) || chamadoId <= 0 || !Number.isInteger(tecnicoId) || tecnicoId <= 0) {
+    return { success: false, error: "Dados inválidos" };
+  }
 
   try {
-    const chamado = await db.chamados.findUnique({ where: { id } });
+    const chamado = await db.chamados.findUnique({
+      where: { id: chamadoId },
+      select: {
+        id: true,
+        titulo: true,
+        descricao: true,
+        usuarioId: true,
+        solucao: true,
+        status: true,
+        tecnicoId: true,
+        tecnicoSolicitadoId: true,
+        updatedAt: true,
+        tecnicoSolicitado: { select: { nome: true } },
+      },
+    });
     if (!chamado) return { success: false, error: "Chamado não encontrado" };
     if (chamado.tecnicoId !== null) return { success: false, error: "Chamado já foi assumido por outro técnico" };
     if (chamado.status !== "ABERTO") return { success: false, error: "Chamado não está em estado inicial" };
+    if (chamado.tecnicoSolicitadoId !== null && chamado.tecnicoSolicitadoId !== tecnicoId) {
+      const nome = chamado.tecnicoSolicitado?.nome?.trim() || "o técnico solicitado";
+      return {
+        success: false,
+        error: `O solicitante pediu que ${nome} realizasse este chamado. Somente esse usuário pode assumir.`,
+      };
+    }
 
-    const tecnicoId = Number(session.user.id);
     const atribuicao = await db.chamados.updateMany({
-      where: { id, tecnicoId: null, status: "ABERTO" },
+      where: {
+        id: chamadoId,
+        tecnicoId: null,
+        status: "ABERTO",
+        tecnicoSolicitadoId: chamado.tecnicoSolicitadoId,
+      },
       data: { status: "EM_ATENDIMENTO", tecnicoId },
     });
     if (atribuicao.count === 0) {
@@ -270,7 +334,7 @@ export async function assumirChamado(id: number) {
 
     const atendimentoIniciadoEm = new Date();
     await notificarChamadoAssumido(chamado.usuarioId, {
-      chamadoId: id,
+      chamadoId,
       titulo: chamado.titulo,
       tecnicoNome: session.user.nome?.trim() || "Equipe de TI",
       createdAt: atendimentoIniciadoEm.toISOString(),
@@ -279,7 +343,7 @@ export async function assumirChamado(id: number) {
     let agendaAtualizadaEm = chamado.updatedAt;
     try {
       const atualizado = await db.chamados.findUnique({
-        where: { id },
+        where: { id: chamadoId },
         select: { id: true, titulo: true, descricao: true, usuarioId: true, solucao: true, updatedAt: true },
       });
       if (atualizado) {
@@ -292,7 +356,7 @@ export async function assumirChamado(id: number) {
       }
     } catch (e) {
       console.error("[chamados] Falha na automação da Agenda Alpha ao assumir", {
-        chamadoId: id,
+        chamadoId,
         message: e instanceof Error ? e.message : "erro desconhecido",
       });
     }
@@ -300,7 +364,7 @@ export async function assumirChamado(id: number) {
     await notificarAgendaChamadoAtualizada(
       [chamado.usuarioId, tecnicoId],
       {
-        chamadoId: id,
+        chamadoId,
         status: "EM_ATENDIMENTO",
         updatedAt: agendaAtualizadaEm.toISOString(),
       },
@@ -310,7 +374,7 @@ export async function assumirChamado(id: number) {
     revalidatePath("/PainelAlpha/CalendarioAlpha");
     return {
       success: true,
-      chamado: { id, status: "EM_ATENDIMENTO", tecnicoId },
+      chamado: { id: chamadoId, status: "EM_ATENDIMENTO", tecnicoId },
     };
   } catch {
     return { success: false, error: "Erro ao assumir chamado." };

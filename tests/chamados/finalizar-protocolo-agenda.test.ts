@@ -5,9 +5,9 @@ const revalidatePathMock = vi.hoisted(() => vi.fn());
 const concluirTarefaMock = vi.hoisted(() => vi.fn());
 const notificarConcluidoMock = vi.hoisted(() => vi.fn());
 const notificarAgendaMock = vi.hoisted(() => vi.fn());
+const concluirChamadoMock = vi.hoisted(() => vi.fn());
 const prismaMock = vi.hoisted(() => ({
-  chamados: { findUnique: vi.fn() },
-  $executeRawUnsafe: vi.fn(),
+  protocoloTemplate: {},
 }));
 
 vi.mock("../../auth", () => ({ auth: authMock }));
@@ -20,6 +20,10 @@ vi.mock("@/lib/chamados/notificacoes-server", () => ({
 vi.mock("@/lib/chamados/tarefa-agendada", () => ({
   concluirTarefaAgendadaDoChamado: concluirTarefaMock,
 }));
+vi.mock("@/lib/chamados/conclusao", () => ({
+  concluirChamadoComFeedback: concluirChamadoMock,
+  ErroConclusaoChamado: class ErroConclusaoChamado extends Error {},
+}));
 
 import { finalizarComProtocolo } from "@/actions/protocolos";
 
@@ -31,14 +35,16 @@ describe("finalizarComProtocolo — integração com Agenda Alpha", () => {
     vi.useFakeTimers();
     vi.setSystemTime(INSTANTE_CONCLUSAO);
     authMock.mockResolvedValue({ user: { id: "3", role: "TI" } });
-    prismaMock.chamados.findUnique.mockResolvedValue({
+    concluirChamadoMock.mockResolvedValue({
       id: 10,
       titulo: "Falha no acesso",
       usuarioId: 7,
       tecnicoId: 3,
-      tecnico: { role: "T.I" },
+      tecnicoRole: "T.I",
+      solucao: "Acesso restabelecido",
+      closedAt: INSTANTE_CONCLUSAO,
+      updatedAt: INSTANTE_CONCLUSAO,
     });
-    prismaMock.$executeRawUnsafe.mockResolvedValue(1);
     concluirTarefaMock.mockResolvedValue(undefined);
     notificarConcluidoMock.mockResolvedValue(undefined);
   });
@@ -55,17 +61,15 @@ describe("finalizarComProtocolo — integração com Agenda Alpha", () => {
     });
 
     expect(resultado).toEqual({ success: true });
-    expect(prismaMock.$executeRawUnsafe).toHaveBeenCalledWith(
-      expect.stringContaining("closedAt = ?"),
-      "CONCLUIDO",
-      "Acesso restabelecido",
-      "Permissão ausente",
-      "Chamado concluído",
-      null,
-      INSTANTE_CONCLUSAO.toISOString(),
-      INSTANTE_CONCLUSAO.toISOString(),
-      10,
-    );
+    expect(concluirChamadoMock).toHaveBeenCalledWith({
+      chamadoId: 10,
+      tecnicoId: 3,
+      concluidoEm: INSTANTE_CONCLUSAO,
+      solucao: "Acesso restabelecido",
+      causa: "Permissão ausente",
+      mensagemFinal: "Chamado concluído",
+      templateId: null,
+    });
     expect(concluirTarefaMock).toHaveBeenCalledWith({
       chamadoId: 10,
       concluidoEm: INSTANTE_CONCLUSAO,
@@ -102,14 +106,8 @@ describe("finalizarComProtocolo — integração com Agenda Alpha", () => {
     consoleError.mockRestore();
   });
 
-  it("não tenta concluir tarefa quando o chamado não possui técnico", async () => {
-    prismaMock.chamados.findUnique.mockResolvedValueOnce({
-      id: 11,
-      titulo: "Chamado sem técnico",
-      usuarioId: 7,
-      tecnicoId: null,
-      tecnico: null,
-    });
+  it("bloqueia role não autorizada antes da conclusão", async () => {
+    authMock.mockResolvedValueOnce({ user: { id: "7", role: "User" } });
 
     const resultado = await finalizarComProtocolo(11, {
       solucao: "Tratativa administrativa",
@@ -117,7 +115,8 @@ describe("finalizarComProtocolo — integração com Agenda Alpha", () => {
       mensagemFinal: "",
     });
 
-    expect(resultado).toEqual({ success: true });
+    expect(resultado).toEqual({ success: false, error: "Permissão insuficiente" });
+    expect(concluirChamadoMock).not.toHaveBeenCalled();
     expect(concluirTarefaMock).not.toHaveBeenCalled();
   });
 });

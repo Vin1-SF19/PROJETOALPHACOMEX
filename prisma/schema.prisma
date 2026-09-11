@@ -9,20 +9,21 @@ datasource db {
 }
 
 model usuarios {
-  id                 Int                @id @default(autoincrement())
-  nome               String
-  usuario            String             @unique
-  email              String             @unique
-  senha              String
-  role               String             @default("User")
-  permissoes         String?
-  chamados_criados   chamados[]         @relation("Solicitante")
-  chamadosAssumidos  chamados[]         @relation("TecnicoChamado")
-  mensagens          MensagensChamado[]
-  Auditoria          Auditoria[]
-  imagemUrl          String?
-  esconderBloqueados Boolean            @default(false)
-  ultimo_aviso       String?
+  id                  Int                @id @default(autoincrement())
+  nome                String
+  usuario             String             @unique
+  email               String             @unique
+  senha               String
+  role                String             @default("User")
+  permissoes          String?
+  chamados_criados    chamados[]         @relation("Solicitante")
+  chamadosAssumidos   chamados[]         @relation("TecnicoChamado")
+  chamadosSolicitados chamados[]         @relation("TecnicoSolicitadoChamado")
+  mensagens           MensagensChamado[]
+  Auditoria           Auditoria[]
+  imagemUrl           String?
+  esconderBloqueados  Boolean            @default(false)
+  ultimo_aviso        String?
 
   atalhos          String? @default("radar,chamados")
   tema_interface   String? @default("blue")
@@ -511,29 +512,50 @@ model OnboardingLog {
 }
 
 model chamados {
-  id             Int                         @id @default(autoincrement())
-  titulo         String
-  descricao      String
-  categoria      String
-  status         String                      @default("ABERTO")
-  prioridade     String                      @default("MEDIA")
-  solucao        String?
-  causa          String?
-  mensagemFinal  String?
-  templateId     Int?
-  closedAt       DateTime?
-  usuarioId      Int
-  tecnicoId      Int?
-  createdAt      DateTime                    @default(now())
-  updatedAt      DateTime                    @updatedAt
-  solicitante    usuarios                    @relation("Solicitante", fields: [usuarioId], references: [id], onDelete: Cascade)
-  tecnico        usuarios?                   @relation("TecnicoChamado", fields: [tecnicoId], references: [id], onDelete: SetNull)
-  mensagens      MensagensChamado[]
-  tarefaAgendada GoogleCalendarTaskSchedule?
+  id                    Int                         @id @default(autoincrement())
+  titulo                String
+  descricao             String
+  categoria             String
+  status                String                      @default("ABERTO")
+  prioridade            String                      @default("MEDIA")
+  solucao               String?
+  causa                 String?
+  mensagemFinal         String?
+  templateId            Int?
+  closedAt              DateTime?
+  dataDesejadaConclusao DateTime?
+  usuarioId             Int
+  tecnicoId             Int?
+  tecnicoSolicitadoId   Int?
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+  solicitante           usuarios                    @relation("Solicitante", fields: [usuarioId], references: [id], onDelete: Cascade)
+  tecnico               usuarios?                   @relation("TecnicoChamado", fields: [tecnicoId], references: [id], onDelete: SetNull)
+  tecnicoSolicitado     usuarios?                   @relation("TecnicoSolicitadoChamado", fields: [tecnicoSolicitadoId], references: [id], onDelete: SetNull)
+  mensagens             MensagensChamado[]
+  tarefaAgendada        GoogleCalendarTaskSchedule?
+  feedback              ChamadoFeedback?
 
   @@index([usuarioId])
   @@index([status])
   @@index([tecnicoId])
+  @@index([tecnicoSolicitadoId])
+}
+
+model ChamadoFeedback {
+  chamadoId               Int       @id
+  status                  String    @default("PENDENTE")
+  notaRapidezResposta     Int?
+  notaPrazoConclusao      Int?
+  solucionadaComoEsperado Boolean?
+  comentario              String?
+  notaQualidadeSolucao    Int?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  decidedAt               DateTime?
+  chamado                 chamados  @relation(fields: [chamadoId], references: [id], onDelete: Cascade)
+
+  @@map("chamados_feedback")
 }
 
 model ProtocoloTemplate {

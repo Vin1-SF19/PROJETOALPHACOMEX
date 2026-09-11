@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { fmtDateTime } from "@/lib/format-date";
+import { fmtDate, fmtDateTime } from "@/lib/format-date";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "./ui/dialog";
@@ -9,7 +9,7 @@ import { Button } from "./ui/button";
 import { assumirChamado } from "@/actions/chamados";
 import {
   Clock, User, MessageSquare, Calendar,
-  CheckCircle2, Tag, Eye, FileText,
+  CheckCircle2, Tag, Eye, FileText, CalendarClock, UserRoundCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import ModalProtocolo from "./ModalProtocolo";
@@ -34,6 +34,9 @@ type ChamadoDetalhes = {
   mensagemFinal?: string | null;
   usuarioId?: number;
   tecnicoId?: number | null;
+  tecnicoSolicitadoId?: number | null;
+  tecnicoSolicitado?: { id: number; nome: string } | null;
+  dataDesejadaConclusao?: Date | string | null;
   createdAt: Date | string;
   solicitante: Solicitante;
 };
@@ -49,6 +52,7 @@ type Template = {
 type Props = {
   chamado: ChamadoDetalhes;
   isAdmin: boolean;
+  usuarioAtualId: number;
   templates?: Template[];
 };
 
@@ -68,11 +72,12 @@ function tempoAberto(data: Date | string): string {
   return `${d}d`;
 }
 
-export default function DetalhesChamado({ chamado, isAdmin, templates = [] }: Props) {
+export function DetalhesChamado({ chamado, isAdmin, usuarioAtualId, templates = [] }: Props) {
   const [open, setOpen] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [modalProtocolo, setModalProtocolo] = useState(false);
   const [tecnicoId, setTecnicoId] = useState(chamado.tecnicoId ?? null);
+  const [status, setStatus] = useState(chamado.status);
 
   const handleAssumir = async () => {
     setCarregando(true);
@@ -80,6 +85,7 @@ export default function DetalhesChamado({ chamado, isAdmin, templates = [] }: Pr
       const res = await assumirChamado(chamado.id);
       if (res.success && res.chamado) {
         setTecnicoId(res.chamado.tecnicoId);
+        setStatus(res.chamado.status);
         toast.success("Chamado assumido com sucesso");
       } else {
         toast.error(res.error || "Erro ao assumir chamado");
@@ -92,6 +98,8 @@ export default function DetalhesChamado({ chamado, isAdmin, templates = [] }: Pr
   };
 
   const prio = prioridadeConfig[chamado.prioridade] ?? prioridadeConfig.MEDIA;
+  const podeAssumir = isAdmin && status === "ABERTO" && tecnicoId == null;
+  const podeFinalizar = isAdmin && status === "EM_ATENDIMENTO" && tecnicoId === usuarioAtualId;
 
   return (
     <>
@@ -168,6 +176,35 @@ export default function DetalhesChamado({ chamado, isAdmin, templates = [] }: Pr
               </div>
             </div>
 
+            {(chamado.tecnicoSolicitado || chamado.dataDesejadaConclusao) && (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {chamado.tecnicoSolicitado && (
+                  <div className="flex gap-3 rounded-2xl border border-white/5 bg-white/[0.03] p-4">
+                    <div className="shrink-0 rounded-xl border border-blue-500/20 bg-blue-600/15 p-2">
+                      <UserRoundCheck className="size-4 text-blue-400" aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="mb-0.5 text-[9px] font-black uppercase tracking-widest text-slate-500">Técnico solicitado</p>
+                      <p className="break-words text-sm font-bold text-white">{chamado.tecnicoSolicitado.nome}</p>
+                      <p className="mt-0.5 text-[10px] font-medium text-slate-600">Preferência informada pelo solicitante</p>
+                    </div>
+                  </div>
+                )}
+                {chamado.dataDesejadaConclusao && (
+                  <div className="flex gap-3 rounded-2xl border border-white/5 bg-white/[0.03] p-4">
+                    <div className="shrink-0 rounded-xl border border-amber-500/20 bg-amber-500/10 p-2">
+                      <CalendarClock className="size-4 text-amber-400" aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="mb-0.5 text-[9px] font-black uppercase tracking-widest text-slate-500">Conclusão desejada</p>
+                      <p className="text-sm font-bold text-white">{fmtDate(chamado.dataDesejadaConclusao)}</p>
+                      <p className="mt-0.5 text-[10px] font-medium text-slate-600">Preferência, sem alterar o prazo operacional</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Descrição */}
             <div className="space-y-2">
               <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
@@ -202,9 +239,9 @@ export default function DetalhesChamado({ chamado, isAdmin, templates = [] }: Pr
             )}
 
             {/* Ações do admin */}
-            {isAdmin && chamado.status !== "CONCLUIDO" && (
+            {isAdmin && status !== "CONCLUIDO" && (
               <div className="pt-5 border-t border-white/5 space-y-2">
-                {tecnicoId == null ? (
+                {podeAssumir ? (
                   <Button
                     onClick={handleAssumir}
                     disabled={carregando}
@@ -214,7 +251,7 @@ export default function DetalhesChamado({ chamado, isAdmin, templates = [] }: Pr
                     <User className="mr-2 w-4 h-4" />
                     {carregando ? "Assumindo..." : "Assumir Chamado"}
                   </Button>
-                ) : (
+                ) : podeFinalizar ? (
                   <Button
                     onClick={() => { setOpen(false); setModalProtocolo(true); }}
                     className="w-full cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white h-12 font-black rounded-xl shadow-lg shadow-emerald-900/20"
@@ -222,7 +259,11 @@ export default function DetalhesChamado({ chamado, isAdmin, templates = [] }: Pr
                     <FileText className="mr-2 w-4 h-4" />
                     Finalizar com Protocolo
                   </Button>
-                )}
+                ) : tecnicoId != null ? (
+                  <p className="rounded-xl border border-white/5 bg-white/[0.03] p-3 text-center text-xs font-medium text-slate-500">
+                    Este chamado está em atendimento por outro técnico.
+                  </p>
+                ) : null}
               </div>
             )}
           </div>

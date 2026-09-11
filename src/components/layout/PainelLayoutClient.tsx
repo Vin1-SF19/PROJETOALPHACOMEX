@@ -10,6 +10,7 @@ import { useSidebarState } from '@/hooks/useSidebarState';
 import { useChamadosNotifications } from '@/hooks/useAdminChamadosNotifications';
 import { useChecklistNotifications } from '@/hooks/useChecklistNotifications';
 import NotificationToast from '@/components/chamados/NotificationToast';
+import { ChamadoFinalizadoFeedbackDialog } from '@/components/chamados/ChamadoFinalizadoFeedbackDialog';
 import { HoleriteNotificacaoGlobal } from '@/components/holerites/HoleriteNotificacaoGlobal';
 import ChecklistNotificationToast from '@/components/Checklist/ChecklistNotificationToast';
 import { MODULOS_REGISTRY } from '@/lib/modulos-registry';
@@ -45,6 +46,7 @@ import {
   parseStoredTabsState,
   type PainelTab,
 } from '@/lib/painel-tabs';
+import { getTema } from '@/lib/temas';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -104,6 +106,7 @@ export default function PainelLayoutClient({
   // A barra de notas é `fixed bottom-0` no shell externo — os iframes de módulo não sabem que
   // ela existe (documentos isolados) e desenhariam conteúdo por baixo dela sem este respiro.
   const notasBarraVisivel = useNotasWorkspace((state) => state.isTaskbarVisible);
+  const chamadosAccent = getTema(temaName).accent;
 
   useChamadosNotifications(role, userId);
   useNotasNotifications(temAcessoNotas ? userId : 0);
@@ -325,6 +328,7 @@ export default function PainelLayoutClient({
   return (
     <>
       <NotificationToast onAbrirChamados={abrirChamadosPorNotificacao} />
+      <ChamadoFinalizadoFeedbackDialog accent={chamadosAccent} />
       <ChecklistNotificationToast />
       <HoleriteNotificacaoGlobal authenticated />
       <NotaNotificacaoToast onAbrirNota={abrirNotasPorNotificacao} />

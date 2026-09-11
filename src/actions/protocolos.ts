@@ -9,11 +9,16 @@ import {
   notificarChamadoConcluido,
 } from "@/lib/chamados/notificacoes-server";
 import { concluirTarefaAgendadaDoChamado } from "@/lib/chamados/tarefa-agendada";
+import {
+  finalizarComProtocoloSchema,
+  primeiraMensagemZod,
+} from "@/lib/chamados/schemas";
+import {
+  concluirChamadoComFeedback,
+  ErroConclusaoChamado,
+} from "@/lib/chamados/conclusao";
 
-// Prisma client types não incluem ProtocoloTemplate ainda.
-// Após parar dev server: `npx prisma generate` para remover os casts abaixo.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const protocoloTemplateModel = (db as any).protocoloTemplate;
+const protocoloTemplateModel = db.protocoloTemplate;
 
 export type ProtocoloTemplate = {
   id: number;
@@ -123,60 +128,53 @@ export async function finalizarComProtocolo(
 ) {
   try {
     const session = await auth();
-    if (!session) return { success: false, error: "Não autorizado" };
+    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+    if (!isAdminRole(session.user.role)) return { success: false, error: "Permissão insuficiente" };
 
-    const chamado = await db.chamados.findUnique({
-      where: { id: chamadoId },
-      select: {
-        id: true,
-        titulo: true,
-        usuarioId: true,
-        tecnicoId: true,
-        tecnico: { select: { role: true } },
-      },
-    });
-    if (!chamado) return { success: false, error: "Chamado não encontrado." };
+    const parsed = finalizarComProtocoloSchema.safeParse({ chamadoId, ...dados });
+    if (!parsed.success) return { success: false, error: primeiraMensagemZod(parsed.error) };
+
+    const tecnicoId = Number(session.user.id);
+    if (!Number.isInteger(tecnicoId) || tecnicoId <= 0) {
+      return { success: false, error: "Sessão inválida" };
+    }
 
     const concluidoEm = new Date();
-    await db.$executeRawUnsafe(
-      `UPDATE chamados SET status = ?, solucao = ?, causa = ?, mensagemFinal = ?, templateId = ?, closedAt = ?, updatedAt = ? WHERE id = ?`,
-      "CONCLUIDO",
-      dados.solucao.trim(),
-      dados.causa.trim() || null,
-      dados.mensagemFinal.trim() || null,
-      dados.templateId ?? null,
-      concluidoEm.toISOString(),
-      concluidoEm.toISOString(),
-      chamadoId
-    );
+    const chamado = await concluirChamadoComFeedback({
+      chamadoId: parsed.data.chamadoId,
+      tecnicoId,
+      concluidoEm,
+      solucao: parsed.data.solucao,
+      causa: parsed.data.causa || null,
+      mensagemFinal: parsed.data.mensagemFinal || null,
+      templateId: parsed.data.templateId ?? null,
+    });
 
-    if (chamado.tecnicoId !== null) {
-      try {
-        await concluirTarefaAgendadaDoChamado({
-          chamadoId: chamado.id,
-          concluidoEm,
-          tecnicoId: chamado.tecnicoId,
-          tecnicoRole: chamado.tecnico?.role,
-        });
-      } catch (error) {
-        // O fechamento do chamado é a fonte de verdade e não pode ser revertido
-        // por uma indisponibilidade momentânea da API do Google Tasks.
-        console.error("[chamados] Falha ao concluir tarefa da Agenda Alpha pelo protocolo", {
-          chamadoId: chamado.id,
-          tecnicoId: chamado.tecnicoId,
-          message: error instanceof Error ? error.message : "erro desconhecido",
-        });
-      }
+    try {
+      await concluirTarefaAgendadaDoChamado({
+        chamadoId: chamado.id,
+        concluidoEm,
+        tecnicoId,
+        tecnicoRole: chamado.tecnicoRole,
+      });
+    } catch (error) {
+      // O fechamento do chamado é a fonte de verdade e não pode ser revertido
+      // por uma indisponibilidade momentânea da API do Google Tasks.
+      console.error("[chamados] Falha ao concluir tarefa da Agenda Alpha pelo protocolo", {
+        chamadoId: chamado.id,
+        tecnicoId,
+        message: error instanceof Error ? error.message : "erro desconhecido",
+      });
     }
 
     await notificarChamadoConcluido(chamado.usuarioId, {
       chamadoId: chamado.id,
       titulo: chamado.titulo,
-      solucao: dados.solucao.trim(),
-      createdAt: concluidoEm.toISOString(),
+      solucao: parsed.data.solucao,
+      createdAt: chamado.closedAt.toISOString(),
     });
     await notificarAgendaChamadoAtualizada(
-      [chamado.usuarioId, chamado.tecnicoId ?? 0],
+      [chamado.usuarioId, tecnicoId],
       {
         chamadoId: chamado.id,
         status: "CONCLUIDO",
@@ -188,6 +186,7 @@ export async function finalizarComProtocolo(
     revalidatePath("/PainelAlpha/CalendarioAlpha");
     return { success: true };
   } catch (e: unknown) {
+    if (e instanceof ErroConclusaoChamado) return { success: false, error: e.message };
     return { success: false, error: e instanceof Error ? e.message : "Erro ao finalizar chamado." };
   }
 }

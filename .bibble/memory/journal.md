@@ -5381,3 +5381,43 @@ Produção foi consultada somente para leitura: 32/32 formulários `READY`, 249 
 - `decisions.md`: autoridade visual e política fail-closed.
 - `architecture.md`: registry, resolver e renderer compartilhado.
 - `codebase-map.md` e `integration-points.md`: arquivos e fluxo ponta a ponta.
+
+---
+
+## [2026-09-11 11:02] — Chamados ganhou feedback persistente e preferência de atendimento
+
+**Tags:** #feature #integration #decision #nextjs #prisma #auth #security #critical
+**Agentes envolvidos:** Bibble/Codex, Scout, River/SM, Vault, Echo, Nova, Forge, Probe, Anubis, Lens, Sage, Scribe e Kowalski
+**Arquivos tocados:** `docs/stories/story-rm-2026-a6f2c9-chamados-feedback-preferencia-prazo.md`; `prisma/schema.prisma`; `prisma/migrations/20260911131500_chamados_feedback_preferencia_prazo/migration.sql`; `prisma/migrations/20260911133500_chamados_feedback_resposta_bool_triggers/migration.sql`; `src/actions/{chamados,chamados-feedback,protocolos}.ts`; `src/lib/chamados/{schemas,conclusao}.ts`; `src/app/PainelAlpha/Chamados/`; `src/app/api/notificacoes/route.ts`; componentes/hook/store de Chamados; `tests/chamados/`; `.bibble/memory/{codebase-map,integration-points,journal}.md`
+
+### Contexto
+O solicitante precisava indicar opcionalmente um técnico e uma data desejada ao abrir o chamado e, após a conclusão, receber um convite persistente para responder ou recusar uma avaliação condicional. A notificação existente deveria permanecer e toda alteração estrutural no Turso de produção exigia protocolo Vault.
+
+### O que foi feito
+- Separada a preferência `tecnicoSolicitadoId` da atribuição efetiva `tecnicoId`; somente o técnico solicitado pode assumir, com validação de role/estado e CAS. `dataDesejadaConclusao` é nullable e informativa, sem interferir na Agenda Alpha.
+- Criado `ChamadoFeedback` 1:1 por chamado com estados `PENDENTE`, `RESPONDIDO` e `RECUSADO`, ownership no servidor, notas inteiras de 0 a 5, ramos SIM/NÃO, relato negativo de 10–1.000 caracteres e decisão concorrente protegida por CAS.
+- Centralizada a conclusão rápida e por protocolo em transação serializável: valida técnico/status, conclui por CAS e cria o feedback pendente no mesmo commit.
+- Adicionado popup global não descartável, preservando o toast. Pusher entrega com baixa latência; polling/API reconcilia pendências entre recargas/abas; shell e polling bloqueiam execução em iframe.
+- Sob Vault, aplicadas no Turso de produção as duas migrations aditivas autorizadas, sem backfill ou alteração de linhas existentes. Backups pre-change foram restaurados e validados: `2026-09-11T12-43-02-826Z` (`a8b14f...f9a`) e `2026-09-11T13-23-34-691Z` (`ffda7e...19f`). Pós-check remoto: estruturas/triggers corretos, integridade `ok`, zero violações FK e zero linhas de feedback.
+- Gates do escopo: Forge, Probe, Anubis, Lens e Sage aprovaram; ESLint escopado, Prisma validate/generate, build, diff-check e 15 arquivos/85 testes de Chamados passaram.
+
+### Decisões tomadas
+- `tecnicoSolicitadoId` nunca preenche `tecnicoId`: preferência e responsabilidade executora têm semânticas diferentes.
+- Data desejada não redefine prazo operacional nem tarefa da Agenda Alpha: é apenas expectativa informada pelo colaborador.
+- Todo novo caminho de conclusão deve reutilizar `concluirChamadoComFeedback`; atualização direta de status quebraria a atomicidade da pendência.
+- Recuperação persistida por polling é autoritativa, mas falha de leitura não pode apagar a fila local; Pusher continua responsável pela experiência imediata.
+- Rollback preferencial das estruturas aditivas é por desativação do código; remoção física futura requer novo protocolo Vault.
+
+### Problemas encontrados / resolvidos
+- SQLite aceita `CHECK` cujo resultado é `NULL`: duas migrations/autorizações foram separadas e os triggers `BEFORE INSERT`/`BEFORE UPDATE` passaram a abortar somente `RESPONDIDO` sem `solucionadaComoEsperado`.
+- O diff Prisma propôs reconstruções e DDL destrutivo por drift legado: artefato rejeitado; somente SQL manual mínimo, ensaiado no backup, foi aplicado.
+- `z.coerce.number()` transformava vazio em nota zero, o comentário não tinha máximo no servidor e datas fora do intervalo podiam produzir `Invalid Date`: validações tornadas estritas/totais; fila também passou a reconciliar decisões feitas em outra aba.
+
+### Pendências
+- Não existe E2E em navegador/Pusher real; modal e entrega estão cobertos por contratos estáticos, store, API, actions e testes de domínio/migration.
+- Gates globais continuam vermelhos por baseline externo: lint com 21.205 ocorrências; typecheck em módulos não relacionados; testes com 359 arquivos/2.814 casos aprovados e 14 arquivos/28 casos falhando, além de 1 pendente. Build global passou com avisos legados de `pdfjs-polyfill`.
+- Débitos anteriores fora desta feature permanecem: canal previsível de chat/Pusher com payload amplo, actions legadas de telefone/leitura com autorização insuficiente e role possivelmente obsoleta no JWT; a rota de Chamados também conserva proteção por sessão mais permissiva que a visibilidade da sidebar.
+
+### Refletido também em
+- `codebase-map.md`: mapa do domínio, arquivos, migrations e fluxo de entrega do feedback.
+- `integration-points.md`: contrato de atribuição, conclusão atômica, popup/Pusher/polling e regras para extensões. `decisions.md`, `architecture.md` e `components.md` não exigiram nova alteração nesta consolidação.

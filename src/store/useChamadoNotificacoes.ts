@@ -11,17 +11,28 @@ export interface ChamadoNotificacao {
   lida: boolean;
 }
 
+export interface ChamadoFeedbackPendente {
+  chamadoId: number;
+  titulo: string;
+  closedAt: string;
+}
+
 interface ChamadoNotificacoesStore {
   notificacoes: ChamadoNotificacao[];
+  feedbacksPendentes: ChamadoFeedbackPendente[];
   adicionarNotificacao: (
     n: Omit<ChamadoNotificacao, 'id' | 'lida'> & { id?: string },
   ) => void;
   marcarTodasLidas: () => void;
   removerNotificacao: (id: string) => void;
+  adicionarFeedbackPendente: (feedback: ChamadoFeedbackPendente) => void;
+  sincronizarFeedbacksPendentes: (feedbacks: ChamadoFeedbackPendente[]) => void;
+  removerFeedbackPendente: (chamadoId: number) => void;
 }
 
 export const useChamadoNotificacoes = create<ChamadoNotificacoesStore>((set) => ({
   notificacoes: [],
+  feedbacksPendentes: [],
   adicionarNotificacao: (n) =>
     set((state) => {
       const id = n.id ?? `${Date.now()}-${n.chamadoId}`;
@@ -40,5 +51,27 @@ export const useChamadoNotificacoes = create<ChamadoNotificacoesStore>((set) => 
   removerNotificacao: (id) =>
     set((state) => ({
       notificacoes: state.notificacoes.filter((n) => n.id !== id),
+    })),
+  adicionarFeedbackPendente: (feedback) =>
+    set((state) => {
+      if (state.feedbacksPendentes.some((item) => item.chamadoId === feedback.chamadoId)) {
+        return state;
+      }
+      return {
+        feedbacksPendentes: [...state.feedbacksPendentes, feedback],
+      };
+    }),
+  sincronizarFeedbacksPendentes: (feedbacks) =>
+    set({
+      feedbacksPendentes: feedbacks.filter(
+        (feedback, indice, itens) =>
+          itens.findIndex((item) => item.chamadoId === feedback.chamadoId) === indice,
+      ),
+    }),
+  removerFeedbackPendente: (chamadoId) =>
+    set((state) => ({
+      feedbacksPendentes: state.feedbacksPendentes.filter(
+        (feedback) => feedback.chamadoId !== chamadoId,
+      ),
     })),
 }));

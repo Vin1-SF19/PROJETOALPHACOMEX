@@ -4,7 +4,7 @@ import { auth } from "../../../../auth";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import db from "@/lib/prisma";
-import DetalhesChamado from "@/components/DetalhesChamado";
+import { DetalhesChamado } from "@/components/DetalhesChamado";
 
 import ChatChamado from "@/components/ChatChamado";
 import { FiltroChamadosCards } from "@/components/FiltroChamado";
@@ -69,6 +69,9 @@ export default async function Chamados({
       include: {
         solicitante: {
           select: { nome: true, usuario: true, telefone: true, telefone_corporativo: true },
+        },
+        tecnicoSolicitado: {
+          select: { id: true, nome: true },
         },
         mensagens: {
           include: {
@@ -282,7 +285,7 @@ export default async function Chamados({
 
                       {/* Ações */}
                       <td className="px-8 py-5 text-right">
-                        <DetalhesChamado chamado={chamado} isAdmin={isAdmin} templates={templates} />
+                        <DetalhesChamado chamado={chamado} isAdmin={isAdmin} usuarioAtualId={userId} templates={templates} />
                       </td>
                     </tr>
                   ))

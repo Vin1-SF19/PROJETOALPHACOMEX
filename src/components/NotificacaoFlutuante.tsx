@@ -7,11 +7,17 @@ import { useChamadoNotificacoes } from "@/store/useChamadoNotificacoes";
 
 interface RespostaNotificacoesChamados {
     notificacoes?: ChamadoMensagemPayload[];
+    feedbacksPendentes?: Array<{
+        chamadoId: number;
+        titulo: string;
+        closedAt: string;
+    }>;
 }
 
 export function NotificacaoFlutuante() {
     const { data: session, status } = useSession();
     const adicionarNotificacao = useChamadoNotificacoes((state) => state.adicionarNotificacao);
+    const sincronizarFeedbacksPendentes = useChamadoNotificacoes((state) => state.sincronizarFeedbacksPendentes);
     const idsEntreguesRef = useRef(new Set<number>());
     const isFetching = useRef(false);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -33,6 +39,7 @@ export function NotificacaoFlutuante() {
             
             if (!res.ok) throw new Error();
             const resposta = await res.json() as RespostaNotificacoesChamados;
+            sincronizarFeedbacksPendentes(resposta.feedbacksPendentes ?? []);
             const mensagensDaMaisAntigaParaNova = [...(resposta.notificacoes ?? [])].reverse();
             for (const msg of mensagensDaMaisAntigaParaNova) {
                 if (idsEntreguesRef.current.has(msg.mensagemId)) continue;
@@ -53,7 +60,7 @@ export function NotificacaoFlutuante() {
             const delay = document.hidden ? 30000 : 6000;
             timeoutRef.current = setTimeout(checkNovasMensagens, delay);
         }
-    }, [adicionarNotificacao, session, status]);
+    }, [adicionarNotificacao, session, sincronizarFeedbacksPendentes, status]);
 
     useEffect(() => {
         if (status === "authenticated") {

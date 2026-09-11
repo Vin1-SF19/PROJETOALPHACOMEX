@@ -37,6 +37,8 @@ function chamadoAberto(overrides: Record<string, unknown> = {}) {
     solucao: null,
     status: "ABERTO",
     tecnicoId: null,
+    tecnicoSolicitadoId: null,
+    tecnicoSolicitado: null,
     updatedAt: new Date(),
     ...overrides,
   };
@@ -98,7 +100,7 @@ describe("assumirChamado — fluxo 'Assumir Chamado'", () => {
     expect(resultado.success).toBe(true);
     expect(resultado.chamado).toEqual({ id: 10, status: "EM_ATENDIMENTO", tecnicoId: 3 });
     expect(prismaMock.chamados.updateMany).toHaveBeenCalledWith({
-      where: { id: 10, tecnicoId: null, status: "ABERTO" },
+      where: { id: 10, tecnicoId: null, status: "ABERTO", tecnicoSolicitadoId: null },
       data: { status: "EM_ATENDIMENTO", tecnicoId: 3 },
     });
     expect(notificarAgendaMock).toHaveBeenCalledWith(
@@ -124,6 +126,47 @@ describe("assumirChamado — fluxo 'Assumir Chamado'", () => {
     expect(resultado.success).toBe(false);
     expect(resultado.error).toMatch(/já foi assumido/i);
     expect(notificarAssumidoMock).not.toHaveBeenCalled();
+  });
+
+  it("bloqueia outro técnico quando o solicitante indicou um responsável", async () => {
+    prismaMock.chamados.findUnique.mockResolvedValue(chamadoAberto({
+      tecnicoSolicitadoId: 9,
+      tecnicoSolicitado: { nome: "Ana Souza" },
+    }));
+
+    const resultado = await assumirChamado(10);
+
+    expect(resultado).toEqual({
+      success: false,
+      error: "O solicitante pediu que Ana Souza realizasse este chamado. Somente esse usuário pode assumir.",
+    });
+    expect(prismaMock.chamados.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("permite que o técnico solicitado assuma com CAS da preferência", async () => {
+    prismaMock.chamados.findUnique
+      .mockResolvedValueOnce(chamadoAberto({
+        tecnicoSolicitadoId: 3,
+        tecnicoSolicitado: { nome: "Carlos Silva" },
+      }))
+      .mockResolvedValueOnce(chamadoAberto());
+    prismaMock.chamados.updateMany.mockResolvedValue({ count: 1 });
+
+    const resultado = await assumirChamado(10);
+
+    expect(resultado.success).toBe(true);
+    expect(prismaMock.chamados.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ tecnicoSolicitadoId: 3 }),
+    }));
+  });
+
+  it("bloqueia ator sem role administrativa no servidor", async () => {
+    authMock.mockResolvedValue({ user: { id: "4", role: "User", nome: "Colaborador" } });
+
+    const resultado = await assumirChamado(10);
+
+    expect(resultado).toEqual({ success: false, error: "Permissão insuficiente" });
+    expect(prismaMock.chamados.findUnique).not.toHaveBeenCalled();
   });
 
   it("notifica o solicitante antes de aguardar a automação da Agenda Alpha", async () => {

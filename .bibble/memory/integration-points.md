@@ -1,5 +1,29 @@
 # INTEGRATION POINTS — Pontos de Integração
 
+## Chamados — conclusão, feedback e preferência de técnico (RM-2026-A6F2C9)
+
+**Arquivos:** `src/lib/chamados/conclusao.ts`, `src/actions/chamados-feedback.ts`, `src/lib/chamados/schemas.ts`, `src/hooks/useAdminChamadosNotifications.ts`, `src/components/NotificacaoFlutuante.tsx`, `src/app/api/notificacoes/route.ts`, `src/components/layout/PainelLayoutClient.tsx` e `src/components/chamados/ChamadoFinalizadoFeedbackDialog.tsx`.
+
+**Propósito:** manter a conclusão do chamado e a criação do feedback pendente atômicas; entregar o convite persistente ao solicitante por realtime com recuperação; separar a preferência de atendimento da atribuição efetiva.
+
+**Contrato de atribuição:** `tecnicoSolicitadoId` é opcional e nunca preenche `tecnicoId` na abertura. Enquanto o chamado estiver `ABERTO`, somente o usuário solicitado pode assumi-lo; a assunção usa CAS incluindo a preferência. Exclusão do usuário solicitado limpa apenas a preferência (`ON DELETE SET NULL`). `dataDesejadaConclusao` é preferência informativa e não cria, move nem conclui tarefa da Agenda Alpha.
+
+**Contrato de conclusão/feedback:** os fluxos rápido e com protocolo chamam o serviço compartilhado em `conclusao.ts`. O serviço valida o técnico efetivo, exige `EM_ATENDIMENTO`, atualiza por CAS e cria `ChamadoFeedback` `PENDENTE` na mesma transação serializável. Existe no máximo um feedback por chamado. `RESPONDIDO` exige as notas comuns e a ramificação coerente: NÃO com relato de 10–1.000 caracteres, ou SIM com nota de qualidade; `RECUSADO` não armazena respostas.
+
+**Exemplo de uso:**
+
+```ts
+await concluirChamadoComFeedback({ chamadoId, tecnicoId, concluidoEm, solucao });
+```
+
+**Entrega do popup:** `useChamadosNotifications` recebe `CHAMADO_CONCLUIDO_EVENT` no canal do usuário, preserva o toast existente e inclui a pendência na store. `NotificacaoFlutuante` reconcilia a fila com `/api/notificacoes`; falha de polling não substitui a fila por vazio. `PainelLayoutClient` monta `ChamadoFinalizadoFeedbackDialog` somente no shell principal, depois da guarda `isEmbedded`, e o polling também abandona execução quando `window !== window.top`. O dialog não fecha por escape, clique externo ou botão de fechar; só avança após recusa ou resposta aceita pelo servidor.
+
+**Ao estender:** todo novo caminho que conclua chamado deve reutilizar `concluirChamadoComFeedback`; não deve atualizar `status` diretamente. Todo novo ponto global de entrega deve deduplicar por `chamadoId`, respeitar ownership no servidor e permanecer desativado em iframe.
+
+**Banco em produção:** migration aditiva `20260911131500_chamados_feedback_preferencia_prazo` e migration corretiva `20260911133500_chamados_feedback_resposta_bool_triggers`, ambas aplicadas no Turso de produção. Os triggers `chamados_feedback_respondido_solucao_insert` e `chamados_feedback_respondido_solucao_update` abortam somente `RESPONDIDO` com `solucionadaComoEsperado IS NULL`.
+
+**Última atualização:** 2026-09-11 por Scribe (RM-2026-A6F2C9)
+
 ## Alpha CRM — publicação versionada da configuração (RM-2026-EB2898)
 
 **Fluxo principal:** `/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]` carrega configuração + `configVersion` → `AdminPipelineClient` mantém snapshot publicado e rascunho → `PublicarConfiguracaoPipelineBpm({ baseVersion, etapas, transicoes, campos })` → Zod + autorização externa/interna → validação do conjunto completo → CAS → filhos + auditoria → commit → revalidate/realtime.
