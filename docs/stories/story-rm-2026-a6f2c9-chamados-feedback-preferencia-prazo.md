@@ -170,6 +170,7 @@ Evoluir o módulo de Chamados sem remover a notificação de conclusão existent
 | 2026-09-11 | 0.1 | Story criada a partir do pedido do usuário, reconhecimento Scout e checkpoint Vault. | River (SM) |
 | 2026-09-11 | 0.2 | Migration principal e correção aditiva por triggers aplicadas em produção com backups e validações Vault. | Vault / Codex |
 | 2026-09-11 | 1.0 | Backend, frontend, recuperação persistida, testes e gates concluídos; story pronta para revisão. | Dex / Nova / Codex |
+| 2026-09-11 | 1.0.1 | Corrigida a leitura do formulário após a validação assíncrona do React Hook Form. | Dex / Codex |
 
 ## Dev Agent Record
 
@@ -181,6 +182,7 @@ Codex (orquestração Bibble com Scout, Vault, Echo, Nova, Forge, Probe, Anubis,
 
 - Backups e evidências Vault descritos na seção **Evidências do checkpoint Vault — 2026-09-11**.
 - Forge final: ESLint estrito do escopo, 15 arquivos/85 testes, Prisma validate, build de produção e `git diff --check` aprovados.
+- Correção 1.0.1: ESLint dos arquivos alterados, 15 arquivos/86 testes de Chamados, build de produção e `git diff --check` aprovados; CodeRabbit indisponível no ambiente por ausência do executável.
 - Gates globais executados: `npm run lint`, `npm run typecheck` e `npm test` continuam vermelhos somente por débitos preexistentes fora da feature; detalhes em **QA Results**.
 
 ### Completion Notes List
@@ -191,6 +193,7 @@ Codex (orquestração Bibble com Scout, Vault, Echo, Nova, Forge, Probe, Anubis,
 - Popup global não descartável preserva o toast, usa Pusher para baixa latência e polling autoritativo para recuperação/reconciliação entre abas.
 - Feedback valida ownership, estado, notas, ramos condicionais, tamanho de comentário e concorrência no servidor e no banco.
 - Revisões Anubis e Lens endureceram coerção de notas, limite de relato, falhas transitórias e datas civis inválidas.
+- A abertura manual agora captura o formulário por `event.target`, que permanece disponível depois da validação assíncrona do React Hook Form; foi adicionada cobertura de regressão para impedir o retorno ao `currentTarget` transitório.
 
 ### File List
 

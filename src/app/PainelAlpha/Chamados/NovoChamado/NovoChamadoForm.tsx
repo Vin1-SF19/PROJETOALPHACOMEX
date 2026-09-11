@@ -54,7 +54,10 @@ export function NovoChamadoForm({ tecnicos }: NovoChamadoFormProps) {
   const descricao = useWatch({ control, name: "descricao" }) ?? "";
 
   const onSubmit = handleSubmit((_dados, event) => {
-    const formulario = event?.currentTarget;
+    // O resolver do react-hook-form valida de forma assíncrona antes de chamar
+    // este callback. Nesse ponto, o React já limpou `currentTarget`, enquanto
+    // `target` ainda referencia o formulário que originou o submit.
+    const formulario = event?.target;
     if (!(formulario instanceof HTMLFormElement)) {
       toast.error("Não foi possível ler o formulário.");
       return;

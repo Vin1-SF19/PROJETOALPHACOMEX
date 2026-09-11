@@ -67,6 +67,13 @@ describe("abertura e detalhes do chamado", () => {
     expect(formulario).toContain("técnico e prazo são opcionais");
   });
 
+  it("lê o formulário pelo alvo persistente após a validação assíncrona", () => {
+    const formulario = ler("src/app/PainelAlpha/Chamados/NovoChamado/NovoChamadoForm.tsx");
+
+    expect(formulario).toContain("const formulario = event?.target;");
+    expect(formulario).not.toContain("const formulario = event?.currentTarget;");
+  });
+
   it("mostra preferência e só oferece finalização ao técnico vinculado", () => {
     const detalhes = ler("src/components/DetalhesChamado.tsx");
 
