@@ -1,5 +1,31 @@
 # INTEGRATION POINTS — Pontos de Integração
 
+## Login → transição cinematográfica persistente (2026-09-11)
+
+**Arquivos:** `src/lib/loginAction.ts`, `src/components/loginForm.tsx`, `src/components/login/{LoginTransitionProvider,LoginSuccessTransition,LoginCargoTransition,LoginCard,Ocean,LoginScene,useReducedMotion}.tsx`, `src/components/login/login-transition-state.ts`, `src/app/{layout,page}.tsx` e `src/app/globals.css`.
+
+**Propósito:** confirmar o cookie/sessão antes da navegação e manter um overlay único durante a troca real de `/` para `/PainelAlpha`, sem simular o painel nem depender de estado preso à página de login.
+
+**Fluxo:** `LoginForm` envia normalmente para `loginAction` → Zod normaliza/valida → Auth.js `signIn` usa `redirect: false` e só retorna sucesso após gravar a sessão → `LoginTransitionProvider` executa `session.update()` → máquina entra em `authorized` e o chunk visual confirma montagem (`visualReady`) → `covering` inicia confirmação curta e empacotamento do card real → `containernavio.png` abre para fora, recebe o card, fecha, sela e segue à área de carga → oceano e navio aproximam → embarque conclui, buzina toca e o navio parte → no checkpoint central chama `router.replace` e entra em `navigation` → `usePathname` confirma `/PainelAlpha` e avança `traversing → revealed → idle`. Falha mantém a mensagem pública do servidor e não monta a sequência visual.
+
+**Persistência e carregamento:** o provider deve permanecer diretamente sob `SessionProvider` no root layout. `LoginSuccessTransition` é carregado por `next/dynamic` e antecipado em `beginValidation`; `Ocean` é um segundo chunk dinâmico, `ssr: false`, montado somente sem reduced motion. A página de login pré-carrega container, navio e buzina; imagens visuais usam `next/image` com prioridade. O card só inicia o empacotamento depois de `visualReady`, evitando sumir se o chunk visual falhar.
+
+**Fallbacks:** uma camada transparente bloqueia interação enquanto o chunk chega sem esconder o login; falha de import/render usa error boundary e navegação completa. Há watchdog de 5 s para carregar a transição, 8 s para a rota, fallback CSS em falha WebGL e timeout de 900 ms para o navio. Reduced motion conclui rapidamente sem Ocean/navio.
+
+**Ao estender:** preserve a ordem `loginAction success → session.update → visualReady → empacotamento → embarque → buzina/partida → checkpoint central → router.replace → pathname confirmado → saída da travessia`; nunca restaure `preventDefault`, ponte em `window`, redirect antecipado, fundo opaco intermediário ou overlay dentro de `LoginScene`. O card real deve permanecer entre as camadas z do corpo e das portas até ficar totalmente oculto. Novos estados pertencem ao reducer puro e precisam manter interação bloqueada entre validação e reveal.
+
+**Exemplo de integração:**
+
+```tsx
+<SessionProvider session={session}>
+  <LoginTransitionProvider>{children}</LoginTransitionProvider>
+</SessionProvider>
+```
+
+**Assets e provas:** `public/BackgroundAtualizado.png`, `public/containernavio.png`, `public/NavioLogin.png`, `public/Logotipo-1.png`, `public/sounds/buzina.mp3`; `tests/auth/login-action.test.ts`, `login-transition-state.test.ts` e `login-transition-wiring.test.ts`.
+
+**Última atualização:** 2026-09-11 por Scribe
+
 ## Chamados — conclusão, feedback e preferência de técnico (RM-2026-A6F2C9)
 
 **Arquivos:** `src/lib/chamados/conclusao.ts`, `src/actions/chamados-feedback.ts`, `src/lib/chamados/schemas.ts`, `src/hooks/useAdminChamadosNotifications.ts`, `src/components/NotificacaoFlutuante.tsx`, `src/app/api/notificacoes/route.ts`, `src/components/layout/PainelLayoutClient.tsx` e `src/components/chamados/ChamadoFinalizadoFeedbackDialog.tsx`.

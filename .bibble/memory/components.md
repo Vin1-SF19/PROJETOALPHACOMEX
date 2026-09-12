@@ -3,6 +3,42 @@
 > Mantido por: Nova (frontend) e Scribe (cartógrafo)
 > Consultar SEMPRE antes de criar um novo componente.
 
+### LoginCargoTransition — empacotamento e embarque do login
+
+**Arquivo:** `src/components/login/LoginCargoTransition.tsx`
+**Tipo:** Client Component visual
+**Props:** `reducedMotion`, `routeReady`, `onContainerLoad`
+**Uso:** montado exclusivamente por `LoginSuccessTransition` após autenticação e confirmação da sessão.
+**Notas:** usa `public/containernavio.png` como container principal. O corpo/interior fica abaixo do card real de login e duas cópias parciais recortadas do mesmo asset simulam as portas acima dele; pivôs externos e rotações Y opostas fazem as folhas abrirem para fora. A trajetória responsiva termina sobre a área de carga do navio. Não contém autenticação, navegação ou lógica de negócio; em reduced motion renderiza apenas a confirmação curta e o fade.
+
+**Última atualização:** 2026-09-11 por Nova (RM-2026 login cinematográfico)
+
+### LoginTransitionPreview — bancada visual local do login
+
+**Arquivo:** `src/components/login/LoginTransitionPreview.tsx` + `src/app/dev/login-transition-preview/page.tsx`
+**Tipo:** Client Component interativo + página Server Component protegida por ambiente
+**Uso:** abrir `/dev/login-transition-preview` durante `npm run dev`; `Mar contínuo` mantém `Ocean` e o navio reais visíveis, enquanto `Transição completa` repete a composição real automaticamente ou pela tecla `R`.
+**Notas:** não chama autenticação, não navega e não altera sessão. A página executa `notFound()` quando `NODE_ENV !== "development"`, portanto não funciona em produção.
+
+**Última atualização:** 2026-09-11 por Nova (RM-2026 login cinematográfico)
+
+### Ocean / ShipWaterContact — material noturno e contato com o casco
+
+**Arquivos:** `src/components/login/Ocean.tsx`, `ocean-material.ts` e `ShipWaterContact.tsx`, na mesma pasta.
+**Tipo:** Client Components visuais e fragment shader WebGL.
+**Uso:** `Ocean` mantém a geometria, relógio e ondas existentes; `ocean-material.ts` controla somente iluminação, microtextura, espuma e reflexos. `ShipWaterContact` deve ser montado após a imagem do navio, dentro do mesmo wrapper posicionado, tanto na travessia quanto na prévia contínua.
+**Notas:** o PNG tem margem transparente: a quilha está em aproximadamente 77% da altura, não no final do elemento. A camada de contato cobre somente a faixa inferior do casco, com proporções responsivas e espuma na proa direita. É decorativa, não recebe interação nem altera login/timeline. O preview carrega o oceano sem SSR para evitar divergência de detecção WebGL.
+
+**Última atualização:** 2026-09-11 por Nova (refinamento visual do mar)
+
+### LoginPageTow / LoginTowRope — embarque e reboque sincronizado
+
+**Arquivos:** `src/components/login/LoginPageTow.tsx`, `LoginTowRope.tsx`, `useLoginVoyage.ts` e `login-voyage.ts`.
+**Uso:** o provider mantém um MotionValue visual compartilhado com `LoginSuccessTransition`. A cena chega ao ponto de atracação, aguarda o embarque e só então toca a buzina e parte. O container mantém o empacotamento original e recebe um progresso separado somente para o embarque.
+**Notas:** `LoginPageTow` envolve o slot real da rota, sem clone, screenshot ou iframe. A corda usa o PNG local original, com recorte DOM apenas das margens transparentes. As posições da popa, corda e borda da página vêm da mesma geometria responsiva. Fora da sequência, o wrapper não aplica transformação nem altera a posição dos descendentes. Reduced motion não monta o reboque. A bancada usa um destino explicitamente identificado como prévia, sem dados/autenticação do painel.
+
+**Última atualização:** 2026-09-11 por Nova (atracação e reboque)
+
 ### CadenciaEtapasSection — associação operacional por coluna
 
 **Arquivo:** `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/CadenciaEtapasSection.tsx`

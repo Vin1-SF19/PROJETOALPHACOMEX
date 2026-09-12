@@ -11,6 +11,7 @@ import { NotificacaoFlutuante } from "@/components/NotificacaoFlutuante";
 import { Heartbeat } from "@/components/Heartbeat";
 import { ThemeSyncer } from "@/components/ThemeSyncer";
 import { PusherGlobal } from "@/components/PusherGlobal.tsx";
+import { LoginTransitionProvider } from "@/components/login/LoginTransitionProvider";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -27,7 +28,7 @@ export default async function RootLayout({
 }>) {
   const session = await auth();
   
-  const rgbPadrao = "59, 130, 246"; 
+  const rgbPadrao = "59, 130, 246";
 
   return (
     <html 
@@ -37,17 +38,19 @@ export default async function RootLayout({
     >
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased selection:bg-alpha/30`}>
         <SessionProvider session={session}>
-          <ThemeSyncer />
-          <Toaster theme="dark" position="top-right" richColors />
-          <StatusConexao />
+          <LoginTransitionProvider>
+            <ThemeSyncer />
+            <Toaster theme="dark" position="top-right" richColors />
+            <StatusConexao />
 
-          <ThemeProviderAlpha>
-            <BroadcastBanner />
-            <NotificacaoFlutuante/>
-            <Heartbeat /> 
-            <PusherGlobal/>
-            {children}
-          </ThemeProviderAlpha>
+            <ThemeProviderAlpha>
+              <BroadcastBanner />
+              <NotificacaoFlutuante />
+              <Heartbeat />
+              <PusherGlobal />
+              {children}
+            </ThemeProviderAlpha>
+          </LoginTransitionProvider>
         </SessionProvider>
       </body>
     </html>

@@ -2,14 +2,18 @@ status:
   branch: main
   modifiedFiles:
     - .aiox/project-status.yaml
-  modifiedFilesTotalCount: 1
+    - .bibble/memory/codebase-map.md
+    - .bibble/memory/components.md
+    - .bibble/memory/integration-points.md
+    - .bibble/memory/session-draft.md
+  modifiedFilesTotalCount: 35
   recentCommits:
-    - Melhorias de chamados e notificaçoes
-    - 'feat(notificacoes): unifica central e avisa chamados assumidos'
+    - 'fix(chamados): corrigir leitura do formulario ao abrir chamado'
+    - 'feat(chamados): adicionar feedback e preferencias de atendimento'
   currentEpic: Agenda Alpha
   currentStory: story-agenda-alpha-operacional-tarefas-status
-  lastUpdate: '2026-09-10T12:38:13.301Z'
+  lastUpdate: '2026-09-11T20:45:14.754Z'
   isGitRepo: true
-timestamp: 1789043893302
+timestamp: 1789159514754
 ttl: 60
-gitFingerprint: 1788020233312.24:1789042661081.7366
+gitFingerprint: 1789060307076.414:1789155832026.7559
