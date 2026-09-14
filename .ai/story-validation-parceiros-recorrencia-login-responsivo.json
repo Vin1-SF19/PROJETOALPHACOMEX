@@ -1,0 +1,25 @@
+{
+  "story": "STORY-PARCEIROS-RECORRENCIA-LOGIN-RESPONSIVO",
+  "validatedAt": "2026-09-14",
+  "verdict": "GO",
+  "score": 9,
+  "confidence": "high",
+  "checks": {
+    "templateCompleteness": "pass",
+    "executorAssignment": "pass",
+    "fileStructure": "pass",
+    "frontendCompleteness": "pass",
+    "acceptanceCriteriaCoverage": "pass",
+    "testingGuidance": "pass",
+    "security": "not-applicable-no-auth-contract-change",
+    "taskSequence": "pass",
+    "codeRabbitIntegration": "pass",
+    "antiHallucination": "pass",
+    "implementationReadiness": "pass"
+  },
+  "notes": [
+    "Independent corrective story based directly on the user's reported defects; no parent epic or previous-story dependency applies.",
+    "Configured architecture documents were unavailable; technical statements were verified against the affected source files.",
+    "No database, API, authentication, authorization, or deployment change is in scope."
+  ]
+}

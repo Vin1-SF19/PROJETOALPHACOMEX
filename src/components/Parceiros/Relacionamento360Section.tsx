@@ -122,7 +122,7 @@ export default function Relacionamento360Section({
         <div>
           <p className="text-[9px] text-slate-600 uppercase tracking-widest font-bold mb-1.5">Potencial de recorrência</p>
           <div className="flex items-center gap-1">
-            {[0, 1, 2, 3, 4, 5].map((n) => (
+            {[1, 2, 3, 4, 5].map((n) => (
               <button
                 key={n}
                 disabled={!podeEditar || salvandoPotencial}

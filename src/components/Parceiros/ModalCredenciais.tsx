@@ -40,17 +40,17 @@ export default function ModalCredenciais({ open, onClose, loginEmail, senhaGerad
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="bg-slate-950 border-white/10 text-slate-200 max-w-md rounded-3xl">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-md overflow-x-hidden overflow-y-auto rounded-3xl border-white/10 bg-slate-950 p-4 text-slate-200 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-white font-black uppercase italic tracking-tight">
-            <Sparkles size={18} className="text-amber-400" />
+          <DialogTitle className="flex min-w-0 items-center gap-2 pr-8 font-black uppercase italic tracking-tight text-white">
+            <Sparkles size={18} className="shrink-0 text-amber-400" />
             Parceiro Cadastrado!
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 pt-2">
-          <p className="text-xs text-slate-400 leading-relaxed">
-            Parceiro <span className="text-white font-black">{nomeParceiro}</span> cadastrado com sucesso.
+        <div className="min-w-0 space-y-4 pt-2">
+          <p className="break-words text-xs leading-relaxed text-slate-400">
+            Parceiro <span className="font-black text-white">{nomeParceiro}</span> cadastrado com sucesso.
             Compartilhe as credenciais de acesso abaixo — a senha só é exibida <span className="text-amber-400 font-bold">uma vez</span>.
           </p>
 
@@ -59,8 +59,8 @@ export default function ModalCredenciais({ open, onClose, loginEmail, senhaGerad
             <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-1">
               <Mail size={10} /> Login
             </span>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-mono text-white">{loginEmail}</span>
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <span className="min-w-0 flex-1 break-all font-mono text-sm text-white">{loginEmail}</span>
               <Button type="button" size="sm" variant="ghost"
                 onClick={() => copiar(loginEmail, "login")}
                 className="h-7 w-7 p-0 text-slate-400 hover:text-white">
@@ -99,7 +99,7 @@ export default function ModalCredenciais({ open, onClose, loginEmail, senhaGerad
               <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-2">
                 Mensagem de Boas-vindas
               </p>
-              <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{mensagemFinal}</p>
+              <p className="whitespace-pre-wrap break-words text-xs leading-relaxed text-slate-300">{mensagemFinal}</p>
               <Button type="button" size="sm" variant="ghost"
                 onClick={() => { navigator.clipboard.writeText(mensagemFinal); toast.success("Mensagem copiada!"); }}
                 className="mt-2 h-7 text-[10px] text-slate-400 hover:text-white gap-1 px-2">
