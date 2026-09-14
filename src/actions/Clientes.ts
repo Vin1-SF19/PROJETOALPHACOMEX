@@ -122,6 +122,7 @@ const CAMPOS_HISTORICO_CLIENTE = [
 
 /** Campos de `ClienteServico` (negócio) rastreados pelo histórico de alterações. */
 const CAMPOS_HISTORICO_SERVICO = [
+  "servico",
   "analistaResponsavel",
   "dataContratacao",
   "status",
@@ -466,6 +467,16 @@ function normalizarNomeServico(texto: string): string {
     .toLowerCase();
 }
 
+function encontrarContratoCorrespondente<T extends { servico: string }>(
+  contratos: T[],
+  servicoAtual: string,
+): T | null {
+  const alvo = normalizarNomeServico(servicoAtual);
+  return contratos.find((contrato) => normalizarNomeServico(contrato.servico) === alvo)
+    ?? contratos.find((contrato) => alvo.includes(normalizarNomeServico(contrato.servico)))
+    ?? null;
+}
+
 /**
  * Busca todos os Contratos Comerciais (módulo Metas/Comercial) daquele CNPJ,
  * mais recente primeiro. Um mesmo CNPJ pode ter vários contratos (serviços
@@ -509,13 +520,55 @@ export async function buscarServicosContratados(cnpj: string) {
 export async function buscarServicoContratadoPorCliente(cnpj: string, servico: string | null) {
   if (!servico) return null;
   const candidatos = await buscarServicosContratados(cnpj);
-  const alvo = normalizarNomeServico(servico);
+  return encontrarContratoCorrespondente(candidatos, servico);
+}
 
-  return (
-    candidatos.find((c) => normalizarNomeServico(c.servico) === alvo) ??
-    candidatos.find((c) => alvo.includes(normalizarNomeServico(c.servico))) ??
-    null
-  );
+const analisarTrocaServicoSchema = z.object({
+  clienteServicoId: z.number().int().positive(),
+  novoServico: z.string().trim().min(1, "Informe o serviço").max(200),
+});
+
+async function buscarContratoMetasCorrespondente(clienteId: number, servicoAtual: string) {
+  const contratos = await db.contratoComercial.findMany({
+    where: { clienteId, arquivado: false },
+    select: { id: true, servico: true },
+    orderBy: { createdAt: "desc" },
+  });
+  return encontrarContratoCorrespondente(contratos, servicoAtual);
+}
+
+/**
+ * Informa à UI o impacto de uma troca de serviço. A origem é sempre resolvida
+ * novamente no servidor a partir do ClienteServico persistido; nenhum sinalizador
+ * de vínculo vindo do navegador é aceito como fonte de verdade.
+ */
+export async function analisarImpactoTrocaServico(raw: unknown) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false as const, error: "Não autorizado" };
+
+  const parsed = analisarTrocaServicoSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { success: false as const, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
+  const atual = await db.clienteServico.findUnique({
+    where: { id: parsed.data.clienteServicoId },
+    select: { id: true, clienteId: true, servico: true },
+  });
+  if (!atual) return { success: false as const, error: "Serviço não encontrado" };
+
+  const contratoMetas = await buscarContratoMetasCorrespondente(atual.clienteId, atual.servico);
+  const origem = contratoMetas ? "ALPHA_METAS" as const : "LEGADO" as const;
+
+  return {
+    success: true as const,
+    impacto: {
+      origem,
+      servicoAnterior: atual.servico,
+      novoServico: parsed.data.novoServico,
+      modulos: contratoMetas ? ["CS & NPS", "Alpha Metas"] : ["CS & NPS"],
+    },
+  };
 }
 
 function normalizarDataRegistro(valor: string): Date {
@@ -687,8 +740,27 @@ export async function salvarAlteracoesServico(clienteServicoId: number, dadosNov
       campos: [...CAMPOS_HISTORICO_SERVICO],
     });
 
-    await db.$transaction(async (tx) => {
+    const resultado = await db.$transaction(async (tx) => {
+      const servicoMudou = dadosParaAtualizar.servico !== undefined
+        && dadosParaAtualizar.servico.trim() !== estadoAnterior.servico.trim();
+      let contratoMetas: { id: string; servico: string } | null = null;
+
+      if (servicoMudou) {
+        const contratos = await tx.contratoComercial.findMany({
+          where: { clienteId: estadoAnterior.clienteId, arquivado: false },
+          select: { id: true, servico: true },
+          orderBy: { createdAt: "desc" },
+        });
+        contratoMetas = encontrarContratoCorrespondente(contratos, estadoAnterior.servico);
+      }
+
       await tx.clienteServico.update({ where: { id: clienteServicoId }, data: dadosParaAtualizar });
+      if (contratoMetas && dadosParaAtualizar.servico) {
+        await tx.contratoComercial.update({
+          where: { id: contratoMetas.id },
+          data: { servico: dadosParaAtualizar.servico },
+        });
+      }
       if (linhasHistorico.length > 0) {
         await tx.clienteServicoHistorico.createMany({ data: linhasHistorico });
       }
@@ -696,15 +768,20 @@ export async function salvarAlteracoesServico(clienteServicoId: number, dadosNov
         await enfileirarAutomacoesDeferimentoBpm({
           clienteId: estadoAnterior.clienteId,
           clienteServicoId: estadoAnterior.id,
-          servico: estadoAnterior.servico,
+          servico: dadosParaAtualizar.servico ?? estadoAnterior.servico,
         }, tx);
       }
+      return { sincronizouMetas: Boolean(contratoMetas) };
     });
 
     revalidatePath("/PainelAlpha/CadastroClientes");
+    if (resultado.sincronizouMetas) revalidatePath("/PainelAlpha/Metas");
     return { success: true };
   } catch (error) {
     console.error("ERRO salvarAlteracoesServico:", error);
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002") {
+      return { success: false, error: "Este cliente já possui o novo serviço contratado" };
+    }
     return { success: false, error: mensagemDoErro(error) };
   }
 }

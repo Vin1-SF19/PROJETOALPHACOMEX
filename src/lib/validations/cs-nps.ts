@@ -73,6 +73,7 @@ export type AlteracoesClienteInput = z.infer<typeof alteracoesClienteSchema>;
 
 // Campos de negócio de `ClienteServico` — editáveis via `salvarAlteracoesServico`.
 export const alteracoesServicoSchema = z.object({
+  servico: z.string().trim().min(1, "Informe o serviço").max(200).optional(),
   analistaResponsavel: z.string().max(120).nullable(),
   dataContratacao: z.string().max(40).nullable(),
   status: z.string().min(1).max(40),

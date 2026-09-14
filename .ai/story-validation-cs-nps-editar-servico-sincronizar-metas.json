@@ -1,0 +1,25 @@
+{
+  "story": "STORY-CS-NPS-EDITAR-SERVICO-SINCRONIZAR-METAS",
+  "validatedAt": "2026-09-14",
+  "verdict": "GO",
+  "score": 9,
+  "confidence": "high",
+  "checks": {
+    "templateCompleteness": "pass",
+    "executorAssignment": "pass",
+    "fileStructure": "pass",
+    "integrationCompleteness": "pass",
+    "frontendCompleteness": "pass",
+    "acceptanceCriteriaCoverage": "pass",
+    "testingGuidance": "pass",
+    "security": "pass-server-side-origin-detection",
+    "transactionSafety": "pass",
+    "codeRabbitIntegration": "pass",
+    "implementationReadiness": "pass"
+  },
+  "notes": [
+    "Independent corrective story based directly on the user's request.",
+    "The existing ClienteServico and ContratoComercial structures are reused without migration or mass mutation.",
+    "The server remains authoritative for detecting whether Alpha Metas must be synchronized."
+  ]
+}

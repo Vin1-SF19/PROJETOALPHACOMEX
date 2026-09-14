@@ -14,6 +14,10 @@ const prismaMock = vi.hoisted(() => ({
   clienteServicoHistorico: {
     createMany: vi.fn(),
   },
+  contratoComercial: {
+    findMany: vi.fn(),
+    update: vi.fn(),
+  },
   $transaction: vi.fn(),
 }));
 
@@ -40,7 +44,14 @@ beforeEach(() => {
   prismaMock.cliente.findUnique.mockResolvedValue(null);
   prismaMock.cliente.create.mockResolvedValue({ id: 501 });
   prismaMock.$transaction.mockImplementation(async (fn) => fn({
-    clienteServico: { create: prismaMock.clienteServico.create },
+    clienteServico: {
+      create: prismaMock.clienteServico.create,
+      update: prismaMock.clienteServico.update,
+    },
+    clienteServicoHistorico: {
+      createMany: prismaMock.clienteServicoHistorico.createMany,
+    },
+    contratoComercial: prismaMock.contratoComercial,
     pessoa: { upsert: vi.fn() },
     pessoaClienteVinculo: { upsert: vi.fn() },
   }));
@@ -51,6 +62,7 @@ beforeEach(() => {
   });
   prismaMock.clienteServico.update.mockResolvedValue({ id: 10 });
   prismaMock.clienteServicoHistorico.createMany.mockResolvedValue({ count: 1 });
+  prismaMock.contratoComercial.findMany.mockResolvedValue([]);
 });
 
 describe("origens padrão do lead no CS & NPS", () => {

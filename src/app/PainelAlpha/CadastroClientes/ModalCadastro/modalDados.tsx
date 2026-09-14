@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from "react-dom";
 import { fmtDate, fmtDateTime } from "@/lib/format-date";
 import { X, Plus, ThumbsUp, ThumbsDown, Minus, Calendar, MessageSquare, Save, Star, Search, CheckCircle2, TrendingUp, LockOpen, Edit3, Check, Trash2, AlertTriangle, Briefcase, Wallet, CreditCard, UserCircle2, Loader2 } from "lucide-react";
-import { adicionarSocio, atualizarLogCS, atualizarLogFeedback, atualizarSocio, atualizarStatusCliente, excluirLogCS, excluirLogFeedback, excluirSocio, salvarAlteracoesCliente, salvarAlteracoesServico, salvarLogCS, salvarLogFeedback, buscarServicoContratadoPorCliente, buscarUsuariosPorRole, type ClienteCS } from '@/actions/Clientes';
+import { adicionarSocio, analisarImpactoTrocaServico, atualizarLogCS, atualizarLogFeedback, atualizarSocio, atualizarStatusCliente, excluirLogCS, excluirLogFeedback, excluirSocio, salvarAlteracoesCliente, salvarAlteracoesServico, salvarLogCS, salvarLogFeedback, buscarServicoContratadoPorCliente, buscarUsuariosPorRole, type ClienteCS } from '@/actions/Clientes';
 import { toast } from 'sonner';
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -14,6 +14,7 @@ import { ModalSelecionarUsuario } from './ModalSelecionarUsuario';
 import { FORMAS_PAGAMENTO, FORMAS_LABEL, formatarFormaPagamento } from './formas-pagamento';
 import { ORIGENS_LEAD_PADRAO } from './origens-lead';
 import { CsNpsModal3DShell } from "../CsNpsMotion";
+import { SERVICOS_COMERCIAIS_PADRAO } from '@/lib/comercial/servicos';
 
 /**
  * `dataContratacao` é salva como `.toISOString()` de uma data "só o dia" (sem
@@ -78,6 +79,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
      * TODOS os cards ao mesmo tempo — decisão do usuário, ver decisions.md).
      */
     interface FormGestaoCard {
+        servico: string;
         status: string;
         dataContratacao: string;
         dataExitoManual: string;
@@ -90,9 +92,16 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
     }
     const [formPorCard, setFormPorCard] = useState<Record<number, FormGestaoCard>>({});
     const [salvandoTudo, setSalvandoTudo] = useState(false);
+    const [confirmacaoTrocaServico, setConfirmacaoTrocaServico] = useState<{
+        origem: "ALPHA_METAS" | "LEGADO";
+        servicoAnterior: string;
+        novoServico: string;
+        modulos: string[];
+    } | null>(null);
 
     function formInicialDoRegistro(registro: ClienteCS): FormGestaoCard {
         return {
+            servico: registro.servico || "",
             status: registro.status || "Em Andamento",
             dataContratacao: registro.dataContratacao || "",
             dataExitoManual: registro.dataExito
@@ -396,7 +405,10 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
             }
             setFormPorCard(inicial);
         }
-        return () => setFormPorCard({});
+        return () => {
+            setFormPorCard({});
+            setConfirmacaoTrocaServico(null);
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [clienteGrupo, isOpen]);
 
@@ -657,8 +669,37 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
      * Alterações" reenviaria sócio/CS/feedback já criados, duplicando). O
      * modal só fecha se NADA falhar.
      */
-    const handleSalvarTudo = async () => {
+    const handleSalvarTudo = async (trocaServicoConfirmada = false) => {
         if (salvandoTudo) return;
+
+        const novoServicoPrincipal = formPorCard[cliente!.id]?.servico?.trim() || "";
+        const servicoPrincipalMudou = novoServicoPrincipal !== (cliente!.servico || "").trim();
+        if (servicoPrincipalMudou && !trocaServicoConfirmada) {
+            if (!novoServicoPrincipal) {
+                toast.error("Informe o novo serviço contratado.");
+                return;
+            }
+
+            setSalvandoTudo(true);
+            try {
+                const resultadoImpacto = await analisarImpactoTrocaServico({
+                    clienteServicoId: cliente!.id,
+                    novoServico: novoServicoPrincipal,
+                });
+                if (!resultadoImpacto.success) {
+                    toast.error(resultadoImpacto.error || "Não foi possível analisar o impacto da troca.");
+                    return;
+                }
+                setConfirmacaoTrocaServico(resultadoImpacto.impacto);
+            } catch {
+                toast.error("Falha na conexão ao analisar a troca de serviço.");
+            } finally {
+                setSalvandoTudo(false);
+            }
+            return;
+        }
+
+        setConfirmacaoTrocaServico(null);
         setSalvandoTudo(true);
 
         const falhas: string[] = [];
@@ -679,13 +720,14 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
         // 2) NPS/feedback Google — hoje só existe 1 vez por Cliente (não por serviço),
         // gravados via o card do serviço PRINCIPAL (mais recente).
         const resDadosGestaoPrincipal = await salvarAlteracoesServico(cliente!.id, {
+            servico: novoServicoPrincipal || cliente!.servico,
             analistaResponsavel: formPorCard[cliente!.id]?.analistaResponsavel ?? cliente!.analistaResponsavel,
             dataContratacao: formPorCard[cliente!.id]?.dataContratacao ?? cliente!.dataContratacao,
             status: formPorCard[cliente!.id]?.status ?? cliente!.status,
             nps,
             feedbackGoogle: feedbackSim,
             nomeGoogle: nomeFeedback || null,
-            embasamento: SERVICOS_COM_EMBASAMENTO.includes(cliente!.servico || "")
+            embasamento: SERVICOS_COM_EMBASAMENTO.includes(novoServicoPrincipal || cliente!.servico || "")
                 ? formPorCard[cliente!.id]?.embasamento || null
                 : null,
             origemLead: formPorCard[cliente!.id]?.origemLead || cliente!.origemLead || null,
@@ -907,12 +949,20 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                             <label className="text-[10px] font-black uppercase text-indigo-400 ml-1 tracking-widest">
                                 Serviço Contratado Recentemente
                             </label>
-                            {/* Somente leitura — Fase 3.6 do Cliente Master: serviço é identidade do
-                                ClienteServico (junto com o Cliente), não um campo editável solto. Para
-                                contratar um serviço novo, use "Serviços Contratados" abaixo (novo card). */}
-                            <div className={`w-full bg-slate-900/30 border border-slate-800/50 rounded-xl py-3 px-4 text-sm font-black ${cliente?.servico ? style.text : "text-slate-600"} italic uppercase truncate`}>
-                                {cliente?.servico || "NENHUM SERVIÇO DEFINIDO"}
-                            </div>
+                            {editandoDados && formPorCard[cliente.id] ? (
+                                <DropdownSelecaoComCriacao
+                                    label="Serviço"
+                                    valorAtual={formPorCard[cliente.id].servico}
+                                    opcoes={[...SERVICOS_COMERCIAIS_PADRAO]}
+                                    onSelecionar={(servico) => atualizarFormCard(cliente.id, { servico })}
+                                    permiteCriarNovo
+                                    placeholder="SELECIONAR SERVIÇO"
+                                />
+                            ) : (
+                                <div className={`w-full bg-slate-900/30 border border-slate-800/50 rounded-xl py-3 px-4 text-sm font-black ${cliente?.servico ? style.text : "text-slate-600"} italic uppercase truncate`}>
+                                    {cliente?.servico || "NENHUM SERVIÇO DEFINIDO"}
+                                </div>
+                            )}
                         </div>
                     </section>
 
@@ -941,7 +991,8 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                     const contrato = contratosPorRegistro[registro.id];
                                     const form = formPorCard[registro.id];
                                     const ehPrincipal = registro.id === cliente.id;
-                                    const embasamentoDesbloqueadoCard = SERVICOS_COM_EMBASAMENTO.includes(registro.servico || "");
+                                    const servicoExibido = form?.servico || registro.servico;
+                                    const embasamentoDesbloqueadoCard = SERVICOS_COM_EMBASAMENTO.includes(servicoExibido || "");
 
                                     return (
                                         <div
@@ -950,7 +1001,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                         >
                                             <div className="flex items-start justify-between gap-3">
                                                 <span className="text-sm font-black text-white uppercase italic tracking-tight">
-                                                    {registro.servico || "Serviço não definido"}
+                                                    {servicoExibido || "Serviço não definido"}
                                                 </span>
                                                 <span className={`shrink-0 text-[9px] font-black uppercase px-2 py-1 rounded-full border ${getStatusColor(registro.status)}`}>
                                                     {registro.status || "Em Andamento"}
@@ -1692,7 +1743,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
 
                     <button
                         type="button"
-                        onClick={handleSalvarTudo}
+                        onClick={() => void handleSalvarTudo()}
                         disabled={salvandoTudo}
                         className="cursor-pointer flex items-center gap-2 px-10 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                         <Save size={18} className={salvandoTudo ? "animate-spin" : ""} />
@@ -1819,6 +1870,71 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                     portalTarget,
                 )}
             </CsNpsModal3DShell>
+
+            {confirmacaoTrocaServico && portalTarget && createPortal(
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="titulo-confirmacao-troca-servico"
+                    className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-black/80 p-3 backdrop-blur-md sm:p-6"
+                >
+                    <CsNpsModal3DShell className={`relative my-auto max-h-[calc(100vh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-[2rem] border bg-[#0b1220] p-5 shadow-2xl sm:max-h-[calc(100vh-3rem)] sm:p-8 ${confirmacaoTrocaServico.origem === "ALPHA_METAS" ? "border-amber-500/40 shadow-amber-950/40" : "border-indigo-500/30 shadow-indigo-950/30"}`}>
+                        <div className="flex items-start gap-4">
+                            <div className={`shrink-0 rounded-2xl p-3 ${confirmacaoTrocaServico.origem === "ALPHA_METAS" ? "bg-amber-500/15 text-amber-400" : "bg-indigo-500/15 text-indigo-400"}`}>
+                                <AlertTriangle size={24} />
+                            </div>
+                            <div className="min-w-0 space-y-2">
+                                <h4 id="titulo-confirmacao-troca-servico" className="text-lg font-black uppercase tracking-tight text-white">
+                                    Confirmar troca de serviço
+                                </h4>
+                                <p className="text-sm leading-relaxed text-slate-400">
+                                    {confirmacaoTrocaServico.origem === "ALPHA_METAS"
+                                        ? "Este cliente veio do Alpha Metas. A troca será feita simultaneamente nos módulos CS & NPS e Alpha Metas. Essa alteração afeta dados comerciais vinculados e exige atenção."
+                                        : "Este é um cliente legado, sem vínculo correspondente no Alpha Metas. A troca será aplicada somente no módulo CS & NPS, com menor risco de impacto."}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="my-6 grid gap-3 rounded-2xl border border-white/5 bg-slate-950/60 p-4 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+                            <div className="min-w-0">
+                                <span className="block text-[9px] font-black uppercase tracking-widest text-slate-600">Serviço atual</span>
+                                <span className="mt-1 block break-words text-sm font-bold text-slate-300">{confirmacaoTrocaServico.servicoAnterior}</span>
+                            </div>
+                            <span className="hidden text-slate-600 sm:block">→</span>
+                            <div className="min-w-0">
+                                <span className="block text-[9px] font-black uppercase tracking-widest text-slate-600">Novo serviço</span>
+                                <span className="mt-1 block break-words text-sm font-bold text-white">{confirmacaoTrocaServico.novoServico}</span>
+                            </div>
+                        </div>
+
+                        <div className="mb-6 flex flex-wrap gap-2">
+                            {confirmacaoTrocaServico.modulos.map((modulo) => (
+                                <span key={modulo} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-300">
+                                    {modulo}
+                                </span>
+                            ))}
+                        </div>
+
+                        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                            <button
+                                type="button"
+                                onClick={() => setConfirmacaoTrocaServico(null)}
+                                className="cursor-pointer rounded-xl bg-slate-800 px-6 py-3 text-xs font-black uppercase tracking-widest text-slate-300 transition-colors hover:bg-slate-700"
+                            >
+                                Não, cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => void handleSalvarTudo(true)}
+                                className={`cursor-pointer rounded-xl px-6 py-3 text-xs font-black uppercase tracking-widest text-white transition-colors ${confirmacaoTrocaServico.origem === "ALPHA_METAS" ? "bg-amber-600 hover:bg-amber-500" : "bg-indigo-600 hover:bg-indigo-500"}`}
+                            >
+                                Sim, confirmar troca
+                            </button>
+                        </div>
+                    </CsNpsModal3DShell>
+                </div>,
+                portalTarget,
+            )}
 
 
             {/* MODAL PEQUENO: NOVO PEDIDO DE FEEDBACK */}
