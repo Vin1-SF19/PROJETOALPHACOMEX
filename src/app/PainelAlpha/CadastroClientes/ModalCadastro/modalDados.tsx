@@ -11,7 +11,14 @@ import { useRouter } from "next/navigation";
 import { getTema } from '@/lib/temas';
 import { DropdownSelecaoComCriacao } from './DropdownSelecaoComCriacao';
 import { ModalSelecionarUsuario } from './ModalSelecionarUsuario';
-import { FORMAS_PAGAMENTO, FORMAS_LABEL, formatarFormaPagamento } from './formas-pagamento';
+import {
+    FORMAS_PAGAMENTO,
+    FORMAS_LABEL,
+    formatarFormaPagamento,
+    listarFormasPagamentoPersonalizadas,
+    removerFormaPagamentoPersonalizada,
+    salvarFormaPagamentoPersonalizada,
+} from './formas-pagamento';
 import { ORIGENS_LEAD_PADRAO } from './origens-lead';
 import { CsNpsModal3DShell } from "../CsNpsMotion";
 import { SERVICOS_COMERCIAIS_PADRAO } from '@/lib/comercial/servicos';
@@ -91,6 +98,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
         closerNome: string;
     }
     const [formPorCard, setFormPorCard] = useState<Record<number, FormGestaoCard>>({});
+    const [formasPagamentoPersonalizadas, setFormasPagamentoPersonalizadas] = useState<string[]>([]);
     const [salvandoTudo, setSalvandoTudo] = useState(false);
     const [confirmacaoTrocaServico, setConfirmacaoTrocaServico] = useState<{
         origem: "ALPHA_METAS" | "LEGADO";
@@ -404,6 +412,9 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                 inicial[registro.id] = formInicialDoRegistro(registro);
             }
             setFormPorCard(inicial);
+            setFormasPagamentoPersonalizadas(listarFormasPagamentoPersonalizadas(
+                registrosDoServicosSecao.map((registro) => registro.formaPagamento || ""),
+            ));
         }
         return () => {
             setFormPorCard({});
@@ -1019,12 +1030,35 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                                         <DropdownSelecaoComCriacao
                                                             label="Forma Pagto."
                                                             valorAtual={formatarFormaPagamento(form.formaPagamento) === "---" ? "" : formatarFormaPagamento(form.formaPagamento)}
-                                                            opcoes={FORMAS_PAGAMENTO.map((f) => FORMAS_LABEL[f])}
+                                                            opcoes={[
+                                                                ...FORMAS_PAGAMENTO.map((f) => FORMAS_LABEL[f]),
+                                                                ...formasPagamentoPersonalizadas,
+                                                            ]}
                                                             onSelecionar={(label) => {
                                                                 const codigo = FORMAS_PAGAMENTO.find((f) => FORMAS_LABEL[f] === label) || label;
-                                                                atualizarFormCard(registro.id, { formaPagamento: codigo === form.formaPagamento ? "" : codigo });
+                                                                if (FORMAS_PAGAMENTO.some((forma) => forma === codigo)) {
+                                                                    atualizarFormCard(registro.id, { formaPagamento: codigo === form.formaPagamento ? "" : codigo });
+                                                                    return;
+                                                                }
+                                                                const resultado = salvarFormaPagamentoPersonalizada(
+                                                                    codigo,
+                                                                    formasPagamentoPersonalizadas,
+                                                                );
+                                                                setFormasPagamentoPersonalizadas(resultado.formas);
+                                                                atualizarFormCard(registro.id, {
+                                                                    formaPagamento: resultado.valorCanonico === form.formaPagamento
+                                                                        ? ""
+                                                                        : resultado.valorCanonico,
+                                                                });
                                                             }}
                                                             disabled={!editandoDados}
+                                                            permiteCriarNovo
+                                                            textoBotaoCriar="Personalizado"
+                                                            placeholderNovoValor="Digite a forma de pagamento..."
+                                                            opcoesRemoviveis={formasPagamentoPersonalizadas}
+                                                            onRemoverOpcao={(valor) => setFormasPagamentoPersonalizadas(
+                                                                (atuais) => removerFormaPagamentoPersonalizada(valor, atuais),
+                                                            )}
                                                             placeholder="Não definido"
                                                         />
                                                         <div className="space-y-2">

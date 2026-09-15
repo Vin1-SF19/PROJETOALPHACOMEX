@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 
 interface DropdownSelecaoComCriacaoProps {
     label: string;
@@ -22,6 +22,10 @@ interface DropdownSelecaoComCriacaoProps {
      */
     onAbrirModalOutro?: () => void;
     textoBotaoOutro?: string;
+    textoBotaoCriar?: string;
+    placeholderNovoValor?: string;
+    opcoesRemoviveis?: string[];
+    onRemoverOpcao?: (valor: string) => void;
 }
 
 /**
@@ -42,6 +46,10 @@ export function DropdownSelecaoComCriacao({
     labelDesbloqueio,
     onAbrirModalOutro,
     textoBotaoOutro,
+    textoBotaoCriar,
+    placeholderNovoValor,
+    opcoesRemoviveis = [],
+    onRemoverOpcao,
 }: DropdownSelecaoComCriacaoProps) {
     const [aberto, setAberto] = useState(false);
     const [criando, setCriando] = useState(false);
@@ -74,19 +82,37 @@ export function DropdownSelecaoComCriacao({
                 {aberto && !disabled && (
                     <div className="absolute top-full mt-1 left-0 right-0 bg-slate-900 border border-white/10 rounded-2xl p-3 z-30 shadow-2xl">
                         <div className="space-y-0.5 max-h-48 overflow-y-auto custom-scrollbar">
-                            {opcoes.map((o) => (
-                                <button
-                                    key={o}
-                                    type="button"
-                                    onClick={() => { onSelecionar(o); setAberto(false); setCriando(false); }}
-                                    className={`w-full text-left p-3 rounded-xl text-xs font-bold transition-all ${valorAtual === o
-                                        ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/20"
-                                        : "hover:bg-white/5 text-slate-400"
-                                        }`}
-                                >
-                                    {o}
-                                </button>
-                            ))}
+                            {opcoes.map((o) => {
+                                const removivel = opcoesRemoviveis.includes(o) && onRemoverOpcao;
+                                return (
+                                    <div key={o} className="flex items-center gap-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => { onSelecionar(o); setAberto(false); setCriando(false); }}
+                                            className={`min-w-0 flex-1 text-left p-3 rounded-xl text-xs font-bold transition-all ${valorAtual === o
+                                                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/20"
+                                                : "hover:bg-white/5 text-slate-400"
+                                                }`}
+                                        >
+                                            <span className="block truncate">{o}</span>
+                                        </button>
+                                        {removivel && (
+                                            <button
+                                                type="button"
+                                                aria-label={`Remover forma de pagamento ${o}`}
+                                                title="Remover das opções futuras"
+                                                onClick={(evento) => {
+                                                    evento.stopPropagation();
+                                                    onRemoverOpcao?.(o);
+                                                }}
+                                                className="shrink-0 rounded-lg p-2 text-slate-500 transition-colors hover:bg-rose-500/10 hover:text-rose-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+                                            >
+                                                <X size={14} aria-hidden="true" />
+                                            </button>
+                                        )}
+                                    </div>
+                                );
+                            })}
 
                             {valorAtual && !opcoes.includes(valorAtual) && (
                                 <button
@@ -115,14 +141,14 @@ export function DropdownSelecaoComCriacao({
                                         onClick={() => setCriando(true)}
                                         className="w-full text-left p-3 rounded-xl text-[10px] font-black text-emerald-500 hover:bg-emerald-500/10 transition-all flex items-center gap-2 border-t border-white/5 mt-2 pt-3"
                                     >
-                                        <Plus size={14} /> NOVO {label.toUpperCase()}
+                                        <Plus size={14} /> {textoBotaoCriar || `NOVO ${label.toUpperCase()}`}
                                     </button>
                                 ) : (
                                     <div className="mt-2 p-2 border-t border-white/5 space-y-2 animate-in slide-in-from-top-2">
                                         <input
                                             autoFocus
                                             type="text"
-                                            placeholder={`Nome ${label.toLowerCase()}...`}
+                                            placeholder={placeholderNovoValor || `Nome ${label.toLowerCase()}...`}
                                             value={novoValor}
                                             onChange={(e) => setNovoValor(e.target.value)}
                                             className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs text-white outline-none focus:border-emerald-500"
@@ -131,8 +157,9 @@ export function DropdownSelecaoComCriacao({
                                             <button
                                                 type="button"
                                                 onClick={() => {
-                                                    if (novoValor) {
-                                                        onSelecionar(novoValor);
+                                                    const valorNormalizado = novoValor.trim();
+                                                    if (valorNormalizado) {
+                                                        onSelecionar(valorNormalizado);
                                                         setAberto(false);
                                                         setCriando(false);
                                                         setNovoValor("");
