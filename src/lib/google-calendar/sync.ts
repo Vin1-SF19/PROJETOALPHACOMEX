@@ -153,6 +153,8 @@ export interface ContextoFencingSincronizacao {
 
 export interface OpcoesSincronizacaoCalendario {
   fencing?: ContextoFencingSincronizacao;
+  /** Repreenche apenas uma janela navegada, preservando o syncToken incremental. */
+  intervalo?: { inicio: Date; fim: Date };
 }
 
 class FencingSincronizacaoPerdidoError extends Error {
@@ -174,14 +176,15 @@ export async function sincronizarCalendario(
   permitirRetryFullSync = true,
   opcoes: OpcoesSincronizacaoCalendario = {},
 ): Promise<ResultadoSincronizacaoCalendario> {
-  const usandoIncremental = Boolean(calendario.syncToken);
+  const sincronizacaoDeIntervalo = opcoes.intervalo !== undefined;
+  const usandoIncremental = Boolean(calendario.syncToken) && !sincronizacaoDeIntervalo;
   const agora = Date.now();
   const timeMin = usandoIncremental
     ? undefined
-    : new Date(agora - JANELA_FULL_SYNC_PASSADO_DIAS * 24 * 60 * 60 * 1000).toISOString();
+    : (opcoes.intervalo?.inicio ?? new Date(agora - JANELA_FULL_SYNC_PASSADO_DIAS * 24 * 60 * 60 * 1000)).toISOString();
   const timeMax = usandoIncremental
     ? undefined
-    : new Date(agora + JANELA_FULL_SYNC_FUTURO_DIAS * 24 * 60 * 60 * 1000).toISOString();
+    : (opcoes.intervalo?.fim ?? new Date(agora + JANELA_FULL_SYNC_FUTURO_DIAS * 24 * 60 * 60 * 1000)).toISOString();
 
   let pageToken: string | undefined;
   let syncTokenFinal: string | null = null;
@@ -227,7 +230,7 @@ export async function sincronizarCalendario(
       }
     } while (pageToken);
 
-    if (!syncTokenFinal) {
+    if (!syncTokenFinal && !sincronizacaoDeIntervalo) {
       return {
         ok: false,
         erro: "O Google não retornou um cursor final de sincronização.",
@@ -262,7 +265,18 @@ export async function sincronizarCalendario(
       let atualizadosNaTransacao = 0;
       let removidosNaTransacao = 0;
 
-      if (!usandoIncremental) {
+      if (sincronizacaoDeIntervalo) {
+        await tx.googleCalendarEventoCache.deleteMany({
+          where: {
+            calendarioId: calendario.id,
+            inicioEm: { lt: opcoes.intervalo!.fim },
+            OR: [
+              { fimEm: { gt: opcoes.intervalo!.inicio } },
+              { fimEm: null },
+            ],
+          },
+        });
+      } else if (!usandoIncremental) {
         await tx.googleCalendarEventoCache.deleteMany({
           where: { calendarioId: calendario.id },
         });
@@ -312,13 +326,14 @@ export async function sincronizarCalendario(
       // Segunda barreira antes de avançar o cursor: se o lease expirou durante
       // a aplicação do lote, a transação inteira é revertida.
       await exigirFencingValido();
-      await tx.googleCalendarSelecionado.update({
-        where: { id: calendario.id },
-        data: {
-          syncToken: syncTokenFinal,
-          ultimaSincronizacaoEm: sincronizadoEm,
-        },
-      });
+      // Uma janela histórica não comprova que a agenda inteira está atualizada;
+      // apenas o ciclo incremental pode avançar o cursor e o marcador de saúde.
+      if (!sincronizacaoDeIntervalo) {
+        await tx.googleCalendarSelecionado.update({
+          where: { id: calendario.id },
+          data: { syncToken: syncTokenFinal, ultimaSincronizacaoEm: sincronizadoEm },
+        });
+      }
       eventosAtualizados = atualizadosNaTransacao;
       eventosRemovidos = removidosNaTransacao;
     }, {

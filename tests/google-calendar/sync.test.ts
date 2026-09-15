@@ -35,10 +35,13 @@ function evento(overrides: Partial<GoogleEventoDTO> = {}): GoogleEventoDTO {
     recorrenciaRegras: null,
     eventoRecorrenteIdOrigem: null,
     participantes: [],
+    conferencia: null,
     linkMeet: null,
     etag: "etag-1",
     atualizadoEm: "2026-07-18T10:00:00Z",
     visibilidade: "default",
+    eventType: "default",
+    statusPropertiesJson: null,
     ...overrides,
   };
 }
@@ -52,6 +55,34 @@ const CALENDARIO = { id: "cal_1", googleCalendarId: "primary", syncToken: null }
 describe("sincronizarCalendario", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("reconcilia intervalo preservando o cursor incremental", async () => {
+    listarEventosPaginaMock.mockResolvedValueOnce(
+      pagina({ eventos: [evento()], proximoSyncToken: null }),
+    );
+    const inicio = new Date("2025-01-01T00:00:00Z");
+    const fim = new Date("2025-02-01T00:00:00Z");
+
+    const resultado = await sincronizarCalendario(
+      { ...CALENDARIO, syncToken: "cursor-existente" },
+      "usuario@empresa.com",
+      false,
+      { intervalo: { inicio, fim } },
+    );
+
+    expect(resultado.ok).toBe(true);
+    expect(listarEventosPaginaMock).toHaveBeenCalledWith(
+      expect.objectContaining({ syncToken: undefined, timeMin: inicio.toISOString(), timeMax: fim.toISOString() }),
+    );
+    expect(prismaMock.googleCalendarSelecionado.update).not.toHaveBeenCalled();
+    expect(prismaMock.googleCalendarEventoCache.deleteMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        calendarioId: CALENDARIO.id,
+        inicioEm: { lt: fim },
+        OR: [{ fimEm: { gt: inicio } }, { fimEm: null }],
+      }),
+    });
   });
 
   it("full sync (sem syncToken) upserta eventos e avança o cursor só no final", async () => {

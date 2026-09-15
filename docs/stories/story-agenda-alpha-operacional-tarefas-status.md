@@ -41,7 +41,7 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - [ ] Estender cliente/DTO/validação do Google Calendar para tipos de status e convidados.
 - [ ] Integrar Google Tasks API por Domain-Wide Delegation e cache local de listas/tarefas.
 - [ ] Ampliar formulário e visões da Agenda Alpha, incluindo conclusão de tarefa acessível.
-- [ ] Exibir diagnóstico operacional e manter sincronização manual; documentar requisitos de push, worker e escopo Google Tasks.
+- [x] Exibir diagnóstico operacional e manter sincronização manual; documentar requisitos de push, worker e escopo Google Tasks.
 - [ ] Criar/regredir testes específicos e executar lint, typecheck, testes e build.
 - [x] Criar vínculo aditivo entre chamado e tarefa Google, com início, fim planejado e fim real locais.
 - [x] Criar a tarefa de uma hora para técnico TI ao assumir o chamado e concluí-la ao fechar o chamado.
@@ -106,6 +106,17 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - `plan/self-critique-chamados-agenda-conclusao.json`
 - `plan/self-critique-chamado-solicitante-agenda.json`
 - `plan/self-critique-agendas-compartilhadas-loading.json`
+- `package.json`
+- `scripts/calendar-alpha-{health,maintenance}.mjs`
+- `src/actions/google-calendar-{conexao,eventos,reconciliacao,sync}.ts`
+- `src/app/api/calendario-alpha/jobs/maintenance/route.ts`
+- `src/components/CalendarioAlpha/{CalendarioAlphaDashboard,EstadoDesconectado,SeletorCalendarios,StatusSincronizacao}.tsx`
+- `src/components/CalendarioAlpha/lib/{datas,layout-eventos,useAgendaAlphaController}.ts`
+- `src/lib/bibble/calendar-tools.ts`
+- `src/lib/google-calendar/{concurrency,health,health-report,maintenance,sync-orchestrator,sync}.ts`
+- `tests/google-calendar/{cache-eventos,cache-first-actions,concurrency,health,layout-eventos,lifecycle-operacional,page-cache-wiring,sync-orchestrator,sync-queue,sync}.test.ts`
+- `vercel.json`
+- `plan/self-critique-agenda-alpha-lifecycle.json`
 
 ## Dev Agent Record
 
@@ -134,6 +145,12 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - A visão mensal passou a seguir a referência fornecida: os dias da semana foram integrados à primeira linha, a quantidade de linhas acompanha as semanas reais do mês, compromissos exibem hierarquia compacta por tipo e somente dois itens ocupam cada célula antes de `Mais N`. Local de trabalho, dia inteiro, evento com horário, convite compartilhado e tarefa concluída mantêm identidades distintas; criação, navegação, edição, conclusão e popover completo continuam disponíveis por mouse e teclado.
 - Correção visual pós-validação: removido o fundo sólido exclusivo da visão mensal; o mês reutiliza exatamente o mesmo fundo translúcido das visões Dia e Semana.
 - Regressão visual do mês: ESLint do recorte sem ocorrências, 9/9 testes direcionados aprovados, `git diff --check` e build de produção aprovados. A suíte global manteve a linha de base de 50 falhas em 19 arquivos, com 2.687 testes aprovados e 1 pendente; o lint global manteve 21.210 ocorrências e o typecheck falhou somente em arquivos externos ao recorte. Não houve alteração de banco, migration ou backfill.
+- O ciclo de ativação agora seleciona uma agenda principal quando necessário, exige a primeira sincronização antes de confirmar sucesso e tenta instalar o canal push. Selecionar uma nova agenda visível também a sincroniza imediatamente. A sincronização manual processa calendários com concorrência limitada por calendário, preservando lease distribuído e cursor incremental.
+- A navegação fora da janela cacheada reconcilia somente o intervalo exibido, sem apagar eventos externos nem substituir o `syncToken`. A grade horária passou a calcular posições explicitamente em `America/Sao_Paulo`, independente do fuso do processo.
+- O status da interface deixou de inferir “Sincronizado” a partir do vínculo local e agora informa primeira sincronização, ausência de agenda, atraso, falha operacional, quantidade em cache e disponibilidade da automação. O comando `calendar-alpha:health` fornece o mesmo diagnóstico agregado sem expor usuários, eventos ou IDs.
+- A manutenção autenticada foi conectada ao cron a cada cinco minutos para renovar canais, criar até dez canais ausentes por ciclo, recuperar claims vencidos e enfileirar apenas agendas visíveis stale. O dry-run de 2026-09-15 encontrou 26 agendas visíveis stale, 10 canais a criar no ciclo, 2 canais a renovar, 25 leases expirados e 2 jobs parados; nenhuma mutação operacional foi executada nesta entrega.
+- Gates do recorte de ciclo operacional: 40 arquivos e 258 testes da Agenda Alpha aprovados, ESLint direcionado sem ocorrências, build de produção aprovado, doctor de configuração aprovado e `git diff --check` limpo. O typecheck não apontou erro no recorte, mas segue bloqueado por 11 erros externos; a suíte completa aprovou 2.957 testes e manteve 19 falhas preexistentes em 11 arquivos externos. O lint global continua impraticável como gate por incluir artefatos AIOX/skills e reportar 204.277 ocorrências; o recorte alterado está limpo. CodeRabbit CLI não está instalado neste ambiente.
+- Não houve mudança de schema, migration, backfill ou execução em massa no banco; por isso o protocolo Vault não foi acionado. A recuperação automática somente ocorrerá após implantação do novo cron.
 
 ### Change Log
 
@@ -144,6 +161,7 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - 2026-09-09: correção do loading infinito das agendas compartilhadas com timeout, falha segura e preservação de resultados parciais.
 - 2026-09-09: reformulação da visão mensal conforme `melhoriaAgenda.png`, com grade compacta e adaptativa, hierarquia visual por tipo de compromisso e preservação integral das interações.
 - 2026-09-09: correção do fundo da visão mensal para manter consistência visual com as abas Dia e Semana.
+- 2026-09-15: ciclo operacional completo da Agenda Alpha com ativação sincronizada, seleção com sync imediato, reconciliação por intervalo, concorrência controlada, status de saúde real, CLI de diagnóstico e cron de manutenção autorreparável.
 
 ## Notas operacionais
 

@@ -24,6 +24,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import type { TemaAlpha } from "@/lib/temas";
+import type { SaudeAgendaAlpha } from "@/lib/google-calendar/health";
 import { cn } from "@/lib/utils";
 
 import { useAgendaDesktop } from "./lib/useAgendaDesktop";
@@ -36,6 +37,7 @@ interface StatusSincronizacaoProps {
   erro?: string | null;
   erroCompartilhadas?: string | null;
   resumo?: ResumoSincronizacaoAgenda | null;
+  saude?: SaudeAgendaAlpha;
   onSincronizar: () => Promise<void> | void;
   onDesativar: () => void;
 }
@@ -59,15 +61,24 @@ function rotuloStatus(status?: string): string {
     em_andamento: "Sincronização já em andamento",
     sem_calendarios: "Nenhuma agenda selecionada",
     sincronizado: "Sincronizado",
+    saudavel: "Sincronizado",
+    desatualizada: "Desatualizada",
+    com_erro: "Requer atenção",
+    primeira_sincronizacao: "Aguardando primeira sincronização",
+    sem_agendas: "Nenhuma agenda selecionada",
+    desativada: "Desativada",
   };
-  return status ? rotulos[status] ?? status.replaceAll("_", " ") : "Sincronizado";
+  return status ? rotulos[status] ?? status.replaceAll("_", " ") : "Status indisponível";
 }
 
 function IconeStatus({ status, carregando }: { status?: string; carregando?: boolean }) {
   if (carregando || status === "em_andamento") return <Loader2 className="size-4 animate-spin" />;
+  if (!status) return <Unplug className="size-4 text-slate-500" />;
   if (status === "cooldown") return <PauseCircle className="size-4 text-amber-400" />;
-  if (status === "erro" || status === "parcial") return <AlertTriangle className="size-4 text-amber-400" />;
-  return <CheckCircle2 className="size-4 text-emerald-400" />;
+  if (["sucesso", "sincronizado", "saudavel"].includes(status)) {
+    return <CheckCircle2 className="size-4 text-emerald-400" />;
+  }
+  return <AlertTriangle className="size-4 text-amber-400" />;
 }
 
 export function StatusSincronizacao({
@@ -78,6 +89,7 @@ export function StatusSincronizacao({
   erro,
   erroCompartilhadas,
   resumo,
+  saude,
   onSincronizar,
   onDesativar,
 }: StatusSincronizacaoProps) {
@@ -85,7 +97,7 @@ export function StatusSincronizacao({
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const emSincronizacao = sincronizando || isPending;
-  const statusAtual = erro ? "erro" : resumo?.status;
+  const statusAtual = erro ? "erro" : resumo?.status ?? saude?.estado;
   const textoStatus = emSincronizacao ? "Sincronizando…" : rotuloStatus(statusAtual);
 
   function sincronizarAgora() {
@@ -114,6 +126,7 @@ export function StatusSincronizacao({
           <p className="mt-1 text-xs leading-relaxed text-slate-400">
             {formatarUltimaSincronizacao(ultimaSincronizacaoEm)}
           </p>
+          {saude && <p className="mt-1 text-xs text-slate-400">{saude.mensagem}</p>}
         </div>
       </div>
 
@@ -149,6 +162,27 @@ export function StatusSincronizacao({
             ))}
           </div>
         </>
+      )}
+
+      {saude && !resumo && (
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="rounded-xl border border-white/5 bg-white/[0.025] p-2.5">
+            <p className="text-slate-500">Agendas visíveis</p>
+            <p className="mt-1 font-bold text-white">{saude.calendariosVisiveis}</p>
+          </div>
+          <div className="rounded-xl border border-white/5 bg-white/[0.025] p-2.5">
+            <p className="text-slate-500">Eventos no cache</p>
+            <p className="mt-1 font-bold text-white">{saude.eventosEmCache}</p>
+          </div>
+          <div className="rounded-xl border border-white/5 bg-white/[0.025] p-2.5">
+            <p className="text-slate-500">Nunca sincronizadas</p>
+            <p className="mt-1 font-bold text-white">{saude.calendariosNuncaSincronizados}</p>
+          </div>
+          <div className="rounded-xl border border-white/5 bg-white/[0.025] p-2.5">
+            <p className="text-slate-500">Canais automáticos</p>
+            <p className="mt-1 font-bold text-white">{saude.canaisAtivos}/{saude.calendariosVisiveis}</p>
+          </div>
+        </div>
       )}
 
       {(erro || erroCompartilhadas || resumo?.erros.length) ? (

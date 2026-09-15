@@ -92,13 +92,13 @@ describe("Agenda Alpha persistent queue", () => {
   });
 
   it.each([
-    [],
-    ["replay-dlq"],
-    ["replay-dlq", "--operation"],
-    ["replay-dlq", "--operation", "op-1", "--extra"],
-    ["--replay="],
-    ["desconhecido"],
-  ])("rejeita combinacao CLI invalida: %j", (args) => {
+    { args: [] },
+    { args: ["replay-dlq"] },
+    { args: ["replay-dlq", "--operation"] },
+    { args: ["replay-dlq", "--operation", "op-1", "--extra"] },
+    { args: ["--replay="] },
+    { args: ["desconhecido"] },
+  ])("rejeita combinacao CLI invalida: $args", ({ args }) => {
     expect(() => parseQueueAgendaAlphaArgs(args)).toThrow();
   });
 

@@ -16,10 +16,13 @@ function eventoBase(overrides: Partial<GoogleEventoDTO> = {}): GoogleEventoDTO {
     recorrenciaRegras: null,
     eventoRecorrenteIdOrigem: null,
     participantes: [],
+    conferencia: null,
     linkMeet: null,
     etag: "etag-1",
     atualizadoEm: "2026-07-18T10:00:00Z",
     visibilidade: "default",
+    eventType: "default",
+    statusPropertiesJson: null,
     ...overrides,
   };
 }

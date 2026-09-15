@@ -1,4 +1,8 @@
-import { mesmodia, mesmodiaDiaInteiro } from "./datas";
+import {
+  mesmodia,
+  mesmodiaDiaInteiro,
+  minutosDesdeInicioDoDia,
+} from "./datas";
 import type { EventoExibicao } from "./tipos";
 
 const MINUTOS_POR_DIA = 24 * 60;
@@ -15,10 +19,6 @@ export interface EventoPosicionado {
   totalColunas: number;
 }
 
-function minutosDesdeMeiaNoite(data: Date): number {
-  return data.getHours() * 60 + data.getMinutes();
-}
-
 /**
  * Posiciona os eventos com horário de um único dia numa grade de 24h, dividindo em colunas
  * quando há sobreposição (particionamento de intervalos — mesmo espírito do algoritmo do
@@ -29,8 +29,8 @@ export function calcularPosicoesEventosDoDia(dia: Date, eventos: EventoExibicao[
     .filter((evento) => !evento.diaInteiro && evento.inicioEm && evento.fimEm && mesmodia(new Date(evento.inicioEm), dia))
     .map((evento) => ({
       evento,
-      inicioMin: Math.max(0, minutosDesdeMeiaNoite(new Date(evento.inicioEm!))),
-      fimMin: Math.min(MINUTOS_POR_DIA, Math.max(minutosDesdeMeiaNoite(new Date(evento.fimEm!)), 1)),
+      inicioMin: Math.max(0, minutosDesdeInicioDoDia(new Date(evento.inicioEm!))),
+      fimMin: Math.min(MINUTOS_POR_DIA, Math.max(minutosDesdeInicioDoDia(new Date(evento.fimEm!)), 1)),
     }))
     .sort((a, b) => a.inicioMin - b.inicioMin || a.fimMin - b.fimMin);
 

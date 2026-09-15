@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { carregarIntervaloAgendaAlpha } from "@/actions/google-calendar-agenda";
+import { reconciliarIntervaloAgendaAlpha } from "@/actions/google-calendar-reconciliacao";
 import { carregarDetalhesEventoColegaParaEdicao } from "@/actions/google-calendar-admin";
 import {
   alternarVisibilidadeColega,
@@ -63,6 +64,7 @@ interface UseAgendaAlphaControllerParams {
 }
 
 const INTERVALO_REVALIDACAO_MS = 60_000;
+const JANELA_CACHE_PADRAO_DIAS = 180;
 
 type ResultadoMutacaoOtimista =
   | { success: true }
@@ -145,6 +147,7 @@ export function useAgendaAlphaController({
   const inicializouPeriodo = useRef(false);
   const snapshotsMemoria = useRef(new Map<string, SnapshotAgendaLocal>());
   const itensOtimistasConfirmados = useRef(new Set<string>());
+  const intervalosReconciliados = useRef(new Set<string>());
   const parametrosAtuais = useRef({
     visao: visaoAtual,
     dataReferenciaISO: dataReferenciaAtualISO,
@@ -299,6 +302,26 @@ export function useAgendaAlphaController({
     inicializouPeriodo.current = true;
     void carregarPeriodo(visao, new Date(dataReferenciaISO));
   }, [carregarPeriodo, dataReferenciaISO, statusConexao.conectado, visao]);
+
+  useEffect(() => {
+    if (!statusConexao.conectado || !conexaoId) return;
+    const alvoData = new Date(dataReferenciaAtualISO);
+    const { inicio, fim } = calcularIntervaloVisao(visaoAtual, alvoData);
+    const agora = Date.now();
+    const janelaMs = JANELA_CACHE_PADRAO_DIAS * 24 * 60 * 60 * 1_000;
+    if (inicio.getTime() >= agora - janelaMs && fim.getTime() <= agora + janelaMs) return;
+    const chave = `${inicio.toISOString()}:${fim.toISOString()}`;
+    if (intervalosReconciliados.current.has(chave)) return;
+    intervalosReconciliados.current.add(chave);
+    void reconciliarIntervaloAgendaAlpha({
+      inicioISO: inicio.toISOString(),
+      fimISO: fim.toISOString(),
+    }).then((resultado) => {
+      if (resultado.success && resultado.data.sincronizados > 0) {
+        void recarregarPeriodoAtual(true);
+      }
+    });
+  }, [conexaoId, dataReferenciaAtualISO, recarregarPeriodoAtual, statusConexao.conectado, visaoAtual]);
 
   useEffect(() => {
     if (statusConexao.conectado) void carregarCompartilhadas();
@@ -510,6 +533,7 @@ export function useAgendaAlphaController({
     });
     if (!resultado.success) toast.error(resultado.error);
     else {
+      if (resultado.warning) toast.warning(resultado.warning);
       atualizarAgenda();
       void recarregarPeriodoAtual(true);
     }

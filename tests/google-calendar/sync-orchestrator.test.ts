@@ -163,8 +163,8 @@ describe("sync orchestrator in-process", () => {
     expect(executarSync).toHaveBeenCalledTimes(2);
   });
 
-  it("impede sincronizações simultâneas de calendários diferentes do mesmo usuário", async () => {
-    let concluir: (() => void) | undefined;
+  it("permite concorrência controlada entre calendários diferentes do mesmo usuário", async () => {
+    const conclusoes: Array<() => void> = [];
     const executarSync = vi.fn(
       () =>
         new Promise<{
@@ -172,8 +172,9 @@ describe("sync orchestrator in-process", () => {
           contadores: typeof contadores;
           sincronizadoEm: Date;
         }>((resolve) => {
-          concluir = () =>
-            resolve({ ok: true, contadores, sincronizadoEm: new Date(40_000) });
+          conclusoes.push(() =>
+            resolve({ ok: true, contadores, sincronizadoEm: new Date(40_000) }),
+          );
         }),
     );
     const orquestrador = criarOrquestradorSincronizacao({
@@ -186,16 +187,18 @@ describe("sync orchestrator in-process", () => {
       calendario,
       emailUsuario: "usuario@empresa.com",
     });
-    const segunda = await orquestrador.executar({
+    const segunda = orquestrador.executar({
       userId: 7,
       calendario: { ...calendario, id: "cal-local-2" },
       emailUsuario: "usuario@empresa.com",
     });
 
-    expect(segunda).toMatchObject({ status: "em_andamento" });
-    expect(executarSync).toHaveBeenCalledTimes(1);
-    concluir?.();
-    await primeira;
+    await vi.waitFor(() => expect(executarSync).toHaveBeenCalledTimes(2));
+    conclusoes.forEach((concluir) => concluir());
+    await expect(Promise.all([primeira, segunda])).resolves.toEqual([
+      expect.objectContaining({ status: "sincronizado" }),
+      expect.objectContaining({ status: "sincronizado" }),
+    ]);
   });
 
   it("isola o dedupe por usuário", async () => {

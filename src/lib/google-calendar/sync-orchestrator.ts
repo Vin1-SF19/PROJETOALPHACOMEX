@@ -76,8 +76,8 @@ interface UltimaTentativa {
 }
 
 /**
- * Coordena chamadas dentro desta instância Node. O dedupe e o cooldown não são
- * locks distribuídos: réplicas/processos diferentes continuam independentes.
+ * Coordena chamadas por usuário/calendário dentro desta instância Node. Calendários
+ * diferentes podem avançar em paralelo; o lease persiste a exclusão entre réplicas.
  */
 export function criarOrquestradorSincronizacao(opcoes: OpcoesOrquestrador = {}) {
   const cooldownMs = opcoes.cooldownMs ?? COOLDOWN_PADRAO_MS;
@@ -92,7 +92,6 @@ export function criarOrquestradorSincronizacao(opcoes: OpcoesOrquestrador = {}) 
   const renovarLease = opcoes.renovarLease ?? renovarLeaseSincronizacao;
   const liberarLease = opcoes.liberarLease ?? liberarLeaseSincronizacao;
   const emAndamento = new Map<string, SincronizacaoEmAndamento>();
-  const usuariosEmAndamento = new Map<number, SincronizacaoEmAndamento>();
   const ultimasTentativas = new Map<string, UltimaTentativa>();
 
   async function executar(params: {
@@ -101,8 +100,7 @@ export function criarOrquestradorSincronizacao(opcoes: OpcoesOrquestrador = {}) 
     emailUsuario: string;
   }): Promise<ResultadoOrquestracaoSincronizacao> {
     const chave = `${params.userId}:${params.calendario.id}`;
-    const existente =
-      emAndamento.get(chave) ?? usuariosEmAndamento.get(params.userId);
+    const existente = emAndamento.get(chave);
     if (existente) {
       return {
         status: "em_andamento",
@@ -240,15 +238,11 @@ export function criarOrquestradorSincronizacao(opcoes: OpcoesOrquestrador = {}) 
 
     const execucao = { iniciadoEm, promessa };
     emAndamento.set(chave, execucao);
-    usuariosEmAndamento.set(params.userId, execucao);
     try {
       return await promessa;
     } finally {
       if (emAndamento.get(chave)?.promessa === promessa) {
         emAndamento.delete(chave);
-      }
-      if (usuariosEmAndamento.get(params.userId)?.promessa === promessa) {
-        usuariosEmAndamento.delete(params.userId);
       }
     }
   }

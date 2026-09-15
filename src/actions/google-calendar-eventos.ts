@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { verificarAcessoCalendarioAlpha } from "@/lib/google-calendar/autorizacao";
+import { criarCanalPush } from "@/lib/google-calendar/push-channels";
+import { lerAgendaAlphaRuntimeConfig } from "@/lib/google-calendar/runtime-config";
+import { orquestrarSincronizacaoCalendario } from "@/lib/google-calendar/sync-orchestrator";
 import { dadosCacheDeEvento } from "@/lib/google-calendar/cache-eventos";
 import {
   atualizarEventoParcial as atualizarEventoParcialGoogleApi,
@@ -149,7 +152,14 @@ export async function listarCalendariosSelecionados() {
 
 export async function definirCalendarioSelecionado(
   input: SelecionarCalendarioInput,
-): Promise<ResultadoAcao<{ id: string }>> {
+): Promise<
+  | {
+      success: true;
+      data: { id: string; googleCalendarId: string; syncToken: string | null };
+      warning?: string;
+    }
+  | { success: false; error: string }
+> {
   const acesso = await verificarAcessoCalendarioAlpha();
   if (!acesso.autorizado) return { success: false, error: "Não autorizado." };
 
@@ -190,11 +200,48 @@ export async function definirCalendarioSelecionado(
       visivel: dados.visivel,
       gravavel: dados.gravavel && (alvo.papelAcesso === "owner" || alvo.papelAcesso === "writer"),
     },
-    select: { id: true },
+    select: { id: true, googleCalendarId: true, syncToken: true },
   });
 
+  let warning: string | undefined;
+  if (dados.visivel) {
+    const sincronizacao = await orquestrarSincronizacaoCalendario({
+      userId: acesso.userId,
+      calendario: registro,
+      emailUsuario: usuarioGoogle.emailUsuario,
+    });
+    if (sincronizacao.status === "sincronizado") {
+      await db.googleCalendarConexao.update({
+        where: { id: dados.conexaoId },
+        data: { ultimaSincronizacaoEm: new Date() },
+      });
+      const runtime = lerAgendaAlphaRuntimeConfig();
+      if (runtime.valid && runtime.pushEnabled && runtime.webhookBaseUrl) {
+        const canal = await db.googleCalendarPushChannel.findFirst({
+          where: {
+            calendarioId: registro.id,
+            status: { in: ["ACTIVE", "CREATING"] },
+            expiresAt: { gt: new Date() },
+          },
+          select: { id: true },
+        });
+        if (!canal) {
+          await criarCanalPush(registro.id, {
+            webhookBaseUrl: runtime.webhookBaseUrl,
+          }).catch(() => {
+            warning = "Agenda sincronizada; a atualização automática será reparada pela manutenção.";
+          });
+        }
+      }
+    } else if (sincronizacao.status === "erro") {
+      warning = sincronizacao.erro;
+    } else if (sincronizacao.status === "em_andamento") {
+      warning = "A agenda foi selecionada e a sincronização continua em segundo plano.";
+    }
+  }
+
   revalidatePath("/PainelAlpha/CalendarioAlpha");
-  return { success: true, data: registro };
+  return { success: true, data: registro, warning };
 }
 
 /** Permite personalizar a cor de um calendário próprio já selecionado (independente da cor do Google). */

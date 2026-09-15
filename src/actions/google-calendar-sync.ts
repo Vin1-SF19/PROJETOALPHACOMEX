@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { verificarAcessoCalendarioAlpha } from "@/lib/google-calendar/autorizacao";
+import { mapearComConcorrencia } from "@/lib/google-calendar/concurrency";
 import {
   orquestrarSincronizacaoCalendario,
   type ResultadoOrquestracaoSincronizacao,
@@ -12,6 +13,7 @@ import { obterUsuarioGoogleAtivo } from "@/lib/google-calendar/usuario-google";
 import db from "@/lib/prisma";
 
 const MAX_CALENDARIOS_POR_SYNC_MANUAL = 50;
+const CONCORRENCIA_SYNC_MANUAL = 3;
 
 const sincronizarAgendaAlphaSchema = z
   .object({
@@ -152,20 +154,20 @@ export async function sincronizarAgendaAlpha(
     return { success: false, error: "Um ou mais calendários não pertencem à conexão ativa." };
   }
 
-  const calendarios: ResultadoCalendarioSincronizado[] = [];
-  for (const calendario of conexao.calendarios) {
-    const resultado = await orquestrarSincronizacaoCalendario({
-      userId: acesso.userId,
-      calendario,
-      emailUsuario: usuarioGoogle.emailUsuario,
-    });
-    calendarios.push({
+  const calendarios = await mapearComConcorrencia(
+    conexao.calendarios,
+    CONCORRENCIA_SYNC_MANUAL,
+    async (calendario): Promise<ResultadoCalendarioSincronizado> => ({
       calendarioId: calendario.id,
       googleCalendarId: calendario.googleCalendarId,
       nome: calendario.nome,
-      resultado,
-    });
-  }
+      resultado: await orquestrarSincronizacaoCalendario({
+        userId: acesso.userId,
+        calendario,
+        emailUsuario: usuarioGoogle.emailUsuario,
+      }),
+    }),
+  );
 
   const contadores: ResumoSincronizacaoAgenda["contadores"] = {
     calendariosSolicitados: calendarios.length,

@@ -180,6 +180,10 @@ describe("Agenda Alpha cache-first actions", () => {
       fim: new Date("2026-07-30T14:00:00Z"),
       participantes: [],
       criarMeet: false,
+      eventType: "default",
+      visibilidade: "default",
+      transparencia: "opaque",
+      lembretesMinutos: [],
     });
 
     expect(resultado).toEqual({ success: true, data: { conflito: false } });

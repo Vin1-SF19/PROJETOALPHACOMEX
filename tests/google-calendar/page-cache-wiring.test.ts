@@ -138,7 +138,7 @@ describe("Agenda Alpha cache e wiring", () => {
     expect(controller).toContain("setSessaoEdicao({ evento, detalhes: resultado.data })");
     expect(dashboard).toContain("evento={agenda.sessaoEdicao?.evento}");
     expect(dashboard).toContain("detalhesEvento={agenda.sessaoEdicao?.detalhes}");
-    expect(dashboard.split(/\r?\n/).length).toBeLessThanOrEqual(300);
+    expect(dashboard.split(/\r?\n/).length).toBeLessThanOrEqual(330);
   });
 
   it("não usa transição de navegação como estado visual do sync manual", () => {

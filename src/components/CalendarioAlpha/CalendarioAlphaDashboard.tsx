@@ -180,6 +180,7 @@ export function CalendarioAlphaDashboard({ temaName, statusConexao, conexaoId, c
       erro={agenda.erroSincronizacao}
       erroCompartilhadas={agenda.compartilhadas.erro}
       resumo={agenda.resumoSincronizacao}
+      saude={statusConexao.saude}
       onSincronizar={agenda.sincronizarAgora}
       onDesativar={() => agenda.setDesativarAberto(true)}
     />

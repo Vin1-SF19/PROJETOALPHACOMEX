@@ -24,9 +24,11 @@ export function EstadoDesconectado({
       const resultado = await ativarCalendarioAlpha();
       if (!resultado.success) {
         toast.error(resultado.error ?? "Não foi possível ativar a Agenda Alpha agora.");
+        if (resultado.ativada) onAtivado();
         return;
       }
-      toast.success("Agenda Alpha ativada.");
+      if (resultado.warning) toast.warning(resultado.warning);
+      else toast.success("Agenda Alpha ativada e sincronizada.");
       onAtivado();
     });
   }

@@ -752,6 +752,10 @@ export async function executarCalendarTool(
         fim: datas.fim,
         participantes: participantesDeTexto(dados.participantes),
         criarMeet: dados.criar_meet ?? false,
+        eventType: "default",
+        visibilidade: "default",
+        transparencia: "opaque",
+        lembretesMinutos: [],
       });
       if (!resultado.success) return resultado.error;
 
@@ -975,6 +979,10 @@ export async function executarCalendarTool(
         fim: datas.fim,
         participantes: participantesDeTexto(dados.participantes),
         criarMeet: dados.criar_meet ?? false,
+        eventType: "default",
+        visibilidade: "default",
+        transparencia: "opaque",
+        lembretesMinutos: [],
       });
       if (!resultado.success) return resultado.error;
 

@@ -56,6 +56,8 @@ export function SeletorCalendarios({
         toast.error(resultado.error);
         return;
       }
+      if (resultado.warning) toast.warning(resultado.warning);
+      else if (novoValor) toast.success("Agenda adicionada e sincronizada.");
       onAtualizado();
     });
   }

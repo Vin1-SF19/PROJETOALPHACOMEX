@@ -7,10 +7,15 @@ async function main() {
   try {
     const {
       executarMaintenanceAgendaAlpha,
+      executarMaintenanceAgendadaAgendaAlpha,
       parseMaintenanceAgendaAlphaArgs,
     } = await import("../src/lib/google-calendar/maintenance.ts");
-    const actions = parseMaintenanceAgendaAlphaArgs(process.argv.slice(2));
-    const summary = await executarMaintenanceAgendaAlpha(actions);
+    const args = process.argv.slice(2);
+    const summary = args[0] === "scheduled"
+      ? await executarMaintenanceAgendadaAgendaAlpha(
+          args.includes("--dry-run") ? "dry-run" : "apply",
+        )
+      : await executarMaintenanceAgendaAlpha(parseMaintenanceAgendaAlphaArgs(args));
     console.info(
       JSON.stringify({
         component: "agenda-alpha-maintenance-cli",

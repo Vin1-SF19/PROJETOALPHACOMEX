@@ -162,6 +162,12 @@ export function formatarDataCivil(data: Date): string {
   return `${String(ano).padStart(4, "0")}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
 }
 
+/** Retorna os minutos desde 00:00 no fuso da Agenda Alpha, sem depender do fuso do processo. */
+export function minutosDesdeInicioDoDia(data: Date): number {
+  const { hora, minuto } = lerPartesNumericas(FORMATADOR_PARTES_INSTANTE, data);
+  return hora * 60 + minuto;
+}
+
 /**
  * Serializa a data civil UTC de uma data (sem passar pelo fuso de São Paulo).
  *

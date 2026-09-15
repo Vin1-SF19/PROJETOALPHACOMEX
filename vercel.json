@@ -13,6 +13,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/calendario-alpha/jobs/maintenance",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/alpha-seo/cron/schedules",
       "schedule": "*/5 * * * *"
     },

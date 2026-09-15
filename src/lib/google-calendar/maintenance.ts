@@ -65,6 +65,53 @@ export interface ResumoMaintenanceAgendaAlpha {
   operationalFailures: number;
 }
 
+/** Plano padrão do scheduler: mantém canais, fila e calendários stale sem IDs manuais. */
+export async function executarMaintenanceAgendadaAgendaAlpha(
+  mode: ModoMaintenanceAgendaAlpha = "apply",
+): Promise<ResumoMaintenanceAgendaAlpha> {
+  const config = exigirAgendaAlphaRuntimeConfig();
+  const agora = new Date();
+  const retryPushAntesDe = new Date(agora.getTime() - 60 * 60 * 1_000);
+  const createCalendarIds = config.pushEnabled
+    ? (
+        await db.googleCalendarSelecionado.findMany({
+          where: {
+            visivel: true,
+            conexao: { status: "ATIVA", user: { status: "ATIVO" } },
+            pushChannels: {
+              none: {
+                OR: [
+                  { status: { in: ["ACTIVE", "CREATING"] }, expiresAt: { gt: agora } },
+                  { status: "ERROR", lastErrorAt: { gt: retryPushAntesDe } },
+                ],
+              },
+            },
+          },
+          select: { id: true },
+          // Evita exceder a janela do cron ao criar canais externos do Google.
+          take: 10,
+        })
+      ).map((calendario) => calendario.id)
+    : [];
+
+  return executarMaintenanceAgendaAlpha(
+    {
+      mode,
+      status: true,
+      renewWatches: config.pushEnabled,
+      reconcileStale: true,
+      recoverExpired: true,
+      createCalendarIds,
+      stopChannelIds: [],
+      stopAll: false,
+    },
+    {
+      // Mantém a entrada de reconciliações abaixo da capacidade do worker de um job/minuto.
+      reconcileStale: (instante) => defaultReconcileStale(instante, 10),
+    },
+  );
+}
+
 export interface EventoMaintenanceAgendaAlpha {
   component: "agenda-alpha-maintenance";
   correlationId: string;
@@ -227,6 +274,7 @@ async function defaultStatus(now: Date): Promise<StatusMaintenanceAgendaAlpha> {
 
 function staleCalendarWhere(staleBefore: Date) {
   return {
+    visivel: true,
     OR: [
       { ultimaSincronizacaoEm: null },
       { ultimaSincronizacaoEm: { lte: staleBefore } },
@@ -275,14 +323,14 @@ async function defaultPlan(
   };
 }
 
-async function defaultReconcileStale(now: Date): Promise<number> {
+async function defaultReconcileStale(now: Date, limite = 500): Promise<number> {
   const staleBefore = new Date(now.getTime() - 15 * 60 * 1_000);
   const bucket = Math.floor(now.getTime() / (15 * 60 * 1_000));
   const calendars = await db.googleCalendarSelecionado.findMany({
     where: staleCalendarWhere(staleBefore),
     select: { id: true },
     orderBy: { ultimaSincronizacaoEm: "asc" },
-    take: 500,
+    take: limite,
   });
   for (const calendar of calendars) {
     await enfileirarOperacao({

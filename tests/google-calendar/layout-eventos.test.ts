@@ -4,7 +4,7 @@ import { parsearDataCivil } from "@/components/CalendarioAlpha/lib/datas";
 import { calcularPosicoesEventosDoDia, eventosDiaInteiroDoDia } from "@/components/CalendarioAlpha/lib/layout-eventos";
 import type { EventoExibicao } from "@/components/CalendarioAlpha/lib/tipos";
 
-const DIA = new Date("2026-07-20T00:00:00");
+const DIA = parsearDataCivil("2026-07-20")!;
 
 function evento(overrides: Partial<EventoExibicao> = {}): EventoExibicao {
   return {
@@ -12,8 +12,8 @@ function evento(overrides: Partial<EventoExibicao> = {}): EventoExibicao {
     googleEventId: "evt_1",
     status: "confirmed",
     titulo: "Evento",
-    inicioEm: "2026-07-20T10:00:00",
-    fimEm: "2026-07-20T11:00:00",
+    inicioEm: "2026-07-20T10:00:00-03:00",
+    fimEm: "2026-07-20T11:00:00-03:00",
     diaInteiro: false,
     etag: "e1",
     linkMeet: null,
@@ -22,6 +22,8 @@ function evento(overrides: Partial<EventoExibicao> = {}): EventoExibicao {
     calendarioNome: "Principal",
     calendarioCorHex: "#3b82f6",
     calendarioGravavel: true,
+    eventType: "default",
+    tipo: "evento",
     ...overrides,
   };
 }
@@ -30,7 +32,7 @@ describe("calcularPosicoesEventosDoDia", () => {
   it("ignora eventos de dia inteiro e de outros dias", () => {
     const posicoes = calcularPosicoesEventosDoDia(DIA, [
       evento({ diaInteiro: true }),
-      evento({ id: "2", inicioEm: "2026-07-21T10:00:00", fimEm: "2026-07-21T11:00:00" }),
+      evento({ id: "2", inicioEm: "2026-07-21T10:00:00-03:00", fimEm: "2026-07-21T11:00:00-03:00" }),
     ]);
     expect(posicoes).toHaveLength(0);
   });
@@ -45,15 +47,15 @@ describe("calcularPosicoesEventosDoDia", () => {
 
   it("dá altura mínima para eventos muito curtos", () => {
     const [pos] = calcularPosicoesEventosDoDia(DIA, [
-      evento({ inicioEm: "2026-07-20T10:00:00", fimEm: "2026-07-20T10:05:00" }),
+      evento({ inicioEm: "2026-07-20T10:00:00-03:00", fimEm: "2026-07-20T10:05:00-03:00" }),
     ]);
     expect(pos.alturaPercentual).toBe(2.5);
   });
 
   it("divide em 2 colunas quando dois eventos se sobrepõem", () => {
     const posicoes = calcularPosicoesEventosDoDia(DIA, [
-      evento({ id: "a", inicioEm: "2026-07-20T10:00:00", fimEm: "2026-07-20T11:00:00" }),
-      evento({ id: "b", inicioEm: "2026-07-20T10:30:00", fimEm: "2026-07-20T11:30:00" }),
+      evento({ id: "a", inicioEm: "2026-07-20T10:00:00-03:00", fimEm: "2026-07-20T11:00:00-03:00" }),
+      evento({ id: "b", inicioEm: "2026-07-20T10:30:00-03:00", fimEm: "2026-07-20T11:30:00-03:00" }),
     ]);
     expect(posicoes).toHaveLength(2);
     expect(posicoes[0].totalColunas).toBe(2);
@@ -63,17 +65,17 @@ describe("calcularPosicoesEventosDoDia", () => {
 
   it("reutiliza a mesma coluna para eventos consecutivos que não se sobrepõem", () => {
     const posicoes = calcularPosicoesEventosDoDia(DIA, [
-      evento({ id: "a", inicioEm: "2026-07-20T09:00:00", fimEm: "2026-07-20T10:00:00" }),
-      evento({ id: "b", inicioEm: "2026-07-20T10:00:00", fimEm: "2026-07-20T11:00:00" }),
+      evento({ id: "a", inicioEm: "2026-07-20T09:00:00-03:00", fimEm: "2026-07-20T10:00:00-03:00" }),
+      evento({ id: "b", inicioEm: "2026-07-20T10:00:00-03:00", fimEm: "2026-07-20T11:00:00-03:00" }),
     ]);
     expect(posicoes.every((p) => p.totalColunas === 1)).toBe(true);
   });
 
   it("cria 3 colunas quando 3 eventos se sobrepõem entre si", () => {
     const posicoes = calcularPosicoesEventosDoDia(DIA, [
-      evento({ id: "a", inicioEm: "2026-07-20T10:00:00", fimEm: "2026-07-20T12:00:00" }),
-      evento({ id: "b", inicioEm: "2026-07-20T10:30:00", fimEm: "2026-07-20T11:30:00" }),
-      evento({ id: "c", inicioEm: "2026-07-20T11:00:00", fimEm: "2026-07-20T11:45:00" }),
+      evento({ id: "a", inicioEm: "2026-07-20T10:00:00-03:00", fimEm: "2026-07-20T12:00:00-03:00" }),
+      evento({ id: "b", inicioEm: "2026-07-20T10:30:00-03:00", fimEm: "2026-07-20T11:30:00-03:00" }),
+      evento({ id: "c", inicioEm: "2026-07-20T11:00:00-03:00", fimEm: "2026-07-20T11:45:00-03:00" }),
     ]);
     expect(posicoes.every((p) => p.totalColunas === 3)).toBe(true);
     expect(new Set(posicoes.map((p) => p.coluna))).toEqual(new Set([0, 1, 2]));
@@ -81,9 +83,9 @@ describe("calcularPosicoesEventosDoDia", () => {
 
   it("clusters separados no tempo não compartilham colunas", () => {
     const posicoes = calcularPosicoesEventosDoDia(DIA, [
-      evento({ id: "a", inicioEm: "2026-07-20T08:00:00", fimEm: "2026-07-20T09:00:00" }),
-      evento({ id: "b", inicioEm: "2026-07-20T08:00:00", fimEm: "2026-07-20T09:00:00" }),
-      evento({ id: "c", inicioEm: "2026-07-20T15:00:00", fimEm: "2026-07-20T16:00:00" }),
+      evento({ id: "a", inicioEm: "2026-07-20T08:00:00-03:00", fimEm: "2026-07-20T09:00:00-03:00" }),
+      evento({ id: "b", inicioEm: "2026-07-20T08:00:00-03:00", fimEm: "2026-07-20T09:00:00-03:00" }),
+      evento({ id: "c", inicioEm: "2026-07-20T15:00:00-03:00", fimEm: "2026-07-20T16:00:00-03:00" }),
     ]);
     const clusterManha = posicoes.filter((p) => p.evento.id !== "c");
     const clusterTarde = posicoes.find((p) => p.evento.id === "c")!;
