@@ -14,6 +14,12 @@ import {
   gerarTelefonePendente,
   paraExibicaoTelefone,
 } from "@/lib/validations/cs-nps";
+import {
+  calcularAlertaUltimoCs,
+  podeReceberAlertasUltimoCs,
+  STATUS_EM_ANDAMENTO,
+  type PendenciaUltimoCs,
+} from "@/lib/cs-nps/alertas-ultimo-cs";
 
 async function getColaboradorNome(): Promise<string> {
   const session = await auth();
@@ -456,6 +462,75 @@ export async function buscarClientes() {
   }
 }
 
+export type ResultadoPendenciasUltimoCs =
+  | { success: true; alertas: PendenciaUltimoCs[] }
+  | { success: false; error: string; alertas: [] };
+
+/**
+ * Fila derivada de CS vencidos para o sino global. Não persiste notificações:
+ * cada leitura reflete o status e o último atendimento atualmente gravados.
+ */
+export async function buscarPendenciasUltimoCs(): Promise<ResultadoPendenciasUltimoCs> {
+  const session = await auth();
+  if (!session?.user?.id || !podeReceberAlertasUltimoCs(session.user.role)) {
+    return { success: false, error: "Acesso restrito aos setores de TI e Recursos Humanos", alertas: [] };
+  }
+
+  try {
+    const agora = new Date();
+    const registros = await db.clienteServico.findMany({
+      where: {
+        status: STATUS_EM_ANDAMENTO,
+        logCs: { some: {} },
+      },
+      select: {
+        id: true,
+        clienteId: true,
+        servico: true,
+        status: true,
+        cliente: {
+          select: { razaoSocial: true, nomeFantasia: true, cnpj: true },
+        },
+        logCs: {
+          select: { dataRegistro: true },
+          orderBy: { dataRegistro: "desc" },
+          take: 1,
+        },
+      },
+    });
+
+    const alertas = registros.flatMap<PendenciaUltimoCs>((registro) => {
+      const alerta = calcularAlertaUltimoCs({
+        status: registro.status,
+        logs: registro.logCs,
+        agora,
+      });
+      if (!alerta) return [];
+
+      return [{
+        clienteServicoId: registro.id,
+        clienteId: registro.clienteId,
+        razaoSocial: registro.cliente.razaoSocial,
+        nomeFantasia: registro.cliente.nomeFantasia,
+        cnpj: registro.cliente.cnpj,
+        servico: registro.servico,
+        ultimoCsEm: alerta.ultimoCs.toISOString(),
+        venceEm: alerta.venceEm.toISOString(),
+        diasSemAtualizacao: alerta.diasSemAtualizacao,
+      }];
+    }).sort((a, b) =>
+      b.diasSemAtualizacao - a.diasSemAtualizacao
+      || a.razaoSocial.localeCompare(b.razaoSocial, "pt-BR")
+      || a.clienteServicoId - b.clienteServicoId
+    );
+
+    return { success: true, alertas };
+  } catch (error) {
+    console.error("ERRO buscarPendenciasUltimoCs:", error);
+    return { success: false, error: "Não foi possível consultar os alertas de CS", alertas: [] };
+  }
+}
+
 /** Tipo de 1 registro retornado por `buscarClientes` — usado pela UI para agrupar/mesclar por CNPJ. */
 export type ClienteCS = Awaited<ReturnType<typeof buscarClientes>>[number];
 
@@ -613,6 +688,15 @@ export async function salvarLogCS(clienteServicoId: number, dados: unknown) {
     console.error("ERRO AO SALVAR CS:", mensagem);
     return { success: false, error: mensagem };
   }
+}
+
+/** Variante do salvamento usada pelo modal global, sem ampliar o acesso do alerta. */
+export async function salvarLogCSPorAlerta(clienteServicoId: number, dados: unknown) {
+  const session = await auth();
+  if (!session?.user?.id || !podeReceberAlertasUltimoCs(session.user.role)) {
+    return { success: false as const, error: "Acesso restrito aos setores de TI e Recursos Humanos" };
+  }
+  return salvarLogCS(clienteServicoId, dados);
 }
 
 export async function atualizarDadosGestao(clienteServicoId: number, dados: { nps?: string | number; feedbackGoogle?: boolean; nomeGoogle?: string; status?: string }) {

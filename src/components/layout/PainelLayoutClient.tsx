@@ -22,7 +22,9 @@ import { useNotasWorkspace } from '@/store/useNotasWorkspace';
 import { useNotasNotifications } from '@/hooks/useNotasNotifications';
 import { useNotasLembretesPendentes } from '@/hooks/useNotasLembretesPendentes';
 import { useCalendarioAlphaNotifications } from '@/hooks/useCalendarioAlphaNotifications';
+import { useCsNpsNotifications } from '@/hooks/useCsNpsNotifications';
 import { CompromissoNotificacaoToast } from '@/components/CalendarioAlpha/CompromissoNotificacaoToast';
+import { CsNpsPendenciasModal } from '@/components/cs-nps/CsNpsPendenciasModal';
 import { CentralNotificacoesPainel } from './CentralNotificacoesPainel';
 import { ChamadosOperacionaisPainel } from '@/components/chamados/ChamadosOperacionaisPainel';
 import { isAdminRole, isSameRole } from '@/lib/roles';
@@ -114,6 +116,7 @@ export default function PainelLayoutClient({
   useNotasLembretesPendentes(temAcessoNotas);
   useChecklistNotifications(role);
   useCalendarioAlphaNotifications(temAcessoCalendarioAlpha ? userId : 0);
+  const { autorizado: podeReceberAlertasCs, reconciliar: reconciliarAlertasCs } = useCsNpsNotifications(role);
 
   // ── Embedded detection (running inside an iframe) ─────────────────────────
   // O primeiro render precisa ser idêntico no servidor e no navegador. Detectar `window`
@@ -334,6 +337,7 @@ export default function PainelLayoutClient({
       <HoleriteNotificacaoGlobal authenticated />
       <NotaNotificacaoToast onAbrirNota={abrirNotasPorNotificacao} />
       {temAcessoCalendarioAlpha && <CompromissoNotificacaoToast onAbrirAgenda={abrirAgendaPorNotificacao} />}
+      {podeReceberAlertasCs && <CsNpsPendenciasModal onReconciliar={reconciliarAlertasCs} />}
 
       {!tvMode && (
         <GlobalSidebar

@@ -5,16 +5,10 @@ import { fmtDate } from "@/lib/format-date";
 import {
     Plus,
     Filter,
-    ArrowLeft,
     Eye,
     Search,
-    MoreHorizontal,
     TrendingUp,
-    MessageSquare,
-    User,
-    Calendar,
     CheckCircle2,
-    AlertCircle,
     Layers
 } from "lucide-react";
 
@@ -28,6 +22,11 @@ import { BotaoExportarDados } from "./BotaoExportarDados";
 import { BotaoImportarLote } from "./importacao/BotaoImportarLote";
 import { CsNpsHero3DCard, CsNpsSurface3DCard } from "./CsNpsMotion";
 import { isAdminRole } from "@/lib/roles";
+import {
+    calcularAlertaUltimoCs,
+    resolverUltimoCs,
+    type StatusClienteServico,
+} from "@/lib/cs-nps/alertas-ultimo-cs";
 
 export const dynamic = 'force-dynamic';
 
@@ -48,10 +47,10 @@ export default function CadastroCliente() {
     const [modalGestaoAberto, setModalGestaoAberto] = useState(false);
 
     const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
-    const [busca, setBusca] = useState("");
-    const [ordenacao, setOrdenacao] = useState({ campo: 'razaoSocial', direcao: 'asc' });
+    const [ordenacao, setOrdenacao] = useState<{ campo: string; direcao: "asc" | "desc" }>({ campo: 'razaoSocial', direcao: 'asc' });
+    const [filtroStatus, setFiltroStatus] = useState<StatusClienteServico | null>(null);
     const [modalLogAberto, setModalLogAberto] = useState(false);
-    const [clienteParaLog, setClienteParaLog] = useState<any>(null);
+    const [clienteParaLog, setClienteParaLog] = useState<ClienteCS | null>(null);
     const [termoBusca, setTermoBusca] = useState("");
 
     /**
@@ -86,6 +85,8 @@ export default function CadastroCliente() {
             const busca = termoBusca.toLowerCase();
             const cnpjLimpo = busca.replace(/\D/g, "");
 
+            if (filtroStatus && c.status !== filtroStatus) return false;
+
             return (
                 c.razaoSocial?.toLowerCase().includes(busca) ||
                 c.nomeFantasia?.toLowerCase().includes(busca) ||
@@ -113,12 +114,12 @@ export default function CadastroCliente() {
                 return valA < valB ? 1 : -1;
             }
         });
-    }, [termoBusca, gruposPorCnpj, ordenacao]);
+    }, [termoBusca, gruposPorCnpj, ordenacao, filtroStatus]);
 
 
 
 
-    const abrirLog = (cliente: any) => {
+    const abrirLog = (cliente: ClienteCS) => {
         setClienteParaLog(cliente);
         setModalLogAberto(true);
     };
@@ -137,6 +138,7 @@ export default function CadastroCliente() {
     };
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial remota da tela
         carregarDados();
     }, []);
 
@@ -350,13 +352,20 @@ export default function CadastroCliente() {
 
                                             {/* ÚLTIMO CS */}
                                             <td className="px-6 py-4 text-center">
-                                                <span className="text-[11px] font-mono text-slate-400">
-                                                    {c.logCs && c.logCs.length > 0 ? (() => {
-                                                        const datas = c.logCs.map((l: any) => new Date(l.data_registro || l.dataRegistro).getTime());
-                                                        const ultimaData = new Date(Math.max(...datas));
-                                                        return fmtDate(ultimaData);
-                                                    })() : "---"}
-                                                </span>
+                                                {(() => {
+                                                    const alerta = calcularAlertaUltimoCs({ status: c.status, logs: c.logCs || [] });
+                                                    const ultimoCs = resolverUltimoCs(c.logCs || []);
+
+                                                    return (
+                                                        <span
+                                                            className={`text-[11px] font-mono ${alerta ? "font-black text-rose-400" : "text-slate-400"}`}
+                                                            title={alerta ? `Atualização necessária: ${alerta.diasSemAtualizacao} dias desde o último CS` : undefined}
+                                                        >
+                                                            {ultimoCs ? fmtDate(ultimoCs) : "---"}
+                                                            {alerta && <span className="ml-1.5 text-[8px] font-black uppercase tracking-wider" aria-label="Atualização de CS necessária">Atualizar</span>}
+                                                        </span>
+                                                    );
+                                                })()}
 
 
                                             </td>
@@ -437,6 +446,8 @@ export default function CadastroCliente() {
                 onClose={() => setModalFiltroAberto(false)}
                 ordenacao={ordenacao}
                 setOrdenacao={setOrdenacao}
+                filtroStatus={filtroStatus}
+                setFiltroStatus={setFiltroStatus}
             />
 
             <ModalLogAuditoria

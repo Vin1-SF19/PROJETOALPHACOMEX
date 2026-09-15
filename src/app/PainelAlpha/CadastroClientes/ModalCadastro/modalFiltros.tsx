@@ -2,8 +2,23 @@
 import React from 'react';
 import { X, SortAsc, Calendar, User, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { CsNpsModal3DShell } from "../CsNpsMotion";
+import { STATUS_CLIENTE_SERVICO, type StatusClienteServico } from "@/lib/cs-nps/alertas-ultimo-cs";
 
-export default function ModalFiltros({ isOpen, onClose, ordenacao, setOrdenacao }: any) {
+interface Ordenacao {
+    campo: string;
+    direcao: "asc" | "desc";
+}
+
+interface ModalFiltrosProps {
+    isOpen: boolean;
+    onClose: () => void;
+    ordenacao: Ordenacao;
+    setOrdenacao: (ordenacao: Ordenacao) => void;
+    filtroStatus: StatusClienteServico | null;
+    setFiltroStatus: (status: StatusClienteServico | null) => void;
+}
+
+export default function ModalFiltros({ isOpen, onClose, ordenacao, setOrdenacao, filtroStatus, setFiltroStatus }: ModalFiltrosProps) {
     if (!isOpen) return null;
 
     const opcoes = [
@@ -12,7 +27,6 @@ export default function ModalFiltros({ isOpen, onClose, ordenacao, setOrdenacao 
         { label: "Nome Fantasia", campo: "nomeFantasia", icon: SortAsc, tipo: "texto" as const },
         { label: "Data Contratação", campo: "dataContratacao", icon: Calendar, tipo: "data" as const },
         { label: "Data Êxito", campo: "dataExito", icon: Calendar, tipo: "data" as const },
-        { label: "Status", campo: "status", icon: ShieldCheck, tipo: "texto" as const },
         { label: "Analista", campo: "analistaResponsavel", icon: User, tipo: "texto" as const },
         { label: "Feedback Google", campo: "feedbackGoogle", icon: CheckCircle2, tipo: "binario" as const },
     ];
@@ -26,6 +40,32 @@ export default function ModalFiltros({ isOpen, onClose, ordenacao, setOrdenacao 
                 </div>
 
                 <div className="p-6 space-y-3 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                    <div className="space-y-3 rounded-2xl border border-white/5 bg-slate-900/50 p-4">
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 text-slate-300">
+                                <ShieldCheck size={16} className="text-indigo-500" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Status</span>
+                            </div>
+                            {filtroStatus && (
+                                <button type="button" onClick={() => setFiltroStatus(null)} className="text-[8px] font-black uppercase tracking-wider text-slate-500 transition-colors hover:text-indigo-400">
+                                    Limpar
+                                </button>
+                            )}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {STATUS_CLIENTE_SERVICO.map((status) => (
+                                <button
+                                    key={status}
+                                    type="button"
+                                    onClick={() => setFiltroStatus(filtroStatus === status ? null : status)}
+                                    aria-pressed={filtroStatus === status}
+                                    className={`rounded-xl border px-3 py-2 text-[8px] font-black uppercase tracking-tight transition-all ${filtroStatus === status ? "border-indigo-400/40 bg-indigo-600 text-white shadow-lg shadow-indigo-900/30" : "border-white/5 bg-slate-800 text-slate-500 hover:bg-slate-700"}`}
+                                >
+                                    {status}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                     {opcoes.map((item) => (
                         <div key={item.campo} className="flex items-center justify-between p-4 bg-slate-900/50 rounded-2xl border border-white/5 hover:border-white/10 transition-all">
                             <div className="flex items-center gap-3 text-slate-300">

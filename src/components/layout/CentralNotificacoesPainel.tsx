@@ -11,6 +11,7 @@ import {
   Inbox,
   NotebookPen,
   ReceiptText,
+  RefreshCcw,
   X,
 } from "lucide-react";
 
@@ -20,6 +21,7 @@ import { useChamadoNotificacoes } from "@/store/useChamadoNotificacoes";
 import { useChecklistNotificacoes } from "@/store/useChecklistNotificacoes";
 import { useHoleriteNotificacoes } from "@/store/useHoleriteNotificacoes";
 import { useNotasNotificacoes } from "@/store/useNotasNotificacoes";
+import { useCsNpsNotificacoes } from "@/store/useCsNpsNotificacoes";
 
 interface ItemCentralNotificacoes {
   id: string;
@@ -31,7 +33,7 @@ interface ItemCentralNotificacoes {
   lida: boolean;
   Icone: ComponentType<{ className?: string }>;
   abrir: () => void;
-  remover: () => void;
+  remover?: () => void;
 }
 
 const ROTULO_JANELA: Record<"10min" | "5min", string> = {
@@ -128,14 +130,16 @@ function CartaoCentral({
         <span className="block truncate text-[10px] text-slate-400">{item.subtitulo}</span>
         <span className="mt-1 block text-[9px] font-medium text-slate-600">{formatarMomento(item.criadoEm)}</span>
       </button>
-      <button
-        type="button"
-        onClick={item.remover}
-        aria-label={`Remover notificação de ${item.origem}`}
-        className="rounded p-0.5 text-slate-600 opacity-0 transition-opacity hover:text-rose-400 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 group-hover:opacity-100"
-      >
-        <X className="size-3" />
-      </button>
+      {item.remover && (
+        <button
+          type="button"
+          onClick={item.remover}
+          aria-label={`Remover notificação de ${item.origem}`}
+          className="rounded p-0.5 text-slate-600 opacity-0 transition-opacity hover:text-rose-400 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 group-hover:opacity-100"
+        >
+          <X className="size-3" />
+        </button>
+      )}
     </motion.div>
   );
 }
@@ -158,6 +162,7 @@ export function CentralNotificacoesPainel({
   const checklist = useChecklistNotificacoes();
   const notas = useNotasNotificacoes();
   const holerite = useHoleriteNotificacoes();
+  const csNps = useCsNpsNotificacoes();
 
   const itens: ItemCentralNotificacoes[] = [
     ...calendario.notificacoes.map((notificacao) => {
@@ -229,6 +234,17 @@ export function CentralNotificacoesPainel({
       abrir: () => onAbrirModulo("/PainelAlpha/Holerites", "Holerites"),
       remover: () => holerite.descartarAlerta(holerite.alertaAtivo!.id),
     }] : []),
+    ...(csNps.pendencias.length > 0 ? [{
+      id: "cs-nps-ultimo-cs",
+      origem: "CS & NPS",
+      titulo: `${csNps.pendencias.length} ${csNps.pendencias.length === 1 ? "registro precisa" : "registros precisam"} atualizar o CS`,
+      subtitulo: "Último CS completou 10 dias",
+      criadoEm: csNps.pendencias[0].venceEm,
+      cor: "#fb7185",
+      lida: csNps.lida,
+      Icone: RefreshCcw,
+      abrir: csNps.abrirModal,
+    }] : []),
   ].sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime());
 
   const naoLidas = itens.filter((item) => !item.lida).length;
@@ -258,6 +274,7 @@ export function CentralNotificacoesPainel({
     checklist.marcarTodasLidas();
     notas.marcarTodasLidas();
     holerite.marcarAlertaComoLido();
+    csNps.marcarComoLida();
   }
 
   function handleAbrir() {
