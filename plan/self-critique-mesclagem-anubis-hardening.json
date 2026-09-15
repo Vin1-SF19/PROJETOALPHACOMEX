@@ -1,0 +1,34 @@
+{
+  "subtaskId": "mesclagem-anubis-hardening",
+  "critiquedAt": "2026-09-15T13:14:00Z",
+  "step5_5": {
+    "predictedBugs": [
+      "Uma relação 1:N adversarial poderia materializar dezenas de milhões de objetos antes de qualquer limite de linhas.",
+      "Um XLSX pequeno em disco poderia declarar ou descompactar XML desproporcional antes de chegar ao ExcelJS.",
+      "A chave userId+IP permitiria ao mesmo usuário abrir processamento concorrente mudando o IP encaminhado.",
+      "A configuração global do endpoint local poderia ser trocada por host público e transformar o fallback em SSRF/vazamento.",
+      "Sessões em memória retinham todas as linhas e mantinham superfícies legadas desnecessárias."
+    ],
+    "edgeCases": [
+      "Mil e uma correspondências do mesmo CNPJ falham antes da expansão com status 413.",
+      "Cento e um registros principais por mil complementares falham overflow-safe acima de cem mil saídas.",
+      "ZIP bomb, mais de cinquenta worksheets, mais de 512 colunas e estrutura XLSX incompleta falham antes do processamento.",
+      "Host externo, credenciais embutidas e redirect HTTP da IA são rejeitados; loopback e allowlist exata são aceitos.",
+      "Dois IPs para o mesmo userId compartilham concorrência e orçamento."
+    ],
+    "errorHandling": true,
+    "securityCheck": true,
+    "passed": true
+  },
+  "step6_5": {
+    "followsPatterns": true,
+    "noHardcoded": true,
+    "testsAdded": true,
+    "docsUpdated": true,
+    "noConsoleLogs": true,
+    "passed": true
+  },
+  "overallVerdict": "PASSED",
+  "skipped": false,
+  "skipWarning": null
+}

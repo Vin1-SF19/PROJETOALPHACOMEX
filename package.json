@@ -46,6 +46,7 @@
     "storage:inventory": "tsx --conditions=react-server scripts/storage-alpha.mjs inventory",
     "storage:doctor": "tsx --conditions=react-server scripts/storage-alpha.mjs doctor",
     "storage:poc": "tsx --conditions=react-server scripts/storage-alpha.mjs poc",
+    "mesclagem:historico": "tsx --conditions=react-server scripts/mesclagem-historico.ts",
     "alpha-seo:inventory": "tsx scripts/alpha-seo.mjs inventory",
     "alpha-seo:doctor": "tsx scripts/alpha-seo.mjs doctor",
     "alpha-seo:worker": "tsx scripts/alpha-seo.mjs worker",

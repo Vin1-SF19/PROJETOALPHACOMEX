@@ -7,6 +7,13 @@ const LIMITE_TOTAL_DESCOMPACTADO = 50 * 1024 * 1024;
 const LIMITE_RAZAO_COMPRESSAO = 100;
 const LIMITE_ENTRADAS = 256;
 
+export interface LimitesPreflightXlsx {
+  entradaDescompactadaBytes?: number;
+  totalDescompactadoBytes?: number;
+  razaoCompressao?: number;
+  entradas?: number;
+}
+
 export class ErroPreflightXlsx extends Error {
   readonly code: string;
   readonly status: 413 | 422;
@@ -53,7 +60,14 @@ function erroDeStream(error: Error): ErroPreflightXlsx {
   return new ErroPreflightXlsx("Falha ao validar conteúdo interno", "INVALID_ZIP_STREAM", 422);
 }
 
-export async function validarXlsxStreaming(buffer: ArrayBuffer): Promise<void> {
+export async function validarXlsxStreaming(
+  buffer: ArrayBuffer,
+  limites: LimitesPreflightXlsx = {},
+): Promise<void> {
+  const limiteEntrada = limites.entradaDescompactadaBytes ?? LIMITE_ENTRADA_DESCOMPACTADA;
+  const limiteTotal = limites.totalDescompactadoBytes ?? LIMITE_TOTAL_DESCOMPACTADO;
+  const limiteRazao = limites.razaoCompressao ?? LIMITE_RAZAO_COMPRESSAO;
+  const limiteEntradas = limites.entradas ?? LIMITE_ENTRADAS;
   const zipfile = await abrirZip(buffer);
 
   await new Promise<void>((resolve, reject) => {
@@ -104,7 +118,7 @@ export async function validarXlsxStreaming(buffer: ArrayBuffer): Promise<void> {
     zipfile.on("entry", (entry: yauzl.Entry) => {
       if (encerrado) return;
       entradasLidas += 1;
-      if (entradasLidas > LIMITE_ENTRADAS) {
+      if (entradasLidas > limiteEntradas) {
         falhar(new ErroPreflightXlsx("Entradas internas demais", "TOO_MANY_ZIP_ENTRIES", 422));
         return;
       }
@@ -116,8 +130,8 @@ export async function validarXlsxStreaming(buffer: ArrayBuffer): Promise<void> {
         falhar(new ErroPreflightXlsx("Método de compressão não suportado", "UNSUPPORTED_COMPRESSION", 422));
         return;
       }
-      if (entry.uncompressedSize > LIMITE_ENTRADA_DESCOMPACTADA) {
-        falhar(new ErroPreflightXlsx("Uma entrada excede 20 MB", "ZIP_ENTRY_TOO_LARGE", 413));
+      if (entry.uncompressedSize > limiteEntrada) {
+        falhar(new ErroPreflightXlsx("Uma entrada excede o orçamento descompactado", "ZIP_ENTRY_TOO_LARGE", 413));
         return;
       }
       if (entry.compressedSize === 0 && entry.uncompressedSize > 0) {
@@ -126,7 +140,7 @@ export async function validarXlsxStreaming(buffer: ArrayBuffer): Promise<void> {
       }
       if (
         entry.compressedSize > 0 &&
-        entry.uncompressedSize / entry.compressedSize > LIMITE_RAZAO_COMPRESSAO
+        entry.uncompressedSize / entry.compressedSize > limiteRazao
       ) {
         falhar(new ErroPreflightXlsx("Taxa de compressão excede o limite", "ZIP_BOMB", 413));
         return;
@@ -161,18 +175,18 @@ export async function validarXlsxStreaming(buffer: ArrayBuffer): Promise<void> {
           if (encerrado) return;
           bytesReaisEntrada += chunk.length;
           totalReal += chunk.length;
-          if (bytesReaisEntrada > LIMITE_ENTRADA_DESCOMPACTADA) {
-            falhar(new ErroPreflightXlsx("Uma entrada real excede 20 MB", "ZIP_ENTRY_TOO_LARGE", 413));
+          if (bytesReaisEntrada > limiteEntrada) {
+            falhar(new ErroPreflightXlsx("Uma entrada real excede o orçamento descompactado", "ZIP_ENTRY_TOO_LARGE", 413));
             return;
           }
-          if (totalReal > LIMITE_TOTAL_DESCOMPACTADO) {
-            falhar(new ErroPreflightXlsx("Conteúdo real excede 50 MB", "ZIP_TOO_LARGE", 413));
+          if (totalReal > limiteTotal) {
+            falhar(new ErroPreflightXlsx("Conteúdo real excede o orçamento descompactado", "ZIP_TOO_LARGE", 413));
             return;
           }
           if (
             (entry.compressedSize === 0 && bytesReaisEntrada > 0) ||
             (entry.compressedSize > 0 &&
-              bytesReaisEntrada / entry.compressedSize > LIMITE_RAZAO_COMPRESSAO)
+              bytesReaisEntrada / entry.compressedSize > limiteRazao)
           ) {
             falhar(new ErroPreflightXlsx("Taxa real de compressão excede o limite", "ZIP_BOMB", 413));
           }

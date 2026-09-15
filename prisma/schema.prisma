@@ -206,6 +206,31 @@ model usuarios {
   documentoTemplatesCriados  DocumentoTemplate[]
   documentosGerados          DocumentoGerado[]
   empresasContratadasCriadas EmpresaContratada[]
+  mesclagensCriadas           MesclagemHistorico[] @relation("MesclagemHistoricoCriador")
+}
+
+model MesclagemHistorico {
+  id                         String   @id @default(cuid())
+  criadoPorId                Int
+  criadoEm                   DateTime @default(now())
+  principalNome              String
+  principalStorageKey        String
+  principalTamanhoBytes      Int
+  complementarNome           String
+  complementarStorageKey     String
+  complementarTamanhoBytes   Int
+  resultadoNome              String
+  resultadoStorageKey        String
+  resultadoTamanhoBytes      Int
+  empresasProcessadas        Int
+  empresasComCorrespondencia Int
+  empresasSemCorrespondencia Int
+  linhasResultado            Int
+
+  criadoPor usuarios @relation("MesclagemHistoricoCriador", fields: [criadoPorId], references: [id], onDelete: Restrict)
+
+  @@index([criadoPorId, criadoEm])
+  @@index([criadoEm])
 }
 
 /// Objetivo priorizado do Roadmap Alpha. O registry de módulos vive em código;

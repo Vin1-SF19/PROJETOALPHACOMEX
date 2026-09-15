@@ -1,0 +1,32 @@
+{
+  "subtaskId": "mesclagem-logcomex-adapter",
+  "critiquedAt": "2026-09-15T00:00:00Z",
+  "step5_5": {
+    "predictedBugs": [
+      "A seleção genérica por texto contendo CNPJ poderia escolher Raiz CNPJ; o adapter exige a assinatura completa e mapeia somente o cabeçalho exato CNPJ.",
+      "A aba Resumo poderia ser usada como fonte por estar em primeiro lugar; o adapter localiza estruturalmente uma única aba de empresas e expõe somente essa aba.",
+      "As 348 colunas poderiam romper o limite legado de 200 ou vazar campos extras; o adapter projeta somente 12 campos internos antes da engine.",
+      "Município (UF) poderia deslocar os dois campos; a separação é limitada ao sufixo parentético de duas letras e tem fallback seguro."
+    ],
+    "edgeCases": [
+      "Arquivo contendo apenas Raiz CNPJ permanece no parser legacy e não recebe classificação Logcomex.",
+      "Duas abas com a mesma assinatura são tratadas como baixa confiança e preservam o fallback legacy.",
+      "Fórmula em qualquer campo efetivamente extraído é rejeitada com FORMULA_NOT_ALLOWED.",
+      "Linhas vazias são ignoradas e o limite canônico de 50 mil registros continua aplicado."
+    ],
+    "errorHandling": true,
+    "securityCheck": true,
+    "passed": true
+  },
+  "step6_5": {
+    "followsPatterns": true,
+    "noHardcoded": true,
+    "testsAdded": true,
+    "docsUpdated": true,
+    "noConsoleLogs": true,
+    "passed": true
+  },
+  "overallVerdict": "PASSED",
+  "skipped": false,
+  "skipWarning": null
+}
