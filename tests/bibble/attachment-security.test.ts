@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
@@ -11,6 +11,8 @@ import {
   fetchTrustedBibbleBlob,
   hasPdfMagicBytes,
   parseTrustedBibbleBlobUrl,
+  bibbleBlobUserNamespace,
+  isBibbleBlobOwnedByUser,
   readRequestTextWithLimit,
 } from "@/lib/bibble/attachment-security";
 import { selectTextForTokenBudget } from "@/lib/bibble/context-budget";
@@ -23,11 +25,19 @@ const validFile = {
   url: "https://store.public.blob.vercel-storage.com/bibble-chat/opaque-id",
 };
 
+beforeEach(() => { process.env.BIBBLE_BLOB_HOST = "store.public.blob.vercel-storage.com"; });
+
 afterEach(() => {
   vi.unstubAllGlobals();
+  delete process.env.BIBBLE_BLOB_HOST;
 });
 
 describe("fronteiras de anexos do Bibble", () => {
+  it("reuses the trusted blob boundary for Onyx document and image downloads", () => {
+    const onyx = readFileSync(resolve("src/app/api/onyx/chat/route.ts"), "utf8");
+    expect(onyx.match(/fetchTrustedBibbleBlob\(/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(onyx).not.toMatch(/fetch\((?:file|img)\.url/);
+  });
   it("mantém as proteções conectadas às rotas nativas", () => {
     const chatRoute = readFileSync(resolve("src/app/api/bibble/chat/route.ts"), "utf8");
     const uploadRoute = readFileSync(resolve("src/app/api/bibble/upload-to-blob/route.ts"), "utf8");
@@ -39,13 +49,15 @@ describe("fronteiras de anexos do Bibble", () => {
     expect(chatRoute).toContain("bibbleChatInputSchema.safeParse");
     expect(chatRoute).toContain("const toolsForTurn = hasAttachments ? [] : toolsToUse;");
     expect(chatRoute).toContain("status: 413");
-    expect(uploadRoute).toContain("hasPdfMagicBytes(buffer)");
-    expect(uploadRoute).toContain("const uniqueName = crypto.randomUUID();");
-    expect(uploadRoute).toContain("selectTextForTokenBudget(");
+    expect(uploadRoute).toContain("acquireBibbleLease(`upload:${session.user.id}`)");
+    expect(uploadRoute).toContain("Uploads temporariamente indisponíveis");
+    expect(uploadRoute).not.toContain('access: "public"');
+    expect(uploadRoute).not.toContain("request.formData()");
     expect(tika).toContain("fetchTrustedBibbleBlob(url");
     expect(pdf24).toContain("const url = resolveSameOriginUrl(PDF24_URL, file.path).href;");
     expect(pdf24).toContain("redirect: \"manual\"");
-    expect(input).toContain("accept={BIBBLE_ATTACHMENT_ACCEPT}");
+    expect(input).not.toContain("BIBBLE_ATTACHMENT_ACCEPT");
+    expect(input).not.toContain("Paperclip");
     expect(layout).toContain("selectAttachmentsWithinLimit(uploadFiles, acceptedFiles)");
     expect(layout).toContain("if (uploadFiles.length > BIBBLE_MAX_FILES_PER_TURN) return;");
   });
@@ -55,7 +67,17 @@ describe("fronteiras de anexos do Bibble", () => {
     expect(parseTrustedBibbleBlobUrl("http://store.public.blob.vercel-storage.com/bibble-chat/id")).toBeNull();
     expect(parseTrustedBibbleBlobUrl("https://store.public.blob.vercel-storage.com/outro/id")).toBeNull();
     expect(parseTrustedBibbleBlobUrl("https://blob.vercel-storage.com.evil.test/bibble-chat/id")).toBeNull();
+    expect(parseTrustedBibbleBlobUrl("https://attacker.public.blob.vercel-storage.com/bibble-chat/id")).toBeNull();
     expect(parseTrustedBibbleBlobUrl("https://store.public.blob.vercel-storage.com/bibble-chat/%2e%2e/secret")).toBeNull();
+  });
+
+  it('requires an unpredictable user-bound namespace', () => {
+    process.env.BIBBLE_BLOB_NAMESPACE_SECRET = 'x'.repeat(32);
+    const namespace = bibbleBlobUserNamespace(42);
+    const owned = `https://${process.env.BIBBLE_BLOB_HOST}/bibble-chat/${namespace}/opaque`;
+    expect(isBibbleBlobOwnedByUser(owned, 42)).toBe(true);
+    expect(isBibbleBlobOwnedByUser(owned, 43)).toBe(false);
+    delete process.env.BIBBLE_BLOB_NAMESPACE_SECRET;
   });
 
   it("bloqueia redirects antes de seguir para outra origem", async () => {

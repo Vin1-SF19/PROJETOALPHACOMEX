@@ -12,7 +12,7 @@ export interface OllamaTool {
   };
 }
 
-export const BIBBLE_TOOLS: OllamaTool[] = [
+const BIBBLE_TOOL_REGISTRY: OllamaTool[] = [
   {
     type: "function",
     function: {
@@ -421,7 +421,7 @@ export const BIBBLE_TOOLS: OllamaTool[] = [
     function: {
       name: "escrever_arquivo",
       description:
-        "Escreve ou sobrescreve o conteúdo completo de um arquivo. Cria o arquivo se não existir. Disponível apenas com acesso ao computador habilitado.",
+        "Sobrescreve um arquivo somente após confirmação explícita vinculada ao caminho de destino.",
       parameters: {
         type: "object",
         properties: {
@@ -433,8 +433,10 @@ export const BIBBLE_TOOLS: OllamaTool[] = [
             type: "string",
             description: "Novo conteúdo completo do arquivo.",
           },
+          confirmado: { type: "boolean", description: "true somente após confirmação explícita do usuário." },
+          confirmacao_alvo: { type: "string", description: "Deve repetir exatamente o caminho confirmado." },
         },
-        required: ["caminho", "conteudo"],
+        required: ["caminho", "conteudo", "confirmado", "confirmacao_alvo"],
       },
     },
   },
@@ -443,7 +445,7 @@ export const BIBBLE_TOOLS: OllamaTool[] = [
     function: {
       name: "apagar",
       description:
-        "Apaga um arquivo ou pasta. Para apagar uma pasta e todo seu conteúdo, passe recursivo: true. Disponível apenas com acesso ao computador habilitado.",
+        "Apaga um arquivo ou pasta vazia somente após confirmação explícita. Exclusão recursiva é bloqueada.",
       parameters: {
         type: "object",
         properties: {
@@ -455,8 +457,10 @@ export const BIBBLE_TOOLS: OllamaTool[] = [
             type: "boolean",
             description: "Se true, apaga a pasta e todo o conteúdo interno. Necessário para pastas não-vazias.",
           },
+          confirmado: { type: "boolean", description: "true somente após confirmação explícita do usuário." },
+          confirmacao_alvo: { type: "string", description: "Deve repetir exatamente o caminho confirmado." },
         },
-        required: ["caminho"],
+        required: ["caminho", "confirmado", "confirmacao_alvo"],
       },
     },
   },
@@ -477,8 +481,10 @@ export const BIBBLE_TOOLS: OllamaTool[] = [
             type: "string",
             description: "Novo caminho de destino.",
           },
+          confirmado: { type: "boolean", description: "true somente após confirmação explícita." },
+          confirmacao_alvo: { type: "string", description: "Deve repetir exatamente o destino confirmado." },
         },
-        required: ["origem", "destino"],
+        required: ["origem", "destino", "confirmado", "confirmacao_alvo"],
       },
     },
   },
@@ -499,8 +505,10 @@ export const BIBBLE_TOOLS: OllamaTool[] = [
             type: "string",
             description: "Caminho de destino da cópia.",
           },
+          confirmado: { type: "boolean", description: "true somente após confirmação explícita." },
+          confirmacao_alvo: { type: "string", description: "Deve repetir exatamente o destino confirmado." },
         },
-        required: ["origem", "destino"],
+        required: ["origem", "destino", "confirmado", "confirmacao_alvo"],
       },
     },
   },
@@ -713,3 +721,9 @@ export const BIBBLE_TOOLS: OllamaTool[] = [
     },
   },
 ];
+
+// Filesystem permanece implementado apenas como defesa interna no executor.
+// Não é capability pública enquanto não houver aprovação humana server-side.
+const DISABLED_FILESYSTEM_TOOLS = new Set(["ler_arquivo", "criar_pasta", "criar_arquivo", "escrever_arquivo", "apagar", "mover_arquivo", "copiar_arquivo"]);
+const DISABLED_MUTATING_TOOLS = new Set(["abrir_chamado", "criar_evento_calendario", "editar_evento_calendario", "cancelar_evento_calendario", "criar_evento_calendario_colega", "editar_evento_calendario_colega", "cancelar_evento_calendario_colega"]);
+export const BIBBLE_TOOLS: OllamaTool[] = BIBBLE_TOOL_REGISTRY.filter(tool => !DISABLED_FILESYSTEM_TOOLS.has(tool.function.name) && !DISABLED_MUTATING_TOOLS.has(tool.function.name));

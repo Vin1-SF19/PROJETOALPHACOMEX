@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Image from "next/image";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -63,25 +63,25 @@ function buildContextFalas(ctx: Ctx): Fala[] {
       );
     } else if (temp < 18) {
       result.push(
-        { mood: "frio", fala: `${t}°C. Fresco assim apaga a vontade de trabalhar, não?` },
+      { mood: "frio", fala: `${t}°C. Está mais fresco hoje.` },
         { mood: "frio", fala: `Com ${t}°C eu esperava um chocolate quente no sistema.` },
       );
     } else if (temp > 33) {
       result.push(
         { mood: "sad", fala: `${t}°C. Isso é temperatura de assar servidor.` },
-        { mood: "sad", fala: `${t}°C e ninguém liga o ar. Parceria suspeita.` },
+        { mood: "sad", fala: `${t}°C. Vale conferir a ventilação do ambiente.` },
       );
     } else if (temp > 28) {
       result.push(
-        { mood: "sad",       fala: `${t}°C. Meu processador mandou um email de reclamação.` },
-        { mood: "relaxando", fala: `${t}°C. Quente mas suportável. Igual esse sistema.` },
+      { mood: "sad",       fala: `${t}°C. Está quente; cuide da hidratação.` },
+      { mood: "relaxando", fala: `${t}°C. Dia quente por aí.` },
       );
     }
   }
 
   if (timeSlot === "madrugada") {
     result.push(
-      { mood: "escondido", fala: `São ${hour}h da manhã. Isso precisava mesmo ser agora?` },
+      { mood: "escondido", fala: `São ${hour}h. Estou disponível se precisar.` },
       { mood: "escondido", fala: "A essa hora até eu quero dormir. E eu nem durmo." },
       { mood: "sad",       fala: `Você tá bem? Pergunto sem julgamento. São ${hour}h.` },
     );
@@ -94,9 +94,9 @@ function buildContextFalas(ctx: Ctx): Fala[] {
   }
   if (timeSlot === "noite_cedo") {
     result.push(
-      { mood: "sad",       fala: `Já passou das ${hour}h. A empresa fecha, eu não. Infelizmente.` },
-      { mood: "relaxando", fala: "Horário de expediente encerrado. Eu fico de plantão. Sem escolha." },
-      { mood: "sad",       fala: "Não vai parar de trabalhar não? Eu também quero descansar." },
+      { mood: "sad",       fala: `Já passou das ${hour}h. Posso ajudar a encerrar o que falta.` },
+      { mood: "relaxando", fala: "O expediente terminou; sigo disponível." },
+      { mood: "sad",       fala: "Uma pausa curta pode ajudar a manter o foco." },
     );
   }
   if (timeSlot === "noite") {
@@ -108,7 +108,7 @@ function buildContextFalas(ctx: Ctx): Fala[] {
   if (isWeekend) {
     result.push(
       { mood: "pensando",  fala: "É fim de semana. Por que nós dois ainda estamos aqui?" },
-      { mood: "sad",       fala: "Sábado ou domingo trabalhando? Isso vai pro meu diário." },
+      { mood: "sad",       fala: "Se estiver trabalhando no fim de semana, posso ajudar a organizar as prioridades." },
       { mood: "relaxando", fala: "Fim de semana é sagrado. Disse quem, mas é." },
     );
   }
@@ -170,19 +170,19 @@ async function fetchCtx(): Promise<Ctx> {
 // ── Fallback falas ─────────────────────────────────────────────────────────────
 
 const FALLBACK_FALAS: Fala[] = [
-  { mood: "happy",     fala: "Sim, tô aqui. Como sempre. Surpreso?" },
-  { mood: "relaxando", fala: "Pode perguntar. Pior que vou saber é improvável." },
-  { mood: "pensando",  fala: "CNPJ, cliente, chamado... escolhe o sofrimento." },
-  { mood: "pensando",  fala: "Meta do mês? Posso calcular. Atingir? Aí é com vocês." },
-  { mood: "frio",      fala: "Conectado. Monitorando. Levemente entediado." },
-  { mood: "relaxando", fala: "Não sou Siri. Não sou Alexa. Sou mais bonito e trabalho mais." },
+  { mood: "happy",     fala: "Estou por aqui. O que precisa resolver?" },
+  { mood: "relaxando", fala: "Pode perguntar. Se eu não souber, aviso diretamente." },
+  { mood: "pensando",  fala: "Posso consultar CNPJ, clientes e chamados dentro das suas permissões." },
+  { mood: "pensando",  fala: "Posso analisar as metas quando você indicar o período." },
+  { mood: "frio",      fala: "Conectado e pronto para trabalhar." },
+  { mood: "relaxando", fala: "Estou disponível para uma consulta objetiva." },
   { mood: "sad",       fala: "Pausa pro café? Eu não tomo, mas apoio." },
   { mood: "happy",     fala: "Tô de olho em tudo. Literalmente. São pixels, mas valem." },
 ];
 
 // ── Constantes ─────────────────────────────────────────────────────────────────
 
-const ROTATION_MS              = 9_000;
+const ROTATION_MS              = 30_000;
 const CURIOSIDADE_INITIAL_MS   = 6_000;
 const CURIOSIDADE_LOOP_MS      = 2 * 60_000;
 const CURIOSIDADE_MIN_SHOW_MS  = 35_000;
@@ -195,20 +195,31 @@ const PIADA_MIN_SHOW_MS        = 30_000;
 // Falas exibidas enquanto a IA está gerando resposta
 const STREAMING_FALAS: Fala[] = [
   { mood: "pensando",  fala: "Deixa eu ver isso com calma..." },
-  { mood: "pensando",  fala: "Processando. Não fui treinado pra ser rápido, fui treinado pra ser preciso." },
-  { mood: "happy",     fala: "Já chegando! Prometo que vai valer." },
-  { mood: "relaxando", fala: "Você pediu, eu to calculando. Paciência é virtude." },
+  { mood: "pensando",  fala: "Processando com atenção..." },
+  { mood: "happy",     fala: "Preparando a resposta..." },
+  { mood: "relaxando", fala: "Analisando os dados disponíveis..." },
   { mood: "pensando",  fala: "Quase lá... ou quase aqui. Depende da perspectiva." },
-  { mood: "happy",     fala: "Boa pergunta. Deixa eu elaborar direito." },
+  { mood: "happy",     fala: "Vou organizar a resposta com cuidado." },
   { mood: "relaxando", fala: "Gerando. Meus neurônios virtuais estão a todo vapor." },
   { mood: "pensando",  fala: "Analisando todas as possibilidades..." },
+];
+const OPERATIONAL_FALAS: Fala[] = [
+  { mood: "happy", fala: "Pronto para ajudar." },
+  { mood: "pensando", fala: "Posso organizar informações e próximos passos." },
+  { mood: "relaxando", fala: "Envie sua solicitação quando quiser." },
+];
+const OPERATIONAL_STREAMING_FALAS: Fala[] = [
+  { mood: "pensando", fala: "Processando com atenção..." },
+  { mood: "happy", fala: "Preparando a resposta..." },
+  { mood: "relaxando", fala: "Analisando os dados disponíveis..." },
 ];
 
 // ── Componente ─────────────────────────────────────────────────────────────────
 
-interface BibbleSpriteCompanionProps { isStreaming?: boolean; }
+interface BibbleSpriteCompanionProps { isStreaming?: boolean; humorEnabled?: boolean; }
 
-export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpriteCompanionProps) {
+export default function BibbleSpriteCompanion({ isStreaming = false, humorEnabled = false }: BibbleSpriteCompanionProps) {
+  const reduceMotion = useReducedMotion();
   const [side] = useState<"left" | "right">(() => Math.random() > 0.5 ? "right" : "left");
 
   const [baseFalas, setBaseFalas] = useState<Fala[]>(FALLBACK_FALAS);
@@ -231,10 +242,23 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
   const piadaShownAt              = useRef<number | null>(null);
 
   const blinkTimeout              = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const curiosidadeFetch          = useRef<AbortController | null>(null);
+  const piadaFetch                = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    if (humorEnabled) return;
+    curiosidadeFetch.current?.abort(); piadaFetch.current?.abort();
+    pendingCuriosidade.current = null; pendingPiada.current = null;
+    curiosidadeActive.current = false; piadaActive.current = false;
+    curiosidadeShownAt.current = null; piadaShownAt.current = null;
+    const clear = setTimeout(() => { setCuriosidade(null); setPiada(null); }, 0);
+    return () => clearTimeout(clear);
+  }, [humorEnabled]);
 
   // ── Falas base (API) ──────────────────────────────────────────────────────
 
   useEffect(() => {
+    if (!humorEnabled) return;
     let active = true;
     fetch("/api/bibble/falas")
       .then(r => r.ok ? r.json() : Promise.reject())
@@ -243,11 +267,12 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
       })
       .catch(() => {});
     return () => { active = false; };
-  }, []);
+  }, [humorEnabled]);
 
   // ── Contexto clima + hora ──────────────────────────────────────────────────
 
   useEffect(() => {
+    if (!humorEnabled) return;
     let active = true;
     const load = async () => {
       const ctx = await fetchCtx();
@@ -259,20 +284,23 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
     void load();
     const id = setInterval(() => { void load(); }, 10 * 60 * 1000);
     return () => { active = false; clearInterval(id); };
-  }, [baseFalas]);
+  }, [baseFalas, humorEnabled]);
 
   // ── Fetch de curiosidades ─────────────────────────────────────────────────
 
   const fetchCuriosidade = useCallback(async () => {
+    if (!humorEnabled) return;
+    curiosidadeFetch.current?.abort();
+    const controller = new AbortController(); curiosidadeFetch.current = controller;
     try {
-      const r = await fetch("/api/bibble/curiosidade");
+      const r = await fetch("/api/bibble/curiosidade", { signal: controller.signal });
       if (!r.ok) return;
       const data = await r.json() as { curiosidade?: string; topic?: string };
       if (!data.curiosidade?.trim()) return;
       const mood = CURIOSIDADE_MOODS[Math.floor(Math.random() * CURIOSIDADE_MOODS.length)];
-      pendingCuriosidade.current = { mood, fala: data.curiosidade.trim() };
+      if (!controller.signal.aborted) pendingCuriosidade.current = { mood, fala: data.curiosidade.trim() };
     } catch { /* silencioso */ }
-  }, []);
+  }, [humorEnabled]);
 
   useEffect(() => {
     let loopId: ReturnType<typeof setInterval>;
@@ -287,15 +315,18 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
   // ── Fetch de piadas ────────────────────────────────────────────────────────
 
   const fetchPiada = useCallback(async () => {
+    if (!humorEnabled) return;
+    piadaFetch.current?.abort();
+    const controller = new AbortController(); piadaFetch.current = controller;
     try {
-      const r = await fetch("/api/bibble/piada");
+      const r = await fetch("/api/bibble/piada", { signal: controller.signal });
       if (!r.ok) return;
       const data = await r.json() as { piada?: string };
       if (!data.piada?.trim()) return;
       const mood = PIADA_MOODS[Math.floor(Math.random() * PIADA_MOODS.length)];
-      pendingPiada.current = { mood, fala: data.piada.trim() };
+      if (!controller.signal.aborted) pendingPiada.current = { mood, fala: data.piada.trim() };
     } catch { /* silencioso */ }
-  }, []);
+  }, [humorEnabled]);
 
   useEffect(() => {
     let loopId: ReturnType<typeof setInterval>;
@@ -314,6 +345,7 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
   // O interval roda SEMPRE — inclusive durante streaming — para manter o sprite ativo
 
   useEffect(() => {
+    if (reduceMotion) return;
     const id = setInterval(() => {
       // blink
       setBlink(true);
@@ -363,16 +395,18 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
       clearInterval(id);
       if (blinkTimeout.current) clearTimeout(blinkTimeout.current);
     };
-  }, [allFalas.length]);
+  }, [allFalas.length, reduceMotion]);
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const streamingFala = STREAMING_FALAS[streamingFalaIndex % STREAMING_FALAS.length];
-  const isCuriosidade = !isStreaming && curiosidade !== null;
-  const isPiada       = !isStreaming && !isCuriosidade && piada !== null;
+  const streamingCorpus = humorEnabled ? STREAMING_FALAS : OPERATIONAL_STREAMING_FALAS;
+  const visibleFalas = humorEnabled ? allFalas : OPERATIONAL_FALAS;
+  const streamingFala = streamingCorpus[streamingFalaIndex % streamingCorpus.length];
+  const isCuriosidade = humorEnabled && !isStreaming && curiosidade !== null;
+  const isPiada       = humorEnabled && !isStreaming && !isCuriosidade && piada !== null;
   const current       = isStreaming
     ? streamingFala
-    : (isCuriosidade ? curiosidade : (isPiada ? piada : (allFalas[index] ?? FALLBACK_FALAS[0])));
+    : (isCuriosidade ? curiosidade : (isPiada ? piada : (visibleFalas[index % visibleFalas.length] ?? OPERATIONAL_FALAS[0])));
   const sprite        = spriteFor(current.mood);
   const bubbleText    = current.fala;
   const bubbleKey     = isStreaming
@@ -391,7 +425,7 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
         <div style={{ width: 72, height: 72, flexShrink: 0 }}>
           <motion.div
             style={{ width: 72, height: 72 }}
-            animate={blink ? { scale: [1, 0.85, 1] } : { y: [0, -5, 0] }}
+            animate={reduceMotion ? undefined : blink ? { scale: [1, 0.85, 1] } : { y: [0, -5, 0] }}
             transition={
               blink
                 ? { duration: 0.22, ease: "easeInOut" }
@@ -421,10 +455,10 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
           <AnimatePresence mode="wait">
             <motion.div
               key={bubbleKey}
-              initial={{ opacity: 0, scale: 0.92, y: 4 }}
+              initial={reduceMotion ? false : { opacity: 0, scale: 0.92, y: 4 }}
               animate={{ opacity: 1, scale: 1,    y: 0 }}
-              exit={{    opacity: 0, scale: 0.92, y: 4 }}
-              transition={{ duration: 0.25, ease: "easeOut" }}
+              exit={reduceMotion ? undefined : { opacity: 0, scale: 0.92, y: 4 }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.25, ease: "easeOut" }}
               className="rounded-2xl px-3 py-2 relative"
               style={{
                 background: isCuriosidade || isPiada
@@ -484,8 +518,8 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
                       <motion.span
                         key={i}
                         style={{ width: 3, height: 3, borderRadius: "50%", background: "#6366f1", display: "inline-block" }}
-                        animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1.2, 0.8] }}
-                        transition={{ duration: 1.0, repeat: Infinity, delay: i * 0.2, ease: "easeInOut" }}
+                        animate={reduceMotion ? undefined : { opacity: [0.2, 1, 0.2], scale: [0.8, 1.2, 0.8] }}
+                        transition={reduceMotion ? { duration: 0 } : { duration: 1.0, repeat: Infinity, delay: i * 0.2, ease: "easeInOut" }}
                       />
                     ))}
                   </span>

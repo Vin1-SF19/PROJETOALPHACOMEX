@@ -77,3 +77,5 @@ next-env.d.ts
 
 # Registro local de MCP servers (contém tokens/credenciais em claro)
 /.mcp.json
+.bibble/cloud-providers.json
+.bibble/*-cache.json

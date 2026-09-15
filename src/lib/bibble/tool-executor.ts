@@ -10,6 +10,8 @@ import {
   encontrarManualModulo,
   podeConsultarManualModulo,
 } from "@/lib/shared/module-knowledge";
+import { BIBBLE_TOOLS } from "@/lib/bibble/tools";
+import { BIBBLE_FS_TOOLS, BIBBLE_MUTATING_TOOLS, authorizedTools, filesystemEnabled, resolveBibbleFsPath, validateFilesystemMutation } from "@/lib/bibble/tool-policy";
 
 export interface UserCtx {
   userId: number;
@@ -36,7 +38,7 @@ function negado(modulo: string): string {
   return `Você não tem permissão para acessar o módulo "${modulo}". Fale com um administrador para solicitar acesso.`;
 }
 
-export async function executarTool(
+async function executarToolUnsafe(
   nome: string,
   params: Record<string, unknown>,
   ctx: UserCtx
@@ -878,5 +880,40 @@ export async function executarTool(
 
     default:
       return `Tool desconhecida: ${nome}`;
+  }
+}
+
+const TOOL_NAMES = new Set([...BIBBLE_TOOLS.map(tool => tool.function.name), ...BIBBLE_FS_TOOLS]);
+const TOOL_RESULT_MAX_CHARS = Math.max(4_096, Number(process.env.BIBBLE_TOOL_RESULT_MAX_CHARS) || 100_000);
+
+/** Fronteira comum de todas as tools: identidade, registry, timeout, sandbox e resultado limitado. */
+export async function executarTool(nome: string, params: Record<string, unknown>, ctx: UserCtx, options: { signal?: AbortSignal; requestId?: string; deadlineAt?: number } = {}): Promise<string> {
+  if (!Number.isInteger(ctx.userId) || ctx.userId <= 0 || !TOOL_NAMES.has(nome)) {
+    return JSON.stringify({ ok: false, erro: "Ferramenta indisponível." });
+  }
+  const safeParams = { ...params };
+  try {
+    if (BIBBLE_MUTATING_TOOLS.has(nome)) return JSON.stringify({ ok: false, erro: "Ferramenta mutável indisponível até existir confirmação humana emitida pelo servidor." });
+    const permitted = authorizedTools(BIBBLE_TOOLS, ctx, false).some(tool => tool.function.name === nome);
+    if (!permitted) return JSON.stringify({ ok: false, erro: "Ferramenta indisponível para este usuário." });
+    if (options.signal?.aborted) return JSON.stringify({ ok: false, erro: "Operação cancelada antes da execução.", requestId: options.requestId });
+    if (BIBBLE_MUTATING_TOOLS.has(nome) && options.deadlineAt && options.deadlineAt - Date.now() < 20_000) return JSON.stringify({ ok: false, erro: "Operação mutável bloqueada: prazo seguro insuficiente.", requestId: options.requestId });
+    console.info('[BIBBLE_TOOL]', { requestId: options.requestId, tool: nome, mutating: BIBBLE_MUTATING_TOOLS.has(nome) });
+    if (BIBBLE_FS_TOOLS.has(nome)) {
+      if (!filesystemEnabled(ctx)) return JSON.stringify({ ok: false, erro: "Acesso a arquivos desabilitado até existir aprovação humana segura." });
+      validateFilesystemMutation(nome, safeParams);
+      if ('caminho' in safeParams) safeParams.caminho = await resolveBibbleFsPath(safeParams.caminho, { existing: !['criar_pasta', 'criar_arquivo'].includes(nome) });
+      if ('origem' in safeParams) safeParams.origem = await resolveBibbleFsPath(safeParams.origem, { existing: true });
+      if ('destino' in safeParams) safeParams.destino = await resolveBibbleFsPath(safeParams.destino, { existing: false });
+    }
+    // Não simulamos cancelamento com Promise.race: isso permitiria que uma
+    // mutação continuasse após o timeout. O deadline é checado antes de iniciar
+    // e o AbortSignal é propagado pelos chamadores capazes de cancelar I/O.
+    const result = await executarToolUnsafe(nome, safeParams, ctx);
+    return result.length > TOOL_RESULT_MAX_CHARS
+      ? `${result.slice(0, TOOL_RESULT_MAX_CHARS)}\n[resultado reduzido por limite seguro]`
+      : result;
+  } catch (error) {
+    return JSON.stringify({ ok: false, erro: error instanceof Error ? error.message : "Falha ao validar ferramenta." });
   }
 }

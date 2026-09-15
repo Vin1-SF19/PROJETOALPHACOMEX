@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../../auth";
 import db from "@/lib/prisma";
+import { z } from "zod";
+import { readRequestTextWithLimit } from "@/lib/bibble/attachment-security";
 
 export const dynamic = "force-dynamic";
+const projectPatchSchema = z.object({
+  title: z.string().trim().min(1).max(160).optional(),
+  systemPrompt: z.string().trim().max(30_000).nullable().optional(),
+}).strict().refine(value => value.title !== undefined || value.systemPrompt !== undefined);
+
+function sameOrigin(req: NextRequest) {
+  const origin = req.headers.get("origin");
+  return !origin || origin === new URL(req.url).origin;
+}
 
 export async function PATCH(
   req: NextRequest,
@@ -10,6 +21,7 @@ export async function PATCH(
 ) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!sameOrigin(req)) return NextResponse.json({ error: "Origem não permitida" }, { status: 403 });
 
   const userId = Number(session.user.id);
   const { id } = await params;
@@ -19,7 +31,10 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const body = (await req.json()) as { title?: string; systemPrompt?: string | null };
+  const raw = await readRequestTextWithLimit(req, 32_768).catch(() => null);
+  const parsed = raw === null ? null : projectPatchSchema.safeParse((() => { try { return JSON.parse(raw); } catch { return null; } })());
+  if (!parsed?.success) return NextResponse.json({ error: "Projeto inválido" }, { status: raw === null ? 413 : 400 });
+  const body = parsed.data;
 
   const updated = await db.bibbleProject.update({
     where: { id },

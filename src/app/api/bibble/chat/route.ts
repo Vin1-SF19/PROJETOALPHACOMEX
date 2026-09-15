@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import { auth } from "../../../../../auth";
 import { modelSupportsVision, getModelLabel, BIBBLE_MODEL } from "@/lib/bibble/client";
-import { BIBBLE_SYSTEM_PROMPT } from "@/lib/bibble/system-prompt";
 import { BIBBLE_TOOLS, type OllamaTool } from "@/lib/bibble/tools";
 import { executarTool, type UserCtx } from "@/lib/bibble/tool-executor";
 import {
@@ -29,13 +28,27 @@ import {
 import { resultadoToolAlterouCalendario } from "@/lib/google-calendar/invalidation";
 import db from "@/lib/prisma";
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
-import { isAdminRole } from "@/lib/roles";
 import {
   bibbleChatInputSchema,
   fetchTrustedBibbleBlob,
+  isBibbleBlobOwnedByUser,
   readRequestTextWithLimit,
   type BibbleChatInput,
 } from "@/lib/bibble/attachment-security";
+import { acquireBibbleLease, type AdmissionLease } from "@/lib/bibble/admission-control";
+import { buildBibbleSystemPrompt } from "@/lib/bibble/persona";
+import { validateBibbleModuleContext } from "@/lib/bibble/module-context";
+import { authorizedTools, routeToolsByIntent } from "@/lib/bibble/tool-policy";
+import { BIBBLE_REQUEST_DEADLINE_MS } from "@/lib/bibble/runtime-config";
+import { createBibbleMetrics, safeBibbleLog, type BibbleMetrics } from "@/lib/bibble/telemetry";
+import { randomUUID } from "crypto";
+import {
+  buildAdaptiveStylePrompt,
+  classifyBehavioralStyle,
+  normalizeAdaptivePreferences,
+} from "@/lib/bibble/adaptive-style";
+import { loadBehavioralHistory } from "@/lib/bibble/behavioral-memory";
+import type { AdaptiveTonePreferences, BehavioralProfile, BehavioralSample } from "@/lib/bibble/adaptive-style";
 
 // ─── File content extraction ──────────────────────────────────────────────────
 
@@ -72,6 +85,7 @@ type ExtractionMetric = {
 async function extractFilesContent(
   files: FileInput[],
   contentTokenBudget: number,
+  signal?: AbortSignal,
 ): Promise<{ text: string; metrics: ExtractionMetric[]; estimatedTokens: number }> {
   if (!files.length) return { text: "", metrics: [], estimatedTokens: 0 };
 
@@ -113,6 +127,7 @@ async function extractFilesContent(
   };
 
   for (const file of files) {
+    if (signal?.aborted) throw signal.reason;
     const isImage = file.type.startsWith("image/");
     const isVideo = file.type.startsWith("video/");
 
@@ -157,7 +172,7 @@ async function extractFilesContent(
     if (isText) {
       try {
         const res = await fetchTrustedBibbleBlob(file.url, {
-          signal: AbortSignal.timeout(12000),
+          signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(12000)]) : AbortSignal.timeout(12000),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const raw = await res.text();
@@ -171,7 +186,9 @@ async function extractFilesContent(
 
     // Documentos: usa Tika (PDF, DOCX, XLSX, PPTX, etc.)
     try {
+      if (signal?.aborted) throw signal.reason;
       const { text, source } = await extractTextFromUrl(file.url, file.type, file.name, 20000);
+      if (signal?.aborted) throw signal.reason;
       if (text) {
         appendExtractedText(`#### 📄 ${file.name} [via ${source}]`, text, source, fileBudget);
       } else {
@@ -216,9 +233,10 @@ type FileInput = {
  * Coleta as imagens dos anexos como data URLs base64 (formato de visão OpenAI-compat).
  * Prioriza o base64 já enviado pelo cliente; senão baixa da URL do Blob e converte.
  */
-async function coletarImagensBase64(files: FileInput[]): Promise<string[]> {
+async function coletarImagensBase64(files: FileInput[], signal?: AbortSignal): Promise<string[]> {
   const imagens: string[] = [];
   for (const file of files) {
+    if (signal?.aborted) throw signal.reason;
     if (!file.type.startsWith("image/")) continue;
     try {
       if (file.base64?.trim()) {
@@ -226,7 +244,7 @@ async function coletarImagensBase64(files: FileInput[]): Promise<string[]> {
         imagens.push(url);
       } else if (file.url) {
         const res = await fetchTrustedBibbleBlob(file.url, {
-          signal: AbortSignal.timeout(15000),
+          signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const buf = Buffer.from(await res.arrayBuffer());
@@ -259,7 +277,7 @@ type SSEEvent =
 
 // ─── Core streaming runner ────────────────────────────────────────────────────
 
-async function runStream(
+export async function runStream(
   controller: ReadableStreamDefaultController,
   enc: TextEncoder,
   baseMessages: ChatMessage[],
@@ -270,11 +288,16 @@ async function runStream(
   temperature?: number,
   contextWindow?: number,
   maxOutputTokens?: number,
+  metrics?: BibbleMetrics,
+  lease?: AdmissionLease,
+  deadlineTimer?: ReturnType<typeof setTimeout>,
+  deadlineAt?: number,
 ): Promise<void> {
   const send = (event: SSEEvent) => {
     try { controller.enqueue(encodeSSE(event, enc)); } catch { /* stream closed */ }
   };
-  const inicioRequisicao = Date.now();
+  const authorizedToolNames = new Set(tools.map(tool => tool.function.name));
+  const effectiveDeadlineAt = deadlineAt ?? Date.now() + BIBBLE_REQUEST_DEADLINE_MS;
   // Margem de segurança antes do maxDuration da rota (120s): uma continuação
   // extra só é pedida se sobrar tempo suficiente para completá-la, senão o
   // Next.js aborta a requisição no meio de uma geração já paga em GPU-time.
@@ -292,77 +315,38 @@ async function runStream(
     let cancelamentoCalendarioExecutado = false;
     let chamadoAbertoComSucesso = false;
 
-    if (
-      userCtx.confirmouCancelamentoCalendario &&
-      userCtx.cancelamentoPendente
-    ) {
-      send({ type: "status", state: "pesquisando" });
-      const alvo = userCtx.cancelamentoPendente;
-      console.info("[BIBBLE CALENDAR] Executando cancelamento confirmado", {
-        userId: userCtx.userId,
-        googleEventId: alvo.googleEventId,
-      });
-      const resultado = await executarTool(
-        "cancelar_evento_calendario",
-        {
-          google_event_id: alvo.googleEventId,
-          etag: alvo.etag,
-          calendario_nome: alvo.calendarioNome,
-          confirmado: true,
-        },
-        userCtx,
-      );
-
-      if (resultadoCancelamentoConcluido("cancelar_evento_calendario", resultado)) {
-        console.info("[BIBBLE CALENDAR] Cancelamento confirmado pelo Google", {
-          userId: userCtx.userId,
-          googleEventId: alvo.googleEventId,
-        });
-        send({ type: "calendar_changed" });
-        send({
-          type: "text",
-          text: `O evento **"${alvo.titulo}"** foi cancelado e removido do seu calendário.`,
-        });
-      } else {
-        console.warn("[BIBBLE CALENDAR] Cancelamento não confirmado", {
-          userId: userCtx.userId,
-          googleEventId: alvo.googleEventId,
-        });
-        let mensagemErro = "Não consegui confirmar a exclusão do evento no Google Agenda.";
-        try {
-          const dados = JSON.parse(resultado) as { erro?: unknown };
-          if (typeof dados.erro === "string") mensagemErro = dados.erro;
-        } catch {
-          if (resultado.trim()) mensagemErro = resultado;
-        }
-        send({ type: "text", text: mensagemErro });
-      }
-      send({ type: "done", successful: true });
-      return;
-    }
-
     for (let turn = 0; turn <= MAX_TOOL_TURNS; turn++) {
       if (tools.length > 0) {
-        const data = await callCompletion(
+        if (Date.now() >= effectiveDeadlineAt - 5_000) throw new Error("deadline");
+        if (metrics) metrics.providerCalls += 1;
+        const decisionResponse = await callCompletion(
           msgs,
           tools,
           model,
           providerCtrl.signal,
-          false,
+          true,
           temperature,
           contextWindow,
           maxOutputTokens,
+          metrics?.requestId,
         );
-        const choice = data.choices[0];
-        if (!choice) throw new Error("Resposta vazia do provedor");
-
-        const toolCalls = choice.message.tool_calls;
-        if (choice.finish_reason === "tool_calls" && toolCalls?.length) {
+        let decisionText = "";
+        const decision = await consumeCompletionStream(decisionResponse, delta => {
+          decisionText += delta;
+        });
+        if (decision.usage?.completion_tokens !== undefined && metrics) {
+          metrics.outputTokens = (metrics.outputTokens ?? 0) + decision.usage.completion_tokens;
+          metrics.inputTokens = decision.usage.prompt_tokens;
+          metrics.tokenCount = "exact";
+        }
+        const toolCalls = decision.toolCalls;
+        if (decision.finishReason === "tool_calls" && toolCalls.length) {
         send({ type: "status", state: "pesquisando" });
+        if (metrics) metrics.toolCycles += 1;
 
         msgs.push({
           role: "assistant",
-          content: choice.message.content ?? "",
+          content: decisionText,
           tool_calls: toolCalls,
         });
 
@@ -378,7 +362,11 @@ async function runStream(
           }
           totalToolCalls += 1;
           let result: string;
-          if (
+          const toolStarted = Date.now();
+          if (!authorizedToolNames.has(tc.function.name)) {
+            console.warn('[BIBBLE_TOOL_REJECTED]', { requestId: metrics?.requestId, reason: 'outside-turn-capabilities' });
+            result = JSON.stringify({ ok: false, erro: 'Ferramenta não autorizada neste turno.' });
+          } else if (
             indice >= MAX_TOOL_CALLS_POR_TURNO ||
             totalToolCalls > MAX_TOOL_CALLS_POR_REQUISICAO
           ) {
@@ -401,11 +389,12 @@ async function runStream(
               });
             } else {
               mutacoesExecutadas.add(assinatura);
-              result = await executarTool(tc.function.name, args, userCtx);
+              result = await executarTool(tc.function.name, args, userCtx, { signal: providerCtrl.signal, requestId: metrics?.requestId, deadlineAt: effectiveDeadlineAt });
             }
           } else {
-            result = await executarTool(tc.function.name, args, userCtx);
+            result = await executarTool(tc.function.name, args, userCtx, { signal: providerCtrl.signal, requestId: metrics?.requestId, deadlineAt: effectiveDeadlineAt });
           }
+          metrics?.tools.push({ name: tc.function.name, durationMs: Date.now() - toolStarted, ok: !/erro|falha/i.test(result) });
 
           if (
             !alteracaoCalendarioNotificada &&
@@ -427,6 +416,15 @@ async function runStream(
         msgs.push(...results);
         send({ type: "status", state: "thinking" });
           continue;
+        }
+        // A resposta da chamada de decisão já é final quando não há tool call.
+        // Reutilizá-la evita a antiga segunda geração descartável.
+        if (decisionText.trim()) {
+          if (metrics && metrics.ttftMs === undefined) metrics.ttftMs = Date.now() - metrics.startedAt;
+          send({ type: "text", text: decisionText });
+          if (metrics) metrics.finishReason = decision.finishReason;
+          send({ type: "done", finishReason: decision.finishReason, successful: true });
+          return;
         }
       }
 
@@ -451,6 +449,8 @@ async function runStream(
       let continuacoesUsadas = 0;
 
       for (;;) {
+        if (Date.now() >= effectiveDeadlineAt - 5_000) throw new Error("deadline");
+        if (metrics) metrics.providerCalls += 1;
         const streamRes = await callCompletion(
           msgs,
           [],
@@ -460,9 +460,11 @@ async function runStream(
           temperature,
           contextWindow,
           maxOutputTokens,
+          metrics?.requestId,
         );
 
         const streamResult = await consumeCompletionStream(streamRes, (delta) => {
+          if (!bufferizarResposta && metrics && metrics.ttftMs === undefined) metrics.ttftMs = Date.now() - metrics.startedAt;
           respostaAcumulada += delta;
           if (bufferizarResposta) {
             respostaFinalProtegida += delta;
@@ -471,9 +473,14 @@ async function runStream(
           }
         });
         finishReason = streamResult.finishReason;
+        if (streamResult.usage?.completion_tokens !== undefined && metrics) {
+          metrics.outputTokens = (metrics.outputTokens ?? 0) + streamResult.usage.completion_tokens;
+          metrics.inputTokens = streamResult.usage.prompt_tokens;
+          metrics.tokenCount = "exact";
+        }
 
         const cortadoPorLimite = isOutputTruncated(finishReason);
-        const tempoEsgotando = Date.now() - inicioRequisicao >= TEMPO_LIMITE_CONTINUACAO_MS;
+        const tempoEsgotando = Date.now() >= effectiveDeadlineAt - Math.max(5_000, BIBBLE_REQUEST_DEADLINE_MS - TEMPO_LIMITE_CONTINUACAO_MS);
         if (
           !cortadoPorLimite
           || bufferizarResposta
@@ -514,6 +521,7 @@ async function runStream(
             chamadoAbertoComSucesso,
           );
         }
+        if (metrics && metrics.ttftMs === undefined) metrics.ttftMs = Date.now() - metrics.startedAt;
         send({ type: "text", text: respostaSegura });
       }
 
@@ -529,6 +537,7 @@ async function runStream(
       }
 
       const truncated = isOutputTruncated(finishReason);
+      if (metrics) { metrics.finishReason = finishReason; metrics.truncated = truncated; }
       if (truncated) {
         send({
           type: "error",
@@ -550,84 +559,124 @@ async function runStream(
 
     send({ type: "error", message: "A solicitação excedeu o limite seguro de etapas com ferramentas." });
     send({ type: "done", finishReason: "tool_turn_limit", truncated: true, successful: false });
-  } catch {
+  } catch (error) {
     if (providerCtrl.signal.aborted) {
       try { send({ type: "done", successful: false }); } catch { /* ignore */ }
       return;
     }
-    console.error("[BIBBLE CHAT] failed", { stage: "stream" });
+    if (metrics) metrics.errorCategory = error instanceof Error && error.message === "deadline" ? "deadline" : "stream";
+    console.error("[BIBBLE CHAT] failed", { stage: metrics?.errorCategory ?? "stream", requestId: metrics?.requestId, deadlineAt: effectiveDeadlineAt });
     try {
-      send({ type: "error", message: "Tive um problema aqui. Tenta de novo!!." });
+      send({ type: "error", message: "Não consegui concluir esta resposta. Seu texto e anexos foram preservados; tente novamente." });
       send({ type: "done", successful: false });
     } catch { /* ignore */ }
   } finally {
+    if (deadlineTimer) clearTimeout(deadlineTimer);
+    lease?.release();
+    if (metrics) safeBibbleLog(metrics);
     try { controller.close(); } catch { /* already closed */ }
   }
 }
 
 // ─── Route handler ────────────────────────────────────────────────────────────
 
-export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
-  }
+type AdaptiveStyleDependencies = {
+  loadHistory: (userId: number) => Promise<BehavioralSample[]>;
+  classify: (history: BehavioralSample[], currentMessage: string) => BehavioralProfile;
+};
 
-  let rawInput: string;
+export async function deriveAdaptiveStyleForTurn(
+  userId: number,
+  message: string,
+  inputPreferences: AdaptiveTonePreferences | undefined,
+  dependencies: AdaptiveStyleDependencies = {
+    loadHistory: loadBehavioralHistory,
+    classify: classifyBehavioralStyle,
+  },
+): Promise<{
+  adaptiveStyle: string | null;
+  telemetry: { ms: number; sampleCount: number; applied: boolean };
+}> {
+  const startedAt = Date.now();
+  const preferences = normalizeAdaptivePreferences(inputPreferences);
   try {
-    rawInput = await readRequestTextWithLimit(req);
+    const history = await dependencies.loadHistory(userId);
+    const profile = dependencies.classify(history, message);
+    return {
+      adaptiveStyle: buildAdaptiveStylePrompt(profile, preferences, message),
+      telemetry: {
+        ms: Date.now() - startedAt,
+        sampleCount: profile.sampleSize,
+        applied: preferences.adaptiveTone,
+      },
+    };
   } catch {
-    return new Response(JSON.stringify({ error: "Payload do chat excede o limite permitido" }), {
-      status: 413,
-      headers: { "Content-Type": "application/json" },
-    });
+    return {
+      adaptiveStyle: null,
+      telemetry: { ms: Date.now() - startedAt, sampleCount: 0, applied: false },
+    };
   }
-  const parsedInput = bibbleChatInputSchema.safeParse(
-    (() => {
-      try { return JSON.parse(rawInput) as unknown; } catch { return null; }
-    })(),
-  );
-  if (!parsedInput.success) {
-    return new Response(JSON.stringify({ error: "Entrada de chat inválida" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+}
+
+export async function POST(req: NextRequest) {
+  const requestStartedAt = Date.now();
+  const requestId = randomUUID();
+  const deadlineAt = requestStartedAt + BIBBLE_REQUEST_DEADLINE_MS;
+  const providerCtrl = new AbortController();
+  const deadlineTimer = setTimeout(() => providerCtrl.abort(new Error('deadline')), Math.max(1, deadlineAt - Date.now()));
+  const onRequestAbort = () => providerCtrl.abort(req.signal.reason);
+  req.signal.addEventListener('abort', onRequestAbort, { once: true });
+  const rejectBeforeLease = (response: Response) => {
+    clearTimeout(deadlineTimer);
+    req.signal.removeEventListener('abort', onRequestAbort);
+    return response;
+  };
+  const session = await auth();
+  if (providerCtrl.signal.aborted) return rejectBeforeLease(new Response(JSON.stringify({ error: "Prazo da solicitação excedido" }), { status: 504 }));
+  if (!session?.user?.id) {
+    return rejectBeforeLease(new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 }));
   }
 
-  const input: BibbleChatInput = parsedInput.data;
   const userId = Number(session.user.id);
   const userTyped = session.user as {
     nome?: string;
     name?: string;
   };
-  const [usuarioAtual, userPermissoes] = await Promise.all([
-    db.usuarios.findUnique({
+  const usuarioAtual = await db.usuarios.findUnique({
       where: { id: userId },
       select: { nome: true, role: true, status: true },
-    }),
-    getPermissoesEfetivas(userId),
-  ]);
-  if (!usuarioAtual || usuarioAtual.status !== "ATIVO") {
-    return new Response(JSON.stringify({ error: "Usuário inativo ou não encontrado" }), {
-      status: 403,
     });
+  if (!usuarioAtual || usuarioAtual.status !== "ATIVO") {
+    return rejectBeforeLease(new Response(JSON.stringify({ error: "Usuário inativo ou não encontrado" }), {
+      status: 403,
+    }));
   }
+  const lease = acquireBibbleLease(String(userId));
+  if (!lease) return rejectBeforeLease(new Response(JSON.stringify({ error: "Bibble está processando outra solicitação sua. Tente novamente em instantes.", retryable: true }), { status: 429, headers: { "Content-Type": "application/json", "Retry-After": "10" } }));
+  const rejectEarly = (response: Response) => { lease.release(); clearTimeout(deadlineTimer); return response; };
+  let rawInput: string;
+  try { rawInput = await readRequestTextWithLimit(req); }
+  catch { return rejectEarly(new Response(JSON.stringify({ error: "Payload do chat excede o limite permitido" }), { status: 413, headers: { "Content-Type": "application/json" } })); }
+  const parsedInput = bibbleChatInputSchema.safeParse((() => { try { return JSON.parse(rawInput) as unknown; } catch { return null; } })());
+  if (!parsedInput.success) return rejectEarly(new Response(JSON.stringify({ error: "Entrada de chat inválida" }), { status: 400, headers: { "Content-Type": "application/json" } }));
+  const input: BibbleChatInput = parsedInput.data;
+  const userPermissoes = await getPermissoesEfetivas(userId);
   const userName = usuarioAtual.nome || userTyped.nome || userTyped.name || "Usuário";
   const userRole = usuarioAtual.role;
 
   const userCtx: UserCtx = { userId, userName, role: userRole, permissoes: userPermissoes };
 
-  const { message = "", history = [], context, model: modelOverride, sessionId, files, temperature, computerAccess, globalSystemPrompt, contextWindow } = input;
-  const inputFiles = files ?? [];
+  const { message = "", history = [], context, sessionId, files, temperature, computerAccess, globalSystemPrompt, contextWindow } = input;
+  const submittedFiles = files ?? [];
+  if (submittedFiles.some(file => !file.url || !isBibbleBlobOwnedByUser(file.url, userId))) {
+    return rejectEarly(new Response(JSON.stringify({ error: "Anexo sem ownership verificável" }), { status: 403 }));
+  }
+  const inputFiles = submittedFiles.map(file => ({ ...file, extractedContent: undefined }));
   const hasAttachments = inputFiles.length > 0;
   // Exige evidência real de conteúdo (URL do Blob validada ou texto já
   // extraído) — sem isso, qualquer usuário conseguiria declarar type/name de
   // PDF sem anexar nada real só para forçar a janela de contexto/output
   // ampliada (mais cara em GPU) no servidor Ollama compartilhado.
-  const hasPdf = inputFiles.some(file =>
-    (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"))
-    && (Boolean(file.url) || Boolean(file.extractedContent?.trim())),
-  );
   const ultimaMensagemBibble = history.at(-1);
   const bibblePediuConfirmacaoDeCancelamento =
     ultimaMensagemBibble?.role === "bibble" &&
@@ -661,11 +710,11 @@ export async function POST(req: NextRequest) {
 
   // Validação: mensagem ou arquivos
   if (!message?.trim() && (!files || files.length === 0)) {
-    return new Response(JSON.stringify({ error: "Mensagem vazia" }), { status: 400 });
+    return rejectEarly(new Response(JSON.stringify({ error: "Mensagem vazia" }), { status: 400 }));
   }
 
-  // ── Resolve system prompt (project override if session is in a project) ──
-  let systemPrompt = BIBBLE_SYSTEM_PROMPT;
+  // Instruções de projeto complementam o núcleo imutável; nunca o substituem.
+  let projectInstructions: string | null = null;
 
   if (sessionId) {
     const bibbleSession = await db.bibbleSession.findUnique({
@@ -673,21 +722,24 @@ export async function POST(req: NextRequest) {
       include: { project: { select: { systemPrompt: true } } },
     });
     if (bibbleSession?.project?.systemPrompt?.trim()) {
-      systemPrompt = bibbleSession.project.systemPrompt.trim();
+      projectInstructions = bibbleSession.project.systemPrompt.trim();
     }
   }
 
-  const activeModel = modelOverride?.trim() || BIBBLE_MODEL;
+  const activeModel = BIBBLE_MODEL;
+
+  // Perfil comportamental é derivado localmente de uma amostra autorizada e
+  // limitada. Falhas degradam para a persona padrão e jamais repetem provider.
+  const adaptiveResult = await deriveAdaptiveStyleForTurn(
+    userId,
+    message,
+    input.adaptivePreferences,
+  );
+  const adaptiveStyle = adaptiveResult.adaptiveStyle;
 
   // ── Preparar mensagem e anexos ──
   let userContent = message.trim();
   let imagensBase64: string[] = [];
-
-  // Injeta contexto do usuário no system prompt para o LLM saber as permissões upfront
-  const isAdmin = isAdminRole(userRole);
-  const permissoesCtx = isAdmin
-    ? `\n\n## CONTEXTO DO USUÁRIO\nUsuário: ${userName} | Role: ${userRole} | Acesso: TOTAL (admin)`
-    : `\n\n## CONTEXTO DO USUÁRIO\nUsuário: ${userName} | Role: ${userRole}\nMódulos com acesso: ${userPermissoes.length > 0 ? userPermissoes.join(", ") : "nenhum"}\n\nIMPORTANTE: Se o usuário pedir algo de um módulo que não está na lista acima, informe que ele não tem acesso e sugira contatar um administrador. NÃO tente executar a ação.`;
 
   const agoraSaoPaulo = new Intl.DateTimeFormat("pt-BR", {
     timeZone: "America/Sao_Paulo",
@@ -699,39 +751,14 @@ export async function POST(req: NextRequest) {
     "Converta referências como hoje, amanhã e próxima semana em datas absolutas antes de chamar ferramentas. " +
     "Para horários, sempre envie ISO 8601 com offset -03:00; não invente data, duração ou participantes ausentes.";
 
-  let finalSystemPrompt = systemPrompt + permissoesCtx + contextoTemporal;
-
-  if (globalSystemPrompt?.trim()) {
-    finalSystemPrompt = finalSystemPrompt + "\n\n---\n\n## PERSONA CUSTOMIZADA (prioridade máxima)\n\n" + globalSystemPrompt.trim();
-  }
-
-  // Acesso ao computador: tools de sistema de arquivos só disponíveis quando habilitado
-  const FS_TOOLS = new Set(["ler_arquivo", "criar_pasta", "criar_arquivo", "escrever_arquivo", "apagar", "mover_arquivo", "copiar_arquivo"]);
-  const toolsToUse = computerAccess
-    ? [...BIBBLE_TOOLS]
-    : BIBBLE_TOOLS.filter(t => !FS_TOOLS.has(t.function.name));
-
-  if (computerAccess) {
-    const userHome = (process.env.USERPROFILE ?? process.env.HOME ?? "C:/Users/Usuario").replace(/\\/g, "/");
-    const desktopPath = userHome + "/Desktop";
-    finalSystemPrompt += `\n\n## ACESSO AO SISTEMA DE ARQUIVOS ATIVO
-O usuário habilitou o acesso completo ao sistema de arquivos. Você tem as seguintes ferramentas disponíveis:
-
-- \`ler_arquivo\` — lê um arquivo ou lista o conteúdo de uma pasta
-- \`criar_pasta\` — cria uma pasta (e subpastas necessárias)
-- \`criar_arquivo\` — cria um novo arquivo com conteúdo
-- \`escrever_arquivo\` — escreve ou sobrescreve um arquivo existente
-- \`apagar\` — apaga arquivo ou pasta (use recursivo: true para pastas com conteúdo)
-- \`mover_arquivo\` — move ou renomeia arquivo/pasta
-- \`copiar_arquivo\` — copia um arquivo para outro local
-
-Caminhos desta máquina:
-- Área de Trabalho: ${desktopPath}
-- Pasta do usuário: ${userHome}
-- Diretório do projeto: .
-
-REGRA ABSOLUTA: Quando o usuário pedir para criar, copiar, mover, apagar ou listar arquivos/pastas, USE as ferramentas acima imediatamente. NUNCA diga que não tem acesso ao sistema de arquivos quando este modo estiver ativo.`;
-  }
+  const validatedModule = validateBibbleModuleContext(context, userPermissoes, userRole);
+  const authorized = authorizedTools(BIBBLE_TOOLS, userCtx, computerAccess === true);
+  const toolsToUse = routeToolsByIntent(authorized, message);
+  const finalSystemPrompt = buildBibbleSystemPrompt({
+    tools: hasAttachments ? [] : toolsToUse, userName, role: userRole, permissions: userPermissoes,
+    moduleContext: validatedModule ? `${validatedModule.moduleKey} (${validatedModule.route})${validatedModule.entityId ? `; registro ${validatedModule.entityId}` : ''}` : undefined,
+    projectInstructions, stylePreference: globalSystemPrompt, adaptiveStyle,
+  }) + contextoTemporal;
 
   // Qualquer anexo segue fluxo isolado de uma única geração: nenhuma tool pode
   // misturar conteúdo não confiável do arquivo com ações no sistema.
@@ -741,7 +768,7 @@ REGRA ABSOLUTA: Quando o usuário pedir para criar, copiar, mover, apagar ou lis
   const temImagem = inputFiles.some(file => file.type.startsWith("image/"));
   if (temImagem) {
     if (modelSupportsVision(activeModel)) {
-      imagensBase64 = await coletarImagensBase64(inputFiles);
+      imagensBase64 = await coletarImagensBase64(inputFiles, providerCtrl.signal);
     } else {
       userContent =
         `⚠️ O modelo atual (**${getModelLabel(activeModel)}**) não consegue analisar imagens. ` +
@@ -750,13 +777,11 @@ REGRA ABSOLUTA: Quando o usuário pedir para criar, copiar, mover, apagar ou lis
     }
   }
 
-  const userPromptWithoutFiles = context?.urlAtual
-    ? `\n\n[Página atual: ${context.urlAtual}]\n\n${userContent || "Analise os arquivos anexados."}`
-    : (userContent || "Analise os arquivos anexados.");
+  const userPromptWithoutFiles = userContent || "Analise os arquivos anexados.";
   const requestBudget = calculateRequestBudget({
     model: activeModel,
     requestedContextWindow: contextWindow,
-    hasPdf,
+    hasPdf: hasAttachments,
     systemPrompt: finalSystemPrompt,
     userPrompt: userPromptWithoutFiles,
     tools: toolsForTurn,
@@ -765,15 +790,16 @@ REGRA ABSOLUTA: Quando o usuário pedir para criar, copiar, mover, apagar ou lis
 
   if (!requestBudget.fitsFixedInput) {
     console.warn("[BIBBLE BUDGET] insufficient", {
+      requestId,
       stage: "request-budget",
       effectiveContextWindow: requestBudget.effectiveContextWindow,
       inputTokenBudget: requestBudget.inputTokenBudget,
       fixedInputTokens: requestBudget.fixedInputTokens,
       outputTokenLimit: requestBudget.outputTokenLimit,
     });
-    return new Response(JSON.stringify({
+    return rejectEarly(new Response(JSON.stringify({
       error: "O prompt e as configurações atuais excedem a capacidade segura do modelo. Reduza o prompt personalizado ou escolha uma janela maior.",
-    }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }), { status: 400, headers: { "Content-Type": "application/json" } }));
   }
 
   const rawHistory: ChatMessage[] = (history ?? []).map(historyMessage => ({
@@ -791,18 +817,20 @@ REGRA ABSOLUTA: Quando o usuário pedir para criar, copiar, mover, apagar ou lis
     0,
     requestBudget.availableContentTokens - initialHistoryBudget,
   );
-  if (hasPdf && documentTokenBudget < 256) {
+  if (hasAttachments && documentTokenBudget < 256) {
     console.warn("[BIBBLE BUDGET] insufficient", {
+      requestId,
       stage: "document-budget",
       effectiveContextWindow: requestBudget.effectiveContextWindow,
       documentTokenBudget,
       outputTokenLimit: requestBudget.outputTokenLimit,
     });
-    return new Response(JSON.stringify({
+    return rejectEarly(new Response(JSON.stringify({
       error: "O PDF não cabe com segurança nesta requisição sem consumir a reserva da resposta. Reduza o prompt personalizado ou escolha uma janela maior.",
-    }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }), { status: 400, headers: { "Content-Type": "application/json" } }));
   }
-  const filesContext = await extractFilesContent(inputFiles, documentTokenBudget);
+  const filesContext = await extractFilesContent(inputFiles, documentTokenBudget, providerCtrl.signal);
+  if (providerCtrl.signal.aborted) return rejectEarly(new Response(JSON.stringify({ error: "Prazo da solicitação excedido" }), { status: 504 }));
   const historySelection = selectRecentHistory(
     rawHistory,
     Math.max(0, requestBudget.availableContentTokens - filesContext.estimatedTokens),
@@ -816,6 +844,7 @@ REGRA ABSOLUTA: Quando o usuário pedir para criar, copiar, mover, apagar ou lis
 
   for (const metric of filesContext.metrics) {
     console.info("[BIBBLE PDF] context", {
+      requestId,
       stage: "request-context",
       source: metric.source,
       extractedChars: metric.extractedChars,
@@ -827,6 +856,7 @@ REGRA ABSOLUTA: Quando o usuário pedir para criar, copiar, mover, apagar ou lis
     });
   }
   console.info("[BIBBLE BUDGET] request", {
+    requestId,
     stage: "request-budget",
     effectiveContextWindow: requestBudget.effectiveContextWindow,
     inputTokenBudget: requestBudget.inputTokenBudget,
@@ -857,7 +887,10 @@ REGRA ABSOLUTA: Quando o usuário pedir para criar, copiar, mover, apagar ou lis
   ];
 
   // ── Provider local (Ollama / OpenAI / Anthropic / Google) ───────────────────
-  const providerCtrl = new AbortController();
+  const metrics = createBibbleMetrics(userId, activeModel, { requestId, startedAt: requestStartedAt });
+  metrics.contextMs = Date.now() - requestStartedAt;
+  metrics.queueMs = lease.queueMs;
+  metrics.adaptiveStyle = adaptiveResult.telemetry;
   const enc = new TextEncoder();
 
   const stream = new ReadableStream({
@@ -873,13 +906,20 @@ REGRA ABSOLUTA: Quando o usuário pedir para criar, copiar, mover, apagar ou lis
         temperature,
         requestBudget.effectiveContextWindow,
         requestBudget.outputTokenLimit,
+        metrics,
+        lease,
+        deadlineTimer,
+        deadlineAt,
       ).catch(() => {
+        lease.release();
+        safeBibbleLog(metrics);
         console.error("[BIBBLE CHAT] fatal", { stage: "stream" });
         try { controller.close(); } catch { /* ignore */ }
       });
     },
     cancel() {
       providerCtrl.abort();
+      clearTimeout(deadlineTimer);
     },
   });
 
@@ -888,6 +928,8 @@ REGRA ABSOLUTA: Quando o usuário pedir para criar, copiar, mover, apagar ou lis
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
+      "X-Request-Id": metrics.requestId,
+      "Server-Timing": `queue;dur=${metrics.queueMs}`,
     },
   });
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../../auth";
 import { getAgent, updateAgent, deleteAgent, getImageGenToolId, OnyxError, type CreateAgentInput } from "@/lib/onyx/client";
-import { isAdminRole, userOwnsAgent, removeAgentOwner, recordAgentOwner } from "@/lib/onyx/ownership";
+import { isAdminRole, userCanUseAgent, userOwnsAgent, removeAgentOwner, recordAgentOwner } from "@/lib/onyx/ownership";
 import { getUserOnyxToken } from "@/lib/onyx/user-token";
 
 /** Remove a skill de geração de imagem dos tool_ids quando o usuário não é admin. */
@@ -45,13 +45,16 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const id = parseId((await params).id);
   if (id === null) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
 
+  const role = (session.user as { role?: string }).role ?? "";
+  if (!await userCanUseAgent(id, Number(session.user.id), role)) return NextResponse.json({ error: "Agente indisponível" }, { status: 403 });
   try {
     const userToken = await getUserOnyxToken(session.user.id);
+    if (!userToken) return NextResponse.json({ error: "Onyx requer credencial individual" }, { status: 403 });
     const agent = await getAgent(id, userToken);
     return NextResponse.json({ agent });
   } catch (err) {
     const status = err instanceof OnyxError ? err.status : 500;
-    return NextResponse.json({ error: (err as Error).message }, { status });
+    return NextResponse.json({ error: "Não foi possível carregar o agente Onyx" }, { status });
   }
 }
 

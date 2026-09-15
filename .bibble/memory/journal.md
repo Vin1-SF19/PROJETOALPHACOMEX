@@ -5421,3 +5421,75 @@ O solicitante precisava indicar opcionalmente um técnico e uma data desejada ao
 ### Refletido também em
 - `codebase-map.md`: mapa do domínio, arquivos, migrations e fluxo de entrega do feedback.
 - `integration-points.md`: contrato de atribuição, conclusão atômica, popup/Pusher/polling e regras para extensões. `decisions.md`, `architecture.md` e `components.md` não exigiram nova alteração nesta consolidação.
+
+## [2026-09-15 16:10] — IAlpha/Bibble transformado com geração única e fronteiras fail-closed
+
+**Tags:** #feature #refactor #nextjs #security #auth #critical
+**Agentes envolvidos:** Bibble/Codex, Scout, River/SM, Dex, Cortex, Muse, Forge, Probe, Anubis, Lens, Sage, Scribe e Kowalski
+**Arquivos tocados:** `src/app/api/bibble/`; `src/app/api/onyx/`; `src/components/BibbleChatHome/`; `src/lib/bibble/`; `src/lib/onyx/`; `scripts/bibble.mjs`; `tests/bibble/`; `docs/operations/bibble-observability.md`; `docs/qa/bibble/benchmark-2026-09-15.md`; `docs/stories/story-ialpha-bibble-transformacao-integral.md`; `.bibble/memory/{architecture,bibble-persona,codebase-map,decisions,integration-points,journal}.md`
+
+### Contexto
+O diagnóstico integral apontou geração duplicada, ausência de métricas operacionais, inconsistência de persona/contexto e fronteiras críticas em provider, filesystem, tools, anexos e Onyx. A correção precisava preservar o runtime local e os contratos de PDF, sem schema, migration ou mutação de banco.
+
+### O que foi feito
+- O runner passou a usar uma geração streaming no chat comum e somente abre novo ciclo após tool call real; requestId, deadline, TTFT, tokens/s, latência de tools e término ficaram observáveis, com doctor, capabilities e benchmarks reproduzíveis por CLI.
+- Endpoint/modelo/janela são definidos no servidor; o contexto efetivo foi limitado a 131.072 tokens, saída a 4.096 e estimativa conservadora, com compactação determinística e política comum para anexos textuais.
+- Persona, saudação, sugestões, humor opt-in e identidade Bibble/Onyx foram alinhados; contexto de módulo passa por registry/permissão e prompts de projeto/estilo não substituem guardrails.
+- Auth, admission control, Zod, limites de corpo, paginação e persistência transacional foram aplicados; tokens permanecem `null` sem contagem exata autoritativa.
+
+### Decisões tomadas
+- Contenção fail-closed: filesystem, tools mutáveis, upload público e anexos Onyx permanecem indisponíveis até existirem autorização humana verificável, storage privado com ownership e contratos próprios.
+- Provider é server-side e secrets são env-only: URL/modelo enviados pelo cliente e arquivo plaintext de chaves não são autoridades de runtime.
+- Segurança precede conveniência: Onyx exige PAT individual e ownership exato de agente/sessão/arquivo; reasoning remoto é descartado e tool fora do conjunto autorizado é recusada em profundidade.
+- Sem banco nesta entrega: métricas são efêmeras e rate limit é local à instância; memória persistente, observabilidade histórica e coordenação distribuída exigem stories futuras.
+
+### Problemas encontrados / resolvidos
+- Anubis encontrou confused deputy/IDOR no Onyx, bypass de tools, provider arbitrário, admission tardio, anexos públicos e confiança em tokens do cliente; os achados foram fechados até o veredito final PASS, sem CRITICAL, HIGH ou MEDIUM remanescente no escopo auditado.
+- Probe encontrou divergências entre UI e capacidades, correlação/TTFT, humor tardio e fallback incorreto do Onyx; os fluxos foram corrigidos e a interface passou a anunciar somente as 18 capabilities read-only autorizadas.
+- Evidência final dirigida: 16 arquivos e 118/118 testes Bibble aprovados, ESLint escopado, diff-check, build e CLIs aprovados; benchmark simples confirmou uma chamada por amostra e o fluxo com tool confirmou duas chamadas/um ciclo.
+
+### Pendências
+- Smoke visual autenticado com teclado, leitor de tela e reduced motion continua manual; persistência atômica não foi testada por indisponibilidade induzida em banco real.
+- Typecheck e suíte globais permanecem vermelhos por dívidas externas discriminadas pelo Forge; CodeRabbit não estava disponível. Não há falha conhecida atribuível ao escopo Bibble nos gates dirigidos.
+- Storage privado/ownership para anexos, tools mutáveis com confirmação server-side, rate limit distribuído e métricas históricas permanecem desabilitados ou fora de escopo até stories próprias; qualquer mudança estrutural de banco exige Vault, backup válido e confirmação explícita.
+
+### Refletido também em
+- `decisions.md`: fronteiras fail-closed, provider server-side, geração única e ausência deliberada de persistência nova.
+- `architecture.md`, `codebase-map.md` e `integration-points.md`: runner, segurança, contexto, observabilidade, persona, integração da aba e contratos Onyx atualizados.
+
+---
+
+## [2026-09-15 20:08] — Bibble ganhou tom adaptativo e memória comportamental sem novo perfil persistente
+
+**Tags:** #feature #refactor #nextjs #security #privacy
+**Agentes envolvidos:** Bibble/Codex, Scout, River/SM, Dex, Forge, Probe, Anubis, Lens, Sage, Scribe e Kowalski
+**Arquivos tocados:** `src/lib/bibble/{adaptive-style,behavioral-memory,persona,telemetry}.ts`; `src/app/api/bibble/chat/route.ts`; `src/components/BibbleChatHome/{BibbleChatLayout,BibbleSettingsPanel}.tsx`; `tests/bibble/{adaptive-integration,adaptive-settings.component,adaptive-style,behavioral-memory}.test.ts`; `docs/stories/story-ialpha-bibble-tom-adaptativo-memoria-comportamental.md`; `.bibble/memory/{architecture,bibble-persona,codebase-map,decisions,integration-points,journal}.md`
+
+### Contexto
+O usuário pediu que o Bibble ajustasse objetividade, informalidade, humor, firmeza e detalhe ao estilo de cada pessoa, mantendo a identidade de “debochado competente”. A solução precisava aprender apenas do histórico nativo autorizado, sem provider adicional, diagnóstico psicológico, mistura com Onyx ou mudança de schema.
+
+### O que foi feito
+- Criado classificador determinístico CPU-local que separa estilo estável ponderado por recência do tom do turno atual; a amostra usa no máximo 48 mensagens `user`, 2.000 caracteres cada, com ownership aplicado na consulta e exclusão de sessões Onyx/anexos.
+- A camada de preferência injeta somente enums, scores, confiança e overrides em até 1.000 caracteres, abaixo dos guardrails; falha do loader/classificador retorna perfil nulo e mantém streaming, tools e a cardinalidade original do provider.
+- A UI ganhou controles acessíveis para tom adaptativo, humor, reação à agressividade e detalhe, com defaults definidos, payload Zod fechado e storage isolado por usuário/dispositivo.
+- Persona e testes fixaram uma alfinetada máxima, continuidade obrigatória da tarefa, frase canônica solicitada e supressão em saúde grave, crise emocional, autoagressão, ameaça, abuso, violência, assédio, credenciais e decisões sensíveis.
+
+### Decisões tomadas
+- Derivação sob demanda, sem perfil persistente: usa o histórico existente e não cria tabela, migration, seed, backfill ou memória comportamental permanente.
+- Adaptação é preferência de menor prioridade: nunca altera fatos, segurança, permissões, tools, critérios de sucesso ou identidade central do Bibble.
+- Uma mensagem ríspida modula somente o turno: mudança do perfil estável exige evidência recorrente; baixa confiança ou sinais sensíveis restauram o tom padrão e suprimem deboche.
+- Privacidade por minimização: histórico bruto, frases detectadas, xingamentos e prompt final não entram em logs/SSE; telemetria expõe apenas duração, tamanho da amostra e aplicação agregada.
+
+### Problemas encontrados / resolvidos
+- Probe identificou vazamento de preferência por uma chave global legada e divergência literal da frase canônica; a chave passou a ser exclusivamente per-user e o contrato textual foi alinhado exatamente.
+- Anubis encontrou cobertura insuficiente de contextos sensíveis; famílias contextuais e negativos técnicos/figurativos foram adicionados, encerrando a reauditoria sem finding remanescente.
+- Sage detectou ausência de provas reais para fallback e controles renderizados; testes passaram a forçar falhas do loader/classificador e a exercitar os quatro controles no componente, sem geração extra.
+
+### Pendências
+- Os gates dirigidos encerraram verdes: Forge final registrou 169/169 testes Bibble, ESLint da File List e diff-check; Sage observou 170/170 após mudanças concorrentes, e Probe, Anubis e Lens finalizaram em PASS.
+- Typecheck e suíte globais continuam não verdes por dívidas externas/concorrentes discriminadas pelo Forge; CodeRabbit permaneceu indisponível. Nenhuma falha foi atribuída aos arquivos da story adaptativa.
+- Não houve smoke visual autenticado em navegador nem perfil server-side persistente. Qualquer evolução de schema ou persistência comportamental requer story própria, Vault, backup verificado e confirmação explícita.
+
+### Refletido também em
+- `decisions.md`: classificação determinística, precedência da adaptação, isolamento per-user e ausência de persistência nova.
+- `architecture.md`, `codebase-map.md` e `integration-points.md`: consulta bounded, composição compacta, controles, telemetria e fallback adaptativo documentados.

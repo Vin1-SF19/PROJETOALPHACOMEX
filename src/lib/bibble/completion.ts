@@ -33,18 +33,24 @@ export interface CompletionResponse {
     };
     finish_reason: string;
   }>;
+  usage?: CompletionUsage;
 }
+
+export interface CompletionUsage { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
 
 export interface StreamChunk {
   choices: Array<{
-    delta: { content?: string };
+    delta: { content?: string; tool_calls?: Array<{ index: number; id?: string; type?: "function"; function?: { name?: string; arguments?: string } }> };
     finish_reason: string | null;
   }>;
+  usage?: CompletionUsage;
 }
 
 export interface CompletionStreamResult {
   finishReason: string | null;
   chunks: number;
+  toolCalls: ToolCallRaw[];
+  usage?: CompletionUsage;
 }
 
 export function isOutputTruncated(finishReason: string | null | undefined): boolean {
@@ -63,6 +69,8 @@ export async function consumeCompletionStream(
   let buffer = "";
   let finishReason: string | null = null;
   let chunks = 0;
+  let usage: CompletionUsage | undefined;
+  const partialCalls = new Map<number, { id: string; name: string; arguments: string }>();
 
   const processLine = (line: string) => {
     if (!line.startsWith("data: ")) return;
@@ -71,11 +79,19 @@ export async function consumeCompletionStream(
     try {
       const chunk = JSON.parse(raw) as StreamChunk;
       const choice = chunk.choices[0];
+      if (chunk.usage) usage = chunk.usage;
       if (choice?.finish_reason) finishReason = choice.finish_reason;
       const delta = choice?.delta?.content;
       if (delta) {
         chunks += 1;
         onText(delta);
+      }
+      for (const toolDelta of choice?.delta?.tool_calls ?? []) {
+        const current = partialCalls.get(toolDelta.index) ?? { id: '', name: '', arguments: '' };
+        current.id += toolDelta.id ?? '';
+        current.name += toolDelta.function?.name ?? '';
+        current.arguments += toolDelta.function?.arguments ?? '';
+        partialCalls.set(toolDelta.index, current);
       }
     } catch { /* ignora apenas frames malformados */ }
   };
@@ -92,7 +108,10 @@ export async function consumeCompletionStream(
   buffer += decoder.decode();
   for (const line of buffer.split("\n")) processLine(line);
 
-  return { finishReason, chunks };
+  return {
+    finishReason, chunks, usage,
+    toolCalls: [...partialCalls.values()].filter(call => call.name).map((call, index) => ({ id: call.id || `tool-${index}`, type: 'function', function: { name: call.name, arguments: call.arguments || '{}' } })),
+  };
 }
 
 /** Chama o provedor (Ollama/OpenAI/Anthropic/Google) via formato OpenAI-compat de chat.completions. */
@@ -105,6 +124,7 @@ export async function callCompletion(
   temperature?: number,
   contextWindow?: number,
   maxOutputTokens?: number,
+  requestId?: string,
 ): Promise<CompletionResponse>;
 export async function callCompletion(
   msgs: ChatMessage[],
@@ -115,6 +135,7 @@ export async function callCompletion(
   temperature?: number,
   contextWindow?: number,
   maxOutputTokens?: number,
+  requestId?: string,
 ): Promise<Response>;
 export async function callCompletion(
   msgs: ChatMessage[],
@@ -125,6 +146,7 @@ export async function callCompletion(
   temperature?: number,
   contextWindow?: number,
   maxOutputTokens?: number,
+  requestId?: string,
 ): Promise<CompletionResponse | Response> {
   const provider = getProvider(model);
   const { baseUrl, headers } = getProviderConfig(provider);
@@ -134,6 +156,7 @@ export async function callCompletion(
     messages: msgs,
     stream: streamMode,
   };
+  if (streamMode) body.stream_options = { include_usage: true };
   if (temperature !== undefined) body.temperature = temperature;
   if (maxOutputTokens && maxOutputTokens > 0) {
     if (provider === "openai" && /^(o1|o3)/i.test(model)) {
@@ -148,7 +171,7 @@ export async function callCompletion(
       ...(maxOutputTokens && maxOutputTokens > 0 ? { num_predict: maxOutputTokens } : {}),
     };
   }
-  if (!streamMode && tools.length > 0) {
+  if (tools.length > 0) {
     body.tools = tools;
   }
 
@@ -157,7 +180,8 @@ export async function callCompletion(
     provider,
     contextWindow: contextWindow ?? null,
     outputTokenLimit: maxOutputTokens ?? null,
-    toolCount: !streamMode ? tools.length : 0,
+    toolCount: tools.length,
+    requestId,
   });
 
   const res = await fetch(baseUrl, {

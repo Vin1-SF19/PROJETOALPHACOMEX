@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { PIADAS_BANK } from "@/lib/bibble/piadas-bank";
+import { auth } from "../../../../../auth";
 
 export const runtime = "nodejs";
 
@@ -38,6 +39,8 @@ async function writeCache(cache: Cache): Promise<void> {
 // ── Route ────────────────────────────────────────────────────────────────────
 
 export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const cache = await readCache();
 
   // Ciclo completo: reinicia mantendo só a última exibida, para não repetir

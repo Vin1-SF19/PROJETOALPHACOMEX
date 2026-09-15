@@ -164,6 +164,7 @@ export default function PainelLayoutClient({
   const [frameRuntime, setFrameRuntime] = useState<PainelFrameRuntimeByTab>({});
   const encerrandoSessaoRef = useRef(false);
   const iframesRef = useRef(new Map<string, HTMLIFrameElement>());
+  const lastOperationalUrlRef = useRef<string | null>(null);
   const intencaoAgendaPendenteRef = useRef<IntencaoAgendaAlpha | null>(null);
   const tabsStorageKey = getTabsStorageKey(userId);
 
@@ -206,6 +207,22 @@ export default function PainelLayoutClient({
       localStorage.setItem(tabsStorageKey, JSON.stringify({ tabs, activeId }));
     } catch { /* localStorage may be unavailable in restricted browsing modes */ }
   }, [tabs, activeId, tabsHydrated, tabsStorageKey]);
+
+  // Publica ao IAlpha somente contexto same-origin e sem dados sensíveis. A
+  // home continua sabendo qual foi o último módulo operacional visitado.
+  useEffect(() => {
+    const active = tabs.find(tab => tab.id === activeId);
+    if (active && active.url !== HOME_URL) lastOperationalUrlRef.current = active.url;
+    const home = tabs.find(tab => tab.url === HOME_URL);
+    const frame = home ? iframesRef.current.get(home.id) : undefined;
+    frame?.contentWindow?.postMessage({
+      type: 'ALPHA_BIBBLE_CONTEXT',
+      activeUrl: active?.url ?? HOME_URL,
+      activeLabel: active?.label ?? HOME_LABEL,
+      lastOperationalUrl: lastOperationalUrlRef.current,
+      openModules: tabs.map(tab => ({ url: tab.url, label: tab.label })),
+    }, window.location.origin);
+  }, [activeId, tabs]);
 
   // ── Tab management ────────────────────────────────────────────────────────
 
@@ -521,6 +538,15 @@ export default function PainelLayoutClient({
                       { type: AGENDA_ALPHA_MENSAGEM, intencao: intencaoPendente },
                       window.location.origin,
                     );
+                  }
+                  if (tab.url === HOME_URL) {
+                    const active = tabs.find(item => item.id === activeId);
+                    event.currentTarget.contentWindow?.postMessage({
+                      type: 'ALPHA_BIBBLE_CONTEXT', activeUrl: active?.url ?? HOME_URL,
+                      activeLabel: active?.label ?? HOME_LABEL,
+                      lastOperationalUrl: lastOperationalUrlRef.current,
+                      openModules: tabs.map(item => ({ url: item.url, label: item.label })),
+                    }, window.location.origin);
                   }
                   try {
                     const href = event.currentTarget.contentWindow?.location.href;

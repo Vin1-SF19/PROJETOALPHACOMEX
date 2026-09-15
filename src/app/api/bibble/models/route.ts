@@ -1,48 +1,55 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import { getOllamaHeaders } from "@/lib/bibble/client";
+import { getBibbleRuntimeConfig } from "@/lib/bibble/runtime-config";
 
 export const dynamic = "force-dynamic";
 
-interface OllamaModel {
-  name: string;
-  size: number;
-  details?: { parameter_size?: string; family?: string };
+interface OpenAICompatModel {
+  id: string;
+  meta?: { size?: number; n_params?: number; ftype?: string };
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { searchParams } = new URL(request.url);
-  const ollamaUrl = (searchParams.get("url") || process.env.BIBBLE_OLLAMA_URL || "http://localhost:11434").replace(/\/$/, "");
+  let ollamaUrl: string;
+  try {
+    ollamaUrl = getBibbleRuntimeConfig().endpoint.toString().replace(/\/$/, "");
+  } catch {
+    return NextResponse.json({ models: [], error: "Configuração do servidor local inválida" }, { status: 503 });
+  }
 
   try {
-    const res = await fetch(`${ollamaUrl}/api/tags`, {
+    // llama.cpp (substituiu o Ollama) não implementa `/api/tags` — usa o
+    // endpoint OpenAI-compat `/v1/models`.
+    const res = await fetch(`${ollamaUrl}/v1/models`, {
       signal: AbortSignal.timeout(5000),
       headers: getOllamaHeaders({ Accept: "application/json" }),
     });
 
     if (!res.ok) {
-      return NextResponse.json({ models: [], error: `Ollama retornou ${res.status}`, baseUrl: ollamaUrl });
+      return NextResponse.json({ models: [], error: `Servidor local retornou ${res.status}` });
     }
 
-    const data = await res.json() as { models: OllamaModel[] };
+    const data = await res.json() as { data: OpenAICompatModel[] };
 
+    const runtime = getBibbleRuntimeConfig();
     return NextResponse.json({
-      models: (data.models ?? []).map(m => ({
-        id: m.name,
-        label: m.name,
-        size: m.size,
-        paramSize: m.details?.parameter_size ?? null,
-        family: m.details?.family ?? null,
+      models: (data.data ?? []).map(m => ({
+        id: m.id,
+        label: m.id,
+        size: m.meta?.size ?? null,
+        paramSize: m.meta?.n_params ?? null,
+        family: m.meta?.ftype ?? null,
       })),
-      baseUrl: ollamaUrl,
+      configured: true,
+      capabilities: { contextWindow: runtime.contextWindow, outputTokenLimit: runtime.outputTokenLimit },
     });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "timeout";
-    return NextResponse.json({ models: [], error: msg, baseUrl: ollamaUrl });
+  } catch {
+    return NextResponse.json({ models: [], error: "Servidor local indisponível" });
   }
 }

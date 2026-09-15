@@ -2368,3 +2368,26 @@ Criação, edição e configuração por coluna validam etapas ativas, ownership
 O aggregate autenticado `ObterCardBpm` inclui formulário/seções/componentes e reutiliza a consulta canônica de campos na avaliação dinâmica, sem N+1. Restrições por perfil ocultam campos sem invalidar a estrutura publicada. Nenhuma migration ou escrita de dados foi necessária.
 
 **Última atualização:** 2026-09-09 por Codex (RM-2026-40526E)
+## IAlpha/Bibble — arquitetura de execução segura (2026-09-15)
+
+O Bibble nativo segue uma fronteira server-authoritative: cliente envia mensagem, preferências limitadas e contexto mínimo da aba; o servidor escolhe o modelo, valida usuário/permissões/módulo, calcula o orçamento e decide quais capabilities entram no turno. O cliente não escolhe provider e não promove rota, título, prompt de projeto ou documento a guardrail.
+
+O caminho principal é `PainelLayoutClient` → `BibbleChatLayout` → `POST /api/bibble/chat` → admission/deadline → orçamento/prompt → completion streaming → tool loop read-only → SSE → persistência transacional. Sem tool call, existe uma única geração. Com tool call real, o próximo ciclo recebe apenas resultado delimitado e o conjunto imutável de tools autorizadas continua sendo reaplicado.
+
+As capacidades são fail-closed. O catálogo exposto ao modelo contém 18 tools somente leitura; mutações e filesystem não são apenas ocultos, mas recusados pelo executor. Upload público está desligado até haver store privado com ownership. O runtime usa modelo configurado no servidor, teto de contexto de 131.072 e saída de até 4.096 tokens.
+
+Observabilidade é parte do fluxo, não um dashboard: `requestId` acompanha provider e tools; logs/`Server-Timing` registram fila, contexto, TTFT, duração, tokens quando disponíveis e throughput sem registrar prompts, anexos ou reasoning. Diagnóstico e benchmarks são executáveis pelo CLI `scripts/bibble.mjs`.
+
+Onyx não compartilha a autoridade do Bibble. Cada chamada exige PAT individual e vínculos de ownership entre usuário, agente, sessão local, sessão remota e persona. Ausência ou divergência bloqueia o runtime; reasoning e anexos não confiáveis não são repassados.
+
+Não houve schema, migration, seed, backfill, RLS nem mutação em massa nesta arquitetura. Memória adicional é compactação in-request sobre o histórico existente. Métricas históricas, storage privado, memória semântica persistente e qualquer estrutura nova de banco exigem story própria e, quando aplicável, protocolo Vault completo.
+
+**Última atualização:** 2026-09-15 por Scribe (story IAlpha/Bibble — transformação integral)
+
+## IAlpha/Bibble — camada adaptativa bounded (2026-09-15)
+
+A adaptação é uma camada determinística de menor prioridade: até 48 mensagens do próprio usuário, 2.000 caracteres cada, produzem estilo estável e tom atual separados. Só enums, confiança, amostra e overrides entram no prompt, limitado a 1.000 caracteres. Não há rede, provider ou geração auxiliar; falha é fail-open para disponibilidade e retorna à persona neutra sem enfraquecer guardrails.
+
+Preferências são locais por usuário/dispositivo e nunca chegam ao Onyx. O “deboche competente” permite no máximo uma alfinetada situacional seguida de execução, sempre suprimida em contexto sensível. Não há perfil psicológico/persistente, schema, migration, seed ou backfill.
+
+**Última atualização:** 2026-09-15 por Scribe (story Bibble — tom adaptativo)

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { auth } from "../../../../../auth";
 import {
   createChatSession,
+  getChatSession,
   sendChatMessageStream,
   uploadChatFiles,
   OnyxError,
@@ -13,6 +14,10 @@ import { extractTextFromUrl } from "@/lib/bibble/tika";
 import { getUserOnyxToken } from "@/lib/onyx/user-token";
 import db from "@/lib/prisma";
 import { isAdminRole } from "@/lib/roles";
+import { fetchTrustedBibbleBlob } from "@/lib/bibble/attachment-security";
+import { bibbleFileInputSchema, BIBBLE_CHAT_MESSAGE_MAX_CHARS, BIBBLE_HISTORY_MESSAGE_MAX_CHARS, readRequestTextWithLimit } from "@/lib/bibble/attachment-security";
+import { z } from "zod";
+import { userCanUseAgent } from "@/lib/onyx/ownership";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -54,6 +59,17 @@ interface ChatInput {
   /** Persona customizada (Bibble mode: agentId=0). Sobrepõe o system prompt padrão. */
   globalSystemPrompt?: string | null;
 }
+
+const onyxChatSchema = z.object({
+  message: z.string().max(BIBBLE_CHAT_MESSAGE_MAX_CHARS).default(""),
+  agentId: z.number().int().nonnegative(),
+  onyxSessionId: z.string().max(200).nullable().optional(),
+  painelSessionId: z.string().max(128).nullable().optional(),
+  pageContext: z.string().max(500).nullable().optional(),
+  files: z.array(bibbleFileInputSchema).max(10).default([]),
+  history: z.array(z.object({ role: z.enum(["user", "bibble"]), text: z.string().max(BIBBLE_HISTORY_MESSAGE_MAX_CHARS) }).strict()).max(200).default([]),
+  globalSystemPrompt: z.string().max(30_000).nullable().optional(),
+}).strict();
 
 const MAX_FILE_CHARS = 25000;
 
@@ -100,7 +116,7 @@ async function buildFileContext(files: AttachedFile[]): Promise<string> {
 
     if (isText && file.url) {
       try {
-        const res = await fetch(file.url, { signal: AbortSignal.timeout(12000) });
+        const res = await fetchTrustedBibbleBlob(file.url, { signal: AbortSignal.timeout(12000) });
         if (res.ok) {
           const raw = await res.text();
           parts.push(`#### 📄 ${file.name}\n\`\`\`\n${truncate(raw)}\n\`\`\``);
@@ -148,7 +164,15 @@ export async function POST(req: NextRequest) {
     return new Response(JSON.stringify({ error: "Não autorizado" }), { status: 401 });
   }
 
-  const input = (await req.json().catch(() => ({}))) as Partial<ChatInput>;
+  let input: ChatInput;
+  try {
+    const raw = await readRequestTextWithLimit(req);
+    const parsed = onyxChatSchema.safeParse(JSON.parse(raw));
+    if (!parsed.success) return new Response(JSON.stringify({ error: "Payload Onyx inválido" }), { status: 400 });
+    input = parsed.data;
+  } catch {
+    return new Response(JSON.stringify({ error: "Payload Onyx inválido ou excede o limite" }), { status: 413 });
+  }
   const message = (input.message ?? "").trim();
   const agentId = Number(input.agentId);
   let onyxSessionId = input.onyxSessionId ?? null;
@@ -164,6 +188,24 @@ export async function POST(req: NextRequest) {
   // usuário no Onyx. Quando NULL, cai no PAT de serviço (comportamento atual).
   // Resolvido pelo id da sessão — nunca aceitar token do corpo da requisição.
   const userToken = await getUserOnyxToken(session.user.id);
+  if (!userToken) return new Response(JSON.stringify({ error: "Onyx requer credencial individual" }), { status: 403 });
+  const role = (session.user as { role?: string }).role ?? "";
+  if (!await userCanUseAgent(agentId, Number(session.user.id), role)) return new Response(JSON.stringify({ error: "Agente Onyx indisponível" }), { status: 403 });
+  if (input.files?.length) return new Response(JSON.stringify({ error: "Anexos em agentes Onyx estão desabilitados por segurança" }), { status: 403 });
+  if (!input.painelSessionId) return new Response(JSON.stringify({ error: "Sessão local obrigatória" }), { status: 403 });
+  const ownedPainelSession = await db.bibbleSession.findFirst({
+    where: { id: input.painelSessionId, userId: Number(session.user.id) },
+    select: { onyxSessionId: true },
+  });
+  if (!ownedPainelSession) return new Response(JSON.stringify({ error: "Sessão local não autorizada" }), { status: 403 });
+  if (onyxSessionId) {
+    if (ownedPainelSession.onyxSessionId !== onyxSessionId) return new Response(JSON.stringify({ error: "Sessão Onyx não autorizada" }), { status: 403 });
+    const remoteSession = await getChatSession(onyxSessionId, userToken).catch(() => null);
+    const remoteAgentId = Number(remoteSession?.persona_id ?? remoteSession?.persona?.id);
+    if (remoteAgentId !== agentId) return new Response(JSON.stringify({ error: "Agente da sessão Onyx não autorizado" }), { status: 403 });
+  } else if (ownedPainelSession.onyxSessionId) {
+    return new Response(JSON.stringify({ error: "Sessão Onyx vinculada deve ser reutilizada" }), { status: 409 });
+  }
 
   // Extrai texto dos arquivos antes de abrir o stream
   const files = input.files ?? [];
@@ -179,14 +221,15 @@ export async function POST(req: NextRequest) {
     try {
       const blobs = await Promise.all(
         imagens.map(async (img) => {
-          const r = await fetch(img.url!, { signal: AbortSignal.timeout(15000) });
+          const r = await fetchTrustedBibbleBlob(img.url!, { signal: AbortSignal.timeout(15000) });
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
           return { blob: await r.blob(), name: img.name };
         }),
       );
       fileDescriptors = await uploadChatFiles(blobs, userToken);
     } catch (err) {
-      console.error("[ONYX] Falha ao subir imagens pro chat:", err);
+      void err;
+      console.error("[ONYX_ATTACHMENT_UPLOAD_FAILED]");
     }
   }
 
@@ -282,49 +325,25 @@ export async function POST(req: NextRequest) {
         });
 
         if (!res.ok || !res.body) {
-          const body = await res.text().catch(() => "");
-          throw new OnyxError(body || `Onyx respondeu ${res.status}`, res.status);
+          await res.body?.cancel().catch(() => undefined);
+          throw new OnyxError(`Onyx respondeu ${res.status}`, res.status);
         }
 
         const reader = res.body.getReader();
         const dec = new TextDecoder();
         let buf = "";
-        let reasoningOpen = false;
         let answerStarted = false;
-        let reasoningChars = 0;
-        // Limite de chars de reasoning antes de abortar o bloco e forçar a resposta.
-        // Modelos como qwen3 entram em loop infinito de <think>; após 8k chars
-        // fechamos o bloco e aguardamos a resposta real chegar.
-        const REASONING_CHAR_LIMIT = 8000;
 
         const handlePacket = (pkt: OnyxPacket) => {
           const obj = pkt.obj;
           if (!obj) return;
           switch (obj.type) {
             case "reasoning_start":
-              reasoningOpen = true;
-              reasoningChars = 0;
-              send({ type: "text", text: "<think>" });
               break;
             case "reasoning_delta":
-              if (obj.reasoning && reasoningOpen) {
-                // Só emite até o limite — depois descarta silenciosamente
-                if (reasoningChars < REASONING_CHAR_LIMIT) {
-                  send({ type: "text", text: obj.reasoning });
-                  reasoningChars += obj.reasoning.length;
-                  if (reasoningChars >= REASONING_CHAR_LIMIT) {
-                    // Fecha o bloco de reasoning na UI; o stream continua
-                    send({ type: "text", text: "\n…[raciocínio truncado]</think>\n\n" });
-                    reasoningOpen = false;
-                  }
-                }
-              }
+              void obj.reasoning;
               break;
             case "reasoning_done":
-              if (reasoningOpen) {
-                reasoningOpen = false;
-                send({ type: "text", text: "</think>\n\n" });
-              }
               break;
             case "message_start":
               if (!answerStarted) {
@@ -389,15 +408,14 @@ export async function POST(req: NextRequest) {
           try { handlePacket(JSON.parse(buf.trim()) as OnyxPacket); } catch { /* ignore */ }
         }
         // Fecha think aberto caso o stream tenha terminado durante o reasoning
-        if (reasoningOpen) send({ type: "text", text: "</think>\n\n" });
-
         send({ type: "done" });
       } catch (err) {
         if (providerCtrl.signal.aborted) {
           try { send({ type: "done" }); } catch { /* ignore */ }
         } else {
-          const msg = err instanceof OnyxError ? err.message : "Erro ao falar com o agente.";
-          console.error("[ONYX CHAT]", msg);
+          console.error("[ONYX_CHAT_FAILED]", {
+            status: err instanceof OnyxError ? err.status : 500,
+          });
           try {
             send({ type: "error", message: "O agente teve um problema. Tenta de novo." });
             send({ type: "done" });

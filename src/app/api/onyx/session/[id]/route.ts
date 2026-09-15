@@ -3,6 +3,7 @@ import { auth } from "../../../../../../auth";
 import { getChatSession, OnyxError } from "@/lib/onyx/client";
 import { getUserOnyxToken } from "@/lib/onyx/user-token";
 import db from "@/lib/prisma";
+import { userCanUseAgent } from "@/lib/onyx/ownership";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,23 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ onyx: false, messages: [] });
   }
 
+  // BibbleSession não possui agentId. Recuperamos a identidade autoritativa da
+  // própria sessão Onyx; sem ela, falhamos fechado para impedir envio ao Bibble.
+  let onyxData;
+  try {
+    const userToken = await getUserOnyxToken(session.user.id);
+    if (!userToken) return NextResponse.json({ error: "Onyx requer credencial individual" }, { status: 403 });
+    onyxData = await getChatSession(bibbleSession.onyxSessionId, userToken);
+  } catch {
+    return NextResponse.json({ error: "Não foi possível validar a identidade do agente Onyx" }, { status: 409 });
+  }
+  const agentId = Number(onyxData.persona_id ?? onyxData.persona?.id);
+  if (!Number.isInteger(agentId) || agentId <= 0) {
+    return NextResponse.json({ error: "Identidade original do agente Onyx indisponível" }, { status: 409 });
+  }
+  const role = (session.user as { role?: string }).role ?? "";
+  if (!await userCanUseAgent(agentId, userId, role)) return NextResponse.json({ error: "Agente Onyx indisponível" }, { status: 403 });
+
   // ── Fonte primária: histórico local (ordem correta + imagens preservadas) ──
   const localMessages = await db.bibbleMessage.findMany({
     where: { sessionId: id },
@@ -55,6 +73,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (localMessages.length > 0) {
     return NextResponse.json({
       onyx: true,
+      agentId,
       messages: localMessages.map((m) => ({
         id: m.id,
         role: m.role === "user" ? ("user" as const) : ("assistant" as const),
@@ -66,10 +85,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   // ── Fallback: sessão antiga sem BibbleMessage local — busca no Onyx ────────
   try {
-    const userToken = await getUserOnyxToken(session.user.id);
-    const data = await getChatSession(bibbleSession.onyxSessionId, userToken);
-
-    const messages = (data.messages ?? [])
+    const messages = (onyxData.messages ?? [])
       // Ignora mensagens de sistema/vazias sem arquivos
       .filter((m) => m.message?.trim() || (m.files?.length ?? 0) > 0)
       // O Onyx não garante a ordem cronológica no array de get-chat-session
@@ -96,9 +112,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         };
       });
 
-    return NextResponse.json({ onyx: true, messages });
+    return NextResponse.json({ onyx: true, agentId, messages });
   } catch (err) {
     const status = err instanceof OnyxError ? err.status : 500;
-    return NextResponse.json({ error: (err as Error).message }, { status });
+    return NextResponse.json({ error: "Não foi possível carregar a sessão Onyx" }, { status });
   }
 }

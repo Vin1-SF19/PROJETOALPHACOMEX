@@ -2,6 +2,7 @@ import { auth } from "../../../auth";
 import { redirect } from "next/navigation";
 import db from "@/lib/prisma";
 import BibbleChatLayout from "@/components/BibbleChatHome/BibbleChatLayout";
+import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -17,10 +18,10 @@ export default async function PainelAlpha() {
     "Operador";
   const userImage = (session.user as { imagemUrl?: string }).imagemUrl || null;
 
-  const userRecord = await db.usuarios.findUnique({
+  const [userRecord, permissions] = await Promise.all([db.usuarios.findUnique({
     where: { id: userId },
     select: { tema_interface: true },
-  });
+  }), getPermissoesEfetivas(userId)]);
   const temaName = userRecord?.tema_interface ?? "blue";
   const currentHour = Number(
     new Intl.DateTimeFormat("pt-BR", {
@@ -44,6 +45,7 @@ export default async function PainelAlpha() {
         userName={nome}
         userImage={userImage}
         role={session.user.role as string | undefined}
+        permissions={permissions}
         temaName={temaName}
         initialHour={currentHour}
         sessoesIniciais={sessoesIniciais.map(s => ({

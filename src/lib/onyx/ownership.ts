@@ -35,6 +35,12 @@ export async function userOwnsAgent(onyxAgentId: number, userId: number): Promis
   return !!owner && owner.userId === userId;
 }
 
+export async function userCanUseAgent(onyxAgentId: number, userId: number, role: string): Promise<boolean> {
+  if (isAdminRole(role)) return true;
+  const owner = await db.onyxAgentOwner.findUnique({ where: { onyxAgentId }, select: { userId: true, isPublic: true } });
+  return !!owner && (owner.userId === userId || owner.isPublic);
+}
+
 export interface AgentOwnerInfo {
   userId: number;
   userName: string | null;

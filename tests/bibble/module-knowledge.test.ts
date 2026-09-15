@@ -85,7 +85,7 @@ describe("catálogo de conhecimento modular do Bibble", () => {
       { userId: 1, userName: "Usuário", role: "User", permissoes: ["parceiros"] },
     );
 
-    expect(negado).toContain("não tem permissão");
+    expect(negado).toContain("Ferramenta indisponível");
     expect(JSON.parse(permitido)).toMatchObject({ sucesso: true, modulo: "Parceiros" });
   });
 

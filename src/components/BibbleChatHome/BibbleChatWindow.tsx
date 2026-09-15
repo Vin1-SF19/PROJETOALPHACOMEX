@@ -33,7 +33,6 @@ interface BibbleChatWindowProps {
   messages: Message[];
   userName: string;
   userImage?: string | null;
-  model: string;
   streamStatus: StreamStatus;
   inputValue: string;
   isStreaming: boolean;
@@ -58,6 +57,8 @@ interface BibbleChatWindowProps {
   onToggleSidebar?: () => void;
   tema?: TemaAlpha;
   currentHour: number;
+  permissions?: string[];
+  humorEnabled?: boolean;
 }
 
 export default function BibbleChatWindow({
@@ -66,7 +67,6 @@ export default function BibbleChatWindow({
   messages,
   userName,
   userImage,
-  model,
   streamStatus,
   inputValue,
   isStreaming,
@@ -91,6 +91,8 @@ export default function BibbleChatWindow({
   onToggleSidebar,
   tema,
   currentHour,
+  permissions = [],
+  humorEnabled = false,
 }: BibbleChatWindowProps) {
   const hasMessages = messages.length > 0;
   const ac = tema?.accent ?? "99, 102, 241";
@@ -141,13 +143,12 @@ export default function BibbleChatWindow({
         <div className="relative z-10">
           <BibbleChatHeader
             title={sessionTitle}
-            model={model}
             onRename={onRenameSession}
             sidebarOpen={sidebarOpen}
             onToggleSidebar={onToggleSidebar}
+            onClearAgent={onClearAgent}
             activeAgentName={activeAgentName}
             activeAgentAvatarUrl={activeAgentAvatarUrl}
-            onClearAgent={onClearAgent}
             tema={tema}
           />
         </div>
@@ -199,7 +200,6 @@ export default function BibbleChatWindow({
             onStop={onStop}
             isStreaming={isStreaming}
             streamStatus={streamStatus}
-            model={model}
             files={uploadFiles}
             onFilesChange={onFilesChange}
             showFiles={showFiles}
@@ -209,18 +209,18 @@ export default function BibbleChatWindow({
             tema={tema}
             isAdmin={isAdmin}
             imageGenAvailable={imageGenAvailable}
+            placeholder={`Pergunte algo a ${activeAgentName || "Bibble"}...`}
           />
 
           {/* Sprite — absolute, alinhado com a borda inferior do input */}
           <div className="absolute bottom-3 left-0 right-0 hidden lg:block pointer-events-none" style={{ zIndex: 20 }}>
-            <BibbleSpriteCompanion isStreaming={isStreaming} />
+            <BibbleSpriteCompanion isStreaming={isStreaming} humorEnabled={humorEnabled} />
           </div>
         </div>
       ) : (
         <div className="relative z-10 flex-1 flex">
           <BibbleEmptyState
             userName={userName}
-            model={model}
             inputValue={inputValue}
             onInputChange={onInputChange}
             onSend={onSend}
@@ -237,6 +237,9 @@ export default function BibbleChatWindow({
             tema={tema}
             isAdmin={isAdmin}
             imageGenAvailable={imageGenAvailable}
+            activeAgentName={activeAgentName}
+            activeAgentAvatarUrl={activeAgentAvatarUrl}
+            permissions={permissions}
           />
         </div>
       )}

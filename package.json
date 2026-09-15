@@ -56,7 +56,11 @@
     "chatbot-alpha:capabilities": "node --import tsx scripts/chatbot-alpha.mjs capabilities",
     "chatbot-alpha:list-conversations": "node --import tsx scripts/chatbot-alpha.mjs list-conversations",
     "chatbot-alpha:list-messages": "node --import tsx scripts/chatbot-alpha.mjs list-messages",
-    "chatbot-alpha:send-message": "node --import tsx scripts/chatbot-alpha.mjs send-message"
+    "chatbot-alpha:send-message": "node --import tsx scripts/chatbot-alpha.mjs send-message",
+    "bibble:doctor": "node --import tsx scripts/bibble.mjs doctor",
+    "bibble:capabilities": "node --import tsx scripts/bibble.mjs capabilities",
+    "bibble:benchmark": "node --import tsx scripts/bibble.mjs benchmark",
+    "bibble:benchmark:tool": "node --import tsx scripts/bibble.mjs benchmark-tool"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1112.0",

@@ -3,11 +3,8 @@ import { applyGlobalRule } from "@/lib/onyx/rule";
 /**
  * Client server-side do Onyx (http://<servidor>:3000).
  * IMPORTANTE: só pode ser importado em código de servidor (rotas/actions).
- * Lê ONYX_API_KEY de process.env — nunca importar em componentes client.
- *
- * Modelo de identidade: CONTA DE SERVIÇO ÚNICA — todas as chamadas usam o PAT
- * em ONYX_API_KEY. O token NUNCA é exposto ao cliente; toda comunicação passa
- * pelas rotas /api/onyx/* que validam a sessão do PainelAlpha antes.
+ * Requer o PAT individual do usuário em todas as operações de usuário. O token
+ * NUNCA é exposto ao cliente; toda comunicação passa pelas rotas /api/onyx/*.
  *
  * Glossário (Onyx → PainelAlpha):
  *   Persona/Assistant  → Agente
@@ -16,23 +13,21 @@ import { applyGlobalRule } from "@/lib/onyx/rule";
  */
 
 const RAW_URL = process.env.ONYX_API_URL ?? "";
-const API_KEY = process.env.ONYX_API_KEY ?? "";
 
 /** Base normalizada, sem barra final. Ex: http://192.168.35.113:3000 */
 export const ONYX_BASE = RAW_URL.replace(/\/+$/, "");
 
 export function isOnyxConfigured(userToken?: string | null): boolean {
-  return Boolean(ONYX_BASE && (userToken?.trim() || API_KEY));
+  return Boolean(ONYX_BASE && userToken?.trim());
 }
 
 /**
  * Monta os headers de autenticação.
- * @param userToken  PAT individual do usuário (token_onyx). Quando presente,
- *                   autentica como o próprio usuário no Onyx; quando ausente,
- *                   usa o PAT de serviço (ONYX_API_KEY).
+ * @param userToken PAT individual do usuário (token_onyx). A ausência sempre
+ *                  falha fechado; não existe fallback para credencial global.
  */
 function authHeaders(extra?: Record<string, string>, userToken?: string | null): Record<string, string> {
-  const token = userToken?.trim() || API_KEY;
+  const token = userToken?.trim();
   return {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
@@ -58,7 +53,7 @@ async function onyxFetch(
   init: OnyxFetchInit = {},
 ): Promise<Response> {
   if (!isOnyxConfigured(init.userToken)) {
-    throw new OnyxError("Onyx não configurado (ONYX_API_URL / ONYX_API_KEY ausentes).", 503);
+    throw new OnyxError("Onyx indisponível para este usuário.", 503);
   }
   const { timeoutMs = 30_000, headers, userToken, ...rest } = init;
   const ctrl = new AbortController();
@@ -74,7 +69,7 @@ async function onyxFetch(
     if ((err as Error).name === "AbortError") {
       throw new OnyxError("Tempo limite ao falar com o Onyx.", 504);
     }
-    throw new OnyxError(`Falha de conexão com o Onyx: ${(err as Error).message}`, 502);
+    throw new OnyxError("Falha de conexão com o Onyx.", 502);
   } finally {
     clearTimeout(timer);
   }
@@ -83,8 +78,8 @@ async function onyxFetch(
 async function onyxJson<T>(path: string, init: OnyxFetchInit = {}): Promise<T> {
   const res = await onyxFetch(path, init);
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new OnyxError(body || `Onyx respondeu ${res.status}`, res.status);
+    await res.body?.cancel().catch(() => undefined);
+    throw new OnyxError(`Onyx respondeu ${res.status}`, res.status);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -221,12 +216,12 @@ export async function uploadAgentImage(file: Blob, filename: string, userToken?:
   // multipart: NÃO setar Content-Type (o fetch define o boundary sozinho)
   const res = await fetch(`${ONYX_BASE}/api/admin/persona/upload-image`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${userToken?.trim() || API_KEY}` },
+    headers: { Authorization: `Bearer ${userToken!.trim()}` },
     body: form,
   });
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new OnyxError(body || `Onyx respondeu ${res.status}`, res.status);
+    await res.body?.cancel().catch(() => undefined);
+    throw new OnyxError(`Onyx respondeu ${res.status}`, res.status);
   }
   const data = (await res.json()) as Record<string, string>;
   const id = data.file_id ?? Object.values(data)[0];
@@ -299,12 +294,12 @@ export async function uploadChatFiles(
 
   const res = await fetch(`${ONYX_BASE}/api/user/projects/file/upload`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${userToken?.trim() || API_KEY}` },
+    headers: { Authorization: `Bearer ${userToken!.trim()}` },
     body: form,
   });
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new OnyxError(body || `Onyx respondeu ${res.status}`, res.status);
+    await res.body?.cancel().catch(() => undefined);
+    throw new OnyxError(`Onyx respondeu ${res.status}`, res.status);
   }
   const data = (await res.json()) as { user_files?: OnyxUserFile[] };
   return (data.user_files ?? []).map((uf) => ({
@@ -369,8 +364,8 @@ export async function setOnyxDefaultModel(
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new OnyxError(detail || "Falha ao atualizar modelo padrão.", res.status);
+    await res.body?.cancel().catch(() => undefined);
+    throw new OnyxError("Falha ao atualizar modelo padrão.", res.status);
   }
 }
 
@@ -466,6 +461,8 @@ export interface OnyxSessionMessage {
 
 export interface OnyxChatSession {
   chat_session_id?: string;
+  persona_id?: number;
+  persona?: { id?: number };
   messages: OnyxSessionMessage[];
 }
 
@@ -634,7 +631,7 @@ export async function transcribeAudio(audio: Blob, filename: string, userToken?:
   form.append("audio", audio, filename);
   return fetch(`${ONYX_BASE}/api/voice/transcribe`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${userToken?.trim() || API_KEY}` },
+    headers: { Authorization: `Bearer ${userToken!.trim()}` },
     body: form,
   });
 }
@@ -969,8 +966,9 @@ export interface UploadedFileRef {
  */
 export async function uploadConnectorFiles(
   files: Array<{ blob: Blob; name: string }>,
+  userToken?: string | null,
 ): Promise<UploadedFileRef> {
-  if (!isOnyxConfigured()) throw new OnyxError("Onyx não configurado.", 503);
+  if (!isOnyxConfigured(userToken)) throw new OnyxError("Onyx indisponível para este usuário.", 503);
   if (files.length === 0) return { file_paths: [], file_names: [] };
 
   const form = new FormData();
@@ -978,12 +976,12 @@ export async function uploadConnectorFiles(
 
   const res = await fetch(`${ONYX_BASE}/api/manage/admin/connector/file/upload`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${API_KEY}` },
+    headers: { Authorization: `Bearer ${userToken!.trim()}` },
     body: form,
   });
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new OnyxError(body || `Onyx respondeu ${res.status}`, res.status);
+    await res.body?.cancel().catch(() => undefined);
+    throw new OnyxError(`Onyx respondeu ${res.status}`, res.status);
   }
   const data = (await res.json()) as { file_paths?: string[]; file_names?: string[] };
   return {

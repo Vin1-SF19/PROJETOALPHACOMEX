@@ -1,8 +1,9 @@
 import { getProvider, type Provider } from "./client";
 import type { ChatMessage } from "./completion";
 
-export const CHARS_PER_TOKEN = 4;
-export const DEFAULT_CONTEXT_WINDOW_TOKENS = 32_768;
+// Estimativa conservadora quando o provider não expõe tokenizer/usage.
+export const CHARS_PER_TOKEN = 3;
+export const DEFAULT_CONTEXT_WINDOW_TOKENS = 131_072;
 export const LEGACY_CONTEXT_WINDOW_TOKENS = 4_096;
 export const DEFAULT_OUTPUT_TOKEN_LIMIT = 4_096;
 export const MIN_OUTPUT_TOKEN_LIMIT = 1_024;
@@ -16,9 +17,9 @@ export const MIN_OUTPUT_TOKEN_LIMIT = 1_024;
 export const ATTACHMENT_CONTEXT_WINDOW_TOKENS =
   Number(process.env.BIBBLE_ATTACHMENT_CONTEXT_WINDOW) || 131_072;
 export const ATTACHMENT_OUTPUT_TOKEN_LIMIT =
-  Number(process.env.BIBBLE_ATTACHMENT_OUTPUT_TOKENS) || 16_384;
+  Math.min(4_096, Number(process.env.BIBBLE_ATTACHMENT_OUTPUT_TOKENS) || 4_096);
 
-const MAX_CONFIGURABLE_CONTEXT_WINDOW = 262_144;
+const MAX_CONFIGURABLE_CONTEXT_WINDOW = 131_072;
 const MIN_PDF_CONTEXT_WINDOW = ATTACHMENT_CONTEXT_WINDOW_TOKENS;
 const MESSAGE_OVERHEAD_TOKENS = 8;
 

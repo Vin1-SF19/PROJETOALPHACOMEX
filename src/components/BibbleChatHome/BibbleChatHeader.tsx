@@ -7,7 +7,6 @@ import { type TemaAlpha } from "@/lib/temas";
 
 interface BibbleChatHeaderProps {
   title: string;
-  model: string;
   onRename: (title: string) => void;
   sidebarOpen?: boolean;
   onToggleSidebar?: () => void;
@@ -19,7 +18,6 @@ interface BibbleChatHeaderProps {
 
 export default function BibbleChatHeader({
   title,
-  model,
   onRename,
   sidebarOpen,
   onToggleSidebar,
@@ -105,20 +103,6 @@ export default function BibbleChatHeader({
             </button>
           )}
         </div>
-      )}
-
-      {/* Model badge */}
-      {model && !isEditing && !activeAgentName && (
-        <span
-          className="text-xs font-semibold tracking-wide px-2 py-0.5 rounded-md shrink-0 transition-opacity duration-200"
-          style={{
-            background: `rgba(${ac},.12)`,
-            border: `1px solid rgba(${ac},.3)`,
-            color: `rgba(${ac},1)`,
-          }}
-        >
-          {model.split(":")[0].toUpperCase()}
-        </span>
       )}
 
       {/* Sidebar toggle button */}

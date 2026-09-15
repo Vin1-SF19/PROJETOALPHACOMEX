@@ -1490,3 +1490,32 @@ de segurança.
 **Decisão:** usar `BpmEtapaFormulario` como única autoridade de composição visual e um registry de targets estáveis como contrato comum de save, builder, resolver, preview e runtime. `BpmCampoEtapaConfig` continua autoridade de aplicabilidade e comportamento de campos. Labels nunca selecionam componentes; ausência ou referência inválida não recebe fallback implícito.
 
 **Consequências:** card e preview compartilham a mesma árvore estrutural, enquanto bindings distintos mantêm o preview inerte. Painéis especializados existentes são preservados por `rendererId`. Elementos invariantes do card permanecem no shell global. Restrição de acesso por perfil oculta sem corromper o diagnóstico estrutural. Draft/PUBLISHED e histórico editorial seguem para P0-4; não houve migration.
+### 2026-09-15 — IAlpha/Bibble: contenção fail-closed, geração única e autoridade server-side
+
+**Decisão:** consolidar o Bibble como assistente operacional read-only até existir confirmação humana verificável para efeitos. O catálogo público foi reduzido a 18 tools somente leitura; filesystem, mutações e upload público permanecem indisponíveis no provider, UI e guard server-side.
+
+**Decisão de inference:** modelo, endpoint, janela e saída são definidos pelo servidor. O cliente não escolhe provider. O teto é 131.072 tokens com até 4.096 tokens reservados à resposta. O runner consome uma única geração streaming no turno comum e só inicia novo ciclo depois de uma tool call real.
+
+**Decisão de segurança:** o conjunto autorizado de tools é imutável por turno e reaplicado antes do executor. Contexto de aba passa por same-origin, registry e permissão. Onyx exige PAT individual e ownership de agente/sessão/persona; reasoning, anexo e arquivo sem vínculo falham fechados. Upload fica 503 até storage privado com ownership comprovável.
+
+**Decisão de identidade:** `src/lib/bibble/persona.ts` é a fonte executável da voz; o prompt preserva segurança e identidade acima de contexto, projeto e estilo. Humor é opcional e desligado por padrão; sugestões só anunciam capabilities reais do runtime ativo.
+
+**Decisão de observabilidade e persistência:** métricas são logs/headers/CLI sem nova tabela. O par do turno é transacional, histórico é paginado e o campo `tokens` permanece nulo sem contagem exata server-side. Não criar memória semântica persistente nesta entrega.
+
+**Evidência:** build e lint direcionado aprovados; Probe, Anubis e Lens em PASS; suíte Bibble 118/118. Os gates globais externos, CodeRabbit indisponível e smoke visual autenticado continuam ressalvas explícitas, não sucesso presumido.
+
+**Consequência:** qualquer reativação de mutação, filesystem ou anexos precisa de contrato de confirmação/ownership, testes negativos e nova passagem por Forge → Probe → Anubis → Lens → Sage. Mudança de schema, storage durável, limpeza em massa ou memória persistente reinicia o protocolo Vault com backup e confirmação explícita.
+
+**Adicionado em:** 2026-09-15 por Scribe (story IAlpha/Bibble — transformação integral)
+
+### 2026-09-15 — Bibble: adaptação derivada, bounded e não persistida
+
+**Decisão:** classificar localmente até 48 mensagens nativas do próprio usuário, com 2.000 caracteres por mensagem, separando estilo estável de tom atual. Injetar somente resumo tipado de até 1.000 caracteres, sem histórico bruto e sem provider extra; falha degrada para voz neutra.
+
+**Persona:** manter “debochado competente”, no máximo uma alfinetada seguida da execução. A resposta contratada é `A pressa é toda sua, não minha, mas vou executar e ja trago o resultado`; sensibilidade sempre suprime deboche.
+
+**Preferências e persistência:** quatro controles vivem somente em `bibble-adaptive-style:<userId>` e não chegam ao Onyx. Não criar coluna/tabela de perfil; evolução durável exige story própria e protocolo Vault.
+
+**Evidência:** suíte Bibble 170/170; Probe, Anubis e Lens aprovaram. Concerns globais externas e CodeRabbit indisponível permanecem na story.
+
+**Adicionado em:** 2026-09-15 por Scribe (story Bibble — tom adaptativo)

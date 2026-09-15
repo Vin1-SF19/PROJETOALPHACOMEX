@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
+import { auth } from "../../../../../auth";
+import { acquireBibbleLease } from "@/lib/bibble/admission-control";
+import { getBibbleRuntimeConfig } from "@/lib/bibble/runtime-config";
+import { getOllamaHeaders } from "@/lib/bibble/client";
 
 export const runtime = "nodejs";
 
@@ -35,6 +39,8 @@ async function writeCache(cache: Cache): Promise<void> {
 // ── Route ────────────────────────────────────────────────────────────────────
 
 export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   // ── Lê tópicos (aceita "- " e "* ") ─────────────────────────────────────
   let content: string;
   try {
@@ -70,14 +76,17 @@ export async function GET() {
   }
 
   // ── Busca nova via Ollama ─────────────────────────────────────────────────
-  const ollamaUrl = process.env.BIBBLE_OLLAMA_URL ?? "http://localhost:11434";
-  const model     = process.env.BIBBLE_CURIOSIDADE_MODEL ?? "gemma4:e4b";
+  const lease = acquireBibbleLease(`curiosidade:${session.user.id}`);
+  if (!lease) return NextResponse.json({ error: "Muitas solicitações. Tente novamente em instantes.", retryable: true }, { status: 429, headers: { "Retry-After": "10" } });
+  const runtime = getBibbleRuntimeConfig();
+  const ollamaUrl = runtime.endpoint.toString().replace(/\/$/, '');
+  const model = process.env.BIBBLE_CURIOSIDADE_MODEL ?? runtime.model;
 
   let r: Response;
   try {
     r = await fetch(`${ollamaUrl}/v1/chat/completions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getOllamaHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         model,
         messages: [
@@ -92,19 +101,22 @@ export async function GET() {
           },
         ],
         stream: false,
-        temperature: 0.92,
+        temperature: 0.7,
         max_tokens: 110,
       }),
       signal: AbortSignal.timeout(28_000),
     });
-  } catch (err) {
-    console.error("[BIBBLE/CURIOSIDADE] Ollama unreachable:", err);
+  } catch {
+    console.error("[BIBBLE/CURIOSIDADE] provider-unavailable");
+    lease.release();
     return NextResponse.json({ error: "Ollama indisponível" }, { status: 502 });
   }
 
+  lease.release();
+
   if (!r.ok) {
-    const body = await r.text().catch(() => "");
-    console.error("[BIBBLE/CURIOSIDADE] Ollama error:", r.status, body);
+    await r.body?.cancel().catch(() => undefined);
+    console.error("[BIBBLE/CURIOSIDADE] provider-error", { status: r.status });
     return NextResponse.json({ error: "Falha no Ollama" }, { status: 502 });
   }
 

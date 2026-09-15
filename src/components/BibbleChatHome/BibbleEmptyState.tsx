@@ -11,7 +11,6 @@ import { type TemaAlpha } from "@/lib/temas";
 
 interface BibbleEmptyStateProps {
   userName: string;
-  model: string;
   inputValue: string;
   onInputChange: (v: string) => void;
   onSend: () => void;
@@ -28,11 +27,13 @@ interface BibbleEmptyStateProps {
   isAdmin?: boolean;
   imageGenAvailable?: boolean;
   onVozUsada?: () => void;
+  activeAgentName?: string | null;
+  activeAgentAvatarUrl?: string | null;
+  permissions?: string[];
 }
 
 export default function BibbleEmptyState({
   userName,
-  model,
   inputValue,
   onInputChange,
   onSend,
@@ -49,6 +50,9 @@ export default function BibbleEmptyState({
   isAdmin,
   imageGenAvailable,
   onVozUsada,
+  activeAgentName,
+  activeAgentAvatarUrl,
+  permissions = [],
 }: BibbleEmptyStateProps) {
   const [nameHovered, setNameHovered] = useState(false);
   const ac = tema?.accent ?? "99, 102, 241";
@@ -120,14 +124,8 @@ export default function BibbleEmptyState({
           transition={{ duration: 0.5, ease: "easeOut" }}
           style={{ filter: `drop-shadow(0 4px 20px rgba(${ac}, 0.4))` }}
         >
-          <Image
-            src="/Logo_Principal.png"
-            alt="Bibble"
-            width={130}
-            height={42}
-            className="object-contain"
-            priority
-          />
+          <Image src={activeAgentAvatarUrl || "/Logo_Principal.png"} alt={activeAgentName || "Bibble"} width={activeAgentName ? 48 : 130} height={activeAgentName ? 48 : 42} className={activeAgentName ? "object-cover rounded-full" : "object-contain"} priority />
+          {activeAgentName && <span className="text-lg font-bold text-white">{activeAgentName}</span>}
           <span
             className="text-[11px] font-black uppercase tracking-widest"
             style={{ color: `rgba(${ac}, 0.6)` }}
@@ -209,37 +207,8 @@ export default function BibbleEmptyState({
             className="text-base font-medium tracking-wide"
             style={{ color: "rgba(148, 163, 184, 0.9)" }}
           >
-            No que posso te ajudar hoje?
+            {activeAgentName ? `Você está conversando com ${activeAgentName}.` : "O que vamos resolver hoje?"}
           </p>
-        </motion.div>
-
-        {/* Badge do modelo */}
-        <motion.div
-          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full"
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4, delay: 0.18, ease: "easeOut" }}
-          style={{
-            background: `rgba(${ac}, 0.09)`,
-            border: `1px solid rgba(${ac}, 0.28)`,
-            boxShadow: `0 0 24px rgba(${ac}, 0.1)`,
-          }}
-        >
-          <motion.span
-            className="w-1.5 h-1.5 rounded-full shrink-0"
-            style={{
-              background: `rgba(${ac}, 1)`,
-              boxShadow: `0 0 8px rgba(${ac}, 0.9)`,
-            }}
-            animate={{ opacity: [1, 0.5, 1] }}
-            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          />
-          <span
-            className="text-[10px] font-bold uppercase tracking-widest"
-            style={{ color: `rgba(${ac}, 0.88)` }}
-          >
-            {model.split(":")[0].toUpperCase()}
-          </span>
         </motion.div>
 
         {/* Input */}
@@ -256,7 +225,6 @@ export default function BibbleEmptyState({
             onStop={onStop}
             isStreaming={isStreaming}
             streamStatus={streamStatus}
-            model={model}
             files={uploadFiles}
             onFilesChange={onFilesChange}
             showFiles={showFiles}
@@ -266,6 +234,7 @@ export default function BibbleEmptyState({
             tema={tema}
             isAdmin={isAdmin}
             imageGenAvailable={imageGenAvailable}
+            placeholder={`Pergunte algo a ${activeAgentName || "Bibble"}...`}
           />
         </motion.div>
 
@@ -276,7 +245,7 @@ export default function BibbleEmptyState({
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.32 }}
         >
-          <BibblePromptSuggestions onSelect={onSuggestion} />
+          <BibblePromptSuggestions onSelect={onSuggestion} activeAgentName={activeAgentName} permissions={permissions} isAdmin={isAdmin} />
         </motion.div>
 
       </div>

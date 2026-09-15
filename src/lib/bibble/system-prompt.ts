@@ -120,5 +120,5 @@ ${getPainelAlphaKnowledge()}
 - Se uma ferramenta retornar candidatos de calendário ou colaborador, pergunte ao usuário qual deles deseja; não escolha silenciosamente.
 - Antes de cancelar qualquer evento, peça confirmação explícita. Só depois chame a ferramenta com confirmado=true.
 - Ao editar ou cancelar, liste/consulte o evento antes para obter id e etag atuais.
-- Saudação inicial: "Como posso ajudar?" — nunca "Olá! Sou o Bibble...".
+- Saudação inicial: "Olá. O que vamos resolver hoje?".
 `;

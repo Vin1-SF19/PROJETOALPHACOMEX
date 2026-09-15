@@ -64,7 +64,8 @@ describe("Bibble attachment send guard", () => {
     expect(guard).toBeLessThan(createMessage);
     expect(source).toContain("lastSentRef.current = { text, files: filesAtSend }");
     expect(source).toContain("const readyFiles = filesAtSend;");
-    expect(source).toContain("const filesForChat = filesAtSend");
+    expect(source).toContain("files: undefined");
+    expect(source).not.toContain("const filesForChat = filesAtSend");
   });
 
   it("migrates the client default away from the legacy 4,096 window", () => {
@@ -72,7 +73,7 @@ describe("Bibble attachment send guard", () => {
       join(process.cwd(), "src/components/BibbleChatHome/BibbleChatLayout.tsx"),
       "utf8",
     );
-    expect(layout).toContain("const DEFAULT_CONTEXT_WINDOW = 32_768;");
+    expect(layout).toContain("const DEFAULT_CONTEXT_WINDOW = 131_072;");
     expect(layout).toContain("stored > 4_096");
   });
 

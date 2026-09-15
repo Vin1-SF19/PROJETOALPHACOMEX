@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { uploadConnectorFiles, OnyxError } from "@/lib/onyx/client";
 import { authorizeConnectors } from "@/lib/onyx/connectors-guard";
+import { getUserOnyxToken } from "@/lib/onyx/user-token";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +24,11 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const userToken = await getUserOnyxToken(authz.userId);
+    if (!userToken) return NextResponse.json({ error: "Onyx requer credencial individual." }, { status: 403 });
     const result = await uploadConnectorFiles(
       entries.map((f) => ({ blob: f, name: f.name })),
+      userToken,
     );
     return NextResponse.json({ success: true, ...result });
   } catch (err) {

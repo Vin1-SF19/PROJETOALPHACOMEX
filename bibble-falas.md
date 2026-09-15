@@ -1,5 +1,7 @@
 # Falas do Bibble - PainelAlpha AI Assistant
 
+> DEPRECATED: arquivo histórico, não carregado em runtime. A fonte executável e curada é `src/lib/bibble/persona.ts`.
+
 Adicione mensagens abaixo no formato de lista. O Bibble exibirá aleatoriamente.
 Cada mensagem tem um humor associado que define o sprite exibido:
 - happy, pensando, relaxando, sad, walking, walking-serius, frio, escondido

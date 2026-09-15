@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { BIBBLE_MAX_FILES_PER_TURN, isAllowedBibbleAttachmentType } from "./attachments";
+import { createHmac } from "crypto";
+import { AGGRESSION_REACTIONS, DETAIL_LEVELS, HUMOR_LEVELS } from "./adaptive-style";
 
 export {
   BIBBLE_ALLOWED_ATTACHMENT_TYPES,
@@ -79,7 +81,8 @@ export function parseTrustedBibbleBlobUrl(value: string): URL | null {
     const decodedPath = decodeURIComponent(url.pathname);
     if (
       url.protocol !== "https:"
-      || !url.hostname.endsWith(".blob.vercel-storage.com")
+      || !process.env.BIBBLE_BLOB_HOST
+      || url.hostname !== process.env.BIBBLE_BLOB_HOST
       || url.username
       || url.password
       || url.port
@@ -93,6 +96,18 @@ export function parseTrustedBibbleBlobUrl(value: string): URL | null {
   } catch {
     return null;
   }
+}
+
+export function bibbleBlobUserNamespace(userId: string | number): string | null {
+  const secret = process.env.BIBBLE_BLOB_NAMESPACE_SECRET;
+  if (!secret || secret.length < 32) return null;
+  return createHmac('sha256', secret).update(String(userId)).digest('hex').slice(0, 32);
+}
+
+export function isBibbleBlobOwnedByUser(value: string, userId: string | number): boolean {
+  const url = parseTrustedBibbleBlobUrl(value);
+  const namespace = bibbleBlobUserNamespace(userId);
+  return !!url && !!namespace && url.pathname.startsWith(`/bibble-chat/${namespace}/`);
 }
 
 export async function fetchTrustedBibbleBlob(
@@ -109,6 +124,11 @@ export async function fetchTrustedBibbleBlob(
   if (response.url && !parseTrustedBibbleBlobUrl(response.url)) {
     throw new Error("Resposta de anexo fora da origem permitida");
   }
+  const length = Number(response.headers.get('content-length'));
+  if (!Number.isFinite(length) || length < 0 || length > BIBBLE_ATTACHMENT_MAX_BYTES) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new Error("Tamanho real do anexo ausente ou excedido");
+  }
   return response;
 }
 
@@ -124,7 +144,7 @@ const historySchema = z.array(historyMessageSchema).max(200).superRefine((histor
   }
 });
 
-const fileInputSchema = z.object({
+export const bibbleFileInputSchema = z.object({
   name: z.string().trim().min(1).max(255),
   type: z.string().trim().min(1).max(150).refine(isAllowedBibbleAttachmentType, "Tipo de anexo não permitido"),
   size: z.number().int().nonnegative().max(BIBBLE_ATTACHMENT_MAX_BYTES),
@@ -145,11 +165,17 @@ export const bibbleChatInputSchema = z.object({
   context: contextSchema.optional(),
   model: z.string().trim().min(1).max(200).optional(),
   sessionId: z.string().trim().min(1).max(128).optional(),
-  files: z.array(fileInputSchema).max(BIBBLE_MAX_FILES_PER_TURN).optional(),
+  files: z.array(bibbleFileInputSchema).max(BIBBLE_MAX_FILES_PER_TURN).optional(),
   temperature: z.number().finite().min(0).max(2).optional(),
   computerAccess: z.boolean().optional(),
   globalSystemPrompt: z.string().max(30_000).optional(),
-  contextWindow: z.number().int().min(512).max(262_144).optional(),
+  contextWindow: z.number().int().min(512).max(131_072).optional(),
+  adaptivePreferences: z.object({
+    adaptiveTone: z.boolean(),
+    humor: z.enum(HUMOR_LEVELS),
+    aggressionReaction: z.enum(AGGRESSION_REACTIONS),
+    detail: z.enum(DETAIL_LEVELS),
+  }).strict().optional(),
 }).strict();
 
 export type BibbleChatInput = z.infer<typeof bibbleChatInputSchema>;

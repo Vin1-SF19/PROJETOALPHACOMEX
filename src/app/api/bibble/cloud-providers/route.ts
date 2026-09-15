@@ -1,23 +1,8 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { readFile, writeFile, mkdir } from "fs/promises";
-import path from "path";
-import { randomUUID } from "crypto";
+import { NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import { isAdminRole } from "@/lib/roles";
 
 export const runtime = "nodejs";
-
-const FILE_PATH = path.join(process.cwd(), ".bibble", "cloud-providers.json");
-
-interface CloudProvider {
-  id: string;
-  provider: "openai" | "google" | "anthropic";
-  modelId: string;
-  label: string;
-  apiKey: string;
-  enabled: boolean;
-  createdAt: string;
-}
 
 interface CloudProviderPublic {
   id: string;
@@ -27,90 +12,40 @@ interface CloudProviderPublic {
   enabled: boolean;
 }
 
-async function readProviders(): Promise<CloudProvider[]> {
-  try {
-    const content = await readFile(FILE_PATH, "utf-8");
-    return JSON.parse(content) as CloudProvider[];
-  } catch {
-    return [];
-  }
-}
-
-async function saveProviders(providers: CloudProvider[]): Promise<void> {
-  await mkdir(path.dirname(FILE_PATH), { recursive: true });
-  await writeFile(FILE_PATH, JSON.stringify(providers, null, 2), "utf-8");
+function configuredProviders(): CloudProviderPublic[] {
+  return [
+    ['openai', 'OPENAI_API_KEY'], ['google', 'GOOGLE_AI_API_KEY'], ['anthropic', 'ANTHROPIC_API_KEY'],
+  ].filter(([, env]) => Boolean(process.env[env])).map(([provider]) => ({
+    id: `env:${provider}`, provider: provider as CloudProviderPublic['provider'],
+    modelId: 'configurado-por-ambiente', label: `${provider} (server-side)`, enabled: true,
+  }));
 }
 
 // GET — público (sem API keys)
 export async function GET() {
-  const providers = await readProviders();
-  const result: CloudProviderPublic[] = providers
-    .filter((p) => p.enabled)
-    .map(({ id, provider, modelId, label, enabled }) => ({ id, provider, modelId, label, enabled }));
-  return NextResponse.json(result);
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  return NextResponse.json(configuredProviders());
 }
 
 // POST — admin only
-export async function POST(req: NextRequest) {
+export async function POST() {
   const session = await auth();
   const userTyped = session?.user as { role?: string } | undefined;
   if (!session?.user || !isAdminRole(userTyped?.role)) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
   }
 
-  const body = (await req.json().catch(() => ({}))) as {
-    provider?: string;
-    modelId?: string;
-    label?: string;
-    apiKey?: string;
-  };
-
-  if (!body.provider || !body.modelId?.trim() || !body.apiKey?.trim()) {
-    return NextResponse.json(
-      { error: "Campos obrigatórios: provider, modelId, apiKey" },
-      { status: 400 },
-    );
-  }
-
-  const providers = await readProviders();
-  const newEntry: CloudProvider = {
-    id: randomUUID(),
-    provider: body.provider as "openai" | "google" | "anthropic",
-    modelId: body.modelId.trim(),
-    label: (body.label?.trim() || body.modelId.trim()),
-    apiKey: body.apiKey.trim(),
-    enabled: true,
-    createdAt: new Date().toISOString(),
-  };
-
-  providers.push(newEntry);
-  await saveProviders(providers);
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { apiKey: _unused, ...pub } = newEntry;
-  return NextResponse.json(pub, { status: 201 });
+  return NextResponse.json({ error: "Chaves devem ser configuradas exclusivamente por variáveis de ambiente no servidor." }, { status: 410 });
 }
 
 // DELETE — admin only
-export async function DELETE(req: NextRequest) {
+export async function DELETE() {
   const session = await auth();
   const userTyped = session?.user as { role?: string } | undefined;
   if (!session?.user || !isAdminRole(userTyped?.role)) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
   }
 
-  const { searchParams } = new URL(req.url);
-  const id = searchParams.get("id");
-  if (!id) {
-    return NextResponse.json({ error: "ID obrigatório" }, { status: 400 });
-  }
-
-  const providers = await readProviders();
-  const filtered = providers.filter((p) => p.id !== id);
-  if (filtered.length === providers.length) {
-    return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
-  }
-
-  await saveProviders(filtered);
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ error: "Providers server-side são gerenciados por variáveis de ambiente." }, { status: 410 });
 }

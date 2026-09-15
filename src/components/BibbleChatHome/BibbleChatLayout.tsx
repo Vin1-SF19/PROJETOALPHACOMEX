@@ -19,12 +19,20 @@ import {
   selectAttachmentsWithinLimit,
 } from "@/lib/bibble/attachments";
 import { consumeBibbleAppStream } from "@/lib/bibble/client-stream";
+import { interruptBibbleTurn } from "@/lib/bibble/turn-interruption";
+import {
+  DEFAULT_ADAPTIVE_PREFERENCES,
+  adaptivePreferencesStorageKey,
+  readAdaptivePreferences,
+  type AdaptiveTonePreferences,
+} from "@/lib/bibble/adaptive-style";
 
 interface BibbleChatLayoutProps {
   userId: number;
   userName: string;
   userImage?: string | null;
   role?: string;
+  permissions?: string[];
   sessoesIniciais: SessionSummary[];
   temaName?: string;
   initialHour: number;
@@ -33,9 +41,7 @@ interface BibbleChatLayoutProps {
 let msgCounter = 0;
 const newId = () => `msg-${++msgCounter}-${Date.now()}`;
 
-// Modelo do Bibble é fixo — sem seletor na UI (ver .env.local BIBBLE_MODEL).
-const DEFAULT_MODEL = process.env.NEXT_PUBLIC_BIBBLE_MODEL || "qwen3.8:latest";
-const DEFAULT_CONTEXT_WINDOW = 32_768;
+const DEFAULT_CONTEXT_WINDOW = 131_072;
 
 export type StreamStatus = "idle" | "thinking" | "pesquisando" | "gerando_imagem";
 
@@ -94,9 +100,11 @@ function splitPersisted(raw: string): { display: string; full: string } {
 }
 
 export default function BibbleChatLayout({
+  userId,
   userName,
   userImage,
   role,
+  permissions = [],
   sessoesIniciais,
   temaName,
   initialHour,
@@ -110,10 +118,17 @@ export default function BibbleChatLayout({
   const [inputValue, setInputValue]         = useState("");
   const [isStreaming, setIsStreaming]       = useState(false);
   const [streamStatus, setStreamStatus]     = useState<StreamStatus>("idle");
-  const model = DEFAULT_MODEL;
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [runtimeBlocked, setRuntimeBlocked] = useState<string | null>(null);
+  const [adaptivePreferences, setAdaptivePreferences] = useState<AdaptiveTonePreferences>(() =>
+    typeof window === "undefined"
+      ? DEFAULT_ADAPTIVE_PREFERENCES
+      : readAdaptivePreferences(localStorage, userId),
+  );
+  const humorEnabled = adaptivePreferences.humor !== "off";
+  const [panelContext, setPanelContext] = useState({ activeUrl: "/PainelAlpha", activeLabel: "IAlpha", lastOperationalUrl: null as string | null, openModules: [] as Array<{url:string; label:string}> });
 
   // ── Onyx (agentes de IA) ──
   const [onyxModalOpen, setOnyxModalOpen] = useState(false);
@@ -132,6 +147,19 @@ export default function BibbleChatLayout({
       .then(([fx, ags]) => { if (ativo) { setFixados(fx); setAgentesCache(ags); } })
       .catch(() => {});
     return () => { ativo = false; };
+  }, []);
+
+  useEffect(() => {
+    const receive = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.source !== window.parent || event.data?.type !== "ALPHA_BIBBLE_CONTEXT") return;
+      const { activeUrl, activeLabel, lastOperationalUrl, openModules } = event.data;
+      if (typeof activeUrl !== "string" || !activeUrl.startsWith("/PainelAlpha") || typeof activeLabel !== "string" || !Array.isArray(openModules)) return;
+      const safeOpen = openModules.filter((item: unknown): item is {url:string;label:string} => !!item && typeof item === "object" && typeof (item as {url?:unknown}).url === "string" && (item as {url:string}).url.startsWith("/PainelAlpha") && typeof (item as {label?:unknown}).label === "string").slice(0, 20);
+      setPanelContext({ activeUrl, activeLabel: activeLabel.slice(0, 100), lastOperationalUrl: typeof lastOperationalUrl === "string" && lastOperationalUrl.startsWith("/PainelAlpha") ? lastOperationalUrl : null, openModules: safeOpen });
+    };
+    window.addEventListener("message", receive);
+    window.parent.postMessage({ type: "ALPHA_BIBBLE_CONTEXT_READY" }, window.location.origin);
+    return () => window.removeEventListener("message", receive);
   }, []);
 
   const handleToggleFixar = useCallback(async (agent: OnyxAgent) => {
@@ -162,8 +190,8 @@ export default function BibbleChatLayout({
     return localStorage.getItem("bibble-system-prompt") ?? "";
   });
   const [ollamaUrl, setOllamaUrl] = useState<string>(() => {
-    if (typeof window === "undefined") return "http://localhost:11434";
-    return localStorage.getItem("bibble-ollama-url") ?? "http://localhost:11434";
+    if (typeof window === "undefined") return "http://127.0.0.1:18080";
+    return localStorage.getItem("bibble-ollama-url") ?? "http://127.0.0.1:18080";
   });
   const [computerAccess, setComputerAccess] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -173,9 +201,16 @@ export default function BibbleChatLayout({
     if (typeof window === "undefined") return DEFAULT_CONTEXT_WINDOW;
     const stored = Number(localStorage.getItem("bibble-context-window"));
     return Number.isFinite(stored) && stored > 4_096
-      ? stored
+      ? Math.min(stored, 131_072)
       : DEFAULT_CONTEXT_WINDOW;
   });
+  const [contextCeiling, setContextCeiling] = useState(DEFAULT_CONTEXT_WINDOW);
+  useEffect(() => {
+    fetch("/api/bibble/models").then(response => response.ok ? response.json() : Promise.reject()).then((data: {capabilities?: {contextWindow?: number}}) => {
+      const ceiling = Number(data.capabilities?.contextWindow);
+      if (Number.isFinite(ceiling) && ceiling >= 4096) { setContextCeiling(ceiling); setContextWindow(current => Math.min(current, ceiling)); }
+    }).catch(() => {});
+  }, []);
   const abortRef                              = useRef<AbortController | null>(null);
   const messagesRef                           = useRef<Message[]>([]);
   // Texto e arquivos do último envio — restaurados na caixa se o usuário interromper.
@@ -274,12 +309,18 @@ export default function BibbleChatLayout({
     localStorage.setItem("bibble-computer-access", String(v));
   };
   const handleContextWindowChange = (v: number) => {
-    setContextWindow(v);
-    localStorage.setItem("bibble-context-window", String(v));
+    const normalized = Math.max(512, Math.min(contextCeiling, v));
+    setContextWindow(normalized);
+    localStorage.setItem("bibble-context-window", String(normalized));
+  };
+  const handleAdaptivePreferencesChange = (preferences: AdaptiveTonePreferences) => {
+    setAdaptivePreferences(preferences);
+    localStorage.setItem(adaptivePreferencesStorageKey(userId), JSON.stringify(preferences));
   };
 
   /* ── Load session ───────────────────────────────────────── */
   const loadSession = useCallback(async (id: string) => {
+    setRuntimeBlocked(null);
     setActiveSessionId(id);
     setMessages([]);
     onyxSessionRef.current = null;
@@ -288,9 +329,19 @@ export default function BibbleChatLayout({
     //    traz texto + imagens enviadas e geradas, que o histórico local não guarda).
     try {
       const onyxRes = await fetch(`/api/onyx/session/${id}`);
+      if (!onyxRes.ok) {
+        setSelectedAgent(null); selectedAgentRef.current = null; onyxSessionRef.current = null;
+        const message = onyxRes.status === 409
+          ? "Esta conversa Onyx está bloqueada porque a identidade original do agente não pôde ser validada."
+          : "Não foi possível verificar o runtime desta conversa. Tente recarregar antes de enviar uma mensagem.";
+        setRuntimeBlocked(message);
+        setMessages([{ id: newId(), role: "assistant", content: message }]);
+        return;
+      }
       if (onyxRes.ok) {
         const onyxData = (await onyxRes.json()) as {
           onyx: boolean;
+          agentId?: number;
           messages: Array<{
             id: string;
             role: "user" | "assistant";
@@ -300,6 +351,16 @@ export default function BibbleChatLayout({
         };
 
         if (onyxData.onyx) {
+          const originalAgent = agentesCache.find(agent => agent.id === onyxData.agentId);
+          if (!originalAgent) {
+            const message = "Não foi possível restaurar a identidade original deste agente Onyx. Reabra a conversa quando o agente estiver disponível.";
+            setRuntimeBlocked(message);
+            setActiveSessionId(null);
+            setMessages([{ id: newId(), role: "assistant", content: message }]);
+            return;
+          }
+          setSelectedAgent(originalAgent);
+          selectedAgentRef.current = originalAgent;
           setMessages(
             onyxData.messages.map(m => {
               if (m.role === "user") {
@@ -325,8 +386,16 @@ export default function BibbleChatLayout({
           );
           return;
         }
+        // A API é a autoridade para afirmar que esta sessão é Bibble nativa.
+        setSelectedAgent(null); selectedAgentRef.current = null; onyxSessionRef.current = null;
       }
-    } catch { /* cai no histórico local */ }
+    } catch {
+      setSelectedAgent(null); selectedAgentRef.current = null; onyxSessionRef.current = null;
+      const message = "Não foi possível verificar o runtime desta conversa. Tente recarregar antes de enviar uma mensagem.";
+      setRuntimeBlocked(message);
+      setMessages([{ id: newId(), role: "assistant", content: message }]);
+      return;
+    }
 
     // 2. Conversa Bibble/Ollama → histórico local (Prisma).
     try {
@@ -356,7 +425,7 @@ export default function BibbleChatLayout({
         })
       );
     } catch { /* ignore */ }
-  }, []);
+  }, [agentesCache]);
 
   /* ── Create session ─────────────────────────────────────── */
   const createSession = useCallback(async (firstMessage?: string, projectId?: string | null): Promise<string | null> => {
@@ -394,7 +463,7 @@ export default function BibbleChatLayout({
       });
       if (!res.ok) {
         console.error("[BIBBLE PERSISTENCE] failed", { status: res.status });
-        return;
+        return false;
       }
       setSessions(prev =>
         prev.map(s =>
@@ -403,8 +472,10 @@ export default function BibbleChatLayout({
             : s
         )
       );
+      return true;
     } catch {
       console.error("[BIBBLE PERSISTENCE] failed", { status: "network-error" });
+      return false;
     }
   }, []);
 
@@ -434,7 +505,7 @@ export default function BibbleChatLayout({
       }
     });
     if (!result.receivedAnyEvent || !fullResponse.trim()) {
-      return fullResponse.trim() || "Tive um problema. Tenta de novo.";
+      return fullResponse.trim() || "Não consegui concluir a resposta. Revise a conexão do provedor e tente enviar novamente.";
     }
     return fullResponse;
   }, []);
@@ -485,6 +556,7 @@ export default function BibbleChatLayout({
 
   /* ── Send message ───────────────────────────────────────── */
   const handleSend = useCallback(async () => {
+    if (runtimeBlocked) return;
     const text = inputValue.trim();
     if (!text && uploadFiles.length === 0) return;
 
@@ -574,17 +646,7 @@ export default function BibbleChatLayout({
 
     try {
       // Preparar dados dos arquivos para envio (URLs do Blob)
-      const filesForChat = filesAtSend
-        .map(f => ({
-          name: f.file.name,
-          type: f.file.type,
-          size: f.file.size,
-          url: f.uploadUrl,
-          extractedContent: f.extractedContent,
-          extractionSource: f.extractionSource,
-        }));
-
-      // Agentes Onyx → /api/onyx/chat | Bibble → /api/bibble/chat com modelo do dropdown
+      // Agentes Onyx → /api/onyx/chat | Bibble → modelo/provider definidos no servidor.
       const agente = selectedAgentRef.current;
       const res = agente
         ? await fetch("/api/onyx/chat", {
@@ -597,7 +659,7 @@ export default function BibbleChatLayout({
               onyxSessionId: onyxSessionRef.current,
               painelSessionId: sessionId,
               pageContext: typeof window !== "undefined" ? window.location.pathname : null,
-              files: filesForChat.length > 0 ? filesForChat : undefined,
+              files: undefined,
               history,
             }),
           })
@@ -608,12 +670,13 @@ export default function BibbleChatLayout({
             body: JSON.stringify({
               message: msgContent,
               history,
-              model,
               sessionId,
-              files: filesForChat.length > 0 ? filesForChat : undefined,
+              files: undefined,
               temperature,
               computerAccess,
               contextWindow,
+              context: panelContext,
+              adaptivePreferences,
               ...(globalSystemPrompt.trim() ? { globalSystemPrompt } : {}),
             }),
           });
@@ -666,15 +729,17 @@ export default function BibbleChatLayout({
     if (fullResponse && sessionId) {
       // Persiste o conteúdo COMPLETO (com texto dos PDFs) para a IA reenxergar
       // o documento ao recarregar a sessão e em perguntas futuras.
-      await saveMessages(sessionId, persistedContent, fullResponse);
+      const saved = await saveMessages(sessionId, persistedContent, fullResponse);
+      if (!saved) setMessages(prev => prev.map(item => item.id === assistantMsg.id ? { ...item, content: `${item.content}\n\n⚠️ A resposta foi exibida, mas não foi salva. Copie o conteúdo e tente novamente.` } : item));
     }
-  }, [inputValue, uploadFiles, activeSessionId, activeProjectId, model, temperature, computerAccess, contextWindow, globalSystemPrompt, createSession, saveMessages, consumeChatStream, falarResposta]);
+  }, [runtimeBlocked, inputValue, uploadFiles, activeSessionId, activeProjectId, temperature, computerAccess, contextWindow, globalSystemPrompt, panelContext, adaptivePreferences, createSession, saveMessages, consumeChatStream, falarResposta]);
 
   // Mantém o ref do handleSend atualizado para uso pelo handleEditMessage.
   useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);
 
   /* ── Conversar (vazio): ativa o agente e abre uma conversa NOVA sem mensagens ── */
   const conversarVazio = useCallback((agent: OnyxAgent) => {
+    setRuntimeBlocked(null);
     setSelectedAgent(agent);
     selectedAgentRef.current = agent;
     onyxSessionRef.current = null;
@@ -687,6 +752,7 @@ export default function BibbleChatLayout({
 
   /* ── "Quem é você?": ativa o agente, abre conversa nova e já pede apresentação ── */
   const quemEhVoceAgente = useCallback(async (agent: OnyxAgent) => {
+    setRuntimeBlocked(null);
     // Ativa o agente imediatamente (UI: header, avatares) e zera a conversa/sessão Onyx
     setSelectedAgent(agent);
     selectedAgentRef.current = agent;
@@ -725,7 +791,7 @@ export default function BibbleChatLayout({
       fullResponse = await consumeChatStream(res, assistantMsg.id);
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
-        fullResponse = fullResponse || "Tive um problema ao apresentar o agente. Tenta de novo.";
+        fullResponse = fullResponse || "Não consegui carregar este agente. Verifique se o Onyx está disponível e tente novamente.";
       }
     }
 
@@ -742,17 +808,32 @@ export default function BibbleChatLayout({
     abortRef.current = null;
 
     if (fullResponse && sessionId) {
-      await saveMessages(sessionId, introText, fullResponse);
+      const saved = await saveMessages(sessionId, introText, fullResponse);
+      if (!saved) setMessages(prev => prev.map(item => item.id === assistantMsg.id ? { ...item, content: `${item.content}\n\n⚠️ A resposta foi exibida, mas não foi salva. Copie o conteúdo e tente novamente.` } : item));
     }
   }, [activeProjectId, createSession, saveMessages, consumeChatStream]);
 
   /* ── Adicionar agente à conversa atual (sem reiniciar nem apresentar) ── */
   const adicionarAgenteNaConversa = useCallback((agent: OnyxAgent) => {
-    // Ativa o agente; o useEffect de selectedAgent zera a sessão Onyx.
-    // Mensagens atuais permanecem — a partir daqui as respostas vêm do agente.
+    setRuntimeBlocked(null);
+    abortRef.current?.abort();
     setSelectedAgent(agent);
     selectedAgentRef.current = agent;
     onyxSessionRef.current = null;
+    setActiveSessionId(null);
+    setMessages([]);
+    setInputValue("");
+    setUploadFiles([]);
+    setIsStreaming(false);
+    setStreamStatus("idle");
+  }, []);
+
+  const clearAgent = useCallback(() => {
+    setRuntimeBlocked(null);
+    abortRef.current?.abort();
+    setSelectedAgent(null); selectedAgentRef.current = null; onyxSessionRef.current = null;
+    setActiveSessionId(null); setMessages([]); setInputValue(""); setUploadFiles([]);
+    setIsStreaming(false); setStreamStatus("idle");
   }, []);
 
   /* ── Clique num agente fixado (sidebar) ──────────────────── */
@@ -804,23 +885,12 @@ export default function BibbleChatLayout({
     }
 
     // Remove o par (mensagem do usuário + resposta vazia) deste turno interrompido.
-    setMessages(prev => {
-      const next = [...prev];
-      // último item é o placeholder do assistente em streaming
-      if (next.length && next[next.length - 1].role === "assistant" && next[next.length - 1].streaming) {
-        next.pop();
-        // e o anterior é a mensagem do usuário que acabou de ser enviada
-        if (next.length && next[next.length - 1].role === "user") next.pop();
-      } else {
-        // fallback: só desliga o streaming
-        return prev.map(m => (m.streaming ? { ...m, streaming: false } : m));
-      }
-      return next;
-    });
+    setMessages(prev => interruptBibbleTurn(abortRef.current, prev));
   }, []);
 
   /* ── New session ────────────────────────────────────────── */
   const handleNewSession = useCallback((projectId?: string | null) => {
+    setRuntimeBlocked(null);
     setActiveSessionId(null);
     setMessages([]);
     setInputValue("");
@@ -835,7 +905,7 @@ export default function BibbleChatLayout({
     } catch { /* ignore */ }
     setSessions(prev => prev.filter(s => s.id !== id));
     if (id === activeSessionId) {
-      setActiveSessionId(null);
+        setActiveSessionId(null);
       setMessages([]);
     }
   }, [activeSessionId]);
@@ -908,7 +978,6 @@ export default function BibbleChatLayout({
         messages={messages}
         userName={userName}
         userImage={userImage}
-        model={model}
         streamStatus={streamStatus}
         inputValue={inputValue}
         isStreaming={isStreaming}
@@ -920,7 +989,7 @@ export default function BibbleChatLayout({
         activeAgentName={selectedAgent?.name ?? null}
         activeAgentAvatarUrl={selectedAgent?.uploaded_image_id ? agentAvatarUrl(selectedAgent.id) : null}
         hasActiveAgent={!!selectedAgent}
-        onClearAgent={() => setSelectedAgent(null)}
+        onClearAgent={clearAgent}
         isAdmin={isAdmin}
         imageGenAvailable={!!selectedAgent?.tools?.some(t => t.name === "generate_image")}
         onVozUsada={() => { vozUsadaRef.current = true; }}
@@ -933,6 +1002,8 @@ export default function BibbleChatLayout({
         onToggleSidebar={() => setSidebarOpen(p => !p)}
         tema={tema}
         currentHour={initialHour}
+        permissions={permissions}
+        humorEnabled={humorEnabled}
       />
 
       {/* Sidebar direita — desktop: inline com animação de largura */}
@@ -962,7 +1033,7 @@ export default function BibbleChatLayout({
             onOpenSettings={() => setSettingsOpen(true)}
             onOpenAgents={() => setOnyxModalOpen(true)}
             activeAgentName={selectedAgent?.name ?? null}
-            onClearAgent={() => setSelectedAgent(null)}
+            onClearAgent={clearAgent}
             fixados={fixadosSidebar}
             onPickFixado={handlePickFixado}
             activeAgentId={selectedAgent?.id ?? null}
@@ -1008,7 +1079,7 @@ export default function BibbleChatLayout({
                 onOpenSettings={() => setSettingsOpen(true)}
                 onOpenAgents={() => setOnyxModalOpen(true)}
                 activeAgentName={selectedAgent?.name ?? null}
-                onClearAgent={() => setSelectedAgent(null)}
+                onClearAgent={clearAgent}
                 fixados={fixadosSidebar}
                 onPickFixado={handlePickFixado}
                 activeAgentId={selectedAgent?.id ?? null}
@@ -1032,6 +1103,10 @@ export default function BibbleChatLayout({
         onContextWindowChange={handleContextWindowChange}
         computerAccess={computerAccess}
         onComputerAccessChange={handleComputerAccessChange}
+        adaptivePreferences={adaptivePreferences}
+        onAdaptivePreferencesChange={handleAdaptivePreferencesChange}
+        maxContextWindow={contextCeiling}
+        approximateContextTokens={Math.ceil(messages.reduce((sum, item) => sum + (item.fullContent ?? item.content).length, 0) / 3)}
       />
 
       <OnyxAgentsModal

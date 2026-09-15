@@ -4,6 +4,8 @@ interface Suggestion {
   emoji: string;
   label: string;
   prompt: string;
+  permission?: string | string[];
+  kind?: "consultar" | "analisar" | "criar";
 }
 
 const SUGGESTIONS: Suggestion[] = [
@@ -11,42 +13,46 @@ const SUGGESTIONS: Suggestion[] = [
     emoji: "📊",
     label: "Gerar ficha de reunião",
     prompt: "Gere a ficha de reunião para o CNPJ ",
+    permission: "analise", kind: "criar",
   },
   {
     emoji: "🔍",
     label: "Buscar empresa por CNPJ",
     prompt: "Consulte os dados da empresa com CNPJ ",
-  },
-  {
-    emoji: "📎",
-    label: "Analisar documento PDF",
-    prompt: "Analise o PDF que vou enviar e me dê um resumo dos pontos principais.",
-  },
-  {
-    emoji: "🛠️",
-    label: "Abrir chamado de suporte",
-    prompt: "Preciso abrir um chamado de suporte: ",
+    permission: ["analise", "radar"], kind: "consultar",
   },
   {
     emoji: "📋",
     label: "Ver consultas recentes",
     prompt: "Mostre as últimas consultas de pré-análise realizadas.",
+    permission: "analise", kind: "consultar",
   },
   {
     emoji: "👥",
     label: "Buscar cliente",
     prompt: "Busque as informações do cliente ",
+    permission: "Cliente", kind: "consultar",
   },
 ];
 
 export default function BibblePromptSuggestions({
   onSelect,
+  activeAgentName,
+  permissions = [],
+  isAdmin = false,
 }: {
   onSelect: (prompt: string) => void;
+  activeAgentName?: string | null;
+  permissions?: string[];
+  isAdmin?: boolean;
 }) {
+  const suggestions = activeAgentName ? [
+    { emoji: "🧠", label: `Conhecer ${activeAgentName}`, prompt: "Apresente suas especialidades e limites de forma objetiva." },
+    { emoji: "📋", label: "Analisar um caso", prompt: "Analise este caso dentro da sua especialidade: " },
+  ] : SUGGESTIONS.filter(item => !item.permission || isAdmin || (Array.isArray(item.permission) ? item.permission.some(permission => permissions.includes(permission)) : permissions.includes(item.permission)));
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 w-full">
-      {SUGGESTIONS.map(s => (
+      {suggestions.map(s => (
         <button
           key={s.label}
           onClick={() => onSelect(s.prompt)}
@@ -73,6 +79,7 @@ export default function BibblePromptSuggestions({
           >
             {s.label}
           </span>
+          {s.kind && <span className="ml-auto text-[9px] uppercase tracking-wide text-slate-500">{s.kind}</span>}
         </button>
       ))}
     </div>

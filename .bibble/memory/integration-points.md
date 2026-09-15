@@ -2704,3 +2704,135 @@ Nos produtores de card, `ativarCadenciasNaEntradaBpm(..., tx)` encontra escopo d
 Na administração, `KanbanCardPreview` passa o mesmo formulário resolvido ao mesmo `FormularioEtapaRenderer`, com inputs desabilitados e componentes especializados apenas descritivos. Formulário ausente/inativo ou referência inválida produz fallback explícito; não há retorno para o catálogo inteiro do pipeline.
 
 **Última atualização:** 2026-09-09 por Codex (RM-2026-40526E)
+
+## Bibble/IAlpha — contrato vigente após hardening integral (2026-09-15)
+
+Esta seção substitui, para novas integrações, os limites e capacidades descritos nas entradas históricas anteriores sem apagá-las.
+
+### Runtime, stream e orçamento
+
+**Arquivos:** `src/lib/bibble/{runtime-config,completion,context-budget,telemetry,admission-control}.ts`, `src/app/api/bibble/chat/route.ts`, `scripts/bibble.mjs`
+
+**Editado quando:** modelo, endpoint, janela, saída, protocolo SSE, concorrência, métricas ou deadline forem alterados.
+
+**Como integrar:** o modelo e endpoint são resolvidos exclusivamente no servidor. A janela efetiva nunca excede 131.072 tokens e reserva até 4.096 para saída. Conversa simples usa uma única chamada streaming; nova chamada só é válida após `tool_call` real. Propague o mesmo `AbortSignal`, `deadlineAt` e `requestId` por completion e tools. Preserve os eventos `done`/`error` e a regra de não persistir resposta incompleta.
+
+Antes de alterar o runtime, execute `npm run bibble:doctor`, `npm run bibble:capabilities` e os benchmarks documentados em `docs/operations/bibble-observability.md`. O catálogo esperado no fechamento é de 18 tools, todas read-only.
+
+### Capabilities, prompt e contexto da aba
+
+**Arquivos:** `src/lib/bibble/{tools,tool-policy,tool-executor,persona,system-prompt,module-context}.ts`, `src/lib/modulos-registry.ts`, `src/components/layout/PainelLayoutClient.tsx`, `src/components/BibbleChatHome/`
+
+**Editado quando:** uma tool, permissão, módulo, sugestão, persona ou camada do prompt mudar.
+
+**Como integrar:** toda tool nova precisa de metadata, autorização server-side e teste negativo. O runner só executa nomes presentes no `Set` imutável daquele turno; mutações e filesystem permanecem recusados até uma story com confirmação humana server-side. Capabilities exibidas e sugestões devem derivar do conjunto autorizado e nunca prometer upload, provider ou mutação indisponível.
+
+O shell envia somente mensagens `ALPHA_BIBBLE_CONTEXT` same-origin. O servidor converte rota em module key pelo registry, reaplica permissão e trata o restante como dado, nunca como instrução. A hierarquia de prompt é segurança → identidade → capacidades → permissões → contexto validado → projeto → estilo; projeto/usuário não substituem guardrails.
+
+### Onyx, anexos e persistência
+
+**Arquivos:** `src/app/api/onyx/`, `src/lib/onyx/{client,ownership,user-token}.ts`, `src/app/api/bibble/upload-to-blob/route.ts`, `src/lib/bibble/attachment-security.ts`, `src/app/api/bibble/sessions/`
+
+**Editado quando:** autenticação Onyx, sessão/persona, upload, arquivo, histórico ou gravação do turno mudar.
+
+**Como integrar:** Onyx exige PAT individual e prova conjunta de agente autorizado, sessão local do usuário, sessão remota e `persona_id`. Nunca use PAT admin/service como fallback de usuário comum, nunca encaminhe `reasoning_*`, e não aceite anexo ou `fileId` sem ownership comprovável.
+
+O upload Bibble permanece `503` fail-closed até storage privado autenticado; não reative Blob público nem aceite host genérico `*.blob.vercel-storage.com`. O par usuário/assistente é gravado em transação, o histórico é paginado até 100 itens e `BibbleMessage.tokens` fica `null` sem contagem exata autoritativa do servidor.
+
+**Validação de fechamento:** Forge direcionado/build PASS, Probe PASS, Anubis PASS, Lens PASS e Sage com 118/118 testes Bibble. Smoke visual autenticado, CodeRabbit indisponível e dívidas dos gates globais seguem registrados na story, sem serem convertidos em sucesso.
+
+**Última atualização:** 2026-09-15 por Scribe (story IAlpha/Bibble — transformação integral)
+
+### Extração de documentos e segurança dos anexos
+
+**Arquivos:** `src/lib/bibble/attachment-security.ts`, `src/lib/bibble/tika.ts`, `src/lib/bibble/pdf24-ocr.ts`, `src/lib/bibble/pdfjs-polyfill.ts`, `src/app/api/bibble/upload-to-blob/route.ts`, `src/app/api/bibble/chat/route.ts`
+
+**Propósito:** valida o envelope do chat e executa a leitura na ordem Tika → `pdf-parse` → PDF24 OCR. Downloads aceitam somente URLs HTTPS do Vercel Blob sob `/bibble-chat/`, bloqueiam redirects e revalidam a URL de resposta. O PDF24 só recebe/retorna recursos da mesma origem configurada.
+
+**Editado quando:** um formato de documento for aceito, a cadeia de extração mudar, o host/caminho de storage mudar, o schema do payload ganhar campo ou um processador externo for substituído.
+
+**Como adicionar:** toda URL de anexo recebida do cliente deve passar por `parseTrustedBibbleBlobUrl`/`fetchTrustedBibbleBlob`; nunca use `fetch(file.url)` diretamente. Preserve `extractionSource` no upload e no payload para observabilidade sem registrar nome ou conteúdo do arquivo.
+
+```typescript
+const parsed = bibbleChatInputSchema.safeParse(input);
+if (!parsed.success) return invalidInputResponse;
+
+const response = await fetchTrustedBibbleBlob(parsed.data.files[0].url!);
+const extraction = await extractTextFromBuffer(buffer, mimeType, fileName);
+```
+
+Qualquer turno com anexo usa `toolsForTurn = []`: conteúdo do documento não confiável não pode acionar tools do sistema. O Blob criado pela rota atual usa `access: "public"`, mas seu caminho é opaco e o chat só baixa URLs que passam pela allowlist acima.
+
+**Última atualização:** 2026-08-11 por Scribe
+
+### Orçamento de contexto e saída do Bibble
+
+**Arquivos:** `src/lib/bibble/context-budget.ts`, `src/lib/bibble/completion.ts`, `src/app/api/bibble/chat/route.ts`, `src/components/BibbleChatHome/BibbleSettingsPanel.tsx`
+
+**Propósito:** evita que PDF/histórico ocupem a reserva da resposta. A janela padrão é 32.768 tokens, a saída reserva até 4.096 tokens e PDFs com janela legada/insuficiente são ajustados para a janela segura do provider. Conteúdo excedente usa seleção explícita de início, meio e fim.
+
+**Editado quando:** um provider/modelo mudar de capacidade, o default do painel mudar, outro tipo de conteúdo exigir custo próprio ou a reserva de saída for alterada.
+
+**Como adicionar:** primeiro calcule os custos fixos; depois distribua `availableContentTokens` entre histórico e anexos. Use `selectTextForTokenBudget`/`selectRecentHistory` em vez de `slice(0, N)` e encaminhe os valores resolvidos à completion.
+
+```typescript
+const budget = calculateRequestBudget({
+  model,
+  requestedContextWindow,
+  hasPdf,
+  systemPrompt,
+  userPrompt,
+  tools,
+});
+
+const selection = selectTextForTokenBudget(text, budget.availableContentTokens, "documento");
+await callCompletion(messages, tools, model, signal, true, temperature,
+  budget.effectiveContextWindow, budget.outputTokenLimit);
+```
+
+No Ollama, `callCompletion` também envia `options.num_ctx` e `options.num_predict`; nos endpoints OpenAI-compatible, usa `max_tokens` ou `max_completion_tokens` conforme o modelo.
+
+**Última atualização:** 2026-08-11 por Scribe
+
+### Protocolo SSE concluído e retry preservando anexos
+
+**Arquivos:** `src/lib/bibble/completion.ts`, `src/lib/bibble/client-stream.ts`, `src/app/api/bibble/chat/route.ts`, `src/components/BibbleChatHome/BibbleChatLayout.tsx`
+
+**Propósito:** distingue resposta concluída de conexão encerrada ou limite de saída. O provider precisa fornecer `finish_reason`; a API precisa emitir `done`; o cliente só persiste quando `done.truncated !== true` e `done.successful !== false`.
+
+**Editado quando:** um endpoint novo reutilizar o consumidor SSE, eventos forem adicionados, o provider mudar de formato ou o fluxo de persistência/retry mudar.
+
+**Como adicionar:** endpoints Bibble devem encerrar com um evento explícito e marcar qualquer conclusão anormal como falha. O client comum deve continuar tratando EOF físico como incompleto.
+
+```typescript
+send({
+  type: "done",
+  finishReason,
+  truncated: isOutputTruncated(finishReason),
+  successful: !isOutputTruncated(finishReason),
+});
+
+await consumeBibbleAppStream(response, onEvent);
+```
+
+Em erro, truncamento, timeout ou EOF sem `done`, `BibbleChatLayout.tsx` remove as mensagens parciais e restaura o texto e a mesma coleção de anexos para retry. Não persista `fullResponse` antes da confirmação do protocolo.
+
+**Testes de contrato:** `tests/bibble/attachment-readiness.test.ts`, `attachment-security.test.ts`, `context-budget.test.ts`, `completion-budget-stream.test.ts`, `client-stream-protocol.test.ts`, `pdf-extraction-chain.test.ts`.
+
+**Última atualização:** 2026-08-11 por Scribe
+
+## Bibble — estilo adaptativo por histórico nativo (2026-09-15)
+
+**Arquivos:** `src/lib/bibble/{adaptive-style,behavioral-memory,persona,telemetry}.ts`, `src/app/api/bibble/chat/route.ts`, `src/lib/bibble/attachment-security.ts`, `src/components/BibbleChatHome/{BibbleChatLayout,BibbleSettingsPanel}.tsx`
+
+**Propósito:** adaptar forma, extensão e vocabulário sem alterar identidade, segurança, autorização, tools ou cardinalidade de chamadas ao provider.
+
+**Editado quando:** sinais, limiares, contextos sensíveis, controles, defaults ou limites da amostra mudarem.
+
+**Como integrar:** preserve `take=48`, 2.000 caracteres por mensagem e 1.000 no prompt. Filtre ownership, `role=user` e `onyxSessionId=null` no banco; nunca copie histórico bruto/anexos para prompt, log ou SSE. Classificação permanece local, sem provider; falha retorna perfil nulo e voz neutra. Preferências usam somente `bibble-adaptive-style:<userId>` e enums server-side fechados.
+
+A entrada exata `Faz logo essa porcaria e para de enrolar.` usa, quando firme e não sensível, `A pressa é toda sua, não minha, mas vou executar e ja trago o resultado`. Saúde grave, crise emocional, ameaça, abuso/assédio, credenciais/privacidade e decisões jurídicas/financeiras suprimem alfinetadas.
+
+**Validação:** suíte Bibble 170/170; fallback, controles renderizados e zero provider extra cobertos.
+
+**Última atualização:** 2026-09-15 por Scribe (story Bibble — tom adaptativo)

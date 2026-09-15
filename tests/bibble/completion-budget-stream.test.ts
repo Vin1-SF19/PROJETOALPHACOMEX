@@ -113,7 +113,7 @@ describe("Bibble provider SSE consumption", () => {
     );
 
     expect(received).toBe("início meio fim");
-    expect(result).toEqual({ finishReason: "length", chunks: 3 });
+    expect(result).toMatchObject({ finishReason: "length", chunks: 3, toolCalls: [] });
     expect(isOutputTruncated(result.finishReason)).toBe(true);
     expect(isOutputTruncated("stop")).toBe(false);
   });

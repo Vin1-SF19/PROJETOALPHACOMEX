@@ -26,7 +26,7 @@ describe("Bibble request context budget", () => {
       hasPdf: true,
     });
 
-    expect(resolved.effectiveContextWindow).toBe(32_768);
+    expect(resolved.effectiveContextWindow).toBe(131_072);
     expect(resolved.legacyContextAdjusted).toBe(true);
   });
 

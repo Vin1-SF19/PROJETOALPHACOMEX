@@ -1387,3 +1387,53 @@ O catálogo 3D ganhou `containerCarga`, adaptação procedural do container da s
 - `docs/reports/crm-canonical-renderer-p0-3.md`: inventário, prova em produção, hardcodes restantes e gates.
 
 **Última atualização:** 2026-09-09 por Codex (RM-2026-40526E)
+
+## IAlpha/Bibble — runtime endurecido e observável (2026-09-15)
+
+O assistente nativo da home (`/PainelAlpha`) é composto por `src/components/BibbleChatHome/`, com orquestração principal em `BibbleChatLayout.tsx`, e pela rota `src/app/api/bibble/chat/route.ts`. O shell `src/components/layout/PainelLayoutClient.tsx` publica por `postMessage` same-origin o contexto mínimo da aba ativa; `src/lib/bibble/module-context.ts` valida esse contexto contra `src/lib/modulos-registry.ts` e as permissões efetivas antes de ele chegar ao prompt.
+
+O núcleo server-side está dividido por responsabilidade:
+
+- `runtime-config.ts`: modelo exclusivo do servidor, teto físico de 131.072 tokens e reserva máxima de saída de 4.096 tokens;
+- `completion.ts`: stream OpenAI-compatible, agregação incremental de `tool_calls`, usage e cancelamento;
+- `context-budget.ts`: estimativa conservadora, orçamento integral e compactação determinística do histórico;
+- `tool-policy.ts`, `tools.ts` e `tool-executor.ts`: registry, autorização por turno e execução em profundidade;
+- `admission-control.ts`: limite local por usuário/slot antes da leitura e do trabalho caro;
+- `telemetry.ts`: `requestId`, TTFT, duração, throughput, provider calls e latência de tools sem conteúdo sensível;
+- `persona.ts` e `system-prompt.ts`: identidade executável e composição em camadas imutáveis;
+- `turn-interruption.ts`: cancelamento e remoção segura do par otimista incompleto.
+
+O catálogo público atual contém exatamente 18 tools somente leitura. Filesystem e mutações foram removidos do provider e falham fechados no executor. Upload/anexos também permanecem indisponíveis (`503`) até existir storage privado com ownership verificável; a UI não oferece essa capacidade enquanto a contenção estiver ativa.
+
+As rotas `src/app/api/onyx/` são uma fronteira separada: exigem PAT individual, validam visibilidade do agente, ownership da sessão local e vínculo com `persona_id`; anexos, proxy de arquivo sem vínculo e reasoning interno falham fechados. Trocar Bibble/Onyx interrompe o turno e reinicializa identidade e memória visual no cliente.
+
+Operação CLI-first: `scripts/bibble.mjs` expõe doctor, capabilities e benchmarks; `docs/operations/bibble-observability.md` documenta coleta e leitura de métricas, e `docs/qa/bibble/benchmark-2026-09-15.md` preserva o baseline sanitizado. Cobertura dedicada vive em `tests/bibble/` (16 arquivos, 118/118 no fechamento).
+
+**Última atualização:** 2026-09-15 por Scribe (story IAlpha/Bibble — transformação integral)
+
+---
+
+### Alpha CRM — Melhoria Visual da Sidebar (RM-2026-4F34CC, 2026-08-17)
+
+**Arquivo único alterado:** `src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx`
+
+**Alterações (exclusivamente visual, zero mudança de lógica):**
+1. `<aside>`: `bg-slate-950` → `bg-slate-950/40 backdrop-blur-xl` — o `CrmSpaceBackground` (já `absolute inset-0 z-0`) agora é visível através da sidebar.
+2. Mobile top bar: `bg-slate-950/80` → `bg-slate-950/40 backdrop-blur-xl` — consistência visual.
+3. NAV links: adicionados `bg-white/[0.04] border border-white/[0.06] rounded-xl` (destaque base), `hover:bg-white/[0.08] hover:shadow-[0_2px_8px_rgba(0,0,0,0.15)] hover:translate-x-0.5` (hover), `active:scale-[0.98] active:shadow-none` (active), `transition-all duration-200 ease-in-out` (transição), `cursor-pointer`.
+4. Ícone NAV: `group-hover:scale-110 transition-transform duration-200`.
+5. Item ativo: `boxShadow: 0 0 12px rgba(accent,0.1)` (glow de accent via `style` inline).
+
+**Padrão adotado:** "Sidebar sobre background vivo" — extensão do "vidro sobre hero" do Aurora Financeira. Ver `design-tokens.md` e `patterns.md`.
+
+**Verificação:** Probe aprovou todos os 6 critérios de aceitação. Sem regressão funcional. Observação menor (não bloqueante): área de toque vertical ~40px (ideal 44px) — `py-2.5` → `py-3` seria a correção.
+
+## IAlpha/Bibble — tom adaptativo e memória comportamental derivada (2026-09-15)
+
+`src/lib/bibble/adaptive-style.ts` separa estilo estável recorrente do tom atual e limita a análise a 48 mensagens nativas do usuário, 2.000 caracteres por mensagem e 1.000 caracteres no bloco final de prompt. `src/lib/bibble/behavioral-memory.ts` aplica ownership, `role="user"`, `onyxSessionId=null`, ordenação e limite diretamente na query; não persiste perfil novo.
+
+A rota do chat deriva apenas sinais compactos antes do runner existente, sem provider ou geração extra. Falha do loader/classificador degrada para voz neutra e telemetria agregada sem interromper stream/tools. `BibbleChatLayout.tsx` e `BibbleSettingsPanel.tsx` mantêm controles tipados na chave `bibble-adaptive-style:<userId>`, sem vazamento entre usuários ou envio ao Onyx.
+
+Cobertura: `adaptive-style.test.ts`, `behavioral-memory.test.ts`, `adaptive-integration.test.ts` e `adaptive-settings.component.test.ts`; suíte Bibble final 170/170, com Probe, Anubis e Lens aprovados. Nenhum schema/migration pertence à entrega.
+
+**Última atualização:** 2026-09-15 por Scribe (story Bibble — tom adaptativo)

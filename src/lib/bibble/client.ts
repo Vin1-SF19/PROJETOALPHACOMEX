@@ -1,8 +1,8 @@
 export const BIBBLE_OLLAMA_URL =
-  process.env.BIBBLE_OLLAMA_URL ?? "http://192.168.35.113:11434";
+  process.env.BIBBLE_OLLAMA_URL ?? "http://127.0.0.1:18080";
 
 export const BIBBLE_MODEL =
-  process.env.BIBBLE_MODEL ?? "qwen3.8:latest";
+  process.env.BIBBLE_MODEL ?? "qwen3.8-131k";
 
 export type Provider = "ollama" | "openai" | "anthropic" | "google";
 
@@ -13,15 +13,11 @@ export interface ModelEntry {
 }
 
 export const PROVIDER_MODELS: Record<Provider, ModelEntry[]> = {
+  // Servidor local trocou de Ollama para llama.cpp (llama-qwen.service) em
+  // 2026-09-14 — serve um único modelo carregado via --model/--alias, sem
+  // troca dinâmica de modelo em runtime. Lista de tags do Ollama removida.
   ollama: [
-    { id: "qwen3.8:latest",  label: "Qwen 3.8 · Latest", provider: "ollama" },
-    { id: "gemma4:e4b",      label: "Gemma 4 · E4B",     provider: "ollama" },
-    { id: "qwen3:14b",       label: "Qwen 3 · 14B",      provider: "ollama" },
-    { id: "qwen3.6:35b",     label: "Qwen 3.6 · 35B",    provider: "ollama" },
-    { id: "qwen3.6:latest",  label: "Qwen 3.6 · Latest", provider: "ollama" },
-    { id: "qwen3.5:35b-a3b", label: "Qwen 3.5 · 35B A3B", provider: "ollama" },
-    { id: "qwen3-coder:30b", label: "Qwen 3 Coder · 30B", provider: "ollama" },
-    { id: "qwen3-coder:30b-oc", label: "Qwen 3 Coder · 30B OC", provider: "ollama" },
+    { id: "qwen3.8-131k", label: "Qwen 3.8 · 131K (llama.cpp)", provider: "ollama" },
   ],
   openai: [
     { id: "gpt-4o",       label: "GPT-4o",       provider: "openai" },
@@ -80,9 +76,10 @@ export interface ProviderConfig {
 }
 
 /**
- * Headers para chamar o Ollama. Inclui `Authorization: Bearer <OLLAMA_API_KEY>` quando
- * a env está setada — necessário em produção, onde o Ollama é exposto via proxy
- * autenticado (Cloudflare). Sem o token o proxy responde 403. Só roda no servidor.
+ * Headers para chamar o servidor local (llama.cpp, ex-Ollama). Inclui
+ * `Authorization: Bearer <OLLAMA_API_KEY>` quando a env está setada —
+ * necessário caso o endpoint volte a ser exposto via proxy autenticado
+ * (Cloudflare). Sem o token o proxy responde 403. Só roda no servidor.
  */
 export function getOllamaHeaders(
   extra: Record<string, string> = {},
@@ -130,28 +127,29 @@ export function getProviderConfig(provider: Provider): ProviderConfig {
   }
 }
 
-// ─── Ollama URL Configuration Function ────
+// ─── Local server URL configuration ────
 
 /**
- * Fetch available models from Ollama API
- * @param ollamaUrl The Ollama API URL to query
- * @returns Promise resolving to an array of available model IDs
+ * Busca os modelos disponíveis no servidor local via endpoint OpenAI-compat
+ * `/v1/models` — o llama.cpp não implementa o `/api/tags` do Ollama.
+ * @param ollamaUrl URL base do servidor (llama.cpp)
+ * @returns Promise resolvendo para um array de IDs de modelo disponíveis
  */
 export async function fetchAvailableModels(ollamaUrl: string): Promise<string[]> {
   try {
-    const response = await fetch(`${ollamaUrl}/api/tags`, { headers: getOllamaHeaders() });
+    const response = await fetch(`${ollamaUrl}/v1/models`, { headers: getOllamaHeaders() });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    const data = (await response.json()) as { models?: Array<{ name: string }> };
-    return data.models?.map(model => model.name) ?? [];
+    const data = (await response.json()) as { data?: Array<{ id: string }> };
+    return data.data?.map(model => model.id) ?? [];
   } catch (error) {
     console.error("[BIBBLE] Failed to fetch available models:", error);
     return [];
   }
 }
 
-// ─── Update Ollama URL function ────
+// ─── Update local server URL function ────
 
 export async function updateOllamaUrl(newUrl: string): Promise<{ success: boolean; error?: string; availableModels?: string[] }> {
   try {
@@ -163,12 +161,12 @@ export async function updateOllamaUrl(newUrl: string): Promise<{ success: boolea
       };
     }
 
-    // Check if the URL is reachable and verify it points to Ollama
-    const response = await fetch(`${newUrl}/api/tags`, { headers: getOllamaHeaders() });
+    // Verifica se a URL responde ao endpoint OpenAI-compat de listagem de modelos
+    const response = await fetch(`${newUrl}/v1/models`, { headers: getOllamaHeaders() });
     if (!response.ok) {
       return {
         success: false,
-        error: `Failed to connect to Ollama at ${newUrl}. HTTP ${response.status}`
+        error: `Failed to connect to local model server at ${newUrl}. HTTP ${response.status}`
       };
     }
 
