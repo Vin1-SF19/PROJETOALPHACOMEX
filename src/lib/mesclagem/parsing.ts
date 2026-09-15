@@ -35,7 +35,7 @@ export function extensaoDoArquivo(nome: string): string {
 export function validarExtensaoMesclagem(nome: string): ExtensaoMesclagem {
   const extensao = extensaoDoArquivo(nome);
   if (!(EXTENSOES_MESCLAGEM as readonly string[]).includes(extensao)) {
-    throw new ErroMesclagem("Envie .xlsx, .xlsm, .csv ou .tsv", "INVALID_FILE_TYPE");
+    throw new ErroMesclagem("Envie .xlsx, .xlsm, .xls, .xlsb, .ods, .csv ou .tsv", "INVALID_FILE_TYPE");
   }
   return extensao as ExtensaoMesclagem;
 }

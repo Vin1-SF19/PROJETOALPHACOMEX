@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const EXTENSOES_MESCLAGEM = [".xlsx", ".xlsm", ".csv", ".tsv"] as const;
+export const EXTENSOES_MESCLAGEM = [".xlsx", ".xlsm", ".xls", ".xlsb", ".ods", ".csv", ".tsv"] as const;
 export type ExtensaoMesclagem = (typeof EXTENSOES_MESCLAGEM)[number];
 
 /** Limites estruturais canônicos, aplicados a todos os formatos e APIs. */

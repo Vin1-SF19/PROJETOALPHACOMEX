@@ -5,6 +5,8 @@ import * as XLSX from "xlsx";
 import { ErroMesclagem } from "./erro";
 import {
   LIMITE_LINHAS_MESCLAGEM,
+  LIMITE_CELULAS_MESCLAGEM,
+  LIMITE_COLUNAS_MESCLAGEM,
   carregarWorkbookXlsx,
   lerLinhasWorkbook,
   lerWorkbookXlsx,
@@ -126,6 +128,71 @@ function colunasInternas(): ColunaPlanilha[] {
   }));
 }
 
+/** Leitor compatível com os formatos legados suportados pelo SheetJS (.xls/.xlsb/.ods)
+ * e também com XLSX que não passa pelo parser do ExcelJS. */
+function lerWorkbookGenerico(buffer: ArrayBuffer): XLSX.WorkBook {
+  try {
+    return XLSX.read(buffer, { type: "array", dense: true, cellDates: true, cellFormula: true });
+  } catch {
+    throw new ErroMesclagem("Não foi possível ler a planilha", "INVALID_XLSX", 422);
+  }
+}
+
+function valorGenerico(celula: CelulaDensa | string | number | Date | undefined, endereco: string): string {
+  if (typeof celula === "string" || typeof celula === "number") return String(celula).trim();
+  if (celula instanceof Date) return celula.toISOString();
+  return valorCelula(celula, endereco);
+}
+
+function inspecionarWorkbookGenerico(workbook: XLSX.WorkBook, nomeArquivo: string, extensao: string): InspecaoPlanilha {
+  if (workbook.SheetNames.length === 0) throw new ErroMesclagem("A planilha não possui abas", "EMPTY_WORKBOOK", 422);
+  let totalCelulas = 0;
+  const abas = workbook.SheetNames.map((nome) => {
+    const sheet = workbook.Sheets[nome] as unknown as AbaDensa;
+    const linhas = sheet_to_json_rows(sheet);
+    const cabecalho = linhas[0] ?? [];
+    const colunas = cabecalho.map((celula, indice) => {
+      const nomeColuna = valorGenerico(celula, `${nome}!${indice + 1}`);
+      return nomeColuna ? { numero: indice + 1, nome: nomeColuna, nomeNormalizado: normalizarNomeColuna(nomeColuna) } : null;
+    }).filter((coluna): coluna is ColunaPlanilha => Boolean(coluna));
+    if (colunas.length === 0) throw new ErroMesclagem(`A aba ${nome} não possui cabeçalho`, "INVALID_HEADER", 422);
+    const vistos = new Set<string>();
+    colunas.forEach((coluna) => { if (vistos.has(coluna.nomeNormalizado)) throw new ErroMesclagem(`Cabeçalho duplicado ou ambíguo: ${coluna.nome}`, "DUPLICATE_HEADER", 422); vistos.add(coluna.nomeNormalizado); });
+    if (colunas.length > LIMITE_COLUNAS_MESCLAGEM) throw new ErroMesclagem(`A aba ${nome} excede o limite de ${LIMITE_COLUNAS_MESCLAGEM} colunas`, "TOO_MANY_COLUMNS", 413);
+    const dados = linhas.slice(1).filter((linha) => linha?.some((celula) => valorGenerico(celula, `${nome}!1`)));
+    totalCelulas += linhas.reduce((total, linha) => total + (linha?.filter(Boolean).length ?? 0), 0);
+    if (totalCelulas > LIMITE_CELULAS_MESCLAGEM) throw new ErroMesclagem(`A planilha excede o limite de ${LIMITE_CELULAS_MESCLAGEM.toLocaleString("pt-BR")} células`, "TOO_MANY_CELLS", 413);
+    if (dados.length > LIMITE_LINHAS_MESCLAGEM) throw new ErroMesclagem(`A aba ${nome} excede o limite de ${LIMITE_LINHAS_MESCLAGEM.toLocaleString("pt-BR")} linhas`, "TOO_MANY_ROWS", 413);
+    return { nome, colunas, totalLinhas: dados.length };
+  });
+  return { nomeArquivo, extensao, abas, colunasCnpjSugeridas: sugerirCnpjGenerico(abas[0].colunas) };
+}
+
+type ValorGenerico = CelulaDensa | string | number | Date | undefined;
+
+function sheet_to_json_rows(sheet: AbaDensa): Array<Array<ValorGenerico>> {
+  const ref = sheet["!ref"];
+  if (!ref) return [];
+  return XLSX.utils.sheet_to_json(sheet as unknown as XLSX.WorkSheet, { header: 1, raw: true, defval: "", blankrows: false }) as Array<Array<ValorGenerico>>;
+}
+
+function sugerirCnpjGenerico(colunas: ColunaPlanilha[]): number[] {
+  return colunas.filter((coluna) => coluna.nomeNormalizado === "cnpj" || coluna.nomeNormalizado.includes("cnpj")).map((coluna) => coluna.numero);
+}
+
+function lerLinhasWorkbookGenerico(workbook: XLSX.WorkBook, nomeAba: string): LinhaPlanilha[] {
+  const sheet = workbook.Sheets[nomeAba] as unknown as AbaDensa | undefined;
+  if (!sheet) throw new ErroMesclagem(`Aba ausente: ${nomeAba}`, "MISSING_SHEET", 422);
+  const linhas = sheet_to_json_rows(sheet);
+  const resultado: LinhaPlanilha[] = [];
+  linhas.slice(1).forEach((linha, indice) => {
+    const valores: Record<number, string> = {};
+    linha.forEach((celula, coluna) => { const valor = valorGenerico(celula, `${nomeAba}!${indice + 2}`); if (valor) valores[coluna + 1] = valor; });
+    if (Object.keys(valores).length > 0) resultado.push({ numero: indice + 2, valores });
+  });
+  return resultado;
+}
+
 function separarMunicipioUf(valor: string): { municipio: string; uf: string } {
   const encontrado = valor.match(/^(.+?)\s*\(([A-Z]{2})\)\s*$/i);
   return encontrado
@@ -169,7 +236,7 @@ function linhasLogcomex(entrada: WorkbookLogcomex, abaSolicitada: string): Linha
 
 /** Detecta apenas layouts com assinatura inequívoca; qualquer ambiguidade preserva o parser legado. */
 export async function detectarLayoutEntradaXlsx(buffer: ArrayBuffer): Promise<LayoutEntradaMesclagem> {
-  await validarPreflightXlsxMesclagem(buffer);
+  if (new Uint8Array(buffer, 0, 2)[0] === 0x50) await validarPreflightXlsxMesclagem(buffer);
   return lerWorkbookLogcomex(buffer, true) ? "logcomex_extended" : "legacy";
 }
 
@@ -179,9 +246,22 @@ export async function inspecionarEntradaXlsx(
   nomeArquivo: string,
   extensao: string,
 ): Promise<InspecaoPlanilha> {
+  const assinatura = new Uint8Array(buffer, 0, 2);
+  if (assinatura[0] !== 0x50 || assinatura[1] !== 0x4b) {
+    return inspecionarWorkbookGenerico(lerWorkbookGenerico(buffer), nomeArquivo, extensao);
+  }
   await validarPreflightXlsxMesclagem(buffer);
   const logcomex = lerWorkbookLogcomex(buffer, true) ? lerWorkbookLogcomex(buffer) : null;
-  if (!logcomex) return carregarWorkbookXlsx(buffer, nomeArquivo, extensao);
+  if (!logcomex) {
+    try {
+      return await carregarWorkbookXlsx(buffer, nomeArquivo, extensao);
+    } catch (error) {
+      if (error instanceof ErroMesclagem && error.code === "INVALID_XLSX") {
+        return inspecionarWorkbookGenerico(lerWorkbookGenerico(buffer), nomeArquivo, extensao);
+      }
+      throw error;
+    }
+  }
   const linhas = linhasLogcomex(logcomex, logcomex.abaNome);
   return {
     nomeArquivo,
@@ -193,8 +273,19 @@ export async function inspecionarEntradaXlsx(
 
 /** Extrai somente valores relevantes e devolve a mesma representação consumida pelo join existente. */
 export async function lerLinhasEntradaXlsx(buffer: ArrayBuffer, nomeAba: string): Promise<LinhaPlanilha[]> {
+  const assinatura = new Uint8Array(buffer, 0, 2);
+  if (assinatura[0] !== 0x50 || assinatura[1] !== 0x4b) {
+    return lerLinhasWorkbookGenerico(lerWorkbookGenerico(buffer), nomeAba);
+  }
   await validarPreflightXlsxMesclagem(buffer);
   const logcomex = lerWorkbookLogcomex(buffer, true) ? lerWorkbookLogcomex(buffer) : null;
   if (logcomex) return linhasLogcomex(logcomex, nomeAba);
-  return lerLinhasWorkbook(await lerWorkbookXlsx(buffer), nomeAba);
+  try {
+    return lerLinhasWorkbook(await lerWorkbookXlsx(buffer), nomeAba);
+  } catch (error) {
+    if (error instanceof ErroMesclagem && error.code === "INVALID_XLSX") {
+      return lerLinhasWorkbookGenerico(lerWorkbookGenerico(buffer), nomeAba);
+    }
+    throw error;
+  }
 }

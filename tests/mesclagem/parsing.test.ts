@@ -15,9 +15,9 @@ describe("Parsing", () => {
     expect(validarExtensaoMesclagem("planilha.csv")).toBe(".csv");
     expect(validarExtensaoMesclagem("planilha.xlsm")).toBe(".xlsm");
     expect(validarExtensaoMesclagem("planilha.tsv")).toBe(".tsv");
-    expect(() => validarExtensaoMesclagem("planilha.xls")).toThrow();
-    expect(() => validarExtensaoMesclagem("planilha.xlsb")).toThrow();
-    expect(() => validarExtensaoMesclagem("planilha.ods")).toThrow();
+    expect(validarExtensaoMesclagem("planilha.xls")).toBe(".xls");
+    expect(validarExtensaoMesclagem("planilha.xlsb")).toBe(".xlsb");
+    expect(validarExtensaoMesclagem("planilha.ods")).toBe(".ods");
     expect(() => validarExtensaoMesclagem("planilha.docx")).toThrow();
   });
 

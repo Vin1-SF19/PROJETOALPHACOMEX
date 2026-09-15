@@ -340,6 +340,7 @@ Cabeçalhos da aba `Template` da evidência: `Data Opção Simples`, `Capital So
 - `tests/mesclagem/mesclador.test.ts`
 - `tests/mesclagem/modal-responsivo.test.ts`
 - `tests/mesclagem/parsing.test.ts`
+- `tests/mesclagem/compatibilidade-formatos.test.ts`
 - `tests/mesclagem/preflight-xlsx.test.ts`
 - `tests/mesclagem/rate-limit.test.ts`
 - `tests/mesclagem/referencia-regressao.test.ts`
