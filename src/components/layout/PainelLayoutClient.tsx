@@ -1,5 +1,4 @@
 'use client';
-/* eslint-disable react-hooks/refs -- padrão SSR intencional: refs de init lidos no render para o fallback */
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { usePathname } from 'next/navigation';
@@ -50,6 +49,22 @@ import {
   type PainelTab,
 } from '@/lib/painel-tabs';
 import { getTema } from '@/lib/temas';
+import { PainelEmbeddedReady } from './PainelEmbeddedReady';
+import { PainelFrameFallback } from './PainelFrameFallback';
+import {
+  ALPHA_EMBED_READY,
+  createPainelFrameId,
+  createPainelFrameName,
+  derivePainelEmbeddedUrl,
+  getPainelFrameRuntimeState,
+  isAlphaEmbedMessage,
+  isPainelCanonicalUrl,
+  PAINEL_EMBED_READY_TIMEOUT_MS,
+  removePainelFrameState,
+  retryPainelFrame,
+  setPainelFrameStatus,
+  type PainelFrameRuntimeByTab,
+} from '@/lib/painel-embedded';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -133,6 +148,7 @@ export default function PainelLayoutClient({
   // Recebe postMessage dos iframes filhos (ex: Modo TV do Painel de Metas)
   useEffect(() => {
     const handler = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
       if (e.data?.type === 'ALPHA_TV_MODE') {
         setTvMode(e.data.active === true);
       }
@@ -145,9 +161,7 @@ export default function PainelLayoutClient({
   const [tabs, setTabs] = useState<PainelTab[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [tabsHydrated, setTabsHydrated] = useState(false);
-  const [initIframeLoaded, setInitIframeLoaded] = useState(false);
-  const initTabIdRef = useRef<string>('');
-  const initialPathnameRef = useRef(pathname);
+  const [frameRuntime, setFrameRuntime] = useState<PainelFrameRuntimeByTab>({});
   const encerrandoSessaoRef = useRef(false);
   const iframesRef = useRef(new Map<string, HTMLIFrameElement>());
   const intencaoAgendaPendenteRef = useRef<IntencaoAgendaAlpha | null>(null);
@@ -161,7 +175,6 @@ export default function PainelLayoutClient({
       if (saved) {
         setTabs(saved.tabs);
         setActiveId(saved.activeId);
-        initTabIdRef.current = saved.activeId;
         setTabsHydrated(true);
         return;
       }
@@ -170,12 +183,10 @@ export default function PainelLayoutClient({
     // Fresh: home fixa + (se não estiver na home) a aba da página atual
     const onHome = pathname === HOME_URL || pathname === HOME_URL + '/';
     if (onHome) {
-      initTabIdRef.current = HOME_TAB_ID;
       setTabs([{ id: HOME_TAB_ID, url: HOME_URL, label: HOME_LABEL, pinned: true }]);
       setActiveId(HOME_TAB_ID);
     } else {
       const id = `tab-${Date.now()}`;
-      initTabIdRef.current = id;
       setTabs([
         { id: HOME_TAB_ID, url: HOME_URL, label: HOME_LABEL, pinned: true },
         { id, url: pathname, label: getLabelForUrl(pathname) },
@@ -199,6 +210,7 @@ export default function PainelLayoutClient({
   // ── Tab management ────────────────────────────────────────────────────────
 
   const openTab = useCallback((url: string, label: string) => {
+    if (!isPainelCanonicalUrl(url)) return;
     setTabs(prev => {
       const existing = prev.find(t => t.url === url);
       if (existing) {
@@ -242,6 +254,7 @@ export default function PainelLayoutClient({
   }, [activeId, entregarIntencaoAgenda, tabs]);
 
   const closeTab = useCallback((id: string) => {
+    setFrameRuntime(prev => removePainelFrameState(prev, id));
     setTabs(prev => {
       const target = prev.find(t => t.id === id);
       if (target?.pinned) return prev; // aba fixa (IAlpha) não fecha
@@ -262,6 +275,26 @@ export default function PainelLayoutClient({
       return filtered;
     });
   }, []);
+
+  const retryActiveFrame = useCallback(() => {
+    if (!activeId) return;
+    setFrameRuntime(prev => retryPainelFrame(prev, activeId));
+  }, [activeId]);
+
+  const activeFrameState = activeId
+    ? getPainelFrameRuntimeState(frameRuntime, activeId)
+    : null;
+
+  useEffect(() => {
+    if (!activeId || activeFrameState?.status !== 'loading') return;
+
+    const attempt = activeFrameState.attempt;
+    const timeout = window.setTimeout(() => {
+      setFrameRuntime(prev => setPainelFrameStatus(prev, activeId, attempt, 'error'));
+    }, PAINEL_EMBED_READY_TIMEOUT_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [activeFrameState?.attempt, activeFrameState?.status, activeId]);
 
   const reorderTabs = useCallback((draggedId: string, targetId: string) => {
     setTabs(prev => {
@@ -284,9 +317,37 @@ export default function PainelLayoutClient({
     });
   }, []);
 
+  // Handshake de hidratação dos iframes. O listener é estável e consulta o Map de refs
+  // ao vivo, evitando perder a mensagem de um módulo que carregue entre dois renders.
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || !isAlphaEmbedMessage(event.data)) return;
+      const message = event.data;
+
+      const sourceEntry = Array.from(iframesRef.current.entries()).find(
+        ([, iframe]) => iframe.contentWindow === event.source,
+      );
+      if (!sourceEntry) return;
+
+      const [sourceTabId] = sourceEntry;
+      setFrameRuntime(prev => {
+        const current = getPainelFrameRuntimeState(prev, sourceTabId);
+        const expectedFrameId = createPainelFrameId(sourceTabId, current.attempt);
+        if (message.frameId !== expectedFrameId) return prev;
+
+        const status = message.type === ALPHA_EMBED_READY ? 'ready' : 'loading';
+        return setPainelFrameStatus(prev, sourceTabId, current.attempt, status);
+      });
+    };
+
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
   // Recebe ALPHA_OPEN_TAB dos iframes filhos (ex: PainelAlpha abrindo módulo em nova aba)
   useEffect(() => {
     const handler = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
       if (e.data?.type === 'ALPHA_OPEN_TAB' && e.data.url) {
         openTab(e.data.url, e.data.label || getLabelForUrl(e.data.url));
       }
@@ -294,11 +355,11 @@ export default function PainelLayoutClient({
       const origemEhAgenda = abaAgenda
         ? iframesRef.current.get(abaAgenda.id)?.contentWindow === e.source
         : false;
-      if (e.origin === window.location.origin && origemEhAgenda && e.data?.type === AGENDA_ALPHA_PRONTA_MENSAGEM) {
+      if (origemEhAgenda && e.data?.type === AGENDA_ALPHA_PRONTA_MENSAGEM) {
         const pendente = intencaoAgendaPendenteRef.current;
         if (pendente) entregarIntencaoAgenda(pendente);
       }
-      if (e.origin === window.location.origin && origemEhAgenda && e.data?.type === AGENDA_ALPHA_CONFIRMACAO_MENSAGEM) {
+      if (origemEhAgenda && e.data?.type === AGENDA_ALPHA_CONFIRMACAO_MENSAGEM) {
         intencaoAgendaPendenteRef.current = null;
       }
     };
@@ -309,7 +370,12 @@ export default function PainelLayoutClient({
   // ── Embedded: render children only, no sidebar/tabs ──────────────────────
 
   if (isEmbedded || role === 'TV') {
-    return <>{children}</>;
+    return (
+      <>
+        {children}
+        {isEmbedded && <PainelEmbeddedReady />}
+      </>
+    );
   }
 
   // ── Derived values ────────────────────────────────────────────────────────
@@ -317,15 +383,6 @@ export default function PainelLayoutClient({
   const activeTab = tabs.find(t => t.id === activeId);
   const activeUrl = activeTab?.url ?? pathname;
   const openUrls = tabs.map(t => t.url);
-
-  // Show children (SSR content) only while the initial tab's iframe hasn't loaded
-  // AND the server-rendered page matches the current tab URL
-  const showChildrenFallback =
-    !initIframeLoaded &&
-    tabs.length > 0 &&
-    activeId === initTabIdRef.current &&
-    (activeUrl === initialPathnameRef.current ||
-      initialPathnameRef.current.startsWith(activeUrl + '/'));
 
   const sidebarOffset = isCollapsed ? 'lg:pl-[72px]' : 'lg:pl-[260px]';
 
@@ -407,34 +464,57 @@ export default function PainelLayoutClient({
           }`}
         >
 
-          {/* SSR fallback shown while initial iframe loads */}
-          {showChildrenFallback && (
-            <div className="absolute inset-0 overflow-auto z-10 bg-[#020617]">
-              {children}
-            </div>
+          {activeTab && activeFrameState?.status !== 'ready' && (
+            <PainelFrameFallback
+              isError={activeFrameState?.status === 'error'}
+              moduleLabel={activeTab.label}
+              onRetry={retryActiveFrame}
+            />
           )}
 
           {/* One iframe per tab — inactive ones are hidden but STAY MOUNTED */}
           {tabs.map(tab => {
             const isActive = tab.id === activeId;
-            const isInitTab = tab.id === initTabIdRef.current;
-            const visible = isActive && (!isInitTab || initIframeLoaded);
+            const runtime = getPainelFrameRuntimeState(frameRuntime, tab.id);
+            const frameId = createPainelFrameId(tab.id, runtime.attempt);
+            const visible = isActive && runtime.status === 'ready';
 
             return (
               <iframe
-                key={tab.id}
+                key={`${tab.id}:${runtime.attempt}`}
                 ref={(elemento) => {
                   if (elemento) iframesRef.current.set(tab.id, elemento);
                   else iframesRef.current.delete(tab.id);
                 }}
-                src={tab.url}
+                src={derivePainelEmbeddedUrl(tab.url, frameId)}
+                name={createPainelFrameName(frameId)}
                 title={tab.label}
                 allow="autoplay; fullscreen"
                 allowFullScreen
-                className="w-full h-full border-none absolute inset-0"
-                style={{ display: visible ? 'block' : 'none' }}
+                className={`absolute inset-0 h-full w-full border-none ${
+                  !isActive
+                    ? 'hidden'
+                    : visible
+                      ? 'visible pointer-events-auto'
+                      : 'invisible pointer-events-none'
+                }`}
                 onLoad={(event) => {
-                  if (isInitTab) setInitIframeLoaded(true);
+                  let childConfirmedReady = false;
+                  try {
+                    childConfirmedReady =
+                      event.currentTarget.contentDocument?.documentElement.dataset.alphaEmbeddedReady === frameId;
+                  } catch {
+                    // Navegação cross-origin nunca pode liberar uma aba interna.
+                  }
+                  setFrameRuntime(prev =>
+                    setPainelFrameStatus(
+                      prev,
+                      tab.id,
+                      runtime.attempt,
+                      childConfirmedReady ? 'ready' : 'loading',
+                    ),
+                  );
+
                   const intencaoPendente = intencaoAgendaPendenteRef.current;
                   if (tab.url === AGENDA_ALPHA_URL && intencaoPendente) {
                     event.currentTarget.contentWindow?.postMessage(

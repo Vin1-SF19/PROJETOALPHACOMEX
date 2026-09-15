@@ -2,6 +2,15 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { isAdminRole } from "@/lib/roles";
+import {
+  isPainelEmbeddedMarker,
+  isPainelIframeDestination,
+  isValidPainelFrameId,
+  PAINEL_EMBED_HEADER,
+  PAINEL_EMBED_PARAM,
+  PAINEL_FRAME_ID_HEADER,
+  PAINEL_FRAME_ID_PARAM,
+} from "@/lib/painel-embedded";
 
 export async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
@@ -46,7 +55,26 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/PainelAlpha", req.nextUrl));
   }
 
-  return NextResponse.next();
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.delete(PAINEL_EMBED_HEADER);
+  requestHeaders.delete(PAINEL_FRAME_ID_HEADER);
+
+  const isPainelRoute = pathname === "/PainelAlpha" || pathname.startsWith("/PainelAlpha/");
+  const hasEmbeddedMarker = isPainelEmbeddedMarker(
+    req.nextUrl.searchParams.get(PAINEL_EMBED_PARAM),
+  );
+  const isIframeNavigation = isPainelIframeDestination(req.headers.get("sec-fetch-dest"));
+
+  if (isPainelRoute && (hasEmbeddedMarker || isIframeNavigation)) {
+    requestHeaders.set(PAINEL_EMBED_HEADER, "1");
+
+    const frameId = req.nextUrl.searchParams.get(PAINEL_FRAME_ID_PARAM);
+    if (isValidPainelFrameId(frameId)) {
+      requestHeaders.set(PAINEL_FRAME_ID_HEADER, frameId);
+    }
+  }
+
+  return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
 export const config = {

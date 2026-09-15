@@ -486,6 +486,15 @@ Os componentes compartilhados finais para datasets são `PaginationControls.tsx`
 
 **Última atualização:** 2026-08-03 por Scribe
 
+### PainelEmbeddedReady / PainelFrameFallback — carregamento seguro das abas
+
+**Arquivos:** `src/components/layout/PainelEmbeddedReady.tsx`, `src/components/layout/PainelFrameFallback.tsx`
+**Tipo:** Client Components do shell global
+**Uso:** o primeiro emite o handshake versionado `ALPHA_EMBED_READY` depois da hidratação do documento filho; o segundo mantém a área da aba coberta durante loading e oferece retry após timeout.
+**Notas:** o shell valida origem, `event.source`, versão e `frameId` antes de revelar a iframe. A URL canônica da aba não recebe parâmetros internos; `src` e `name` da iframe são derivados em runtime por `src/lib/painel-embedded.ts`. O marcador embedded controla somente composição visual e nunca substitui autenticação ou permissões.
+
+**Última atualização:** 2026-09-15 por Nova
+
 ### ContainerCargaRender (Container Alpha animado)
 
 **Arquivos:** `src/components/Apresentacoes/Editor/RenderEngine/ContainerCarga{Render,Model,CameraRig}.tsx`
