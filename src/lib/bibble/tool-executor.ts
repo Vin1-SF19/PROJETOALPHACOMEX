@@ -4,6 +4,7 @@ import { gerarFichaServer } from "@/lib/bibble/gerar-ficha-server";
 import { executarCalendarTool, isCalendarTool } from "@/lib/bibble/calendar-tools";
 import type { EventoCancelamentoPendente } from "@/lib/bibble/calendar-cancellation";
 import { notificarNovoChamado } from "@/lib/chamados/notificacoes-server";
+import { marcarDescricaoComoAbertaViaBibble } from "@/lib/chamados/origem-bibble";
 import { isAdminRole } from "@/lib/roles";
 import {
   consultarManualModulo,
@@ -161,7 +162,7 @@ async function executarToolUnsafe(
         const chamado = await db.chamados.create({
           data: {
             titulo,
-            descricao: `[Aberto via Bibble]\n\n${descricao}`,
+            descricao: marcarDescricaoComoAbertaViaBibble(descricao),
             categoria: "SUPORTE",
             prioridade,
             usuarioId: userId,

@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
+  Bot,
   CheckCircle2,
   ChevronDown,
   ExternalLink,
@@ -24,6 +25,7 @@ import {
   type ChamadoOperacionalTI,
 } from "@/actions/chamados";
 import { CHAMADOS_OPERACIONAIS_ATUALIZAR_EVENT } from "@/lib/chamados/notificacoes";
+import { separarOrigemBibbleDaDescricao } from "@/lib/chamados/origem-bibble";
 import { fmtDateTime, fmtTime } from "@/lib/format-date";
 
 interface ChamadosOperacionaisPainelProps {
@@ -256,6 +258,7 @@ export function ChamadosOperacionaisPainel({
             <div className="max-h-[min(70vh,34rem)] space-y-2 overflow-y-auto p-3">
               {chamados.map((chamado) => {
                 const expandido = expandidoId === chamado.id;
+                const origemBibble = separarOrigemBibbleDaDescricao(chamado.descricao);
                 const proprioAtendimento = chamado.status === "EM_ATENDIMENTO" && chamado.tecnicoId === usuarioAtualId;
                 const podeAssumir = chamado.status === "ABERTO"
                   && (chamado.tecnicoSolicitadoId === null || chamado.tecnicoSolicitadoId === usuarioAtualId);
@@ -286,6 +289,15 @@ export function ChamadosOperacionaisPainel({
                         {chamado.tecnicoSolicitado && (
                           <span className="mt-1 block truncate text-[8px] font-bold text-cyan-500">Solicitado: {chamado.tecnicoSolicitado.nome}</span>
                         )}
+                        {origemBibble.abertoViaBibble && (
+                          <span
+                            data-origem-bibble
+                            className="mt-1 inline-flex items-center gap-1 rounded-md border border-violet-400/20 bg-violet-500/10 px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wider text-violet-300"
+                          >
+                            <Bot className="size-2.5" aria-hidden="true" />
+                            Aberto via Bibble
+                          </span>
+                        )}
                       </span>
                       <ChevronDown className={`mt-0.5 size-3.5 shrink-0 text-slate-600 transition-transform ${expandido ? "rotate-180" : ""}`} aria-hidden="true" />
                     </button>
@@ -299,7 +311,7 @@ export function ChamadosOperacionaisPainel({
                           className="overflow-hidden"
                         >
                           <div className="space-y-3 border-t border-white/5 p-3">
-                            <p className="line-clamp-3 text-[10px] leading-relaxed text-slate-400">{chamado.descricao}</p>
+                            <p className="line-clamp-3 text-[10px] leading-relaxed text-slate-400">{origemBibble.descricaoLimpa}</p>
 
                             {chamado.mensagens.length > 0 && (
                               <div className="max-h-36 space-y-1.5 overflow-y-auto rounded-lg border border-white/5 bg-black/20 p-2">

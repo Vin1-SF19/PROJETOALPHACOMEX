@@ -3,6 +3,7 @@ import { auth } from "../../../../../auth";
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { notificarNovoChamado } from "@/lib/chamados/notificacoes-server";
+import { marcarDescricaoComoAbertaViaBibble } from "@/lib/chamados/origem-bibble";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -14,7 +15,7 @@ export async function POST(req: Request) {
     const novoChamado = await db.chamados.create({
       data: {
         titulo,
-        descricao,
+        descricao: marcarDescricaoComoAbertaViaBibble(String(descricao ?? "")),
         categoria: categoria || "SUPORTE",
         prioridade: prioridade || "MEDIA",
         usuarioId: Number(session.user.id),

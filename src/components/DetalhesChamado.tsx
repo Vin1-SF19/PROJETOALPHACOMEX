@@ -9,11 +9,12 @@ import { Button } from "./ui/button";
 import { assumirChamado } from "@/actions/chamados";
 import {
   Clock, User, MessageSquare, Calendar,
-  CheckCircle2, Tag, Eye, FileText, CalendarClock, UserRoundCheck,
+  Bot, CheckCircle2, Tag, Eye, FileText, CalendarClock, UserRoundCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import ModalProtocolo from "./ModalProtocolo";
 import { NotesContextButton } from "@/components/Notas/Contexto/NotesContextButton";
+import { separarOrigemBibbleDaDescricao } from "@/lib/chamados/origem-bibble";
 
 type Solicitante = {
   nome: string;
@@ -98,6 +99,7 @@ export function DetalhesChamado({ chamado, isAdmin, usuarioAtualId, templates = 
   };
 
   const prio = prioridadeConfig[chamado.prioridade] ?? prioridadeConfig.MEDIA;
+  const origemBibble = separarOrigemBibbleDaDescricao(chamado.descricao);
   const podeAssumir = isAdmin && status === "ABERTO" && tecnicoId == null;
   const podeFinalizar = isAdmin && status === "EM_ATENDIMENTO" && tecnicoId === usuarioAtualId;
 
@@ -121,6 +123,15 @@ export function DetalhesChamado({ chamado, isAdmin, usuarioAtualId, templates = 
             <DialogHeader>
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
+                  {origemBibble.abertoViaBibble && (
+                    <span
+                      data-origem-bibble
+                      className="mb-2 inline-flex items-center gap-1.5 rounded-lg border border-violet-400/25 bg-violet-500/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-violet-300"
+                    >
+                      <Bot className="size-3" aria-hidden="true" />
+                      Aberto via Bibble
+                    </span>
+                  )}
                   <DialogTitle className="mb-1 break-words text-xl font-black uppercase leading-tight tracking-tighter sm:text-2xl">
                     {chamado.titulo}
                   </DialogTitle>
@@ -212,7 +223,7 @@ export function DetalhesChamado({ chamado, isAdmin, usuarioAtualId, templates = 
                 Ocorrência Relatada
               </h4>
               <div className="whitespace-pre-wrap break-words p-5 rounded-2xl bg-slate-900/40 border border-white/5 text-slate-300 text-sm leading-relaxed">
-                {chamado.descricao}
+                {origemBibble.descricaoLimpa}
               </div>
             </div>
 
