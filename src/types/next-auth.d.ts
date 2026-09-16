@@ -3,6 +3,7 @@ import NextAuth from "next-auth";
 declare module "next-auth" {
   interface Session {
     acessoBloqueado?: boolean;
+    authenticatedAt?: number;
     user: {
       id: string;
       nome: string;
@@ -32,6 +33,7 @@ declare module "next-auth" {
 
 declare module "next-auth/jwt" {
   interface JWT {
+    authenticatedAt?: number;
     id?: string;
     nome?: string;
     usuario?: string;

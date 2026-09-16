@@ -1,0 +1,31 @@
+[Unit]
+Description=Alpha Explorer SMB Gateway
+After=network-online.target alpha-explorer-vault.service
+Requires=alpha-explorer-vault.service
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=alpha-explorer-gateway
+Group=alpha-explorer-gateway
+WorkingDirectory=/opt/alpha-explorer-gateway/current
+EnvironmentFile=/etc/alpha-explorer-gateway/gateway.env
+LoadCredentialEncrypted=vault_token:/etc/credstore.encrypted/alpha-explorer-gateway-vault-token
+LoadCredentialEncrypted=ticket_production:/etc/credstore.encrypted/alpha-explorer-ticket-production
+LoadCredentialEncrypted=ticket_stage:/etc/credstore.encrypted/alpha-explorer-ticket-stage
+Environment=SMB_GATEWAY_VAULT_TOKEN_FILE=%d/vault_token
+Environment=SMB_GATEWAY_TICKET_SECRET_PRODUCTION_FILE=%d/ticket_production
+Environment=SMB_GATEWAY_TICKET_SECRET_STAGE_FILE=%d/ticket_stage
+ExecStart=/opt/alpha-explorer-gateway/current/.venv/bin/uvicorn app.main:app --app-dir /opt/alpha-explorer-gateway/current --host 127.0.0.1 --port 8765 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/alpha-explorer-gateway
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

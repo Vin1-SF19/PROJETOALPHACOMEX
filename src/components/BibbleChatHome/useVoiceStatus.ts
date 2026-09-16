@@ -1,115 +1,139 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
-interface VoiceStatus {
+export interface VoiceStatus {
   stt_enabled: boolean;
   tts_enabled: boolean;
   loaded: boolean;
-  /** true = usa Web Speech API nativa (sem Onyx) */
+  /** Refere-se somente ao STT: true usa SpeechRecognition no navegador. */
   nativeMode: boolean;
+  modelLoaded: boolean;
+  referenceConfigured: boolean;
+  device: "cpu" | "cuda" | "unavailable";
 }
+
+type FetchVoiceStatus = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+type VoiceStatusListener = (status: VoiceStatus) => void;
+
+const STATUS_TTL_MS = 60_000;
+const FAILURE_RETRY_MS = 10_000;
+const EMPTY_STATUS: VoiceStatus = {
+  stt_enabled: false,
+  tts_enabled: false,
+  loaded: false,
+  nativeMode: false,
+  modelLoaded: false,
+  referenceConfigured: false,
+  device: "unavailable",
+};
 
 let cache: VoiceStatus | null = null;
 let cacheTs = 0;
-const TTL = 60_000;
+let refreshAfterMs = STATUS_TTL_MS;
+let inFlight: Promise<VoiceStatus> | null = null;
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+const listeners = new Set<VoiceStatusListener>();
 
-/**
- * Detecta suporte à Web Speech API no browser.
- * Retorna quais recursos estão disponíveis nativamente.
- */
-function detectNativeSupport(): { stt: boolean; tts: boolean } {
-  if (typeof window === "undefined") return { stt: false, tts: false };
-  const w = window as unknown as Record<string, unknown>;
-  const stt = !!(w["SpeechRecognition"] || w["webkitSpeechRecognition"]);
-  const tts = !!(window.speechSynthesis && window.SpeechSynthesisUtterance);
-  return { stt, tts };
+function nativeSttAvailable(): boolean {
+  if (typeof window === "undefined") return false;
+  const browser = window as unknown as Record<string, unknown>;
+  return !!(browser.SpeechRecognition || browser.webkitSpeechRecognition);
 }
 
-/**
- * Status do serviço de voz.
- * Tenta o Onyx primeiro; se falhar ou timeout (5s), usa Web Speech API nativa.
- * Cache em módulo com TTL de 1 min.
- */
+async function fetchJson(
+  fetchStatus: FetchVoiceStatus,
+  url: string,
+  timeoutMs: number,
+): Promise<Record<string, unknown>> {
+  const response = await fetchStatus(url, { signal: AbortSignal.timeout(timeoutMs) });
+  if (!response.ok) throw new Error(String(response.status));
+  return response.json() as Promise<Record<string, unknown>>;
+}
+
+function notify(status: VoiceStatus): void {
+  for (const listener of listeners) listener(status);
+}
+
+function scheduleRefresh(): void {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  refreshTimer = null;
+  if (listeners.size === 0) return;
+  const delay = Math.max(0, cacheTs + refreshAfterMs - Date.now());
+  refreshTimer = setTimeout(() => {
+    refreshTimer = null;
+    void refreshBibbleVoiceStatus();
+  }, delay);
+}
+
+/** Compartilhado por todas as bolhas: no máximo um par de health checks em voo. */
+export function refreshBibbleVoiceStatus(
+  fetchStatus: FetchVoiceStatus = fetch,
+  now = Date.now(),
+): Promise<VoiceStatus> {
+  if (inFlight) return inFlight;
+  if (cache && now - cacheTs < refreshAfterMs) return Promise.resolve(cache);
+
+  const nativeStt = nativeSttAvailable();
+  inFlight = Promise.allSettled([
+    fetchJson(fetchStatus, "/api/onyx/voice/status", 5_000),
+    fetchJson(fetchStatus, "/api/bibble/voice", 5_000),
+  ]).then(([sttResult, ttsResult]) => {
+    const onyxStt = sttResult.status === "fulfilled" && sttResult.value.stt_enabled === true;
+    const voiceData = ttsResult.status === "fulfilled"
+      ? ttsResult.value.data as { status?: unknown; cuda?: unknown; device?: unknown; modelLoaded?: unknown; referenceConfigured?: unknown } | undefined
+      : undefined;
+    const result: VoiceStatus = {
+      stt_enabled: onyxStt || nativeStt,
+      tts_enabled: voiceData?.status === "ok"
+        && (voiceData.device === "cpu" || (voiceData.device === "cuda" && voiceData.cuda === true))
+        && voiceData.referenceConfigured === true,
+      loaded: true,
+      nativeMode: !onyxStt,
+      modelLoaded: voiceData?.modelLoaded === true,
+      referenceConfigured: voiceData?.referenceConfigured === true,
+      device: voiceData?.device === "cpu" || voiceData?.device === "cuda" ? voiceData.device : "unavailable",
+    };
+    cache = result;
+    cacheTs = now;
+    refreshAfterMs = sttResult.status === "rejected" || ttsResult.status === "rejected"
+      ? FAILURE_RETRY_MS
+      : STATUS_TTL_MS;
+    notify(result);
+    return result;
+  }).finally(() => {
+    inFlight = null;
+    scheduleRefresh();
+  });
+  return inFlight;
+}
+
+/** Consulta apenas endpoints de status; nunca gera áudio para testar disponibilidade. */
 export function useVoiceStatus(): VoiceStatus {
-  const [status, setStatus] = useState<VoiceStatus>(
-    cache ?? { stt_enabled: false, tts_enabled: false, loaded: false, nativeMode: false },
-  );
+  const [status, setStatus] = useState<VoiceStatus>(cache ?? EMPTY_STATUS);
 
   useEffect(() => {
-    const cacheValido =
-      cache &&
-      Date.now() - cacheTs < TTL &&
-      (cache.stt_enabled || cache.tts_enabled);
-
-    if (cacheValido) return;
-
-    let ativo = true;
-
-    const nativo = detectNativeSupport();
-
-    // Tenta o Onyx com timeout curto (5s). Se falhar, usa modo nativo.
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 5_000);
-
-    fetch("/api/onyx/voice/status", { signal: ctrl.signal })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((d: { stt_enabled?: boolean; tts_enabled?: boolean }) => {
-        clearTimeout(timer);
-        // Onyx respondeu: usa as flags dele, mas complementa com nativo se necessário
-        const stt = !!d.stt_enabled || nativo.stt;
-        const tts = !!d.tts_enabled || nativo.tts;
-        // Testa se o Onyx TTS realmente funciona com um ping rápido
-        testOnyxTts().then((onyxTtsOk) => {
-          const result: VoiceStatus = {
-            stt_enabled: stt,
-            tts_enabled: tts,
-            loaded: true,
-            // nativeMode = verdadeiro se Onyx TTS não funciona (usa fallback nativo)
-            nativeMode: !onyxTtsOk,
-          };
-          cache = result;
-          cacheTs = Date.now();
-          if (ativo) setStatus(result);
-        });
-      })
-      .catch(() => {
-        clearTimeout(timer);
-        // Onyx inacessível → usa modo nativo puro
-        const result: VoiceStatus = {
-          stt_enabled: nativo.stt,
-          tts_enabled: nativo.tts,
-          loaded: true,
-          nativeMode: true,
-        };
-        cache = result;
-        cacheTs = Date.now();
-        if (ativo) setStatus(result);
-      });
-
+    listeners.add(setStatus);
+    void refreshBibbleVoiceStatus();
+    scheduleRefresh();
     return () => {
-      ativo = false;
-      clearTimeout(timer);
+      listeners.delete(setStatus);
+      if (listeners.size === 0 && refreshTimer) {
+        clearTimeout(refreshTimer);
+        refreshTimer = null;
+      }
     };
   }, []);
 
   return status;
 }
 
-/** Verifica se o Onyx TTS está respondendo (ping rápido com timeout curto). */
-async function testOnyxTts(): Promise<boolean> {
-  try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 6_000);
-    const res = await fetch("/api/onyx/voice/synthesize", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: "ok" }),
-      signal: ctrl.signal,
-    });
-    clearTimeout(timer);
-    return res.ok;
-  } catch {
-    return false;
-  }
+export function resetVoiceStatusCacheForTests(): void {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  refreshTimer = null;
+  cache = null;
+  cacheTs = 0;
+  refreshAfterMs = STATUS_TTL_MS;
+  inFlight = null;
+  listeners.clear();
 }

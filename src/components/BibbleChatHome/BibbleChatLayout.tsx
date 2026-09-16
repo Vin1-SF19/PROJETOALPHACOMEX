@@ -26,6 +26,13 @@ import {
   readAdaptivePreferences,
   type AdaptiveTonePreferences,
 } from "@/lib/bibble/adaptive-style";
+import {
+  DEFAULT_BIBBLE_VOICE_PREFERENCES,
+  bibbleVoicePreferencesKey,
+  readBibbleVoicePreferences,
+  shouldAutoPlayBibbleVoice,
+  type BibbleVoicePreferences,
+} from "@/lib/bibble/voice-preferences";
 
 interface BibbleChatLayoutProps {
   userId: number;
@@ -126,6 +133,11 @@ export default function BibbleChatLayout({
     typeof window === "undefined"
       ? DEFAULT_ADAPTIVE_PREFERENCES
       : readAdaptivePreferences(localStorage, userId),
+  );
+  const [voicePreferences, setVoicePreferences] = useState<BibbleVoicePreferences>(() =>
+    typeof window === "undefined"
+      ? DEFAULT_BIBBLE_VOICE_PREFERENCES
+      : readBibbleVoicePreferences(localStorage, userId),
   );
   const humorEnabled = adaptivePreferences.humor !== "off";
   const [panelContext, setPanelContext] = useState({ activeUrl: "/PainelAlpha", activeLabel: "IAlpha", lastOperationalUrl: null as string | null, openModules: [] as Array<{url:string; label:string}> });
@@ -317,9 +329,14 @@ export default function BibbleChatLayout({
     setAdaptivePreferences(preferences);
     localStorage.setItem(adaptivePreferencesStorageKey(userId), JSON.stringify(preferences));
   };
+  const handleVoicePreferencesChange = (preferences: BibbleVoicePreferences) => {
+    setVoicePreferences(preferences);
+    localStorage.setItem(bibbleVoicePreferencesKey(userId), JSON.stringify(preferences));
+  };
 
   /* ── Load session ───────────────────────────────────────── */
   const loadSession = useCallback(async (id: string) => {
+    vozUsadaRef.current = false;
     setRuntimeBlocked(null);
     setActiveSessionId(id);
     setMessages([]);
@@ -335,7 +352,7 @@ export default function BibbleChatLayout({
           ? "Esta conversa Onyx está bloqueada porque a identidade original do agente não pôde ser validada."
           : "Não foi possível verificar o runtime desta conversa. Tente recarregar antes de enviar uma mensagem.";
         setRuntimeBlocked(message);
-        setMessages([{ id: newId(), role: "assistant", content: message }]);
+        setMessages([{ id: newId(), role: "assistant", content: message, voiceEligible: false }]);
         return;
       }
       if (onyxRes.ok) {
@@ -356,7 +373,7 @@ export default function BibbleChatLayout({
             const message = "Não foi possível restaurar a identidade original deste agente Onyx. Reabra a conversa quando o agente estiver disponível.";
             setRuntimeBlocked(message);
             setActiveSessionId(null);
-            setMessages([{ id: newId(), role: "assistant", content: message }]);
+            setMessages([{ id: newId(), role: "assistant", content: message, voiceEligible: false }]);
             return;
           }
           setSelectedAgent(originalAgent);
@@ -381,7 +398,7 @@ export default function BibbleChatLayout({
               const imgMd = m.images
                 .map(img => `\n\n![${img.name.replace(/[[\]]/g, "")}](${img.src})`)
                 .join("");
-              return { id: m.id, role: "assistant" as const, content: content + imgMd, thinkContent };
+              return { id: m.id, role: "assistant" as const, content: content + imgMd, thinkContent, voiceEligible: false };
             })
           );
           return;
@@ -393,7 +410,7 @@ export default function BibbleChatLayout({
       setSelectedAgent(null); selectedAgentRef.current = null; onyxSessionRef.current = null;
       const message = "Não foi possível verificar o runtime desta conversa. Tente recarregar antes de enviar uma mensagem.";
       setRuntimeBlocked(message);
-      setMessages([{ id: newId(), role: "assistant", content: message }]);
+      setMessages([{ id: newId(), role: "assistant", content: message, voiceEligible: false }]);
       return;
     }
 
@@ -421,6 +438,7 @@ export default function BibbleChatLayout({
             role: "assistant" as const,
             content,
             thinkContent,
+            voiceEligible: true,
           };
         })
       );
@@ -510,50 +528,6 @@ export default function BibbleChatLayout({
     return fullResponse;
   }, []);
 
-  /* ── Fala automática da resposta (quando a pergunta foi por voz) ── */
-  const falarResposta = useCallback(async (texto: string) => {
-    const limpo = texto
-      .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
-      .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-      .replace(/```[\s\S]*?```/g, " ")
-      .replace(/[#*_`>~]/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
-    if (!limpo) return;
-
-    // Tenta Onyx TTS; se falhar (timeout/erro), usa Web Speech API nativa.
-    const falarNativo = () => {
-      if (typeof window === "undefined" || !window.speechSynthesis) return;
-      window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(limpo.slice(0, 5000));
-      utter.lang = "pt-BR";
-      utter.rate = 1.05;
-      window.speechSynthesis.speak(utter);
-    };
-
-    try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 8_000);
-      const res = await fetch("/api/onyx/voice/synthesize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: limpo.slice(0, 5000) }),
-        signal: ctrl.signal,
-      });
-      clearTimeout(timer);
-      if (!res.ok) { falarNativo(); return; }
-      const ct = res.headers.get("content-type") ?? "";
-      const url = ct.includes("application/json")
-        ? ((await res.json()) as { url?: string }).url
-        : URL.createObjectURL(await res.blob());
-      if (url) {
-        const audio = new Audio(url);
-        if (url.startsWith("blob:")) audio.onended = () => URL.revokeObjectURL(url);
-        void audio.play().catch(() => {});
-      }
-    } catch { falarNativo(); }
-  }, []);
-
   /* ── Send message ───────────────────────────────────────── */
   const handleSend = useCallback(async () => {
     if (runtimeBlocked) return;
@@ -564,6 +538,12 @@ export default function BibbleChatLayout({
     // de todos os anexos terem URL confirmada e estarem livres de erro.
     if (!areAttachmentsReady(uploadFiles)) return;
     if (uploadFiles.length > BIBBLE_MAX_FILES_PER_TURN) return;
+
+    // A origem vale somente para este envio. É zerada antes de qualquer I/O para
+    // não vazar autoplay a retries, mensagens futuras, histórico ou reload.
+    const inputWasAudio = vozUsadaRef.current;
+    vozUsadaRef.current = false;
+    const isNativeBibbleTurn = selectedAgentRef.current === null;
 
     const filesAtSend = uploadFiles;
 
@@ -605,7 +585,13 @@ export default function BibbleChatLayout({
 
     // A bolha mostra os anexos visualmente; o histórico/banco guarda o conteúdo completo.
     const userMsg: Message      = { id: newId(), role: "user",      content: msgContent, fullContent: persistedContent, files: filesForBubble.length > 0 ? filesForBubble : undefined };
-    const assistantMsg: Message = { id: newId(), role: "assistant",  content: "", streaming: true };
+    const assistantMsg: Message = {
+      id: newId(),
+      role: "assistant",
+      content: "",
+      streaming: true,
+      voiceEligible: isNativeBibbleTurn,
+    };
 
     setMessages(prev => [...prev, userMsg, assistantMsg]);
     setUploadFiles([]);
@@ -621,7 +607,7 @@ export default function BibbleChatLayout({
         setMessages(prev =>
           prev.map(m =>
             m.id === assistantMsg.id
-              ? { ...m, content: "Erro ao criar sessão.", streaming: false }
+              ? { ...m, content: "Erro ao criar sessão.", streaming: false, voiceEligible: false }
               : m
           )
         );
@@ -712,7 +698,15 @@ export default function BibbleChatLayout({
     setMessages(prev =>
       prev.map(m =>
         m.id === assistantMsg.id
-          ? { ...m, content: finalContent, thinkContent: finalThink, streaming: false }
+          ? {
+              ...m,
+              content: finalContent,
+              thinkContent: finalThink,
+              streaming: false,
+              voiceAutoPlay: isNativeBibbleTurn
+                && finalContent.trim().length > 0
+                && shouldAutoPlayBibbleVoice(inputWasAudio, voicePreferences),
+            }
           : m
       )
     );
@@ -720,25 +714,20 @@ export default function BibbleChatLayout({
     setStreamStatus("idle");
     abortRef.current = null;
 
-    // Se a mensagem foi ditada por voz, fala a resposta automaticamente.
-    if (vozUsadaRef.current && finalContent.trim()) {
-      void falarResposta(finalContent);
-    }
-    vozUsadaRef.current = false;
-
     if (fullResponse && sessionId) {
       // Persiste o conteúdo COMPLETO (com texto dos PDFs) para a IA reenxergar
       // o documento ao recarregar a sessão e em perguntas futuras.
       const saved = await saveMessages(sessionId, persistedContent, fullResponse);
       if (!saved) setMessages(prev => prev.map(item => item.id === assistantMsg.id ? { ...item, content: `${item.content}\n\n⚠️ A resposta foi exibida, mas não foi salva. Copie o conteúdo e tente novamente.` } : item));
     }
-  }, [runtimeBlocked, inputValue, uploadFiles, activeSessionId, activeProjectId, temperature, computerAccess, contextWindow, globalSystemPrompt, panelContext, adaptivePreferences, createSession, saveMessages, consumeChatStream, falarResposta]);
+  }, [runtimeBlocked, inputValue, uploadFiles, activeSessionId, activeProjectId, temperature, computerAccess, contextWindow, globalSystemPrompt, panelContext, adaptivePreferences, voicePreferences, createSession, saveMessages, consumeChatStream]);
 
   // Mantém o ref do handleSend atualizado para uso pelo handleEditMessage.
   useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);
 
   /* ── Conversar (vazio): ativa o agente e abre uma conversa NOVA sem mensagens ── */
   const conversarVazio = useCallback((agent: OnyxAgent) => {
+    vozUsadaRef.current = false;
     setRuntimeBlocked(null);
     setSelectedAgent(agent);
     selectedAgentRef.current = agent;
@@ -752,6 +741,7 @@ export default function BibbleChatLayout({
 
   /* ── "Quem é você?": ativa o agente, abre conversa nova e já pede apresentação ── */
   const quemEhVoceAgente = useCallback(async (agent: OnyxAgent) => {
+    vozUsadaRef.current = false;
     setRuntimeBlocked(null);
     // Ativa o agente imediatamente (UI: header, avatares) e zera a conversa/sessão Onyx
     setSelectedAgent(agent);
@@ -762,7 +752,7 @@ export default function BibbleChatLayout({
 
     const introText = "Quem é você? Se apresente e me explique, de forma objetiva, o que você pode fazer por mim.";
     const userMsg: Message      = { id: newId(), role: "user",      content: introText };
-    const assistantMsg: Message = { id: newId(), role: "assistant", content: "", streaming: true };
+    const assistantMsg: Message = { id: newId(), role: "assistant", content: "", streaming: true, voiceEligible: false };
     setMessages([userMsg, assistantMsg]);
 
     setIsStreaming(true);
@@ -815,6 +805,7 @@ export default function BibbleChatLayout({
 
   /* ── Adicionar agente à conversa atual (sem reiniciar nem apresentar) ── */
   const adicionarAgenteNaConversa = useCallback((agent: OnyxAgent) => {
+    vozUsadaRef.current = false;
     setRuntimeBlocked(null);
     abortRef.current?.abort();
     setSelectedAgent(agent);
@@ -829,6 +820,7 @@ export default function BibbleChatLayout({
   }, []);
 
   const clearAgent = useCallback(() => {
+    vozUsadaRef.current = false;
     setRuntimeBlocked(null);
     abortRef.current?.abort();
     setSelectedAgent(null); selectedAgentRef.current = null; onyxSessionRef.current = null;
@@ -850,6 +842,7 @@ export default function BibbleChatLayout({
   const handleEditMessage = useCallback((messageId: string, novoTexto: string) => {
     const texto = novoTexto.trim();
     if (!texto || isStreaming) return;
+    vozUsadaRef.current = false;
 
     // Remove a mensagem editada e TUDO que veio depois (resposta + turnos seguintes),
     // igual ChatGPT/Onyx: a conversa é "rebobinada" até antes da mensagem editada.
@@ -890,6 +883,7 @@ export default function BibbleChatLayout({
 
   /* ── New session ────────────────────────────────────────── */
   const handleNewSession = useCallback((projectId?: string | null) => {
+    vozUsadaRef.current = false;
     setRuntimeBlocked(null);
     setActiveSessionId(null);
     setMessages([]);
@@ -905,7 +899,8 @@ export default function BibbleChatLayout({
     } catch { /* ignore */ }
     setSessions(prev => prev.filter(s => s.id !== id));
     if (id === activeSessionId) {
-        setActiveSessionId(null);
+      vozUsadaRef.current = false;
+      setActiveSessionId(null);
       setMessages([]);
     }
   }, [activeSessionId]);
@@ -981,7 +976,13 @@ export default function BibbleChatLayout({
         streamStatus={streamStatus}
         inputValue={inputValue}
         isStreaming={isStreaming}
-        onInputChange={setInputValue}
+        onInputChange={(value) => {
+          // Qualquer edição manual encerra a proveniência da transcrição.
+          // O callback do microfone marca novamente como áudio somente depois de
+          // inserir com sucesso a transcrição atual.
+          vozUsadaRef.current = false;
+          setInputValue(value);
+        }}
         onSend={handleSend}
         onStop={handleStop}
         onEditMessage={handleEditMessage}
@@ -1004,6 +1005,7 @@ export default function BibbleChatLayout({
         currentHour={initialHour}
         permissions={permissions}
         humorEnabled={humorEnabled}
+        showVoiceButton={voicePreferences.showButton}
       />
 
       {/* Sidebar direita — desktop: inline com animação de largura */}
@@ -1105,6 +1107,8 @@ export default function BibbleChatLayout({
         onComputerAccessChange={handleComputerAccessChange}
         adaptivePreferences={adaptivePreferences}
         onAdaptivePreferencesChange={handleAdaptivePreferencesChange}
+        voicePreferences={voicePreferences}
+        onVoicePreferencesChange={handleVoicePreferencesChange}
         maxContextWindow={contextCeiling}
         approximateContextTokens={Math.ceil(messages.reduce((sum, item) => sum + (item.fullContent ?? item.content).length, 0) / 3)}
       />

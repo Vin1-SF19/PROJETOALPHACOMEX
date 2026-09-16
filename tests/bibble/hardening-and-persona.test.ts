@@ -58,9 +58,9 @@ describe('Bibble hardening', () => {
     expect(routeToolsByIntent(authorizedTools(BIBBLE_TOOLS, ctx, false), 'consulte CNPJ e gere ficha')).toEqual([]);
   });
 
-  it('publishes only the 18 read-only non-filesystem tools', () => {
+  it('publishes only the 19 read-only non-filesystem tools', () => {
     const registry = toolRegistry(BIBBLE_TOOLS);
-    expect(registry).toHaveLength(18);
+    expect(registry).toHaveLength(19);
     expect(registry.some(item => ['ler_arquivo', 'apagar', 'escrever_arquivo'].includes(item.name))).toBe(false);
     expect(registry.every(item => item.domain && item.timeoutMs > 0 && item.resultMaxChars > 0)).toBe(true);
   });

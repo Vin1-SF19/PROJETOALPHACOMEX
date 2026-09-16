@@ -59,6 +59,7 @@ interface BibbleChatWindowProps {
   currentHour: number;
   permissions?: string[];
   humorEnabled?: boolean;
+  showVoiceButton?: boolean;
 }
 
 export default function BibbleChatWindow({
@@ -93,6 +94,7 @@ export default function BibbleChatWindow({
   currentHour,
   permissions = [],
   humorEnabled = false,
+  showVoiceButton = true,
 }: BibbleChatWindowProps) {
   const hasMessages = messages.length > 0;
   const ac = tema?.accent ?? "99, 102, 241";
@@ -191,6 +193,7 @@ export default function BibbleChatWindow({
             onEditMessage={onEditMessage}
             isStreaming={isStreaming}
             accent={ac}
+            showVoiceButton={showVoiceButton}
           />
 
           <BibbleChatInput

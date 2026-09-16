@@ -17,12 +17,13 @@ interface BibbleMessageListProps {
   isStreaming?: boolean;
   /** Cor do tema (string "R, G, B") — usada nos botões de voz. */
   accent?: string;
+  showVoiceButton?: boolean;
 }
 
 const BOTTOM_THRESHOLD = 120;
 
 export default function BibbleMessageList({
-  messages, userName, userImage, agentActive, agentAvatarUrl, agentName, onEditMessage, isStreaming, accent,
+  messages, userName, userImage, agentActive, agentAvatarUrl, agentName, onEditMessage, isStreaming, accent, showVoiceButton,
 }: BibbleMessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -77,6 +78,7 @@ export default function BibbleMessageList({
               onEdit={onEditMessage}
               isStreaming={isStreaming}
               accent={accent}
+              showVoiceButton={showVoiceButton}
             />
           ))}
           <div ref={sentinelRef} style={{ height: 1 }} />

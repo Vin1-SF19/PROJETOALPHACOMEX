@@ -2,7 +2,7 @@ import path from 'path';
 import { lstat, realpath } from 'fs/promises';
 import type { OllamaTool } from '@/lib/bibble/tools';
 import type { UserCtx } from '@/lib/bibble/tool-executor';
-import { isAdminRole } from '@/lib/roles';
+import { isAdminRole, normalizeRole } from '@/lib/roles';
 
 export const BIBBLE_FS_TOOLS = new Set(['ler_arquivo', 'criar_pasta', 'criar_arquivo', 'escrever_arquivo', 'apagar', 'mover_arquivo', 'copiar_arquivo']);
 export const BIBBLE_MUTATING_TOOLS = new Set(['criar_pasta', 'criar_arquivo', 'escrever_arquivo', 'apagar', 'mover_arquivo', 'copiar_arquivo', 'abrir_chamado', 'criar_evento_calendario', 'editar_evento_calendario', 'cancelar_evento_calendario', 'criar_evento_calendario_colega', 'editar_evento_calendario_colega', 'cancelar_evento_calendario_colega']);
@@ -26,6 +26,11 @@ export function filesystemEnabled(ctx: UserCtx) {
   return false;
 }
 
+export function canConsultBehavioralProfiles(role?: string | null): boolean {
+  const normalized = normalizeRole(role);
+  return normalized === 'ADMIN' || normalized === 'TI';
+}
+
 export function authorizedTools(all: OllamaTool[], ctx: UserCtx, requestedFs: boolean) {
   void requestedFs;
   const permissions = new Set(ctx.permissoes);
@@ -33,6 +38,7 @@ export function authorizedTools(all: OllamaTool[], ctx: UserCtx, requestedFs: bo
   const can = (name: string) => {
     if (BIBBLE_FS_TOOLS.has(name)) return false;
     if (BIBBLE_MUTATING_TOOLS.has(name)) return false;
+    if (name === 'consultar_estilo_comunicacao_usuario') return canConsultBehavioralProfiles(ctx.role);
     if (admin) return true;
     if (/colega/.test(name) || name === 'consultar_usuarios') return false;
     if (/calendario|agenda|evento|disponibilidade/.test(name)) return permissions.has('calendarioAlpha');
@@ -56,6 +62,8 @@ export function routeToolsByIntent(tools: OllamaTool[], text: string): OllamaToo
   const q = text.toLocaleLowerCase('pt-BR');
   const matches = new Set<string>();
   const add = (...names: string[]) => names.forEach(n => matches.add(n));
+  const behavioralProfileIntent = /(?:como|jeito|forma|estilo|perfil).{0,80}(?:fala|conversa|escreve|comunica(?:ção|r)?).{0,50}(?:com (?:você|voce)|com (?:o )?bibble)|(?:estilo|perfil) (?:de )?comunica(?:ção|cao)/u.test(q);
+  if (behavioralProfileIntent) add('consultar_estilo_comunicacao_usuario');
   if (/cnpj|empresa|radar|ficha|pré[- ]análise/.test(q)) add('buscar_empresa', 'gerar_ficha_pre_analise', 'buscar_consultas_recentes');
   if (/cliente|crm/.test(q)) add('listar_clientes');
   if (/chamado|suporte|incidente/.test(q)) add('abrir_chamado', 'consultar_chamados');
@@ -63,7 +71,7 @@ export function routeToolsByIntent(tools: OllamaTool[], text: string): OllamaToo
   if (/agenda|calendário|evento|reunião|disponibilidade/.test(q)) tools.filter(t => t.function.name.includes('calendario') || t.function.name.includes('agenda') || t.function.name.includes('evento') || t.function.name.includes('disponibilidade')).forEach(t => matches.add(t.function.name));
   if (/arquivo|pasta|diretório|filesystem/.test(q)) BIBBLE_FS_TOOLS.forEach(name => add(name));
   if (/meta|venda|comercial/.test(q)) add('consultar_metas_comerciais');
-  if (/usuário|colaborador/.test(q)) add('consultar_usuarios');
+  if (!behavioralProfileIntent && /usuário|colaborador/.test(q)) add('consultar_usuarios');
   if (/manual|como (?:usar|funciona)|módulo/.test(q)) add('consultar_manual_modulo', 'consultar_base_onyx');
   if (!matches.size) return [];
   return tools.filter(t => matches.has(t.function.name));

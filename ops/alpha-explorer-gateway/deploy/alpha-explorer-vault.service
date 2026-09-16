@@ -1,0 +1,21 @@
+[Unit]
+Description=Alpha Explorer isolated HashiCorp Vault
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=exec
+Restart=on-failure
+RestartSec=5
+LoadCredentialEncrypted=vault_unseal:/etc/credstore.encrypted/alpha-explorer-vault-unseal
+ExecStartPre=-/usr/bin/docker rm -f alpha-explorer-vault
+ExecStart=/usr/bin/docker run --rm --name alpha-explorer-vault --publish 127.0.0.1:8200:8200 --read-only --tmpfs /tmp:rw,noexec,nosuid,size=32m -v /etc/alpha-explorer-vault/vault.hcl:/vault/config/vault.hcl:ro -v /etc/alpha-explorer-vault/tls:/vault/tls:ro -v /var/lib/alpha-explorer-vault:/vault/file:rw hashicorp/vault@sha256:5520cc26271c024e6ffa45cdf95255bd26b70d71ba4b7e0bc18925bef4128adb server
+ExecStartPost=/usr/local/libexec/alpha-explorer-vault-unseal
+ExecStop=/usr/bin/docker stop --time 20 alpha-explorer-vault
+TimeoutStartSec=60
+TimeoutStopSec=30
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

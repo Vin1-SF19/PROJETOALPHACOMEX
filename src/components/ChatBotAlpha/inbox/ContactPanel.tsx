@@ -1,0 +1,14 @@
+import { Mail, Phone, UserRound } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import type { Contact, Conversation, ConversationStatus } from "@/types/chatbot";
+
+interface ContactPanelProps { contact: Contact; conversation: Conversation; isBusy: boolean; embedded?: boolean; onStatus: (status: ConversationStatus) => void }
+export function ContactPanel({ contact, conversation, isBusy, embedded = false, onStatus }: ContactPanelProps) {
+  return <aside className={embedded ? "min-h-0 overflow-y-auto p-5 pt-14" : "hidden min-h-0 w-[300px] shrink-0 overflow-y-auto border-l border-white/5 p-4 xl:block"} aria-label="Informações do contato">
+    <div className="text-center"><span className="mx-auto grid size-14 place-items-center rounded-full bg-slate-800 text-sm font-semibold">{contact.initials}</span><h2 className="mt-2 text-sm font-semibold">{contact.name}</h2><p className="text-xs text-slate-500">{contact.source}</p></div>
+    <dl className="mt-5 space-y-3 text-xs"><div className="flex gap-2"><Phone className="size-4 text-slate-500" /><div><dt className="text-slate-500">Telefone</dt><dd className="mt-0.5 text-slate-300">{contact.phone ?? "Não informado"}</dd></div></div><div className="flex gap-2"><Mail className="size-4 text-slate-500" /><div className="min-w-0"><dt className="text-slate-500">E-mail</dt><dd className="mt-0.5 truncate text-slate-300">{contact.email ?? "Não informado"}</dd></div></div><div className="flex gap-2"><UserRound className="size-4 text-slate-500" /><div><dt className="text-slate-500">Responsável</dt><dd className="mt-0.5 text-slate-300">{contact.assignee?.name ?? "Sem responsável"}</dd></div></div></dl>
+    <div className="mt-5"><p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Tags</p><div className="flex flex-wrap gap-1">{contact.tags.length ? contact.tags.map((tag) => <span key={tag.id} className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-slate-300">{tag.name}</span>) : <span className="text-xs text-slate-600">Sem tags</span>}</div></div>
+    <div className="mt-5"><p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Status da conversa</p><div className="grid gap-1.5">{(["open", "pending", "resolved"] as const).map((status) => <Button key={status} type="button" variant={conversation.status === status ? "secondary" : "ghost"} size="sm" disabled={isBusy} onClick={() => onStatus(status)} className="justify-start text-xs">{status === "open" ? "● Aberta" : status === "pending" ? "◷ Pendente" : "✓ Encerrada"}</Button>)}</div></div>
+    <div className="mt-5 rounded-lg border border-white/5 bg-white/[0.02] p-3"><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Notas</p><p className="mt-2 text-xs leading-relaxed text-slate-400">{contact.notes}</p></div>
+  </aside>;
+}

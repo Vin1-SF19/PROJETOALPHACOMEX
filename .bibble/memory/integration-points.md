@@ -1,5 +1,88 @@
 # INTEGRATION POINTS — Pontos de Integração
 
+## ChatBot Alpha frontend — rotas, gate, shell e provider
+
+**Arquivos:** `src/lib/modulos-registry.ts`, `src/app/PainelAlpha/ChatBotAlpha/{layout,page}.tsx`, `src/app/PainelAlpha/ChatBotAlpha/{dashboard,inbox,contatos,fluxos,agentes,campanhas,sequencias,templates,integracoes,configuracoes}/page.tsx`, `src/components/ChatBotAlpha/shell/ChatbotShell.tsx`, `src/components/ChatBotAlpha/shell/navigation.ts`, `src/types/chatbot.ts`, `src/services/chatbot/`, `src/mocks/chatbot/data.ts`, `src/store/useChatbotStore.ts`, `tests/chatbot-alpha/frontend-*.test.ts` e `docs/chatbot-backend-contract.md`.
+
+**Propósito:** integrar uma aplicação operacional de chatbot ao App Router e à autorização do Painel Alpha, mantendo UI, cache, contrato e dados simulados desacoplados para que um provider de API possa ser criado futuramente sem reescrever as dez telas.
+
+**Editado quando:** uma seção, entidade, filtro, mutação, evento realtime futuro ou requisito de backend do ChatBot Alpha mudar. Alteração de provider, transporte ou integração externa exige uma fase própria; nesta entrada o único provider habilitado é `mock` e nenhuma rede é autorizada.
+
+**Caminho de integração:**
+
+1. `src/lib/modulos-registry.ts` já declara `chatBotAlpha`, `href: "/PainelAlpha/ChatBotAlpha"` e permissão `chatBotAlpha`; o menu global deriva sua entrada desse registry.
+2. `ChatBotAlpha/layout.tsx` chama `auth()` e, para não-admin, `getPermissoesEfetivas()`; somente depois monta `ChatbotShell`. A raiz `page.tsx` redireciona para `/PainelAlpha/ChatBotAlpha/dashboard`.
+3. `navigation.ts` é a fonte única das dez URLs; cada página monta um workspace de `src/components/ChatBotAlpha/` sob o shell compartilhado.
+4. O shell chama `useChatbotStore.initialize()` e trata loading/error/retry. Workspaces leem/mutam o snapshot pelo store; não importam fixtures nem o provider.
+5. `useChatbotStore.ts` chama apenas a interface `ChatbotService`; o singleton de `src/services/chatbot/index.ts` resolve `MockChatbotProvider`. A opção `api` lança erro explícito e não contém `fetch`.
+6. `MockChatbotProvider` valida inputs com schemas Zod, pagina/filtra/ordena, faz mutações em memória e retorna clones via `cloneChatbotData` (`src/services/chatbot/clone.ts`). O helper centraliza o único acesso direto a `globalThis.structuredClone` e usa fallback JSON-safe quando a API não existe. `withDerivedDashboard` recalcula métricas após mutações/eventos.
+7. `applyChatbotRealtimeEvent` aceita os sete eventos tipados e atualiza somente o cache local. Não existe WebSocket, SSE, Pusher ou polling no novo módulo.
+
+**Como adicionar uma seção frontend mock:**
+
+```ts
+// src/components/ChatBotAlpha/shell/navigation.ts
+{ href: "/PainelAlpha/ChatBotAlpha/nova-secao", label: "Nova seção", icon: Icone }
+```
+
+Crie `src/app/PainelAlpha/ChatBotAlpha/nova-secao/page.tsx` sob o layout existente e um workspace componentizado. Se a seção introduzir uma entidade/operação, atualize em conjunto `src/types/chatbot.ts`, `ChatbotService`, `MockChatbotProvider`, `useChatbotStore.ts`, fixtures, schemas, testes estruturais e `docs/chatbot-backend-contract.md`. Não duplique dados no componente e não adicione um segundo gate client-side como substituto do layout server-side.
+
+**Como preparar o provider futuro:** implemente `ChatbotService` em arquivo próprio e injete-o pela factory/store mantendo os mesmos tipos normalizados. Antes disso, a fase de backend deve definir autenticação/escopo de workspace, erros, paginação e eventos conforme `docs/chatbot-backend-contract.md`. Não converter silenciosamente `createChatbotService("api")` em fallback mock e nunca expor token/secret ao browser.
+
+**Fluxos:** `FlowEditor.tsx` usa `@xyflow/react`; `flow-validation.ts` é a fonte pura de validação e remoção de nodes/edges. Novos node kinds só podem entrar após confirmação funcional na referência, atualização de `FlowNodeKind`, schemas, editor, mocks, contrato futuro e testes.
+
+**Compatibilidade de clone:** DTOs do módulo devem continuar restritos a objetos JSON-safe; `Date`, `Map`, `Set`, `File`, `BigInt` e ciclos não pertencem ao snapshot. Não chame `structuredClone` diretamente em páginas, componentes, mocks, provider ou store: use `cloneChatbotData`. O teste `tests/chatbot-alpha/frontend-structured-clone-compat.test.ts` mantém essa fronteira e cobre o fluxo operacional completo com a API nativa ausente.
+
+**Deploy do stage:** nunca sobrescreva `.next` com `next build` enquanto `next start` usa esse diretório. Use o `restartProject` autoritativo em ordem **stop → build → start**, para que manifesto e chunks pertençam ao mesmo Build ID. Evidência de 2026-09-15: porta 3005 servindo `5kqIHl35UZV--w8j5SpVh`, PID 502162 iniciado às 18:18:56Z após build às 18:17:36Z e 31 chunks HTTP 200. `.next-chatbot-fix-verify` é saída isolada de validação e nunca deve ser tomada como release servida.
+
+**Fronteiras preservadas:** `ChatBotAlphaClient.tsx`, `ChatConversa.tsx`, `IframeChatBotAlpha.tsx`, `SeletorSistemaChatBot.tsx`, `src/actions/ChatBotAlpha*.ts` e `src/lib/chatbot-alpha/chat-api.ts` são legado preservado, não dependências do novo shell. `/home/ialpha/projetos/ChatbotX-main` é apenas referência funcional e nunca deve ser importado ou modificado por este módulo.
+
+**Evidência/limites:** Forge, Probe, Anubis e Lens aprovaram o delta original; após o fix de compatibilidade, 158 testes ChatBot Alpha passaram e 1 ficou todo, com lint escopado, `git diff --check` e build aprovados. O typecheck global ainda registra apenas falhas externas/preexistentes. O React Flow conserva o default `connectOnClick=true`; explicitar a prop é hardening futuro não bloqueante, sem relação com o crash. A saúde do processo/chunks do stage foi confirmada, mas smoke autenticado/console das dez rotas não foi executado.
+
+**Última atualização:** 2026-09-15 por Scribe (compatibilidade de clone e operação segura do stage)
+
+---
+
+## Mesclagem de Planilhas — rota, autorização, workspace e pipeline stateless
+
+**Arquivos:** `src/lib/modulos-registry.ts`, `src/app/PainelAlpha/Mesclagem/page.tsx`, `src/app/PainelAlpha/Mesclagem/MesclagemWorkspace.tsx`, `src/app/PainelAlpha/Mesclagem/useMesclagemController.ts`, `src/app/PainelAlpha/Mesclagem/api-mesclagem.ts`, `src/app/PainelAlpha/Mesclagem/workspace-state.ts`, `src/app/api/mesclagem/{inspecionar,sugerir,previa,exportar,template}/route.ts`, `src/lib/mesclagem/` e `public/templates/template-padrao.xlsx`.
+
+**Propósito:** expor o módulo full-page e manter uma cadeia única entre descoberta/permissão, page gate, estado de UI, cinco APIs autenticadas, processamento de domínio e exportação XLSX.
+
+**Editado quando:** formato, destino, limite, regra CNPJ, estratégia de mapeamento, template, permissão, etapa do workflow ou contrato HTTP da Mesclagem mudar. Nova API do módulo deve reutilizar o mesmo gate, headers `no-store`, guards e limites; não deve criar sessão server-side.
+
+**Caminho de integração:**
+
+1. `modulos-registry.ts` declara `{ id: "mesclagem", href: "/PainelAlpha/Mesclagem", permission: "mesclagemPlanilhas" }`; os consumidores de navegação derivam visibilidade do registry.
+2. `page.tsx` chama `verificarAcessoMesclagem()` e só então monta `MesclagemWorkspace` diretamente na área de conteúdo do Painel Alpha.
+3. `useMesclagemController.ts` conduz `Arquivos → CNPJ → Mapeamento → Prévia/Exportação`, usa `api-mesclagem.ts` e invalida derivados/requests obsoletas quando arquivo, aba, CNPJ ou override muda.
+4. `POST inspecionar` valida um arquivo; `POST sugerir` recebe apenas metadados de cabeçalho; `POST previa` reprocessa e devolve até 100 linhas; `POST exportar` reprocessa o payload atual e devolve XLSX; `GET template` baixa o template oficial.
+5. `processamento.ts` orquestra parsing, seleção de aba/CNPJ, validação da allowlist de mapeamento e `mesclador.ts`. `template.ts` resolve destinos por cabeçalho normalizado, preserva os existentes e acrescenta ausentes.
+
+**Contrato stateless:** não existe `sessionId`, mapa global ou endpoint de atualização de sessão. Prévia e exportação enviam novamente os dois arquivos, abas, colunas CNPJ e o mapeamento atual. Esse contrato impede afinidade de instância e torna o override manual a fonte do próximo resultado.
+
+**Catálogo e limites:** `catalogo.ts` é a fonte única para `.xlsx`, `.xlsm`, `.csv`, `.tsv`, 31 destinos (26 legados + `DDD1`–`DDD5`), 200 colunas e 2.000.000 células. `parsing.ts` limita 80 MB por arquivo e 50.000 linhas; `preflight-xlsx.ts`, 50 abas, 128 MB por entrada descompactada, 256 MB descompactados no total e razão máxima 100:1; `mesclador.ts`, 100.000 linhas resultantes e multiplicidade 1.000 por CNPJ. Rotas reservam 82 MB no multipart unitário e 164 MB no multipart duplo, mantendo sugestão de 128 KiB, cinco tentativas/minuto e uma operação concorrente por usuário.
+
+**IA local:** `mapeamento-deterministico.ts` roda primeiro. Somente pendências seguem para `mapeamento-ia.ts` (`server-only`), que envia destinos e `{ numero, nome }` dos cabeçalhos sanitizados ao Qwen/Llama local. O fallback aceita somente URL local/host interno permitido, até 40 matches, índices/destinos da allowlist e JSON Zod estrito; timeout configurável permanece entre 1 e 5 s. Falha, truncamento ou resposta inválida preserva o determinístico e deixa pendências editáveis.
+
+**Segurança:** página e todas as APIs usam `verificarAcessoMesclagem`: sessão válida + usuário `ATIVO` + `isAdminRole` ou permissão efetiva `mesclagemPlanilhas`. POSTs exigem origin/host same-origin, `Content-Type`, `Content-Length`, assinatura/estrutura real e limites antes do processamento. Respostas usam `Cache-Control: no-store`; auditoria best-effort recebe somente eventos e contagens agregadas, nunca arquivos, células, CNPJ ou PII.
+
+**Como adicionar um destino:**
+
+```ts
+// src/lib/mesclagem/catalogo.ts — fonte canônica para UI e servidor
+export const CAMPOS_DESTINO_MESCLAGEM = [
+  // ...destinos existentes
+  "NOVO_DESTINO",
+] as const;
+```
+
+Depois, acrescente aliases determinísticos se existirem, assegure o cabeçalho no template/regra de append e cubra sugestão, override, fallback da principal e exportação fora de ordem. Não duplique o catálogo no client.
+
+**Última atualização:** 2026-09-15 por Scribe (Mesclagem full-page stateless)
+
+---
+
 ## Login → transição cinematográfica persistente (2026-09-11)
 
 **Arquivos:** `src/lib/loginAction.ts`, `src/components/loginForm.tsx`, `src/components/login/{LoginTransitionProvider,LoginSuccessTransition,LoginCargoTransition,LoginCard,Ocean,LoginScene,useReducedMotion}.tsx`, `src/components/login/login-transition-state.ts`, `src/app/{layout,page}.tsx` e `src/app/globals.css`.
@@ -2163,6 +2246,44 @@ Na rota de upload, novos tipos precisam entrar na allowlist compartilhada e ter 
 
 **Última atualização:** 2026-08-11 por Scribe
 
+## Bibble/IAlpha — contrato vigente após hardening integral (2026-09-15)
+
+Esta seção substitui, para novas integrações, os limites e capacidades descritos nas entradas históricas anteriores sem apagá-las.
+
+### Runtime, stream e orçamento
+
+**Arquivos:** `src/lib/bibble/{runtime-config,completion,context-budget,telemetry,admission-control}.ts`, `src/app/api/bibble/chat/route.ts`, `scripts/bibble.mjs`
+
+**Editado quando:** modelo, endpoint, janela, saída, protocolo SSE, concorrência, métricas ou deadline forem alterados.
+
+**Como integrar:** o modelo e endpoint são resolvidos exclusivamente no servidor. A janela efetiva nunca excede 131.072 tokens e reserva até 4.096 para saída. Conversa simples usa uma única chamada streaming; nova chamada só é válida após `tool_call` real. Propague o mesmo `AbortSignal`, `deadlineAt` e `requestId` por completion e tools. Preserve os eventos `done`/`error` e a regra de não persistir resposta incompleta.
+
+Antes de alterar o runtime, execute `npm run bibble:doctor`, `npm run bibble:capabilities` e os benchmarks documentados em `docs/operations/bibble-observability.md`. O catálogo esperado no fechamento é de 18 tools, todas read-only.
+
+### Capabilities, prompt e contexto da aba
+
+**Arquivos:** `src/lib/bibble/{tools,tool-policy,tool-executor,persona,system-prompt,module-context}.ts`, `src/lib/modulos-registry.ts`, `src/components/layout/PainelLayoutClient.tsx`, `src/components/BibbleChatHome/`
+
+**Editado quando:** uma tool, permissão, módulo, sugestão, persona ou camada do prompt mudar.
+
+**Como integrar:** toda tool nova precisa de metadata, autorização server-side e teste negativo. O runner só executa nomes presentes no `Set` imutável daquele turno; mutações e filesystem permanecem recusados até uma story com confirmação humana server-side. Capabilities exibidas e sugestões devem derivar do conjunto autorizado e nunca prometer upload, provider ou mutação indisponível.
+
+O shell envia somente mensagens `ALPHA_BIBBLE_CONTEXT` same-origin. O servidor converte rota em module key pelo registry, reaplica permissão e trata o restante como dado, nunca como instrução. A hierarquia de prompt é segurança → identidade → capacidades → permissões → contexto validado → projeto → estilo; projeto/usuário não substituem guardrails.
+
+### Onyx, anexos e persistência
+
+**Arquivos:** `src/app/api/onyx/`, `src/lib/onyx/{client,ownership,user-token}.ts`, `src/app/api/bibble/upload-to-blob/route.ts`, `src/lib/bibble/attachment-security.ts`, `src/app/api/bibble/sessions/`
+
+**Editado quando:** autenticação Onyx, sessão/persona, upload, arquivo, histórico ou gravação do turno mudar.
+
+**Como integrar:** Onyx exige PAT individual e prova conjunta de agente autorizado, sessão local do usuário, sessão remota e `persona_id`. Nunca use PAT admin/service como fallback de usuário comum, nunca encaminhe `reasoning_*`, e não aceite anexo ou `fileId` sem ownership comprovável.
+
+O upload Bibble permanece `503` fail-closed até storage privado autenticado; não reative Blob público nem aceite host genérico `*.blob.vercel-storage.com`. O par usuário/assistente é gravado em transação, o histórico é paginado até 100 itens e `BibbleMessage.tokens` fica `null` sem contagem exata autoritativa do servidor.
+
+**Validação de fechamento:** Forge direcionado/build PASS, Probe PASS, Anubis PASS, Lens PASS e Sage com 118/118 testes Bibble. Smoke visual autenticado, CodeRabbit indisponível e dívidas dos gates globais seguem registrados na story, sem serem convertidos em sucesso.
+
+**Última atualização:** 2026-09-15 por Scribe (story IAlpha/Bibble — transformação integral)
+
 ### Extração de documentos e segurança dos anexos
 
 **Arquivos:** `src/lib/bibble/attachment-security.ts`, `src/lib/bibble/tika.ts`, `src/lib/bibble/pdf24-ocr.ts`, `src/lib/bibble/pdfjs-polyfill.ts`, `src/app/api/bibble/upload-to-blob/route.ts`, `src/app/api/bibble/chat/route.ts`
@@ -2705,121 +2826,19 @@ Na administração, `KanbanCardPreview` passa o mesmo formulário resolvido ao m
 
 **Última atualização:** 2026-09-09 por Codex (RM-2026-40526E)
 
-## Bibble/IAlpha — contrato vigente após hardening integral (2026-09-15)
+### Alpha Explorer — módulo, storage e rollout
 
-Esta seção substitui, para novas integrações, os limites e capacidades descritos nas entradas históricas anteriores sem apagá-las.
+**Arquivos:** `src/lib/modulos-registry.ts`, `.env.example`, `src/lib/alpha-explorer/runtime.ts`, `src/app/PainelAlpha/ExploradorArquivos/page.tsx` e `src/app/api/alpha-explorer/`.
 
-### Runtime, stream e orçamento
+**Propósito:** registrar o módulo `exploradorArquivos`, protegê-lo com flags server-only e conectar sessão/permissões do Painel a prefixes lógicos e providers privados.
 
-**Arquivos:** `src/lib/bibble/{runtime-config,completion,context-budget,telemetry,admission-control}.ts`, `src/app/api/bibble/chat/route.ts`, `scripts/bibble.mjs`
+**Editado quando:** adicionar capacidade, raiz autorizável, endpoint, operação de arquivo ou mudar o rollout do Explorer.
 
-**Editado quando:** modelo, endpoint, janela, saída, protocolo SSE, concorrência, métricas ou deadline forem alterados.
+**Como adicionar:** inclua a capacidade em `EXPLORER_CAPABILITIES`, valide-a em Zod, reautorize no servidor e cubra CLI/testes. Nunca aceite bucket, provider, object key ou user ID vindos do cliente como autoridade. Novas estruturas persistentes exigem Vault.
 
-**Como integrar:** o modelo e endpoint são resolvidos exclusivamente no servidor. A janela efetiva nunca excede 131.072 tokens e reserva até 4.096 para saída. Conversa simples usa uma única chamada streaming; nova chamada só é válida após `tool_call` real. Propague o mesmo `AbortSignal`, `deadlineAt` e `requestId` por completion e tools. Preserve os eventos `done`/`error` e a regra de não persistir resposta incompleta.
+**Fluxo:** registry → página protegida → React Query → `/api/alpha-explorer/*` → guarda same-origin nas mutações → autorização efetiva/ACL → metadados Turso → provider registrado QuObjects ou Blob. Upload QuObjects usa URLs assinadas em janelas; fallback só é escolhido antes da sessão e exige Blob privado. Downloads Blob privados usam `issueSignedToken` + `presignUrl` restritos a GET/objeto/120 segundos, sem proxy de arquivo grande. `explorer:acl-set` e reconciliação são dry-run por padrão; escrita/abort exigem confirmações literais distintas.
 
-Antes de alterar o runtime, execute `npm run bibble:doctor`, `npm run bibble:capabilities` e os benchmarks documentados em `docs/operations/bibble-observability.md`. O catálogo esperado no fechamento é de 18 tools, todas read-only.
-
-### Capabilities, prompt e contexto da aba
-
-**Arquivos:** `src/lib/bibble/{tools,tool-policy,tool-executor,persona,system-prompt,module-context}.ts`, `src/lib/modulos-registry.ts`, `src/components/layout/PainelLayoutClient.tsx`, `src/components/BibbleChatHome/`
-
-**Editado quando:** uma tool, permissão, módulo, sugestão, persona ou camada do prompt mudar.
-
-**Como integrar:** toda tool nova precisa de metadata, autorização server-side e teste negativo. O runner só executa nomes presentes no `Set` imutável daquele turno; mutações e filesystem permanecem recusados até uma story com confirmação humana server-side. Capabilities exibidas e sugestões devem derivar do conjunto autorizado e nunca prometer upload, provider ou mutação indisponível.
-
-O shell envia somente mensagens `ALPHA_BIBBLE_CONTEXT` same-origin. O servidor converte rota em module key pelo registry, reaplica permissão e trata o restante como dado, nunca como instrução. A hierarquia de prompt é segurança → identidade → capacidades → permissões → contexto validado → projeto → estilo; projeto/usuário não substituem guardrails.
-
-### Onyx, anexos e persistência
-
-**Arquivos:** `src/app/api/onyx/`, `src/lib/onyx/{client,ownership,user-token}.ts`, `src/app/api/bibble/upload-to-blob/route.ts`, `src/lib/bibble/attachment-security.ts`, `src/app/api/bibble/sessions/`
-
-**Editado quando:** autenticação Onyx, sessão/persona, upload, arquivo, histórico ou gravação do turno mudar.
-
-**Como integrar:** Onyx exige PAT individual e prova conjunta de agente autorizado, sessão local do usuário, sessão remota e `persona_id`. Nunca use PAT admin/service como fallback de usuário comum, nunca encaminhe `reasoning_*`, e não aceite anexo ou `fileId` sem ownership comprovável.
-
-O upload Bibble permanece `503` fail-closed até storage privado autenticado; não reative Blob público nem aceite host genérico `*.blob.vercel-storage.com`. O par usuário/assistente é gravado em transação, o histórico é paginado até 100 itens e `BibbleMessage.tokens` fica `null` sem contagem exata autoritativa do servidor.
-
-**Validação de fechamento:** Forge direcionado/build PASS, Probe PASS, Anubis PASS, Lens PASS e Sage com 118/118 testes Bibble. Smoke visual autenticado, CodeRabbit indisponível e dívidas dos gates globais seguem registrados na story, sem serem convertidos em sucesso.
-
-**Última atualização:** 2026-09-15 por Scribe (story IAlpha/Bibble — transformação integral)
-
-### Extração de documentos e segurança dos anexos
-
-**Arquivos:** `src/lib/bibble/attachment-security.ts`, `src/lib/bibble/tika.ts`, `src/lib/bibble/pdf24-ocr.ts`, `src/lib/bibble/pdfjs-polyfill.ts`, `src/app/api/bibble/upload-to-blob/route.ts`, `src/app/api/bibble/chat/route.ts`
-
-**Propósito:** valida o envelope do chat e executa a leitura na ordem Tika → `pdf-parse` → PDF24 OCR. Downloads aceitam somente URLs HTTPS do Vercel Blob sob `/bibble-chat/`, bloqueiam redirects e revalidam a URL de resposta. O PDF24 só recebe/retorna recursos da mesma origem configurada.
-
-**Editado quando:** um formato de documento for aceito, a cadeia de extração mudar, o host/caminho de storage mudar, o schema do payload ganhar campo ou um processador externo for substituído.
-
-**Como adicionar:** toda URL de anexo recebida do cliente deve passar por `parseTrustedBibbleBlobUrl`/`fetchTrustedBibbleBlob`; nunca use `fetch(file.url)` diretamente. Preserve `extractionSource` no upload e no payload para observabilidade sem registrar nome ou conteúdo do arquivo.
-
-```typescript
-const parsed = bibbleChatInputSchema.safeParse(input);
-if (!parsed.success) return invalidInputResponse;
-
-const response = await fetchTrustedBibbleBlob(parsed.data.files[0].url!);
-const extraction = await extractTextFromBuffer(buffer, mimeType, fileName);
-```
-
-Qualquer turno com anexo usa `toolsForTurn = []`: conteúdo do documento não confiável não pode acionar tools do sistema. O Blob criado pela rota atual usa `access: "public"`, mas seu caminho é opaco e o chat só baixa URLs que passam pela allowlist acima.
-
-**Última atualização:** 2026-08-11 por Scribe
-
-### Orçamento de contexto e saída do Bibble
-
-**Arquivos:** `src/lib/bibble/context-budget.ts`, `src/lib/bibble/completion.ts`, `src/app/api/bibble/chat/route.ts`, `src/components/BibbleChatHome/BibbleSettingsPanel.tsx`
-
-**Propósito:** evita que PDF/histórico ocupem a reserva da resposta. A janela padrão é 32.768 tokens, a saída reserva até 4.096 tokens e PDFs com janela legada/insuficiente são ajustados para a janela segura do provider. Conteúdo excedente usa seleção explícita de início, meio e fim.
-
-**Editado quando:** um provider/modelo mudar de capacidade, o default do painel mudar, outro tipo de conteúdo exigir custo próprio ou a reserva de saída for alterada.
-
-**Como adicionar:** primeiro calcule os custos fixos; depois distribua `availableContentTokens` entre histórico e anexos. Use `selectTextForTokenBudget`/`selectRecentHistory` em vez de `slice(0, N)` e encaminhe os valores resolvidos à completion.
-
-```typescript
-const budget = calculateRequestBudget({
-  model,
-  requestedContextWindow,
-  hasPdf,
-  systemPrompt,
-  userPrompt,
-  tools,
-});
-
-const selection = selectTextForTokenBudget(text, budget.availableContentTokens, "documento");
-await callCompletion(messages, tools, model, signal, true, temperature,
-  budget.effectiveContextWindow, budget.outputTokenLimit);
-```
-
-No Ollama, `callCompletion` também envia `options.num_ctx` e `options.num_predict`; nos endpoints OpenAI-compatible, usa `max_tokens` ou `max_completion_tokens` conforme o modelo.
-
-**Última atualização:** 2026-08-11 por Scribe
-
-### Protocolo SSE concluído e retry preservando anexos
-
-**Arquivos:** `src/lib/bibble/completion.ts`, `src/lib/bibble/client-stream.ts`, `src/app/api/bibble/chat/route.ts`, `src/components/BibbleChatHome/BibbleChatLayout.tsx`
-
-**Propósito:** distingue resposta concluída de conexão encerrada ou limite de saída. O provider precisa fornecer `finish_reason`; a API precisa emitir `done`; o cliente só persiste quando `done.truncated !== true` e `done.successful !== false`.
-
-**Editado quando:** um endpoint novo reutilizar o consumidor SSE, eventos forem adicionados, o provider mudar de formato ou o fluxo de persistência/retry mudar.
-
-**Como adicionar:** endpoints Bibble devem encerrar com um evento explícito e marcar qualquer conclusão anormal como falha. O client comum deve continuar tratando EOF físico como incompleto.
-
-```typescript
-send({
-  type: "done",
-  finishReason,
-  truncated: isOutputTruncated(finishReason),
-  successful: !isOutputTruncated(finishReason),
-});
-
-await consumeBibbleAppStream(response, onEvent);
-```
-
-Em erro, truncamento, timeout ou EOF sem `done`, `BibbleChatLayout.tsx` remove as mensagens parciais e restaura o texto e a mesma coleção de anexos para retry. Não persista `fullResponse` antes da confirmação do protocolo.
-
-**Testes de contrato:** `tests/bibble/attachment-readiness.test.ts`, `attachment-security.test.ts`, `context-budget.test.ts`, `completion-budget-stream.test.ts`, `client-stream-protocol.test.ts`, `pdf-extraction-chain.test.ts`.
-
-**Última atualização:** 2026-08-11 por Scribe
+**Última atualização:** 2026-09-15 por Scribe
 
 ## Bibble — estilo adaptativo por histórico nativo (2026-09-15)
 
@@ -2836,3 +2855,39 @@ A entrada exata `Faz logo essa porcaria e para de enrolar.` usa, quando firme e 
 **Validação:** suíte Bibble 170/170; fallback, controles renderizados e zero provider extra cobertos.
 
 **Última atualização:** 2026-09-15 por Scribe (story Bibble — tom adaptativo)
+
+## Bibble Voice — proxy local, reprodução e operação (2026-09-15)
+
+**Arquivos:** `src/app/api/bibble/voice/route.ts`, `src/lib/bibble/voice-{service,admission,client,preferences}.ts`, `src/components/BibbleChatHome/{BibbleChatLayout,BibbleChatWindow,BibbleMessageBubble,BibbleMessageList,BibbleSettingsPanel,BotaoFalarMensagem,bibble-audio-manager,useVoiceStatus}.ts(x)`, `.env.example`, `/home/ialpha/services/bibble-voice/`
+
+**Propósito:** anexar voz local às respostas nativas do Bibble sem recriar o chat, alterar LLM/STT ou expor o FastAPI ao navegador.
+
+**Editado quando:** mudar contrato de síntese, URL/tokens server-to-server, limites, regra de elegibilidade/autoplay, preferências, estados de reprodução, voz autorizada, cache/modelo ou unidade systemd.
+
+**Como integrar:**
+
+1. O navegador chama somente `GET|POST /api/bibble/voice`; nunca use `127.0.0.1:8787` em código client. A rota autentica e, no POST, compara o `Origin` com o header `Host` público em vez da URL interna da request, permitindo o proxy reverso do Cloudflare Tunnel. O guard permanece fail-closed para `Origin`/`Host` ausentes, inválidos ou divergentes e rejeita `Sec-Fetch-Site` quando presente e diferente de `same-origin`. Depois disso, aceita somente `{ text, voice: "bibble", language: "pt" }`, limita corpo/áudio e valida o WAV.
+2. `voice-service.ts` lê `BIBBLE_VOICE_URL` e `BIBBLE_VOICE_TOKEN` no servidor. Loopback pode operar sem token; qualquer host não loopback exige HTTPS e token. Em Vercel, configure uma conexão privada server-to-server antes de promover — não abra a porta 8787 à internet.
+3. Preserve a admissão de voz em `voice-admission.ts` separada da admissão do chat. O limitador atual é em memória e por instância; horizontalização requer store/coordenação compartilhada se o limite precisar ser global.
+4. Mensagem assistente nativa nova recebe `voiceEligible=true`; Onyx, erros, intros e placeholders não recebem. A saída de áudio pertence à mesma mensagem e não deve ser persistida como nova mensagem.
+5. Capture se a entrada foi áudio antes de iniciar fetch/stream e limpe a marca em edição manual, nova/troca/limpeza/exclusão de sessão e reenvio. Autoplay só ocorre na nova resposta ligada àquela entrada, salvo opt-in explícito `autoPlayAll`; nunca ao hidratar histórico ou recarregar.
+6. Use `bibbleAudioManager` para toda reprodução, mantendo um único áudio ativo e liberando object URLs. Falha/bloqueio de autoplay degrada para botão pronto; falha de TTS não toca chat, SSE ou persistência.
+7. O serviço local resolve `bibble → /home/ialpha/services/bibble-voice/voices/bibble.wav`, carrega o V3 sob demanda no dispositivo explícito `TTS_DEVICE=cpu|cuda`, serializa geração, usa cache e descarrega após `MODEL_IDLE_TIMEOUT`. Nunca aceite paths de voz do cliente, fallback silencioso de dispositivo nem voz alternativa.
+8. Preserve `PKUSEG_HOME` apontando para o snapshot local verificado. O runtime não deve baixar tokenizer/modelo em requisição; o WAV de saída deve continuar PCM signed de 16 bits.
+
+**Exemplo de fluxo:**
+
+```text
+BibbleMessageBubble
+  → POST /api/bibble/voice (sessão + same-origin + admissão)
+  → BIBBLE_VOICE_URL/v1/speech (server-to-server)
+  → cache hit OU Chatterbox Multilingual V3 no TTS_DEVICE explícito
+  → audio/wav PCM16
+  → bibbleAudioManager (mesma bolha, uma reprodução por vez)
+```
+
+**Defaults e limites:** `replyToAudio=true`, `showButton=true`, `autoPlayAll=false`; texto 2.500 caracteres; request 16 KiB; WAV 25 MiB; proxy 570 s; motor 540 s; fila 4; cache 7 dias/2 GiB; idle 300 s. A operação atual usa `TTS_DEVICE=cpu` e `TTS_CPU_THREADS=8`; o preflight de 4.096 MiB livres aplica-se ao modo CUDA.
+
+**Operação validada em 2026-09-16:** unidade `bibble-voice.service` habilitada e ativa em `127.0.0.1:8787`, health `ok`, `device=cpu`, referência autorizada configurada e PKUSEG offline verificado. O systemd limita impacto com `Nice=10`, `CPUWeight=50`, `MemoryHigh=8G` e `MemoryMax=12G`. Em CPU, unload agenda fail-stop do worker depois de liberar referências/GC; o systemd reinicia somente o serviço de voz para devolver RAM. O teste real comprovou MISS → geração, HIT para a repetição, unload → restart e reload → novo MISS. O WAV produzido é PCM16. A RTX 4090/llama.cpp permaneceram intactos (1.631 MiB livres; llama.cpp 21.992 MiB; Bibble fora da VRAM). A rota do Painel está ativa e responde 401 sem sessão, comprovando publicação e proteção. A regressão focal do proxy/cliente passou 26/26 após o ajuste do guard; smoke autenticado da UI e AC20 permanecem pendentes.
+
+**Última atualização:** 2026-09-16 por Scribe (guard de origem compatível com Cloudflare Tunnel; AC20 pendente)

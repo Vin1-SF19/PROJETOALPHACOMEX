@@ -1,18 +1,109 @@
 # CODEBASE MAP — Mapa Estrutural do Projeto
 
+- Bibble Voice local (atualizado em 2026-09-16): o Painel mantém chat/LLM/STT existentes e acrescenta TTS por `src/app/api/bibble/voice/route.ts`, com contrato server-only em `src/lib/bibble/voice-{service,admission,client,preferences}.ts` e reprodução em `src/components/BibbleChatHome/{BotaoFalarMensagem,bibble-audio-manager,useVoiceStatus}.ts(x)`. O navegador segue `browser → /api/bibble/voice → BIBBLE_VOICE_URL → /v1/speech`; a rota ativa responde 401 sem sessão, em vez de 404. No POST, o guard compara `Origin` com o header `Host` público, não com a URL interna da request, preservando compatibilidade com Cloudflare Tunnel sem abrir cross-site: ausência, formato inválido, divergência e `Sec-Fetch-Site` incompatível continuam bloqueados. O microserviço independente em `/home/ialpha/services/bibble-voice` usa FastAPI/Chatterbox Multilingual V3, `TTS_DEVICE=cpu|cuda`, cache WAV PCM16, fila serializada, carga sob demanda e unload após 300 s. A operação atual usa CPU/8 threads e referência autorizada `voices/bibble.wav`; testes reais comprovaram MISS, HIT, unload, restart fail-stop para devolver RAM e reload com novo MISS. A GPU/llama.cpp permaneceu intacta.
+- ChatBot Alpha frontend nativo/mock (2026-09-15): dez rotas operacionais em `src/app/PainelAlpha/ChatBotAlpha/{dashboard,inbox,contatos,fluxos,agentes,campanhas,sequencias,templates,integracoes,configuracoes}/`; gate único e shell em `layout.tsx` + `src/components/ChatBotAlpha/shell/`; domínio tipado em `src/types/chatbot.ts`; fronteira assíncrona e clonagem compatível em `src/services/chatbot/`; fixtures centralizadas em `src/mocks/chatbot/data.ts`; cache/mutações/reducer realtime futuro em `src/store/useChatbotStore.ts`; seis suítes frontend em `tests/chatbot-alpha/frontend-*.test.ts`; contrato da API futura em `docs/chatbot-backend-contract.md`. O único provider funcional é mock em memória: não há backend, realtime transport, canal ou integração externa conectado.
+- Mesclagem de Planilhas (2026-09-15): menu/permissão em `src/lib/modulos-registry.ts`; rota full-page e controller em `src/app/PainelAlpha/Mesclagem/`; cinco APIs stateless em `src/app/api/mesclagem/{inspecionar,sugerir,previa,exportar,template}/route.ts`; domínio em `src/lib/mesclagem/`; template em `public/templates/template-padrao.xlsx`; 15 suítes em `tests/mesclagem/`. Não existe sessão de mesclagem nem persistência de arquivo/resultado.
 - Login cinematográfico (RM-2026, 2026-09-11): `src/lib/loginAction.ts` valida credenciais com Zod e aguarda `signIn("credentials", { redirect: false })`; `src/components/loginForm.tsx` só inicia a transição após `{ success: true }`. O host persistente `LoginTransitionProvider.tsx`, sob `SessionProvider`, confirma a sessão e aguarda `visualReady`; `LoginCargoTransition.tsx` usa `containernavio.png` em camadas para abrir as portas para fora, receber o card real de `LoginCard.tsx`, selar e transportar a carga. `LoginSuccessTransition.tsx` coordena aproximação, embarque, buzina e partida; chama `router.replace("/PainelAlpha")` no checkpoint central e `usePathname` libera a saída sobre o painel real. `Ocean.tsx` permanece dinâmico com fallback CSS; imagens têm preload/Next Image, e watchdogs, error boundary, espera de assets e reduced motion preservam saída segura. Cena em `src/components/login/`; assets em `public/{BackgroundAtualizado.png,containernavio.png,NavioLogin.png,Logotipo-1.png,sounds/buzina.mp3}`; contratos em `tests/auth/login-{action,transition-state,transition-wiring}.test.ts`.
 - Chamados — feedback pós-finalização e preferência de atendimento (RM-2026-A6F2C9): `chamados.tecnicoSolicitadoId` registra a preferência opcional sem ocupar `tecnicoId`; `dataDesejadaConclusao` é somente a data desejada pelo solicitante e não altera a Agenda Alpha. `ChamadoFeedback`/`chamados_feedback` mantém um registro 1:1 por chamado nos estados `PENDENTE`, `RESPONDIDO` ou `RECUSADO`. A conclusão rápida e por protocolo converge em `src/lib/chamados/conclusao.ts`, que usa transação serializável, CAS sobre `EM_ATENDIMENTO`/técnico efetivo e cria a pendência na mesma transação. Actions/validação ficam em `src/actions/chamados-feedback.ts` e `src/lib/chamados/schemas.ts`; UI em `src/components/chamados/{ChamadoFinalizadoFeedbackDialog,ChamadoFeedbackForm,FeedbackRatingScale}.tsx`; entrega global combina Pusher (`src/hooks/useAdminChamadosNotifications.ts`) com recuperação por polling (`src/components/NotificacaoFlutuante.tsx` e `src/app/api/notificacoes/route.ts`), fora de iframes. As migrations `20260911131500_chamados_feedback_preferencia_prazo` e `20260911133500_chamados_feedback_resposta_bool_triggers` foram aplicadas no Turso de produção; os dois triggers impedem `RESPONDIDO` sem resposta SIM/NÃO.
 - Consistência de publicação CRM (RM-2026-EB2898): contador em `BpmPipeline.configVersion`; migration `20260909211000_bpm_pipeline_config_version`; CAS/agregado em `src/actions/bpm/ConfiguracaoPipeline.ts`; validação/diff em `src/lib/bpm/pipeline-config-publicacao.ts`; invalidação de escritores em `src/lib/bpm/config-version.ts`; UI/estados em `admin/pipelines/[pipelineId]/{page,AdminPipelineClient,EtapaAvancadaSection,CadenciaEtapasSection,FormularioEtapaWorkspace,SlaConfigSection,VisibilidadeEtapasSection}.tsx`; provas em `tests/bpm/{configuracao-pipeline-publicacao-action,pipeline-config-publicacao,pipeline-config-workspace,pipeline-config-version-transaction}.test.ts`.
 - Formulários canônicos por etapa (RM-2026-045CC0): composição em `BpmEtapaFormulario`/`BpmFormularioSecao`/`BpmFormularioComponente`; contrato e allowlists em `src/lib/bpm/formularios-etapa.ts`; classificação/dry-run em `src/lib/bpm/formularios-etapa-migration.ts`; save diferencial em `src/actions/bpm/FormulariosEtapa.ts`; UI administrativa em `FormularioEtapaWorkspace.tsx`; CLI auditável em `scripts/bpm-stage-form-migration.mjs`; relatório em `docs/reports/crm-stage-form-migration-p0-2.md`.
 - Checklist Builder: models Prisma `BpmChecklistTemplate*`/`BpmChecklistTemplateEtapa`/`BpmCardChecklist*`; domínio em `src/lib/bpm/checklists/{schemas,leitura,service,integracao}.ts` (`leitura.ts` expõe `filtroEtapaTemplateChecklist`, fonte única de aplicabilidade de etapa, RM-2026-457A31); actions em `src/actions/bpm/Checklists.ts`; workspace em `src/components/bpm/checklists/{ChecklistsWorkspace,EtapasMultiSelect}.tsx` + `checklist-editor-state.ts` (multiselect de etapas, RM-2026-457A31); painel em `CardModal/PainelChecklistsCard.tsx`, montado em `PainelHistorico.tsx` (aba Checklist); alerta/navegação em `PainelProximaEtapa.tsx` + `PainelRegistrar.tsx`; ação automática `MATERIALIZAR_CHECKLIST` em `src/lib/bpm/automacoes/{schemas,executor}.ts`.
 - SLA BPM: cálculo, provisionamento idempotente, pausa/retomada, recálculo on-read e sincronização de movimento em `src/lib/bpm/sla.ts`; fachada autenticada em `src/actions/bpm/Sla.ts`; `Cards.ts` sincroniza a saída/entrada de etapa e o standby na mesma transação do movimento.
-- ChatBot Alpha: rota em `src/app/PainelAlpha/ChatBotAlpha/page.tsx`; client em `src/components/ChatBotAlpha/{ChatBotAlphaClient,ChatConversa,SeletorSistemaChatBot,IframeChatBotAlpha}.tsx`; actions em `src/actions/{ChatBotAlpha,ChatBotAlphaChat}.ts`; domínio em `src/lib/chatbot-alpha/{contracts,doctor,observability,chat-api}.ts`; CLI em `scripts/chatbot-alpha.mjs`; testes em `tests/chatbot-alpha/{contracts,observability,chat-api,actions}.test.ts`.
+- ChatBot Alpha legado (preservado, fora do novo shell): clients em `src/components/ChatBotAlpha/{ChatBotAlphaClient,ChatConversa,SeletorSistemaChatBot,IframeChatBotAlpha}.tsx`; actions em `src/actions/{ChatBotAlpha,ChatBotAlphaChat}.ts`; domínio HTTP/infra em `src/lib/chatbot-alpha/{contracts,doctor,observability,chat-api}.ts`; CLI em `scripts/chatbot-alpha.mjs`; testes legados em `tests/chatbot-alpha/{contracts,observability,chat-api,actions}.test.ts`.
 
 **RM-2026-457A31 — cobertura conferida por Scribe em 2026-09-09:** `tests/bpm/checklists-workspace-submit.test.ts` (handlers de submissão/payload/rascunho), `checklists-multiplas-etapas-migration.test.ts` (SQL em memória, FKs/backfill/índices) e `checklists-multiplas-etapas.test.ts` (actions/permissões/transações). As 11 suítes `tests/bpm/checklists-*.test.ts` somam 73 testes aprovados; não equivalem a smoke autenticado.
 
 > Mantido por: Scribe (cartógrafo)
 > Atualizar após TODA sessão significativa de desenvolvimento.
-> Última atualização: 2026-09-11 por Scribe (login cinematográfico)
+> Última atualização: 2026-09-16 por Scribe (guard de origem do Bibble Voice atrás de Cloudflare Tunnel)
+
+---
+
+## Bibble Voice — TTS local isolado (2026-09-15)
+
+| Área | Arquivos | Responsabilidade |
+|---|---|---|
+| Proxy autenticado | `src/app/api/bibble/voice/route.ts` | Expõe status e síntese ao navegador autenticado; no POST compara `Origin` com o `Host` público para operar atrás de Cloudflare Tunnel, mantendo fail-closed e `Sec-Fetch-Site`, além de JSON estrito, limites e validação do WAV |
+| Fronteira server-only | `src/lib/bibble/voice-service.ts`, `voice-admission.ts` | Resolve `BIBBLE_VOICE_URL`/token somente no backend, exige HTTPS + token fora de loopback e aplica admissão independente do chat |
+| Cliente e preferências | `src/lib/bibble/voice-client.ts`, `voice-preferences.ts` | Normaliza texto, deduplica requisições por mensagem e persiste preferências locais por usuário |
+| Reprodução | `src/components/BibbleChatHome/{BotaoFalarMensagem,bibble-audio-manager,useVoiceStatus}.ts(x)` | Estados de áudio, uma reprodução global por vez, pausa/retomada, status compartilhado sem sintetizar ping e liberação de blobs |
+| Orquestração do chat | `src/components/BibbleChatHome/{BibbleChatLayout,BibbleChatWindow,BibbleMessageBubble,BibbleMessageList,BibbleSettingsPanel}.tsx` | Marca somente respostas nativas elegíveis, transporta a proveniência da entrada e faz autoplay apenas para uma nova resposta originada de áudio |
+| Serviço local | `/home/ialpha/services/bibble-voice/app/{main,engine,cache,schemas,config}.py` | FastAPI, Chatterbox Multilingual V3 em CPU ou CUDA explícita, cache WAV PCM16, fila, timeout, observabilidade e descarga de recursos |
+| Operação | `/home/ialpha/services/bibble-voice/{scripts,README.md,bibble-voice.service,requirements.lock}` | Instalação reprodutível, snapshots do modelo e PKUSEG verificados para operação offline, healthcheck, teste real e unidade systemd endurecida |
+| Provas | `tests/bibble/{voice-client,voice-proxy}.test.ts`, `/home/ialpha/services/bibble-voice/tests/test_core.py` | Contratos do proxy/UI e núcleo do serviço sem depender de uma voz inventada |
+
+Fluxo: a resposta textual continua sendo produzida e persistida pelo pipeline existente. Para uma mensagem nativa elegível, o botão chama `POST /api/bibble/voice`; essa rota autentica a sessão, aplica limite por usuário/global e encaminha server-to-server para `${BIBBLE_VOICE_URL}/v1/speech`. O FastAPI aceita apenas `voice="bibble"` e `language="pt"`, resolve internamente `voices/bibble.wav`, consulta o cache e, em miss, serializa a geração no dispositivo escolhido explicitamente por `TTS_DEVICE`. O WAV PCM signed de 16 bits volta para a mesma bolha; nenhuma mensagem adicional é criada.
+
+Proveniência e autoplay: `BibbleChatLayout.tsx` captura `vozUsadaRef` antes do I/O e grava `voiceAutoPlay` somente na nova resposta nativa diretamente causada por aquela entrada de áudio. Edição manual, troca/limpeza/exclusão de sessão, histórico, erro e mensagens Onyx limpam ou não recebem a marca. `replyToAudio=true` e `showButton=true` são defaults; `autoPlayAll=false`. Bloqueio de autoplay pelo navegador deixa o botão pronto, sem erro técnico. Falha do TTS nunca altera o stream, a persistência ou o envio do chat.
+
+Limites: 2.500 caracteres, 16 KiB no corpo, 25 MiB no WAV proxy, timeout do proxy de 570 s, serviço de 540 s, fila local de 4, cache de 7 dias/2 GiB e idle timeout de 300 s. A admissão no Next é em memória (6/min por usuário, uma concorrente por usuário, quatro globais) e portanto é apenas por processo; uma implantação horizontal deve usar coordenação compartilhada antes de depender desse limite como defesa global.
+
+Estado operacional conferido em 2026-09-16: `bibble-voice.service` habilitado e ativo em `127.0.0.1:8787`, health `ok`, `device=cpu`, referência autorizada configurada, snapshot V3 e artefatos PKUSEG locais verificados. `TTS_CPU_THREADS=8` limita PyTorch; a unidade usa `Nice=10`, `CPUWeight=50`, `MemoryHigh=8G` e `MemoryMax=12G`. Em CPU, unload faz `del`/GC e agenda encerramento fail-stop do próprio worker; o systemd o reinicia para devolver RAM ao sistema. Os testes reais registraram carga do V3, geração MISS, repetição HIT, unload, restart, recarga e nova geração MISS. A RTX 4090 permaneceu com 1.631 MiB livres, o llama.cpp com 21.992 MiB e nenhum processo Bibble na VRAM. A rota do Painel está publicada: sem sessão, `GET /api/bibble/voice` retorna 401, confirmando presença sem expor status a anônimos. Após a correção do `403` sob Cloudflare Tunnel, os testes focais Vitest passaram 26/26; o smoke autenticado da UI e o AC20 continuam pendentes, sem inferir aceite ponta a ponta no navegador.
+
+Não houve mudança de schema, migration, transcrição ou lógica do LLM. Configuração remota/Vercel exige um canal server-to-server privado em HTTPS e `BIBBLE_VOICE_TOKEN`; nunca exponha `127.0.0.1:8787` nem passe URL/segredo ao frontend.
+
+**Última atualização:** 2026-09-16 por Scribe (guard de origem compatível com Cloudflare Tunnel; AC20 pendente)
+
+---
+
+## ChatBot Alpha — frontend nativo desacoplado com provider mock (2026-09-15)
+
+| Área | Arquivos | Responsabilidade |
+|---|---|---|
+| Entrada e proteção | `src/app/PainelAlpha/ChatBotAlpha/{layout,page}.tsx` | O layout server-side aplica `auth()`, `getPermissoesEfetivas()` e bypass de `isAdminRole()` uma única vez; a raiz redireciona para Dashboard |
+| Rotas | `src/app/PainelAlpha/ChatBotAlpha/{dashboard,inbox,contatos,fluxos,agentes,campanhas,sequencias,templates,integracoes,configuracoes}/page.tsx` | Dez páginas App Router reais, todas montadas sob o mesmo layout protegido |
+| Shell | `src/components/ChatBotAlpha/shell/ChatbotShell.tsx`, `src/components/ChatBotAlpha/shell/navigation.ts` | Navegação desktop/mobile, rota ativa, estado global de hidratação/retry e sinalização explícita de ambiente MOCK |
+| UI operacional | `src/components/ChatBotAlpha/{dashboard,inbox,contatos,fluxos,agentes,campanhas,sequencias,templates,integracoes,configuracoes,shared}/` | Dashboard compacto, Inbox, CRUDs visuais, editor de nodes, integrações cenográficas e estados compartilhados |
+| Domínio | `src/types/chatbot.ts` | Entidades, filtros/paginação, grafo, settings, snapshot e união discriminada dos sete eventos realtime futuros |
+| Serviço | `src/services/chatbot/` | Interface `ChatbotService`, factory de provider, schemas Zod, provider mock, métricas derivadas, validação/remoção de nodes e `cloneChatbotData` com caminho nativo + fallback JSON-safe |
+| Dados simulados | `src/mocks/chatbot/data.ts` | Única origem das fixtures realistas; componentes e páginas não declaram dados de domínio inline |
+| Estado/cache | `src/store/useChatbotStore.ts` | Hidratação assíncrona, seleção, busy/error, mutações sem reload e `applyChatbotRealtimeEvent`; não abre transporte realtime |
+| Contrato futuro | `docs/chatbot-backend-contract.md` | Necessidades futuras de API, autenticação, paginação, filtros, erros, eventos e dependências; tudo marcado como não implementado |
+| Provas | `tests/chatbot-alpha/frontend-{architecture,edge-cases,mock-provider,realtime-flow,store,structured-clone-compat}.test.ts` | Arquitetura, rotas, segurança estrutural, provider, concorrência, reducer, flows e navegador sem `structuredClone`; suíte completa do módulo: 158 testes aprovados + 1 todo |
+
+Fluxo da nova superfície: rota protegida → `ChatbotShell` → workspace da seção → `useChatbotStore` → contrato assíncrono `ChatbotService` → `MockChatbotProvider` → snapshot em memória. `createChatbotService("api")` falha explicitamente; não existe fallback de rede, cliente Railway ou tentativa de conexão externa nesta fase.
+
+A Inbox usa lista/conversa/detalhes do contato, composer e mutações simuladas. Fluxos usa `@xyflow/react` com os dez kinds canônicos, edges, zoom/pan, propriedades, save mock e validação pura em `flow-validation.ts`. Dashboard é recalculado por `withDerivedDashboard` após mutações e eventos locais, evitando métricas estáticas divergentes.
+
+O reducer cobre somente a aplicação local tipada de `conversation.created`, `conversation.updated`, `message.created`, `message.updated`, `message.delivered`, `message.read` e `contact.updated`. WebSocket, SSE, Pusher e qualquer outro transporte permanecem futuros.
+
+Compatibilidade de clone: todo dado do novo módulo é JSON-safe e passa por `src/services/chatbot/clone.ts`. `cloneChatbotData` usa `globalThis.structuredClone` quando disponível e cai para serialização JSON quando o navegador/webview não oferece a API. O guard em `frontend-structured-clone-compat.test.ts` executa importação, snapshot, provider, envio, store, evento realtime e flow sem a API nativa, além de impedir novos usos diretos fora do helper.
+
+Regra operacional do stage: nunca executar `next build` sobre a mesma `.next` enquanto um `next start` está ativo. Isso mistura manifestos mantidos em memória com chunks recém-gravados e pode causar `ChunkLoadError`/exceção client-side. A promoção autoritativa deve usar `restartProject` em sequência **stop → build → start**. Em 2026-09-15, o stage da porta 3005 foi confirmado no Build ID `5kqIHl35UZV--w8j5SpVh`, com `next-server` PID 502162 iniciado às 18:18:56Z após o build das 18:17:36Z; 31 chunks responderam HTTP 200. `.next-chatbot-fix-verify` é somente artefato isolado do Forge e não é servido.
+
+Os componentes legados `ChatBotAlphaClient.tsx`, `ChatConversa.tsx`, `IframeChatBotAlpha.tsx` e `SeletorSistemaChatBot.tsx`, assim como actions/client HTTP antigos, permanecem no repositório, mas não são importados pelo novo shell. O projeto de referência `/home/ialpha/projetos/ChatbotX-main` também não é dependência de runtime.
+
+Validação registrada: Forge, Probe, Anubis e Lens aprovaram o delta; os testes ChatBot Alpha somam 158 aprovados + 1 todo. Lint do delta, teste de compatibilidade e build foram aprovados. O typecheck global ainda falha somente por diagnósticos externos/preexistentes. O React Flow mantém `connectOnClick=true` implícito da biblioteca; torná-lo explícito é hardening futuro não bloqueante e não participa da falha de entrada. O stage/chunks foi sondado, mas o smoke autenticado das dez rotas e a inspeção do console ainda não foram executados.
+
+**Última atualização:** 2026-09-15 por Scribe (compatibilidade de clone e operação segura do stage)
+
+---
+
+## Mesclagem de Planilhas — módulo full-page stateless (2026-09-15)
+
+| Área | Arquivos | Responsabilidade |
+|---|---|---|
+| Descoberta/acesso | `src/lib/modulos-registry.ts` | Item `mesclagem`, rota `/PainelAlpha/Mesclagem` e permissão `mesclagemPlanilhas` |
+| Page gate | `src/app/PainelAlpha/Mesclagem/page.tsx` | Revalida acesso e monta diretamente o workspace; sem landing/modal |
+| Workflow | `MesclagemWorkspace.tsx`, `useMesclagemController.ts`, `workspace-state.ts`, `api-mesclagem.ts`, `components/*.tsx` | Upload independente, seleção de abas/CNPJ, sugestão, override, prévia e download |
+| HTTP | `src/app/api/mesclagem/{inspecionar,sugerir,previa,exportar,template}/route.ts` | Cinco endpoints autenticados e `no-store`; POSTs exigem same-origin e contratos limitados |
+| Domínio | `src/lib/mesclagem/` | Catálogo, parsing/preflight, CNPJ, mapeamento determinístico/IA, mesclador, schemas, rate limit e XLSX |
+| Artefato | `public/templates/template-padrao.xlsx` | Template oficial lido no servidor; cabeçalhos existentes são preservados e destinos ausentes acrescentados |
+| Provas | `tests/mesclagem/*.test.ts` | 15 suítes; 87 testes direcionados aprovados na entrega |
+
+Fluxo: registry/menu + permissão → `page.tsx`/`verificarAcessoMesclagem` → `MesclagemWorkspace`/controller → APIs `inspecionar` e `sugerir` → `previa` → `processamento.ts`/`mesclador.ts` → `exportar`/`template.ts` → XLSX. `template` é o quinto endpoint e pode ser baixado diretamente pelo workspace.
+
+O contrato é integralmente stateless: prévia e exportação recebem novamente os dois arquivos, abas, colunas CNPJ e mapeamento atual; não há ID, mapa global, afinidade de instância ou ownership de sessão temporária. A única escrita reutilizada é auditoria best-effort com metadados agregados sanitizados.
+
+Catálogo canônico: `.xlsx`, `.xlsm`, `.csv`, `.tsv`; 31 destinos (26 legados + `DDD1`–`DDD5`). Limites principais: 80 MB/arquivo, 50.000 linhas/aba, 200 colunas, 2.000.000 células, 50 abas XLSX, prévia de 100 linhas, resultado de 100.000 linhas e multiplicidade 1:N de 1.000 por CNPJ. O HTTP reserva até 82 MB para o multipart unitário e 164 MB para o multipart com dois arquivos; o preflight da Mesclagem mantém razão máxima 100:1 e orçamentos próprios de 128 MB por entrada/256 MB descompactados. A sugestão JSON permanece em 128 KiB; rate limit é 5 tentativas/minuto por usuário e uma operação concorrente.
+
+IA: `mapeamento-deterministico.ts` sempre roda primeiro. `mapeamento-ia.ts` é `server-only` e consulta Qwen/Llama local somente para pendências, enviando destinos e nomes/índices de cabeçalhos sanitizados; não envia linhas nem valores. URL local/allowlist, schema Zod estrito, allowlists de destino/índice, até 40 campos e timeout de 1–5 s tornam o fallback best-effort e não bloqueante.
+
+Segurança: `autorizacao.ts` exige sessão válida, usuário `ATIVO` e papel administrativo ou permissão efetiva `mesclagemPlanilhas`. Todos os endpoints repetem o gate; mutations exigem origin/host same-origin, `Content-Type` e `Content-Length`, validam assinatura/preflight/estrutura e retornam `Cache-Control: no-store`. Fórmulas, cabeçalhos ambíguos e expansão excessiva são recusados.
+
+Validação registrada: 87/87 testes direcionados, lint direcionado e build aprovados. Não houve smoke browser autenticado; typecheck/testes globais permanecem vermelhos apenas por diagnósticos/falhas externos ao módulo, conforme a story.
+
+**Última atualização:** 2026-09-15 por Scribe (Mesclagem full-page stateless)
 
 ---
 
@@ -1266,6 +1357,29 @@ O catálogo 3D ganhou `containerCarga`, adaptação procedural do container da s
 
 **Última atualização:** 2026-08-14 por Scribe/Kowalski
 
+## IAlpha/Bibble — runtime endurecido e observável (2026-09-15)
+
+O assistente nativo da home (`/PainelAlpha`) é composto por `src/components/BibbleChatHome/`, com orquestração principal em `BibbleChatLayout.tsx`, e pela rota `src/app/api/bibble/chat/route.ts`. O shell `src/components/layout/PainelLayoutClient.tsx` publica por `postMessage` same-origin o contexto mínimo da aba ativa; `src/lib/bibble/module-context.ts` valida esse contexto contra `src/lib/modulos-registry.ts` e as permissões efetivas antes de ele chegar ao prompt.
+
+O núcleo server-side está dividido por responsabilidade:
+
+- `runtime-config.ts`: modelo exclusivo do servidor, teto físico de 131.072 tokens e reserva máxima de saída de 4.096 tokens;
+- `completion.ts`: stream OpenAI-compatible, agregação incremental de `tool_calls`, usage e cancelamento;
+- `context-budget.ts`: estimativa conservadora, orçamento integral e compactação determinística do histórico;
+- `tool-policy.ts`, `tools.ts` e `tool-executor.ts`: registry, autorização por turno e execução em profundidade;
+- `admission-control.ts`: limite local por usuário/slot antes da leitura e do trabalho caro;
+- `telemetry.ts`: `requestId`, TTFT, duração, throughput, provider calls e latência de tools sem conteúdo sensível;
+- `persona.ts` e `system-prompt.ts`: identidade executável e composição em camadas imutáveis;
+- `turn-interruption.ts`: cancelamento e remoção segura do par otimista incompleto.
+
+O catálogo público atual contém exatamente 18 tools somente leitura. Filesystem e mutações foram removidos do provider e falham fechados no executor. Upload/anexos também permanecem indisponíveis (`503`) até existir storage privado com ownership verificável; a UI não oferece essa capacidade enquanto a contenção estiver ativa.
+
+As rotas `src/app/api/onyx/` são uma fronteira separada: exigem PAT individual, validam visibilidade do agente, ownership da sessão local e vínculo com `persona_id`; anexos, proxy de arquivo sem vínculo e reasoning interno falham fechados. Trocar Bibble/Onyx interrompe o turno e reinicializa identidade e memória visual no cliente.
+
+Operação CLI-first: `scripts/bibble.mjs` expõe doctor, capabilities e benchmarks; `docs/operations/bibble-observability.md` documenta coleta e leitura de métricas, e `docs/qa/bibble/benchmark-2026-09-15.md` preserva o baseline sanitizado. Cobertura dedicada vive em `tests/bibble/` (16 arquivos, 118/118 no fechamento).
+
+**Última atualização:** 2026-09-15 por Scribe (story IAlpha/Bibble — transformação integral)
+
 ---
 
 ### Alpha CRM — Melhoria Visual da Sidebar (RM-2026-4F34CC, 2026-08-17)
@@ -1388,45 +1502,17 @@ O catálogo 3D ganhou `containerCarga`, adaptação procedural do container da s
 
 **Última atualização:** 2026-09-09 por Codex (RM-2026-40526E)
 
-## IAlpha/Bibble — runtime endurecido e observável (2026-09-15)
+## Alpha Explorer — arquivos privados no NAS (2026-09-15)
 
-O assistente nativo da home (`/PainelAlpha`) é composto por `src/components/BibbleChatHome/`, com orquestração principal em `BibbleChatLayout.tsx`, e pela rota `src/app/api/bibble/chat/route.ts`. O shell `src/components/layout/PainelLayoutClient.tsx` publica por `postMessage` same-origin o contexto mínimo da aba ativa; `src/lib/bibble/module-context.ts` valida esse contexto contra `src/lib/modulos-registry.ts` e as permissões efetivas antes de ele chegar ao prompt.
+- `src/lib/alpha-explorer/`: paths, capacidades, autorização, contratos Zod, persistência, storage, rate limit, auditoria e CLIs.
+- `src/lib/storage/{contracts,providers/*}.ts`: listagem paginada, copy verificado, ListParts/ListUploads e presign de partes no QuObjects; list/copy e URL GET assinada curta no Blob privado.
+- `src/app/api/alpha-explorer/`: items, multipart, download e ACL; toda rota repete sessão, módulo, prefixo e capacidade, e toda mutação exige origem HTTP same-origin.
+- `src/app/PainelAlpha/ExploradorArquivos/page.tsx` + `src/components/AlphaExplorer/`: Server Component protegido, workspace React Query, upload direto, lixeira e tutorial.
+- `AlphaExplorerItem`, `AlphaExplorerUploadSession`, `AlphaExplorerAcl` e `AlphaExplorerOperation`: metadados, provider imutável, ACL aditiva e reconciliação; objetos continuam fora do Turso.
+- `scripts/alpha-explorer.mjs`: doctor, permissions, acl-set, list, reconcile e smoke; ACL e cleanup exigem dry-run prévio e confirmação literal própria.
+- `docs/operations/alpha-explorer.md`: rollout por flags, CORS, smoke, monitoramento e rollback.
 
-O núcleo server-side está dividido por responsabilidade:
-
-- `runtime-config.ts`: modelo exclusivo do servidor, teto físico de 131.072 tokens e reserva máxima de saída de 4.096 tokens;
-- `completion.ts`: stream OpenAI-compatible, agregação incremental de `tool_calls`, usage e cancelamento;
-- `context-budget.ts`: estimativa conservadora, orçamento integral e compactação determinística do histórico;
-- `tool-policy.ts`, `tools.ts` e `tool-executor.ts`: registry, autorização por turno e execução em profundidade;
-- `admission-control.ts`: limite local por usuário/slot antes da leitura e do trabalho caro;
-- `telemetry.ts`: `requestId`, TTFT, duração, throughput, provider calls e latência de tools sem conteúdo sensível;
-- `persona.ts` e `system-prompt.ts`: identidade executável e composição em camadas imutáveis;
-- `turn-interruption.ts`: cancelamento e remoção segura do par otimista incompleto.
-
-O catálogo público atual contém exatamente 18 tools somente leitura. Filesystem e mutações foram removidos do provider e falham fechados no executor. Upload/anexos também permanecem indisponíveis (`503`) até existir storage privado com ownership verificável; a UI não oferece essa capacidade enquanto a contenção estiver ativa.
-
-As rotas `src/app/api/onyx/` são uma fronteira separada: exigem PAT individual, validam visibilidade do agente, ownership da sessão local e vínculo com `persona_id`; anexos, proxy de arquivo sem vínculo e reasoning interno falham fechados. Trocar Bibble/Onyx interrompe o turno e reinicializa identidade e memória visual no cliente.
-
-Operação CLI-first: `scripts/bibble.mjs` expõe doctor, capabilities e benchmarks; `docs/operations/bibble-observability.md` documenta coleta e leitura de métricas, e `docs/qa/bibble/benchmark-2026-09-15.md` preserva o baseline sanitizado. Cobertura dedicada vive em `tests/bibble/` (16 arquivos, 118/118 no fechamento).
-
-**Última atualização:** 2026-09-15 por Scribe (story IAlpha/Bibble — transformação integral)
-
----
-
-### Alpha CRM — Melhoria Visual da Sidebar (RM-2026-4F34CC, 2026-08-17)
-
-**Arquivo único alterado:** `src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx`
-
-**Alterações (exclusivamente visual, zero mudança de lógica):**
-1. `<aside>`: `bg-slate-950` → `bg-slate-950/40 backdrop-blur-xl` — o `CrmSpaceBackground` (já `absolute inset-0 z-0`) agora é visível através da sidebar.
-2. Mobile top bar: `bg-slate-950/80` → `bg-slate-950/40 backdrop-blur-xl` — consistência visual.
-3. NAV links: adicionados `bg-white/[0.04] border border-white/[0.06] rounded-xl` (destaque base), `hover:bg-white/[0.08] hover:shadow-[0_2px_8px_rgba(0,0,0,0.15)] hover:translate-x-0.5` (hover), `active:scale-[0.98] active:shadow-none` (active), `transition-all duration-200 ease-in-out` (transição), `cursor-pointer`.
-4. Ícone NAV: `group-hover:scale-110 transition-transform duration-200`.
-5. Item ativo: `boxShadow: 0 0 12px rgba(accent,0.1)` (glow de accent via `style` inline).
-
-**Padrão adotado:** "Sidebar sobre background vivo" — extensão do "vidro sobre hero" do Aurora Financeira. Ver `design-tokens.md` e `patterns.md`.
-
-**Verificação:** Probe aprovou todos os 6 critérios de aceitação. Sem regressão funcional. Observação menor (não bloqueante): área de toque vertical ~40px (ideal 44px) — `py-2.5` → `py-3` seria a correção.
+**Última atualização:** 2026-09-15 por Scribe
 
 ## IAlpha/Bibble — tom adaptativo e memória comportamental derivada (2026-09-15)
 

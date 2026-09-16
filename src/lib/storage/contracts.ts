@@ -49,6 +49,49 @@ export interface StorageObjectMetadata {
   url?: string;
 }
 
+export interface StorageListObject {
+  objectKey: string;
+  size: number;
+  etag?: string;
+  uploadedAt?: Date;
+}
+
+export interface StorageListResult {
+  objects: StorageListObject[];
+  prefixes: string[];
+  continuationToken?: string;
+}
+
+export interface StorageMultipartUploadSummary {
+  objectKey: string;
+  uploadId: string;
+  initiatedAt?: Date;
+}
+
+export interface StorageMultipartListResult {
+  uploads: StorageMultipartUploadSummary[];
+  continuationToken?: string;
+}
+
+export interface ExplorerStorageProvider extends StorageProvider {
+  listObjects(
+    target: StorageTarget,
+    prefix: string,
+    continuationToken?: string,
+    limit?: number,
+    signal?: AbortSignal,
+  ): Promise<StorageListResult>;
+  copyObject(target: StorageTarget, sourceKey: string, destinationKey: string, signal?: AbortSignal): Promise<StorageObjectMetadata>;
+  listMultipartUploads(
+    target: StorageTarget,
+    prefix: string,
+    continuationToken?: string,
+    signal?: AbortSignal,
+  ): Promise<StorageMultipartListResult>;
+  listUploadedParts(session: StorageMultipartSession, signal?: AbortSignal): Promise<StorageCompletedPart[]>;
+  createUploadPartUrl(session: StorageMultipartSession, partNumber: number, expiresInSeconds: number): Promise<string>;
+}
+
 export interface StorageDiagnostic {
   ok: boolean;
   provider: StorageProviderId;
@@ -134,4 +177,12 @@ export function validatePartSize(size: number): void {
   if (!Number.isSafeInteger(size) || size < STORAGE_MIN_PART_SIZE || size > STORAGE_MAX_PART_SIZE) {
     throw new StorageError("SIZE_INVALID", "Part size must be between 5 MiB and 95 MiB");
   }
+}
+
+export function normalizeEtag(etag: string): string {
+  const normalized = etag.trim();
+  if (!normalized) throw new StorageError("PART_FAILED", "ETag is required");
+  return normalized.startsWith('"') && normalized.endsWith('"')
+    ? normalized
+    : `"${normalized.replaceAll('"', "")}"`;
 }

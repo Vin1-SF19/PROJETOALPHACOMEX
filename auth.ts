@@ -68,6 +68,7 @@ const nextAuth = NextAuth({
   callbacks: {
     async jwt({ token, user, trigger, session }) {
       if (user) {
+        token.authenticatedAt = Math.floor(Date.now() / 1000);
         token.id = user.id;
         token.email = user.email;
         token.nome = (user as any).nome;
@@ -114,6 +115,7 @@ const nextAuth = NextAuth({
       }
 
       if (session.user) {
+        session.authenticatedAt = token.authenticatedAt;
         session.user.id = token.id as string;
         session.user.nome = token.nome as string;
         session.user.usuario = token.usuario as string;

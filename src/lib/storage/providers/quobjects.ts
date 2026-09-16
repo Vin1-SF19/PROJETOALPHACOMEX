@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   AbortMultipartUploadCommand,
+  CopyObjectCommand,
   CompleteMultipartUploadCommand,
   CreateMultipartUploadCommand,
   DeleteObjectCommand,
@@ -9,6 +10,8 @@ import {
   HeadBucketCommand,
   HeadObjectCommand,
   ListObjectsCommand,
+  ListObjectsV2Command,
+  ListMultipartUploadsCommand,
   ListPartsCommand,
   S3Client,
   UploadPartCommand,
@@ -19,6 +22,9 @@ import type {
   StartMultipartInput,
   StorageCompletedPart,
   StorageDiagnostic,
+  ExplorerStorageProvider,
+  StorageListResult,
+  StorageMultipartListResult,
   StorageMultipartSession,
   StorageObjectMetadata,
   StorageProvider,
@@ -30,7 +36,7 @@ import { classifyStorageError } from "@/lib/storage/sanitize";
 
 export type QuObjectsClient = Pick<S3Client, "send">;
 
-export class QuObjectsProvider implements StorageProvider {
+export class QuObjectsProvider implements StorageProvider, ExplorerStorageProvider {
   readonly id = "quobjects" as const;
   private readonly client: QuObjectsClient;
 
@@ -245,5 +251,118 @@ export class QuObjectsProvider implements StorageProvider {
     } catch (error) {
       throw classifyStorageError(error, this.id);
     }
+  }
+
+  async listObjects(
+    target: StorageTarget,
+    prefix: string,
+    continuationToken?: string,
+    limit = 100,
+    signal?: AbortSignal,
+  ): Promise<StorageListResult> {
+    try {
+      const result = await this.client.send(new ListObjectsV2Command({
+        Bucket: target.bucket,
+        Prefix: prefix,
+        Delimiter: "/",
+        ContinuationToken: continuationToken,
+        MaxKeys: Math.max(1, Math.min(1_000, limit)),
+      }), { abortSignal: signal });
+      return {
+        objects: (result.Contents ?? []).filter((item) => item.Key).map((item) => ({
+          objectKey: item.Key ?? "",
+          size: item.Size ?? 0,
+          etag: item.ETag,
+          uploadedAt: item.LastModified,
+        })),
+        prefixes: (result.CommonPrefixes ?? []).flatMap((item) => item.Prefix ? [item.Prefix] : []),
+        continuationToken: result.IsTruncated ? result.NextContinuationToken : undefined,
+      };
+    } catch (error) {
+      throw classifyStorageError(error, this.id);
+    }
+  }
+
+  async copyObject(
+    target: StorageTarget,
+    sourceKey: string,
+    destinationKey: string,
+    signal?: AbortSignal,
+  ): Promise<StorageObjectMetadata> {
+    try {
+      await this.client.send(new CopyObjectCommand({
+        Bucket: target.bucket,
+        CopySource: `${encodeURIComponent(target.bucket)}/${sourceKey.split("/").map(encodeURIComponent).join("/")}`,
+        Key: destinationKey,
+      }), { abortSignal: signal });
+      return await this.head(target, destinationKey, signal);
+    } catch (error) {
+      throw classifyStorageError(error, this.id);
+    }
+  }
+
+  async listMultipartUploads(
+    target: StorageTarget,
+    prefix: string,
+    continuationToken?: string,
+    signal?: AbortSignal,
+  ): Promise<StorageMultipartListResult> {
+    try {
+      const [keyMarker, uploadIdMarker] = continuationToken?.split("\u0000") ?? [];
+      const result = await this.client.send(new ListMultipartUploadsCommand({
+        Bucket: target.bucket,
+        Prefix: prefix,
+        KeyMarker: keyMarker || undefined,
+        UploadIdMarker: uploadIdMarker || undefined,
+        MaxUploads: 1_000,
+      }), { abortSignal: signal });
+      const next = result.IsTruncated && result.NextKeyMarker
+        ? `${result.NextKeyMarker}\u0000${result.NextUploadIdMarker ?? ""}`
+        : undefined;
+      return {
+        uploads: (result.Uploads ?? []).flatMap((upload) => upload.Key && upload.UploadId ? [{
+          objectKey: upload.Key,
+          uploadId: upload.UploadId,
+          initiatedAt: upload.Initiated,
+        }] : []),
+        continuationToken: next,
+      };
+    } catch (error) {
+      throw classifyStorageError(error, this.id);
+    }
+  }
+
+  async listUploadedParts(session: StorageMultipartSession, signal?: AbortSignal): Promise<StorageCompletedPart[]> {
+    try {
+      const result = await this.client.send(new ListPartsCommand({
+        Bucket: session.bucketOrStore,
+        Key: session.objectKey,
+        UploadId: session.uploadId,
+        MaxParts: 10_000,
+      }), { abortSignal: signal });
+      return (result.Parts ?? []).flatMap((part) => part.PartNumber && part.ETag ? [{
+        partNumber: part.PartNumber,
+        etag: part.ETag,
+        size: part.Size ?? 0,
+      }] : []);
+    } catch (error) {
+      throw classifyStorageError(error, this.id);
+    }
+  }
+
+  async createUploadPartUrl(
+    session: StorageMultipartSession,
+    partNumber: number,
+    expiresInSeconds: number,
+  ): Promise<string> {
+    if (!(this.client instanceof S3Client)) {
+      throw new StorageError("CONFIG_INVALID", "Signed URLs require a real S3 client", { provider: this.id });
+    }
+    return getSignedUrl(this.client, new UploadPartCommand({
+      Bucket: session.bucketOrStore,
+      Key: session.objectKey,
+      UploadId: session.uploadId,
+      PartNumber: partNumber,
+    }), { expiresIn: Math.max(30, Math.min(900, expiresInSeconds)) });
   }
 }

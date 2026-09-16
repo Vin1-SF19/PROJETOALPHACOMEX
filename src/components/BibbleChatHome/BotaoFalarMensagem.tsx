@@ -1,109 +1,102 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { Volume2, Loader2, Square } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Loader2, Pause, Play, Volume2, VolumeX } from "lucide-react";
+
+import { cleanBibbleSpeechText, releaseBibbleSpeech, requestBibbleSpeech } from "@/lib/bibble/voice-client";
+import { bibbleAudioManager, type BibbleAudioState } from "./bibble-audio-manager";
 import { useVoiceStatus } from "./useVoiceStatus";
 
-/** Remove markdown/imagens do texto antes de falar. */
-function limparParaFala(texto: string): string {
-  return texto
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/```[\s\S]*?```/g, " (bloco de código) ")
-    .replace(/`([^`]*)`/g, "$1")
-    .replace(/[#*_>~]/g, "")
-    .replace(/<think>[\s\S]*?<\/think>/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+interface BotaoFalarMensagemProps {
+  messageId: string;
+  texto: string;
+  autoPlay?: boolean;
+  visible?: boolean;
+  accent?: string;
 }
 
-export function BotaoFalarMensagem({ texto, accent = "99, 102, 241" }: { texto: string; accent?: string }) {
-  const { tts_enabled, loaded, nativeMode } = useVoiceStatus();
-  const [estado, setEstado] = useState<"idle" | "carregando" | "tocando">("idle");
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+export function BotaoFalarMensagem({
+  messageId,
+  texto,
+  autoPlay = false,
+  visible = true,
+  accent = "99, 102, 241",
+}: BotaoFalarMensagemProps) {
+  const { tts_enabled, loaded, modelLoaded } = useVoiceStatus();
+  const [state, setState] = useState<BibbleAudioState>("idle");
+  const blobRef = useRef<Blob | null>(null);
+  const autoPlayAttemptedRef = useRef(false);
 
-  if (!loaded || !tts_enabled) return null;
-
-  const parar = () => {
-    if (nativeMode) {
-      window.speechSynthesis?.cancel();
-    } else {
-      audioRef.current?.pause();
-      if (audioRef.current) audioRef.current.currentTime = 0;
+  const play = useCallback(async (automatic = false) => {
+    if (state === "playing") {
+      bibbleAudioManager.pause(messageId);
+      return;
     }
-    setEstado("idle");
-  };
+    if (state === "paused" && await bibbleAudioManager.resume(messageId)) return;
 
-  const falarNativo = (fala: string) => {
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(fala.slice(0, 5000));
-    utter.lang = "pt-BR";
-    utter.rate = 1.05;
-    utteranceRef.current = utter;
-    utter.onstart = () => setEstado("tocando");
-    utter.onend = () => setEstado("idle");
-    utter.onerror = () => setEstado("idle");
-    window.speechSynthesis.speak(utter);
-    setEstado("tocando");
-  };
-
-  const falarOnyx = async (fala: string) => {
-    setEstado("carregando");
+    const speechText = cleanBibbleSpeechText(texto);
+    if (!speechText) return;
     try {
-      const res = await fetch("/api/onyx/voice/synthesize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: fala.slice(0, 5000) }),
-      });
-      if (!res.ok) throw new Error(String(res.status));
-
-      const ct = res.headers.get("content-type") ?? "";
-      let url: string;
-      if (ct.includes("application/json")) {
-        const data = (await res.json()) as { url?: string };
-        if (!data.url) throw new Error("sem áudio");
-        url = data.url;
-      } else {
-        url = URL.createObjectURL(await res.blob());
+      if (!blobRef.current) {
+        setState("loading");
+        blobRef.current = await requestBibbleSpeech(messageId, speechText);
       }
-
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onended = () => { setEstado("idle"); if (url.startsWith("blob:")) URL.revokeObjectURL(url); };
-      audio.onerror = () => setEstado("idle");
-      await audio.play();
-      setEstado("tocando");
+      setState("ready");
+      const played = await bibbleAudioManager.play(messageId, blobRef.current, setState);
+      // Bloqueio de autoplay é comportamento normal do navegador, não erro técnico.
+      if (!played && !automatic) setState("ready");
     } catch {
-      // Onyx falhou → fallback para modo nativo
-      falarNativo(fala);
+      setState("error");
     }
-  };
+  }, [messageId, state, texto]);
 
-  const falar = async () => {
-    if (estado === "tocando") { parar(); return; }
-    const fala = limparParaFala(texto);
-    if (!fala) return;
+  useEffect(() => () => {
+    bibbleAudioManager.stop(messageId);
+    releaseBibbleSpeech(messageId);
+  }, [messageId]);
 
-    if (nativeMode) {
-      falarNativo(fala);
-    } else {
-      await falarOnyx(fala);
-    }
-  };
+  useEffect(() => {
+    if (!autoPlay || !loaded || !tts_enabled || autoPlayAttemptedRef.current) return;
+    autoPlayAttemptedRef.current = true;
+    void play(true);
+  }, [autoPlay, loaded, play, tts_enabled]);
+
+  if (!visible || !loaded) return null;
+
+  const unavailable = !tts_enabled;
+  const label = unavailable
+    ? "Tentar voz do Bibble"
+    : state === "loading"
+      ? modelLoaded ? "Gerando áudio..." : "Preparando voz do Bibble..."
+      : state === "playing"
+        ? "Pausar voz"
+        : state === "paused"
+          ? "Continuar voz"
+          : state === "error"
+            ? "Tentar gerar voz novamente"
+            : "Ouvir resposta";
 
   return (
     <button
-      onClick={falar}
-      title={estado === "tocando" ? "Parar" : "Ouvir resposta"}
-      aria-label={estado === "tocando" ? "Parar áudio" : "Ouvir resposta em voz"}
-      className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider transition-all duration-150 hover:brightness-125"
-      style={{ color: estado !== "idle" ? `rgba(${accent},1)` : "#64748b" }}
+      type="button"
+      onClick={() => void play(false)}
+      disabled={state === "loading"}
+      title={label}
+      aria-label={label}
+      aria-pressed={state === "playing"}
+      className="flex items-center gap-1 rounded px-1 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 transition-all duration-150 hover:brightness-125 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-45"
+      style={{ color: !unavailable && state !== "idle" ? `rgba(${accent},1)` : undefined }}
     >
-      {estado === "carregando" ? <Loader2 size={11} className="animate-spin" />
-        : estado === "tocando" ? <Square size={11} fill="currentColor" />
-        : <Volume2 size={11} />}
-      {estado === "tocando" ? "PARAR" : "OUVIR"}
+      {state === "loading" ? <Loader2 size={11} className="animate-spin" aria-hidden />
+        : unavailable ? <VolumeX size={11} aria-hidden />
+        : state === "playing" ? <Pause size={11} aria-hidden />
+        : state === "paused" || state === "ready" ? <Play size={11} aria-hidden />
+        : <Volume2 size={11} aria-hidden />}
+      {state === "loading" ? (modelLoaded ? "GERANDO" : "PREPARANDO")
+        : state === "playing" ? "PAUSAR"
+        : state === "paused" ? "CONTINUAR"
+        : state === "error" ? "TENTAR"
+        : "OUVIR"}
     </button>
   );
 }

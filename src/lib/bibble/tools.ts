@@ -287,6 +287,25 @@ const BIBBLE_TOOL_REGISTRY: OllamaTool[] = [
   {
     type: "function",
     function: {
+      name: "consultar_estilo_comunicacao_usuario",
+      description:
+        "Somente leitura e exclusiva para Admin/TI: analisa como outro usuário costuma conversar com o Bibble usando apenas métricas agregadas do histórico nativo. Use quando perguntarem como uma pessoa fala, escreve ou se comunica com o Bibble. Nunca retorna mensagens, trechos, anexos ou conteúdo bruto.",
+      parameters: {
+        type: "object",
+        properties: {
+          usuario_nome: {
+            type: "string",
+            description: "Nome do usuário cujo estilo de comunicação deve ser analisado. Em caso de nomes parecidos, informe o nome completo exato.",
+          },
+        },
+        required: ["usuario_nome"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "consultar_metas_comerciais",
       description:
         "Consulta vendas (contratos comerciais) e metas do painel de metas. Retorna quantidade de vendas, valor total, meta mensal e progresso de um colaborador ou de toda a equipe. Use quando perguntarem sobre vendas, contratos, metas, progresso comercial ou desempenho de vendas.",

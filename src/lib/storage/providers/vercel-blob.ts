@@ -2,11 +2,14 @@ import "server-only";
 
 import {
   completeMultipartUpload,
+  copy,
   createMultipartUpload,
   del,
   get,
   head,
+  issueSignedToken,
   list,
+  presignUrl,
   uploadPart,
 } from "@vercel/blob";
 
@@ -14,6 +17,7 @@ import type {
   StartMultipartInput,
   StorageCompletedPart,
   StorageDiagnostic,
+  StorageListResult,
   StorageMultipartSession,
   StorageObjectMetadata,
   StorageProvider,
@@ -31,9 +35,12 @@ export type BlobSdk = {
   head: typeof head;
   get: typeof get;
   del: typeof del;
+  copy: typeof copy;
+  issueSignedToken: typeof issueSignedToken;
+  presignUrl: typeof presignUrl;
 };
 
-const defaultSdk: BlobSdk = { list, createMultipartUpload, uploadPart, completeMultipartUpload, head, get, del };
+const defaultSdk: BlobSdk = { list, createMultipartUpload, uploadPart, completeMultipartUpload, head, get, del, copy, issueSignedToken, presignUrl };
 
 export class VercelBlobProvider implements StorageProvider {
   readonly id = "vercel-blob" as const;
@@ -198,8 +205,25 @@ export class VercelBlobProvider implements StorageProvider {
     }
   }
 
-  async createDownloadUrl(target: StorageTarget, objectKey: string): Promise<string> {
+  async createDownloadUrl(target: StorageTarget, objectKey: string, expiresInSeconds: number): Promise<string> {
     void target;
+    if (this.config.blobAccess === "private") {
+      const validUntil = Date.now() + Math.max(1, Math.min(300, expiresInSeconds)) * 1_000;
+      const signedToken = await this.sdk.issueSignedToken({
+        token: this.config.blobToken,
+        pathname: objectKey,
+        operations: ["get"],
+        validUntil,
+      });
+      const result = await this.sdk.presignUrl(signedToken, {
+        access: "private",
+        operation: "get",
+        pathname: objectKey,
+        validUntil,
+        useCache: false,
+      });
+      return result.presignedUrl;
+    }
     const result = await this.sdk.head(objectKey, { token: this.config.blobToken });
     return result.downloadUrl;
   }
@@ -207,6 +231,57 @@ export class VercelBlobProvider implements StorageProvider {
   async delete(_target: StorageTarget, objectKey: string, signal?: AbortSignal): Promise<void> {
     try {
       await this.sdk.del(objectKey, { token: this.config.blobToken, abortSignal: signal });
+    } catch (error) {
+      throw classifyStorageError(error, this.id);
+    }
+  }
+
+  async listObjects(
+    target: StorageTarget,
+    prefix: string,
+    continuationToken?: string,
+    limit = 100,
+    signal?: AbortSignal,
+  ): Promise<StorageListResult> {
+    void target;
+    try {
+      const result = await this.sdk.list({
+        token: this.config.blobToken,
+        prefix,
+        cursor: continuationToken,
+        limit: Math.max(1, Math.min(1_000, limit)),
+        mode: "folded",
+        abortSignal: signal,
+      });
+      return {
+        objects: result.blobs.map((blob) => ({
+          objectKey: blob.pathname,
+          size: blob.size,
+          etag: blob.etag,
+          uploadedAt: blob.uploadedAt,
+        })),
+        prefixes: result.folders,
+        continuationToken: result.hasMore ? result.cursor : undefined,
+      };
+    } catch (error) {
+      throw classifyStorageError(error, this.id);
+    }
+  }
+
+  async copyObject(
+    target: StorageTarget,
+    sourceKey: string,
+    destinationKey: string,
+    signal?: AbortSignal,
+  ): Promise<StorageObjectMetadata> {
+    void target;
+    try {
+      await this.sdk.copy(sourceKey, destinationKey, {
+        ...this.commonOptions(signal),
+        addRandomSuffix: false,
+        allowOverwrite: false,
+      });
+      return await this.head(target, destinationKey, signal);
     } catch (error) {
       throw classifyStorageError(error, this.id);
     }

@@ -79,3 +79,9 @@ next-env.d.ts
 /.mcp.json
 .bibble/cloud-providers.json
 .bibble/*-cache.json
+
+# Alpha Explorer SMB gateway — ambiente e estado operacional locais.
+/ops/alpha-explorer-gateway/.venv/
+/ops/alpha-explorer-gateway/**/__pycache__/
+/ops/alpha-explorer-gateway/**/*.pyc
+/ops/alpha-explorer-gateway/*.sqlite3*

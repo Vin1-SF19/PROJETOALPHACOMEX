@@ -11,7 +11,8 @@ import {
   podeConsultarManualModulo,
 } from "@/lib/shared/module-knowledge";
 import { BIBBLE_TOOLS } from "@/lib/bibble/tools";
-import { BIBBLE_FS_TOOLS, BIBBLE_MUTATING_TOOLS, authorizedTools, filesystemEnabled, resolveBibbleFsPath, validateFilesystemMutation } from "@/lib/bibble/tool-policy";
+import { inspectBehavioralProfileByName } from "@/lib/bibble/behavioral-memory";
+import { BIBBLE_FS_TOOLS, BIBBLE_MUTATING_TOOLS, authorizedTools, canConsultBehavioralProfiles, filesystemEnabled, resolveBibbleFsPath, validateFilesystemMutation } from "@/lib/bibble/tool-policy";
 
 export interface UserCtx {
   userId: number;
@@ -586,6 +587,20 @@ async function executarToolUnsafe(
           exibindo: usuarios.length,
         },
         usuarios,
+      });
+    }
+
+    case "consultar_estilo_comunicacao_usuario": {
+      if (!canConsultBehavioralProfiles(ctx.role)) {
+        return JSON.stringify({ ok: false, erro: "Consulta disponível somente para Admin e TI." });
+      }
+
+      const usuarioNome = typeof params.usuario_nome === "string" ? params.usuario_nome : "";
+      const inspection = await inspectBehavioralProfileByName(usuarioNome);
+      return JSON.stringify({
+        ok: inspection.status === "ready" || inspection.status === "insufficient_sample",
+        privacy: "Resultado agregado; nenhuma mensagem, trecho ou anexo foi retornado.",
+        ...inspection,
       });
     }
 

@@ -1,6 +1,9 @@
 import {
+  CopyObjectCommand,
   HeadObjectCommand,
   ListObjectsCommand,
+  ListObjectsV2Command,
+  ListMultipartUploadsCommand,
   ListPartsCommand,
   UploadPartCommand,
 } from "@aws-sdk/client-s3";
@@ -97,5 +100,33 @@ describe("QuObjects provider", () => {
     });
     expect(send.mock.calls[0]?.[0]).toBeInstanceOf(HeadObjectCommand);
     expect(send.mock.calls[1]?.[0]).toBeInstanceOf(ListObjectsCommand);
+  });
+
+  it("pagina objetos e prefixes sem listar o bucket inteiro", async () => {
+    const send = vi.fn().mockResolvedValue({
+      Contents: [{ Key: "financeiro/a.pdf", Size: 12, ETag: '"a"' }],
+      CommonPrefixes: [{ Prefix: "financeiro/2026/" }],
+      IsTruncated: true,
+      NextContinuationToken: "next",
+    });
+    const provider = new QuObjectsProvider(runtimeConfig(), { send } as unknown as QuObjectsClient);
+    const result = await provider.listObjects({ logicalStorage: "documentos", primaryProvider: "quobjects", fallbackProvider: "vercel-blob", storageSpace: "painel-alpha-poc", bucket: "pa-poc-private", fallbackStore: "legacy-default" }, "financeiro/", undefined, 25);
+    expect(result).toMatchObject({ prefixes: ["financeiro/2026/"], continuationToken: "next" });
+    expect(send.mock.calls[0]?.[0]).toBeInstanceOf(ListObjectsV2Command);
+    expect(send.mock.calls[0]?.[0].input).toMatchObject({ Prefix: "financeiro/", Delimiter: "/", MaxKeys: 25 });
+  });
+
+  it("lista multipart incompleto e copia antes de confirmar destino", async () => {
+    const send = vi.fn()
+      .mockResolvedValueOnce({ Uploads: [{ Key: "alpha-explorer/a", UploadId: "u1" }] })
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ ContentLength: 20, ContentType: "application/pdf" });
+    const provider = new QuObjectsProvider(runtimeConfig(), { send } as unknown as QuObjectsClient);
+    const target = { logicalStorage: "documentos", primaryProvider: "quobjects", fallbackProvider: "vercel-blob", storageSpace: "painel-alpha-poc", bucket: "pa-poc-private", fallbackStore: "legacy-default" } as const;
+    await expect(provider.listMultipartUploads(target, "alpha-explorer/")).resolves.toMatchObject({ uploads: [{ uploadId: "u1" }] });
+    await expect(provider.copyObject(target, "alpha-explorer/a", "alpha-explorer/b")).resolves.toMatchObject({ size: 20 });
+    expect(send.mock.calls[0]?.[0]).toBeInstanceOf(ListMultipartUploadsCommand);
+    expect(send.mock.calls[1]?.[0]).toBeInstanceOf(CopyObjectCommand);
+    expect(send.mock.calls[2]?.[0]).toBeInstanceOf(HeadObjectCommand);
   });
 });

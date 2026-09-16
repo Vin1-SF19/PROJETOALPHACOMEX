@@ -5,12 +5,9 @@ import { isAdminRole } from '@/lib/roles';
 import { z } from 'zod';
 import db from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { MODULOS_REGISTRY } from '@/lib/modulos-registry';
+import { KNOWN_MODULE_PERMISSIONS, readEffectiveModulePermissions } from '@/lib/permissions/effective';
 
-const KNOWN_MODULOS = new Set([
-  ...(MODULOS_REGISTRY.map(m => m.permission).filter(Boolean) as string[]),
-  "roadmapProduction",
-]);
+const KNOWN_MODULOS = KNOWN_MODULE_PERMISSIONS;
 
 async function requireAdminSession() {
   const session = await auth();
@@ -21,35 +18,7 @@ async function requireAdminSession() {
 
 // ── Fonte única de verdade ─────────────────────────────────────────────────────
 export async function getPermissoesEfetivas(usuarioId: number): Promise<string[]> {
-  const user = await db.usuarios.findUnique({
-    where: { id: usuarioId },
-    select: { role: true, permissoes: true },
-  });
-  if (!user) return [];
-
-  if (isAdminRole(user.role)) return Array.from(KNOWN_MODULOS);
-
-  const setorPerms = await db.setorPermissao.findMany({
-    where: { setor: user.role },
-    select: { modulo: true },
-  });
-
-  // If sector has no config yet, fall back to legacy permissoes column
-  const base: Set<string> =
-    setorPerms.length > 0
-      ? new Set(setorPerms.map(p => p.modulo))
-      : new Set((user.permissoes ?? '').split(',').filter(Boolean));
-
-  const overrides = await db.usuarioPermissaoOverride.findMany({
-    where: { usuarioId },
-    select: { modulo: true, acao: true },
-  });
-  for (const o of overrides) {
-    if (o.acao === 'ADD') base.add(o.modulo);
-    else if (o.acao === 'REMOVE') base.delete(o.modulo);
-  }
-
-  return Array.from(base);
+  return readEffectiveModulePermissions(usuarioId);
 }
 
 // ── Setor: listar permissões ───────────────────────────────────────────────────

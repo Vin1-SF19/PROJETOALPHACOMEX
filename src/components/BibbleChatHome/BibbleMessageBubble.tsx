@@ -28,6 +28,10 @@ export interface Message {
   files?: Array<{ name: string; type: string; url?: string; size?: number }>;
   streaming?: boolean;
   createdAt?: Date;
+  /** Efêmero: somente a nova resposta direta ao envio atual pode solicitar autoplay. */
+  voiceAutoPlay?: boolean;
+  /** Proveniência efêmera/runtime: somente respostas do Bibble nativo usam sua voz. */
+  voiceEligible?: boolean;
 }
 
 // ── Language color map ────────────────────────────────────────────────────────
@@ -690,6 +694,7 @@ export default function BibbleMessageBubble({
   agentName,
   onEdit,
   isStreaming,
+  showVoiceButton = true,
   accent = "99, 102, 241",
 }: {
   message: Message;
@@ -700,6 +705,7 @@ export default function BibbleMessageBubble({
   agentName?: string | null;
   onEdit?: (messageId: string, novoTexto: string) => void;
   isStreaming?: boolean;
+  showVoiceButton?: boolean;
   accent?: string;
 }) {
   const isUser   = message.role === "user";
@@ -843,7 +849,13 @@ export default function BibbleMessageBubble({
                 </span>
               </div>
               <div className="flex items-center gap-3">
-                <BotaoFalarMensagem texto={message.content} accent={accent} />
+                <BotaoFalarMensagem
+                  messageId={message.id}
+                  texto={message.content}
+                  autoPlay={message.voiceAutoPlay === true}
+                  visible={showVoiceButton && message.voiceEligible === true}
+                  accent={accent}
+                />
                 <CopyButton text={message.content} label="Copiar resposta" />
               </div>
             </div>

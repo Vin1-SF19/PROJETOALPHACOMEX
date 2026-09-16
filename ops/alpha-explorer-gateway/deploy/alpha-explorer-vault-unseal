@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+credential="${CREDENTIALS_DIRECTORY:?}/vault_unseal"
+for _attempt in $(seq 1 30); do
+  if curl --silent --show-error --cacert /etc/alpha-explorer-vault/tls/ca.crt https://127.0.0.1:8200/v1/sys/health >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+
+sealed=$(curl --silent --show-error --cacert /etc/alpha-explorer-vault/tls/ca.crt https://127.0.0.1:8200/v1/sys/seal-status | jq -r '.sealed')
+if [[ "$sealed" == "true" ]]; then
+  jq -Rs '{key: rtrimstr("\n")}' "$credential" \
+    | curl --silent --show-error --cacert /etc/alpha-explorer-vault/tls/ca.crt \
+        --header 'Content-Type: application/json' --data-binary @- \
+        https://127.0.0.1:8200/v1/sys/unseal >/dev/null
+fi
+
+test "$(curl --silent --show-error --cacert /etc/alpha-explorer-vault/tls/ca.crt https://127.0.0.1:8200/v1/sys/seal-status | jq -r '.sealed')" = "false"

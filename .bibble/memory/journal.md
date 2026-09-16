@@ -5422,6 +5422,120 @@ O solicitante precisava indicar opcionalmente um técnico e uma data desejada ao
 - `codebase-map.md`: mapa do domínio, arquivos, migrations e fluxo de entrega do feedback.
 - `integration-points.md`: contrato de atribuição, conclusão atômica, popup/Pusher/polling e regras para extensões. `decisions.md`, `architecture.md` e `components.md` não exigiram nova alteração nesta consolidação.
 
+---
+
+## [2026-09-15 11:06] — Mesclagem tornou-se um módulo full-page, stateless e funcional
+
+**Tags:** #feature #bugfix #refactor #nextjs #security #auth
+**Agentes envolvidos:** Bibble/Codex, Scout, River/SM, Dex/Dev, Anubis, Forge, Probe, Lens, Sage, Scribe e Kowalski
+**Arquivos tocados:** `src/lib/modulos-registry.ts`; `src/app/PainelAlpha/Mesclagem/`; `src/app/api/mesclagem/`; `src/lib/mesclagem/`; `public/templates/template-padrao.xlsx`; `tests/mesclagem/`; `docs/stories/story-mesclagem-*.md`; `plan/self-critique-mesclagem-*.json`; `.bibble/memory/{codebase-map,integration-points,journal}.md`
+
+### Contexto
+O módulo aparecia como um modal sobre uma landing, o auto-mapeamento só ocorria tarde demais e o estado efêmero impedia que overrides comandassem confiavelmente a prévia e o XLSX. A revisão cirúrgica precisava preservar a identidade visual, corrigir o fluxo completo e não criar banco ou persistência.
+
+### O que foi feito
+- A rota passou a montar diretamente um workspace full-page responsivo, mantendo cards, stepper e badges; uploads ganharam estados independentes, affordance nativa/teclado, ARIA, tokens Tailwind e reduced motion.
+- O controller conduz `Arquivos → CNPJ → Mapeamento → Prévia → Exportação`, descarta respostas obsoletas e sugere antes da revisão: aliases determinísticos primeiro e Qwen/Llama local somente para pendências, sem linhas, células, CNPJ ou PII.
+- Prévia e exportação tornaram-se stateless e reprocessam arquivos, abas, CNPJs e mapeamento atuais. O catálogo inclui os 26 destinos existentes e `DDD1`–`DDD5`; o XLSX resolve por cabeçalho normalizado, acrescenta ausentes e preserva ordem, estilos, dados e relações 1:N.
+- Autorização foi uniformizada no registry, página e cinco APIs. Guards compartilhados cobrem same-origin, tipo/tamanho, `no-store`, rate/concurrency; preflight ZIP, limites incrementais, teto de expansão e auditoria agregada reduzem abuso e vazamento.
+
+### Decisões tomadas
+- Arquitetura stateless: eliminar sessão/UUID e afinidade de instância faz do override manual a fonte autoritativa do próximo resultado.
+- IA local é fallback best-effort: timeout padrão de 4 s, teto de 5 s, endpoint server-only/local, sem redirects e resposta estritamente validada; erro preserva o determinístico e a edição manual.
+- Duplicado válido não é inválido: diagnóstico separa duplicados reais, grupos 1:N, vazios e inválidos; “Empresas processadas” soma com e sem match.
+
+### Problemas encontrados / resolvidos
+- Lens identificou timeout da IA incompatível com a rota, override preso a índice stale, parser CSV/TSV por split físico e limites aplicados tarde: timeout foi limitado, troca de aba reassocia unicamente por `origemNome` normalizado ou limpa com aviso, parser passou a ser lógico/stateful e limites viraram early abort incremental.
+- Lens também removeu sessão/rota/helper mortos, reduziu o workspace de 388 para 128 linhas via controller, compartilhou guards HTTP, separou métricas de duplicidade/1:N, removeu CSS global/hardcoded e tornou a validação do client Zod estrita/discriminada.
+- Anubis endureceu expansão para 100 mil linhas e 1.000 matches por CNPJ, preflight de ZIP, isolamento da IA local e concorrência/rate por usuário.
+
+### Pendências
+- QA manual em navegador autenticado, desktop e viewport reduzida, com arquivos válidos, override para coluna/**Vazio** e download XLSX.
+- Gates globais externos permanecem vermelhos: typecheck com 16 diagnósticos fora da Mesclagem e testes globais com 19 falhas em 11 arquivos; CodeRabbit não está instalado. Não houve deploy, alteração de banco nem smoke autenticado.
+- Evidência final do escopo: 87/87 testes, lint direcionado, build e diff-check aprovados.
+
+### Refletido também em
+- `codebase-map.md`: mapa do módulo full-page, cinco APIs, domínio, catálogo, limites e provas.
+- `integration-points.md`: pipeline stateless, autorização uniforme, automapping/IA local, segurança e extensão de destinos.
+
+---
+
+## [2026-09-15 12:22] — ChatBot Alpha ganhou frontend nativo, operacional e mock-only
+
+**Tags:** #feature #refactor #nextjs #tailwind #auth #security
+**Agentes envolvidos:** Bibble/Codex, Scout, River/SM, Iris, Nova, Forge, Probe, Anubis, Lens, Sage, Scribe e Kowalski
+**Arquivos tocados:** `src/app/PainelAlpha/ChatBotAlpha/`; `src/components/ChatBotAlpha/`; `src/{types,mocks,services,store}/`; `tests/chatbot-alpha/`; `docs/chatbot-backend-contract.md`; `docs/qa/assessments/CHATBOT-ALPHA-FE-MOCK-test-design-20260915.md`; `docs/stories/story-chatbot-alpha-frontend-nativo-mock.md`; `.bibble/memory/{codebase-map,integration-points,journal}.md`
+
+### Contexto
+O usuário pediu uma integração exclusivamente frontend do ChatbotX no Painel Alpha, usando o projeto original apenas como referência funcional. A entrega precisava oferecer uma aplicação operacional completa com mocks, sem backend, Railway, banco, realtime ou canais externos.
+
+### O que foi feito
+- O diagnóstico Scout mapeou Painel Alpha e ChatbotX, separando recursos visuais das dependências de backend, realtime, integrações, autenticação e banco; o original permaneceu intacto e desacoplado.
+- Criadas dez rotas nativas: Dashboard, Inbox, Contatos, Fluxos, Agentes, Campanhas, Sequências, Templates, Integrações e Configurações, sob um shell denso, responsivo e consistente com o design system Alpha.
+- Implementada a arquitetura `UI → store → service → mock provider`, com hidratação assíncrona, loading/erro/retry, mutações em memória, filtros, formulários RHF/Zod e aplicação idempotente de sete eventos futuros de realtime, sem transporte ativo.
+- Inbox, editor node-based de fluxos e demais workspaces ficaram interativos; o contrato futuro documentou operações, payloads, autenticação, paginação, filtros, erros, eventos e dependências externas.
+- Forge, Probe, Anubis e Lens aprovaram o delta; Sage encerrou com 12 arquivos, 155 testes aprovados e 1 todo, lint/typecheck escopados e build de produção aprovado.
+
+### Decisões tomadas
+- O ChatbotX é referência funcional, nunca dependência de runtime: nenhuma importação interna, credencial ou alteração foi feita no projeto original.
+- A rota nova preserva sessão e permissão `chatBotAlpha` no layout server-side, mas não importa nem aciona actions, cliente HTTP ou Infra legados.
+- A API futura substituirá somente o provider; telas e store não conhecerão Railway, WebSocket, banco ou SDKs de canal.
+
+### Problemas encontrados / resolvidos
+- Hidratação inicialmente síncrona e erros absorvidos impediam estados reais: convertidos para fluxo assíncrono com propagação, retry e controle `busy/finally`.
+- Inbox responsiva, vínculos de agentes, criação de fluxo e métricas derivadas tinham lacunas: fluxos e estados foram completados e cobertos por testes estruturais.
+- Envios concorrentes podiam repetir IDs quando `Date.now()` coincidia: o mock provider passou a usar sequência monotônica por instância, com regressão automatizada.
+
+### Pendências
+- Executar smoke autenticado em navegador, incluindo navegação, viewports, estados e ausência de erros no console.
+- Gates globais permanecem vermelhos por débitos externos ao módulo: testes com 19 falhas em 11 arquivos e lint/typecheck com ocorrências preexistentes; o escopo ChatBot Alpha está verde.
+- Backend/API, transporte realtime, Railway, banco, webhooks, OAuth e conexões reais continuam deliberadamente para a próxima fase.
+
+### Refletido também em
+- `codebase-map.md`: arquitetura, rotas, componentes, service/mock provider, store e validações do módulo.
+- `integration-points.md`: gate de acesso, fronteiras mock-only e contrato de substituição futura pelo provider de API.
+
+---
+
+## [2026-09-15] — Mesclagem ampliou upload para 80 MB por arquivo
+
+O teto comprimido passou de 10 MB para 80 MB por arquivo. A inspeção reserva 82 MB para o envelope multipart e prévia/exportação, 164 MB para os dois arquivos. O preflight XLSX permanece antes do ExcelJS, com razão máxima 100:1 e orçamentos específicos de 128 MB por entrada e 256 MB descompactados no total; limites de linhas, colunas, células e expansão 1:N continuam inalterados. A interface informa o novo máximo. Não houve banco ou migration. Validação: 89/89 testes direcionados (Mesclagem e regressão do preflight compartilhado), ESLint direcionado e diff-check aprovados.
+
+---
+
+## [2026-09-15 15:34] — Crash do ChatBot Alpha corrigido e stage reiniciado de forma controlada
+
+**Tags:** #bugfix #critical #nextjs
+**Agentes envolvidos:** Bibble/Codex, Forge, Probe, Lens, Sage e Kowalski
+**Arquivos tocados:** `src/services/chatbot/clone.ts`; `src/services/chatbot/index.ts`; `src/mocks/chatbot/data.ts`; `src/services/chatbot/mock-provider.ts`; `tests/chatbot-alpha/frontend-structured-clone-compat.test.ts`; `.bibble/memory/journal.md`
+
+### Contexto
+Ao abrir o sistema no stage, o navegador apresentava uma exceção client-side. O diagnóstico isolou dois fatores independentes: o processo `next start` mantinha o manifesto anterior enquanto `.next` já continha outro build, e o frontend do ChatBot Alpha exigia `structuredClone` mesmo em navegadores/webviews sem suporte à API.
+
+### O que foi feito
+- Centralizada a clonagem dos DTOs JSON-safe em `cloneChatbotData`, usando `structuredClone` quando disponível e serialização JSON como fallback compatível; os usos diretos foram substituídos no snapshot e no mock provider.
+- Adicionados testes de regressão para ambiente sem `structuredClone`, preservação do caminho nativo e proibição de novos usos diretos fora do helper.
+- Forge, Probe, Lens e Sage validaram correção, integração e regressões: 158 testes passaram e 1 permaneceu marcado como `todo`.
+- O stage foi atualizado pelo fluxo oficial `stop → build → start`; o novo processo subiu com PID `502162`, Build ID `5kqIHl35UZV--w8j5SpVh` e os 31 assets esperados foram verificados. A indisponibilidade total foi de 1 minuto e 49 segundos.
+
+### Decisões tomadas
+- Compatibilidade de clonagem fica centralizada no helper: impede que imports executados no cliente derrubem todo o módulo em runtimes sem `structuredClone`.
+- Builds não devem sobrescrever `.next` sob um `next start` ativo: atualização do stage deve seguir sempre o ciclo oficial de parada, build e inicialização.
+- O encerramento forçado foi restrito ao processo órfão e só ocorreu após confirmação explícita do usuário.
+
+### Problemas encontrados / resolvidos
+- O primeiro `SIGTERM` do gerenciador oficial não encerrou o processo órfão: após autorização explícita, foi aplicado `force-stop` somente nesse alvo e a inicialização prosseguiu com o build novo.
+- Manifesto e chunks incompatíveis podiam resultar em `ChunkLoadError`; o restart controlado realinhou processo e artefatos.
+- Navegadores sem clonagem estruturada falhavam durante a carga do módulo; o fallback removeu essa dependência obrigatória sem alterar o formato dos mocks.
+
+### Pendências
+- Incorporar ao procedimento de deploy uma garantia automatizada de que `.next` nunca seja substituído enquanto o processo anterior estiver servindo tráfego.
+- Não houve alteração de banco, backend, Railway ou do projeto ChatbotX original.
+
+### Refletido também em
+- `decisions.md`: não alterado nesta consolidação.
+- `components.md`: não alterado nesta consolidação.
+
 ## [2026-09-15 16:10] — IAlpha/Bibble transformado com geração única e fronteiras fail-closed
 
 **Tags:** #feature #refactor #nextjs #security #auth #critical
@@ -5493,3 +5607,131 @@ O usuário pediu que o Bibble ajustasse objetividade, informalidade, humor, firm
 ### Refletido também em
 - `decisions.md`: classificação determinística, precedência da adaptação, isolamento per-user e ausência de persistência nova.
 - `architecture.md`, `codebase-map.md` e `integration-points.md`: consulta bounded, composição compacta, controles, telemetria e fallback adaptativo documentados.
+
+---
+
+## [2026-09-15 20:55] — Voz local do Bibble integrada com isolamento e degradação segura
+
+**Tags:** #feature #integration #nextjs #security
+**Agentes envolvidos:** Bibble/Codex, Scout, River/SM, Dex, Forge, Probe, Anubis, Lens, Sage, Scribe e Kowalski
+**Arquivos tocados:** `/home/ialpha/services/bibble-voice/`; `/etc/systemd/system/bibble-voice.service`; `src/app/api/bibble/voice/route.ts`; `src/lib/bibble/voice-{service,client,preferences,admission}.ts`; `src/components/BibbleChatHome/`; `tests/bibble/voice-{client,proxy}.test.ts`; `docs/stories/story-bibble-voz-local-chatterbox.md`
+
+### Contexto
+O usuário pediu TTS inteiramente local para o Bibble, preservando o chat, o LLM e a transcrição existentes. O diagnóstico confirmou Next.js/React no painel, streaming e persistência já operantes, STT via rota Onyx e uma interface de voz anterior que precisava ser conectada a um serviço isolado.
+
+### O que foi feito
+- Criado o microserviço FastAPI `/home/ialpha/services/bibble-voice`, com Chatterbox Multilingual V3 local, carga sob demanda, fila, cache, timeout, limites de entrada e descarga da GPU após ociosidade; o systemd ficou ativo e habilitado somente em `127.0.0.1:8787`, sem carregar o modelo no boot.
+- Integrados proxy autenticado server-side, preferências e controle de reprodução único: texto recebe botão sem autoplay; áudio recém-enviado arma TTS automático para a mesma resposta; histórico, reload e mensagens Onyx não disparam voz.
+- Gates dirigidos aprovaram 17 testes Python, 20 testes frontend, Ruff, ESLint escopado e build isolado; falha do TTS permanece independente do chat.
+
+### Decisões tomadas
+- Voz é complemento fail-soft: indisponibilidade ou erro do serviço nunca bloqueia resposta textual, persistência ou streaming do Bibble.
+- Microserviço permanece loopback e o navegador acessa apenas o proxy do Painel Alpha; URL e token são variáveis server-side, sem credenciais no frontend.
+- Nenhuma voz substituta será inventada: síntese permanece indisponível até existir gravação autorizada em `voices/bibble.wav`.
+
+### Problemas encontrados / resolvidos
+- O servidor tinha somente 1.631 MiB de VRAM livre devido aos processos existentes; foi adicionado preflight para recusar carga insegura sem afetar Ollama.
+- Corridas de unload/geração, descritor temporário, tempestade de health checks, procedência de mensagem e edição manual após transcrição foram corrigidos e cobertos por testes.
+- A instalação PyPI não expunha a API V3 necessária; o pacote foi fixado no commit oficial compatível e o snapshot V3 foi baixado por revisão imutável e validado por hashes.
+
+### Pendências
+- Falta o `bibble.wav` autorizado e a VRAM livre atual é insuficiente; por isso TTS real, cache hit de áudio, unload/reload e queda de VRAM ainda não foram validados e não devem ser declarados funcionais.
+- O deployment ativo ainda serve um build antigo e retorna 404 na nova rota; não foi redeployado para evitar publicar mudanças alheias presentes no worktree compartilhado.
+- Em implantação horizontal/Vercel, o admission control em memória exige coordenação distribuída; acesso remoto seguro ao Ubuntu ainda depende de endpoint privado/túnel e token configurados.
+
+### Refletido também em
+- `decisions.md`: não alterado nesta consolidação.
+- `codebase-map.md` e `integration-points.md`: atualizados separadamente pelo Scribe com o serviço e o fluxo de voz.
+
+---
+
+## [2026-09-16 15:12] — Bibble Voice validado em CPU sem disputar a VRAM do LLM
+
+**Tags:** #feature #integration #security #performance
+**Agentes envolvidos:** Bibble/Codex, Forge, Probe, Anubis, Lens, Sage e Kowalski
+**Arquivos tocados:** `/home/ialpha/services/bibble-voice/`; `/etc/systemd/system/bibble-voice.service`; `src/app/api/bibble/voice/route.ts`; `src/lib/bibble/voice-{service,client,preferences,admission}.ts`; `src/components/BibbleChatHome/`; `tests/bibble/voice-{client,proxy}.test.ts`; `docs/stories/story-bibble-voz-local-chatterbox.md`; `.bibble/memory/journal.md`
+
+### Contexto
+A RTX 4090 permanecia ocupada pelo `llama.cpp`, impedindo coexistência segura do Chatterbox na VRAM. Com a referência autorizada agora disponível, o serviço precisava ser validado de ponta a ponta sem interferir no LLM existente.
+
+### O que foi feito
+- Configurado `TTS_DEVICE=cpu` com 8 threads, referência autorizada em `voices/bibble.wav`, recursos PKUSEG totalmente locais/offline e saída WAV PCM16 mono a 24 kHz.
+- A unidade systemd permaneceu em loopback e recebeu contenção operacional: `Nice=10`, `CPUWeight=50`, `MemoryHigh=8G`, `MemoryMax=12G`, um worker e hardening de filesystem/processo.
+- Testes reais comprovaram cache MISS em 27,16s, HIT da mesma fala em 0,01s, unload com restart controlado e novo MISS/reload em 23,42s; Pytest 26/26, Vitest 21/21, compileall e gates Forge, Probe, Anubis, Lens e Sage passaram.
+
+### Decisões tomadas
+- CPU é o device de produção: preserva a VRAM já comprometida pelo LLM e evita fallback silencioso entre CPU e CUDA.
+- Unload em CPU encerra somente o worker de voz após liberar o modelo; systemd o reinicia limpo, devolvendo efetivamente a RAM ao sistema sem tocar no `llama-server`.
+- Recursos de tokenização e modelo ficam locais e offline; o serviço não depende de downloads durante boot ou síntese.
+
+### Problemas encontrados / resolvidos
+- A coexistência em CUDA não era segura com a carga atual: em CPU, a VRAM permaneceu invariável durante load, inferência, unload e reload, e o health do llama/Ollama continuou saudável.
+- O modelo atingiu aproximadamente 7,1 GiB de RAM durante a execução; após unload/restart, o serviço retornou a cerca de 45 MiB em repouso.
+- A referência antes ausente foi configurada com autorização, permitindo validar geração portuguesa real, formato PCM16, cache e recarga sem inventar ou baixar voz substituta.
+
+### Pendências
+- Executar smoke autenticado da UI para texto, áudio, autoplay contextual, reprodução exclusiva e fail-safe do chat.
+- Configurar `BIBBLE_VOICE_TOKEN` somente se a topologia futura exigir acesso server-to-server remoto; no loopback atual ele não é necessário.
+
+### Refletido também em
+- `decisions.md`: execução CPU para coexistência com o LLM e unload por restart isolado.
+- `codebase-map.md` e `integration-points.md`: runtime CPU, referência autorizada e evidências operacionais atualizados separadamente.
+
+---
+
+## [2026-09-16 16:36] — Botão Ouvir corrigido para acesso pelo Cloudflare Tunnel
+
+**Tags:** #bugfix #integration #nextjs #security
+**Agentes envolvidos:** Bibble/Codex, Scout, Echo, Forge, Probe, Anubis, Lens, Sage, Scribe e Kowalski
+**Arquivos tocados:** `src/lib/bibble/voice-service.ts`; `tests/bibble/voice-proxy.test.ts`; `docs/stories/story-bibble-voz-local-chatterbox.md`; `.bibble/memory/{codebase-map,integration-points,journal}.md`
+
+### Contexto
+O botão Ouvir retornava `403 Forbidden` no ambiente stage acessado pelo domínio público do Cloudflare Tunnel, embora a rota de voz estivesse disponível.
+
+### O que foi feito
+- Ajustado o guard da rota de voz para comparar o `Origin` com o host público encaminhado, preservando a validação same-origin atrás do proxy/túnel.
+- A correção passou em 26/26 testes focais, ESLint e build; Anubis, Lens e Sage concluíram PASS sem bloqueantes.
+
+### Decisões tomadas
+- Origem pública como referência do guard: `request.url` pode representar o endereço interno do proxy e não deve, sozinho, definir a origem legítima do navegador.
+
+### Problemas encontrados / resolvidos
+- O guard comparava o `Origin` público com a URL interna observada no servidor, gerando falso negativo e `403`; a comparação passou a considerar `Origin` e `Host` público encaminhado pelo Cloudflare Tunnel.
+- Gates globais ainda refletem falhas de baseline externo ao escopo; os gates focais da correção permaneceram verdes.
+
+### Pendências
+- Probe ainda precisa concluir o smoke autenticado e validar o AC20.
+- Não houve alteração de banco nem deploy nesta sessão.
+
+### Refletido também em
+- `decisions.md`: não alterado nesta consolidação.
+- `components.md`: não alterado nesta consolidação.
+
+---
+
+## [2026-09-16 16:49] — 503 do botão Ouvir isolado ao restart do stage
+
+**Tags:** #integration #nextjs #bugfix
+**Agentes envolvidos:** Bibble/Codex e Kowalski
+**Arquivos tocados:** `.bibble/memory/journal.md`
+
+### Contexto
+Após o restart do stage, o botão Ouvir passou de `403` para `503`, exigindo confirmar se o novo build havia sido aplicado ou se havia uma falha distinta.
+
+### O que foi feito
+- O `503` foi rastreado ao Cloudflare: `connection refused` em `127.0.0.1:3005` enquanto o Next.js estava indisponível durante build/restart; não veio da API de voz nem do TTS.
+- O build novo terminou às 16:48, o Next voltou a escutar, o bundle publicado contém o guard baseado em `Host` e a rota pública `GET` voltou a responder `401`; o TTS em `127.0.0.1:8787` está saudável e uma síntese real retornou `200 audio/wav`.
+
+### Decisões tomadas
+- Tratar o `503` observado como indisponibilidade transitória do frontend durante o restart, separada do `403` de origem já corrigido.
+
+### Problemas encontrados / resolvidos
+- A janela de build/restart deixou a porta `3005` sem listener e o Cloudflare devolveu `503`; o listener retornou após a conclusão do build.
+
+### Pendências
+- Repetir o clique autenticado em Ouvir com o stage estabilizado para confirmar o fluxo completo no navegador.
+- Nenhuma alteração de código, banco ou restart foi realizada pelo agente neste diagnóstico.
+
+### Refletido também em
+- `decisions.md`: não alterado nesta consolidação.
+- `components.md`: não alterado nesta consolidação.

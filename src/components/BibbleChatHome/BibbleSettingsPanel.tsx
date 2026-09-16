@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, ShieldCheck, X } from "lucide-react";
+import { Bot, ShieldCheck, Volume2, X } from "lucide-react";
 import {
   DEFAULT_ADAPTIVE_PREFERENCES,
   type AdaptiveTonePreferences,
@@ -8,6 +8,7 @@ import {
   type DetailPreference,
   type HumorLevel,
 } from "@/lib/bibble/adaptive-style";
+import { DEFAULT_BIBBLE_VOICE_PREFERENCES, type BibbleVoicePreferences } from "@/lib/bibble/voice-preferences";
 
 interface BibbleSettingsPanelProps {
   open: boolean;
@@ -27,14 +28,19 @@ interface BibbleSettingsPanelProps {
   onAdaptivePreferencesChange: (v: AdaptiveTonePreferences) => void;
   maxContextWindow?: number;
   approximateContextTokens?: number;
+  voicePreferences?: BibbleVoicePreferences;
+  onVoicePreferencesChange?: (v: BibbleVoicePreferences) => void;
 }
 
+const ignoreVoicePreferenceChange = () => undefined;
 
 export default function BibbleSettingsPanel({
   open,
   onClose,
   adaptivePreferences,
   onAdaptivePreferencesChange,
+  voicePreferences = DEFAULT_BIBBLE_VOICE_PREFERENCES,
+  onVoicePreferencesChange = ignoreVoicePreferenceChange,
 }: BibbleSettingsPanelProps) {
   if (!open) return null;
 
@@ -55,6 +61,36 @@ export default function BibbleSettingsPanel({
           <section className="rounded-xl p-4 space-y-2" style={{ background: "rgba(30,45,74,.45)", border: "1px solid #1e2d4a" }}>
             <div className="flex items-center gap-2 text-emerald-300"><ShieldCheck size={16} /><h3 className="text-xs font-bold uppercase tracking-wider">Capacidades seguras</h3></div>
             <p className="text-xs leading-relaxed text-slate-400">Somente consultas liberadas para seu perfil aparecem durante a conversa. Uploads, acesso a arquivos e ações mutáveis permanecem indisponíveis.</p>
+          </section>
+          <section className="rounded-xl p-4 space-y-4" style={{ background: "rgba(30,45,74,.45)", border: "1px solid #1e2d4a" }} aria-labelledby="bibble-voice-title">
+            <div className="flex items-center gap-2 text-indigo-300">
+              <Volume2 size={16} aria-hidden />
+              <div>
+                <h3 id="bibble-voice-title" className="text-sm font-semibold text-slate-100">Voz do Bibble</h3>
+                <p className="mt-0.5 text-xs text-slate-500">Áudio local, complementar à resposta em texto.</p>
+              </div>
+            </div>
+            {([
+              ["replyToAudio", "Responder com voz quando eu enviar áudio"],
+              ["showButton", "Exibir botão de voz nas mensagens"],
+              ["autoPlayAll", "Reproduzir todas as respostas automaticamente"],
+            ] as const).map(([key, label]) => (
+              <div key={key} className="flex items-center justify-between gap-3">
+                <span id={`voice-${key}-label`} className="text-sm text-slate-300">{label}</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-labelledby={`voice-${key}-label`}
+                  aria-checked={voicePreferences[key]}
+                  onClick={() => onVoicePreferencesChange({ ...voicePreferences, [key]: !voicePreferences[key] })}
+                  className="relative h-6 w-11 shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  style={{ background: voicePreferences[key] ? "#6366f1" : "#1e2d4a" }}
+                >
+                  <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform duration-200" style={{ transform: voicePreferences[key] ? "translateX(20px)" : "translateX(0)" }} />
+                </button>
+              </div>
+            ))}
+            <p className="text-[11px] leading-relaxed text-slate-500">A reprodução automática geral permanece desligada por padrão. Se o navegador bloquear o áudio, use o botão da mensagem.</p>
           </section>
           <section className="rounded-xl p-4 space-y-4" style={{ background: "rgba(30,45,74,.45)", border: "1px solid #1e2d4a" }} aria-labelledby="adaptive-style-title">
             <div>

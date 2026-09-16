@@ -206,7 +206,16 @@ model usuarios {
   documentoTemplatesCriados  DocumentoTemplate[]
   documentosGerados          DocumentoGerado[]
   empresasContratadasCriadas EmpresaContratada[]
-  mesclagensCriadas           MesclagemHistorico[] @relation("MesclagemHistoricoCriador")
+  mesclagensCriadas          MesclagemHistorico[] @relation("MesclagemHistoricoCriador")
+
+  explorerItensCriados         AlphaExplorerItem[]          @relation("AlphaExplorerItemCreatedBy")
+  explorerItensExcluidos       AlphaExplorerItem[]          @relation("AlphaExplorerItemDeletedBy")
+  explorerUploads              AlphaExplorerUploadSession[]
+  explorerAclsCriadas          AlphaExplorerAcl[]           @relation("AlphaExplorerAclCreatedBy")
+  explorerOperacoesSolicitadas AlphaExplorerOperation[]     @relation("AlphaExplorerOperationRequestedBy")
+  explorerSmbBinding           AlphaExplorerSmbBinding?     @relation("AlphaExplorerSmbBindingUser")
+  explorerSmbBindingsCreated   AlphaExplorerSmbBinding[]    @relation("AlphaExplorerSmbBindingCreatedBy")
+  explorerSmbBindingsUpdated   AlphaExplorerSmbBinding[]    @relation("AlphaExplorerSmbBindingUpdatedBy")
 }
 
 model MesclagemHistorico {
@@ -231,6 +240,144 @@ model MesclagemHistorico {
 
   @@index([criadoPorId, criadoEm])
   @@index([criadoEm])
+}
+
+/// Registro canônico de arquivo ou pasta lógica do Alpha Explorer.
+/// Chaves físicas e bucket/store são exclusivamente server-side.
+model AlphaExplorerItem {
+  id             String    @id @default(cuid())
+  kind           String
+  name           String
+  normalizedName String
+  logicalPath    String
+  parentPath     String
+  objectKey      String?   @unique
+  provider       String?
+  bucketStore    String?
+  sizeBytes      BigInt?
+  declaredMime   String?
+  validatedMime  String?
+  checksum       String?
+  status         String    @default("ACTIVE")
+  version        Int       @default(1)
+  createdById    Int
+  deletedById    Int?
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  createdBy      usuarios                     @relation("AlphaExplorerItemCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  deletedBy      usuarios?                    @relation("AlphaExplorerItemDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+  uploadSessions AlphaExplorerUploadSession[]
+  operations     AlphaExplorerOperation[]
+
+  @@index([parentPath, status, normalizedName])
+  @@index([logicalPath, status])
+  @@index([createdById])
+  @@index([deletedAt])
+}
+
+/// Sessão de upload vinculada ao usuário e a um único provider desde o início.
+model AlphaExplorerUploadSession {
+  id              String    @id @default(cuid())
+  userId          Int
+  itemId          String?
+  destinationPath String
+  displayName     String
+  normalizedName  String
+  objectKey       String    @unique
+  provider        String
+  bucketStore     String
+  uploadId        String?
+  declaredSize    BigInt
+  finalSize       BigInt?
+  declaredMime    String?
+  status          String    @default("CREATED")
+  partSizeBytes   Int
+  expiresAt       DateTime
+  completedAt     DateTime?
+  failureCode     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user usuarios           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  item AlphaExplorerItem? @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([status, expiresAt])
+  @@index([destinationPath, normalizedName, status])
+  @@index([itemId])
+}
+
+/// Regra aditiva de capacidade por sujeito e prefixo lógico.
+model AlphaExplorerAcl {
+  id               String   @id @default(cuid())
+  subjectType      String
+  subjectId        String
+  prefix           String
+  capabilitiesJson String
+  createdById      Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  createdBy usuarios @relation("AlphaExplorerAclCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([subjectType, subjectId, prefix])
+  @@index([prefix])
+  @@index([createdById])
+}
+
+/// Operação rastreável usada para move/rename e reconciliação de falhas parciais.
+model AlphaExplorerOperation {
+  id                   String    @id @default(cuid())
+  itemId               String?
+  type                 String
+  status               String    @default("PENDING")
+  provider             String
+  sourcePath           String
+  destinationPath      String?
+  sourceObjectKey      String?
+  destinationObjectKey String?
+  requestedById        Int
+  errorCode            String?
+  startedAt            DateTime?
+  completedAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  item        AlphaExplorerItem? @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  requestedBy usuarios           @relation("AlphaExplorerOperationRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+
+  @@index([itemId, status])
+  @@index([status, createdAt])
+  @@index([requestedById])
+}
+
+/// Metadados não secretos do vínculo entre usuário interno e principal QNAP.
+/// A credencial permanece exclusivamente no Vault; `secretRef` é uma referência opaca.
+model AlphaExplorerSmbBinding {
+  id                String    @id @default(cuid())
+  userId            Int       @unique
+  qnapPrincipal     String
+  qnapPrincipalKey  String    @unique
+  secretRef         String    @unique
+  status            String    @default("PENDING")
+  credentialVersion Int       @default(0)
+  lastValidatedAt   DateTime?
+  lastRotatedAt     DateTime?
+  revokedAt         DateTime?
+  createdById       Int
+  updatedById       Int?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user      usuarios  @relation("AlphaExplorerSmbBindingUser", fields: [userId], references: [id], onDelete: Restrict)
+  createdBy usuarios  @relation("AlphaExplorerSmbBindingCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy usuarios? @relation("AlphaExplorerSmbBindingUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([status, updatedAt])
+  @@index([createdById])
+  @@index([updatedById])
 }
 
 /// Objetivo priorizado do Roadmap Alpha. O registry de módulos vive em código;
@@ -3908,7 +4055,7 @@ model BpmEtapa {
   nome             String
   ordem            Int     @default(0)
   cor              String? // cor de exibição da etapa (ex.: badge/coluna do Kanban); ausente = cor padrão do tema
-  slaDias          Int?    // histórico legado; runtime e administração usam BpmSlaConfig
+  slaDias          Int? // histórico legado; runtime e administração usam BpmSlaConfig
   script           String? // roteiro de texto exibido na aba "Script" da coluna Presente — só leitura por enquanto
   ativo            Boolean @default(true)
   ehInicial        Boolean @default(false) // marca a etapa de entrada configurável do pipeline
