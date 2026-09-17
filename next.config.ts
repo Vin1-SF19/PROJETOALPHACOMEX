@@ -20,6 +20,10 @@ const nextConfig = {
     "/**": [
       "./node_modules/pdf-parse/node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
       "./node_modules/pdf-parse/node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs",
+      // Prisma com `engineType = "client"` carrega o compilador WASM em runtime.
+      // O trace automatico do Next nao detecta o caminho resolvido pelo loader,
+      // entao o artefato precisa ser incluido explicitamente nas funcoes Vercel.
+      "./node_modules/.prisma/client/query_compiler_bg.wasm",
     ],
   },
   experimental: {

@@ -113,6 +113,12 @@ para receber o erro conhecido quando o login for inválido e entrar no painel po
   - [x] Preservar autenticação, destino, reduced motion e caminhos de falha.
   - [x] Validar geometria, sequência, prévia, lint, typecheck, testes e build; atualizar file list.
 
+- [x] Task 12 — Restaurar o runtime Prisma do login em produção (incidente 2026-09-17; AC: 1–3, 10–11)
+  - [x] Confirmar a causa raiz nos logs do deploy sem executar mutation ou migration.
+  - [x] Incluir explicitamente `query_compiler_bg.wasm` no output file tracing das funções Vercel.
+  - [x] Adicionar teste de regressão para o contrato de empacotamento do Prisma.
+  - [x] Validar o artefato na build e repetir o smoke HTTP do login em produção.
+
 ## Dev Notes
 
 ### Causa raiz confirmada
@@ -220,6 +226,7 @@ para receber o erro conhecido quando o login for inválido e entrar no painel po
 | 2026-09-11 | 1.4 | Adicionada bancada local de preview contínuo do oceano e replay da transição, indisponível em produção. | Codex |
 | 2026-09-11 | 1.5 | Refinado somente o material da água e o contato visual com o casco, sem alterar ondas, câmera, asset ou timeline. | Codex |
 | 2026-09-11 | 1.6 | Navio atraca sob o container, recebe a carga e parte rebocando a rota real com o PNG de corda fornecido. | Codex |
+| 2026-09-17 | 1.7 | Hotfix de produção: inclui o compilador WASM do Prisma no bundle serverless e adiciona regressão de empacotamento. | Codex |
 
 ## Dev Agent Record
 
@@ -234,6 +241,10 @@ Codex — agente de implementação e revisão desta sessão.
 - Não foi criado debug log separado.
 
 ### Completion Notes List
+
+- Incidente de 2026-09-17: logs da Vercel confirmaram `ENOENT` para `/var/task/node_modules/.prisma/client/query_compiler_bg.wasm` em toda consulta Prisma, inclusive `usuarios.findFirst()` no login. O banco e as credenciais locais permaneceram íntegros; nenhuma migration ou mutation foi executada.
+- `next.config.ts` passou a rastrear explicitamente o compilador WASM usado pelo Prisma com `engineType = "client"`; `tests/auth/prisma-vercel-runtime.test.ts` impede nova publicação sem esse contrato.
+- Hotfix publicado no deployment Vercel `dpl_HgBMaTUoabxFLHBydMGXugJRLRSo` e promovido para `https://painel.alpha-comex.com`. O smoke do Server Action voltou a responder `Dados de Login Incorretos` para credenciais deliberadamente inválidas, confirmando a consulta ao banco; os logs do novo deployment registraram apenas o `CredentialsSignin` esperado, sem `ENOENT` ou falha do Prisma.
 
 - Autenticação passou a concluir e confirmar a sessão antes de liberar qualquer estado visual de sucesso.
 - Credenciais inválidas preservam `Dados de Login Incorretos` e não montam navio, oceano ou overlay.
@@ -298,7 +309,9 @@ Codex — agente de implementação e revisão desta sessão.
 - `src/components/login/login-transition-state.ts`
 - `src/components/login/useReducedMotion.ts`
 - `src/lib/loginAction.ts`
+- `next.config.ts`
 - `tests/auth/login-action.test.ts`
+- `tests/auth/prisma-vercel-runtime.test.ts`
 - `tests/auth/login-transition-state.test.ts`
 - `tests/auth/login-transition-preview.test.ts`
 - `tests/auth/login-transition-wiring.test.ts`
