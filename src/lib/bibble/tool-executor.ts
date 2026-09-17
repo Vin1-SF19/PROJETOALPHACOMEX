@@ -14,6 +14,9 @@ import {
 import { BIBBLE_TOOLS } from "@/lib/bibble/tools";
 import { inspectBehavioralProfileByName } from "@/lib/bibble/behavioral-memory";
 import { BIBBLE_FS_TOOLS, BIBBLE_MUTATING_TOOLS, authorizedTools, canConsultBehavioralProfiles, filesystemEnabled, resolveBibbleFsPath, validateFilesystemMutation } from "@/lib/bibble/tool-policy";
+import { consumeBibbleMutationGrant, type BibbleMutationGrant } from "@/lib/bibble/mutation-grant";
+import { isSameRole } from "@/lib/roles";
+import { z } from "zod";
 
 export interface UserCtx {
   userId: number;
@@ -40,10 +43,58 @@ function negado(modulo: string): string {
   return `Você não tem permissão para acessar o módulo "${modulo}". Fale com um administrador para solicitar acesso.`;
 }
 
+const abrirChamadoParamsSchema = z.object({
+  titulo: z.string().trim().min(1).max(120),
+  descricao: z.string().trim().min(1).max(800),
+  prioridade: z.enum(["BAIXA", "MEDIA", "ALTA", "URGENTE"]).default("MEDIA"),
+  tecnico_solicitado_nome: z.string().trim().min(1).max(120).optional(),
+  responsavel: z.string().trim().min(1).max(120).optional(),
+}).strict().superRefine((value, ctx) => {
+  if (
+    value.tecnico_solicitado_nome
+    && value.responsavel
+    && value.tecnico_solicitado_nome.localeCompare(value.responsavel, "pt-BR", { sensitivity: "base" }) !== 0
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "O responsável foi informado de duas formas diferentes.",
+      path: ["responsavel"],
+    });
+  }
+});
+
+function normalizarNomeResponsavel(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function validarPayloadDerivadoDoPedido(
+  pedidoAutorizado: string | undefined,
+  payload: z.infer<typeof abrirChamadoParamsSchema>,
+): boolean {
+  if (!pedidoAutorizado?.trim()) return false;
+  const pedido = normalizarNomeResponsavel(pedidoAutorizado);
+  const campos = [payload.titulo, payload.descricao, payload.tecnico_solicitado_nome ?? payload.responsavel]
+    .filter((value): value is string => Boolean(value))
+    .map(normalizarNomeResponsavel);
+  if (campos.some((value) => value.length < 2 || !pedido.includes(value))) return false;
+  if (payload.prioridade !== "MEDIA") {
+    const prioridade = payload.prioridade.toLocaleLowerCase("pt-BR");
+    if (!new RegExp(`\\b${prioridade}\\b`).test(pedido)) return false;
+  }
+  return true;
+}
+
 async function executarToolUnsafe(
   nome: string,
   params: Record<string, unknown>,
-  ctx: UserCtx
+  ctx: UserCtx,
+  requestId?: string,
+  authorizedMutationText?: string,
 ): Promise<string> {
   const { userId } = ctx;
 
@@ -141,47 +192,113 @@ async function executarToolUnsafe(
       // fluxo manual (createChamadoAction / API AbrirChamado). A permissão
       // "chamados" controla apenas a gestão/visualização do módulo, não o
       // direito de registrar o próprio chamado de suporte.
-      const titulo = String(params.titulo || "").trim().substring(0, 100);
-      const descricao = String(params.descricao || "").trim();
-      const prioridade = String(params.prioridade || "MEDIA");
-
-      if (!titulo || !descricao) {
-        return "FALHA_ABRIR_CHAMADO: dados insuficientes (título ou descrição vazios). Nenhum chamado foi criado — peça os dados que faltam ao usuário.";
+      const parsed = abrirChamadoParamsSchema.safeParse(params);
+      if (!parsed.success) {
+        return "FALHA_ABRIR_CHAMADO: os dados do chamado são inválidos ou excedem os limites permitidos. Nenhum chamado foi criado — confirme título, descrição, prioridade e responsável.";
+      }
+      const { titulo, descricao, prioridade } = parsed.data;
+      const responsavel = parsed.data.tecnico_solicitado_nome ?? parsed.data.responsavel;
+      if (!validarPayloadDerivadoDoPedido(authorizedMutationText, parsed.data)) {
+        return "FALHA_ABRIR_CHAMADO: título, descrição, prioridade ou responsável não foram informados literalmente no pedido atual. Nenhum chamado foi criado — peça ao usuário os dados que faltam.";
       }
 
       try {
-        const cincoMinAtras = new Date(Date.now() - 5 * 60 * 1000);
-        const duplicado = await db.chamados.findFirst({
-          where: { usuarioId: userId, titulo, createdAt: { gte: cincoMinAtras } },
-        });
+        let tecnicoSolicitadoId: number | null = null;
+        let nomeResponsavelNormalizado: string | null = null;
+        if (responsavel) {
+          const tecnicosAtivos = await db.usuarios.findMany({
+            where: { status: "ATIVO" },
+            select: { id: true, nome: true, role: true },
+          });
+          const nomeBuscado = normalizarNomeResponsavel(responsavel);
+          nomeResponsavelNormalizado = nomeBuscado;
+          const tecnicos = tecnicosAtivos.filter((usuario) => isSameRole(usuario.role, "TI"));
+          const exatos = tecnicos.filter((usuario) => normalizarNomeResponsavel(usuario.nome) === nomeBuscado);
+          const candidatos = exatos.length > 0
+            ? exatos
+            : tecnicos.filter((usuario) => normalizarNomeResponsavel(usuario.nome).includes(nomeBuscado));
 
-        if (duplicado) {
-          return `FALHA_ABRIR_CHAMADO: chamado "${titulo}" já havia sido registrado há poucos minutos (ID #${duplicado.id}). Nenhum chamado novo foi criado — informe o ID existente ao usuário.`;
+          if (candidatos.length === 0) {
+            return "FALHA_ABRIR_CHAMADO: o responsável informado não corresponde a um usuário de TI ativo. Nenhum chamado foi criado.";
+          }
+          if (candidatos.length > 1) {
+            return "FALHA_ABRIR_CHAMADO: há mais de um usuário de TI ativo com esse nome. Nenhum chamado foi criado — peça o nome completo do responsável.";
+          }
+          tecnicoSolicitadoId = candidatos[0].id;
         }
 
-        const chamado = await db.chamados.create({
-          data: {
-            titulo,
-            descricao: marcarDescricaoComoAbertaViaBibble(descricao),
-            categoria: "SUPORTE",
-            prioridade,
-            usuarioId: userId,
-            status: "ABERTO",
-          },
-        });
+        const cincoMinAtras = new Date(Date.now() - 5 * 60 * 1000);
+        const transactionResult = await db.$transaction(async (tx) => {
+          const solicitanteAtivo = await tx.usuarios.findFirst({
+            where: { id: userId, status: "ATIVO" },
+            select: { id: true },
+          });
+          if (!solicitanteAtivo) return { kind: "inactive" as const };
 
-        await notificarNovoChamado({
-          chamadoId: chamado.id,
-          titulo: chamado.titulo,
-          usuario: ctx.userName || "Usuário",
-          setor: ctx.role || "",
-          urgencia: chamado.prioridade,
-          createdAt: chamado.createdAt.toISOString(),
-        });
+          const duplicado = await tx.chamados.findFirst({
+            where: { usuarioId: userId, titulo, createdAt: { gte: cincoMinAtras } },
+            select: { id: true },
+          });
+          if (duplicado) return { kind: "duplicate" as const, id: duplicado.id };
 
-        return `SUCESSO_ABRIR_CHAMADO: Chamado #${chamado.id} criado com título "${titulo}" e prioridade ${prioridade}.`;
-      } catch (err) {
-        console.error("[BIBBLE] Falha ao criar chamado:", err);
+          if (tecnicoSolicitadoId !== null && nomeResponsavelNormalizado !== null) {
+            const tecnicoAindaElegivel = await tx.usuarios.findFirst({
+              where: { id: tecnicoSolicitadoId, status: "ATIVO" },
+              select: { id: true, nome: true, role: true },
+            });
+            if (
+              !tecnicoAindaElegivel
+              || !isSameRole(tecnicoAindaElegivel.role, "TI")
+              || !normalizarNomeResponsavel(tecnicoAindaElegivel.nome).includes(nomeResponsavelNormalizado)
+            ) {
+              return { kind: "technician-unavailable" as const };
+            }
+          }
+
+          const chamado = await tx.chamados.create({
+            data: {
+              titulo,
+              descricao: marcarDescricaoComoAbertaViaBibble(descricao),
+              categoria: "Outro",
+              prioridade,
+              usuarioId: userId,
+              tecnicoSolicitadoId,
+              status: "ABERTO",
+            },
+          });
+          return { kind: "created" as const, chamado };
+        }, { isolationLevel: "Serializable" });
+
+        if (transactionResult.kind === "inactive") {
+          return "FALHA_ABRIR_CHAMADO: o usuário não está mais ativo. Nenhum chamado foi criado.";
+        }
+        if (transactionResult.kind === "duplicate") {
+          return `FALHA_ABRIR_CHAMADO: um chamado igual já havia sido registrado há poucos minutos (ID #${transactionResult.id}). Nenhum chamado novo foi criado — informe o ID existente ao usuário.`;
+        }
+        if (transactionResult.kind === "technician-unavailable") {
+          return "FALHA_ABRIR_CHAMADO: o responsável de TI deixou de estar elegível antes da criação. Nenhum chamado foi criado — confirme novamente o responsável.";
+        }
+        const { chamado } = transactionResult;
+
+        try {
+          const notificado = await notificarNovoChamado({
+            chamadoId: chamado.id,
+            titulo: chamado.titulo,
+            usuario: ctx.userName || "Usuário",
+            setor: ctx.role || "",
+            urgencia: chamado.prioridade,
+            createdAt: chamado.createdAt.toISOString(),
+          });
+          if (!notificado) {
+            console.warn("[BIBBLE_TOOL] notification-failed", { requestId, tool: nome });
+          }
+        } catch {
+          console.warn("[BIBBLE_TOOL] notification-failed", { requestId, tool: nome });
+        }
+
+        return `SUCESSO_ABRIR_CHAMADO: Chamado #${chamado.id} criado com prioridade ${prioridade}${responsavel ? ` e responsável de TI ${responsavel}` : ""}.`;
+      } catch {
+        console.error("[BIBBLE_TOOL] execution-failed", { requestId, tool: nome });
         return "FALHA_ABRIR_CHAMADO: erro interno ao gravar no banco de dados. Nenhum chamado foi criado — informe ao usuário que a abertura falhou e peça para tentar novamente em instantes.";
       }
     }
@@ -908,17 +1025,31 @@ const TOOL_NAMES = new Set([...BIBBLE_TOOLS.map(tool => tool.function.name), ...
 const TOOL_RESULT_MAX_CHARS = Math.max(4_096, Number(process.env.BIBBLE_TOOL_RESULT_MAX_CHARS) || 100_000);
 
 /** Fronteira comum de todas as tools: identidade, registry, timeout, sandbox e resultado limitado. */
-export async function executarTool(nome: string, params: Record<string, unknown>, ctx: UserCtx, options: { signal?: AbortSignal; requestId?: string; deadlineAt?: number } = {}): Promise<string> {
+export async function executarTool(nome: string, params: Record<string, unknown>, ctx: UserCtx, options: { signal?: AbortSignal; requestId?: string; deadlineAt?: number; mutationGrant?: BibbleMutationGrant } = {}): Promise<string> {
   if (!Number.isInteger(ctx.userId) || ctx.userId <= 0 || !TOOL_NAMES.has(nome)) {
     return JSON.stringify({ ok: false, erro: "Ferramenta indisponível." });
   }
   const safeParams = { ...params };
+  let authorizedMutationText: string | undefined;
   try {
-    if (BIBBLE_MUTATING_TOOLS.has(nome)) return JSON.stringify({ ok: false, erro: "Ferramenta mutável indisponível até existir confirmação humana emitida pelo servidor." });
     const permitted = authorizedTools(BIBBLE_TOOLS, ctx, false).some(tool => tool.function.name === nome);
     if (!permitted) return JSON.stringify({ ok: false, erro: "Ferramenta indisponível para este usuário." });
     if (options.signal?.aborted) return JSON.stringify({ ok: false, erro: "Operação cancelada antes da execução.", requestId: options.requestId });
-    if (BIBBLE_MUTATING_TOOLS.has(nome) && options.deadlineAt && options.deadlineAt - Date.now() < 20_000) return JSON.stringify({ ok: false, erro: "Operação mutável bloqueada: prazo seguro insuficiente.", requestId: options.requestId });
+    if (BIBBLE_MUTATING_TOOLS.has(nome)) {
+      if (nome !== "abrir_chamado") return JSON.stringify({ ok: false, erro: "Ferramenta mutável indisponível até existir confirmação humana emitida pelo servidor." });
+      if (!options.requestId || !options.deadlineAt || options.deadlineAt - Date.now() < 20_000) {
+        return JSON.stringify({ ok: false, erro: "A autorização deste turno expirou ou não possui prazo seguro.", requestId: options.requestId });
+      }
+      const consumedGrant = consumeBibbleMutationGrant(options.mutationGrant, {
+        userId: ctx.userId,
+        requestId: options.requestId,
+        tool: nome,
+      });
+      if (!consumedGrant) {
+        return JSON.stringify({ ok: false, erro: "A abertura do chamado não foi autorizada neste turno.", requestId: options.requestId });
+      }
+      authorizedMutationText = consumedGrant.authorizedText;
+    }
     console.info('[BIBBLE_TOOL]', { requestId: options.requestId, tool: nome, mutating: BIBBLE_MUTATING_TOOLS.has(nome) });
     if (BIBBLE_FS_TOOLS.has(nome)) {
       if (!filesystemEnabled(ctx)) return JSON.stringify({ ok: false, erro: "Acesso a arquivos desabilitado até existir aprovação humana segura." });
@@ -930,7 +1061,7 @@ export async function executarTool(nome: string, params: Record<string, unknown>
     // Não simulamos cancelamento com Promise.race: isso permitiria que uma
     // mutação continuasse após o timeout. O deadline é checado antes de iniciar
     // e o AbortSignal é propagado pelos chamadores capazes de cancelar I/O.
-    const result = await executarToolUnsafe(nome, safeParams, ctx);
+    const result = await executarToolUnsafe(nome, safeParams, ctx, options.requestId, authorizedMutationText);
     return result.length > TOOL_RESULT_MAX_CHARS
       ? `${result.slice(0, TOOL_RESULT_MAX_CHARS)}\n[resultado reduzido por limite seguro]`
       : result;

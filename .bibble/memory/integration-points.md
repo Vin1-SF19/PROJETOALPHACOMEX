@@ -2258,7 +2258,7 @@ Esta seção substitui, para novas integrações, os limites e capacidades descr
 
 **Como integrar:** o modelo e endpoint são resolvidos exclusivamente no servidor. A janela efetiva nunca excede 131.072 tokens e reserva até 4.096 para saída. Conversa simples usa uma única chamada streaming; nova chamada só é válida após `tool_call` real. Propague o mesmo `AbortSignal`, `deadlineAt` e `requestId` por completion e tools. Preserve os eventos `done`/`error` e a regra de não persistir resposta incompleta.
 
-Antes de alterar o runtime, execute `npm run bibble:doctor`, `npm run bibble:capabilities` e os benchmarks documentados em `docs/operations/bibble-observability.md`. O catálogo esperado no fechamento é de 18 tools, todas read-only.
+Antes de alterar o runtime, execute `npm run bibble:doctor`, `npm run bibble:capabilities` e os benchmarks documentados em `docs/operations/bibble-observability.md`. O catálogo atual é de 20 tools: 19 read-only e somente `abrir_chamado` mutável sob grant server-owned.
 
 ### Capabilities, prompt e contexto da aba
 
@@ -2266,7 +2266,7 @@ Antes de alterar o runtime, execute `npm run bibble:doctor`, `npm run bibble:cap
 
 **Editado quando:** uma tool, permissão, módulo, sugestão, persona ou camada do prompt mudar.
 
-**Como integrar:** toda tool nova precisa de metadata, autorização server-side e teste negativo. O runner só executa nomes presentes no `Set` imutável daquele turno; mutações e filesystem permanecem recusados até uma story com confirmação humana server-side. Capabilities exibidas e sugestões devem derivar do conjunto autorizado e nunca prometer upload, provider ou mutação indisponível.
+**Como integrar:** toda tool nova precisa de metadata, autorização server-side e teste negativo. O runner só executa nomes presentes no `Set` imutável daquele turno. Filesystem e mutações continuam recusados, com uma única exceção explícita: `abrir_chamado`, protegida pelo detector de intenção e grant server-owned descritos abaixo. Capabilities exibidas e sugestões devem derivar do conjunto autorizado e nunca prometer upload, provider ou mutação indisponível.
 
 O shell envia somente mensagens `ALPHA_BIBBLE_CONTEXT` same-origin. O servidor converte rota em module key pelo registry, reaplica permissão e trata o restante como dado, nunca como instrução. A hierarquia de prompt é segurança → identidade → capacidades → permissões → contexto validado → projeto → estilo; projeto/usuário não substituem guardrails.
 
@@ -2283,6 +2283,36 @@ O upload Bibble permanece `503` fail-closed até storage privado autenticado; n�
 **Validação de fechamento:** Forge direcionado/build PASS, Probe PASS, Anubis PASS, Lens PASS e Sage com 118/118 testes Bibble. Smoke visual autenticado, CodeRabbit indisponível e dívidas dos gates globais seguem registrados na story, sem serem convertidos em sucesso.
 
 **Última atualização:** 2026-09-15 por Scribe (story IAlpha/Bibble — transformação integral)
+
+### Bibble/IAlpha — criação de chamado condicionada por intenção e grant (2026-09-17)
+
+**Arquivos:** `src/lib/bibble/{tools,tool-policy,chamado-guard,mutation-grant,tool-executor}.ts`, `src/app/api/bibble/chat/route.ts`, `tests/bibble/{chamado-creation-security,route-runner.integration,hardening-and-persona}.test.ts`
+
+**Propósito:** permitir que qualquer usuário autenticado abra o próprio chamado pelo Bibble sem transformar texto gerado pelo modelo em autorização de escrita e sem ampliar o acesso de consulta ao módulo.
+
+**Editado quando:** o vocabulário de intenção, payload do chamado, TTL/vínculo do grant, elegibilidade do responsável, deduplicação, permissão de criação/consulta ou protocolo de sucesso mudar.
+
+**Como adicionar/manter:** use `mensagemSolicitaAbrirChamado(message)` como fonte única para selecionar a capability no turno. Consultas devem rotear apenas `consultar_chamados`; perguntas de instrução, negações, citações, conteúdo de e-mail/mensagem e relato em terceira pessoa não podem emitir grant. A rota só chama `issueBibbleMutationGrant` quando o usuário autenticado pediu a ação no texto atual, `abrir_chamado` consta nas tools autorizadas do turno, não há anexos e o deadline permite TTL de até 120 segundos.
+
+```typescript
+const grant = issueBibbleMutationGrant({
+  userId,
+  requestId,
+  tool: "abrir_chamado",
+  expiresAt: Math.min(deadlineAt, Date.now() + 120_000),
+  authorizedText: message,
+});
+```
+
+O estado fica apenas no `WeakMap` server-side. `consumeBibbleMutationGrant` apaga a referência antes de validar, tornando-a use-once inclusive em tentativa com usuário, request ou tool divergente. Não substitua esse mecanismo por booleano, campo nos argumentos da tool, nonce aceito do cliente ou afirmação do modelo.
+
+No executor, `abrirChamadoParamsSchema` aceita objeto Zod estrito com título, descrição, prioridade e nome opcional do responsável. Título, descrição, responsável e prioridade não padrão devem existir literalmente no `authorizedText`; ID de usuário/técnico nunca vem do modelo. O nome resolve um único usuário `ATIVO` com role TI. A transação `Serializable` revalida o solicitante ativo, verifica duplicata por usuário+título nos cinco minutos anteriores, revalida o técnico escolhido e cria o chamado; nenhuma notificação posterior converte falha de persistência em sucesso.
+
+**Permissões:** `getToolMetadata("abrir_chamado")` retorna `permission: null`, e `authorizedTools` a libera para qualquer sessão autenticada, coerente com a abertura manual de suporte. `consultar_chamados` mantém `permission: "chamados"`; criação não concede listagem, gestão ou visibilidade de chamados alheios.
+
+**Validação operacional pendente:** a cobertura automatizada prova grant ausente/forjado/expirado/reutilizado/cross-user, payload literal, técnico inexistente/ambíguo/inativo, transação abortada e retry sequencial. Ainda falta smoke concorrente no Turso real para confirmar a serialização/deduplicação sob duas criações simultâneas; não registrar esse cenário como aprovado até executá-lo.
+
+**Última atualização:** 2026-09-17 por Scribe (mutação `abrir_chamado` condicionada; smoke concorrente Turso pendente)
 
 ### Extração de documentos e segurança dos anexos
 

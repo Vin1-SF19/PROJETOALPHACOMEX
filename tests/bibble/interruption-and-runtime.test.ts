@@ -37,7 +37,7 @@ describe('Bibble interruption and runtime contracts', () => {
 
   it('does not start a mutation without sufficient deadline margin', async () => {
     const result = await executarTool('abrir_chamado', { titulo: 'x' }, { userId: 1, userName: 'T', role: 'USER', permissoes: [] }, { deadlineAt: Date.now() + 100 });
-    expect(result).toContain('Ferramenta indisponível');
+    expect(result).toContain('não possui prazo seguro');
   });
 
   it('aborts and clears delayed humor and blocks Onyx probe failures before native fallback', async () => {

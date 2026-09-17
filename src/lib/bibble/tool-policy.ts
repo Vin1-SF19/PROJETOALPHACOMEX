@@ -3,6 +3,7 @@ import { lstat, realpath } from 'fs/promises';
 import type { OllamaTool } from '@/lib/bibble/tools';
 import type { UserCtx } from '@/lib/bibble/tool-executor';
 import { isAdminRole, normalizeRole } from '@/lib/roles';
+import { mensagemSolicitaAbrirChamado } from '@/lib/bibble/chamado-guard';
 
 export const BIBBLE_FS_TOOLS = new Set(['ler_arquivo', 'criar_pasta', 'criar_arquivo', 'escrever_arquivo', 'apagar', 'mover_arquivo', 'copiar_arquivo']);
 export const BIBBLE_MUTATING_TOOLS = new Set(['criar_pasta', 'criar_arquivo', 'escrever_arquivo', 'apagar', 'mover_arquivo', 'copiar_arquivo', 'abrir_chamado', 'criar_evento_calendario', 'editar_evento_calendario', 'cancelar_evento_calendario', 'criar_evento_calendario_colega', 'editar_evento_calendario_colega', 'cancelar_evento_calendario_colega']);
@@ -13,7 +14,15 @@ export type BibbleToolMetadata = { name: string; domain: string; mutating: boole
 export function getToolMetadata(tool: OllamaTool): BibbleToolMetadata {
   const name = tool.function.name;
   const domain = BIBBLE_FS_TOOLS.has(name) ? 'filesystem' : /calendario|agenda|evento|disponibilidade/.test(name) ? 'calendar' : /curso|modulo|progreso/.test(name) ? 'skills' : /empresa|ficha|consultas_recentes/.test(name) ? 'analise' : name.includes('chamado') ? 'chamados' : 'painel';
-  const permission = domain === 'analise' ? 'analise' : domain === 'skills' ? 'skills' : domain === 'chamados' ? 'chamados' : null;
+  const permission = name === 'abrir_chamado'
+    ? null
+    : domain === 'analise'
+      ? 'analise'
+      : domain === 'skills'
+        ? 'skills'
+        : domain === 'chamados'
+          ? 'chamados'
+          : null;
   return { name, domain, mutating: BIBBLE_MUTATING_TOOLS.has(name), permission, confirmation: ['escrever_arquivo', 'apagar', 'mover_arquivo', 'copiar_arquivo', 'cancelar_evento_calendario', 'cancelar_evento_calendario_colega'].includes(name), timeoutMs: Number(process.env.BIBBLE_TOOL_TIMEOUT_MS) || 20_000, resultMaxChars: Number(process.env.BIBBLE_TOOL_RESULT_MAX_CHARS) || 100_000 };
 }
 
@@ -37,7 +46,7 @@ export function authorizedTools(all: OllamaTool[], ctx: UserCtx, requestedFs: bo
   const admin = isAdminRole(ctx.role);
   const can = (name: string) => {
     if (BIBBLE_FS_TOOLS.has(name)) return false;
-    if (BIBBLE_MUTATING_TOOLS.has(name)) return false;
+    if (BIBBLE_MUTATING_TOOLS.has(name) && name !== 'abrir_chamado') return false;
     if (name === 'consultar_estilo_comunicacao_usuario') return canConsultBehavioralProfiles(ctx.role);
     if (admin) return true;
     if (/colega/.test(name) || name === 'consultar_usuarios') return false;
@@ -50,6 +59,7 @@ export function authorizedTools(all: OllamaTool[], ctx: UserCtx, requestedFs: bo
     if (name === 'buscar_empresa') return permissions.has('analise') || permissions.has('radar');
     if (name === 'gerar_ficha_pre_analise' || name === 'buscar_consultas_recentes') return permissions.has('analise');
     if (name === 'listar_clientes') return permissions.has('Cliente') || permissions.has('crm');
+    if (name === 'abrir_chamado') return true;
     if (name === 'consultar_chamados') return permissions.has('chamados');
     if (name === 'consultar_metas_comerciais') return permissions.has('metas');
     if (name === 'consultar_base_onyx') return permissions.has('conectoresIAlpha');
@@ -66,7 +76,8 @@ export function routeToolsByIntent(tools: OllamaTool[], text: string): OllamaToo
   if (behavioralProfileIntent) add('consultar_estilo_comunicacao_usuario');
   if (/cnpj|empresa|radar|ficha|pré[- ]análise/.test(q)) add('buscar_empresa', 'gerar_ficha_pre_analise', 'buscar_consultas_recentes');
   if (/cliente|crm/.test(q)) add('listar_clientes');
-  if (/chamado|suporte|incidente/.test(q)) add('abrir_chamado', 'consultar_chamados');
+  if (mensagemSolicitaAbrirChamado(text)) add('abrir_chamado');
+  if (/\b(?:consult|list|mostr|ver|quant|status|histor|meus?|abertos?|pendentes?)\w*.{0,50}\bchamado|\bchamado\w*.{0,50}\b(?:consult|list|mostr|ver|quant|status|histor)\w*/u.test(q)) add('consultar_chamados');
   if (/curso|aula|módulo|treinamento|skills/.test(q)) add('lista_cursos', 'detalhes_curso', 'lista_modulos', 'detalhes_modulo', 'consulta_progreso_aluno');
   if (/agenda|calendário|evento|reunião|disponibilidade/.test(q)) tools.filter(t => t.function.name.includes('calendario') || t.function.name.includes('agenda') || t.function.name.includes('evento') || t.function.name.includes('disponibilidade')).forEach(t => matches.add(t.function.name));
   if (/arquivo|pasta|diretório|filesystem/.test(q)) BIBBLE_FS_TOOLS.forEach(name => add(name));

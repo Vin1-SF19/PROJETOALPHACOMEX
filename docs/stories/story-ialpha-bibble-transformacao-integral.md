@@ -504,6 +504,7 @@ Codex GPT-5 / Dex (Builder), modo autônomo YOLO.
 - Alinhamento UI pós-Probe: removidas sugestões de chamado/PDF, affordance de upload/paperclip, seletores/badges de modelo e configuração de providers; a interface agora informa apenas identidade e capacidades autorizadas pelo servidor.
 - Revalidação UI segura: 16 arquivos/117 testes Bibble PASS; ESLint dos componentes/testes alterados e `git diff --check` direcionado PASS.
 - Fechamento MEDIUM Anubis: PATCH de projeto/sessão com Zod strict, limite de body e same-origin; histórico limitado a 100 itens/página; tokens permanecem `null` até existir usage exato autoritativo server-side e receipts do cliente são rejeitados; timer/listener pré-lease limpos em 401/403/429/504. Suíte Bibble 16 arquivos/118 testes, ESLint e diff-check direcionados PASS.
+- Correção de abertura de chamados (2026-09-17): `abrir_chamado` foi reabilitada como única mutação pública, somente em turno sem anexos com intenção explícita; grant opaco server-owned vincula usuário, requestId, tool, expiração e texto atual e é consumido uma única vez. Metadata declara criação self-service sem permissão de módulo, preservando `chamados` apenas na consulta; teste do runner comprova o repasse do mesmo grant por identidade e a ausência dele na consulta. Hardening adicional mascara spans entre aspas antes de classificar intenção e reconhece ações positivas somente no início da mensagem após prefixos diretos opcionais, rejeitando discurso reportado, narrativa/passado/meta/condicional e perguntas informativas de automação por construção; exige que payload seja derivado literalmente do texto autorizado, revalida solicitante e técnico elegível imediatamente antes do write e executa dedupe de cinco minutos + criação numa transação interativa `Serializable`. Notificação falsa/indisponível não desfaz nem mascara criação confirmada. Limitações residuais: após o commit, uma interrupção de rede/deadline pode impedir a entrega da confirmação ao cliente; a deduplicação transacional protege o retry sequencial, mas corrida concorrente real contra o Turso permanece como smoke operacional pendente e não foi alegada como testada. Suíte Bibble: 24 arquivos/221 testes PASS; ESLint escopado PASS; typecheck global continua falhando apenas em dívidas preexistentes fora do delta.
 - Self-critique: `plan/self-critique-bibble-transformacao-integral.json`.
 
 ### Completion Notes List
@@ -529,6 +530,7 @@ Codex GPT-5 / Dex (Builder), modo autônomo YOLO.
 - Prompt nativo agora é composto em camadas imutáveis a partir de `persona.ts`; projeto/estilo não substituem guardrails. Home, Onyx empty state, sugestões e mascote foram alinhados; humor é opt-in e desligado por padrão.
 - Persistência do par user/assistant usa `$transaction` e Zod; tokens só podem ser gravados com flag de contagem exata. Nenhum schema/migration/seed/backfill/blob foi alterado.
 - Achados Anubis críticos/high foram fechados sem migration: Onyx exige PAT individual e ownership de agente/sessão, file proxy e anexos Onyx falham fechados, reasoning é descartado, tool calls usam Set exato autorizado, modelo do request é ignorado, todas as mutações saíram do catálogo/runtime, admission antecede o body e upload/blob público retorna 503 até existir storage privado com ownership verificável.
+- Abertura de chamado voltou a funcionar para qualquer usuário autenticado ativo, sem exigir permissão do módulo: a tool só chega ao modelo após pedido explícito atual e exige grant efêmero one-shot no executor. Parâmetros usam Zod strict; responsável é resolvido exclusivamente por nome para um único usuário de TI ativo; IDs fornecidos pelo modelo são recusados; calendário e filesystem permanecem bloqueados.
 - Benchmark pós-refatoração (3 amostras): 1 chamada/amostra, p50 total 1.241 ms, p95 1.493 ms, TTFT p50 1.159 ms, p95 1.411 ms; relatório em `docs/qa/bibble/benchmark-2026-09-15.md`.
 - Pendências explícitas após os gates: browser/a11y smoke autenticado, dívidas externas dos gates globais e CodeRabbit indisponível.
 
@@ -580,7 +582,9 @@ Codex GPT-5 / Dex (Builder), modo autônomo YOLO.
 - `src/lib/bibble/client.ts`
 - `src/lib/bibble/completion.ts`
 - `src/lib/bibble/context-budget.ts`
+- `src/lib/bibble/chamado-guard.ts`
 - `src/lib/bibble/module-context.ts` (novo)
+- `src/lib/bibble/mutation-grant.ts` (novo)
 - `src/lib/bibble/persona.ts` (novo)
 - `src/lib/bibble/runtime-config.ts` (novo)
 - `src/lib/bibble/system-prompt.ts`
@@ -594,6 +598,7 @@ Codex GPT-5 / Dex (Builder), modo autônomo YOLO.
 - `src/lib/onyx/ownership.ts`
 - `src/lib/onyx/user-token.ts`
 - `tests/bibble/attachment-security.test.ts`
+- `tests/bibble/chamado-creation-security.test.ts` (novo)
 - `tests/bibble/attachment-readiness.test.ts`
 - `tests/bibble/completion-budget-stream.test.ts`
 - `tests/bibble/context-budget.test.ts`

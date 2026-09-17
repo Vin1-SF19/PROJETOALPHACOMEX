@@ -59,13 +59,13 @@ const BIBBLE_TOOL_REGISTRY: OllamaTool[] = [
     function: {
       name: "abrir_chamado",
       description:
-        "Cria um chamado de suporte no sistema quando o usuário relatar um erro, bug ou problema.",
+        "Cria um chamado somente quando o usuário pedir explicitamente para abrir, criar, registrar ou fazer um chamado. Título, descrição e responsável devem copiar trechos literais do pedido atual; não resuma nem invente dados.",
       parameters: {
         type: "object",
         properties: {
           titulo: {
             type: "string",
-            description: "Título resumido do problema (máximo 100 caracteres)",
+            description: "Título resumido copiado do pedido atual (máximo 120 caracteres)",
           },
           descricao: {
             type: "string",
@@ -73,10 +73,19 @@ const BIBBLE_TOOL_REGISTRY: OllamaTool[] = [
           },
           prioridade: {
             type: "string",
-            description: "Prioridade: BAIXA, MEDIA, ALTA ou URGENTE",
+            description: "Prioridade: BAIXA, MEDIA, ALTA ou URGENTE. Se não for informada, use MEDIA.",
+          },
+          tecnico_solicitado_nome: {
+            type: "string",
+            description: "Nome do responsável/técnico de TI solicitado pelo usuário (opcional). Nunca envie ID.",
+          },
+          responsavel: {
+            type: "string",
+            description: "Nome do responsável/técnico de TI solicitado pelo usuário (alias opcional). Nunca envie ID.",
           },
         },
-        required: ["titulo", "descricao", "prioridade"],
+        required: ["titulo", "descricao"],
+        additionalProperties: false,
       },
     },
   },
@@ -744,5 +753,5 @@ const BIBBLE_TOOL_REGISTRY: OllamaTool[] = [
 // Filesystem permanece implementado apenas como defesa interna no executor.
 // Não é capability pública enquanto não houver aprovação humana server-side.
 const DISABLED_FILESYSTEM_TOOLS = new Set(["ler_arquivo", "criar_pasta", "criar_arquivo", "escrever_arquivo", "apagar", "mover_arquivo", "copiar_arquivo"]);
-const DISABLED_MUTATING_TOOLS = new Set(["abrir_chamado", "criar_evento_calendario", "editar_evento_calendario", "cancelar_evento_calendario", "criar_evento_calendario_colega", "editar_evento_calendario_colega", "cancelar_evento_calendario_colega"]);
+const DISABLED_MUTATING_TOOLS = new Set(["criar_evento_calendario", "editar_evento_calendario", "cancelar_evento_calendario", "criar_evento_calendario_colega", "editar_evento_calendario_colega", "cancelar_evento_calendario_colega"]);
 export const BIBBLE_TOOLS: OllamaTool[] = BIBBLE_TOOL_REGISTRY.filter(tool => !DISABLED_FILESYSTEM_TOOLS.has(tool.function.name) && !DISABLED_MUTATING_TOOLS.has(tool.function.name));

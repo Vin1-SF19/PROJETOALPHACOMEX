@@ -49,6 +49,7 @@ import {
 } from "@/lib/bibble/adaptive-style";
 import { loadBehavioralHistory } from "@/lib/bibble/behavioral-memory";
 import type { AdaptiveTonePreferences, BehavioralProfile, BehavioralSample } from "@/lib/bibble/adaptive-style";
+import { issueBibbleMutationGrant, type BibbleMutationGrant } from "@/lib/bibble/mutation-grant";
 
 // ─── File content extraction ──────────────────────────────────────────────────
 
@@ -292,6 +293,7 @@ export async function runStream(
   lease?: AdmissionLease,
   deadlineTimer?: ReturnType<typeof setTimeout>,
   deadlineAt?: number,
+  mutationGrant?: BibbleMutationGrant,
 ): Promise<void> {
   const send = (event: SSEEvent) => {
     try { controller.enqueue(encodeSSE(event, enc)); } catch { /* stream closed */ }
@@ -389,10 +391,10 @@ export async function runStream(
               });
             } else {
               mutacoesExecutadas.add(assinatura);
-              result = await executarTool(tc.function.name, args, userCtx, { signal: providerCtrl.signal, requestId: metrics?.requestId, deadlineAt: effectiveDeadlineAt });
+              result = await executarTool(tc.function.name, args, userCtx, { signal: providerCtrl.signal, requestId: metrics?.requestId, deadlineAt: effectiveDeadlineAt, mutationGrant });
             }
           } else {
-            result = await executarTool(tc.function.name, args, userCtx, { signal: providerCtrl.signal, requestId: metrics?.requestId, deadlineAt: effectiveDeadlineAt });
+            result = await executarTool(tc.function.name, args, userCtx, { signal: providerCtrl.signal, requestId: metrics?.requestId, deadlineAt: effectiveDeadlineAt, mutationGrant });
           }
           metrics?.tools.push({ name: tc.function.name, durationMs: Date.now() - toolStarted, ok: !/erro|falha/i.test(result) });
 
@@ -763,6 +765,17 @@ export async function POST(req: NextRequest) {
   // Qualquer anexo segue fluxo isolado de uma única geração: nenhuma tool pode
   // misturar conteúdo não confiável do arquivo com ações no sistema.
   const toolsForTurn = hasAttachments ? [] : toolsToUse;
+  const mutationGrant = userCtx.solicitouAbrirChamado === true
+    && toolsForTurn.some((tool) => tool.function.name === "abrir_chamado")
+    && deadlineAt > Date.now()
+      ? issueBibbleMutationGrant({
+          userId,
+          requestId,
+          tool: "abrir_chamado",
+          expiresAt: Math.min(deadlineAt, Date.now() + 120_000),
+          authorizedText: message,
+        })
+      : undefined;
 
   // Imagens → visão (base64). Se o modelo não suporta, avisa o usuário.
   const temImagem = inputFiles.some(file => file.type.startsWith("image/"));
@@ -910,6 +923,7 @@ export async function POST(req: NextRequest) {
         lease,
         deadlineTimer,
         deadlineAt,
+        mutationGrant,
       ).catch(() => {
         lease.release();
         safeBibbleLog(metrics);

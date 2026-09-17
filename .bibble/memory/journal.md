@@ -5735,3 +5735,40 @@ Após o restart do stage, o botão Ouvir passou de `403` para `503`, exigindo co
 ### Refletido também em
 - `decisions.md`: não alterado nesta consolidação.
 - `components.md`: não alterado nesta consolidação.
+
+---
+
+## [2026-09-17 18:56] — Bibble voltou a abrir chamados com autorização efêmera e fail-closed
+
+**Tags:** #bugfix #integration #security #auth #critical
+**Agentes envolvidos:** Bibble/Codex, Scout, Dex, Anubis, Forge, Probe, Lens, Sage, Scribe e Kowalski
+**Arquivos tocados:** `src/app/api/bibble/chat/route.ts`; `src/lib/bibble/{chamado-guard,mutation-grant,tool-executor,tool-policy,tools}.ts`; `tests/bibble/{chamado-creation-security,hardening-and-persona,interruption-and-runtime,route-runner.integration}.test.ts`; `docs/stories/story-ialpha-bibble-transformacao-integral.md`; `.bibble/memory/{codebase-map,integration-points,journal}.md`
+
+### Contexto
+Um usuário pediu ao Bibble que abrisse um chamado de exclusão do manual de CS/NPS, com justificativa e responsável, mas o assistente respondeu que somente podia consultar chamados. O fluxo precisava voltar a criar chamados sem reabrir genericamente as mutações anteriormente bloqueadas por segurança.
+
+### O que foi feito
+- Reabilitada somente a capability `abrir_chamado` para usuário autenticado ativo e pedido explícito no turno atual; consultas continuam sujeitas à permissão `chamados`, enquanto calendário e filesystem permanecem bloqueados.
+- Adicionado grant opaco, server-owned, one-shot e com expiração, vinculado a usuário, request, tool e texto autorizado; o executor exige Zod strict, campos literais do pedido e revalida as identidades imediatamente antes da gravação.
+- Responsável solicitado passou a ser resolvido por nome contra um único usuário de TI ativo, recusando IDs fornecidos pelo modelo, nomes inexistentes, ambíguos ou inelegíveis.
+- A criação e a deduplicação de cinco minutos passaram por transação `Serializable`; falha posterior de notificação não mascara uma criação já confirmada.
+
+### Decisões tomadas
+- Capability condicional em vez de liberar mutações em bloco: `abrir_chamado` só é exposta quando o classificador conservador confirma uma ordem direta, sem anexos, e o servidor emite o grant do turno.
+- Criação self-service não exige acesso ao módulo de chamados: replica o fluxo manual do sistema; visualizar ou administrar chamados continua exigindo sua permissão própria.
+- O nome do responsável é dado de negócio verificável, nunca autoridade enviada pelo modelo: o backend resolve e revalida o técnico elegível.
+
+### Problemas encontrados / resolvidos
+- A tool era removida do catálogo pelo filtro global de mutações: foi excluída desse bloqueio sem liberar as demais mutações.
+- A política recusava qualquer tool mutável e associava o domínio inteiro à permissão `chamados`: foi criada a exceção mínima para criação self-service, mantendo a consulta protegida.
+- Não existia autorização server-side por intenção/turno para executar a mutação com segurança: o grant efêmero e a detecção conservadora agora negam ausência, falsificação, expiração, reutilização, outro usuário, discurso reportado, perguntas, passado e condicionais.
+- Anubis, Lens e Sage endureceram intenção, payload, concorrência, notificação e regressões; a suíte Bibble concluiu 221/221 e os testes críticos 44/44, com ESLint focal e diff-check aprovados.
+- `typecheck`, `lint` e `npm test` globais permaneceram vermelhos por baseline externo ao delta; a suíte global registrou 3.299 testes aprovados, 20 falhas e 1 `todo`.
+
+### Pendências
+- Executar smoke real de duas criações concorrentes contra o Turso para validar a deduplicação sob corrida; essa evidência ainda não foi alegada.
+- Não houve migration, alteração estrutural ou mutação real de banco, nem deploy nesta sessão.
+
+### Refletido também em
+- `codebase-map.md`: capability condicional, grant efêmero e fronteira da criação de chamados.
+- `integration-points.md`: intenção explícita, resolução do técnico por nome e autorização server-side documentadas.
