@@ -9,8 +9,8 @@ const nextConfig = {
     NEXT_PUBLIC_PUSHER_KEY: process.env.NEXT_PUBLIC_PUSHER_KEY,
     NEXT_PUBLIC_PUSHER_CLUSTER: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
   },
-  transpilePackages: ["pusher-js"],
-  serverExternalPackages: ["@react-pdf/renderer", "pdf-parse"],
+  transpilePackages: ["pusher-js", "@react-pdf/renderer"],
+  serverExternalPackages: ["pdf-parse"],
   // pdf-parse carrega o worker do pdfjs-dist (embutido, node_modules aninhado)
   // via import() dinâmico com caminho variável — o file tracing do Next.js não
   // segue esse caminho sozinho e deixa pdf.worker.mjs de fora do bundle da
@@ -23,6 +23,11 @@ const nextConfig = {
     ],
   },
   experimental: {
+    // Serializa a geração estática para manter margem no container de build.
+    cpus: 1,
+    // Reduz o pico de memória do compilador em troca de uma pequena perda de
+    // velocidade. O build Turbopack deste monólito excede o limite da Vercel.
+    webpackMemoryOptimizations: true,
     serverActions: {
       bodySizeLimit: "100mb",
     },

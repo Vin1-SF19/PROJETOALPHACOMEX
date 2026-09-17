@@ -505,6 +505,7 @@ Codex GPT-5 / Dex (Builder), modo autônomo YOLO.
 - Revalidação UI segura: 16 arquivos/117 testes Bibble PASS; ESLint dos componentes/testes alterados e `git diff --check` direcionado PASS.
 - Fechamento MEDIUM Anubis: PATCH de projeto/sessão com Zod strict, limite de body e same-origin; histórico limitado a 100 itens/página; tokens permanecem `null` até existir usage exato autoritativo server-side e receipts do cliente são rejeitados; timer/listener pré-lease limpos em 401/403/429/504. Suíte Bibble 16 arquivos/118 testes, ESLint e diff-check direcionados PASS.
 - Correção de abertura de chamados (2026-09-17): `abrir_chamado` foi reabilitada como única mutação pública, somente em turno sem anexos com intenção explícita; grant opaco server-owned vincula usuário, requestId, tool, expiração e texto atual e é consumido uma única vez. Metadata declara criação self-service sem permissão de módulo, preservando `chamados` apenas na consulta; teste do runner comprova o repasse do mesmo grant por identidade e a ausência dele na consulta. Hardening adicional mascara spans entre aspas antes de classificar intenção e reconhece ações positivas somente no início da mensagem após prefixos diretos opcionais, rejeitando discurso reportado, narrativa/passado/meta/condicional e perguntas informativas de automação por construção; exige que payload seja derivado literalmente do texto autorizado, revalida solicitante e técnico elegível imediatamente antes do write e executa dedupe de cinco minutos + criação numa transação interativa `Serializable`. Notificação falsa/indisponível não desfaz nem mascara criação confirmada. Limitações residuais: após o commit, uma interrupção de rede/deadline pode impedir a entrega da confirmação ao cliente; a deduplicação transacional protege o retry sequencial, mas corrida concorrente real contra o Turso permanece como smoke operacional pendente e não foi alegada como testada. Suíte Bibble: 24 arquivos/221 testes PASS; ESLint escopado PASS; typecheck global continua falhando apenas em dívidas preexistentes fora do delta.
+- Hotfix de deploy Vercel (2026-09-17): o build anterior com Turbopack, heap de 8 GiB e 23 workers atingiu 8.215.452 KiB RSS (cerca de 7,84 GiB) e reproduziu a causa do `SIGKILL`. O build de produção passou a usar Webpack, heap de 3 GiB, geração estática serializada e `webpackMemoryOptimizations`; `@react-pdf/renderer` é transpilado em vez de externalizado. `npm run build` concluiu com 80/80 páginas em 1m15s e pico medido de 7.380.788 KiB (cerca de 7,04 GiB), preservando mais de 1 GiB de margem no container padrão de 8 GiB.
 - Self-critique: `plan/self-critique-bibble-transformacao-integral.json`.
 
 ### Completion Notes List
@@ -544,6 +545,7 @@ Codex GPT-5 / Dex (Builder), modo autônomo YOLO.
 - `.bibble/memory/journal.md`
 - `.gitignore`
 - `bibble-falas.md`
+- `next.config.ts`
 - `package.json`
 - `docs/operations/bibble-observability.md` (novo)
 - `docs/qa/bibble/benchmark-2026-09-15.md` (novo)
