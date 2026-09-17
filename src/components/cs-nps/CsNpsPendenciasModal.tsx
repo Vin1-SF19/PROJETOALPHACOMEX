@@ -132,7 +132,7 @@ export function CsNpsPendenciasModal({ onReconciliar }: { onReconciliar: () => P
             <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-400"><AlertTriangle className="size-5" /></span>
             <div>
               <h2 id="cs-pendencias-titulo" className="text-lg font-black uppercase tracking-tight text-white">CS para atualizar</h2>
-              <p className="mt-1 text-[10px] text-slate-500">Serviços em andamento há 10 dias ou mais sem novo CS.</p>
+              <p className="mt-1 text-[10px] text-slate-500">Serviços em andamento sem CS realizado ou há 10 dias sem atualização.</p>
             </div>
           </div>
           <button type="button" onClick={fechar} aria-label="Fechar empresas pendentes" className="rounded-full p-2 text-slate-500 transition-colors hover:bg-white/5 hover:text-white"><X className="size-5" /></button>
@@ -151,7 +151,7 @@ export function CsNpsPendenciasModal({ onReconciliar }: { onReconciliar: () => P
             <div className="flex flex-col items-center gap-3 py-16 text-center">
               <span className="flex size-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400"><CheckCircle2 className="size-6" /></span>
               <p className="text-sm font-bold text-white">Todos os CS estão atualizados</p>
-              <p className="text-xs text-slate-500">Não há empresas na janela de alerta.</p>
+              <p className="text-xs text-slate-500">Não há empresas sem CS ou na janela de alerta.</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -163,11 +163,17 @@ export function CsNpsPendenciasModal({ onReconciliar }: { onReconciliar: () => P
                     <span className="mt-1 block text-[9px] text-slate-600">{pendencia.cnpj || "CNPJ não informado"}</span>
                   </span>
                   <span className="flex items-center gap-3 sm:text-right">
-                    <span>
-                      <span className="flex items-center gap-1 text-[9px] font-black uppercase text-rose-400 sm:justify-end"><CalendarDays className="size-3" /> Último CS</span>
-                      <span className="mt-1 block text-xs font-mono text-slate-300">{fmtDate(pendencia.ultimoCsEm)}</span>
-                      <span className="block text-[9px] font-bold text-rose-400">há {pendencia.diasSemAtualizacao} dias</span>
-                    </span>
+                    {pendencia.tipo === "SEM_CS" ? (
+                      <span className="rounded-lg border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-amber-300">
+                        Sem CS realizado
+                      </span>
+                    ) : (
+                      <span>
+                        <span className="flex items-center gap-1 text-[9px] font-black uppercase text-rose-400 sm:justify-end"><CalendarDays className="size-3" /> Último CS</span>
+                        <span className="mt-1 block text-xs font-mono text-slate-300">{pendencia.ultimoCsEm ? fmtDate(pendencia.ultimoCsEm) : "—"}</span>
+                        <span className="block text-[9px] font-bold text-rose-400">há {pendencia.diasSemAtualizacao} dias</span>
+                      </span>
+                    )}
                     <MessageSquare className="size-4 text-slate-700 transition-colors group-hover:text-emerald-400" />
                   </span>
                 </button>

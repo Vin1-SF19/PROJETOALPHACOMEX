@@ -39,6 +39,8 @@ describe("integração visual dos alertas de Último CS", () => {
     expect(central).toContain('origem: "CS & NPS"');
     expect(central).toContain('id: "cs-nps-ultimo-cs"');
     expect(central).toContain("csNps.pendencias.length");
+    expect(central).toContain('pendencia.tipo === "SEM_CS"');
+    expect(central).toContain("resumoCsNps");
     expect(central).toContain("abrir: csNps.abrirModal");
     for (const fonte of ["calendario.notificacoes", "chamados.notificacoes", "checklist.notificacoes", "notas.notificacoes", "holerite.alertaAtivo"]) {
       expect(central).toContain(fonte);
@@ -56,7 +58,17 @@ describe("integração visual dos alertas de Último CS", () => {
     expect(modal).toContain("await onReconciliar()");
     expect(modal).toContain("salvarLogCSPorAlerta(pendencia.clienteServicoId");
     expect(modal).toContain("Não foi possível atualizar o CS");
+    expect(modal).toContain('pendencia.tipo === "SEM_CS"');
+    expect(modal).toContain("Sem CS realizado");
+    expect(modal).toContain('pendencia.ultimoCsEm ? fmtDate(pendencia.ultimoCsEm) : "—"');
     expect(modal).toContain('role="dialog" aria-modal="true"');
+  });
+
+  it("usa no shell a role atual persistida do usuário", () => {
+    const layout = ler("src/app/PainelAlpha/layout.tsx");
+
+    expect(layout).toContain("role: true");
+    expect(layout).toContain("role = userRecord.role");
   });
 
   it("reconcilia na carga, no foco e durante a sessão sem sobrepor consultas", () => {

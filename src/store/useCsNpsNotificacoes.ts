@@ -19,7 +19,7 @@ interface CsNpsNotificacoesStore {
 
 function assinatura(pendencias: PendenciaUltimoCs[]): string {
   return pendencias
-    .map((item) => `${item.clienteServicoId}:${item.ultimoCsEm}`)
+    .map((item) => `${item.clienteServicoId}:${item.tipo}:${item.ultimoCsEm ?? "sem-cs"}`)
     .sort()
     .join("|");
 }

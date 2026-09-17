@@ -34,7 +34,7 @@ export default async function PainelLayout({
   const user = session?.user as { id?: string; role?: string; nome?: string; name?: string; imagemUrl?: string } | undefined;
 
   const userId = Number(user?.id ?? 0);
-  const role = user?.role ?? 'User';
+  let role = user?.role ?? 'User';
 
   if (!Number.isSafeInteger(userId) || userId <= 0) {
     redirect("/?acesso=bloqueado");
@@ -52,6 +52,7 @@ export default async function PainelLayout({
         where: { id: userId },
         select: {
           status: true,
+          role: true,
           tema_interface: true,
           onboarding_ialpha_visto: true,
         },
@@ -64,6 +65,7 @@ export default async function PainelLayout({
     }
 
     permissoes = perms;
+    role = userRecord.role;
     temaName = userRecord?.tema_interface ?? "blue";
     onboardingVisto = userRecord?.onboarding_ialpha_visto ?? false;
     linksExternos = links;

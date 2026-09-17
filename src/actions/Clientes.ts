@@ -15,7 +15,7 @@ import {
   paraExibicaoTelefone,
 } from "@/lib/validations/cs-nps";
 import {
-  calcularAlertaUltimoCs,
+  calcularPendenciaCs,
   podeReceberAlertasUltimoCs,
   STATUS_EM_ANDAMENTO,
   type PendenciaUltimoCs,
@@ -466,22 +466,36 @@ export type ResultadoPendenciasUltimoCs =
   | { success: true; alertas: PendenciaUltimoCs[] }
   | { success: false; error: string; alertas: [] };
 
+async function obterRoleAtualUsuario(userId: unknown): Promise<string | null> {
+  const id = Number(userId);
+  if (!Number.isSafeInteger(id) || id <= 0) return null;
+
+  const usuario = await db.usuarios.findUnique({
+    where: { id },
+    select: { role: true, status: true },
+  });
+
+  return usuario?.status === "ATIVO" ? usuario.role : null;
+}
+
 /**
- * Fila derivada de CS vencidos para o sino global. Não persiste notificações:
+ * Fila derivada de CS ausentes ou vencidos para o sino global. Não persiste notificações:
  * cada leitura reflete o status e o último atendimento atualmente gravados.
  */
 export async function buscarPendenciasUltimoCs(): Promise<ResultadoPendenciasUltimoCs> {
   const session = await auth();
-  if (!session?.user?.id || !podeReceberAlertasUltimoCs(session.user.role)) {
-    return { success: false, error: "Acesso restrito aos setores de TI e Recursos Humanos", alertas: [] };
-  }
+  if (!session?.user?.id) return { success: false, error: "Não autorizado", alertas: [] };
 
   try {
+    const roleAtual = await obterRoleAtualUsuario(session.user.id);
+    if (!podeReceberAlertasUltimoCs(roleAtual)) {
+      return { success: false, error: "Acesso restrito a Admin, TI e Recursos Humanos", alertas: [] };
+    }
+
     const agora = new Date();
     const registros = await db.clienteServico.findMany({
       where: {
         status: STATUS_EM_ANDAMENTO,
-        logCs: { some: {} },
       },
       select: {
         id: true,
@@ -500,7 +514,7 @@ export async function buscarPendenciasUltimoCs(): Promise<ResultadoPendenciasUlt
     });
 
     const alertas = registros.flatMap<PendenciaUltimoCs>((registro) => {
-      const alerta = calcularAlertaUltimoCs({
+      const alerta = calcularPendenciaCs({
         status: registro.status,
         logs: registro.logCs,
         agora,
@@ -514,12 +528,14 @@ export async function buscarPendenciasUltimoCs(): Promise<ResultadoPendenciasUlt
         nomeFantasia: registro.cliente.nomeFantasia,
         cnpj: registro.cliente.cnpj,
         servico: registro.servico,
-        ultimoCsEm: alerta.ultimoCs.toISOString(),
-        venceEm: alerta.venceEm.toISOString(),
+        tipo: alerta.tipo,
+        ultimoCsEm: alerta.ultimoCs?.toISOString() ?? null,
+        venceEm: alerta.venceEm?.toISOString() ?? null,
         diasSemAtualizacao: alerta.diasSemAtualizacao,
       }];
     }).sort((a, b) =>
-      b.diasSemAtualizacao - a.diasSemAtualizacao
+      Number(b.tipo === "SEM_CS") - Number(a.tipo === "SEM_CS")
+      || (b.diasSemAtualizacao ?? -1) - (a.diasSemAtualizacao ?? -1)
       || a.razaoSocial.localeCompare(b.razaoSocial, "pt-BR")
       || a.clienteServicoId - b.clienteServicoId
     );
@@ -693,8 +709,16 @@ export async function salvarLogCS(clienteServicoId: number, dados: unknown) {
 /** Variante do salvamento usada pelo modal global, sem ampliar o acesso do alerta. */
 export async function salvarLogCSPorAlerta(clienteServicoId: number, dados: unknown) {
   const session = await auth();
-  if (!session?.user?.id || !podeReceberAlertasUltimoCs(session.user.role)) {
-    return { success: false as const, error: "Acesso restrito aos setores de TI e Recursos Humanos" };
+  if (!session?.user?.id) return { success: false as const, error: "Não autorizado" };
+
+  try {
+    const roleAtual = await obterRoleAtualUsuario(session.user.id);
+    if (!podeReceberAlertasUltimoCs(roleAtual)) {
+      return { success: false as const, error: "Acesso restrito a Admin, TI e Recursos Humanos" };
+    }
+  } catch (error) {
+    console.error("ERRO AO VALIDAR ACESSO DO ALERTA DE CS:", mensagemDoErro(error));
+    return { success: false as const, error: "Não foi possível validar o acesso ao alerta de CS" };
   }
   return salvarLogCS(clienteServicoId, dados);
 }

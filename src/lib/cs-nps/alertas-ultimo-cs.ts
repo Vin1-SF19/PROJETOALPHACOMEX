@@ -13,6 +13,8 @@ export const STATUS_CLIENTE_SERVICO = [
 
 export type StatusClienteServico = (typeof STATUS_CLIENTE_SERVICO)[number];
 
+export type TipoPendenciaCs = "SEM_CS" | "CS_VENCIDO";
+
 type LogCsComData = {
   dataRegistro?: Date | string | null;
   data_registro?: Date | string | null;
@@ -25,16 +27,19 @@ export interface PendenciaUltimoCs {
   nomeFantasia: string | null;
   cnpj: string | null;
   servico: string;
-  ultimoCsEm: string;
-  venceEm: string;
-  diasSemAtualizacao: number;
+  tipo: TipoPendenciaCs;
+  ultimoCsEm: string | null;
+  venceEm: string | null;
+  diasSemAtualizacao: number | null;
 }
 
 const MILISSEGUNDOS_POR_DIA = 24 * 60 * 60 * 1000;
 
 export function podeReceberAlertasUltimoCs(role?: string | null): boolean {
   const roleNormalizada = normalizeRole(role);
-  return roleNormalizada === "TI" || roleNormalizada === "RECURSOSHUMANOS";
+  return roleNormalizada === "ADMIN"
+    || roleNormalizada === "TI"
+    || roleNormalizada === "RECURSOSHUMANOS";
 }
 
 export function resolverUltimoCs(logs: readonly LogCsComData[]): Date | null {
@@ -71,5 +76,36 @@ export function calcularAlertaUltimoCs(params: {
     ultimoCs,
     venceEm,
     diasSemAtualizacao: Math.floor((timestampAgora - ultimoCs.getTime()) / MILISSEGUNDOS_POR_DIA),
+  };
+}
+
+export function calcularPendenciaCs(params: {
+  status?: string | null;
+  logs: readonly LogCsComData[];
+  agora?: Date;
+}): {
+  tipo: TipoPendenciaCs;
+  ultimoCs: Date | null;
+  venceEm: Date | null;
+  diasSemAtualizacao: number | null;
+} | null {
+  if (params.status !== STATUS_EM_ANDAMENTO) return null;
+
+  const ultimoCs = resolverUltimoCs(params.logs);
+  if (!ultimoCs) {
+    return {
+      tipo: "SEM_CS",
+      ultimoCs: null,
+      venceEm: null,
+      diasSemAtualizacao: null,
+    };
+  }
+
+  const alerta = calcularAlertaUltimoCs(params);
+  if (!alerta) return null;
+
+  return {
+    tipo: "CS_VENCIDO",
+    ...alerta,
   };
 }

@@ -66,6 +66,11 @@ function formatarMomento(iso: string): string {
   });
 }
 
+function timestampOrdenacao(iso: string): number {
+  const timestamp = new Date(iso).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
 function conteudoAgenda(notificacao: CalendarioAlphaNotificacao): {
   titulo: string;
   subtitulo: string;
@@ -163,6 +168,15 @@ export function CentralNotificacoesPainel({
   const notas = useNotasNotificacoes();
   const holerite = useHoleriteNotificacoes();
   const csNps = useCsNpsNotificacoes();
+  const quantidadeSemCs = csNps.pendencias.filter((pendencia) => pendencia.tipo === "SEM_CS").length;
+  const quantidadeCsVencido = csNps.pendencias.length - quantidadeSemCs;
+  const resumoCsNps = quantidadeSemCs > 0 && quantidadeCsVencido > 0
+    ? `${quantidadeSemCs} sem CS · ${quantidadeCsVencido} vencidos`
+    : quantidadeSemCs > 0
+      ? `${quantidadeSemCs} ${quantidadeSemCs === 1 ? "sem CS realizado" : "sem CS realizados"}`
+      : "Último CS completou 10 dias";
+  const referenciaCsNps = csNps.pendencias.find((pendencia) => pendencia.venceEm)?.venceEm
+    ?? "sem-data";
 
   const itens: ItemCentralNotificacoes[] = [
     ...calendario.notificacoes.map((notificacao) => {
@@ -238,14 +252,14 @@ export function CentralNotificacoesPainel({
       id: "cs-nps-ultimo-cs",
       origem: "CS & NPS",
       titulo: `${csNps.pendencias.length} ${csNps.pendencias.length === 1 ? "registro precisa" : "registros precisam"} atualizar o CS`,
-      subtitulo: "Último CS completou 10 dias",
-      criadoEm: csNps.pendencias[0].venceEm,
+      subtitulo: resumoCsNps,
+      criadoEm: referenciaCsNps,
       cor: "#fb7185",
       lida: csNps.lida,
       Icone: RefreshCcw,
       abrir: csNps.abrirModal,
     }] : []),
-  ].sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime());
+  ].sort((a, b) => timestampOrdenacao(b.criadoEm) - timestampOrdenacao(a.criadoEm));
 
   const naoLidas = itens.filter((item) => !item.lida).length;
   const quantidadeAnteriorRef = useRef(itens.length);
