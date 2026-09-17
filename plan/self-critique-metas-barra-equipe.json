@@ -1,0 +1,40 @@
+{
+  "subtaskId": "STORY-METAS-BARRA-EQUIPE-LIDERES",
+  "critiquedAt": "2026-09-16T22:12:00Z",
+  "step5_5": {
+    "predictedBugs": [
+      "O termômetro poderia crescer de cima para baixo se o preenchimento não fosse ancorado explicitamente em bottom: 0.",
+      "A coluna lateral poderia comprimir ou sobrepor as fotos em larguras menores sem largura responsiva e min-width zero na lista.",
+      "Com zero integrantes visíveis, dividir a altura diretamente pela quantidade de colaboradores causaria divisão por zero.",
+      "Uma meta ultrapassada poderia produzir preenchimento maior que a altura do termômetro sem limite de 100%.",
+      "A líder poderia aparecer na configuração, mas continuar ausente do placar se somente uma das consultas aceitasse a nova role.",
+      "Uma super meta menor que a meta normal tornaria os marcadores e o progresso incoerentes.",
+      "A comemoração de super meta poderia sobrepor a celebração normal quando as duas fossem atingidas na mesma atualização.",
+      "A edição de uma meta individual poderia sobrescrever indevidamente um total geral personalizado."
+    ],
+    "edgeCases": [
+      "Meta e super meta iguais a zero exibem somente o realizado, estado 'Sem meta' e nenhum preenchimento.",
+      "Super meta zero mantém compatibilidade usando a meta normal como limite visual, mas exibe denominador individual como travessão.",
+      "Total de vendas acima da super meta mantém o realizado real e limita apenas a altura visual a 100%.",
+      "Nenhum integrante visível preserva o termômetro lateral e o estado vazio sem divisão por zero.",
+      "Modo TV amplia a altura disponível sem duplicar o termômetro ou alterar a direção do preenchimento.",
+      "Falha ao persistir qualquer meta impede o feedback de sucesso.",
+      "Super meta positiva inferior à meta normal é bloqueada no cliente e no servidor.",
+      "Ao atingir meta e super meta juntas, a celebração extraordinária aguarda a fila individual e a celebração coletiva normal."
+    ],
+    "errorHandling": true,
+    "securityCheck": true,
+    "passed": true
+  },
+  "step6_5": {
+    "followsPatterns": true,
+    "noHardcoded": true,
+    "testsAdded": true,
+    "docsUpdated": true,
+    "noConsoleLogs": true,
+    "passed": true
+  },
+  "overallVerdict": "PASSED",
+  "skipped": false,
+  "skipWarning": null
+}

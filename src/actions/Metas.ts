@@ -4,6 +4,16 @@ import db from "@/lib/prisma";
 import { auth } from "../../auth";
 import { podeGerenciarMetas } from "@/lib/metas-permissoes";
 
+const ROLES_EQUIPE_COMERCIAL = ["COMERCIAL", "Lider Comercial"];
+
+function metasValidas(metaMensal: number, superMetaMensal: number) {
+    return Number.isInteger(metaMensal)
+        && Number.isInteger(superMetaMensal)
+        && metaMensal >= 0
+        && superMetaMensal >= 0
+        && (superMetaMensal === 0 || superMetaMensal >= metaMensal);
+}
+
 export interface ColaboradorMeta {
     colaboradoraId: string;
     nome: string;
@@ -12,12 +22,14 @@ export interface ColaboradorMeta {
     tema: string;
     vendas: number;
     meta: number;
+    superMeta: number;
 }
 
 export interface DadosMetasResult {
     success: true;
     colaboradores: ColaboradorMeta[];
     metaEquipe: number;
+    superMetaEquipe: number;
     totalVendas: number;
     mes: number;
     ano: number;
@@ -40,7 +52,10 @@ export async function getDadosMetas(
         // Fonte de verdade: ContratoComercial.status = FECHADO (desacoplado de ComercialPerformance)
         const [comerciais, contratosFechados, metas, metaEquipe] = await Promise.all([
             db.usuarios.findMany({
-                where: { role: "COMERCIAL", meta_visivel_painel: true },
+                where: {
+                    role: { in: ROLES_EQUIPE_COMERCIAL },
+                    meta_visivel_painel: true,
+                },
                 select: { id: true, nome: true, usuario: true, imagemUrl: true, tema_interface: true },
                 orderBy: { nome: "asc" },
             }),
@@ -71,6 +86,7 @@ export async function getDadosMetas(
                 tema: usuario.tema_interface ?? "blue",
                 vendas: fechados?._count?.id ?? 0,
                 meta: metaReg?.metaMensal ?? 0,
+                superMeta: metaReg?.superMetaMensal ?? 0,
             };
         });
 
@@ -80,6 +96,7 @@ export async function getDadosMetas(
             success: true,
             colaboradores,
             metaEquipe: metaEquipe?.metaMensal ?? 0,
+            superMetaEquipe: metaEquipe?.superMetaMensal ?? 0,
             totalVendas: colaboradores.reduce((acc, c) => acc + c.vendas, 0),
             mes,
             ano,
@@ -102,7 +119,7 @@ export async function getColaboradoresParaConfigurar() {
     try {
         const [comerciais, metas, metaEquipe] = await Promise.all([
             db.usuarios.findMany({
-                where: { role: "COMERCIAL" },
+                where: { role: { in: ROLES_EQUIPE_COMERCIAL } },
                 select: { id: true, nome: true, usuario: true, meta_visivel_painel: true },
                 orderBy: { nome: "asc" },
             }),
@@ -117,9 +134,11 @@ export async function getColaboradoresParaConfigurar() {
                 colaboradoraId: c.nome,
                 usuario: c.usuario,
                 meta: metas.find((m) => m.colaboradoraId === c.nome)?.metaMensal ?? 0,
+                superMeta: metas.find((m) => m.colaboradoraId === c.nome)?.superMetaMensal ?? 0,
                 visivelNoPainel: c.meta_visivel_painel,
             })),
             metaEquipe: metaEquipe?.metaMensal ?? 0,
+            superMetaEquipe: metaEquipe?.superMetaMensal ?? 0,
             mes,
             ano,
         };
@@ -133,7 +152,6 @@ export async function toggleMetaVisibilidade(userId: number, visivel: boolean) {
     const session = await auth();
     if (!session || !podeGerenciarMetas(session.user.role ?? ""))
         return { success: false, error: "Não autorizado" };
-
     try {
         await db.usuarios.update({
             where: { id: userId },
@@ -148,18 +166,21 @@ export async function toggleMetaVisibilidade(userId: number, visivel: boolean) {
 export async function upsertMetaUsuario(
     colaboradoraId: string,
     metaMensal: number,
+    superMetaMensal: number,
     mes: number,
     ano: number,
 ) {
     const session = await auth();
     if (!session || !podeGerenciarMetas(session.user.role ?? ""))
         return { success: false, error: "Não autorizado" };
+    if (!metasValidas(metaMensal, superMetaMensal))
+        return { success: false, error: "Super meta inválida" };
 
     try {
         await db.metaUsuario.upsert({
             where: { colaboradoraId_mes_ano: { colaboradoraId, mes, ano } },
-            update: { metaMensal },
-            create: { colaboradoraId, metaMensal, mes, ano },
+            update: { metaMensal, superMetaMensal },
+            create: { colaboradoraId, metaMensal, superMetaMensal, mes, ano },
         });
         return { success: true };
     } catch (error) {
@@ -168,16 +189,23 @@ export async function upsertMetaUsuario(
     }
 }
 
-export async function upsertMetaEquipe(metaMensal: number, mes: number, ano: number) {
+export async function upsertMetaEquipe(
+    metaMensal: number,
+    superMetaMensal: number,
+    mes: number,
+    ano: number,
+) {
     const session = await auth();
     if (!session || !podeGerenciarMetas(session.user.role ?? ""))
         return { success: false, error: "Não autorizado" };
+    if (!metasValidas(metaMensal, superMetaMensal))
+        return { success: false, error: "Super meta inválida" };
 
     try {
         await db.metaEquipe.upsert({
             where: { mes_ano: { mes, ano } },
-            update: { metaMensal },
-            create: { metaMensal, mes, ano },
+            update: { metaMensal, superMetaMensal },
+            create: { metaMensal, superMetaMensal, mes, ano },
         });
         return { success: true };
     } catch (error) {

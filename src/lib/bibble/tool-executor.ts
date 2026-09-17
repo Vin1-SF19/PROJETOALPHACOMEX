@@ -654,19 +654,19 @@ async function executarToolUnsafe(
       });
 
       // Meta individual
-      let metaMensal: number | null = null;
+      let metaIndividual: { metaMensal: number; superMetaMensal: number } | null = null;
       if (usuarioInfo) {
         const meta = await db.metaUsuario.findUnique({
           where: { colaboradoraId_mes_ano: { colaboradoraId: usuarioInfo.nome, mes, ano } },
-          select: { metaMensal: true },
+          select: { metaMensal: true, superMetaMensal: true },
         });
-        metaMensal = meta?.metaMensal ?? null;
+        metaIndividual = meta;
       }
 
       // Meta da equipe
       const metaEquipe = await db.metaEquipe.findUnique({
         where: { mes_ano: { mes, ano } },
-        select: { metaMensal: true },
+        select: { metaMensal: true, superMetaMensal: true },
       });
 
       const total = contratos.length;
@@ -682,8 +682,13 @@ async function executarToolUnsafe(
           pendentes: total - confirmados,
           valor_total: `R$ ${valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
         },
-        meta_individual: metaMensal !== null ? { quantidade: metaMensal, progresso: `${total}/${metaMensal} (${metaMensal > 0 ? Math.round((total / metaMensal) * 100) : 0}%)` } : null,
+        meta_individual: metaIndividual ? {
+          quantidade: metaIndividual.metaMensal,
+          super_meta: metaIndividual.superMetaMensal,
+          progresso: `${total}/${metaIndividual.metaMensal} (${metaIndividual.metaMensal > 0 ? Math.round((total / metaIndividual.metaMensal) * 100) : 0}%)`,
+        } : null,
         meta_equipe: metaEquipe?.metaMensal ?? null,
+        super_meta_equipe: metaEquipe?.superMetaMensal ?? null,
         contratos: contratos.map(c => ({
           empresa: c.cliente.razaoSocial,
           valor: `R$ ${c.valorContrato.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,

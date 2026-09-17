@@ -1869,25 +1869,27 @@ model ServicosComerciais {
 }
 
 model MetaUsuario {
-  id             Int      @id @default(autoincrement())
-  colaboradoraId String
-  metaMensal     Int      @default(0)
-  mes            Int
-  ano            Int
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              Int      @id @default(autoincrement())
+  colaboradoraId  String
+  metaMensal      Int      @default(0)
+  superMetaMensal Int      @default(0)
+  mes             Int
+  ano             Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@unique([colaboradoraId, mes, ano])
   @@map("meta_usuario")
 }
 
 model MetaEquipe {
-  id         Int      @id @default(autoincrement())
-  metaMensal Int      @default(0)
-  mes        Int
-  ano        Int
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id              Int      @id @default(autoincrement())
+  metaMensal      Int      @default(0)
+  superMetaMensal Int      @default(0)
+  mes             Int
+  ano             Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@unique([mes, ano])
   @@map("meta_equipe")

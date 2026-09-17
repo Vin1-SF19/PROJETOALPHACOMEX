@@ -14,7 +14,7 @@ export const MANUAL_ALPHA_METAS: ManualModulo = {
       id: "dashboard",
       titulo: "Entender o dashboard e o ranking",
       aliases: ["dashboard", "ranking", "progresso", "vendas", "performance"],
-      conteudo: `O dashboard ordena os colaboradores comerciais pela quantidade de vendas do período e mostra ranking, avatar, vendas realizadas, meta individual e barra de progresso. A meta da equipe aparece no cabeçalho. Só contam contratos FECHADOS, marcados para contar como venda e com pagamento confirmado no mês consultado. Atualmente os serviços que contam como venda são Revisão RADAR 150K e Revisão RADAR ILIMITADO. O painel recebe atualizações em tempo real quando uma venda é confirmada.`,
+      conteudo: `O dashboard ordena closers e líderes comerciais visíveis pela quantidade de vendas do período e mostra ranking, avatar, vendas realizadas, meta normal, super meta e barra de progresso até a super meta. A meta da equipe aparece em um termômetro na lateral do placar: o preenchimento sobe de baixo para cima, o círculo inferior mostra somente o realizado, uma linha marca a meta normal e a linha superior marca a super meta. Ao atingir a meta, o termômetro pulsa em vermelho; ao atingir a super meta, uma celebração especial é exibida. Só contam contratos FECHADOS, marcados para contar como venda e com pagamento confirmado no mês consultado. Atualmente os serviços que contam como venda são Revisão RADAR 150K e Revisão RADAR ILIMITADO. O painel recebe atualizações em tempo real quando uma venda é confirmada.`,
     },
     {
       id: "configurar-metas",
@@ -22,10 +22,11 @@ export const MANUAL_ALPHA_METAS: ManualModulo = {
       aliases: ["configurar metas", "meta individual", "meta da equipe", "ocultar colaborador", "visibilidade"],
       conteudo: `1. Abra Alpha Metas.
 2. Clique em **Configurar Metas**. O botão aparece para Admin, CEO, TI e Líder Comercial.
-3. Informe a meta mensal da equipe.
-4. Informe a meta individual de cada colaborador comercial.
-5. Use o controle de visibilidade para mostrar ou ocultar o colaborador no painel.
-6. Salve. A configuração vale para o mês e ano selecionados.`,
+3. A meta mensal da equipe é preenchida pela soma das metas individuais. Se necessário, edite o total ou use **Usar soma** para voltar ao cálculo automático.
+4. Informe a super meta geral da equipe.
+5. Informe a meta normal e a super meta de cada closer ou líder comercial. A super meta deve ser igual ou maior que a meta normal; zero deixa a super meta desativada.
+6. Use o controle de visibilidade para mostrar ou ocultar closers e líderes no painel.
+7. Salve. A configuração vale para o mês e ano selecionados.`,
     },
     {
       id: "gerenciamento-leads",
@@ -95,7 +96,7 @@ O cliente do CS & NPS é criado ou reativado somente quando o pagamento/fechamen
       id: "modo-tv",
       titulo: "Usar o modo TV e as celebrações",
       aliases: ["modo tv", "telão", "celebração", "som da meta"],
-      conteudo: `Clique em **Modo TV** no cabeçalho para ocultar os controles e ajustar automaticamente as linhas do ranking à tela, sem rolagem. Vendas confirmadas e metas atingidas podem exibir celebrações e som. A mesma celebração é deduplicada durante a sessão para não repetir continuamente.`,
+      conteudo: `Clique em **Modo TV** no cabeçalho para ocultar os controles e ajustar automaticamente as linhas do ranking à tela, sem rolagem. Vendas confirmadas e metas atingidas podem exibir celebrações e som. A super meta da equipe possui uma celebração própria, mais exuberante, e cada comemoração é deduplicada durante a sessão para não repetir continuamente.`,
     },
   ],
 };

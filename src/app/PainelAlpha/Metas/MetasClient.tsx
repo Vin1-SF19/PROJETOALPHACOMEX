@@ -80,7 +80,7 @@ function unlockAudio() {
     } catch {}
 }
 
-function tocarSomMeta(tipo: "individual" | "equipe") {
+function tocarSomMeta(tipo: "individual" | "equipe" | "super") {
     if (typeof window === "undefined") return;
     try {
         const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -185,6 +185,15 @@ function tocarSomMeta(tipo: "individual" | "equipe") {
                 boom(0.72, 0.80);
                 boom(1.25, 0.50);
                 noise(0.72, 0.20, 0.50);
+
+                if (tipo === "super") {
+                    [1046.5, 1318.5, 1568, 2093].forEach((freq, index) => {
+                        nota(freq, 1.05 + index * 0.12, 1.8, 0.78 - index * 0.1, index % 2 ? "sine" : "sawtooth");
+                    });
+                    boom(1.05, 1.2);
+                    boom(1.55, 0.9);
+                    noise(1.05, 0.35, 0.65);
+                }
             }
         };
 
@@ -302,9 +311,11 @@ function LinhaColaborador({ colab, rank, rowHeight }: {
 }) {
     const tema = getTema(colab.tema);
     const bateuMeta = colab.meta > 0 && colab.vendas >= colab.meta;
+    const bateuSuperMeta = colab.superMeta > 0 && colab.vendas >= colab.superMeta;
     const faltam = colab.meta > colab.vendas ? colab.meta - colab.vendas : 0;
     const quaseNaMeta = faltam > 0 && faltam <= 2;
-    const progresso = colab.meta > 0 ? Math.min((colab.vendas / colab.meta) * 100, 100) : 0;
+    const alvoProgresso = colab.superMeta > 0 ? colab.superMeta : colab.meta;
+    const progresso = alvoProgresso > 0 ? Math.min((colab.vendas / alvoProgresso) * 100, 100) : 0;
     const accentRgb = tema.accent;
 
     // Linha tem altura FIXA (rowHeight) — a pill nunca ultrapassa esse valor,
@@ -322,7 +333,7 @@ function LinhaColaborador({ colab, rank, rowHeight }: {
 
     return (
         <div
-            className="flex items-center px-6 lg:px-10 shrink-0"
+            className="flex items-center px-3 sm:px-6 lg:px-10 shrink-0"
             style={{ height: `${rowHeight}px`, paddingTop: `${gap / 2}px`, paddingBottom: `${gap / 2}px` }}
         >
 
@@ -442,7 +453,7 @@ function LinhaColaborador({ colab, rank, rowHeight }: {
                                 textShadow: "0 0 28px rgba(245,158,11,0.55), 0 0 60px rgba(245,158,11,0.22)",
                             }}
                         >
-                            META BATIDA
+                            {bateuSuperMeta ? "SUPER META BATIDA" : "META BATIDA"}
                         </span>
                     </div>
                 )}
@@ -481,9 +492,10 @@ function LinhaColaborador({ colab, rank, rowHeight }: {
                             ${bateuMeta ? "text-amber-500/80" : quaseNaMeta ? "text-white/50" : "text-slate-700"}`}
                             style={{ fontSize: `${fontStatus}px` }}
                         >
-                            {bateuMeta ? "● META BATIDA"
+                            {bateuSuperMeta ? "● SUPER META BATIDA"
+                                : bateuMeta ? "● META BATIDA"
                                 : quaseNaMeta ? `⚡ FALTA ${faltam}!`
-                                : colab.meta > 0 ? `Meta: ${colab.meta}` : "Sem meta"}
+                                : colab.meta > 0 ? "EM PROGRESSO" : "SEM META"}
                         </p>
                     </div>
 
@@ -508,8 +520,18 @@ function LinhaColaborador({ colab, rank, rowHeight }: {
                         </div>
                     )}
 
-                    {/* Vendas totais / Meta */}
-                    <div className="shrink-0 flex items-baseline gap-1 ml-auto">
+                    {/* Meta normal ao lado de vendas totais / super meta */}
+                    <div className="shrink-0 flex items-center gap-2 sm:gap-3 ml-auto">
+                        <span
+                            title={`Meta normal: ${colab.meta || "não definida"}`}
+                            aria-label={`Meta normal ${colab.meta || "não definida"}`}
+                            className={`font-black tabular-nums leading-none ${bateuMeta ? "text-red-400" : "text-slate-400"}`}
+                            style={{ fontSize: `${Math.round(fontVendas * 0.72)}px` }}
+                        >
+                            {colab.meta || "—"}
+                        </span>
+                        <span className="h-5 w-px bg-white/10" aria-hidden="true" />
+                        <div className="flex items-baseline gap-1">
                         <span
                             className={`font-black tabular-nums leading-none
                                 ${bateuMeta ? "text-amber-400" : quaseNaMeta ? "text-white" : tema.text}`}
@@ -526,12 +548,105 @@ function LinhaColaborador({ colab, rank, rowHeight }: {
                         </span>
                         <span className="font-black text-slate-700" style={{ fontSize: `${Math.round(fontVendas * 0.7)}px` }}>/</span>
                         <span className="font-black tabular-nums text-slate-500" style={{ fontSize: `${Math.round(fontVendas * 0.7)}px` }}>
-                            {colab.meta || "—"}
+                            {colab.superMeta || "—"}
                         </span>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
+    );
+}
+
+// ─── Termômetro lateral da meta coletiva ────────────────────────────────────
+
+function TermometroMetaEquipe({ totalVendas, meta, superMeta }: {
+    totalVendas: number;
+    meta: number;
+    superMeta: number;
+}) {
+    const bateuMeta = meta > 0 && totalVendas >= meta;
+    const bateuSuperMeta = superMeta > 0 && totalVendas >= superMeta;
+    const faltam = meta > totalVendas ? meta - totalVendas : 0;
+    const alvo = superMeta > 0 ? superMeta : meta;
+    const progresso = alvo > 0 ? Math.min((totalVendas / alvo) * 100, 100) : 0;
+    const posicaoMeta = alvo > 0 && meta > 0 ? Math.min((meta / alvo) * 100, 100) : 0;
+
+    return (
+        <aside
+            data-team-goal-thermometer
+            aria-label={alvo > 0
+                ? `Equipe com ${totalVendas} vendas; meta ${meta || "não definida"}; super meta ${superMeta || "não definida"}`
+                : `Meta da equipe: ${totalVendas} vendas realizadas, sem meta definida`}
+            className={`relative z-10 w-[92px] sm:w-[112px] lg:w-[132px] shrink-0 border-r bg-slate-950/35 px-2 sm:px-3 py-4 sm:py-5 flex flex-col items-center overflow-hidden ${bateuMeta ? "border-red-600/40" : "border-white/[0.06]"}`}
+        >
+            <p className={`text-[8px] sm:text-[9px] font-black uppercase tracking-[0.16em] sm:tracking-[0.22em] text-center ${bateuSuperMeta ? "text-amber-300" : bateuMeta ? "text-red-400" : "text-blue-300"}`}>
+                Meta Equipe
+            </p>
+
+            <div className={`relative flex-1 w-full min-h-0 mt-3 flex flex-col items-center justify-end ${bateuMeta ? "animate-pulse" : ""}`}>
+                {bateuMeta && (
+                    <div className={`absolute top-0 z-30 h-8 w-8 sm:h-9 sm:w-9 rounded-full border-2 border-[#020617] flex items-center justify-center ${bateuSuperMeta ? "bg-amber-300 shadow-[0_0_32px_rgba(251,191,36,0.85)]" : "bg-red-600 shadow-[0_0_30px_rgba(220,38,38,0.8)]"}`}>
+                        <Trophy size={14} className="text-slate-950" />
+                    </div>
+                )}
+
+                <div
+                    role={alvo > 0 ? "progressbar" : undefined}
+                    aria-valuemin={alvo > 0 ? 0 : undefined}
+                    aria-valuemax={alvo > 0 ? alvo : undefined}
+                    aria-valuenow={alvo > 0 ? Math.min(totalVendas, alvo) : undefined}
+                    aria-valuetext={alvo > 0 ? `${totalVendas} vendas de ${alvo}` : "Metas não definidas"}
+                    className={`relative flex-1 min-h-[92px] w-8 sm:w-10 overflow-hidden rounded-t-full rounded-b-md border ${bateuSuperMeta ? "border-amber-300/80" : bateuMeta ? "border-red-500/80 shadow-[0_0_30px_rgba(185,28,28,0.55)]" : "border-blue-400/30"} bg-slate-950/90 shadow-inner`}
+                >
+                    <div className="absolute inset-0 overflow-hidden rounded-t-full rounded-b-md">
+                        <div className="absolute inset-x-0 top-3 bottom-3 flex flex-col justify-between pointer-events-none z-10">
+                        {[100, 75, 50, 25].map((marca) => (
+                            <span key={marca} className="block h-px w-full bg-white/10" />
+                        ))}
+                        </div>
+                        <div
+                            data-team-goal-fill
+                            className={`absolute inset-x-0 bottom-0 transition-[height] duration-1000 ease-out motion-reduce:transition-none ${bateuMeta ? "bg-gradient-to-t from-red-950 via-red-700 to-red-500" : "bg-gradient-to-t from-blue-700 via-blue-500 to-cyan-300"}`}
+                            style={{ height: `${progresso}%` }}
+                        />
+                        <div className={`absolute inset-x-0 bottom-0 h-1/3 blur-lg pointer-events-none ${bateuMeta ? "bg-red-600/45" : "bg-blue-400/25"}`} />
+                    </div>
+
+                    {meta > 0 && (
+                        <div
+                            data-team-goal-normal-marker
+                            className="absolute inset-x-0 z-20 flex flex-col items-center"
+                            style={{ bottom: `calc(${Math.min(posicaoMeta, 92)}% - 1px)` }}
+                        >
+                            <span className="mb-0.5 text-[6px] sm:text-[7px] font-black uppercase leading-none text-red-200 whitespace-nowrap">Meta {meta}</span>
+                            <span className="h-0.5 w-full bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.9)]" />
+                        </div>
+                    )}
+                    {superMeta > 0 && (
+                        <div data-team-goal-super-marker className="absolute inset-x-0 top-1 z-20 flex flex-col items-center">
+                            <span className="mb-0.5 text-[5px] sm:text-[6px] font-black uppercase leading-none text-amber-200 whitespace-nowrap">Super Meta {superMeta}</span>
+                            <span className="h-0.5 w-full bg-amber-300 shadow-[0_0_8px_rgba(252,211,77,0.9)]" />
+                        </div>
+                    )}
+                </div>
+
+                <div
+                    data-team-goal-reading
+                    className={`relative z-20 -mt-2 h-[62px] w-[62px] sm:h-[76px] sm:w-[76px] rounded-full border-[3px] flex flex-col items-center justify-center text-center ${bateuSuperMeta ? "bg-gradient-to-br from-red-600 to-amber-400 border-amber-200 text-white shadow-[0_0_38px_rgba(251,191,36,0.7)]" : bateuMeta ? "bg-gradient-to-br from-red-700 to-red-950 border-red-400 text-white shadow-[0_0_34px_rgba(220,38,38,0.7)]" : "bg-gradient-to-br from-blue-600 to-indigo-800 border-blue-300/70 text-white shadow-[0_0_24px_rgba(59,130,246,0.38)]"}`}
+                    style={{
+                        textShadow: "0 0 14px rgba(255,255,255,0.28)",
+                    }}
+                >
+                    <span className="text-xl sm:text-2xl font-black tabular-nums tracking-tighter leading-none whitespace-nowrap">
+                        {totalVendas}
+                    </span>
+                    <span className="mt-1 text-[6px] sm:text-[7px] font-black uppercase tracking-[0.12em] text-white/80">
+                        {bateuSuperMeta ? "Super meta!" : bateuMeta ? "Meta batida" : meta > 0 ? `Faltam ${faltam}` : "Sem meta"}
+                    </span>
+                </div>
+            </div>
+        </aside>
     );
 }
 
@@ -620,27 +735,29 @@ function TelaCelebracaoIndividual({ colab, onFechar }: {
 
 // ─── Tela de celebração da EQUIPE ────────────────────────────────────────────
 
-function TelaCelebracaoEquipe({ colaboradores, totalVendas, meta, onFechar }: {
+function TelaCelebracaoEquipe({ colaboradores, totalVendas, meta, superMeta = 0, superMetaAtingida = false, onFechar }: {
     colaboradores: ColaboradorMeta[];
     totalVendas: number;
     meta: number;
+    superMeta?: number;
+    superMetaAtingida?: boolean;
     onFechar: () => void;
 }) {
     useEffect(() => {
-        tocarSomMeta("equipe");
-        const t = setTimeout(onFechar, 18_000);
+        tocarSomMeta(superMetaAtingida ? "super" : "equipe");
+        const t = setTimeout(onFechar, superMetaAtingida ? 22_000 : 18_000);
         return () => clearTimeout(t);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     return (
         <div
-            className="fixed inset-0 z-[9999] bg-[#040d1a] flex flex-col items-center justify-center select-none overflow-hidden"
+            className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center select-none overflow-hidden ${superMetaAtingida ? "bg-[#160308]" : "bg-[#040d1a]"}`}
         >
             {/* Red accent frame */}
             <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-transparent via-red-600 to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gradient-to-r from-transparent via-red-600 to-transparent" />
+                <div className={`absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-transparent ${superMetaAtingida ? "via-amber-300" : "via-red-600"} to-transparent`} />
+                <div className={`absolute bottom-0 left-0 right-0 h-2 bg-gradient-to-r from-transparent ${superMetaAtingida ? "via-amber-300" : "via-red-600"} to-transparent`} />
                 <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-transparent via-red-600 to-transparent" />
                 <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-transparent via-red-600 to-transparent" />
                 {[["top-0 left-0", "border-t-2 border-l-2"],
@@ -655,10 +772,22 @@ function TelaCelebracaoEquipe({ colaboradores, totalVendas, meta, onFechar }: {
             <div className="absolute inset-0 pointer-events-none">
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] bg-red-950/25 blur-[200px] rounded-full" />
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-950/20 blur-[150px] rounded-full" />
+                {superMetaAtingida && (
+                    <>
+                        <div className="absolute inset-[-20%] bg-[radial-gradient(circle_at_center,rgba(251,191,36,0.18),transparent_55%)] animate-pulse" />
+                        {Array.from({ length: 24 }).map((_, index) => (
+                            <span
+                                key={index}
+                                className="absolute h-2 w-2 rotate-45 bg-amber-300 animate-pulse shadow-[0_0_16px_rgba(252,211,77,0.9)]"
+                                style={{ left: `${4 + ((index * 37) % 92)}%`, top: `${5 + ((index * 53) % 88)}%`, animationDelay: `${(index % 7) * 120}ms` }}
+                            />
+                        ))}
+                    </>
+                )}
             </div>
 
             <div className="absolute top-8 left-10 text-[9px] font-black text-red-900 uppercase tracking-[0.4em]">
-                ALPHA::EQUIPE::META::REACHED
+                {superMetaAtingida ? "ALPHA::EQUIPE::SUPER::META" : "ALPHA::EQUIPE::META::REACHED"}
             </div>
 
             <button onClick={onFechar} className="absolute top-6 right-6 p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-500 hover:text-white transition-colors z-10">
@@ -692,17 +821,17 @@ function TelaCelebracaoEquipe({ colaboradores, totalVendas, meta, onFechar }: {
 
                 {/* Text */}
                 <div className="space-y-3">
-                    <p className="text-[11px] font-black uppercase tracking-[0.6em] text-red-500">
-                        Parabéns — Equipe Comercial
+                    <p className={`text-[11px] font-black uppercase tracking-[0.6em] ${superMetaAtingida ? "text-amber-300" : "text-red-500"}`}>
+                        {superMetaAtingida ? "Conquista Extraordinária" : "Parabéns — Equipe Comercial"}
                     </p>
-                    <h2 className="text-5xl lg:text-7xl font-black uppercase italic text-white tracking-tighter leading-none">
-                        Meta Batida!
+                    <h2 className={`text-5xl lg:text-7xl font-black uppercase italic tracking-tighter leading-none ${superMetaAtingida ? "text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-amber-200 to-red-400 drop-shadow-[0_0_30px_rgba(251,191,36,0.5)]" : "text-white"}`}>
+                        {superMetaAtingida ? "Super Meta Batida!" : "Meta Batida!"}
                     </h2>
                     <div className="flex items-center justify-center gap-3 mt-3">
                         <Trophy size={24} className="text-amber-400" />
                         <p className="text-xl text-slate-200 font-black">
                             <span className="text-red-400">{totalVendas}</span>
-                            <span className="text-slate-500"> / {meta} vendas</span>
+                            <span className="text-slate-500"> / {superMetaAtingida ? superMeta : meta} vendas</span>
                         </p>
                         <Trophy size={24} className="text-amber-400" />
                     </div>
@@ -715,11 +844,13 @@ function TelaCelebracaoEquipe({ colaboradores, totalVendas, meta, onFechar }: {
 
 // ─── Modal de configuração (admin) ───────────────────────────────────────────
 
-type ColabConfig = { id: number; colaboradoraId: string; usuario: string; meta: number; visivelNoPainel: boolean };
+type ColabConfig = { id: number; colaboradoraId: string; usuario: string; meta: number; superMeta: number; visivelNoPainel: boolean };
 
 function ModalConfigurar({ mes, ano, onFechar }: { mes: number; ano: number; onFechar: () => void }) {
     const [colabs, setColabs] = useState<ColabConfig[]>([]);
     const [metaEquipe, setMetaEquipe] = useState(0);
+    const [superMetaEquipe, setSuperMetaEquipe] = useState(0);
+    const [metaEquipeEditada, setMetaEquipeEditada] = useState(false);
     const [carregando, setCarregando] = useState(true);
     const [salvando, setSalvando] = useState(false);
     const [togglingId, setTogglingId] = useState<number | null>(null);
@@ -727,8 +858,12 @@ function ModalConfigurar({ mes, ano, onFechar }: { mes: number; ano: number; onF
     useEffect(() => {
         getColaboradoresParaConfigurar().then((res) => {
             if (res.success) {
-                setColabs(res.colaboradores as ColabConfig[]);
-                setMetaEquipe(res.metaEquipe);
+                const colaboradores = res.colaboradores as ColabConfig[];
+                const somaMetas = colaboradores.reduce((total, colaborador) => total + colaborador.meta, 0);
+                setColabs(colaboradores);
+                setMetaEquipe(res.metaEquipe || somaMetas);
+                setSuperMetaEquipe(res.superMetaEquipe);
+                setMetaEquipeEditada(res.metaEquipe > 0 && res.metaEquipe !== somaMetas);
             }
             setCarregando(false);
         });
@@ -749,10 +884,20 @@ function ModalConfigurar({ mes, ano, onFechar }: { mes: number; ano: number; onF
     };
 
     const salvar = async () => {
+        const superMetaInvalida = colabs.some((c) => c.superMeta > 0 && c.superMeta < c.meta);
+        if (superMetaInvalida || (superMetaEquipe > 0 && superMetaEquipe < metaEquipe)) {
+            toast.error("A super meta deve ser igual ou maior que a meta normal");
+            return;
+        }
         setSalvando(true);
         try {
-            await upsertMetaEquipe(metaEquipe, mes, ano);
-            await Promise.all(colabs.map((c) => upsertMetaUsuario(c.colaboradoraId, c.meta, mes, ano)));
+            const resultados = await Promise.all([
+                upsertMetaEquipe(metaEquipe, superMetaEquipe, mes, ano),
+                ...colabs.map((c) => upsertMetaUsuario(c.colaboradoraId, c.meta, c.superMeta, mes, ano)),
+            ]);
+            if (resultados.some((resultado) => !resultado.success)) {
+                throw new Error("Falha ao persistir uma ou mais metas");
+            }
             toast.success("Metas atualizadas!");
             onFechar();
         } catch {
@@ -773,7 +918,7 @@ function ModalConfigurar({ mes, ano, onFechar }: { mes: number; ano: number; onF
                         <div>
                             <h3 className="font-black text-white uppercase italic tracking-tight">Configurar Metas</h3>
                             <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mt-0.5">
-                                {MESES[mes - 1]} {ano} · role COMERCIAL
+                                {MESES[mes - 1]} {ano} · equipe comercial
                             </p>
                         </div>
                     </div>
@@ -791,26 +936,60 @@ function ModalConfigurar({ mes, ano, onFechar }: { mes: number; ano: number; onF
                     ) : (
                         <>
                             <div className="p-5 rounded-2xl bg-blue-600/5 border border-blue-500/20">
-                                <label className="text-[10px] font-black uppercase text-blue-400 tracking-widest block mb-3 flex items-center gap-2">
-                                    <Users size={12} /> Meta Geral da Equipe
-                                </label>
-                                <input
-                                    type="number"
-                                    value={metaEquipe}
-                                    onChange={(e) => setMetaEquipe(Number(e.target.value))}
-                                    min={0}
-                                    className="w-full h-12 bg-black/60 border border-blue-500/20 rounded-xl px-4 text-white font-black text-xl focus:border-blue-500/50 outline-none"
-                                    placeholder="0"
-                                />
+                                <div className="mb-3 flex items-center justify-between gap-3">
+                                    <label className="text-[10px] font-black uppercase text-blue-400 tracking-widest flex items-center gap-2">
+                                        <Users size={12} /> Metas Gerais da Equipe
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setMetaEquipe(colabs.reduce((total, colaborador) => total + colaborador.meta, 0));
+                                            setMetaEquipeEditada(false);
+                                        }}
+                                        className="text-[8px] font-black uppercase tracking-wider text-blue-300/70 hover:text-blue-200"
+                                    >
+                                        Usar soma
+                                    </button>
+                                </div>
+                                <div className="space-y-3">
+                                    <label className="space-y-1.5 text-[8px] font-black uppercase tracking-widest text-slate-500">
+                                        Meta normal
+                                        <input
+                                            type="number"
+                                            value={metaEquipe}
+                                            onChange={(e) => {
+                                                setMetaEquipe(Number(e.target.value));
+                                                setMetaEquipeEditada(true);
+                                            }}
+                                            min={0}
+                                            className="w-full h-12 bg-black/60 border border-blue-500/20 rounded-xl px-4 text-white font-black text-xl focus:border-blue-500/50 outline-none"
+                                            placeholder="0"
+                                        />
+                                    </label>
+                                    <label className="space-y-1.5 text-[8px] font-black uppercase tracking-widest text-amber-400/80">
+                                        Super meta
+                                        <input
+                                            type="number"
+                                            value={superMetaEquipe}
+                                            onChange={(e) => setSuperMetaEquipe(Number(e.target.value))}
+                                            min={0}
+                                            className="w-full h-12 bg-black/60 border border-amber-500/25 rounded-xl px-4 text-amber-200 font-black text-xl focus:border-amber-400/60 outline-none"
+                                            placeholder="0"
+                                        />
+                                    </label>
+                                </div>
+                                <p className="mt-2 text-[8px] font-bold text-slate-600">
+                                    {metaEquipeEditada ? "Valor geral personalizado" : "Meta geral sincronizada com a soma individual"}
+                                </p>
                             </div>
 
                             <div className="space-y-2">
                                 <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest px-1 flex items-center gap-2">
-                                    <Target size={11} /> Metas Individuais (COMERCIAL)
+                                    <Target size={11} /> Metas Individuais · Equipe Comercial
                                 </p>
                                 {colabs.length === 0 && (
                                     <p className="text-xs text-slate-600 text-center py-6">
-                                        Nenhum usuário com role COMERCIAL encontrado.
+                                        Nenhum integrante comercial encontrado.
                                     </p>
                                 )}
                                 {colabs.map((c, i) => (
@@ -827,18 +1006,41 @@ function ModalConfigurar({ mes, ano, onFechar }: { mes: number; ano: number; onF
                                                 : c.visivelNoPainel ? <Eye size={13} /> : <EyeOff size={13} />
                                             }
                                         </button>
-                                        <input
-                                            type="number"
-                                            value={c.meta}
-                                            onChange={(e) => {
-                                                const novo = [...colabs];
-                                                novo[i] = { ...novo[i], meta: Number(e.target.value) };
-                                                setColabs(novo);
-                                            }}
-                                            min={0}
-                                            className="w-24 h-10 bg-black/60 border border-white/10 rounded-xl px-3 text-white font-black text-sm focus:border-blue-500/50 outline-none text-center"
-                                            placeholder="0"
-                                        />
+                                        <label className="w-20 sm:w-24 shrink-0 text-center text-[7px] font-black uppercase tracking-widest text-slate-600">
+                                            Meta
+                                            <input
+                                                type="number"
+                                                value={c.meta}
+                                                onChange={(e) => {
+                                                    const novo = [...colabs];
+                                                    novo[i] = { ...novo[i], meta: Number(e.target.value) };
+                                                    setColabs(novo);
+                                                    if (!metaEquipeEditada) {
+                                                        setMetaEquipe(novo.reduce((total, colaborador) => total + colaborador.meta, 0));
+                                                    }
+                                                }}
+                                                min={0}
+                                                aria-label={`Meta normal de ${c.usuario}`}
+                                                className="mt-1 w-full h-10 bg-black/60 border border-white/10 rounded-xl px-2 text-white font-black text-sm focus:border-blue-500/50 outline-none text-center"
+                                                placeholder="0"
+                                            />
+                                        </label>
+                                        <label className="w-20 sm:w-24 shrink-0 text-center text-[7px] font-black uppercase tracking-widest text-amber-500/60">
+                                            Super meta
+                                            <input
+                                                type="number"
+                                                value={c.superMeta}
+                                                onChange={(e) => {
+                                                    const novo = [...colabs];
+                                                    novo[i] = { ...novo[i], superMeta: Number(e.target.value) };
+                                                    setColabs(novo);
+                                                }}
+                                                min={0}
+                                                aria-label={`Super meta de ${c.usuario}`}
+                                                className="mt-1 w-full h-10 bg-black/60 border border-amber-500/20 rounded-xl px-2 text-amber-200 font-black text-sm focus:border-amber-400/60 outline-none text-center"
+                                                placeholder="0"
+                                            />
+                                        </label>
                                     </div>
                                 ))}
                             </div>
@@ -871,6 +1073,7 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
         dadosIniciais.success ? dadosIniciais.colaboradores : []
     );
     const [metaEquipe, setMetaEquipe] = useState(dadosIniciais.success ? dadosIniciais.metaEquipe : 0);
+    const [superMetaEquipe, setSuperMetaEquipe] = useState(dadosIniciais.success ? dadosIniciais.superMetaEquipe : 0);
     const [totalVendas, setTotalVendas] = useState(dadosIniciais.success ? dadosIniciais.totalVendas : 0);
     const [atualizando, setAtualizando] = useState(false);
     const [modalAberto, setModalAberto] = useState(false);
@@ -894,9 +1097,11 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
 
     // Celebração da equipe
     const [celebrandoEquipe, setCelebrandoEquipe] = useState(false);
+    const [celebrandoSuperMetaEquipe, setCelebrandoSuperMetaEquipe] = useState(false);
     const equipeJaCelebradaRef = useRef(false);
+    const superMetaEquipeJaCelebradaRef = useRef(false);
 
-    const processarCelebracoes = useCallback((colabs: ColaboradorMeta[], total: number, meta: number) => {
+    const processarCelebracoes = useCallback((colabs: ColaboradorMeta[], total: number, meta: number, superMeta: number) => {
         const novosIndividuais = colabs.filter(
             (c) => c.meta > 0 && c.vendas >= c.meta && !celebradosRef.current.has(c.colaboradoraId)
         );
@@ -911,10 +1116,18 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
             setCelebracaoQueue((prev) => [...prev, ...novosIndividuais]);
         }
 
+        let atrasoEquipe = novosIndividuais.length * 10_500;
         if (meta > 0 && total >= meta && !equipeJaCelebradaRef.current) {
             equipeJaCelebradaRef.current = true;
             try { sessionStorage.setItem(`metas-eq-${mesAtual}-${anoAtual}`, "true"); } catch {}
-            setTimeout(() => setCelebrandoEquipe(true), novosIndividuais.length * 10_500);
+            setTimeout(() => setCelebrandoEquipe(true), atrasoEquipe);
+            atrasoEquipe += 18_500;
+        }
+
+        if (superMeta > 0 && total >= superMeta && !superMetaEquipeJaCelebradaRef.current) {
+            superMetaEquipeJaCelebradaRef.current = true;
+            try { sessionStorage.setItem(`metas-eq-super-${mesAtual}-${anoAtual}`, "true"); } catch {}
+            setTimeout(() => setCelebrandoSuperMetaEquipe(true), atrasoEquipe);
         }
     }, [mesAtual, anoAtual]);
 
@@ -940,10 +1153,17 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
             }
             equipeJaCelebradaRef.current =
                 sessionStorage.getItem(`metas-eq-${mesAtual}-${anoAtual}`) === "true";
+            superMetaEquipeJaCelebradaRef.current =
+                sessionStorage.getItem(`metas-eq-super-${mesAtual}-${anoAtual}`) === "true";
         } catch {}
 
         if (dadosIniciais.success) {
-            processarCelebracoes(dadosIniciais.colaboradores, dadosIniciais.totalVendas, dadosIniciais.metaEquipe);
+            processarCelebracoes(
+                dadosIniciais.colaboradores,
+                dadosIniciais.totalVendas,
+                dadosIniciais.metaEquipe,
+                dadosIniciais.superMetaEquipe,
+            );
         }
 
         return () => {
@@ -960,8 +1180,9 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
             if (res.success) {
                 setColaboradores(res.colaboradores);
                 setMetaEquipe(res.metaEquipe);
+                setSuperMetaEquipe(res.superMetaEquipe);
                 setTotalVendas(res.totalVendas);
-                processarCelebracoes(res.colaboradores, res.totalVendas, res.metaEquipe);
+                processarCelebracoes(res.colaboradores, res.totalVendas, res.metaEquipe, res.superMetaEquipe);
             }
         } finally {
             setAtualizando(false);
@@ -994,27 +1215,25 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
         setModoTV(next);
         window.parent.postMessage({ type: 'ALPHA_TV_MODE', active: next }, '*');
     };
-    const HEADER_HEIGHT = isTV ? 56 : 72;
+    const HEADER_HEIGHT = 72;
     useEffect(() => {
         const el = scoreboardRef.current;
         if (!el) return;
         const calc = () => {
-            if (colaboradores.length === 0) { setRowHeight(isTV ? 160 : 120); return; }
             // Mede a altura REAL do container (não window.innerHeight — dentro de iframe
             // o tamanho da janela pode não bater com a área que o iframe realmente ocupa).
-            // Cada linha recebe altura FIXA: soma das linhas == altura disponível, sem scroll.
+            // O termômetro ocupa apenas o eixo horizontal. A altura é distribuída
+            // exclusivamente entre as linhas individuais (ou o estado vazio).
             const alturaDisponivel = el.clientHeight;
             if (alturaDisponivel <= 0) return;
-            setRowHeight(Math.floor(alturaDisponivel / colaboradores.length));
+            const totalLinhas = Math.max(colaboradores.length, 1);
+            setRowHeight(Math.floor(alturaDisponivel / totalLinhas));
         };
         calc();
         const observer = new ResizeObserver(calc);
         observer.observe(el);
         return () => observer.disconnect();
     }, [colaboradores.length, isTV]);
-
-    const metaEquipePct = metaEquipe > 0 ? Math.min((totalVendas / metaEquipe) * 100, 100) : 0;
-    const equipeBateuMeta = metaEquipe > 0 && totalVendas >= metaEquipe;
 
     return (
         <main className="h-screen bg-[#020617] text-slate-200 font-sans overflow-hidden flex flex-col">
@@ -1024,45 +1243,15 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
                 <div className="absolute -bottom-[20%] -right-[10%] w-[50%] h-[50%] bg-indigo-800/5 blur-[180px] rounded-full" />
             </div>
 
-            {/* ── Header TV — só meta da equipe ── */}
-            {isTV && (
-                <header className="relative z-10 flex items-center justify-center px-6 py-3 border-b border-white/5 bg-slate-950/60 backdrop-blur-2xl shrink-0">
-                    <div className={`flex items-center gap-3 px-6 py-2.5 rounded-2xl border transition-all
-                        ${equipeBateuMeta
-                            ? "bg-amber-500/10 border-amber-500/30 shadow-[0_0_25px_-5px_rgba(245,158,11,0.3)]"
-                            : "bg-slate-900/60 border-white/5"}`}>
-                        <Target size={16} className={equipeBateuMeta ? "text-amber-400" : "text-slate-500"} />
-                        <div>
-                            <p className={`text-[9px] font-black uppercase tracking-widest ${equipeBateuMeta ? "text-amber-400" : "text-slate-500"}`}>
-                                Meta Equipe
-                            </p>
-                            <p className="text-base font-black leading-none">
-                                <span className={equipeBateuMeta ? "text-amber-400" : "text-white"}>{totalVendas}</span>
-                                <span className="text-slate-600 font-black"> / {metaEquipe || "—"}</span>
-                            </p>
-                        </div>
-                        {metaEquipe > 0 && (
-                            <div className="h-8 w-1.5 rounded-full bg-slate-800 overflow-hidden relative">
-                                <div
-                                    className={`absolute bottom-0 left-0 right-0 rounded-full transition-all duration-700 ${equipeBateuMeta ? "bg-amber-400" : "bg-blue-500"}`}
-                                    style={{ height: `${metaEquipePct}%` }}
-                                />
-                            </div>
-                        )}
-                        {equipeBateuMeta && <Trophy size={16} className="text-amber-400" />}
-                    </div>
-
-                    {/* Botão sair modo TV — só visível quando ativado por botão (não role TV real) */}
-                    {modoTV && (
-                        <button
-                            onClick={toggleModoTV}
-                            title="Sair do Modo TV"
-                            className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-white/5 border border-white/10 text-slate-500 hover:text-white hover:bg-white/10 transition-all"
-                        >
-                            <Tv size={13} />
-                        </button>
-                    )}
-                </header>
+            {/* Saída do modo TV manual; a meta coletiva agora vive somente no placar. */}
+            {isTV && modoTV && (
+                <button
+                    onClick={toggleModoTV}
+                    title="Sair do Modo TV"
+                    className="fixed right-4 top-4 z-20 h-11 w-11 rounded-xl bg-slate-950/80 border border-white/10 text-slate-500 hover:text-white hover:bg-white/10 transition-all backdrop-blur-xl flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                >
+                    <Tv size={13} />
+                </button>
             )}
 
             {/* ── Header (oculto no modo TV) ── */}
@@ -1102,32 +1291,6 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
                     >
                         <RefreshCw size={14} className={atualizando ? "animate-spin" : ""} />
                     </button>
-
-                    {/* Widget meta equipe */}
-                    <div className={`flex items-center gap-3 px-4 py-2 rounded-2xl border transition-all
-                        ${equipeBateuMeta
-                            ? "bg-amber-500/10 border-amber-500/30 shadow-[0_0_25px_-5px_rgba(245,158,11,0.3)]"
-                            : "bg-slate-900/60 border-white/5"}`}>
-                        <Target size={14} className={equipeBateuMeta ? "text-amber-400" : "text-slate-500"} />
-                        <div>
-                            <p className={`text-[8px] font-black uppercase tracking-widest ${equipeBateuMeta ? "text-amber-400" : "text-slate-500"}`}>
-                                Meta Equipe
-                            </p>
-                            <p className="text-sm font-black leading-none">
-                                <span className={equipeBateuMeta ? "text-amber-400" : "text-white"}>{totalVendas}</span>
-                                <span className="text-slate-600 font-black"> / {metaEquipe || "—"}</span>
-                            </p>
-                        </div>
-                        {metaEquipe > 0 && (
-                            <div className="h-8 w-1.5 rounded-full bg-slate-800 overflow-hidden relative">
-                                <div
-                                    className={`absolute bottom-0 left-0 right-0 rounded-full transition-all duration-700 ${equipeBateuMeta ? "bg-amber-400" : "bg-blue-500"}`}
-                                    style={{ height: `${metaEquipePct}%` }}
-                                />
-                            </div>
-                        )}
-                        {equipeBateuMeta && <Trophy size={14} className="text-amber-400" />}
-                    </div>
 
                     <button
                         onClick={() => setModalGerenciamentoAberto(true)}
@@ -1169,30 +1332,34 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
                 </div>
             </header>}
 
-            {/* ── Scoreboard — altura de cada linha é fixa (rowHeight), sem scroll: sempre cabe tudo ── */}
-            <div ref={scoreboardRef} className="relative z-10 flex-1 flex flex-col overflow-hidden">
-                {colaboradores.length === 0 ? (
-                    <div className="flex-1 flex flex-col items-center justify-center gap-5 opacity-30">
-                        <TrendingUp size={72} className="text-slate-700" strokeWidth={1} />
-                        <div className="text-center">
-                            <p className="text-sm font-black uppercase tracking-widest text-slate-500">
-                                Nenhum usuário com role COMERCIAL
-                            </p>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-700 mt-1">
-                                Cadastre usuários com role COMERCIAL para aparecerem aqui
-                            </p>
+            {/* ── Scoreboard — termômetro coletivo lateral + linhas individuais ── */}
+            <div ref={scoreboardRef} className="relative z-10 flex-1 flex overflow-hidden">
+                <TermometroMetaEquipe totalVendas={totalVendas} meta={metaEquipe} superMeta={superMetaEquipe} />
+
+                <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
+                    {colaboradores.length === 0 ? (
+                        <div className="flex-1 flex flex-col items-center justify-center gap-5 opacity-30 px-4">
+                            <TrendingUp size={72} className="text-slate-700" strokeWidth={1} />
+                            <div className="text-center">
+                                <p className="text-sm font-black uppercase tracking-widest text-slate-500">
+                                    Nenhum integrante comercial visível
+                                </p>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-700 mt-1">
+                                    Ajuste a visibilidade de closers e líderes em Configurar Metas
+                                </p>
+                            </div>
                         </div>
-                    </div>
-                ) : (
-                    colaboradores.map((colab, i) => (
-                        <LinhaColaborador
-                            key={colab.colaboradoraId}
-                            colab={colab}
-                            rank={i + 1}
-                            rowHeight={rowHeight}
-                        />
-                    ))
-                )}
+                    ) : (
+                        colaboradores.map((colab, i) => (
+                            <LinhaColaborador
+                                key={colab.colaboradoraId}
+                                colab={colab}
+                                rank={i + 1}
+                                rowHeight={rowHeight}
+                            />
+                        ))
+                    )}
+                </div>
             </div>
 
             {/* Celebrações individuais */}
@@ -1209,7 +1376,20 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
                     colaboradores={colaboradores}
                     totalVendas={totalVendas}
                     meta={metaEquipe}
+                    superMeta={superMetaEquipe}
                     onFechar={() => setCelebrandoEquipe(false)}
+                />
+            )}
+
+            {/* Celebração exuberante da super meta da equipe */}
+            {celebrandoSuperMetaEquipe && !celebrandoAtual && !celebrandoEquipe && (
+                <TelaCelebracaoEquipe
+                    colaboradores={colaboradores}
+                    totalVendas={totalVendas}
+                    meta={metaEquipe}
+                    superMeta={superMetaEquipe}
+                    superMetaAtingida
+                    onFechar={() => setCelebrandoSuperMetaEquipe(false)}
                 />
             )}
 
