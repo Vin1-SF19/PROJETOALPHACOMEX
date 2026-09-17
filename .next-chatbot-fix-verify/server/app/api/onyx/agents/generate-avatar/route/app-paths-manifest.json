@@ -1,0 +1,3 @@
+{
+  "/api/onyx/agents/generate-avatar/route": "app/api/onyx/agents/generate-avatar/route.js"
+}

@@ -1,0 +1,3 @@
+{
+  "/api/bpm/webhooks/[slug]/route": "app/api/bpm/webhooks/[slug]/route.js"
+}

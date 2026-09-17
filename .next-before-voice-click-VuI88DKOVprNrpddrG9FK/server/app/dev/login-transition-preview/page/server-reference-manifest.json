@@ -1,0 +1,20 @@
+{
+  "node": {
+    "609711401c201e4856fe99660c5d6b921a765c3557": {
+      "workers": {
+        "app/dev/login-transition-preview/page": {
+          "moduleId": 630973,
+          "async": true,
+          "exportedName": "default",
+          "filename": "src/lib/loginAction.ts"
+        }
+      },
+      "layer": {
+        "app/dev/login-transition-preview/page": "action-browser"
+      },
+      "exportedName": "default",
+      "filename": "src/lib/loginAction.ts"
+    }
+  },
+  "edge": {}
+}

@@ -14,6 +14,7 @@ from typing import Iterator
 import smbclient
 
 from .config import Settings
+from .office import is_office_temporary_file
 from .paths import BLOCKED_NAMES, TRASH_ROOT, child_relative_path, to_internal_unc, to_unc, validate_segment
 from .secrets import NasCredential
 
@@ -198,12 +199,15 @@ class SmbClient:
                 pass_fds=(descriptor,),
                 env={"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"},
             )
+            discovered_shares = self._parse_share_catalog(result.stdout)
+            if discovered_shares:
+                return discovered_shares
             if result.returncode != 0:
                 diagnostic_output = "\n".join(
                     value.strip() for value in (result.stderr, result.stdout) if value.strip()
                 )
                 raise self._classify_connection_error(RuntimeError(diagnostic_output or "smbclient failed"))
-            return self._parse_share_catalog(result.stdout)
+            return []
         except subprocess.TimeoutExpired as error:
             raise SmbConnectionTimeout("SMB share discovery timeout") from error
         finally:
@@ -252,7 +256,11 @@ class SmbClient:
                         name = validate_segment(entry.name)
                     except ValueError:
                         continue
-                    if name.casefold() in {blocked.casefold() for blocked in BLOCKED_NAMES} or name.casefold().startswith(".alpha-explorer-upload-"):
+                    if (
+                        name.casefold() in {blocked.casefold() for blocked in BLOCKED_NAMES}
+                        or name.casefold().startswith(".alpha-explorer-upload-")
+                        or is_office_temporary_file(name)
+                    ):
                         continue
                     stat = entry.stat(follow_symlinks=False)
                     is_directory = entry.is_dir(follow_symlinks=False)

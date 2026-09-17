@@ -1,0 +1,20 @@
+{
+  "node": {
+    "60f949d954048383c1e36ffd89c4076daea407189c": {
+      "workers": {
+        "app/auth/RedefinirSenha/page": {
+          "moduleId": 465528,
+          "async": true,
+          "exportedName": "redefinirSenha",
+          "filename": "src/actions/RecuperarSenha.ts"
+        }
+      },
+      "layer": {
+        "app/auth/RedefinirSenha/page": "action-browser"
+      },
+      "exportedName": "redefinirSenha",
+      "filename": "src/actions/RecuperarSenha.ts"
+    }
+  },
+  "edge": {}
+}

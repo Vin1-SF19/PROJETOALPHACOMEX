@@ -2,28 +2,26 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { GuiaModuloTour } from "@/components/Guias/GuiaModuloTour";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { marcarTutorialModuloComoVisto } from "@/lib/guias/tutorial-modulo";
-import { FileDetails } from "./FileDetails";
+import { canPreviewInline, createPreviewObjectUrl, previewMimeType } from "@/lib/alpha-explorer/file-preview";
+import { FilePreviewDialog, type ExplorerFilePreview } from "./FilePreviewDialog";
 import { FileList, type ExplorerItemAction } from "./FileList";
-import { ExplorerHeader } from "./ExplorerHeader";
-import { ExplorerSidebar, type ExplorerCompanyFolder, type ExplorerNavKey } from "./ExplorerSidebar";
+import { ExplorerSidebar, type ExplorerCompanyFolder } from "./ExplorerSidebar";
 import { ExplorerToolbar, type ExplorerSort } from "./ExplorerToolbar";
 import { ExplorerUpload } from "./ExplorerUpload";
-import { ALPHA_EXPLORER_TUTORIAL } from "./tutorial";
 import { explorerFetch, explorerItemViewSchema, explorerListDataSchema, type ExplorerItemView } from "./types";
 
 const folderFormSchema = z.object({ name: z.string().trim().min(1, "Informe um nome").max(240) });
 type FolderForm = z.infer<typeof folderFormSchema>;
+interface ActiveFilePreview extends ExplorerFilePreview { item: ExplorerItemView }
 
 interface AlphaExplorerClientProps { userId: number; initialPath: string; admin: boolean; writeEnabled: boolean }
 
@@ -32,40 +30,29 @@ export function AlphaExplorerClient(props: AlphaExplorerClientProps) {
   return <QueryClientProvider client={client}><ExplorerWorkspace {...props} /></QueryClientProvider>;
 }
 
-function ExplorerWorkspace({ userId, initialPath, admin, writeEnabled }: AlphaExplorerClientProps) {
-  const [navKey, setNavKey] = useState<ExplorerNavKey>("meus");
+function ExplorerWorkspace({ initialPath, admin, writeEnabled }: AlphaExplorerClientProps) {
   const [path, setPath] = useState(initialPath);
   const [searchInput, setSearchInput] = useState("");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<ExplorerSort>("name");
   const [page, setPage] = useState(1);
-  const [trash, setTrash] = useState(false);
   const [view, setView] = useState<"list" | "grid">("list");
-  const [selected, setSelected] = useState<ExplorerItemView | null>(null);
   const [folderOpen, setFolderOpen] = useState(false);
-  const [tourOpen, setTourOpen] = useState(false);
+  const [preview, setPreview] = useState<ActiveFilePreview | null>(null);
+  const previewAbortRef = useRef<AbortController | null>(null);
   const form = useForm<FolderForm>({ resolver: zodResolver(folderFormSchema), defaultValues: { name: "" } });
 
-  const params = new URLSearchParams({ path, query, sort, direction: "asc", page: String(page), limit: "50", trash: String(trash) });
-  const listing = useQuery({ queryKey: ["alpha-explorer", path, query, sort, page, trash], queryFn: () => explorerFetch(`/api/alpha-explorer/items?${params}`, explorerListDataSchema) });
+  const params = new URLSearchParams({ path, query, sort, direction: "asc", page: String(page), limit: "50", trash: "false" });
+  const listing = useQuery({ queryKey: ["alpha-explorer", path, query, sort, page], queryFn: () => explorerFetch(`/api/alpha-explorer/items?${params}`, explorerListDataSchema) });
   const refresh = useCallback(() => void listing.refetch(), [listing]);
 
-  function navigate(nextPath: string) { setPath(nextPath); setPage(1); setTrash(false); setQuery(""); setSearchInput(""); setSelected(null); }
-
-  function handleNavigate(key: ExplorerNavKey) {
-    if (key === "lixeira") { setNavKey("lixeira"); setTrash(true); setPath(""); setPage(1); setQuery(""); setSearchInput(""); setSelected(null); return; }
-    if (key === "compartilhados") { setNavKey("compartilhados"); setTrash(false); setPath("compartilhados"); setPage(1); setQuery(""); setSearchInput(""); setSelected(null); return; }
-    setNavKey("meus"); setTrash(false); setPath(initialPath); setPage(1); setQuery(""); setSearchInput(""); setSelected(null);
-  }
+  function navigate(nextPath: string) { setPath(nextPath); setPage(1); setQuery(""); setSearchInput(""); }
 
   function handleSelectFolder(logicalPath: string) {
-    setNavKey(logicalPath === "compartilhados" ? "compartilhados" : "meus");
-    setTrash(false);
     setPath(logicalPath);
     setPage(1);
     setQuery("");
     setSearchInput("");
-    setSelected(null);
   }
 
   const companyFolders = useMemo<ExplorerCompanyFolder[]>(() => {
@@ -100,6 +87,43 @@ function ExplorerWorkspace({ userId, initialPath, admin, writeEnabled }: AlphaEx
     } catch (error) { toast.error(error instanceof Error ? error.message : "Download indisponível"); }
   }
 
+  async function openFile(item: ExplorerItemView) {
+    const mimeType = previewMimeType(item.name);
+    if (!mimeType || !canPreviewInline(item.name, item.sizeBytes)) {
+      toast.info(mimeType
+        ? "Este arquivo é grande para visualizar no navegador e será baixado."
+        : "Este formato será baixado para abrir no aplicativo correspondente.");
+      await download(item);
+      return;
+    }
+    previewAbortRef.current?.abort();
+    if (preview?.sourceUrl) URL.revokeObjectURL(preview.sourceUrl);
+    const controller = new AbortController();
+    previewAbortRef.current = controller;
+    setPreview({ item, fileName: item.name, sizeBytes: item.sizeBytes, mimeType, sourceUrl: null, isLoading: true, error: null });
+    try {
+      const data = await explorerFetch(`/api/alpha-explorer/items/${item.id}/download`, z.object({ url: z.string().url(), expiresInSeconds: z.number().nullable(), fileName: z.string() }), { method: "POST" });
+      const response = await fetch(data.url, { cache: "no-store", signal: controller.signal });
+      if (!response.ok) throw new Error("O provedor não entregou o conteúdo para visualização.");
+      const sourceUrl = await createPreviewObjectUrl(response, item.name);
+      if (controller.signal.aborted || previewAbortRef.current !== controller) { URL.revokeObjectURL(sourceUrl); return; }
+      setPreview((current) => current?.item.id === item.id
+        ? { ...current, sourceUrl, isLoading: false }
+        : current);
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      setPreview((current) => current?.item.id === item.id
+        ? { ...current, isLoading: false, error: error instanceof Error ? error.message : "Visualização indisponível" }
+        : current);
+    }
+  }
+  function closePreview() {
+    previewAbortRef.current?.abort();
+    previewAbortRef.current = null;
+    if (preview?.sourceUrl) URL.revokeObjectURL(preview.sourceUrl);
+    setPreview(null);
+  }
+
   async function itemAction(item: ExplorerItemView, action: ExplorerItemAction) {
     let body: Record<string, string | number> = { action, version: item.version };
     if (action === "rename") {
@@ -114,7 +138,6 @@ function ExplorerWorkspace({ userId, initialPath, admin, writeEnabled }: AlphaEx
     try {
       await explorerFetch(`/api/alpha-explorer/items/${item.id}`, explorerItemViewSchema, { method: "PATCH", body: JSON.stringify(body) });
       toast.success(action === "restore" ? "Item restaurado" : "Operação concluída");
-      setSelected(null);
       refresh();
     } catch (error) { toast.error(error instanceof Error ? error.message : "Operação não concluída"); }
   }
@@ -132,18 +155,14 @@ function ExplorerWorkspace({ userId, initialPath, admin, writeEnabled }: AlphaEx
     <div className="flex h-dvh w-full overflow-hidden bg-[#020916] text-[#F2F6FC]">
       <div className="hidden w-64 shrink-0 md:block">
         <ExplorerSidebar
-          navKey={navKey}
-          onNavigate={handleNavigate}
           companyFolders={companyFolders}
-          activePath={navKey === "lixeira" ? "__trash__" : path}
+          activePath={path}
           onSelectFolder={handleSelectFolder}
           nasOnline={nasOnline}
         />
       </div>
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <ExplorerHeader admin={admin} nasOnline={nasOnline} onOpenTour={() => setTourOpen(true)} />
-
         {!writeEnabled && (
           <div role="status" className="border-b border-amber-500/20 bg-amber-500/[0.06] px-5 py-2 text-[13px] text-amber-200/90">
             Modo leitura ativo. A escrita será liberada somente após o smoke test operacional.
@@ -160,8 +179,7 @@ function ExplorerWorkspace({ userId, initialPath, admin, writeEnabled }: AlphaEx
           onSearchSubmit={() => { setQuery(searchInput.trim()); setPage(1); }}
           sort={sort}
           onSortChange={setSort}
-          trash={trash}
-          onToggleTrash={() => { setTrash((current) => !current); setPage(1); }}
+          admin={admin}
           view={view}
           onViewChange={setView}
           writeEnabled={writeEnabled}
@@ -192,10 +210,11 @@ function ExplorerWorkspace({ userId, initialPath, admin, writeEnabled }: AlphaEx
             <FileList
               items={listing.data.items}
               view={view}
-              trash={trash}
-              selected={selected}
-              onSelect={setSelected}
+              trash={false}
+              selected={null}
+              onSelect={() => undefined}
               onOpenFolder={navigate}
+              onOpenFile={(item) => void openFile(item)}
               onDownload={(item) => void download(item)}
               onAction={(item, action) => void itemAction(item, action)}
             />
@@ -215,14 +234,11 @@ function ExplorerWorkspace({ userId, initialPath, admin, writeEnabled }: AlphaEx
         </div>
       </main>
 
-      <FileDetails
-        item={selected}
-        trash={trash}
-        admin={admin}
-        onClose={() => setSelected(null)}
-        onOpenFolder={navigate}
-        onDownload={(item) => void download(item)}
-        onAction={(item, action) => void itemAction(item, action)}
+      <FilePreviewDialog
+        preview={preview}
+        onClose={closePreview}
+        onDownload={() => { if (preview) void download(preview.item); }}
+        onRetry={() => { if (preview) void openFile(preview.item); }}
       />
 
       <Dialog open={folderOpen} onOpenChange={setFolderOpen}>
@@ -245,12 +261,6 @@ function ExplorerWorkspace({ userId, initialPath, admin, writeEnabled }: AlphaEx
         </DialogContent>
       </Dialog>
 
-      <GuiaModuloTour
-        aberto={tourOpen}
-        config={ALPHA_EXPLORER_TUTORIAL}
-        accent="hsl(var(--primary))"
-        onFinalizar={() => { marcarTutorialModuloComoVisto(window.localStorage, ALPHA_EXPLORER_TUTORIAL, userId); setTourOpen(false); }}
-      />
     </div>
   );
 }

@@ -1,0 +1,3 @@
+{
+  "/api/holerites/[id]/download/route": "app/api/holerites/[id]/download/route.js"
+}

@@ -769,3 +769,10 @@ O editor principal apresenta as etapas ativas como checkboxes multiselect acess�
 Na configuração por pipeline, a mesma cadência pode ser escolhida em várias linhas; remover uma linha exclui somente aquele vínculo. Falha mantém/restaura o snapshot confirmado pelo servidor.
 
 **Última atualização:** 2026-09-08 por Codex (RM-2026-6F3C54)
+# FilePreviewDialog — Alpha Explorer
+
+**Arquivo:** `src/components/AlphaExplorer/FilePreviewDialog.tsx`
+
+Modal responsivo baseado no Dialog shadcn para visualização segura de arquivos do Alpha Explorer. Renderiza PDF, imagens raster, texto, áudio e vídeo a partir de URL temporária com MIME controlado; possui loading, erro/retry, download e fechamento por Escape. O componente é puramente apresentacional: carregamento, autorização, cancelamento e revogação da URL ficam no workspace consumidor.
+
+**Última atualização:** 2026-09-17 por Nova/Dex.

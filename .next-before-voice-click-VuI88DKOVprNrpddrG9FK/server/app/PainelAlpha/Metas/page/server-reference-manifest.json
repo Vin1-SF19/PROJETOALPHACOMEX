@@ -1,0 +1,1340 @@
+{
+  "node": {
+    "000fe8e9481a8052abb4a9397f36b7eed421f8f015": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "logout",
+          "filename": "src/actions/logout.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "logout",
+      "filename": "src/actions/logout.ts"
+    },
+    "6052791d6d76f29b898f45344b08de3be14dc5f6ae": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "atualizarInterfaceAction",
+          "filename": "src/actions/preferencias.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "atualizarInterfaceAction",
+      "filename": "src/actions/preferencias.ts"
+    },
+    "60096841ac443e0a203ede54b74d53fb3656966580": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "dispararAvisoAction",
+          "filename": "src/actions/avisos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "dispararAvisoAction",
+      "filename": "src/actions/avisos.ts"
+    },
+    "00715870dec92278f739efcd839a74002aebad8726": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "encerrarAvisoAction",
+          "filename": "src/actions/avisos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "encerrarAvisoAction",
+      "filename": "src/actions/avisos.ts"
+    },
+    "400a5aa41a3309e7da7c92afadad8d39de65387626": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "CriarLinkExterno",
+          "filename": "src/actions/LinksExternos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "rsc"
+      },
+      "exportedName": "CriarLinkExterno",
+      "filename": "src/actions/LinksExternos.ts"
+    },
+    "60e280727ffef64a1d1b9bca35bbd68fda9de64e1c": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "AtualizarLinkExterno",
+          "filename": "src/actions/LinksExternos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "rsc"
+      },
+      "exportedName": "AtualizarLinkExterno",
+      "filename": "src/actions/LinksExternos.ts"
+    },
+    "4026a02f98b428f33b8ff75f33fea4c3bb7ce8db34": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "ExcluirLinkExterno",
+          "filename": "src/actions/LinksExternos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "rsc"
+      },
+      "exportedName": "ExcluirLinkExterno",
+      "filename": "src/actions/LinksExternos.ts"
+    },
+    "0068a566f9088111e9238bb7d22dae477767ac3d6a": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "ListarLinksExternosGestao",
+          "filename": "src/actions/LinksExternos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "rsc"
+      },
+      "exportedName": "ListarLinksExternosGestao",
+      "filename": "src/actions/LinksExternos.ts"
+    },
+    "400b12d37db5186fc50e7280b85434e6efb947b8dd": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "recusarFeedbackChamadoAction",
+          "filename": "src/actions/chamados-feedback.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "recusarFeedbackChamadoAction",
+      "filename": "src/actions/chamados-feedback.ts"
+    },
+    "40d763e3cc39a0dda049f4be7a391beceb98cd709e": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "responderFeedbackChamadoAction",
+          "filename": "src/actions/chamados-feedback.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "responderFeedbackChamadoAction",
+      "filename": "src/actions/chamados-feedback.ts"
+    },
+    "00cfa2e59cf86b4f2ad274cf308ed993b20d34b47e": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "getUltimoAlerta",
+          "filename": "src/actions/HoleriteAlertas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "getUltimoAlerta",
+      "filename": "src/actions/HoleriteAlertas.ts"
+    },
+    "40e27b3a791220ebedd4b68fad92acd716d4707ad6": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "CriarNota",
+          "filename": "src/actions/Notas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "CriarNota",
+      "filename": "src/actions/Notas.ts"
+    },
+    "40d7bf352be1fea8b312676583f0c576e46d6684eb": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "ObterNota",
+          "filename": "src/actions/Notas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "ObterNota",
+      "filename": "src/actions/Notas.ts"
+    },
+    "408e708166af7da965ce585ee86cc2225edf6fbff2": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "ArquivarNota",
+          "filename": "src/actions/Notas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "ArquivarNota",
+      "filename": "src/actions/Notas.ts"
+    },
+    "4043f2852d702f21bcb9f0310fc9c378b468f639f3": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "MoverNotaParaLixeira",
+          "filename": "src/actions/Notas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "MoverNotaParaLixeira",
+      "filename": "src/actions/Notas.ts"
+    },
+    "40dbb3ff8fe9fcd19431a45e627dfd88da8b60c2e4": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "FixarNota",
+          "filename": "src/actions/NotasBusca.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "FixarNota",
+      "filename": "src/actions/NotasBusca.ts"
+    },
+    "40953786ab28542fbc60aad1b9c08623acbbebab62": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "DefinirCorNota",
+          "filename": "src/actions/NotasBusca.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "DefinirCorNota",
+      "filename": "src/actions/NotasBusca.ts"
+    },
+    "40256dbdf2b64d838787cc1cbc752577415ef7d04f": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "AbrirAbaNota",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "AbrirAbaNota",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "40e6352df8eb6c4a0e942f907bff87cf60b6f71469": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "FecharAbaNota",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "FecharAbaNota",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "4034146d6e7242680f96fb64527f693f6ed624c547": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "ReordenarAbasNotas",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "ReordenarAbasNotas",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "40c6259ab0249e5d654af49187b17e4883c3606abf": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "AtivarAbaNota",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "AtivarAbaNota",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "008c8aa82690fda0cd3bc7e054cbdd63a65ce12b9d": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "ObterWorkspaceNotas",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "ObterWorkspaceNotas",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "401c401b9409d342bd5e53ccf64a6b4044cfca283d": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "AtualizarWorkspaceNotas",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "AtualizarWorkspaceNotas",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "40ee4675299cba313b8919d105b0c622b5e735161b": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "AtualizarNota",
+          "filename": "src/actions/Notas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "AtualizarNota",
+      "filename": "src/actions/Notas.ts"
+    },
+    "0008875e248c36edd645f2ab5243ad69912b711597": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "BuscarTodosUsuarios",
+          "filename": "src/actions/RecursosHumanos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "BuscarTodosUsuarios",
+      "filename": "src/actions/RecursosHumanos.ts"
+    },
+    "40f078b01f3dab24dfbad38cbb6b22d12524a5cc3e": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "BuscarNotas",
+          "filename": "src/actions/NotasBusca.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "BuscarNotas",
+      "filename": "src/actions/NotasBusca.ts"
+    },
+    "400d0ff0f996fb56cafa388a10c625adaacbe5d462": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "CompartilharNota",
+          "filename": "src/actions/NotasColaboracao.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "CompartilharNota",
+      "filename": "src/actions/NotasColaboracao.ts"
+    },
+    "40b4c69e443770ce0307548e4f4da4e09fc3ccb3eb": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "ListarPermissoesNota",
+          "filename": "src/actions/NotasColaboracao.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "ListarPermissoesNota",
+      "filename": "src/actions/NotasColaboracao.ts"
+    },
+    "40fa933a72776f9155c8c44ce70ebb042d877960a4": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "RemoverAcessoNota",
+          "filename": "src/actions/NotasColaboracao.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "RemoverAcessoNota",
+      "filename": "src/actions/NotasColaboracao.ts"
+    },
+    "4047b5e7a1d0649b248c84d941dce685f85256a5e2": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "CompartilharNotaComEquipe",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "CompartilharNotaComEquipe",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40723b9b476f48246949fb33cb75dc29b802272667": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "ListarCompartilhamentosEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "ListarCompartilhamentosEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "001535157778bc0499165d8bb40188e820e2310a5e": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "ListarMinhasEquipesNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "ListarMinhasEquipesNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40b0d6d49b1fbe32c0f7947c30b0900f103e1e00fe": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "RemoverCompartilhamentoEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "RemoverCompartilhamentoEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "008e1c6c43cb61c2e8026e1399f7dc9a7f03e23d90": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "getSetoresParaSelect",
+          "filename": "src/actions/gestaoSetores.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "getSetoresParaSelect",
+      "filename": "src/actions/gestaoSetores.ts"
+    },
+    "40fc82114441018262904f4215b87c5fc9fffb4dc5": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "CriarEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "CriarEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40398f557b10c5b9e59594382ce010ca2c000439f6": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "ExcluirEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "ExcluirEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40c45fb43873487949cef3e33d7d97e3d011369cbd": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "RenomearEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "RenomearEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40cbfc85807656f699d04c7fef314cd7c216c9cdec": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "SairDaEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "SairDaEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "4053ec9e9eabd4d0d2e632bca8c8e1ac9de8a6f57d": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "AdicionarMembrosEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "AdicionarMembrosEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40bf6f5c994cc3c038ef3c22055a00d0e6ea41dc7f": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "AlterarPapelMembroEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "AlterarPapelMembroEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40e9f7fb10f18345795e66ab4203c7ce11a1af5d67": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "RemoverMembroEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "RemoverMembroEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40b784c82b158166cdee71a712961ecdcbaa7455e0": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "BuscarUsuariosParaEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "BuscarUsuariosParaEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40de2594224474bf047f4594c9bc9984558011ab9f": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "BuscarRegistrosVinculaveis",
+          "filename": "src/actions/NotasContexto.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "BuscarRegistrosVinculaveis",
+      "filename": "src/actions/NotasContexto.ts"
+    },
+    "4077e0e350e63812f5bc227d2aa12045fb97ee2a42": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "VincularContextoNota",
+          "filename": "src/actions/NotasContexto.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "VincularContextoNota",
+      "filename": "src/actions/NotasContexto.ts"
+    },
+    "00d0f7297b6b664729d965f2712bc16de5e751974f": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "VerificarLembretesPendentes",
+          "filename": "src/actions/NotasLembretes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "VerificarLembretesPendentes",
+      "filename": "src/actions/NotasLembretes.ts"
+    },
+    "00b7fcffd9f3a07ba234845374e610bd078ba74931": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "buscarPendenciasUltimoCs",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "buscarPendenciasUltimoCs",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "6034f8aa31c40725c888ef9259dfe9d7ba38c610cd": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "salvarLogCSPorAlerta",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "salvarLogCSPorAlerta",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "40de6f4d887b00fc023584ddd5de3cc3eab14446e0": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "assumirChamado",
+          "filename": "src/actions/chamados.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "assumirChamado",
+      "filename": "src/actions/chamados.ts"
+    },
+    "6096c5982d35daab01d3dc258f35c83a368dc4ecb2": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "enviarMensagemChamadoAtendidoTIAction",
+          "filename": "src/actions/chamados.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "enviarMensagemChamadoAtendidoTIAction",
+      "filename": "src/actions/chamados.ts"
+    },
+    "005a9ad3110c32247b386ae993fae3dbef5d2ee66e": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "listarChamadosAtivosTIAction",
+          "filename": "src/actions/chamados.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "listarChamadosAtivosTIAction",
+      "filename": "src/actions/chamados.ts"
+    },
+    "70c2b8721c87a9cc7fb223e83e9ce9a47db860bc83": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "updateChamadosStatus",
+          "filename": "src/actions/chamados.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "updateChamadosStatus",
+      "filename": "src/actions/chamados.ts"
+    },
+    "007ab8cb3baf8a410f419303fed2106173cc832dfd": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "listarUsersParaGestao",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "rsc"
+      },
+      "exportedName": "listarUsersParaGestao",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "4028f37a47f8b728e90a58ae32017d7a420e363426": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "resetarUserParaSetor",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "rsc"
+      },
+      "exportedName": "resetarUserParaSetor",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "4031e5391c13afc507d9164eb151acbda4a25a05c0": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "listarModulosEfetivosDeUser",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "rsc"
+      },
+      "exportedName": "listarModulosEfetivosDeUser",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "403848827b9eab04a8323c06f557ec2f1cdc6cd39a": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "listarAcessoModulo",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "rsc"
+      },
+      "exportedName": "listarAcessoModulo",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "4050d9b22c5b2a6742f08bdba4c8e01a51ceae8710": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "listarPermissoesPorSetor",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "rsc"
+      },
+      "exportedName": "listarPermissoesPorSetor",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "4051cc0fb894e921be0b1c666d11342af70bdb2ffb": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "getPermissoesEfetivas",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "rsc"
+      },
+      "exportedName": "getPermissoesEfetivas",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "405e6daf3331b0784bee4e63a2a33ddf576e004e09": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "adicionarOverride",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "rsc"
+      },
+      "exportedName": "adicionarOverride",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "40a9459f642b69077f48291a41487e1034fb9b62df": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "atribuirModulosAoSetor",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "rsc"
+      },
+      "exportedName": "atribuirModulosAoSetor",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "40b5163f604ce9da211909661d50b3aef8ab0ee116": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "listarOverridesDeUser",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "rsc"
+      },
+      "exportedName": "listarOverridesDeUser",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "40eb4a5a8b22444db29e30d0ba8d614736b0d66b91": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "removerOverride",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "rsc"
+      },
+      "exportedName": "removerOverride",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "6043f2f1c011189f174b16ce35b63e1cc8716afd6d": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "toggleAcessoModulo",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "rsc"
+      },
+      "exportedName": "toggleAcessoModulo",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "009f7206278e418533962ad34934ef214b60126fdc": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "ListarLinksExternosVisiveis",
+          "filename": "src/actions/LinksExternos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "rsc"
+      },
+      "exportedName": "ListarLinksExternosVisiveis",
+      "filename": "src/actions/LinksExternos.ts"
+    },
+    "0005141c4a07aefa90419d82b4ce4ffb21f63e5fb3": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "getColaboradoresParaConfigurar",
+          "filename": "src/actions/Metas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "getColaboradoresParaConfigurar",
+      "filename": "src/actions/Metas.ts"
+    },
+    "6088bc35071dd132ec01c7a352722ba839610c836d": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "getDadosMetas",
+          "filename": "src/actions/Metas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "getDadosMetas",
+      "filename": "src/actions/Metas.ts"
+    },
+    "60d0a20db7f52dc40aa7c2bac017633137cb37be17": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "toggleMetaVisibilidade",
+          "filename": "src/actions/Metas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "toggleMetaVisibilidade",
+      "filename": "src/actions/Metas.ts"
+    },
+    "7090ed50e074fcfa6bec90fa6a108b826358311f91": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "upsertMetaEquipe",
+          "filename": "src/actions/Metas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "upsertMetaEquipe",
+      "filename": "src/actions/Metas.ts"
+    },
+    "78da2da2d76c29b79940f80f2920ce41ae2ec3f1fc": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "upsertMetaUsuario",
+          "filename": "src/actions/Metas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "upsertMetaUsuario",
+      "filename": "src/actions/Metas.ts"
+    },
+    "405d93ab6ae41ad6765185d185f25392faff6c2fb7": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "criarContrato",
+          "filename": "src/actions/ContratoComercial.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "criarContrato",
+      "filename": "src/actions/ContratoComercial.ts"
+    },
+    "400c1c4fc02ce103cd6145d04b7ca51b575f36d4bb": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "atualizarContrato",
+          "filename": "src/actions/ContratoComercial.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "atualizarContrato",
+      "filename": "src/actions/ContratoComercial.ts"
+    },
+    "40ae041a5e0e9008ea6c1fdd3233bacc86ee22e903": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "getContratos",
+          "filename": "src/actions/ContratoComercial.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "getContratos",
+      "filename": "src/actions/ContratoComercial.ts"
+    },
+    "00169ba75bd104675bd9d31acaa6882794aededc80": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "getColaboradoresComerciais",
+          "filename": "src/actions/ContratoComercial.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "getColaboradoresComerciais",
+      "filename": "src/actions/ContratoComercial.ts"
+    },
+    "0073f79f7da3f562605b4c8002db9bbe04d7086e9e": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "getServicosComerciais",
+          "filename": "src/actions/ContratoComercial.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "getServicosComerciais",
+      "filename": "src/actions/ContratoComercial.ts"
+    },
+    "00286734b432de493060e6db09a6bd227efac9a893": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "getProspeccoesAtivas",
+          "filename": "src/actions/ContratoComercial.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "getProspeccoesAtivas",
+      "filename": "src/actions/ContratoComercial.ts"
+    },
+    "40e0aa623793fa2f227207c277cfd12333c9b61e17": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "criarServicoComercial",
+          "filename": "src/actions/ContratoComercial.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "criarServicoComercial",
+      "filename": "src/actions/ContratoComercial.ts"
+    },
+    "404f3f6a60edcc32860b85ba91863e8eff0dc2ce1e": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "excluirContrato",
+          "filename": "src/actions/ContratoComercial.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "excluirContrato",
+      "filename": "src/actions/ContratoComercial.ts"
+    },
+    "600bfb03497608252233bdddb75c14aaad01a9870b": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "atualizarContratoUrl",
+          "filename": "src/actions/ContratoComercial.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "atualizarContratoUrl",
+      "filename": "src/actions/ContratoComercial.ts"
+    },
+    "40b2996e2f1e8a27e268b10ee6640731265014ea77": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "arquivarContrato",
+          "filename": "src/actions/ContratoComercial.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "arquivarContrato",
+      "filename": "src/actions/ContratoComercial.ts"
+    },
+    "40d150e700f0bdc2f0b57140654c4b1fce38981396": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "restaurarContrato",
+          "filename": "src/actions/ContratoComercial.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "restaurarContrato",
+      "filename": "src/actions/ContratoComercial.ts"
+    },
+    "701d8ce29928c881e6e10cd9b86d13cbc79fc69865": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "criarObservacaoContrato",
+          "filename": "src/actions/ContratoComercial.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "criarObservacaoContrato",
+      "filename": "src/actions/ContratoComercial.ts"
+    },
+    "40a5554662ada99343829337bfe5bb1cb624dc6a09": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "buscarClienteParaContrato",
+          "filename": "src/actions/ContratoComercial.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "buscarClienteParaContrato",
+      "filename": "src/actions/ContratoComercial.ts"
+    },
+    "00a7b57a03ac7a4f7a1502a2a386784ab287599416": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "listarClientesEmConstituicao",
+          "filename": "src/actions/ContratoComercial.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "listarClientesEmConstituicao",
+      "filename": "src/actions/ContratoComercial.ts"
+    },
+    "0064bd218431d7e95d291b5193c1a23cc57081094e": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "listarParceirosSimples",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "listarParceirosSimples",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "4074f5721ea5ce8c37b44d103f3a4c3b0f1d49609f": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "buscarParceiroDetalheSimples",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "buscarParceiroDetalheSimples",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "40daf7dd04b86fb80ea78265b4cf830ef09e26fcc3": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "confirmarFechamento",
+          "filename": "src/actions/ContratoComercial.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "confirmarFechamento",
+      "filename": "src/actions/ContratoComercial.ts"
+    },
+    "6066e2118ffc07e6d0e57be32692d8dae2d2eb3550": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "BuscarJustificativaVigente",
+          "filename": "src/actions/JustificativaMeta.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "BuscarJustificativaVigente",
+      "filename": "src/actions/JustificativaMeta.ts"
+    },
+    "404f967cc551a0fa8497160ee4da79d75a4c3f964f": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "ExcluirJustificativaMeta",
+          "filename": "src/actions/JustificativaMeta.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "ExcluirJustificativaMeta",
+      "filename": "src/actions/JustificativaMeta.ts"
+    },
+    "00c5e010677ba16d9696159640e25fa5ff664fd2a3": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "ListarHistoricoJustificativas",
+          "filename": "src/actions/JustificativaMeta.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "ListarHistoricoJustificativas",
+      "filename": "src/actions/JustificativaMeta.ts"
+    },
+    "404ce372ed1b15588abd3ad585b738a653a622d6da": {
+      "workers": {
+        "app/PainelAlpha/Metas/page": {
+          "moduleId": 15552,
+          "async": true,
+          "exportedName": "RegistrarJustificativaMeta",
+          "filename": "src/actions/JustificativaMeta.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/Metas/page": "action-browser"
+      },
+      "exportedName": "RegistrarJustificativaMeta",
+      "filename": "src/actions/JustificativaMeta.ts"
+    }
+  },
+  "edge": {}
+}

@@ -122,6 +122,7 @@ A decisão deve registrar fonte da verdade, provisionamento/desprovisionamento, 
   - [x] Implementar enrollment/rotação/desvinculação administrativos no Vault KV v2, sessão SMB em memória, revogação e persistência reconciliada de metadados não secretos no Turso.
 - [ ] Task 4 — Operações SMB íntegras (AC: 13–20)
   - [ ] Implementar listagem/pesquisa limitada e download streaming.
+  - [x] Implementar abertura nativa somente leitura de DOCX/XLSX no Word/Excel por sessão HTTPS opaca, curta e vinculada ao arquivo, sem expor UNC, credencial ou WebDAV ao navegador.
   - [x] Implementar upload temporário, verificação e publicação segura, com cancelamento e limpeza reconciliável.
   - [x] Implementar pasta, rename, move, lixeira e restore sem overwrite ou delete físico.
   - [x] Implementar controle de concorrência e respostas 409 para estado obsoleto.
@@ -357,6 +358,13 @@ Arquivos previstos, sujeitos à ADR e ao mapeamento final do `@dev`:
 | 2026-09-16 | 0.5.2 | Sessão SMB alinhada à ADR: SMB3 e signing obrigatórios, encryption negociada quando suportada; removido falso `SMB_CREDENTIAL_REJECTED` no QNAP piloto sem encryption. | Dex (`@dev`) / Gage (`@devops`) |
 | 2026-09-16 | 0.5.3 | Falhas de vínculo classificadas por causa (autenticação, bloqueio, senha expirada, ausência de shares, segurança e conectividade), mensagens administrativas traduzidas e support ID correlacionado entre UI, resposta e log. | Dex (`@dev`) / Gage (`@devops`) |
 | 2026-09-16 | 0.5.4 | Fluxo administrativo simplificado por decisão do responsável: removidos reautenticação de cinco minutos e campo de justificativa; mantidos admin RBAC, ticket single-use, nonce, rate limit e auditoria. Diagnóstico SMB passou a combinar stdout/stderr para não perder o status nativo do QNAP. | Dex (`@dev`) / Gage (`@devops`) |
+| 2026-09-16 | 0.5.5 | Descoberta de shares corrigida para preservar catálogo SMB3 válido mesmo quando o cliente também emite diagnóstico legado de SMB1/workgroup; comportamento reproduzido e validado contra o QNAP real. | Dex (`@dev`) / Gage (`@devops`) |
+| 2026-09-16 | 0.5.6 | Sandbox systemd corrigido com `AF_NETLINK`, necessário ao `smbclient` para descobrir interfaces; vínculo real do ADM concluído no Vault e listagem real de 29 shares permitidas validada via CLI. | Dex (`@dev`) / Gage (`@devops`) |
+| 2026-09-17 | 0.5.7 | Interface simplificada e renomeada para Alpha Explorer: sidebar restrita às pastas da empresa, header e painel de detalhes removidos, lixeira retirada da navegação e administração QNAP reduzida a escudo visível somente para admins junto à ordenação. | Nova (`@frontend`) / Dex (`@dev`) |
+| 2026-09-17 | 0.5.8 | Duplo clique e tecla Enter passaram a abrir previews seguros de PDF, imagens, texto, áudio e vídeo; conteúdo ativo e formatos não suportados usam download, com limite de 100 MiB para proteger a memória do navegador. | Nova (`@frontend`) / Dex (`@dev`) |
+| 2026-09-17 | 0.5.9 | Preview transferido da nova aba para um modal responsivo do Alpha Explorer, com estados de loading/erro/retry, PDF e mídia incorporados, download no cabeçalho, cancelamento e revogação da URL temporária ao fechar. | Nova (`@frontend`) / Dex (`@dev`) |
+| 2026-09-17 | 0.6.0 | DOCX/XLSX passam a abrir no Word/Excel instalado por URI oficial do Office e sessão HTTPS opaca de 120 segundos, vinculada a identidade, IP, arquivo e tamanho; leitura somente, sem expor UNC ou credencial SMB. | Dex (`@dev`) / Anubis (`@security`) |
+| 2026-09-17 | 0.6.1 | Arquivos temporários `~$` do Microsoft Office foram removidos da listagem e bloqueados no fluxo nativo; `painel-alpha.alpak.ai` passou a ser alias exato do runtime stage no emissor e CORS do gateway. | Dex (`@dev`) |
 
 ## Dev Agent Record
 
@@ -380,6 +388,16 @@ Codex GPT-5, com revisão arquitetural e de segurança delegada.
 - Pytest gateway após correção de compatibilidade SMB: 24/24; sessão Python assinada validada no QNAP real e health do gateway aprovado.
 - Diagnóstico amigável de vínculo: pytest gateway 25/25 e testes focados TypeScript 17/17; release imutável `20260916-182559-errors` ativa e health Node → gateway aprovado.
 - Simplificação administrativa e correção do diagnóstico nativo: pytest gateway 25/25, testes focados TypeScript 12/12 e lint focado aprovado; release `20260916-1847-no-reauth` ativa, stage recompilado e health aprovado.
+- Catálogo SMB3 versus aviso legado: pytest gateway 26/26; QNAP real retornou 30 shares e aviso de workgroup SMB1, e a release `20260916-1900-share-catalog` passou a priorizar o catálogo válido.
+- Smoke real de identidade: diagnóstico dentro do sandbox revelou `Could not determine network interfaces`; após liberar somente `AF_NETLINK`, enrollment real do ADM passou, `identity linked=true` e a raiz retornou 29 shares permitidas (30 anunciadas pelo NAS, com share reservada filtrada).
+- Refinamento visual 0.5.7: lint focado aprovado e 9/9 testes focados passaram, incluindo visibilidade administrativa e ausência de Meus Arquivos/Compartilhados/Lixeira na sidebar.
+- Abertura de arquivos 0.5.8: lint focado aprovado e 11/11 testes focados passaram; formatos ativos (HTML/SVG), formatos desconhecidos, limite de memória e limite server-side do ticket foram cobertos.
+- Modal de preview 0.5.9: lint focado aprovado e 12/12 testes focados passaram; JPG/JPEG/PNG/PDF, MIME não confiável sobrescrito e ticket de leitura limitado foram cobertos.
+- Abertura Office 0.6.0: pytest gateway 30/30 e testes focados TypeScript 11/11; ticket single-use, URL opaca, extensão permitida, vínculo a arquivo/IP/identidade/tamanho, Range/HEAD, expiração e ausência de path/principal na resposta foram cobertos.
+- Release gateway `/opt/alpha-explorer-gateway/releases/20260917-1410-office-native` ativa; Uvicorn sem access log e `explorer:smb:health` aprovado (`application=true`, `vaultConfigured=true`).
+- Release stage `/home/ialpha/deployments/painel-alpha-stage/releases/20260917-140424` ativa; build `2kFbmKCkYG6qZx9m9yzwK`, shell/Explorer redirecionam corretamente usuários não autenticados e o bundle publicado contém o fluxo Office.
+- Correção Office lock/origin 0.6.1: pytest gateway 32/32 e testes de configuração/origem/ticket 12/12; `~$CLIENTES RADAR -.xlsx` é ocultado enquanto o arquivo real permanece listado. CORS aprovou somente stage e `painel-alpha.alpak.ai`, recusando origem desconhecida.
+- Releases finais: gateway `/opt/alpha-explorer-gateway/releases/20260917-1424-origin-alias-office-lock`; stage `/home/ialpha/deployments/painel-alpha-stage/releases/20260917-142412`, build `Y8ieSyQFNNLPC41F4qN4k`.
 - CORS público: origin de stage permitido e origin não autorizado sem `Access-Control-Allow-Origin`.
 - Restart oficial do stage: aprovado, novo processo `RUNNING` na porta 3005.
 - Build de produção: aprovado.
@@ -408,6 +426,15 @@ Codex GPT-5, com revisão arquitetural e de segurança delegada.
 - O enrollment não reduz mais toda falha a `SMB_CREDENTIAL_REJECTED`: causas operacionais recebem mensagens humanas em português, enquanto a referência UUID fica reservada à correlação com o suporte e coincide com o ID do log.
 - Enrollment, rotação e desvinculação não exigem mais reautenticação recente nem justificativa; a autorização administrativa, vínculo ator/alvo, ticket efêmero single-use, nonce, rate limit e auditoria continuam obrigatórios.
 - A descoberta de shares combina os canais stdout e stderr do `smbclient`; avisos não conseguem mais ocultar o `NT_STATUS_*` devolvido pelo QNAP.
+- A descoberta não descarta shares SMB3 já recebidas por causa de diagnóstico posterior relacionado a SMB1/workgroup, que permanece desabilitado no NAS.
+- O serviço systemd permite `AF_NETLINK` exclusivamente para descoberta de interfaces do cliente Samba; as restrições `AF_UNIX`, `AF_INET`, `AF_INET6`, `ProtectSystem`, `PrivateTmp` e `NoNewPrivileges` foram preservadas.
+- O workspace principal agora prioriza a área de arquivos: sem header interno ou painel direito; a sidebar mostra apenas shares liberadas e o escudo administrativo fica na toolbar somente para administradores.
+- Arquivos compatíveis são abertos por duplo clique ou Enter; previews usam MIME seguro definido pelo Explorer e limite de 100 MiB, enquanto os demais seguem pelo fluxo explícito de download.
+- O preview compatível abre dentro de um modal responsivo do próprio Alpha Explorer; fechar cancela a leitura ativa e libera a URL temporária. O cabeçalho mantém a ação explícita de download.
+- DOCX e XLSX abrem o Word/Excel instalado em modo somente leitura. O cliente recebe apenas uma URL HTTPS opaca por 120 segundos; salvar de volta no NAS permanece fora desta story porque exige WOPI/WebDAV e controle de locks/conflitos.
+- Sessões Office são vinculadas à identidade, IP de origem, nome e tamanho real, têm rate limit, são revogadas na rotação/desvinculação e não aparecem no access log do Uvicorn.
+- Locks temporários criados pelo Word/Excel (`~$...`) não são documentos e agora são filtrados antes da paginação, recusados pelo gateway de abertura e explicados amigavelmente caso permaneçam em uma tela antiga.
+- O domínio `painel-alpha.alpak.ai` é aceito como alias stage explícito; a validação continua fail-closed e não usa wildcard de origem.
 - O gateway é executado por usuário Linux dedicado a partir de release imutável em `/opt/alpha-explorer-gateway/current`; a chave privada da CA fica fora do volume montado no container.
 - `ONYX` é bloqueada permanentemente no gateway por pertencer a outro sistema, independentemente do catálogo retornado pelo NAS.
 - Listagem, pasta, download Range, upload em chunks, rename, move de arquivo, lixeira/restauração e reconciliação foram implementados com SMB simulado.
@@ -420,7 +447,8 @@ Codex GPT-5, com revisão arquitetural e de segurança delegada.
 - `src/lib/alpha-explorer/http.ts`; `src/lib/alpha-explorer/smb/`
 - `src/app/api/alpha-explorer/smb/`; `src/app/api/alpha-explorer/smb/admin/`
 - `src/app/PainelAlpha/ExploradorArquivos/page.tsx`; `src/app/PainelAlpha/ExploradorArquivos/AdministracaoQnap/page.tsx`
-- `src/components/AlphaExplorer/AlphaExplorerSmbClient.tsx`; `AdminQnapClient.tsx`
+- `src/components/AlphaExplorer/AlphaExplorerSmbClient.tsx`; `AlphaExplorerClient.tsx`; `FileList.tsx`; `AdminQnapClient.tsx`
+- `src/components/AlphaExplorer/FilePreviewDialog.tsx`
 - `src/components/AlphaExplorer/ExplorerHeader.tsx`
 - `src/components/AlphaExplorer/SmbExplorerUpload.tsx`; `SmbIdentityGate.tsx`
 - `scripts/alpha-explorer-smb.mjs`; `ops/alpha-explorer-gateway/` (administração Vault e múltiplas shares)
@@ -428,6 +456,9 @@ Codex GPT-5, com revisão arquitetural e de segurança delegada.
 - `tests/alpha-explorer/smb-ticket.test.ts`; `smb-browser-client.test.ts`
 - `tests/alpha-explorer/smb-binding-metadata.test.ts`
 - `tests/alpha-explorer/admin-navigation.test.ts`
+- `src/lib/alpha-explorer/file-preview.ts`; `tests/alpha-explorer/file-preview.test.ts`
+- `ops/alpha-explorer-gateway/app/office.py`; `ops/alpha-explorer-gateway/tests/test_office.py`
+- `ops/alpha-explorer-gateway/README.md`; `ops/alpha-explorer-gateway/deploy/alpha-explorer-gateway.service`
 - `tests/alpha-explorer/smb-config.test.ts`
 - `tests/alpha-explorer/http-origin.test.ts`
 - `tests/alpha-explorer/smb-error-messages.test.ts`

@@ -1,0 +1,3 @@
+module.exports=[436815,a=>{"use strict";var b=a.i(907997);function c(){return(0,b.jsx)("div",{className:"min-h-screen bg-[#020617] p-8",children:(0,b.jsxs)("div",{className:"mx-auto max-w-6xl animate-pulse space-y-4 motion-reduce:animate-none",children:[(0,b.jsx)("div",{className:"h-10 w-72 rounded-xl bg-white/5"}),(0,b.jsx)("div",{className:"h-24 rounded-2xl bg-white/5"}),(0,b.jsxs)("div",{className:"grid gap-4 md:grid-cols-3",children:[(0,b.jsx)("div",{className:"h-40 rounded-2xl bg-white/5"}),(0,b.jsx)("div",{className:"h-40 rounded-2xl bg-white/5"}),(0,b.jsx)("div",{className:"h-40 rounded-2xl bg-white/5"})]})]})})}a.s(["default",()=>c])}];
+
+//# sourceMappingURL=src_app_PainelAlpha_AlphaSEO_loading_tsx_cb657676._.js.map

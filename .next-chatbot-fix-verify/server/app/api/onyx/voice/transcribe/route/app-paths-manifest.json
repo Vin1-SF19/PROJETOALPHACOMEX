@@ -1,0 +1,3 @@
+{
+  "/api/onyx/voice/transcribe/route": "app/api/onyx/voice/transcribe/route.js"
+}

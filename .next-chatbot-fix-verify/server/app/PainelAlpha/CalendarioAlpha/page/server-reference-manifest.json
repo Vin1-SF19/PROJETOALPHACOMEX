@@ -1,0 +1,1625 @@
+{
+  "node": {
+    "00b4a711a04bbce452c322c56a2cd1871e0cb71f0b": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "logout",
+          "filename": "src/actions/logout.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "logout",
+      "filename": "src/actions/logout.ts"
+    },
+    "60bf5119c1438378f7cf0a18af97a463875a0d6e67": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "atualizarInterfaceAction",
+          "filename": "src/actions/preferencias.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "atualizarInterfaceAction",
+      "filename": "src/actions/preferencias.ts"
+    },
+    "60e0d0cd74f74b3269413d4569514fa7de2b408e6d": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "dispararAvisoAction",
+          "filename": "src/actions/avisos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "dispararAvisoAction",
+      "filename": "src/actions/avisos.ts"
+    },
+    "00bf8cd3c4f6948f561de252d7dc80a51e9bbcf109": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "encerrarAvisoAction",
+          "filename": "src/actions/avisos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "encerrarAvisoAction",
+      "filename": "src/actions/avisos.ts"
+    },
+    "403e011ae62f2e333ac3fd003f5d52fbb5477c9dd3": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "CriarLinkExterno",
+          "filename": "src/actions/LinksExternos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "rsc"
+      },
+      "exportedName": "CriarLinkExterno",
+      "filename": "src/actions/LinksExternos.ts"
+    },
+    "60cc6051e79d9da944387408ac418f7d292fa2f898": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "AtualizarLinkExterno",
+          "filename": "src/actions/LinksExternos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "rsc"
+      },
+      "exportedName": "AtualizarLinkExterno",
+      "filename": "src/actions/LinksExternos.ts"
+    },
+    "402d84010e11523ac15c125b9ff469f7108c008579": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "ExcluirLinkExterno",
+          "filename": "src/actions/LinksExternos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "rsc"
+      },
+      "exportedName": "ExcluirLinkExterno",
+      "filename": "src/actions/LinksExternos.ts"
+    },
+    "00b5c0b1dde35a29def041feab2fd6720d05f2d4ff": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "ListarLinksExternosGestao",
+          "filename": "src/actions/LinksExternos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "rsc"
+      },
+      "exportedName": "ListarLinksExternosGestao",
+      "filename": "src/actions/LinksExternos.ts"
+    },
+    "4046699dab1c87eeff79d16ccd1fe004710fe43e01": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "recusarFeedbackChamadoAction",
+          "filename": "src/actions/chamados-feedback.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "recusarFeedbackChamadoAction",
+      "filename": "src/actions/chamados-feedback.ts"
+    },
+    "405ab957f54a8499f138b804646db50f35a7f1dfad": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "responderFeedbackChamadoAction",
+          "filename": "src/actions/chamados-feedback.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "responderFeedbackChamadoAction",
+      "filename": "src/actions/chamados-feedback.ts"
+    },
+    "008e7b7ee1c33f0a1a46f9a7085ece1e3b07c252c3": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "getUltimoAlerta",
+          "filename": "src/actions/HoleriteAlertas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "getUltimoAlerta",
+      "filename": "src/actions/HoleriteAlertas.ts"
+    },
+    "40e402ad9f5f01925aead0265b2b9dbfa63b3b365e": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "CriarNota",
+          "filename": "src/actions/Notas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "CriarNota",
+      "filename": "src/actions/Notas.ts"
+    },
+    "4043d5d56ceb31626386ab08a89e78f825c3c1ba42": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "ObterNota",
+          "filename": "src/actions/Notas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "ObterNota",
+      "filename": "src/actions/Notas.ts"
+    },
+    "4072707ba5fa3b10ea78f484c678d3fadd1682ba24": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "ArquivarNota",
+          "filename": "src/actions/Notas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "ArquivarNota",
+      "filename": "src/actions/Notas.ts"
+    },
+    "40ca104d061619b9d9d2b035074ba26acadb1c4036": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "MoverNotaParaLixeira",
+          "filename": "src/actions/Notas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "MoverNotaParaLixeira",
+      "filename": "src/actions/Notas.ts"
+    },
+    "40a5068b455ad99f5d44d87d2dd8508d83c95eef15": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "FixarNota",
+          "filename": "src/actions/NotasBusca.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "FixarNota",
+      "filename": "src/actions/NotasBusca.ts"
+    },
+    "40242880fc2f8dab7bd42b7234b5235d5b625fa067": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "DefinirCorNota",
+          "filename": "src/actions/NotasBusca.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "DefinirCorNota",
+      "filename": "src/actions/NotasBusca.ts"
+    },
+    "40ac07c43142066ab2a55a333dd311051135b95f29": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "AbrirAbaNota",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "AbrirAbaNota",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "40c474a67986f23908c55e1d7eb0f5b1c2c4d8e54f": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "FecharAbaNota",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "FecharAbaNota",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "403ed5338cb84b9fc665c0e8c8ef73b07af3344a94": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "ReordenarAbasNotas",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "ReordenarAbasNotas",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "400355de8be5e8e1f46692d8206849033cbfb8ed1f": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "AtivarAbaNota",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "AtivarAbaNota",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "00b781821c4505509e5429830eeb3ae6a4a7672687": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "ObterWorkspaceNotas",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "ObterWorkspaceNotas",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "4080457d665f9f920f8976018bd6e67ca0cd1e466d": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "AtualizarWorkspaceNotas",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "AtualizarWorkspaceNotas",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "40e968d17b6019d39fffdd63f4c689f78bbdc8b03b": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "AtualizarNota",
+          "filename": "src/actions/Notas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "AtualizarNota",
+      "filename": "src/actions/Notas.ts"
+    },
+    "0074515490713fbf2de6d290c96b0555fc0e537995": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "BuscarTodosUsuarios",
+          "filename": "src/actions/RecursosHumanos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "BuscarTodosUsuarios",
+      "filename": "src/actions/RecursosHumanos.ts"
+    },
+    "40286a71e08574cf508091d6f89a784e7ab111809b": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "BuscarNotas",
+          "filename": "src/actions/NotasBusca.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "BuscarNotas",
+      "filename": "src/actions/NotasBusca.ts"
+    },
+    "40a0bf91d2a5b39d24872f34b41c42768bc2db00b2": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "CompartilharNota",
+          "filename": "src/actions/NotasColaboracao.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "CompartilharNota",
+      "filename": "src/actions/NotasColaboracao.ts"
+    },
+    "403659c69ab4a74d3e1ca188af64cf08823706418d": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "ListarPermissoesNota",
+          "filename": "src/actions/NotasColaboracao.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "ListarPermissoesNota",
+      "filename": "src/actions/NotasColaboracao.ts"
+    },
+    "40602cab74465581274b1154220fbd0e21945ddadb": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "RemoverAcessoNota",
+          "filename": "src/actions/NotasColaboracao.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "RemoverAcessoNota",
+      "filename": "src/actions/NotasColaboracao.ts"
+    },
+    "4049b4ddb65a90d3260ce091f5d13cc898d3ccab6b": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "CompartilharNotaComEquipe",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "CompartilharNotaComEquipe",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "402779e85588cf5065ce4856c580b7e107d9dae632": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "ListarCompartilhamentosEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "ListarCompartilhamentosEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "00a593e10a16c5cde006cd1e0ed8685b1c2f2ea774": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "ListarMinhasEquipesNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "ListarMinhasEquipesNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40c33bf8084a52b6eaf72c2f1d26e47ddcf84e145d": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "RemoverCompartilhamentoEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "RemoverCompartilhamentoEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "005a05c25fb71e462fe7b91e05fb1a74d581fd27ca": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "getSetoresParaSelect",
+          "filename": "src/actions/gestaoSetores.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "getSetoresParaSelect",
+      "filename": "src/actions/gestaoSetores.ts"
+    },
+    "4015419128fd059d7bbcd71aa06ee8ee3dba967637": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "CriarEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "CriarEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40e5331a83e0dd01391632c463179090af6b6f1862": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "ExcluirEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "ExcluirEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "401884080824ec7bd68dac4c23660c5869b702cad3": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "RenomearEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "RenomearEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40395c6fc77dd5df8d6446335cbb66208ae4a19842": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "SairDaEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "SairDaEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40c5aa28468f69a1f62b22e5f1e3bc02f13e2a8447": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "AdicionarMembrosEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "AdicionarMembrosEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40bdccc5457c310a69769cbe8f2f15226199253732": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "AlterarPapelMembroEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "AlterarPapelMembroEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "4008eeb64301865e31b1ab74e0c9a54c8073ed723c": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "RemoverMembroEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "RemoverMembroEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "409bf44058e693b9d3f5958f8566adc357d3583a79": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "BuscarUsuariosParaEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "BuscarUsuariosParaEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40498cd3e816b06469d09d9194b9eff55794d4b784": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "BuscarRegistrosVinculaveis",
+          "filename": "src/actions/NotasContexto.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "BuscarRegistrosVinculaveis",
+      "filename": "src/actions/NotasContexto.ts"
+    },
+    "40130e73727b52a5da29aa1c401d70910a06708959": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "VincularContextoNota",
+          "filename": "src/actions/NotasContexto.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "VincularContextoNota",
+      "filename": "src/actions/NotasContexto.ts"
+    },
+    "00b266187b2d2206b95d8fd0de65210339dcf46cf6": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "VerificarLembretesPendentes",
+          "filename": "src/actions/NotasLembretes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "VerificarLembretesPendentes",
+      "filename": "src/actions/NotasLembretes.ts"
+    },
+    "00599268ba22dc213eaec8c67ed01bc5fb34d9656d": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "buscarPendenciasUltimoCs",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "buscarPendenciasUltimoCs",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "60cbae905934a619bb0f0f22ef02a3249e8734f3eb": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "salvarLogCSPorAlerta",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "salvarLogCSPorAlerta",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "40937f3d56f4673e748d4cab871888f57e47aa600f": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "assumirChamado",
+          "filename": "src/actions/chamados.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "assumirChamado",
+      "filename": "src/actions/chamados.ts"
+    },
+    "608613dfeb4775b1ed2592e1149674569c34fb2f0d": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "enviarMensagemChamadoAtendidoTIAction",
+          "filename": "src/actions/chamados.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "enviarMensagemChamadoAtendidoTIAction",
+      "filename": "src/actions/chamados.ts"
+    },
+    "0001ef231507213030f81fc8650626bfb670c42e48": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "listarChamadosAtivosTIAction",
+          "filename": "src/actions/chamados.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "listarChamadosAtivosTIAction",
+      "filename": "src/actions/chamados.ts"
+    },
+    "70ffe01059356b03bd80a0c890c9e4204494d4b767": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "updateChamadosStatus",
+          "filename": "src/actions/chamados.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "updateChamadosStatus",
+      "filename": "src/actions/chamados.ts"
+    },
+    "00db72b8160fa795935b8c756e89ee8f3da460b8b0": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "listarUsersParaGestao",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "rsc"
+      },
+      "exportedName": "listarUsersParaGestao",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "402778d1d2cf2524db678b5821dff4f98db4e35cf0": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "listarPermissoesPorSetor",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "rsc"
+      },
+      "exportedName": "listarPermissoesPorSetor",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "40343a76e69c1834cfd594cd08c0359a28c73eba5e": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "atribuirModulosAoSetor",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "rsc"
+      },
+      "exportedName": "atribuirModulosAoSetor",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "403991500d185a7c0ba721e2cf9dbccd4791008558": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "resetarUserParaSetor",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "rsc"
+      },
+      "exportedName": "resetarUserParaSetor",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "40462bea9bb39f794a48bb8f0dbaf5c879e6a34d40": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "removerOverride",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "rsc"
+      },
+      "exportedName": "removerOverride",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "405db78a4b917f9bc5f020f619b77a8397586000f4": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "listarOverridesDeUser",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "rsc"
+      },
+      "exportedName": "listarOverridesDeUser",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "40693b8e2f52a13682ee6b9b5e61648089097ff8ac": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "listarAcessoModulo",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "rsc"
+      },
+      "exportedName": "listarAcessoModulo",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "4077b04c6eba3e81ac1217e71f8cccc0dd396c5f24": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "adicionarOverride",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "rsc"
+      },
+      "exportedName": "adicionarOverride",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "40b22a8d52ad168d9be9918ad4c58e84caf1e43d81": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "listarModulosEfetivosDeUser",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "rsc"
+      },
+      "exportedName": "listarModulosEfetivosDeUser",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "40eba84def265611483380bb268a852d4a9a777e8b": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "getPermissoesEfetivas",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "rsc"
+      },
+      "exportedName": "getPermissoesEfetivas",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "60ccec99d1d237106c62f64c4f582ef16b4ea90932": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "toggleAcessoModulo",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "rsc"
+      },
+      "exportedName": "toggleAcessoModulo",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "002c9e6ffe048d0fa4b62a4bd8e3b9fa965b6ccd00": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "ListarLinksExternosVisiveis",
+          "filename": "src/actions/LinksExternos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "rsc"
+      },
+      "exportedName": "ListarLinksExternosVisiveis",
+      "filename": "src/actions/LinksExternos.ts"
+    },
+    "000733f20f45752c2c468400d8291f7d910011089b": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "desativarCalendarioAlpha",
+          "filename": "src/actions/google-calendar-conexao.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "desativarCalendarioAlpha",
+      "filename": "src/actions/google-calendar-conexao.ts"
+    },
+    "0078e19ca69481d55d27779a67676959c02131161c": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "obterStatusConexaoCalendarioAlpha",
+          "filename": "src/actions/google-calendar-conexao.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "rsc"
+      },
+      "exportedName": "obterStatusConexaoCalendarioAlpha",
+      "filename": "src/actions/google-calendar-conexao.ts"
+    },
+    "009fca93c7ccc262dd06d37d8b79a3c92abaa8244a": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "ativarCalendarioAlpha",
+          "filename": "src/actions/google-calendar-conexao.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "ativarCalendarioAlpha",
+      "filename": "src/actions/google-calendar-conexao.ts"
+    },
+    "000ac3d6a235d035ee797f35e55cc7e89861865313": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "listarCalendariosGoogleDisponiveis",
+          "filename": "src/actions/google-calendar-eventos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "listarCalendariosGoogleDisponiveis",
+      "filename": "src/actions/google-calendar-eventos.ts"
+    },
+    "00507ec40209e1ea40fc75eb01a773a024d2c196fb": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "listarCalendariosSelecionados",
+          "filename": "src/actions/google-calendar-eventos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "rsc"
+      },
+      "exportedName": "listarCalendariosSelecionados",
+      "filename": "src/actions/google-calendar-eventos.ts"
+    },
+    "4024de073baad06af206e0b2127c32fa9b405ddf4e": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "listarEventosCache",
+          "filename": "src/actions/google-calendar-eventos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "rsc"
+      },
+      "exportedName": "listarEventosCache",
+      "filename": "src/actions/google-calendar-eventos.ts"
+    },
+    "4036c52f8ddcbf7e7a2da84f9f9011c45d08d7ed20": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "atualizarEventoParcialNoCalendario",
+          "filename": "src/actions/google-calendar-eventos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "atualizarEventoParcialNoCalendario",
+      "filename": "src/actions/google-calendar-eventos.ts"
+    },
+    "405759ca75ada49c84ed7656682d7a9e30173f758a": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "definirCalendarioSelecionado",
+          "filename": "src/actions/google-calendar-eventos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "definirCalendarioSelecionado",
+      "filename": "src/actions/google-calendar-eventos.ts"
+    },
+    "40733848c190aa39d73e4676830b41be72dae92e02": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "criarEventoNoCalendario",
+          "filename": "src/actions/google-calendar-eventos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "criarEventoNoCalendario",
+      "filename": "src/actions/google-calendar-eventos.ts"
+    },
+    "4078065ab67dd3634970ef36900978e7f358af9aa1": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "atualizarEventoNoCalendario",
+          "filename": "src/actions/google-calendar-eventos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "rsc"
+      },
+      "exportedName": "atualizarEventoNoCalendario",
+      "filename": "src/actions/google-calendar-eventos.ts"
+    },
+    "40846b6b432c811c7f68da672a718726fe7e005077": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "cancelarEventoNoCalendario",
+          "filename": "src/actions/google-calendar-eventos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "cancelarEventoNoCalendario",
+      "filename": "src/actions/google-calendar-eventos.ts"
+    },
+    "40998a94e8cd3f455bbca7419f1771bb207eede514": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "carregarDetalhesEventoParaEdicao",
+          "filename": "src/actions/google-calendar-eventos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "carregarDetalhesEventoParaEdicao",
+      "filename": "src/actions/google-calendar-eventos.ts"
+    },
+    "40d6cf7871fff610d429b57754d1c54cb47f5f637e": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "consultarDisponibilidade",
+          "filename": "src/actions/google-calendar-eventos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "rsc"
+      },
+      "exportedName": "consultarDisponibilidade",
+      "filename": "src/actions/google-calendar-eventos.ts"
+    },
+    "40df1fa972267539ad193c221b5b7b88bcea8bd867": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "carregarDetalhesEventoParaVisualizacao",
+          "filename": "src/actions/google-calendar-eventos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "carregarDetalhesEventoParaVisualizacao",
+      "filename": "src/actions/google-calendar-eventos.ts"
+    },
+    "40f1049b9023b5743152708d4a943ae317c456aba5": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "responderConvite",
+          "filename": "src/actions/google-calendar-eventos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "responderConvite",
+      "filename": "src/actions/google-calendar-eventos.ts"
+    },
+    "60605bcb1936a03be6ac6f4fe4ae5f702207d4408b": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "personalizarCorCalendario",
+          "filename": "src/actions/google-calendar-eventos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "personalizarCorCalendario",
+      "filename": "src/actions/google-calendar-eventos.ts"
+    },
+    "7067d1bf8b5794a12ec02583246772977e2363c64e": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "listarEventosDoCalendario",
+          "filename": "src/actions/google-calendar-eventos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "rsc"
+      },
+      "exportedName": "listarEventosDoCalendario",
+      "filename": "src/actions/google-calendar-eventos.ts"
+    },
+    "609eed7ddcdcd3deed3539d077a999622575e8c690": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "atualizarEventoParcialParaColega",
+          "filename": "src/actions/google-calendar-admin.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "atualizarEventoParcialParaColega",
+      "filename": "src/actions/google-calendar-admin.ts"
+    },
+    "603fc54513658a44667e1d93312fb2e933e3448682": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "atualizarTarefaParaColega",
+          "filename": "src/actions/google-calendar-admin.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "atualizarTarefaParaColega",
+      "filename": "src/actions/google-calendar-admin.ts"
+    },
+    "6011fa9428a55798be5c6694dca54753e09bf5aa4d": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "criarEventoParaColega",
+          "filename": "src/actions/google-calendar-admin.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "criarEventoParaColega",
+      "filename": "src/actions/google-calendar-admin.ts"
+    },
+    "60e4ceaa3b57bb8f772edeea74b04cc32d2c222ecc": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "criarTarefaParaColega",
+          "filename": "src/actions/google-calendar-admin.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "criarTarefaParaColega",
+      "filename": "src/actions/google-calendar-admin.ts"
+    },
+    "40678454b440388a1aaf4815eb5375b6c35e1fc057": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "atualizarTarefaAgendaAlpha",
+          "filename": "src/actions/google-calendar-tarefas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "atualizarTarefaAgendaAlpha",
+      "filename": "src/actions/google-calendar-tarefas.ts"
+    },
+    "403f59edd0195404bc4e00366cf7009b224a8a30de": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "criarTarefaAgendaAlpha",
+          "filename": "src/actions/google-calendar-tarefas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "criarTarefaAgendaAlpha",
+      "filename": "src/actions/google-calendar-tarefas.ts"
+    },
+    "6022961ab0794f851765ff29ccfa74dfbb07c2ac42": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "alternarVisibilidadeColega",
+          "filename": "src/actions/google-calendar-colegas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "alternarVisibilidadeColega",
+      "filename": "src/actions/google-calendar-colegas.ts"
+    },
+    "603955c7b7372ee30c284afa65f88e8a541a31b649": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "personalizarCorColega",
+          "filename": "src/actions/google-calendar-colegas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "personalizarCorColega",
+      "filename": "src/actions/google-calendar-colegas.ts"
+    },
+    "402fe6da4f382b9c7e600e344c28cf26e43fa3b00a": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "removerColegaVisivel",
+          "filename": "src/actions/google-calendar-colegas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "removerColegaVisivel",
+      "filename": "src/actions/google-calendar-colegas.ts"
+    },
+    "40ceb49114095a2457275ee80fb3a3310488c33f40": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "aprovarSolicitacao",
+          "filename": "src/actions/google-calendar-solicitacoes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "aprovarSolicitacao",
+      "filename": "src/actions/google-calendar-solicitacoes.ts"
+    },
+    "4051c04bdb6adb62449cf5b988e45294403bf11ded": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "recusarSolicitacao",
+          "filename": "src/actions/google-calendar-solicitacoes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "recusarSolicitacao",
+      "filename": "src/actions/google-calendar-solicitacoes.ts"
+    },
+    "6066c9ced7bb2cc46fa7afa57a18d695be5d347403": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "solicitarCompartilhamento",
+          "filename": "src/actions/google-calendar-solicitacoes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "solicitarCompartilhamento",
+      "filename": "src/actions/google-calendar-solicitacoes.ts"
+    },
+    "604b42ab07a50cb4198cc420e728f30e26bb67d04d": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "alternarPermissaoColegas",
+          "filename": "src/actions/google-calendar-colegas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "alternarPermissaoColegas",
+      "filename": "src/actions/google-calendar-colegas.ts"
+    },
+    "60fb1ef1e5c5f32a815742be5d3c9a2da5e2a05055": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "cancelarEventoParaColega",
+          "filename": "src/actions/google-calendar-admin.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "cancelarEventoParaColega",
+      "filename": "src/actions/google-calendar-admin.ts"
+    },
+    "604004f3e8d8983a5b66e6e45cecd9eb6e067622e0": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "carregarDetalhesEventoColegaParaEdicao",
+          "filename": "src/actions/google-calendar-admin.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "carregarDetalhesEventoColegaParaEdicao",
+      "filename": "src/actions/google-calendar-admin.ts"
+    },
+    "607ecd5320efea63ea83ca3a00a5d3c5c8e9812347": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "responderConviteParaColega",
+          "filename": "src/actions/google-calendar-admin.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "responderConviteParaColega",
+      "filename": "src/actions/google-calendar-admin.ts"
+    },
+    "60334489b97e61f229bbe90cb9b547d29213e0aded": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "concluirTarefaParaColega",
+          "filename": "src/actions/google-calendar-admin.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "concluirTarefaParaColega",
+      "filename": "src/actions/google-calendar-admin.ts"
+    },
+    "408582877b3dc09d7fdcf408ad3b2566f4feb1e838": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "concluirTarefaAgendaAlpha",
+          "filename": "src/actions/google-calendar-tarefas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "concluirTarefaAgendaAlpha",
+      "filename": "src/actions/google-calendar-tarefas.ts"
+    },
+    "40b0e7a5feb03d888df4e7d297d1b0f48bcbd8a66d": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "carregarIntervaloAgendaAlpha",
+          "filename": "src/actions/google-calendar-agenda.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "carregarIntervaloAgendaAlpha",
+      "filename": "src/actions/google-calendar-agenda.ts"
+    },
+    "409257bee5cf7bf265d5262904db75dfe8c3170e40": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "reconciliarIntervaloAgendaAlpha",
+          "filename": "src/actions/google-calendar-reconciliacao.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "reconciliarIntervaloAgendaAlpha",
+      "filename": "src/actions/google-calendar-reconciliacao.ts"
+    },
+    "00dbae58580e1efe49409751d2c07b1bd22d0e27cf": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "listarColegasVisiveis",
+          "filename": "src/actions/google-calendar-colegas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "listarColegasVisiveis",
+      "filename": "src/actions/google-calendar-colegas.ts"
+    },
+    "00e134a72e673a99521734a970009d3fc8afd2dd6f": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "listarPermissoesColegasTodosUsuarios",
+          "filename": "src/actions/google-calendar-colegas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "listarPermissoesColegasTodosUsuarios",
+      "filename": "src/actions/google-calendar-colegas.ts"
+    },
+    "0057b484f38c3f6920cc187ac5cdfa92f3f19faf4d": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "listarUsuariosParaCompartilhar",
+          "filename": "src/actions/google-calendar-colegas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "listarUsuariosParaCompartilhar",
+      "filename": "src/actions/google-calendar-colegas.ts"
+    },
+    "0003286412e81ad2ec48224cc494333955a19bc105": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "listarSolicitacoesPendentesRecebidas",
+          "filename": "src/actions/google-calendar-solicitacoes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "listarSolicitacoesPendentesRecebidas",
+      "filename": "src/actions/google-calendar-solicitacoes.ts"
+    },
+    "4005f2034487cec9588334c077f1bd4a664f27457e": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "sincronizarAgendaAlpha",
+          "filename": "src/actions/google-calendar-sync.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "sincronizarAgendaAlpha",
+      "filename": "src/actions/google-calendar-sync.ts"
+    },
+    "00088c5b7d1a582f64e0937289285c6bedccc78fa3": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "sincronizarTarefasAgendaAlpha",
+          "filename": "src/actions/google-calendar-tarefas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "sincronizarTarefasAgendaAlpha",
+      "filename": "src/actions/google-calendar-tarefas.ts"
+    },
+    "70ff9b7ce454642c2a6e8fdfbc2b843e922b85128b": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "listarEventosDeColega",
+          "filename": "src/actions/google-calendar-colegas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "listarEventosDeColega",
+      "filename": "src/actions/google-calendar-colegas.ts"
+    },
+    "405fe95df2b76af8aeed8ae1a47c425a296b8eb02c": {
+      "workers": {
+        "app/PainelAlpha/CalendarioAlpha/page": {
+          "moduleId": 468131,
+          "async": true,
+          "exportedName": "listarTarefasDeColega",
+          "filename": "src/actions/google-calendar-colegas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/CalendarioAlpha/page": "action-browser"
+      },
+      "exportedName": "listarTarefasDeColega",
+      "filename": "src/actions/google-calendar-colegas.ts"
+    }
+  },
+  "edge": {}
+}

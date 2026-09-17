@@ -76,6 +76,7 @@ def _encode(value: object) -> str:
 class FakeSmb:
     def __init__(self) -> None:
         self.validated: list[str] = []
+        self.file_size = 6
 
     def validate(self, credential: NasCredential) -> None:
         if credential.password != "valid-password":
@@ -85,7 +86,9 @@ class FakeSmb:
     def list_directory(
         self, credential: NasCredential, relative_path: str, offset: int, limit: int
     ) -> tuple[list[SmbEntry], bool]:
-        if credential.principal == "maria":
+        if relative_path:
+            entries = [SmbEntry("Relatorio.docx", child_relative_path(relative_path, "Relatorio.docx"), False, self.file_size, None)]
+        elif credential.principal == "maria":
             entries = [SmbEntry("Financeiro", child_relative_path(relative_path, "Financeiro"), True, None, None)]
         else:
             entries = [SmbEntry("Comercial", child_relative_path(relative_path, "Comercial"), True, None, None)]
@@ -96,7 +99,7 @@ class FakeSmb:
         self.validated.append(f"mkdir:{parent_path}:{name}")
 
     def stat_file(self, credential: NasCredential, relative_path: str) -> int:
-        return 6
+        return self.file_size
 
     def iter_file(self, credential: NasCredential, relative_path: str, start: int, length: int):
         yield b"abcdef"[start:start + length]
@@ -135,6 +138,77 @@ class FakeSmb:
 
 def auth_headers(scope: str, **kwargs: str) -> dict[str, str]:
     return {"Origin": ORIGIN, "Authorization": f"Bearer {ticket(scope, **kwargs)}"}
+
+
+def test_office_session_opens_docx_without_exposing_smb_path_or_credential() -> None:
+    store, smb = MemorySecretStore(), FakeSmb()
+    binding = BindingIdentity(ISSUER, "alpha-explorer-smb-gateway", "user:42")
+    store.create(binding, NasCredential("maria", "valid-password"))
+    client = TestClient(create_app(settings(), store, smb))
+
+    root = client.get("/v1/items?handle=root", headers=auth_headers("list"))
+    folder_handle = root.json()["entries"][0]["handle"]
+    child = client.get(
+        f"/v1/items?handle={folder_handle}",
+        headers=auth_headers("list", resource=folder_handle),
+    )
+    file_handle = child.json()["entries"][0]["handle"]
+    opened = client.post(
+        "/v1/office/sessions",
+        headers=auth_headers(
+            "office_open", resource=file_handle, max_bytes=6, target_name="Relatorio.docx",
+        ),
+        json={"name": "Relatorio.docx"},
+    )
+
+    assert opened.status_code == 201
+    payload = opened.json()
+    assert payload["application"] == "word"
+    assert payload["documentPath"].startswith("/v1/office/files/o_")
+    assert "Financeiro" not in payload["documentPath"]
+    assert "maria" not in payload["documentPath"]
+
+    document = client.get(payload["documentPath"])
+    assert document.status_code == 200
+    assert document.content == b"abcdef"
+    assert document.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+    assert document.headers["content-disposition"].startswith("inline;")
+    assert document.headers["cache-control"] == "private, no-store"
+
+    partial = client.get(payload["documentPath"], headers={"Range": "bytes=1-3"})
+    assert partial.status_code == 206 and partial.content == b"bcd"
+    assert partial.headers["content-range"] == "bytes 1-3/6"
+    assert client.head(payload["documentPath"]).status_code == 200
+    assert client.get(payload["documentPath"].replace("Relatorio.docx", "Outro.docx")).status_code == 404
+
+    smb.file_size = 7
+    assert client.get(payload["documentPath"]).status_code == 409
+
+
+def test_office_session_denies_stale_size_and_unsupported_extension() -> None:
+    store, smb = MemorySecretStore(), FakeSmb()
+    binding = BindingIdentity(ISSUER, "alpha-explorer-smb-gateway", "user:42")
+    store.create(binding, NasCredential("maria", "valid-password"))
+    client = TestClient(create_app(settings(), store, smb))
+    root = client.get("/v1/items?handle=root", headers=auth_headers("list"))
+    folder_handle = root.json()["entries"][0]["handle"]
+    child = client.get(f"/v1/items?handle={folder_handle}", headers=auth_headers("list", resource=folder_handle))
+    file_handle = child.json()["entries"][0]["handle"]
+
+    stale = client.post(
+        "/v1/office/sessions",
+        headers=auth_headers("office_open", resource=file_handle, max_bytes=5, target_name="Relatorio.docx"),
+        json={"name": "Relatorio.docx"},
+    )
+    assert stale.status_code == 409
+    wrong_name = client.post(
+        "/v1/office/sessions",
+        headers=auth_headers("office_open", resource=file_handle, max_bytes=6, target_name="Relatorio.html"),
+        json={"name": "Relatorio.html"},
+    )
+    assert wrong_name.status_code == 403
 
 
 def test_admin_enrollment_list_and_unlink_are_bound_to_target_subject() -> None:
@@ -363,6 +437,28 @@ def test_vault_requires_https_outside_loopback_tests() -> None:
         raise AssertionError("identical production and stage ticket secrets were accepted")
 
 
+def test_gateway_accepts_only_explicit_runtime_origin_aliases() -> None:
+    configured = load_settings({
+        "SMB_GATEWAY_ENVIRONMENT": "test",
+        "SMB_GATEWAY_AUDIENCE": "alpha-explorer-smb-gateway",
+        "SMB_GATEWAY_PRODUCTION_ORIGIN": "https://painel.alpha-comex.com",
+        "SMB_GATEWAY_STAGE_ORIGIN": ORIGIN,
+        "SMB_GATEWAY_ADDITIONAL_STAGE_ORIGINS": "https://painel-alpha.alpak.ai",
+        "SMB_GATEWAY_ISSUER_PRODUCTION": "alpha-explorer-production",
+        "SMB_GATEWAY_ISSUER_STAGE": ISSUER,
+        "SMB_GATEWAY_TICKET_KID_PRODUCTION": "prod-key-2026",
+        "SMB_GATEWAY_TICKET_KID_STAGE": "stage-key-2026",
+        "SMB_GATEWAY_TICKET_SECRET_PRODUCTION": "production-secret-with-more-than-32-bytes",
+        "SMB_GATEWAY_TICKET_SECRET_STAGE": SECRET.decode(),
+        "SMB_GATEWAY_SMB_SERVER": "nas.invalid",
+        "SMB_GATEWAY_SECRET_STORE": "memory",
+    })
+    assert configured.origins == (
+        "https://painel.alpha-comex.com", ORIGIN, "https://painel-alpha.alpak.ai",
+    )
+    assert configured.origin_issuers["https://painel-alpha.alpak.ai"] == ISSUER
+
+
 def test_root_discovers_shares_and_lists_only_those_accessible_to_bound_identity(monkeypatch) -> None:
     class EmptyDirectory:
         def __iter__(self):
@@ -436,6 +532,53 @@ def test_root_can_discover_all_accessible_non_reserved_shares_without_allowlist(
     assert has_more is False
 
 
+def test_directory_listing_hides_microsoft_office_lock_files(monkeypatch) -> None:
+    class Stat:
+        st_size = 12
+        st_mtime = 0
+        st_file_attributes = 0
+        st_reparse_tag = 0
+
+    class Entry:
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+        def stat(self, follow_symlinks: bool = False):
+            return Stat()
+
+        def is_dir(self, follow_symlinks: bool = False) -> bool:
+            return False
+
+        def is_symlink(self) -> bool:
+            return False
+
+    class DirectoryIterator:
+        def __init__(self) -> None:
+            self._entries = iter([Entry("~$CLIENTES RADAR -.xlsx"), Entry("CLIENTES RADAR -.xlsx")])
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            return next(self._entries)
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr("app.smb.smbclient.register_session", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr("app.smb.smbclient.reset_connection_cache", lambda **_kwargs: None)
+    monkeypatch.setattr("app.smb.smbclient.stat", lambda *_args, **_kwargs: Stat())
+    monkeypatch.setattr("app.smb.smbclient.path.islink", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr("app.smb.smbclient.scandir", lambda *_args, **_kwargs: DirectoryIterator())
+
+    client = SmbClient(settings())
+    entries, has_more = client.list_directory(
+        NasCredential("maria", "valid-password"), "ALPHA_TEST", 0, 100,
+    )
+    assert [entry.name for entry in entries] == ["CLIENTES RADAR -.xlsx"]
+    assert has_more is False
+
+
 def test_share_catalog_parser_accepts_only_disk_shares_and_removes_duplicates() -> None:
     output = "\n".join([
         "Disk|Comercial|Equipe comercial",
@@ -487,6 +630,21 @@ def test_share_discovery_classifies_qnap_authentication_failure(monkeypatch) -> 
         assert error.diagnostic_code == "NT_STATUS_LOGON_FAILURE"
     else:
         raise AssertionError("QNAP authentication failure was not classified")
+
+
+def test_share_discovery_accepts_valid_catalog_before_legacy_workgroup_warning(monkeypatch) -> None:
+    def fake_run(arguments, **_options):
+        return subprocess.CompletedProcess(
+            arguments,
+            1,
+            "Disk|Comercial|\nDisk|Financeiro|\n",
+            "SMB1 disabled -- no workgroup available",
+        )
+
+    monkeypatch.setattr("app.smb.shutil.which", lambda _name: "/usr/bin/smbclient")
+    monkeypatch.setattr("app.smb.subprocess.run", fake_run)
+    client = SmbClient(Settings(**{**settings().__dict__, "smb_shares": ()}))
+    assert client._enumerate_shares(NasCredential("maria", "valid-password")) == ["Comercial", "Financeiro"]
 
 
 def test_share_allowlist_is_optional_for_automatic_discovery() -> None:

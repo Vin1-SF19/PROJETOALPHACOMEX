@@ -1,0 +1,1938 @@
+{
+  "version": 3,
+  "pages404": true,
+  "appType": "app",
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "priority": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    }
+  ],
+  "headers": [],
+  "rewrites": {
+    "beforeFiles": [],
+    "afterFiles": [],
+    "fallback": []
+  },
+  "dynamicRoutes": [
+    {
+      "page": "/api/alpha-explorer/items/[id]",
+      "regex": "^/api/alpha\\-explorer/items/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/alpha\\-explorer/items/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-explorer/items/[id]/download",
+      "regex": "^/api/alpha\\-explorer/items/([^/]+?)/download(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/alpha\\-explorer/items/(?<nxtPid>[^/]+?)/download(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-explorer/uploads/[sessionId]",
+      "regex": "^/api/alpha\\-explorer/uploads/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPsessionId": "nxtPsessionId"
+      },
+      "namedRegex": "^/api/alpha\\-explorer/uploads/(?<nxtPsessionId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-explorer/uploads/[sessionId]/complete",
+      "regex": "^/api/alpha\\-explorer/uploads/([^/]+?)/complete(?:/)?$",
+      "routeKeys": {
+        "nxtPsessionId": "nxtPsessionId"
+      },
+      "namedRegex": "^/api/alpha\\-explorer/uploads/(?<nxtPsessionId>[^/]+?)/complete(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-explorer/uploads/[sessionId]/parts",
+      "regex": "^/api/alpha\\-explorer/uploads/([^/]+?)/parts(?:/)?$",
+      "routeKeys": {
+        "nxtPsessionId": "nxtPsessionId"
+      },
+      "namedRegex": "^/api/alpha\\-explorer/uploads/(?<nxtPsessionId>[^/]+?)/parts(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-seo/oauth/[product]/callback",
+      "regex": "^/api/alpha\\-seo/oauth/([^/]+?)/callback(?:/)?$",
+      "routeKeys": {
+        "nxtPproduct": "nxtPproduct"
+      },
+      "namedRegex": "^/api/alpha\\-seo/oauth/(?<nxtPproduct>[^/]+?)/callback(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-seo/oauth/[product]/start",
+      "regex": "^/api/alpha\\-seo/oauth/([^/]+?)/start(?:/)?$",
+      "routeKeys": {
+        "nxtPproduct": "nxtPproduct"
+      },
+      "namedRegex": "^/api/alpha\\-seo/oauth/(?<nxtPproduct>[^/]+?)/start(?:/)?$"
+    },
+    {
+      "page": "/api/apresentacoes/[id]/exportar-html",
+      "regex": "^/api/apresentacoes/([^/]+?)/exportar\\-html(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/apresentacoes/(?<nxtPid>[^/]+?)/exportar\\-html(?:/)?$"
+    },
+    {
+      "page": "/api/apresentacoes/[id]/importar-pptx",
+      "regex": "^/api/apresentacoes/([^/]+?)/importar\\-pptx(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/apresentacoes/(?<nxtPid>[^/]+?)/importar\\-pptx(?:/)?$"
+    },
+    {
+      "page": "/api/apresentacoes/[id]/miniatura",
+      "regex": "^/api/apresentacoes/([^/]+?)/miniatura(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/apresentacoes/(?<nxtPid>[^/]+?)/miniatura(?:/)?$"
+    },
+    {
+      "page": "/api/apresentacoes/[id]/pptx-preview",
+      "regex": "^/api/apresentacoes/([^/]+?)/pptx\\-preview(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/apresentacoes/(?<nxtPid>[^/]+?)/pptx\\-preview(?:/)?$"
+    },
+    {
+      "page": "/api/apresentacoes/[id]/pptx-upload",
+      "regex": "^/api/apresentacoes/([^/]+?)/pptx\\-upload(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/apresentacoes/(?<nxtPid>[^/]+?)/pptx\\-upload(?:/)?$"
+    },
+    {
+      "page": "/api/auth/[...nextauth]",
+      "regex": "^/api/auth/(.+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPnextauth": "nxtPnextauth"
+      },
+      "namedRegex": "^/api/auth/(?<nxtPnextauth>.+?)(?:/)?$"
+    },
+    {
+      "page": "/api/bibble/projects/[id]",
+      "regex": "^/api/bibble/projects/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/bibble/projects/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/bibble/sessions/[id]",
+      "regex": "^/api/bibble/sessions/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/bibble/sessions/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/bibble/sessions/[id]/messages",
+      "regex": "^/api/bibble/sessions/([^/]+?)/messages(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/bibble/sessions/(?<nxtPid>[^/]+?)/messages(?:/)?$"
+    },
+    {
+      "page": "/api/bpm/anexos/[anexoId]",
+      "regex": "^/api/bpm/anexos/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPanexoId": "nxtPanexoId"
+      },
+      "namedRegex": "^/api/bpm/anexos/(?<nxtPanexoId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/bpm/webhooks/[slug]",
+      "regex": "^/api/bpm/webhooks/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPslug": "nxtPslug"
+      },
+      "namedRegex": "^/api/bpm/webhooks/(?<nxtPslug>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/checklist/[empresaId]/documentos/zip",
+      "regex": "^/api/checklist/([^/]+?)/documentos/zip(?:/)?$",
+      "routeKeys": {
+        "nxtPempresaId": "nxtPempresaId"
+      },
+      "namedRegex": "^/api/checklist/(?<nxtPempresaId>[^/]+?)/documentos/zip(?:/)?$"
+    },
+    {
+      "page": "/api/comissoes/comprovantes/[paymentId]",
+      "regex": "^/api/comissoes/comprovantes/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPpaymentId": "nxtPpaymentId"
+      },
+      "namedRegex": "^/api/comissoes/comprovantes/(?<nxtPpaymentId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/gerador-documentos/clientes/[clienteId]/historico",
+      "regex": "^/api/gerador\\-documentos/clientes/([^/]+?)/historico(?:/)?$",
+      "routeKeys": {
+        "nxtPclienteId": "nxtPclienteId"
+      },
+      "namedRegex": "^/api/gerador\\-documentos/clientes/(?<nxtPclienteId>[^/]+?)/historico(?:/)?$"
+    },
+    {
+      "page": "/api/gerador-documentos/[id]/download",
+      "regex": "^/api/gerador\\-documentos/([^/]+?)/download(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/gerador\\-documentos/(?<nxtPid>[^/]+?)/download(?:/)?$"
+    },
+    {
+      "page": "/api/holerites/[id]/download",
+      "regex": "^/api/holerites/([^/]+?)/download(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/holerites/(?<nxtPid>[^/]+?)/download(?:/)?$"
+    },
+    {
+      "page": "/api/mesclagem/historico/[id]/arquivo/[tipo]",
+      "regex": "^/api/mesclagem/historico/([^/]+?)/arquivo/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid",
+        "nxtPtipo": "nxtPtipo"
+      },
+      "namedRegex": "^/api/mesclagem/historico/(?<nxtPid>[^/]+?)/arquivo/(?<nxtPtipo>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/metas/justificativas/[id]",
+      "regex": "^/api/metas/justificativas/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/metas/justificativas/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/notas/anexos/[id]",
+      "regex": "^/api/notas/anexos/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/notas/anexos/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/agent-tools/[tool]",
+      "regex": "^/api/onyx/agent\\-tools/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPtool": "nxtPtool"
+      },
+      "namedRegex": "^/api/onyx/agent\\-tools/(?<nxtPtool>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/agents/[id]",
+      "regex": "^/api/onyx/agents/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/onyx/agents/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/agents/[id]/avatar",
+      "regex": "^/api/onyx/agents/([^/]+?)/avatar(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/onyx/agents/(?<nxtPid>[^/]+?)/avatar(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/connectors/[ccPairId]",
+      "regex": "^/api/onyx/connectors/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPccPairId": "nxtPccPairId"
+      },
+      "namedRegex": "^/api/onyx/connectors/(?<nxtPccPairId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/file/[fileId]",
+      "regex": "^/api/onyx/file/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPfileId": "nxtPfileId"
+      },
+      "namedRegex": "^/api/onyx/file/(?<nxtPfileId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/session/[id]",
+      "regex": "^/api/onyx/session/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/onyx/session/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/painel-alpha/clientes/[id]/timeline",
+      "regex": "^/api/painel\\-alpha/clientes/([^/]+?)/timeline(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/painel\\-alpha/clientes/(?<nxtPid>[^/]+?)/timeline(?:/)?$"
+    },
+    {
+      "page": "/api/roadmap/production/objectives/[objectiveId]/completion-report",
+      "regex": "^/api/roadmap/production/objectives/([^/]+?)/completion\\-report(?:/)?$",
+      "routeKeys": {
+        "nxtPobjectiveId": "nxtPobjectiveId"
+      },
+      "namedRegex": "^/api/roadmap/production/objectives/(?<nxtPobjectiveId>[^/]+?)/completion\\-report(?:/)?$"
+    },
+    {
+      "page": "/api/roadmap/production/objectives/[objectiveId]/runs",
+      "regex": "^/api/roadmap/production/objectives/([^/]+?)/runs(?:/)?$",
+      "routeKeys": {
+        "nxtPobjectiveId": "nxtPobjectiveId"
+      },
+      "namedRegex": "^/api/roadmap/production/objectives/(?<nxtPobjectiveId>[^/]+?)/runs(?:/)?$"
+    },
+    {
+      "page": "/api/roadmap/production/runs/[runId]",
+      "regex": "^/api/roadmap/production/runs/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPrunId": "nxtPrunId"
+      },
+      "namedRegex": "^/api/roadmap/production/runs/(?<nxtPrunId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/roadmap/production/runs/[runId]/approve",
+      "regex": "^/api/roadmap/production/runs/([^/]+?)/approve(?:/)?$",
+      "routeKeys": {
+        "nxtPrunId": "nxtPrunId"
+      },
+      "namedRegex": "^/api/roadmap/production/runs/(?<nxtPrunId>[^/]+?)/approve(?:/)?$"
+    },
+    {
+      "page": "/api/roadmap/production/runs/[runId]/events",
+      "regex": "^/api/roadmap/production/runs/([^/]+?)/events(?:/)?$",
+      "routeKeys": {
+        "nxtPrunId": "nxtPrunId"
+      },
+      "namedRegex": "^/api/roadmap/production/runs/(?<nxtPrunId>[^/]+?)/events(?:/)?$"
+    },
+    {
+      "page": "/api/roadmap/production/runs/[runId]/status",
+      "regex": "^/api/roadmap/production/runs/([^/]+?)/status(?:/)?$",
+      "routeKeys": {
+        "nxtPrunId": "nxtPrunId"
+      },
+      "namedRegex": "^/api/roadmap/production/runs/(?<nxtPrunId>[^/]+?)/status(?:/)?$"
+    },
+    {
+      "page": "/apresentacao/[slug]",
+      "regex": "^/apresentacao/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPslug": "nxtPslug"
+      },
+      "namedRegex": "^/apresentacao/(?<nxtPslug>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/convite/parceiro/[token]",
+      "regex": "^/convite/parceiro/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPtoken": "nxtPtoken"
+      },
+      "namedRegex": "^/convite/parceiro/(?<nxtPtoken>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaBlueprint/[projectId]",
+      "regex": "^/PainelAlpha/AlphaBlueprint/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaBlueprint/(?<nxtPprojectId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]",
+      "regex": "^/PainelAlpha/AlphaCRM/admin/pipelines/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPpipelineId": "nxtPpipelineId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaCRM/admin/pipelines/(?<nxtPpipelineId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaCRM/empresa/[empresaId]",
+      "regex": "^/PainelAlpha/AlphaCRM/empresa/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPempresaId": "nxtPempresaId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaCRM/empresa/(?<nxtPempresaId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaCRM/pipeline/[pipelineId]",
+      "regex": "^/PainelAlpha/AlphaCRM/pipeline/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPpipelineId": "nxtPpipelineId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaCRM/pipeline/(?<nxtPpipelineId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSEO/[projectId]",
+      "regex": "^/PainelAlpha/AlphaSEO/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaSEO/(?<nxtPprojectId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSEO/[projectId]/audit",
+      "regex": "^/PainelAlpha/AlphaSEO/([^/]+?)/audit(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaSEO/(?<nxtPprojectId>[^/]+?)/audit(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]",
+      "regex": "^/PainelAlpha/AlphaSEO/([^/]+?)/audit/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId",
+        "nxtPauditId": "nxtPauditId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaSEO/(?<nxtPprojectId>[^/]+?)/audit/(?<nxtPauditId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]",
+      "regex": "^/PainelAlpha/AlphaSEO/([^/]+?)/audit/([^/]+?)/performance/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId",
+        "nxtPauditId": "nxtPauditId",
+        "nxtPresultId": "nxtPresultId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaSEO/(?<nxtPprojectId>[^/]+?)/audit/(?<nxtPauditId>[^/]+?)/performance/(?<nxtPresultId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSEO/[projectId]/backlinks",
+      "regex": "^/PainelAlpha/AlphaSEO/([^/]+?)/backlinks(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaSEO/(?<nxtPprojectId>[^/]+?)/backlinks(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSEO/[projectId]/brand-lookup",
+      "regex": "^/PainelAlpha/AlphaSEO/([^/]+?)/brand\\-lookup(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaSEO/(?<nxtPprojectId>[^/]+?)/brand\\-lookup(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSEO/[projectId]/dashboard",
+      "regex": "^/PainelAlpha/AlphaSEO/([^/]+?)/dashboard(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaSEO/(?<nxtPprojectId>[^/]+?)/dashboard(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSEO/[projectId]/domain",
+      "regex": "^/PainelAlpha/AlphaSEO/([^/]+?)/domain(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaSEO/(?<nxtPprojectId>[^/]+?)/domain(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSEO/[projectId]/keywords",
+      "regex": "^/PainelAlpha/AlphaSEO/([^/]+?)/keywords(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaSEO/(?<nxtPprojectId>[^/]+?)/keywords(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSEO/[projectId]/prompt-explorer",
+      "regex": "^/PainelAlpha/AlphaSEO/([^/]+?)/prompt\\-explorer(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaSEO/(?<nxtPprojectId>[^/]+?)/prompt\\-explorer(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSEO/[projectId]/rank",
+      "regex": "^/PainelAlpha/AlphaSEO/([^/]+?)/rank(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaSEO/(?<nxtPprojectId>[^/]+?)/rank(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSEO/[projectId]/rank/[trackerId]",
+      "regex": "^/PainelAlpha/AlphaSEO/([^/]+?)/rank/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId",
+        "nxtPtrackerId": "nxtPtrackerId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaSEO/(?<nxtPprojectId>[^/]+?)/rank/(?<nxtPtrackerId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSEO/[projectId]/sam",
+      "regex": "^/PainelAlpha/AlphaSEO/([^/]+?)/sam(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaSEO/(?<nxtPprojectId>[^/]+?)/sam(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSEO/[projectId]/saved",
+      "regex": "^/PainelAlpha/AlphaSEO/([^/]+?)/saved(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaSEO/(?<nxtPprojectId>[^/]+?)/saved(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSEO/[projectId]/search-performance",
+      "regex": "^/PainelAlpha/AlphaSEO/([^/]+?)/search\\-performance(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaSEO/(?<nxtPprojectId>[^/]+?)/search\\-performance(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSEO/[projectId]/settings",
+      "regex": "^/PainelAlpha/AlphaSEO/([^/]+?)/settings(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaSEO/(?<nxtPprojectId>[^/]+?)/settings(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSEO/[projectId]/settings/context",
+      "regex": "^/PainelAlpha/AlphaSEO/([^/]+?)/settings/context(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaSEO/(?<nxtPprojectId>[^/]+?)/settings/context(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSEO/[projectId]/settings/integrations",
+      "regex": "^/PainelAlpha/AlphaSEO/([^/]+?)/settings/integrations(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaSEO/(?<nxtPprojectId>[^/]+?)/settings/integrations(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSEO/[projectId]/settings/mcp",
+      "regex": "^/PainelAlpha/AlphaSEO/([^/]+?)/settings/mcp(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaSEO/(?<nxtPprojectId>[^/]+?)/settings/mcp(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSkills/modulo/[id]",
+      "regex": "^/PainelAlpha/AlphaSkills/modulo/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/PainelAlpha/AlphaSkills/modulo/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Apresentacoes/[id]/apresentar",
+      "regex": "^/PainelAlpha/Apresentacoes/([^/]+?)/apresentar(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/PainelAlpha/Apresentacoes/(?<nxtPid>[^/]+?)/apresentar(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Apresentacoes/[id]/editor",
+      "regex": "^/PainelAlpha/Apresentacoes/([^/]+?)/editor(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/PainelAlpha/Apresentacoes/(?<nxtPid>[^/]+?)/editor(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/CheckList/Embasamentos/[tipo]",
+      "regex": "^/PainelAlpha/CheckList/Embasamentos/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPtipo": "nxtPtipo"
+      },
+      "namedRegex": "^/PainelAlpha/CheckList/Embasamentos/(?<nxtPtipo>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/CheckList/[empresaId]",
+      "regex": "^/PainelAlpha/CheckList/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPempresaId": "nxtPempresaId"
+      },
+      "namedRegex": "^/PainelAlpha/CheckList/(?<nxtPempresaId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/ExtratosBancarios/[Id]",
+      "regex": "^/PainelAlpha/ExtratosBancarios/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPId": "nxtPId"
+      },
+      "namedRegex": "^/PainelAlpha/ExtratosBancarios/(?<nxtPId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/GeradorDocumentos/conferencia/[token]",
+      "regex": "^/PainelAlpha/GeradorDocumentos/conferencia/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPtoken": "nxtPtoken"
+      },
+      "namedRegex": "^/PainelAlpha/GeradorDocumentos/conferencia/(?<nxtPtoken>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/GeradorDocumentos/[templateId]",
+      "regex": "^/PainelAlpha/GeradorDocumentos/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPtemplateId": "nxtPtemplateId"
+      },
+      "namedRegex": "^/PainelAlpha/GeradorDocumentos/(?<nxtPtemplateId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/GeradorDocumentos/[templateId]/download",
+      "regex": "^/PainelAlpha/GeradorDocumentos/([^/]+?)/download(?:/)?$",
+      "routeKeys": {
+        "nxtPtemplateId": "nxtPtemplateId"
+      },
+      "namedRegex": "^/PainelAlpha/GeradorDocumentos/(?<nxtPtemplateId>[^/]+?)/download(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Holerites/[id]",
+      "regex": "^/PainelAlpha/Holerites/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/PainelAlpha/Holerites/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Mesclagem/[id]",
+      "regex": "^/PainelAlpha/Mesclagem/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/PainelAlpha/Mesclagem/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Parceiros/[id]",
+      "regex": "^/PainelAlpha/Parceiros/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/PainelAlpha/Parceiros/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/prova/[presetId]",
+      "regex": "^/PainelAlpha/prova/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPpresetId": "nxtPpresetId"
+      },
+      "namedRegex": "^/PainelAlpha/prova/(?<nxtPpresetId>[^/]+?)(?:/)?$"
+    }
+  ],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/_global-error",
+      "regex": "^/_global\\-error(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_global\\-error(?:/)?$"
+    },
+    {
+      "page": "/_not-found",
+      "regex": "^/_not\\-found(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-explorer/items",
+      "regex": "^/api/alpha\\-explorer/items(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/alpha\\-explorer/items(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-explorer/permissions",
+      "regex": "^/api/alpha\\-explorer/permissions(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/alpha\\-explorer/permissions(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-explorer/smb/admin/status",
+      "regex": "^/api/alpha\\-explorer/smb/admin/status(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/alpha\\-explorer/smb/admin/status(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-explorer/smb/admin/ticket",
+      "regex": "^/api/alpha\\-explorer/smb/admin/ticket(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/alpha\\-explorer/smb/admin/ticket(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-explorer/smb/admin/users",
+      "regex": "^/api/alpha\\-explorer/smb/admin/users(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/alpha\\-explorer/smb/admin/users(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-explorer/smb/health",
+      "regex": "^/api/alpha\\-explorer/smb/health(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/alpha\\-explorer/smb/health(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-explorer/smb/ticket",
+      "regex": "^/api/alpha\\-explorer/smb/ticket(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/alpha\\-explorer/smb/ticket(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-explorer/uploads",
+      "regex": "^/api/alpha\\-explorer/uploads(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/alpha\\-explorer/uploads(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-seo/cron/oauth-cleanup",
+      "regex": "^/api/alpha\\-seo/cron/oauth\\-cleanup(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/alpha\\-seo/cron/oauth\\-cleanup(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-seo/cron/schedules",
+      "regex": "^/api/alpha\\-seo/cron/schedules(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/alpha\\-seo/cron/schedules(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-seo/cron/worker",
+      "regex": "^/api/alpha\\-seo/cron/worker(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/alpha\\-seo/cron/worker(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-seo/mcp",
+      "regex": "^/api/alpha\\-seo/mcp(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/alpha\\-seo/mcp(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-seo/mcp/keys",
+      "regex": "^/api/alpha\\-seo/mcp/keys(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/alpha\\-seo/mcp/keys(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-seo/mcp/oauth/authorize",
+      "regex": "^/api/alpha\\-seo/mcp/oauth/authorize(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/alpha\\-seo/mcp/oauth/authorize(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-seo/mcp/oauth/metadata",
+      "regex": "^/api/alpha\\-seo/mcp/oauth/metadata(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/alpha\\-seo/mcp/oauth/metadata(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-seo/mcp/oauth/register",
+      "regex": "^/api/alpha\\-seo/mcp/oauth/register(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/alpha\\-seo/mcp/oauth/register(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-seo/mcp/oauth/revoke",
+      "regex": "^/api/alpha\\-seo/mcp/oauth/revoke(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/alpha\\-seo/mcp/oauth/revoke(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-seo/mcp/oauth/token",
+      "regex": "^/api/alpha\\-seo/mcp/oauth/token(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/alpha\\-seo/mcp/oauth/token(?:/)?$"
+    },
+    {
+      "page": "/api/alpha-seo/sam/stream",
+      "regex": "^/api/alpha\\-seo/sam/stream(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/alpha\\-seo/sam/stream(?:/)?$"
+    },
+    {
+      "page": "/api/apresentacoes/assets",
+      "regex": "^/api/apresentacoes/assets(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/apresentacoes/assets(?:/)?$"
+    },
+    {
+      "page": "/api/apresentacoes/fontes",
+      "regex": "^/api/apresentacoes/fontes(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/apresentacoes/fontes(?:/)?$"
+    },
+    {
+      "page": "/api/apresentacoes/gerar-slide",
+      "regex": "^/api/apresentacoes/gerar\\-slide(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/apresentacoes/gerar\\-slide(?:/)?$"
+    },
+    {
+      "page": "/api/bibble/chat",
+      "regex": "^/api/bibble/chat(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/bibble/chat(?:/)?$"
+    },
+    {
+      "page": "/api/bibble/cloud-providers",
+      "regex": "^/api/bibble/cloud\\-providers(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/bibble/cloud\\-providers(?:/)?$"
+    },
+    {
+      "page": "/api/bibble/curiosidade",
+      "regex": "^/api/bibble/curiosidade(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/bibble/curiosidade(?:/)?$"
+    },
+    {
+      "page": "/api/bibble/documents",
+      "regex": "^/api/bibble/documents(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/bibble/documents(?:/)?$"
+    },
+    {
+      "page": "/api/bibble/falas",
+      "regex": "^/api/bibble/falas(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/bibble/falas(?:/)?$"
+    },
+    {
+      "page": "/api/bibble/gerar-ficha",
+      "regex": "^/api/bibble/gerar\\-ficha(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/bibble/gerar\\-ficha(?:/)?$"
+    },
+    {
+      "page": "/api/bibble/models",
+      "regex": "^/api/bibble/models(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/bibble/models(?:/)?$"
+    },
+    {
+      "page": "/api/bibble/piada",
+      "regex": "^/api/bibble/piada(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/bibble/piada(?:/)?$"
+    },
+    {
+      "page": "/api/bibble/projects",
+      "regex": "^/api/bibble/projects(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/bibble/projects(?:/)?$"
+    },
+    {
+      "page": "/api/bibble/sessions",
+      "regex": "^/api/bibble/sessions(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/bibble/sessions(?:/)?$"
+    },
+    {
+      "page": "/api/bibble/upload",
+      "regex": "^/api/bibble/upload(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/bibble/upload(?:/)?$"
+    },
+    {
+      "page": "/api/bibble/upload-to-blob",
+      "regex": "^/api/bibble/upload\\-to\\-blob(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/bibble/upload\\-to\\-blob(?:/)?$"
+    },
+    {
+      "page": "/api/bibble/voice",
+      "regex": "^/api/bibble/voice(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/bibble/voice(?:/)?$"
+    },
+    {
+      "page": "/api/blueprint/chat",
+      "regex": "^/api/blueprint/chat(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/blueprint/chat(?:/)?$"
+    },
+    {
+      "page": "/api/blueprint/gerar-layout",
+      "regex": "^/api/blueprint/gerar\\-layout(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/blueprint/gerar\\-layout(?:/)?$"
+    },
+    {
+      "page": "/api/blueprint/gerar-prompt",
+      "regex": "^/api/blueprint/gerar\\-prompt(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/blueprint/gerar\\-prompt(?:/)?$"
+    },
+    {
+      "page": "/api/blueprint/upload",
+      "regex": "^/api/blueprint/upload(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/blueprint/upload(?:/)?$"
+    },
+    {
+      "page": "/api/bpm/jobs/alertas-tarefas",
+      "regex": "^/api/bpm/jobs/alertas\\-tarefas(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/bpm/jobs/alertas\\-tarefas(?:/)?$"
+    },
+    {
+      "page": "/api/bpm/jobs/automacao-novos-leads",
+      "regex": "^/api/bpm/jobs/automacao\\-novos\\-leads(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/bpm/jobs/automacao\\-novos\\-leads(?:/)?$"
+    },
+    {
+      "page": "/api/bpm/jobs/automacoes",
+      "regex": "^/api/bpm/jobs/automacoes(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/bpm/jobs/automacoes(?:/)?$"
+    },
+    {
+      "page": "/api/bpm/noloss-leads/ingest",
+      "regex": "^/api/bpm/noloss\\-leads/ingest(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/bpm/noloss\\-leads/ingest(?:/)?$"
+    },
+    {
+      "page": "/api/bpm/upload",
+      "regex": "^/api/bpm/upload(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/bpm/upload(?:/)?$"
+    },
+    {
+      "page": "/api/broadcast",
+      "regex": "^/api/broadcast(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/broadcast(?:/)?$"
+    },
+    {
+      "page": "/api/BuscaLote",
+      "regex": "^/api/BuscaLote(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/BuscaLote(?:/)?$"
+    },
+    {
+      "page": "/api/calendario-alpha/jobs/alertas-compromissos",
+      "regex": "^/api/calendario\\-alpha/jobs/alertas\\-compromissos(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/calendario\\-alpha/jobs/alertas\\-compromissos(?:/)?$"
+    },
+    {
+      "page": "/api/calendario-alpha/jobs/maintenance",
+      "regex": "^/api/calendario\\-alpha/jobs/maintenance(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/calendario\\-alpha/jobs/maintenance(?:/)?$"
+    },
+    {
+      "page": "/api/calendario-alpha/jobs/worker",
+      "regex": "^/api/calendario\\-alpha/jobs/worker(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/calendario\\-alpha/jobs/worker(?:/)?$"
+    },
+    {
+      "page": "/api/calendario-alpha/webhook",
+      "regex": "^/api/calendario\\-alpha/webhook(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/calendario\\-alpha/webhook(?:/)?$"
+    },
+    {
+      "page": "/api/chat/upload",
+      "regex": "^/api/chat/upload(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/chat/upload(?:/)?$"
+    },
+    {
+      "page": "/api/ChatBot",
+      "regex": "^/api/ChatBot(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/ChatBot(?:/)?$"
+    },
+    {
+      "page": "/api/ChatBot/AbrirChamado",
+      "regex": "^/api/ChatBot/AbrirChamado(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/ChatBot/AbrirChamado(?:/)?$"
+    },
+    {
+      "page": "/api/ConsultaCompleta",
+      "regex": "^/api/ConsultaCompleta(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/ConsultaCompleta(?:/)?$"
+    },
+    {
+      "page": "/api/ConsultaCpf",
+      "regex": "^/api/ConsultaCpf(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/ConsultaCpf(?:/)?$"
+    },
+    {
+      "page": "/api/ConsultaRadar",
+      "regex": "^/api/ConsultaRadar(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/ConsultaRadar(?:/)?$"
+    },
+    {
+      "page": "/api/contratos/upload",
+      "regex": "^/api/contratos/upload(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/contratos/upload(?:/)?$"
+    },
+    {
+      "page": "/api/convite/consulta-cpf",
+      "regex": "^/api/convite/consulta\\-cpf(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/convite/consulta\\-cpf(?:/)?$"
+    },
+    {
+      "page": "/api/convite/validar-pin",
+      "regex": "^/api/convite/validar\\-pin(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/convite/validar\\-pin(?:/)?$"
+    },
+    {
+      "page": "/api/cs-nps/exportar",
+      "regex": "^/api/cs\\-nps/exportar(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cs\\-nps/exportar(?:/)?$"
+    },
+    {
+      "page": "/api/cs-nps/importar/modelo",
+      "regex": "^/api/cs\\-nps/importar/modelo(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cs\\-nps/importar/modelo(?:/)?$"
+    },
+    {
+      "page": "/api/cs-nps/importar/previsualizar",
+      "regex": "^/api/cs\\-nps/importar/previsualizar(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cs\\-nps/importar/previsualizar(?:/)?$"
+    },
+    {
+      "page": "/api/cs-nps/importar/salvar",
+      "regex": "^/api/cs\\-nps/importar/salvar(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cs\\-nps/importar/salvar(?:/)?$"
+    },
+    {
+      "page": "/api/documentos",
+      "regex": "^/api/documentos(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/documentos(?:/)?$"
+    },
+    {
+      "page": "/api/documentos/ordenar",
+      "regex": "^/api/documentos/ordenar(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/documentos/ordenar(?:/)?$"
+    },
+    {
+      "page": "/api/documentos/salvar",
+      "regex": "^/api/documentos/salvar(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/documentos/salvar(?:/)?$"
+    },
+    {
+      "page": "/api/DownloadArquivos",
+      "regex": "^/api/DownloadArquivos(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/DownloadArquivos(?:/)?$"
+    },
+    {
+      "page": "/api/EmpresaAqui",
+      "regex": "^/api/EmpresaAqui(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/EmpresaAqui(?:/)?$"
+    },
+    {
+      "page": "/api/ExclusaoFiscal",
+      "regex": "^/api/ExclusaoFiscal(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/ExclusaoFiscal(?:/)?$"
+    },
+    {
+      "page": "/api/gerador-documentos/gerar",
+      "regex": "^/api/gerador\\-documentos/gerar(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/gerador\\-documentos/gerar(?:/)?$"
+    },
+    {
+      "page": "/api/GerarPdf",
+      "regex": "^/api/GerarPdf(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/GerarPdf(?:/)?$"
+    },
+    {
+      "page": "/api/heartbeat",
+      "regex": "^/api/heartbeat(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/heartbeat(?:/)?$"
+    },
+    {
+      "page": "/api/HistoricoRadar",
+      "regex": "^/api/HistoricoRadar(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/HistoricoRadar(?:/)?$"
+    },
+    {
+      "page": "/api/holerites/upload",
+      "regex": "^/api/holerites/upload(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/holerites/upload(?:/)?$"
+    },
+    {
+      "page": "/api/ImportarHistorico",
+      "regex": "^/api/ImportarHistorico(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/ImportarHistorico(?:/)?$"
+    },
+    {
+      "page": "/api/InfoSimples",
+      "regex": "^/api/InfoSimples(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/InfoSimples(?:/)?$"
+    },
+    {
+      "page": "/api/LimpezaBd",
+      "regex": "^/api/LimpezaBd(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/LimpezaBd(?:/)?$"
+    },
+    {
+      "page": "/api/ListarArquivos",
+      "regex": "^/api/ListarArquivos(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/ListarArquivos(?:/)?$"
+    },
+    {
+      "page": "/api/mesclagem/exportar",
+      "regex": "^/api/mesclagem/exportar(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/mesclagem/exportar(?:/)?$"
+    },
+    {
+      "page": "/api/mesclagem/inspecionar",
+      "regex": "^/api/mesclagem/inspecionar(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/mesclagem/inspecionar(?:/)?$"
+    },
+    {
+      "page": "/api/mesclagem/previa",
+      "regex": "^/api/mesclagem/previa(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/mesclagem/previa(?:/)?$"
+    },
+    {
+      "page": "/api/mesclagem/sugerir",
+      "regex": "^/api/mesclagem/sugerir(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/mesclagem/sugerir(?:/)?$"
+    },
+    {
+      "page": "/api/mesclagem/template",
+      "regex": "^/api/mesclagem/template(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/mesclagem/template(?:/)?$"
+    },
+    {
+      "page": "/api/metas/justificativas/upload",
+      "regex": "^/api/metas/justificativas/upload(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/metas/justificativas/upload(?:/)?$"
+    },
+    {
+      "page": "/api/notas/upload",
+      "regex": "^/api/notas/upload(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/notas/upload(?:/)?$"
+    },
+    {
+      "page": "/api/notificacoes",
+      "regex": "^/api/notificacoes(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/notificacoes(?:/)?$"
+    },
+    {
+      "page": "/api/onboarding/marcar-visto",
+      "regex": "^/api/onboarding/marcar\\-visto(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/onboarding/marcar\\-visto(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/agent-tools/register",
+      "regex": "^/api/onyx/agent\\-tools/register(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/onyx/agent\\-tools/register(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/agentes-fixados",
+      "regex": "^/api/onyx/agentes\\-fixados(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/onyx/agentes\\-fixados(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/agents",
+      "regex": "^/api/onyx/agents(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/onyx/agents(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/agents/generate-avatar",
+      "regex": "^/api/onyx/agents/generate\\-avatar(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/onyx/agents/generate\\-avatar(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/agents/upload-image",
+      "regex": "^/api/onyx/agents/upload\\-image(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/onyx/agents/upload\\-image(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/chat",
+      "regex": "^/api/onyx/chat(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/onyx/chat(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/connectors",
+      "regex": "^/api/onyx/connectors(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/onyx/connectors(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/connectors/credentials",
+      "regex": "^/api/onyx/connectors/credentials(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/onyx/connectors/credentials(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/connectors/document-sets",
+      "regex": "^/api/onyx/connectors/document\\-sets(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/onyx/connectors/document\\-sets(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/connectors/upload",
+      "regex": "^/api/onyx/connectors/upload(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/onyx/connectors/upload(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/extrato",
+      "regex": "^/api/onyx/extrato(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/onyx/extrato(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/extrato/reprocessar",
+      "regex": "^/api/onyx/extrato/reprocessar(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/onyx/extrato/reprocessar(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/image-models",
+      "regex": "^/api/onyx/image\\-models(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/onyx/image\\-models(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/llm-models",
+      "regex": "^/api/onyx/llm\\-models(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/onyx/llm\\-models(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/tools",
+      "regex": "^/api/onyx/tools(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/onyx/tools(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/voice/status",
+      "regex": "^/api/onyx/voice/status(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/onyx/voice/status(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/voice/synthesize",
+      "regex": "^/api/onyx/voice/synthesize(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/onyx/voice/synthesize(?:/)?$"
+    },
+    {
+      "page": "/api/onyx/voice/transcribe",
+      "regex": "^/api/onyx/voice/transcribe(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/onyx/voice/transcribe(?:/)?$"
+    },
+    {
+      "page": "/api/parceiros/jobs/desenvolvimento",
+      "regex": "^/api/parceiros/jobs/desenvolvimento(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/parceiros/jobs/desenvolvimento(?:/)?$"
+    },
+    {
+      "page": "/api/pusher/auth",
+      "regex": "^/api/pusher/auth(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/pusher/auth(?:/)?$"
+    },
+    {
+      "page": "/api/radar",
+      "regex": "^/api/radar(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/radar(?:/)?$"
+    },
+    {
+      "page": "/api/RadarFiscal",
+      "regex": "^/api/RadarFiscal(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/RadarFiscal(?:/)?$"
+    },
+    {
+      "page": "/api/ReceitaFederal",
+      "regex": "^/api/ReceitaFederal(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/ReceitaFederal(?:/)?$"
+    },
+    {
+      "page": "/api/roadmap/production/queue",
+      "regex": "^/api/roadmap/production/queue(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/roadmap/production/queue(?:/)?$"
+    },
+    {
+      "page": "/api/SalvarPlanilhaFiscal",
+      "regex": "^/api/SalvarPlanilhaFiscal(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/SalvarPlanilhaFiscal(?:/)?$"
+    },
+    {
+      "page": "/api/upload",
+      "regex": "^/api/upload(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/upload(?:/)?$"
+    },
+    {
+      "page": "/api/UploadSkills",
+      "regex": "^/api/UploadSkills(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/UploadSkills(?:/)?$"
+    },
+    {
+      "page": "/api/usuarios/avatar",
+      "regex": "^/api/usuarios/avatar(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/usuarios/avatar(?:/)?$"
+    },
+    {
+      "page": "/auth/RedefinirSenha",
+      "regex": "^/auth/RedefinirSenha(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/auth/RedefinirSenha(?:/)?$"
+    },
+    {
+      "page": "/dev/login-transition-preview",
+      "regex": "^/dev/login\\-transition\\-preview(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dev/login\\-transition\\-preview(?:/)?$"
+    },
+    {
+      "page": "/favicon.ico",
+      "regex": "^/favicon\\.ico(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/favicon\\.ico(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha",
+      "regex": "^/PainelAlpha(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaBlueprint",
+      "regex": "^/PainelAlpha/AlphaBlueprint(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/AlphaBlueprint(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaComm",
+      "regex": "^/PainelAlpha/AlphaComm(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/AlphaComm(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaConnect",
+      "regex": "^/PainelAlpha/AlphaConnect(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/AlphaConnect(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaCRM",
+      "regex": "^/PainelAlpha/AlphaCRM(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/AlphaCRM(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaCRM/admin",
+      "regex": "^/PainelAlpha/AlphaCRM/admin(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/AlphaCRM/admin(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaCRM/admin/automacoes",
+      "regex": "^/PainelAlpha/AlphaCRM/admin/automacoes(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/AlphaCRM/admin/automacoes(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaCRM/admin/cadencias",
+      "regex": "^/PainelAlpha/AlphaCRM/admin/cadencias(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/AlphaCRM/admin/cadencias(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaCRM/admin/checklists",
+      "regex": "^/PainelAlpha/AlphaCRM/admin/checklists(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/AlphaCRM/admin/checklists(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaCRM/admin/conhecimento",
+      "regex": "^/PainelAlpha/AlphaCRM/admin/conhecimento(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/AlphaCRM/admin/conhecimento(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaCRM/admin/regras",
+      "regex": "^/PainelAlpha/AlphaCRM/admin/regras(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/AlphaCRM/admin/regras(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaCRM/automacoes",
+      "regex": "^/PainelAlpha/AlphaCRM/automacoes(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/AlphaCRM/automacoes(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaCRM/pendencias",
+      "regex": "^/PainelAlpha/AlphaCRM/pendencias(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/AlphaCRM/pendencias(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaCRM/pipelines",
+      "regex": "^/PainelAlpha/AlphaCRM/pipelines(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/AlphaCRM/pipelines(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaCRM/tarefas",
+      "regex": "^/PainelAlpha/AlphaCRM/tarefas(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/AlphaCRM/tarefas(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSchools",
+      "regex": "^/PainelAlpha/AlphaSchools(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/AlphaSchools(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSchools/presets",
+      "regex": "^/PainelAlpha/AlphaSchools/presets(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/AlphaSchools/presets(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSEO",
+      "regex": "^/PainelAlpha/AlphaSEO(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/AlphaSEO(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSEO/invite",
+      "regex": "^/PainelAlpha/AlphaSEO/invite(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/AlphaSEO/invite(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSkills",
+      "regex": "^/PainelAlpha/AlphaSkills(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/AlphaSkills(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaSkills/Gerenciamento",
+      "regex": "^/PainelAlpha/AlphaSkills/Gerenciamento(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/AlphaSkills/Gerenciamento(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/AlphaVault",
+      "regex": "^/PainelAlpha/AlphaVault(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/AlphaVault(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Apresentacoes",
+      "regex": "^/PainelAlpha/Apresentacoes(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Apresentacoes(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/cadastro",
+      "regex": "^/PainelAlpha/cadastro(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/cadastro(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/CadastroClientes",
+      "regex": "^/PainelAlpha/CadastroClientes(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/CadastroClientes(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/CalendarioAlpha",
+      "regex": "^/PainelAlpha/CalendarioAlpha(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/CalendarioAlpha(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Chamados",
+      "regex": "^/PainelAlpha/Chamados(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Chamados(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Chamados/ChatChamado",
+      "regex": "^/PainelAlpha/Chamados/ChatChamado(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Chamados/ChatChamado(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Chamados/NovoChamado",
+      "regex": "^/PainelAlpha/Chamados/NovoChamado(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Chamados/NovoChamado(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/ChatBotAlpha",
+      "regex": "^/PainelAlpha/ChatBotAlpha(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/ChatBotAlpha(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/ChatBotAlpha/agentes",
+      "regex": "^/PainelAlpha/ChatBotAlpha/agentes(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/ChatBotAlpha/agentes(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/ChatBotAlpha/campanhas",
+      "regex": "^/PainelAlpha/ChatBotAlpha/campanhas(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/ChatBotAlpha/campanhas(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/ChatBotAlpha/configuracoes",
+      "regex": "^/PainelAlpha/ChatBotAlpha/configuracoes(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/ChatBotAlpha/configuracoes(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/ChatBotAlpha/contatos",
+      "regex": "^/PainelAlpha/ChatBotAlpha/contatos(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/ChatBotAlpha/contatos(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/ChatBotAlpha/dashboard",
+      "regex": "^/PainelAlpha/ChatBotAlpha/dashboard(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/ChatBotAlpha/dashboard(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/ChatBotAlpha/fluxos",
+      "regex": "^/PainelAlpha/ChatBotAlpha/fluxos(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/ChatBotAlpha/fluxos(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/ChatBotAlpha/inbox",
+      "regex": "^/PainelAlpha/ChatBotAlpha/inbox(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/ChatBotAlpha/inbox(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/ChatBotAlpha/integracoes",
+      "regex": "^/PainelAlpha/ChatBotAlpha/integracoes(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/ChatBotAlpha/integracoes(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/ChatBotAlpha/sequencias",
+      "regex": "^/PainelAlpha/ChatBotAlpha/sequencias(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/ChatBotAlpha/sequencias(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/ChatBotAlpha/templates",
+      "regex": "^/PainelAlpha/ChatBotAlpha/templates(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/ChatBotAlpha/templates(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/CheckList",
+      "regex": "^/PainelAlpha/CheckList(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/CheckList(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/CheckList/Embasamentos",
+      "regex": "^/PainelAlpha/CheckList/Embasamentos(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/CheckList/Embasamentos(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/CheckList/Historico",
+      "regex": "^/PainelAlpha/CheckList/Historico(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/CheckList/Historico(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Comissoes",
+      "regex": "^/PainelAlpha/Comissoes(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Comissoes(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Comissoes/Configuracoes",
+      "regex": "^/PainelAlpha/Comissoes/Configuracoes(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Comissoes/Configuracoes(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Comissoes/Divergencias",
+      "regex": "^/PainelAlpha/Comissoes/Divergencias(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Comissoes/Divergencias(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Comissoes/Simulador",
+      "regex": "^/PainelAlpha/Comissoes/Simulador(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Comissoes/Simulador(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Conectores",
+      "regex": "^/PainelAlpha/Conectores(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Conectores(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/ControleLeads",
+      "regex": "^/PainelAlpha/ControleLeads(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/ControleLeads(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/ControleLeads/Marketing",
+      "regex": "^/PainelAlpha/ControleLeads/Marketing(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/ControleLeads/Marketing(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/DocsAlpha",
+      "regex": "^/PainelAlpha/DocsAlpha(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/DocsAlpha(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/ExploradorArquivos",
+      "regex": "^/PainelAlpha/ExploradorArquivos(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/ExploradorArquivos(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/ExploradorArquivos/AdministracaoQnap",
+      "regex": "^/PainelAlpha/ExploradorArquivos/AdministracaoQnap(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/ExploradorArquivos/AdministracaoQnap(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/ExtratosBancarios",
+      "regex": "^/PainelAlpha/ExtratosBancarios(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/ExtratosBancarios(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/GeradorDocumentos",
+      "regex": "^/PainelAlpha/GeradorDocumentos(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/GeradorDocumentos(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/GeradorDocumentos/gerar",
+      "regex": "^/PainelAlpha/GeradorDocumentos/gerar(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/GeradorDocumentos/gerar(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/GerenciamentoArquivos",
+      "regex": "^/PainelAlpha/GerenciamentoArquivos(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/GerenciamentoArquivos(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/GestaoColaboradores",
+      "regex": "^/PainelAlpha/GestaoColaboradores(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/GestaoColaboradores(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/GestaoOnboarding",
+      "regex": "^/PainelAlpha/GestaoOnboarding(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/GestaoOnboarding(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/GestaoProtocolos",
+      "regex": "^/PainelAlpha/GestaoProtocolos(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/GestaoProtocolos(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/GestaoSetores",
+      "regex": "^/PainelAlpha/GestaoSetores(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/GestaoSetores(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Guia",
+      "regex": "^/PainelAlpha/Guia(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Guia(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/HabilitacaoRadar",
+      "regex": "^/PainelAlpha/HabilitacaoRadar(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/HabilitacaoRadar(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/HistoricoArquivos",
+      "regex": "^/PainelAlpha/HistoricoArquivos(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/HistoricoArquivos(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Holerites",
+      "regex": "^/PainelAlpha/Holerites(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Holerites(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/InfosPerfil/Perfil",
+      "regex": "^/PainelAlpha/InfosPerfil/Perfil(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/InfosPerfil/Perfil(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Marketing",
+      "regex": "^/PainelAlpha/Marketing(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Marketing(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Mesclagem",
+      "regex": "^/PainelAlpha/Mesclagem(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Mesclagem(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Mesclagem/nova",
+      "regex": "^/PainelAlpha/Mesclagem/nova(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Mesclagem/nova(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Metas",
+      "regex": "^/PainelAlpha/Metas(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Metas(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/mudar-senha",
+      "regex": "^/PainelAlpha/mudar\\-senha(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/mudar\\-senha(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Notas",
+      "regex": "^/PainelAlpha/Notas(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Notas(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/PainelTarefas/GerenciarTarefas",
+      "regex": "^/PainelAlpha/PainelTarefas/GerenciarTarefas(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/PainelTarefas/GerenciarTarefas(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/PainelTarefas/GerenciarTarefas/GerenciamentoUserTarefa",
+      "regex": "^/PainelAlpha/PainelTarefas/GerenciarTarefas/GerenciamentoUserTarefa(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/PainelTarefas/GerenciarTarefas/GerenciamentoUserTarefa(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/PainelTarefas/PainelTarefaC",
+      "regex": "^/PainelAlpha/PainelTarefas/PainelTarefaC(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/PainelTarefas/PainelTarefaC(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/PainelTarefas/painelTarefaSG",
+      "regex": "^/PainelAlpha/PainelTarefas/painelTarefaSG(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/PainelTarefas/painelTarefaSG(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/PainelTarefas/painelTarefaSG/Carrinho",
+      "regex": "^/PainelAlpha/PainelTarefas/painelTarefaSG/Carrinho(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/PainelTarefas/painelTarefaSG/Carrinho(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/PainelTarefas/painelTarefaSG/PainelEstoque",
+      "regex": "^/PainelAlpha/PainelTarefas/painelTarefaSG/PainelEstoque(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/PainelTarefas/painelTarefaSG/PainelEstoque(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Parceiros",
+      "regex": "^/PainelAlpha/Parceiros(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Parceiros(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Parceiros/Aquisicao",
+      "regex": "^/PainelAlpha/Parceiros/Aquisicao(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Parceiros/Aquisicao(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Parceiros/Configuracoes",
+      "regex": "^/PainelAlpha/Parceiros/Configuracoes(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Parceiros/Configuracoes(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Parceiros/Dashboard",
+      "regex": "^/PainelAlpha/Parceiros/Dashboard(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Parceiros/Dashboard(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Parceiros/Indicacoes",
+      "regex": "^/PainelAlpha/Parceiros/Indicacoes(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Parceiros/Indicacoes(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Parceiros/Lista",
+      "regex": "^/PainelAlpha/Parceiros/Lista(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Parceiros/Lista(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Parceiros/novo",
+      "regex": "^/PainelAlpha/Parceiros/novo(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Parceiros/novo(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Parceiros/Relacionamento",
+      "regex": "^/PainelAlpha/Parceiros/Relacionamento(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Parceiros/Relacionamento(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/ReservaSalas",
+      "regex": "^/PainelAlpha/ReservaSalas(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/ReservaSalas(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/Roadmap",
+      "regex": "^/PainelAlpha/Roadmap(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/Roadmap(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/SistemaPreAnalise",
+      "regex": "^/PainelAlpha/SistemaPreAnalise(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/SistemaPreAnalise(?:/)?$"
+    },
+    {
+      "page": "/PainelAlpha/UsuariosOnline",
+      "regex": "^/PainelAlpha/UsuariosOnline(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PainelAlpha/UsuariosOnline(?:/)?$"
+    },
+    {
+      "page": "/PdfPreview",
+      "regex": "^/PdfPreview(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/PdfPreview(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "rsc",
+    "varyHeader": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "prefetchHeader": "next-router-prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSegmentHeader": "next-router-segment-prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments",
+    "clientParamParsing": false,
+    "dynamicRSCPrerender": false
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  }
+}

@@ -1,0 +1,1475 @@
+{
+  "node": {
+    "00b4a711a04bbce452c322c56a2cd1871e0cb71f0b": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "logout",
+          "filename": "src/actions/logout.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "logout",
+      "filename": "src/actions/logout.ts"
+    },
+    "60bf5119c1438378f7cf0a18af97a463875a0d6e67": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "atualizarInterfaceAction",
+          "filename": "src/actions/preferencias.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "atualizarInterfaceAction",
+      "filename": "src/actions/preferencias.ts"
+    },
+    "60e0d0cd74f74b3269413d4569514fa7de2b408e6d": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "dispararAvisoAction",
+          "filename": "src/actions/avisos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "dispararAvisoAction",
+      "filename": "src/actions/avisos.ts"
+    },
+    "00bf8cd3c4f6948f561de252d7dc80a51e9bbcf109": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "encerrarAvisoAction",
+          "filename": "src/actions/avisos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "encerrarAvisoAction",
+      "filename": "src/actions/avisos.ts"
+    },
+    "403e011ae62f2e333ac3fd003f5d52fbb5477c9dd3": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "CriarLinkExterno",
+          "filename": "src/actions/LinksExternos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "rsc"
+      },
+      "exportedName": "CriarLinkExterno",
+      "filename": "src/actions/LinksExternos.ts"
+    },
+    "60cc6051e79d9da944387408ac418f7d292fa2f898": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "AtualizarLinkExterno",
+          "filename": "src/actions/LinksExternos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "rsc"
+      },
+      "exportedName": "AtualizarLinkExterno",
+      "filename": "src/actions/LinksExternos.ts"
+    },
+    "402d84010e11523ac15c125b9ff469f7108c008579": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ExcluirLinkExterno",
+          "filename": "src/actions/LinksExternos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "rsc"
+      },
+      "exportedName": "ExcluirLinkExterno",
+      "filename": "src/actions/LinksExternos.ts"
+    },
+    "00b5c0b1dde35a29def041feab2fd6720d05f2d4ff": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ListarLinksExternosGestao",
+          "filename": "src/actions/LinksExternos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "rsc"
+      },
+      "exportedName": "ListarLinksExternosGestao",
+      "filename": "src/actions/LinksExternos.ts"
+    },
+    "4046699dab1c87eeff79d16ccd1fe004710fe43e01": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "recusarFeedbackChamadoAction",
+          "filename": "src/actions/chamados-feedback.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "recusarFeedbackChamadoAction",
+      "filename": "src/actions/chamados-feedback.ts"
+    },
+    "405ab957f54a8499f138b804646db50f35a7f1dfad": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "responderFeedbackChamadoAction",
+          "filename": "src/actions/chamados-feedback.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "responderFeedbackChamadoAction",
+      "filename": "src/actions/chamados-feedback.ts"
+    },
+    "008e7b7ee1c33f0a1a46f9a7085ece1e3b07c252c3": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "getUltimoAlerta",
+          "filename": "src/actions/HoleriteAlertas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "getUltimoAlerta",
+      "filename": "src/actions/HoleriteAlertas.ts"
+    },
+    "40e402ad9f5f01925aead0265b2b9dbfa63b3b365e": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "CriarNota",
+          "filename": "src/actions/Notas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "CriarNota",
+      "filename": "src/actions/Notas.ts"
+    },
+    "4043d5d56ceb31626386ab08a89e78f825c3c1ba42": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ObterNota",
+          "filename": "src/actions/Notas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ObterNota",
+      "filename": "src/actions/Notas.ts"
+    },
+    "4072707ba5fa3b10ea78f484c678d3fadd1682ba24": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ArquivarNota",
+          "filename": "src/actions/Notas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ArquivarNota",
+      "filename": "src/actions/Notas.ts"
+    },
+    "40ca104d061619b9d9d2b035074ba26acadb1c4036": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "MoverNotaParaLixeira",
+          "filename": "src/actions/Notas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "MoverNotaParaLixeira",
+      "filename": "src/actions/Notas.ts"
+    },
+    "40a5068b455ad99f5d44d87d2dd8508d83c95eef15": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "FixarNota",
+          "filename": "src/actions/NotasBusca.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "FixarNota",
+      "filename": "src/actions/NotasBusca.ts"
+    },
+    "40242880fc2f8dab7bd42b7234b5235d5b625fa067": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "DefinirCorNota",
+          "filename": "src/actions/NotasBusca.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "DefinirCorNota",
+      "filename": "src/actions/NotasBusca.ts"
+    },
+    "40ac07c43142066ab2a55a333dd311051135b95f29": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "AbrirAbaNota",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "AbrirAbaNota",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "40c474a67986f23908c55e1d7eb0f5b1c2c4d8e54f": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "FecharAbaNota",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "FecharAbaNota",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "403ed5338cb84b9fc665c0e8c8ef73b07af3344a94": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ReordenarAbasNotas",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ReordenarAbasNotas",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "400355de8be5e8e1f46692d8206849033cbfb8ed1f": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "AtivarAbaNota",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "AtivarAbaNota",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "00b781821c4505509e5429830eeb3ae6a4a7672687": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ObterWorkspaceNotas",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ObterWorkspaceNotas",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "4080457d665f9f920f8976018bd6e67ca0cd1e466d": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "AtualizarWorkspaceNotas",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "AtualizarWorkspaceNotas",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "40e968d17b6019d39fffdd63f4c689f78bbdc8b03b": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "AtualizarNota",
+          "filename": "src/actions/Notas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "AtualizarNota",
+      "filename": "src/actions/Notas.ts"
+    },
+    "0074515490713fbf2de6d290c96b0555fc0e537995": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "BuscarTodosUsuarios",
+          "filename": "src/actions/RecursosHumanos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "BuscarTodosUsuarios",
+      "filename": "src/actions/RecursosHumanos.ts"
+    },
+    "40286a71e08574cf508091d6f89a784e7ab111809b": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "BuscarNotas",
+          "filename": "src/actions/NotasBusca.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "BuscarNotas",
+      "filename": "src/actions/NotasBusca.ts"
+    },
+    "40a0bf91d2a5b39d24872f34b41c42768bc2db00b2": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "CompartilharNota",
+          "filename": "src/actions/NotasColaboracao.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "CompartilharNota",
+      "filename": "src/actions/NotasColaboracao.ts"
+    },
+    "403659c69ab4a74d3e1ca188af64cf08823706418d": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ListarPermissoesNota",
+          "filename": "src/actions/NotasColaboracao.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ListarPermissoesNota",
+      "filename": "src/actions/NotasColaboracao.ts"
+    },
+    "40602cab74465581274b1154220fbd0e21945ddadb": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "RemoverAcessoNota",
+          "filename": "src/actions/NotasColaboracao.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "RemoverAcessoNota",
+      "filename": "src/actions/NotasColaboracao.ts"
+    },
+    "4049b4ddb65a90d3260ce091f5d13cc898d3ccab6b": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "CompartilharNotaComEquipe",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "CompartilharNotaComEquipe",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "402779e85588cf5065ce4856c580b7e107d9dae632": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ListarCompartilhamentosEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ListarCompartilhamentosEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "00a593e10a16c5cde006cd1e0ed8685b1c2f2ea774": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ListarMinhasEquipesNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ListarMinhasEquipesNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40c33bf8084a52b6eaf72c2f1d26e47ddcf84e145d": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "RemoverCompartilhamentoEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "RemoverCompartilhamentoEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "005a05c25fb71e462fe7b91e05fb1a74d581fd27ca": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "getSetoresParaSelect",
+          "filename": "src/actions/gestaoSetores.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "getSetoresParaSelect",
+      "filename": "src/actions/gestaoSetores.ts"
+    },
+    "4015419128fd059d7bbcd71aa06ee8ee3dba967637": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "CriarEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "CriarEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40e5331a83e0dd01391632c463179090af6b6f1862": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ExcluirEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ExcluirEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "401884080824ec7bd68dac4c23660c5869b702cad3": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "RenomearEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "RenomearEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40395c6fc77dd5df8d6446335cbb66208ae4a19842": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "SairDaEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "SairDaEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40c5aa28468f69a1f62b22e5f1e3bc02f13e2a8447": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "AdicionarMembrosEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "AdicionarMembrosEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40bdccc5457c310a69769cbe8f2f15226199253732": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "AlterarPapelMembroEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "AlterarPapelMembroEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "4008eeb64301865e31b1ab74e0c9a54c8073ed723c": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "RemoverMembroEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "RemoverMembroEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "409bf44058e693b9d3f5958f8566adc357d3583a79": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "BuscarUsuariosParaEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "BuscarUsuariosParaEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40498cd3e816b06469d09d9194b9eff55794d4b784": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "BuscarRegistrosVinculaveis",
+          "filename": "src/actions/NotasContexto.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "BuscarRegistrosVinculaveis",
+      "filename": "src/actions/NotasContexto.ts"
+    },
+    "40130e73727b52a5da29aa1c401d70910a06708959": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "VincularContextoNota",
+          "filename": "src/actions/NotasContexto.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "VincularContextoNota",
+      "filename": "src/actions/NotasContexto.ts"
+    },
+    "00b266187b2d2206b95d8fd0de65210339dcf46cf6": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "VerificarLembretesPendentes",
+          "filename": "src/actions/NotasLembretes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "VerificarLembretesPendentes",
+      "filename": "src/actions/NotasLembretes.ts"
+    },
+    "00599268ba22dc213eaec8c67ed01bc5fb34d9656d": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "buscarPendenciasUltimoCs",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "buscarPendenciasUltimoCs",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "60cbae905934a619bb0f0f22ef02a3249e8734f3eb": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "salvarLogCSPorAlerta",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "salvarLogCSPorAlerta",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "40937f3d56f4673e748d4cab871888f57e47aa600f": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "assumirChamado",
+          "filename": "src/actions/chamados.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "assumirChamado",
+      "filename": "src/actions/chamados.ts"
+    },
+    "608613dfeb4775b1ed2592e1149674569c34fb2f0d": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "enviarMensagemChamadoAtendidoTIAction",
+          "filename": "src/actions/chamados.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "enviarMensagemChamadoAtendidoTIAction",
+      "filename": "src/actions/chamados.ts"
+    },
+    "0001ef231507213030f81fc8650626bfb670c42e48": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "listarChamadosAtivosTIAction",
+          "filename": "src/actions/chamados.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "listarChamadosAtivosTIAction",
+      "filename": "src/actions/chamados.ts"
+    },
+    "70ffe01059356b03bd80a0c890c9e4204494d4b767": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "updateChamadosStatus",
+          "filename": "src/actions/chamados.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "updateChamadosStatus",
+      "filename": "src/actions/chamados.ts"
+    },
+    "00db72b8160fa795935b8c756e89ee8f3da460b8b0": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "listarUsersParaGestao",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "rsc"
+      },
+      "exportedName": "listarUsersParaGestao",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "402778d1d2cf2524db678b5821dff4f98db4e35cf0": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "listarPermissoesPorSetor",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "rsc"
+      },
+      "exportedName": "listarPermissoesPorSetor",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "40343a76e69c1834cfd594cd08c0359a28c73eba5e": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "atribuirModulosAoSetor",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "rsc"
+      },
+      "exportedName": "atribuirModulosAoSetor",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "403991500d185a7c0ba721e2cf9dbccd4791008558": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "resetarUserParaSetor",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "rsc"
+      },
+      "exportedName": "resetarUserParaSetor",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "40462bea9bb39f794a48bb8f0dbaf5c879e6a34d40": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "removerOverride",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "rsc"
+      },
+      "exportedName": "removerOverride",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "405db78a4b917f9bc5f020f619b77a8397586000f4": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "listarOverridesDeUser",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "rsc"
+      },
+      "exportedName": "listarOverridesDeUser",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "40693b8e2f52a13682ee6b9b5e61648089097ff8ac": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "listarAcessoModulo",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "rsc"
+      },
+      "exportedName": "listarAcessoModulo",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "4077b04c6eba3e81ac1217e71f8cccc0dd396c5f24": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "adicionarOverride",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "rsc"
+      },
+      "exportedName": "adicionarOverride",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "40b22a8d52ad168d9be9918ad4c58e84caf1e43d81": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "listarModulosEfetivosDeUser",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "rsc"
+      },
+      "exportedName": "listarModulosEfetivosDeUser",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "40eba84def265611483380bb268a852d4a9a777e8b": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "getPermissoesEfetivas",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "rsc"
+      },
+      "exportedName": "getPermissoesEfetivas",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "60ccec99d1d237106c62f64c4f582ef16b4ea90932": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "toggleAcessoModulo",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "rsc"
+      },
+      "exportedName": "toggleAcessoModulo",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "002c9e6ffe048d0fa4b62a4bd8e3b9fa965b6ccd00": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ListarLinksExternosVisiveis",
+          "filename": "src/actions/LinksExternos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "rsc"
+      },
+      "exportedName": "ListarLinksExternosVisiveis",
+      "filename": "src/actions/LinksExternos.ts"
+    },
+    "006acbc37e6b0451a170bd0786a267de2319e23f0f": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ObterDashboardBpm",
+          "filename": "src/actions/bpm/Dashboard.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "rsc"
+      },
+      "exportedName": "ObterDashboardBpm",
+      "filename": "src/actions/bpm/Dashboard.ts"
+    },
+    "4092a3621d38663bb7e0cb9e2384c54384efc8dc52": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ObterCardBpm",
+          "filename": "src/actions/bpm/Cards.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ObterCardBpm",
+      "filename": "src/actions/bpm/Cards.ts"
+    },
+    "604f9aaaa8e0ca20c8f8f59fb389f0750caca0063f": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ObterPipelineBpm",
+          "filename": "src/actions/bpm/Pipelines.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ObterPipelineBpm",
+      "filename": "src/actions/bpm/Pipelines.ts"
+    },
+    "4014c13fbfca496263c5a450f06095938557284ce6": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ListarInteracoesCardBpm",
+          "filename": "src/actions/bpm/Interacoes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ListarInteracoesCardBpm",
+      "filename": "src/actions/bpm/Interacoes.ts"
+    },
+    "4048a8045c9bbcd45afb488696f61256282fbecd9e": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "AtualizarCardBpm",
+          "filename": "src/actions/bpm/Cards.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "AtualizarCardBpm",
+      "filename": "src/actions/bpm/Cards.ts"
+    },
+    "4041cbbb3d87271b281451a4e40111014d20a5fb65": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "RegistrarAnexoBpm",
+          "filename": "src/actions/bpm/Anexos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "RegistrarAnexoBpm",
+      "filename": "src/actions/bpm/Anexos.ts"
+    },
+    "40baa8260a2982efa0a61ad8b96ee2afdb226c6bf7": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ObterUltimoFollowUpBpm",
+          "filename": "src/actions/bpm/FollowUp.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ObterUltimoFollowUpBpm",
+      "filename": "src/actions/bpm/FollowUp.ts"
+    },
+    "40daf9aec6ec65962fef1262dcfd4896efa9f2b59b": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "SalvarChecklistFollowUpBpm",
+          "filename": "src/actions/bpm/FollowUp.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "SalvarChecklistFollowUpBpm",
+      "filename": "src/actions/bpm/FollowUp.ts"
+    },
+    "40d089f739f2451a81ca2d7816299368dc6f1c5772": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "AgendarReuniaoGoogleMeetBpm",
+          "filename": "src/actions/bpm/GoogleMeet.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "AgendarReuniaoGoogleMeetBpm",
+      "filename": "src/actions/bpm/GoogleMeet.ts"
+    },
+    "40b438ba308a5c025628b39e0ce0c2b76aa6c08e3d": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ReagendarReuniaoBpm",
+          "filename": "src/actions/bpm/GoogleMeet.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ReagendarReuniaoBpm",
+      "filename": "src/actions/bpm/GoogleMeet.ts"
+    },
+    "40f2bd48835f3cbddd14183e5e3a7f7f5051ca7ae6": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "SalvarResumoReuniaoBpm",
+          "filename": "src/actions/bpm/TranscricaoMeet.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "SalvarResumoReuniaoBpm",
+      "filename": "src/actions/bpm/TranscricaoMeet.ts"
+    },
+    "40513e2b383a0874f96fb0990ce251338eaf25e4b2": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "SincronizarTranscricaoReuniaoBpm",
+          "filename": "src/actions/bpm/TranscricaoMeet.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "SincronizarTranscricaoReuniaoBpm",
+      "filename": "src/actions/bpm/TranscricaoMeet.ts"
+    },
+    "406222094a21c75ee51812202b9dc75fce8bd6a627": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "InterromperStandbyFollowUpBpm",
+          "filename": "src/actions/bpm/StandbyFollowUp.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "InterromperStandbyFollowUpBpm",
+      "filename": "src/actions/bpm/StandbyFollowUp.ts"
+    },
+    "401cab36b43ac22d1701c4be24e0da4b55d75e2f4a": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ObterEstadoStandbyFollowUpBpm",
+          "filename": "src/actions/bpm/StandbyFollowUp.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ObterEstadoStandbyFollowUpBpm",
+      "filename": "src/actions/bpm/StandbyFollowUp.ts"
+    },
+    "40fd8afa59536e0e1c4234c86f58f395ee24c99bd9": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ObterDadosEmpresaCardBpm",
+          "filename": "src/actions/bpm/Empresas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ObterDadosEmpresaCardBpm",
+      "filename": "src/actions/bpm/Empresas.ts"
+    },
+    "404e668e14c9edec9e7b7945f240a32fba2c2058d0": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ExcluirCardBpm",
+          "filename": "src/actions/bpm/Cards.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ExcluirCardBpm",
+      "filename": "src/actions/bpm/Cards.ts"
+    },
+    "40eefb61b23f275e0ad461bcbb6cf8c1a3cd9fdcc7": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ListarPipelinesBpm",
+          "filename": "src/actions/bpm/Pipelines.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ListarPipelinesBpm",
+      "filename": "src/actions/bpm/Pipelines.ts"
+    },
+    "40dec1345cf2de6c9e1acec0382d500f113d81050b": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ExcluirAnexoBpm",
+          "filename": "src/actions/bpm/Anexos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ExcluirAnexoBpm",
+      "filename": "src/actions/bpm/Anexos.ts"
+    },
+    "400a9f7127d6b7222728aca77dce0b9da7cb03e3da": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ListarTimelineCardBpm",
+          "filename": "src/actions/bpm/Timeline.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ListarTimelineCardBpm",
+      "filename": "src/actions/bpm/Timeline.ts"
+    },
+    "40635bf90f730b95f6b1c87eb5f20121a8b8f39a24": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "CancelarCadenciaCardBpm",
+          "filename": "src/actions/bpm/Cadencias.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "CancelarCadenciaCardBpm",
+      "filename": "src/actions/bpm/Cadencias.ts"
+    },
+    "40bb7098dfbacfbe74f9663cf8a6b4e2cad45c05bb": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ListarCadenciasDoCardBpm",
+          "filename": "src/actions/bpm/Cadencias.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ListarCadenciasDoCardBpm",
+      "filename": "src/actions/bpm/Cadencias.ts"
+    },
+    "40cfbddde2788f2a00542fedff907d949564d120ce": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "CriarTarefaBpm",
+          "filename": "src/actions/bpm/Tarefas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "CriarTarefaBpm",
+      "filename": "src/actions/bpm/Tarefas.ts"
+    },
+    "40488443e9e8bf87f125ba8fb19027133797d07d0c": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ConcluirTarefaBpm",
+          "filename": "src/actions/bpm/Tarefas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ConcluirTarefaBpm",
+      "filename": "src/actions/bpm/Tarefas.ts"
+    },
+    "40a01c0a65f38eefaf5da7ffc5af00521c80895d3b": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "AdicionarItemExclusivoChecklistCardBpm",
+          "filename": "src/actions/bpm/Checklists.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "AdicionarItemExclusivoChecklistCardBpm",
+      "filename": "src/actions/bpm/Checklists.ts"
+    },
+    "4008b3c7bc92dcb0d5391bf8324d73bf05a9ea570b": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "AtualizarItemChecklistCardBpm",
+          "filename": "src/actions/bpm/Checklists.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "AtualizarItemChecklistCardBpm",
+      "filename": "src/actions/bpm/Checklists.ts"
+    },
+    "400bcaf73b39ad08dea0c9aac53833ec27d24d35f7": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ListarChecklistsCardBpm",
+          "filename": "src/actions/bpm/Checklists.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ListarChecklistsCardBpm",
+      "filename": "src/actions/bpm/Checklists.ts"
+    },
+    "4071658d5e013b4ec0c20c771583898adc6cdd9944": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "CriarInteracaoCardBpm",
+          "filename": "src/actions/bpm/Interacoes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "CriarInteracaoCardBpm",
+      "filename": "src/actions/bpm/Interacoes.ts"
+    },
+    "6024e6135db82196c91591cdcaf300be6886062af6": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ListarCardsEmpresaPorPipeline",
+          "filename": "src/actions/bpm/Cards.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ListarCardsEmpresaPorPipeline",
+      "filename": "src/actions/bpm/Cards.ts"
+    },
+    "40a3b594bc19f303aafe45c673b702fdcca5fe7d0b": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "MoverCardBpm",
+          "filename": "src/actions/bpm/Cards.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "MoverCardBpm",
+      "filename": "src/actions/bpm/Cards.ts"
+    },
+    "409640111abeedb4b9b122252e528dd1efc7fd9285": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ObterResumoChecklistCardBpm",
+          "filename": "src/actions/bpm/Checklists.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ObterResumoChecklistCardBpm",
+      "filename": "src/actions/bpm/Checklists.ts"
+    },
+    "60f1ce269d51b43b8ded7b1b82d0b92cff0d20a7ad": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "IniciarLigacaoTelefoneCardBpm",
+          "filename": "src/actions/bpm/Cards.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "IniciarLigacaoTelefoneCardBpm",
+      "filename": "src/actions/bpm/Cards.ts"
+    },
+    "40430536bf8f6a64fea48e3ec8db81907ba5def780": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ListarTelefonesCardBpm",
+          "filename": "src/actions/bpm/Cards.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ListarTelefonesCardBpm",
+      "filename": "src/actions/bpm/Cards.ts"
+    },
+    "4098a08a9baafc38d6a16d59ece7ca0b546931b924": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "AtualizarMembrosCardBpm",
+          "filename": "src/actions/bpm/Membros.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "AtualizarMembrosCardBpm",
+      "filename": "src/actions/bpm/Membros.ts"
+    },
+    "40eedb9e32f4f5593623d2d154f38edf712991442b": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ListarUsuariosVinculaveisCardBpm",
+          "filename": "src/actions/bpm/Membros.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ListarUsuariosVinculaveisCardBpm",
+      "filename": "src/actions/bpm/Membros.ts"
+    },
+    "4041c614e23d1c67d07c3358c05b6440a641dc0b19": {
+      "workers": {
+        "app/PainelAlpha/AlphaCRM/page": {
+          "moduleId": 682824,
+          "async": true,
+          "exportedName": "ObterStatusSlaCard",
+          "filename": "src/actions/bpm/Sla.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaCRM/page": "action-browser"
+      },
+      "exportedName": "ObterStatusSlaCard",
+      "filename": "src/actions/bpm/Sla.ts"
+    }
+  },
+  "edge": {}
+}

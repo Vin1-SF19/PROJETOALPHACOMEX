@@ -1,0 +1,3 @@
+{
+  "/api/bpm/noloss-leads/ingest/route": "app/api/bpm/noloss-leads/ingest/route.js"
+}

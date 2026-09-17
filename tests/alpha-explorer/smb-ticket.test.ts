@@ -12,6 +12,7 @@ const config: SmbRuntimeConfig = {
   audience: "alpha-explorer-smb-gateway",
   productionOrigin: "https://painel.alpha-comex.com",
   stageOrigin: "https://stagealpha-sistema.alpak.ai",
+  additionalOrigins: ["https://painel-alpha.alpak.ai"],
   issuer: "alpha-explorer-stage",
   keyId: "stage-key-2026",
   secret: "stage-secret-with-more-than-thirty-two-bytes",
@@ -59,6 +60,7 @@ describe("SMB operation ticket", () => {
     const issued = issueSmbTicket({ config, userId: 1, origin: config.stageOrigin, scope: "health", resource: "root" });
     expect(() => verifySmbTicketForTest(`${issued.token.slice(0, -1)}x`, config)).toThrow("SMB_TICKET_SIGNATURE_INVALID");
     expect(() => issuerForOrigin(config, config.productionOrigin)).toThrow("SMB_ORIGIN_NOT_ALLOWED");
+    expect(issuerForOrigin(config, "https://painel-alpha.alpak.ai").issuer).toBe(config.issuer);
     expect(() => issuerForOrigin(config, "https://evil.example")).toThrow("SMB_ORIGIN_NOT_ALLOWED");
   });
 

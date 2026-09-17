@@ -1,0 +1,3 @@
+module.exports=[110092,a=>{"use strict";var b=a.i(907997),c=a.i(217081),d=a.i(896615);function e({children:a}){return(0,b.jsxs)("div",{className:"painel-cadastro",children:[(0,b.jsx)(d.Toaster,{richColors:!0,position:"top-right"}),(0,b.jsx)(c.ThemeProviderAlpha,{children:a})]})}a.s(["default",()=>e,"metadata",0,{title:"Painel Alpha | Gerenciamento de Usuários"}])}];
+
+//# sourceMappingURL=src_app_PainelAlpha_cadastro_layout_tsx_5de46c33._.js.map

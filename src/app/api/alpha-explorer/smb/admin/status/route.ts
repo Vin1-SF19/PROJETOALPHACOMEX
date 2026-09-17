@@ -6,7 +6,7 @@ import { ExplorerError } from "@/lib/alpha-explorer/errors";
 import { explorerErrorResponse, requireExplorerIdentity, resolveExplorerRequestOrigin } from "@/lib/alpha-explorer/http";
 import { auditExplorer, writeExplorerLog } from "@/lib/alpha-explorer/observability";
 import { reconcileSmbBindingMetadata } from "@/lib/alpha-explorer/smb/binding-metadata";
-import { originForSmbRuntime, readSmbRuntimeConfig } from "@/lib/alpha-explorer/smb/config";
+import { allowedOriginsForSmbRuntime, readSmbRuntimeConfig } from "@/lib/alpha-explorer/smb/config";
 import { issueSmbTicket } from "@/lib/alpha-explorer/smb/ticket";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
 
     const config = readSmbRuntimeConfig();
     if (!config.enabled) throw new ExplorerError("SMB_DISABLED", 503, "Alpha Explorer SMB indisponível");
-    const origin = resolveExplorerRequestOrigin(request, [originForSmbRuntime(config)]);
+    const origin = resolveExplorerRequestOrigin(request, allowedOriginsForSmbRuntime(config));
     const ticket = issueSmbTicket({
       config,
       userId: input.targetUserId,

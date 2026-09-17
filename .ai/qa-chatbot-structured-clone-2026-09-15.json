@@ -1,0 +1,29 @@
+{
+  "target": "ChatBot Alpha structuredClone compatibility fix",
+  "executedAt": "2026-09-15T18:31:00Z",
+  "decision": "APPROVED",
+  "validation": {
+    "fallbackWithoutNativeStructuredClone": "passed",
+    "nativeStructuredClonePath": "passed",
+    "importAndSnapshotLoad": "passed",
+    "providerAndSendMessage": "passed",
+    "zustandStoreAndRealtimeEvent": "passed",
+    "flowCloneSaveAndNodeRemoval": "passed",
+    "directUsageGuard": "passed",
+    "chatbotTestSuite": {
+      "filesPassed": 13,
+      "testsPassed": 158,
+      "todo": 1
+    },
+    "scopedEslint": "passed",
+    "diffCheck": "passed",
+    "globalTypecheck": "failed_due_to_preexisting_unrelated_errors"
+  },
+  "tooling": {
+    "coderabbit": "not_installed"
+  },
+  "nonBlockingNotes": [
+    "React Flow currently relies on the library default connectOnClick=true; making it explicit is a future accessibility/interaction hardening item and does not affect module entry or this crash fix.",
+    "The first typecheck attempt exhausted the default 4 GB Node heap. With 8 GB it completed and reported only existing errors outside the ChatBot Alpha compatibility change."
+  ]
+}

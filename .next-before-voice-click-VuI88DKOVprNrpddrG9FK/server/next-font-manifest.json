@@ -1,0 +1,660 @@
+{
+  "app": {
+    "[project]/src/app/PainelAlpha/AlphaBlueprint/[projectId]/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaBlueprint/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaCRM/admin/automacoes/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaCRM/admin/cadencias/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaCRM/admin/checklists/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaCRM/admin/conhecimento/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaCRM/admin/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaCRM/admin/regras/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaCRM/automacoes/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaCRM/empresa/[empresaId]/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaCRM/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaCRM/pendencias/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaCRM/pipelines/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaCRM/tarefas/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaComm/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaConnect/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSEO/[projectId]/audit/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSEO/[projectId]/backlinks/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSEO/[projectId]/brand-lookup/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSEO/[projectId]/dashboard/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSEO/[projectId]/domain/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSEO/[projectId]/keywords/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSEO/[projectId]/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSEO/[projectId]/prompt-explorer/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSEO/[projectId]/rank/[trackerId]/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSEO/[projectId]/rank/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSEO/[projectId]/sam/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSEO/[projectId]/saved/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSEO/[projectId]/search-performance/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSEO/[projectId]/settings/context/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSEO/[projectId]/settings/integrations/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSEO/[projectId]/settings/mcp/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSEO/[projectId]/settings/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSEO/invite/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSEO/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSchools/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSchools/presets/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSkills/Gerenciamento/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSkills/modulo/[id]/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaSkills/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/AlphaVault/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Apresentacoes/[id]/apresentar/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Apresentacoes/[id]/editor/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Apresentacoes/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/CadastroClientes/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/CalendarioAlpha/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Chamados/ChatChamado/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Chamados/NovoChamado/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Chamados/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/ChatBotAlpha/agentes/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/ChatBotAlpha/campanhas/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/ChatBotAlpha/configuracoes/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/ChatBotAlpha/contatos/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/ChatBotAlpha/dashboard/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/ChatBotAlpha/fluxos/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/ChatBotAlpha/inbox/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/ChatBotAlpha/integracoes/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/ChatBotAlpha/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/ChatBotAlpha/sequencias/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/ChatBotAlpha/templates/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/CheckList/Embasamentos/[tipo]/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/CheckList/Embasamentos/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/CheckList/Historico/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/CheckList/[empresaId]/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/CheckList/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Comissoes/Configuracoes/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Comissoes/Divergencias/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Comissoes/Simulador/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Comissoes/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Conectores/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/ControleLeads/Marketing/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/ControleLeads/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/DocsAlpha/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/ExploradorArquivos/AdministracaoQnap/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/ExploradorArquivos/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/ExtratosBancarios/[Id]/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/ExtratosBancarios/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/GeradorDocumentos/[templateId]/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/GeradorDocumentos/conferencia/[token]/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/GeradorDocumentos/gerar/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/GeradorDocumentos/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/GerenciamentoArquivos/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/GestaoColaboradores/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/GestaoOnboarding/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/GestaoProtocolos/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/GestaoSetores/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Guia/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/HabilitacaoRadar/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/HistoricoArquivos/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Holerites/[id]/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Holerites/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/InfosPerfil/Perfil/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Marketing/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Mesclagem/[id]/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Mesclagem/nova/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Mesclagem/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Metas/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Notas/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/PainelTarefas/GerenciarTarefas/GerenciamentoUserTarefa/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/PainelTarefas/GerenciarTarefas/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/PainelTarefas/PainelTarefaC/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/PainelTarefas/painelTarefaSG/Carrinho/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/PainelTarefas/painelTarefaSG/PainelEstoque/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/PainelTarefas/painelTarefaSG/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Parceiros/(comSidebar)/Aquisicao/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Parceiros/(comSidebar)/Configuracoes/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Parceiros/(comSidebar)/Dashboard/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Parceiros/(comSidebar)/Indicacoes/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Parceiros/(comSidebar)/Lista/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Parceiros/(comSidebar)/Relacionamento/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Parceiros/(comSidebar)/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Parceiros/[id]/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Parceiros/novo/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/ReservaSalas/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/Roadmap/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/SistemaPreAnalise/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/UsuariosOnline/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/cadastro/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/mudar-senha/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PainelAlpha/prova/[presetId]/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2",
+      "static/media/SF_Pro_Display_Bold-s.p.389a1287.otf"
+    ],
+    "[project]/src/app/PdfPreview/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/src/app/_not-found/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/src/app/apresentacao/[slug]/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/src/app/auth/RedefinirSenha/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/src/app/convite/parceiro/[token]/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/src/app/dev/login-transition-preview/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/src/app/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ]
+  },
+  "appUsingSizeAdjust": true,
+  "pages": {},
+  "pagesUsingSizeAdjust": false
+}

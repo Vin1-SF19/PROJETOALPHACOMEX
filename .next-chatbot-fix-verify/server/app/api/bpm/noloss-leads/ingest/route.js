@@ -1,0 +1,10 @@
+var R=require("../../../../../chunks/[turbopack]_runtime.js")("server/app/api/bpm/noloss-leads/ingest/route.js")
+R.c("server/chunks/[root-of-the-server]__0251fc4a._.js")
+R.c("server/chunks/_97525657._.js")
+R.c("server/chunks/node_modules_next_594ba3a6._.js")
+R.c("server/chunks/node_modules_zod_v4_7b1186d4._.js")
+R.c("server/chunks/[root-of-the-server]__ae5d6a65._.js")
+R.c("server/chunks/node_modules_next_dist_e341186c._.js")
+R.c("server/chunks/_next-internal_server_app_api_bpm_noloss-leads_ingest_route_actions_abf942bf.js")
+R.m(75966)
+module.exports=R.m(75966).exports

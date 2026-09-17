@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { assertExplorerMutationRequest, explorerErrorResponse, requireExplorerIdentity } from "@/lib/alpha-explorer/http";
 import { ExplorerError } from "@/lib/alpha-explorer/errors";
-import { originForSmbRuntime, readSmbRuntimeConfig } from "@/lib/alpha-explorer/smb/config";
+import { allowedOriginsForSmbRuntime, readSmbRuntimeConfig } from "@/lib/alpha-explorer/smb/config";
 import { smbTicketRequestSchema } from "@/lib/alpha-explorer/smb/contracts";
 import { issueSmbTicket } from "@/lib/alpha-explorer/smb/ticket";
 import { consumeExplorerRateLimit } from "@/lib/alpha-explorer/rate-limit";
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     const config = readSmbRuntimeConfig();
-    const origin = assertExplorerMutationRequest(request, [originForSmbRuntime(config)]);
+    const origin = assertExplorerMutationRequest(request, allowedOriginsForSmbRuntime(config));
     const identity = await requireExplorerIdentity();
     const input = smbTicketRequestSchema.parse(await request.json());
     const destructiveScopes = new Set(["mkdir", "rename", "move", "trash", "restore", "upload_cancel", "upload_reconcile"]);

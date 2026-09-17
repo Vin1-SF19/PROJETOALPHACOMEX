@@ -1,0 +1,3 @@
+{
+  "/api/gerador-documentos/[id]/download/route": "app/api/gerador-documentos/[id]/download/route.js"
+}

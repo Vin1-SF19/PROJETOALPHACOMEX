@@ -1,0 +1,1295 @@
+{
+  "node": {
+    "00b4a711a04bbce452c322c56a2cd1871e0cb71f0b": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "logout",
+          "filename": "src/actions/logout.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "logout",
+      "filename": "src/actions/logout.ts"
+    },
+    "60bf5119c1438378f7cf0a18af97a463875a0d6e67": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "atualizarInterfaceAction",
+          "filename": "src/actions/preferencias.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "atualizarInterfaceAction",
+      "filename": "src/actions/preferencias.ts"
+    },
+    "60e0d0cd74f74b3269413d4569514fa7de2b408e6d": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "dispararAvisoAction",
+          "filename": "src/actions/avisos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "dispararAvisoAction",
+      "filename": "src/actions/avisos.ts"
+    },
+    "00bf8cd3c4f6948f561de252d7dc80a51e9bbcf109": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "encerrarAvisoAction",
+          "filename": "src/actions/avisos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "encerrarAvisoAction",
+      "filename": "src/actions/avisos.ts"
+    },
+    "403e011ae62f2e333ac3fd003f5d52fbb5477c9dd3": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "CriarLinkExterno",
+          "filename": "src/actions/LinksExternos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "rsc"
+      },
+      "exportedName": "CriarLinkExterno",
+      "filename": "src/actions/LinksExternos.ts"
+    },
+    "60cc6051e79d9da944387408ac418f7d292fa2f898": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "AtualizarLinkExterno",
+          "filename": "src/actions/LinksExternos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "rsc"
+      },
+      "exportedName": "AtualizarLinkExterno",
+      "filename": "src/actions/LinksExternos.ts"
+    },
+    "402d84010e11523ac15c125b9ff469f7108c008579": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "ExcluirLinkExterno",
+          "filename": "src/actions/LinksExternos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "rsc"
+      },
+      "exportedName": "ExcluirLinkExterno",
+      "filename": "src/actions/LinksExternos.ts"
+    },
+    "00b5c0b1dde35a29def041feab2fd6720d05f2d4ff": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "ListarLinksExternosGestao",
+          "filename": "src/actions/LinksExternos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "rsc"
+      },
+      "exportedName": "ListarLinksExternosGestao",
+      "filename": "src/actions/LinksExternos.ts"
+    },
+    "4046699dab1c87eeff79d16ccd1fe004710fe43e01": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "recusarFeedbackChamadoAction",
+          "filename": "src/actions/chamados-feedback.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "recusarFeedbackChamadoAction",
+      "filename": "src/actions/chamados-feedback.ts"
+    },
+    "405ab957f54a8499f138b804646db50f35a7f1dfad": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "responderFeedbackChamadoAction",
+          "filename": "src/actions/chamados-feedback.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "responderFeedbackChamadoAction",
+      "filename": "src/actions/chamados-feedback.ts"
+    },
+    "008e7b7ee1c33f0a1a46f9a7085ece1e3b07c252c3": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "getUltimoAlerta",
+          "filename": "src/actions/HoleriteAlertas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "getUltimoAlerta",
+      "filename": "src/actions/HoleriteAlertas.ts"
+    },
+    "40e402ad9f5f01925aead0265b2b9dbfa63b3b365e": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "CriarNota",
+          "filename": "src/actions/Notas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "CriarNota",
+      "filename": "src/actions/Notas.ts"
+    },
+    "4043d5d56ceb31626386ab08a89e78f825c3c1ba42": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "ObterNota",
+          "filename": "src/actions/Notas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "ObterNota",
+      "filename": "src/actions/Notas.ts"
+    },
+    "4072707ba5fa3b10ea78f484c678d3fadd1682ba24": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "ArquivarNota",
+          "filename": "src/actions/Notas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "ArquivarNota",
+      "filename": "src/actions/Notas.ts"
+    },
+    "40ca104d061619b9d9d2b035074ba26acadb1c4036": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "MoverNotaParaLixeira",
+          "filename": "src/actions/Notas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "MoverNotaParaLixeira",
+      "filename": "src/actions/Notas.ts"
+    },
+    "40a5068b455ad99f5d44d87d2dd8508d83c95eef15": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "FixarNota",
+          "filename": "src/actions/NotasBusca.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "FixarNota",
+      "filename": "src/actions/NotasBusca.ts"
+    },
+    "40242880fc2f8dab7bd42b7234b5235d5b625fa067": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "DefinirCorNota",
+          "filename": "src/actions/NotasBusca.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "DefinirCorNota",
+      "filename": "src/actions/NotasBusca.ts"
+    },
+    "40ac07c43142066ab2a55a333dd311051135b95f29": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "AbrirAbaNota",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "AbrirAbaNota",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "40c474a67986f23908c55e1d7eb0f5b1c2c4d8e54f": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "FecharAbaNota",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "FecharAbaNota",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "403ed5338cb84b9fc665c0e8c8ef73b07af3344a94": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "ReordenarAbasNotas",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "ReordenarAbasNotas",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "400355de8be5e8e1f46692d8206849033cbfb8ed1f": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "AtivarAbaNota",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "AtivarAbaNota",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "00b781821c4505509e5429830eeb3ae6a4a7672687": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "ObterWorkspaceNotas",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "ObterWorkspaceNotas",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "4080457d665f9f920f8976018bd6e67ca0cd1e466d": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "AtualizarWorkspaceNotas",
+          "filename": "src/actions/NotasWorkspace.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "AtualizarWorkspaceNotas",
+      "filename": "src/actions/NotasWorkspace.ts"
+    },
+    "40e968d17b6019d39fffdd63f4c689f78bbdc8b03b": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "AtualizarNota",
+          "filename": "src/actions/Notas.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "AtualizarNota",
+      "filename": "src/actions/Notas.ts"
+    },
+    "0074515490713fbf2de6d290c96b0555fc0e537995": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "BuscarTodosUsuarios",
+          "filename": "src/actions/RecursosHumanos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "BuscarTodosUsuarios",
+      "filename": "src/actions/RecursosHumanos.ts"
+    },
+    "40286a71e08574cf508091d6f89a784e7ab111809b": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "BuscarNotas",
+          "filename": "src/actions/NotasBusca.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "BuscarNotas",
+      "filename": "src/actions/NotasBusca.ts"
+    },
+    "40a0bf91d2a5b39d24872f34b41c42768bc2db00b2": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "CompartilharNota",
+          "filename": "src/actions/NotasColaboracao.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "CompartilharNota",
+      "filename": "src/actions/NotasColaboracao.ts"
+    },
+    "403659c69ab4a74d3e1ca188af64cf08823706418d": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "ListarPermissoesNota",
+          "filename": "src/actions/NotasColaboracao.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "ListarPermissoesNota",
+      "filename": "src/actions/NotasColaboracao.ts"
+    },
+    "40602cab74465581274b1154220fbd0e21945ddadb": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "RemoverAcessoNota",
+          "filename": "src/actions/NotasColaboracao.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "RemoverAcessoNota",
+      "filename": "src/actions/NotasColaboracao.ts"
+    },
+    "4049b4ddb65a90d3260ce091f5d13cc898d3ccab6b": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "CompartilharNotaComEquipe",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "CompartilharNotaComEquipe",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "402779e85588cf5065ce4856c580b7e107d9dae632": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "ListarCompartilhamentosEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "ListarCompartilhamentosEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "00a593e10a16c5cde006cd1e0ed8685b1c2f2ea774": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "ListarMinhasEquipesNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "ListarMinhasEquipesNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40c33bf8084a52b6eaf72c2f1d26e47ddcf84e145d": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "RemoverCompartilhamentoEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "RemoverCompartilhamentoEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "005a05c25fb71e462fe7b91e05fb1a74d581fd27ca": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "getSetoresParaSelect",
+          "filename": "src/actions/gestaoSetores.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "getSetoresParaSelect",
+      "filename": "src/actions/gestaoSetores.ts"
+    },
+    "4015419128fd059d7bbcd71aa06ee8ee3dba967637": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "CriarEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "CriarEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40e5331a83e0dd01391632c463179090af6b6f1862": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "ExcluirEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "ExcluirEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "401884080824ec7bd68dac4c23660c5869b702cad3": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "RenomearEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "RenomearEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40395c6fc77dd5df8d6446335cbb66208ae4a19842": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "SairDaEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "SairDaEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40c5aa28468f69a1f62b22e5f1e3bc02f13e2a8447": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "AdicionarMembrosEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "AdicionarMembrosEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40bdccc5457c310a69769cbe8f2f15226199253732": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "AlterarPapelMembroEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "AlterarPapelMembroEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "4008eeb64301865e31b1ab74e0c9a54c8073ed723c": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "RemoverMembroEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "RemoverMembroEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "409bf44058e693b9d3f5958f8566adc357d3583a79": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "BuscarUsuariosParaEquipeNota",
+          "filename": "src/actions/NotasEquipes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "BuscarUsuariosParaEquipeNota",
+      "filename": "src/actions/NotasEquipes.ts"
+    },
+    "40498cd3e816b06469d09d9194b9eff55794d4b784": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "BuscarRegistrosVinculaveis",
+          "filename": "src/actions/NotasContexto.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "BuscarRegistrosVinculaveis",
+      "filename": "src/actions/NotasContexto.ts"
+    },
+    "40130e73727b52a5da29aa1c401d70910a06708959": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "VincularContextoNota",
+          "filename": "src/actions/NotasContexto.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "VincularContextoNota",
+      "filename": "src/actions/NotasContexto.ts"
+    },
+    "00b266187b2d2206b95d8fd0de65210339dcf46cf6": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "VerificarLembretesPendentes",
+          "filename": "src/actions/NotasLembretes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "VerificarLembretesPendentes",
+      "filename": "src/actions/NotasLembretes.ts"
+    },
+    "00599268ba22dc213eaec8c67ed01bc5fb34d9656d": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "buscarPendenciasUltimoCs",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "buscarPendenciasUltimoCs",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "60cbae905934a619bb0f0f22ef02a3249e8734f3eb": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "salvarLogCSPorAlerta",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "salvarLogCSPorAlerta",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "40937f3d56f4673e748d4cab871888f57e47aa600f": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "assumirChamado",
+          "filename": "src/actions/chamados.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "assumirChamado",
+      "filename": "src/actions/chamados.ts"
+    },
+    "608613dfeb4775b1ed2592e1149674569c34fb2f0d": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "enviarMensagemChamadoAtendidoTIAction",
+          "filename": "src/actions/chamados.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "enviarMensagemChamadoAtendidoTIAction",
+      "filename": "src/actions/chamados.ts"
+    },
+    "0001ef231507213030f81fc8650626bfb670c42e48": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "listarChamadosAtivosTIAction",
+          "filename": "src/actions/chamados.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "listarChamadosAtivosTIAction",
+      "filename": "src/actions/chamados.ts"
+    },
+    "70ffe01059356b03bd80a0c890c9e4204494d4b767": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "updateChamadosStatus",
+          "filename": "src/actions/chamados.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "updateChamadosStatus",
+      "filename": "src/actions/chamados.ts"
+    },
+    "00db72b8160fa795935b8c756e89ee8f3da460b8b0": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "listarUsersParaGestao",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "rsc"
+      },
+      "exportedName": "listarUsersParaGestao",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "402778d1d2cf2524db678b5821dff4f98db4e35cf0": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "listarPermissoesPorSetor",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "rsc"
+      },
+      "exportedName": "listarPermissoesPorSetor",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "40343a76e69c1834cfd594cd08c0359a28c73eba5e": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "atribuirModulosAoSetor",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "rsc"
+      },
+      "exportedName": "atribuirModulosAoSetor",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "403991500d185a7c0ba721e2cf9dbccd4791008558": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "resetarUserParaSetor",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "rsc"
+      },
+      "exportedName": "resetarUserParaSetor",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "40462bea9bb39f794a48bb8f0dbaf5c879e6a34d40": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "removerOverride",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "rsc"
+      },
+      "exportedName": "removerOverride",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "405db78a4b917f9bc5f020f619b77a8397586000f4": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "listarOverridesDeUser",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "rsc"
+      },
+      "exportedName": "listarOverridesDeUser",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "40693b8e2f52a13682ee6b9b5e61648089097ff8ac": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "listarAcessoModulo",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "rsc"
+      },
+      "exportedName": "listarAcessoModulo",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "4077b04c6eba3e81ac1217e71f8cccc0dd396c5f24": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "adicionarOverride",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "rsc"
+      },
+      "exportedName": "adicionarOverride",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "40b22a8d52ad168d9be9918ad4c58e84caf1e43d81": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "listarModulosEfetivosDeUser",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "rsc"
+      },
+      "exportedName": "listarModulosEfetivosDeUser",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "40eba84def265611483380bb268a852d4a9a777e8b": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "getPermissoesEfetivas",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "rsc"
+      },
+      "exportedName": "getPermissoesEfetivas",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "60ccec99d1d237106c62f64c4f582ef16b4ea90932": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "toggleAcessoModulo",
+          "filename": "src/actions/PermissoesSetor.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "rsc"
+      },
+      "exportedName": "toggleAcessoModulo",
+      "filename": "src/actions/PermissoesSetor.ts"
+    },
+    "002c9e6ffe048d0fa4b62a4bd8e3b9fa965b6ccd00": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "ListarLinksExternosVisiveis",
+          "filename": "src/actions/LinksExternos.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "rsc"
+      },
+      "exportedName": "ListarLinksExternosVisiveis",
+      "filename": "src/actions/LinksExternos.ts"
+    },
+    "40d8e094feb1fbcbb963a99844e7b37c41b9672660": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "ObterResultadosAuditoriaAlphaSeo",
+          "filename": "src/actions/AlphaSeoAudit.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "ObterResultadosAuditoriaAlphaSeo",
+      "filename": "src/actions/AlphaSeoAudit.ts"
+    },
+    "40fdc7488dd0a2336bf6f1aae317171d1923147032": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "ObterStatusAuditoriaAlphaSeo",
+          "filename": "src/actions/AlphaSeoAudit.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "ObterStatusAuditoriaAlphaSeo",
+      "filename": "src/actions/AlphaSeoAudit.ts"
+    },
+    "40b617e18bce2db07baa4edca14235ac7d31db0fcc": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "RemoverAuditoriaAlphaSeo",
+          "filename": "src/actions/AlphaSeoAudit.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "RemoverAuditoriaAlphaSeo",
+      "filename": "src/actions/AlphaSeoAudit.ts"
+    },
+    "40e56a27d899a2c9bcdcb7915a7c80cd42519fc254": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "ExportarCsvAlphaSeo",
+          "filename": "src/actions/AlphaSeoExports.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "ExportarCsvAlphaSeo",
+      "filename": "src/actions/AlphaSeoExports.ts"
+    },
+    "408ab14e8ba5703d75ff1baa93e36dc2bb569f2f7d": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "ExportarGoogleSheetsAlphaSeo",
+          "filename": "src/actions/AlphaSeoExports.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "ExportarGoogleSheetsAlphaSeo",
+      "filename": "src/actions/AlphaSeoExports.ts"
+    },
+    "40273d232f88d4bfc285a22b58ca05c17baa079ec2": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "ExportarIssuesLighthouseAlphaSeo",
+          "filename": "src/actions/AlphaSeoAudit.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "ExportarIssuesLighthouseAlphaSeo",
+      "filename": "src/actions/AlphaSeoAudit.ts"
+    },
+    "408fb86ce7c5ea4981d1d85abab140a246c2107d11": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "ObterIssuesLighthouseAlphaSeo",
+          "filename": "src/actions/AlphaSeoAudit.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "ObterIssuesLighthouseAlphaSeo",
+      "filename": "src/actions/AlphaSeoAudit.ts"
+    },
+    "40c8abcf047085bd68dacbf85c385d0cd1fbe57c8e": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "AdicionarKeywordsRankAlphaSeo",
+          "filename": "src/actions/AlphaSeoRankTracking.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "AdicionarKeywordsRankAlphaSeo",
+      "filename": "src/actions/AlphaSeoRankTracking.ts"
+    },
+    "406e6f68e992264b8a7ead16617f7a5b6d2539c440": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "AprovarCustoMetricasKeywordsRankAlphaSeo",
+          "filename": "src/actions/AlphaSeoRankTracking.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "AprovarCustoMetricasKeywordsRankAlphaSeo",
+      "filename": "src/actions/AlphaSeoRankTracking.ts"
+    },
+    "40f3e54b90fccf09029debe2b8e3c232b968a899b3": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "AprovarCustoRankAlphaSeo",
+          "filename": "src/actions/AlphaSeoRankTracking.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "AprovarCustoRankAlphaSeo",
+      "filename": "src/actions/AlphaSeoRankTracking.ts"
+    },
+    "402ac06117f36001cbf33ce2848bfb1bc53c85c9e8": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "AtualizarMetricasKeywordsRankAlphaSeo",
+          "filename": "src/actions/AlphaSeoRankTracking.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "AtualizarMetricasKeywordsRankAlphaSeo",
+      "filename": "src/actions/AlphaSeoRankTracking.ts"
+    },
+    "402c89732c4fd4d10898a47ddd901fd719ec8ecd45": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "AtualizarRankTrackerAlphaSeo",
+          "filename": "src/actions/AlphaSeoRankTracking.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "AtualizarRankTrackerAlphaSeo",
+      "filename": "src/actions/AlphaSeoRankTracking.ts"
+    },
+    "40b4df499ed3b50f216994786298fcdf6b9a617817": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "CriarRankTrackerAlphaSeo",
+          "filename": "src/actions/AlphaSeoRankTracking.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "CriarRankTrackerAlphaSeo",
+      "filename": "src/actions/AlphaSeoRankTracking.ts"
+    },
+    "40a212594085dcb0cf66c78bf642564a5eca300206": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "EstimarCustoRankAlphaSeo",
+          "filename": "src/actions/AlphaSeoRankTracking.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "EstimarCustoRankAlphaSeo",
+      "filename": "src/actions/AlphaSeoRankTracking.ts"
+    },
+    "40bd8a4c9e2ad434074c759b6d192608c7d34393dc": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "EstimarCustoMetricasKeywordsRankAlphaSeo",
+          "filename": "src/actions/AlphaSeoRankTracking.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "EstimarCustoMetricasKeywordsRankAlphaSeo",
+      "filename": "src/actions/AlphaSeoRankTracking.ts"
+    },
+    "402259d5768061eb3b926b3f981f89fa68bad6fcc7": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "ExecutarRankTrackerAlphaSeo",
+          "filename": "src/actions/AlphaSeoRankTracking.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "ExecutarRankTrackerAlphaSeo",
+      "filename": "src/actions/AlphaSeoRankTracking.ts"
+    },
+    "4081ce7b8f5522b8d085e328b9dced831a648de56f": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "ObterHistoricoKeywordRankAlphaSeo",
+          "filename": "src/actions/AlphaSeoRankTracking.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "ObterHistoricoKeywordRankAlphaSeo",
+      "filename": "src/actions/AlphaSeoRankTracking.ts"
+    },
+    "40f65deb6e5bc5112a71a21e9b48bb88a3548ab007": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "ObterResultadosRankAlphaSeo",
+          "filename": "src/actions/AlphaSeoRankTracking.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "ObterResultadosRankAlphaSeo",
+      "filename": "src/actions/AlphaSeoRankTracking.ts"
+    },
+    "400192773516504c6f1421525db4334b57efba6261": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "ObterTendenciaRankAlphaSeo",
+          "filename": "src/actions/AlphaSeoRankTracking.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "ObterTendenciaRankAlphaSeo",
+      "filename": "src/actions/AlphaSeoRankTracking.ts"
+    },
+    "40d72ac72f431c1735c25e256cc7b28a013de6afff": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "RemoverKeywordsRankAlphaSeo",
+          "filename": "src/actions/AlphaSeoRankTracking.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "RemoverKeywordsRankAlphaSeo",
+      "filename": "src/actions/AlphaSeoRankTracking.ts"
+    },
+    "40999f96327e34c63a73e2c2a8cf362566b25a7f5e": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "SugerirKeywordsRankAlphaSeo",
+          "filename": "src/actions/AlphaSeoRankTracking.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "SugerirKeywordsRankAlphaSeo",
+      "filename": "src/actions/AlphaSeoRankTracking.ts"
+    },
+    "40acd3d04935bb9238ed88f94dc4a99fa9dfeb2da2": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "BuscarLocalizacoesSerpAlphaSeo",
+          "filename": "src/actions/AlphaSeoSettings.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "BuscarLocalizacoesSerpAlphaSeo",
+      "filename": "src/actions/AlphaSeoSettings.ts"
+    },
+    "40d9160a0ca6511808dc7c7fafb59698320a194b5c": {
+      "workers": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": {
+          "moduleId": 529352,
+          "async": true,
+          "exportedName": "PreaquecerLocalizacoesSerpAlphaSeo",
+          "filename": "src/actions/AlphaSeoSettings.ts"
+        }
+      },
+      "layer": {
+        "app/PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]/page": "action-browser"
+      },
+      "exportedName": "PreaquecerLocalizacoesSerpAlphaSeo",
+      "filename": "src/actions/AlphaSeoSettings.ts"
+    }
+  },
+  "edge": {}
+}

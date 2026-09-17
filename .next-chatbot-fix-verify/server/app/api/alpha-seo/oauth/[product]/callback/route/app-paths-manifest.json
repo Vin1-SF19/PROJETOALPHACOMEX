@@ -1,0 +1,3 @@
+{
+  "/api/alpha-seo/oauth/[product]/callback/route": "app/api/alpha-seo/oauth/[product]/callback/route.js"
+}

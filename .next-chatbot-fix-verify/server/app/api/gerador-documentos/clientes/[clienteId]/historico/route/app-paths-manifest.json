@@ -1,0 +1,3 @@
+{
+  "/api/gerador-documentos/clientes/[clienteId]/historico/route": "app/api/gerador-documentos/clientes/[clienteId]/historico/route.js"
+}

@@ -1,0 +1,12 @@
+var R=require("../../../../../chunks/[turbopack]_runtime.js")("server/app/api/onyx/voice/synthesize/route.js")
+R.c("server/chunks/node_modules_next_594ba3a6._.js")
+R.c("server/chunks/[root-of-the-server]__12ff65cd._.js")
+R.c("server/chunks/node_modules_bcryptjs_index_42ebb250.js")
+R.c("server/chunks/_97525657._.js")
+R.c("server/chunks/_259ee7a2._.js")
+R.c("server/chunks/node_modules_next_dist_e341186c._.js")
+R.c("server/chunks/node_modules_zod_v4_76b20a3c._.js")
+R.c("server/chunks/[root-of-the-server]__ae5d6a65._.js")
+R.c("server/chunks/_next-internal_server_app_api_onyx_voice_synthesize_route_actions_f027eeb3.js")
+R.m(493524)
+module.exports=R.m(493524).exports

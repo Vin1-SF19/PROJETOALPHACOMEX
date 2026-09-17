@@ -11,6 +11,13 @@ const exactOrigin = z.string().url().transform((value, context) => {
   return value;
 });
 
+const exactOriginList = z.preprocess(
+  (value) => typeof value === "string"
+    ? value.split(",").map((item) => item.trim()).filter(Boolean)
+    : [],
+  z.array(exactOrigin).max(8),
+).transform((origins) => [...new Set(origins)]);
+
 const configSchema = z.object({
   runtime: z.enum(["production", "stage"]),
   enabled: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
@@ -20,6 +27,7 @@ const configSchema = z.object({
   audience: z.string().min(8).max(200),
   productionOrigin: exactOrigin,
   stageOrigin: exactOrigin,
+  additionalOrigins: exactOriginList,
   issuer: z.string().min(8).max(200),
   keyId: z.string().regex(/^[A-Za-z0-9._-]{8,64}$/),
   secret: z.string().min(32),
@@ -34,6 +42,7 @@ export interface SmbRuntimeConfig {
   audience: string;
   productionOrigin: string;
   stageOrigin: string;
+  additionalOrigins: string[];
   issuer: string;
   keyId: string;
   secret: string;
@@ -49,6 +58,7 @@ function rawSmbRuntimeConfig(env: Readonly<Record<string, string | undefined>>) 
     audience: env.ALPHA_EXPLORER_SMB_AUDIENCE,
     productionOrigin: env.ALPHA_EXPLORER_SMB_PRODUCTION_ORIGIN,
     stageOrigin: env.ALPHA_EXPLORER_SMB_STAGE_ORIGIN,
+    additionalOrigins: env.ALPHA_EXPLORER_SMB_ADDITIONAL_ORIGINS,
     issuer: env.ALPHA_EXPLORER_SMB_ISSUER,
     keyId: env.ALPHA_EXPLORER_SMB_TICKET_KID,
     secret: env.ALPHA_EXPLORER_SMB_TICKET_SECRET,
@@ -72,7 +82,11 @@ export function originForSmbRuntime(config: SmbRuntimeConfig): string {
   return config.runtime === "production" ? config.productionOrigin : config.stageOrigin;
 }
 
+export function allowedOriginsForSmbRuntime(config: SmbRuntimeConfig): string[] {
+  return [...new Set([originForSmbRuntime(config), ...config.additionalOrigins])];
+}
+
 export function issuerForOrigin(config: SmbRuntimeConfig, origin: string): { issuer: string; secret: string; keyId: string } {
-  if (origin !== originForSmbRuntime(config)) throw new Error("SMB_ORIGIN_NOT_ALLOWED");
+  if (!allowedOriginsForSmbRuntime(config).includes(origin)) throw new Error("SMB_ORIGIN_NOT_ALLOWED");
   return { issuer: config.issuer, secret: config.secret, keyId: config.keyId };
 }

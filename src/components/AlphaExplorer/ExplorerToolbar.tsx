@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowUp, Grid2X2, List, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowUp, Grid2X2, List, Plus, Search, Shield } from "lucide-react";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,8 +19,7 @@ interface ExplorerToolbarProps {
   onSearchSubmit: () => void;
   sort: ExplorerSort;
   onSortChange: (value: ExplorerSort) => void;
-  trash: boolean;
-  onToggleTrash: () => void;
+  admin: boolean;
   view: "list" | "grid";
   onViewChange: (view: "list" | "grid") => void;
   writeEnabled: boolean;
@@ -93,16 +93,13 @@ export function ExplorerToolbar(props: ExplorerToolbarProps) {
             <option value="createdAt">Data</option>
           </select>
 
-          <Button
-            data-guia-explorer="trash"
-            variant={props.trash ? "secondary" : "outline"}
-            size="sm"
-            onClick={props.onToggleTrash}
-            className={cn("rounded-xl", props.trash && "bg-[#1677FF]/15 text-[#F2F6FC] ring-1 ring-inset ring-[#1677FF]/30")}
-          >
-            <Trash2 className="mr-2 size-4" />
-            Lixeira
-          </Button>
+          {props.admin && (
+            <Button asChild variant="outline" size="icon" className="rounded-xl">
+              <Link href="/PainelAlpha/ExploradorArquivos/AdministracaoQnap" aria-label="Administração QNAP" title="Administração QNAP">
+                <Shield className="size-4" />
+              </Link>
+            </Button>
+          )}
 
           <Button
             variant="outline"

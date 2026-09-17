@@ -1,0 +1,3 @@
+{
+  "/api/bibble/sessions/[id]/route": "app/api/bibble/sessions/[id]/route.js"
+}

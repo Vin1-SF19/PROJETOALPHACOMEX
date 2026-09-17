@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, MoreHorizontal, RotateCcw, Trash2 } from "lucide-react";
+import { Download, ExternalLink, MoreHorizontal, RotateCcw, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -18,6 +18,7 @@ interface FileListProps {
   selected: ExplorerItemView | null;
   onSelect: (item: ExplorerItemView | null) => void;
   onOpenFolder: (path: string) => void;
+  onOpenFile: (item: ExplorerItemView) => void;
   onDownload: (item: ExplorerItemView) => void;
   onAction: (item: ExplorerItemView, action: ExplorerItemAction) => void;
 }
@@ -59,7 +60,14 @@ export function FileList(props: FileListProps) {
             <button
               type="button"
               onClick={() => (item.kind === "FOLDER" ? props.onOpenFolder(item.logicalPath) : props.onSelect(item))}
-              onDoubleClick={() => (item.kind === "FILE" ? props.onDownload(item) : props.onOpenFolder(item.logicalPath))}
+              onDoubleClick={() => (item.kind === "FILE" ? props.onOpenFile(item) : props.onOpenFolder(item.logicalPath))}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                if (item.kind === "FILE") props.onOpenFile(item);
+                else props.onOpenFolder(item.logicalPath);
+              }}
+              title={item.kind === "FILE" ? "Clique duas vezes para abrir" : "Abrir pasta"}
               className="flex min-w-0 items-center gap-3 text-left focus-visible:outline-none"
             >
               <span className={cn("grid size-9 shrink-0 place-items-center rounded-lg ring-1 ring-inset ring-white/[0.06]", isSelected ? "bg-[#1677FF]/15" : "bg-[#0A1830]")}>
@@ -79,7 +87,7 @@ export function FileList(props: FileListProps) {
 
             {!virtual && (
               <span className="flex justify-end">
-                <ItemMenu item={item} trash={props.trash} onDownload={props.onDownload} onAction={props.onAction} />
+                <ItemMenu item={item} trash={props.trash} onOpenFile={props.onOpenFile} onDownload={props.onDownload} onAction={props.onAction} />
               </span>
             )}
           </>
@@ -113,9 +121,10 @@ export function FileList(props: FileListProps) {
   );
 }
 
-function ItemMenu({ item, trash, onDownload, onAction }: {
+function ItemMenu({ item, trash, onOpenFile, onDownload, onAction }: {
   item: ExplorerItemView;
   trash: boolean;
+  onOpenFile: (item: ExplorerItemView) => void;
   onDownload: (item: ExplorerItemView) => void;
   onAction: (item: ExplorerItemView, action: ExplorerItemAction) => void;
 }) {
@@ -127,6 +136,12 @@ function ItemMenu({ item, trash, onDownload, onAction }: {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-44 rounded-xl border-white/[0.08] bg-[#0A1830]">
+        {!trash && item.kind === "FILE" && (
+          <DropdownMenuItem onClick={() => onOpenFile(item)} className="rounded-lg text-[13px]">
+            <ExternalLink className="mr-2 size-4" />
+            Abrir
+          </DropdownMenuItem>
+        )}
         {!trash && item.kind === "FILE" && (
           <DropdownMenuItem onClick={() => onDownload(item)} className="rounded-lg text-[13px]">
             <Download className="mr-2 size-4" />

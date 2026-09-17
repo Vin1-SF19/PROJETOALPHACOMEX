@@ -1,0 +1,3 @@
+{
+  "/api/roadmap/production/objectives/[objectiveId]/completion-report/route": "app/api/roadmap/production/objectives/[objectiveId]/completion-report/route.js"
+}

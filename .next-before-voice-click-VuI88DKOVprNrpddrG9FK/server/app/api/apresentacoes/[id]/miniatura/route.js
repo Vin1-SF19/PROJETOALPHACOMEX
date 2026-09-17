@@ -1,0 +1,13 @@
+var R=require("../../../../../chunks/[turbopack]_runtime.js")("server/app/api/apresentacoes/[id]/miniatura/route.js")
+R.c("server/chunks/node_modules_next_594ba3a6._.js")
+R.c("server/chunks/node_modules_bcryptjs_index_42ebb250.js")
+R.c("server/chunks/_97525657._.js")
+R.c("server/chunks/[root-of-the-server]__c22d46dd._.js")
+R.c("server/chunks/node_modules_next_dist_e341186c._.js")
+R.c("server/chunks/node_modules_c0de9c77._.js")
+R.c("server/chunks/_259ee7a2._.js")
+R.c("server/chunks/[root-of-the-server]__ae5d6a65._.js")
+R.c("server/chunks/node_modules_b3398e44._.js")
+R.c("server/chunks/ce889_server_app_api_apresentacoes_[id]_miniatura_route_actions_3b8690f4.js")
+R.m(367589)
+module.exports=R.m(367589).exports

@@ -1,0 +1,3 @@
+{
+  "/api/alpha-seo/cron/worker/route": "app/api/alpha-seo/cron/worker/route.js"
+}

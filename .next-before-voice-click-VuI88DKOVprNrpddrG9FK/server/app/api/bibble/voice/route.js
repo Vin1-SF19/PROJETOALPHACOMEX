@@ -1,0 +1,13 @@
+var R=require("../../../../chunks/[turbopack]_runtime.js")("server/app/api/bibble/voice/route.js")
+R.c("server/chunks/[root-of-the-server]__99fc7e7a._.js")
+R.c("server/chunks/_612728f0._.js")
+R.c("server/chunks/node_modules_bcryptjs_index_42ebb250.js")
+R.c("server/chunks/node_modules_next_594ba3a6._.js")
+R.c("server/chunks/_97525657._.js")
+R.c("server/chunks/[root-of-the-server]__ae5d6a65._.js")
+R.c("server/chunks/node_modules_zod_v4_76b20a3c._.js")
+R.c("server/chunks/_259ee7a2._.js")
+R.c("server/chunks/node_modules_next_dist_e341186c._.js")
+R.c("server/chunks/_next-internal_server_app_api_bibble_voice_route_actions_f95c343d.js")
+R.m(370035)
+module.exports=R.m(370035).exports

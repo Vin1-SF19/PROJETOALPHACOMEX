@@ -1,0 +1,11 @@
+var R=require("../../../../chunks/[turbopack]_runtime.js")("server/app/api/bibble/curiosidade/route.js")
+R.c("server/chunks/[root-of-the-server]__30166b8d._.js")
+R.c("server/chunks/node_modules_bcryptjs_index_42ebb250.js")
+R.c("server/chunks/node_modules_next_594ba3a6._.js")
+R.c("server/chunks/_259ee7a2._.js")
+R.c("server/chunks/_97525657._.js")
+R.c("server/chunks/[root-of-the-server]__ae5d6a65._.js")
+R.c("server/chunks/node_modules_next_dist_e341186c._.js")
+R.c("server/chunks/_next-internal_server_app_api_bibble_curiosidade_route_actions_170defdb.js")
+R.m(952651)
+module.exports=R.m(952651).exports

@@ -1,0 +1,3 @@
+{
+  "/api/comissoes/comprovantes/[paymentId]/route": "app/api/comissoes/comprovantes/[paymentId]/route.js"
+}

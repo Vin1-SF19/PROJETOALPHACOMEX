@@ -1,0 +1,1085 @@
+{
+  "node": {
+    "0059b3d09c92ba9373815029b61bc63b38ccb79fbd": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "obterConfigParceiros",
+          "filename": "src/actions/convites-parceiro.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "obterConfigParceiros",
+      "filename": "src/actions/convites-parceiro.ts"
+    },
+    "00d840551ae21b35c65bb3b77519faa044dfe90ef0": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "contarPreCadastrosPendentes",
+          "filename": "src/actions/convites-parceiro.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "contarPreCadastrosPendentes",
+      "filename": "src/actions/convites-parceiro.ts"
+    },
+    "00f1059b12b2b39337ff948b731a702bd9dfa8f828": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "listarConvites",
+          "filename": "src/actions/convites-parceiro.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "listarConvites",
+      "filename": "src/actions/convites-parceiro.ts"
+    },
+    "40307807ea1ab3ac420cf6fdd3823171898955f0ad": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "gerarConvite",
+          "filename": "src/actions/convites-parceiro.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "gerarConvite",
+      "filename": "src/actions/convites-parceiro.ts"
+    },
+    "404d5cebaa4473ea38f7ccf10c562ee52b1a84afb5": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "revogarConvite",
+          "filename": "src/actions/convites-parceiro.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "revogarConvite",
+      "filename": "src/actions/convites-parceiro.ts"
+    },
+    "407e631b463acae1ea4bc3a4f4303962053061ccee": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "submeterConvitePublico",
+          "filename": "src/actions/convites-parceiro.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "action-browser"
+      },
+      "exportedName": "submeterConvitePublico",
+      "filename": "src/actions/convites-parceiro.ts"
+    },
+    "40966063d0baac1a2664a813cca0d8e4d0e9e54a60": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "rejeitarPreCadastro",
+          "filename": "src/actions/convites-parceiro.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "rejeitarPreCadastro",
+      "filename": "src/actions/convites-parceiro.ts"
+    },
+    "40b1491ae554fad742b241c5d75ff1a58989f2b61b": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "togglePermitirParceiroConvidar",
+          "filename": "src/actions/convites-parceiro.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "togglePermitirParceiroConvidar",
+      "filename": "src/actions/convites-parceiro.ts"
+    },
+    "40c6ac03825ba70f8f20ce549bab5a2c39753bb199": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "validarConvitePublico",
+          "filename": "src/actions/convites-parceiro.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "validarConvitePublico",
+      "filename": "src/actions/convites-parceiro.ts"
+    },
+    "40eff51ad3e33b76364279665cf412b508a29170fd": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "AtualizarRegrasParceiros",
+          "filename": "src/actions/convites-parceiro.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "AtualizarRegrasParceiros",
+      "filename": "src/actions/convites-parceiro.ts"
+    },
+    "40fd76a56c0e1bdf83ec6d5e6c567552964ddf2503": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "listarPreCadastros",
+          "filename": "src/actions/convites-parceiro.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "listarPreCadastros",
+      "filename": "src/actions/convites-parceiro.ts"
+    },
+    "40fd9f8d0c78b99e6cecb89339af35f7b32180b837": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "aprovarPreCadastro",
+          "filename": "src/actions/convites-parceiro.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "aprovarPreCadastro",
+      "filename": "src/actions/convites-parceiro.ts"
+    },
+    "60072b73ea5e9f34aec002e2026d6006635698731a": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "atualizarPreCadastro",
+          "filename": "src/actions/convites-parceiro.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "atualizarPreCadastro",
+      "filename": "src/actions/convites-parceiro.ts"
+    },
+    "002e4322081324b2ded2dad68843a55494efd995e4": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "obterTermoAtivo",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "obterTermoAtivo",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "0049230e6f563c2f0cf01a3cce672dea1d943855df": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "listarAcessosParceiros",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "listarAcessosParceiros",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "004fc83ccf27bcc3facbbd88b3893abb91968adb6d": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "listarHistoricoTermos",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "listarHistoricoTermos",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "0064bd218431d7e95d291b5193c1a23cc57081094e": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "listarParceirosSimples",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "listarParceirosSimples",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "0073783b4e4e566033bd86164787cefffbebd5cb83": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "listarParceirosPendentesCadastro",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "listarParceirosPendentesCadastro",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "007c70ca6d8af3ade83b7d758eccd88e5150c79156": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "getCtx",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "getCtx",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "0081a7944313db4a91c33535953305722aa6189048": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "recalcularNiveisInativos",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "recalcularNiveisInativos",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "00c0eaea5560381944c27d908de7798d665bb3ca8e": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "getPermissaoParceiros",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "getPermissaoParceiros",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "40209a4c7beb291397b84a548d329404d2eb2cc6fa": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "excluirParceiros",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "excluirParceiros",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "40250e59feded2e514e6ace88b78705aa67a16bac8": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "desvincularIndicacao",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "desvincularIndicacao",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "402f8d716661aadf2a00e4876faae1b22831f069ec": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "recalcularNivel",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "recalcularNivel",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "40421eb24ec7b94974b690307b9280c1e9bcc2bcc3": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "gerarMensagemLoginParceiro",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "gerarMensagemLoginParceiro",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "40424ce279299febea211121c5a9e069818ffc8c43": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "buscarParceiro",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "buscarParceiro",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "40639d25260fbc7d97a2617c870436d9e182f777c9": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "listarClientesParaIndicacao",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "listarClientesParaIndicacao",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "4074f5721ea5ce8c37b44d103f3a4c3b0f1d49609f": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "buscarParceiroDetalheSimples",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "buscarParceiroDetalheSimples",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "40b1aefee7d95373889f122260fb8a4b6ec70befe5": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "buscarParceiroPendenteCadastro",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "buscarParceiroPendenteCadastro",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "40b867746857cc9c2e1704f14192b15ffc24a15136": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "removerComprovante",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "removerComprovante",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "40e200f7e31e11d14dc02ffc35f728b1ac5d110c53": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "criarIndicacao",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "criarIndicacao",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "40e79aaaefe8d87310df7037a74cea297ebf36132b": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "criarParceiro",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "criarParceiro",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "40ead094c35d20dd29d5057fdfe5f278406e6703a4": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "obterTermoPorId",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "obterTermoPorId",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "602a03057bea4f4ed6e9e4eb7f3e9723526ec84844": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "redefinirSenhaParceiro",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "redefinirSenhaParceiro",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "603bead68db00124aab7b9060709c641edb0080875": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "enviarComprovante",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "enviarComprovante",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "608f5b209771b1a6ea984a46e57b5caf59447cf59a": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "alternarAcessoParceiro",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "alternarAcessoParceiro",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "60a5b668a8175bd6d21e4653ef70b59780e779782e": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "atualizarTermo",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "atualizarTermo",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "60a73308e427d97305e1cdc35d9e9e263cd68b9237": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "editarParceiro",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "editarParceiro",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "70d306aea2b72d190a79ed1139be0822e661f4ab0d": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "listarParceiros",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "listarParceiros",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "781c1d66324df4f012c48d74736db994167853606b": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "salvarAcessoParceiro",
+          "filename": "src/actions/parceiros.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "salvarAcessoParceiro",
+      "filename": "src/actions/parceiros.ts"
+    },
+    "0092c45e24e78bf0bed3752f81d26f5afde803e961": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "ListarTodasIndicacoes",
+          "filename": "src/actions/parceiros-indicacoes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "ListarTodasIndicacoes",
+      "filename": "src/actions/parceiros-indicacoes.ts"
+    },
+    "00e7f33903d95de4664bd07071177a2a263d312f42": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "obterEtapaNovosLeadsPipelineIndicacoes",
+          "filename": "src/actions/parceiros-indicacoes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "obterEtapaNovosLeadsPipelineIndicacoes",
+      "filename": "src/actions/parceiros-indicacoes.ts"
+    },
+    "407102a502252899d34a64f820c4694308bc3c6810": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "direcionarIndicacaoParaCloserAutomatico",
+          "filename": "src/actions/parceiros-indicacoes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "direcionarIndicacaoParaCloserAutomatico",
+      "filename": "src/actions/parceiros-indicacoes.ts"
+    },
+    "40e751719d565eee3018936326b2d17ae699298c1a": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "ListarIndicacoesDoParceiro",
+          "filename": "src/actions/parceiros-indicacoes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "ListarIndicacoesDoParceiro",
+      "filename": "src/actions/parceiros-indicacoes.ts"
+    },
+    "40fd242f243487371879bae89e67e1de201dbb9d7e": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "DirecionarIndicacaoParaCloser",
+          "filename": "src/actions/parceiros-indicacoes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "DirecionarIndicacaoParaCloser",
+      "filename": "src/actions/parceiros-indicacoes.ts"
+    },
+    "00e2d5e7c30a0def4a6bc85aa5469f3cacc5e073eb": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "buscarHistorico",
+          "filename": "src/actions/PreAnalise.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "buscarHistorico",
+      "filename": "src/actions/PreAnalise.ts"
+    },
+    "40621eed1ddf8a0214cb71c383e077fd46504de5a4": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "upsertConsulta",
+          "filename": "src/actions/PreAnalise.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "upsertConsulta",
+      "filename": "src/actions/PreAnalise.ts"
+    },
+    "60f6ea7bedd4e27b11de788437ffb55e06e4ad7419": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "atualizarRadar",
+          "filename": "src/actions/PreAnalise.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "atualizarRadar",
+      "filename": "src/actions/PreAnalise.ts"
+    },
+    "00850e825e2be2277f84df7602c7edf00d3971ceed": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "buscarClientes",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "buscarClientes",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "00b7fcffd9f3a07ba234845374e610bd078ba74931": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "buscarPendenciasUltimoCs",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "buscarPendenciasUltimoCs",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "4012df24d6caad5791f0745b943b90915c1f61a945": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "buscarUsuariosPorRole",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "buscarUsuariosPorRole",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "403b9afddc5ceb3f815776046df60f21e4003848de": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "analisarImpactoTrocaServico",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "analisarImpactoTrocaServico",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "405caee8fe85580dd242e1391b31a783780b47a0ab": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "buscarServicosContratados",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "buscarServicosContratados",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "407267548f291c8d9b88749ef94c14cad64484f74d": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "criarRegistroClienteAPartirDeContrato",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "criarRegistroClienteAPartirDeContrato",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "4090f965ee597bdd553d7c8aeee3992e02497cb2a2": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "excluirLogCS",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "excluirLogCS",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "40bcd00c3fcfd176b3cc42eef2edd5a54ec8d1ae3e": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "verificarCNPJDuplicado",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "verificarCNPJDuplicado",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "40e34c6dbea91714cb125270f1022a0f07f899f86e": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "excluirLogFeedback",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "excluirLogFeedback",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "6008b77be47e8fc2d77fc2e84aa76687befbc97e14": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "adicionarSocio",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "adicionarSocio",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "601cc623bf44a7dd4c4344e8747a7e36ec97ee04d4": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "excluirSocio",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "excluirSocio",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "60267fc778ac092db40ddd7ff8ebc07e685272856a": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "salvarLogCS",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "salvarLogCS",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "6034f8aa31c40725c888ef9259dfe9d7ba38c610cd": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "salvarLogCSPorAlerta",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "salvarLogCSPorAlerta",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "604498f17e25739c6c06a4c2484bb68370e231416a": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "atualizarDadosGestao",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "atualizarDadosGestao",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "604dbdf87f4dc81625d3bb0ba3ac948ff7b126017e": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "atualizarStatusCliente",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "atualizarStatusCliente",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "605c1958903ff7809981b38415706716e372d3fcd4": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "salvarAlteracoesServico",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "salvarAlteracoesServico",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "606e8d9a4531f795fe760145dd5305ff6eec5330ad": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "salvarAlteracoesCliente",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "salvarAlteracoesCliente",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "60991253e9fdf71e565f51ada7e730c9e4ba1c93c3": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "reverterCampoHistorico",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "reverterCampoHistorico",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "60c3fb0cefdeb5ca7b024e8900cf807a5121f2bbe0": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "salvarLogFeedback",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "salvarLogFeedback",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "60c7663bce8d4df9b8877ad3f2f340f4e236c01855": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "CadastrarCliente",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "CadastrarCliente",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "60ddb58e93f9a0e910adeb97d45b26064b3ed777b0": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "buscarServicoContratadoPorCliente",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "buscarServicoContratadoPorCliente",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "60e1ac5d27837fea2d42e67df9044733a493702cc0": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "atualizarLogCS",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "atualizarLogCS",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "60e83c815839a594386c51e987639e898463f8a34e": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "atualizarLogFeedback",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "atualizarLogFeedback",
+      "filename": "src/actions/Clientes.ts"
+    },
+    "70e17dd7d3c53614fa08b4d492cba191b6210b5c3e": {
+      "workers": {
+        "app/convite/parceiro/[token]/page": {
+          "moduleId": 564046,
+          "async": true,
+          "exportedName": "atualizarSocio",
+          "filename": "src/actions/Clientes.ts"
+        }
+      },
+      "layer": {
+        "app/convite/parceiro/[token]/page": "rsc"
+      },
+      "exportedName": "atualizarSocio",
+      "filename": "src/actions/Clientes.ts"
+    }
+  },
+  "edge": {}
+}

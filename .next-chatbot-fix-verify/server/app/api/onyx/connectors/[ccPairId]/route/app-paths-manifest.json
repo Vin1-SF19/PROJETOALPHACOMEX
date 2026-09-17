@@ -1,0 +1,3 @@
+{
+  "/api/onyx/connectors/[ccPairId]/route": "app/api/onyx/connectors/[ccPairId]/route.js"
+}

@@ -19,4 +19,11 @@ describe("Alpha Explorer SMB friendly errors", () => {
     expect(friendlySmbErrorMessage(new SmbGatewayError("SMB_NO_ACCESSIBLE_SHARES", 403)))
       .toContain("foi autenticada");
   });
+
+  it("explains an expired Office session without exposing the internal error code", () => {
+    const message = friendlySmbErrorMessage(new SmbGatewayError("OFFICE_SESSION_NOT_FOUND", 404));
+    expect(message).toContain("acesso temporário");
+    expect(message).toContain("Abra o arquivo novamente");
+    expect(message).not.toContain("OFFICE_SESSION_NOT_FOUND");
+  });
 });

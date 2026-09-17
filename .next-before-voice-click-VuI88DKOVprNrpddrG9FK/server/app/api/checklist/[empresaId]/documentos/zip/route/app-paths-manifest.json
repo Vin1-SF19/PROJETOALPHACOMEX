@@ -1,0 +1,3 @@
+{
+  "/api/checklist/[empresaId]/documentos/zip/route": "app/api/checklist/[empresaId]/documentos/zip/route.js"
+}

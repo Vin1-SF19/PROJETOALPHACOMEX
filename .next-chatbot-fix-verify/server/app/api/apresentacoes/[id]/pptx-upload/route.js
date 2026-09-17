@@ -1,0 +1,13 @@
+var R=require("../../../../../chunks/[turbopack]_runtime.js")("server/app/api/apresentacoes/[id]/pptx-upload/route.js")
+R.c("server/chunks/node_modules_next_594ba3a6._.js")
+R.c("server/chunks/node_modules_bcryptjs_index_42ebb250.js")
+R.c("server/chunks/_97525657._.js")
+R.c("server/chunks/[root-of-the-server]__d402d78f._.js")
+R.c("server/chunks/[root-of-the-server]__ae5d6a65._.js")
+R.c("server/chunks/node_modules_fe37600c._.js")
+R.c("server/chunks/node_modules_zod_v4_7b1186d4._.js")
+R.c("server/chunks/_259ee7a2._.js")
+R.c("server/chunks/node_modules_next_dist_e341186c._.js")
+R.c("server/chunks/ce889_server_app_api_apresentacoes_[id]_pptx-upload_route_actions_6530d785.js")
+R.m(207208)
+module.exports=R.m(207208).exports

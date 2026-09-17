@@ -6,6 +6,12 @@ import {
   type SmbIssuedTicket,
   type SmbTicketScope,
 } from "./contracts";
+import {
+  createPreviewObjectUrl,
+  MAX_INLINE_PREVIEW_BYTES,
+  nativeOfficeApplication,
+  previewMimeType,
+} from "../file-preview";
 
 const supportIdSchema = z.string().uuid();
 const ticketEnvelopeSchema = z.object({
@@ -114,6 +120,12 @@ const trashListSchema = z.object({
   nextCursor: z.string().nullable(),
   supportId: supportIdSchema,
 }).strict();
+const officeSessionSchema = z.object({
+  application: z.enum(["word", "excel"]),
+  documentPath: z.string().regex(/^\/v1\/office\/files\/o_[A-Za-z0-9_-]{32,128}\/[A-Za-z0-9%._~-]+$/),
+  expiresAt: z.string().datetime(),
+  supportId: supportIdSchema,
+}).strict();
 
 export async function getSmbLinkStatus(signal?: AbortSignal): Promise<boolean> {
   const ticket = await requestTicket({ scope: "link_status" }, signal);
@@ -136,9 +148,46 @@ export async function createSmbDirectory(parentHandle: string, name: string, sig
   });
 }
 
-export async function openSmbDownload(handle: string, signal?: AbortSignal): Promise<Response> {
-  const ticket = await requestTicket({ scope: "download", resource: handle, maxBytes: 2 * 1024 * 1024 * 1024 }, signal);
+export async function openSmbDownload(
+  handle: string,
+  signal?: AbortSignal,
+  maxBytes = 2 * 1024 * 1024 * 1024,
+): Promise<Response> {
+  const ticket = await requestTicket({ scope: "download", resource: handle, maxBytes }, signal);
   return gatewayRequest(ticket, "/v1/files/download", { method: "GET", signal });
+}
+
+export async function loadSmbPreview(handle: string, fileName: string, signal?: AbortSignal): Promise<string> {
+  const mimeType = previewMimeType(fileName);
+  if (!mimeType) throw new SmbGatewayError("SMB_PREVIEW_UNSUPPORTED", 415);
+  const response = await openSmbDownload(handle, signal, MAX_INLINE_PREVIEW_BYTES);
+  return createPreviewObjectUrl(response, fileName);
+}
+
+export async function openSmbOfficeDocument(input: {
+  handle: string;
+  fileName: string;
+  sizeBytes: number | null;
+  signal?: AbortSignal;
+}): Promise<void> {
+  const application = nativeOfficeApplication(input.fileName);
+  if (!application || input.sizeBytes === null) throw new SmbGatewayError("OFFICE_FILE_UNSUPPORTED", 415);
+  const ticket = await requestTicket({
+    scope: "office_open",
+    resource: input.handle,
+    maxBytes: input.sizeBytes,
+    targetName: input.fileName,
+  }, input.signal);
+  const session = await gatewayJson(ticket, "/v1/office/sessions", officeSessionSchema, {
+    method: "POST",
+    body: JSON.stringify({ name: input.fileName }),
+    signal: input.signal,
+  });
+  if (session.application !== application) throw new SmbGatewayError("OFFICE_APPLICATION_MISMATCH", 502, session.supportId);
+  const gatewayOrigin = new URL(ticket.gatewayUrl).origin;
+  const documentUrl = new URL(session.documentPath, ticket.gatewayUrl);
+  if (documentUrl.origin !== gatewayOrigin) throw new SmbGatewayError("OFFICE_DOCUMENT_URL_INVALID", 502, session.supportId);
+  window.location.assign(`ms-${application}:ofv|u|${documentUrl.href}`);
 }
 
 interface WritableFileHandle {

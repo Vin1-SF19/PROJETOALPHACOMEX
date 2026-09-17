@@ -1,0 +1,13 @@
+var R=require("../../../../chunks/[turbopack]_runtime.js")("server/app/api/apresentacoes/gerar-slide/route.js")
+R.c("server/chunks/[root-of-the-server]__06072e46._.js")
+R.c("server/chunks/node_modules_next_594ba3a6._.js")
+R.c("server/chunks/node_modules_bcryptjs_index_42ebb250.js")
+R.c("server/chunks/_97525657._.js")
+R.c("server/chunks/node_modules_zod_v4_76b20a3c._.js")
+R.c("server/chunks/_e11c479c._.js")
+R.c("server/chunks/node_modules_next_dist_e341186c._.js")
+R.c("server/chunks/_259ee7a2._.js")
+R.c("server/chunks/[root-of-the-server]__ae5d6a65._.js")
+R.c("server/chunks/_next-internal_server_app_api_apresentacoes_gerar-slide_route_actions_ce04db10.js")
+R.m(513974)
+module.exports=R.m(513974).exports

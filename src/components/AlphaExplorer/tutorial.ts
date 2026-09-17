@@ -3,7 +3,7 @@ import type { ConfigTutorialModulo } from "@/lib/guias/tutorial-modulo";
 export const ALPHA_EXPLORER_TUTORIAL: ConfigTutorialModulo = {
   modulo: "alpha-explorer",
   versao: 1,
-  titulo: "Como usar o Explorador de Arquivos",
+  titulo: "Como usar o Alpha Explorer",
   passos: [
     { id: "navigation", seletor: '[data-guia-explorer="navigation"]', titulo: "Navegue com segurança", descricao: "Use as pastas e o breadcrumb. Diretórios sem permissão não aparecem." },
     { id: "folder", seletor: '[data-guia-explorer="folder"]', titulo: "Crie pastas", descricao: "Nova pasta cria uma organização lógica no escopo autorizado." },

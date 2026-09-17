@@ -11,10 +11,19 @@ Gateway server-only que autentica cada operação com ticket HMAC curto e abre u
 - Segredos em HashiCorp Vault KV v2. O store em memória é recusado fora de `environment=test`.
 - Cada operação usa um connection cache `smbclient` privado e descartável, impedindo reuso entre identidades/operações concorrentes.
 - CORS limitado às origens exatas de produção e stage.
+- Abertura nativa somente leitura de `.docx` e `.xlsx` pelo Word/Excel instalado, usando URI oficial do Office e uma sessão HTTPS opaca de 120 segundos. O navegador e o aplicativo nunca recebem caminho UNC nem credencial SMB.
 
 Uploads usam chunks de até 8 MiB diretamente navegador → gateway, estado SQLite persistente, temporário opaco no mesmo diretório de destino e commit com ticket novo. O arquivo só recebe o nome final após tamanho verificado e rename sem overwrite. Cancelamento e reconciliação de sessões incompletas estão disponíveis.
 
 Rename no mesmo diretório usa rename atômico sem overwrite, inclusive para diretórios. Move de arquivo usa copy → verificação de tamanho → delete; falha no delete retorna `MOVE_RECONCILIATION_REQUIRED` e mantém ambas as cópias. Movimento recursivo de diretório é recusado nesta versão. A lixeira reservada fica sob o diretório pai autorizado, é listável de forma paginada e não equivale ao `@Recycle` nem a snapshots do QNAP.
+
+## Abertura no Word e Excel instalados
+
+Ao abrir um `.docx` ou `.xlsx`, o Painel solicita um ticket de operação single-use, e o gateway cria uma URL HTTPS opaca e curta, vinculada à identidade, ao IP de origem, ao nome e ao tamanho atual do arquivo. Em seguida, o navegador aciona `ms-word:ofv|u|...` ou `ms-excel:ofv|u|...`. O arquivo é entregue por streaming SMB com `HEAD`, `GET` e `Range`; a URL expira em 120 segundos e tem rate limit próprio.
+
+Esta versão é deliberadamente somente leitura (`ofv`). Alterações feitas no Word/Excel devem ser salvas como uma cópia local; salvar de volta no NAS exigiria WOPI ou WebDAV com locks, conflitos e autorização próprios, fora desta story. O computador precisa ter Microsoft Word/Excel instalados e o navegador pode pedir confirmação antes de abrir o aplicativo.
+
+O serviço systemd usa `--no-access-log` para impedir que o token presente no path temporário seja gravado pelo Uvicorn. Reverse proxies adicionais também não devem registrar o path completo dessas rotas.
 
 ## Configuração server-only do Painel
 

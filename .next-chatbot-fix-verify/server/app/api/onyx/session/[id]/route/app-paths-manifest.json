@@ -1,0 +1,3 @@
+{
+  "/api/onyx/session/[id]/route": "app/api/onyx/session/[id]/route.js"
+}

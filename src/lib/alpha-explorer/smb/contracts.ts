@@ -3,6 +3,7 @@ import { z } from "zod";
 export const SMB_OPERATION_TICKET_SCOPES = [
   "health", "link_status", "list", "mkdir", "download", "upload_start", "upload_chunk",
   "upload_commit", "upload_cancel", "rename", "move", "trash", "trash_list", "restore", "upload_reconcile",
+  "office_open",
 ] as const;
 export const SMB_CREDENTIAL_TICKET_SCOPES = [
   "credential:status", "credential:enroll", "credential:rotate", "credential:unlink",

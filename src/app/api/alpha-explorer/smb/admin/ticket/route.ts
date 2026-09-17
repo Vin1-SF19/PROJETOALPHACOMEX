@@ -5,7 +5,7 @@ import { ExplorerError } from "@/lib/alpha-explorer/errors";
 import { assertExplorerMutationRequest, explorerErrorResponse, requireExplorerIdentity } from "@/lib/alpha-explorer/http";
 import { auditExplorer, createSupportId, writeExplorerLog } from "@/lib/alpha-explorer/observability";
 import { consumeExplorerRateLimit } from "@/lib/alpha-explorer/rate-limit";
-import { originForSmbRuntime, readSmbRuntimeConfig } from "@/lib/alpha-explorer/smb/config";
+import { allowedOriginsForSmbRuntime, readSmbRuntimeConfig } from "@/lib/alpha-explorer/smb/config";
 import { smbCredentialTicketRequestSchema } from "@/lib/alpha-explorer/smb/contracts";
 import { issueSmbTicket } from "@/lib/alpha-explorer/smb/ticket";
 
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     const config = readSmbRuntimeConfig();
-    const origin = assertExplorerMutationRequest(request, [originForSmbRuntime(config)]);
+    const origin = assertExplorerMutationRequest(request, allowedOriginsForSmbRuntime(config));
     const actor = await requireExplorerIdentity();
     if (!actor.authorization.admin) throw new ExplorerError("FORBIDDEN", 403, "Sem permissão administrativa");
     if (!consumeExplorerRateLimit(actor.userId, "destructive")) {

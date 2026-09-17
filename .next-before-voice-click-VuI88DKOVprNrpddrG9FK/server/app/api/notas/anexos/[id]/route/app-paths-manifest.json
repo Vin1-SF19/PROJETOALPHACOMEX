@@ -1,0 +1,3 @@
+{
+  "/api/notas/anexos/[id]/route": "app/api/notas/anexos/[id]/route.js"
+}

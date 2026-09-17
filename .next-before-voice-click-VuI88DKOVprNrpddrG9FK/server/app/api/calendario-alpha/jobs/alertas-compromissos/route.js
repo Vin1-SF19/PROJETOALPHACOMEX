@@ -1,0 +1,11 @@
+var R=require("../../../../../chunks/[turbopack]_runtime.js")("server/app/api/calendario-alpha/jobs/alertas-compromissos/route.js")
+R.c("server/chunks/[root-of-the-server]__0b9eea4b._.js")
+R.c("server/chunks/_021b959e._.js")
+R.c("server/chunks/node_modules_next_594ba3a6._.js")
+R.c("server/chunks/[root-of-the-server]__ae5d6a65._.js")
+R.c("server/chunks/[root-of-the-server]__f7a9ec92._.js")
+R.c("server/chunks/node_modules_next_dist_e341186c._.js")
+R.c("server/chunks/_97525657._.js")
+R.c("server/chunks/bec2d_app_api_calendario-alpha_jobs_alertas-compromissos_route_actions_c77834c2.js")
+R.m(376693)
+module.exports=R.m(376693).exports

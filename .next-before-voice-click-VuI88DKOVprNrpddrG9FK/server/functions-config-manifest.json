@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "functions": {
+    "/api/alpha-seo/cron/oauth-cleanup": {
+      "maxDuration": 60
+    },
+    "/api/alpha-seo/cron/schedules": {
+      "maxDuration": 300
+    },
+    "/api/alpha-seo/cron/worker": {
+      "maxDuration": 300
+    },
+    "/api/alpha-seo/mcp": {},
+    "/api/alpha-seo/mcp/keys": {},
+    "/api/alpha-seo/mcp/oauth/authorize": {},
+    "/api/alpha-seo/mcp/oauth/token": {},
+    "/api/apresentacoes/[id]/exportar-html": {
+      "maxDuration": 60
+    },
+    "/api/apresentacoes/[id]/importar-pptx": {
+      "maxDuration": 120
+    },
+    "/api/apresentacoes/[id]/pptx-preview": {
+      "maxDuration": 120
+    },
+    "/api/apresentacoes/gerar-slide": {
+      "maxDuration": 60
+    },
+    "/api/bibble/chat": {
+      "maxDuration": 120
+    },
+    "/api/bibble/cloud-providers": {},
+    "/api/bibble/curiosidade": {},
+    "/api/bibble/gerar-ficha": {
+      "maxDuration": 30
+    },
+    "/api/bibble/piada": {},
+    "/api/bibble/upload-to-blob": {
+      "maxDuration": 30
+    },
+    "/api/bibble/voice": {
+      "maxDuration": 600
+    },
+    "/api/blueprint/chat": {
+      "maxDuration": 120
+    },
+    "/api/blueprint/gerar-layout": {
+      "maxDuration": 60
+    },
+    "/api/blueprint/gerar-prompt": {
+      "maxDuration": 120
+    },
+    "/api/bpm/noloss-leads/ingest": {},
+    "/api/bpm/webhooks/[slug]": {},
+    "/api/calendario-alpha/jobs/maintenance": {
+      "maxDuration": 300
+    },
+    "/api/calendario-alpha/jobs/worker": {
+      "maxDuration": 300
+    },
+    "/api/calendario-alpha/webhook": {},
+    "/api/checklist/[empresaId]/documentos/zip": {
+      "maxDuration": 60
+    },
+    "/api/cs-nps/exportar": {
+      "maxDuration": 60
+    },
+    "/api/cs-nps/importar/modelo": {
+      "maxDuration": 30
+    },
+    "/api/cs-nps/importar/previsualizar": {
+      "maxDuration": 60
+    },
+    "/api/cs-nps/importar/salvar": {
+      "maxDuration": 60
+    },
+    "/api/mesclagem/exportar": {
+      "maxDuration": 300
+    },
+    "/api/mesclagem/historico/[id]/arquivo/[tipo]": {
+      "maxDuration": 90
+    },
+    "/api/mesclagem/inspecionar": {
+      "maxDuration": 60
+    },
+    "/api/mesclagem/previa": {
+      "maxDuration": 90
+    },
+    "/api/mesclagem/sugerir": {
+      "maxDuration": 15
+    },
+    "/api/mesclagem/template": {
+      "maxDuration": 30
+    },
+    "/api/onyx/agent-tools/[tool]": {
+      "maxDuration": 60
+    },
+    "/api/onyx/agents/generate-avatar": {
+      "maxDuration": 120
+    },
+    "/api/onyx/chat": {
+      "maxDuration": 120
+    },
+    "/api/onyx/extrato": {
+      "maxDuration": 800
+    },
+    "/api/onyx/extrato/reprocessar": {
+      "maxDuration": 300
+    },
+    "/api/onyx/voice/synthesize": {
+      "maxDuration": 60
+    },
+    "/api/onyx/voice/transcribe": {
+      "maxDuration": 60
+    },
+    "/api/roadmap/production/objectives/[objectiveId]/completion-report": {},
+    "/api/roadmap/production/objectives/[objectiveId]/runs": {},
+    "/api/roadmap/production/queue": {},
+    "/api/roadmap/production/runs/[runId]": {},
+    "/api/roadmap/production/runs/[runId]/approve": {},
+    "/api/roadmap/production/runs/[runId]/events": {},
+    "/api/roadmap/production/runs/[runId]/status": {}
+  }
+}

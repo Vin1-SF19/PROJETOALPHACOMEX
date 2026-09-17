@@ -1,0 +1,3 @@
+module.exports=[141897,a=>{"use strict";var b=a.i(187924);function c({reset:a}){return(0,b.jsx)("div",{className:"grid min-h-screen place-items-center bg-[#020617] p-6 text-center text-white",children:(0,b.jsxs)("div",{children:[(0,b.jsx)("h2",{className:"text-xl font-black",children:"Alpha SEO encontrou um erro"}),(0,b.jsx)("p",{className:"mt-2 text-sm text-slate-400",children:"Nenhuma cobrança foi repetida automaticamente."}),(0,b.jsx)("button",{onClick:a,className:"mt-5 rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-bold",children:"Tentar novamente"})]})})}a.s(["default",()=>c])}];
+
+//# sourceMappingURL=src_app_PainelAlpha_AlphaSEO_error_tsx_3a1dc0d4._.js.map

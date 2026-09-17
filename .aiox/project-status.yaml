@@ -3,17 +3,17 @@ status:
   modifiedFiles:
     - .aiox/project-status.yaml
     - .bibble/curiosidades-cache.json
-    - .bibble/memory/codebase-map.md
-    - .bibble/memory/integration-points.md
-    - .bibble/memory/journal.md
-  modifiedFilesTotalCount: 100
+    - .bibble/memory/components.md
+    - .bibble/piadas-cache.json
+    - docs/stories/story-alpha-explorer-pastas-compartilhadas-smb-qnap.md
+  modifiedFilesTotalCount: 34
   recentCommits:
-    - 'feat(bibble): endurecer runtime e adaptar personalidade'
-    - 'fix(painel): eliminar sidebar duplicada em abas'
+    - 'feat(metas): adicionar super metas e termometro'
+    - 'fix(chamados): identificar aberturas via Bibble'
   currentEpic: Agenda Alpha
   currentStory: story-agenda-alpha-operacional-tarefas-status
-  lastUpdate: '2026-09-16T18:43:02.683Z'
+  lastUpdate: '2026-09-17T14:18:31.822Z'
   isGitRepo: true
-timestamp: 1789584182684
+timestamp: 1789654711822
 ttl: 60
-gitFingerprint: 1789060307076.414:1789576982463.4653
+gitFingerprint: 1789060307076.414:1789651129185.6633

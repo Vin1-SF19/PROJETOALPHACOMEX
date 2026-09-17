@@ -12,11 +12,12 @@ import uuid
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from .config import Settings, load_settings
 from .handles import HandleRegistry
+from .office import OfficeSessionRegistry, office_file_type
 from .paths import TEMP_ROOT, TRASH_ROOT, child_relative_path, internal_relative_path, validate_segment
 from .secrets import (
     BindingAlreadyExists, BindingIdentity, BindingNotFound, NasCredential, PrincipalAlreadyLinked,
@@ -58,6 +59,11 @@ class ReconcileBody(BaseModel):
     execute: bool = False
 
 
+class OfficeSessionBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=255)
+
+
 def _subject_hash(subject: str) -> str:
     return hashlib.sha256(subject.encode()).hexdigest()[:16]
 
@@ -90,6 +96,7 @@ def create_app(settings: Settings | None = None, store: SecretStore | None = Non
     replay = ReplayGuard(current.replay_db_path)
     state = OperationState(current.state_db_path)
     handles = HandleRegistry(current.handle_ttl_seconds)
+    office_sessions = OfficeSessionRegistry()
     upload_locks: dict[str, threading.Lock] = {}
     app = FastAPI(title="Alpha Explorer SMB Gateway", version="1.0.0", docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(
@@ -121,7 +128,7 @@ def create_app(settings: Settings | None = None, store: SecretStore | None = Non
                 raise HTTPException(status_code=401, detail="UNAUTHENTICATED") from None
             binding = binding_for(claims)
             client_host = request.client.host if request.client is not None else "unknown"
-            maximum, window = ((5, 600) if scope in {"credential:enroll", "credential:rotate"} else (60, 60) if scope == "list" else (30, 60) if scope in {
+            maximum, window = ((5, 600) if scope in {"credential:enroll", "credential:rotate"} else (20, 60) if scope == "office_open" else (60, 60) if scope == "list" else (30, 60) if scope in {
                 "mkdir", "rename", "move", "trash", "restore", "unlink", "upload_start", "upload_commit"
             } or scope == "credential:unlink" else (240, 60))
             now = int(time.time())
@@ -265,6 +272,7 @@ def create_app(settings: Settings | None = None, store: SecretStore | None = Non
         except Exception:
             raise HTTPException(status_code=503, detail="SECRET_STORE_UNAVAILABLE") from None
         handles.revoke_binding(binding_for(claims).key)
+        office_sessions.revoke_binding(binding_for(claims).key)
         _log("credential.rotate" if rotate else "credential.enroll", "success", support_id, claims.subject,
              int((time.monotonic() - started) * 1000), claims.actor_subject)
         return {"ok": True, "linked": True, "supportId": support_id}
@@ -285,6 +293,7 @@ def create_app(settings: Settings | None = None, store: SecretStore | None = Non
         support_id = str(uuid.uuid4())
         secret_store.delete(binding_for(claims))
         handles.revoke_binding(binding_for(claims).key)
+        office_sessions.revoke_binding(binding_for(claims).key)
         _log("credential.unlink", "success", support_id, claims.subject, actor=claims.actor_subject)
         return {"ok": True, "linked": False, "supportId": support_id}
 
@@ -346,6 +355,94 @@ def create_app(settings: Settings | None = None, store: SecretStore | None = Non
         if status == 206:
             headers["Content-Range"] = f"bytes {start}-{end}/{size}"
         return StreamingResponse(smb_client.iter_file(credential, relative, start, length), status_code=status, headers=headers, media_type="application/octet-stream")
+
+    @app.post("/v1/office/sessions", status_code=201)
+    def create_office_session(
+        body: OfficeSessionBody,
+        request: Request,
+        claims: TicketClaims = Depends(authorize("office_open")),
+    ):
+        support_id, started = str(uuid.uuid4()), time.monotonic()
+        binding, credential = credential_for(claims)
+        relative = resolve_handle(claims, claims.resource)
+        file_name = relative.rsplit("\\", 1)[-1]
+        if claims.target_name != body.name or body.name != file_name or office_file_type(file_name) is None:
+            raise HTTPException(status_code=403, detail="OFFICE_FILE_DENIED")
+        try:
+            size = smb_client.stat_file(credential, relative)
+        except Exception:
+            raise HTTPException(status_code=404, detail="FILE_NOT_FOUND") from None
+        if claims.max_bytes is None or claims.max_bytes != size:
+            raise HTTPException(status_code=409, detail="OFFICE_FILE_CHANGED")
+        client_host = request.client.host if request.client is not None else "unknown"
+        session = office_sessions.issue(binding, relative, file_name, size, client_host)
+        document_path = f"/v1/office/files/{session.token}/{quote(file_name, safe='')}"
+        _log("office.open", "success", support_id, claims.subject, int((time.monotonic() - started) * 1000))
+        return {
+            "application": session.application,
+            "documentPath": document_path,
+            "expiresAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(session.expires_at_epoch)),
+            "supportId": support_id,
+        }
+
+    @app.options("/v1/office/files/{session_token}")
+    def office_folder_options(session_token: str, request: Request):
+        client_host = request.client.host if request.client is not None else "unknown"
+        try:
+            office_sessions.resolve_token(session_token, client_host)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="OFFICE_SESSION_NOT_FOUND") from None
+        return Response(status_code=204, headers={
+            "Allow": "OPTIONS, HEAD, GET",
+            "Cache-Control": "private, no-store",
+        })
+
+    @app.api_route("/v1/office/files/{session_token}/{file_name}", methods=["OPTIONS", "HEAD", "GET"])
+    def office_file(session_token: str, file_name: str, request: Request):
+        support_id, started = str(uuid.uuid4()), time.monotonic()
+        client_host = request.client.host if request.client is not None else "unknown"
+        try:
+            session = office_sessions.resolve(session_token, file_name, client_host)
+            credential = secret_store.get(session.binding)
+        except Exception:
+            raise HTTPException(status_code=404, detail="OFFICE_SESSION_NOT_FOUND") from None
+        session_rate_key = hashlib.sha256(f"office-session\x1f{session_token}".encode()).hexdigest()
+        if not replay.consume_rate(session_rate_key, 64, 60, int(time.time())):
+            raise HTTPException(status_code=429, detail="RATE_LIMITED")
+        if credential is None:
+            raise HTTPException(status_code=403, detail="SMB_IDENTITY_NOT_LINKED")
+        if request.method == "OPTIONS":
+            return Response(status_code=204, headers={
+                "Allow": "OPTIONS, HEAD, GET",
+                "Cache-Control": "private, no-store",
+            })
+        try:
+            size = smb_client.stat_file(credential, session.relative_path)
+        except Exception:
+            raise HTTPException(status_code=404, detail="FILE_NOT_FOUND") from None
+        if size != session.expected_size:
+            raise HTTPException(status_code=409, detail="OFFICE_FILE_CHANGED")
+        start, end, status = _parse_range(request.headers.get("range"), size)
+        length = end - start + 1
+        headers = {
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "private, no-store",
+            "Content-Disposition": f"inline; filename*=UTF-8''{quote(session.file_name, safe='')}",
+            "Content-Length": str(length),
+            "X-Content-Type-Options": "nosniff",
+            "X-Support-Id": support_id,
+        }
+        if status == 206:
+            headers["Content-Range"] = f"bytes {start}-{end}/{size}"
+        _log("office.read", "success", support_id, session.binding.subject, int((time.monotonic() - started) * 1000))
+        if request.method == "HEAD":
+            return Response(status_code=status, headers=headers, media_type=session.content_type)
+        return StreamingResponse(
+            smb_client.iter_file(credential, session.relative_path, start, length),
+            status_code=status,
+            headers=headers,
+            media_type=session.content_type,
+        )
 
     @app.post("/v1/uploads", status_code=201)
     def upload_start(body: UploadStartBody, claims: TicketClaims = Depends(authorize("upload_start"))):

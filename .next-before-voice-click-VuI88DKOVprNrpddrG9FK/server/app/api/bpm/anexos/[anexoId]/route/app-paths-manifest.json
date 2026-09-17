@@ -1,0 +1,3 @@
+{
+  "/api/bpm/anexos/[anexoId]/route": "app/api/bpm/anexos/[anexoId]/route.js"
+}

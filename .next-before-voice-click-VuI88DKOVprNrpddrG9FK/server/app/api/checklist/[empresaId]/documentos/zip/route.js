@@ -1,0 +1,12 @@
+var R=require("../../../../../../chunks/[turbopack]_runtime.js")("server/app/api/checklist/[empresaId]/documentos/zip/route.js")
+R.c("server/chunks/[root-of-the-server]__593cdf24._.js")
+R.c("server/chunks/node_modules_next_594ba3a6._.js")
+R.c("server/chunks/node_modules_bcryptjs_index_42ebb250.js")
+R.c("server/chunks/node_modules_next_dist_e341186c._.js")
+R.c("server/chunks/node_modules_68d73284._.js")
+R.c("server/chunks/_97525657._.js")
+R.c("server/chunks/_259ee7a2._.js")
+R.c("server/chunks/[root-of-the-server]__ae5d6a65._.js")
+R.c("server/chunks/ce889_server_app_api_checklist_[empresaId]_documentos_zip_route_actions_bf18b8a1.js")
+R.m(42848)
+module.exports=R.m(42848).exports

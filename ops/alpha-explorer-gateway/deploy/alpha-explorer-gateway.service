@@ -16,7 +16,7 @@ LoadCredentialEncrypted=ticket_stage:/etc/credstore.encrypted/alpha-explorer-tic
 Environment=SMB_GATEWAY_VAULT_TOKEN_FILE=%d/vault_token
 Environment=SMB_GATEWAY_TICKET_SECRET_PRODUCTION_FILE=%d/ticket_production
 Environment=SMB_GATEWAY_TICKET_SECRET_STAGE_FILE=%d/ticket_stage
-ExecStart=/opt/alpha-explorer-gateway/current/.venv/bin/uvicorn app.main:app --app-dir /opt/alpha-explorer-gateway/current --host 127.0.0.1 --port 8765 --proxy-headers --forwarded-allow-ips=127.0.0.1
+ExecStart=/opt/alpha-explorer-gateway/current/.venv/bin/uvicorn app.main:app --app-dir /opt/alpha-explorer-gateway/current --host 127.0.0.1 --port 8765 --proxy-headers --forwarded-allow-ips=127.0.0.1 --no-access-log
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=30
@@ -25,7 +25,7 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
 ReadWritePaths=/var/lib/alpha-explorer-gateway
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 
 [Install]
 WantedBy=multi-user.target

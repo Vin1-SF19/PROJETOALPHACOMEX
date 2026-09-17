@@ -43,7 +43,7 @@ def _ticket_secret(env: dict[str, str], environment_name: str) -> bytes:
 @dataclass(frozen=True)
 class Settings:
     audience: str
-    origins: tuple[str, str]
+    origins: tuple[str, ...]
     key_authorities: dict[str, tuple[str, bytes]]
     origin_issuers: dict[str, str]
     smb_server: str
@@ -65,6 +65,22 @@ def load_settings(source: dict[str, str] | None = None) -> Settings:
     environment = env.get("SMB_GATEWAY_ENVIRONMENT", "production").strip().lower()
     prod_origin = _exact_origin(_required(env, "SMB_GATEWAY_PRODUCTION_ORIGIN"))
     stage_origin = _exact_origin(_required(env, "SMB_GATEWAY_STAGE_ORIGIN"))
+    production_aliases = tuple(dict.fromkeys(
+        _exact_origin(value.strip())
+        for value in env.get("SMB_GATEWAY_ADDITIONAL_PRODUCTION_ORIGINS", "").split(",")
+        if value.strip()
+    ))
+    stage_aliases = tuple(dict.fromkeys(
+        _exact_origin(value.strip())
+        for value in env.get("SMB_GATEWAY_ADDITIONAL_STAGE_ORIGINS", "").split(",")
+        if value.strip()
+    ))
+    if len(production_aliases) > 8 or len(stage_aliases) > 8:
+        raise ConfigurationError("too many additional origins")
+    production_origins = tuple(dict.fromkeys((prod_origin, *production_aliases)))
+    stage_origins = tuple(dict.fromkeys((stage_origin, *stage_aliases)))
+    if set(production_origins) & set(stage_origins):
+        raise ConfigurationError("production and stage origins must differ")
     prod_issuer = _required(env, "SMB_GATEWAY_ISSUER_PRODUCTION")
     stage_issuer = _required(env, "SMB_GATEWAY_ISSUER_STAGE")
     prod_kid = _required(env, "SMB_GATEWAY_TICKET_KID_PRODUCTION")
@@ -105,9 +121,12 @@ def load_settings(source: dict[str, str] | None = None) -> Settings:
             raise ConfigurationError("Vault URL must use HTTPS")
     return Settings(
         audience=_required(env, "SMB_GATEWAY_AUDIENCE"),
-        origins=(prod_origin, stage_origin),
+        origins=(*production_origins, *stage_origins),
         key_authorities={prod_kid: (prod_issuer, prod_secret), stage_kid: (stage_issuer, stage_secret)},
-        origin_issuers={prod_origin: prod_issuer, stage_origin: stage_issuer},
+        origin_issuers={
+            **{origin: prod_issuer for origin in production_origins},
+            **{origin: stage_issuer for origin in stage_origins},
+        },
         smb_server=_required(env, "SMB_GATEWAY_SMB_SERVER"),
         smb_shares=smb_shares,
         smb_port=port,

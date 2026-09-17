@@ -2,44 +2,43 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { GuiaModuloTour } from "@/components/Guias/GuiaModuloTour";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { marcarTutorialModuloComoVisto } from "@/lib/guias/tutorial-modulo";
 import {
   createSmbDirectory,
   getSmbLinkStatus,
   listSmbItems,
-  listSmbTrash,
+  loadSmbPreview,
+  openSmbOfficeDocument,
   renameOrMoveSmbItem,
   restoreSmbItem,
   saveSmbDownload,
   trashSmbItem,
 } from "@/lib/alpha-explorer/smb/browser-client";
 import { friendlySmbErrorMessage } from "@/lib/alpha-explorer/smb/error-messages";
-import { ExplorerHeader } from "./ExplorerHeader";
-import { ExplorerSidebar, type ExplorerCompanyFolder, type ExplorerNavKey } from "./ExplorerSidebar";
+import { canPreviewInline, isOfficeTemporaryFile, MAX_INLINE_PREVIEW_BYTES, nativeOfficeApplication, previewMimeType } from "@/lib/alpha-explorer/file-preview";
+import { ExplorerSidebar, type ExplorerCompanyFolder } from "./ExplorerSidebar";
 import { ExplorerToolbar, type ExplorerSort } from "./ExplorerToolbar";
-import { FileDetails } from "./FileDetails";
 import { FileList, type ExplorerItemAction } from "./FileList";
+import { FilePreviewDialog, type ExplorerFilePreview } from "./FilePreviewDialog";
 import { SmbExplorerUpload } from "./SmbExplorerUpload";
 import { SmbIdentityGate } from "./SmbIdentityGate";
-import { ALPHA_EXPLORER_TUTORIAL } from "./tutorial";
 import type { ExplorerItemView } from "./types";
 
 const folderSchema = z.object({ name: z.string().trim().min(1, "Informe um nome").max(240) });
 type FolderValues = z.infer<typeof folderSchema>;
 interface Props { userId: number; admin: boolean; writeEnabled: boolean }
 interface Crumb { handle: string; name: string }
-type SmbListing = Awaited<ReturnType<typeof listSmbItems>> | Awaited<ReturnType<typeof listSmbTrash>>;
+type SmbListing = Awaited<ReturnType<typeof listSmbItems>>;
+interface ActiveFilePreview extends ExplorerFilePreview { item: ExplorerItemView }
 
 export function AlphaExplorerSmbClient(props: Props) {
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { staleTime: 5_000, retry: 1 } } }));
@@ -74,18 +73,16 @@ function asItem(entry: Awaited<ReturnType<typeof listSmbItems>>["entries"][numbe
   };
 }
 
-function SmbWorkspace({ userId, admin, writeEnabled }: Props) {
+function SmbWorkspace({ admin, writeEnabled }: Props) {
   const [crumbs, setCrumbs] = useState<Crumb[]>([]);
-  const [navKey, setNavKey] = useState<ExplorerNavKey>("meus");
-  const [trash, setTrash] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<ExplorerSort>("name");
   const [view, setView] = useState<"list" | "grid">("list");
-  const [selected, setSelected] = useState<ExplorerItemView | null>(null);
   const [moving, setMoving] = useState<ExplorerItemView | null>(null);
   const [folderOpen, setFolderOpen] = useState(false);
-  const [tourOpen, setTourOpen] = useState(false);
+  const [preview, setPreview] = useState<ActiveFilePreview | null>(null);
+  const previewAbortRef = useRef<AbortController | null>(null);
   const [cursorHistory, setCursorHistory] = useState<string[]>([""]);
   const [cursorIndex, setCursorIndex] = useState(0);
   const form = useForm<FolderValues>({ resolver: zodResolver(folderSchema), defaultValues: { name: "" } });
@@ -93,8 +90,8 @@ function SmbWorkspace({ userId, admin, writeEnabled }: Props) {
   const cursor = cursorHistory[cursorIndex] || undefined;
 
   const listing = useQuery<SmbListing>({
-    queryKey: ["alpha-explorer-smb", trash ? "trash" : "items", currentHandle, cursor],
-    queryFn: ({ signal }) => trash ? listSmbTrash(cursor, signal) : listSmbItems(currentHandle, cursor, signal),
+    queryKey: ["alpha-explorer-smb", "items", currentHandle, cursor],
+    queryFn: ({ signal }) => listSmbItems(currentHandle, cursor, signal),
   });
   const roots = useQuery({
     queryKey: ["alpha-explorer-smb", "roots"],
@@ -103,13 +100,7 @@ function SmbWorkspace({ userId, admin, writeEnabled }: Props) {
 
   const items = useMemo<ExplorerItemView[]>(() => {
     if (!listing.data) return [];
-    const mapped = "entries" in listing.data
-      ? listing.data.entries.map((entry) => asItem(entry, currentHandle))
-      : listing.data.items.map((entry) => ({
-        id: entry.trashHandle, kind: "FILE" as const, name: entry.name, logicalPath: entry.trashHandle,
-        parentPath: "", provider: "smb", providerLabel: "NAS", sizeBytes: null, validatedMime: null,
-        status: "TRASHED", version: 1, createdAt: new Date(0).toISOString(), updatedAt: new Date(0).toISOString(), deletedAt: new Date(0).toISOString(),
-      }));
+    const mapped = listing.data.entries.map((entry) => asItem(entry, currentHandle));
     const term = query.toLocaleLowerCase("pt-BR");
     const filtered = term ? mapped.filter((item) => item.name.toLocaleLowerCase("pt-BR").includes(term)) : mapped;
     return [...filtered].sort((left, right) => {
@@ -124,7 +115,7 @@ function SmbWorkspace({ userId, admin, writeEnabled }: Props) {
     .map((entry) => ({ name: entry.name, logicalPath: entry.handle })) ?? [], [roots.data]);
 
   function resetPagination() { setCursorHistory([""]); setCursorIndex(0); }
-  function openRoot() { setCrumbs([]); setTrash(false); setNavKey("meus"); setSelected(null); resetPagination(); }
+  function openRoot() { setCrumbs([]); resetPagination(); }
   function openHandle(handle: string) {
     if (handle === "root" || handle === "") { openRoot(); return; }
     const candidate = items.find((item) => item.id === handle) ?? roots.data?.entries.find((entry) => entry.handle === handle);
@@ -132,16 +123,12 @@ function SmbWorkspace({ userId, admin, writeEnabled }: Props) {
     const name = "kind" in candidate && candidate.kind === "directory" ? candidate.name : candidate.name;
     const rootEntry = roots.data?.entries.some((entry) => entry.handle === handle);
     setCrumbs(rootEntry ? [{ handle, name }] : [...crumbs, { handle, name }]);
-    setTrash(false); setSelected(null); resetPagination();
+    resetPagination();
   }
   function navigateCrumb(path: string) {
     if (!path) { openRoot(); return; }
     const names = path.split("/");
-    setCrumbs(crumbs.slice(0, names.length)); setSelected(null); resetPagination();
-  }
-  function navigateSidebar(key: ExplorerNavKey) {
-    if (key === "lixeira") { setTrash(true); setNavKey(key); setCrumbs([]); setSelected(null); resetPagination(); return; }
-    openRoot(); setNavKey(key);
+    setCrumbs(crumbs.slice(0, names.length)); resetPagination();
   }
 
   async function createFolder(values: FolderValues) {
@@ -153,6 +140,55 @@ function SmbWorkspace({ userId, admin, writeEnabled }: Props) {
   async function download(item: ExplorerItemView) {
     try { await saveSmbDownload(item.id, item.name); }
     catch (error) { toast.error(friendlySmbErrorMessage(error)); }
+  }
+  async function openFile(item: ExplorerItemView) {
+    if (isOfficeTemporaryFile(item.name)) {
+      toast.info("Este é um arquivo temporário criado pelo Microsoft Office. Abra a planilha ou o documento original, sem o prefixo ‘~$’.");
+      void listing.refetch();
+      return;
+    }
+    const officeApplication = nativeOfficeApplication(item.name);
+    if (officeApplication) {
+      try {
+        toast.info(officeApplication === "word" ? "Abrindo no Microsoft Word…" : "Abrindo no Microsoft Excel…");
+        await openSmbOfficeDocument({ handle: item.id, fileName: item.name, sizeBytes: item.sizeBytes });
+      } catch (error) {
+        toast.error(friendlySmbErrorMessage(error));
+      }
+      return;
+    }
+    const mimeType = previewMimeType(item.name);
+    if (!mimeType || !canPreviewInline(item.name, item.sizeBytes)) {
+      const supported = mimeType !== null;
+      toast.info(supported
+        ? `A visualização é limitada a ${MAX_INLINE_PREVIEW_BYTES / 1024 / 1024} MiB. Escolha onde salvar o arquivo.`
+        : "Este formato será baixado para abrir no aplicativo correspondente.");
+      await download(item);
+      return;
+    }
+    previewAbortRef.current?.abort();
+    if (preview?.sourceUrl) URL.revokeObjectURL(preview.sourceUrl);
+    const controller = new AbortController();
+    previewAbortRef.current = controller;
+    setPreview({ item, fileName: item.name, sizeBytes: item.sizeBytes, mimeType, sourceUrl: null, isLoading: true, error: null });
+    try {
+      const sourceUrl = await loadSmbPreview(item.id, item.name, controller.signal);
+      if (controller.signal.aborted || previewAbortRef.current !== controller) { URL.revokeObjectURL(sourceUrl); return; }
+      setPreview((current) => current?.item.id === item.id
+        ? { ...current, sourceUrl, isLoading: false }
+        : current);
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      setPreview((current) => current?.item.id === item.id
+        ? { ...current, isLoading: false, error: friendlySmbErrorMessage(error) }
+        : current);
+    }
+  }
+  function closePreview() {
+    previewAbortRef.current?.abort();
+    previewAbortRef.current = null;
+    if (preview?.sourceUrl) URL.revokeObjectURL(preview.sourceUrl);
+    setPreview(null);
   }
   async function action(item: ExplorerItemView, operation: ExplorerItemAction) {
     if (operation === "move") { setMoving(item); toast.info("Abra a pasta de destino e confirme ‘Mover aqui’."); return; }
@@ -167,7 +203,7 @@ function SmbWorkspace({ userId, admin, writeEnabled }: Props) {
       } else {
         await restoreSmbItem(item.id);
       }
-      setSelected(null); toast.success(operation === "restore" ? "Item restaurado" : "Operação concluída"); void listing.refetch();
+      toast.success(operation === "restore" ? "Item restaurado" : "Operação concluída"); void listing.refetch();
     } catch (error) { toast.error(friendlySmbErrorMessage(error)); }
   }
   async function moveHere() {
@@ -182,25 +218,25 @@ function SmbWorkspace({ userId, admin, writeEnabled }: Props) {
   const nasOnline = !listing.isError && !roots.isError;
   return (
     <div className="flex h-dvh w-full overflow-hidden bg-[#020916] text-[#F2F6FC]">
-      <div className="hidden w-64 shrink-0 md:block"><ExplorerSidebar navKey={navKey} onNavigate={navigateSidebar} companyFolders={companyFolders} activePath={trash ? "__trash__" : currentHandle} onSelectFolder={openHandle} nasOnline={nasOnline} /></div>
+      <div className="hidden w-64 shrink-0 md:block"><ExplorerSidebar companyFolders={companyFolders} activePath={currentHandle} onSelectFolder={openHandle} nasOnline={nasOnline} /></div>
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <ExplorerHeader admin={admin} nasOnline={nasOnline} onOpenTour={() => setTourOpen(true)} />
-        <div className="flex items-center justify-between gap-3 border-b px-5 py-2 text-xs text-muted-foreground">
-          <span>Pastas liberadas pelas permissões da sua conta QNAP.</span>
-        </div>
         {moving && <div role="status" className="flex items-center justify-between gap-3 border-b bg-primary/10 px-5 py-2 text-sm"><span>Movendo “{moving.name}”</span><span className="flex gap-2"><Button size="sm" onClick={() => void moveHere()}>Mover aqui</Button><Button size="sm" variant="ghost" onClick={() => setMoving(null)}>Cancelar</Button></span></div>}
         {!writeEnabled && <div role="status" className="border-b border-amber-500/20 bg-amber-500/[0.06] px-5 py-2 text-[13px] text-amber-200/90">Modo leitura ativo.</div>}
-        <ExplorerToolbar crumbs={crumbs.map((crumb) => crumb.name)} canGoUp={crumbs.length > 0} onGoUp={() => { setCrumbs(crumbs.slice(0, -1)); resetPagination(); }} onSelectCrumb={navigateCrumb} searchInput={searchInput} onSearchChange={setSearchInput} onSearchSubmit={() => setQuery(searchInput.trim())} sort={sort} onSortChange={setSort} trash={trash} onToggleTrash={() => navigateSidebar(trash ? "meus" : "lixeira")} view={view} onViewChange={setView} writeEnabled={writeEnabled && !trash} upload={<SmbExplorerUpload parentHandle={currentHandle} disabled={!writeEnabled || trash} onComplete={() => void listing.refetch()} />} onNewFolder={() => setFolderOpen(true)} />
+        <ExplorerToolbar crumbs={crumbs.map((crumb) => crumb.name)} canGoUp={crumbs.length > 0} onGoUp={() => { setCrumbs(crumbs.slice(0, -1)); resetPagination(); }} onSelectCrumb={navigateCrumb} searchInput={searchInput} onSearchChange={setSearchInput} onSearchSubmit={() => setQuery(searchInput.trim())} sort={sort} onSortChange={setSort} admin={admin} view={view} onViewChange={setView} writeEnabled={writeEnabled} upload={<SmbExplorerUpload parentHandle={currentHandle} disabled={!writeEnabled} onComplete={() => void listing.refetch()} />} onNewFolder={() => setFolderOpen(true)} />
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {listing.isLoading && <div className="space-y-2">{Array.from({ length: 6 }, (_, index) => <Skeleton key={index} className="h-12 w-full" />)}</div>}
           {listing.isError && <SmbFailure message={friendlySmbErrorMessage(listing.error)} retry={() => void listing.refetch()} contained />}
-          {listing.data && <FileList items={items} view={view} trash={trash} selected={selected} onSelect={setSelected} onOpenFolder={openHandle} onDownload={(item) => void download(item)} onAction={(item, nextAction) => void action(item, nextAction)} />}
+          {listing.data && <FileList items={items} view={view} trash={false} selected={null} onSelect={() => undefined} onOpenFolder={openHandle} onOpenFile={(item) => void openFile(item)} onDownload={(item) => void download(item)} onAction={(item, nextAction) => void action(item, nextAction)} />}
           {(cursorIndex > 0 || nextCursor) && <nav className="mt-4 flex justify-end gap-2"><Button variant="outline" size="sm" disabled={cursorIndex === 0} onClick={() => setCursorIndex((value) => value - 1)}>Anterior</Button><Button variant="outline" size="sm" disabled={!nextCursor} onClick={() => { if (nextCursor) { setCursorHistory((values) => [...values.slice(0, cursorIndex + 1), nextCursor]); setCursorIndex((value) => value + 1); } }}>Próxima</Button></nav>}
         </div>
       </main>
-      <FileDetails item={selected} trash={trash} admin={admin} onClose={() => setSelected(null)} onOpenFolder={openHandle} onDownload={(item) => void download(item)} onAction={(item, nextAction) => void action(item, nextAction)} />
+      <FilePreviewDialog
+        preview={preview}
+        onClose={closePreview}
+        onDownload={() => { if (preview) void download(preview.item); }}
+        onRetry={() => { if (preview) void openFile(preview.item); }}
+      />
       <Dialog open={folderOpen} onOpenChange={setFolderOpen}><DialogContent><form onSubmit={form.handleSubmit(createFolder)}><DialogHeader><DialogTitle>Nova pasta</DialogTitle><DialogDescription>A pasta será criada no diretório atual do NAS.</DialogDescription></DialogHeader><div className="py-4"><label htmlFor="smb-folder-name" className="text-sm font-medium">Nome</label><Input id="smb-folder-name" autoFocus {...form.register("name")} /><p className="mt-1 text-xs text-destructive">{form.formState.errors.name?.message}</p></div><DialogFooter><Button type="button" variant="outline" onClick={() => setFolderOpen(false)}>Cancelar</Button><Button type="submit" disabled={form.formState.isSubmitting}>Criar pasta</Button></DialogFooter></form></DialogContent></Dialog>
-      <GuiaModuloTour aberto={tourOpen} config={ALPHA_EXPLORER_TUTORIAL} accent="hsl(var(--primary))" onFinalizar={() => { marcarTutorialModuloComoVisto(window.localStorage, ALPHA_EXPLORER_TUTORIAL, userId); setTourOpen(false); }} />
     </div>
   );
 }
