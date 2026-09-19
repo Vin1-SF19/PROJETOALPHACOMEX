@@ -436,7 +436,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
           where: {
             campo: {
               OR: [
-                { nome: { in: ["Canal de origem", "Resumo da reunião"] } },
+                { nome: { in: ["Canal de origem", "Resumo da reunião", "Radar pretendido"] } },
                 ...(campoIdsConfigurados.length ? [{ id: { in: campoIdsConfigurados } }] : []),
               ],
             },
