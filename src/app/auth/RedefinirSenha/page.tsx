@@ -4,6 +4,7 @@ import { useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { redefinirSenha } from "@/actions/RecuperarSenha";
 import { toast } from "sonner";
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "@/lib/auth/password-policy";
 
 function FormularioRedefinir() {
     const searchParams = useSearchParams();
@@ -24,15 +25,15 @@ function FormularioRedefinir() {
             return toast.error("As senhas não coincidem!");
         }
 
-        if (novaSenha.length < 6) {
-            return toast.error("Senha muito curta!");
+        if (novaSenha.length < PASSWORD_MIN_LENGTH || novaSenha.length > PASSWORD_MAX_LENGTH) {
+            return toast.error(`A senha deve ter entre ${PASSWORD_MIN_LENGTH} e ${PASSWORD_MAX_LENGTH} caracteres.`);
         }
 
         const res = await redefinirSenha(token, novaSenha);
 
         if (res.success) {
             toast.success("Senha atualizada! Redirecionando...");
-            setTimeout(() => router.push("/login"), 2000);
+            setTimeout(() => router.push("/"), 2000);
         } else {
             toast.error(res.error || "Erro ao redefinir senha.");
         }
@@ -48,6 +49,9 @@ function FormularioRedefinir() {
                 placeholder="NOVA SENHA" 
                 value={novaSenha} 
                 onChange={e => setNovaSenha(e.target.value)}
+                minLength={PASSWORD_MIN_LENGTH}
+                maxLength={PASSWORD_MAX_LENGTH}
+                autoComplete="new-password"
                 className="w-full bg-black border border-white/10 rounded-xl p-4 text-white outline-none focus:border-indigo-500"
             />
             <input 
@@ -55,6 +59,9 @@ function FormularioRedefinir() {
                 placeholder="CONFIRMAR NOVA SENHA" 
                 value={confirmarSenha} 
                 onChange={e => setConfirmarSenha(e.target.value)}
+                minLength={PASSWORD_MIN_LENGTH}
+                maxLength={PASSWORD_MAX_LENGTH}
+                autoComplete="new-password"
                 className="w-full bg-black border border-white/10 rounded-xl p-4 text-white outline-none focus:border-indigo-500"
             />
             <button type="submit" className="w-full py-4 bg-indigo-600 text-white font-black uppercase rounded-xl">

@@ -4,8 +4,9 @@ import { z } from "zod";
 import { auth } from "../../auth";
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { hashSync } from "bcryptjs";
+import { hash } from "bcryptjs";
 import { isAdminRole } from "@/lib/roles";
+import { validarNovaSenha } from "@/lib/auth/password-policy";
 
 // ─── Role helpers ─────────────────────────────────────────────────────────────
 
@@ -432,14 +433,18 @@ export async function alterarSenhaAdmin(usuarioId: number, novaSenha: string) {
   const dbUser = await db.usuarios.findUnique({ where: { id: userId }, select: { role: true } });
   if (!isAdminRole(dbUser?.role)) return { success: false as const, error: "Sem permissão" };
 
-  if (!novaSenha || novaSenha.length < 6) {
-    return { success: false as const, error: "Senha deve ter ao menos 6 caracteres" };
-  }
+  const id = z.number().int().positive().safeParse(usuarioId);
+  const senha = validarNovaSenha(novaSenha);
+  if (!id.success) return { success: false as const, error: "Usuário inválido" };
+  if (!senha.success) return { success: false as const, error: senha.error };
 
   try {
     await db.usuarios.update({
-      where: { id: usuarioId },
-      data: { senha: hashSync(novaSenha, 10) },
+      where: { id: id.data },
+      data: {
+        senha: await hash(senha.password, 12),
+        authSessionVersion: { increment: 1 },
+      },
     });
     return { success: true as const };
   } catch {

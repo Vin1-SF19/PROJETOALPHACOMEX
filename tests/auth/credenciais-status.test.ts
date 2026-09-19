@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   findFirst: vi.fn(),
-  compareSync: vi.fn(),
+  compare: vi.fn(),
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -14,7 +14,7 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 vi.mock("bcryptjs", () => ({
-  compareSync: mocks.compareSync,
+  compare: mocks.compare,
 }));
 
 import { findUserByCredentials } from "@/lib/user";
@@ -28,13 +28,14 @@ const usuarioBase = {
   role: "User",
   permissoes: "agenda,chamados",
   status: "ATIVO",
+  authSessionVersion: 0,
   presets: [],
 };
 
 describe("login por credenciais e status do colaborador", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.compareSync.mockReturnValue(true);
+    mocks.compare.mockResolvedValue(true);
   });
 
   it("permite credenciais corretas quando o status atual é ATIVO", async () => {
@@ -46,6 +47,7 @@ describe("login por credenciais e status do colaborador", () => {
       id: "12",
       email: usuarioBase.email,
       permissoes: ["agenda", "chamados"],
+      authSessionVersion: 0,
     });
 
     expect(mocks.findFirst).toHaveBeenCalledWith({
@@ -65,7 +67,7 @@ describe("login por credenciais e status do colaborador", () => {
       await expect(
         findUserByCredentials(usuarioBase.email, "senha-correta"),
       ).resolves.toBeNull();
-      expect(mocks.compareSync).not.toHaveBeenCalled();
+      expect(mocks.compare).toHaveBeenCalledOnce();
     },
   );
 
@@ -75,12 +77,16 @@ describe("login por credenciais e status do colaborador", () => {
     await expect(
       findUserByCredentials("ausente@alpha.test", "senha-correta"),
     ).resolves.toBeNull();
-    expect(mocks.compareSync).not.toHaveBeenCalled();
+    expect(mocks.compare).toHaveBeenCalledOnce();
+    expect(mocks.compare).toHaveBeenCalledWith(
+      "senha-correta",
+      expect.stringMatching(/^\$2[aby]\$/),
+    );
   });
 
   it("recusa senha incorreta para usuário ativo", async () => {
     mocks.findFirst.mockResolvedValue(usuarioBase);
-    mocks.compareSync.mockReturnValue(false);
+    mocks.compare.mockResolvedValue(false);
 
     await expect(
       findUserByCredentials(usuarioBase.email, "senha-incorreta"),

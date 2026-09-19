@@ -1,9 +1,21 @@
 "use server";
 
 import db from "@/lib/prisma";
-import { hashSync } from "bcryptjs";
+import { hash } from "bcryptjs";
 import { requireAdmin } from "@/lib/auth-guard";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { validarNovaSenha } from "@/lib/auth/password-policy";
+
+const cadastroUsuarioSchema = z.object({
+  nome: z.string().trim().min(2).max(120),
+  usuario: z.string().trim().min(3).max(64),
+  email: z.string().trim().toLowerCase().email().max(254),
+  senha: z.string(),
+  role: z.string().trim().min(1).max(100),
+  callixUserId: z.string().trim().max(100).nullable(),
+  tokenOnyx: z.string().trim().max(4096).nullable(),
+});
 
 export default async function registerAction(
   _prevState: unknown,
@@ -12,23 +24,29 @@ export default async function registerAction(
   try {
     await requireAdmin();
 
-    const nome = formData.get("nome") as string;
-    const usuario = formData.get("usuario") as string;
-    const email = formData.get("email") as string;
-    const senha = formData.get("senha") as string;
-    const role = (formData.get("role") as string) || "User";
-    const callixHabilitado = role === "COMERCIAL" && formData.get("callixHabilitado") === "on";
-    const callixUserId = (formData.get("callixUserId") as string | null)?.trim() || null;
-    // Token Onyx é opcional — pode ser preenchido depois. String vazia → null.
-    const tokenOnyxRaw = (formData.get("token_onyx") as string | null)?.trim();
-    const tokenOnyx = tokenOnyxRaw ? tokenOnyxRaw : null;
-
-    if (!nome || !usuario || !email || !senha) {
+    const parsed = cadastroUsuarioSchema.safeParse({
+      nome: formData.get("nome"),
+      usuario: formData.get("usuario"),
+      email: formData.get("email"),
+      senha: formData.get("senha"),
+      role: formData.get("role") || "User",
+      callixUserId: formData.get("callixUserId") || null,
+      tokenOnyx: formData.get("token_onyx") || null,
+    });
+    if (!parsed.success) {
       return {
         success: false,
-        message: "Preencha todos os campos obrigatórios",
+        message: "Dados de cadastro inválidos",
       };
     }
+
+    const senhaValidada = validarNovaSenha(parsed.data.senha);
+    if (!senhaValidada.success) {
+      return { success: false, message: senhaValidada.error };
+    }
+
+    const { nome, usuario, email, role, callixUserId, tokenOnyx } = parsed.data;
+    const callixHabilitado = role === "COMERCIAL" && formData.get("callixHabilitado") === "on";
 
     if (callixHabilitado && !callixUserId) {
       return {
@@ -62,7 +80,8 @@ export default async function registerAction(
         nome,
         usuario,
         email,
-        senha: hashSync(senha, 10),
+        senha: await hash(senhaValidada.password, 12),
+        senhaTemporaria: true,
         role,
         permissoes: permissoesString,
         callixHabilitado,
@@ -72,9 +91,6 @@ export default async function registerAction(
       // token_onyx NUNCA retornado ao cliente.
       select: { id: true, nome: true, usuario: true, email: true, role: true, telefone: true, telefone_corporativo: true },
     });
-
-    // senhaTemporaria não está nos tipos Prisma ainda — atualiza via raw SQL
-    await db.$executeRawUnsafe(`UPDATE usuarios SET senhaTemporaria = 1 WHERE id = ?`, novoUsuario.id);
 
     revalidatePath("/PainelAlpha/cadastro");
 

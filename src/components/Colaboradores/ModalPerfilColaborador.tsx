@@ -22,6 +22,7 @@ import { AUTOFILL_PROTECTION_ATTRS } from '@/components/ui/autofill-protection';
 import { getTokenOnyxUpdate } from '@/lib/colaboradores/token-onyx-update';
 import { prepareAvatarImage } from '@/lib/avatar-upload';
 import { isAdminRole } from '@/lib/roles';
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@/lib/auth/password-policy';
 
 // ─── Explicit types (independent of Prisma client version) ───────────────────
 
@@ -280,9 +281,12 @@ export default function ModalPerfilColaborador({
 
   useEffect(() => {
     if (!open || !usuarioId) return;
+    // O reset é intencional ao abrir um colaborador diferente.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTab('dados');
     setShowNovoContrato(false);
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, usuarioId]);
 
   async function load() {
@@ -473,7 +477,10 @@ export default function ModalPerfilColaborador({
 
   async function handleSalvarSenha() {
     if (!usuarioId) return;
-    if (novaSenha.length < 6) { toast.error('Senha deve ter ao menos 6 caracteres'); return; }
+    if (novaSenha.length < PASSWORD_MIN_LENGTH || novaSenha.length > PASSWORD_MAX_LENGTH) {
+      toast.error(`A senha deve ter entre ${PASSWORD_MIN_LENGTH} e ${PASSWORD_MAX_LENGTH} caracteres`);
+      return;
+    }
     if (novaSenha !== confirmarSenha) { toast.error('Senhas não coincidem'); return; }
     setSalvandoSenha(true);
     const res = await alterarSenhaAdmin(usuarioId, novaSenha);
@@ -1023,7 +1030,9 @@ export default function ModalPerfilColaborador({
                               type="password"
                               value={novaSenha}
                               onChange={e => setNovaSenha(e.target.value)}
-                              placeholder="Mínimo 6 caracteres"
+                              placeholder={`Mínimo ${PASSWORD_MIN_LENGTH} caracteres`}
+                              minLength={PASSWORD_MIN_LENGTH}
+                              maxLength={PASSWORD_MAX_LENGTH}
                               autoComplete="new-password"
                               {...AUTOFILL_PROTECTION_ATTRS}
                               className="w-full h-10 bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 text-sm text-white placeholder:text-slate-700 focus:border-red-500/40 outline-none"
@@ -1039,6 +1048,8 @@ export default function ModalPerfilColaborador({
                               onChange={e => setConfirmarSenha(e.target.value)}
                               placeholder="Repita a nova senha"
                               autoComplete="new-password"
+                              minLength={PASSWORD_MIN_LENGTH}
+                              maxLength={PASSWORD_MAX_LENGTH}
                               {...AUTOFILL_PROTECTION_ATTRS}
                               className="w-full h-10 bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 text-sm text-white placeholder:text-slate-700 focus:border-red-500/40 outline-none"
                             />

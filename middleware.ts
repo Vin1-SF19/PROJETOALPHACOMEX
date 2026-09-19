@@ -22,8 +22,8 @@ export async function middleware(req: NextRequest) {
     secret,
     raw: false,
     cookieName: process.env.NODE_ENV === "production" 
-      ? "next-auth.session-token" 
-      : "next-auth.session-token"
+      ? "__Secure-authjs.session-token"
+      : "authjs.session-token"
   });
 
   const isLoggedIn = !!token && token.acessoBloqueado !== true;
@@ -46,6 +46,11 @@ export async function middleware(req: NextRequest) {
 
   if (!isLoggedIn && pathname.startsWith("/PainelAlpha")) {
     return NextResponse.redirect(new URL("/", req.nextUrl));
+  }
+
+  const isMudarSenhaPage = pathname === "/PainelAlpha/mudar-senha";
+  if (isLoggedIn && token?.senhaTemporaria === true && pathname.startsWith("/PainelAlpha") && !isMudarSenhaPage) {
+    return NextResponse.redirect(new URL("/PainelAlpha/mudar-senha", req.nextUrl));
   }
 
   if (

@@ -7,6 +7,9 @@ export default async function MudarSenhaPage() {
   const session = await auth();
 
   if (!session) redirect("/");
+  if (!(session.user as { senhaTemporaria?: boolean }).senhaTemporaria) {
+    redirect("/PainelAlpha");
+  }
 
   return (
     <main className="min-h-screen bg-[#020617] text-slate-200 font-sans flex items-center justify-center p-6 relative overflow-hidden">

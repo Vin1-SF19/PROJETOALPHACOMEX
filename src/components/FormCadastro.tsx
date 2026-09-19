@@ -21,6 +21,7 @@ import PreviewModulosSetor from "./cadastro/PreviewModulosSetor";
 import AbaGestaoEquipe from "./cadastro/AbaGestaoEquipe";
 import ModalOnboarding, { type OnboardingTemplate, type NovoUsuario } from "./ModalOnboarding";
 import { isAdminRole } from "@/lib/roles";
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "@/lib/auth/password-policy";
 
 function gerarSenhaSegura(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#!";
@@ -54,6 +55,8 @@ export default function CadastroUsuarios({
       if (state.success) {
         toast.success(state.message || "Acesso Alpha Criado");
         if (state.novoUsuario) {
+          // O estado do modal deriva da conclusão assíncrona da Server Action.
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setUsuarioOnboarding(state.novoUsuario);
           setModalOnboarding(true);
         }
@@ -171,6 +174,8 @@ export default function CadastroUsuarios({
                             placeholder="••••••••"
                             value={senhaCapturada}
                             onChange={(e) => setSenhaCapturada(e.target.value)}
+                            minLength={PASSWORD_MIN_LENGTH}
+                            maxLength={PASSWORD_MAX_LENGTH}
                             className="h-13 bg-black/40 border-white/5 rounded-2xl pl-10 focus:border-indigo-500/50 font-mono text-sm"
                             required
                           />

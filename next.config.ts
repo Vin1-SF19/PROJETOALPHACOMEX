@@ -33,8 +33,26 @@ const nextConfig = {
     // velocidade. O build Turbopack deste monólito excede o limite da Vercel.
     webpackMemoryOptimizations: true,
     serverActions: {
-      bodySizeLimit: "100mb",
+      // O maior fluxo legado via Server Action aceita comprovantes de 25 MB.
+      // Uploads novos/grandes devem usar Route Handlers dedicados e streaming.
+      bodySizeLimit: "30mb",
     },
+  },
+
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'self'; object-src 'none'; base-uri 'self'" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), geolocation=(), payment=(), usb=()" },
+          { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+        ],
+      },
+    ];
   },
 
   typescript: {

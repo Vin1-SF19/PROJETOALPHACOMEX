@@ -1,18 +1,16 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { signOut } from "next-auth/react";
 import { Lock, Eye, EyeOff, ShieldCheck, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { trocarSenhaObrigatoria } from "@/actions/onboarding";
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "@/lib/auth/password-policy";
 
 export default function MudarSenhaForm() {
-  const router = useRouter();
-  const { update } = useSession();
   const [isPending, startTransition] = useTransition();
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmar, setConfirmar] = useState("");
@@ -20,8 +18,8 @@ export default function MudarSenhaForm() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (novaSenha.length < 6) {
-      toast.error("Senha deve ter no mínimo 6 caracteres");
+    if (novaSenha.length < PASSWORD_MIN_LENGTH || novaSenha.length > PASSWORD_MAX_LENGTH) {
+      toast.error(`A senha deve ter entre ${PASSWORD_MIN_LENGTH} e ${PASSWORD_MAX_LENGTH} caracteres`);
       return;
     }
     if (novaSenha !== confirmar) {
@@ -32,10 +30,8 @@ export default function MudarSenhaForm() {
     startTransition(async () => {
       const res = await trocarSenhaObrigatoria(novaSenha);
       if (res.success) {
-        toast.success("Senha definida com sucesso! Bem-vindo ao Painel Alpha.");
-        await update({ senhaTemporaria: false });
-        router.push("/PainelAlpha");
-        router.refresh();
+        toast.success("Senha definida com sucesso. Entre novamente para continuar.");
+        await signOut({ redirectTo: "/" });
       } else {
         toast.error(res.error ?? "Erro ao alterar senha");
       }
@@ -53,10 +49,12 @@ export default function MudarSenhaForm() {
             type={mostrar ? "text" : "password"}
             value={novaSenha}
             onChange={(e) => setNovaSenha(e.target.value)}
-            placeholder="Mínimo 6 caracteres"
+            placeholder={`Mínimo ${PASSWORD_MIN_LENGTH} caracteres`}
             className="h-13 bg-black/40 border-white/5 rounded-2xl pl-10 pr-10 focus:border-indigo-500/50 font-mono"
             required
-            minLength={6}
+            minLength={PASSWORD_MIN_LENGTH}
+            maxLength={PASSWORD_MAX_LENGTH}
+            autoComplete="new-password"
           />
           <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-indigo-500 transition-colors" size={16} />
           <button
@@ -81,6 +79,9 @@ export default function MudarSenhaForm() {
             placeholder="Repita a senha"
             className="h-13 bg-black/40 border-white/5 rounded-2xl pl-10 focus:border-indigo-500/50 font-mono"
             required
+            minLength={PASSWORD_MIN_LENGTH}
+            maxLength={PASSWORD_MAX_LENGTH}
+            autoComplete="new-password"
           />
           <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-indigo-500 transition-colors" size={16} />
         </div>

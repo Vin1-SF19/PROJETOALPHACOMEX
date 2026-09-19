@@ -117,7 +117,10 @@ export async function excluirSetor(id: number) {
   if (usuariosNoSetor > 0) {
     await db.usuarios.updateMany({
       where: { role: setor.nome },
-      data: { role: SETOR_BASE },
+      data: {
+        role: SETOR_BASE,
+        authSessionVersion: { increment: 1 },
+      },
     });
   }
 

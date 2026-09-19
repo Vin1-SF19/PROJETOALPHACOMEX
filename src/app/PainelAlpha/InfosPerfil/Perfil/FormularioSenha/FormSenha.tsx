@@ -8,7 +8,28 @@ import { toast } from "sonner";
 import { alterarSenhaPropriaAction } from "@/actions/perfil";
 import { logout } from "@/actions/logout";
 import { useFormStatus } from "react-dom";
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "@/lib/auth/password-policy";
 
+function BotaoSubmit() {
+    const { pending } = useFormStatus();
+
+    return (
+        <Button
+            type="submit"
+            disabled={pending}
+            className="cursor-pointer h-12 px-10 bg-amber-600 hover:bg-amber-500 text-white font-black uppercase text-[10px] tracking-[0.3em] rounded-2xl transition-all disabled:opacity-50"
+        >
+            {pending ? (
+                <div className="flex items-center gap-2">
+                    <LoaderCircle className="animate-spin" size={16} />
+                    Sincronizando...
+                </div>
+            ) : (
+                "Atualizar Protocolo de Segurança"
+            )}
+        </Button>
+    );
+}
 
 export function FormSenha() {
     async function handleAction(formData: FormData) {
@@ -27,33 +48,12 @@ export function FormSenha() {
         }
     }
 
-    function BotaoSubmit() {
-        const { pending } = useFormStatus();
-
-        return (
-            <Button
-                type="submit"
-                disabled={pending}
-                className="cursor-pointer h-12 px-10 bg-amber-600 hover:bg-amber-500 text-white font-black uppercase text-[10px] tracking-[0.3em] rounded-2xl transition-all disabled:opacity-50"
-            >
-                {pending ? (
-                    <div className="flex items-center gap-2">
-                        <LoaderCircle className="animate-spin" size={16} />
-                        Sincronizando...
-                    </div>
-                ) : (
-                    "Atualizar Protocolo de Segurança"
-                )}
-            </Button>
-        );
-    }
-
     return (
         <form action={handleAction} id="form-seguranca" className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
                 <Label className="text-[9px] font-black text-slate-500 uppercase ml-2 tracking-widest">Senha Atual</Label>
                 <div className="relative">
-                    <Input name="senhaAtual" autoComplete="new-password" type="password" required placeholder="••••••••" className="h-12 bg-black/40 border-white/5 rounded-2xl pl-10 text-xs focus:ring-amber-500/20" />
+                    <Input name="senhaAtual" autoComplete="current-password" type="password" required maxLength={PASSWORD_MAX_LENGTH} placeholder="••••••••" className="h-12 bg-black/40 border-white/5 rounded-2xl pl-10 text-xs focus:ring-amber-500/20" />
                     <Lock className="absolute left-3 top-3.5 text-slate-600" size={14} />
                 </div>
             </div>
@@ -61,7 +61,7 @@ export function FormSenha() {
             <div className="space-y-2">
                 <Label className="text-[9px] font-black text-slate-500 uppercase ml-2 tracking-widest">Nova Credencial</Label>
                 <div className="relative">
-                    <Input name="novaSenha" type="password" required placeholder="••••••••" className="h-12 bg-black/40 border-white/5 rounded-2xl pl-10 text-xs focus:ring-amber-500/20" />
+                    <Input name="novaSenha" type="password" required minLength={PASSWORD_MIN_LENGTH} maxLength={PASSWORD_MAX_LENGTH} autoComplete="new-password" placeholder={`Mínimo ${PASSWORD_MIN_LENGTH} caracteres`} className="h-12 bg-black/40 border-white/5 rounded-2xl pl-10 text-xs focus:ring-amber-500/20" />
                     <KeyRound className="absolute left-3 top-3.5 text-slate-600" size={14} />
                 </div>
             </div>

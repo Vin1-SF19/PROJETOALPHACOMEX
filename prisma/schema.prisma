@@ -85,6 +85,7 @@ model usuarios {
 
   senhaTemporaria  Boolean   @default(false)
   primeiroAcessoEm DateTime?
+  authSessionVersion Int      @default(0)
 
   bibbleSessions BibbleSession[]
   bibbleProjects BibbleProject[]
@@ -216,6 +217,20 @@ model usuarios {
   explorerSmbBinding           AlphaExplorerSmbBinding?     @relation("AlphaExplorerSmbBindingUser")
   explorerSmbBindingsCreated   AlphaExplorerSmbBinding[]    @relation("AlphaExplorerSmbBindingCreatedBy")
   explorerSmbBindingsUpdated   AlphaExplorerSmbBinding[]    @relation("AlphaExplorerSmbBindingUpdatedBy")
+}
+
+/// Contadores de abuso da autenticação. A chave é um HMAC; e-mail e IP nunca
+/// são persistidos em claro. O estado precisa ser compartilhado entre as
+/// instâncias serverless, por isso não pode viver somente em memória.
+model AuthRateLimit {
+  key             String    @id
+  scope           String
+  attempts        Int       @default(0)
+  windowStartedAt DateTime
+  blockedUntil    DateTime?
+  updatedAt       DateTime  @updatedAt
+
+  @@index([updatedAt])
 }
 
 model MesclagemHistorico {

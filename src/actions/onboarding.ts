@@ -5,7 +5,9 @@ import { revalidatePath } from "next/cache";
 import { auth } from "../../auth";
 import { isAdminRole } from "@/lib/roles";
 import { Resend } from "resend";
-import { hashSync } from "bcryptjs";
+import { hash } from "bcryptjs";
+import { validarNovaSenha } from "@/lib/auth/password-policy";
+import { STATUS_USUARIO_ATIVO } from "@/lib/auth/acesso-painel";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const onboardingTemplateModel = (db as any).onboardingTemplate;
@@ -243,20 +245,30 @@ export async function enviarEmailOnboarding(dados: {
 export async function trocarSenhaObrigatoria(novaSenha: string) {
   try {
     const session = await auth();
-    if (!session) return { success: false, error: "Não autorizado" };
+    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
 
-    if (novaSenha.length < 6) {
-      return { success: false, error: "Senha deve ter no mínimo 6 caracteres." };
+    const senha = validarNovaSenha(novaSenha);
+    if (!senha.success) return senha;
+
+    const senhaHash = await hash(senha.password, 12);
+
+    const updated = await db.usuarios.updateMany({
+      where: {
+        id: Number(session.user.id),
+        status: STATUS_USUARIO_ATIVO,
+        senhaTemporaria: true,
+      },
+      data: {
+        senha: senhaHash,
+        senhaTemporaria: false,
+        primeiroAcessoEm: new Date(),
+        authSessionVersion: { increment: 1 },
+      },
+    });
+
+    if (updated.count !== 1) {
+      return { success: false, error: "Esta troca obrigatória não está mais disponível." };
     }
-
-    const senhaHash = hashSync(novaSenha, 10);
-
-    await db.$executeRawUnsafe(
-      `UPDATE usuarios SET senha = ?, senhaTemporaria = 0, primeiroAcessoEm = ? WHERE id = ?`,
-      senhaHash,
-      new Date().toISOString(),
-      Number(session.user.id)
-    );
 
     revalidatePath("/PainelAlpha");
     return { success: true };

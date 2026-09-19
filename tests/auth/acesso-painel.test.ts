@@ -29,19 +29,19 @@ describe("política de acesso ao Painel Alpha", () => {
   });
 
   it("consulta o estado atual do usuário pelo id", async () => {
-    prismaMock.usuarios.findUnique.mockResolvedValue({ status: "ATIVO" });
+    prismaMock.usuarios.findUnique.mockResolvedValue({ status: "ATIVO", authSessionVersion: 0 });
 
     await expect(usuarioPodeAcessarPainel("42")).resolves.toBe(true);
     expect(prismaMock.usuarios.findUnique).toHaveBeenCalledWith({
       where: { id: 42 },
-      select: { status: true },
+      select: { status: true, authSessionVersion: true },
     });
   });
 
   it.each(["INATIVO", "AFASTADO", "FÉRIAS", "FERIAS"])(
     "nega o status não ativo %s",
     async (status) => {
-      prismaMock.usuarios.findUnique.mockResolvedValue({ status });
+      prismaMock.usuarios.findUnique.mockResolvedValue({ status, authSessionVersion: 0 });
 
       await expect(usuarioPodeAcessarPainel(7)).resolves.toBe(false);
     },
@@ -69,21 +69,22 @@ describe("política de acesso ao Painel Alpha", () => {
   });
 
   it("mantém um JWT ativo quando o banco ainda confirma ATIVO", async () => {
-    prismaMock.usuarios.findUnique.mockResolvedValue({ status: "ATIVO" });
+    prismaMock.usuarios.findUnique.mockResolvedValue({ status: "ATIVO", authSessionVersion: 0 });
 
     await expect(
-      revalidarTokenAcesso({ id: "7", email: "ativo@alpha.test", role: "User" }),
+      revalidarTokenAcesso({ id: "7", email: "ativo@alpha.test", role: "User", authSessionVersion: 0 }),
     ).resolves.toMatchObject({
       id: "7",
       email: "ativo@alpha.test",
       role: "User",
       acessoBloqueado: false,
       statusUsuario: "ATIVO",
+      authSessionVersion: 0,
     });
   });
 
   it("invalida a identidade de um JWT emitido antes do bloqueio", async () => {
-    prismaMock.usuarios.findUnique.mockResolvedValue({ status: "INATIVO" });
+    prismaMock.usuarios.findUnique.mockResolvedValue({ status: "INATIVO", authSessionVersion: 0 });
 
     const token = await revalidarTokenAcesso({
       sub: "7",
@@ -110,5 +111,19 @@ describe("política de acesso ao Painel Alpha", () => {
       id: undefined,
     });
     expect(prismaMock.usuarios.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("invalida JWT emitido antes de uma troca de senha", async () => {
+    prismaMock.usuarios.findUnique.mockResolvedValue({ status: "ATIVO", authSessionVersion: 2 });
+
+    const token = await revalidarTokenAcesso({
+      id: "7",
+      email: "ativo@alpha.test",
+      authSessionVersion: 1,
+    });
+
+    expect(token).toMatchObject({ acessoBloqueado: true });
+    expect(token.id).toBeUndefined();
+    expect(token.authSessionVersion).toBeUndefined();
   });
 });

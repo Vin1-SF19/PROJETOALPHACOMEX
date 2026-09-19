@@ -1,4 +1,4 @@
-import { compareSync } from "bcryptjs";
+import { compare } from "bcryptjs";
 import db from "./prisma";
 import {
   statusPermiteAcessoPainel,
@@ -20,7 +20,14 @@ type User = {
   esconderBloqueados?: boolean;
   presetId?: string | null;
   senhaTemporaria?: boolean;
+  authSessionVersion: number;
+  bibble_ativo?: boolean;
 };
+
+// Mantém o mesmo custo de bcrypt quando o identificador não existe ou está
+// inativo, reduzindo o sinal temporal usado para enumerar contas.
+const INVALID_CREDENTIAL_HASH =
+  "$2b$12$mAspyBYrDkFMzkve9CA3TeB12YezNr12QeEaxeTCDFZSdIJ3O4yPi";
 
 export async function findUserByCredentials(
   email: string,
@@ -36,13 +43,11 @@ export async function findUserByCredentials(
     }
   });
 
-  if (!user || !statusPermiteAcessoPainel(user.status)) return null;
+  const passwordMatch = await compare(senha, user?.senha ?? INVALID_CREDENTIAL_HASH);
 
-  const presetId = (user as any).presets?.[0]?.id || null;
-  const passwordMatch = await compareSync(senha, user.senha);
+  if (!user || !statusPermiteAcessoPainel(user.status) || !passwordMatch) return null;
 
-  if (!passwordMatch) return null;
-
+  const presetId = user.presets[0]?.id ?? null;
 
   return {
     id: String(user.id),
@@ -52,11 +57,13 @@ export async function findUserByCredentials(
     role: user.role,
     presetId: presetId,
     permissoes: user.permissoes?.split(",") ?? [],
-    imagemUrl: (user as any).imagemUrl ?? null,
-    atalhos: (user as any).atalhos ?? null,
-    tema_interface: (user as any).tema_interface ?? "blue",
-    densidade_painel: (user as any).densidade_painel ?? "default",
-    esconderBloqueados: !!(user as any).esconderBloqueados,
-    senhaTemporaria: !!(user as any).senhaTemporaria,
+    imagemUrl: user.imagemUrl,
+    atalhos: user.atalhos,
+    tema_interface: user.tema_interface ?? "blue",
+    densidade_painel: user.densidade_painel ?? "default",
+    esconderBloqueados: user.esconderBloqueados,
+    senhaTemporaria: user.senhaTemporaria,
+    authSessionVersion: user.authSessionVersion,
+    bibble_ativo: user.bibble_ativo,
   };
 }

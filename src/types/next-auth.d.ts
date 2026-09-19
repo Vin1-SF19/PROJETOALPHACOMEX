@@ -1,4 +1,4 @@
-import NextAuth from "next-auth";
+import "next-auth";
 
 declare module "next-auth" {
   interface Session {
@@ -15,6 +15,13 @@ declare module "next-auth" {
       atalhos?: string | null;
       esconderBloqueados: boolean;
       statusUsuario?: string;
+      senhaTemporaria?: boolean;
+      authSessionVersion?: number;
+      presetId?: string | null;
+      tema_interface?: string | null;
+      densidade_painel?: string | null;
+      bibble_ativo?: boolean;
+      setor?: string;
     };
   }
 
@@ -28,6 +35,14 @@ declare module "next-auth" {
     atalhos?: string | null;
     statusUsuario?: string;
     acessoBloqueado?: boolean;
+    senhaTemporaria?: boolean;
+    authSessionVersion?: number;
+    imagemUrl?: string | null;
+    esconderBloqueados?: boolean;
+    presetId?: string | null;
+    tema_interface?: string | null;
+    densidade_painel?: string | null;
+    bibble_ativo?: boolean;
   }
 }
 
@@ -42,5 +57,14 @@ declare module "next-auth/jwt" {
     permissoes?: string[];
     statusUsuario?: string;
     acessoBloqueado?: boolean;
+    senhaTemporaria?: boolean;
+    authSessionVersion?: number;
+    imagemUrl?: string | null;
+    atalhos?: string | null;
+    esconderBloqueados?: boolean;
+    presetId?: string | null;
+    tema_interface?: string | null;
+    densidade_painel?: string | null;
+    bibble_ativo?: boolean;
   }
 }

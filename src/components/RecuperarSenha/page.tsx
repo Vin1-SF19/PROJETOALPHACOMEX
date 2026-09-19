@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { X, Mail, ShieldCheck, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from 'sonner';
+import { solicitarRecuperacao } from "@/actions/RecuperarSenha";
 
 export default function ModalRecuperarSenha({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
     const [email, setEmail] = useState("");
@@ -13,14 +14,18 @@ export default function ModalRecuperarSenha({ isOpen, onClose }: { isOpen: boole
         if (!email.includes("@")) return toast.error("Insira um e-mail válido.");
 
         setEnviando(true);
-        
-        setTimeout(() => {
+
+        try {
+            await solicitarRecuperacao(email);
             setEnviando(false);
             setSucesso(true);
             toast.success("E-mail de recuperação enviado!", {
                 description: "Verifique sua caixa de entrada e spam."
             });
-        }, 2000);
+        } catch {
+            setEnviando(false);
+            toast.error("Não foi possível processar a solicitação. Tente novamente.");
+        }
     };
 
     if (!isOpen) return null;

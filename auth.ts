@@ -6,6 +6,12 @@ import {
   revalidarTokenAcesso,
   STATUS_USUARIO_ATIVO,
 } from "@/lib/auth/acesso-painel";
+import {
+  clearAuthRateLimit,
+  consumeAuthRateLimit,
+  getAuthRequestAddress,
+  normalizeAuthIdentifier,
+} from "@/lib/auth/rate-limit";
 
 const nextAuth = NextAuth({
   providers: [
@@ -15,15 +21,29 @@ const nextAuth = NextAuth({
         senha: { type: "password" },
       },
 
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         if (!credentials?.email || !credentials?.senha) return null;
 
+        const email = normalizeAuthIdentifier(String(credentials.email));
+        const requestAddress = getAuthRequestAddress(request.headers);
+        const [ipLimit, identifierLimit] = await Promise.all([
+          consumeAuthRateLimit("login_ip", requestAddress),
+          consumeAuthRateLimit("login_identifier", email),
+        ]);
+        if (!ipLimit.allowed || !identifierLimit.allowed) return null;
+
         const user = await findUserByCredentials(
-          String(credentials.email),
+          email,
           String(credentials.senha)
         );
 
         if (!user) return null;
+
+        try {
+          await clearAuthRateLimit("login_identifier", email);
+        } catch (error) {
+          console.error("Falha ao limpar limite de login após autenticação válida:", error);
+        }
 
 
         return {
@@ -33,14 +53,15 @@ const nextAuth = NextAuth({
           usuario: user.usuario,
           role: user.role,
           presetId: user.presetId,
-          permissoes: (user as any).permissoes,
-          imagemUrl: (user as any).imagemUrl,
-          atalhos: (user as any).atalhos,
-          tema_interface: (user as any).tema_interface,
-          densidade_painel: (user as any).densidade_painel,
-          esconderBloqueados: (user as any).esconderBloqueados,
-          bibble_ativo: (user as any).bibble_ativo ?? true,
-          senhaTemporaria: !!(user as any).senhaTemporaria,
+          permissoes: user.permissoes,
+          imagemUrl: user.imagemUrl,
+          atalhos: user.atalhos,
+          tema_interface: user.tema_interface,
+          densidade_painel: user.densidade_painel,
+          esconderBloqueados: user.esconderBloqueados,
+          bibble_ativo: user.bibble_ativo ?? true,
+          senhaTemporaria: !!user.senhaTemporaria,
+          authSessionVersion: user.authSessionVersion,
           statusUsuario: STATUS_USUARIO_ATIVO,
           acessoBloqueado: false,
         };
@@ -53,37 +74,27 @@ const nextAuth = NextAuth({
     maxAge: 60 * 60 * 24,
   },
 
-  cookies: {
-    sessionToken: {
-      name: `next-auth.session-token`,
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-      },
-    },
-  },
-
   callbacks: {
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.authenticatedAt = Math.floor(Date.now() / 1000);
         token.id = user.id;
         token.email = user.email;
-        token.nome = (user as any).nome;
-        token.usuario = (user as any).usuario;
-        token.role = (user as any).role;
-        token.permissoes = (user as any).permissoes;
-        token.imagemUrl = (user as any).imagemUrl;
-        token.atalhos = (user as any).atalhos;
-        token.esconderBloqueados = (user as any).esconderBloqueados;
-        token.tema_interface = (user as any).tema_interface;
-        token.densidade_painel = (user as any).densidade_painel;
-        token.presetId = (user as any).presetId;
-        token.usuario = (user as any).usuario;
-        token.bibble_ativo = (user as any).bibble_ativo ?? true;
-        token.senhaTemporaria = !!(user as any).senhaTemporaria;
+        token.nome = user.nome;
+        token.usuario = user.usuario;
+        token.role = user.role;
+        token.permissoes = Array.isArray(user.permissoes)
+          ? user.permissoes
+          : user.permissoes?.split(",");
+        token.imagemUrl = user.imagemUrl;
+        token.atalhos = user.atalhos;
+        token.esconderBloqueados = user.esconderBloqueados;
+        token.tema_interface = user.tema_interface;
+        token.densidade_painel = user.densidade_painel;
+        token.presetId = user.presetId;
+        token.bibble_ativo = user.bibble_ativo ?? true;
+        token.senhaTemporaria = !!user.senhaTemporaria;
+        token.authSessionVersion = Number(user.authSessionVersion ?? 0);
         token.statusUsuario = STATUS_USUARIO_ATIVO;
         token.acessoBloqueado = false;
       } else {
@@ -100,8 +111,7 @@ const nextAuth = NextAuth({
         if (session.user.esconderBloqueados !== undefined) token.esconderBloqueados = session.user.esconderBloqueados;
         if (session.user.tema_interface) token.tema_interface = session.user.tema_interface;
         if (session.user.densidade_painel) token.densidade_painel = session.user.densidade_painel;
-        if ((session.user as any).bibble_ativo !== undefined) token.bibble_ativo = (session.user as any).bibble_ativo;
-        if ((session.user as any).senhaTemporaria === false) token.senhaTemporaria = false;
+        if (session.user.bibble_ativo !== undefined) token.bibble_ativo = session.user.bibble_ativo;
       }
 
       return token;
@@ -121,17 +131,18 @@ const nextAuth = NextAuth({
         session.user.usuario = token.usuario as string;
         session.user.email = token.email as string;
         session.user.role = token.role as string;
-        (session.user as any).setor = token.role as string;
+        session.user.setor = token.role as string;
         session.user.imagemUrl = token.imagemUrl as string;
         session.user.permissoes = token.permissoes as string[];
         session.user.atalhos = token.atalhos as string;
         session.user.esconderBloqueados = !!token.esconderBloqueados;
-        (session.user as any).tema_interface = token.tema_interface;
-        (session.user as any).densidade_painel = token.densidade_painel;
-        (session.user as any).presetId = token.presetId;
-        (session.user as any).usuario = token.usuario;
-        (session.user as any).bibble_ativo = token.bibble_ativo ?? true;
-        (session.user as any).senhaTemporaria = !!token.senhaTemporaria;
+        session.user.tema_interface = token.tema_interface;
+        session.user.densidade_painel = token.densidade_painel;
+        session.user.presetId = token.presetId;
+        session.user.usuario = token.usuario as string;
+        session.user.bibble_ativo = token.bibble_ativo ?? true;
+        session.user.senhaTemporaria = !!token.senhaTemporaria;
+        session.user.authSessionVersion = Number(token.authSessionVersion ?? 0);
         session.acessoBloqueado = false;
       }
 

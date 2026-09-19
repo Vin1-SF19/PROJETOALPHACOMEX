@@ -1,9 +1,10 @@
 "use server";
 
 import db from "@/lib/prisma";
-import { auth, signOut } from "../../auth";
-import { hashSync, compareSync } from "bcryptjs";
+import { auth } from "../../auth";
+import { compare, hash } from "bcryptjs";
 import { revalidatePath } from "next/cache";
+import { validarNovaSenha } from "@/lib/auth/password-policy";
 
 export async function alterarSenhaPropriaAction(formData: FormData) {
     try {
@@ -16,6 +17,8 @@ export async function alterarSenhaPropriaAction(formData: FormData) {
         const senhaNova = formData.get("novaSenha")?.toString();
 
         if (!senhaAtual || !senhaNova) return { success: false, error: "Preencha os campos." };
+        const senhaValidada = validarNovaSenha(senhaNova);
+        if (!senhaValidada.success) return senhaValidada;
 
         const usuarioBanco = await db.usuarios.findUnique({
             where: { id: Number(session.user.id) }
@@ -23,16 +26,19 @@ export async function alterarSenhaPropriaAction(formData: FormData) {
 
         if (!usuarioBanco) return { success: false, error: "Usuário não encontrado." };
 
-        const senhaCorreta = compareSync(senhaAtual, usuarioBanco.senha);
+        const senhaCorreta = await compare(senhaAtual, usuarioBanco.senha);
         if (!senhaCorreta) return { success: false, error: "Senha atual incorreta." };
 
         await db.usuarios.update({
             where: { id: usuarioBanco.id },
-            data: { senha: hashSync(senhaNova, 10) }
+            data: {
+                senha: await hash(senhaValidada.password, 12),
+                authSessionVersion: { increment: 1 },
+            }
         });
 
         return { success: true };
-    } catch (error: any) {
+    } catch {
         return { success: false, error: "Erro na sincronização." };
     }
 }
@@ -60,8 +66,11 @@ export async function atualizarFotoPerfilAction(url: string | null) {
       revalidatePath("/PainelAlpha/InfosPerfil/Perfil");
       
       return { success: true };
-    } catch (error: any) {
-      console.error("❌ ERRO NO PRISMA:", error.message);
+    } catch (error: unknown) {
+      console.error(
+        "❌ ERRO NO PRISMA:",
+        error instanceof Error ? error.message : "erro desconhecido",
+      );
       return { success: false, error: "Erro ao sincronizar imagem no banco." };
     }
   }
