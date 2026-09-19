@@ -307,6 +307,16 @@ function KanbanCard({
                   Agendar pelo Google Meet
                 </button>
               )}
+              {card.cardViewComposicao !== undefined && (
+                // RM-2026-E1E1F7: o widget de Agendar Reunião substitui o corpo
+                // padrão do card, então a composição configurável precisa ser
+                // renderizada aqui também — senão etapas com esse widget nunca
+                // mostram nenhum campo configurado (bug reportado em produção).
+                <CardKanbanRenderer
+                  composicao={card.cardViewComposicao}
+                  valores={card.cardViewValores ?? { nativos: {}, campos: {}, camposLabel: {} }}
+                />
+              )}
             </div>
           ) : (
             <>
