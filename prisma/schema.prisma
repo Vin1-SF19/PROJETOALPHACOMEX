@@ -1321,13 +1321,19 @@ model DiretrizSala {
 }
 
 model Categoria {
-  id           String           @id @default(uuid())
-  nome         String           @unique
-  cor          String?          @default("#6366f1")
-  icone        String?          @default("Package")
-  produtos     ProdutoEstoque[]
-  listaCompras ListaCompra[]
-  createdAt    DateTime         @default(now())
+  id            String           @id @default(uuid())
+  nome          String           @unique
+  cor           String?          @default("#6366f1")
+  icone         String?          @default("Package")
+  produtos      ProdutoEstoque[]
+  listaCompras  ListaCompra[]
+  createdAt     DateTime         @default(now())
+  descricao     String?
+  parentId      String?
+  ativo         Boolean          @default(true)
+  updatedAt     DateTime?
+  archivedAt    DateTime?
+  inventoryTags InventoryTag[]
 }
 
 model ProdutoEstoque {
@@ -1345,6 +1351,41 @@ model ProdutoEstoque {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  descricao              String?
+  marca                  String?
+  modelo                 String?
+  codigoInterno          String?   @unique
+  trackingMode           String    @default("QUANTIDADE")
+  usagePolicy            String    @default("RETORNAVEL")
+  status                 String    @default("DISPONIVEL")
+  defaultLocationId      String?
+  observacoes            String?
+  dataAquisicao          DateTime?
+  valorAquisicaoCentavos Int?
+  moeda                  String    @default("BRL")
+  fornecedor             String?
+  quantidadeEmUso        Int       @default(0)
+  quantidadeReservada    Int       @default(0)
+  quantidadeManutencao   Int       @default(0)
+  quantidadeDanificada   Int       @default(0)
+  quantidadeTotal        Int       @default(0)
+  searchText             String?
+  version                Int       @default(1)
+  createdById            Int?
+  updatedById            Int?
+  archivedAt             DateTime?
+
+  inventoryAssets          InventoryAsset[]
+  inventoryBalances        InventoryStockBalance[]
+  inventoryMovements       InventoryMovement[]
+  inventoryAssignments     InventoryAssignment[]
+  inventoryMaintenances    InventoryMaintenance[]
+  inventoryImages          InventoryImage[]
+  inventoryItemTags        InventoryItemTag[]
+  inventoryTagRequirements InventoryTagRequirement[]
+  inventoryKitComponents   InventoryKitComponent[]
+  inventoryReturnLines     InventoryReturnLine[]
 }
 
 model ListaCompra {
@@ -1359,6 +1400,373 @@ model ListaCompra {
 
   categoriaId String?
   categoria   Categoria? @relation(fields: [categoriaId], references: [id])
+}
+
+model InventoryLocation {
+  id            String                  @id @default(cuid())
+  nome          String                  @unique
+  descricao     String?
+  tipo          String?
+  ativo         Boolean                 @default(true)
+  createdById   Int?
+  updatedById   Int?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+  archivedAt    DateTime?
+  assets        InventoryAsset[]
+  balances      InventoryStockBalance[]
+  assignments   InventoryAssignment[]
+  returnLines   InventoryReturnLine[]
+  kitInstances  InventoryKitInstance[]
+  movementsFrom InventoryMovement[]     @relation("MovementFromLocation")
+  movementsTo   InventoryMovement[]     @relation("MovementToLocation")
+}
+
+model InventoryAsset {
+  id                     String                  @id @default(cuid())
+  produtoId              String
+  produto                ProdutoEstoque          @relation(fields: [produtoId], references: [id], onDelete: Restrict)
+  codigoInterno          String?                 @unique
+  patrimonio             String?                 @unique
+  serial                 String?                 @unique
+  status                 String                  @default("DISPONIVEL")
+  currentLocationId      String?
+  currentLocation        InventoryLocation?      @relation(fields: [currentLocationId], references: [id], onDelete: SetNull)
+  observacoes            String?
+  dataAquisicao          DateTime?
+  valorAquisicaoCentavos Int?
+  moeda                  String                  @default("BRL")
+  fornecedor             String?
+  version                Int                     @default(1)
+  createdById            Int?
+  updatedById            Int?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  archivedAt             DateTime?
+  movements              InventoryMovement[]
+  assignments            InventoryAssignment[]
+  maintenances           InventoryMaintenance[]
+  images                 InventoryImage[]
+  kitComponents          InventoryKitComponent[]
+  returnLines            InventoryReturnLine[]
+
+  @@index([produtoId, status])
+  @@index([currentLocationId, status])
+}
+
+model InventoryStockBalance {
+  id         String             @id @default(cuid())
+  produtoId  String
+  produto    ProdutoEstoque     @relation(fields: [produtoId], references: [id], onDelete: Restrict)
+  locationId String?
+  location   InventoryLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  bucket     String
+  quantity   Int                @default(0)
+  version    Int                @default(1)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@index([produtoId, bucket])
+  @@index([locationId, bucket])
+}
+
+model InventoryOperation {
+  id                 String                 @id @default(cuid())
+  idempotencyKey     String                 @unique
+  requestHash        String
+  type               String
+  actorType          String
+  actorUserId        Int?
+  actorNameSnapshot  String
+  occurredAt         DateTime
+  observacao         String?
+  metadataJson       String?
+  createdAt          DateTime               @default(now())
+  movements          InventoryMovement[]
+  auditLogs          InventoryAuditLog[]
+  assignments        InventoryAssignment[]
+  returnBatches      InventoryReturnBatch[]
+  maintenanceSends   InventoryMaintenance[] @relation("MaintenanceSendOperation")
+  maintenanceReturns InventoryMaintenance[] @relation("MaintenanceReturnOperation")
+}
+
+model InventoryMovement {
+  id              String                 @id @default(cuid())
+  operationId     String
+  operation       InventoryOperation     @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  produtoId       String
+  produto         ProdutoEstoque         @relation(fields: [produtoId], references: [id], onDelete: Restrict)
+  assetId         String?
+  asset           InventoryAsset?        @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  assignmentId    String?
+  assignment      InventoryAssignment?   @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  maintenanceId   String?
+  maintenance     InventoryMaintenance?  @relation(fields: [maintenanceId], references: [id], onDelete: Restrict)
+  kitInstanceId   String?
+  kitInstance     InventoryKitInstance?  @relation(fields: [kitInstanceId], references: [id], onDelete: Restrict)
+  kitComponentId  String?
+  kitComponent    InventoryKitComponent? @relation(fields: [kitComponentId], references: [id], onDelete: Restrict)
+  quantity        Int
+  fromLocationId  String?
+  fromLocation    InventoryLocation?     @relation("MovementFromLocation", fields: [fromLocationId], references: [id], onDelete: SetNull)
+  toLocationId    String?
+  toLocation      InventoryLocation?     @relation("MovementToLocation", fields: [toLocationId], references: [id], onDelete: SetNull)
+  fromBucket      String?
+  toBucket        String?
+  availableBefore Int
+  availableAfter  Int
+  totalBefore     Int
+  totalAfter      Int
+  createdAt       DateTime               @default(now())
+
+  @@index([produtoId, createdAt, id])
+  @@index([assetId, createdAt, id])
+  @@index([operationId])
+  @@index([assignmentId])
+  @@index([kitInstanceId, createdAt])
+  @@index([createdAt, id])
+}
+
+model InventoryAssignment {
+  id                String                 @id @default(cuid())
+  produtoId         String?
+  produto           ProdutoEstoque?        @relation(fields: [produtoId], references: [id], onDelete: Restrict)
+  assetId           String?
+  asset             InventoryAsset?        @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  kitInstanceId     String?
+  kitInstance       InventoryKitInstance?  @relation(fields: [kitInstanceId], references: [id], onDelete: Restrict)
+  responsibleUserId Int
+  sectorId          Int?
+  locationId        String?
+  location          InventoryLocation?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  quantity          Int
+  deliveredAt       DateTime
+  expectedReturnAt  DateTime?
+  returnedQuantity  Int                    @default(0)
+  status            String                 @default("ATIVA")
+  observacao        String?
+  handedById        Int
+  operationId       String                 @unique
+  operation         InventoryOperation     @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  version           Int                    @default(1)
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  closedAt          DateTime?
+  returns           InventoryReturnBatch[]
+  movements         InventoryMovement[]
+
+  @@index([status, responsibleUserId, deliveredAt])
+  @@index([produtoId, status])
+  @@index([kitInstanceId, status])
+}
+
+model InventoryReturnBatch {
+  id           String                @id @default(cuid())
+  assignmentId String
+  assignment   InventoryAssignment   @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  operationId  String                @unique
+  operation    InventoryOperation    @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  receivedById Int
+  returnedAt   DateTime
+  observacao   String?
+  createdAt    DateTime              @default(now())
+  lines        InventoryReturnLine[]
+
+  @@index([assignmentId, returnedAt])
+}
+
+model InventoryReturnLine {
+  id                    String                 @id @default(cuid())
+  batchId               String
+  batch                 InventoryReturnBatch   @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  produtoId             String
+  produto               ProdutoEstoque         @relation(fields: [produtoId], references: [id], onDelete: Restrict)
+  assetId               String?
+  asset                 InventoryAsset?        @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  kitComponentId        String?
+  kitComponent          InventoryKitComponent? @relation(fields: [kitComponentId], references: [id], onDelete: Restrict)
+  quantity              Int
+  condition             String
+  destinationLocationId String?
+  destinationLocation   InventoryLocation?     @relation(fields: [destinationLocationId], references: [id], onDelete: SetNull)
+  observacao            String?
+  createdAt             DateTime               @default(now())
+
+  @@index([batchId])
+  @@index([produtoId, createdAt])
+}
+
+model InventoryMaintenance {
+  id                String              @id @default(cuid())
+  produtoId         String
+  produto           ProdutoEstoque      @relation(fields: [produtoId], references: [id], onDelete: Restrict)
+  assetId           String?
+  asset             InventoryAsset?     @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  quantity          Int
+  reason            String
+  provider          String?
+  sentAt            DateTime
+  expectedAt        DateTime?
+  returnedAt        DateTime?
+  status            String              @default("ABERTA")
+  observacao        String?
+  openedById        Int
+  closedById        Int?
+  sendOperationId   String              @unique
+  sendOperation     InventoryOperation  @relation("MaintenanceSendOperation", fields: [sendOperationId], references: [id], onDelete: Restrict)
+  returnOperationId String?             @unique
+  returnOperation   InventoryOperation? @relation("MaintenanceReturnOperation", fields: [returnOperationId], references: [id], onDelete: Restrict)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  movements         InventoryMovement[]
+
+  @@index([status, sentAt])
+  @@index([produtoId, status])
+}
+
+model InventoryImage {
+  id              String          @id @default(cuid())
+  produtoId       String?
+  produto         ProdutoEstoque? @relation(fields: [produtoId], references: [id], onDelete: Restrict)
+  assetId         String?
+  asset           InventoryAsset? @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  storageProvider String
+  objectKey       String          @unique
+  url             String
+  mimeType        String
+  sizeBytes       Int
+  checksum        String?
+  isPrimary       Boolean         @default(false)
+  uploadedById    Int
+  createdAt       DateTime        @default(now())
+  deletedAt       DateTime?
+
+  @@index([produtoId, deletedAt])
+  @@index([assetId, deletedAt])
+}
+
+model InventoryTag {
+  id             String                    @id @default(cuid())
+  kind           String                    @default("ETIQUETA")
+  nome           String
+  normalizedName String                    @unique
+  descricao      String?
+  cor            String                    @default("#2563eb")
+  icone          String?
+  categoriaId    String?
+  categoria      Categoria?                @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  ativo          Boolean                   @default(true)
+  version        Int                       @default(1)
+  createdById    Int
+  updatedById    Int?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  archivedAt     DateTime?
+  itemTags       InventoryItemTag[]
+  requirements   InventoryTagRequirement[]
+  kitInstances   InventoryKitInstance[]
+}
+
+model InventoryItemTag {
+  id          String         @id @default(cuid())
+  tagId       String
+  tag         InventoryTag   @relation(fields: [tagId], references: [id], onDelete: Restrict)
+  produtoId   String
+  produto     ProdutoEstoque @relation(fields: [produtoId], references: [id], onDelete: Restrict)
+  createdById Int
+  createdAt   DateTime       @default(now())
+
+  @@unique([tagId, produtoId])
+  @@index([produtoId])
+}
+
+model InventoryTagRequirement {
+  id               String                  @id @default(cuid())
+  tagId            String
+  tag              InventoryTag            @relation(fields: [tagId], references: [id], onDelete: Restrict)
+  produtoId        String
+  produto          ProdutoEstoque          @relation(fields: [produtoId], references: [id], onDelete: Restrict)
+  quantityRequired Int
+  required         Boolean                 @default(true)
+  sortOrder        Int                     @default(0)
+  observacao       String?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  components       InventoryKitComponent[]
+
+  @@unique([tagId, produtoId])
+  @@index([tagId, required, sortOrder])
+}
+
+model InventoryKitInstance {
+  id                     String                  @id @default(cuid())
+  tagId                  String
+  tag                    InventoryTag            @relation(fields: [tagId], references: [id], onDelete: Restrict)
+  code                   String                  @unique
+  status                 String                  @default("RASCUNHO")
+  responsibleUserId      Int?
+  sectorId               Int?
+  locationId             String?
+  location               InventoryLocation?      @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  assembledById          Int
+  assembledAt            DateTime?
+  assignedAt             DateTime?
+  completedAt            DateTime?
+  requiredQuantityCache  Int                     @default(0)
+  fulfilledQuantityCache Int                     @default(0)
+  version                Int                     @default(1)
+  observacao             String?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  archivedAt             DateTime?
+  components             InventoryKitComponent[]
+  assignments            InventoryAssignment[]
+  movements              InventoryMovement[]
+
+  @@index([tagId, status, createdAt])
+}
+
+model InventoryKitComponent {
+  id               String                  @id @default(cuid())
+  kitInstanceId    String
+  kitInstance      InventoryKitInstance    @relation(fields: [kitInstanceId], references: [id], onDelete: Restrict)
+  requirementId    String
+  requirement      InventoryTagRequirement @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  produtoId        String
+  produto          ProdutoEstoque          @relation(fields: [produtoId], references: [id], onDelete: Restrict)
+  assetId          String?
+  asset            InventoryAsset?         @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  quantity         Int
+  returnedQuantity Int                     @default(0)
+  status           String                  @default("SELECIONADO")
+  addedById        Int
+  addedAt          DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  movements        InventoryMovement[]
+  returnLines      InventoryReturnLine[]
+
+  @@index([kitInstanceId, requirementId])
+  @@index([assetId, status])
+}
+
+model InventoryAuditLog {
+  id                String              @id @default(cuid())
+  entityType        String
+  entityId          String
+  action            String
+  operationId       String?
+  operation         InventoryOperation? @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  actorType         String
+  actorUserId       Int?
+  actorNameSnapshot String
+  oldDataJson       String?
+  newDataJson       String?
+  requestId         String?
+  createdAt         DateTime            @default(now())
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([operationId])
 }
 
 // Fase 3.4 do Cliente Master (2026-08-13) — mantém snapshot cadastral próprio

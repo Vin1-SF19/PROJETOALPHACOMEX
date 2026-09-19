@@ -108,6 +108,12 @@ agents:
       title: "Operador de Infraestrutura"
       icon: "🚀"
       skill: "/devops"
+    - id: virtus
+      name: "Virtus"
+      title: "Guardião Final de Produção"
+      icon: "🏛️"
+      skill: "/virtus"
+      activation: "manual-only"
   bibble_assistant:
     - id: bibble-muse
       name: "Muse"
@@ -142,6 +148,7 @@ executionFlow:
     - sage         # Testes
     - scribe       # Atualizar memória
     - kowalski     # Arquivar sessão
+    - offer-virtus # Apenas oferecer /virtus; nunca ativar automaticamente
 
 # Localização dos recursos
 paths:
@@ -233,6 +240,23 @@ qualityGates:
       - ai
       - upload
       - payments
+  production:
+    agent: virtus
+    activation: manual-only
+    requireExplicitPushConfirmation: true
+    exactConfirmationQuestion: "Deseja que eu faça o commit e o push para produção agora?"
+    checks:
+      - typecheck
+      - lint
+      - test
+      - build
+      - diff
+      - secrets
+      - dependencies
+      - preview-or-staging
+      - rollback-plan
+      - production-smoke
+      - production-logs
 
 # Versioning
 versioning:

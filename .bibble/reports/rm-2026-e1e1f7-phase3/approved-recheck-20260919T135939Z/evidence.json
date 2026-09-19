@@ -1,0 +1,12 @@
+{
+  "timestamp": "2026-09-19T13:59:38.962527+00:00",
+  "planSha256": "9a8143fe3f5681d8c1eabd171ebc7ade7ccc0169242cb23d5551d7e635ba8226",
+  "schemaSha256": "4dad6e25f38f3c9f0e3210582c49c2c3dc541a9c08427842b8abdd4e56604773",
+  "modelsMatchPlan": {
+    "BpmPipeline": true,
+    "BpmEtapa": true
+  },
+  "cardViewModels": [],
+  "backupExitCode": 1,
+  "backupError": "TURSO_DATABASE_URL e TURSO_AUTH_TOKEN obrigat\u00f3rios; configura\u00e7\u00e3o indispon\u00edvel; falha anterior \u00e0 conex\u00e3o."
+}

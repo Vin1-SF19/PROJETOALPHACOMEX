@@ -2888,7 +2888,7 @@ A entrada exata `Faz logo essa porcaria e para de enrolar.` usa, quando firme e 
 
 ## Bibble Voice — proxy local, reprodução e operação (2026-09-15)
 
-**Arquivos:** `src/app/api/bibble/voice/route.ts`, `src/lib/bibble/voice-{service,admission,client,preferences}.ts`, `src/components/BibbleChatHome/{BibbleChatLayout,BibbleChatWindow,BibbleMessageBubble,BibbleMessageList,BibbleSettingsPanel,BotaoFalarMensagem,bibble-audio-manager,useVoiceStatus}.ts(x)`, `.env.example`, `/home/ialpha/services/bibble-voice/`
+**Arquivos:** `src/app/api/bibble/voice/route.ts`, `src/lib/bibble/voice-{service,admission,client,preferences}.ts`, `src/components/BibbleChatHome/{BibbleChatLayout,BibbleChatWindow,BibbleMessageBubble,BibbleMessageList,BibbleSettingsPanel,BotaoFalarMensagem,bibble-audio-manager,useVoiceStatus}.ts(x)`, `.env.example`, `/home/ialpha/services/bibble-voice/app/{engine,text_normalization}.py`, `/home/ialpha/services/bibble-voice/tests/test_core.py`, `/home/ialpha/services/bibble-voice/README.md`
 
 **Propósito:** anexar voz local às respostas nativas do Bibble sem recriar o chat, alterar LLM/STT ou expor o FastAPI ao navegador.
 
@@ -2903,7 +2903,8 @@ A entrada exata `Faz logo essa porcaria e para de enrolar.` usa, quando firme e 
 5. Capture se a entrada foi áudio antes de iniciar fetch/stream e limpe a marca em edição manual, nova/troca/limpeza/exclusão de sessão e reenvio. Autoplay só ocorre na nova resposta ligada àquela entrada, salvo opt-in explícito `autoPlayAll`; nunca ao hidratar histórico ou recarregar.
 6. Use `bibbleAudioManager` para toda reprodução, mantendo um único áudio ativo e liberando object URLs. Falha/bloqueio de autoplay degrada para botão pronto; falha de TTS não toca chat, SSE ou persistência.
 7. O serviço local resolve `bibble → /home/ialpha/services/bibble-voice/voices/bibble.wav`, carrega o V3 sob demanda no dispositivo explícito `TTS_DEVICE=cpu|cuda`, serializa geração, usa cache e descarrega após `MODEL_IDLE_TIMEOUT`. Nunca aceite paths de voz do cliente, fallback silencioso de dispositivo nem voz alternativa.
-8. Preserve `PKUSEG_HOME` apontando para o snapshot local verificado. O runtime não deve baixar tokenizer/modelo em requisição; o WAV de saída deve continuar PCM signed de 16 bits.
+8. Preserve a ordem `sanitize_text → normalize_spoken_dates → cache.key → split_text/model` em `app/engine.py`. A normalização de `app/text_normalization.py` aceita somente datas standalone exatas `dd/mm/aaaa` ou `dd-mm-aaaa`, valida o calendário, preserva inválidas/ISO/paths/queries/e-mails/códigos/IDs/versões e deve permanecer idempotente. Slash e hífen equivalentes precisam convergir antes da chave para reutilizar o mesmo WAV.
+9. Preserve `PKUSEG_HOME` apontando para o snapshot local verificado. O runtime não deve baixar tokenizer/modelo em requisição; o WAV de saída deve continuar PCM signed de 16 bits.
 
 **Exemplo de fluxo:**
 
@@ -2918,6 +2919,20 @@ BibbleMessageBubble
 
 **Defaults e limites:** `replyToAudio=true`, `showButton=true`, `autoPlayAll=false`; texto 2.500 caracteres; request 16 KiB; WAV 25 MiB; proxy 570 s; motor 540 s; fila 4; cache 7 dias/2 GiB; idle 300 s. A operação atual usa `TTS_DEVICE=cpu` e `TTS_CPU_THREADS=8`; o preflight de 4.096 MiB livres aplica-se ao modo CUDA.
 
-**Operação validada em 2026-09-16:** unidade `bibble-voice.service` habilitada e ativa em `127.0.0.1:8787`, health `ok`, `device=cpu`, referência autorizada configurada e PKUSEG offline verificado. O systemd limita impacto com `Nice=10`, `CPUWeight=50`, `MemoryHigh=8G` e `MemoryMax=12G`. Em CPU, unload agenda fail-stop do worker depois de liberar referências/GC; o systemd reinicia somente o serviço de voz para devolver RAM. O teste real comprovou MISS → geração, HIT para a repetição, unload → restart e reload → novo MISS. O WAV produzido é PCM16. A RTX 4090/llama.cpp permaneceram intactos (1.631 MiB livres; llama.cpp 21.992 MiB; Bibble fora da VRAM). A rota do Painel está ativa e responde 401 sem sessão, comprovando publicação e proteção. A regressão focal do proxy/cliente passou 26/26 após o ajuste do guard; smoke autenticado da UI e AC20 permanecem pendentes.
+**Operação validada em 2026-09-18:** unidade `bibble-voice.service` reiniciada de forma controlada, habilitada e ativa em `127.0.0.1:8787`, health local `ok`, smoke público aprovado, `device=cpu` e referência autorizada configurada. Os 64 testes Python passaram; a regressão cobre calendário, anos `0001..9999`, isolamento lexical, idempotência, ordem antes de cache/split e convergência slash/hífen. O systemd reinicia somente o serviço de voz e o startup preserva lazy loading. Smoke autenticado completo da UI e AC20 permanecem pendentes.
 
-**Última atualização:** 2026-09-16 por Scribe (guard de origem compatível com Cloudflare Tunnel; AC20 pendente)
+**Operação do túnel em produção:** `cloudflared.service` e `cloudflared-alpak-ha.service` consomem a configuração compartilhada em `/etc/cloudflared/config.yml`. Toda alteração nesse arquivo exige reiniciar e validar ambas as units; deixar uma delas com a configuração antiga pode produzir respostas intermitentes entre conectores. Em 2026-09-18, o restart do HA eliminou `404` alternado e as provas posteriores somaram 120 respostas protegidas `401`, 80 health checks `200` e geração pública autenticada de WAV válido.
+
+**Última atualização:** 2026-09-18 por Scribe (normalização de datas antes do cache/modelo/split e ativação local validada; AC20 pendente)
+
+## Estoque Geral — pontos de integração (2026-09-18)
+
+1. Toda mudança de saldo passa por `src/lib/estoque/movement-service.ts`; edição cadastral nunca altera `quantidade` e confirmação de `ListaCompra` vira uma `ENTRADA` idempotente.
+2. A autorização canônica relê usuário ativo/role e usa `readEffectiveModulePermissions`; web, navegação e CLI aceitam `estoque` e a compatibilidade legada `ServiçosGerais`, respeitando overrides `REMOVE`.
+3. A navegação aponta exclusivamente para `/PainelAlpha/Estoque`. O caminho antigo permanece somente como redirect para preservar bookmarks.
+4. Fotos usam o storage Blob já existente, chaves confinadas ao item, validação/decodificação Sharp e normalização WebP; URLs legadas continuam renderizadas.
+5. Tags referenciam `ProdutoEstoque`; modelos definem requisitos e instâncias de kit selecionam quantidades/unidades reais. Entrega/devolução usa batch transacional do ledger.
+6. Consultas novas são paginadas/limitadas. `buscarProdutos` mantém compatibilidade dos consumidores de Serviços Gerais/Comercial com limite padrão de 200; o catálogo de kits possui busca server-side para itens além do recorte inicial.
+7. A migration de produção só pode ser considerada pelo trio de hashes registrado na story. V4/V5/V6, Prisma diff bruto, DROP/RENAME/RESET/rebuild e FK/alteração em `ListaCompra` continuam proibidos sem novo Vault e nova autorização.
+
+**Última atualização:** 2026-09-18 por Codex (Estoque Geral)

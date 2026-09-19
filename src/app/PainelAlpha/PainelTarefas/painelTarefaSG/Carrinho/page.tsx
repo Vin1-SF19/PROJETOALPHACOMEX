@@ -19,6 +19,7 @@ interface ItemCompra {
 export default function ListaCompras({ itens, aoVoltar, atualizarDados }: { itens: ItemCompra[], aoVoltar: () => void, atualizarDados: () => void }) {
     const [itemSelecionado, setItemSelecionado] = useState<ItemCompra | null>(null);
     const [qtdComprada, setQtdComprada] = useState<string>("1");
+    const [operationKey, setOperationKey] = useState<string>("");
     const [loading, setLoading] = useState(false);
 
     const itensPendentes = itens.filter(item => item.status === "PENDENTE");
@@ -26,12 +27,13 @@ export default function ListaCompras({ itens, aoVoltar, atualizarDados }: { iten
     const handleConfirmarCompra = async () => {
         if (!itemSelecionado) return;
         setLoading(true);
-        const res = await RegistrarCompra(itemSelecionado.produtoId, Number(qtdComprada));
+        const res = await RegistrarCompra(itemSelecionado.produtoId, Number(qtdComprada), operationKey);
         if (res.success) {
             toast.success("Estoque atualizado!");
             atualizarDados();
             setItemSelecionado(null);
             setQtdComprada("1");
+            setOperationKey("");
         }
         setLoading(false);
     };
@@ -197,7 +199,10 @@ export default function ListaCompras({ itens, aoVoltar, atualizarDados }: { iten
                                             <Trash2 size={20} />
                                         </button>
                                         <button
-                                            onClick={() => setItemSelecionado(item)}
+                                            onClick={() => {
+                                                setItemSelecionado(item);
+                                                setOperationKey(crypto.randomUUID());
+                                            }}
                                             className="px-6 py-4 bg-white text-black rounded-2xl hover:bg-indigo-600 hover:text-white transition-all shadow-xl cursor-pointer font-black text-[10px] uppercase flex items-center gap-2"
                                         >
                                             <CheckCircle2 size={18} />

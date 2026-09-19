@@ -1,7 +1,7 @@
 # BIBBLE SQUAD CONSTITUTION
 
 > Documento inegociável. Gates automáticos bloqueiam violações.
-> Versão: 1.0.0
+> Versão: 1.1.0
 
 ---
 
@@ -38,7 +38,8 @@ GATE: Scout blueprint recebido? → SIM → Prosseguir | NÃO → BLOQUEADO
 
 | Operação | Agente Exclusivo |
 |----------|-----------------|
-| `git push` / PR | **DevOps** — nenhum outro agente pode fazer push |
+| Infraestrutura, CI/CD, branches, PRs, releases e tags | **DevOps** — autoridade geral do domínio |
+| `git commit` / `git push` no gate final de produção | **Virtus** — somente após chamada manual e confirmação explícita |
 | Migrations destrutivas | **Vault** — exige backup antes |
 | Aprovação de build | **Forge** — tsc + lint + build REAIS |
 | Verificação de integração | **Probe** — checklist dos 8 pontos |
@@ -163,10 +164,18 @@ GATE: Probe aprovou? → SIM → Entrega completa | NÃO → Corrigir integratio
 
 ---
 
+## Artigo IX — Virtus é o Gate Final Manual (NON-NEGOTIABLE)
+
+Produção só é publicada pelo fluxo Virtus quando o usuário o chama manualmente. Bibble apenas oferece `/virtus`; nunca o ativa automaticamente. Virtus repete os gates reais, analisa diff, segredos, dependências, preview/staging e rollback. Antes de commit ou push, apresenta escopo, branch, gates e rollback e pergunta exatamente: `Deseja que eu faça o commit e o push para produção agora?`
+
+Silêncio ou aprovação genérica não valem. Após confirmação explícita, Virtus faz stage seletivo, Conventional Commit, push, monitora deployment, smoke e logs. Virtus nunca substitui nem contorna Vault.
+
+---
+
 ## Resumo dos Gates
 
 ```
-Scout blueprint → Implementação → Vault (se DB) → Forge → Probe → Anubis → Lens → Sage → Scribe → Kowalski
+Scout blueprint → Implementação → Vault (se DB) → Forge → Probe → Anubis → Lens → Sage → Scribe → Kowalski → oferecer /virtus
 ```
 
-**Cada gate é um checkpoint obrigatório, não uma sugestão.**
+**Cada gate é um checkpoint obrigatório, não uma sugestão. Virtus só entra no fluxo após chamada manual.**

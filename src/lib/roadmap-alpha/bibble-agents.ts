@@ -33,6 +33,7 @@ const AGENT_META: Record<string, { name: string; title: string; icon: string }> 
   devops: { name: "DevOps", title: "Operador de Infraestrutura", icon: "🚀" },
   "bibble-muse": { name: "Muse", title: "Designer de Persona", icon: "🎭" },
   "bibble-cortex": { name: "Cortex", title: "Engenheiro de IA", icon: "🧬" },
+  virtus: { name: "Virtus", title: "Guardião Final de Produção", icon: "🏛️" },
 };
 
 function extractDescription(skill: string): string {

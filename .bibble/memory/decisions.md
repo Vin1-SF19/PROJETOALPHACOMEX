@@ -1519,3 +1519,15 @@ de segurança.
 **Evidência:** suíte Bibble 170/170; Probe, Anubis e Lens aprovaram. Concerns globais externas e CodeRabbit indisponível permanecem na story.
 
 **Adicionado em:** 2026-09-15 por Scribe (story Bibble — tom adaptativo)
+
+### 2026-09-18 — Estoque Geral: ledger aditivo e rota canônica única
+
+**Decisão:** evoluir `ProdutoEstoque`/`Categoria` in-place, usando `/PainelAlpha/Estoque` como única UI, ledger imutável para toda variação de saldo e tabelas aditivas para patrimônio, uso, manutenção, auditoria, Tags e kits. `ListaCompra` permanece integração legada sem FK ou rebuild.
+
+**Segurança:** UI, actions e CLI resolvem usuário ativo e permissões efetivas do Painel, incluindo setor e overrides. `ServiçosGerais` é alias de compatibilidade, não autorizador paralelo.
+
+**Dados:** somente os hashes aprovados do baseline, V1/V2 e V3 foram aplicados ao Turso após backup restaurável, preflight 3/3/18 e dry-run em clone. Qualquer evolução posterior reinicia o Vault.
+
+**Consequência:** edição cadastral não toca saldo; operação, saldo, movimento e auditoria são atômicos/idempotentes. Itens relacionados são arquivados. Tags não duplicam itens e instâncias de kit refletem a natureza quantitativa ou patrimonial de cada componente.
+
+**Adicionado em:** 2026-09-18 por Codex (Estoque Geral)

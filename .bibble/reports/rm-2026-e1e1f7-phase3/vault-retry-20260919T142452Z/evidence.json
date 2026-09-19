@@ -1,0 +1,16 @@
+{
+  "checkedAt": "2026-09-19T14:24:52.544377+00:00",
+  "approvalReceipt": "d57b98e4ab6c358e2fdd1093c27e8668cc4afc264540e1012802cfe3aaa4798d",
+  "planSha256": "9a8143fe3f5681d8c1eabd171ebc7ade7ccc0169242cb23d5551d7e635ba8226",
+  "schemaSha256": "d767af639532f8aeb740f83644f2af07e68a471ee74b116930f6518021d20c00",
+  "modelsMatchPlan": {
+    "BpmPipeline": true,
+    "BpmEtapa": true
+  },
+  "cardViewModelPresent": false,
+  "backupExitCode": 1,
+  "backupFailure": "TURSO_DATABASE_URL e/ou TURSO_AUTH_TOKEN indisponíveis; abortou antes de conectar",
+  "schemaChanged": false,
+  "migrationCreated": false,
+  "migrationApplied": false
+}

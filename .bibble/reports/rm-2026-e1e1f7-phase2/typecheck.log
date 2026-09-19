@@ -1,0 +1,22 @@
+
+> alpha_sistema@0.1.0 typecheck
+> tsc --noEmit
+
+
+<--- Last few GCs --->
+
+[1053:0xe0ac000]    25821 ms: Scavenge (interleaved) 4073.4 (4095.9) -> 4071.2 (4103.9) MB, pooled: 0 MB, 13.81 / 0.00 ms  (average mu = 0.330, current mu = 0.311) allocation failure; 
+[1053:0xe0ac000]    26407 ms: Mark-Compact (reduce) 4079.7 (4105.3) -> 4061.3 (4083.4) MB, pooled: 0 MB, 11.30 / 0.00 ms  (+ 541.7 ms in 111 steps since start of marking, biggest step 5.8 ms, walltime since start of marking 585 ms) (average mu = 0.275, cu
+FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory
+----- Native stack trace -----
+
+ 1: 0xf53df6 node::OOMErrorHandler(char const*, v8::OOMDetails const&) [node]
+ 2: 0x13bf4b0 v8::Utils::ReportOOMFailure(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [node]
+ 3: 0x13bf59f v8::internal::V8::FatalProcessOutOfMemory(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [node]
+ 4: 0x1658085  [node]
+ 5: 0x16580b2  [node]
+ 6: 0x16583aa v8::internal::Heap::RecomputeLimits(v8::internal::GarbageCollector, v8::base::TimeTicks) [node]
+ 7: 0x16688ca  [node]
+ 8: 0x166cc70  [node]
+ 9: 0x20ffb21  [node]
+Aborted (core dumped)

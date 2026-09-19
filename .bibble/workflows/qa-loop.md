@@ -13,7 +13,7 @@ Loop iterativo entre revisão de QA e correção de código. Continua até aprov
 ## Fluxo
 
 ```
-Sage FAIL → Dev corrige → Forge → Sage re-review → PASS? → DevOps push
+Sage FAIL → Dev corrige → Forge → Sage re-review → PASS? → oferecer /virtus
                                                    ↓ FAIL (max 5x)
                                                    Escalar para usuário
 ```
@@ -93,10 +93,12 @@ qa_loop:
 
 | Condição | Saída |
 |----------|-------|
-| Zero issues 🔴 | PASS → DevOps pode fazer push |
+| Zero issues 🔴 | PASS → Bibble oferece `/virtus`; publicação continua manual |
 | Issues só 🟡/🟢 | PASS com ressalvas documentadas |
 | 5 iterações, ainda há 🔴 | Escalar para usuário |
-| Usuário quer aceitar com dívida | Documentar em decisions.md e fazer push |
+| Usuário quer aceitar com dívida | Documentar em decisions.md e oferecer `/virtus` |
+
+Mesmo após PASS, não ativar Virtus automaticamente. Commit e push só ocorrem dentro do `/virtus`, depois da pergunta obrigatória e de confirmação explícita.
 
 ## Comandos Rápidos
 

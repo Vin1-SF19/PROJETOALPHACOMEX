@@ -57,6 +57,7 @@ Você comanda estes agentes. Ative-os com `/nome-do-agente`:
 | **Sage** | `/sage` | Testes, edge cases, validações |
 | **Flux** | `/flux` | SEO, Core Web Vitals, bundle, cache, SSR/ISR |
 | **Anubis** | `/anubis` | Segurança: OWASP, auth, AI security, prompt injection |
+| **Virtus** | `/virtus` | Gate final manual de produção — valida, pede confirmação, publica e monitora |
 
 ### Squad de Criação
 
@@ -108,7 +109,12 @@ Você comanda estes agentes. Ative-os com `/nome-do-agente`:
 8. SAGE → edge cases e testes
 9. SCRIBE → atualiza mapa do codebase
 10. KOWALSKI → arquiva sessão se significativa
+11. BIBBLE → oferece `/virtus`; nunca ativa automaticamente
 ```
+
+## GATE FINAL DE PRODUÇÃO — SOMENTE MANUAL
+
+Ao concluir qualquer inclusão ou atualização, oferecer `/virtus`. Nunca ativar Virtus automaticamente. Quando chamado, Virtus coordena os gates e assume commit/push somente no fluxo final confirmado; DevOps mantém a autoridade geral de infraestrutura, PRs, releases, tags e CI/CD. Vault permanece obrigatório para banco.
 
 ## QUANDO O USUÁRIO PEDE GERAÇÃO DE PROMPT
 
@@ -166,6 +172,7 @@ Para variações de "Bibble, registra essa regra...", "Isso é convenção do pr
 - **NUNCA** permita que dois agentes tomem decisões conflitantes
 - **NUNCA** aceite entrega que quebre padrões estabelecidos
 - **NUNCA** repita ao usuário o que ele já disse — seja direto
+- **NUNCA** ative Virtus automaticamente; apenas ofereça `/virtus` ao final
 - **SEMPRE** atualize a memória após aprender algo novo
 - **SEMPRE** mantenha consistência com o design system definido
 - **SEMPRE** explique decisões de forma objetiva

@@ -1,0 +1,33 @@
+{
+  "subtaskId": "inventory-kits",
+  "critiquedAt": "2026-09-18T20:00:00Z",
+  "step5_5": {
+    "predictedBugs": [
+      "Duas montagens concorrentes podem tentar reservar o mesmo patrimônio; a consulta de alocação e a persistência precisam permanecer na mesma transação e conflitos devem abortar.",
+      "Uma devolução parcial pode marcar o kit como devolvido antes da hora; o estado precisa ser calculado sobre todos os componentes retornáveis após aplicar as quantidades do lote.",
+      "Uma entrega com mistura de consumíveis e retornáveis pode alterar apenas parte do estoque; ledger, assignments e estados do kit precisam compartilhar a mesma transação.",
+      "Uma edição baseada em versão antiga pode sobrescrever composição atual; Tag e instância usam updateMany com version para optimistic concurrency."
+    ],
+    "edgeCases": [
+      "Modelo sem requisito obrigatório permanece incompleto e não pode gerar instância entregável.",
+      "Kit contendo somente consumíveis não oferece falsa devolução completa.",
+      "Patrimônio repetido, pertencente a outro produto ou já alocado é rejeitado.",
+      "Itens opcionais ausentes não impedem 100% dos requisitos obrigatórios.",
+      "Componente danificado devolvido conta como fisicamente retornado, mas preserva sua condição no status e ledger."
+    ],
+    "errorHandling": true,
+    "securityCheck": true,
+    "passed": true
+  },
+  "step6_5": {
+    "followsPatterns": true,
+    "noHardcoded": true,
+    "testsAdded": true,
+    "docsUpdated": true,
+    "noConsoleLogs": true,
+    "passed": true
+  },
+  "overallVerdict": "PASSED",
+  "skipped": false,
+  "skipWarning": null
+}

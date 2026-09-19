@@ -1,0 +1,529 @@
+.estoque-alpha {
+  --estoque-bg: #020817;
+  --estoque-surface: rgba(7, 18, 38, 0.72);
+  --estoque-surface-soft: rgba(10, 24, 48, 0.58);
+  --estoque-border: rgba(96, 165, 250, 0.16);
+  --estoque-border-strong: rgba(96, 165, 250, 0.34);
+  --estoque-text: #f2f6fc;
+  --estoque-muted: #91a5c2;
+  --estoque-faint: #607594;
+  --estoque-blue: #2478ff;
+  --estoque-blue-2: #3c8dff;
+  --estoque-cyan: #38d7ff;
+  --estoque-red: #ff4d4f;
+  --estoque-violet: #8b5cf6;
+  --estoque-emerald: #34d399;
+  --estoque-amber: #fbbf24;
+  --estoque-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+  --estoque-glow: 0 18px 54px rgba(36, 120, 255, 0.22);
+  --estoque-transition: 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  color: var(--estoque-text);
+  background:
+    radial-gradient(circle at top right, rgba(36, 120, 255, 0.18), transparent 30%),
+    radial-gradient(circle at 12% 18%, rgba(56, 215, 255, 0.08), transparent 24%),
+    radial-gradient(circle at 88% 72%, rgba(255, 77, 79, 0.05), transparent 22%),
+    linear-gradient(180deg, #020817 0%, #041020 45%, #06152b 100%);
+}
+
+.estoque-alpha::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.72;
+  background-image:
+    linear-gradient(rgba(145, 165, 194, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(145, 165, 194, 0.055) 1px, transparent 1px),
+    radial-gradient(circle at 50% 0%, rgba(36, 120, 255, 0.12), transparent 30%);
+  background-size: 42px 42px, 42px 42px, 100% 100%;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.24) 42%, transparent 82%);
+}
+
+.estoque-alpha h1 {
+  font-size: clamp(34px, 4.2vw, 48px);
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+  background: linear-gradient(180deg, #ffffff 0%, #dbeafe 54%, #93c5fd 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 18px 60px rgba(36, 120, 255, 0.18);
+}
+
+.estoque-alpha .estoque-panel {
+  position: relative;
+  border: 1px solid var(--estoque-border);
+  background:
+    linear-gradient(180deg, rgba(13, 30, 58, 0.88), rgba(6, 18, 38, 0.72)),
+    radial-gradient(circle at top left, rgba(36, 120, 255, 0.1), transparent 32%);
+  box-shadow:
+    var(--estoque-shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(18px);
+}
+
+.estoque-alpha .estoque-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, rgba(56, 215, 255, 0.16), transparent 18%, transparent 82%, rgba(255, 77, 79, 0.08));
+  opacity: 0.28;
+  mix-blend-mode: screen;
+}
+
+.estoque-alpha .estoque-panel-hover {
+  transition: transform var(--estoque-transition), border-color var(--estoque-transition), box-shadow var(--estoque-transition), background-color var(--estoque-transition);
+  will-change: transform, box-shadow;
+}
+
+.estoque-alpha .estoque-panel-hover:hover {
+  transform: translateY(-3px);
+  border-color: var(--estoque-border-strong);
+  box-shadow:
+    0 28px 90px rgba(0, 0, 0, 0.38),
+    0 0 0 1px rgba(96, 165, 250, 0.1),
+    var(--estoque-glow);
+}
+
+.estoque-alpha .estoque-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--estoque-border);
+  background:
+    linear-gradient(135deg, rgba(15, 35, 68, 0.92), rgba(5, 15, 32, 0.82)),
+    radial-gradient(circle at 82% 18%, rgba(56, 215, 255, 0.1), transparent 26%);
+  box-shadow:
+    0 22px 70px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(16px);
+  transition: transform var(--estoque-transition), border-color var(--estoque-transition), box-shadow var(--estoque-transition);
+}
+
+.estoque-alpha .estoque-card::after {
+  content: "";
+  position: absolute;
+  inset: auto -20% -42% -20%;
+  height: 46%;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(36, 120, 255, 0.2), transparent 62%);
+  opacity: 0.38;
+}
+
+.estoque-alpha .estoque-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(96, 165, 250, 0.36);
+  box-shadow:
+    0 32px 90px rgba(0, 0, 0, 0.4),
+    0 0 36px rgba(36, 120, 255, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.estoque-alpha .estoque-card-icon {
+  position: relative;
+  z-index: 1;
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.estoque-alpha .estoque-primary {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(147, 197, 253, 0.32);
+  background: linear-gradient(180deg, #3c8dff 0%, #2478ff 54%, #175dd6 100%);
+  box-shadow:
+    0 18px 42px rgba(36, 120, 255, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    inset 0 -12px 26px rgba(0, 0, 0, 0.14);
+  transition: transform var(--estoque-transition), box-shadow var(--estoque-transition), filter var(--estoque-transition);
+}
+
+.estoque-alpha .estoque-primary::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 18%, rgba(255, 255, 255, 0.28) 42%, transparent 62%);
+  transform: translateX(-130%) skewX(-18deg);
+  transition: transform 520ms ease;
+}
+
+.estoque-alpha .estoque-primary:not(:disabled):hover {
+  transform: translateY(-2px);
+  filter: brightness(1.06);
+  box-shadow:
+    0 24px 54px rgba(36, 120, 255, 0.4),
+    0 0 28px rgba(56, 215, 255, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.estoque-alpha .estoque-primary:not(:disabled):hover::before {
+  transform: translateX(130%) skewX(-18deg);
+}
+
+.estoque-alpha .estoque-primary:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+.estoque-alpha .estoque-secondary {
+  border: 1px solid rgba(145, 165, 194, 0.22);
+  background: linear-gradient(180deg, rgba(17, 36, 68, 0.9), rgba(8, 20, 40, 0.82));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: transform var(--estoque-transition), border-color var(--estoque-transition), box-shadow var(--estoque-transition), background-color var(--estoque-transition);
+}
+
+.estoque-alpha .estoque-secondary:not(:disabled):hover {
+  transform: translateY(-2px);
+  border-color: rgba(96, 165, 250, 0.38);
+  background: linear-gradient(180deg, rgba(24, 48, 88, 0.94), rgba(10, 24, 48, 0.88));
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, 0.28),
+    0 0 22px rgba(36, 120, 255, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.estoque-alpha .estoque-secondary:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+.estoque-alpha .estoque-ghost {
+  border: 1px solid transparent;
+  background: transparent;
+  transition: background-color var(--estoque-transition), color var(--estoque-transition), box-shadow var(--estoque-transition);
+}
+
+.estoque-alpha .estoque-ghost:not(:disabled):hover {
+  background: rgba(36, 120, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.18);
+}
+
+.estoque-alpha .estoque-tabs {
+  border: 1px solid rgba(96, 165, 250, 0.18);
+  background:
+    linear-gradient(180deg, rgba(10, 24, 48, 0.86), rgba(4, 12, 26, 0.72)),
+    radial-gradient(circle at top left, rgba(36, 120, 255, 0.12), transparent 28%);
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+}
+
+.estoque-alpha .estoque-tab {
+  position: relative;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--estoque-muted);
+  transition: color var(--estoque-transition), background-color var(--estoque-transition), border-color var(--estoque-transition), box-shadow var(--estoque-transition);
+}
+
+.estoque-alpha .estoque-tab::after {
+  content: "";
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(56, 215, 255, 0.9), rgba(36, 120, 255, 0.9), transparent);
+  opacity: 0;
+  transform: scaleX(0.55);
+  transition: opacity var(--estoque-transition), transform var(--estoque-transition);
+}
+
+.estoque-alpha .estoque-tab:hover {
+  color: #dbeafe;
+  background: rgba(36, 120, 255, 0.08);
+}
+
+.estoque-alpha .estoque-tab[data-state="active"] {
+  color: #ffffff;
+  border-color: rgba(96, 165, 250, 0.24);
+  background: linear-gradient(180deg, rgba(36, 120, 255, 0.2), rgba(10, 30, 62, 0.36));
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.22),
+    0 0 24px rgba(36, 120, 255, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.estoque-alpha .estoque-tab[data-state="active"]::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+.estoque-alpha .estoque-input,
+.estoque-alpha .estoque-select,
+.estoque-alpha .estoque-textarea {
+  border: 1px solid rgba(145, 165, 194, 0.2);
+  background: rgba(2, 8, 23, 0.68);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: border-color var(--estoque-transition), box-shadow var(--estoque-transition), background-color var(--estoque-transition);
+}
+
+.estoque-alpha .estoque-input:focus,
+.estoque-alpha .estoque-select:focus,
+.estoque-alpha .estoque-textarea:focus {
+  border-color: rgba(96, 165, 250, 0.56);
+  outline: none;
+  background: rgba(3, 12, 30, 0.82);
+  box-shadow:
+    0 0 0 3px rgba(36, 120, 255, 0.16),
+    0 0 24px rgba(36, 120, 255, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.estoque-alpha .estoque-table-shell {
+  border: 1px solid var(--estoque-border);
+  background:
+    linear-gradient(180deg, rgba(8, 20, 40, 0.86), rgba(3, 10, 24, 0.78)),
+    radial-gradient(circle at top right, rgba(36, 120, 255, 0.08), transparent 28%);
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(18px);
+}
+
+.estoque-alpha .estoque-table-row {
+  position: relative;
+  transition: background-color var(--estoque-transition), box-shadow var(--estoque-transition);
+}
+
+.estoque-alpha .estoque-table-row::before {
+  content: "";
+  position: absolute;
+  inset: 10% 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(96, 165, 250, 0.28), transparent);
+  opacity: 0;
+  transition: opacity var(--estoque-transition);
+}
+
+.estoque-alpha .estoque-table-row:hover,
+.estoque-alpha .estoque-table-row:focus-visible {
+  background: linear-gradient(90deg, rgba(36, 120, 255, 0.1), rgba(56, 215, 255, 0.04) 44%, transparent 82%);
+  box-shadow: inset 3px 0 0 rgba(56, 215, 255, 0.5);
+}
+
+.estoque-alpha .estoque-table-row:hover::before,
+.estoque-alpha .estoque-table-row:focus-visible::before {
+  opacity: 1;
+}
+
+.estoque-alpha .estoque-badge {
+  border: 1px solid rgba(145, 165, 194, 0.2);
+  background: rgba(10, 24, 48, 0.56);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.estoque-alpha .estoque-dialog,
+.estoque-alpha .estoque-sheet {
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  background:
+    linear-gradient(180deg, rgba(8, 20, 40, 0.96), rgba(4, 12, 26, 0.96)),
+    radial-gradient(circle at top left, rgba(36, 120, 255, 0.12), transparent 30%);
+  box-shadow:
+    0 40px 120px rgba(0, 0, 0, 0.48),
+    0 0 0 1px rgba(255, 255, 255, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(22px);
+}
+
+.estoque-alpha .estoque-dialog::before,
+.estoque-alpha .estoque-sheet::before {
+  content: "";
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(56, 215, 255, 0.8), rgba(36, 120, 255, 0.8), transparent);
+  opacity: 0.55;
+}
+
+.estoque-alpha .estoque-section {
+  border: 1px solid rgba(145, 165, 194, 0.16);
+  background: linear-gradient(180deg, rgba(10, 24, 48, 0.58), rgba(4, 12, 26, 0.42));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.estoque-alpha .estoque-chip {
+  border: 1px solid rgba(145, 165, 194, 0.18);
+  background: rgba(10, 24, 48, 0.48);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.estoque-alpha .estoque-thumbnail {
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  background: linear-gradient(145deg, rgba(10, 24, 48, 0.9), rgba(3, 10, 24, 0.88));
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.estoque-alpha .estoque-empty {
+  border: 1px dashed rgba(96, 165, 250, 0.24);
+  background:
+    linear-gradient(180deg, rgba(8, 20, 40, 0.58), rgba(3, 10, 24, 0.46)),
+    radial-gradient(circle at center, rgba(36, 120, 255, 0.08), transparent 38%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.estoque-alpha .estoque-guide {
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  background:
+    linear-gradient(180deg, rgba(10, 26, 54, 0.72), rgba(4, 12, 26, 0.62)),
+    radial-gradient(circle at top left, rgba(36, 120, 255, 0.14), transparent 30%);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+}
+
+.estoque-alpha .estoque-guide-card {
+  border: 1px solid rgba(145, 165, 194, 0.16);
+  background: linear-gradient(180deg, rgba(11, 28, 56, 0.68), rgba(5, 14, 30, 0.58));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: transform var(--estoque-transition), border-color var(--estoque-transition), box-shadow var(--estoque-transition);
+}
+
+.estoque-alpha .estoque-guide-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(96, 165, 250, 0.28);
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.26),
+    0 0 24px rgba(36, 120, 255, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.estoque-alpha .estoque-kit-card {
+  border: 1px solid var(--estoque-border);
+  background:
+    linear-gradient(180deg, rgba(10, 24, 48, 0.86), rgba(4, 12, 26, 0.76)),
+    radial-gradient(circle at top right, rgba(139, 92, 246, 0.08), transparent 28%);
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+  transition: transform var(--estoque-transition), border-color var(--estoque-transition), box-shadow var(--estoque-transition);
+}
+
+.estoque-alpha .estoque-kit-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(139, 92, 246, 0.28);
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.36),
+    0 0 32px rgba(36, 120, 255, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.estoque-alpha .estoque-maintenance-card {
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  background:
+    linear-gradient(180deg, rgba(48, 32, 10, 0.32), rgba(6, 18, 38, 0.72)),
+    radial-gradient(circle at top right, rgba(251, 191, 36, 0.12), transparent 30%);
+  box-shadow:
+    0 22px 60px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: transform var(--estoque-transition), border-color var(--estoque-transition), box-shadow var(--estoque-transition);
+}
+
+.estoque-alpha .estoque-maintenance-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(251, 191, 36, 0.36);
+  box-shadow:
+    0 26px 70px rgba(0, 0, 0, 0.32),
+    0 0 28px rgba(251, 191, 36, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.estoque-alpha .estoque-row-card {
+  border: 1px solid rgba(145, 165, 194, 0.14);
+  background: linear-gradient(180deg, rgba(9, 22, 44, 0.58), rgba(4, 12, 26, 0.44));
+  transition: transform var(--estoque-transition), border-color var(--estoque-transition), box-shadow var(--estoque-transition);
+}
+
+.estoque-alpha .estoque-row-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(96, 165, 250, 0.26);
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.26),
+    0 0 24px rgba(36, 120, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.estoque-alpha .estoque-progress {
+  border: 1px solid rgba(145, 165, 194, 0.18);
+  background: rgba(2, 8, 23, 0.68);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.estoque-alpha .estoque-progress-fill {
+  background: linear-gradient(90deg, #38d7ff, #2478ff, #8b5cf6);
+  box-shadow: 0 0 18px rgba(56, 215, 255, 0.28);
+}
+
+.estoque-alpha .estoque-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(96, 165, 250, 0.28) transparent;
+}
+
+.estoque-alpha .estoque-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.estoque-alpha .estoque-scroll::-webkit-scrollbar-thumb {
+  background: rgba(96, 165, 250, 0.28);
+  border-radius: 999px;
+}
+
+.estoque-alpha .estoque-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.estoque-alpha .estoque-enter {
+  animation: estoque-enter 420ms cubic-bezier(0.4, 0, 0.2, 1) backwards;
+}
+
+@keyframes estoque-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .estoque-alpha,
+  .estoque-alpha *,
+  .estoque-alpha *::before,
+  .estoque-alpha *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .estoque-alpha .estoque-panel-hover:hover,
+  .estoque-alpha .estoque-card:hover,
+  .estoque-alpha .estoque-primary:not(:disabled):hover,
+  .estoque-alpha .estoque-secondary:not(:disabled):hover,
+  .estoque-alpha .estoque-guide-card:hover,
+  .estoque-alpha .estoque-kit-card:hover,
+  .estoque-alpha .estoque-maintenance-card:hover,
+  .estoque-alpha .estoque-row-card:hover {
+    transform: none;
+  }
+
+  .estoque-alpha .estoque-primary::before {
+    transform: none;
+    opacity: 0;
+  }
+}

@@ -7,6 +7,7 @@ export interface ModuloRegistryItem {
   iconName: string;
   category: string;
   permission: string | null;
+  permissionAliases?: string[];
   adminOnly?: boolean;
   allowedRoles?: string[];
   img?: string;
@@ -34,7 +35,9 @@ export function podeVisualizarModulo(
   if (isAdminRole(role)) return true;
   if (modulo.adminOnly) return rolePermitido;
   if (rolePermitido) return true;
-  if (modulo.permission) return permissoes.includes(modulo.permission);
+  if (modulo.permission) {
+    return permissoes.includes(modulo.permission) || Boolean(modulo.permissionAliases?.some((permission) => permissoes.includes(permission)));
+  }
 
   return !modulo.allowedRoles?.length;
 }
@@ -57,6 +60,7 @@ export const MODULOS_REGISTRY: ModuloRegistryItem[] = [
   { id: 'Reservas',           label: 'Reserva de Salas',      href: '/PainelAlpha/ReservaSalas',                                                     iconName: 'CalendarDays',  category: 'operacional', permission: 'Reservas',           img: '/icons8-sala-de-reuniões-64.png', desc: 'Agendamento de salas com controle de horários.', tag: 'Facilities', color: 'from-emerald-600/20', grupo: 'agendaEspacos' },
   { id: 'calendarioAlpha',    label: 'Agenda Alpha',          href: '/PainelAlpha/CalendarioAlpha',                                                  iconName: 'CalendarClock', category: 'operacional', permission: 'calendarioAlpha',   img: '/google.png',                      desc: 'Sua agenda Google conectada ao Painel.',         tag: 'Agenda',     color: 'from-blue-600/20', grupo: 'agendaEspacos' },
   { id: 'ServiçosGerais',     label: 'Serviços Gerais',       href: '/PainelAlpha/PainelTarefas/painelTarefaSG',                                     iconName: 'Wrench',        category: 'operacional', permission: 'ServiçosGerais',    img: '/cleaning.png',           desc: 'Bancada de tarefas diárias dos serviços gerais.',       tag: 'Serviços',   color: 'from-pink-600/20', grupo: 'gestaoTarefas' },
+  { id: 'estoque',            label: 'Estoque Alpha',         href: '/PainelAlpha/Estoque',                                                          iconName: 'Warehouse',     category: 'operacional', permission: null, desc: 'Consulte itens em posse ou gerencie equipamentos e patrimônios conforme seu setor.', tag: 'Inventário', color: 'from-blue-600/20', grupo: 'gestaoTarefas' },
 
   // ─── COMERCIAL ───
   { id: 'alphaSeo',           label: 'Open SEO · Alpha SEO',  href: '/PainelAlpha/AlphaSEO',                                                         iconName: 'ScanSearch',    category: 'comercial',   permission: 'alphaSeo',           desc: 'Pesquisa, monitoramento, auditoria e inteligência SEO em um único workspace.', tag: 'SEO', aliases: ['Open SEO', 'Alpha SEO', 'OpenSEO'], color: 'from-cyan-600/20', grupo: 'leadsMarketing' },

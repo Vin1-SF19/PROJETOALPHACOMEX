@@ -1,0 +1,32 @@
+{
+  "subtaskId": "inventory-photos-ui",
+  "critiquedAt": "2026-09-18T20:00:00Z",
+  "step5_5": {
+    "predictedBugs": [
+      "Um arquivo pode declarar image/jpeg com extensão PNG; a validação servidor agora exige X-File-Name, compara extensão, MIME e magic bytes.",
+      "Trocar a foto antes de persistir o novo vínculo poderia perder a imagem anterior; o endpoint grava blob, InventoryImage e ProdutoEstoque antes de limpar a anterior.",
+      "Uma URL gerenciada reutilizada por outro ProdutoEstoque poderia ser apagada; o cleanup verifica referências ativas em InventoryImage e ProdutoEstoque."
+      ,"Magic bytes válidos ainda poderiam ocultar imagem truncada ou bomba de pixels; o servidor agora decodifica com Sharp, limita 24 MP e normaliza a saída."
+    ],
+    "edgeCases": [
+      "URLs legadas externas sem InventoryImage podem ser removidas do cadastro, mas nunca são enviadas ao del do Vercel Blob.",
+      "Falha no banco após upload remove somente o blob recém-criado e preserva a foto anterior.",
+      "Arquivo vazio, maior que o limite, MIME não permitido, extensão incompatível e assinatura adulterada retornam erro antes da persistência."
+      ,"Fotos novas maiores que a área de exibição são reduzidas a 1600×1600 e as visualizações do Blob usam o otimizador Next; URLs legadas continuam compatíveis."
+    ],
+    "errorHandling": true,
+    "securityCheck": true,
+    "passed": true
+  },
+  "step6_5": {
+    "followsPatterns": true,
+    "noHardcoded": true,
+    "testsAdded": true,
+    "docsUpdated": true,
+    "noConsoleLogs": true,
+    "passed": true
+  },
+  "overallVerdict": "PASSED",
+  "skipped": false,
+  "skipWarning": null
+}

@@ -13,7 +13,7 @@ Workflow completo para implementar uma feature do zero, garantindo qualidade em 
 ## Fluxo
 
 ```
-Scout → Nova/Echo/Iris → Vault? → Forge → Probe → Anubis? → Lens → Sage → Scribe → Kowalski
+Scout → Nova/Echo/Iris → Vault? → Forge → Probe → Anubis? → Lens → Sage → Scribe → Kowalski → oferecer /virtus
 ```
 
 ## Fases
@@ -166,6 +166,12 @@ Kowalski arquiva:
 
 ---
 
+### Fase 11 — Oferta do Gate Final (Virtus) — MANUAL
+
+Bibble oferece `/virtus`, sem ativá-lo automaticamente. Somente a chamada manual inicia o gate. Virtus repete gates e checks de produção e, antes de commit/push, pergunta exatamente: `Deseja que eu faça o commit e o push para produção agora?`. Confirmação explícita é obrigatória; Vault não pode ser contornado.
+
+---
+
 ## Condições de Skip
 
 Algumas fases podem ser puladas com justificativa:
@@ -176,7 +182,7 @@ Algumas fases podem ser puladas com justificativa:
 | Anubis | Feature puramente visual, sem auth/API/AI |
 | Sage | Bug fix simples com scope muito pequeno |
 
-**NUNCA pode pular:** Scout, Forge, Probe, Lens, Kowalski
+**NUNCA pode pular:** Scout, Forge, Probe, Lens, Kowalski. Virtus não é automático; quando chamado para produção, seu gate completo não pode ser pulado.
 
 ---
 
@@ -196,6 +202,7 @@ Algumas fases podem ser puladas com justificativa:
 - [x] Sage — PASS
 - [x] Scribe — memória atualizada
 - [x] Kowalski — sessão arquivada
+- [ ] Virtus — [não chamado ou PUBLICADO E VALIDADO]
 
-### Pronto para push? [SIM/NÃO]
+### `/virtus` foi oferecido ao usuário? [SIM/NÃO]
 ```

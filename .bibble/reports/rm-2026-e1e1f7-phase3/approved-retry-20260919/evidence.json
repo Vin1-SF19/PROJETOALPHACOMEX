@@ -1,0 +1,16 @@
+{
+  "recordedAt": "2026-09-19T13:58:04.202034+00:00",
+  "approvalReceipt": "2439549dca422dd73d6ab15a9bd1c55a4efcd55de3f68cb94377fa49e3ced7a8",
+  "approvedAt": "2026-09-19T13:55:48.183Z",
+  "approvedBy": "Worker automático do Roadmap",
+  "planSha256": "9a8143fe3f5681d8c1eabd171ebc7ade7ccc0169242cb23d5551d7e635ba8226",
+  "schemaSha256": "4dad6e25f38f3c9f0e3210582c49c2c3dc541a9c08427842b8abdd4e56604773",
+  "backupCommand": "node scripts/turso-backup.mjs \"RM-2026-E1E1F7 fase 3 retomada aprovada card Kanban por etapa\"",
+  "backupExitCode": 1,
+  "backupErrorCode": "TURSO_CONFIG_UNAVAILABLE",
+  "backupVerified": false,
+  "databaseChanged": false,
+  "migrationCreated": false,
+  "status": "BLOCKED",
+  "code": "DATABASE_BACKUP_UNAVAILABLE"
+}

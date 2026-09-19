@@ -1,0 +1,11 @@
+{
+  "lint": {
+    "exitCode": 1
+  },
+  "typecheck": {
+    "exitCode": 134
+  },
+  "test": {
+    "exitCode": 1
+  }
+}

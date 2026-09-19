@@ -1,0 +1,30 @@
+{
+  "subtaskId": "inventory-ui-final",
+  "critiquedAt": "2026-09-18T20:06:00Z",
+  "step5_5": {
+    "predictedBugs": [
+      "A view de movimentações poderia tratar o novo retorno paginado como array; foi adaptada para items e nextCursor.",
+      "Uma devolução parcial poderia desaparecer ao consultar apenas status ATIVA; a lista inclui PARCIALMENTE_DEVOLVIDA.",
+      "Trocar o item no modal poderia manter a localização do item anterior; a origem agora acompanha o item selecionado."
+    ],
+    "edgeCases": [
+      "Item individual sem unidade elegível impede confirmação até selecionar/cadastrar patrimônio.",
+      "Painéis sem registros usam estados vazios reais e o painel de manutenção não fabrica cards.",
+      "Falhas de consulta ou mutação preservam o modal e exibem mensagem sem alterar o estado local como sucesso."
+    ],
+    "errorHandling": true,
+    "securityCheck": true,
+    "passed": true
+  },
+  "step6_5": {
+    "followsPatterns": true,
+    "noHardcoded": true,
+    "testsAdded": true,
+    "docsUpdated": true,
+    "noConsoleLogs": true,
+    "passed": true
+  },
+  "overallVerdict": "PASSED",
+  "skipped": false,
+  "skipWarning": null
+}

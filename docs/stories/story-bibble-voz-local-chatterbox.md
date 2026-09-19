@@ -43,6 +43,7 @@ Ready for Review — implementação e motor TTS validados; smoke autenticado da
 
 - [x] **AC7.** Cache WAV usa SHA-256 de texto, voz, idioma e configuração, com TTL, limite de bytes, gravação atômica e cache hit sem GPU.
 - [x] **AC8.** Textos têm limite de 2.500 caracteres e divisão por parágrafos/sentenças/pontuação, sem cortar palavras arbitrariamente.
+- [x] **AC8a.** Datas standalone válidas em `dd/mm/aaaa` ou `dd-mm-aaaa` são expandidas para cardinal natural pt-BR depois da sanitização e antes do cache/split; formatos inválidos, ISO e tokens de path/query/e-mail/código/ID/versão permanecem inalterados.
 - [x] **AC9.** Payload, voz e idioma são validados; HTML é reduzido a texto; caminhos arbitrários e conteúdo executável não são aceitos.
 - [x] **AC10.** Timeout, fila cheia, falta da referência e recursos insuficientes retornam erros controlados; stack trace e conteúdo integral não chegam ao cliente/log.
 - [x] **AC11.** Health/status informam device, CUDA, referência, snapshot, modelo, idle, fila e cache sem dados sensíveis.
@@ -65,6 +66,7 @@ Ready for Review — implementação e motor TTS validados; smoke autenticado da
 - [x] Criar serviço FastAPI isolado e configuração validada (AC1–AC3).
 - [x] Implementar lazy load, locks, fila, seleção explícita de device, limites de recursos e unload ocioso (AC4–AC6).
 - [x] Implementar cache, segmentação, sanitização, limites, timeouts e logs seguros (AC7–AC11).
+- [x] Normalizar datas brasileiras standalone antes do cache e da segmentação, com validação de calendário, isolamento lexical, idempotência e convergência dos separadores (AC8a).
 - [x] Instalar e habilitar unidade systemd sem carregar modelo no boot (AC12).
 - [x] Criar documentação, healthcheck, download verificado e teste isolado (AC13).
 - [x] Implementar proxy autenticado e cliente server-side resiliente (AC14).
@@ -100,6 +102,8 @@ Ready for Review — implementação e motor TTS validados; smoke autenticado da
 - Regressão do proxy em staging: cobertura adicionada para URL interna + `Host`/`Origin` públicos, divergência Host/Origin, Origin ausente e `Sec-Fetch-Site: cross-site`.
 - Regressão do upstream: cobertura adicionada para URLs exatas de health/model/speech com base raiz e base com subpath, além da rejeição de endpoint com autoridade (`//host`).
 - Pytest do serviço: 26/26 testes aprovados; depois do gate, o venv de produção foi ressincronizado ao `requirements.lock` sem dependências exclusivas de desenvolvimento.
+- Regressão de pronúncia de datas: suíte final com 64/64 testes aprovados, incluindo anos `0001..9999`, regra gregoriana de séculos, inválidas byte-a-byte, Unicode de contexto, entrada longa, concorrência, múltiplas datas, pontuação, isolamento lexical, ISO, idempotência, texto entregue ao modelo e convergência slash/hífen para cache hit.
+- Smoke de produção da normalização: serviço reiniciado e saudável; `18/09/2026` gerou WAV real HTTP 200 (`audio/wav`, RIFF/WAVE) em cache MISS e `18-09-2026` retornou o mesmo áudio/identidade em cache HIT. A rota pública do Painel respondeu 401 sem sessão, confirmando existência e proteção, sem regressão para 404.
 - Forge focal: Vitest 28/28, ESLint direcionado e build aprovados (o build aprovado precede a correção pontual de resolução; a correção foi revalidada por Vitest e ESLint focais).
 - Gates globais preservam débitos externos ao escopo: `npm run lint` falha no baseline do repositório; `npm run typecheck` encerra por falta de memória e, com heap de 8 GB, reporta somente erros fora desta entrega; `npm test` registra 20 falhas fora do escopo.
 - UI: o smoke autenticado ainda não foi registrado; AC20 permanece aberto sem inferir resultado.
@@ -111,6 +115,8 @@ Ready for Review — implementação e motor TTS validados; smoke autenticado da
 - [x] Contratos TypeScript do cliente/proxy cobertos por 28 testes focais.
 - [x] Código Python compila; configuração e bind foram validados no processo real.
 - [x] Testes Python do serviço aprovados: 26/26; venv de produção novamente alinhado ao lock sem dependências dev.
+- [x] Testes da normalização de datas aprovados no Python 3.11 do serviço: 64/64 em `tests/test_core.py`; ferramentas de desenvolvimento foram executadas isoladamente, sem alterar o venv de produção.
+- [x] Smoke de produção aprovado: serviço healthy, WAV real HTTP 200 e equivalência slash/hífen comprovada por cache MISS/HIT e identidade binária.
 - [x] TTS real, cache MISS/HIT, unload/restart, reload, RAM, VRAM invariável e health do llama validados.
 - [x] Forge focal aprovado no conjunto acumulado: 28/28 testes e ESLint direcionado; o build PASS registrado precede a correção pontual de resolução.
 - [ ] Gates globais não estão verdes por baseline externo: lint falha, typecheck exige heap ampliado e ainda reporta erros fora do escopo, e testes globais mantêm 20 falhas externas.
@@ -121,7 +127,8 @@ Ready for Review — implementação e motor TTS validados; smoke autenticado da
 - Implementação de serviço, proxy, UI, segurança, cache, lazy load, fila, systemd e documentação concluída.
 - O serviço está operacional em CPU com a referência autorizada, gera WAV PCM16 mono 24 kHz e não disputa VRAM com o LLM.
 - Lazy load, cache, unload/restart, reload e liberação de RAM foram comprovados com inferências reais.
-- As validações focais passaram: Pytest do serviço 26/26, Vitest 28/28 e ESLint direcionado; o build aprovado registrado precede a correção pontual de resolução. Isso não equivale a aprovação dos gates globais, que mantêm os baselines externos descritos acima.
+- Datas brasileiras standalone válidas agora chegam ao modelo por extenso em pt-BR; a normalização precede cache e split, é idempotente e faz slash/hífen equivalentes reutilizarem o mesmo WAV.
+- As validações focais passaram: suíte Python final 64/64, Vitest 28/28 e ESLint direcionado; o build aprovado registrado precede a correção pontual de resolução. Isso não equivale a aprovação dos gates globais, que mantêm os baselines externos descritos acima.
 - O chat, STT, IA, Ollama e banco foram preservados; o health do llama permaneceu OK.
 - O único critério funcional pendente é o smoke autenticado da UI (AC20); os gates globais permanecem vermelhos pelo baseline externo. O token remoto é condicional à topologia e não deve ser criado se loopback for suficiente.
 - O `403` causado pela comparação de `Origin` com a URL interna atrás do Cloudflare Tunnel foi corrigido no guard do proxy; o smoke autenticado permanece pendente e AC20 continua aberto.
@@ -156,6 +163,7 @@ Ready for Review — implementação e motor TTS validados; smoke autenticado da
 
 - `/home/ialpha/services/bibble-voice/{.env,.env.example,.gitignore,README.md,requirements.txt,requirements.lock,requirements-dev.txt,bibble-voice.service}`
 - `/home/ialpha/services/bibble-voice/app/{__init__.py,cache.py,config.py,engine.py,main.py,schemas.py}`
+- `/home/ialpha/services/bibble-voice/app/text_normalization.py`
 - `/home/ialpha/services/bibble-voice/scripts/{download_model.py,healthcheck.sh,install.sh,test_voice.py}`
 - `/home/ialpha/services/bibble-voice/tests/test_core.py`
 - `/home/ialpha/services/bibble-voice/voices/bibble.wav` (referência autorizada)
@@ -165,6 +173,12 @@ Ready for Review — implementação e motor TTS validados; smoke autenticado da
 - `/home/ialpha/services/bibble-voice/models/README.md`
 - `/home/ialpha/services/bibble-voice/models/chatterbox-v3/` (snapshot local V3 e manifesto SHA-256)
 - `/etc/systemd/system/bibble-voice.service`
+
+### Serviço local — modificados no bugfix de datas
+
+- `/home/ialpha/services/bibble-voice/app/engine.py`
+- `/home/ialpha/services/bibble-voice/tests/test_core.py`
+- `/home/ialpha/services/bibble-voice/README.md`
 
 ## Change Log
 
@@ -176,3 +190,5 @@ Ready for Review — implementação e motor TTS validados; smoke autenticado da
 | 2026-09-16 | 1.3 | Guarda same-origin compatível com autoridade pública atrás do Cloudflare Tunnel e testes de regressão | Echo (Backend) |
 | 2026-09-16 | 1.4 | Evidências do Forge separadas entre validação focal aprovada e baselines globais externos | Echo (Backend) |
 | 2026-09-16 | 1.5 | Resolução segura dos endpoints TTS para base raiz/subpath, eliminando troca involuntária de host e cobrindo regressão | Echo (Backend) |
+| 2026-09-18 | 1.6 | Normalização segura de datas brasileiras antes de cache/split, cardinais pt-BR, isolamento lexical e regressão 57/57 | Echo (Backend) |
+| 2026-09-18 | 1.7 | QA final 64/64 e smoke de produção com WAV real, rota protegida e convergência de cache slash/hífen | Bibble |

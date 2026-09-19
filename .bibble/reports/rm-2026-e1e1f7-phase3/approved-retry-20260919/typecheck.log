@@ -1,0 +1,27 @@
+
+> alpha_sistema@0.1.0 typecheck
+> tsc --noEmit --incremental false
+
+
+<--- Last few GCs --->
+
+[1120:0x2da2c000]    10127 ms: Mark-Compact 2041.7 (2055.0) -> 2039.9 (2064.7) MB, pooled: 0 MB, 319.05 / 0.00 ms  (average mu = 0.143, current mu = 0.028) allocation failure; scavenge might not succeed
+[1120:0x2da2c000]    10529 ms: Mark-Compact (reduce) 2040.0 (2064.7) -> 2039.9 (2050.0) MB, pooled: 0 MB, 339.98 / 0.00 ms  (+ 3.7 ms in 1 steps since start of marking, biggest step 3.7 ms, walltime since start of marking 345 ms) (average mu = 0.143, curr
+FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory
+----- Native stack trace -----
+
+ 1: 0xf53df6 node::OOMErrorHandler(char const*, v8::OOMDetails const&) [node]
+ 2: 0x13bf4b0 v8::Utils::ReportOOMFailure(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [node]
+ 3: 0x13bf59f v8::internal::V8::FatalProcessOutOfMemory(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [node]
+ 4: 0x1658085  [node]
+ 5: 0x16580b2  [node]
+ 6: 0x16583aa v8::internal::Heap::RecomputeLimits(v8::internal::GarbageCollector, v8::base::TimeTicks) [node]
+ 7: 0x16688ca  [node]
+ 8: 0x166cc70  [node]
+ 9: 0x20ffb21  [node]
+Aborted (core dumped)
+npm notice
+npm notice New minor version of npm available! 11.6.1 -> 11.19.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.19.1
+npm notice To update run: npm install -g npm@11.19.1
+npm notice

@@ -1,0 +1,12 @@
+{
+  "approvalReceipt": "899e0c58b52b67eb52c856c722b5ac6a25b4e75cb56950ad0ff965c994e3b367",
+  "planSha256": "9a8143fe3f5681d8c1eabd171ebc7ade7ccc0169242cb23d5551d7e635ba8226",
+  "schemaSha256Before": "d767af639532f8aeb740f83644f2af07e68a471ee74b116930f6518021d20c00",
+  "modelsMatchPlan": {
+    "BpmPipeline": true,
+    "BpmEtapa": true
+  },
+  "cardViewModelPresent": false,
+  "backupExitCode": 1,
+  "backupFailure": "TURSO_CONFIGURATION_UNAVAILABLE"
+}

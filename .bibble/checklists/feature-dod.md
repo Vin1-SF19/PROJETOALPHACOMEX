@@ -1,6 +1,6 @@
 # Checklist: Feature Definition of Done
 
-**Usado por:** Bibble, Probe, Sage  
+**Usado por:** Bibble, Probe, Sage, Virtus
 **Quando:** Antes de declarar qualquer feature como completa  
 
 ---
@@ -74,11 +74,19 @@ Parcialmente done = não done.
 - [ ] Kowalski arquivou em journal.md
 - [ ] Erros novos em known-errors.md
 
+### 11. Produção — somente quando `/virtus` for chamado
+- [ ] Baseline e gates reais registrados
+- [ ] Diff, segredos, dependências e rollback revisados
+- [ ] Confirmação explícita recebida após a pergunta obrigatória
+- [ ] Stage seletivo, Conventional Commit e push concluídos
+- [ ] Deployment, smoke tests e logs validados
+
 ---
 
 ## Resultado
 
-**Todos marcados:** Feature DONE ✅ → Pronta para push  
+**Itens 1-10 marcados:** Feature DONE ✅ → Bibble oferece `/virtus`
+**Item 11 marcado:** Produção PUBLICADA E VALIDADA ✅
 **Qualquer desmarcado:** Feature NOT DONE ❌ → Completar antes do push
 
 ---
@@ -88,3 +96,4 @@ Parcialmente done = não done.
 - Items de banco só se aplicam se houve mudança no banco
 - Items de AI só se aplicam se houve código de AI
 - Todos os outros são obrigatórios em qualquer feature
+- O item 11 só se aplica após chamada manual `/virtus`; nunca dispara automaticamente

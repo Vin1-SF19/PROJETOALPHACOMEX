@@ -1,0 +1,30 @@
+{
+  "lint": {
+    "command": [
+      "npm",
+      "run",
+      "lint"
+    ],
+    "exitCode": 1
+  },
+  "typecheck": {
+    "command": [
+      "npm",
+      "run",
+      "typecheck",
+      "--",
+      "--incremental",
+      "false"
+    ],
+    "exitCode": 134
+  },
+  "test": {
+    "command": [
+      "npm",
+      "test",
+      "--",
+      "--coverage.reportsDirectory=.bibble/reports/rm-2026-e1e1f7-phase2-revalidation/coverage"
+    ],
+    "exitCode": 1
+  }
+}

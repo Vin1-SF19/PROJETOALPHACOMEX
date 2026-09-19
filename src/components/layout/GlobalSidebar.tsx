@@ -18,7 +18,7 @@ import {
   FolderKanban, Radar, Users2, Clapperboard, CircleDollarSign,
   Contact, LibraryBig, FolderOpen, CalendarRange, MessagesSquare,
   Globe, ExternalLink, Settings, Cloud, Server, ShieldCheck, Wallet, Building2, Link2,
-  Plus, Pencil, Bot, FileSpreadsheet,
+  Plus, Pencil, Bot, FileSpreadsheet, Warehouse,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -55,7 +55,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   FolderKanban, Radar, Users2, Clapperboard, CircleDollarSign,
   Contact, LibraryBig, FolderOpen, CalendarRange, MessagesSquare,
   Globe, ExternalLink, Settings, Cloud, Server, ShieldCheck, Wallet, Building2, Link2,
-  Bot, FileSpreadsheet,
+  Bot, FileSpreadsheet, Warehouse,
 };
 
 const ACTIVE_BG: Record<string, string> = {
