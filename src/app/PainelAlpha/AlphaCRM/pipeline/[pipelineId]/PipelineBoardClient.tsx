@@ -207,7 +207,12 @@ function KanbanCard({
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1, animationDelay: `${index * 40}ms` };
 
   const ehLeadVirtual = card.origem === "noloss";
-  const agendarReuniao = etapaEhAgendarReuniao(etapaNome);
+  // RM-2026-E1E1F7: etapa com composição explícita decide pelo config
+  // (elemento nativo AGENDAMENTO_REUNIAO); sem config, preserva o
+  // comportamento legado por nome de etapa.
+  const agendarReuniao = card.cardViewComposicao !== undefined
+    ? card.cardViewComposicao.some((elemento) => elemento.kind === "NATIVE" && elemento.key === "AGENDAMENTO_REUNIAO")
+    : etapaEhAgendarReuniao(etapaNome);
   const naoAcessado = !card.primeiraVisualizacaoEm;
   const alertaBoasVindas = !ehLeadVirtual && etapaEhBoasVindas(etapaNome) && naoAcessado;
   const canalOrigem = card.campoValores?.find((campo) => campo.campo.nome === "Canal de origem")?.valor;

@@ -83,9 +83,17 @@ describe("CRM - registry de composição do card do Kanban (RM-2026-E1E1F7)", ()
     expect(composicaoCardKanbanSemAlteracao(anterior, [])).toBe(false);
   });
 
-  it("expõe todos os elementos nativos documentados no plano do Vault", () => {
+  it("expõe todos os elementos nativos documentados no plano do Vault e o widget estrutural de reunião", () => {
     expect(new Set(CARD_KANBAN_NATIVE_KEYS)).toEqual(
-      new Set(["EMPRESA_NOME", "CNPJ", "TELEFONE", "CHECKLIST", "CADENCIA", "PENDENCIAS"]),
+      new Set([
+        "EMPRESA_NOME",
+        "CNPJ",
+        "TELEFONE",
+        "CHECKLIST",
+        "CADENCIA",
+        "PENDENCIAS",
+        "AGENDAMENTO_REUNIAO",
+      ]),
     );
   });
 });

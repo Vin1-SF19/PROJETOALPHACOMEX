@@ -2,7 +2,7 @@ import { AlertTriangle, Building2, CalendarClock, ClipboardList, Phone } from "l
 
 import { cn } from "@/lib/utils";
 import type { CardKanbanComposicao, CardKanbanNativeKey } from "@/lib/bpm/card-kanban";
-import { elementoCardKanbanChaveEstavel } from "@/lib/bpm/card-kanban";
+import { CARD_KANBAN_NATIVE_ESTRUTURAIS, elementoCardKanbanChaveEstavel } from "@/lib/bpm/card-kanban";
 
 /**
  * `ok`: valor presente e íntegro. `vazio`: fonte consultada, sem valor (ex.:
@@ -72,9 +72,13 @@ export function CardKanbanRenderer({
 }) {
   const itens = composicao.flatMap((elemento) => {
     if (elemento.kind === "NATIVE") {
+      // Elementos estruturais (ex.: o widget de agendamento de reunião) têm
+      // apresentação própria e são renderizados pelo consumidor — nunca como
+      // badge de texto genérico aqui.
+      if ((CARD_KANBAN_NATIVE_ESTRUTURAIS as readonly string[]).includes(elemento.key)) return [];
       const dado = valores.nativos[elemento.key];
       if (!dado || dado.status !== "ok" || !dado.valor) return [];
-      const definicaoLabel: Record<CardKanbanNativeKey, string> = {
+      const definicaoLabel: Partial<Record<CardKanbanNativeKey, string>> = {
         EMPRESA_NOME: "Empresa",
         CNPJ: "CNPJ",
         TELEFONE: "Telefone",
@@ -85,7 +89,7 @@ export function CardKanbanRenderer({
       return [
         {
           chave: elementoCardKanbanChaveEstavel(elemento),
-          label: definicaoLabel[elemento.key],
+          label: definicaoLabel[elemento.key] ?? "Campo",
           valor: dado.valor,
           icone: ICONE_NATIVO[elemento.key],
           tom: (elemento.key === "PENDENCIAS" ? "atencao" : "neutro") as "atencao" | "neutro",

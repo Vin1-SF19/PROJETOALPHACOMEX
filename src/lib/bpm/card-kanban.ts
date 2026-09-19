@@ -32,6 +32,10 @@ export const CARD_KANBAN_NATIVE_REGISTRY = {
     label: "Pendências obrigatórias",
     description: "Quantidade de pendências obrigatórias em aberto para avançar o card.",
   },
+  AGENDAMENTO_REUNIAO: {
+    label: "Agendamento de reunião (data/hora + Google Meet)",
+    description: "Widget de data/hora da reunião e botão de Google Meet — substitui o corpo padrão do card quando ativo.",
+  },
 } as const;
 
 export type CardKanbanNativeKey = keyof typeof CARD_KANBAN_NATIVE_REGISTRY;
@@ -39,6 +43,16 @@ export type CardKanbanNativeKey = keyof typeof CARD_KANBAN_NATIVE_REGISTRY;
 export const CARD_KANBAN_NATIVE_KEYS = Object.keys(
   CARD_KANBAN_NATIVE_REGISTRY,
 ) as CardKanbanNativeKey[];
+
+/**
+ * Elementos que não são um badge de texto simples — têm apresentação própria
+ * e são renderizados pelo consumidor (PipelineBoardClient), não pelo
+ * CardKanbanRenderer genérico. Ainda assim fazem parte da composição
+ * persistida e do catálogo do editor, para não ficarem hardcoded por etapa.
+ */
+export const CARD_KANBAN_NATIVE_ESTRUTURAIS: readonly CardKanbanNativeKey[] = [
+  "AGENDAMENTO_REUNIAO",
+];
 
 const cardKanbanNativeKeySchema = z.enum(
   CARD_KANBAN_NATIVE_KEYS as [CardKanbanNativeKey, ...CardKanbanNativeKey[]],
