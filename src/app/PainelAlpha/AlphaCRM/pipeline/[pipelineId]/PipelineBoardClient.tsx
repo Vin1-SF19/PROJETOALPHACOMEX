@@ -53,6 +53,8 @@ import { cn } from "@/lib/utils";
 import { formatCNPJ } from "@/lib/format-cnpj";
 import { GradientBlobCard } from "@/components/ui/gradient-blob-card";
 import { SlaStatusBadge } from "@/components/bpm/sla/SlaStatusBadge";
+import { CardKanbanRenderer, type CardKanbanValores } from "@/components/bpm/kanban/CardKanbanRenderer";
+import type { CardKanbanComposicao } from "@/lib/bpm/card-kanban";
 
 import { SkeletonColumn } from "./PipelineBoardSkeleton";
 import { useLazyColumn } from "@/hooks/useLazyColumn";
@@ -103,6 +105,8 @@ interface CardBpm {
   _count: { tarefas: number; anexos: number };
   tarefas: { titulo: string; prazo: Date | string | null; tipo: string }[];
   campoValores?: { valor: string | null; campo: { nome: string } }[];
+  cardViewComposicao?: CardKanbanComposicao;
+  cardViewValores?: CardKanbanValores;
   ligacoesHoje?: number;
   metaLigacoesDia?: number;
   diasUteisDecorridos?: number;
@@ -373,21 +377,37 @@ function KanbanCard({
           </div>
         )}
 
-        {!ehLeadVirtual && ((!novosLeads && (canalOrigem || statusConfig)) || (novosLeads && radarPretendido) || card.proximoContatoEm !== undefined) && (
+        {!ehLeadVirtual && (
+          card.cardViewComposicao !== undefined
+          || (!novosLeads && (canalOrigem || statusConfig))
+          || (novosLeads && radarPretendido)
+          || card.proximoContatoEm !== undefined
+        ) && (
           <div className="flex flex-wrap items-center gap-1.5">
-            {!novosLeads && canalOrigem && (
-              <span className="rounded-lg border border-white/10 bg-white/[0.05] px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-slate-300">
-                {canalOrigem}
-              </span>
+            {card.cardViewComposicao !== undefined ? (
+              // RM-2026-E1E1F7: etapa migrada para a composição configurável —
+              // nenhuma seleção por nome de etapa a partir daqui.
+              <CardKanbanRenderer
+                composicao={card.cardViewComposicao}
+                valores={card.cardViewValores ?? { nativos: {}, campos: {}, camposLabel: {} }}
+              />
+            ) : (
+              <>
+                {!novosLeads && canalOrigem && (
+                  <span className="rounded-lg border border-white/10 bg-white/[0.05] px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-slate-300">
+                    {canalOrigem}
+                  </span>
+                )}
+                {novosLeads && radarPretendido && (
+                  <span className="rounded-lg border border-white/10 bg-white/[0.05] px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-slate-300">
+                    {radarPretendido}
+                  </span>
+                )}
+              </>
             )}
             {!novosLeads && statusConfig && (
               <span className={cn("rounded-lg border px-2 py-1 text-[9px] font-bold uppercase tracking-wide", statusConfig.badgeClassName)}>
                 {statusConfig.label}
-              </span>
-            )}
-            {novosLeads && radarPretendido && (
-              <span className="rounded-lg border border-white/10 bg-white/[0.05] px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-slate-300">
-                {radarPretendido}
               </span>
             )}
             {card.proximoContatoEm !== undefined && (
@@ -415,7 +435,7 @@ function KanbanCard({
           </div>
         )}
 
-        {!ehLeadVirtual && !novosLeads && (card.checklistProgress || card.cadenciaProximaExecucaoEm || card.pendenciasObrigatorias !== null && card.pendenciasObrigatorias !== undefined) && (
+        {!ehLeadVirtual && !novosLeads && card.cardViewComposicao === undefined && (card.checklistProgress || card.cadenciaProximaExecucaoEm || card.pendenciasObrigatorias !== null && card.pendenciasObrigatorias !== undefined) && (
           <div className="space-y-1.5 border-t border-white/[0.06] pt-2.5">
             {card.pendenciasObrigatorias !== null && card.pendenciasObrigatorias !== undefined && (
               <div className="flex items-center gap-1.5 text-[10px] font-medium" title={card.pendenciasObrigatorias > 0 ? `${card.pendenciasObrigatorias} pendência(s) obrigatória(s)` : "Sem pendências"}>

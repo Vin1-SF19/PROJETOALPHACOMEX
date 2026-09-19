@@ -9,7 +9,7 @@ import {
   moverCardSchema,
   salvarRequisitosEMoverCardSchema,
 } from "@/lib/validations/bpm";
-import { normalizarCNPJ } from "@/lib/format-cnpj";
+import { formatCNPJ, normalizarCNPJ } from "@/lib/format-cnpj";
 import {
   exigirAcessoBpmCard,
   exigirAcessoBpmPipeline,
@@ -33,6 +33,8 @@ import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { executarAutomacoesCentraisDoCardAgora } from "@/lib/bpm/automacoes/orquestrador";
 import { automacaoMigradaEstaAtiva, NOMES_AUTOMACOES_MIGRADAS } from "@/lib/bpm/automacoes/migracao-hardcoded";
 import { salvarValoresGlobaisPersonalizadosCampos } from "@/lib/bpm/campos-configuraveis-server";
+import { desserializarComposicaoCardKanban, type CardKanbanComposicao } from "@/lib/bpm/card-kanban";
+import type { CardKanbanValores } from "@/components/bpm/kanban/CardKanbanRenderer";
 
 import { buscarServicosContratados } from "@/actions/Clientes";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
@@ -357,6 +359,37 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
       .filter(([, permissao]) => permissao.podeVer)
       .map(([etapaId]) => etapaId);
 
+    // RM-2026-E1E1F7: composição configurável do card fechado, por etapa.
+    // Ausência de registro (etapaId fora do mapa) preserva o comportamento
+    // legado abaixo; um registro presente — mesmo com lista vazia — passa a
+    // ser renderizado pelo CardKanbanRenderer no cliente.
+    const configuracoesCardKanban = etapasVisiveis.length
+      ? await db.bpmEtapaCardViewConfig.findMany({
+          where: { etapaId: { in: etapasVisiveis } },
+          select: { etapaId: true, camposJson: true },
+        })
+      : [];
+    const composicaoPorEtapa = new Map<string, CardKanbanComposicao>(
+      configuracoesCardKanban.map((registro) => [
+        registro.etapaId,
+        desserializarComposicaoCardKanban(registro.camposJson) ?? [],
+      ]),
+    );
+    const campoIdsConfigurados = [
+      ...new Set(
+        [...composicaoPorEtapa.values()].flatMap((composicao) =>
+          composicao.flatMap((elemento) => (elemento.kind === "CAMPO" ? [elemento.campoId] : [])),
+        ),
+      ),
+    ];
+    const etapasComTelefoneConfigurado = new Set(
+      [...composicaoPorEtapa.entries()]
+        .filter(([, composicao]) =>
+          composicao.some((elemento) => elemento.kind === "NATIVE" && elemento.key === "TELEFONE"),
+        )
+        .map(([etapaId]) => etapaId),
+    );
+
     // D-021: card sempre tem empresa vinculada — select sempre inclui a empresa.
     const cards = await db.bpmCard.findMany({
       where: {
@@ -396,11 +429,19 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
           orderBy: [{ prazo: "asc" }, { createdAt: "asc" }],
           take: 10,
         },
-        // Só o campo "Canal de origem" — evita carregar todos os BpmCampo do card no board.
+        // Campos legados por nome (compatibilidade com o card antigo) + campos
+        // comerciais explicitamente configurados na composição do card por
+        // etapa (RM-2026-E1E1F7) — ambos batched, sem consulta por card.
         campoValores: {
-          where: { campo: { nome: { in: ["Canal de origem", "Resumo da reunião"] } } },
-          select: { valor: true, campo: { select: { nome: true } } },
-          take: 2,
+          where: {
+            campo: {
+              OR: [
+                { nome: { in: ["Canal de origem", "Resumo da reunião"] } },
+                ...(campoIdsConfigurados.length ? [{ id: { in: campoIdsConfigurados } }] : []),
+              ],
+            },
+          },
+          select: { valor: true, campo: { select: { id: true, nome: true } } },
         },
       },
       orderBy: { createdAt: "desc" },
@@ -437,11 +478,83 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
       );
     }
 
+    // Telefone real (RM-2026-E1E1F7): mesma fonte de ListarTelefonesCardBpm
+    // (PessoaClienteVinculo → Pessoa.celular), projetada em lote apenas para
+    // os cards de etapas com TELEFONE configurado — nunca por card.
+    const empresaIdsComTelefoneConfigurado = [
+      ...new Set(
+        cards
+          .filter((card) => etapasComTelefoneConfigurado.has(card.etapaId))
+          .map((card) => card.empresa.id),
+      ),
+    ];
+    const telefonesPorEmpresa = new Map<number, string>();
+    if (empresaIdsComTelefoneConfigurado.length) {
+      const vinculos = await db.pessoaClienteVinculo.findMany({
+        where: { clienteId: { in: empresaIdsComTelefoneConfigurado } },
+        select: { clienteId: true, pessoa: { select: { nome: true, celular: true } } },
+        orderBy: { pessoa: { nome: "asc" } },
+      });
+      for (const vinculo of vinculos) {
+        if (telefonesPorEmpresa.has(vinculo.clienteId)) continue;
+        const telefone = paraExibicaoTelefone(vinculo.pessoa.celular).trim();
+        if (telefone) telefonesPorEmpresa.set(vinculo.clienteId, telefone);
+      }
+    }
+
+    const camposLabelPorId = new Map<string, string>();
+    for (const card of cards) {
+      for (const campoValor of card.campoValores) {
+        camposLabelPorId.set(campoValor.campo.id, campoValor.campo.nome);
+      }
+    }
+
+    function construirValoresCardKanban(params: {
+      composicao: CardKanbanComposicao;
+      empresaId: number;
+      empresaNome: string;
+      cnpj: string | null;
+      telefoneVirtual?: string | null;
+      campoValores: { valor: string | null; campo: { id: string; nome: string } }[];
+    }): CardKanbanValores {
+      const campoValorPorId = new Map(
+        params.campoValores.map((registro) => [registro.campo.id, registro.valor]),
+      );
+      const nativos: CardKanbanValores["nativos"] = {};
+      const campos: CardKanbanValores["campos"] = {};
+      const camposLabel: CardKanbanValores["camposLabel"] = {};
+      for (const elemento of params.composicao) {
+        if (elemento.kind === "NATIVE") {
+          if (elemento.key === "EMPRESA_NOME") {
+            nativos.EMPRESA_NOME = params.empresaNome
+              ? { status: "ok", valor: params.empresaNome }
+              : { status: "vazio" };
+          } else if (elemento.key === "CNPJ") {
+            const formatado = formatCNPJ(params.cnpj);
+            nativos.CNPJ = formatado ? { status: "ok", valor: formatado } : { status: "vazio" };
+          } else if (elemento.key === "TELEFONE") {
+            const telefone = params.telefoneVirtual ?? telefonesPorEmpresa.get(params.empresaId) ?? null;
+            nativos.TELEFONE = telefone ? { status: "ok", valor: telefone } : { status: "vazio" };
+          } else {
+            // CHECKLIST/CADENCIA/PENDENCIAS: catálogo pronto, projeção ainda não
+            // alimentada nesta entrega — ver relatório de conclusão da RM.
+            nativos[elemento.key] = { status: "indisponivel" };
+          }
+        } else {
+          const valor = campoValorPorId.get(elemento.campoId);
+          camposLabel[elemento.campoId] = camposLabelPorId.get(elemento.campoId) ?? "Campo";
+          campos[elemento.campoId] = valor?.trim() ? { status: "ok", valor } : { status: "vazio" };
+        }
+      }
+      return { nativos, campos, camposLabel };
+    }
+
     const cardsReais = cards.map((card) => {
       const ehNovoLead = card.etapaId === etapaNovosLeads?.id;
       const sla = [...(slaPorCard.get(card.id) ?? [])]
         .filter((item) => item.status !== "CONCLUIDO")
         .sort((a, b) => prioridadeStatusSla(b.status) - prioridadeStatusSla(a.status))[0] ?? null;
+      const composicaoCardKanban = composicaoPorEtapa.get(card.etapaId);
       return {
         ...card,
         sla,
@@ -457,6 +570,16 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
           : 1,
         podeAgirEtapa:
           visibilidadePorEtapa.get(card.etapaId)?.podeAgir ?? false,
+        cardViewComposicao: composicaoCardKanban,
+        cardViewValores: composicaoCardKanban
+          ? construirValoresCardKanban({
+              composicao: composicaoCardKanban,
+              empresaId: card.empresa.id,
+              empresaNome: card.empresa.razaoSocial || card.empresa.nomeFantasia || "",
+              cnpj: card.empresa.cnpj,
+              campoValores: card.campoValores,
+            })
+          : undefined,
       };
     });
 
@@ -466,6 +589,9 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
     const permissaoNovosLeads = etapaNovosLeads
       ? visibilidadePorEtapa.get(etapaNovosLeads.id)
       : null;
+    const composicaoNovosLeads = etapaNovosLeads
+      ? composicaoPorEtapa.get(etapaNovosLeads.id)
+      : undefined;
     const cardsVirtuais = (
       etapaNovosLeads
       && permissaoNovosLeads?.podeVer
@@ -508,6 +634,17 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
           diasUteisDecorridos: 0,
           diaCiclo: 1,
           podeAgirEtapa: permissaoNovosLeads.podeAgir,
+          cardViewComposicao: composicaoNovosLeads,
+          cardViewValores: composicaoNovosLeads
+            ? construirValoresCardKanban({
+                composicao: composicaoNovosLeads,
+                empresaId: 0,
+                empresaNome: lead.nome || lead.email || "Lead sem nome",
+                cnpj: null,
+                telefoneVirtual: lead.telefone,
+                campoValores: [],
+              })
+            : undefined,
         }))
       : [];
 

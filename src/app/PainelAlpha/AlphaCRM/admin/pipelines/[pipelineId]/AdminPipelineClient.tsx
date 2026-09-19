@@ -59,6 +59,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { CardKanbanWorkspace } from "@/components/bpm/kanban/CardKanbanWorkspace";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   FormularioEtapaWorkspace,
   type FormularioEtapaAdmin,
@@ -204,6 +206,7 @@ export default function AdminPipelineClient({
   const [conflitoPublicacao, setConflitoPublicacao] = useState(false);
   const [novaEtapaNome, setNovaEtapaNome] = useState("");
   const [abaAtiva, setAbaAtiva] = useState("overview");
+  const [etapaCardKanbanId, setEtapaCardKanbanId] = useState(etapasIniciais[0]?.id ?? "");
   const [etapaSelecionadaId, setEtapaSelecionadaId] = useState<string | null>(
     null,
   );
@@ -940,16 +943,32 @@ export default function AdminPipelineClient({
           </div>
         </TabsContent>
 
-        <TabsContent value="card">
-          <FormularioEtapaWorkspace
-            pipelineId={pipeline.id}
-            etapas={etapas}
-            campos={campos}
-            onFormularioAtualizado={handleFormularioAtualizado}
-            modo="card"
-            publicationBlocked={alteracoesPendentes > 0}
-            onPublished={() => router.refresh()}
-          />
+        <TabsContent value="card" className="space-y-4">
+          <Select value={etapaCardKanbanId} onValueChange={setEtapaCardKanbanId}>
+            <SelectTrigger className="h-9 w-full max-w-sm text-sm">
+              <SelectValue placeholder="Selecione a etapa" />
+            </SelectTrigger>
+            <SelectContent>
+              {etapas.map((etapa) => (
+                <SelectItem key={etapa.id} value={etapa.id}>
+                  {etapa.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {(() => {
+            const etapaSelecionada = etapas.find((etapa) => etapa.id === etapaCardKanbanId);
+            return etapaSelecionada ? (
+              <CardKanbanWorkspace
+                key={etapaSelecionada.id}
+                pipelineId={pipeline.id}
+                etapaId={etapaSelecionada.id}
+                etapaNome={etapaSelecionada.nome}
+              />
+            ) : (
+              <p className="text-sm text-slate-400">Selecione uma etapa para configurar o card.</p>
+            );
+          })()}
         </TabsContent>
 
         <TabsContent value="history">

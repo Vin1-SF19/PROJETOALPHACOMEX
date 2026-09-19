@@ -3951,6 +3951,7 @@ model BpmPipeline {
   webhookEndpoints   BpmWebhookEndpoint[]
   camposAssociados   BpmCampoPipeline[]
   requisitos         BpmRequisito[]
+  cardViewConfigs    BpmEtapaCardViewConfig[]
 
   @@index([ativo])
   @@index([ordem])
@@ -4105,10 +4106,32 @@ model BpmEtapa {
   requisitos                   BpmRequisito[]
   execucoesTransicaoOrigem     BpmTransicaoExecucao[]       @relation("BpmTransicaoExecucaoOrigem")
   execucoesTransicaoDestino    BpmTransicaoExecucao[]       @relation("BpmTransicaoExecucaoDestino")
+  cardViewConfigs              BpmEtapaCardViewConfig[]
 
   @@unique([pipelineId, chave])
   @@index([pipelineId])
   @@index([pipelineId, ordem])
+}
+
+// Composição configurável do card fechado do Kanban por etapa (RM-2026-E1E1F7).
+// Independente de BpmEtapaFormulario (card aberto) e de BpmCampoEtapaConfig
+// (autoridade de presença/visibilidade dos campos comerciais); camposJson guarda
+// apenas identidades estáveis do registry compacto, nunca rótulos. A unicidade
+// composta (pipelineId, etapaId) é a única restrição de banco aprovada no
+// checkpoint Vault — nenhum índice adicional além do documentado no plano.
+model BpmEtapaCardViewConfig {
+  id         String   @id @default(cuid())
+  pipelineId String
+  etapaId    String
+  camposJson String
+  versao     Int      @default(1)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  pipeline BpmPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  etapa    BpmEtapa    @relation(fields: [etapaId], references: [id], onDelete: Cascade)
+
+  @@unique([pipelineId, etapaId])
 }
 
 // Substatus configuráveis de negócio dentro de uma etapa (ex.: "Aguardando documento",
