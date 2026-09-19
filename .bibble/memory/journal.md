@@ -5772,3 +5772,188 @@ Um usuário pediu ao Bibble que abrisse um chamado de exclusão do manual de CS/
 ### Refletido também em
 - `codebase-map.md`: capability condicional, grant efêmero e fronteira da criação de chamados.
 - `integration-points.md`: intenção explícita, resolução do técnico por nome e autorização server-side documentadas.
+
+---
+
+## [2026-09-18 12:43] — Voz do Bibble conectada à produção Vercel por túnel autenticado
+
+**Tags:** #production #infrastructure #security #voice #vercel
+**Agentes envolvidos:** Virtus, DevOps e Scout
+**Configurações afetadas:** `/etc/cloudflared/config.yml`; `/home/ialpha/services/bibble-voice/.env`; Vercel Production do projeto `painel-alpha-projeto`
+
+### Contexto
+O Painel Alpha em produção não possuía `BIBBLE_VOICE_URL` nem `BIBBLE_VOICE_TOKEN`. O backend fazia fallback para `127.0.0.1:8787` dentro da função serverless da Vercel e não conseguia alcançar o microserviço local.
+
+### O que foi feito
+- Criado o hostname `bibble-voice.alpha-comex.com` no Cloudflare Tunnel, encaminhado exclusivamente para `http://127.0.0.1:8787`.
+- Gerado segredo Bearer forte, configurado no microserviço local e cadastrado como secret server-side na Vercel Production junto da URL HTTPS.
+- Reiniciados e validados `bibble-voice` e `cloudflared`; o endpoint protegido passou a responder `401` sem token e `200` com token.
+- Redeployado somente o último artefato saudável da Vercel, sem enviar o worktree local; deployment `dpl_86FQAyKTjitKS81ccUudoDodfn2d` ficou Ready e recebeu o alias `painel.alpha-comex.com`.
+- Smoke real pelo túnel gerou WAV RIFF/WAVE válido de 103.724 bytes. A API do Painel Alpha permaneceu protegida, retornando `401` sem sessão.
+
+### Segurança e rollback
+- URL e token permanecem server-side; nenhum segredo foi impresso, versionado ou exposto como `NEXT_PUBLIC_*`.
+- Backups anteriores foram preservados em `/etc/cloudflared/config.yml.pre-virtus-20260918` e `/home/ialpha/services/bibble-voice/.env.pre-virtus-20260918`.
+- Rollback: restaurar os dois backups, reiniciar os serviços, remover as duas variáveis da Vercel e promover novamente o deployment anterior.
+
+### Limitações
+- O smoke autenticado pelo navegador depende de uma sessão real de usuário; o gate confirmou infraestrutura, áudio real, proteção Bearer, deployment e proteção da rota, mas não simulou clique autenticado na interface.
+- Nenhuma alteração de banco, commit ou push de código foi executada. Alterações preexistentes do worktree foram preservadas e não participaram do redeploy.
+
+---
+
+## [2026-09-18 12:55] — 404 intermitente da voz eliminado no conector HA
+
+**Tags:** #bugfix #integration #infrastructure #voice
+**Agentes envolvidos:** Bibble/Codex, Scout, DevOps, Probe e Kowalski
+**Arquivos tocados:** `/etc/cloudflared/config.yml`; `.bibble/memory/{journal,integration-points}.md`
+
+### Contexto
+O POST de voz em produção alternava entre sucesso e `404` mesmo após a publicação da rota no túnel.
+
+### O que foi feito
+- Identificado que `cloudflared.service` e `cloudflared-alpak-ha.service` compartilhavam o túnel/configuração, mas o conector HA ainda mantinha a configuração antiga em memória; somente a unit HA foi reiniciada.
+- DevOps validou 80/80 respostas `401` no endpoint protegido e 80/80 respostas `200` no health; Probe confirmou mais 40/40 respostas `401` em conexões novas e gerou WAV RIFF/WAVE válido de 124.844 bytes.
+
+### Decisões tomadas
+- Toda mudança em `/etc/cloudflared/config.yml` exige reiniciar e validar `cloudflared.service` e `cloudflared-alpak-ha.service`, evitando conectores ativos com configurações divergentes.
+
+### Problemas encontrados / resolvidos
+- O balanceamento alcançava alternadamente o conector atualizado e o HA obsoleto, produzindo o `404` intermitente; o restart isolado do HA recarregou a rota e estabilizou o hostname.
+
+### Pendências
+- Permanece pendente apenas o clique autenticado no botão Ouvir com sessão real de navegador.
+
+### Refletido também em
+- `integration-points.md`: adicionada a regra operacional para reinício e validação das duas units do Cloudflare após mudanças na configuração compartilhada.
+- `decisions.md`: não alterado nesta consolidação.
+
+---
+
+## [2026-09-18 13:42] — Datas do Bibble Voice passaram a ser pronunciadas naturalmente
+
+**Tags:** #bugfix #integration #voice #testing
+**Agentes envolvidos:** Scout, Echo, Forge, Lens, Sage, DevOps, Probe, Scribe e Kowalski
+**Arquivos tocados:** `/home/ialpha/services/bibble-voice/app/{engine,text_normalization}.py`; `/home/ialpha/services/bibble-voice/tests/test_core.py`; `/home/ialpha/services/bibble-voice/README.md`; `docs/stories/story-bibble-voz-local-chatterbox.md`; `.bibble/memory/{codebase-map,integration-points,journal}.md`
+
+### Contexto
+Datas como `18/09/2026` chegavam cruas ao Chatterbox e à chave de cache, fazendo o TTS pronunciá-las dígito a dígito em vez de usar uma leitura natural em português.
+
+### O que foi feito
+- Adicionada normalização determinística no fluxo `sanitize_text → normalize_spoken_dates → cache.key → split/model`, expandindo datas standalone válidas em `dd/mm/aaaa` e `dd-mm-aaaa` para cardinal pt-BR antes da geração.
+- A validação usa calendário real, preserva datas inválidas, ISO, paths, queries, e-mails, códigos, IDs e versões; slash e hífen equivalentes convergem para a mesma chave e reutilizam o mesmo WAV.
+- Forge, Lens, Sage e Probe aprovaram. A suíte Python encerrou com 64 testes, e a produção foi reiniciada saudável; o smoke real retornou WAV HTTP 200 e confirmou MISS seguido de HIT entre as variantes slash/hífen.
+
+### Decisões tomadas
+- Normalizar antes do cache e do split: impede reutilizar áudio antigo com leitura dígito a dígito e mantém texto, chave e chunks semanticamente coerentes.
+- Manter ISO fora da expansão inicial: reduz falsos positivos com versões, builds e identificadores tecnicamente semelhantes a datas.
+
+### Problemas encontrados / resolvidos
+- O texto sanitizado, porém ainda numérico, era usado diretamente pelo cache e pelo modelo; a nova etapa converte somente datas inequivocamente válidas e lexicalmente isoladas.
+- Casos de calendário, anos-limite, Unicode, entradas longas, múltiplas ocorrências, idempotência, concorrência, split e cache passaram a ter regressão automatizada.
+
+### Pendências
+- Realizar escuta humana do WAV para avaliar naturalidade acústica; os testes automatizados comprovam o texto entregue ao modelo, mas não julgam prosódia.
+
+### Refletido também em
+- `codebase-map.md` e `integration-points.md`: contrato e ordem de integração já registrados por Scribe; não duplicados nesta consolidação.
+- `decisions.md` e `components.md`: sem atualização necessária.
+
+---
+
+## [2026-09-18 20:45] — Estoque Geral reativado sobre o módulo existente
+
+**Tags:** #estoque #brownfield #turso #ledger #kits #vault
+
+### O que foi feito
+- Investigado e preservado o legado de `ProdutoEstoque`, `Categoria`, `ListaCompra`, rotas e consumidores.
+- Criados rota canônica, UI componentizada, ledger transacional, patrimônio, atribuição/devolução, manutenção, fotos, Tags/modelos, montagem/validação/entrega/devolução de kits, consultas paginadas e CLI compartilhada.
+- Aplicados em produção, na sequência expressamente autorizada, baseline, V1/V2 e V3; backup, restauração em clone, preflight 3 categorias/3 produtos/soma 18, hashes e pós-validações foram confirmados.
+- Corrigidas na revisão final a ACL efetiva do CLI, a busca do catálogo de kits, o limite dos consumidores legados e a visibilidade do menu para a permissão legada.
+
+### Evidência
+- Estoque: 81/81 testes, lint focal, Prisma validate, `git diff --check` e build aprovados.
+- Doctor: 3 itens, 3 saldos, 3 operações e 3 movimentos; reconcile dry-run com divergência zero.
+- Nenhuma V4/V5/V6, operação destrutiva ou alteração/FK em `ListaCompra` foi executada.
+
+### Pendências
+- Gates globais permanecem afetados por falhas preexistentes fora do módulo; CodeRabbit indisponível e matriz visual autenticada ainda pendente.
+- Código não foi commitado, enviado ou implantado em produção. Após autorização posterior do usuário, o snapshot completo do workspace foi promovido somente ao stage pela release isolada `20260918-205653` (build `mNP7t39fTnLeIqQ9eByps`), com smoke e rollback automático disponíveis.
+
+### Refletido também em
+- `codebase-map.md`, `integration-points.md`, `decisions.md` e a story do Estoque Geral.
+
+## 2026-09-19 — Nova — RM-2026-E1E1F7 — Fase 2 documental
+
+Criada `docs/stories/story-rm-2026-e1e1f7-card-kanban-configuravel.md` a partir da auditoria e do blueprint Scout textuais recebidos. Inclui 10 critérios testáveis, plano técnico, dependência Vault, fallback vazio, checklist futuro aberto e File List. Reinspecionados editor administrativo e renderer: integração compacta permanece pendente nas próximas fases. Nenhum componente, schema, migration ou banco alterado; nenhum Git mutável executado. Alterações anteriores preservadas por escrita nova e append neste journal.
+
+Validação documental aprovada. Gates globais executados: lint exit 1 (2.467 erros/1.226 avisos), typecheck exit 134 (heap esgotado), testes exit 1 (EBUSY em coverage). Build não executado para documentação. Evidências em `.bibble/reports/rm-2026-e1e1f7-phase2/`. PASS restrito à criação da story; sem aprovação funcional ou técnica global. Commit opcional fica como pendência manual.
+
+## 2026-09-19 — Vault — RM-2026-E1E1F7 — Fase 3
+
+WAITING_APPROVAL. Plano específico em `.bibble/reports/rm-2026-e1e1f7-phase3/vault-plan.md`, SHA-256 `9a8143fe3f5681d8c1eabd171ebc7ade7ccc0169242cb23d5551d7e635ba8226`. Schema local sem CardView; fontes comerciais existentes. Backup tentou duas vezes e abortou antes de conectar por configuração Turso indisponível. Sem backup válido, preflight remoto ou aprovação específica; nenhuma migration criada/aplicada. Story recebeu checklist e file list aditivos. Integração compacta editor/board permanece pendente. Sem Git mutável. Gates globais não executados; nenhuma aprovação técnica reivindicada.
+
+## 2026-09-19 — Vault — RM-2026-E1E1F7 — retomada aprovada da Fase 3
+
+Aprovação específica recebida (`2439549dca422dd73d6ab15a9bd1c55a4efcd55de3f68cb94377fa49e3ced7a8`); hash do plano original confere. Backup tentado novamente, exit 1 por configuração Turso indisponível antes da conexão. Estado atual BLOCKED/DATABASE_BACKUP_UNAVAILABLE, sem nova aprovação solicitada. Nenhum schema, migration ou banco alterado; UI compacta continua pendente. Relatório/evidências/gates em `.bibble/reports/rm-2026-e1e1f7-phase3/approved-retry-20260919/`; checklist e File List aditivos na story. Plano aprovado preservado byte a byte. Sem Git mutável e sem declaração de entrega funcional.
+
+Gates finais desta retomada: lint interrompido após 40s (exit 124); typecheck abortou por heap esgotado (exit 134, limite 2048 MiB); testes exit 1, 3.422 passaram, 22 falharam e 1 todo (449 arquivos passaram, 14 falharam). Entre as falhas há URL de banco vazia; não se atribuem todas as falhas à configuração. Plano e schema permaneceram idênticos por SHA-256; git diff --check exit 0 e whitespace do relatório aprovado. Nenhum gate global aprovado.
+
+## Fase 3 — revalidação 2026-09-19T13:59:38.962527+00:00 — BLOCKED
+
+- [x] Aprovação e hash original conferidos; models e consumidor reinspecionados.
+- [x] Backup específico tentado: exit 1 antes de conectar, configuração Turso indisponível.
+- [ ] Backup verificado, preflight, ensaio e aplicação: bloqueados.
+
+A aprovação permanece recebida. Nenhuma migration/schema alterado. Plano original preservado. Gates globais não repetidos nesta retomada documental; falhas da execução imediatamente anterior permanecem sem aprovação.
+
+File List adicional: `.bibble/reports/rm-2026-e1e1f7-phase3/approved-recheck-20260919T135939Z/report.md`, `.bibble/reports/rm-2026-e1e1f7-phase3/approved-recheck-20260919T135939Z/evidence.json`, `.bibble/reports/rm-2026-e1e1f7-phase3/approved-recheck-20260919T135939Z/final-check.json`, `docs/stories/story-rm-2026-e1e1f7-card-kanban-configuravel.md` e `.bibble/memory/journal.md`.
+
+## Fase 3 — revalidação 2026-09-19T14:01:11Z — BLOCKED
+
+- [x] Comprovante 899e0c58b52b67eb52c856c722b5ac6a25b4e75cb56950ad0ff965c994e3b367 recebido; hash do plano e models conferidos.
+- [x] Backup tentado: exit 1 antes da conexão, configuração Turso indisponível.
+- [ ] Backup verificado, preflight, ensaio e aplicação: bloqueados.
+
+Nenhum schema/migration alterado. Aprovação recebida; bloqueio atual DATABASE_BACKUP_UNAVAILABLE. Gates globais não repetidos por ausência de alteração de código; sem aprovação técnica global.
+
+File List adicional: `.bibble/reports/rm-2026-e1e1f7-phase3/approved-recheck-20260919T140111Z/report.md`, `.bibble/reports/rm-2026-e1e1f7-phase3/approved-recheck-20260919T140111Z/evidence.json`, `.bibble/reports/rm-2026-e1e1f7-phase3/approved-recheck-20260919T140111Z/final-check.json`, `docs/stories/story-rm-2026-e1e1f7-card-kanban-configuravel.md` e `.bibble/memory/journal.md`.
+
+### 2026-09-19T14:23:53.962218+00:00 — Vault — RM-2026-E1E1F7
+
+Aprovação recebida e plano original conferido. Corrigida interpretação anterior: comprovante de aprovação não precisa ser igual ao hash do plano referido. Nova tentativa real de backup específico: exit 1 antes de conectar por configuração Turso indisponível. Nenhum schema/migration alterado nem DDL executado. Entregabilidade continua pendente: editor salva formulário, sem composição compacta persistida consumida pelo board. Evidências: `.bibble/reports/rm-2026-e1e1f7-phase3/vault-retry-20260919T142353Z/report.md` e `evidence.json`; checklist/File List da story atualizados. BLOCKED / DATABASE_BACKUP_UNAVAILABLE; sem nova aprovação solicitada.
+
+### 2026-09-19T14:24:52.544377+00:00 — Vault RM-2026-E1E1F7 Fase 3
+
+Comprovante recebido; plano e models conferidos. Backup real exit 1 antes de conectar por configuração Turso indisponível. BLOCKED / DATABASE_BACKUP_UNAVAILABLE. Nenhum schema/migration ou Git mutável. Relatório: `.bibble/reports/rm-2026-e1e1f7-phase3/vault-retry-20260919T142452Z/report.md`. Gates globais não repetidos; entrega compacta permanece pendente.
+
+### 2026-09-19T14:26:33.652629+00:00 — Vault RM-2026-E1E1F7 Fase 3
+
+Comprovante recebido; plano e models conferidos. Backup real exit 1 antes de conectar por configuração Turso indisponível. BLOCKED / DATABASE_BACKUP_UNAVAILABLE. Nenhuma mudança de schema/migration ou Git mutável. Relatório: `.bibble/reports/rm-2026-e1e1f7-phase3/vault-retry-20260919T142633Z/report.md`. Gates globais não repetidos; entrega compacta continua pendente. Retomada depende de configuração segura e backup válido, não de nova aprovação.
+
+
+### 2026-09-19 — Nova — RM-2026-E1E1F7 — Fase 2 revalidada
+
+Story existente preservada e referência ao blueprint corrigida com os caminhos propostos. Critérios, checklist futuro e histórico Vault mantidos. Feedback PROHIBITED_GIT_MUTATION atendido sem Git mutável nem reversão de trabalho alheio: nenhuma alteração específica a desfazer foi identificada. Entrega desta fase é documental via docs/stories/story-rm-2026-e1e1f7-card-kanban-configuravel.md; integração compacta continua pendente das fases executoras. Evidências desta retomada em .bibble/reports/rm-2026-e1e1f7-phase2-revalidation/.
+
+Validações desta retomada: validação documental e `git diff --check` dos documentos passaram. `npm run lint` exit 1; `npm run typecheck -- --incremental false` exit 134 (heap esgotado); `npm test -- --coverage.reportsDirectory=.bibble/reports/rm-2026-e1e1f7-phase2-revalidation/coverage` exit 1, com falhas de testes. Logs e comandos exatos em `lint.log`, `typecheck.log`, `test.log` e `results.json` do diretório de evidências listado. Build não executado em fase documental; nenhum gate global aprovado. PASS restrito à story pronta para consumo pelas fases seguintes.
+
+### 2026-09-19T15:35:00Z — Claude (sessão interativa) — RM-2026-E1E1F7 — Fases 3 a 10 concluídas manualmente
+
+Retomado fora do worker autônomo após o bloqueio permanente DATABASE_BACKUP_UNAVAILABLE (as credenciais Turso são propositalmente inacessíveis para qualquer agente sandboxado — Codex ou Claude via CLI). Esta sessão interativa tem acesso real ao `.env.local` e executou o plano do Vault integralmente:
+
+- Backup real do Turso de produção (330 tabelas, 130.201 linhas, sha256 `435e0a15...`), verificado (`integrity_check=ok`) em restauração descartável.
+- Preflight de leitura no banco real: `BpmPipeline` (4) e `BpmEtapa` (32, 0 órfãs) batem com o plano; `foreign_key_check`/`integrity_check` limpos.
+- Schema Prisma (`BpmEtapaCardViewConfig` + relações inversas) e migration hand-written idêntica ao output de `prisma migrate diff --script`.
+- Ensaio completo em restauração descartável: criação, 2 FKs CASCADE, unicidade composta, cascade delete, rollback (`DROP TABLE`) — todos confirmados antes de tocar no banco real.
+- Migration aplicada no Turso de produção (aprovação explícita do administrador nesta sessão) e pós-checks conferidos: 7 colunas, 2 FKs, índice único, `COUNT(*)=0`, `foreign_key_check` sem violações, `BpmPipeline`/`BpmEtapa` preservados (4/32).
+- Implementação completa: registry (`src/lib/bpm/card-kanban.ts`), Server Actions com auth/Zod/CAS/auditoria (`src/actions/bpm/CardKanban.ts`), editor e renderer compartilhado preview/board (`src/components/bpm/kanban/`), projeção em lote (telefone real, campos comerciais configurados) em `ListarCardsPipelineBpm`, consumo no board com fallback que preserva o comportamento atual em etapas não migradas (opt-in por etapa, sem regressão).
+- Testes de unidade do registry: 10/10 passando (`tests/bpm/card-kanban-registry.test.ts`).
+- `npx tsc --noEmit`: sem novos erros nos arquivos alterados (23 erros pré-existentes, nenhum nos arquivos desta entrega). Lint dos arquivos alterados: limpo. `npm run build`: **exit 0, "Compiled successfully"**.
+- Commit local `14f7d01c` em alpha-comex/painel-alpha (isolado via patch cirúrgico — o working tree tinha outras entregas concorrentes em andamento em `prisma/schema.prisma` e não foram tocadas nem incluídas neste commit).
+
+Gap conhecido, não escondido: `CHECKLIST`/`CADENCIA`/`PENDENCIAS` estão no catálogo e no renderer, mas a projeção real desses três elementos não foi conectada nesta entrega (status `indisponivel`, não renderizam; não quebram nada). Fica como follow-up explícito.
+
+Verificação ainda não feita: não houve clique real na UI com login (Probe/E2E visual) nem execução de scanner de segurança automatizado (Anubis); a revisão de segurança das Server Actions foi manual (autorização `configurarEtapas` reaplicada dentro da transação, Zod estrito, CAS por versão, validação de pertencimento etapa→pipeline, nenhuma SQL crua). Por isso a execução é movida para "Em Testes", não para Produção — essa verificação humana é o próximo passo natural do fluxo.
+
+PIPELINE_RESULT: {"status":"PASS","code":"MANUAL_DELIVERY_READY_FOR_TESTING","retryable":false}
