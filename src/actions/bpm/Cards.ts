@@ -1883,13 +1883,13 @@ async function executarMovimentoLegadoDesativado(
     }
     if (Object.keys(camposValores).some((campoId) => {
       const campo = camposAtuais.find((item) => item.id === campoId);
-      return (campo?.escopo === "GLOBAL" && Boolean(campo.fonteEntidade)) || campo?.somenteLeitura || campo?.editavel === false;
+      return campo?.somenteLeitura === true || campo?.editavel === false;
     })) {
       throw new Error("MOVIMENTO_INVALIDO:Um ou mais campos informados são somente leitura.");
     }
     const valoresParaValidar = etapaEhFechado(destinoAtual.nome)
       ? Object.fromEntries(
-          camposAtuais.filter((campo) => !(campo.escopo === "GLOBAL" && Boolean(campo.fonteEntidade)) && !campo.somenteLeitura && campo.editavel !== false).map((campo) => [
+          camposAtuais.filter((campo) => !campo.somenteLeitura && campo.editavel !== false).map((campo) => [
             campo.id,
             camposValores[campo.id] ?? campo.valor ?? "",
           ]),
@@ -2154,6 +2154,10 @@ async function executarMovimentoCanonico(
   revalidatePath(`${ROTA_BASE}/tarefas`);
   return cardsFilhosCriados.length ? { success: true, cardsFilhosCriados } : { success: true };
 }
+
+// Mantém a implementação de caracterização referenciada enquanto o histórico
+// de migração para o TransitionCommand ainda for necessário.
+void executarMovimentoLegadoDesativado;
 
 export async function SalvarRequisitosEMoverCardBpm(dados: unknown) {
   try {

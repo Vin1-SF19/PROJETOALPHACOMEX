@@ -1,0 +1,1 @@
+tests/bibble/route-runner.integration.test.ts(19,38): error TS2459: Module '"@/app/api/bibble/chat/route"' declares 'runStream' locally, but it is not exported.

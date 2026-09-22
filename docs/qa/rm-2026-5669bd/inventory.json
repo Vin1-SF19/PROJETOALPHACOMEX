@@ -1,0 +1,590 @@
+{
+  "capturedAt": "2026-09-22T12:48:05.503939+00:00",
+  "head": "5f575f2539708fc3b25bfeed889a0349192ba1f1",
+  "headTree": "98ab0e3cb6ba3d559ab0755f2cbb9ba83bc55192",
+  "candidateTree": null,
+  "note": "Read-only inventory of local source dependencies, not an isolated Git candidate. Public assets, tests and generated prerequisites require DevOps review.",
+  "files": [
+    {
+      "path": "auth.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "472efec1403e8c5872e4cf0cc505a31072e7b543f380abba2406b4f24e81f383",
+      "ignored": false
+    },
+    {
+      "path": "next.config.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "1b9e2b1a78c381dd13c15e8d4e7fd6a6c561f83fed9aea9d2735e06ea422c192",
+      "ignored": false
+    },
+    {
+      "path": "package-lock.json",
+      "tracked": true,
+      "exists": true,
+      "sha256": "0ae1b3d34d910d87d595e71cd12dd4896dac4039fc1b00b3f47434ea50b3ccb0",
+      "ignored": false
+    },
+    {
+      "path": "package.json",
+      "tracked": true,
+      "exists": true,
+      "sha256": "e906d7bdf6e4c1ea7a53ae1037c96f3a368e8533bae2720bfbfe353849732377",
+      "ignored": false
+    },
+    {
+      "path": "prisma/migrations/20260904133000_bpm_regras_persistencia/migration.sql",
+      "tracked": true,
+      "exists": true,
+      "sha256": "ee4bed8908f8fddb3db9312e3d8940397343630def5845b0e43b5b7212dae423",
+      "ignored": false
+    },
+    {
+      "path": "prisma/migrations/20260904160000_bpm_sla_prazos_alertas/migration.sql",
+      "tracked": true,
+      "exists": true,
+      "sha256": "b486c1e22f59dd36ce8c8e8b0014fde914dc318fea5a20c0cce4544904b04a21",
+      "ignored": false
+    },
+    {
+      "path": "prisma/migrations/20260904180500_bpm_sla_config_completa/migration.sql",
+      "tracked": true,
+      "exists": true,
+      "sha256": "b9171a2ce1a947c631f4ae816d24bd46b83eab133bcb049f152c8d11f75f462d",
+      "ignored": false
+    },
+    {
+      "path": "prisma/schema.prisma",
+      "tracked": true,
+      "exists": true,
+      "sha256": "fff59aaff5e6691a7d819be6d844ba176856b1aba8e2cb91054cff5e44389030",
+      "ignored": false
+    },
+    {
+      "path": "scripts/build-apresentacoes-player.mjs",
+      "tracked": true,
+      "exists": true,
+      "sha256": "0c663efaa4eab27aa0f8ae7cb5b531f69554dc564e0d685b9584b105c8eeb21d",
+      "ignored": false
+    },
+    {
+      "path": "src/actions/RecursosHumanos.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "a632b0cdf9a4ea286f4a82bc035452c4f09d1b8505fbc0f468e2a9ad3e3137c1",
+      "ignored": false
+    },
+    {
+      "path": "src/actions/bpm/Conhecimento.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "f23f377eabcfa305bfe8ded6a14899f6d914b1d0211ddefa5fc168f111c2b376",
+      "ignored": false
+    },
+    {
+      "path": "src/actions/bpm/Pendencias.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "379f9f87c78d79f4bd2580b962dc74bdab2c0bfd7129bc3a3520b842b9434557",
+      "ignored": false
+    },
+    {
+      "path": "src/actions/bpm/Pipelines.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "341d3c0125ba94cebed84eb437ad4f2aca529578c7434e46c91dd2b3ea147cf3",
+      "ignored": false
+    },
+    {
+      "path": "src/actions/bpm/Regras.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "3e5554193de0eb09bba2482d6a9610939f9e0c8ae4117837e620e9a234cc38c0",
+      "ignored": false
+    },
+    {
+      "path": "src/app/PainelAlpha/AlphaCRM/CRMBackground.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "bb0c3dc1b196f389a1ecd9e62568f8c00110d239d068b81d8f0f632f1cf2943f",
+      "ignored": false
+    },
+    {
+      "path": "src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "129e8b985a0584c261af05d0154a1edf1e08867d86e8bb6035837d0cfc42e29f",
+      "ignored": false
+    },
+    {
+      "path": "src/app/PainelAlpha/AlphaCRM/admin/AdminPipelinesListClient.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "9bdda20e1bf5504ec56312ddd63ed572023c03f48ec28dbc90f21c4a7b6981af",
+      "ignored": false
+    },
+    {
+      "path": "src/app/PainelAlpha/AlphaCRM/admin/conhecimento/page.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "d297ed2cd37a70796f507fa80e905d16c49d6c1781662e0b10a59c0a785a0b3f",
+      "ignored": false
+    },
+    {
+      "path": "src/app/PainelAlpha/AlphaCRM/admin/page.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "6a60d1587cc99788d84d37d747dee988ee7885cd7e66be9bc368f2a325daa130",
+      "ignored": false
+    },
+    {
+      "path": "src/app/PainelAlpha/AlphaCRM/admin/regras/page.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "92553159a78bbcbcebe248761cd30410c176f63e0380483a12a2efb187803196",
+      "ignored": false
+    },
+    {
+      "path": "src/app/PainelAlpha/AlphaCRM/pendencias/page.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "f913544707411bc39ddbe659b8b38f5ff89fc7be328ccd71fc13aabee43bd54a",
+      "ignored": false
+    },
+    {
+      "path": "src/components/CalendarioAlpha/lib/datas.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "f3fd97e370412c6829aa3182e2417241d77dfc3b8c898047a7f1d4f0682c2165",
+      "ignored": false
+    },
+    {
+      "path": "src/components/Notas/NoteEditor/MentionList.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "adf7b9547917cbfbbbd881df5e19cd39940e07cff4798267c291d188788bec92",
+      "ignored": false
+    },
+    {
+      "path": "src/components/Notas/NoteEditor/NoteEditorPrimitives.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "c4f492299c33fc1fcbc591988f58dd90f53da67ea7847a830f7efc9d99aa7ffc",
+      "ignored": false
+    },
+    {
+      "path": "src/components/Notas/NoteEditor/SlashCommandList.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "6cc0f4930e0e6be0562ac80dcbfdbfd2f2f993714929a8f037d80108e34d7d70",
+      "ignored": false
+    },
+    {
+      "path": "src/components/Notas/NoteEditor/TableEditPanel.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "517a7452ba0908b7a2848139b6a93e551183376b3612211ec68e6b3b2774d4dd",
+      "ignored": false
+    },
+    {
+      "path": "src/components/Notas/NoteEditor/TableSizePicker.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "af8699c889a7712be0c7dff4b7d1ec1615c9847a0fe3b1bf594260321c38dbbc",
+      "ignored": false
+    },
+    {
+      "path": "src/components/Notas/NoteEditor/mention-suggestion.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "b1d104cd74f1d78b2438d2ec1bafeddfe6ef2eeb476f3c4cedb977bfdadd2020",
+      "ignored": false
+    },
+    {
+      "path": "src/components/Notas/NoteEditor/slash-command.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "966fc97bd43a0337b14bda98ba5efce75c0d06e944242433a672920963c7d461",
+      "ignored": false
+    },
+    {
+      "path": "src/components/PerfilEmpresaGlobal/PerfilEmpresaModal.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "5e4d3237121acece1e29d9dbb5fc8c044ed36b70423f3cdb7950e038e46ab4fc",
+      "ignored": false
+    },
+    {
+      "path": "src/components/PerfilEmpresaGlobal/PerfilEmpresaProvider.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "dd6e4af074eb0ce2e283e6845592d4fa08f4482bd3f2b42b613e2bc6c91d5f46",
+      "ignored": false
+    },
+    {
+      "path": "src/components/PerfilEmpresaGlobal/Timeline.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "241db8c64b9a40001130b9d66545705a2fa0563383f2cd847d4b2747ffcf5f11",
+      "ignored": false
+    },
+    {
+      "path": "src/components/PerfilEmpresaGlobal/index.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "acdc0cb4995db3c64bd715a19dd85e3837aa48a258ae2028086c01308b6a0e5b",
+      "ignored": false
+    },
+    {
+      "path": "src/components/PerfilEmpresaGlobal/useClientTimeline.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "0ba8ef844d728c3ff9e0203eb4aeccf2aaad893b2152c6fce9e39f7eb7fce584",
+      "ignored": false
+    },
+    {
+      "path": "src/components/bpm/conhecimento/ConhecimentoWorkspace.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "d75fc4cc27d2999bd1963a2366b83aaf1f099e0d3653cb5946ce598de40fe1f5",
+      "ignored": false
+    },
+    {
+      "path": "src/components/bpm/conhecimento/ScriptEtapaEditor.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "412ff307912b819a7c00e3130046124e75306c3b1a103a40fa4929e764459f04",
+      "ignored": false
+    },
+    {
+      "path": "src/components/bpm/pendencias/PendenciasWorkspace.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "7b0485b84eea41345291c17f3f8c764c876135abee609d03187959fe66a279e0",
+      "ignored": false
+    },
+    {
+      "path": "src/components/bpm/regras/RegraFormDialog.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "8437a5a58077b8395afbd99e11b59064ac8521741a5113c6e5b8da0f072508ea",
+      "ignored": false
+    },
+    {
+      "path": "src/components/bpm/regras/RegrasWorkspace.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "a3f0c2846c18cc065b9f0cbfa2a19623aaebd8f91125ec22f96670d94e1c5d9f",
+      "ignored": false
+    },
+    {
+      "path": "src/components/bpm/regras/types.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "f816c66dd13cf68c744bde2612e7f79efdda0f19928ed91fd35d0ae8df184fef",
+      "ignored": false
+    },
+    {
+      "path": "src/components/crm-visual/index.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "d01917d09ebeaf0d24235902d24ecd702088933cb3689a65b02c06560eab2306",
+      "ignored": false
+    },
+    {
+      "path": "src/components/crm-visual/primitives.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "7e7e67cc6005b19da68fcfd77fb007b76e1766a124d4bc2f371ed4c744a4b370",
+      "ignored": false
+    },
+    {
+      "path": "src/components/ui/alert-dialog.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "129fa428c6c936787d4ee89cd9a2a789e9d7cc806dd46fecf98a82f86cb88d19",
+      "ignored": false
+    },
+    {
+      "path": "src/components/ui/badge.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "6dbd83d8aa66b16389225ca9fbce387c03c5b8196a34e0f7bab97a2d18480f6c",
+      "ignored": false
+    },
+    {
+      "path": "src/components/ui/button.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "1baf62b6f0adea29c221c456df0ec77d323a7ff5e4f368dbdadd53fee1868490",
+      "ignored": false
+    },
+    {
+      "path": "src/components/ui/checkbox.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "ecef2a947a216ab8db86ed851bbe3902f6f8e5604e97d169c36a35ab4197b83d",
+      "ignored": false
+    },
+    {
+      "path": "src/components/ui/dialog.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "86e01dc7623b53de507651a4cf0f5e7447390357925ad135faaea81008b27dc7",
+      "ignored": false
+    },
+    {
+      "path": "src/components/ui/dock.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "3e1db3cb901802006125cde87849550f91d8040a9049b77b781c1d5b74ca9bb0",
+      "ignored": false
+    },
+    {
+      "path": "src/components/ui/flow-button.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "af474d7e6dd87cda09bd50c0b4c4eacea7c23f031ebf46772a7266ea80180d1d",
+      "ignored": false
+    },
+    {
+      "path": "src/components/ui/input.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "025efdf41181b695274497ae1165e0dc3ab0620fb23eae2adf95e4e29f4cebbf",
+      "ignored": false
+    },
+    {
+      "path": "src/components/ui/popover.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "47e5dbd1e657967e2cdb05cc4ce6fd4dca9f1de505e77cde35c4527cdfb5fa6c",
+      "ignored": false
+    },
+    {
+      "path": "src/components/ui/select.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "71459423cd653def7dc3b55e2b5fd583955903ecc6c4a32889303c496e36f198",
+      "ignored": false
+    },
+    {
+      "path": "src/components/ui/skeleton.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "5dfd6dc31cea89e7deda95eea9c446eeeca9220f107e4aa15163ff72e6b9e19c",
+      "ignored": false
+    },
+    {
+      "path": "src/components/ui/switch.tsx",
+      "tracked": true,
+      "exists": true,
+      "sha256": "0e79c8ce83a04f88128543e321f24df9bd00bdcb18c639a1af48a24ec52bd96c",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/auth/acesso-painel.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "563f7f949ae6fb617038ce3143be389a3902c774f33482ce81385cada9304883",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/auth/rate-limit.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "49cff5977c48a070f90921a584530bebc80663d1bd42e4d3ea6aa31896793840",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/bpm/boas-vindas.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "7b986b4f20ec83492a3d197e33843e367bc9870aac3f2440559e63fd4e166e4e",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/bpm/config-version.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "53b71a0ba09f6679fa93479449079e48a310117a4bd979af2eda2b4312cb1fec",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/bpm/novos-leads.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "14037391bd3eb9538011b250e00f9bb44f1fff212569d680cbcc7bbe1507f337",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/bpm/ownership.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "b5a9b21adabc053a2c793e0c676c270b7fb4722b27d9a022684e8ae3ef746fbc",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/bpm/pendencias/motor.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "a918bd06380d588ffb262bdb836c1beb7c162564969da81e1325347e4aafa42b",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/bpm/realtime-server.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "e1504656310d51202e41293c9d125e29ca55c5b88f65336bc6a335d15a49f21c",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/bpm/realtime.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "33cc0b212b15be450c361d6b4e5dc62a67b51bdd378899a1769a48f9ade09650",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/bpm/regras/legado.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "eee1046f8b36e68cb803c8d77b3d2b56e16aa60dd785a307e4a4f2ffa4f38152",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/bpm/regras/persistencia-schemas.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "e5d66d0debda9cd867c3981050177a95eb379ebff55103a2cd8fb067f178656a",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/bpm/regras/schemas.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "50a79cb051e1a683145e92779dea0d02cefb17608c4cd81b6da73b7966b957d4",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/bpm/regras/types.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "de32ca4227514a5b9ff00ece86cb34e03f495b97b01f242959927c6e99fa9115",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/bpm/script-etapa.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "39e695440d93e00f69429f58a5082f7edccd642c5e8d59dd7de6f35b182c84fe",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/bpm/status-pos-fechamento.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "77d111668ce2a8516c2d3e4c8aded718e40313bf59538b17f007b0c47733d764",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/bpm/tarefas-tipo.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "582fe05a834d9e417090e922418e58b70e558b0b53e903692f8157f662dfdfaf",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/bpm/visibilidade-etapa.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "d94a1075da2d5009f12dc161332e3285c365817cf5be18e5c7730a9f22308d5f",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/format-cnpj.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "b7083768821b3695825c52a6236dc470745c87b2c8c52b6a533d8eaca9bd68eb",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/format-date.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "e3f7a803885939008ef716d0a816171dcfed1681f4c81798403744afe03a7293",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/prisma.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "3688b5d4124851f1c9481b2853e70e93c1eb596dcfe0908465dcf9caf93f6dcf",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/pusher-server.ts.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "3f66eebe46e7d573efb760bc51c027f7dbd8863334fb9a1d2e324176520fba2a",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/roles.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "e376b4c796549bf6bd45a1e9caa017b5717f367976b5e2a9a41b9c42c62a4d01",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/temas.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "3d719b87ef988c5060f870727696de91571cbe04213a7cbaa5e48f9b99bc681f",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/timeline/types.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "f4ed4c9a2fa38297c02e0372024ed2d77ada3b3c714832891d3a478b6a8c7666",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/user.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "1cafda84ffb28aff699b43d92f62374ecfdb1179ed2019fe9285e87223afcfc2",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/utils.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "7c8c3dfc0cdd370d44932828eb067ef771c8fe7996693221d5d4b90af6d54f2d",
+      "ignored": false
+    },
+    {
+      "path": "src/lib/validations/bpm.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "d5a50e07e93e552d44c3f0a9dea0197bcb1a251a2f87dd773e1c6ec9852b1294",
+      "ignored": false
+    },
+    {
+      "path": "tsconfig.json",
+      "tracked": true,
+      "exists": true,
+      "sha256": "c06d7b376f54d158f7e63833d98bf1f66747eecf9a9fca1d03fb038d94e4159d",
+      "ignored": false
+    },
+    {
+      "path": "vitest.config.ts",
+      "tracked": true,
+      "exists": true,
+      "sha256": "c1b8129c51c697c3ceb88ce32d3cd0e186a91149bcbf9b4c8f26ef18e55a9550",
+      "ignored": false
+    }
+  ]
+}

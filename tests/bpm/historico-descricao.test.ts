@@ -60,7 +60,7 @@ describe("descreverEventoHistorico", () => {
       status: "CONCLUIDO",
       checklistId: idTecnico,
       itemId: idTecnico,
-    })).toBe("Item de checklist marcado como concluído");
+    })).toBe("Item de procedimento marcado como concluído");
 
     const automacao = descrever("AUTOMACAO_EXECUTADA", undefined, {
       nome: "Distribuir oportunidades",

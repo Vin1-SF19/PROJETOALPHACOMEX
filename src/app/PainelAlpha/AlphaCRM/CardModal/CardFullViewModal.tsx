@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 
 
 
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 import { isAdminRole } from "@/lib/roles";
@@ -51,7 +52,10 @@ interface Props {
 }
 
 function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, currentUserId, currentUserRole, onClose, onAtualizado, onAbrirCard, abrirChecklistInicial = false }: Props) {
-  const { flushSaves } = useCardSave();
+  const { flushSaves, getPendingFields } = useCardSave();
+  const [camposNaoSalvos, setCamposNaoSalvos] = useState<string[]>([]);
+  const fechandoRef = useRef(false);
+  const focoAnteriorRef = useRef<HTMLElement | null>(null);
   const [card, setCard] = useState<CardDetalhe | null>(null);
   const [etapas, setEtapas] = useState<EtapaOpcao[]>([]);
   const [interacoes, setInteracoes] = useState<Interacao[]>([]);
@@ -180,14 +184,19 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
         ? "Aguarde a validação do último follow-up antes de fechar este card."
         : estadoFollowUpAtual === "ERRO"
           ? "Não foi possível validar o follow-up. Recarregue a seção antes de fechar o card."
-          : "Conclua o checklist do último follow-up antes de fechar este card.");
+          : "Conclua o procedimento do último follow-up antes de fechar este card.");
       return;
     }
+    if (fechandoRef.current || camposNaoSalvos.length) return;
+    fechandoRef.current = true;
+    focoAnteriorRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     await Promise.resolve();
     const savesConcluidos = await flushSaves();
+    fechandoRef.current = false;
     if (!savesConcluidos) {
-      toast.error("Não foi possível salvar todas as alterações. O card permanecerá aberto.");
+      const pendentes = getPendingFields();
+      setCamposNaoSalvos(pendentes.length ? pendentes : ["Alterações cujo salvamento não foi confirmado"]);
       return;
     }
     onClose();
@@ -231,6 +240,24 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
                    />
               </CardAbertoLayout>
         )}
+        <AlertDialog open={camposNaoSalvos.length > 0} onOpenChange={(open) => { if (!open) setCamposNaoSalvos([]); }}>
+          <AlertDialogContent onCloseAutoFocus={(event) => { event.preventDefault(); focoAnteriorRef.current?.focus(); }}>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Campos não salvos</AlertDialogTitle>
+              <AlertDialogDescription>As alterações abaixo não foram confirmadas. Deseja sair mesmo assim?</AlertDialogDescription>
+            </AlertDialogHeader>
+            <ul className="max-h-60 overflow-auto list-disc pl-5 text-sm text-foreground">
+              {camposNaoSalvos.map((nome) => <li key={nome}>{nome}</li>)}
+            </ul>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={() => {
+                toast.warning("As alterações pendentes não foram salvas.");
+                onClose();
+              }}>Sair mesmo assim</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </SheetContent>
     </Sheet>
   );

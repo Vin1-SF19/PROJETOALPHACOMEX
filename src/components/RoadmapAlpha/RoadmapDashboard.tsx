@@ -256,11 +256,14 @@ export function RoadmapDashboard({
   const [productionModuleKey, setProductionModuleKey] = useState<string | null>(
     null,
   );
-  const [awaitingApproval, setAwaitingApproval] = useState<
-    Map<string, string>
-  >(new Map());
+  const [awaitingApproval, setAwaitingApproval] = useState<Map<string, string>>(
+    new Map(),
+  );
   const [needingAttention, setNeedingAttention] = useState<
-    Map<string, { executionId: string; status: "BLOCKED" | "NEEDS_INPUT" }>
+    Map<
+      string,
+      { executionId: string; status: "BLOCKED" | "NEEDS_INPUT" | "FAILED" }
+    >
   >(new Map());
   const [objectiveExecutions, setObjectiveExecutions] = useState<
     Map<string, { executionId: string; status: string }>
@@ -549,7 +552,8 @@ export function RoadmapDashboard({
                     <span>
                       {
                         objectives.filter(
-                          (objective) => lifecycleOf(objective) === lifecycleFilter,
+                          (objective) =>
+                            lifecycleOf(objective) === lifecycleFilter,
                         ).length
                       }
                     </span>
@@ -589,7 +593,10 @@ export function RoadmapDashboard({
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="sistemas-externos" className="border-white/10">
+            <AccordionItem
+              value="sistemas-externos"
+              className="border-white/10"
+            >
               <AccordionTrigger className="px-3 py-3 text-xs font-semibold text-slate-400 hover:text-slate-200 hover:no-underline">
                 Sistemas Externos
               </AccordionTrigger>
@@ -750,7 +757,10 @@ export function RoadmapDashboard({
                               {needingAttention.get(objective.id)?.status ===
                               "NEEDS_INPUT"
                                 ? "Aguardando resposta — precisa de você"
-                                : "Bloqueado — precisa de você"}
+                                : needingAttention.get(objective.id)?.status ===
+                                    "FAILED"
+                                  ? "Falha detectada — fluxo pausado para correção"
+                                  : "Bloqueado — precisa de você"}
                             </span>
                             <button
                               type="button"
@@ -799,9 +809,7 @@ export function RoadmapDashboard({
                                   type="button"
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    setProductionModuleKey(
-                                      objective.moduleKey,
-                                    );
+                                    setProductionModuleKey(objective.moduleKey);
                                     setView("production");
                                   }}
                                   className="inline-flex items-center gap-1 rounded-full border border-cyan-400/20 bg-cyan-400/[.06] px-2 py-1 text-[10px] text-cyan-300 hover:bg-cyan-400/10"
@@ -1078,23 +1086,23 @@ export function RoadmapDashboard({
       </div>
 
       {canMutate && (
-      <CreateObjectiveDialog
-        key={objectives.length}
-        open={createOpen}
-        onOpenChange={(open) => {
-          setCreateOpen(open);
-          if (!open) setCreateNovoModuloPreset(false);
-        }}
-        modules={modules}
-        nextPriority={activeObjectiveCount + 1}
-        novoModuloPreset={createNovoModuloPreset}
-        onCreated={() => {
-          setCreateOpen(false);
-          setCreateNovoModuloPreset(false);
-          void refreshObjectives();
-          router.refresh();
-        }}
-      />
+        <CreateObjectiveDialog
+          key={objectives.length}
+          open={createOpen}
+          onOpenChange={(open) => {
+            setCreateOpen(open);
+            if (!open) setCreateNovoModuloPreset(false);
+          }}
+          modules={modules}
+          nextPriority={activeObjectiveCount + 1}
+          novoModuloPreset={createNovoModuloPreset}
+          onCreated={() => {
+            setCreateOpen(false);
+            setCreateNovoModuloPreset(false);
+            void refreshObjectives();
+            router.refresh();
+          }}
+        />
       )}
       {canMutate && selected && (
         <EditObjectiveDialog
@@ -1235,8 +1243,8 @@ function CreateObjectiveDialog({
         {novoModuloPreset && (
           <div className="rounded-xl border border-violet-400/20 bg-violet-400/[.06] px-3 py-2 text-[11px] leading-5 text-violet-200/90">
             As restrições já foram pré-preenchidas com a checklist obrigatória
-            de registro de módulo (MODULOS_REGISTRY). Ajuste se necessário,
-            mas não remova os passos de integração.
+            de registro de módulo (MODULOS_REGISTRY). Ajuste se necessário, mas
+            não remova os passos de integração.
           </div>
         )}
         <form onSubmit={submit} className="space-y-4">
@@ -1373,22 +1381,20 @@ function CreateObjectiveDialog({
               escolhido aqui.
             </p>
             <div className="grid gap-2 sm:grid-cols-2">
-              {(
-                [
-                  {
-                    id: "claude" as const,
-                    label: "Claude",
-                    description: "Implementa via Claude Code, no chat",
-                    disabled: false,
-                  },
-                  {
-                    id: "codex" as const,
-                    label: "Codex",
-                    description: "Ainda não configurado",
-                    disabled: true,
-                  },
-                ]
-              ).map((brain) => (
+              {[
+                {
+                  id: "claude" as const,
+                  label: "Claude",
+                  description: "Implementa via Claude Code, no chat",
+                  disabled: false,
+                },
+                {
+                  id: "codex" as const,
+                  label: "Codex",
+                  description: "Ainda não configurado",
+                  disabled: true,
+                },
+              ].map((brain) => (
                 <button
                   key={brain.id}
                   type="button"
@@ -1631,22 +1637,20 @@ function EditObjectiveDialog({
               próximas fases usam a nova preferência.
             </p>
             <div className="grid gap-2 sm:grid-cols-2">
-              {(
-                [
-                  {
-                    id: "claude" as const,
-                    label: "Claude",
-                    description: "Implementa via Claude Code, no chat",
-                    disabled: false,
-                  },
-                  {
-                    id: "codex" as const,
-                    label: "Codex",
-                    description: "Ainda não configurado",
-                    disabled: true,
-                  },
-                ]
-              ).map((brain) => (
+              {[
+                {
+                  id: "claude" as const,
+                  label: "Claude",
+                  description: "Implementa via Claude Code, no chat",
+                  disabled: false,
+                },
+                {
+                  id: "codex" as const,
+                  label: "Codex",
+                  description: "Ainda não configurado",
+                  disabled: true,
+                },
+              ].map((brain) => (
                 <button
                   key={brain.id}
                   type="button"

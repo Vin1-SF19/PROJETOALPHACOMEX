@@ -1,23 +1,10 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/prisma";
-import { getReceitaData } from "@/app/api/ReceitaFederal/route";
+import { getReceitaData } from "@/lib/cnpj/receita-federal";
+import { parseDateBR } from "@/lib/cnpj/parse-date-br";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-export function parseDateBR(value: any): string | null {
-  if (!value || value === "" || value === "N/A") return null;
-  try {
-    const d = new Date(value);
-    if (!isNaN(d.getTime())) return d.toISOString();
-    if (typeof value === "string" && value.includes("/")) {
-      const [day, month, year] = value.split("/").map(Number);
-      const dt = new Date(year, month - 1, day, 12, 0, 0);
-      if (!isNaN(dt.getTime())) return dt.toISOString();
-    }
-  } catch {}
-  return null;
-}
 
 // Consulta RADAR direto na InfoSimples (sem HTTP interno)
 async function getRadarData(cnpj: string) {

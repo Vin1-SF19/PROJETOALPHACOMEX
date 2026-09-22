@@ -1,0 +1,38 @@
+npm error code ERESOLVE
+npm error ERESOLVE could not resolve
+npm error
+npm error While resolving: alpha_sistema@0.1.0
+npm error Found: @tiptap/core@3.29.1
+npm error node_modules/@tiptap/core
+npm error   peer @tiptap/core@"3.29.1" from @tiptap/extension-text-style@3.29.1
+npm error   node_modules/@tiptap/extension-text-style
+npm error     @tiptap/extension-text-style@"3.29.1" from the root project
+npm error     peer @tiptap/extension-text-style@"3.29.1" from @tiptap/extension-color@3.29.1
+npm error     node_modules/@tiptap/extension-color
+npm error       @tiptap/extension-color@"3.29.1" from the root project
+npm error   peer @tiptap/core@"3.29.1" from @tiptap/extension-highlight@3.29.1
+npm error   node_modules/@tiptap/extension-highlight
+npm error     @tiptap/extension-highlight@"3.29.1" from the root project
+npm error
+npm error Could not resolve dependency:
+npm error @tiptap/extension-image@"^3.29.1" from the root project
+npm error
+npm error Conflicting peer dependency: @tiptap/core@3.31.3
+npm error node_modules/@tiptap/core
+npm error   peer @tiptap/core@"3.31.3" from @tiptap/extension-image@3.31.3
+npm error   node_modules/@tiptap/extension-image
+npm error     @tiptap/extension-image@"^3.29.1" from the root project
+npm error
+npm error Fix the upstream dependency conflict, or retry
+npm error this command with --force or --legacy-peer-deps
+npm error to accept an incorrect (and potentially broken) dependency resolution.
+npm error
+npm error
+npm error For a full report see:
+npm error /home/ialpha/.npm/_logs/2026-09-22T15_59_54_675Z-eresolve-report.txt
+npm notice
+npm notice New minor version of npm available! 11.6.1 -> 11.19.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.19.1
+npm notice To update run: npm install -g npm@11.19.1
+npm notice
+npm error A complete log of this run can be found in: /home/ialpha/.npm/_logs/2026-09-22T15_59_54_675Z-debug-0.log

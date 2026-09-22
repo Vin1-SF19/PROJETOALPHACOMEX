@@ -5,7 +5,7 @@ import { Prisma } from "@prisma/client";
 import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 
 export const MENSAGEM_TAREFA_CHECKLIST_PENDENTE =
-  "Esta tarefa é controlada pelo checklist. Conclua os itens do checklist para finalizá-la.";
+  "Esta tarefa é controlada pelo procedimento. Conclua os itens do procedimento para finalizá-la.";
 
 export type AcaoReconciliacaoTarefaChecklist =
   | "CRIADA"
@@ -61,7 +61,7 @@ type ChecklistReconciliacao = Prisma.BpmCardChecklistGetPayload<{
 type TarefaGerenciada = Prisma.BpmTarefaGetPayload<{ select: typeof selectTarefaGerenciada }>;
 
 function tituloTarefa(checklist: Pick<ChecklistReconciliacao, "templateNome">) {
-  return `Checklist: ${checklist.templateNome}`;
+  return `Procedimento: ${checklist.templateNome}`;
 }
 
 function estadoDesejado(checklist: ChecklistReconciliacao) {

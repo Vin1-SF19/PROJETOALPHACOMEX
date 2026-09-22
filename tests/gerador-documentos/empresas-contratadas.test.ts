@@ -30,7 +30,7 @@ vi.mock("@/actions/PermissoesSetor", () => ({
   getPermissoesEfetivas: mocks.getPermissoesEfetivas,
 }));
 
-vi.mock("@/app/api/ReceitaFederal/route", () => ({
+vi.mock("@/lib/cnpj/receita-federal", () => ({
   getReceitaData: mocks.getReceitaData,
 }));
 

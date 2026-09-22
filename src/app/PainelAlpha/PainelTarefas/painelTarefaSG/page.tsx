@@ -12,7 +12,7 @@ import { useSession } from 'next-auth/react';
 import { BuscarTarefasPorEmail, AlternarStatusTarefa } from '@/actions/Tarefas';
 import { toast } from 'sonner';
 import { buscarReservasAtivas, BuscarTodasDiretrizes } from '@/actions/Reservas';
-import ListaCompras from './Carrinho/page';
+import ListaCompras from './ListaCompras';
 import { buscarListaCompra, buscarProdutos } from "@/actions/Estoque";
 
 // Este painel sempre exibe as tarefas da conta "Serviços Gerais",

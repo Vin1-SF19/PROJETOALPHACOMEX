@@ -57,7 +57,7 @@ const OPERADORES_LISTA = new Set<OperadorRegra>(["estaEm", "naoEstaEm"]);
 const FONTES: FonteCampo[] = ["card", "cliente", "processo", "contratacao", "relacionada", "checklist", "campo_dinamico"];
 const FONTE_LABEL: Record<FonteCampo, string> = {
   card: "Card", cliente: "Cliente", processo: "Processo", contratacao: "Contratação",
-  relacionada: "Entidade relacionada", checklist: "Checklist", campo_dinamico: "Campo dinâmico (CUID)",
+  relacionada: "Entidade relacionada", checklist: "Procedimento", campo_dinamico: "Campo dinâmico (CUID)",
 };
 
 const RESULTADO_TIPO_LABEL: Record<ResultadoRegra["tipo"], string> = {

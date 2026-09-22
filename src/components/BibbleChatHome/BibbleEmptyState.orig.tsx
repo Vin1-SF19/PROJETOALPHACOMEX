@@ -75,7 +75,6 @@ export default function BibbleEmptyState({
             onStop={onStop}
             isStreaming={isStreaming}
             streamStatus={streamStatus}
-            model={model}
             files={uploadFiles}
             onFilesChange={onFilesChange}
             showFiles={showFiles}

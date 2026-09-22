@@ -103,7 +103,7 @@ export async function SalvarChecklistFollowUpBpm(dados: unknown) {
       if (!card) throw new Error("FOLLOW_UP_NEGOCIO:Card não encontrado.");
       if (!etapaEhEmTratativa(card.etapa.nome)) {
         throw new Error(
-          "FOLLOW_UP_NEGOCIO:O checklist de follow-up só pode ser operado em Em Tratativa.",
+          "FOLLOW_UP_NEGOCIO:O procedimento de follow-up só pode ser operado em Em Tratativa.",
         );
       }
 
@@ -116,7 +116,7 @@ export async function SalvarChecklistFollowUpBpm(dados: unknown) {
       const ultimo = await carregarUltimoChecklist(cardId, tx);
       if (checklistId && ultimo?.id !== checklistId) {
         throw new Error(
-          "FOLLOW_UP_NEGOCIO:Este checklist não é mais o último follow-up do card. Recarregue os dados.",
+          "FOLLOW_UP_NEGOCIO:Este procedimento não é mais o último follow-up do card. Recarregue os dados.",
         );
       }
       if (checklistId && ultimo?.completo) {
@@ -262,8 +262,8 @@ export async function SalvarChecklistFollowUpBpm(dados: unknown) {
         : error instanceof Error && error.message.startsWith("FOLLOW_UP_NEGOCIO:")
           ? error.message.slice("FOLLOW_UP_NEGOCIO:".length)
           : error instanceof Error && error.message === "FOLLOW_UP_DADOS_INVALIDOS"
-            ? "Os dados do checklist são inválidos. Recarregue e tente novamente."
-            : "Erro ao salvar o checklist de follow-up";
+            ? "Os dados do procedimento são inválidos. Recarregue e tente novamente."
+            : "Erro ao salvar o procedimento de follow-up";
     return { success: false, error: msg };
   }
 }

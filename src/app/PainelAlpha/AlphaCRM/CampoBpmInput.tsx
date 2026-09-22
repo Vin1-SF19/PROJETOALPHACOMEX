@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { campoBpmEhCnpj } from "@/lib/bpm/campos-dinamicos";
 import { formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";
 import { RegistrarAnexoBpm } from "@/actions/bpm/Anexos";
@@ -83,7 +84,7 @@ export function CampoBpmInput({
     return (
       <select
         id={`campo-bpm-${campo.id}`}
-        className={className}
+        className={cn(className, "bg-slate-900 text-slate-100")}
         required={campo.obrigatorio}
         aria-required={campo.obrigatorio}
         aria-invalid={invalid || undefined}
@@ -93,9 +94,13 @@ export function CampoBpmInput({
         onChange={(event) => onChange(event.target.value)}
         onBlur={onBlur}
       >
-        <option value="">Selecione...</option>
+        <option value="" className="bg-slate-900 text-slate-100">
+          Selecione...
+        </option>
         {opcoes.map((opcao) => (
-          <option key={opcao} value={opcao}>{opcao}</option>
+          <option key={opcao} value={opcao} className="bg-slate-900 text-slate-100">
+            {opcao}
+          </option>
         ))}
       </select>
     );
@@ -110,7 +115,7 @@ export function CampoBpmInput({
     return (
       <select
         id={`campo-bpm-${campo.id}`}
-        className={className}
+        className={cn(className, "bg-slate-900 text-slate-100")}
         multiple
         value={selecionadas}
         disabled={bloqueado}
@@ -119,7 +124,15 @@ export function CampoBpmInput({
         onChange={(event) => onChange(JSON.stringify(Array.from(event.currentTarget.selectedOptions, (option) => option.value)))}
         onBlur={onBlur}
       >
-        {opcoes.map((opcao) => <option key={opcao} value={opcao}>{opcao}</option>)}
+        {opcoes.map((opcao) => (
+          <option
+            key={opcao}
+            value={opcao}
+            className="bg-slate-900 text-slate-100 checked:bg-cyan-900 checked:text-cyan-50 checked:font-semibold"
+          >
+            {opcao}
+          </option>
+        ))}
       </select>
     );
   }

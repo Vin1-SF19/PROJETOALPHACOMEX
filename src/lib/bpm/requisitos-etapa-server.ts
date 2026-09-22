@@ -227,8 +227,8 @@ export async function carregarCamposAplicaveisEtapa(
       fonteAtributo: campo.fonteAtributo ?? null,
       entidadeGlobal: campo.entidadeGlobal ?? null,
       visivel: acesso.visivel,
-      editavel: acesso.editavel,
-      somenteLeitura: acesso.somenteLeitura,
+      editavel: acesso.editavel && campo.editavel !== false && campo.somenteLeitura !== true,
+      somenteLeitura: acesso.somenteLeitura || campo.somenteLeitura === true,
       configVersao: campo.configVersao ?? 1,
       condicaoVisibilidadeJson: configEtapa?.condicaoVisibilidadeJson ?? null,
       condicaoObrigatoriedadeJson: configEtapa?.condicaoObrigatoriedadeJson ?? null,
@@ -386,7 +386,9 @@ export async function carregarCamposAplicaveisCardEtapa(
     const valorPersistido = valorPorCampo.get(campo.id) ?? null;
     const mapeamento = mapeamentos.find((item) => item.campoDestinoId === campo.id);
     const valorNovoContrato = campo.escopo === "GLOBAL"
-      ? (valoresCanonicos[campo.id] || null)
+      ? (campo.fonteEntidade && !campo.somenteLeitura && campo.editavel !== false && !mapeamento && valorPersistido?.trim()
+        ? valorPersistido
+        : (valoresCanonicos[campo.id] || null))
       : (resolvidos.efetivos[campo.id] || valorPersistido || campo.valorPadrao || null);
     const valor = campo.escopo === "CARD" && !mapeamento && !valorPersistido
       ? resolverValorEfetivoCampoBpm({ nomeCampo: campo.nome, valorPersistido: valorNovoContrato, dadosMestres })
@@ -396,8 +398,8 @@ export async function carregarCamposAplicaveisCardEtapa(
       valor,
       mapeamentoModo: mapeamento?.modo ?? null,
       campoOrigemId: mapeamento?.campoOrigemId ?? null,
-      somenteLeitura: campo.somenteLeitura || (campo.escopo === "GLOBAL" && Boolean(campo.fonteEntidade)) || resolvidos.somenteLeitura.has(campo.id),
-      editavel: campo.editavel && !(campo.escopo === "GLOBAL" && Boolean(campo.fonteEntidade)) && !resolvidos.somenteLeitura.has(campo.id),
+      somenteLeitura: campo.somenteLeitura === true || resolvidos.somenteLeitura.has(campo.id),
+      editavel: campo.editavel !== false && !resolvidos.somenteLeitura.has(campo.id),
     };
   });
 }

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "pg-chatbotx": {
+      "type": "local",
+      "command": ["/home/ialpha/projetos/alpha-comex/painel-alpha/mcp/postgres/start-chatbotx.sh"],
+      "enabled": true
+    },
+    "pg-gc-importflow": {
+      "type": "local",
+      "command": ["/home/ialpha/projetos/alpha-comex/painel-alpha/mcp/postgres/start-gc-importflow.sh"],
+      "enabled": true
+    },
+    "pg-onyx": {
+      "type": "local",
+      "command": ["/home/ialpha/projetos/alpha-comex/painel-alpha/mcp/postgres/start-onyx.sh"],
+      "enabled": true
+    },
+    "pg-rocket-mkt": {
+      "type": "local",
+      "command": ["/home/ialpha/projetos/alpha-comex/painel-alpha/mcp/postgres/start-rocket-mkt.sh"],
+      "enabled": true
+    },
+    "pg-temporal": {
+      "type": "local",
+      "command": ["/home/ialpha/projetos/alpha-comex/painel-alpha/mcp/postgres/start-temporal.sh"],
+      "enabled": true
+    },
+    "pg-postiz": {
+      "type": "local",
+      "command": ["/home/ialpha/projetos/alpha-comex/painel-alpha/mcp/postgres/start-postiz.sh"],
+      "enabled": true
+    },
+    "turso": {
+      "type": "remote",
+      "url": "https://mcp.turso.ai/mcp",
+      "headers": {
+        "Authorization": "Bearer eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJaODZfSWJXekVmR2F2QzRPclVtTEdnIiwib3JnX2lkIjoxMDAwMTE4MjUyfQ.Vx67JE6ExrBjxPrTr0TG3VRdrwv7Z12o5_FR18WFiMxJ1KErkJa-PvYehrL5xRsloQ4aISUIJl8MS1TJC6dLAw"
+      },
+      "enabled": true
+    }
+  }
+}

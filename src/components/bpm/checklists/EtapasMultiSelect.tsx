@@ -65,8 +65,8 @@ export function EtapasMultiSelect({
       <legend className="text-sm font-medium text-slate-200">Etapas</legend>
       <p id="etapas-checklist-ajuda" className="text-xs text-slate-500">
         {pipelineSelecionado
-          ? "Escolha se o checklist se aplica a qualquer etapa do pipeline ou somente a etapas específicas."
-          : "Selecione um pipeline para restringir o checklist a etapas específicas."}
+          ? "Escolha se o procedimento se aplica a qualquer etapa do pipeline ou somente a etapas específicas."
+          : "Selecione um pipeline para restringir o procedimento a etapas específicas."}
       </p>
       <div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
         <label className="flex min-h-11 items-center gap-2 text-sm text-slate-200">

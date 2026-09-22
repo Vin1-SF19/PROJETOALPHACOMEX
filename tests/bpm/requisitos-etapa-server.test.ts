@@ -595,3 +595,28 @@ describe("campos obrigatórios por etapa (validação de transição)", () => {
     expect(faltantes).toEqual([]);
   });
 });
+
+
+describe("RM-2026-6F4E3F: override local GLOBAL", () => {
+  it.each([
+    [null, false, true, "11222333000181"],
+    ["", false, true, "11222333000181"],
+    ["  ", false, true, "11222333000181"],
+    ["04252011000110", false, true, "04252011000110"],
+    ["04252011000110", true, true, "11222333000181"],
+    ["04252011000110", false, false, "11222333000181"],
+  ])("local %s / somenteLeitura %s / editavel %s", async (local, somenteLeitura, editavel, esperado) => {
+    const client = criarCliente({
+      bpmCardCampoValor: { findMany: vi.fn().mockResolvedValue([{ campoId: "cnpj", valor: local }]) },
+      bpmCard: { findUnique: vi.fn().mockResolvedValue({ empresa: { cnpj: "11222333000181", pessoas: [] } }) },
+    });
+    const campos = await carregarCamposAplicaveisCardEtapa("card", "pipeline", "etapa", client as never, undefined, [{
+      id: "cnpj", nome: "CNPJ", tipo: "cnpj", pipelineId: "pipeline", etapaId: null,
+      opcoesJson: null, obrigatorio: false, ordem: 0, visivel: true,
+      escopo: "GLOBAL", fonteEntidade: "CLIENTE", fonteAtributo: "cnpj", somenteLeitura, editavel,
+    }]);
+    expect(campos[0].valor).toBe(esperado);
+    expect(campos[0].somenteLeitura).toBe(somenteLeitura);
+    expect(campos[0].editavel).toBe(editavel);
+  });
+});

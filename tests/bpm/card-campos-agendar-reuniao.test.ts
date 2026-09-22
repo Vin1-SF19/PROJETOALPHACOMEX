@@ -22,7 +22,9 @@ describe("BPM - card restrito na etapa Agendar reunião", () => {
       board.indexOf("          ) : (\n            <>", board.indexOf("{agendarReuniao && !ehLeadVirtual ? (")),
     );
 
-    expect(board).toContain("const agendarReuniao = etapaEhAgendarReuniao(etapaNome)");
+    expect(board).toContain("const agendarReuniao = card.cardViewComposicao !== undefined");
+    expect(board).toContain('elemento.key === "AGENDAMENTO_REUNIAO"');
+    expect(board).toContain(": etapaEhAgendarReuniao(etapaNome)");
     expect(ramoAgendar).toContain("Data e hora");
     expect(ramoAgendar).toContain("card.dataReuniao");
     expect(ramoAgendar).toContain("Agendar pelo Google Meet");

@@ -16,6 +16,18 @@ export async function verificarCnpjsNoRadarFiscal(cnpjs: string[]) {
     }
 }
 
+export async function excluirEmpresasAction(ids: number[]) {
+    try {
+        await db.radar_fiscal.deleteMany({
+            where: { id: { in: ids } }
+        });
+        revalidatePath("/PainelAlpha/RadarFiscal");
+        return { success: true };
+    } catch (error) {
+        return { success: false };
+    }
+}
+
 export async function protocolarNoRadarAction(dados: any) {
     try {
         const payload = {

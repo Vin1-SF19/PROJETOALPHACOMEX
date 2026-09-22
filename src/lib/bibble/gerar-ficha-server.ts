@@ -4,7 +4,7 @@ import fs from "fs";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { FichaAlphaPDF } from "@/components/GerarFicha";
 import { put } from "@vercel/blob";
-import { getReceitaData } from "@/app/api/ReceitaFederal/route";
+import { getReceitaData } from "@/lib/cnpj/receita-federal";
 import db from "@/lib/prisma";
 import { upsertConsulta } from "@/actions/PreAnalise";
 

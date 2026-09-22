@@ -97,7 +97,7 @@ describe("listarPendenciasBpm", () => {
     const itens = await listarPendenciasBpm(1, false);
 
     expect(itens).toEqual(
-      expect.arrayContaining([expect.objectContaining({ tipo: "CHECKLIST_PENDENTE", titulo: "Checklist pendente — Abertura de processo" })]),
+      expect.arrayContaining([expect.objectContaining({ tipo: "CHECKLIST_PENDENTE", titulo: "Procedimento pendente — Abertura de processo" })]),
     );
   });
 

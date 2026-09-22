@@ -1,0 +1,42 @@
+
+ RUN  v4.1.10 /home/ialpha/projetos/alpha-comex/painel-alpha
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯⎯⎯ Unhandled Error ⎯⎯⎯⎯⎯⎯⎯
+Error: [vitest-pool]: Failed to start forks worker for test files /home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/cpf-pendencias-react.test.ts.
+ ❯ node_modules/vitest/dist/chunks/cli-api.BK8pd4xc.js:3465:94
+ ❯ processTicksAndRejections node:internal/process/task_queues:105:5
+ ❯ Pool.schedule node_modules/vitest/dist/chunks/cli-api.BK8pd4xc.js:3465:5
+
+Caused by: Error: Cannot find package 'happy-dom' imported from /home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/vitest/dist/chunks/index.DC7d2Pf8.js
+ ❯ Object.getPackageJSONURL node:internal/modules/package_json_reader:316:9
+ ❯ packageResolve node:internal/modules/esm/resolve:768:81
+ ❯ moduleResolve node:internal/modules/esm/resolve:858:18
+ ❯ defaultResolve node:internal/modules/esm/resolve:990:11
+ ❯ #cachedDefaultResolve node:internal/modules/esm/loader:757:20
+ ❯ ModuleLoader.resolve node:internal/modules/esm/loader:734:38
+ ❯ ModuleLoader.getModuleJobForImport node:internal/modules/esm/loader:317:38
+ ❯ onImport.tracePromise.__proto__ node:internal/modules/esm/loader:685:36
+ ❯ TracingChannel.tracePromise node:diagnostics_channel:350:14
+ ❯ ModuleLoader.import node:internal/modules/esm/loader:684:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'ERR_MODULE_NOT_FOUND' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+     Errors  1 error
+   Start at  15:56:49
+   Duration  75ms (transform 10ms, setup 0ms, import 15ms, tests 2ms, environment 0ms)
+
+npm notice
+npm notice New minor version of npm available! 11.6.1 -> 11.19.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.19.1
+npm notice To update run: npm install -g npm@11.19.1
+npm notice

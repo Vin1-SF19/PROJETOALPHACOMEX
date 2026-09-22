@@ -1,5 +1,5 @@
 import db from "@/lib/prisma";
-import { getReceitaData } from "@/app/api/ReceitaFederal/route";
+import { getReceitaData } from "@/lib/cnpj/receita-federal";
 import { gerarFichaServer } from "@/lib/bibble/gerar-ficha-server";
 import { executarCalendarTool, isCalendarTool } from "@/lib/bibble/calendar-tools";
 import type { EventoCancelamentoPendente } from "@/lib/bibble/calendar-cancellation";

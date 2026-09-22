@@ -146,6 +146,20 @@ export async function alertasTarefasForamMigrados(): Promise<boolean> {
   return pipelines > 0 && definicoes >= pipelines;
 }
 
+async function repetirSeBancoOcupado<T>(operacao: () => Promise<T>): Promise<T> {
+  let ultimaFalha: unknown;
+  for (let tentativa = 1; tentativa <= 5; tentativa++) {
+    try {
+      return await operacao();
+    } catch (error) {
+      ultimaFalha = error;
+      if (!String(error).includes("SQLITE_BUSY") || tentativa === 5) throw error;
+      await new Promise((resolve) => setTimeout(resolve, tentativa * 250));
+    }
+  }
+  throw ultimaFalha;
+}
+
 export async function migrarAutomacoesHardcodedBpm(params: { aplicar: boolean; userId?: number }) {
   const definicoes = await planejarMigracaoAutomacoesHardcodedBpm();
   if (!params.aplicar) return { modo: "PLANO" as const, definicoes, criadas: 0, atualizadas: 0, inalteradas: 0 };
@@ -161,13 +175,13 @@ export async function migrarAutomacoesHardcodedBpm(params: { aplicar: boolean; u
     versoesAtivasIds: [] as string[],
   };
   for (const definicao of definicoes) {
-    const salvo = await db.$transaction(async (tx) => {
+    const salvo = await repetirSeBancoOcupado(() => db.$transaction(async (tx) => {
       const candidatas = await tx.bpmAutomacao.findMany({ where: { pipelineId: definicao.pipelineId }, include: { versoes: { where: { status: "ATIVA" }, orderBy: { versao: "desc" }, take: 1 } } });
       const existente = candidatas.find((item) => { try { return item.versoes.some((versao) => JSON.parse(versao.gatilhoConfigJson).origemChave === definicao.origemChave); } catch { return false; } }) ?? null;
       const gatilhoConfigJson = JSON.stringify(definicao.gatilhoConfig);
       const grafoJson = JSON.stringify(definicao.grafo);
       const atual = existente?.versoes[0];
-      if (existente && atual && existente.nome === definicao.nome && existente.descricao === definicao.descricao && atual.gatilhoTipo === definicao.gatilhoTipo && atual.gatilhoConfigJson === gatilhoConfigJson && atual.grafoJson === grafoJson && existente.ativa) return { tipo: "inalterada" as const, automacaoId: existente.id, versaoId: atual.id };
+      if (existente && atual && existente.nome === definicao.nome && existente.descricao === definicao.descricao && atual.gatilhoTipo === definicao.gatilhoTipo && atual.gatilhoConfigJson === gatilhoConfigJson && atual.grafoJson === grafoJson) return { tipo: "inalterada" as const, automacaoId: existente.id, versaoId: atual.id };
       const primeiraAcao = (definicao.grafo as { nos: Array<{ tipo: string; acaoTipo?: string; parametros?: Record<string, unknown> }> }).nos.find((no) => no.tipo === "ACAO");
       const automacao = existente
         ? await tx.bpmAutomacao.update({ where: { id: existente.id }, data: { nome: definicao.nome, descricao: definicao.descricao, pipelineId: definicao.pipelineId, etapaId: definicao.etapaId, gatilhoTipo: definicao.gatilhoTipo, tempoMinutos: null, acaoTipo: primeiraAcao?.acaoTipo ?? "SEM_ACAO", parametrosJson: JSON.stringify(primeiraAcao?.parametros ?? {}), ativa: false } })
@@ -177,7 +191,7 @@ export async function migrarAutomacoesHardcodedBpm(params: { aplicar: boolean; u
       const versao = await tx.bpmAutomacaoVersao.create({ data: { automacaoId: automacao.id, versao: (ultima._max.versao ?? 0) + 1, status: "ATIVA", gatilhoTipo: definicao.gatilhoTipo, gatilhoConfigJson, condicaoJson: null, grafoJson, timezone: "America/Sao_Paulo", criadoPorId: userId, ativadaEm: new Date() } });
       await tx.bpmPipelineConfigAuditoria.create({ data: { pipelineId: definicao.pipelineId, adminId: userId, campoAlterado: "AUTOMACAO_HARDCODED_MIGRADA", valorAnteriorJson: existente ? JSON.stringify({ automacaoId: existente.id, versaoId: atual?.id ?? null }) : null, valorNovoJson: JSON.stringify({ automacaoId: automacao.id, versaoId: versao.id, origemChave: definicao.origemChave }) } });
       return { tipo: existente ? "atualizada" as const : "criada" as const, automacaoId: automacao.id, versaoId: versao.id };
-    });
+    }));
     if (salvo.tipo === "criada") resultado.criadas++;
     else if (salvo.tipo === "atualizada") resultado.atualizadas++;
     else resultado.inalteradas++;
@@ -186,10 +200,10 @@ export async function migrarAutomacoesHardcodedBpm(params: { aplicar: boolean; u
   }
   const idsUnicos = [...new Set(resultado.automacoesIds)];
   if (idsUnicos.length !== definicoes.length) throw new Error("Cutover cancelado: o conjunto preparado de automações está incompleto");
-  await db.$transaction(async (tx) => {
+  await repetirSeBancoOcupado(() => db.$transaction(async (tx) => {
     const ativadas = await tx.bpmAutomacao.updateMany({ where: { id: { in: idsUnicos } }, data: { ativa: true } });
     if (ativadas.count !== definicoes.length) throw new Error("Cutover cancelado: nem todas as automações puderam ser ativadas");
-  });
+  }));
   for (const versaoId of resultado.versoesAtivasIds) await sincronizarAgendasVersaoAutomacao(versaoId);
   return resultado;
 }

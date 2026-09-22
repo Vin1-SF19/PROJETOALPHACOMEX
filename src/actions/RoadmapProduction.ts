@@ -83,7 +83,10 @@ function serializeQueueRun(
     resultSummary: run.resultSummary,
     errorCode: run.errorCode,
     updatedAt: run.updatedAt.toISOString(),
-    objective: { ...objectiveRest, completionReportAvailable: completionReportGeneratedAt !== null },
+    objective: {
+      ...objectiveRest,
+      completionReportAvailable: completionReportGeneratedAt !== null,
+    },
     artifact: run.artifact,
   };
 }
@@ -107,7 +110,9 @@ export async function ObterRoadmapProduction(moduleKey: string) {
   try {
     const access = await requireRoadmapProductionAccess();
     const scopedModuleKey = z.string().trim().min(1).max(120).parse(moduleKey);
-    const queue = await listRoadmapProductionQueue({ moduleKey: scopedModuleKey });
+    const queue = await listRoadmapProductionQueue({
+      moduleKey: scopedModuleKey,
+    });
     return {
       success: true as const,
       canManage: access.canMutate,
@@ -143,9 +148,13 @@ export async function ObterRelatorioConclusaoRoadmap(objectiveId: unknown) {
         completionReportGeneratedAt: true,
       },
     });
-    if (!objective) return { success: false as const, error: "Objetivo não encontrado" };
+    if (!objective)
+      return { success: false as const, error: "Objetivo não encontrado" };
     if (!objective.completionReportMarkdown) {
-      return { success: false as const, error: "Relatório de conclusão ainda não disponível" };
+      return {
+        success: false as const,
+        error: "Relatório de conclusão ainda não disponível",
+      };
     }
     return {
       success: true as const,
@@ -240,6 +249,31 @@ export async function AtualizarStatusRoadmapProduction(payload: unknown) {
   }
 }
 
+export async function ReabrirFaseRoadmapProduction(runId: unknown) {
+  try {
+    const access = await requireRoadmapProductionAccess(true);
+    const id = runIdSchema.parse(runId);
+    const author = await authorName(access.userId);
+    const run = await updateRoadmapProductionRunStatus(
+      id,
+      "PENDING",
+      {
+        authorKind: "user",
+        authorLabel: author,
+        authorUserId: access.userId,
+      },
+      {
+        resultSummary:
+          "Fase reaberta para correção da falha antes de continuar o fluxo.",
+      },
+    );
+    revalidatePath(ROUTE);
+    return { success: true as const, run };
+  } catch (error) {
+    return { success: false as const, error: publicError(error) };
+  }
+}
+
 /**
  * Deliberadamente usa requireRoadmapAccess (não requireRoadmapProductionAccess)
  * — aprovar é uma decisão de gestão. O card de objetivo na lista principal
@@ -267,11 +301,16 @@ export async function RegistrarEventoRoadmapProduction(payload: unknown) {
     const access = await requireRoadmapProductionAccess(true);
     const input = eventSchema.parse(payload);
     const author = await authorName(access.userId);
-    const event = await registerRoadmapProductionEvent(input.runId, input.kind, input.content, {
-      authorKind: "user",
-      authorLabel: author,
-      authorUserId: access.userId,
-    });
+    const event = await registerRoadmapProductionEvent(
+      input.runId,
+      input.kind,
+      input.content,
+      {
+        authorKind: "user",
+        authorLabel: author,
+        authorUserId: access.userId,
+      },
+    );
     revalidatePath(ROUTE);
     return { success: true as const, event };
   } catch (error) {
@@ -306,7 +345,10 @@ export async function ListarExecucoesAguardandoAprovacao() {
     });
     return {
       success: true as const,
-      data: runs.map((run) => ({ objectiveId: run.objectiveId, executionId: run.id })),
+      data: runs.map((run) => ({
+        objectiveId: run.objectiveId,
+        executionId: run.id,
+      })),
     };
   } catch (error) {
     return { success: false as const, error: publicError(error), data: [] };
@@ -317,7 +359,7 @@ export async function ListarExecucoesPrecisandoAtencao() {
   try {
     await requireRoadmapAccess();
     const runs = await db.roadmapProductionRun.findMany({
-      where: { status: { in: ["NEEDS_INPUT", "BLOCKED"] } },
+      where: { status: { in: ["NEEDS_INPUT", "BLOCKED", "FAILED"] } },
       select: { id: true, objectiveId: true, status: true },
     });
     return {
@@ -325,7 +367,7 @@ export async function ListarExecucoesPrecisandoAtencao() {
       data: runs.map((run) => ({
         objectiveId: run.objectiveId,
         executionId: run.id,
-        status: run.status as "NEEDS_INPUT" | "BLOCKED",
+        status: run.status as "NEEDS_INPUT" | "BLOCKED" | "FAILED",
       })),
     };
   } catch (error) {
@@ -355,7 +397,10 @@ export async function ListarExecucoesPorObjetivo() {
         status: run.status,
       });
     }
-    return { success: true as const, data: Array.from(latestByObjective.values()) };
+    return {
+      success: true as const,
+      data: Array.from(latestByObjective.values()),
+    };
   } catch (error) {
     return { success: false as const, error: publicError(error), data: [] };
   }

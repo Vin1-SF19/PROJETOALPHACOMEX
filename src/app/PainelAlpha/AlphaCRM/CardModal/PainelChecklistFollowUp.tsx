@@ -205,7 +205,7 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
 
           {checklist.completo ? (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-emerald-300"><CheckCircle2 size={14} /> Checklist concluído.</div>
+              <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-emerald-300"><CheckCircle2 size={14} /> Procedimento concluído.</div>
               <button type="button" onClick={() => void iniciarNovoFollowUp()} disabled={!podeEditar || salvando} className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-2.5 text-xs font-semibold text-slate-300 transition-colors hover:border-white/20 hover:text-white disabled:opacity-50">
                 {salvando && <Loader2 size={13} className="animate-spin" />} Iniciar novo follow-up
               </button>

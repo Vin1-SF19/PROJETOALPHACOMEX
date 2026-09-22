@@ -89,6 +89,34 @@ describe("CRM - edição dos campos definidos da etapa", () => {
     prismaMock.$transaction.mockImplementation(async (callback) => callback(prismaMock));
   });
 
+  it.each(["04.252.011/0001-10", ""])("salva override GLOBAL CNPJ local: %s", async (valor) => {
+    carregarCamposAplicaveisCardEtapaMock.mockResolvedValue([{
+      ...campoNulo, nome: "CNPJ", tipo: "cnpj", escopo: "GLOBAL",
+      fonteEntidade: "CLIENTE", editavel: true, somenteLeitura: false,
+    }]);
+    const resultado = await AtualizarCardBpm({ cardId: CARD_ID, camposValores: { [CAMPO_ID]: valor }, versaoEsperadaEm: UPDATED_AT.toISOString() });
+    expect(resultado).toEqual({ success: true });
+    expect(prismaMock.bpmCardCampoValor.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: { valor: valor.replace(/\D/g, "") } }));
+  });
+
+  it.each([false, true])("preserva relacionamento existente (somenteLeitura=%s)", async (somenteLeitura) => {
+    carregarCamposAplicaveisCardEtapaMock.mockResolvedValue([{
+      ...campoNulo, tipo: "relacionamento", somenteLeitura,
+    }]);
+    const resultado = await AtualizarCardBpm({
+      cardId: CARD_ID, camposValores: { [CAMPO_ID]: "  Empresa parceira  " },
+      versaoEsperadaEm: UPDATED_AT.toISOString(),
+    });
+    expect(resultado.success).toBe(!somenteLeitura);
+    if (somenteLeitura) {
+      expect(prismaMock.bpmCardCampoValor.upsert).not.toHaveBeenCalled();
+    } else {
+      expect(prismaMock.bpmCardCampoValor.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ update: { valor: "Empresa parceira" } }),
+      );
+    }
+  });
+
   it("rejeita próximo contato fora do contrato antes de ownership e persistência", async () => {
     for (const proximoContatoEm of [
       "09/04/2026 10:30",

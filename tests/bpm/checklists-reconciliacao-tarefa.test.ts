@@ -46,7 +46,7 @@ describe("reconciliação checklist → tarefa", () => {
     expect(tx.bpmTarefa.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         cardChecklistId: "checklist-1",
-        titulo: "Checklist: Documentos de embarque",
+        titulo: "Procedimento: Documentos de embarque",
         tipo: "CHECKLIST",
         status: "PENDENTE",
         responsavelId: 9,
@@ -59,7 +59,7 @@ describe("reconciliação checklist → tarefa", () => {
   it("é idempotente e não grava histórico quando o estado já coincide", async () => {
     const tx = client({
       tarefa: {
-        id: "tarefa-1", cardId: "card-1", titulo: "Checklist: Documentos de embarque",
+        id: "tarefa-1", cardId: "card-1", titulo: "Procedimento: Documentos de embarque",
         tipo: "CHECKLIST", status: "PENDENTE", responsavelId: 9, concluidaEm: null,
       },
     });
@@ -74,7 +74,7 @@ describe("reconciliação checklist → tarefa", () => {
     const concluido = client({
       checklist: { ...checklistBase, itens: checklistBase.itens.map((item) => ({ ...item, status: "CONCLUIDO" })) },
       tarefa: {
-        id: "tarefa-1", cardId: "card-1", titulo: "Checklist: Documentos de embarque",
+        id: "tarefa-1", cardId: "card-1", titulo: "Procedimento: Documentos de embarque",
         tipo: "CHECKLIST", status: "PENDENTE", responsavelId: 7, concluidaEm: null,
       },
     });
@@ -87,7 +87,7 @@ describe("reconciliação checklist → tarefa", () => {
 
     const reaberto = client({
       tarefa: {
-        id: "tarefa-1", cardId: "card-1", titulo: "Checklist: Documentos de embarque",
+        id: "tarefa-1", cardId: "card-1", titulo: "Procedimento: Documentos de embarque",
         tipo: "CHECKLIST", status: "CONCLUIDA", responsavelId: 9, concluidaEm: agora,
       },
     });
@@ -101,7 +101,7 @@ describe("reconciliação checklist → tarefa", () => {
   it("preserva campos não gerenciados ao sincronizar responsável", async () => {
     const tx = client({
       tarefa: {
-        id: "tarefa-1", cardId: "card-1", titulo: "Checklist: Documentos de embarque",
+        id: "tarefa-1", cardId: "card-1", titulo: "Procedimento: Documentos de embarque",
         tipo: "CHECKLIST", status: "PENDENTE", responsavelId: 7, concluidaEm: null,
       },
     });
@@ -124,7 +124,7 @@ describe("reconciliação checklist → tarefa", () => {
   it("resolve colisão P2002 pelo vínculo único sem duplicar", async () => {
     const tx = client();
     const concorrente = {
-      id: "tarefa-concorrente", cardId: "card-1", titulo: "Checklist: Documentos de embarque",
+      id: "tarefa-concorrente", cardId: "card-1", titulo: "Procedimento: Documentos de embarque",
       tipo: "CHECKLIST", status: "PENDENTE", responsavelId: 9, concluidaEm: null,
     };
     tx.bpmTarefa.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(concorrente);

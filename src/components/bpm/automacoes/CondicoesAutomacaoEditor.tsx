@@ -43,7 +43,7 @@ const FONTE_LABEL: Record<FonteCampo, string> = {
   processo: "Processo",
   contratacao: "Contratação/origem",
   relacionada: "Relacionados",
-  checklist: "Checklist",
+  checklist: "Procedimento",
   campo_dinamico: "Campo configurável",
 };
 

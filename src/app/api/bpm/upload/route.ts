@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { auth } from "../../../../../auth";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
-import { BPM_ANEXO_ALLOWED_MIME, BPM_ANEXO_MAX_BYTES, validarUploadAnexo } from "@/lib/validations/bpm";
+import { validarUploadAnexo } from "@/lib/validations/bpm";
 import { criarReciboUploadAnexoBpm, recibosAnexoBpmConfigurados } from "@/lib/bpm/anexos-storage";
 
 export const dynamic = "force-dynamic";
@@ -71,4 +71,3 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export { BPM_ANEXO_ALLOWED_MIME, BPM_ANEXO_MAX_BYTES };

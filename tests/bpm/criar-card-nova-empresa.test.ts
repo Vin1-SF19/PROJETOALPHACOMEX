@@ -86,7 +86,7 @@ describe("CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master)", 
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: 501 });
     prismaMock.cliente.create.mockResolvedValue({ id: 501 });
-    prismaMock.bpmCard.create.mockResolvedValue({ id: "card-1", empresaId: 501 });
+    prismaMock.bpmCard.create.mockResolvedValue({ id: "cmu8n1508008hihrqtgerc2u7", empresaId: 501 });
 
     const resultado = await CriarCardBpm({
       novaEmpresa: { cnpj: "CNPJ: 12.345.678/0001-90", razaoSocial: "Empresa Nova Ltda", nomeFantasia: "Nova", uf: "sp", municipio: "São Paulo" },
@@ -149,7 +149,7 @@ describe("CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master)", 
 
   it("continua vinculando empresa já existente via empresaId, sem criar Cliente novo", async () => {
     prismaMock.cliente.findUnique.mockResolvedValue({ id: 42 });
-    prismaMock.bpmCard.create.mockResolvedValue({ id: "card-2", empresaId: 42 });
+    prismaMock.bpmCard.create.mockResolvedValue({ id: "cmu8n150b008lihrq0tcunqj0", empresaId: 42 });
 
     const resultado = await CriarCardBpm({
       empresaId: 42,
@@ -272,7 +272,7 @@ describe("CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master)", 
 
   it("ignora payload legado sem validar nem persistir controles de etapa", async () => {
     prismaMock.cliente.findUnique.mockResolvedValue({ id: 42 });
-    prismaMock.bpmCard.create.mockResolvedValue({ id: "card-legado", empresaId: 42 });
+    prismaMock.bpmCard.create.mockResolvedValue({ id: "cmu8n150e008pihrq9ipu8voe", empresaId: 42 });
 
     const resultado = await CriarCardBpm({
       empresaId: 42,

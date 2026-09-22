@@ -10,7 +10,7 @@ export const BPM_TAREFA_TIPOS = [
 export type BpmTarefaTipo = (typeof BPM_TAREFA_TIPOS)[number];
 
 export const BPM_TAREFA_TIPO_CONFIG: Record<BpmTarefaTipo, { label: string; descricao: string }> = {
-  CHECKLIST: { label: "Checklist", descricao: "Itens a conferir antes do prazo." },
+  CHECKLIST: { label: "Procedimento", descricao: "Itens a conferir antes do prazo." },
   LIGACAO: { label: "Ligação", descricao: "Contato telefônico programado." },
   WHATSAPP: { label: "WhatsApp", descricao: "Mensagem a enviar para o contato." },
   EMAIL: { label: "E-mail", descricao: "E-mail a redigir e enviar." },

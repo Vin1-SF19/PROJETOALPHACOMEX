@@ -2936,3 +2936,8 @@ BibbleMessageBubble
 7. A migration de produção só pode ser considerada pelo trio de hashes registrado na story. V4/V5/V6, Prisma diff bruto, DROP/RENAME/RESET/rebuild e FK/alteração em `ListaCompra` continuam proibidos sem novo Vault e nova autorização.
 
 **Última atualização:** 2026-09-18 por Codex (Estoque Geral)
+
+
+### 2026-09-22 — RM-2026-B5C986
+
+RM-2026-B5C986: page.tsx administrativa envolve AdminPipelineClient (chave id:configVersion preservada) em PipelineEditorStateProvider (chave pipelineId). FormularioEtapaWorkspace preserva seleção por modo e rascunho por etapa; callback fields mantém aba antes do refresh. Nenhuma rota/permissão/action nova.

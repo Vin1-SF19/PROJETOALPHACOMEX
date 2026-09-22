@@ -5957,3 +5957,107 @@ Gap conhecido, não escondido: `CHECKLIST`/`CADENCIA`/`PENDENCIAS` estão no cat
 Verificação ainda não feita: não houve clique real na UI com login (Probe/E2E visual) nem execução de scanner de segurança automatizado (Anubis); a revisão de segurança das Server Actions foi manual (autorização `configurarEtapas` reaplicada dentro da transação, Zod estrito, CAS por versão, validação de pertencimento etapa→pipeline, nenhuma SQL crua). Por isso a execução é movida para "Em Testes", não para Produção — essa verificação humana é o próximo passo natural do fluxo.
 
 PIPELINE_RESULT: {"status":"PASS","code":"MANUAL_DELIVERY_READY_FOR_TESTING","retryable":false}
+
+
+## 2026-09-22 — Nova — RM-2026-5669BD, retomada da Fase 3
+
+Links administrativos já implementados foram reinspecionados e preservados. Produzidos inventário de 83 arquivos rastreados, hashes, diff revisável e handoff em docs/qa/rm-2026-5669bd/. Typecheck/tsc, lint e testes reais falharam; build com saída isolada registrado em gates.json. Delegação indisponível, sem candidato Git isolado nem congelamento coordenado: BLOCKED. Sem edição funcional, Git mutável ou alteração de banco. Clique autenticado e confirmação SLA remota pendentes. Story atualizada com checklist, evidência e file list.
+
+Build local finalizado: exit 0 em 119,2 s, saída isolada. Demais gates reprovados; BLOCKED permanece.
+
+
+### 2026-09-22 — Nova, RM-2026-5669BD, revalidação após interrupção por volume
+Preservado todo código existente; 83 hashes iguais antes/depois. Inventário complementar registra 10 testes BPM e 8 arquivos de correções anteriores, incluindo helper de webhook untracked. Lint exit 1 (2418 erros), typecheck exit 2 (TS2459), test exit 1 (35 falhas). Build não repetido para não gerar outra árvore; resultado anterior é histórico. Somente cinco artefatos documentais afetados; logs novos no diretório ignorado `.roadmap-worker/rm-5669bd-recheck/`. Candidato/encaminhamento operacional DevOps BLOCKED pela proibição de Git mutável; clique autenticado e leitura remota SLA pendentes. Nenhuma mutação Git/banco. Evidência: `docs/qa/rm-2026-5669bd/recheck.json` e story da RM.
+
+
+### 2026-09-22 — Nova, RM-2026-5669BD Fase 3, reinspeção atual
+
+Preservada reconciliação funcional existente. 83 hashes e suplemento inalterados; helper Google Calendar agora rastreado. Corrigidas na story afirmações antigas de rota órfã e validação ponta a ponta. Evidência em `docs/qa/rm-2026-5669bd/nova-current-validation.json`: lint/typecheck/tsc/test reprovados; build histórico não repetido. Handoff atualizado para HEAD atual; isolamento/indexação explicitamente bloqueados por Git mutável proibido. Nenhum código, SQL ou banco alterado. Clique autenticado e leitura SLA remota pendentes. RESULT: BLOCKED.
+
+
+### 2026-09-22 — Vault, RM-2026-9941F2, checkpoint R1
+
+Revisado plano na story `docs/stories/story-rm-2026-9941f2-saneamento-capacidades-bpm.md`, preservando trabalho existente. Corrigido rollback para IDs inseridos/valores anteriores exatos. Schema local inspecionado; contagens remotas não comprovadas. Backup específico tentado via script existente: exit 1 por variáveis Turso ausentes, antes de acesso remoto. Nenhum dump gerado ou mutação executada. Cards preservados; plano executável depende de inventário, backup verificado e aprovação específica. Checkpoint WAITING_APPROVAL; evidências de gates em `.roadmap-worker/vault-rm9941/`.
+
+Gates concluídos nesta revisão: lint/typecheck/test, todos exit 1. Diff check documental sem erros. Build/UAT não executados.
+
+## 2026-09-22 — RM-2026-FFD798 — Checklist → Procedimento no Alpha CRM
+
+Foi concluída a auditoria e a renomeação de toda a superfície visível do recurso no Alpha CRM. A aba do card, configuração administrativa, tarefas, pendências, histórico/timeline, formulários, catálogo de automações e mensagens públicas agora usam “Procedimento(s)”. A identidade estrutural `CHECKLIST` foi mantida deliberadamente; não houve migration ou mutação de dados.
+
+Forge: typecheck e build aprovados; lint direcionado sem erros novos; suíte BPM com 927/927 testes. Probe/Lens: caminhos reais e varredura textual confirmam que as ocorrências remanescentes pertencem a contratos internos preservados. DELIVERY_READY: Alpha CRM → pipeline → card → aba “Procedimento”. Próximo gate é manual: `/virtus` somente quando o administrador decidir promover para produção.
+
+
+## 2026-09-22 — Nova — RM-2026-B5C986, fase 2
+
+Criada `docs/stories/story-rm-2026-b5c986-manter-aba-campos-formularios.md`, Ready for Execution. Blueprint Scout incorporado: estado acima da chave versionada, preservação de etapa/rascunho e concorrência, testes de ambas as ordens assíncronas. Caminho administrativo e auth conferidos no código; UI autenticada não exercitada. Produção e alterações preexistentes preservadas. Nenhum componente, schema ou dado alterado.
+
+Gates reais: `npm run lint`: resultado `1`; `npm run typecheck`: resultado `0`; `npm test`: resultado `1`. Teste bloqueado por EBUSY no diretório coverage. Logs em `.roadmap-worker/rm-2026-b5c986-phase2/`. Build pendente para implementação. Entrega desta fase é documental; não constitui aprovação funcional da correção.
+
+
+### 2026-09-22 — RM-2026-B5C986
+
+Nova — RM-2026-B5C986 fase 3: implementada preservação de aba/etapa/rascunho/versão-base e resposta assíncrona em provedor por pipeline. Alterações anteriores preservadas. Testes do armazenamento criados; montagem React e fluxo autenticado pendentes. Lint focado passou; lint global 2417 erros; npm test padrão bloqueado por EBUSY em coverage, repetição isolada solicitada. Sem banco e sem Git mutável.
+
+
+Validação final registrada: lint focado sem saída de erro; lint global 2.417 erros/1.218 warnings; npm test padrão EBUSY. targeted: Test Files  5 passed (5) | Tests  46 passed (46); test-isolated: consultar log; resultado final não sintetizado; build: consultar log; resultado final não sintetizado. Typecheck: ver log typecheck.log e resultado de execução. Aprovação integral retida por gates globais e ausência de teste de montagem/autenticado.
+
+
+### 2026-09-22 — Nova / RM-2026-B5C986 reexecução
+Corrigido fallback por chave no hook do editor. Cinco testes com montagem React do workspace/provedor aprovados, cobrindo remontagem, criação assíncrona, publicação/conflito e isolamento. Happy DOM adicionado para testes (instalação com legacy-peer-deps; lockfile alterado). Fluxo autenticado e gates globais permanecem pendentes. Evidências em `.roadmap-worker/rm-2026-b5c986-recheck/`; checklist/file list atualizados na story. Nenhuma mutação de banco ou Git.
+
+
+### 2026-09-22 — Nova / RM-2026-B5C986: cobertura e gates reais
+
+Produção preservada após reinspeção. Teste React ampliado com falha/retry e duas ordens de publicação/revalidação. 54 testes focados passaram; typecheck final e build passaram. Lint global: 2.417 erros/1.218 avisos. Teste padrão: EBUSY; execução com coverage isolado: 19 falhas, 3.482 passes, 1 todo. Happy DOM restaurado localmente sem edição intencional de manifesto/lockfile. Fluxo autenticado CA9 pendente. Story atualizada; logs em `.roadmap-worker/rm-2026-b5c986-final-gates/`. Sem banco/API/auth/Git mutável. Resultado FAIL por gates globais.
+
+
+### 2026-09-22 — Nova — RM-2026-B5C986, rechecagem executável
+Correção existente preservada após inspeção. Typecheck e lint focado aprovados; lint global 2.417 erros/1.218 warnings; npm test EBUSY; testes focados 46 aprovados, suíte React impedida por happy-dom ausente. Nenhum ajuste de produção, banco ou Git mutável. Story atualizada; logs em `.roadmap-worker/rm-2026-b5c986-current-check/`. Resultado FAIL; validação autenticada pendente.
+
+
+### 2026-09-22 — Nova — RM-2026-389729
+Story criada conforme blueprint recebido. CampoBpmInput usa cn para contraste dos selects e opções múltiplas com destaque checked, preservando alterações locais anteriores, JSON e permissões. Typecheck/lint focado e 63 testes passaram; lint global: 2.417 erros/1.218 avisos; npm test: EBUSY em coverage. Build: 0. Evidências em .roadmap-worker/rm-2026-389729-gates/. Caminho de consumo confirmado no código pelo formulário da etapa no card; validação visual autenticada pendente. Resultado FAIL por gates globais. Sem banco ou Git mutável.
+
+
+### 2026-09-22 — Nova — RM-2026-6F4E3F
+Edição local de GLOBAL com fonte implementada no painel, DTO, validador e transição.
+Fallback canônico para valor vazio, restrições explícitas preservadas e testes de override adicionados.
+Gates reais e limitações registrados em docs/stories/story-rm-2026-6f4e3f-edicao-global-fonte.md. Sem banco ou Git mutável.
+
+### 2026-09-22 — Nova / RM-2026-6F4E3F, revalidação local real
+Implementação existente preservada e inspecionada conforme blueprint Scout. Sem
+novo componente. 78 testes direcionados, lint focado, typecheck, tsc (8 GiB) e
+build passaram. Lint global: 2417 erros/1218 avisos; npm test: EBUSY em coverage
+antes de executar testes. RESULT: FAIL por gates globais. Caminho do editor
+validado no código; navegador autenticado pendente. Story atualizada; evidências
+em .roadmap-worker/rm-2026-6f4e3f-recheck-20260922/. Sem banco ou Git mutável.
+
+
+### 2026-09-22 — Nova — RM-2026-51AE7B, fase 2 documental
+Story executável criada em `docs/stories/story-rm-2026-51ae7b-remover-componente-compativel.md`, com blueprint Scout recebido e reinspecionado, critérios de preservação dos campos/composição/publicação e dependência da RM-2026-B5C986. Autoajuste de story ausente resolvido. Caminho administrativo validado no código; navegador autenticado e remoção visual pendentes para implementação. Nenhum frontend, banco ou Git mutável alterado nesta fase. Typecheck: 0; lint: 1 (2.417 erros/1.218 avisos); npm test: 1 (EBUSY em coverage). Logs: `.roadmap-worker/rm-2026-51ae7b-phase2/`. PASS documental, sem aprovação técnica do produto. Nenhum componente criado nem decisão nova de arquitetura.
+
+
+### 2026-09-22 — Nova — RM-2026-51AE7B, fase 3
+Remoção mínima do seletor de componentes compatíveis em FormularioEtapaWorkspace (62 linhas), conforme blueprint Scout. Campos, composição existente e publicação preservados; sem banco ou Git mutável. Story e catálogo atualizados. Typecheck e lint local passaram; lint global falhou (2417 erros/1218 avisos); npm test falhou por EBUSY em coverage. Suítes direcionadas: 50 testes passaram, suíte React não iniciou por happy-dom ausente (exit 1). Build e aceite autenticado pendentes. RESULT: FAIL pelos gates. Evidências: .roadmap-worker/rm-2026-51ae7b-phase3/.
+
+
+### 2026-09-22 — Nova — RM-2026-2C769C, fase 2
+Story criada antes da implementação conforme blueprint Scout. Removida uma entrada da lista de criação, preservando alterações anteriores. Adicionadas fixtures de compatibilidade; 12 testes de action passaram. UI bloqueada por happy-dom ausente; npm test falhou por coverage EBUSY. Lint, typecheck e build executados, evidências nos logs .relacionamento-*.log e story. Sem aprovação integral dos gates ou navegação autenticada; sem banco/Git mutável.
+
+### 2026-09-22 — Nova — RM-2026-2C769C, reexecução da fase 2
+Implementação existente preservada. Happy-dom instalado isoladamente na versão do lockfile, sem scripts e sem mudar manifesto/lockfile. 23 testes direcionados passaram, incluindo fixtures React anteriormente bloqueadas, composição/publicação, edição e somente leitura. Typecheck e lint direcionado passaram. Lint global: 2417 erros/1218 avisos. Suíte global com cobertura em diretório próprio: 19 falhas, 3496 aprovados, 1 todo (14 arquivos falharam/458 passaram), sem EBUSY. Story e catálogo atualizados. RESULT: FAIL pelos gates globais; navegação autenticada não executada. Logs em .roadmap-worker/rm-2026-2c769c-recheck/. Nenhuma alteração adicional de aplicação, banco/schema ou Git mutável.
+
+
+## 2026-09-22 — Nova / RM-2026-09A642 fase 4
+Implementação local de CPF validado/normalizado e reconciliação por revisão, pendências persistentes e confirmação ao fechar CardFullViewModal. Story criada conforme blueprint anterior. Typecheck passou; testes React bloqueados por happy-dom ausente; npm test bloqueado por coverage EBUSY. Integração inspecionada no código, sem homologação autenticada. Sem banco/Git mutável. Evidências: docs/stories/story-rm-2026-09a642-cpf-modal.md e docs/qa/rm-2026-09a642/.
+
+### 2026-09-22 — Nova — RM-2026-09A642, reexecução local
+Reinspecionada implementação anterior de CPF/rascunhos. Adicionado teste React de fechamento com Sheet/AlertDialog reais em tests/bpm/cpf-fechamento-react.test.ts. Typecheck aprovado (exit 0); suíte global exit 1, demais resultados em docs/qa/rm-2026-09a642/*retry.log. Aprovação global e homologação autenticada não concedidas. Story atualizada; sem schema, banco ou Git mutável.
+
+Resultado direcionado após regularizar happy-dom e corrigir fixture do formulário:
+```text
+ Test Files  3 passed (3)
+      Tests  19 passed (19)
+```
+Lint focado: 0 erros, 10 warnings preexistentes no modal. Lint global: 2417 erros/1218 warnings. Suíte global: 16 arquivos falharam, 454 passaram; 19 testes falharam, 3463 passaram, 1 todo; 4 erros de execução. Build compilou; conclusão não confirmada, com diagnóstico EACCES no carregamento de .env (conteúdo não acessado). Resultado da fase: FAIL / VALIDATION_INCOMPLETE.

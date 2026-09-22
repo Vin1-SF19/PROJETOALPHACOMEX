@@ -16,6 +16,12 @@
 # next.js
 /.next/
 /.next-alpha-dev/
+# Diretórios de build de validação ad-hoc que os agentes de produção do
+# roadmap criam (ex.: .next-rm-<codigo>-validation) pra rodar `next build`
+# sem sujar o /.next/ real. Sem isso, git via como ~2 mil arquivos "novos" e
+# o guard de segurança (limite de 100 arquivos por fase) abortava a fase
+# como falso positivo, mesmo sem nenhuma alteração real de código.
+/.next-*/
 /out/
 
 # production

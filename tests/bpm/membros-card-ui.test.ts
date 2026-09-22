@@ -6,7 +6,7 @@ const raiz = process.cwd();
 const ler = (arquivo: string) => readFileSync(resolve(raiz, arquivo), "utf8");
 
 const seletor = ler("src/app/PainelAlpha/AlphaCRM/CardModal/SeletorMembrosCard.tsx");
-const modal = ler("src/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal.tsx");
+const modal = ler("src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx");
 const board = ler("src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx");
 
 describe("CRM - pessoas vinculadas ao card na interface", () => {
@@ -36,11 +36,11 @@ describe("CRM - pessoas vinculadas ao card na interface", () => {
     expect(modal).toContain("const podeGerenciarMembros = isAdminRole(currentUserRole)");
     expect(modal).toContain("<SeletorMembrosCard");
     expect(modal).toContain("podeGerenciar={podeGerenciarMembros}");
-    expect(modal).toContain("onAtualizado={() => { void recarregar(); onAtualizado(); }}");
+    expect(modal).toContain("onMembrosAtualizados={() => { onAtualizado(); }}");
   });
 
   it("permite que participante vinculado trabalhe no card, mantendo a gestão de membros restrita", () => {
-    expect(modal).toContain("const podeTrabalharNoCard = isAdminRole(currentUserRole) || Boolean(meuVinculo)");
+    expect(modal).toContain("|| (Boolean(meuVinculo) && podeAgirNaEtapa)");
     expect(modal).toContain("const podeMoverEtapa = podeTrabalharNoCard");
     expect(modal).toContain("const podeEditar = podeTrabalharNoCard");
     expect(modal).toContain("const podeTrabalharTarefas = podeTrabalharNoCard");

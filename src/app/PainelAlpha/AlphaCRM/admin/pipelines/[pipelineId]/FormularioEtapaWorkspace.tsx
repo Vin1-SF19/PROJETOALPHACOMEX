@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import {
   ChevronDown,
   ChevronUp,
@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { PipelineEditorStateBoundary, usePipelineEditorState } from "./PipelineEditorStateProvider";
 import { CriarCampoBpm } from "@/actions/bpm/Campos";
 import { SalvarFormularioEtapaBpm } from "@/actions/bpm/FormulariosEtapa";
 import { FormularioEtapaRenderer } from "@/app/PainelAlpha/AlphaCRM/CardModal/FormularioEtapaRenderer";
@@ -26,7 +27,6 @@ import {
 } from "@/components/ui/dialog";
 import { resolverFormularioEtapa } from "@/lib/bpm/formulario-renderer";
 import {
-  listarCatalogoComponentesFormulario,
   obterDefinicaoComponenteFormulario,
 } from "@/lib/bpm/formularios-etapa";
 
@@ -92,7 +92,6 @@ const TIPOS_CAMPO = [
   ["telefone", "Telefone"],
   ["url", "Link/URL"],
   ["arquivo", "Arquivo"],
-  ["relacionamento", "Relacionamento"],
 ] as const;
 
 function mensagemErroCampo(error: unknown): string {
@@ -154,7 +153,7 @@ function aplicarRotulo(
   };
 }
 
-export function FormularioEtapaWorkspace({
+function FormularioEtapaWorkspaceContent({
   pipelineId,
   etapas,
   campos,
@@ -174,23 +173,33 @@ export function FormularioEtapaWorkspace({
   publicationBlocked?: boolean;
   onPublished?: () => void;
 }) {
-  const primeiraEtapa = etapas[0];
-  const [etapaId, setEtapaId] = useState(primeiraEtapa?.id ?? "");
-  const [secoes, setSecoes] = useState<SecaoFormulario[]>(() =>
-    secoesDaEtapa(primeiraEtapa),
-  );
-  const [ativo, setAtivo] = useState(primeiraEtapa?.formulario?.ativo ?? true);
-  const [salvando, setSalvando] = useState(false);
-  const [sujo, setSujo] = useState(false);
-  const [camposLocais, setCamposLocais] = useState<CampoAplicavel[]>(campos);
-  const [secaoNovoCampo, setSecaoNovoCampo] = useState<number | null>(null);
-  const [nomeNovoCampo, setNomeNovoCampo] = useState("");
-  const [tipoNovoCampo, setTipoNovoCampo] =
-    useState<(typeof TIPOS_CAMPO)[number][0]>("texto");
-  const [opcoesNovoCampo, setOpcoesNovoCampo] = useState("");
-  const [novoCampoObrigatorio, setNovoCampoObrigatorio] = useState(false);
-  const [criandoCampo, setCriandoCampo] = useState(false);
-  const etapa = etapas.find((item) => item.id === etapaId);
+  const scope = `${pipelineId}:${modo}`;
+  const [etapaEscolhida, setEtapaId] = usePipelineEditorState(`${scope}:etapa`, etapas[0]?.id ?? "");
+  const etapa = etapas.find((item) => item.id === etapaEscolhida) ?? etapas[0];
+  const etapaId = etapa?.id ?? "";
+  const draftKey = `${scope}:${etapaId}`;
+  const [secoes, setSecoes] = usePipelineEditorState<SecaoFormulario[]>(`${draftKey}:secoes`, () => secoesDaEtapa(etapa));
+  const [ativo, setAtivo] = usePipelineEditorState(`${draftKey}:ativo`, etapa?.formulario?.ativo ?? true);
+  const [salvando, setSalvando] = usePipelineEditorState(`${draftKey}:salvando`, false);
+  const [sujo, setSujo] = usePipelineEditorState(`${draftKey}:sujo`, false);
+  const [versaoBase, setVersaoBase] = usePipelineEditorState<number | null>(`${draftKey}:versao`, etapa?.formulario?.versao ?? null);
+  const [camposCriados, setCamposLocais] = usePipelineEditorState<CampoAplicavel[]>(`${scope}:campos`, []);
+  const camposLocais = useMemo(() => [...new Map([...camposCriados, ...campos].map((campo) => [campo.id, campo])).values()], [campos, camposCriados]);
+  const [secaoNovoCampo, setSecaoNovoCampo] = usePipelineEditorState<number | null>(`${draftKey}:nova-secao`, null);
+  const [nomeNovoCampo, setNomeNovoCampo] = usePipelineEditorState(`${draftKey}:nome`, "");
+  const [tipoNovoCampo, setTipoNovoCampo] = usePipelineEditorState<(typeof TIPOS_CAMPO)[number][0]>(`${draftKey}:tipo`, "texto");
+  const [opcoesNovoCampo, setOpcoesNovoCampo] = usePipelineEditorState(`${draftKey}:opcoes`, "");
+  const [novoCampoObrigatorio, setNovoCampoObrigatorio] = usePipelineEditorState(`${draftKey}:obrigatorio`, false);
+  const [criandoCampo, setCriandoCampo] = usePipelineEditorState(`${draftKey}:criando`, false);
+
+  useEffect(() => {
+    if (etapaEscolhida !== etapaId) setEtapaId(etapaId);
+    if (!sujo && !salvando && !criandoCampo && (etapa?.formulario?.versao ?? 0) > (versaoBase ?? 0)) {
+      setSecoes(secoesDaEtapa(etapa));
+      setAtivo(etapa?.formulario?.ativo ?? true);
+      setVersaoBase(etapa?.formulario?.versao ?? null);
+    }
+  }, [etapa, etapaId, etapaEscolhida, sujo, salvando, criandoCampo, versaoBase, setEtapaId, setSecoes, setAtivo, setVersaoBase]);
   const camposAplicaveis = useMemo(
     () =>
       camposLocais.filter(
@@ -201,10 +210,6 @@ export function FormularioEtapaWorkspace({
           ),
       ),
     [camposLocais, etapaId],
-  );
-  const catalogoComponentes = useMemo(
-    () => listarCatalogoComponentesFormulario(etapa?.capabilitiesJson),
-    [etapa?.capabilitiesJson],
   );
   const editandoCard = modo === "card";
   const formularioPreview = useMemo(
@@ -246,15 +251,11 @@ export function FormularioEtapaWorkspace({
   );
 
   function selecionar(id: string) {
-    if (id !== etapaId && sujo) {
+    if (id !== etapaId && (sujo || criandoCampo || salvando)) {
       toast.error("Salve ou descarte as alterações antes de trocar de etapa");
       return;
     }
-    const proxima = etapas.find((item) => item.id === id);
-    setEtapaId(id);
-    setSecoes(secoesDaEtapa(proxima));
-    setAtivo(proxima?.formulario?.ativo ?? true);
-    setSujo(false);
+    if (etapas.some((item) => item.id === id)) setEtapaId(id);
   }
 
   function alterarSecao(indice: number, patch: Partial<SecaoFormulario>) {
@@ -267,6 +268,8 @@ export function FormularioEtapaWorkspace({
   }
 
   function descartarAlteracoesFormulario() {
+    if (criandoCampo || salvando) return;
+    setVersaoBase(etapa?.formulario?.versao ?? null);
     setSecoes(secoesDaEtapa(etapa));
     setAtivo(etapa?.formulario?.ativo ?? true);
     setSujo(false);
@@ -294,34 +297,6 @@ export function FormularioEtapaWorkspace({
           capability: null,
           configJson: null,
           campo,
-        },
-      ],
-    });
-  }
-
-  function adicionarComponente(indiceSecao: number, target: string) {
-    const definicao = catalogoComponentes.find(
-      (item) => item.target === target,
-    );
-    if (!definicao) return;
-    if (
-      !definicao.multiple &&
-      secoes.some((secao) =>
-        secao.componentes.some(
-          (componente) => componente.capability === target,
-        ),
-      )
-    )
-      return;
-    alterarSecao(indiceSecao, {
-      componentes: [
-        ...secoes[indiceSecao].componentes,
-        {
-          chave: `componente-${target.toLocaleLowerCase("pt-BR").replaceAll("_", "-")}`,
-          tipo: definicao.tipo,
-          campoId: null,
-          capability: definicao.target,
-          configJson: null,
         },
       ],
     });
@@ -355,6 +330,12 @@ export function FormularioEtapaWorkspace({
       return;
     }
 
+    const secaoChave = secoes[secaoNovoCampo]?.chave;
+    if (!secaoChave || salvando) return;
+    // Pin the base snapshot before the action can revalidate/remount this editor.
+    setSecoes(secoes);
+    setAtivo(ativo);
+    setVersaoBase(versaoBase);
     setCriandoCampo(true);
     try {
       const resposta = await CriarCampoBpm({
@@ -381,10 +362,10 @@ export function FormularioEtapaWorkspace({
       }
 
       const campoCriado = resposta.data as CampoAplicavel;
-      setCamposLocais((atuais) => [...atuais, campoCriado]);
+      setCamposLocais((atuais) => [...atuais.filter((campo) => campo.id !== campoCriado.id), campoCriado]);
       setSecoes((atuais) =>
-        atuais.map((secao, indice) =>
-          indice === secaoNovoCampo
+        atuais.map((secao) =>
+          secao.chave === secaoChave && !secao.componentes.some((item) => item.campoId === campoCriado.id)
             ? {
                 ...secao,
                 componentes: [
@@ -437,13 +418,13 @@ export function FormularioEtapaWorkspace({
   }
 
   async function salvar() {
-    if (!etapa || publicationBlocked || salvando) return;
+    if (!etapa || publicationBlocked || salvando || criandoCampo) return;
     setSalvando(true);
     try {
       const resposta = await SalvarFormularioEtapaBpm({
         pipelineId,
         etapaId: etapa.id,
-        versaoEsperada: etapa.formulario?.versao ?? null,
+        versaoEsperada: versaoBase,
         ativo,
         secoes: secoes.map((secao) => ({
           id: secao.id,
@@ -475,6 +456,7 @@ export function FormularioEtapaWorkspace({
           componentes: secao.componentes.map((item) => ({ ...item })),
         })),
       );
+      setVersaoBase(confirmado.versao);
       setAtivo(confirmado.ativo);
       setSujo(false);
       toast.success(
@@ -567,7 +549,7 @@ export function FormularioEtapaWorkspace({
             </label>
             <button
               type="button"
-              disabled={!sujo || salvando}
+              disabled={!sujo || salvando || criandoCampo}
               onClick={descartarAlteracoesFormulario}
               className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 px-3 text-xs font-bold text-slate-300 hover:bg-white/5 disabled:opacity-40"
             >
@@ -575,7 +557,7 @@ export function FormularioEtapaWorkspace({
             </button>
             <button
               type="button"
-              disabled={!sujo || publicationBlocked || salvando}
+              disabled={!sujo || publicationBlocked || salvando || criandoCampo}
               onClick={() => void salvar()}
               className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-cyan-400 px-3 text-xs font-bold text-slate-950 disabled:opacity-40"
             >
@@ -811,35 +793,6 @@ export function FormularioEtapaWorkspace({
                       <Plus size={13} aria-hidden="true" /> Criar novo campo
                     </button>
                   </div>
-                  <label className="flex items-center gap-2 text-xs text-slate-500">
-                    <Plus size={14} />
-                    <select
-                      aria-label={`Adicionar componente à seção ${secao.titulo}`}
-                      value=""
-                      onChange={(event) =>
-                        adicionarComponente(indiceSecao, event.target.value)
-                      }
-                      className="min-h-9 flex-1 rounded-lg border border-white/10 bg-slate-900 px-2 text-xs text-slate-300"
-                    >
-                      <option value="">Adicionar componente compatível…</option>
-                      {catalogoComponentes
-                        .filter(
-                          (item) =>
-                            item.multiple ||
-                            !secoes.some((secaoAtual) =>
-                              secaoAtual.componentes.some(
-                                (componente) =>
-                                  componente.capability === item.target,
-                              ),
-                            ),
-                        )
-                        .map((item) => (
-                          <option key={item.target} value={item.target}>
-                            {item.label}
-                          </option>
-                        ))}
-                    </select>
-                  </label>
                 </div>
               </div>
             ))}
@@ -1034,4 +987,14 @@ export function FormularioEtapaWorkspace({
       </Dialog>
     </section>
   );
+}
+
+function FormularioEtapaWorkspaceSelection(props: Parameters<typeof FormularioEtapaWorkspaceContent>[0]) {
+  const [selected] = usePipelineEditorState(`${props.pipelineId}:${props.modo ?? "formulario"}:etapa`, props.etapas[0]?.id ?? "");
+  const stage = props.etapas.find((item) => item.id === selected) ?? props.etapas[0];
+  return <FormularioEtapaWorkspaceContent key={`${props.pipelineId}:${props.modo ?? "formulario"}:${stage?.id ?? ""}`} {...props} />;
+}
+
+export function FormularioEtapaWorkspace(props: Parameters<typeof FormularioEtapaWorkspaceContent>[0]) {
+  return <PipelineEditorStateBoundary key={props.pipelineId}><FormularioEtapaWorkspaceSelection {...props} /></PipelineEditorStateBoundary>;
 }

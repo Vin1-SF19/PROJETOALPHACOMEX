@@ -59,7 +59,7 @@ export function CardOpenFormSlot({
                   className="flex min-h-12 w-full items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 text-left text-sm text-slate-200 hover:bg-white/[0.05]"
                 >
                   <ClipboardCheck size={17} style={{ color: `rgb(${accent})` }} />
-                  Abrir checklists da etapa
+                  Abrir procedimentos da etapa
                 </button>
               );
             case "meeting-scheduler":

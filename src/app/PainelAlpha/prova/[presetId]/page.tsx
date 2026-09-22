@@ -14,8 +14,11 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getPresetCompletoAction, salvarResultadoProva } from '@/actions/questoes';
+import { useSession } from 'next-auth/react';
 
-export default function PaginaProva({ params, userId }: { params: Promise<{ presetId: string }>, userId: number }) {
+export default function PaginaProva({ params }: { params: Promise<{ presetId: string }> }) {
+    const { data: session, status: sessionStatus } = useSession();
+    const userId = Number(session?.user?.id);
     const [loading, setLoading] = useState(true);
     const [questoesFiltradas, setQuestoesFiltradas] = useState<any[]>([]);
     const [indiceAtual, setIndiceAtual] = useState(0);
@@ -28,6 +31,8 @@ export default function PaginaProva({ params, userId }: { params: Promise<{ pres
     const presetId = resolvedParams.presetId;
 
     useEffect(() => {
+        if (sessionStatus === "loading" || !Number.isInteger(userId) || userId <= 0) return;
+
         async function carregarProva() {
             try {
                 const preset = await getPresetCompletoAction(presetId);
@@ -60,7 +65,7 @@ export default function PaginaProva({ params, userId }: { params: Promise<{ pres
             }
         }
         carregarProva();
-    }, [presetId, userId]);
+    }, [presetId, sessionStatus, userId]);
 
     const handleResposta = (perguntaId: string, letra: string) => {
         if (enviandoResultado) return;

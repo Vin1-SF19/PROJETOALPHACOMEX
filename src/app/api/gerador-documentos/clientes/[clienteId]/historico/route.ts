@@ -26,7 +26,7 @@ export async function GET(
   }
 
   const isAdmin = (session.user as { role?: string }).role === "Admin" || (session.user as { role?: string }).role === "CEO";
-  const userId = (session.user as { id?: number }).id;
+  const userId = Number((session.user as { id?: string }).id);
 
   const documentos = await db.documentoGerado.findMany({
     where: {

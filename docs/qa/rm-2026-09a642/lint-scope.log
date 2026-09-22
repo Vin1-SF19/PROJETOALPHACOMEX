@@ -1,0 +1,15 @@
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal.tsx
+   20:3   warning  'DadosEmpresaDrawer' is defined but never used             @typescript-eslint/no-unused-vars
+   21:3   warning  'DadosEmpresaToggle' is defined but never used             @typescript-eslint/no-unused-vars
+   63:10  warning  'abaAtiva' is assigned a value but never used              @typescript-eslint/no-unused-vars
+   63:20  warning  'setAbaAtiva' is assigned a value but never used           @typescript-eslint/no-unused-vars
+   67:9   warning  'dadosEmpresaDrawer' is assigned a value but never used    @typescript-eslint/no-unused-vars
+   77:9   warning  'focarPainelReuniao' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  159:9   warning  'podeMoverEtapa' is assigned a value but never used        @typescript-eslint/no-unused-vars
+  161:9   warning  'podeTrabalharTarefas' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  162:9   warning  'podeGerenciarMembros' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  168:9   warning  'etapasParaMover' is assigned a value but never used       @typescript-eslint/no-unused-vars
+
+✖ 10 problems (0 errors, 10 warnings)
+

@@ -59,8 +59,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { usePipelineEditorState } from "./PipelineEditorStateProvider";
 import { CardKanbanWorkspace } from "@/components/bpm/kanban/CardKanbanWorkspace";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   FormularioEtapaWorkspace,
   type FormularioEtapaAdmin,
@@ -205,8 +205,7 @@ export default function AdminPipelineClient({
   const [baseVersion, setBaseVersion] = useState(pipeline.configVersion);
   const [conflitoPublicacao, setConflitoPublicacao] = useState(false);
   const [novaEtapaNome, setNovaEtapaNome] = useState("");
-  const [abaAtiva, setAbaAtiva] = useState("overview");
-  const [etapaCardKanbanId, setEtapaCardKanbanId] = useState(etapasIniciais[0]?.id ?? "");
+  const [abaAtiva, setAbaAtiva] = usePipelineEditorState(`${pipeline.id}:tab`, "overview");
   const [etapaSelecionadaId, setEtapaSelecionadaId] = useState<string | null>(
     null,
   );
@@ -557,7 +556,7 @@ export default function AdminPipelineClient({
               <Bot size={14} /> Automações
             </TabsTrigger>
             <TabsTrigger value="checklists">
-              <ClipboardCheck size={14} /> Checklists
+              <ClipboardCheck size={14} /> Procedimentos
             </TabsTrigger>
             <TabsTrigger value="knowledge">
               <BookOpen size={14} /> Base de Conhecimento
@@ -944,31 +943,7 @@ export default function AdminPipelineClient({
         </TabsContent>
 
         <TabsContent value="card" className="space-y-4">
-          <Select value={etapaCardKanbanId} onValueChange={setEtapaCardKanbanId}>
-            <SelectTrigger className="h-9 w-full max-w-sm text-sm">
-              <SelectValue placeholder="Selecione a etapa" />
-            </SelectTrigger>
-            <SelectContent>
-              {etapas.map((etapa) => (
-                <SelectItem key={etapa.id} value={etapa.id}>
-                  {etapa.nome}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {(() => {
-            const etapaSelecionada = etapas.find((etapa) => etapa.id === etapaCardKanbanId);
-            return etapaSelecionada ? (
-              <CardKanbanWorkspace
-                key={etapaSelecionada.id}
-                pipelineId={pipeline.id}
-                etapaId={etapaSelecionada.id}
-                etapaNome={etapaSelecionada.nome}
-              />
-            ) : (
-              <p className="text-sm text-slate-400">Selecione uma etapa para configurar o card.</p>
-            );
-          })()}
+          <CardKanbanWorkspace pipelineId={pipeline.id} etapas={etapas} accent={accent} />
         </TabsContent>
 
         <TabsContent value="history">
@@ -983,7 +958,7 @@ export default function AdminPipelineClient({
               campos={campos}
               onFormularioAtualizado={handleFormularioAtualizado}
               publicationBlocked={alteracoesPendentes > 0}
-              onPublished={() => router.refresh()}
+              onPublished={() => { setAbaAtiva("fields"); router.refresh(); }}
             />
           </div>
         </TabsContent>

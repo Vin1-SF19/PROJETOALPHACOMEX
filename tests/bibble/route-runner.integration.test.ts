@@ -16,7 +16,8 @@ vi.mock('@/lib/bibble/completion', async importOriginal => {
 });
 vi.mock('@/lib/bibble/tool-executor', () => ({ executarTool: provider.tool }));
 
-import { deriveAdaptiveStyleForTurn, runStream } from '@/app/api/bibble/chat/route';
+import { deriveAdaptiveStyleForTurn } from '@/lib/bibble/adaptive-turn';
+import { runStream } from '@/lib/bibble/chat-stream-runner';
 import type { OllamaTool } from '@/lib/bibble/tools';
 import { createBibbleMetrics } from '@/lib/bibble/telemetry';
 import { issueBibbleMutationGrant, type BibbleMutationGrant } from '@/lib/bibble/mutation-grant';

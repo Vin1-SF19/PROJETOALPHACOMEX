@@ -325,6 +325,7 @@ function KanbanCard({
             </div>
           ) : (
             <>
+          {card.cardViewComposicao === undefined && (
           <div className="flex items-start gap-2.5">
             <div
               aria-hidden="true"
@@ -367,6 +368,7 @@ function KanbanCard({
               {!novosLeads && card.servico && <p className="mt-1 line-clamp-1 text-[11px] font-medium leading-tight text-slate-400">{card.servico}</p>}
             </div>
           </div>
+          )}
 
         {!novosLeads && (alertaBoasVindas || alertaAlinhamento) && (
           <div
@@ -378,7 +380,7 @@ function KanbanCard({
           </div>
         )}
 
-        {ehLeadVirtual && (
+        {ehLeadVirtual && card.cardViewComposicao === undefined && (
           <div className="flex flex-wrap items-center gap-1.5">
             <span
               className="rounded-lg border border-sky-400/30 bg-sky-500/10 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-sky-300"
@@ -390,6 +392,16 @@ function KanbanCard({
               Recebido em {formatarPrazoNoCard(card.createdAt)}
             </span>
           </div>
+        )}
+
+        {ehLeadVirtual && card.cardViewComposicao !== undefined && (
+          // Mesma composição configurável da etapa (RM-2026-E1E1F7), agora também
+          // aplicada ao lead virtual — só os campos com dado disponível para um
+          // lead ainda não promovido aparecem (CardKanbanRenderer já filtra "vazio").
+          <CardKanbanRenderer
+            composicao={card.cardViewComposicao}
+            valores={card.cardViewValores ?? { nativos: {}, campos: {}, camposLabel: {} }}
+          />
         )}
 
         {!ehLeadVirtual && (
@@ -462,9 +474,9 @@ function KanbanCard({
               </div>
             )}
             {card.checklistProgress && (
-              <div className="flex items-center gap-1.5 text-[10px] font-medium" title={`Checklist: ${card.checklistProgress.completed}/${card.checklistProgress.total}`}>
+              <div className="flex items-center gap-1.5 text-[10px] font-medium" title={`Procedimento: ${card.checklistProgress.completed}/${card.checklistProgress.total}`}>
                 <ClipboardList size={12} aria-hidden="true" className="shrink-0 text-cyan-300" />
-                <span className="shrink-0 uppercase tracking-wide text-cyan-300/75">Checklist</span>
+                <span className="shrink-0 uppercase tracking-wide text-cyan-300/75">Procedimento</span>
                 <span className="ml-auto tabular-nums text-slate-200">{card.checklistProgress.completed}/{card.checklistProgress.total}</span>
               </div>
             )}

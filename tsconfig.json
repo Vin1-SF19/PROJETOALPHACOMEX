@@ -43,7 +43,9 @@
     "**/*.mts",
     "src/actions/ComersialControle.js",
     ".next-alpha-dev/types/**/*.ts",
-    ".next-alpha-dev/dev/types/**/*.ts"
+    ".next-alpha-dev/dev/types/**/*.ts",
+    ".next-rm-b5c986/types/**/*.ts",
+    ".next-rm-b5c986/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

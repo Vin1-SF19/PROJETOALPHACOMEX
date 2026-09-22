@@ -95,7 +95,7 @@ export default function TarefasCentralClient({ tarefas, visual, currentUserId, c
                 setCardSelecionadoId(t.cardId);
               }}
               aria-label={t.cardChecklistId
-                ? `Abrir checklist ${t.cardChecklist?.templateNome ?? t.titulo} no card`
+                ? `Abrir procedimento ${t.cardChecklist?.templateNome ?? t.titulo} no card`
                 : `Abrir tarefa ${t.titulo} no card`}
               className="w-full flex items-center justify-between gap-3 bg-slate-900/60 border border-white/5 rounded-xl px-4 py-3 text-left hover:border-white/15 transition-colors"
             >
@@ -105,7 +105,7 @@ export default function TarefasCentralClient({ tarefas, visual, currentUserId, c
                 </p>
                 {t.cardChecklistId && (
                   <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-300">
-                    <ClipboardCheck size={11} aria-hidden="true" /> Checklist
+                    <ClipboardCheck size={11} aria-hidden="true" /> Procedimento
                   </span>
                 )}
                 <p className="text-xs text-slate-500 truncate">

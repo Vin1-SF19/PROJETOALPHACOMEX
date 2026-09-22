@@ -302,18 +302,18 @@ function descreverCatalogado(
     case "MOVIDO_AUTOMACAO": return descricaoMovimento(true, anterior, novo, contexto);
     case "CHECKLIST_ITEM_ATUALIZADO": {
       const status = rotuloStatus(texto(novo, "status"));
-      return `Item de checklist atualizado${status ? `: ${status}` : ""}`;
+      return `Item de procedimento atualizado${status ? `: ${status}` : ""}`;
     }
-    case "CHECKLIST_ITEM_EXCLUSIVO_ADICIONADO": return `Item de checklist adicionado: ${nome("nome", "novo item")}`;
-    case "CHECKLIST_MATERIALIZADO": return `Checklist ${nome("templateNome", "configurado")} aplicado ao card`;
+    case "CHECKLIST_ITEM_EXCLUSIVO_ADICIONADO": return `Item de procedimento adicionado: ${nome("nome", "novo item")}`;
+    case "CHECKLIST_MATERIALIZADO": return `Procedimento ${nome("templateNome", "configurado")} aplicado ao card`;
     case "CHECKLIST_STATUS_ALTERADO": {
       const status = rotuloStatus(texto(novo, "status"));
-      return status ? `Item de checklist marcado como ${status}` : "Status do checklist atualizado";
+      return status ? `Item de procedimento marcado como ${status}` : "Status do procedimento atualizado";
     }
-    case "TAREFA_CHECKLIST_CRIADA": return "Tarefa criada automaticamente a partir do checklist";
-    case "TAREFA_CHECKLIST_ATUALIZADA": return "Tarefa do checklist sincronizada";
-    case "TAREFA_CHECKLIST_REABERTA": return "Tarefa reaberta porque o checklist voltou a ter pendências";
-    case "TAREFA_CHECKLIST_CONCLUIDA": return "Tarefa concluída automaticamente com o checklist";
+    case "TAREFA_CHECKLIST_CRIADA": return "Tarefa criada automaticamente a partir do procedimento";
+    case "TAREFA_CHECKLIST_ATUALIZADA": return "Tarefa do procedimento sincronizada";
+    case "TAREFA_CHECKLIST_REABERTA": return "Tarefa reaberta porque o procedimento voltou a ter pendências";
+    case "TAREFA_CHECKLIST_CONCLUIDA": return "Tarefa concluída automaticamente com o procedimento";
     case "COMUNICACAO_PENDENTE": return `Comunicação por ${nome("canal", "canal configurado")} aguardando envio`;
     case "DISTRIBUICAO_AUTOMATICA": return `Responsável definido automaticamente: ${nomeUsuario(numero(novo, "responsavelId"), contexto)}`;
     case "FOLLOW_UP_ATUALIZADO": return "Follow-up atualizado";

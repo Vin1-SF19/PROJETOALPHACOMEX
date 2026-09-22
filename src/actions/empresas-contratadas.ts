@@ -9,7 +9,7 @@ import {
   EmpresaContratadaSchema,
   AtualizarEmpresaContratadaSchema,
 } from "@/lib/gerador-documentos/schemas";
-import { getReceitaData } from "@/app/api/ReceitaFederal/route";
+import { getReceitaData } from "@/lib/cnpj/receita-federal";
 
 const ROTA_BASE = "/PainelAlpha/GeradorDocumentos";
 const getSessao = getSessaoGeradorDocumentos;

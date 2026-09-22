@@ -1,8 +1,10 @@
 import "server-only";
 
+import type { Prisma } from "@prisma/client";
 import db from "@/lib/prisma";
 import {
   assertRoadmapRunTransition,
+  findRoadmapRunStartBlocker,
   isValidRoadmapRunStatus,
   type RoadmapRunStatus,
 } from "./status-machine";
@@ -19,9 +21,15 @@ export class RoadmapProductionOperationError extends Error {
 }
 
 async function getRunOrThrow(runId: string) {
-  const run = await db.roadmapProductionRun.findUnique({ where: { id: runId } });
+  const run = await db.roadmapProductionRun.findUnique({
+    where: { id: runId },
+  });
   if (!run) {
-    throw new RoadmapProductionOperationError(404, "RUN_NOT_FOUND", "Fase não encontrada.");
+    throw new RoadmapProductionOperationError(
+      404,
+      "RUN_NOT_FOUND",
+      "Fase não encontrada.",
+    );
   }
   return run;
 }
@@ -51,32 +59,132 @@ export async function listRoadmapProductionQueue(filter: {
         },
       },
       artifact: {
-        select: { phaseNumber: true, title: true, kind: true, relativePath: true },
+        select: {
+          phaseNumber: true,
+          title: true,
+          kind: true,
+          relativePath: true,
+        },
       },
     },
-    orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
+    orderBy: [
+      { objective: { globalPriority: "asc" } },
+      { sourceVersion: "asc" },
+      { phaseNumber: "asc" },
+    ],
     take: 200,
   });
 }
 
-export async function getRoadmapProductionRunDetail(runId: string, eventsLimit = 50) {
+async function assertRoadmapRunCanStart(
+  client: Prisma.TransactionClient | typeof db,
+  run: {
+    id: string;
+    objectiveId: string;
+    sourceVersion: number;
+    phaseNumber: number;
+    objective: { code: string; globalPriority: number };
+  },
+) {
+  const [previousArtifacts, previousRuns, earlierObjective, runningRun] =
+    await Promise.all([
+      client.roadmapPromptArtifact.findMany({
+        where: {
+          objectiveId: run.objectiveId,
+          documentationVersion: run.sourceVersion,
+          phaseNumber: { lt: run.phaseNumber },
+          status: "PUBLISHED",
+        },
+        orderBy: { phaseNumber: "asc" },
+        select: { phaseNumber: true },
+      }),
+      client.roadmapProductionRun.findMany({
+        where: {
+          objectiveId: run.objectiveId,
+          sourceVersion: run.sourceVersion,
+          phaseNumber: { lt: run.phaseNumber },
+        },
+        select: { phaseNumber: true, status: true },
+      }),
+      client.roadmapObjective.findFirst({
+        where: {
+          id: { not: run.objectiveId },
+          globalPriority: { lt: run.objective.globalPriority },
+          archivedAt: null,
+          documentationStatus: "DOCUMENTED",
+          status: { in: ["ACTIVE", "IN_DEVELOPMENT"] },
+        },
+        orderBy: [{ globalPriority: "asc" }, { createdAt: "asc" }],
+        select: { code: true, title: true },
+      }),
+      client.roadmapProductionRun.findFirst({
+        where: { id: { not: run.id }, status: "IN_PROGRESS" },
+        orderBy: { startedAt: "asc" },
+        select: {
+          phaseNumber: true,
+          objective: { select: { code: true } },
+        },
+      }),
+    ]);
+
+  const blocker = findRoadmapRunStartBlocker({
+    objectiveCode: run.objective.code,
+    previousPhaseNumbers: previousArtifacts.map(
+      (artifact) => artifact.phaseNumber,
+    ),
+    previousRuns,
+    earlierObjective,
+    runningRun: runningRun
+      ? {
+          objectiveCode: runningRun.objective.code,
+          phaseNumber: runningRun.phaseNumber,
+        }
+      : null,
+  });
+  if (blocker) {
+    throw new RoadmapProductionOperationError(
+      400,
+      blocker.code,
+      blocker.message,
+    );
+  }
+}
+
+export async function getRoadmapProductionRunDetail(
+  runId: string,
+  eventsLimit = 50,
+) {
   const run = await db.roadmapProductionRun.findUnique({
     where: { id: runId },
     include: {
       objective: {
-        select: { id: true, code: true, title: true, moduleKey: true, moduleLabelSnapshot: true },
+        select: {
+          id: true,
+          code: true,
+          title: true,
+          moduleKey: true,
+          moduleLabelSnapshot: true,
+        },
       },
       artifact: true,
       events: { orderBy: { createdAt: "desc" }, take: eventsLimit },
     },
   });
   if (!run) {
-    throw new RoadmapProductionOperationError(404, "RUN_NOT_FOUND", "Fase não encontrada.");
+    throw new RoadmapProductionOperationError(
+      404,
+      "RUN_NOT_FOUND",
+      "Fase não encontrada.",
+    );
   }
   return run;
 }
 
-export async function listRoadmapProductionEvents(runId: string, limit: number, cursor?: string) {
+export async function listRoadmapProductionEvents(
+  runId: string,
+  limit: number,
+  cursor?: string,
+) {
   await getRunOrThrow(runId);
   return db.roadmapProductionEvent.findMany({
     where: { runId },
@@ -99,30 +207,61 @@ export async function updateRoadmapProductionRunStatus(
   extra: { resultSummary?: string; errorCode?: string } = {},
 ) {
   if (!isValidRoadmapRunStatus(toStatus)) {
-    throw new RoadmapProductionOperationError(400, "INVALID_STATUS", "Status inválido.");
-  }
-  const run = await getRunOrThrow(runId);
-  const fromStatus = run.status as RoadmapRunStatus;
-  try {
-    assertRoadmapRunTransition(fromStatus, toStatus);
-  } catch {
     throw new RoadmapProductionOperationError(
       400,
-      "INVALID_TRANSITION",
-      `Transição inválida: ${fromStatus} → ${toStatus}.`,
+      "INVALID_STATUS",
+      "Status inválido.",
     );
   }
-
   const now = new Date();
-  const updated = await db.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
+    const run = await tx.roadmapProductionRun.findUnique({
+      where: { id: runId },
+      include: {
+        objective: { select: { code: true, globalPriority: true } },
+      },
+    });
+    if (!run) {
+      throw new RoadmapProductionOperationError(
+        404,
+        "RUN_NOT_FOUND",
+        "Fase não encontrada.",
+      );
+    }
+
+    const fromStatus = run.status as RoadmapRunStatus;
+    try {
+      assertRoadmapRunTransition(fromStatus, toStatus);
+    } catch {
+      throw new RoadmapProductionOperationError(
+        400,
+        "INVALID_TRANSITION",
+        `Transição inválida: ${fromStatus} → ${toStatus}.`,
+      );
+    }
+
+    if (toStatus === "IN_PROGRESS") {
+      await assertRoadmapRunCanStart(tx, run);
+    }
+
+    const isFailedRetry = fromStatus === "FAILED" && toStatus === "PENDING";
     const saved = await tx.roadmapProductionRun.update({
       where: { id: runId },
       data: {
         status: toStatus,
-        startedAt: toStatus === "IN_PROGRESS" && !run.startedAt ? now : undefined,
-        finishedAt: toStatus === "SUCCEEDED" || toStatus === "FAILED" ? now : undefined,
+        startedAt: isFailedRetry
+          ? null
+          : toStatus === "IN_PROGRESS" && !run.startedAt
+            ? now
+            : undefined,
+        finishedAt: isFailedRetry
+          ? null
+          : toStatus === "SUCCEEDED" || toStatus === "FAILED"
+            ? now
+            : undefined,
         resultSummary: extra.resultSummary ?? undefined,
-        errorCode: toStatus === "FAILED" ? (extra.errorCode ?? undefined) : null,
+        errorCode:
+          toStatus === "FAILED" ? (extra.errorCode ?? undefined) : null,
       },
     });
     await tx.roadmapProductionEvent.create({
@@ -162,7 +301,10 @@ export async function updateRoadmapProductionRunStatus(
       });
       if (lastArtifact && run.phaseNumber === lastArtifact.phaseNumber) {
         await tx.roadmapObjective.updateMany({
-          where: { id: run.objectiveId, status: { in: ["ACTIVE", "IN_DEVELOPMENT"] } },
+          where: {
+            id: run.objectiveId,
+            status: { in: ["ACTIVE", "IN_DEVELOPMENT"] },
+          },
           data: { status: "COMPLETED" },
         });
       }
@@ -170,10 +312,12 @@ export async function updateRoadmapProductionRunStatus(
 
     return saved;
   });
-  return updated;
 }
 
-export async function approveRoadmapProductionRun(runId: string, author: AuthorInfo) {
+export async function approveRoadmapProductionRun(
+  runId: string,
+  author: AuthorInfo,
+) {
   return updateRoadmapProductionRunStatus(runId, "PENDING", author);
 }
 
@@ -196,7 +340,9 @@ export async function registerRoadmapProductionEvent(
       },
     });
     if (kind === "QUESTION") {
-      const run = await tx.roadmapProductionRun.findUniqueOrThrow({ where: { id: runId } });
+      const run = await tx.roadmapProductionRun.findUniqueOrThrow({
+        where: { id: runId },
+      });
       if (run.status === "IN_PROGRESS") {
         await tx.roadmapProductionRun.update({
           where: { id: runId },
@@ -219,7 +365,11 @@ export async function createRoadmapProductionRun(
     select: { id: true, sourceVersion: true },
   });
   if (!objective) {
-    throw new RoadmapProductionOperationError(404, "OBJECTIVE_NOT_FOUND", "Objetivo não encontrado.");
+    throw new RoadmapProductionOperationError(
+      404,
+      "OBJECTIVE_NOT_FOUND",
+      "Objetivo não encontrado.",
+    );
   }
   const artifact = await db.roadmapPromptArtifact.findFirst({
     where: {
@@ -271,11 +421,18 @@ export async function setRoadmapObjectiveCompletionReport(
     select: { id: true },
   });
   if (!objective) {
-    throw new RoadmapProductionOperationError(404, "OBJECTIVE_NOT_FOUND", "Objetivo não encontrado.");
+    throw new RoadmapProductionOperationError(
+      404,
+      "OBJECTIVE_NOT_FOUND",
+      "Objetivo não encontrado.",
+    );
   }
   return db.roadmapObjective.update({
     where: { id: objectiveId },
-    data: { completionReportMarkdown: reportMarkdown, completionReportGeneratedAt: new Date() },
+    data: {
+      completionReportMarkdown: reportMarkdown,
+      completionReportGeneratedAt: new Date(),
+    },
     select: { id: true, completionReportGeneratedAt: true },
   });
 }

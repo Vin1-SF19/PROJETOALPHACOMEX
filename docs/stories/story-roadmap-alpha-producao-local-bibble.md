@@ -115,7 +115,8 @@ Ready for Review
 | 2026-08-18 |   1.5.0 | Qwen e agentes passaram a auditar a forma de entrega e promover automaticamente lacunas para implementação e validação ponta a ponta.    | Codex / `@dev` |
 | 2026-08-18 |   1.6.0 | Roteamento híbrido permite tarefas básicas no Qwen e escala engenharia, banco e código para Claude/Codex com preservação do diagnóstico. | Codex / `@dev` |
 | 2026-08-18 |   1.6.1 | Modal de edição passou a alterar a IA preferencial do objetivo sem regenerar prompts, aplicando-a às próximas fases e tentativas.        | Codex / `@dev` |
-| 2026-08-18 |   1.6.2 | Feature gate local oculta Produção no hospedado e bloqueia actions diretas com diagnóstico específico.                               | Codex / `@dev` |
+| 2026-08-18 |   1.6.2 | Feature gate local oculta Produção no hospedado e bloqueia actions diretas com diagnóstico específico.                                   | Codex / `@dev` |
+| 2026-09-22 |   1.6.3 | Fila de desenvolvimento tornou-se fail-closed: falha em uma fase pausa fases e objetivos posteriores até correção e sucesso.             | Codex / `@dev` |
 
 ## Dev Agent Record
 
@@ -144,6 +145,9 @@ Codex (GPT-5)
 - O Qwen executa tarefas básicas com tools confinadas; o roteador envia frontend, backend, banco e código diretamente para Claude/Codex e preserva o diagnóstico quando o próprio Qwen solicita escalonamento por capacidade.
 - O modal de edição exibe a preferência atual e permite trocar Claude/Codex sem nova revisão; o worker sincroniza a mudança antes do próximo processamento da execução.
 - A Produção deixou de ser anunciada no runtime hospedado; permissão e feature gate local agora são exigidos em conjunto, inclusive nas server actions.
+- Correção de fluxo (2026-09-22): a API passou a validar a prioridade global e todas as fases anteriores dentro da transação que inicia uma execução. `FAILED` não conta mais como término liberador; a fila permanece pausada até a própria fase ser reaberta, corrigida e concluída com `SUCCEEDED`.
+- A ação **Corrigir esta fase** e a tool MCP `roadmap_tentar_fase_novamente` devolvem somente a fase que falhou para `PENDING`, limpando os tempos da tentativa anterior. A regra anterior que isolava falhas e liberava revisões seguintes foi deliberadamente substituída pela sequência estrita solicitada.
+- Gate direcionado da correção: ESLint passou e 16 testes Roadmap passaram; typecheck executado após a integração de `FAILED` aos indicadores de atenção.
 
 ### File List
 
@@ -167,11 +171,14 @@ Codex (GPT-5)
 - `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`
 - `src/app/PainelAlpha/Roadmap/page.tsx`
 - `src/components/RoadmapAlpha/RoadmapDashboard.tsx`
+- `src/components/RoadmapAlpha/RoadmapImplementationRoom.tsx`
 - `src/components/RoadmapAlpha/RoadmapProductionPanel.tsx`
 - `src/components/ui/gradient-blob-card.tsx`
 - `src/lib/roadmap-alpha/authorization.ts`
 - `src/lib/roadmap-alpha/improve-with-ai.ts`
 - `src/lib/roadmap-alpha/objectives.ts`
+- `src/lib/roadmap-production-api/operations.ts`
+- `src/lib/roadmap-production-api/status-machine.ts`
 - `src/lib/roadmap-production/agents.ts`
 - `src/lib/roadmap-production/cli-providers.ts`
 - `src/lib/roadmap-production/contracts.ts`
@@ -185,6 +192,7 @@ Codex (GPT-5)
 - `tests/roadmap-production/agents.test.ts`
 - `tests/bpm/card-modal-integration.test.ts`
 - `tests/roadmap-alpha/contracts.test.ts`
+- `tests/roadmap-alpha/production-queue-order.test.ts`
 - `tests/roadmap-alpha/improve-with-ai.test.ts`
 - `tests/roadmap-production/completion-report.test.ts`
 - `tests/roadmap-production/contracts.test.ts`
@@ -193,6 +201,8 @@ Codex (GPT-5)
 - `tests/roadmap-production/runtime.test.ts`
 - `tests/roadmap-production/storage.test.ts`
 - `tests/roadmap-production/tools.test.ts`
+- `mcp/roadmap-status/README.md`
+- `mcp/roadmap-status/src/tools.ts`
 
 ## QA Results
 

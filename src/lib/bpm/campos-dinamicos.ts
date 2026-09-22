@@ -74,7 +74,7 @@ export function validarValoresCamposBpm(
     if (!campo) {
       return { success: false, error: "Um ou mais campos não pertencem a este contexto." };
     }
-    if ((campo.escopo === "GLOBAL" && Boolean(campo.fonteEntidade)) || campo.somenteLeitura || campo.editavel === false) {
+    if (campo.somenteLeitura === true || campo.editavel === false) {
       return { success: false, error: `O campo "${campo.nome}" é somente leitura.` };
     }
     const valor = valorOriginal.trim();

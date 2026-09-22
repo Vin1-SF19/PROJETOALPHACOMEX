@@ -55,7 +55,7 @@ function erroPublico(error: unknown): string {
     "Template não encontrado",
     "Item não encontrado",
     "Card não encontrado",
-    "Checklist não encontrado",
+    "Procedimento não encontrado",
     "Pipeline inválido",
     "Etapa inválida para o pipeline",
     "Card específico incompatível com os vínculos informados",
@@ -71,7 +71,7 @@ function erroPublico(error: unknown): string {
     tipo: error instanceof Error ? error.name : typeof error,
     ...(codigo ? { codigo } : {}),
   });
-  return "Não foi possível concluir a operação de checklist";
+  return "Não foi possível concluir a operação de procedimento";
 }
 
 function nuloSeVazio(valor: string | null | undefined) {
@@ -483,7 +483,7 @@ export async function AdicionarItemExclusivoChecklistCardBpm(payload: unknown) {
       where: { id: dados.cardChecklistId },
       select: { id: true, cardId: true, card: { select: { pipelineId: true, responsavelId: true } } },
     });
-    if (!checklist) throw new Error("Checklist não encontrado");
+    if (!checklist) throw new Error("Procedimento não encontrado");
     await exigirAcessoBpmCard(checklist.cardId, userId, role, "editarCard");
     const item = await db.$transaction(async (tx) => {
       await exigirAcessoBpmCard(checklist.cardId, userId, role, "editarCard", tx);

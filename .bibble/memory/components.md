@@ -776,3 +776,20 @@ Na configuração por pipeline, a mesma cadência pode ser escolhida em várias 
 Modal responsivo baseado no Dialog shadcn para visualização segura de arquivos do Alpha Explorer. Renderiza PDF, imagens raster, texto, áudio e vídeo a partir de URL temporária com MIME controlado; possui loading, erro/retry, download e fechamento por Escape. O componente é puramente apresentacional: carregamento, autorização, cancelamento e revogação da URL ficam no workspace consumidor.
 
 **Última atualização:** 2026-09-17 por Nova/Dex.
+
+
+### 2026-09-22 — RM-2026-B5C986
+
+PipelineEditorStateProvider e PipelineEditorStateBoundary: estado efêmero por pipeline acima do editor versionado; hook usePipelineEditorState com assinaturas síncronas. Reutilizados por AdminPipelineClient e FormularioEtapaWorkspace. Não usam storage do navegador.
+
+
+### FormularioEtapaWorkspace — RM-2026-51AE7B (2026-09-22)
+Removido apenas o seletor “Adicionar componente compatível” e dependências locais sem uso. “Adicionar campo aplicável”, “Criar novo campo”, apresentação de componentes existentes e publicação permanecem. Consumido por AdminPipelineClient na aba fields. Nenhum componente novo; aceite autenticado pendente.
+
+
+### FormularioEtapaWorkspace — RM-2026-2C769C (2026-09-22)
+Removida somente a opção Relacionamento de TIPOS_CAMPO na criação. Contratos, actions e renderizadores preservados. Nenhum componente novo. Reexecução: fixtures React de composição/publicação, seletor, edição/readonly e action passaram (23 testes com regressão do editor); happy-dom local disponibilizado. Gates globais ainda falham; ver story RM-2026-2C769C.
+
+
+### CardSaveContext / CardFullViewModal — RM-2026-09A642
+Componentes existentes: pendências por instância do formulário, flush até fila estabilizar e confirmação AlertDialog com nomes dos campos. PainelCamposEtapaAtual confirma somente revisões efetivamente enviadas e usa valores relidos do servidor. Nenhum componente visual novo. Homologação de interação pendente; ver story do RM.

@@ -35,8 +35,8 @@ describe("CRM Fechado - representacao no board", () => {
     expect(board).toContain('title="Nunca acessado"');
     expect(board).toContain("`${nomeEmpresa}. Status pós-fechamento: ${statusConfig.label}`");
     expect(board).toContain(": nomeEmpresa}");
-    expect(board.indexOf("{...attributes}")).toBeLessThan(board.indexOf("aria-label={statusConfig"));
-    expect(board.indexOf("{...listeners}")).toBeLessThan(board.indexOf("aria-label={statusConfig"));
+    expect(board.indexOf("{...attributes}")).toBeLessThan(board.indexOf("aria-label={ehLeadVirtual"));
+    expect(board.indexOf("{...listeners}")).toBeLessThan(board.indexOf("aria-label={ehLeadVirtual"));
     expect(board).toContain("statusConfig.label");
   });
 });

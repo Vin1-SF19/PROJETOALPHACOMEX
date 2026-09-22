@@ -195,3 +195,36 @@ DELIVERY_READY: story acessível em `docs/stories/story-rm-2026-e1e1f7-card-kanb
 As lacunas AUTO_ADJUSTMENT_REQUIRED e respectivos critérios acima permanecem requisitos obrigatórios das fases executoras. A aba administrativa foi reinspecionada e ainda monta `FormularioEtapaWorkspace` com `modo="card"`. O histórico de Vault foi preservado e não constitui autorização desta sessão para executar mudanças de banco.
 
 Validações desta retomada: validação documental e `git diff --check` dos documentos passaram. `npm run lint` exit 1; `npm run typecheck -- --incremental false` exit 134 (heap esgotado); `npm test -- --coverage.reportsDirectory=.bibble/reports/rm-2026-e1e1f7-phase2-revalidation/coverage` exit 1, com falhas de testes. Logs e comandos exatos em `lint.log`, `typecheck.log`, `test.log` e `results.json` do diretório de evidências listado. Build não executado em fase documental; nenhum gate global aprovado. PASS restrito à story pronta para consumo pelas fases seguintes.
+
+## Dev Agent Record — correção funcional de 2026-09-22
+
+### Completion Notes
+
+- A aba `Card do Kanban` passou a concentrar o seletor de etapa, a composição ordenável e a prévia do card fechado no mesmo workspace.
+- Cada etapa carrega e salva sua composição independente; a troca de etapa é bloqueada enquanto houver alterações não salvas, com ações explícitas para salvar ou descartar.
+- A prévia administrativa deixou de inserir nome da empresa e etapa fora da composição. O card real também deixa de renderizar nome, CNPJ e serviço hardcoded quando existe uma composição publicada, mantendo o comportamento legado somente nas etapas ainda sem configuração.
+- Leads virtuais de Novos Leads consomem a mesma composição configurada, exibindo apenas valores disponíveis antes da promoção.
+- O estado de salvamento é sempre liberado em sucesso ou erro e conflitos de versão continuam forçando recarga segura.
+- Nenhuma alteração de schema, migration, seed, backfill ou escrita direta no banco foi realizada nesta correção.
+- Validações do escopo: ESLint sem ocorrências; 45/45 testes focados verdes; `npm run typecheck` verde; `npm run build` verde.
+- Gates globais externos ao escopo permanecem bloqueados: `npm run lint` encontrou 2.417 erros e 1.218 avisos preexistentes; `npm test -- --coverage.enabled=false` terminou com 3.476 testes verdes, 17 falhas e 1 todo em módulos não relacionados ao CRM, além de um worker sem `happy-dom`.
+- CodeRabbit não executado porque o CLI não está instalado neste ambiente; revisão manual e `git diff --check` não encontraram erro no escopo.
+
+### File List
+
+- `src/actions/bpm/Cards.ts`
+- `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/AdminPipelineClient.tsx`
+- `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/page.tsx`
+- `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`
+- `src/components/bpm/kanban/CardKanbanRenderer.tsx`
+- `src/components/bpm/kanban/CardKanbanWorkspace.tsx`
+- `src/lib/bpm/card-kanban.ts`
+- `tests/bpm/card-campos-agendar-reuniao.test.ts`
+- `tests/bpm/card-kanban-registry.test.ts`
+- `tests/bpm/crm-configuracoes-centralizadas.test.ts`
+- `tests/bpm/pipeline-config-workspace.test.ts`
+- `docs/stories/story-rm-2026-e1e1f7-card-kanban-configuravel.md`
+
+### Change Log
+
+- 2026-09-22: configuração visual do card fechado consolidada por etapa na aba `Card do Kanban`, prévia alinhada ao renderer real, proteção contra perda de rascunho e remoção de detalhes hardcoded quando há composição publicada.

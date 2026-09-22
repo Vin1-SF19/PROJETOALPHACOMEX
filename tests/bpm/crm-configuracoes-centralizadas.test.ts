@@ -12,7 +12,7 @@ describe("CRM - configurações centralizadas e card editável", () => {
 
     for (const label of [
       "Automações",
-      "Checklists",
+      "Procedimentos",
       "Base de Conhecimento",
       "Cadências",
     ]) {
@@ -49,7 +49,7 @@ describe("CRM - configurações centralizadas e card editável", () => {
     expect(admin).not.toContain("Criar e publicar campo");
     expect(admin).toContain("<FormularioEtapaWorkspace");
     expect(admin).not.toContain("Pré-visualização publicada");
-    expect(admin).toContain('modo="card"');
+    expect(admin).toContain('<TabsContent value="fields"');
   });
 
   it("oferece edição, exclusão, ordem e movimento entre seções", () => {
@@ -74,6 +74,25 @@ describe("CRM - configurações centralizadas e card editável", () => {
     expect(builder).toContain("descartarAlteracoesFormulario");
     expect(builder).toContain("Salve ou descarte as alterações antes de trocar de etapa");
     expect(builder).not.toContain("Etapa exibida");
+  });
+
+  it("configura o card fechado por etapa sem descartar alterações silenciosamente", () => {
+    const admin = ler(
+      "src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/AdminPipelineClient.tsx",
+    );
+    const workspace = ler("src/components/bpm/kanban/CardKanbanWorkspace.tsx");
+    const board = ler(
+      "src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx",
+    );
+
+    expect(admin).toContain('<TabsContent value="card"');
+    expect(admin).toContain("<CardKanbanWorkspace");
+    expect(workspace).toContain("Card do Kanban — {etapaAtual.nome}");
+    expect(workspace).toContain("Salve ou descarte as alterações antes de trocar de etapa");
+    expect(workspace).toContain("Descartar alterações");
+    expect(workspace).toContain("Alterações não salvas");
+    expect(workspace).not.toContain("Empresa de exemplo");
+    expect(board).toContain("card.cardViewComposicao === undefined && (");
   });
 
   it("remove somente a simulação visual de SLA", () => {

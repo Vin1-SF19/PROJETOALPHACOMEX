@@ -64,7 +64,7 @@ function lerOpcoesPergunta(
   try {
     opcoes = JSON.parse(opcoesJson);
   } catch {
-    throw new Error("Opções do checklist de follow-up estão inválidas");
+    throw new Error("Opções do procedimento de follow-up estão inválidas");
   }
 
   if (
@@ -72,7 +72,7 @@ function lerOpcoesPergunta(
     || opcoes.length === 0
     || !opcoes.every((opcao) => typeof opcao === "string" && opcao.trim().length > 0)
   ) {
-    throw new Error("Opções do checklist de follow-up estão inválidas");
+    throw new Error("Opções do procedimento de follow-up estão inválidas");
   }
 
   return Array.from(new Set(opcoes.map((opcao) => opcao.trim())));
@@ -118,15 +118,15 @@ export function lerSnapshotPerguntasFollowUp(
   try {
     parsed = JSON.parse(valor);
   } catch {
-    throw new Error("O snapshot do checklist de follow-up está inválido");
+    throw new Error("O snapshot do procedimento de follow-up está inválido");
   }
   if (!Array.isArray(parsed) || parsed.length === 0) {
-    throw new Error("O snapshot do checklist de follow-up está inválido");
+    throw new Error("O snapshot do procedimento de follow-up está inválido");
   }
 
   return parsed.map((item): PerguntaFollowUpSnapshot => {
     if (!item || typeof item !== "object") {
-      throw new Error("O snapshot do checklist de follow-up está inválido");
+      throw new Error("O snapshot do procedimento de follow-up está inválido");
     }
     const pergunta = item as Record<string, unknown>;
     if (
@@ -138,7 +138,7 @@ export function lerSnapshotPerguntasFollowUp(
       || !Array.isArray(pergunta.opcoes)
       || !pergunta.opcoes.every((opcao) => typeof opcao === "string")
     ) {
-      throw new Error("O snapshot do checklist de follow-up está inválido");
+      throw new Error("O snapshot do procedimento de follow-up está inválido");
     }
     return {
       id: pergunta.id,
@@ -156,15 +156,15 @@ export function lerRespostasFollowUp(valor: string): RespostasFollowUp {
   try {
     parsed = JSON.parse(valor);
   } catch {
-    throw new Error("As respostas do checklist de follow-up estão inválidas");
+    throw new Error("As respostas do procedimento de follow-up estão inválidas");
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("As respostas do checklist de follow-up estão inválidas");
+    throw new Error("As respostas do procedimento de follow-up estão inválidas");
   }
   const respostas: RespostasFollowUp = {};
   for (const [id, resposta] of Object.entries(parsed)) {
     if (typeof resposta !== "string" && typeof resposta !== "boolean") {
-      throw new Error("As respostas do checklist de follow-up estão inválidas");
+      throw new Error("As respostas do procedimento de follow-up estão inválidas");
     }
     respostas[id] = resposta;
   }
@@ -178,7 +178,7 @@ export function validarRespostasFollowUp(
   const idsConhecidos = new Set(perguntas.map((pergunta) => pergunta.id));
   const idsDesconhecidos = Object.keys(respostas).filter((id) => !idsConhecidos.has(id));
   if (idsDesconhecidos.length > 0) {
-    throw new Error("O checklist contém respostas para perguntas desconhecidas");
+    throw new Error("O procedimento contém respostas para perguntas desconhecidas");
   }
 
   const respostasValidadas: RespostasFollowUp = {};
@@ -260,5 +260,5 @@ export function obterErroChecklistParaSaidaEmTratativa(params: {
   if (!etapaEhEmTratativa(params.etapaOrigemNome)) return null;
   if (!params.ultimoChecklist || params.ultimoChecklist.completo) return null;
 
-  return "Não é possível sair de Em Tratativa: conclua as anotações e o checklist do último follow-up.";
+  return "Não é possível sair de Em Tratativa: conclua as anotações e o procedimento do último follow-up.";
 }

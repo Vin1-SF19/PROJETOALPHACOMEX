@@ -51,6 +51,7 @@ antes de abrir o Claude Code, ou usar `.env` local lido por um wrapper.)
 - `roadmap_marcar_fase_iniciada`
 - `roadmap_marcar_fase_concluida`
 - `roadmap_marcar_fase_falhou`
+- `roadmap_tentar_fase_novamente`
 - `roadmap_perguntar`
 - `roadmap_registrar_nota`
 - `roadmap_ver_historico`

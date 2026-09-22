@@ -18,8 +18,8 @@ export const BPM_FORM_COMPONENT_REGISTRY = {
   [BPM_CAPABILITIES.STAGE_CHECKLIST]: {
     tipo: "CHECKLIST",
     target: BPM_CAPABILITIES.STAGE_CHECKLIST,
-    label: "Checklists da etapa",
-    description: "Checklists aplicáveis ao card na etapa atual.",
+    label: "Procedimentos da etapa",
+    description: "Procedimentos aplicáveis ao card na etapa atual.",
     rendererId: "stage-checklist",
     multiple: false,
     configSchema: presentationConfigSchema,
@@ -54,7 +54,7 @@ export const BPM_FORM_COMPONENT_REGISTRY = {
   [BPM_CAPABILITIES.FOLLOW_UP_CHECKLIST]: {
     tipo: "CAPABILITY",
     target: BPM_CAPABILITIES.FOLLOW_UP_CHECKLIST,
-    label: "Checklist de follow-up",
+    label: "Procedimento de follow-up",
     description: "Acompanha as ações de follow-up da etapa.",
     rendererId: "follow-up-checklist",
     multiple: false,
@@ -154,14 +154,14 @@ const componenteFormularioSchema = z
         context.addIssue({
           code: "custom",
           path: ["campoId"],
-          message: "Componente CHECKLIST não aceita campoId.",
+          message: "Componente de procedimento não aceita campoId.",
         });
       }
       if (componente.capability !== BPM_STAGE_CHECKLIST_TARGET) {
         context.addIssue({
           code: "custom",
           path: ["capability"],
-          message: `Componente CHECKLIST exige o target ${BPM_STAGE_CHECKLIST_TARGET}.`,
+          message: `Componente de procedimento exige o target ${BPM_STAGE_CHECKLIST_TARGET}.`,
         });
       }
     }

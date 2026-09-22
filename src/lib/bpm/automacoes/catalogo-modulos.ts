@@ -173,12 +173,12 @@ const METADADOS_ACOES_CENTRAIS = {
     destaque: true,
   },
   MATERIALIZAR_CHECKLIST: {
-    nome: "Criar checklist da etapa",
-    modulo: "Alpha CRM · Checklist",
-    descricao: "Materializa no card os checklists aplicáveis ao seu contexto atual.",
-    fluxo: ["Evento do CRM", "Motor de regras", "Templates aplicáveis", "Checklist do card"],
-    preRequisitos: ["Template de checklist aplicável"],
-    resultado: "Itens de checklist criados de forma idempotente no card.",
+    nome: "Criar procedimento da etapa",
+    modulo: "Alpha CRM · Procedimento",
+    descricao: "Materializa no card os procedimentos aplicáveis ao seu contexto atual.",
+    fluxo: ["Evento do CRM", "Motor de regras", "Templates aplicáveis", "Procedimento do card"],
+    preRequisitos: ["Template de procedimento aplicável"],
+    resultado: "Itens de procedimento criados de forma idempotente no card.",
     evidencias: ["src/lib/bpm/automacoes/executor.ts", "src/lib/bpm/checklists/service.ts"],
   },
   DISTRIBUIR_RESPONSAVEL: {

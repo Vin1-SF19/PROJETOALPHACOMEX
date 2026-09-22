@@ -1,10 +1,11 @@
 "use client";
-
+import { criarRastreadorRascunho } from "@/lib/bpm/rascunho-versionado";
+import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, ClipboardPaste, Loader2, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { AtualizarCardBpm, ObterCardBpm } from "@/actions/bpm/Cards";
-import { CampoBpmInput } from "../CampoBpmInput";
+import { CampoBpmInput } from "@/app/PainelAlpha/AlphaCRM/CampoBpmInput";
 import { MOTIVO_LOST_OUTRO_OBRIGATORIO_MENSAGEM } from "@/lib/bpm/lost";
 import {
   montarPayloadCamposDestino,
@@ -14,11 +15,9 @@ import {
 } from "@/lib/bpm/card-modal-ui";
 import { TEMPLATE_RESUMO_ALINHAMENTO } from "@/lib/bpm/alinhamento-estrategico";
 import { BPM_FIELD_KEYS, BPM_STAGE_KEYS } from "@/lib/bpm/ontology";
-import { useCardSave } from "./CardSaveContext";
-
+import { useCardSave } from "@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext";
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type CamposEtapaCard = CardDetalhe["camposEtapa"];
-
 interface Props {
   card: CardDetalhe;
   campoIds: string[];
@@ -30,7 +29,6 @@ interface Props {
   realtimeRevision: number;
   onAtualizado: () => void;
 }
-
 /** Editor dos campos da etapa atual. Deve viver exclusivamente na aba central
  * "Formulário da Etapa", jamais no modal de criação ou no painel direito. */
 export function PainelCamposEtapaAtual({
@@ -68,8 +66,26 @@ export function PainelCamposEtapaAtual({
   const [conflitoCamposAtuais, setConflitoCamposAtuais] = useState(false);
   const camposAtuaisSujosRef = useRef(false);
   const [salvandoCamposAtuais, setSalvandoCamposAtuais] = useState(false);
-  const { registerSave } = useCardSave();
-
+  const { registerSave, setPendingFields } = useCardSave();
+  const valoresRef = useRef(valoresCamposAtuais);
+  const rastreadores = useRef(new Map<string, ReturnType<typeof criarRastreadorRascunho>>());
+  function atualizarPendencias() {
+    const pendentes = camposEtapaBase.filter((campo) =>
+      (valoresRef.current[campo.id] ?? "") !== (snapshotAtivoRef.current.valores[campo.id] ?? ""));
+    camposAtuaisSujosRef.current = pendentes.length > 0;
+    setPendingFields(idInstancia, pendentes.map((campo) => campoLabels[campo.id] ?? campo.nome));
+  }
+  function alterarCampo(id: string, valor: string) {
+    let rastreador = rastreadores.current.get(id);
+    if (!rastreador) {
+      rastreador = criarRastreadorRascunho(valoresRef.current[id] ?? "");
+      rastreadores.current.set(id, rastreador);
+    }
+    rastreador.alterar(valor);
+    valoresRef.current = { ...valoresRef.current, [id]: valor };
+    atualizarPendencias();
+    setValoresCamposAtuais(valoresRef.current);
+  }
   const configuracaoLostUi = prepararCamposMotivoLostUiCanonico(
     card.etapa.chave,
     camposEtapaBase,
@@ -90,12 +106,14 @@ export function PainelCamposEtapaAtual({
   );
   const snapshotCamposEtapa = JSON.stringify(camposDoComponente);
   const versaoRemotaCampos = new Date(card.updatedAt).toISOString();
-
   useEffect(() => {
     const camposRemotos = JSON.parse(snapshotCamposEtapa) as CamposEtapaCard;
     const novosValores = Object.fromEntries(camposRemotos.map((campo) => [campo.id, campo.valor ?? ""]));
     const snapshotRemoto = { valores: novosValores, versao: versaoRemotaCampos };
     const timer = setTimeout(() => {
+      // A própria confirmação pode chegar pelo realtime após uma nova edição.
+      // A mesma versão já confirmada não representa conflito externo.
+      if (camposAtuaisSujosRef.current && snapshotRemoto.versao === snapshotAtivoRef.current.versao) return;
       const resolucao = resolverSnapshotCamposRealtime({
         rascunhoSujo: camposAtuaisSujosRef.current,
         snapshotAtual: snapshotAtivoRef.current,
@@ -108,6 +126,7 @@ export function PainelCamposEtapaAtual({
         return;
       }
       snapshotAtivoRef.current = resolucao.snapshotAtivo;
+      valoresRef.current = resolucao.snapshotAtivo.valores;
       setValoresCamposAtuais(resolucao.snapshotAtivo.valores);
       setBaseCamposAtuais(resolucao.snapshotAtivo.valores);
       setVersaoBaseCampos(resolucao.snapshotAtivo.versao);
@@ -119,9 +138,11 @@ export function PainelCamposEtapaAtual({
     }, 0);
     return () => clearTimeout(timer);
   }, [snapshotCamposEtapa, versaoRemotaCampos, realtimeRevision]);
-
   function usarDadosAtualizadosCampos() {
     if (!snapshotRemotoPendente || !camposRemotosPendentes) return;
+    valoresRef.current = snapshotRemotoPendente.valores;
+    rastreadores.current.clear();
+    setPendingFields(idInstancia, []);
     setValoresCamposAtuais(snapshotRemotoPendente.valores);
     setBaseCamposAtuais(snapshotRemotoPendente.valores);
     setVersaoBaseCampos(snapshotRemotoPendente.versao);
@@ -133,7 +154,6 @@ export function PainelCamposEtapaAtual({
     camposAtuaisSujosRef.current = false;
     setConflitoCamposAtuais(false);
   }
-
   async function salvarCamposAtuais() {
     if (!podeEditar || !camposAtuaisAlterados || conflitoCamposAtuais) return;
     if (complementoLostPendente) {
@@ -145,7 +165,10 @@ export function PainelCamposEtapaAtual({
     );
     // Valores apenas hidratados da entidade mestre (por exemplo Cliente.cnpj)
     // não viram cópias em BpmCardCampoValor quando outro campo é salvo.
-    const camposValores = montarPayloadCamposDestino(camposAlterados, valoresCamposAtuais);
+    const validacao = validarValoresCamposBpm(camposAlterados, montarPayloadCamposDestino(camposAlterados, valoresCamposAtuais));
+    if (!validacao.success) { toast.error(validacao.error); return; }
+    const camposValores = validacao.valores;
+    const revisoes = new Map(camposAlterados.map((campo) => [campo.id, rastreadores.current.get(campo.id)?.capturar()]));
     setSalvandoCamposAtuais(true);
     const promise = registerSave(async () => {
       const resultado = await AtualizarCardBpm({
@@ -164,25 +187,37 @@ export function PainelCamposEtapaAtual({
       }
       const novaVersao = new Date(cardAtualizado.data.updatedAt).toISOString();
       toast.success("Campos da etapa atualizados");
-      setBaseCamposAtuais((atual) => ({ ...atual, ...camposValores }));
+      const confirmados = Object.fromEntries(cardAtualizado.data.camposEtapa
+        .filter((campo) => Object.hasOwn(camposValores, campo.id))
+        .map((campo) => [campo.id, campo.valor ?? ""]));
+      for (const [id, valor] of Object.entries(confirmados)) {
+        const revisao = revisoes.get(id);
+        if (revisao && rastreadores.current.get(id)?.corresponde(revisao)) {
+          valoresRef.current = { ...valoresRef.current, [id]: valor };
+          rastreadores.current.get(id)?.sincronizar(valor);
+        }
+      }
+      setValoresCamposAtuais(valoresRef.current);
+      setBaseCamposAtuais((atual) => ({ ...atual, ...confirmados }));
       snapshotAtivoRef.current = {
-        valores: { ...snapshotAtivoRef.current.valores, ...camposValores },
+        valores: { ...snapshotAtivoRef.current.valores, ...confirmados },
         versao: novaVersao,
       };
       versaoBaseCamposRef.current = novaVersao;
       setVersaoBaseCampos(novaVersao);
-      camposAtuaisSujosRef.current = false;
+      atualizarPendencias();
       setConflitoCamposAtuais(false);
       onAtualizado();
       return true;
+    }).then((salvo) => {
+      if (!salvo) toast.error("Há alterações não confirmadas. Revise os campos antes de sair.");
+      return salvo;
     }).finally(() => {
       setSalvandoCamposAtuais(false);
     });
     await promise;
   }
-
   const inputCls = "w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-600 outline-none focus:border-white/25 transition-colors";
-
   return (
     <section
       id={`campos-etapa-atual-${idInstancia}`}
@@ -204,14 +239,12 @@ export function PainelCamposEtapaAtual({
           <p className="mt-0.5 text-[11px] text-slate-500">{card.etapa.nome} · campos obrigatórios e opcionais.</p>
         </div>
       </div>
-
       {alertaAlinhamento && (
         <div role="alert" className="flex items-start gap-2 rounded-xl border border-red-500/35 bg-red-500/10 p-3 text-xs text-red-100">
           <AlertTriangle size={15} className="mt-0.5 shrink-0 text-red-300" aria-hidden="true" />
           <p><strong>Chamada de alinhamento pendente.</strong> Cole o resumo da reunião para liberar o avanço da etapa.</p>
         </div>
       )}
-
       {camposAtuaisVisiveis.length === 0 ? (
         <p className="text-xs text-slate-500">Esta etapa não possui campos configurados.</p>
       ) : (
@@ -227,22 +260,20 @@ export function PainelCamposEtapaAtual({
           <fieldset className="space-y-3 rounded-xl border border-white/[0.06] p-3">
               {camposAtuaisVisiveis.map((campo) => {
             const complementoPendente = campo.id === configuracaoLostUi.campoComplementoId && complementoLostPendente;
-            const somenteLeitura = campo.somenteLeitura
-              || (campo.escopo === "GLOBAL" && Boolean(campo.fonteEntidade))
-              || campo.editavel === false;
+            const somenteLeitura = campo.somenteLeitura === true || campo.editavel === false;
+            const fonteAutomatica = campo.escopo === "GLOBAL" && Boolean(campo.fonteEntidade);
             const descricaoId = complementoPendente ? `campo-bpm-${campo.id}-erro` : undefined;
             return (
               <div key={campo.id} className="space-y-1.5">
                 <label htmlFor={`campo-bpm-${campo.id}`} className="text-[11px] font-medium text-slate-400">
-                  {campoLabels[campo.id] ?? campo.nome}{campo.obrigatorio ? " *" : ""}{campo.obrigatorioEntrada ? " · exigido na entrada" : ""}{campo.obrigatorioSaida ? " · exigido na saída" : ""}{somenteLeitura ? " · automático" : ""}
+                  {campoLabels[campo.id] ?? campo.nome}{campo.obrigatorio ? " *" : ""}{campo.obrigatorioEntrada ? " · exigido na entrada" : ""}{campo.obrigatorioSaida ? " · exigido na saída" : ""}{fonteAutomatica ? " · automático" : ""}
                 </label>
                 {campo.chave === BPM_FIELD_KEYS.MEETING_SUMMARY && (
                   <button
                     type="button"
                     disabled={!podeEditar || Boolean(valoresCamposAtuais[campo.id]?.trim())}
                     onClick={() => {
-                      camposAtuaisSujosRef.current = true;
-                      setValoresCamposAtuais((atuais) => ({ ...atuais, [campo.id]: TEMPLATE_RESUMO_ALINHAMENTO }));
+                      alterarCampo(campo.id, TEMPLATE_RESUMO_ALINHAMENTO);
                     }}
                     className="inline-flex items-center gap-1 rounded-lg border border-sky-300/25 px-2 py-1 text-[10px] font-semibold text-sky-200 hover:bg-sky-300/10 disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -255,8 +286,7 @@ export function PainelCamposEtapaAtual({
                   invalid={complementoPendente}
                   describedBy={descricaoId}
                   onChange={(valor) => {
-                    camposAtuaisSujosRef.current = true;
-                    setValoresCamposAtuais((atuais) => ({ ...atuais, [campo.id]: valor }));
+                    alterarCampo(campo.id, valor);
                   }}
                   onBlur={() => void salvarCamposAtuais()}
                   className={inputCls}

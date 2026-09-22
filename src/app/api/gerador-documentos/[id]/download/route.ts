@@ -33,7 +33,7 @@ export async function GET(
   }
 
   const isAdmin = (session.user as { role?: string }).role === "Admin" || (session.user as { role?: string }).role === "CEO";
-  if (!isAdmin && documento.criadoPorId !== (session.user as { id?: number }).id) {
+  if (!isAdmin && documento.criadoPorId !== Number((session.user as { id?: string }).id)) {
     return NextResponse.json({ success: false, error: "Não autorizado" }, { status: 403 });
   }
 
@@ -42,15 +42,18 @@ export async function GET(
   }
 
   try {
-    const blob = await get(documento.pdfUrl);
+    const resultado = await get(documento.pdfUrl, { access: "public" });
+    if (!resultado || resultado.statusCode !== 200) {
+      return NextResponse.json({ success: false, error: "PDF não encontrado no armazenamento" }, { status: 404 });
+    }
     const filename = `contrato_${documento.id}.pdf`;
 
-    return new NextResponse(blob.body, {
+    return new NextResponse(resultado.stream, {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${filename}"`,
-        "Content-Length": String(blob.size),
+        "Content-Length": String(resultado.blob.size),
       },
     });
   } catch {

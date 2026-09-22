@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getReceitaData } from "../ReceitaFederal/route"; 
-import { getEmpresaAquiData } from "../EmpresaAqui/route";
+import { getReceitaData } from "@/lib/cnpj/receita-federal";
+import { getEmpresaAquiData } from "@/lib/cnpj/empresa-aqui";
 
 import db from "@/lib/prisma";
 

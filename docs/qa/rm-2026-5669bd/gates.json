@@ -1,0 +1,27 @@
+[
+  {
+    "gate": "typecheck",
+    "exit": 2,
+    "seconds": 35.2
+  },
+  {
+    "gate": "tsc",
+    "exit": 1,
+    "seconds": 6.9
+  },
+  {
+    "gate": "lint",
+    "exit": 1,
+    "seconds": 37.8
+  },
+  {
+    "gate": "test",
+    "exit": 1,
+    "seconds": 28.1
+  },
+  {
+    "gate": "build",
+    "exit": 0,
+    "seconds": 119.2
+  }
+]

@@ -82,7 +82,7 @@ export function CardKanbanRenderer({
         EMPRESA_NOME: "Empresa",
         CNPJ: "CNPJ",
         TELEFONE: "Telefone",
-        CHECKLIST: "Checklist",
+        CHECKLIST: "Procedimento",
         CADENCIA: "Cadência",
         PENDENCIAS: "Pendências",
       };

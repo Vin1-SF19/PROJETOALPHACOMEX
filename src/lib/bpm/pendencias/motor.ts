@@ -158,7 +158,7 @@ export async function listarPendenciasBpm(
     itens.push({
       ...base(checklist.cardId),
       tipo: "CHECKLIST_PENDENTE",
-      titulo: `Checklist pendente — ${checklist.templateNome}`,
+      titulo: `Procedimento pendente — ${checklist.templateNome}`,
       prazo: null,
     });
   }

@@ -17,7 +17,7 @@ import type { ItemPendencia, TipoPendencia } from "@/lib/bpm/pendencias/motor";
 const TIPO_META: Record<TipoPendencia, { label: string; icon: typeof AlertTriangle; cor: string }> = {
   TAREFA_PENDENTE: { label: "Tarefa pendente", icon: ListTodo, cor: "text-sky-300 border-sky-400/25 bg-sky-400/[0.08]" },
   PROXIMO_CONTATO_VENCIDO: { label: "Próximo contato vencido", icon: CalendarClock, cor: "text-amber-300 border-amber-400/25 bg-amber-400/[0.08]" },
-  CHECKLIST_PENDENTE: { label: "Checklist pendente", icon: CheckSquare, cor: "text-violet-300 border-violet-400/25 bg-violet-400/[0.08]" },
+  CHECKLIST_PENDENTE: { label: "Procedimento pendente", icon: CheckSquare, cor: "text-violet-300 border-violet-400/25 bg-violet-400/[0.08]" },
   CAMPO_OBRIGATORIO_FALTANTE: { label: "Campo obrigatório faltando", icon: ClipboardList, cor: "text-rose-300 border-rose-400/25 bg-rose-400/[0.08]" },
   SLA_PROXIMO: { label: "SLA próximo do vencimento", icon: TimerReset, cor: "text-amber-300 border-amber-400/25 bg-amber-400/[0.08]" },
   SLA_VENCIDO: { label: "SLA vencido", icon: ShieldAlert, cor: "text-rose-300 border-rose-400/25 bg-rose-400/[0.08]" },
@@ -27,7 +27,7 @@ const FILTROS: { value: TipoPendencia | "TODOS"; label: string }[] = [
   { value: "TODOS", label: "Todos" },
   { value: "TAREFA_PENDENTE", label: "Tarefas" },
   { value: "PROXIMO_CONTATO_VENCIDO", label: "Próximo contato" },
-  { value: "CHECKLIST_PENDENTE", label: "Checklists" },
+  { value: "CHECKLIST_PENDENTE", label: "Procedimentos" },
   { value: "CAMPO_OBRIGATORIO_FALTANTE", label: "Campos faltantes" },
   { value: "SLA_PROXIMO", label: "SLA próximo" },
   { value: "SLA_VENCIDO", label: "SLA vencido" },

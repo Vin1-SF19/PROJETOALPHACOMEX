@@ -3,6 +3,8 @@
 import { createContext, useCallback, useContext, useRef, type ReactNode } from "react";
 
 interface CardSaveContextValue {
+  setPendingFields: (instance: string, fields: string[]) => void;
+  getPendingFields: () => string[];
   /** Enfileira um save para preservar a ordem e a versão-base do card. */
   registerSave: (save: () => Promise<boolean>) => Promise<boolean>;
   /** Aguarda todos os saves e informa se a persistência foi concluída. */
@@ -12,6 +14,12 @@ interface CardSaveContextValue {
 const CardSaveContext = createContext<CardSaveContextValue | null>(null);
 
 export function CardSaveProvider({ children }: { children: ReactNode }) {
+  const pendingRef = useRef(new Map<string, string[]>());
+  const setPendingFields = useCallback((instance: string, fields: string[]) => {
+    if (fields.length) pendingRef.current.set(instance, fields);
+    else pendingRef.current.delete(instance);
+  }, []);
+  const getPendingFields = useCallback(() => [...new Set([...pendingRef.current.values()].flat())], []);
   const savePromiseRef = useRef<Promise<boolean>>(Promise.resolve(true));
 
   const registerSave = useCallback((save: () => Promise<boolean>) => {
@@ -26,16 +34,19 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const flushSaves = useCallback(async () => {
-    const savesPendentes = savePromiseRef.current;
-    const savesConcluidos = await savesPendentes;
-    if (savePromiseRef.current === savesPendentes) {
-      savePromiseRef.current = Promise.resolve(true);
+    let resultado = true;
+    while (true) {
+      const savesPendentes = savePromiseRef.current;
+      resultado = (await savesPendentes) && resultado;
+      if (savePromiseRef.current === savesPendentes) {
+        savePromiseRef.current = Promise.resolve(true);
+        return resultado && getPendingFields().length === 0;
+      }
     }
-    return savesConcluidos;
-  }, []);
+  }, [getPendingFields]);
 
   return (
-    <CardSaveContext.Provider value={{ registerSave, flushSaves }}>
+    <CardSaveContext.Provider value={{ registerSave, flushSaves, setPendingFields, getPendingFields }}>
       {children}
     </CardSaveContext.Provider>
   );

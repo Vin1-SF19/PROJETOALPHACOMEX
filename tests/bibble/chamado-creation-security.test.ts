@@ -22,7 +22,7 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/lib/chamados/notificacoes-server", () => ({
   notificarNovoChamado: mocks.notificar,
 }));
-vi.mock("@/app/api/ReceitaFederal/route", () => ({ getReceitaData: vi.fn() }));
+vi.mock("@/lib/cnpj/receita-federal", () => ({ getReceitaData: vi.fn() }));
 vi.mock("@/lib/bibble/gerar-ficha-server", () => ({ gerarFichaServer: vi.fn() }));
 vi.mock("@/lib/bibble/calendar-tools", () => ({
   executarCalendarTool: vi.fn(),

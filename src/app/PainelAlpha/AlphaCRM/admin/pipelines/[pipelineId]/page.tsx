@@ -20,6 +20,7 @@ import { ChecklistsWorkspace } from "@/components/bpm/checklists/ChecklistsWorks
 import { ConhecimentoWorkspace } from "@/components/bpm/conhecimento/ConhecimentoWorkspace";
 import { isAdminRole } from "@/lib/bpm/ownership";
 import db from "@/lib/prisma";
+import { PipelineEditorStateProvider } from "./PipelineEditorStateProvider";
 import AdminPipelineClient from "./AdminPipelineClient";
 import type { TransicaoBpm } from "./EtapaAvancadaSection";
 
@@ -112,6 +113,7 @@ export default async function AdminPipelinePage({
   }
 
   return (
+    <PipelineEditorStateProvider key={pipelineId}>
     <AdminPipelineClient
       key={`${pipelineResult.data.id}:${pipelineResult.data.configVersion}`}
       pipeline={pipelineResult.data}
@@ -178,5 +180,6 @@ export default async function AdminPipelinePage({
       cadenciasIniciais={cadenciasResult.data}
       visual={visual}
     />
+    </PipelineEditorStateProvider>
   );
 }

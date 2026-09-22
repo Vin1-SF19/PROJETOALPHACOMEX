@@ -37,7 +37,7 @@ vi.mock("@/lib/bpm/automacoes/fila", () => ({ enfileirarAutomacoesCriacaoTarefaB
 vi.mock("@/lib/bpm/automacoes/eventos", () => ({ publicarEventoBpm: mocks.evento }));
 vi.mock("@/lib/bpm/sla", () => ({ criarSlaInstancia: mocks.sla }));
 vi.mock("@/lib/bpm/checklists/reconciliacao-tarefa", () => ({
-  MENSAGEM_TAREFA_CHECKLIST_PENDENTE: "Esta tarefa é controlada pelo checklist. Conclua os itens do checklist para finalizá-la.",
+  MENSAGEM_TAREFA_CHECKLIST_PENDENTE: "Esta tarefa é controlada pelo procedimento. Conclua os itens do procedimento para finalizá-la.",
   reconciliarTarefaChecklist: mocks.reconciliar,
 }));
 
@@ -47,7 +47,7 @@ const TAREFA_ID = "cm12345678901234567890123";
 const tarefaBase = {
   id: TAREFA_ID,
   cardId: "card-1",
-  titulo: "Checklist: Documentos",
+  titulo: "Procedimento: Documentos",
   tipo: "CHECKLIST",
   status: "PENDENTE",
   cardChecklistId: "checklist-1",
@@ -75,7 +75,7 @@ describe("conclusão de tarefa derivada de checklist", () => {
     const resultado = await ConcluirTarefaBpm({ tarefaId: TAREFA_ID });
     expect(resultado).toEqual({
       success: false,
-      error: "Esta tarefa é controlada pelo checklist. Conclua os itens do checklist para finalizá-la.",
+      error: "Esta tarefa é controlada pelo procedimento. Conclua os itens do procedimento para finalizá-la.",
     });
     expect(mocks.tarefaUpdate).not.toHaveBeenCalled();
     expect(mocks.reconciliar).not.toHaveBeenCalled();

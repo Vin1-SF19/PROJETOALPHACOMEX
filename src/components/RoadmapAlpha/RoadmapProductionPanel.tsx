@@ -46,7 +46,12 @@ interface RunView {
     moduleLabelSnapshot: string;
     completionReportAvailable: boolean;
   };
-  artifact: { phaseNumber: number; title: string; kind: string; relativePath: string | null } | null;
+  artifact: {
+    phaseNumber: number;
+    title: string;
+    kind: string;
+    relativePath: string | null;
+  } | null;
 }
 
 interface AccessView {
@@ -132,7 +137,7 @@ export function RoadmapProductionPanel({
   const inProgress = runs.filter((run) => run.status === "IN_PROGRESS").length;
   const succeeded = runs.filter((run) => run.status === "SUCCEEDED").length;
   const needsAttention = runs.filter((run) =>
-    ["NEEDS_INPUT", "BLOCKED"].includes(run.status),
+    ["NEEDS_INPUT", "BLOCKED", "FAILED"].includes(run.status),
   ).length;
 
   const roomRun = useMemo(
@@ -233,7 +238,9 @@ export function RoadmapProductionPanel({
             >
               <div className="flex items-start gap-3 p-3">
                 <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-950 font-bold text-violet-300">
-                  {run.artifact ? String(run.artifact.phaseNumber).padStart(2, "0") : "—"}
+                  {run.artifact
+                    ? String(run.artifact.phaseNumber).padStart(2, "0")
+                    : "—"}
                 </span>
                 <div className="min-w-0 flex-1">
                   <span className="block text-[10px] uppercase tracking-wider text-slate-500">

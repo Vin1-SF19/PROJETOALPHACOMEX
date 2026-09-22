@@ -32,7 +32,7 @@ type Props = {
 };
 
 const TIPO_LABEL: Record<string, string> = {
-  CHECKLIST: "Checklist", LIGACAO: "Ligação", WHATSAPP: "WhatsApp", EMAIL: "E-mail", TAREFA: "Tarefa", LEMBRETE_RAPIDO: "Lembrete rápido",
+  CHECKLIST: "Procedimento", LIGACAO: "Ligação", WHATSAPP: "WhatsApp", EMAIL: "E-mail", TAREFA: "Tarefa", LEMBRETE_RAPIDO: "Lembrete rápido",
 };
 export function CadenciaFormDialog({ cadencia, pipelines, onClose, onSaved, onCreated }: Props) {
   const [ativa, setAtiva] = useState(cadencia?.ativa ?? true);

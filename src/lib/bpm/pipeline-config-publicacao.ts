@@ -113,10 +113,9 @@ export function validarSnapshotPublicacao(params: {
     const par = `${transicao.etapaOrigemId}:${transicao.etapaDestinoId}`;
     if (pares.has(par)) erros.push("O rascunho contém transição duplicada.");
     pares.add(par);
-    const passouALigarEtapaInativa = transicao.permitida
-      && (!atual || !atual.permitida)
+    const ligaEtapaInativa = transicao.permitida
       && (!idsAtivos.has(transicao.etapaOrigemId) || !idsAtivos.has(transicao.etapaDestinoId));
-    if (passouALigarEtapaInativa) {
+    if (ligaEtapaInativa) {
       erros.push("Transições permitidas só podem conectar etapas ativas.");
     }
   }

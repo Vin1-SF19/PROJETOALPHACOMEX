@@ -299,7 +299,7 @@ describe("P0-3 - resolver canônico do formulário de etapa", () => {
     const preview = readFileSync(
       resolve(
         raiz,
-        "src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/PipelineWorkspaceSections.tsx",
+        "src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/FormularioEtapaWorkspace.tsx",
       ),
       "utf8",
     );

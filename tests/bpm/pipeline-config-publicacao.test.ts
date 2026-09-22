@@ -49,7 +49,7 @@ describe("publicação versionada da configuração", () => {
     expect(validarSnapshotPublicacao({ atual: { etapas, transicoes, campos }, proposto: { ...base, transicoes: bloqueadas, campos: base.campos.map((item) => ({ ...item, ativo: item.id === "regime" })) } }).join(" ")).toContain("alcançáveis");
   });
 
-  it("preserva transição publicada para etapa inativa sem reabrir decisão histórica", () => {
+  it("recusa transição permitida que ainda referencia etapa inativa", () => {
     const etapasAtuais = etapas.map((item) => ({ ...item, ativo: item.id === "e2" ? false : item.ativo }));
     const proposto = {
       etapas: etapasAtuais.map((item) => ({ ...item })),
@@ -58,7 +58,7 @@ describe("publicação versionada da configuração", () => {
     };
 
     expect(validarSnapshotPublicacao({ atual: { etapas: etapasAtuais, transicoes, campos }, proposto }))
-      .not.toContain("Transições permitidas só podem conectar etapas ativas.");
+      .toContain("Transições permitidas só podem conectar etapas ativas.");
   });
 
   it("rejeita até transição bloqueada que referencie etapa fora do pipeline", () => {

@@ -116,7 +116,7 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
                   return;
                 }
                 void ConcluirTarefaBpm({ tarefaId: tarefa.id }).then((res) => res.success ? onAtualizado() : toast.error(typeof res.error === "string" ? res.error : "Erro ao concluir tarefa"));
-              }} disabled={!podeTrabalharTarefas || tarefa.status === "CONCLUIDA"} className="mt-0.5 text-slate-500 disabled:cursor-not-allowed" aria-label={tarefa.status === "CONCLUIDA" ? "Tarefa concluída" : gerenciadaPorChecklist ? "Abrir checklist para concluir" : "Concluir tarefa"}>
+              }} disabled={!podeTrabalharTarefas || tarefa.status === "CONCLUIDA"} className="mt-0.5 text-slate-500 disabled:cursor-not-allowed" aria-label={tarefa.status === "CONCLUIDA" ? "Tarefa concluída" : gerenciadaPorChecklist ? "Abrir procedimento para concluir" : "Concluir tarefa"}>
                 <CheckCircle2 size={16} className={tarefa.status === "CONCLUIDA" ? "text-emerald-400" : ""} />
               </button>
               <div className="min-w-0 flex-1">
@@ -157,7 +157,7 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
             ))}
           </div>
 
-          {tipo === "CHECKLIST" && <><input className={inputCls} placeholder="Título do checklist" value={titulo} onChange={(e) => setTitulo(e.target.value)} /><textarea className={`${inputCls} min-h-24 resize-none`} placeholder="Um item por linha" value={itensChecklist} onChange={(e) => setItensChecklist(e.target.value)} /></>}
+          {tipo === "CHECKLIST" && <><input className={inputCls} placeholder="Título do procedimento" value={titulo} onChange={(e) => setTitulo(e.target.value)} /><textarea className={`${inputCls} min-h-24 resize-none`} placeholder="Um item por linha" value={itensChecklist} onChange={(e) => setItensChecklist(e.target.value)} /></>}
           {tipo === "LIGACAO" && <><input className={inputCls} placeholder="Contato (opcional)" value={contato} onChange={(e) => setContato(e.target.value)} /><input className={inputCls} placeholder="Telefone" value={telefone} onChange={(e) => setTelefone(e.target.value)} /><textarea className={`${inputCls} min-h-20 resize-none`} placeholder="Objetivo da ligação" value={descricao} onChange={(e) => setDescricao(e.target.value)} /></>}
           {tipo === "WHATSAPP" && <><input className={inputCls} placeholder="Contato" value={contato} onChange={(e) => setContato(e.target.value)} /><textarea className={`${inputCls} min-h-24 resize-none`} placeholder="Mensagem a enviar" value={mensagem} onChange={(e) => setMensagem(e.target.value)} /></>}
           {tipo === "EMAIL" && <><input className={inputCls} type="email" placeholder="E-mail do destinatário" value={emailDestino} onChange={(e) => setEmailDestino(e.target.value)} /><input className={inputCls} placeholder="Assunto" value={titulo} onChange={(e) => setTitulo(e.target.value)} /><textarea className={`${inputCls} min-h-24 resize-none`} placeholder="Mensagem do e-mail" value={mensagem} onChange={(e) => setMensagem(e.target.value)} /></>}

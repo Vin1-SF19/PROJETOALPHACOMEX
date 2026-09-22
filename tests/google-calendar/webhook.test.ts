@@ -41,10 +41,8 @@ vi.mock("@/lib/google-calendar/sync-queue", () => ({
 }));
 vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
 
-import {
-  POST,
-  resetAgendaAlphaWebhookRateLimiterForTests,
-} from "@/app/api/calendario-alpha/webhook/route";
+import { POST } from "@/app/api/calendario-alpha/webhook/route";
+import { resetAgendaAlphaWebhookRateLimiterForTests } from "@/lib/google-calendar/webhook-rate-limiter";
 
 function requestWebhook(
   overrides: Record<string, string> = {},

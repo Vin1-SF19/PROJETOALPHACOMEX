@@ -1,0 +1,149 @@
+{
+  "note": "Supplement to the existing 83-file inventory; no candidate tree created and no Git mutations. Cross-module repairs are not silently included in BPM.",
+  "files": [
+    {
+      "path": "tests/bpm/conhecimento-actions.test.ts",
+      "category": "BPM regression",
+      "exists": true,
+      "tracked": true,
+      "ignored": false,
+      "sha256": "491a5c87d69f3d442090d94c0b962b2eab896febde57c345cfcf6e6ecba416e6"
+    },
+    {
+      "path": "tests/bpm/conhecimento-scripts-ui.test.ts",
+      "category": "BPM regression",
+      "exists": true,
+      "tracked": true,
+      "ignored": false,
+      "sha256": "8427267bbd1a9fd238d8842ba9a681c76be69d561f7e21f3ef8181da764f5413"
+    },
+    {
+      "path": "tests/bpm/pendencias-motor.test.ts",
+      "category": "BPM regression",
+      "exists": true,
+      "tracked": true,
+      "ignored": false,
+      "sha256": "501c4e92f009527ed8f38ca3ae7d834a7524d3b08b690c960ce21e49bcf277ce"
+    },
+    {
+      "path": "tests/bpm/regras-actions.test.ts",
+      "category": "BPM regression",
+      "exists": true,
+      "tracked": true,
+      "ignored": false,
+      "sha256": "7569690fdbd62ee9008ea88bdd4b3bf22052ad9976fb283b52b82e8782ef3aa2"
+    },
+    {
+      "path": "tests/bpm/regras-engine.test.ts",
+      "category": "BPM regression",
+      "exists": true,
+      "tracked": true,
+      "ignored": false,
+      "sha256": "ade9ed5839fa63dffc6779273adaa65d76ed9aa8bf9b33f9734f7db311418d81"
+    },
+    {
+      "path": "tests/bpm/regras-financeiras-remocao.test.ts",
+      "category": "BPM regression",
+      "exists": true,
+      "tracked": true,
+      "ignored": false,
+      "sha256": "76370ce1acfd89412653e055608f2b22fa8507a356b95ad7f7c89c66b8593be6"
+    },
+    {
+      "path": "tests/bpm/regras-guarda-movimento.test.ts",
+      "category": "BPM regression",
+      "exists": true,
+      "tracked": true,
+      "ignored": false,
+      "sha256": "acf807d20ad91c4bf08add84b687066567dc123ece7c6c8135b191e9292e95cf"
+    },
+    {
+      "path": "tests/bpm/sla-admin-ui.test.ts",
+      "category": "BPM regression",
+      "exists": true,
+      "tracked": true,
+      "ignored": false,
+      "sha256": "f3eb3205947a382988cad87b67ac749541dad3c672bd9345fe6c9626347d9086"
+    },
+    {
+      "path": "tests/bpm/sla-alertas-automacao.test.ts",
+      "category": "BPM regression",
+      "exists": true,
+      "tracked": true,
+      "ignored": false,
+      "sha256": "a68324d142192eb5a8dd55f4cae36093cb0f9f01f9532d985c2edd234bcbb4f7"
+    },
+    {
+      "path": "tests/bpm/sla-calculo.test.ts",
+      "category": "BPM regression",
+      "exists": true,
+      "tracked": true,
+      "ignored": false,
+      "sha256": "d84cc25bc9c79d17df4eec6da09f860de772f37bd784384b62e74d9de8d5516f"
+    },
+    {
+      "path": "src/lib/google-calendar/webhook-rate-limiter.ts",
+      "category": "prior cross-module typecheck repair; review as a separate dependency group",
+      "exists": true,
+      "tracked": false,
+      "ignored": false,
+      "sha256": "964c48d6c880e901f700ab7c794d8b0af54471a99d3ce3fe822842c4324e1797"
+    },
+    {
+      "path": "src/app/api/calendario-alpha/webhook/route.ts",
+      "category": "prior cross-module typecheck repair; review as a separate dependency group",
+      "exists": true,
+      "tracked": true,
+      "ignored": false,
+      "sha256": "a3b167975a9443cb9829242010d5e5c22b730ed69fe09f26241469f276b03ce2"
+    },
+    {
+      "path": "tests/google-calendar/webhook.test.ts",
+      "category": "prior cross-module typecheck repair; review as a separate dependency group",
+      "exists": true,
+      "tracked": true,
+      "ignored": false,
+      "sha256": "175c2c0c03b63d9b6dc72de26c3ff4aadd60179e817a27013d15d6c2527dd881"
+    },
+    {
+      "path": "src/actions/RadarFiscal.ts",
+      "category": "prior cross-module typecheck repair; review as a separate dependency group",
+      "exists": true,
+      "tracked": true,
+      "ignored": false,
+      "sha256": "c0ff807bb8b360baa9e857192a4c4d7fa2f9b7c09933da0ee44f6e8e573ffd22"
+    },
+    {
+      "path": "src/app/PainelAlpha/AlphaConnect/RadarFiscalClient.tsx",
+      "category": "prior cross-module typecheck repair; review as a separate dependency group",
+      "exists": true,
+      "tracked": true,
+      "ignored": false,
+      "sha256": "ba01e780a6489ffa0061a49d84c857794bb0f3db07d380a1ff9ef7beee91c351"
+    },
+    {
+      "path": "src/app/api/ExclusaoFiscal/route.ts",
+      "category": "prior cross-module typecheck repair; review as a separate dependency group",
+      "exists": true,
+      "tracked": true,
+      "ignored": false,
+      "sha256": "5e4b673f9564b4f7124432bc487c31671bb08d0f663709dbddbf4b2cf02af07d"
+    },
+    {
+      "path": "src/app/api/bpm/upload/route.ts",
+      "category": "prior cross-module typecheck repair; review as a separate dependency group",
+      "exists": true,
+      "tracked": true,
+      "ignored": false,
+      "sha256": "7f48cc17daa13112f34408933377ee3963543c95ca787e0ec4f0557e3811a416"
+    },
+    {
+      "path": "scripts/verify-checklist-task-e2e.ts",
+      "category": "prior cross-module typecheck repair; review as a separate dependency group",
+      "exists": true,
+      "tracked": true,
+      "ignored": false,
+      "sha256": "56e446554e53eed309f1badeea210faf54a7742031ef3af720e80f70b5464aa8"
+    }
+  ]
+}

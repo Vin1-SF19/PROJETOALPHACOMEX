@@ -286,7 +286,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     const bloqueadoPorPolicy = campo.editavel === false || campo.somenteLeitura
       || config?.editavel === false || config?.somenteLeitura
       || (input.ator.tipo === "MANUAL" && (acesso?.visivel === false || acesso?.editavel === false || acesso?.somenteLeitura));
-    if (bloqueadoPorPolicy || (campo.escopo === "GLOBAL" && campo.fonteEntidade)) {
+    if (bloqueadoPorPolicy) {
       erro("FIELD_READONLY", `O campo "${campo.nome}" é somente leitura.`);
     }
   }
@@ -319,8 +319,18 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     })), tx),
   ]);
   const valoresEfetivosPorId = new Map<string, string | null>(persistidos.map((item) => [item.campoId, item.valor]));
-  for (const [campoId, value] of Object.entries(canonicos)) valoresEfetivosPorId.set(campoId, value);
-  for (const [campoId, value] of Object.entries(formato.valores)) valoresEfetivosPorId.set(campoId, value);
+  for (const [campoId, value] of Object.entries(canonicos)) {
+    const campo = camposPorId.get(campoId);
+    const possuiOverride = campo?.fonteEntidade && !campo.somenteLeitura
+      && campo.editavel !== false && valoresEfetivosPorId.get(campoId)?.trim();
+    if (!possuiOverride) valoresEfetivosPorId.set(campoId, value);
+  }
+  for (const [campoId, value] of Object.entries(formato.valores)) {
+    const campo = camposPorId.get(campoId);
+    valoresEfetivosPorId.set(campoId, !value.trim() && campo?.escopo === "GLOBAL" && campo.fonteEntidade
+      ? (canonicos[campoId] || null)
+      : value);
+  }
 
   const contextoRegra = await montarContextoAvaliacaoDoCard(card, tx);
   contextoRegra.camposDinamicos = {
@@ -393,7 +403,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
   }
   if (card.etapa.chave === BPM_STAGE_KEYS.EM_TRATATIVA) {
     const ultimo = await tx.bpmChecklistFollowUp.findFirst({ where: { cardId: card.id }, orderBy: [{ criadoEm: "desc" }, { id: "desc" }], select: { completo: true } });
-    if (!ultimo?.completo) erro("FOLLOW_UP_CHECKLIST_PENDING", "Conclua o checklist do último follow-up antes de sair de Em Tratativa.");
+    if (!ultimo?.completo) erro("FOLLOW_UP_CHECKLIST_PENDING", "Conclua o procedimento do último follow-up antes de sair de Em Tratativa.");
   }
 
   if (destino.chave === BPM_STAGE_KEYS.LOST) {

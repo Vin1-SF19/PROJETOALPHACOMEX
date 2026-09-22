@@ -9,6 +9,7 @@ import {
   HelpCircle,
   Loader2,
   MessageSquareText,
+  RotateCcw,
   Send,
   UserRound,
 } from "lucide-react";
@@ -17,6 +18,7 @@ import { toast } from "sonner";
 import {
   AprovarFaseRoadmapProduction,
   ListarHistoricoRoadmapProduction,
+  ReabrirFaseRoadmapProduction,
   RegistrarEventoRoadmapProduction,
 } from "@/actions/RoadmapProduction";
 import { Button } from "@/components/ui/button";
@@ -44,7 +46,12 @@ export interface RoadmapImplementationRoomRun {
   id: string;
   status: string;
   assignee: string;
-  objective: { id: string; code: string; title: string; completionReportAvailable?: boolean };
+  objective: {
+    id: string;
+    code: string;
+    title: string;
+    completionReportAvailable?: boolean;
+  };
   artifact: { phaseNumber: number; title: string } | null;
 }
 
@@ -150,6 +157,22 @@ export function RoadmapImplementationRoom({
     });
   }
 
+  async function retryFailedPhase() {
+    if (!run) return;
+    startTransition(async () => {
+      const result = await ReabrirFaseRoadmapProduction(run.id);
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success(
+        "Fase devolvida para correção. O fluxo continua pausado até ela concluir.",
+      );
+      await loadEvents(run.id);
+      await onChanged();
+    });
+  }
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
@@ -200,6 +223,17 @@ export function RoadmapImplementationRoom({
                   <CirclePlay className="size-4" /> Aprovar
                 </Button>
               )}
+              {canManage && run.status === "FAILED" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={pending}
+                  className="ml-auto border-rose-400/25 text-rose-200 hover:bg-rose-400/10"
+                  onClick={() => void retryFailedPhase()}
+                >
+                  <RotateCcw className="size-4" /> Corrigir esta fase
+                </Button>
+              )}
             </div>
           )}
         </SheetHeader>
@@ -236,12 +270,14 @@ export function RoadmapImplementationRoom({
                   <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-slate-500">
                     <Icon className="size-3.5" />
                     {event.authorLabel}
-                    {event.kind === "STATUS_CHANGE" && event.fromStatus && event.toStatus && (
-                      <span>
-                        · {STATUS_LABEL[event.fromStatus] ?? event.fromStatus} →{" "}
-                        {STATUS_LABEL[event.toStatus] ?? event.toStatus}
-                      </span>
-                    )}
+                    {event.kind === "STATUS_CHANGE" &&
+                      event.fromStatus &&
+                      event.toStatus && (
+                        <span>
+                          · {STATUS_LABEL[event.fromStatus] ?? event.fromStatus}{" "}
+                          → {STATUS_LABEL[event.toStatus] ?? event.toStatus}
+                        </span>
+                      )}
                     <time className="ml-auto normal-case tracking-normal">
                       {formatDate(event.createdAt)}
                     </time>
@@ -272,7 +308,11 @@ export function RoadmapImplementationRoom({
                 placeholder="Registre uma nota ou orientação para esta fase…"
                 className="min-h-11 flex-1 resize-none rounded-xl border border-white/10 bg-slate-950 p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40"
                 onKeyDown={(event) => {
-                  if ((event.ctrlKey || event.metaKey) && event.key === "Enter" && draft.trim()) {
+                  if (
+                    (event.ctrlKey || event.metaKey) &&
+                    event.key === "Enter" &&
+                    draft.trim()
+                  ) {
                     event.preventDefault();
                     void sendNote();
                   }

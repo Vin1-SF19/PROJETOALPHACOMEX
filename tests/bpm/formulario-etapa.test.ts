@@ -70,7 +70,7 @@ describe("CRM - formulário unificado por etapa", () => {
 
   it("impede o builder de recriar campo fora da configuração canônica da etapa", () => {
     expect(builder).toContain("config.etapaId === etapaId && config.visivel");
-    expect(builder).toContain("versaoEsperada: etapa.formulario?.versao ?? null");
+    expect(builder).toContain("versaoEsperada: versaoBase");
     expect(builder).toContain("id: secao.id");
     expect(builder).toContain("id: componente.id");
     expect(builder).toContain("!secoes.some((secaoAtual)");

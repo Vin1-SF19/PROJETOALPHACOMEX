@@ -14,7 +14,7 @@ describe("workspace integral de configuração", () => {
       "Campos e formulários",
       "SLA",
       "Automações",
-      "Checklists",
+      "Procedimentos",
       "Base de Conhecimento",
       "Cadências",
       "Permissões",

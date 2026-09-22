@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo } from "react";
 import { HeaderRadar } from "./HeaderRadar";
 import { TabelaRadar } from "./TabelaRadar";
 import { toast } from "sonner";
-import { excluirEmpresasAction } from "@/app/api/ExclusaoFiscal/route";
+import { excluirEmpresasAction } from "@/actions/RadarFiscal";
 
 export default function RadarFiscalClient({ initialDados, style }: { initialDados: any[], style: any }) {
     const [filtro, setFiltro] = useState("todos");

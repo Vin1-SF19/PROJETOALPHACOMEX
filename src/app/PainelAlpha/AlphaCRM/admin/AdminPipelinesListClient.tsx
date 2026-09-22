@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Settings2, ArrowRight, Pencil, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Settings2, ArrowRight, Pencil, ArrowUp, ArrowDown, BookOpen, ListChecks } from "lucide-react";
 import type { TemaAlpha } from "@/lib/temas";
 import {
   CriarPipelineBpm,
@@ -170,6 +170,39 @@ export default function AdminPipelinesListClient({ pipelines: pipelinesIniciais,
         >
           <Plus size={15} /> Novo Pipeline
         </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <Link
+          href="/PainelAlpha/AlphaCRM/admin/conhecimento"
+          className="flex items-center gap-3 bg-slate-900/60 border border-white/5 rounded-xl px-4 py-3 hover:opacity-90"
+        >
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: `rgba(${accent},0.15)` }}
+          >
+            <BookOpen size={16} style={{ color: `rgb(${accent})` }} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-white">Base de Conhecimento</p>
+            <p className="text-xs text-slate-500 truncate">Scripts por etapa de cada pipeline</p>
+          </div>
+        </Link>
+        <Link
+          href="/PainelAlpha/AlphaCRM/admin/regras"
+          className="flex items-center gap-3 bg-slate-900/60 border border-white/5 rounded-xl px-4 py-3 hover:opacity-90"
+        >
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: `rgba(${accent},0.15)` }}
+          >
+            <ListChecks size={16} style={{ color: `rgb(${accent})` }} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-white">Regras</p>
+            <p className="text-xs text-slate-500 truncate">Motor determinístico de regras do CRM</p>
+          </div>
+        </Link>
       </div>
 
       {mostrarForm && (

@@ -54,3 +54,13 @@ describe("validação semântica de campos BPM", () => {
     });
   });
 });
+
+
+it("GLOBAL com fonte valida CNPJ e preserva bloqueios explícitos", () => {
+  const campo = { id: "cnpj", nome: "CNPJ", tipo: "cnpj", opcoesJson: null, escopo: "GLOBAL", fonteEntidade: "CLIENTE" };
+  expect(validarValoresCamposBpm([campo], { cnpj: "04.252.011/0001-10" })).toEqual({ success: true, valores: { cnpj: "04252011000110" } });
+  expect(validarValoresCamposBpm([campo], { cnpj: "11111111111111" }).success).toBe(false);
+  expect(validarValoresCamposBpm([campo], { cnpj: "" }).success).toBe(true);
+  expect(validarValoresCamposBpm([{ ...campo, somenteLeitura: true }], { cnpj: "" }).success).toBe(false);
+  expect(validarValoresCamposBpm([{ ...campo, editavel: false }], { cnpj: "" }).success).toBe(false);
+});

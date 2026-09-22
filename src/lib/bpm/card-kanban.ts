@@ -21,8 +21,8 @@ export const CARD_KANBAN_NATIVE_REGISTRY = {
     description: "Telefone real das pessoas vinculadas à empresa (ou do lead virtual).",
   },
   CHECKLIST: {
-    label: "Progresso do checklist",
-    description: "Itens concluídos sobre o total dos checklists aplicáveis ao card.",
+    label: "Progresso do procedimento",
+    description: "Itens concluídos sobre o total dos procedimentos aplicáveis ao card.",
   },
   CADENCIA: {
     label: "Próxima execução da cadência",

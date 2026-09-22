@@ -526,7 +526,7 @@ export function HabilitacaoRadarClient() {
         const chunk = cnpjsFiltrados.slice(i, i + CHUNK);
         const res = await verificarCnpjsExistentes(chunk);
         if (res.success) {
-          for (const d of res.data) {
+          for (const d of res.data ?? []) {
             encontradosMap.set(d.cnpj, d as unknown as EmpresaRadar);
           }
         }

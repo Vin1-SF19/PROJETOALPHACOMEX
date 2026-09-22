@@ -1,0 +1,32 @@
+{
+  "startedAt": "2026-09-22T12:57:34.982716+00:00",
+  "changedSincePriorCapture": [],
+  "head": "5f575f2539708fc3b25bfeed889a0349192ba1f1",
+  "baseTree": "98ab0e3cb6ba3d559ab0755f2cbb9ba83bc55192",
+  "candidateTree": null,
+  "missing": [],
+  "untracked": [],
+  "finishedAt": "2026-09-22T12:59:29.491583+00:00",
+  "gates": [
+    {
+      "gate": "lint",
+      "exit": 1,
+      "seconds": 42.4
+    },
+    {
+      "gate": "typecheck",
+      "exit": 2,
+      "seconds": 11.8
+    },
+    {
+      "gate": "test",
+      "exit": 1,
+      "seconds": 29.6
+    }
+  ],
+  "candidateStatus": "BLOCKED",
+  "build": "Not rerun: previous local exit 0 is historical evidence only, not proof of a clean candidate. next.config.ts sets ignoreBuildErrors=true.",
+  "changedAtEnd": [],
+  "requiredUntrackedDependency": "src/lib/google-calendar/webhook-rate-limiter.ts",
+  "trackedNavigationDiffCheckExit": 0
+}

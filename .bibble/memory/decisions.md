@@ -1531,3 +1531,13 @@ de segurança.
 **Consequência:** edição cadastral não toca saldo; operação, saldo, movimento e auditoria são atômicos/idempotentes. Itens relacionados são arquivados. Tags não duplicam itens e instâncias de kit refletem a natureza quantitativa ou patrimonial de cada componente.
 
 **Adicionado em:** 2026-09-18 por Codex (Estoque Geral)
+
+### 2026-09-22 — RM-2026-FFD798: rótulo de apresentação não renomeia o domínio
+
+**Decisão:** usar “Procedimento(s)” em toda superfície visível do Alpha CRM e preservar `CHECKLIST` nos contratos internos — schema Prisma, valores persistidos, eventos, rotas, capabilities, rendererIds, arquivos e funções.
+
+**Consequências:** a terminologia para o usuário fica consistente sem migration, backfill ou quebra de integrações. Futuras mudanças de nomenclatura devem separar explicitamente apresentação de identidade estrutural e só renomear dados persistidos mediante objetivo próprio e protocolo Vault.
+
+
+### 2026-09-22 — RM-2026-6F4E3F: override de GLOBAL com fonte
+Fonte automática identifica proveniência possível, não autorização. Override não vazio reside no card; vazio retorna à fonte canônica. GLOBAL personalizado mantém armazenamento compartilhado. Flags explícitas de definição, etapa, perfil e mapeamento continuam protegendo edição; campos protegidos continuam canônicos. Nenhuma sincronização de override para a empresa.

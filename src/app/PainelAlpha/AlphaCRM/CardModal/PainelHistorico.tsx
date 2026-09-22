@@ -147,7 +147,7 @@ export default function PainelHistorico({
           {checklistHabilitado && (
             <TabsTrigger value="checklist" className="flex-none gap-1.5">
               <ClipboardCheck size={13} />
-              Checklist
+              Procedimento
             </TabsTrigger>
           )}
           <TabsTrigger value="etapas" className="flex-none gap-1.5">
