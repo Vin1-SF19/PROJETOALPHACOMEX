@@ -14,6 +14,11 @@ import {
   enfileirarOperacao,
   type AgendaAlphaSqlExecutor,
 } from "@/lib/google-calendar/sync-queue";
+import {
+  consumirRateLimit,
+  rateLimitPosAuth,
+  rateLimitPreDb,
+} from "@/lib/google-calendar/webhook-rate-limiter";
 import db from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -21,18 +26,8 @@ export const runtime = "nodejs";
 
 const ESTADOS_RECURSO = new Set(["sync", "exists", "not_exists"]);
 const MAX_HEADER_OPACO = 512;
-const JANELA_RATE_LIMIT_MS = 60_000;
 const LIMITE_PRE_DB_POR_ORIGEM = 300;
 const LIMITE_POS_AUTH_POR_CANAL = 120;
-const MAX_CHAVES_RATE_LIMIT = 5_000;
-
-interface EntradaRateLimit {
-  inicioJanela: number;
-  total: number;
-}
-
-const rateLimitPreDb = new Map<string, EntradaRateLimit>();
-const rateLimitPosAuth = new Map<string, EntradaRateLimit>();
 
 interface HeadersWebhook {
   googleChannelId: string;
@@ -139,44 +134,6 @@ function origemTecnica(request: NextRequest): string {
   return referenciaTecnica(origem.slice(0, 128));
 }
 
-function consumirRateLimit(
-  store: Map<string, EntradaRateLimit>,
-  chave: string,
-  limite: number,
-  agora = Date.now(),
-): { allowed: boolean; retryAfterSeconds: number } {
-  const existente = store.get(chave);
-  if (!existente || agora - existente.inicioJanela >= JANELA_RATE_LIMIT_MS) {
-    if (store.size >= MAX_CHAVES_RATE_LIMIT) {
-      for (const [chaveExistente, entrada] of store) {
-        if (agora - entrada.inicioJanela >= JANELA_RATE_LIMIT_MS) {
-          store.delete(chaveExistente);
-        }
-      }
-      if (store.size >= MAX_CHAVES_RATE_LIMIT) {
-        const primeiraChave = store.keys().next().value;
-        if (primeiraChave) store.delete(primeiraChave);
-      }
-    }
-    store.set(chave, { inicioJanela: agora, total: 1 });
-    return { allowed: true, retryAfterSeconds: 0 };
-  }
-
-  existente.total += 1;
-  if (existente.total <= limite) {
-    return { allowed: true, retryAfterSeconds: 0 };
-  }
-  return {
-    allowed: false,
-    retryAfterSeconds: Math.max(
-      1,
-      Math.ceil(
-        (JANELA_RATE_LIMIT_MS - (agora - existente.inicioJanela)) / 1_000,
-      ),
-    ),
-  };
-}
-
 function respostaRateLimit(retryAfterSeconds: number): NextResponse {
   return NextResponse.json(
     { success: false, error: "Notificação de calendário temporariamente limitada." },
@@ -185,16 +142,6 @@ function respostaRateLimit(retryAfterSeconds: number): NextResponse {
       headers: { "Retry-After": String(retryAfterSeconds) },
     },
   );
-}
-
-/**
- * Limiter local, limitado em memória, para absorver abuso por instância. Em
- * produção multi-instância, WAF/rate limit distribuído continua obrigatório.
- */
-export function resetAgendaAlphaWebhookRateLimiterForTests(): void {
-  if (process.env.NODE_ENV !== "test") return;
-  rateLimitPreDb.clear();
-  rateLimitPosAuth.clear();
 }
 
 function respostaErro(status: number): NextResponse {
