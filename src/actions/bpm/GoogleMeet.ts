@@ -106,6 +106,7 @@ async function confirmarLinkMeetCriado(params: {
 
 async function reagendarEventoVinculado(params: {
   cardId: string;
+  userId: number;
   googleEventId: string;
   googleCalendarId: string;
   googleMeetLink: string;
@@ -113,47 +114,37 @@ async function reagendarEventoVinculado(params: {
   fim: Date;
   emailCliente: string;
 }) {
-  const vinculos = await db.googleCalendarEventoCache.findMany({
+  // O ID "primary" pode existir em várias contas. A agenda usada deve ser
+  // sempre a de quem solicitou o reagendamento, sem depender do cache local.
+  const vinculo = await db.googleCalendarSelecionado.findFirst({
     where: {
-      googleEventId: params.googleEventId,
-      calendario: { googleCalendarId: params.googleCalendarId, gravavel: true },
+      conexao: { userId: params.userId },
+      googleCalendarId: params.googleCalendarId,
+      gravavel: true,
     },
-    select: {
-      calendarioId: true,
-      calendario: { select: { timezone: true } },
-    },
-    take: 2,
+    select: { id: true, timezone: true },
   });
-  if (vinculos.length > 1) {
-    return { success: false as const, error: "Mais de um calendário está vinculado a esta reunião. Revise o vínculo na Agenda Alpha antes de reagendar." };
-  }
-  // O cache pode expirar ou ainda não conter o link do Meet. Ele não é a
-  // autoridade sobre o espaço: a confirmação abaixo é feita no próprio Google.
-  let vinculo = vinculos[0];
   if (!vinculo) {
-    const calendarios = await db.googleCalendarSelecionado.findMany({
-      where: { googleCalendarId: params.googleCalendarId, gravavel: true },
-      select: { id: true, timezone: true },
-      take: 2,
-    });
-    if (calendarios.length > 1) {
-      return { success: false as const, error: "Mais de um calendário pode conter esta reunião. Revise o vínculo na Agenda Alpha antes de reagendar." };
-    }
-    if (calendarios.length === 0) {
-      return { success: false as const, error: "O calendário desta reunião não está disponível para edição. Revise a conexão e a permissão de escrita na Agenda Alpha." };
-    }
-    vinculo = { calendarioId: calendarios[0].id, calendario: { timezone: calendarios[0].timezone } };
+    return { success: false as const, error: "O calendário desta reunião não está disponível para edição na sua Agenda Alpha. Revise a conexão e a permissão de escrita." };
   }
-  const usuarioGoogle = await obterUsuarioGoogleAtivoPorCalendario(vinculo.calendarioId);
-  if (!usuarioGoogle.ok) {
-    return { success: false as const, error: "A Agenda Alpha do organizador não está ativa." };
+  const usuarioGoogle = await obterUsuarioGoogleAtivoPorCalendario(vinculo.id);
+  if (!usuarioGoogle.ok || usuarioGoogle.userId !== params.userId) {
+    return { success: false as const, error: "Sua Agenda Alpha não está ativa." };
   }
 
-  const eventoAtual = await obterEventoGoogle({
-    emailUsuario: usuarioGoogle.emailUsuario,
-    calendarId: params.googleCalendarId,
-    googleEventId: params.googleEventId,
-  });
+  let eventoAtual: Awaited<ReturnType<typeof obterEventoGoogle>>;
+  try {
+    eventoAtual = await obterEventoGoogle({
+      emailUsuario: usuarioGoogle.emailUsuario,
+      calendarId: params.googleCalendarId,
+      googleEventId: params.googleEventId,
+    });
+  } catch (error) {
+    if (error instanceof GoogleCalendarError && error.kind === "not_found") {
+      return { success: false as const, error: "Esta reunião não foi encontrada na sua Agenda Alpha. Confira se o card foi agendado por esta conta." };
+    }
+    throw error;
+  }
   if (eventoAtual.status === "cancelled" || eventoAtual.linkMeet !== params.googleMeetLink) {
     return { success: false as const, error: "O espaço do Google Meet foi alterado fora do painel. Revise o evento antes de reagendar." };
   }
@@ -170,13 +161,13 @@ async function reagendarEventoVinculado(params: {
       inicio: params.inicio,
       fim: params.fim,
       diaInteiro: false,
-      timezone: vinculo.calendario.timezone || "America/Sao_Paulo",
+      timezone: vinculo.timezone || "America/Sao_Paulo",
       participantes: combinarParticipantesReuniao(eventoAtual.participantes, params.emailCliente),
     },
   });
   const compensacao: ReagendamentoPendente = {
     cardId: params.cardId,
-    calendarioId: vinculo.calendarioId,
+    calendarioId: vinculo.id,
     googleCalendarId: params.googleCalendarId,
     googleEventId: params.googleEventId,
     googleMeetLink: params.googleMeetLink,
@@ -184,7 +175,7 @@ async function reagendarEventoVinculado(params: {
     fimAnterior: eventoAtual.fim.dataHora,
     inicioNovo: params.inicio.toISOString(),
     participantesAnteriores: eventoAtual.participantes.map((p) => p.email),
-    timezone: vinculo.calendario.timezone || "America/Sao_Paulo",
+    timezone: vinculo.timezone || "America/Sao_Paulo",
   };
   if (eventoAtualizado.linkMeet !== params.googleMeetLink) {
     return { success: false as const, error: "O Google devolveu um espaço de reunião diferente. O card não foi alterado; revise o evento na Agenda Alpha.", compensacao };
@@ -192,11 +183,11 @@ async function reagendarEventoVinculado(params: {
   await db.googleCalendarEventoCache.upsert({
     where: {
       calendarioId_googleEventId: {
-        calendarioId: vinculo.calendarioId,
+        calendarioId: vinculo.id,
         googleEventId: params.googleEventId,
       },
     },
-    create: { calendarioId: vinculo.calendarioId, googleEventId: params.googleEventId, ...dadosCacheDeEvento(eventoAtualizado) },
+    create: { calendarioId: vinculo.id, googleEventId: params.googleEventId, ...dadosCacheDeEvento(eventoAtualizado) },
     update: dadosCacheDeEvento(eventoAtualizado),
   }).catch((error) => console.error("[ReagendarReuniaoBpm] Cache Google será sincronizado depois", error));
   return { success: true as const, compensacao };
@@ -494,6 +485,7 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
     await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
     const resultado = await reagendarEventoVinculado({
       cardId,
+      userId,
       googleCalendarId: card.googleCalendarId,
       googleEventId: card.googleEventId,
       googleMeetLink: card.googleMeetLink,

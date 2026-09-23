@@ -58,3 +58,28 @@ DELIVERY_READY: /PainelAlpha/AlphaCRM/pipeline/[pipelineId] → card em Agendar 
 ## Revalidação terminal de 2026-09-23
 
 Retomada da fase 2: os testes de reagendamento e transcrição passaram **22/22**; ESLint dos arquivos de ação/testes e typecheck completo passaram. A implementação conserva sessão, autorização, calendário gravável, confirmação do evento remoto, ETag e controle de concorrência. O teste com conta Google real fica para Testes. A atribuição do `journal.md` compartilhado ainda impede staging automático isolado; nenhuma credencial ou calendário real foi usado.
+
+## Ajuste solicitado — agenda de quem reagenda
+
+O usuário confirmou que o reagendamento deve usar a API do Google na agenda da pessoa que solicita a ação e enviar o e-mail digitado do cliente como convidado. A busca global por `googleCalendarId` podia gerar falsa ambiguidade entre contas quando o cache do evento não existia, especialmente para o identificador `primary`.
+
+### Aceites
+- [x] Resolver o calendário gravável pelo usuário autenticado e pelo ID de calendário persistido no card.
+- [x] Consultar o evento no Google com a conta desse usuário e conferir o link do Meet antes do PATCH.
+- [x] Preservar os convidados existentes, incluir o e-mail do cliente uma única vez e solicitar notificações via Google Calendar.
+- [x] Recusar calendário ausente, conexão de outra conta, evento ausente e identidade do Meet divergente sem alterar o evento.
+- [x] Manter ETag, CAS, compensação e cache como resultado da atualização, sem exigir cache prévio.
+- [x] Executar gates globais e registrar resultados abaixo.
+
+### File list deste ajuste
+- `src/actions/bpm/GoogleMeet.ts`
+- `tests/bpm/google-meet-etapa-guard.test.ts`
+- `docs/stories/story-rm-2026-d64af1-reagendar-reuniao.md`
+
+### Validação deste ajuste
+- Teste focado: 16/16 passaram; ESLint dos arquivos alterados: sem erros; `git diff --check`: passou.
+- `npm run typecheck`: passou.
+- `npm run lint`: passou com 0 erros e 1192 avisos no repositório.
+- `npm test`: 500 arquivos passaram; 3766 testes passaram, 4 ignorados e 1 todo.
+- `npm run build`: passou.
+- A verificação com conta Google real ainda depende de smoke autenticado; os testes locais usam mocks da API.
