@@ -7,6 +7,8 @@ import { processarCadenciasBpm } from "@/lib/bpm/cadencias/executor";
 import { materializarAgendasAutomacoesBpm, materializarGatilhosTemporaisBpm, sincronizarAgendasAutomacoesAtivasBpm } from "@/lib/bpm/automacoes/agenda";
 import { materializarExecucoesEventosBpm } from "@/lib/bpm/automacoes/eventos";
 import { processarFilaAutomacoesCentraisBpm } from "@/lib/bpm/automacoes/central-runtime";
+import { reconciliarBlobsAnexosBpm } from "@/lib/bpm/anexos-lifecycle";
+import { reconciliarCompensacoesGoogleBpm } from "@/lib/bpm/google-meet-compensacao";
 
 export const dynamic = "force-dynamic";
 let jobEmAndamento = false;
@@ -39,7 +41,15 @@ export async function GET(request: Request) {
     const tempo = await materializarAutomacoesTempoBpm();
     const fila = await processarFilaAutomacoesBpm();
     const cadencias = await processarCadenciasBpm();
-    return NextResponse.json({ success: true, data: { agendasSincronizadas, agendasCentrais, gatilhosTemporais, eventosCentrais, filaCentral, tempo, fila, cadencias } });
+    const anexos = await reconciliarBlobsAnexosBpm().catch((error) => {
+      console.error("[AutomacoesBpmRoute] Reconciliação de anexos", error);
+      return { examinados: 0, concluidos: 0, falhas: 1 };
+    });
+    const reunioes = await reconciliarCompensacoesGoogleBpm().catch((error) => {
+      console.error("[AutomacoesBpmRoute] Reconciliação de reuniões", error);
+      return { examinados: 0, concluidos: 0, falhas: 1 };
+    });
+    return NextResponse.json({ success: true, data: { agendasSincronizadas, agendasCentrais, gatilhosTemporais, eventosCentrais, filaCentral, tempo, fila, cadencias, anexos, reunioes } });
   } catch (error) {
     console.error("[AutomacoesBpmRoute] Falha no lote", error);
     return NextResponse.json(

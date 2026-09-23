@@ -1,0 +1,58 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /home/ialpha/projetos/alpha-comex/painel-alpha
+
+ ❯ tests/bpm/cpf-fechamento-react.test.ts (3 tests | 3 failed) 55ms
+   × X fecha imediatamente sem confirmação 36ms
+   × Escape fecha imediatamente sem confirmação 11ms
+   × externo fecha imediatamente sem confirmação 8ms
+ ❯ tests/bpm/cpf-pendencias-react.test.ts (20 tests | 5 failed) 232ms
+   × campo dinâmico selecao da etapa salva no change sem blur nem avanço do relógio 11ms
+   × campo dinâmico multiselecao da etapa salva no change sem blur nem avanço do relógio 8ms
+   × campo dinâmico booleano da etapa salva no change sem blur nem avanço do relógio 8ms
+   × campo dinâmico data da etapa salva no change sem blur nem avanço do relógio 9ms
+   × campo dinâmico data_hora da etapa salva no change sem blur nem avanço do relógio 9ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/bpm/cpf-fechamento-react.test.ts > X fecha imediatamente sem confirmação
+ FAIL  tests/bpm/cpf-fechamento-react.test.ts > Escape fecha imediatamente sem confirmação
+ FAIL  tests/bpm/cpf-fechamento-react.test.ts > externo fecha imediatamente sem confirmação
+ FAIL  tests/bpm/cpf-pendencias-react.test.ts > campo dinâmico selecao da etapa salva no change sem blur nem avanço do relógio
+ FAIL  tests/bpm/cpf-pendencias-react.test.ts > campo dinâmico multiselecao da etapa salva no change sem blur nem avanço do relógio
+ FAIL  tests/bpm/cpf-pendencias-react.test.ts > campo dinâmico booleano da etapa salva no change sem blur nem avanço do relógio
+ FAIL  tests/bpm/cpf-pendencias-react.test.ts > campo dinâmico data da etapa salva no change sem blur nem avanço do relógio
+ FAIL  tests/bpm/cpf-pendencias-react.test.ts > campo dinâmico data_hora da etapa salva no change sem blur nem avanço do relógio
+TypeError: Cannot read properties of undefined (reading 'map')
+ ❯ PainelCamposEtapaAtual src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx:47:40
+     45|   const { registerSave, setPendingFields, scheduleSave, flushScheduled…
+     46|   const idInstancia = `${card.id}-${instanceKey}`;
+     47|   const ordemCampos = new Map(campoIds.map((id, indice) => [id, indice…
+       |                                        ^
+     48|   const camposDoComponente = card.camposEtapa
+     49|     .filter((campo) => ordemCampos.has(campo.id))
+ ❯ Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:20
+ ❯ renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:22
+ ❯ updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:19
+ ❯ beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:18
+ ❯ runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:874:13
+ ❯ performUnitOfWork node_modules/react-dom/cjs/react-dom-client.development.js:17641:22
+ ❯ workLoopSync node_modules/react-dom/cjs/react-dom-client.development.js:17469:41
+ ❯ renderRootSync node_modules/react-dom/cjs/react-dom-client.development.js:17450:11
+ ❯ performWorkOnRoot node_modules/react-dom/cjs/react-dom-client.development.js:16583:35
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+
+ Test Files  2 failed | 1 passed (3)
+      Tests  8 failed | 57 passed (65)
+   Start at  20:34:11
+   Duration  978ms (transform 497ms, setup 0ms, import 1.25s, tests 307ms, environment 205ms)
+
+npm notice
+npm notice New minor version of npm available! 11.6.1 -> 11.19.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.19.1
+npm notice To update run: npm install -g npm@11.19.1
+npm notice

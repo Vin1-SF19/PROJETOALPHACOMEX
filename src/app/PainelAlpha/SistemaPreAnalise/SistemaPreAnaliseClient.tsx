@@ -11,15 +11,23 @@ import { toast } from "sonner";
 import { upsertConsulta, buscarHistorico } from "@/actions/PreAnalise";
 import BlocoResultados from "./BlocoResultados";
 import ProgressCard from "./ProgressCard";
+import type { TemaAlpha } from "@/lib/temas";
+import type { ConsultaPreAnalise } from "@prisma/client";
 
 
 type StatusConsulta = "idle" | "loading" | "success" | "error";
 type Fase = "input" | "loading" | "results";
+type CadastroDados = { cnpj?: string } & Record<string, unknown>;
+type SavedPayload = {
+    rfb?: ({ dados?: CadastroDados } & Record<string, unknown>);
+    radar?: { dados?: Record<string, unknown>; consultadoEm?: string | null };
+    empresaqui?: ({ dados?: Record<string, unknown> } & Record<string, unknown>);
+};
 
 interface EtapasState {
-    rfb: { status: StatusConsulta; dados: any };
-    radar: { status: StatusConsulta; dados: any; consultadoEm: string | null };
-    empresaqui: { status: StatusConsulta; dados: any };
+    rfb: { status: StatusConsulta; dados: CadastroDados | null };
+    radar: { status: StatusConsulta; dados: Record<string, unknown> | null; consultadoEm: string | null };
+    empresaqui: { status: StatusConsulta; dados: Record<string, unknown> | null };
 }
 
 interface SessionUser {
@@ -29,16 +37,16 @@ interface SessionUser {
 
 interface Props {
     sessionUser: SessionUser;
-    visual: any;
+    visual: TemaAlpha;
 }
 
 export default function SistemaPreAnaliseClient({ sessionUser, visual }: Props) {
     const [cnpj, setCnpj] = useState("");
     const [fase, setFase] = useState<Fase>("input");
-    const [historico, setHistorico] = useState<any[]>([]);
+    const [historico, setHistorico] = useState<ConsultaPreAnalise[]>([]);
     const [modalHistorico, setModalHistorico] = useState(false);
     const [loadingHistorico, setLoadingHistorico] = useState(false);
-    const [cnpjHistorico, setCnpjHistorico] = useState<any | null>(null);
+    const [cnpjHistorico, setCnpjHistorico] = useState<ConsultaPreAnalise | null>(null);
     const [confirmarNovaConsulta, setConfirmarNovaConsulta] = useState(false);
     const savedRef = useRef(false);
 
@@ -56,7 +64,6 @@ export default function SistemaPreAnaliseClient({ sessionUser, visual }: Props) 
 
     useEffect(() => {
         if (!modalHistorico) return;
-        setLoadingHistorico(true);
         buscarHistorico().then(res => {
             if (res.data) setHistorico(res.data);
             setLoadingHistorico(false);
@@ -75,20 +82,22 @@ export default function SistemaPreAnaliseClient({ sessionUser, visual }: Props) 
 
         savedRef.current = true;
 
-        const shouldNavigate = etapas.rfb.status === "success" && etapas.empresaqui.status === "success";
+        if (etapas.rfb.status !== "success") return;
 
         upsertConsulta({
             rfb: { dados: etapas.rfb.dados },
             empresaqui: { dados: etapas.empresaqui.dados },
             radar: { dados: etapas.radar.dados },
             extra: {}
-        }).then(() => {
-            if (shouldNavigate) setFase("results");
+        }).then((result) => {
+            if (result.error) toast.warning("Resultado exibido, mas não foi salvo no histórico.");
+            setFase("results");
         }).catch(err => {
             console.error(err);
-            if (shouldNavigate) setFase("results");
+            toast.warning("Resultado exibido, mas não foi salvo no histórico.");
+            setFase("results");
         });
-    }, [etapas.rfb.status, etapas.empresaqui.status, fase]);
+    }, [etapas.rfb.status, etapas.empresaqui.status, etapas.rfb.dados, etapas.empresaqui.dados, etapas.radar.dados, fase]);
 
     const executarConsulta = async (cleanCnpj: string) => {
         savedRef.current = false;
@@ -99,49 +108,32 @@ export default function SistemaPreAnaliseClient({ sessionUser, visual }: Props) 
             radar: { status: "idle", dados: null, consultadoEm: null }
         });
 
-        await Promise.allSettled([
-            (async () => {
-                try {
-                    const res = await fetch(`/api/ReceitaFederal?cnpj=${cleanCnpj}`);
-                    const data = await res.json();
-                    setEtapas(prev => ({ ...prev, rfb: { status: data.error ? "error" : "success", dados: data } }));
-                } catch {
-                    setEtapas(prev => ({ ...prev, rfb: { status: "error", dados: null } }));
-                }
-            })(),
-            (async () => {
-                try {
-                    const res = await fetch(`/api/RadarFiscal?cnpj=${cleanCnpj}`);
-                    const data = await res.json();
-                    setEtapas(prev => ({ ...prev, empresaqui: { status: data.error ? "error" : "success", dados: data } }));
-                } catch {
-                    setEtapas(prev => ({ ...prev, empresaqui: { status: "error", dados: null } }));
-                }
-            })()
-        ]);
+        try {
+            const res = await fetch(`/api/RadarFiscal?cnpj=${cleanCnpj}`);
+            const data = await res.json();
+            if (!res.ok || data.error || !data.receita) throw new Error("Consulta indisponível");
+            setEtapas({
+                rfb: { status: "success", dados: data.receita },
+                empresaqui: { status: data.consultaStatus === "completa" ? "success" : "error", dados: data },
+                radar: { status: "idle", dados: null, consultadoEm: null },
+            });
+        } catch {
+            setEtapas({
+                rfb: { status: "error", dados: null },
+                empresaqui: { status: "error", dados: null },
+                radar: { status: "idle", dados: null, consultadoEm: null },
+            });
+        }
     };
 
-    const reconsultarIndividual = async (chave: "rfb" | "empresaqui") => {
-        savedRef.current = false;
-        setEtapas(prev => ({ ...prev, [chave]: { ...prev[chave], status: "loading" } }));
-
-        const cnpjLimpo = cnpj.replace(/\D/g, "");
-        const endpoint = chave === "rfb" ? "ReceitaFederal" : "RadarFiscal";
-
-        try {
-            const res = await fetch(`/api/${endpoint}?cnpj=${cnpjLimpo}`);
-            if (!res.ok) throw new Error();
-            const data = await res.json();
-            setEtapas(prev => ({ ...prev, [chave]: { status: data.error ? "error" : "success", dados: data } }));
-        } catch {
-            setEtapas(prev => ({ ...prev, [chave]: { ...prev[chave], status: "error" } }));
-        }
+    const reconsultarIndividual = async () => {
+        await executarConsulta(cnpj.replace(/\D/g, ""));
     };
 
     const handleConsultar = async (e: React.FormEvent) => {
         e.preventDefault();
         const cleanCnpj = cnpj.replace(/\D/g, "");
-        if (cleanCnpj.length < 14) return;
+        if (cleanCnpj.length !== 14) return;
 
         const itemNoHistorico = historico.find(h => (h.cnpj || "").replace(/\D/g, "") === cleanCnpj);
         if (itemNoHistorico) {
@@ -152,18 +144,31 @@ export default function SistemaPreAnaliseClient({ sessionUser, visual }: Props) 
         await executarConsulta(cleanCnpj);
     };
 
-    const reabrirConsulta = (dadosSalvos: any) => {
+    const reabrirConsulta = (dadosSalvos: ConsultaPreAnalise) => {
         try {
-            const payload = typeof dadosSalvos.dadosBrutos === "string"
+            const bruto = typeof dadosSalvos.dadosBrutos === "string"
                 ? JSON.parse(dadosSalvos.dadosBrutos)
                 : dadosSalvos.dadosBrutos;
+            if (!bruto || typeof bruto !== "object" || Array.isArray(bruto)) throw new Error("Histórico inválido");
+            const payload = bruto as SavedPayload;
 
             const radarDados = payload.radar?.dados || null;
             const radarTemDados = radarDados && typeof radarDados === "object" && Object.keys(radarDados).length > 0;
 
+            const rfbOriginal = payload.rfb?.dados || payload.rfb;
+            const rfbSalvo = rfbOriginal?.fonteCadastro ? rfbOriginal : {
+                ...rfbOriginal,
+                optante_simples: null,
+                optante_simei: null,
+                regimeTributario: null,
+            };
+            const tributarioSalvo = payload.empresaqui?.dados || payload.empresaqui;
+            const resultadoTributario = tributarioSalvo?.consultaStatus
+                ? tributarioSalvo
+                : { ...tributarioSalvo, consultaStatus: "parcial", qualificacao: null, regimeEA: null };
             setEtapas({
-                rfb: { status: "success", dados: payload.rfb?.dados || payload.rfb },
-                empresaqui: { status: "success", dados: payload.empresaqui?.dados || payload.empresaqui },
+                rfb: { status: rfbSalvo?.cnpj ? "success" : "error", dados: rfbSalvo as CadastroDados },
+                empresaqui: { status: resultadoTributario?.consultaStatus === "completa" ? "success" : "error", dados: resultadoTributario },
                 radar: {
                     status: radarTemDados ? "success" : "idle",
                     dados: radarTemDados ? radarDados : null,
@@ -223,7 +228,7 @@ export default function SistemaPreAnaliseClient({ sessionUser, visual }: Props) 
 
                     <div className="flex items-center gap-3">
                         <button
-                            onClick={() => setModalHistorico(true)}
+                            onClick={() => { setLoadingHistorico(true); setModalHistorico(true); }}
                             className="cursor-pointer flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all text-slate-300"
                         >
                             <History size={14} className={visual.text} /> Historico
@@ -295,13 +300,13 @@ export default function SistemaPreAnaliseClient({ sessionUser, visual }: Props) 
                                     label="Cartão CNPJ RFB"
                                     status={etapas.rfb.status}
                                     icon={<Database size={26} />}
-                                    onRetry={() => reconsultarIndividual("rfb")}
+                                    onRetry={reconsultarIndividual}
                                 />
                                 <ProgressCard
                                     label="Regime Tributário"
                                     status={etapas.empresaqui.status}
                                     icon={<BarChart3 size={26} />}
-                                    onRetry={() => reconsultarIndividual("empresaqui")}
+                                    onRetry={reconsultarIndividual}
                                 />
                             </div>
 
@@ -311,10 +316,10 @@ export default function SistemaPreAnaliseClient({ sessionUser, visual }: Props) 
                                         key="ver-parcial"
                                         initial={{ opacity: 0, y: 20 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        onClick={() => setFase("results")}
+                                        onClick={() => etapas.rfb.status === "success" ? setFase("results") : void reconsultarIndividual()}
                                         className="cursor-pointer group flex items-center gap-4 px-12 py-5 rounded-[1.5rem] bg-white text-black font-black uppercase tracking-[0.3em] text-sm hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(255,255,255,0.15)]"
                                     >
-                                        Ver Resultados Parciais
+                                        {etapas.rfb.status === "success" ? "Ver Resultados Parciais" : "Tentar novamente"}
                                         <ArrowRight size={20} className="group-hover:translate-x-2 transition-transform" />
                                     </motion.button>
                                 )}
@@ -330,6 +335,7 @@ export default function SistemaPreAnaliseClient({ sessionUser, visual }: Props) 
                                 dados={etapas}
                                 visual={visual}
                                 userName={sessionUser.nome || "Não Identificado"}
+                                onRetry={() => void executarConsulta(String(etapas.rfb?.dados?.cnpj || cnpj).replace(/\D/g, ""))}
                             />
                         </motion.div>
                     )}
@@ -366,7 +372,7 @@ export default function SistemaPreAnaliseClient({ sessionUser, visual }: Props) 
                                     {historico.length === 0 ? (
                                         <p className="text-center text-slate-600 font-bold uppercase text-xs">Nenhuma consulta encontrada</p>
                                     ) : (
-                                        historico.map((item: any) => (
+                                        historico.map((item) => (
                                             <div key={item.id} className="group bg-white/5 border border-white/5 hover:border-white/10 p-6 rounded-[1.5rem] transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                                 <div className="flex items-center gap-5">
                                                     <div className="p-4 rounded-2xl bg-slate-900 border border-white/5 text-slate-400 group-hover:text-white group-hover:border-orange-500/30 transition-all">

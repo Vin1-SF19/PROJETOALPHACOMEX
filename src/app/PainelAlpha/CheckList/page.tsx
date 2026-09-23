@@ -8,7 +8,7 @@ export default async function CheckListPage() {
   const session = await auth();
   if (!session) redirect("/");
 
-  const userId = Number((session.user as any)?.id);
+  const userId = Number(session.user.id);
 
   const [result, pastasResult, clientesAcesso, userDb] = await Promise.all([
     getEmpresasChecklist(),
@@ -22,7 +22,7 @@ export default async function CheckListPage() {
 
   const empresas = result.data ?? [];
   const tema = userDb?.tema_interface ?? "blue";
-  const role = (session.user as any)?.role ?? "";
+  const role = session.user.role ?? "";
 
   return (
     <div className="relative min-h-screen text-slate-200 overflow-x-hidden">

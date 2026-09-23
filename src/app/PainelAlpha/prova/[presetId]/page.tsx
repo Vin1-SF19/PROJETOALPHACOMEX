@@ -16,11 +16,15 @@ import { toast } from 'sonner';
 import { getPresetCompletoAction, salvarResultadoProva } from '@/actions/questoes';
 import { useSession } from 'next-auth/react';
 
+type PresetCompleto = NonNullable<Awaited<ReturnType<typeof getPresetCompletoAction>>>;
+type Pergunta = PresetCompleto["tags"][number]["perguntas"][number];
+type QuestaoComTag = Pergunta & { tagNome: string };
+
 export default function PaginaProva({ params }: { params: Promise<{ presetId: string }> }) {
     const { data: session, status: sessionStatus } = useSession();
     const userId = Number(session?.user?.id);
     const [loading, setLoading] = useState(true);
-    const [questoesFiltradas, setQuestoesFiltradas] = useState<any[]>([]);
+    const [questoesFiltradas, setQuestoesFiltradas] = useState<QuestaoComTag[]>([]);
     const [indiceAtual, setIndiceAtual] = useState(0);
     const [respostas, setRespostas] = useState<Record<string, string>>({});
     const [provaFinalizada, setProvaFinalizada] = useState(false);
@@ -38,15 +42,15 @@ export default function PaginaProva({ params }: { params: Promise<{ presetId: st
                 const preset = await getPresetCompletoAction(presetId);
 
                 if (preset && preset.tags) {
-                    const poolTotal = preset.tags.flatMap((tag: any) =>
+                    const poolTotal = preset.tags.flatMap((tag) =>
                         (tag.perguntas || [])
-                            .filter((p: any) => p.opcoes && p.opcoes !== "[]" && p.opcoes !== "")
-                            .map((p: any) => ({ ...p, tagNome: tag.nome }))
+                            .filter((p) => p.opcoes && p.opcoes !== "[]" && p.opcoes !== "")
+                            .map((p) => ({ ...p, tagNome: tag.nome }))
                     );
 
                     const shuffled = [...poolTotal].sort(() => Math.random() - 0.5);
 
-                    const tentativasAnteriores = preset.ResultadoProva?.filter((r: any) => r.userId === userId).length || 0;
+                    const tentativasAnteriores = preset.ResultadoProva?.filter((r) => r.userId === userId).length || 0;
 
                     const offset = (tentativasAnteriores % 2 === 0) ? 0 : 10;
 

@@ -20,7 +20,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       
 
     return NextResponse.json(blob);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    console.error("Falha no upload do chat:", error);
+    return NextResponse.json({ error: "Falha no upload" }, { status: 500 });
   }
 }

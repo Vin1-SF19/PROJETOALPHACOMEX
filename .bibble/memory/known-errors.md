@@ -5,6 +5,15 @@
 
 ---
 
+### Autosave dependente de blur — campos perdidos ao sair do card (RM-2026-B88712)
+**Sintoma:** campos editados no card do CRM (texto, número, moeda, CPF, CNPJ, e-mail, URL, telefone, data, booleano, select, multiselect) não persistiam ao fechar o card por X, ESC ou clique externo — o usuário perdia a edição. Templates e seleção isolada de data também deixavam pendências fora da fila.
+**Causa raiz:** `alterarCampo` em `PainelCamposEtapaAtual.tsx` atualizava apenas o rascunho local; o save estava conectado exclusivamente ao `onBlur` do campo. `flushSaves` aguardava operações já registradas, mas não iniciava saves ainda fora da fila. O `CardSaveProvider` vivia dentro do modal, sem recuperação durável após desmontagem.
+**Fix aplicado:** autosave universal por campo com debounce de 500 ms (texto) e disparo imediato (seleções, booleanos, datas, arquivos). `scheduleSave(key, callback, delay)` agenda por chave `${cardId}:${campoId}`; blur antecipa sem duplicar. `flushSaves(cardId)` captura e enfileira todas as revisões pendentes ao fechar. `CardSaveProvider` movido para `layout.tsx` do CRM, sobrevivendo ao fechamento. Diálogo "Campos não salvos" removido integralmente.
+**Como evitar:** qualquer campo editável no card DEVE registrar via `scheduleSave` ou `registerSave` no `CardSaveContext` — nunca depender exclusivamente de `onBlur` para persistência. O provider deve viver acima do modal (layout) para preservar rascunhos após desmontagem.
+**Adicionado em:** 2026-09-22 (Scribe, fechamento RM-2026-B88712)
+
+---
+
 ### Padrão de armadilha — Server Action legada aceita o contrato novo mas grava o campo antigo sem reconciliar a associação normalizada (RM-2026-457A31)
 **Sintoma:** ao migrar `BpmChecklistTemplate` de etapa singular (`etapaId`) para associação normalizada multietapa (`BpmChecklistTemplateEtapa`), a action `AtualizarTemplateChecklistBpm` já validava o payload plural (`etapaIds`) via Zod, mas continuava gravando diretamente `dados.etapaId`/`pipelineId` sem chamar a reconciliação de associações — permitindo, por análise de código, um vínculo com etapa de outro pipeline e deixando associações antigas órfãs quando o escopo mudava para global ou para outro pipeline.
 **Causa raiz:** ao introduzir um contrato novo (schema Zod ampliado) em cima de uma persistência antiga, é possível atualizar só a validação de entrada e esquecer de atualizar TODOS os caminhos de escrita que gravam o dado — não apenas o caminho principal exercitado pela UI. A ausência de consumidor de UI para a action legada mascarou o problema até uma auditoria de segurança dedicada (Anubis) inspecionar cada export da action, não apenas o fluxo feliz.
@@ -692,3 +701,72 @@ Em 2026-09-08, a suíte global aprovou 2.588/2.638 testes, com 49 falhas e 1 tod
 
 ### 2026-09-09 — Echo — RM-2026-457A31: fallback singular
 Lista de associações vazia era tratada como global em templateChecklistCompativel mesmo com shadow preenchido; corrigido para usar o singular, como o filtro Prisma. Auditoria de Salvar/Atualizar também passa a preservar esse shadow anterior. Regressões cobertas nas 65 asserções/testes aprovados do módulo; sem alteração de banco.
+
+
+### RM-2026-09A642 — reversão durante autosave
+Comparar o rascunho com a base antes de entrar na fila perde reversões: o valor original parece limpo enquanto outra gravação está pendente. Comparar na execução serial, após o save anterior, mantendo snapshot/revisão do blur. Regressão coberta em cpf-pendencias-react.test.ts com duas chamadas e versão confirmada na segunda.
+
+
+### RM-2026-B88712 — confirmação após reabrir o card
+Callbacks de retry permanecem vinculados à montagem antiga. CardSaveProvider agora notifica assinantes por card somente após confirmação e leitura do servidor; modal reaberto recebe esse snapshot, campos fixos reconciliam o rascunho e upload atualiza o link. O timer de sincronização inicial também precisava rejeitar versões anteriores, pois sobrescrevia o vínculo confirmado após retry. Cobertura: autosave-fixed-recovery-react, autosave-recovery-react e cpf-pendencias-react; validação com servidor simulado.
+
+### 2026-09-22 — Scribe — RM-2026-B88712: campos perdidos ao sair do card
+
+**Sintoma reportado:** campos editados não persistiam ao sair do card. **Causa comprovada pelo Scout:** `onChange` alterava apenas o rascunho, persistência dependia de blur e `flushSaves` aguardava somente saves já registrados. Template/data podiam ficar fora da fila; o provider local ao modal perdia o estado de recuperação ao desmontar. Não foi comprovado debounce cancelado, nem perda em todo fechamento (o fechamento normal já forçava blur).
+
+**Correção reinspecionada:** agendamento no onChange, debounce de 500 ms ou disparo imediato por tipo; provider no layout; flush ao fechar/desmontar/trocar card; remoção do diálogo de descarte. Preservar snapshots/revisões, comparação dentro da fila, versão confirmada compartilhada e rascunhos com retry. Confirmação notifica a montagem reaberta; sucesso visual somente para a revisão confirmada. Fila/falhas/pendências usam cardId, evitando que erro no card A bloqueie avanço no B; prefixos usam delimitador `:` (A/AB).
+
+**Regressões:** `tests/bpm/cpf-pendencias-react.test.ts`, `cpf-fechamento-react.test.ts`, `autosave-recovery-react.test.ts`, `autosave-fixed-recovery-react.test.ts`, `autosave-tipos-imediatos-react.test.ts` e `arquivo-persistencia-react.test.ts`. Evidências anteriores usam servidor simulado; homologação autenticada e persistência após reload real continuam pendentes. Nenhuma mudança de banco nesta fase.
+
+**Pendência técnica reinspecionada na Fase 11 (2026-09-22, Scribe):** `npm run typecheck` retornou exit 2 com TS2352 em `tests/bpm/autosave-tipos-imediatos-react.test.ts:47`: mock parcial incompatível com o retorno de ObterCardBpm. Não corrigido nesta fase documental; adequar fixture ao contrato e repetir typecheck/teste direcionado. Não classificar como OOM.
+
+
+## RM-2026-1FFBAA — Fase 3, implementação parcial (2026-09-22)
+
+Blueprint recebido das fases anteriores e revalidado localmente. Preservada a implementação de arquivamento já existente no working tree. `BpmCard.status` é String e o board seleciona ATIVO; nenhuma migration, alteração de dados, Git mutável ou integração externa executada. Política: manter arquivamento em vez de delete físico, preservando dependências. O schema mistura Cascade e Restrict; o diagnóstico anterior de que todas as relações eram Restrict estava incorreto. Versão implantada e quatro dependências do incidente não foram verificadas.
+
+Implementado: motor de pendências exige acesso efetivo ao módulo e aplica checarAcessoBpmCard(visualizar) antes das consultas dependentes, preservando Boas-vindas, visibilidade e vínculo. O booleano administrativo de seleção não concede acesso. ExcluirCardBpm valida entrada com Zod. UI solicita atualização do board após sucesso e informa arquivamento. O cálculo existente de podeGerenciarMembros já restringe a responsáveis/administradores com ação na etapa; a divergência alegada não foi reproduzida.
+
+Validação: 33 testes direcionados passaram (excluir-card, membros-card-ownership e pendencias-motor), incluindo cinco novos cenários comportamentais de autorização com guard real e persistência simulada. npm run typecheck passou. npm run lint, npm test e npm run build foram executados com limite de 50 segundos; consultar logs locais em .cache/rm-2026-1ffbaa. Não há aprovação Forge/Probe/Anubis/Lens completa nesta execução.
+
+- [x] Central aplica guard canônico antes de consultar dependências.
+- [x] Preservado arquivamento e adicionado Zod/atualização da UI.
+- [x] Testes direcionados e typecheck executados com sucesso.
+- [ ] Teste comportamental da action com banco descartável e dependências reais (o teste excluir-card atual é estrutural, não comprova esse aceite).
+- [ ] Validar ciclo de vida das automações após arquivamento e auditoria da ação.
+- [ ] Testes comportamentais dos estados da UI e gates completos.
+
+Auditoria de entrega: caminhos inspecionados /PainelAlpha/AlphaCRM/pendencias → ListarPendenciasBpm → motor → PendenciasWorkspace e board → CardAbertoLayout → ExcluirCardBpm. Consumidores: usuários autorizados do CRM. Acesso pelo código confirmado; fluxo autenticado em navegador não executado. Não declarar DELIVERY_READY integral.
+
+AUTO_ADJUSTMENT_REQUIRED: falta comprovar retenção e comportamento da remoção com dependências reais e o fluxo autenticado após arquivamento.
+AUTO_ADJUSTMENT_ACCEPTANCE: executar teste da action com banco descartável, verificar automações/auditoria e validar remoção do board com estados de sucesso/erro.
+
+File list desta execução: src/actions/bpm/Cards.ts; src/lib/bpm/pendencias/motor.ts; src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx; tests/bpm/pendencias-motor.test.ts; docs/stories/story-rm-2026-1ffbaa-resolver-exclusao-autorizacao.md; .bibble/memory/decisions.md; .bibble/memory/known-errors.md; .bibble/memory/journal.md.
+
+Resultado: FAIL por aceites ainda não comprovados, não por atribuir falhas globais a esta alteração.
+
+
+## RM-2026-1FFBAA — continuação local da Fase 3 (2026-09-22)
+
+Preservadas as alterações anteriores. Acrescentado CARD_ARQUIVADO em BpmCardHistorico na mesma transação da mudança de status, com usuário da sessão e estado anterior/novo; repetição de card já arquivado não duplica histórico. UI agora trata rejeição inesperada da action com toast e libera o estado de carregamento. Novos testes executam ExcluirCardBpm e ownership reais, com persistência simulada, cobrindo sessão, Zod, roles, vínculo revogado, permissão efetiva, etapa oculta, Boas-vindas, revalidação transacional e falha da auditoria. Não houve acesso ao banco real nem alteração de schema.
+
+- [x] Auditoria transacional e tratamento de erro inesperado na UI.
+- [x] Testes comportamentais da action adicionados.
+- [ ] Banco descartável com dependências reais e rollback comprovado.
+- [ ] Estados da UI exercitados em navegador e Probe completo.
+- [ ] Ciclo de vida do motor central validado: cadências verificam status ATIVO, mas processarUma em central-runtime.ts não mostrou guarda equivalente antes de executarGrafo. Requer correção/teste específico antes de aprovar arquivamento integral.
+- [ ] Aprovações Forge/Probe/Anubis/Lens; não emitidas nesta execução.
+
+Auditoria de entregabilidade: usuário autorizado do CRM acessa board → CardAbertoLayout → ExcluirCardBpm; pendências em /PainelAlpha/AlphaCRM/pendencias → motor com guard canônico. Caminho confirmado no código, não validado em sessão autenticada.
+
+AUTO_ADJUSTMENT_REQUIRED: comprovar retenção com banco descartável, impedir efeitos de automações centrais pendentes em card arquivado e validar estados da UI.
+AUTO_ADJUSTMENT_ACCEPTANCE: testes reais de dependências/rollback, automação pendente sem efeitos após arquivamento e fluxo autenticado de sucesso/erro no board.
+
+File list desta continuação: src/actions/bpm/Cards.ts; src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx; tests/bpm/excluir-card-action.test.ts; docs/stories/story-rm-2026-1ffbaa-resolver-exclusao-autorizacao.md; .bibble/memory/journal.md; .bibble/memory/known-errors.md.
+
+Gates reais (código 124 = limite de 20s; não equivale a aprovação): {'targeted': 0, 'lint': 124, 'typecheck': 124, 'test': 124, 'build': 124}. Logs: .cache/rm-2026-1ffbaa/. Lint dos arquivos tocados executado separadamente: zero erros, warning preexistente etapaAtual não utilizado no layout. Os gates globais não foram declarados aprovados por inferência.
+
+Resultado: FAIL — implementação parcial, aceites de integração ainda pendentes.
+
+
+RM-2026-1FFBAA: fixture @libsql/client file::memory: perdeu tabelas após fechamento da transação; teste passou a usar arquivo temporário exclusivo em .cache, removido em finally. As quatro FKs Restrict são eventos, agendas, transições e templates; membros/histórico usam Cascade. Diagnóstico do incidente em produção permanece não comprovado.

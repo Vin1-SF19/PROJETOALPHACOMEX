@@ -2,6 +2,7 @@
 
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 
 
 export async function createTagAction(nome: string) {
@@ -10,8 +11,8 @@ export async function createTagAction(nome: string) {
       data: { nome: nome.toUpperCase() }
     });
     return { success: true, data: novaTag };
-  } catch (error: any) {
-    if (error.code === 'P2002') {
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       return { success: false, error: "Esta categoria já existe." };
     }
     return { success: false, error: "Erro ao criar categoria." };
@@ -303,4 +304,3 @@ export async function buscarProgressosUsuario(userId: number, videoIds: string[]
       return [];
   }
 }
-

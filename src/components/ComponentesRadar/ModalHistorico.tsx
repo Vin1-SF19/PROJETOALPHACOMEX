@@ -27,7 +27,7 @@ const baixarArquivoEDados = async (id: number, nomeBase: string) => {
 
         if (dados.error) return alert(dados.error);
 
-        const dadosExcel = dados.map((r: any, index: number) => ({
+        const dadosExcel = dados.map((r: Record<string, string>, index: number) => ({
             "Nº": index + 1,
             "Data Consulta": r.data_consulta ? new Date(r.data_consulta).toLocaleDateString("pt-BR") : "",
             "CNPJ": r.cnpj,
@@ -105,25 +105,27 @@ export default function ModalHistorico({ onClose, onImportar }: Props) {
 
 
     const [abaAtiva, setAbaAtiva] = useState<"individuais" | "arquivos">("arquivos");
-    const [arquivos, setArquivos] = useState<ArquivoRadar[]>([]);
+    const [resultadoArquivos, setResultadoArquivos] = useState<{ chave: string; dados: ArquivoRadar[] } | null>(null);
 
     const [dadosAvulsos, setDadosAvulsos] = useState<ConsultaRadar[]>([]);
 
 
-    const [loading, setLoading] = useState(false);
+    const chaveArquivos = `${busca}\u0000${ordem}`;
+    const loading = abaAtiva === "arquivos" && resultadoArquivos?.chave !== chaveArquivos;
+    const arquivos = resultadoArquivos?.chave === chaveArquivos ? resultadoArquivos.dados : [];
 
     useEffect(() => {
         if (abaAtiva === "arquivos") {
-            setLoading(true);
-            fetch(`/api/ListarArquivos?nome=${busca}&ordem=${ordem}`)
+            const controller = new AbortController();
+            fetch(`/api/ListarArquivos?nome=${encodeURIComponent(busca)}&ordem=${ordem}`, { signal: controller.signal })
                 .then(res => res.json())
                 .then(data => {
-                    console.log("Arquivos recebidos:", data);
-                    setArquivos(data);
+                    setResultadoArquivos({ chave: chaveArquivos, dados: data });
                 })
-                .finally(() => setLoading(false));
+                .catch(() => { if (!controller.signal.aborted) setResultadoArquivos({ chave: chaveArquivos, dados: [] }); });
+            return () => controller.abort();
         }
-    }, [abaAtiva, busca, ordem]);
+    }, [abaAtiva, busca, ordem, chaveArquivos]);
 
     useEffect(() => {
         if (abaAtiva === "individuais") {
@@ -163,7 +165,7 @@ export default function ModalHistorico({ onClose, onImportar }: Props) {
 
 
 
-    const [usersList, setUsersList] = useState<any[]>([]);
+    const [usersList, setUsersList] = useState<unknown[]>([]);
 
     useEffect(() => {
         async function fetchData() {

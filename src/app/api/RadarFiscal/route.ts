@@ -1,25 +1,29 @@
 import { NextResponse } from "next/server";
 import { getReceitaData } from "@/lib/cnpj/receita-federal";
 import { getEmpresaAquiData } from "@/lib/cnpj/empresa-aqui";
-
-import db from "@/lib/prisma";
+import { requirePreAnaliseAccess } from "@/lib/pre-analise/access";
+import { validarCnpj } from "@/lib/gerador-documentos/cnpj";
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
+    const denied = await requirePreAnaliseAccess("tributario");
+    if (denied) return denied;
     try {
         const { searchParams } = new URL(req.url);
         const cnpj = (searchParams.get("cnpj") || "").replace(/\D/g, "");
 
-        if (!cnpj || cnpj.length !== 14) return NextResponse.json({ error: "CNPJ obrigatório" }, { status: 400 });
+        if (!validarCnpj(cnpj)) return NextResponse.json({ error: "CNPJ inválido" }, { status: 400 });
 
-        const receita: any = await getReceitaData(cnpj);
+        const receita = await getReceitaData(cnpj);
 
-        let ea: any = {};
+        let ea: Record<string, unknown> | null = null;
+        let eaStatus: "disponivel" | "indisponivel" | "insuficiente" = "indisponivel";
         try {
             ea = await getEmpresaAquiData(cnpj);
-        } catch (e) { 
-            console.log("Falha ao obter dados do EmpresaAqui via função interna"); 
+            eaStatus = "disponivel";
+        } catch {
+            console.warn("[RadarFiscal] EmpresaAqui indisponível");
         }
 
         const anexo1 = [
@@ -48,20 +52,23 @@ export async function GET(req: Request) {
         const temAnexo1 = todosCnaesBrutos.some(cnae => anexo1.includes(cnae));
         const temAnexo2 = todosCnaesBrutos.some(cnae => anexo2.includes(cnae));
 
-        let anexoPertencente = "NÃO PERTENCE";
+        let anexoPertencente = todosCnaesBrutos.length === 0 ? "NÃO INFORMADO" : "NÃO PERTENCE";
         if (temAnexo1 && temAnexo2) anexoPertencente = "ANEXO 1 / ANEXO 2";
         else if (temAnexo1) anexoPertencente = "ANEXO 1";
         else if (temAnexo2) anexoPertencente = "ANEXO 2";
 
         const parseData = (d: string) => {
             if (!d || d === "null" || d === "00/00/0000") return null;
-            const [day, month, year] = d.split("/").map(Number);
-            return new Date(year, month - 1, day);
+            const br = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(d);
+            const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(d);
+            const date = br ? new Date(Number(br[3]), Number(br[2]) - 1, Number(br[1]))
+                : iso ? new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])) : null;
+            return date && !Number.isNaN(date.getTime()) ? date : null;
         };
 
         const dataAbertura = parseData(receita.abertura_bruta || receita.dataConstituicao);
         
-        const dataExclusaoSimples = receita.simples?.data_exclusao || ea?.data_exc_simples || null;
+        const dataExclusaoSimples = String(receita.data_exclusaoSimples || ea?.data_exc_simples || "");
         const dataExclusao = parseData(dataExclusaoSimples);
 
         const limiteAbertura = new Date(2022, 2, 18);
@@ -71,10 +78,9 @@ export async function GET(req: Request) {
 
         let isPerse = "NÃO";
         const aberturaOk = dataAbertura && dataAbertura <= limiteAbertura;
-        const isSimples = receita.optante_simples === true;
 
         let regimeOk = false;
-        if (!isSimples) {
+        if (receita.optante_simples === false) {
             if (!receita.data_opcao || receita.data_opcao === "null") {
                 regimeOk = true;
             } else if (dataExclusao && dataExclusao <= limiteExclusao) {
@@ -85,25 +91,31 @@ export async function GET(req: Request) {
         if (anexoPertencente !== "NÃO PERTENCE" && aberturaOk && regimeOk) {
             isPerse = "SIM";
         }
+        const exclusaoNecessariaAusente = receita.optante_simples === false && Boolean(receita.data_opcao) && !dataExclusao;
+        if (receita.optante_simples === null || !dataAbertura || todosCnaesBrutos.length === 0 || exclusaoNecessariaAusente) {
+            isPerse = "NÃO INFORMADO";
+        }
 
         let totalDivida = 0;
         if (ea) {
             Object.keys(ea).forEach(key => {
-                if (!isNaN(Number(key)) && ea[key]?.dividas_valor) {
-                    const v = parseFloat(String(ea[key].dividas_valor).replace(",", "."));
+                const debt = ea[key];
+                const debtValue = debt && typeof debt === "object" && "dividas_valor" in debt ? debt.dividas_valor : null;
+                if (!isNaN(Number(key)) && debtValue) {
+                    const v = parseFloat(String(debtValue).replace(",", "."));
                     if (!isNaN(v)) totalDivida += v;
                 }
             });
         }
 
-        const isSimplesEA = String(ea?.opcao_simples || "").toUpperCase() === "S";
+        const isSimplesEA = ["S", "SIM"].includes(String(ea?.opcao_simples || "").trim().toUpperCase());
 
-        let regimeLimpo: string;
+        let regimeLimpo: string | null = null;
         if (isSimplesEA) {
             // opcao_simples é a fonte autoritativa para Simples Nacional
             regimeLimpo = "SIMPLES NACIONAL";
         } else {
-            const regimeEAraw = String(ea?.regime_tributario || "NÃO INFORMADO");
+            const regimeEAraw = String(ea?.regime_tributario || "");
             const stripAno = (s: string) => s.replace(/ANO\s+\d{4}\s+/i, "").trim();
 
             if (regimeEAraw.includes(";")) {
@@ -114,25 +126,31 @@ export async function GET(req: Request) {
                     return { ano: m ? parseInt(m[1]) : 0, regime: stripAno(p) };
                 });
                 comAno.sort((a, b) => b.ano - a.ano);
-                regimeLimpo = comAno[0]?.regime || stripAno(partes[partes.length - 1]);
+                regimeLimpo = comAno[0]?.regime || (partes.length ? stripAno(partes[partes.length - 1]) : null);
             } else {
-                regimeLimpo = stripAno(regimeEAraw);
+                regimeLimpo = stripAno(regimeEAraw) || null;
             }
         }
 
-        const regimeEA = String(regimeLimpo).toUpperCase();
+        const regimeEA = regimeLimpo && !/^(N[ÃA]O INFORMADO|N\/A|NULL|-+)$/i.test(regimeLimpo.trim())
+            ? regimeLimpo.toUpperCase() : null;
+        if (eaStatus === "disponivel" && !regimeEA) eaStatus = "insuficiente";
+        const consultaStatus = eaStatus === "disponivel" && receita.optante_simples !== null ? "completa" : "parcial";
 
-        let qualificacaoFinal = "DESQUALIFICADO";
-        if (isSimplesEA || anosEmpresa < 3) {
+        let qualificacaoFinal: string | null = null;
+        if (regimeEA && dataAbertura && receita.optante_simples !== null && (isSimplesEA || anosEmpresa < 3)) {
             qualificacaoFinal = "DESQUALIFICADO";
-        } else if (anosEmpresa >= 5 && regimeEA.includes("REAL")) {
+        } else if (regimeEA && dataAbertura && receita.optante_simples !== null && anosEmpresa >= 5 && regimeEA.includes("REAL")) {
             qualificacaoFinal = "PREMIUM";
-        } else if (anosEmpresa >= 3 && (regimeEA.includes("PRESUMIDO") || regimeEA.includes("REAL") || !isSimplesEA)) {
+        } else if (regimeEA && dataAbertura && receita.optante_simples !== null && anosEmpresa >= 3 && (regimeEA.includes("PRESUMIDO") || regimeEA.includes("REAL"))) {
             qualificacaoFinal = "QUALIFICADO";
         }
 
         return NextResponse.json({
             cnpj,
+            consultaStatus,
+            fontes: { receita: "disponivel", empresaAqui: eaStatus },
+            receita,
             qualificacao: qualificacaoFinal,
             razaoSocial: (receita.razaoSocial || "").toUpperCase(),
             nomeFantasia: (receita.nomeFantasia || "SEM NOME FANTASIA").toUpperCase(),
@@ -150,18 +168,18 @@ export async function GET(req: Request) {
                 ? `${dataExclusaoSimples.substring(6, 8)}/${dataExclusaoSimples.substring(4, 6)}/${dataExclusaoSimples.substring(0, 4)}`
                 : dataExclusaoSimples || "---",
 
-            regimeReceita: (receita.regimeTributario || "N/A").toUpperCase(),
-            regimeEA: regimeLimpo.toUpperCase(),
-            divida_tributaria: totalDivida,
-            historicoRegime: ea?.historicoRegimePorAno || [],
+            regimeReceita: receita.regimeTributario?.toUpperCase() ?? null,
+            regimeEA,
+            divida_tributaria: eaStatus === "indisponivel" ? null : totalDivida,
+            historicoRegime: Array.isArray(ea?.historicoRegimePorAno) ? ea.historicoRegimePorAno : [],
             cnaes: { 
                 principal: receita.atividade_principal || [], 
                 secundarios: receita.atividades_secundarias || [] 
             }
         });
 
-    } catch (err: any) {
-        console.error("ERRO RADAR:", err.message);
-        return NextResponse.json({ error: err.message }, { status: 500 });
+    } catch {
+        console.error("[RadarFiscal] Falha na consulta cadastral");
+        return NextResponse.json({ error: "Não foi possível consultar o cadastro da empresa", consultaStatus: "erro", fontes: { receita: "indisponivel", empresaAqui: "nao_consultada" } }, { status: 502 });
     }
 }

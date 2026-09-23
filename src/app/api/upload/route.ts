@@ -15,7 +15,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       onUploadCompleted: async () => {},
     });
     return NextResponse.json(jsonResponse);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  } catch (error) {
+    console.error("Falha no upload:", error);
+    return NextResponse.json({ error: "Falha no upload" }, { status: 400 });
   }
 }

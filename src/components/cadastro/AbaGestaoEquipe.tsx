@@ -31,6 +31,12 @@ interface AbaGestaoEquipeProps {
 
 export default function AbaGestaoEquipe({ currentUserRole = 'User' }: AbaGestaoEquipeProps) {
   const isAdmin = isAdminRole(currentUserRole);
+  const [agora, setAgora] = useState(() => Date.now());
+
+  useEffect(() => {
+    const intervalo = window.setInterval(() => setAgora(Date.now()), 60_000);
+    return () => window.clearInterval(intervalo);
+  }, []);
 
   const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,32 +60,31 @@ export default function AbaGestaoEquipe({ currentUserRole = 'User' }: AbaGestaoE
   const [statusLeitura, setStatusLeitura] = useState<Record<number, StatusLeituraUsuario>>({});
 
   async function load() {
-    setLoading(true);
     const data = await getUsers();
     setUsers(Array.isArray(data) ? data : []);
     setLoading(false);
   }
 
-  async function loadAlertas() {
-    const res = await getContratosVencendo();
-    if (res.success) setContratosVencendo(res.contratos as typeof contratosVencendo);
-  }
-
-  async function loadStatusLeitura() {
-    const res = await buscarStatusLeituraEquipe();
-    if (res.success) setStatusLeitura(res.data);
-  }
-
   useEffect(() => {
-    void load();
-    void loadAlertas();
-    void loadStatusLeitura();
+    let ativo = true;
+    void getUsers().then((data) => {
+      if (!ativo) return;
+      setUsers(Array.isArray(data) ? data : []);
+      setLoading(false);
+    });
+    void getContratosVencendo().then((res) => {
+      if (ativo && res.success) setContratosVencendo(res.contratos as typeof contratosVencendo);
+    });
+    void buscarStatusLeituraEquipe().then((res) => {
+      if (ativo && res.success) setStatusLeitura(res.data);
+    });
+    return () => { ativo = false; };
   }, []);
 
   async function handleDelete() {
     if (!deleteId) return;
     const r = await deleteUser(deleteId);
-    if (r.success) { toast.success('Usuário removido'); void load(); }
+    if (r.success) { toast.success('Usuário removido'); setLoading(true); void load(); }
     setDeleteOpen(false);
     setDeleteId(null);
   }
@@ -98,7 +103,7 @@ export default function AbaGestaoEquipe({ currentUserRole = 'User' }: AbaGestaoE
 
   const diasAte = (date: Date | null) => {
     if (!date) return null;
-    return Math.ceil((new Date(date).getTime() - Date.now()) / 86400000);
+    return Math.ceil((new Date(date).getTime() - agora) / 86400000);
   };
 
   return (

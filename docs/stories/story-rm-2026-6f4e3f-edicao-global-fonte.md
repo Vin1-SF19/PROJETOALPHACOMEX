@@ -1,6 +1,6 @@
 # RM-2026-6F4E3F — Edição local de campos GLOBAL com fonte
 
-Status: Implementada; revalidação local com FAIL nos gates globais (ver evidências mais recentes)
+Status: Pronta para testes — implementação e gates do escopo aprovados
 
 ## Objetivo e blueprint Scout
 Usuários autorizados editam CNPJ e demais GLOBAL com fonte no formulário do card.
@@ -106,3 +106,17 @@ Arquivos documentais atualizados: esta story e .bibble/memory/journal.md.
 Build também regenera seus artefatos usuais; nenhuma alteração intencional de código,
 schema, dados ou Git mutável. RESULT: FAIL por gates globais, sem atribuir a falha
 do lint a este ajuste e sem declarar aprovação independente dos demais agentes.
+
+## Encerramento técnico 3/10 — 2026-09-22
+
+- [x] Revalidada a edição local de CNPJ GLOBAL com fonte mestre, incluindo
+      normalização, persistência por card e limpeza para restaurar o fallback.
+- [x] Bloqueios explícitos (`somenteLeitura`/`editavel=false`), autorização,
+      CAS e ausência de escrita na entidade mestre preservados.
+- [x] Cinco suítes focadas: 80/80 testes aprovados.
+- [x] ESLint dos arquivos da implementação e testes: aprovado.
+- [x] Typecheck completo: aprovado.
+- [ ] Reabrir o card em sessão autenticada permanece como homologação.
+
+Resultado final do desenvolvimento: **PASS no escopo**. Objetivo liberado para
+**Em testes** e objetivo 4/10 autorizado a iniciar.

@@ -1,0 +1,34 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /home/ialpha/projetos/alpha-comex/painel-alpha
+
+ ❯ tests/bpm/cpf-pendencias-react.test.ts (11 tests | 1 failed) 123ms
+   × salva a reversão feita antes de terminar o primeiro autosave 11ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/bpm/cpf-pendencias-react.test.ts > salva a reversão feita antes de terminar o primeiro autosave
+AssertionError: expected "vi.fn()" to be called 2 times, but got 1 times
+ ❯ tests/bpm/cpf-pendencias-react.test.ts:98:28
+     96|   await edit(""); await blur();
+     97|   await act(async () => { liberar({ success: true } as Awaited<ReturnT…
+     98|   expect(AtualizarCardBpm).toHaveBeenCalledTimes(2);
+       |                            ^
+     99|   expect(AtualizarCardBpm).toHaveBeenLastCalledWith(expect.objectConta…
+    100|   expect(container.querySelector("input")!.value).toBe("");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 10 passed (11)
+   Start at  19:41:12
+   Duration  415ms (transform 60ms, setup 0ms, import 135ms, tests 123ms, environment 96ms)
+
+npm notice
+npm notice New minor version of npm available! 11.6.1 -> 11.19.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.19.1
+npm notice To update run: npm install -g npm@11.19.1
+npm notice

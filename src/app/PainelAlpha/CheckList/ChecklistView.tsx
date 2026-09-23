@@ -60,6 +60,7 @@ interface Empresa {
   regimeTributario: string | null;
   cliente: { nome: string; email: string }; checklists: ChecklistData[];
 }
+type ResumoCell = { label: string; value: string | null; full?: boolean; highlight?: string };
 
 const STATUS_OPTIONS: StatusItemChecklist[] = [
   "PENDENTE", "OK", "IRREGULAR", "PARCIALMENTE_IRREGULAR",
@@ -218,7 +219,7 @@ export default function ChecklistView({
           <div className="flex flex-col lg:flex-row">
             {/* Info da empresa */}
             <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 divide-x divide-y divide-white/5">
-              {[
+              {([
                 { label: "Razão Social", value: empresaInicial.razaoSocial, full: true },
                 { label: "CNPJ", value: empresaInicial.cnpj },
                 { label: "Situação", value: empresaInicial.status,
@@ -226,15 +227,15 @@ export default function ChecklistView({
                 { label: "Cliente", value: empresaInicial.cliente.nome, full: true },
                 { label: "Regime Tributário", value: empresaInicial.regimeTributario || "—" },
                 { label: "Mês Protocolo", value: empresaInicial.mesProtocolo || "—" },
-              ].map((cell, i) => (
+              ] as ResumoCell[]).map((cell, i) => (
                 <div
                   key={i}
-                  className={`p-4 flex flex-col gap-1 ${(cell as any).full ? "col-span-2 sm:col-span-3" : ""}`}
+                  className={`p-4 flex flex-col gap-1 ${cell.full ? "col-span-2 sm:col-span-3" : ""}`}
                 >
                   <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">
                     {cell.label}
                   </span>
-                  <span className={`text-xs font-bold uppercase truncate ${(cell as any).highlight ?? "text-white"}`}>
+                  <span className={`text-xs font-bold uppercase truncate ${cell.highlight ?? "text-white"}`}>
                     {cell.value}
                   </span>
                 </div>
@@ -491,7 +492,7 @@ function GlowCard({
 
   return (
     <Tag
-      ref={ref as any}
+      ref={ref}
       className={`relative overflow-hidden ${className}`}
       style={baseStyle}
       onMouseMove={onMouseMove}

@@ -4,7 +4,16 @@ import { useState } from 'react';
 import { ChevronDown, Info, FileText, CheckCircle2 } from 'lucide-react';
 import { getTema } from '@/lib/temas';
 
-export default function EmbasamentoRetomada({ empresa, configBanco }: { empresa: any, configBanco: any }) {
+type EmpresaEmbasamento = {
+    razaoSocial: string;
+    cnpj?: string | null;
+    cliente?: { nome?: string | null } | null;
+    regimeTributario?: string | null;
+    submodalidade?: string | null;
+    progresso?: number | null;
+};
+
+export default function EmbasamentoRetomada({ empresa, configBanco }: { empresa: EmpresaEmbasamento, configBanco?: { tema?: string | null } | null }) {
     const temaNome = configBanco?.tema || "blue";
 
     const style = getTema(temaNome);
@@ -172,7 +181,7 @@ export default function EmbasamentoRetomada({ empresa, configBanco }: { empresa:
 }
 
 /* --- SUBCOMPONENTE: CÉLULA DE DADOS --- */
-function Cell({ label, value, className = "", isEditable = false }: any) {
+function Cell({ label, value, className = "", isEditable = false }: { label: string; value?: string | null; className?: string; isEditable?: boolean }) {
     return (
         <div className={`border-r border-b border-white/5 p-5 flex flex-col gap-1 transition-colors hover:bg-white/[0.02] ${className}`}>
             <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.15em]">{label}</span>
@@ -184,7 +193,7 @@ function Cell({ label, value, className = "", isEditable = false }: any) {
 }
 
 /* --- SUBCOMPONENTE: CÉLULA DE SELEÇÃO --- */
-function SelectCell({ label, options, accent = false }: any) {
+function SelectCell({ label, options, accent = false }: { label: string; options: string[]; accent?: boolean }) {
     return (
         <div className={`border-r border-b border-white/5 p-5 flex flex-col gap-1 ${accent ? 'bg-blue-600/5' : ''}`}>
             <span className={`text-[9px] font-black uppercase tracking-[0.15em] ${accent ? 'text-blue-400' : 'text-slate-500'}`}>

@@ -3,8 +3,11 @@
 import { FileSpreadsheet } from "lucide-react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
+import type { RadarFiscalItem } from "./types";
 
-export function BotaoExportarExcel({ item }: { item: any }) {
+type HistoricoRegime = { ano?: string | number; Ano?: string | number; periodo?: string; regime?: string; Regime?: string };
+
+export function BotaoExportarExcel({ item }: { item: RadarFiscalItem }) {
     const exportar = async () => {
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet("Dados Fiscais");
@@ -26,7 +29,7 @@ export function BotaoExportarExcel({ item }: { item: any }) {
             : (item.historico_regime || item.historicoRegime || []);
 
         const listaHistorico = Array.isArray(historicoRaw) 
-            ? historicoRaw.map((h: any) => `${h.ano || h.Ano || h.periodo}: ${h.regime || h.Regime}`).join("\n")
+            ? historicoRaw.map((h: HistoricoRegime) => `${h.ano || h.Ano || h.periodo}: ${h.regime || h.Regime}`).join("\n")
             : "N/A";
 
         const capitalSocialFormatado = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(item.capital_social || item.capitalSocial || 0));
@@ -77,7 +80,7 @@ export function BotaoExportarExcel({ item }: { item: any }) {
         });
 
         const buffer = await workbook.xlsx.writeBuffer();
-        const nomeArquivo = `${(item.razao_social || item.razaoSocial).toUpperCase()} - DADOS.xlsx`;
+        const nomeArquivo = `${(item.razao_social || item.razaoSocial || "EMPRESA").toUpperCase()} - DADOS.xlsx`;
         saveAs(new Blob([buffer]), nomeArquivo);
     };
 

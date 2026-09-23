@@ -39,26 +39,29 @@ export function ModalCompartilharApresentacao({
   usuarioAtualId,
 }: ModalCompartilharApresentacaoProps) {
   const [usuarios, setUsuarios] = useState<UsuarioSelecionavel[]>([]);
-  const [carregando, setCarregando] = useState(false);
+  const [carregando, setCarregando] = useState(true);
   const [busca, setBusca] = useState("");
   const [selecionados, setSelecionados] = useState<Set<number>>(new Set());
   const [compartilhando, setCompartilhando] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    setCarregando(true);
+    let ativo = true;
     getUsers()
       .then((dados) => {
+        if (!ativo) return;
         setUsuarios(
           dados
             .filter((u) => u.id !== usuarioAtualId && u.status !== "INATIVO")
             .map((u) => ({ id: u.id, nome: u.nome, usuario: u.usuario, email: u.email, cargo: u.cargo })),
         );
       })
-      .finally(() => setCarregando(false));
+      .finally(() => { if (ativo) setCarregando(false); });
+    return () => { ativo = false; };
   }, [open, usuarioAtualId]);
 
   function fecharEResetar() {
+    setCarregando(true);
     onOpenChange(false);
     setBusca("");
     setSelecionados(new Set());

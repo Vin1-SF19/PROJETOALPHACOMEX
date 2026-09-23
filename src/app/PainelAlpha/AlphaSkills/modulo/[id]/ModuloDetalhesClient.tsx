@@ -5,15 +5,25 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Play, Clock, LayoutGrid, CheckCircle2, Trophy, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { marcarAulaComoConcluida } from '@/actions/GetVideos';
+import { marcarAulaComoConcluida, type getModulos, type getVideos, type getUserProgresso } from '@/actions/GetVideos';
 import { UserDropdown } from '@/components/UserDropdown';
 import { toast } from 'sonner';
 
-export default function ModuloDetalhesClient({ session, modulo, aulasIniciais, progressoInicial }: any) {
+type Modulo = Awaited<ReturnType<typeof getModulos>>[number];
+type Aula = Awaited<ReturnType<typeof getVideos>>[number];
+type Progresso = Awaited<ReturnType<typeof getUserProgresso>>[number];
+type Props = {
+    session: { user?: { id?: string; nome?: string; role?: string; imagemUrl?: string | null } } | null;
+    modulo: Modulo;
+    aulasIniciais: Aula[];
+    progressoInicial: Progresso[];
+};
+
+export default function ModuloDetalhesClient({ session, modulo, aulasIniciais, progressoInicial }: Props) {
     const router = useRouter();
-    const [videoAtivo, setVideoAtivo] = useState<any>(aulasIniciais[0] || null);
+    const [videoAtivo, setVideoAtivo] = useState<Aula | null>(aulasIniciais[0] || null);
     const [aulasConcluidas, setAulasConcluidas] = useState<string[]>(
-        progressoInicial ? progressoInicial.map((p: any) => p.aulaId) : []
+        progressoInicial ? progressoInicial.map((p) => p.aulaId) : []
     );
 
     const userName = session?.user?.nome || "Operador";
@@ -22,7 +32,7 @@ export default function ModuloDetalhesClient({ session, modulo, aulasIniciais, p
 
     const progressoPorcentagem = useMemo(() => {
         if (aulasIniciais.length === 0) return 0;
-        return Math.round((aulasConcluidas.filter(id => aulasIniciais.some((a:any) => a.id === id)).length / aulasIniciais.length) * 100);
+        return Math.round((aulasConcluidas.filter(id => aulasIniciais.some((a) => a.id === id)).length / aulasIniciais.length) * 100);
     }, [aulasIniciais, aulasConcluidas]);
 
     const handleConcluir = async () => {
@@ -105,7 +115,7 @@ export default function ModuloDetalhesClient({ session, modulo, aulasIniciais, p
                                 className="h-full bg-gradient-to-r from-orange-600 to-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.5)]" 
                             />
                         </div>
-                        <p className="text-[9px] font-bold text-slate-500 uppercase text-center">{aulasConcluidas.filter(id => aulasIniciais.some((a:any) => a.id === id)).length} de {aulasIniciais.length} tarefas finalizadas</p>
+                        <p className="text-[9px] font-bold text-slate-500 uppercase text-center">{aulasConcluidas.filter(id => aulasIniciais.some((a) => a.id === id)).length} de {aulasIniciais.length} tarefas finalizadas</p>
                     </div>
 
                     {/* Lista de Aulas */}
@@ -115,7 +125,7 @@ export default function ModuloDetalhesClient({ session, modulo, aulasIniciais, p
                         </div>
                         
                         <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
-                            {aulasIniciais.map((aula: any, idx: number) => {
+                            {aulasIniciais.map((aula, idx) => {
                                 const isConcluida = aulasConcluidas.includes(aula.id);
                                 const isAtiva = videoAtivo?.id === aula.id;
 

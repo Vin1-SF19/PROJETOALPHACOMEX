@@ -1,4 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+vi.mock("@/lib/prisma", () => ({ default: {} }));
+vi.mock("@/lib/chamados/notificacoes-server", () => ({ notificarNovoChamado: vi.fn() }));
+vi.mock("@/lib/cnpj/receita-federal", () => ({ getReceitaData: vi.fn() }));
+vi.mock("@/lib/bibble/gerar-ficha-server", () => ({ gerarFichaServer: vi.fn() }));
+vi.mock("@/lib/bibble/calendar-tools", () => ({
+  executarCalendarTool: vi.fn(),
+  isCalendarTool: vi.fn(() => false),
+}));
 import { interruptBibbleTurn } from '@/lib/bibble/turn-interruption';
 import { safeBibbleLog } from '@/lib/bibble/telemetry';
 import { readFile } from 'fs/promises';

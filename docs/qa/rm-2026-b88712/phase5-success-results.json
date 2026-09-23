@@ -1,0 +1,22 @@
+{
+  "focused": {
+    "command": "npx vitest run tests/bpm/cpf-pendencias-react.test.ts tests/bpm/cpf-fechamento-react.test.ts tests/bpm/card-save-flow.test.ts tests/bpm/arquivo-persistencia-react.test.ts tests/bpm/edicao-campos-card.test.ts tests/bpm/autosave-recovery-react.test.ts tests/bpm/autosave-fixed-recovery-react.test.ts tests/bpm/campo-select-contraste-react.test.ts tests/bpm/rascunho-data-hora.test.ts",
+    "exit": 0
+  },
+  "scope-lint": {
+    "command": "npx eslint src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx tests/bpm/cpf-pendencias-react.test.ts",
+    "exit": 0
+  },
+  "lint": {
+    "command": "npm run lint",
+    "exit": 1
+  },
+  "typecheck": {
+    "command": "npm run typecheck",
+    "exit": 0
+  },
+  "test": {
+    "command": "npm test",
+    "exit": 1
+  }
+}

@@ -310,7 +310,7 @@ class PerformanceOptimizer extends EventEmitter {
 
   async detectHighComplexityAlgorithms(ast, content) {
     const issues = [];
-    const self = this;
+    const complexityThreshold = this.options.complexityThreshold;
 
     traverse(ast, {
       FunctionDeclaration: checkFunction,
@@ -321,7 +321,7 @@ class PerformanceOptimizer extends EventEmitter {
     function checkFunction(path) {
       const complexity = calculateTimeComplexity(path.node);
       
-      if (complexity.score > self.options.complexityThreshold) {
+      if (complexity.score > complexityThreshold) {
         issues.push({
           type: 'high_complexity',
           location: {

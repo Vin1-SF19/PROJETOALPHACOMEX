@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 
-export default function EmbasamentoDAS({ empresa }: { empresa: any }) {
+type EmpresaEmbasamento = { razaoSocial: string; cnpj?: string | null; cliente?: { nome?: string | null } | null; status?: string | null };
+
+export default function EmbasamentoDAS({ empresa }: { empresa: EmpresaEmbasamento }) {
     return (
         <div className="max-w-5xl mx-auto bg-slate-900 border border-white/10 rounded-xl overflow-hidden shadow-2xl font-sans">
             
@@ -51,7 +53,7 @@ export default function EmbasamentoDAS({ empresa }: { empresa: any }) {
 }
 
 /* Componente Auxiliar para Células de Texto */
-function Cell({ label, value, className = "", isEditable = false }: any) {
+function Cell({ label, value, className = "", isEditable = false }: { label: string; value?: string | null; className?: string; isEditable?: boolean }) {
     return (
         <div className={`border-r border-b border-white/5 p-4 flex flex-col gap-1 ${className}`}>
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{label}</span>

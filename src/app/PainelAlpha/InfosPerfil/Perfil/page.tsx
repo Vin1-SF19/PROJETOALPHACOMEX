@@ -73,7 +73,7 @@ export default async function PerfilUnificadoPage() {
                         <div className="mt-8 space-y-3">
                             <Label className="text-[9px] font-black text-slate-500 uppercase ml-2 tracking-widest">Módulos Autorizados</Label>
                             <div className="flex flex-wrap gap-2 p-4 bg-black/20 rounded-[1.5rem] border border-white/5">
-                                {user?.permissoes?.map((p: any) => (
+                                {user?.permissoes?.map((p: string) => (
                                     <span key={p} className="px-3 py-1 bg-blue-500/10 border border-blue-500/10 rounded-lg text-[8px] font-black text-blue-400 uppercase tracking-widest italic">{p}</span>
                                 ))}
                             </div>

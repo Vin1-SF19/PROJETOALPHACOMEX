@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
 type Blip = {
@@ -14,23 +13,20 @@ type Blip = {
 const ANEIS = [18, 32, 46, 60, 74];
 const QUANTIDADE_BLIPS = 16;
 
-function criarBlips(): Blip[] {
-  return Array.from({ length: QUANTIDADE_BLIPS }, () => ({
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    size: 2 + Math.random() * 2.5,
-    delay: Math.random() * 6,
-    duration: 2.5 + Math.random() * 2.5,
-  }));
+function dispersao(indice: number, sal: number) {
+  return ((indice * 73 + sal * 41) % 101) / 101;
 }
+
+const BLIPS: Blip[] = Array.from({ length: QUANTIDADE_BLIPS }, (_, indice) => ({
+    x: dispersao(indice, 1) * 100,
+    y: dispersao(indice, 2) * 100,
+    size: 2 + dispersao(indice, 3) * 2.5,
+    delay: dispersao(indice, 4) * 6,
+    duration: 2.5 + dispersao(indice, 5) * 2.5,
+  }));
 
 export default function RadarBackground({ accentRgb }: { accentRgb: string }) {
   const reduceMotion = useReducedMotion();
-  const [blips, setBlips] = useState<Blip[]>([]);
-
-  useEffect(() => {
-    setBlips(criarBlips());
-  }, []);
 
   return (
     <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
@@ -73,7 +69,7 @@ export default function RadarBackground({ accentRgb }: { accentRgb: string }) {
       )}
 
       {/* Blips — pontos "detectados" piscando aleatoriamente. */}
-      {blips.map((blip, i) => (
+      {BLIPS.map((blip, i) => (
         <motion.div
           key={i}
           aria-hidden

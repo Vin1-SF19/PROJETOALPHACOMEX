@@ -371,6 +371,12 @@ async function processarUma(id: string) {
   if (claim.count !== 1) return "ignorada" as const;
   const execucao = await carregarExecucao(id);
   if (!execucao?.automacaoVersao || execucao.claimToken !== token) return "ignorada" as const;
+  // Card arquivado (soft-delete, RM-2026-1FFBAA): não executa efeitos de
+  // automação pendentes — preserva a retenção sem gerar novos eventos/ações.
+  if (execucao.card.status === "ARQUIVADO") {
+    await db.bpmAutomacaoExecucao.update({ where: { id }, data: { status: "IGNORADA", resultadoJson: JSON.stringify({ motivo: "CARD_ARQUIVADO" }), executadoEm: new Date(), claimToken: null } });
+    return "ignorada" as const;
+  }
   const recurso = `card:${execucao.cardId}`;
   if (!await adquirirLease(recurso, token)) {
     await db.bpmAutomacaoExecucao.update({ where: { id }, data: { status: "PENDENTE", claimToken: null, disponivelEm: new Date(Date.now() + 5_000) } });

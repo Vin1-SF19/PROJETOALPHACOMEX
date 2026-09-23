@@ -13,7 +13,7 @@ interface ItemCompra {
     minimoEsperado: number;
     unidade: string;
     status: string;
-    categoria?: { nome: string };
+    categoria?: { nome: string } | null;
 }
 
 export default function ListaCompras({ itens, aoVoltar, atualizarDados }: {

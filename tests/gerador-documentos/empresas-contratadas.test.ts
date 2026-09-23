@@ -43,7 +43,7 @@ import {
 
 const PAYLOAD_VALIDO = {
   razaoSocial: "Empresa Teste LTDA",
-  cnpj: "12345678000190",
+  cnpj: "11222333000181",
 };
 
 describe("CriarEmpresaContratada", () => {
@@ -142,7 +142,7 @@ describe("AtualizarEmpresaContratada", () => {
 
     const resultado = await AtualizarEmpresaContratada({
       empresaId: "clx0000000000000000000000",
-      cnpj: "99999999000199",
+      cnpj: "11222333000181",
     });
 
     expect(resultado).toEqual({ success: false, error: "CNPJ já cadastrado" });
@@ -156,7 +156,7 @@ describe("AtualizarEmpresaContratada", () => {
 
     const resultado = await AtualizarEmpresaContratada({
       empresaId: "clx0000000000000000000000",
-      cnpj: "12345678000190",
+      cnpj: "11222333000181",
     });
 
     expect(resultado).toEqual({ success: true });

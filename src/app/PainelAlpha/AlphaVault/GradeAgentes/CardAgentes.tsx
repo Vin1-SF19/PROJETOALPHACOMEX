@@ -4,11 +4,12 @@ import { useState } from "react";
 import { User, ShieldCheck, Calendar, ArrowRight } from "lucide-react";
 import { getTema } from "@/lib/temas";
 import { ModalEditarAgente } from "../EditarColaborador/ModalEditarAgente";
+import type { ColaboradorVault, RecursoVault, SistemaVault } from "../types";
 
 interface CardAgenteProps {
-  colab: any;
-  sistemas: any[];
-  recursos: any[]; 
+  colab: ColaboradorVault;
+  sistemas: SistemaVault[];
+  recursos: RecursoVault[];
 }
 
 export function CardAgente({ colab, sistemas, recursos }: CardAgenteProps) {

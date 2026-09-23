@@ -1,0 +1,9 @@
+
+> alpha_sistema@0.1.0 typecheck
+> NODE_OPTIONS=--max-old-space-size=8192 tsc --noEmit
+
+tests/bpm/edicao-campos-card.test.ts(125,56): error TS2345: Argument of type '(anexos: { id: string; campoId: string; } | undefined) => Promise<void>' is not assignable to parameter of type '(...args: [] | [{ id: string; campoId: string; }]) => Awaitable<void>'.
+  Types of parameters 'anexos' and 'args' are incompatible.
+    Type '[] | [{ id: string; campoId: string; }]' is not assignable to type '[anexos: { id: string; campoId: string; } | undefined]'.
+      Type '[]' is not assignable to type '[anexos: { id: string; campoId: string; } | undefined]'.
+        Source has 0 element(s) but target requires 1.

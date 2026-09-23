@@ -1,9 +1,13 @@
+import { z } from "zod";
+import { conteudoUploadCompativel } from "@/lib/bpm/upload-conteudo";
 import { NextRequest, NextResponse } from "next/server";
-import { put } from "@vercel/blob";
+import { del, put } from "@vercel/blob";
+import db from "@/lib/prisma";
 import { auth } from "../../../../../auth";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import { validarUploadAnexo } from "@/lib/validations/bpm";
-import { criarReciboUploadAnexoBpm, recibosAnexoBpmConfigurados } from "@/lib/bpm/anexos-storage";
+import { criarReciboUploadAnexoBpm, criarReferenciaAnexoBpm, recibosAnexoBpmConfigurados } from "@/lib/bpm/anexos-storage";
+import { ACAO_UPLOAD_ANEXO_SEM_REGISTRO } from "@/lib/bpm/anexos-lifecycle";
 
 export const dynamic = "force-dynamic";
 
@@ -17,13 +21,17 @@ export async function POST(request: NextRequest) {
   }
   const userId = Number(session.user.id);
 
-  const formData = await request.formData();
-  const file = formData.get("file") as File | null;
-  const cardId = formData.get("cardId") as string | null;
-
-  if (!file || !cardId) {
-    return NextResponse.json({ success: false, error: "Arquivo ou card ausente" }, { status: 400 });
+  let formData: FormData;
+  try { formData = await request.formData(); } catch {
+    return NextResponse.json({ success: false, error: "Multipart inválido" }, { status: 400 });
   }
+  const parsed = z.object({ file: z.instanceof(File), cardId: z.string().cuid() }).safeParse({
+    file: formData.get("file"), cardId: formData.get("cardId"),
+  });
+  if (!parsed.success) {
+    return NextResponse.json({ success: false, error: "Arquivo ou card inválido" }, { status: 400 });
+  }
+  const { file, cardId } = parsed.data;
 
   try {
     await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "enviarArquivo");
@@ -41,12 +49,28 @@ export async function POST(request: NextRequest) {
   const uploadPath = `bpm/${cardId}/${uniqueName}`;
 
   const arrayBuffer = await file.arrayBuffer();
+  if (!await conteudoUploadCompativel(arrayBuffer, file.type)) {
+    return NextResponse.json({ success: false, error: "Conteúdo incompatível com o tipo do arquivo" }, { status: 400 });
+  }
 
   try {
     const blob = await put(uploadPath, new Blob([arrayBuffer], { type: file.type }), {
       access: "private",
       token: process.env.CRM_READ_WRITE_TOKEN,
     });
+
+    try {
+      await db.bpmCardHistorico.create({ data: {
+        cardId,
+        acao: ACAO_UPLOAD_ANEXO_SEM_REGISTRO,
+        usuarioId: userId,
+        valorAnteriorJson: criarReferenciaAnexoBpm(blob.pathname),
+      } });
+    } catch (error) {
+      await del(blob.pathname, { token: process.env.CRM_READ_WRITE_TOKEN }).catch((cleanupError) =>
+        console.error("[POST /api/bpm/upload] Blob sem registro de limpeza", { pathname: blob.pathname, cleanupError }));
+      throw error;
+    }
 
     const recibo = criarReciboUploadAnexoBpm({
       cardId,
@@ -70,4 +94,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Erro ao enviar arquivo" }, { status: 500 });
   }
 }
-

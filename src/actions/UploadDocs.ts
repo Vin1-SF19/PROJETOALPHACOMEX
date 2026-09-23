@@ -52,9 +52,9 @@ export async function uploadDocumento(formData: FormData) {
 
     revalidatePath("/PainelAlpha/DocsAlpha");
     return { success: true };
-  } catch (error: any) {
-    console.error("FALHA_ACTION:", error.message);
-    return { success: false, error: error.message };
+  } catch (error) {
+    console.error("FALHA_ACTION:", error);
+    return { success: false, error: "Falha ao enviar documento." };
   }
 }
 
@@ -67,8 +67,8 @@ export async function desativarDocumentoAction(id: number) {
 
     revalidatePath("/PainelAlpha/DocsAlpha");
     return { success: true };
-  } catch (error: any) {
-    console.error("ERRO_DESATIVAR:", error.message);
-    return { success: false, error: error.message };
+  } catch (error) {
+    console.error("ERRO_DESATIVAR:", error);
+    return { success: false, error: "Falha ao desativar documento." };
   }
 }

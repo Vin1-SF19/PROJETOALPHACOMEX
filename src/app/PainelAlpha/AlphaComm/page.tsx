@@ -13,6 +13,7 @@ import { redirect } from "next/navigation";
 import { toast } from "sonner";
 import { usePresence } from "@/components/PusherGlobal.tsx";
 import { isAdminRole } from "@/lib/roles";
+import type { mensagens as Mensagem } from "@prisma/client";
 
 interface Agente {
   id: number;
@@ -24,12 +25,26 @@ interface Agente {
   updatedAt?: string | Date;
 }
 
+function isNotificacao(data: unknown): data is { remetenteId: number; texto: string } {
+  return typeof data === "object" && data !== null &&
+    "remetenteId" in data && typeof data.remetenteId === "number" &&
+    "texto" in data && typeof data.texto === "string";
+}
+
+function isMensagem(data: unknown): data is Omit<Mensagem, "createdAt"> & { createdAt: string } {
+  return typeof data === "object" && data !== null &&
+    "id" in data && typeof data.id === "number" &&
+    "remetenteId" in data && typeof data.remetenteId === "number" &&
+    "texto" in data && typeof data.texto === "string" &&
+    "createdAt" in data && typeof data.createdAt === "string";
+}
+
 export default function AlphaCommPage() {
   const { data: session } = useSession();
   const [contatos, setContatos] = useState<Agente[]>([]);
   const { usuariosOnline } = usePresence();
   const [agenteAtivo, setAgenteAtivo] = useState<Agente | null>(null);
-  const [mensagens, setMensagens] = useState<any[]>([]);
+  const [mensagens, setMensagens] = useState<Mensagem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState("");
   const [mensagem, setMensagem] = useState("");
@@ -37,13 +52,13 @@ export default function AlphaCommPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  if (session && !isAdminRole(session.user?.role) && (session.user as any).usuario !== "Weslei") {
+  if (session && !isAdminRole(session.user?.role) && session.user.usuario !== "Weslei") {
     toast.error("Acesso restrito ao núcleo Alpha.");
     redirect("/PainelAlpha");
   }
 
-  const meuId = Number((session?.user as any)?.id);
-  const style = getTema((session?.user as any)?.tema_interface || "blue");
+  const meuId = Number(session?.user?.id);
+  const style = getTema(session?.user?.tema_interface || "blue");
 
   const idsOnlineNumericos = useMemo(() => {
     return usuariosOnline.map(id => Number(id));
@@ -65,7 +80,8 @@ export default function AlphaCommPage() {
     
     const notifyChannel = client.subscribe(`user-notifications-${meuId}`);
     
-    notifyChannel.bind("atualizar-lista", (data: any) => {
+    notifyChannel.bind("atualizar-lista", (data: unknown) => {
+      if (!isNotificacao(data)) return;
       if (!isMuted && data.remetenteId !== meuId) audioRef.current?.play().catch(() => {});
       
       const isChatAberto = agenteAtivo?.id === data.remetenteId;
@@ -124,8 +140,9 @@ export default function AlphaCommPage() {
     const canalId = `chat-${[meuId, Number(agenteAtivo.id)].sort((a, b) => a - b).join("-")}`;
     const channel = client.subscribe(canalId);
 
-    channel.bind("nova-mensagem", (data: any) => {
-      setMensagens((prev) => (prev.find((m) => m.id === data.id) ? prev : [...prev, data]));
+    channel.bind("nova-mensagem", (data: unknown) => {
+      if (!isMensagem(data)) return;
+      setMensagens((prev) => (prev.find((m) => m.id === data.id) ? prev : [...prev, { ...data, createdAt: new Date(data.createdAt) }]));
       setTimeout(() => {
         if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
       }, 100);

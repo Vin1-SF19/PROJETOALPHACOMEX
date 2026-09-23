@@ -36,6 +36,8 @@ interface HistoricoDoc {
     protecao: string;
 }
 
+type DocumentoPasta = { setor?: string; PastaArquivos?: string; tipo?: string };
+
 const SETORES = ["REGRAS GERAIS", "OPERACIONAL", "COMERCIAL", "RECURSOS HUMANOS", "FINANCEIRO", "JURÍDICO", "PARCEIRO", "SERVIÇOES GERAIS"];
 
 const PASTAS_ESTATICAS: Record<string, string[]> = {
@@ -74,11 +76,11 @@ export default function PaginaHistorico() {
             if (!modalEdicao?.setor) return;
             try {
                 const res = await fetch("/api/documentos");
-                const docs = await res.json();
+                const docs = await res.json() as DocumentoPasta[];
                 if (Array.isArray(docs)) {
                     const filtradas = docs
-                        .filter((d: any) => d.setor?.toUpperCase() === modalEdicao.setor.toUpperCase())
-                        .map((d: any) => (d.PastaArquivos || d.tipo || "").toUpperCase().trim())
+                        .filter((d) => d.setor?.toUpperCase() === modalEdicao.setor.toUpperCase())
+                        .map((d) => (d.PastaArquivos || d.tipo || "").toUpperCase().trim())
                         .filter((p: string) => p !== "" && p !== "PDF" && p !== "VIDEO");
                     setPastasDoBanco(Array.from(new Set(filtradas)));
                 }
@@ -125,8 +127,8 @@ export default function PaginaHistorico() {
             carregarHistorico();
             setModalEdicao(null);
             setNewFile(null);
-        } catch (err: any) {
-            toast.error(err.message || "Erro na sincronização.");
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : "Erro na sincronização.");
         } finally {
             setSalvando(false);
         }

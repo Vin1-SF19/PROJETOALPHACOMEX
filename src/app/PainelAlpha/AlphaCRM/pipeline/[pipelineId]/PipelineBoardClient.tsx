@@ -786,6 +786,26 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
     };
   }, [pipeline.id, recarregarCards, router]);
 
+  // Atualiza sessões que não receberam o evento realtime, inclusive após a
+  // aba voltar ao primeiro plano. O mesmo guard do arrasto evita substituir
+  // um snapshot otimista enquanto o usuário move um card.
+  useEffect(() => {
+    const sincronizar = () => {
+      if (document.visibilityState === "hidden" || movimentoPendenteRef.current || snapshotArrastoRef.current || atualizacaoManualRef.current) return;
+      void recarregarCards();
+    };
+    const aoRetomarAba = () => {
+      if (document.visibilityState === "visible") sincronizar();
+    };
+    const intervalo = window.setInterval(sincronizar, 30_000);
+    document.addEventListener("visibilitychange", aoRetomarAba);
+    return () => {
+      window.clearInterval(intervalo);
+      document.removeEventListener("visibilitychange", aoRetomarAba);
+      ultimaRequisicaoRef.current += 1;
+    };
+  }, [recarregarCards]);
+
   const abrirCard = useCallback((cardId: string) => {
     const card = cards.find((c) => c.id === cardId);
     if (card?.origem === "noloss") {
@@ -799,6 +819,12 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
   const fecharCard = useCallback(() => {
     cardSelecionadoIdRef.current = null;
     setCardSelecionadoId(null);
+  }, []);
+
+  const removerCardLocal = useCallback((cardId: string) => {
+    // Uma resposta iniciada antes da exclusão não deve recolocar o card no board.
+    ultimaRequisicaoRef.current += 1;
+    setCards((prev) => prev.filter((c) => c.id !== cardId));
   }, []);
 
   function onDragStart({ active }: DragStartEvent) {
@@ -1010,6 +1036,16 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
         </div>
       )}
 
+      {!erro && cards.length === 0 && (
+        <div
+          role="status"
+          className="mx-6 mb-3 flex items-center gap-2 px-4 py-3 rounded-xl bg-white/[0.03] border border-white/10 text-slate-400 text-sm"
+        >
+          <ClipboardList size={16} aria-hidden="true" className="shrink-0 text-slate-500" />
+          <span>Nenhum card neste pipeline. Crie um card na etapa inicial para começar.</span>
+        </div>
+      )}
+
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -1082,6 +1118,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
             await recarregarCards();
             router.refresh();
           }}
+          onCardExcluido={removerCardLocal}
           onAbrirCard={abrirCard}
         />
       )}

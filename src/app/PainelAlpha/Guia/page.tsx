@@ -303,7 +303,7 @@ const RELEASES: Release[] = [
 // ── Componente principal ──────────────────────────────────
 export default function NotasAtualizacao() {
   const { data: session } = useSession();
-  const style = getTema((session?.user as any)?.tema_interface);
+  const style = getTema(session?.user?.tema_interface ?? undefined);
 
   return (
     <main className="min-h-screen bg-[#020617] text-slate-200 relative overflow-hidden">

@@ -23,17 +23,19 @@ export default async function ModuloPage({
         getUserProgresso(session.user.id || "")
     ]);
 
-    const moduloAtual = mods.find((m: any) => String(m.id) === String(id));
+    const moduloAtual = mods.find((m) => String(m.id) === String(id));
+
+    if (!moduloAtual) notFound();
 
     if (moduloAtual?.bloqueado) {
-        const todosModulosOrdenados = mods.sort((a: any, b: any) => (a.ordem || 0) - (b.ordem || 0));
-        const indexAtual = todosModulosOrdenados.findIndex((m: any) => m.id === moduloAtual.id);
+        const todosModulosOrdenados = mods;
+        const indexAtual = todosModulosOrdenados.findIndex((m) => m.id === moduloAtual.id);
 
         if (indexAtual > 0) {
             const moduloAnterior = todosModulosOrdenados[indexAtual - 1];
 
-            const aulasAnt = vids.filter((v: any) => v.modulo?.some((m: any) => m.id === moduloAnterior.id));
-            const concluidasAnt = progresso.filter((p: any) => aulasAnt.some(a => a.id === p.aulaId) && p.concluido);
+            const aulasAnt = vids.filter((v) => v.modulo?.some((m) => m.id === moduloAnterior.id));
+            const concluidasAnt = progresso.filter((p) => aulasAnt.some(a => a.id === p.aulaId) && p.concluido);
 
             if (concluidasAnt.length < aulasAnt.length) {
                 redirect("/PainelAlpha/AlphaSkills?msg=conclua-o-anterior");
@@ -43,11 +45,10 @@ export default async function ModuloPage({
 
 
     const aulasDoModulo = vids
-        .filter((v: any) => {
-            const relacaoModulo = v.modulo || v.modulos || [];
-            return relacaoModulo.some((m: any) => String(m.id) === String(id));
+        .filter((v) => {
+            return v.modulo.some((m) => String(m.id) === String(id));
         })
-        .sort((a: any, b: any) => (Number(a.ordem) || 0) - (Number(b.ordem) || 0));
+        .sort((a, b) => (Number(a.ordem) || 0) - (Number(b.ordem) || 0));
 
     return (
         <ModuloDetalhesClient

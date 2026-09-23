@@ -53,8 +53,9 @@ export async function uploadVideosLote(payload: unknown) {
                 }
             })
             criados++
-        } catch (e: any) {
-            const msg = e.message?.includes('Unique') || e.message?.includes('unique')
+        } catch (e) {
+            const errorMessage = e instanceof Error ? e.message : ''
+            const msg = errorMessage.includes('Unique') || errorMessage.includes('unique')
                 ? 'Título já existe'
                 : 'Erro ao salvar'
             erros.push(`"${v.titulo}": ${msg}`)

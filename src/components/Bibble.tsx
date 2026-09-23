@@ -101,15 +101,16 @@ function randomPos() {
 // para evitar distrações no dashboard
 
 export default function BibbleChat() {
+  const pathname = usePathname();
+  if (!pathname.startsWith("/PainelAlpha")) return null;
+  return <BibbleChatContent pathname={pathname} />;
+}
+
+function BibbleChatContent({ pathname }: { pathname: string }) {
   const { data: session } = useSession();
   const { contextoExtra } = useBibble();
-  const pathname = usePathname();
 
   const isAdmin = isAdminRole(session?.user?.role);
-
-  // ─── Guard: só aparece em páginas do PainelAlpha (outra área para o dashboard) ───
-  const isPainelAlpha = pathname.startsWith("/PainelAlpha");
-  if (!isPainelAlpha) return null;
 
   const temaNome = (session?.user as { tema_interface?: string })?.tema_interface;
   const visual = getTema(temaNome);
@@ -181,7 +182,7 @@ export default function BibbleChat() {
   }, [safeTimeout]);
 
   // ── Autonomous behaviour loop ──
-  const agir = useCallback(() => {
+  const agir = useCallback(function agir() {
     if (isOpen || hidden) return;
 
     const roll = Math.random();

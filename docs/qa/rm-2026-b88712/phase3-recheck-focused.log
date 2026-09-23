@@ -1,0 +1,58 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /home/ialpha/projetos/alpha-comex/painel-alpha
+
+stderr | tests/bpm/edicao-campos-card.test.ts > CRM - edição dos campos definidos da etapa > recusa referência sem vínculo ao card/campo: undefined
+[AtualizarCardBpm] TypeError: Cannot read properties of undefined (reading 'some')
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1304:58
+    at Array.some (<anonymous>)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1304:34
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+
+stderr | tests/bpm/edicao-campos-card.test.ts > CRM - edição dos campos definidos da etapa > recusa referência sem vínculo ao card/campo: {"id":"clw0000000000000anex","campoId":"clw0000000000000fora"}
+[AtualizarCardBpm] TypeError: anexos.some is not a function
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1304:58
+    at Array.some (<anonymous>)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1304:34
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+
+stderr | tests/bpm/edicao-campos-card.test.ts
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+
+ ❯ tests/bpm/edicao-campos-card.test.ts (40 tests | 2 failed) 26ms
+     × recusa referência sem vínculo ao card/campo: undefined 6ms
+     × recusa referência sem vínculo ao card/campo: {"id":"clw0000000000000anex","campoId":"clw0000000000000fora"} 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/bpm/edicao-campos-card.test.ts > CRM - edição dos campos definidos da etapa > recusa referência sem vínculo ao card/campo: undefined
+ FAIL  tests/bpm/edicao-campos-card.test.ts > CRM - edição dos campos definidos da etapa > recusa referência sem vínculo ao card/campo: {"id":"clw0000000000000anex","campoId":"clw0000000000000fora"}
+AssertionError: expected { success: false, …(1) } to deeply equal { success: false, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "error": "Arquivo não vinculado a este campo do card.",
++   "error": "Erro ao atualizar card",
+    "success": false,
+  }
+
+ ❯ tests/bpm/edicao-campos-card.test.ts:131:25
+    129|         cardId: CARD_ID, camposValores: { [CAMPO_ID]: "clw000000000000…
+    130|       });
+    131|       expect(resultado).toEqual({ success: false, error: "Arquivo não …
+       |                         ^
+    132|       expect(prismaMock.bpmCardAnexo.findMany).toHaveBeenCalledWith({
+    133|         where: { cardId: CARD_ID, OR: [{ id: "clw0000000000000anex", c…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed | 3 passed (4)
+      Tests  2 failed | 52 passed (54)
+   Start at  19:57:54
+   Duration  2.53s (transform 2.65s, setup 0ms, import 3.71s, tests 37ms, environment 0ms)
+

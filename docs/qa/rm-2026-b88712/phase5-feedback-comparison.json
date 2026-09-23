@@ -1,0 +1,8 @@
+{
+  "baseline_failures": 19,
+  "current_failures": 20,
+  "added": [
+    "tests/bpm/campo-select-contraste-react.test.ts > contraste dos selects do formulário de etapa > destaca opções selecionadas e preserva JSON, blur e bloqueio da multisseleção"
+  ],
+  "removed": []
+}

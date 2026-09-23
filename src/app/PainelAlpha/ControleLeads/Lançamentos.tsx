@@ -1,15 +1,23 @@
 "use client"
 
-import { getExportData, getExportDataColaborador, getPerformanceAcumulada, getPerformanceDiaria, upsertPerformance } from "@/actions/ComercialControle";
+import { getExportDataColaborador, getPerformanceAcumulada, getPerformanceDiaria, upsertPerformance } from "@/actions/ComercialControle";
 import { Calendar, Download, Zap } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import XLSX from 'xlsx-js-style';
 import { CalendarioCheckIn } from "./CalendarioCheckIn";
+import type { ComercialPerformance } from '@prisma/client';
+import type { ReactNode } from 'react';
 
 type Canal = 'TRAFEGO_PAGO' | 'CALLIX' | 'INDICACAO' | 'EVENTOS' | 'CHINA';
 type Servico = 'REVISAO' | 'HABILITACAO';
+type CanalResumo = {
+    leads: number; leadsDesqualificados: number; agendadas: number; realizadas: number;
+    noShow: number; habilitacao: number; revisao: number;
+    HotLeadsHabilitacao: number; HotLeadsRevisao: number;
+};
+type ResumoLateral = { canais: Record<string, CanalResumo> };
 
 const METRICAS_VAZIAS = {
     leads_recebidos: 0,
@@ -23,7 +31,7 @@ const METRICAS_VAZIAS = {
     HotLeadsHabilitacao: 0,
 };
 
-const RESUMO_VAZIO = {
+const RESUMO_VAZIO: ResumoLateral = {
     canais: Object.fromEntries(
         ['TRAFEGO_PAGO', 'CALLIX', 'INDICACAO', 'EVENTOS', 'CHINA'].map((canal) => [
             canal,
@@ -43,7 +51,7 @@ const RESUMO_VAZIO = {
 };
 
 interface LancamentosProps {
-    dadosAcumulados: any;
+    dadosAcumulados: ResumoLateral | null;
     canalAtual?: string;
     usuario?: string;
     colaboradoraId: string;
@@ -60,14 +68,13 @@ export default function Lancamentos({
     const usuarioNome = colaboradoraId || usuario || session?.user?.nome || "";
     const router = useRouter();
     const [status, setStatus] = useState<'idle' | 'saving' | 'success'>('idle');
-    const [servico, setServico] = useState<Servico>('REVISAO');
+    const servico: Servico = 'REVISAO';
     const searchParams = useSearchParams();
     const [canal, setCanal] = useState<Canal>((searchParams.get('canal') as Canal) || 'TRAFEGO_PAGO');
     const canalAtual = searchParams.get('canal') || 'TRAFEGO_PAGO';
     const [loading, setLoading] = useState(true);
     const [metricas, setMetricas] = useState(METRICAS_VAZIAS);
-    const [resumoLateral, setResumoLateral] = useState(dadosAcumulados);
-    const v = { leads: 0, agendadas: 0, realizadas: 0, noShow: 0, habilitacao: 0, revisao: 0, leadsDesqualificados: 0 };
+    const [resumoLateral, setResumoLateral] = useState<ResumoLateral>(dadosAcumulados ?? RESUMO_VAZIO);
     const mesAtualUrl = parseInt(searchParams.get('mes') || new Date().getMonth().toString());
     const anoAtualUrl = parseInt(searchParams.get('ano') || new Date().getFullYear().toString());
     const meses = [
@@ -79,16 +86,16 @@ export default function Lancamentos({
 
 
     const dadosMensaisTotais = {
-        leads_recebidos: Object.values(resumoLateral?.canais || {}).reduce((acc: number, v: any) => acc + (v.leads || 0), 0),
-        leads_desqualificados: Object.values(resumoLateral?.canais || {}).reduce((acc: number, v: any) => acc + (v.leadsDesqualificados || 0), 0),
-        no_show: Object.values(resumoLateral?.canais || {}).reduce((acc: number, v: any) => acc + (v.noShow || 0), 0),
-        reunioes_agendadas: Object.values(resumoLateral?.canais || {}).reduce((acc: number, v: any) => acc + (v.agendadas || 0), 0),
-        reunioes_realizadas: Object.values(resumoLateral?.canais || {}).reduce((acc: number, v: any) => acc + (v.realizadas || 0), 0),
-        contratos_Habilit: Object.values(resumoLateral?.canais || {}).reduce((acc: number, v: any) => acc + (v.habilitacao || 0), 0),
-        contratos_Revisao: Object.values(resumoLateral?.canais || {}).reduce((acc: number, v: any) => acc + (v.revisao || 0), 0),
+        leads_recebidos: Object.values(resumoLateral.canais).reduce((acc, v) => acc + (v.leads || 0), 0),
+        leads_desqualificados: Object.values(resumoLateral.canais).reduce((acc, v) => acc + (v.leadsDesqualificados || 0), 0),
+        no_show: Object.values(resumoLateral.canais).reduce((acc, v) => acc + (v.noShow || 0), 0),
+        reunioes_agendadas: Object.values(resumoLateral.canais).reduce((acc, v) => acc + (v.agendadas || 0), 0),
+        reunioes_realizadas: Object.values(resumoLateral.canais).reduce((acc, v) => acc + (v.realizadas || 0), 0),
+        contratos_Habilit: Object.values(resumoLateral.canais).reduce((acc, v) => acc + (v.habilitacao || 0), 0),
+        contratos_Revisao: Object.values(resumoLateral.canais).reduce((acc, v) => acc + (v.revisao || 0), 0),
 
-        HotLeadsHabilitacao: Object.values(resumoLateral?.canais || {}).reduce((acc: number, v: any) => acc + (v.HotLeadsHabilitacao || 0), 0),
-        HotLeadsRevisao: Object.values(resumoLateral?.canais || {}).reduce((acc: number, v: any) => acc + (v.HotLeadsRevisao || 0), 0),
+        HotLeadsHabilitacao: Object.values(resumoLateral.canais).reduce((acc, v) => acc + (v.HotLeadsHabilitacao || 0), 0),
+        HotLeadsRevisao: Object.values(resumoLateral.canais).reduce((acc, v) => acc + (v.HotLeadsRevisao || 0), 0),
     };
 
 
@@ -189,7 +196,7 @@ export default function Lancamentos({
                 alert(response.error || "Erro ao salvar.");
                 setStatus('idle');
             }
-        } catch (error) {
+        } catch {
             alert("Erro ao salvar.");
             setStatus('idle');
         }
@@ -222,7 +229,7 @@ export default function Lancamentos({
                 { id: "CHINA", label: "CHINA", cor: "E7E6E6" }              // Cinza
             ];
 
-            const metricasLabel = [
+            const metricasLabel: Array<{ label: string; chave: keyof ComercialPerformance }> = [
                 { label: "Leads Recebidos", chave: "leadsRecebidos" },
                 { label: "Leads Desqualificados", chave: "leadsDesqualificados" },
                 { label: "Agendamentos", chave: "reunioesAgendadas" },
@@ -234,8 +241,8 @@ export default function Lancamentos({
                 { label: "Hot Revisão", chave: "HotLeadsRevisao" },
             ];
 
-            const matrizFinal: any[] = [];
-            const merges: any[] = [];
+            const matrizFinal: unknown[][] = [];
+            const merges: Array<{ s: { r: number; c: number }; e: { r: number; c: number } }> = [];
 
             const headerRow = ["CANAL:", "MÉTRICAS:"];
             for (let i = 1; i <= 31; i++) headerRow.push(String(i));
@@ -246,7 +253,7 @@ export default function Lancamentos({
                 const linhaInicial = matrizFinal.length;
 
                 metricasLabel.forEach((metrica, idx) => {
-                    const rowData: any[] = [
+                    const rowData: unknown[] = [
                         {
                             v: idx === 0 ? canal.label : "", s: {
                                 alignment: { vertical: "center", horizontal: "center" },
@@ -259,10 +266,10 @@ export default function Lancamentos({
 
                     let somaTotal = 0;
                     for (let dia = 1; dia <= 31; dia++) {
-                        const reg = dadosBrutos.find((d: any) =>
+                        const reg = dadosBrutos.find((d) =>
                             new Date(d.dataRegistro).getUTCDate() === dia && d.canal === canal.id
                         );
-                        const valor = reg ? (reg as any)[metrica.chave] || 0 : 0;
+                        const valor = reg ? Number(reg[metrica.chave]) || 0 : 0;
 
                         rowData.push({
                             v: valor, s: {
@@ -515,8 +522,12 @@ export default function Lancamentos({
         </div>
     )
 
-    function CardCanalSimples({ titulo, leads, desq, agendadas, Realizadas, NoShow, vendasRevisao, VendasHabilit, HotLeadsHabilitacao, HotLeadsRevisao, cor }: any) {
-        const colorClasses: any = {
+    function CardCanalSimples({ titulo, leads, desq, agendadas, Realizadas, NoShow, vendasRevisao, VendasHabilit, HotLeadsHabilitacao, HotLeadsRevisao, cor }: {
+        titulo: string; leads: number; desq: number; agendadas: number; Realizadas: number; NoShow: number;
+        vendasRevisao: number; VendasHabilit: number; HotLeadsHabilitacao: number; HotLeadsRevisao: number;
+        cor: 'blue' | 'orange' | 'emerald' | 'pink' | 'amber' | 'red';
+    }) {
+        const colorClasses: Record<typeof cor, string> = {
             blue: 'text-blue-600 border-blue-100 bg-blue-50/30',
             orange: 'text-orange-600 border-orange-100 bg-orange-50/30',
             emerald: 'text-emerald-600 border-emerald-100 bg-emerald-50/30',
@@ -549,7 +560,7 @@ export default function Lancamentos({
         );
     }
 
-    function CardResumoLateral({ titulo, dados, icon }: any) {
+    function CardResumoLateral({ titulo, dados, icon }: { titulo: string; tipo?: string; dados: typeof dadosMensaisTotais; icon: ReactNode }) {
         return (
             <div className="p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
                 <div className="flex items-center gap-2 mb-6">
@@ -571,7 +582,7 @@ export default function Lancamentos({
         );
     }
 
-    function ItemResumo({ label, valor, color }: any) {
+    function ItemResumo({ label, valor, color }: { label: string; valor: number; color: string }) {
         return (
             <div className="flex justify-between items-end border-b border-slate-100 dark:border-slate-800 pb-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase">{label}</span>
@@ -581,8 +592,8 @@ export default function Lancamentos({
     }
 }
 
-function InputMetrica({ label, value, onChange, color, flat, disabled = false }: any) {
-    const colors: any = {
+function InputMetrica({ label, value, onChange, color, flat, disabled = false }: { label: string; value: number; onChange: (value: string) => void; color: string; flat?: boolean; disabled?: boolean }) {
+    const colors: Record<string, string> = {
         blue: 'focus-within:border-blue-500 text-blue-600',
         red: 'focus-within:border-red-500 text-red-600',
         purple: 'focus-within:border-purple-500 text-purple-600',

@@ -1,4 +1,4 @@
-import { promises as fs } from "node:fs";
+import { existsSync, promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -12,8 +12,33 @@ import {
 } from "@/lib/alpha-seo/worker";
 
 const SOURCE_ROOT = path.resolve(process.cwd(), "..", "open-seo-main");
+const hasSourceCheckout = existsSync(path.join(SOURCE_ROOT, "src/server/mcp/server.ts"));
 
 describe("Alpha SEO doctor and fixture worker", () => {
+  it.skipIf(hasSourceCheckout)("reports unavailable historical source checkout as a failed contract", async () => {
+    const result = await runAlphaSeoDoctor({
+      sourceRoot: SOURCE_ROOT,
+      env: {
+        TURSO_DATABASE_URL: "libsql://secret-host.invalid",
+        TURSO_AUTH_TOKEN: "secret-turso-token",
+        DATAFORSEO_API_KEY: "secret-dataforseo",
+        OPENROUTER_API_KEY: "secret-openrouter",
+        GOOGLE_CLIENT_ID: "secret-google-id",
+        GOOGLE_CLIENT_SECRET: "secret-google-secret",
+        ALPHA_SEO_GOOGLE_TOKEN_ENCRYPTION_KEY: "secret-encryption",
+        ALPHA_SEO_QUEUE_MODE: "fixture-memory",
+        ALPHA_SEO_LOCK_MODE: "fixture-memory",
+      },
+      skipNetwork: true,
+    });
+    expect(result.code).toBe(2);
+    expect(result.checks.find((check) => check.id === "contract.source-manifest")).toMatchObject({
+      ok: false,
+      kind: "contract",
+    });
+    expect(result.checks.find((check) => check.id === "contract.mcp-source-parity")).toBeUndefined();
+  });
+
   it("loads .env.local after .env with override without mutating process.env", async () => {
     const fixtureRoot = await fs.mkdtemp(
       path.join(os.tmpdir(), "alpha-seo-env-"),
@@ -55,7 +80,7 @@ describe("Alpha SEO doctor and fixture worker", () => {
     }
   });
 
-  it("keeps doctor read-only/redacted and passes the 46/46 named source contract", async () => {
+  it.skipIf(!hasSourceCheckout)("keeps doctor read-only/redacted and passes the 46/46 named source contract", async () => {
     const secrets = {
       TURSO_DATABASE_URL: "libsql://secret-host.invalid",
       TURSO_AUTH_TOKEN: "secret-turso-token",
@@ -107,7 +132,7 @@ describe("Alpha SEO doctor and fixture worker", () => {
     ).toBe("Read-only network probe explicitly skipped");
   });
 
-  it("returns code 2 offline only for genuinely missing configuration, never for historical MCP metadata", async () => {
+  it.skipIf(!hasSourceCheckout)("returns code 2 offline only for genuinely missing configuration, never for historical MCP metadata", async () => {
     const result = await runAlphaSeoDoctor({
       sourceRoot: SOURCE_ROOT,
       env: {},

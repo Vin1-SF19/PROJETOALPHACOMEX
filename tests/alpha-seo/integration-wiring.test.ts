@@ -86,11 +86,13 @@ describe("Alpha SEO module integration", () => {
     for (const consumer of [sidebar, layout, tabBar]) {
       expect(consumer).toContain("MODULOS_REGISTRY");
     }
-    expect(sidebar).toContain("[...pinnedModulos, ...unpinnedModulos].map");
+    expect(sidebar).toContain("pinnedModulos.map(mod => renderModuloItem(mod))");
+    expect(sidebar).toContain("modulosSoltos.map(mod => renderModuloItem(mod))");
+    expect(sidebar).toContain("itens.map(mod => renderModuloItem(mod");
     expect(sidebar).toContain("onOpenTab(mod.href, mod.label)");
     expect(layout).toContain("onOpenTab={openTab}");
     expect(layout).toContain("return [...prev, { id, url, label }]");
-    expect(layout).toContain("src={tab.url}");
+    expect(layout).toContain("src={derivePainelEmbeddedUrl(tab.url, frameId)}");
     expect(layout).toContain("url.startsWith(m.href + '/')");
     expect(tabBar).toMatch(/tab\.url\.startsWith\(`\$\{module\.href\}\//);
   });

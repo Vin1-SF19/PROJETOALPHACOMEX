@@ -28,18 +28,22 @@ export function ModalSelecionarUsuario({ open, onClose, onSelecionar, titulo = "
 
     useEffect(() => {
         if (!open) {
-            setBusca("");
-            return;
+            let active = true;
+            queueMicrotask(() => { if (active) setBusca(""); });
+            return () => { active = false; };
         }
         let cancelado = false;
-        (async () => {
-            setCarregando(true);
-            const res = await BuscarTodosUsuarios();
-            if (!cancelado) {
-                setUsuarios(res.success ? res.data : []);
-                setCarregando(false);
-            }
-        })();
+        queueMicrotask(() => {
+            if (cancelado) return;
+            void (async () => {
+                setCarregando(true);
+                const res = await BuscarTodosUsuarios();
+                if (!cancelado) {
+                    setUsuarios(res.success ? res.data : []);
+                    setCarregando(false);
+                }
+            })();
+        });
         return () => { cancelado = true; };
     }, [open]);
 

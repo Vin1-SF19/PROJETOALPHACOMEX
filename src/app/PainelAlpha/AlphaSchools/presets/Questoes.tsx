@@ -18,8 +18,18 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
+import type { getTagsAction } from "@/actions/questoes";
+import type { TemaAlpha } from "@/lib/temas";
 
-export default function FormularioPerguntas({ temaConfig, tagAtiva, onVoltar }: any) {
+type TagQuestao = Awaited<ReturnType<typeof getTagsAction>>[number];
+type Pergunta = TagQuestao['perguntas'][number];
+
+export default function FormularioPerguntas({ temaConfig, tagAtiva, onVoltar }: {
+    temaConfig: TemaAlpha;
+    tagAtiva: TagQuestao;
+    onVoltar: () => void;
+    refresh?: () => Promise<void>;
+}) {
     const router = useRouter();
     const [tipo, setTipo] = useState<'OBJETIVA' | 'DESCRITIVA'>('OBJETIVA');
     const [enunciado, setEnunciado] = useState("");
@@ -35,7 +45,7 @@ export default function FormularioPerguntas({ temaConfig, tagAtiva, onVoltar }: 
     const totalQuestoes = tagAtiva.perguntas?.length || 0;
     const limiteAtingido = totalQuestoes >= 20;
 
-    const handlePrepararEdicao = (p: any) => {
+    const handlePrepararEdicao = (p: Pergunta) => {
         setEditandoId(p.id);
         setTipo(p.tipo as 'OBJETIVA' | 'DESCRITIVA');
         setEnunciado(p.enunciado);
@@ -74,7 +84,6 @@ export default function FormularioPerguntas({ temaConfig, tagAtiva, onVoltar }: 
 
         try {
             const payload = {
-                id: editandoId,
                 enunciado,
                 tipo,
                 opcoes: tipo === 'OBJETIVA' ? opcoes : [],
@@ -82,9 +91,9 @@ export default function FormularioPerguntas({ temaConfig, tagAtiva, onVoltar }: 
                 tagId: tagAtiva.id
             };
 
-            const res = editandoId 
-                ? await updatePerguntaAction(payload as any) 
-                : await createPerguntaAction(payload as any);
+            const res = editandoId
+                ? await updatePerguntaAction({ ...payload, id: editandoId })
+                : await createPerguntaAction(payload);
 
             if (res.success) {
                 toast.success(editandoId ? "Edição salva!" : "Pergunta vinculada!");
@@ -200,7 +209,7 @@ export default function FormularioPerguntas({ temaConfig, tagAtiva, onVoltar }: 
                 </div>
 
                 <div className="grid grid-cols-1 gap-2 px-2">
-                    {tagAtiva.perguntas?.map((p: any) => (
+                    {tagAtiva.perguntas?.map((p) => (
                         <div key={p.id} className={`group p-5 border rounded-[1.5rem] flex items-center justify-between transition-all ${editandoId === p.id ? 'bg-orange-500/10 border-orange-500/40' : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.04]'}`}>
                             <div className="flex-1 min-w-0 flex items-center gap-4">
                                 <div className="w-10 h-10 rounded-xl flex items-center justify-center border bg-white/5 border-white/5 text-slate-400">

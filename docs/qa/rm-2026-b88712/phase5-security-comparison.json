@@ -1,0 +1,7 @@
+{
+  "additionalFailuresComparedToSuccess": [
+    "FAIL  tests/bpm/card-modal-integration.test.ts > CRM - wiring do modal por etapa > limita o novo card aos dados-base e preserva cadastro de empresa",
+    "FAIL  tests/bpm/cnpj-mascara.test.ts > Integração — wiring dos consumidores visuais > NovoCardModal usa o utilitário compartilhado (sem máscara local duplicada)",
+    "FAIL  tests/gerador-documentos/criar-template-via-upload.test.ts > CriarTemplateViaUpload > caminho feliz: extrai texto, sobe blob, chama IA e persiste o template"
+  ]
+}

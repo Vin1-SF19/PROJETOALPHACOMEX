@@ -28,8 +28,8 @@ export async function confirmarLeituraDocumento(documentoId: number) {
 
     revalidatePath("/PainelAlpha/DocsAlpha");
     return { success: true };
-  } catch (error: any) {
-    console.error("ERRO AO CONFIRMAR LEITURA:", error.message);
+  } catch (error) {
+    console.error("ERRO AO CONFIRMAR LEITURA:", error);
     return { success: false, error: "Erro ao confirmar leitura." };
   }
 }
@@ -99,8 +99,8 @@ export async function buscarStatusLeituraEquipe(): Promise<
     }
 
     return { success: true, data: resultado };
-  } catch (error: any) {
-    console.error("ERRO AO BUSCAR STATUS DE LEITURA:", error.message);
+  } catch (error) {
+    console.error("ERRO AO BUSCAR STATUS DE LEITURA:", error);
     return { success: false, error: "Erro ao buscar status de leitura." };
   }
 }

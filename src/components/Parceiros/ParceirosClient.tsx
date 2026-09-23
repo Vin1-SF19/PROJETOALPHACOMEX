@@ -228,13 +228,16 @@ export default function ParceirosClient({
   const [abrirVideoAutomaticamente, setAbrirVideoAutomaticamente] = useState(false);
   useEffect(() => {
     if (!abrir) return;
-    if (abrir === "tutorial") setTutorialAberto(true);
-    if (abrir === "acoes") setMenuOpen(true);
-    if (abrir === "video") setAbrirVideoAutomaticamente(true);
+    const frame = window.requestAnimationFrame(() => {
+      if (abrir === "tutorial") setTutorialAberto(true);
+      if (abrir === "acoes") setMenuOpen(true);
+      if (abrir === "video") setAbrirVideoAutomaticamente(true);
+    });
     const params = new URLSearchParams(window.location.search);
     params.delete("abrir");
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    return () => window.cancelAnimationFrame(frame);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [abrir]);
 

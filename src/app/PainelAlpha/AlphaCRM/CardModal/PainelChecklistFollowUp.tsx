@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, ClipboardList, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { ObterUltimoFollowUpBpm, SalvarChecklistFollowUpBpm } from "@/actions/bpm/FollowUp";
-import { useCardSave } from "./CardSaveContext";
+import { useCardSave } from "@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext";
 
 type RespostaObterFollowUp = NonNullable<Awaited<ReturnType<typeof ObterUltimoFollowUpBpm>>["data"]>;
 type Checklist = NonNullable<RespostaObterFollowUp["checklist"]>;
@@ -37,9 +37,17 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
   const [erroCarregamento, setErroCarregamento] = useState(false);
   const [tentativa, setTentativa] = useState(0);
   const [conflitoRealtime, setConflitoRealtime] = useState(false);
+  const respostasRef = useRef<Record<string, Resposta>>({});
+  const revisaoRef = useRef(0);
   const draftSujoRef = useRef(false);
   const revisaoAnteriorRef = useRef(realtimeRevision);
-  const { registerSave } = useCardSave();
+  const { registerSave, scheduleSave, getDraft, setDraft, subscribeConfirmation } = useCardSave();
+  const draftKey = `${cardId}:followup`;
+  useEffect(() => subscribeConfirmation(cardId, (_card, key) => {
+    if (key !== draftKey || getDraft(draftKey)) return;
+    draftSujoRef.current = false;
+    setTentativa((value) => value + 1);
+  }), [cardId, draftKey, getDraft, subscribeConfirmation]);
 
   useEffect(() => {
     let cancelado = false;
@@ -60,8 +68,12 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
         return;
       }
       setEstado(resultado.data);
-      setRespostas(resultado.data.checklist?.respostas ?? {});
-      draftSujoRef.current = false;
+      const recovered = getDraft(draftKey);
+      respostasRef.current = recovered
+        ? Object.fromEntries(Object.entries(recovered).map(([id, value]) => [id, JSON.parse(value) as Resposta]))
+        : resultado.data.checklist?.respostas ?? {};
+      setRespostas(respostasRef.current);
+      draftSujoRef.current = Boolean(getDraft(draftKey));
       setConflitoRealtime(false);
       onEstadoChange(resultado.data.estado);
     }).catch(() => {
@@ -72,11 +84,23 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
       toast.error("Nao foi possivel carregar o follow-up");
     });
     return () => { cancelado = true; };
-  }, [cardId, onEstadoChange, tentativa, realtimeRevision]);
+  }, [cardId, onEstadoChange, tentativa, realtimeRevision, draftKey, getDraft]);
+
+  function alterarResposta(id: string, value: Resposta | undefined, delay: number) {
+    draftSujoRef.current = true;
+    revisaoRef.current += 1;
+    const next = { ...respostasRef.current };
+    if (value === undefined) delete next[id]; else next[id] = value;
+    respostasRef.current = next;
+    setDraft(draftKey, Object.fromEntries(Object.entries(next).map(([id, value]) => [id, JSON.stringify(value)])));
+    setRespostas(next);
+    scheduleSave(`${cardId}:followup:${id}`, () => void persistir(false), delay);
+  }
 
   async function persistir(concluir: boolean) {
-    if (!concluir && estado?.checklist && (!draftSujoRef.current || salvando)) return;
-    const respostasAtual = respostas;
+    if (!concluir && estado?.checklist && !draftSujoRef.current) return;
+    const respostasAtual = { ...respostasRef.current };
+    const revisao = revisaoRef.current;
     const checklistIdAtual = estado?.checklist?.id;
     const estadoAnterior = estado?.estado;
     setSalvando(true);
@@ -91,15 +115,20 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
         toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível salvar o follow-up");
         return false;
       }
+      const savedDraft = Object.fromEntries(Object.entries(respostasAtual).map(([id, value]) => [id, JSON.stringify(value)]));
+      if (JSON.stringify(getDraft(draftKey)) === JSON.stringify(savedDraft)) setDraft(draftKey);
       setEstado({ estado: resultado.data.estado, checklist: resultado.data.checklist });
-      setRespostas(resultado.data.checklist?.respostas ?? {});
-      draftSujoRef.current = false;
+      if (revisao === revisaoRef.current) {
+        respostasRef.current = resultado.data.checklist?.respostas ?? {};
+        setRespostas(respostasRef.current);
+        draftSujoRef.current = false;
+      }
       setConflitoRealtime(false);
       onEstadoChange(resultado.data.estado);
       toast.success(concluir ? "Follow-up concluído" : estadoAnterior === "NAO_INICIADO" ? "Follow-up iniciado" : "Rascunho do follow-up salvo");
       onAtualizado();
       return true;
-    }).finally(() => {
+    }, cardId, draftKey).finally(() => {
       setSalvando(false);
     });
   }
@@ -174,30 +203,20 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
               </label>
               {pergunta.tipo === "selecao" ? (
                 <select id={`follow-up-${pergunta.id}`} disabled={!podeEditar} className={inputClassName} value={valorTexto(respostas[pergunta.id])} onChange={(evento) => {
-                  draftSujoRef.current = true;
-                  setRespostas((atuais) => ({ ...atuais, [pergunta.id]: evento.target.value }));
+                  alterarResposta(pergunta.id, evento.target.value, pergunta.tipo === "selecao" ? 0 : 500);
                 }} onBlur={() => void persistir(false)}>
                   <option value="">Selecione...</option>
                   {pergunta.opcoes.map((opcao) => <option key={opcao} value={opcao}>{opcao}</option>)}
                 </select>
               ) : pergunta.tipo === "booleano" ? (
                 <select id={`follow-up-${pergunta.id}`} disabled={!podeEditar} className={inputClassName} value={typeof respostas[pergunta.id] === "boolean" ? String(respostas[pergunta.id]) : ""} onChange={(evento) => {
-                  draftSujoRef.current = true;
-                  setRespostas((atuais) => {
-                  if (!evento.target.value) {
-                    const proximas = { ...atuais };
-                    delete proximas[pergunta.id];
-                    return proximas;
-                  }
-                  return { ...atuais, [pergunta.id]: evento.target.value === "true" };
-                  });
+                  alterarResposta(pergunta.id, evento.target.value ? evento.target.value === "true" : undefined, 0);
                 }} onBlur={() => void persistir(false)}>
                   <option value="">Selecione...</option><option value="true">Sim</option><option value="false">Não</option>
                 </select>
               ) : (
                 <textarea id={`follow-up-${pergunta.id}`} disabled={!podeEditar} className={`${inputClassName} min-h-24 resize-y`} value={valorTexto(respostas[pergunta.id])} onChange={(evento) => {
-                  draftSujoRef.current = true;
-                  setRespostas((atuais) => ({ ...atuais, [pergunta.id]: evento.target.value }));
+                  alterarResposta(pergunta.id, evento.target.value, pergunta.tipo === "selecao" ? 0 : 500);
                 }} onBlur={() => void persistir(false)} />
               )}
             </div>

@@ -1,20 +1,51 @@
 "use client";
 
 import { pdf } from "@react-pdf/renderer";
-import { FichaAlphaPDF } from "./GerarFicha";
+import { FichaAlphaPDF, type FichaAlphaDados } from "./GerarFicha";
 import { useEffect, useState } from "react";
 import { upsertConsulta } from "@/actions/PreAnalise";
 import { ChevronDown, ChevronUp, X, FileText } from "lucide-react";
 
 interface Props {
-    dados: any;
-    radarDados: any;
+    dados: unknown;
+    radarDados: unknown;
     user: string;
     isOpen: boolean;
     onClose: () => void;
 }
 
-export const ModalPDF = ({ dados, radarDados, user, isOpen, onClose }: Props) => {
+const objeto = (valor: unknown): Record<string, unknown> =>
+    typeof valor === "object" && valor !== null && !Array.isArray(valor) ? valor as Record<string, unknown> : {};
+const texto = (valor: unknown): string | undefined => typeof valor === "string" ? valor : undefined;
+const valorMonetario = (valor: unknown): string | number | undefined =>
+    typeof valor === "string" || typeof valor === "number" ? valor : undefined;
+
+function normalizarFichaDados(entrada: unknown): FichaAlphaDados {
+    const raiz = objeto(entrada);
+    const rfb = objeto(raiz.rfb);
+    const origemRfb = objeto(rfb.dados ?? raiz.rfb);
+    const empresaqui = objeto(raiz.empresaqui);
+    const origemEmpresaqui = objeto(empresaqui.dados ?? raiz.empresaqui);
+    const radar = objeto(raiz.radar);
+    const origemRadar = objeto(radar.dados ?? raiz.radar);
+    return {
+        rfb: { dados: {
+            razaoSocial: texto(origemRfb.razaoSocial), nomeFantasia: texto(origemRfb.nomeFantasia),
+            cnpj: texto(origemRfb.cnpj), uf: texto(origemRfb.uf),
+            dataConstituicao: texto(origemRfb.dataConstituicao),
+            capitalSocial: valorMonetario(origemRfb.capitalSocial),
+            capital_social: valorMonetario(origemRfb.capital_social),
+            natureza_juridica: texto(origemRfb.natureza_juridica),
+        } },
+        empresaqui: { dados: { regimeEA: texto(origemEmpresaqui.regimeEA) } },
+        radar: { situacao: texto(origemRadar.situacao), submodalidade: texto(origemRadar.submodalidade) },
+    };
+}
+
+export const ModalPDF = ({ dados: dadosEntrada, radarDados: radarEntrada, user, isOpen, onClose }: Props) => {
+    const dados = normalizarFichaDados(dadosEntrada);
+    const radarObjeto = objeto(radarEntrada);
+    const radarDados = objeto(radarObjeto.dados ?? radarEntrada);
     const [dadosManuais, setDadosManuais] = useState({
         dataSituacao: "",
         horaSituacao: "",
@@ -47,14 +78,14 @@ export const ModalPDF = ({ dados, radarDados, user, isOpen, onClose }: Props) =>
     if (!isOpen) return null;
 
     const gerarEVisualizar = async () => {
-        const radarReal = radarDados?.dados || radarDados;
+        const radarReal = radarDados;
         const payload = {
-            ...dados,
+            ...objeto(dadosEntrada),
             radar: radarReal,
             extra: { ...dadosManuais }
         };
         await upsertConsulta(payload);
-        const doc = <FichaAlphaPDF dados={payload} userLogado={user} />;
+        const doc = <FichaAlphaPDF dados={{ ...normalizarFichaDados(payload), extra: dadosManuais }} userLogado={user} />;
         const blob = await pdf(doc).toBlob();
         window.open(URL.createObjectURL(blob), "_blank");
     };
@@ -265,10 +296,10 @@ export const ModalPDF = ({ dados, radarDados, user, isOpen, onClose }: Props) =>
                                 <DetalheCard
                                     tag="Consulta Siscomex"
                                     tagColor="text-orange-400"
-                                    title={radarDados?.submodalidade || "Não Identificado"}
+                                    title={texto(radarDados.submodalidade) || "Não Identificado"}
                                     lines={[
-                                        `Situação: ${radarDados?.situacao || "---"}`,
-                                        `Data: ${radarDados?.dataSituacao || "---"}`,
+                                        `Situação: ${texto(radarDados.situacao) || "---"}`,
+                                        `Data: ${texto(radarDados.dataSituacao) || "---"}`,
                                     ]}
                                 />
 

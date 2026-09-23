@@ -27,12 +27,13 @@ interface Props {
 }
 
 export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarFormulario = true }: Props) {
-  const { registerSave } = useCardSave();
+  const { registerSave, scheduleSave, getVersion, getDraft, setDraft } = useCardSave();
   const [dataHora, setDataHora] = useState(() => formatarDataHoraLocalBpm(card.dataReuniao));
   const [erroDataHora, setErroDataHora] = useState<string | null>(null);
   const [emailCliente, setEmailCliente] = useState(card.emailClienteReuniao ?? "");
   const [erroEmailCliente, setErroEmailCliente] = useState<string | null>(null);
-  const [resumo, setResumo] = useState(card.transcricaoReuniao ?? "");
+  const draftKey = `${card.id}:resumo`;
+  const [resumo, setResumo] = useState(() => getDraft(draftKey)?.valor ?? card.transcricaoReuniao ?? "");
   const [salvando, setSalvando] = useState(false);
   const [salvandoResumo, setSalvandoResumo] = useState(false);
   const [sincronizando, setSincronizando] = useState(false);
@@ -43,11 +44,11 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
   const cardIdRef = useRef(card.id);
   const dataHoraSujaRef = useRef(false);
   const emailClienteSujoRef = useRef(false);
-  const resumoSujoRef = useRef(false);
+  const resumoSujoRef = useRef(Boolean(getDraft(draftKey)));
   const dataHoraPersistidaRef = useRef(formatarDataHoraLocalBpm(card.dataReuniao));
   const resumoPersistidoRef = useRef(card.transcricaoReuniao ?? "");
   const dataHoraRascunhoRef = useRef(criarRastreadorRascunho(formatarDataHoraLocalBpm(card.dataReuniao)));
-  const resumoRascunhoRef = useRef(criarRastreadorRascunho(card.transcricaoReuniao ?? ""));
+  const resumoRascunhoRef = useRef(criarRastreadorRascunho(resumo));
 
   const jaAgendada = Boolean(card.googleEventId);
   const transcricaoRecebida = Boolean(card.transcricaoReuniao?.trim());
@@ -89,6 +90,7 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
       setConflitoDataHora(false);
     }
 
+    if (!getDraft(draftKey)) resumoSujoRef.current = false;
     if (resumoSujoRef.current) {
       if (novoResumo !== resumoPersistidoRef.current) setConflitoResumo(true);
     } else {
@@ -97,7 +99,7 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
       setResumo(novoResumo);
       setConflitoResumo(false);
     }
-  }, [card.id, card.dataReuniao, card.emailClienteReuniao, card.transcricaoReuniao]);
+  }, [card.id, card.dataReuniao, card.emailClienteReuniao, card.transcricaoReuniao, draftKey, getDraft]);
 
   async function handleAgendar() {
     if (salvando || !podeEditar) return;
@@ -165,14 +167,13 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
   }
 
   async function persistirResumo(): Promise<boolean> {
-    if (resumo === resumoPersistidoRef.current) return true;
     const snapshot = resumoRascunhoRef.current.capturar();
     return registerSave(async () => {
       setSalvandoResumo(true);
       const resultado = await SalvarResumoReuniaoBpm({
         cardId: card.id,
         resumo: snapshot.valor,
-        versaoEsperadaEm: card.updatedAt,
+        versaoEsperadaEm: getVersion(card.id, new Date(card.updatedAt).toISOString()),
       });
       setSalvandoResumo(false);
       if (!resultado.success) {
@@ -180,6 +181,7 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
         return false;
       }
       resumoPersistidoRef.current = snapshot.valor;
+      if (getDraft(draftKey)?.valor === snapshot.valor) setDraft(draftKey);
       if (resumoRascunhoRef.current.corresponde(snapshot)) {
         resumoSujoRef.current = false;
         setConflitoResumo(false);
@@ -187,7 +189,7 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
       toast.success("Resumo da reunião salvo");
       onAtualizado();
       return true;
-    });
+    }, card.id, draftKey);
   }
 
   return (
@@ -329,9 +331,11 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
                   resumoSujoRef.current = true;
                   resumoRascunhoRef.current.alterar(event.target.value);
                   setResumo(event.target.value);
+                  setDraft(draftKey, { valor: event.target.value });
+                  scheduleSave(`${card.id}:resumo`, () => void persistirResumo());
                 }}
                 onBlur={() => void persistirResumo()}
-                disabled={!podeEditar || salvandoResumo}
+                disabled={!podeEditar}
                 aria-label="Resumo da reunião"
                 className="min-h-32 w-full resize-y rounded-xl border border-white/10 bg-black/20 p-3 text-[11px] leading-relaxed text-slate-300 outline-none transition-colors focus:border-white/20 disabled:cursor-not-allowed disabled:opacity-60"
               />

@@ -1,5 +1,26 @@
 # INTEGRATION POINTS — Pontos de Integração
 
+## Autosave universal do card CRM — provider, hook e consumidores (RM-2026-B88712)
+
+**Arquivos:** `src/app/PainelAlpha/AlphaCRM/layout.tsx` (provider), `src/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext.tsx` (hook `useCardSave`), `CardModal/{PainelCamposEtapaAtual,PainelProximoContato,PainelReuniao,PainelChecklistFollowUp,PainelStatusPosFechamento,PainelProximaEtapa,CardFullViewModal}.tsx`, `CampoBpmInput.tsx`.
+
+**Propósito:** persistência universal por campo no card do CRM, com debounce de 500 ms para texto e disparo imediato para seleções/booleanos/datas/arquivos. Fechamento (X/ESC/clique externo) executa `flushSaves(cardId)` antes de desmontar, sem diálogo de confirmação.
+
+**Caminho de integração:**
+
+1. `layout.tsx` do CRM monta `CardSaveProvider` acima de todos os consumidores, sobrevivendo ao fechamento do modal e à navegação interna.
+2. `useCardSave()` retorna `scheduleSave(key, cb, delay)`, `registerSave(cb, cardId, recoveryKey)`, `flushScheduled(prefix)`, `flushSaves(cardId)`, `getDraft(key)`, `setDraft(key, value)`, `getVersion(cardId)`, `subscribeConfirmation(cardId, cb)`.
+3. `PainelCamposEtapaAtual` chama `scheduleSave(`${cardId}:${campoId}`, saveFn, 500)` em `alterarCampo`; blur antecipa via `flushScheduled(`${cardId}:`)`.
+4. `CardFullViewModal.solicitarFechamento()` executa blur → `flushSaves(cardId)` → `onClose()`. Sem diálogo intermediário.
+5. `PainelProximaEtapa.handleMover` chama `flushSaves(cardId)` antes de `MoverCardBpm`, garantindo que o movimento só ocorre após persistência.
+6. `CampoBpmInput` integra upload ao mesmo fluxo: `registerSave` com `recoveryKey` para recuperação após falha.
+
+**Editado quando:** novo painel de card adicionado, tipo de campo novo, mudança no contrato de persistência ou no provider.
+
+**Última atualização:** 2026-09-22 por Scribe (RM-2026-B88712)
+
+---
+
 ## ChatBot Alpha frontend — rotas, gate, shell e provider
 
 **Arquivos:** `src/lib/modulos-registry.ts`, `src/app/PainelAlpha/ChatBotAlpha/{layout,page}.tsx`, `src/app/PainelAlpha/ChatBotAlpha/{dashboard,inbox,contatos,fluxos,agentes,campanhas,sequencias,templates,integracoes,configuracoes}/page.tsx`, `src/components/ChatBotAlpha/shell/ChatbotShell.tsx`, `src/components/ChatBotAlpha/shell/navigation.ts`, `src/types/chatbot.ts`, `src/services/chatbot/`, `src/mocks/chatbot/data.ts`, `src/store/useChatbotStore.ts`, `tests/chatbot-alpha/frontend-*.test.ts` e `docs/chatbot-backend-contract.md`.
@@ -384,14 +405,14 @@ await concluirChamadoComFeedback({ chamadoId, tecnicoId, concluidoEm, solucao })
 
 **Padrão obrigatório:** qualquer componente editável com autosave-on-blur/onChange dentro de `CardSaveProvider` DEVE registrar via `registerSave` do `CardSaveContext`. Nunca chamar a Server Action diretamente.
 
-**Componentes que usam `registerSave` (lista completa):**
+**Componentes que usam `registerSave` (lista histórica; atualizada por Scribe em 2026-09-22, RM-2026-B88712):**
 
 | Componente | Campo(s) | Trigger | Server Action |
 |---|---|---|---|
-| `PainelCamposEtapaAtual.tsx` | campos dinâmicos (`BpmCampo`) | `onBlur` | `AtualizarCardBpm` |
-| `PainelProximoContato.tsx` | `proximoContatoEm` | `onBlur` | `AtualizarCardBpm` |
+| `PainelCamposEtapaAtual.tsx` | campos dinâmicos (`BpmCampo`) | `onChange`: 500 ms ou imediato por tipo; blur antecipa | `AtualizarCardBpm` |
+| `PainelProximoContato.tsx` | `proximoContatoEm` | `onChange` imediato | `AtualizarCardBpm` |
 | `PainelStatusPosFechamento.tsx` | `statusPosFechamento` | `onChange` | `AtualizarCardBpm` |
-| `PainelChecklistFollowUp.tsx` | respostas do checklist | `onBlur` | `SalvarChecklistFollowUpBpm` |
+| `PainelChecklistFollowUp.tsx` | respostas do checklist | `onChange` com delay por tipo | `SalvarChecklistFollowUpBpm` |
 
 **Componentes intencionalmente fora (botão explícito, não autosave):**
 
@@ -401,7 +422,7 @@ await concluirChamadoComFeedback({ chamadoId, tecnicoId, concluidoEm, solucao })
 | `PainelStandbyFollowUp.tsx` | "Interromper" | ação destrutiva com confirmação |
 | `SeletorMembrosCard.tsx` | clique em membro | ação deliberada, não autosave |
 
-**Consumidor:** `PainelProximaEtapa.handleMover` → `flushSaves()` → se `true` → `MoverCardBpm`.
+**Consumidor:** `PainelProximaEtapa.handleMover` → `flushSaves(card.id)` → se `true` → `MoverCardBpm`.
 
 **Novo componente editável no card?** Se usa autosave-on-blur/onChange, registrar via `registerSave`. Se usa botão explícito, não precisa.
 
@@ -2941,3 +2962,18 @@ BibbleMessageBubble
 ### 2026-09-22 — RM-2026-B5C986
 
 RM-2026-B5C986: page.tsx administrativa envolve AdminPipelineClient (chave id:configVersion preservada) em PipelineEditorStateProvider (chave pipelineId). FormularioEtapaWorkspace preserva seleção por modo e rascunho por etapa; callback fields mantém aba antes do refresh. Nenhuma rota/permissão/action nova.
+
+### 2026-09-22 — Scribe — RM-2026-B88712: autosave fora do ciclo de vida do modal
+
+**Arquivo:** `src/app/PainelAlpha/AlphaCRM/layout.tsx` e `CardModal/CardSaveContext.tsx`.
+**Propósito:** compartilhar fila, versões e recuperação entre consumidores e navegação interna do CRM.
+**Editado quando:** novo painel editável ou novo consumidor do modal precisar participar do autosave.
+
+**Exemplo de integração:** obter `scheduleSave`, `registerSave` e `flushScheduled` por `useCardSave`; após atualizar o rascunho, chamar ``scheduleSave(`${cardId}:${campoId}`, () => void persistir(), 500)``; dentro de persistir registrar a Promise real com `registerSave(salvarSnapshot, cardId, recoveryKey)`. Para controles imediatos usar delay 0. Ao desmontar disparar ``flushScheduled(`${cardId}:`)``; para movimento de etapa aguardar `flushSaves(cardId)` e conferir true. Preservar revisão e validação, não marcar Salvo apenas por agendar.
+
+**Entrega:** usuários comerciais/operacionais autorizados → menu Alpha CRM (`modulos-registry.ts`, permissão crm) → `/PainelAlpha/AlphaCRM` → link de pipeline em DashboardClient → `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → PipelineBoardClient → card → CardFullViewModal → formulário. Dashboard e `/PainelAlpha/AlphaCRM/tarefas` também consomem o modal. Arquivo: upload → RegistrarAnexoBpm → `/api/bpm/anexos/[anexoId]`, com acesso protegido. Caminho reinspecionado no código; testes React anteriores usam mocks, navegador autenticado não validado nesta fase.
+
+
+### RM-2026-04A236 — Fase 5 Nova
+
+RM-2026-04A236: FormularioEtapaWorkspace → ListaCamposFormulario → moverItemFormulario → rascunho no PipelineEditorStateProvider → SalvarFormularioEtapaBpm. Contrato de seções e leitura por campoIds preservado; sem nova rota.

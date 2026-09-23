@@ -3,10 +3,11 @@ import { useState, useCallback } from "react";
 import { UploadCloud, FileSpreadsheet, AlertCircle, X } from "lucide-react";
 import * as XLSX from "xlsx";
 import { motion, AnimatePresence } from "framer-motion";
+import type { TemaAlpha } from "@/lib/temas";
 
 interface DropzoneProps {
-  onFileLoaded: (dados: any[]) => void;
-  visual: any;
+  onFileLoaded: (dados: Record<string, unknown>[]) => void;
+  visual: TemaAlpha;
 }
 
 export default function DropzoneRadar({ onFileLoaded, visual }: DropzoneProps) {
@@ -25,7 +26,7 @@ export default function DropzoneRadar({ onFileLoaded, visual }: DropzoneProps) {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: "array" });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+        const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet);
 
         if (jsonData.length === 0) {
           setError("A planilha está vazia.");

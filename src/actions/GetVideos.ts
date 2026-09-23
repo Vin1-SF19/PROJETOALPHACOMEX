@@ -75,9 +75,9 @@ export async function createVideo(input: {
 
         revalidatePath("/PainelAlpha/AlphaSkills/Gerenciamento");
         return { success: true, video };
-    } catch (error: any) {
+    } catch (error) {
         console.error("ERRO NO CREATE:", error);
-        return { success: false, error: error.message };
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
 }
 
@@ -123,9 +123,16 @@ export async function deleteVideo(id: string, videoUrl: string, thumbUrl?: strin
     }
 }
 
-export async function updateVideoData(id: string, data: any) {
+export async function updateVideoData(id: string, data: {
+    titulo: string;
+    descricao: string;
+    url: string;
+    thumbUrl: string | null;
+    setor: string;
+    modulosIds: string[];
+}) {
     try {
-        const idsValidos = data.modulosIds.filter((mid: any) => mid);
+        const idsValidos = data.modulosIds.filter(Boolean);
 
         const video = await db.videos.update({
             where: { id },

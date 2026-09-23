@@ -42,7 +42,7 @@ function DomainDetail() {
     return (
       <div className="domain-not-found">
         <h2>Domain not found</h2>
-        <p>The domain "{domainId}" does not exist.</p>
+        <p>The domain &quot;{domainId}&quot; does not exist.</p>
         <Link to="/" className="back-link">&larr; Back to Dashboard</Link>
       </div>
     );

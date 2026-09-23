@@ -5,8 +5,24 @@ import { Search, ExternalLink, ArrowUpRight, MoreHorizontal, Plus } from 'lucide
 import ModalCadastroCliente from './Modais/CadastroCliente';
 import Link from 'next/link';
 
+type ClienteLista = {
+    id: string;
+    clienteId?: string | null;
+    donoNome?: string | null;
+    donoEmail?: string | null;
+    cliente?: { nome?: string | null; email?: string | null } | null;
+    status: string;
+    razaoSocial: string;
+    nomeFantasia?: string | null;
+    cnpj: string;
+    progresso: number;
+    mesProtocolo?: string | null;
+    linkGrupo?: string | null;
+};
+type ClienteAcesso = { id: string; nome: string; email: string };
+
 const StatusBadge = ({ status }: { status: string }) => {
-    const styles: any = {
+    const styles: Record<string, string> = {
         "ATIVO": "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
         "PENDENTE": "bg-amber-500/10 text-amber-500 border-amber-500/20",
         "FINALIZADO": "bg-blue-500/10 text-blue-500 border-blue-500/20",
@@ -22,8 +38,8 @@ export default function ListaClientesOperacional({
     dadosIniciais,
     usuariosAcesso
 }: {
-    dadosIniciais: any[],
-    usuariosAcesso: any[]
+    dadosIniciais: ClienteLista[],
+    usuariosAcesso: ClienteAcesso[]
 }) {
     const [busca, setBusca] = useState("");
     const [isModalOpen, setIsModalOpen] = useState(false);

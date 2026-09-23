@@ -1,0 +1,8 @@
+{
+  "baselineFailures": 19,
+  "currentFailures": 18,
+  "added": [],
+  "removed": [
+    " FAIL  tests/gerador-documentos/criar-template-via-upload.test.ts > CriarTemplateViaUpload > caminho feliz: extrai texto, sobe blob, chama IA e persiste o template"
+  ]
+}

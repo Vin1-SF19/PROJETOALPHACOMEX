@@ -15,7 +15,7 @@ export function AvatarUpload({ inicial, fotoAtual }: { inicial: string, fotoAtua
   const [preview, setPreview] = useState(fotoAtual);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const temaNome = (session?.user as any)?.tema_interface || "blue";
+  const temaNome = session?.user?.tema_interface || "blue";
   const style = getTema(temaNome);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -43,8 +43,8 @@ export function AvatarUpload({ inicial, fotoAtual }: { inicial: string, fotoAtua
         toast.success("Identidade atualizada!", { id: toastId });
         setIsModalOpen(false);
       }
-    } catch (error: any) {
-      toast.error(`Falha: ${error.message}`, { id: toastId });
+    } catch (error: unknown) {
+      toast.error(`Falha: ${error instanceof Error ? error.message : String(error)}`, { id: toastId });
     } finally {
       setLoading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";

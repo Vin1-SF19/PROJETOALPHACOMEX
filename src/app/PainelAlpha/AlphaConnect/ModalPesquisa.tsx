@@ -1,14 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import type { TemaAlpha } from "@/lib/temas";
+import type { LucideIcon } from "lucide-react";
 import { X, Search, Building2, ShieldCheck, History, Check, Loader2, MapPin, Landmark, Calendar, Activity } from "lucide-react";
 import { toast } from "sonner";
 import { protocolarNoRadarAction } from "@/actions/RadarFiscal";
 
 
-export function ModalConsultarCNPJ({ isOpen, onClose, style }: any) {
+type HistoricoRegime = { Ano?: string | number; ano?: string | number; Regime?: string; regime?: string };
+type DadosConsulta = {
+    cnpj?: string;
+    consultaStatus?: string;
+    razaoSocial?: string;
+    nomeFantasia?: string;
+    situacao?: string;
+    municipio?: string;
+    uf?: string;
+    abertura?: string;
+    capitalSocial?: string | number;
+    capital_social?: string | number;
+    regimeReceita?: string;
+    regimeEA?: string;
+    dataOpcao?: string;
+    dataExclusao?: string;
+    divida_tributaria?: number;
+    perse?: string;
+    perse_anexo?: string;
+    perse_motivo?: string;
+    anexo?: string;
+    historicoRegime?: HistoricoRegime[];
+};
+
+export function ModalConsultarCNPJ({ isOpen, onClose, style }: { isOpen: boolean; onClose: () => void; style: TemaAlpha }) {
     const [cnpj, setCnpj] = useState("");
-    const [dados, setDados] = useState<any>(null);
+    const [dados, setDados] = useState<DadosConsulta | null>(null);
     const [loading, setLoading] = useState(false);
     const [salvando, setSalvando] = useState(false);
 
@@ -16,6 +42,10 @@ export function ModalConsultarCNPJ({ isOpen, onClose, style }: any) {
     const handleProtocolar = async () => {
         if (!dados?.cnpj) {
             toast.error("CNPJ NÃO ENCONTRADO");
+            return;
+        }
+        if (dados.consultaStatus !== "completa") {
+            toast.error("Consulta tributária parcial. Consulte novamente antes de protocolar.");
             return;
         }
     
@@ -50,28 +80,22 @@ export function ModalConsultarCNPJ({ isOpen, onClose, style }: any) {
 
     const handleConsultar = async () => {
         const cnpjLimpo = cnpj.replace(/\D/g, "");
+        setDados(null);
         if (cnpjLimpo.length !== 14) return toast.error("CNPJ INVÁLIDO");
     
         setLoading(true);
         try {
-            const [resRec, resRadar] = await Promise.all([
-                fetch(`/api/ReceitaFederal?cnpj=${cnpjLimpo}`),
-                fetch(`/api/RadarFiscal?cnpj=${cnpjLimpo}&forcar=true`)
-            ]);
-    
-            const dataRec = await resRec.json();
+            const resRadar = await fetch(`/api/RadarFiscal?cnpj=${cnpjLimpo}&forcar=true`);
             const dataRadar = await resRadar.json();
-    
-            if (dataRec.error) throw new Error(dataRec.error);
-            
-            if (dataRadar.error) throw new Error(dataRadar.error);
+            if (!resRadar.ok || dataRadar.error) throw new Error(dataRadar.error || "Consulta indisponível");
     
             setDados(dataRadar);
-            toast.success("Análise Alpha Concluída!");
+            if (dataRadar.consultaStatus === "completa") toast.success("Análise Alpha Concluída!");
+            else toast.warning("Consulta parcial: regime e qualificação não confirmados.");
     
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error("Erro na consulta:", e);
-            toast.error(e.message || "FALHA NA CONEXÃO");
+            toast.error(e instanceof Error ? e.message : "FALHA NA CONEXÃO");
         } finally {
             setLoading(false);
         }
@@ -96,7 +120,7 @@ export function ModalConsultarCNPJ({ isOpen, onClose, style }: any) {
                     <div className="flex gap-4 mb-12 bg-black/20 p-4 rounded-[2.5rem] border border-white/5">
                         <input
                             value={cnpj}
-                            onChange={(e) => setCnpj(e.target.value.replace(/\D/g, ""))}
+                            onChange={(e) => { setCnpj(e.target.value.replace(/\D/g, "")); setDados(null); }}
                             placeholder="DIGITE O CNPJ PARA ANÁLISE..."
                             className="flex-1 bg-transparent px-6 text-lg font-black tracking-[0.2em] text-white outline-none"
                         />
@@ -140,11 +164,11 @@ export function ModalConsultarCNPJ({ isOpen, onClose, style }: any) {
                                 <InfoRow
                                     label="Dívida Ativa"
                                     value={
-                                        dados?.divida_tributaria > 0
-                                            ? `R$ ${Number(dados.divida_tributaria).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                                        (dados?.divida_tributaria ?? 0) > 0
+                                            ? `R$ ${Number(dados?.divida_tributaria ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
                                             : (dados ? "NÃO POSSUI DÍVIDAS" : "---")
                                     }
-                                    color={dados?.divida_tributaria > 0 ? "text-red-500" : "text-emerald-500"}
+                                    color={(dados?.divida_tributaria ?? 0) > 0 ? "text-red-500" : "text-emerald-500"}
                                 />
                             </div>
                         </section>
@@ -193,7 +217,7 @@ export function ModalConsultarCNPJ({ isOpen, onClose, style }: any) {
                             </h4>
                             <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                                 {[2018, 2019, 2020, 2021, 2022, 2023].map(ano => {
-                                    const registro = dados?.historicoRegime?.find((h: any) =>
+                                    const registro = dados?.historicoRegime?.find((h: HistoricoRegime) =>
                                         String(h.Ano) === String(ano) || String(h.ano) === String(ano)
                                     );
 
@@ -226,7 +250,7 @@ export function ModalConsultarCNPJ({ isOpen, onClose, style }: any) {
     );
 }
 
-function InfoCard({ label, value, icon: Icon, status }: any) {
+function InfoCard({ label, value, icon: Icon, status }: { label: string; value: ReactNode; icon: LucideIcon; status?: boolean }) {
     return (
         <div className="bg-black/40 border border-white/5 p-6 rounded-[2rem] space-y-2">
             <div className="flex items-center gap-2 text-slate-600 uppercase font-black text-[9px] tracking-widest">
@@ -239,7 +263,7 @@ function InfoCard({ label, value, icon: Icon, status }: any) {
     );
 }
 
-function InfoRow({ label, value, highlight, color, style }: any) {
+function InfoRow({ label, value, highlight, color, style }: { label: string; value: ReactNode; highlight?: boolean; color?: string; style?: TemaAlpha }) {
     return (
         <div className="flex justify-between items-center py-3 border-b border-white/[0.03]">
             <span className="text-[10px] font-black uppercase text-slate-600 tracking-widest">{label}</span>

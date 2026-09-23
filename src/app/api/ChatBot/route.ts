@@ -3,12 +3,11 @@ import { auth } from '../../../../auth';
 import db from '@/lib/prisma';
 
 const API_KEY = process.env.GEMINI_API_KEY || '';
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-
-async function fetchInterno(endpoint: string, cnpj: string) {
+async function fetchInterno(endpoint: string, cnpj: string, request: Request) {
   try {
-    const res = await fetch(`${baseUrl}/api/${endpoint}?cnpj=${cnpj}`, {
-      next: { revalidate: 3600 },
+    const res = await fetch(`${new URL(request.url).origin}/api/${endpoint}?cnpj=${cnpj}`, {
+      headers: { cookie: request.headers.get("cookie") || "" },
+      cache: "no-store",
     });
     if (!res.ok) return { error: "Não encontrado" };
     return await res.json();
@@ -29,9 +28,9 @@ export async function POST(req: Request) {
     if (cnpjMatch) {
       const cnpj = cnpjMatch[0].replace(/\D/g, "");
       const [receita, radar, empresaAqui] = await Promise.all([
-        fetchInterno("ReceitaFederal", cnpj),
-        fetchInterno("ConsultaRadar", cnpj),
-        fetchInterno("RadarFiscal", cnpj)
+        fetchInterno("ReceitaFederal", cnpj, req),
+        fetchInterno("ConsultaRadar", cnpj, req),
+        fetchInterno("RadarFiscal", cnpj, req)
       ]);
       dadosConsolidados = { receita, radar, empresaAqui, cnpj_consultado: cnpj };
     }
@@ -97,4 +96,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ text: "Deu erro no motor do Bibble." });
   }
 }
-

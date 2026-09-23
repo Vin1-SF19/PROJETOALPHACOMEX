@@ -293,6 +293,10 @@ export const excluirCampoSchema = z.object({
   campoId: z.string().cuid(),
 });
 
+export const excluirCardSchema = z.object({
+  cardId: z.string().trim().min(1),
+});
+
 export const configurarMapeamentoCampoSchema = z.object({
   campoDestinoId: z.string().cuid(),
   campoOrigemId: z.string().cuid(),
@@ -333,6 +337,25 @@ export const criarCardSchema = z.object({
   path: ["empresaId"],
 });
 
+// Autosave aceita valores nativos e mantém a representação textual já usada
+// pelo formulário, validação por tipo e armazenamento. Upload usa RegistrarAnexoBpm.
+const valorAutosaveBpmSchema = z.union([
+  z.string().max(4000),
+  z.number().finite(),
+  z.boolean(),
+  z.array(z.string().max(4000)).max(MAX_CAMPOS_VALORES_BPM),
+  z.null(),
+]).transform((valor) => {
+  if (valor === null) return "";
+  if (typeof valor === "boolean") return valor ? "Sim" : "Não";
+  if (Array.isArray(valor)) return JSON.stringify(valor);
+  return String(valor);
+}).pipe(z.string().max(4000));
+
+const camposAutosaveBpmSchema = z.record(z.string().cuid(), valorAutosaveBpmSchema)
+  .refine((valores) => Object.keys(valores).length <= MAX_CAMPOS_VALORES_BPM,
+    `No máximo ${MAX_CAMPOS_VALORES_BPM} campos podem ser enviados por operação.`);
+
 export const atualizarCardSchema = z.object({
   cardId: z.string().cuid(),
   responsavelId: z.number().int().positive().optional(),
@@ -342,7 +365,7 @@ export const atualizarCardSchema = z.object({
   statusPosFechamento: z.enum(STATUS_POS_FECHAMENTO_CODIGOS).optional(),
   versaoEsperadaEm: z.coerce.date().optional(),
   proximoContatoEm: dataHoraOpcionalBpmSchema,
-  camposValores: camposValoresBpmSchema.optional(),
+  camposValores: camposAutosaveBpmSchema.optional(),
 });
 
 export const MAX_MEMBROS_CARD_BPM = 50;

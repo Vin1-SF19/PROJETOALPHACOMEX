@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Edit3, Trash2, Film, Image as ImageIcon, Activity, Settings, FolderKanban, PlayCircle, X, BookOpen, ChevronLeft, Shield } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useSession } from 'next-auth/react';
@@ -15,37 +15,47 @@ import ModalModulosDoCurso from './ModalModulosDoCurso';
 import ModalAcessoGerenciamento from './ModalAcessoGerenciamento';
 import { isAdminRole } from '@/lib/roles';
 
+type Video = Awaited<ReturnType<typeof getVideos>>[number];
+type Modulo = Awaited<ReturnType<typeof getModulos>>[number];
+type Curso = Awaited<ReturnType<typeof getAllCursos>>[number];
+type VideoOrdenado = Awaited<ReturnType<typeof import('@/actions/GetVideos').getVideosDoModulo>>[number];
+type ModuloAtivo = Pick<Modulo, "id" | "nome"> & { imagemUrl?: string | null };
+
 export default function GerenciadorAlphaSkills() {
     const { data: session } = useSession();
     const isAdmin = isAdminRole((session?.user as { role?: string })?.role);
 
     const [filtroSetor, setFiltroSetor] = useState("Todos");
     const [loading, setLoading] = useState(true);
-    const [videosList, setVideosList] = useState<any[]>([]);
-    const [modulosList, setModulosList] = useState<any[]>([]);
-    const [cursosList, setCursosList] = useState<any[]>([]);
+    const [videosList, setVideosList] = useState<Video[]>([]);
+    const [modulosList, setModulosList] = useState<Modulo[]>([]);
+    const [cursosList, setCursosList] = useState<Curso[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [videoSelecionado, setVideoSelecionado] = useState<any>(null);
+    const [videoSelecionado, setVideoSelecionado] = useState<Video | VideoOrdenado | null>(null);
     const [modalEditOpen, setModalEditOpen] = useState(false);
     const [modalDeleteOpen, setModalDeleteOpen] = useState(false);
-    const [moduloAtivo, setModuloAtivo] = useState<any>(null);
+    const [moduloAtivo, setModuloAtivo] = useState<ModuloAtivo | null>(null);
     const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
-    const [videosOrdenados, setVideosOrdenados] = useState<any[]>([]);
+    const [videosOrdenados, setVideosOrdenados] = useState<VideoOrdenado[]>([]);
     const [modalCursoOpen, setModalCursoOpen] = useState(false);
     const [cursoSelecionadoId, setCursoSelecionadoId] = useState<string | null>(null);
     const [modalAcessoOpen, setModalAcessoOpen] = useState(false);
 
 
-    const carregarDados = async () => {
+    const carregarDados = useCallback(async () => {
         setLoading(true);
         const [vids, mods, cursos] = await Promise.all([getVideos(), getModulos(), getAllCursos()]);
         setVideosList(vids);
         setModulosList(mods);
-        setCursosList(cursos as any[]);
+        setCursosList(cursos);
         setLoading(false);
-    };
+    }, []);
 
-    useEffect(() => { carregarDados(); }, []);
+    useEffect(() => {
+        let ativo = true;
+        queueMicrotask(() => { if (ativo) void carregarDados(); });
+        return () => { ativo = false; };
+    }, [carregarDados]);
 
 
     const filteredModulos = useMemo(() => {
@@ -278,7 +288,7 @@ export default function GerenciadorAlphaSkills() {
                                                     >
                                                         {(vid.thumbUrl || moduloAtivo?.imagemUrl) ? (
                                                             <img
-                                                                src={vid.thumbUrl || moduloAtivo?.imagemUrl}
+                                                                src={vid.thumbUrl || moduloAtivo?.imagemUrl || ""}
                                                                 className="w-full h-full object-cover group-hover/thumb:scale-110 transition-transform duration-500"
                                                             />
                                                         ) : (

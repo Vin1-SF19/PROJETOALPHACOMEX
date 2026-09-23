@@ -34,7 +34,7 @@ export function UserDropdown({ userName, userRole }: UserDropdownProps) {
     };
 
     const userImage = session?.user?.imagemUrl;
-    const fotoFinal = userImage || session?.user?.imagemUrl || (session?.user as any)?.image;
+    const fotoFinal = userImage;
     const initials = userName?.substring(0, 2).toUpperCase() || "OP";
 
 

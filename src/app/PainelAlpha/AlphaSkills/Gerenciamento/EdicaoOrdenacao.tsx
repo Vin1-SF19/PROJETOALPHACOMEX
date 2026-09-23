@@ -117,8 +117,8 @@ export default function ModalGerenciamento({ isOpen, onClose, modulo, videos, on
                                                     </div>
 
                                                     <div className="w-12 h-8 bg-black rounded-lg overflow-hidden shrink-0 border border-white/5">
-                                                        {(vid.thumbUrl || modulo?.imagemUrl) && (
-                                                            <img src={vid.thumbUrl || modulo?.imagemUrl!} className="w-full h-full object-cover opacity-80" />
+                                                        {(vid.thumbUrl || modulo.imagemUrl) && (
+                                                            <img src={vid.thumbUrl || modulo.imagemUrl || undefined} className="w-full h-full object-cover opacity-80" />
                                                         )}
                                                     </div>
 

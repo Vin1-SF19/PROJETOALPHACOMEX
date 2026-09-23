@@ -31,7 +31,7 @@ export function FiltroChamadosCards({
     router.push(`?${params.toString()}`, { scroll: false });
   };
 
-  const styles: any = {
+  const styles: Record<string, { border: string; active: string; text: string }> = {
     blue: { border: "border-blue-500/20", active: "bg-blue-600/20 border-blue-500 shadow-[0_0_25px_rgba(59,130,246,0.3)] ring-1 ring-blue-500", text: "text-blue-400" },
     amber: { border: "border-amber-500/20", active: "bg-amber-600/20 border-amber-500 shadow-[0_0_25px_rgba(245,158,11,0.3)] ring-1 ring-amber-500", text: "text-amber-400" },
     purple: { border: "border-purple-500/20", active: "bg-purple-600/20 border-purple-500 shadow-[0_0_25px_rgba(168,85,247,0.3)] ring-1 ring-purple-500", text: "text-purple-400" },

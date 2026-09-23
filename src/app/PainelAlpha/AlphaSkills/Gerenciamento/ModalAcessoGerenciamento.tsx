@@ -24,10 +24,15 @@ export default function ModalAcessoGerenciamento({
 
     useEffect(() => {
         if (!isOpen) return;
-        setLoading(true);
-        listarAcessoModulo(MODULO)
-            .then(data => setUsers(data))
-            .finally(() => setLoading(false));
+        let active = true;
+        queueMicrotask(() => {
+            if (!active) return;
+            setLoading(true);
+            listarAcessoModulo(MODULO)
+                .then(data => { if (active) setUsers(data); })
+                .finally(() => { if (active) setLoading(false); });
+        });
+        return () => { active = false; };
     }, [isOpen]);
 
     const temAcesso = (user: UserAcesso) => {

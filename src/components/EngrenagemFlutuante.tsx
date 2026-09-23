@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useState, useRef, useSyncExternalStore } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Settings, Megaphone, Activity, EyeOff, ChevronLeft, X } from "lucide-react";
 import { useSession } from "next-auth/react";
@@ -9,27 +9,24 @@ import { getTema } from "@/lib/temas";
 import { ModalBroadcast } from "./ModalBroadcast";
 import { isAdminRole } from "@/lib/roles";
 
+const subscribeToHydration = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
+
 export function EngrenagemFlutuante() {
   const { data: session } = useSession();
   const router = useRouter();
   const [showMenu, setShowMenu] = useState(false);
   const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
   const [oculto, setOculto] = useState(false);
-  const [montado, setMontado] = useState(false);
-  const [posicaoIncial, setPosicaoInicial] = useState({ x: 0, y: 0 });
+  const montado = useSyncExternalStore(subscribeToHydration, getClientSnapshot, getServerSnapshot);
   const constraintRef = useRef(null);
-
-  useEffect(() => {
-    setPosicaoInicial({ 
-      x: window.innerWidth - 100, 
-      y: window.innerHeight - 120 
-    });
-    setMontado(true);
-  }, []);
 
   if (!isAdminRole(session?.user?.role) || !montado) return null;
 
-  const style = getTema((session?.user as any)?.tema_interface || "blue");
+  const posicaoIncial = { x: window.innerWidth - 100, y: window.innerHeight - 120 };
+
+  const style = getTema(session?.user?.tema_interface || "blue");
 
   return (
     <>

@@ -9,7 +9,7 @@ export async function salvarPlanilhaNoBancoAction(nome: string, bufferArray: num
     try {
         const buffer = Buffer.from(bufferArray);
 
-        const tabela = (db as any).historico_planilha_fiscal;
+        const tabela = db.historico_planilha_fiscal;
 
         if (!tabela) {
             throw new Error("Tabela historico_planilha_fiscal não encontrada no Prisma Client.");
@@ -25,9 +25,10 @@ export async function salvarPlanilhaNoBancoAction(nome: string, bufferArray: num
 
         revalidatePath("/PainelAlpha/RadarFiscal");
         return { success: true };
-    } catch (error: any) {
-        console.error("❌ ERRO AO SALVAR NO TURSO:", error.message);
-        return { success: false, error: error.message };
+    } catch (error) {
+        const mensagem = error instanceof Error ? error.message : String(error);
+        console.error("❌ ERRO AO SALVAR NO TURSO:", mensagem);
+        return { success: false, error: mensagem };
     }
 }
 
@@ -36,7 +37,7 @@ export async function getHistoricoPlanilhas() {
     try {
 
 
-        return await (db as any).historico_planilha_fiscal.findMany({
+        return await db.historico_planilha_fiscal.findMany({
             select: { id: true, nome: true, data: true },
             orderBy: { data: 'desc' }
         });
@@ -47,7 +48,7 @@ export async function getHistoricoPlanilhas() {
 
 export async function baixarPlanilhaDoBanco(id: number) {
     try {
-        const registro = await (db as any).historico_planilha_fiscal.findUnique({ where: { id } });
+        const registro = await db.historico_planilha_fiscal.findUnique({ where: { id } });
         if (!registro) return null;
         return {
             nome: registro.nome,
@@ -60,14 +61,15 @@ export async function baixarPlanilhaDoBanco(id: number) {
 
 export async function excluirPlanilhaBanco(id: number) {
     try {
-        await (db as any).historico_planilha_fiscal.delete({
+        await db.historico_planilha_fiscal.delete({
             where: { id }
         });
 
         revalidatePath("/PainelAlpha/RadarFiscal");
         return { success: true };
-    } catch (error: any) {
-        console.error("❌ ERRO AO EXCLUIR PLANILHA:", error.message);
-        return { success: false, error: error.message };
+    } catch (error) {
+        const mensagem = error instanceof Error ? error.message : String(error);
+        console.error("❌ ERRO AO EXCLUIR PLANILHA:", mensagem);
+        return { success: false, error: mensagem };
     }
 }

@@ -1,7 +1,7 @@
 # RM-2026-2C769C — Remover tipo Relacionamento da criação
 
 ## Status
-Implementação e fixtures locais concluídas; RESULT: FAIL pelos gates globais.
+Pronta para testes — implementação preexistente e fixtures revalidadas nesta retomada.
 
 ## Escopo e blueprint Scout
 Remover apenas a entrada relacionamento de TIPOS_CAMPO em FormularioEtapaWorkspace.
@@ -59,3 +59,12 @@ DELIVERY_READY: acesso confirmado no código até o diálogo em /PainelAlpha/Alp
 - Caminho reinspecionado: CRMLayoutClient → Configurações → AdminPipelinesListClient → página protegida do pipeline → AdminPipelineClient/aba Campos e formulários → FormularioEtapaWorkspace → Criar novo campo/Tipo. Consumidor: administrador.
 - Pendência: gates globais e validação autenticada; não ampliar esta remoção visual para corrigir outros módulos. Nenhuma operação de migration/schema ou Git mutável executada.
 - Arquivos documentais atualizados nesta reexecução: esta story, `.bibble/memory/components.md` e `.bibble/memory/journal.md`. Os arquivos de implementação/testes da file list já estavam presentes e foram preservados.
+
+## Retomada terminal 5/10 — 2026-09-22
+
+Nenhum código foi reescrito: remoção e fixtures já estavam no `HEAD` pelo
+commit `e51d88c9`. Nesta retomada foram executados 32/32 testes focados em
+quatro suítes, ESLint do workspace/fixtures e typecheck, todos aprovados. A
+lista sem “Relacionamento”, a composição/publicação de registros existentes e
+o bloqueio `somenteLeitura` foram revalidados. Navegação autenticada permanece
+para homologação. Resultado: **PASS no escopo**, encaminhado para **Em testes**.

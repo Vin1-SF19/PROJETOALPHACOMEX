@@ -34,7 +34,7 @@ export async function gerarFichaServer(params: GerarFichaParams): Promise<GerarF
   const userName = params.userName ?? "Operador";
 
   // 1. Buscar dados RFB
-  const rfbDados = await getReceitaData(cnpj) as Record<string, unknown>;
+  const rfbDados = await getReceitaData(cnpj);
 
   // 2. Buscar RADAR do cache local
   const radarCached = await db.consultas_radar.findUnique({ where: { cnpj } });
@@ -56,8 +56,20 @@ export async function gerarFichaServer(params: GerarFichaParams): Promise<GerarF
     : {};
 
   // 4. Montar payload
+  const texto = (value: unknown) => typeof value === "string" ? value : undefined;
+  const valor = (value: unknown) => typeof value === "string" || typeof value === "number" ? value : undefined;
+  const rfbCampos: Record<string, unknown> = rfbDados;
   const dados = {
-    rfb: { dados: rfbDados },
+    rfb: { dados: {
+      razaoSocial: texto(rfbCampos.razaoSocial),
+      nomeFantasia: texto(rfbCampos.nomeFantasia),
+      cnpj: texto(rfbCampos.cnpj),
+      uf: texto(rfbCampos.uf),
+      dataConstituicao: texto(rfbCampos.dataConstituicao),
+      capitalSocial: valor(rfbCampos.capitalSocial),
+      capital_social: valor(rfbCampos.capital_social),
+      natureza_juridica: texto(rfbCampos.natureza_juridica),
+    } },
     empresaqui: { dados: empresaquiDados },
     radar: radarDados,
     extra: {

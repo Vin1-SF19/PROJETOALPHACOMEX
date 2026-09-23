@@ -7,36 +7,63 @@ import {
     Users, Phone, Mail, Landmark, User, History
 } from "lucide-react";
 import { useState } from "react";
-import { pdf } from "@react-pdf/renderer";
-import { FichaAlphaPDF } from "@/components/GerarFicha";
 import { ModalPDF } from "@/components/ModalPdf";
+import type { TemaAlpha } from "@/lib/temas";
+
+type CnaeExibicao = { code?: string; codigo?: string; text?: string; descricao?: string };
+type SocioExibicao = { nome?: string; qual?: string };
+type HistoricoExibicao = { Ano?: string | number; ano?: string | number; periodo?: string | number; Regime?: string; regime?: string };
+type DadosRfbExibicao = {
+    razaoSocial?: string; nomeFantasia?: string; cnpj?: string; situacao?: string;
+    dataConstituicao?: string; porte?: string; capitalSocial?: string | number;
+    natureza_juridica?: string; atividade_principal?: CnaeExibicao[];
+    atividades_secundarias?: CnaeExibicao[]; qsa?: SocioExibicao[];
+    logradouro?: string; numero?: string; bairro?: string; municipio?: string;
+    uf?: string; cep?: string; optante_simples?: boolean | null;
+    optante_simei?: boolean | null; data_opcao?: string;
+    data_exclusaoSimples?: string; data_opcaoSimei?: string;
+    data_exclusaoSimei?: string; email?: string; telefone?: string;
+};
+type DadosEmpresaquiExibicao = {
+    historico_regime?: HistoricoExibicao[]; historicoRegime?: HistoricoExibicao[];
+    consultaStatus?: string; regimeEA?: string;
+};
+type DadosRadarExibicao = { submodalidade?: string; situacao?: string; dataSituacao?: string };
+type EtapaExibicao = {
+    status?: string;
+    dados?: Record<string, unknown> | null;
+    consultadoEm?: string | null;
+};
 
 interface Props {
-    dados: any;
-    visual: any;
+    dados: { rfb?: EtapaExibicao; empresaqui?: EtapaExibicao; radar?: EtapaExibicao };
+    visual: TemaAlpha;
     userName: string;
+    onRetry?: () => void;
 }
 
-export default function BlocoResultados({ dados, visual, userName }: Props) {
-    const rfb = dados.rfb?.dados || {};
-    const empresaqui = dados.empresaqui?.dados || {};
+export default function BlocoResultados({ dados, visual, userName, onRetry }: Props) {
+    const rfb = (dados.rfb?.dados || {}) as DadosRfbExibicao;
+    const empresaqui = (dados.empresaqui?.dados || {}) as DadosEmpresaquiExibicao;
     const [loadingRadar, setLoadingRadar] = useState(false);
     const [showModal, setShowModal] = useState(false);
 
     const radarSalvo = dados?.radar?.dados && typeof dados.radar.dados === "object" && Object.keys(dados.radar.dados).length > 0
-        ? dados.radar.dados
+        ? dados.radar.dados as DadosRadarExibicao
         : null;
 
     const [etapas, setEtapas] = useState({
         radar: {
             status: radarSalvo ? "success" : "idle" as "success" | "idle" | "loading" | "error",
             dados: radarSalvo,
-            consultadoEm: (dados?.radar as any)?.consultadoEm ?? null,
+            consultadoEm: dados?.radar?.consultadoEm ?? null,
         }
     });
 
     const dadosExibicaoRadar = etapas.radar.dados || {};
-    const historico = empresaqui.historico_regime || empresaqui.historicoRegime || [];
+    const historicoBruto = empresaqui.historico_regime || empresaqui.historicoRegime;
+    const historico = Array.isArray(historicoBruto) ? historicoBruto : [];
+    const consultaParcial = empresaqui.consultaStatus === "parcial" || dados.empresaqui?.status === "error";
 
     const estadosBrasileiros: Record<string, string> = {
         AC: "Acre", AL: "Alagoas", AP: "Amapá", AM: "Amazonas", BA: "Bahia", CE: "Ceará",
@@ -58,7 +85,7 @@ export default function BlocoResultados({ dados, visual, userName }: Props) {
         try {
             const response = await fetch(`/api/ConsultaRadar?cnpj=${cnpjParaConsultar}`);
             const resRadar = await response.json();
-            const sucesso = !resRadar.error;
+            const sucesso = response.ok && !resRadar.error;
             const agora = sucesso ? new Date().toISOString() : null;
 
             setEtapas(prev => ({
@@ -85,6 +112,13 @@ export default function BlocoResultados({ dados, visual, userName }: Props) {
         <>
             <div className="space-y-6 md:space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-1000">
 
+                {consultaParcial && (
+                    <div role="status" className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 text-amber-200 text-sm">
+                        Consulta parcial: o regime tributário e a qualificação dependem de dados que não estão disponíveis.
+                        {onRetry && <button type="button" onClick={onRetry} className="ml-3 font-bold underline">Consultar novamente</button>}
+                    </div>
+                )}
+
                 {/* HEADER: RAZÃO SOCIAL E STATUS */}
                 <div className="p-6 md:p-12 rounded-[2rem] md:rounded-[4rem] bg-white/5 border border-white/10 backdrop-blur-3xl relative overflow-hidden">
                     <div className={`absolute top-0 right-0 w-96 h-96 ${visual.bg} opacity-10 blur-[120px]`} />
@@ -99,7 +133,7 @@ export default function BlocoResultados({ dados, visual, userName }: Props) {
                             </div>
                             <div className="relative">
                                 <h2 className="text-4xl md:text-7xl font-black uppercase italic tracking-tighter text-white leading-[0.9] drop-shadow-2xl">
-                                    {rfb.razaoSocial || "NÃO LOCALIZADO"}
+                                    {rfb.razaoSocial || "Não informado"}
                                 </h2>
                                 <div className="mt-6 flex flex-col md:flex-row md:items-center gap-4">
                                     <p className="text-slate-500 font-mono text-xs md:text-lg tracking-[0.2em] uppercase border-l-2 border-white/10 pl-4">
@@ -175,7 +209,7 @@ export default function BlocoResultados({ dados, visual, userName }: Props) {
                                             );
                                         }
 
-                                        return listaCnaes.map((cnae: any, i: number) => {
+                                        return listaCnaes.map((cnae: CnaeExibicao, i: number) => {
                                             const codigo = cnae.code || cnae.codigo;
                                             const descricao = cnae.text || cnae.descricao;
                                             const isPrincipal = i === 0;
@@ -214,8 +248,8 @@ export default function BlocoResultados({ dados, visual, userName }: Props) {
                                 <h3 className="text-sm md:text-base font-black uppercase tracking-[0.2em] text-white">Quadro de Sócios e Administradores (QSA)</h3>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {rfb.qsa?.length > 0
-                                    ? rfb.qsa.map((socio: any, i: number) => (
+                                {(rfb.qsa?.length ?? 0) > 0
+                                    ? rfb.qsa?.map((socio: SocioExibicao, i: number) => (
                                         <div key={i} className="flex items-center gap-6 p-6 rounded-[1.5rem] bg-white/5 border border-white/5 hover:border-white/10 transition-all">
                                             <div className="p-4 rounded-xl bg-white/5"><User size={20} className="text-slate-400" /></div>
                                             <div className="min-w-0">
@@ -239,7 +273,7 @@ export default function BlocoResultados({ dados, visual, userName }: Props) {
                                 <DataField label="Logradouro" value={`${rfb.logradouro}, ${rfb.numero}`} />
                                 <DataField label="Bairro" value={rfb.bairro} />
                                 <DataField label="Município" value={rfb.municipio} />
-                                <DataField label="Estado (UF)" value={estadosBrasileiros[rfb.uf?.toUpperCase()] || rfb.uf || "---"} />
+                                <DataField label="Estado (UF)" value={estadosBrasileiros[rfb.uf?.toUpperCase() ?? ""] || rfb.uf || "---"} />
                                 <DataField label="CEP" value={rfb.cep} />
                                 <DataField label="País" value="BRASIL" />
                             </div>
@@ -308,7 +342,7 @@ export default function BlocoResultados({ dados, visual, userName }: Props) {
                                             </div>
                                         ) : (
                                             <div className={loadingRadar ? "opacity-40 animate-pulse pointer-events-none" : ""}>
-                                                <DataField label="Submodalidade de Atuação" value={dadosExibicaoRadar?.submodalidade || "Não Habilitado"} />
+                                                <DataField label="Submodalidade de Atuação" value={dadosExibicaoRadar?.submodalidade || "Não informado"} />
                                                 <DataField label="Status de Habilitação" value={dadosExibicaoRadar?.situacao || "---"} />
                                                 <DataField label="Última Atualização" value={dadosExibicaoRadar?.dataSituacao || "---"} />
                                             </div>
@@ -361,7 +395,7 @@ export default function BlocoResultados({ dados, visual, userName }: Props) {
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-4">
                             {[2021, 2022, 2023, 2024, 2025].map(ano => {
-                                const registro = historico.find((h: any) =>
+                                const registro = historico.find((h: HistoricoExibicao) =>
                                     String(h.Ano || h.ano || h.periodo).includes(String(ano))
                                 );
                                 return (
@@ -387,7 +421,7 @@ export default function BlocoResultados({ dados, visual, userName }: Props) {
             <ModalPDF
                 isOpen={showModal}
                 onClose={() => { document.body.style.overflow = "unset"; setShowModal(false); }}
-                dados={dados}
+                dados={{ rfb: { dados: rfb }, empresaqui: { dados: empresaqui }, radar: radarSalvo }}
                 radarDados={etapas.radar.dados}
                 user={userName}
             />
@@ -399,21 +433,22 @@ function DataField({ label, value, fullWidth = false }: { label: string; value?:
     return (
         <div className={`${fullWidth ? "col-span-1 sm:col-span-2 md:col-span-4" : ""} min-w-0`}>
             <p className="text-[10px] md:text-[11px] font-black text-slate-600 uppercase tracking-[0.2em] mb-2">{label}</p>
-            <p className="text-sm md:text-lg font-bold text-slate-100 uppercase italic leading-tight break-words">{value || "---"}</p>
+            <p className="text-sm md:text-lg font-bold text-slate-100 uppercase italic leading-tight break-words">{value || "Não informado"}</p>
         </div>
     );
 }
 
-function StatusRow({ label, active }: { label: string; active: boolean }) {
+function StatusRow({ label, active }: { label: string; active?: boolean | null }) {
     return (
         <div className="flex justify-between items-center gap-4">
             <span className="text-xs font-black text-slate-500 uppercase tracking-widest">{label}</span>
             <span className={`text-[11px] font-black px-5 py-2 rounded-lg ${
-                active
+                active === true
                     ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                    : "bg-rose-500/10 text-rose-500 border border-rose-500/20"
+                    : active === false ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
+                    : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
             }`}>
-                {active ? "SIM" : "NÃO"}
+                {active === true ? "SIM" : active === false ? "NÃO" : "Não informado"}
             </span>
         </div>
     );

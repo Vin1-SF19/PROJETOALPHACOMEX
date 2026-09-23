@@ -5,11 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PipelineEditorStateProvider, usePipelineEditorState } from "@/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/PipelineEditorStateProvider";
 import { FormularioEtapaWorkspace, type FormularioEtapaAdmin } from "@/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/FormularioEtapaWorkspace";
 
-vi.mock("@/actions/bpm/Campos", () => ({ CriarCampoBpm: vi.fn() }));
+vi.mock("@/actions/bpm/Campos", () => ({ CriarCampoBpm: vi.fn(), ExcluirCampoBpm: vi.fn() }));
 vi.mock("@/actions/bpm/FormulariosEtapa", () => ({ SalvarFormularioEtapaBpm: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/FormularioEtapaRenderer", () => ({ FormularioEtapaRenderer: () => null }));
-import { CriarCampoBpm } from "@/actions/bpm/Campos";
+import { CriarCampoBpm, ExcluirCampoBpm } from "@/actions/bpm/Campos";
 import { SalvarFormularioEtapaBpm } from "@/actions/bpm/FormulariosEtapa";
 import { toast } from "sonner";
 
@@ -56,6 +56,36 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
 
 describe("workspace React com remontagem versionada", () => {
+  it("remove componente compatível e preserva adicionar/criar campo", async () => {
+    expect(container.textContent).not.toContain("Adicionar componente compatível");
+    expect(container.querySelector('[aria-label^="Adicionar componente à seção"]')).toBeNull();
+    expect(container.querySelector<HTMLSelectElement>('[aria-label="Adicionar campo à seção Section second"]')).toBeTruthy();
+    await click("Criar novo campo");
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Criar campo para second");
+  });
+
+  it("confirma e exclui campo aplicável sem removê-lo apenas da composição", async () => {
+    vi.mocked(ExcluirCampoBpm).mockResolvedValue({ success: true });
+    await click("Excluir campo aplicável");
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("exclusão é permanente");
+    await click("Excluir definitivamente");
+    expect(ExcluirCampoBpm).toHaveBeenCalledWith({ campoId: field.id });
+    expect(container.querySelector(`option[value="${field.id}"]`)).toBeNull();
+    expect(toast.success).toHaveBeenCalledWith("Campo “Existing” excluído");
+  });
+
+  it("mantém o campo e o modal quando o servidor bloqueia dados associados", async () => {
+    vi.mocked(ExcluirCampoBpm).mockResolvedValue({
+      success: false,
+      error: "Este campo possui dados associados e não pode ser excluído",
+    });
+    await click("Excluir campo aplicável");
+    await click("Excluir definitivamente");
+    expect(container.querySelector(`option[value="${field.id}"]`)).toBeTruthy();
+    expect(document.querySelector('[role="dialog"]')).toBeTruthy();
+    expect(toast.error).toHaveBeenCalledWith("Este campo possui dados associados e não pode ser excluído");
+  });
+
   it("troca a etapa sem transplantar seções; preserva rascunho e aba após remontagem", async () => {
     expect(title()).toBe("Section second");
     await addExisting(); version++; await render();

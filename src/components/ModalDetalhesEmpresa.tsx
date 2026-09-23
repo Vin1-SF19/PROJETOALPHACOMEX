@@ -2,20 +2,19 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
-import { Building2, MapPin, BadgeDollarSign, CalendarDays, FileText } from "lucide-react";
+import { Building2, MapPin, BadgeDollarSign, CalendarDays, FileText, type LucideIcon } from "lucide-react";
 
-export function ModalDetalhesEmpresa({ empresa, open, onOpenChange }: any) {
-  if (!empresa) return null;
+type EmpresaDetalhes = Partial<Record<
+  "cnpj" | "situacao" | "razaoSocial" | "nomeFantasia" | "contribuinte" |
+  "municipio" | "uf" | "dataConstituicao" | "capitalSocial" |
+  "regimeTributario" | "dataSituacao" | "submodalidade" | "data_opcao",
+  string | null
+>>;
 
-  // FUNÇÃO PARA FORMATAR DATA (Limpa o formato ISO da imagem)
-  const formatarData = (valor: any) => {
-    if (!valor || valor === "N/A" || valor === "") return "Não informado";
-    const data = new Date(valor);
-    if (isNaN(data.getTime())) return valor;
-    return data.toLocaleDateString("pt-BR", { timeZone: "UTC" });
-  };
+type InfoRowProps = { icon: LucideIcon; label: string; value?: string | null; color?: string };
 
-  const InfoRow = ({ icon: Icon, label, value, color }: any) => (
+function InfoRow({ icon: Icon, label, value, color }: InfoRowProps) {
+  return (
     <div className="flex flex-col gap-1 p-3 rounded-xl bg-slate-900/50 border border-white/5">
       <div className="flex items-center gap-2 text-slate-500">
         <Icon size={14} className={color || "text-blue-500"} />
@@ -26,6 +25,21 @@ export function ModalDetalhesEmpresa({ empresa, open, onOpenChange }: any) {
       </p>
     </div>
   );
+}
+
+function formatarData(valor?: string | null) {
+  if (!valor || valor === "N/A") return "Não informado";
+  const data = new Date(valor);
+  if (isNaN(data.getTime())) return valor;
+  return data.toLocaleDateString("pt-BR", { timeZone: "UTC" });
+}
+
+export function ModalDetalhesEmpresa({ empresa, open, onOpenChange }: {
+  empresa: EmpresaDetalhes | null | undefined;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  if (!empresa) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

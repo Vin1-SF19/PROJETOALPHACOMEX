@@ -190,7 +190,7 @@ async function analyzeMigrationPlan(projectRoot, options = {}) {
   for (const filePath of allFiles) {
     const relativePath = path.relative(aioxCoreDir, filePath);
     const stats = await fs.promises.stat(filePath);
-    const module = categorizeFile(relativePath);
+    const moduleName = categorizeFile(relativePath);
 
     const fileInfo = {
       sourcePath: filePath,
@@ -198,11 +198,11 @@ async function analyzeMigrationPlan(projectRoot, options = {}) {
       size: stats.size,
     };
 
-    if (module && plan.modules[module]) {
+    if (moduleName && plan.modules[moduleName]) {
       // Calculate target path
-      fileInfo.targetPath = path.join(aioxCoreDir, module, relativePath);
-      plan.modules[module].files.push(fileInfo);
-      plan.modules[module].size += stats.size;
+      fileInfo.targetPath = path.join(aioxCoreDir, moduleName, relativePath);
+      plan.modules[moduleName].files.push(fileInfo);
+      plan.modules[moduleName].size += stats.size;
     } else {
       plan.uncategorized.push(fileInfo);
     }

@@ -122,7 +122,7 @@ describe("CRM - formulário unificado por etapa", () => {
   });
 
   it("persiste os formulários locais automaticamente ao sair do campo", () => {
-    expect(campos).toContain("onBlur={() => void salvarCamposAtuais()}");
+    expect(campos).toContain("onBlur={() => { scheduleSave");
     expect(campos).not.toContain("Salvar campos da etapa");
     expect(proximoContato).toContain("onCommit={(novoValor) => void persistir(novoValor || null)}");
     expect(proximoContato).not.toContain(">Salvar<");
@@ -133,7 +133,7 @@ describe("CRM - formulário unificado por etapa", () => {
   });
 
   it("mantém avançar como uma ação explícita e compacta no painel direito", () => {
-    expect(proximaEtapa).toContain("await flushSaves()");
+    expect(proximaEtapa).toContain("await flushSaves(card.id)");
     expect(proximaEtapa).toContain("MoverCardBpm({ cardId: card.id, etapaDestinoId })");
     expect(proximaEtapa).not.toContain("Salvar e avançar");
     expect(proximaEtapa).toContain("px-3 py-2 rounded-xl text-xs");

@@ -1,6 +1,6 @@
 # RM-2026-389729 — Contraste dos selects do formulário de etapa
 
-Status: Implementada; gates globais e validação visual pendentes
+Status: Pronta para testes — implementação e gates do escopo aprovados
 
 ## Objetivo e contexto
 Usuários autorizados do Alpha CRM precisam ler booleano, seleção simples e
@@ -40,6 +40,7 @@ reportar problemas do working tree preexistente; registrar sem ocultar falhas.
 ## File list
 - `docs/stories/story-rm-2026-389729-corrigir-contraste-selects-etapa.md`
 - `src/app/PainelAlpha/AlphaCRM/CampoBpmInput.tsx`
+- `tests/bpm/campo-select-contraste-react.test.ts`
 - `.bibble/memory/journal.md`
 
 ## Evidências
@@ -70,3 +71,17 @@ Resultado da fase: FAIL por gates globais; não houve alteração de banco,
 API, auth ou Git mutável. Conferência visual autenticada e screenshot ficam
 pendentes; não se afirma aprovação visual das opções nativas em todos os SOs.
 
+## Encerramento técnico 2/10 — 2026-09-22
+
+- [x] Adicionada cobertura React para seleção simples, booleano e
+      multisseleção, incluindo resolução de classes conflitantes,
+      placeholder/opções, seleção destacada, JSON, blur e readOnly.
+- [x] Quatro suítes focadas: 31/31 testes aprovados.
+- [x] ESLint do componente e do novo teste: aprovado.
+- [x] Typecheck completo: aprovado.
+- [x] Falhas globais preexistentes já registradas na execução do objetivo 1/10
+      não atingem este escopo; nenhum teste relacionado falhou.
+- [ ] Validação visual autenticada permanece para a etapa de homologação.
+
+Resultado final do desenvolvimento: **PASS no escopo**. Objetivo liberado para
+**Em testes** e objetivo 3/10 autorizado a iniciar.

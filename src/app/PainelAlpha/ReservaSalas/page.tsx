@@ -12,18 +12,21 @@ import { agendarSala, buscarReservasAtivas, cancelarReserva, buscarHistoricoRese
 import { getTema } from '@/lib/temas';
 import { isAdminRole } from '@/lib/roles';
 
+type Reserva = Awaited<ReturnType<typeof buscarReservasAtivas>>[number];
+type ReservaEditando = Reserva & { dataStr: string; inicioStr: string; fimStr: string };
+
 export default function ReservaSalas() {
   const { data: session, status } = useSession();
-  const [reservas, setReservas] = useState<any[]>([]);
-  const [historico, setHistorico] = useState<any[]>([]);
+  const [reservas, setReservas] = useState<Reserva[]>([]);
+  const [historico, setHistorico] = useState<Awaited<ReturnType<typeof buscarHistoricoReservas>>>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [reservaEditando, setReservaEditando] = useState<any>(null);
+  const [reservaEditando, setReservaEditando] = useState<ReservaEditando | null>(null);
   const [erros, setErros] = useState<string[]>([]);
   const [isPending, setIsPending] = useState(false);
 
-  const temaNome = (session?.user as any)?.tema_interface || "blue";
+  const temaNome = session?.user?.tema_interface || "blue";
   const style = getTema(temaNome);
-  const usuarioLogado = session?.user?.nome || (session?.user as any)?.usuario || "Usuário";
+  const usuarioLogado = session?.user?.nome || session?.user?.usuario || "Usuário";
   const isAdmin = isAdminRole(session?.user?.role);
 
   const atualizar = useCallback(async () => {
@@ -42,8 +45,15 @@ export default function ReservaSalas() {
   });
 
   useEffect(() => {
-    if (status === "authenticated") atualizar();
-  }, [status, atualizar]);
+    if (status !== "authenticated") return;
+    let ativo = true;
+    void Promise.all([buscarReservasAtivas(), buscarHistoricoReservas()]).then(([ativos, passados]) => {
+      if (!ativo) return;
+      setReservas(ativos);
+      setHistorico(passados);
+    });
+    return () => { ativo = false; };
+  }, [status]);
 
   const handleInicioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const novoInicio = e.target.value;
@@ -56,7 +66,7 @@ export default function ReservaSalas() {
     const novoInicio = e.target.value;
     const [horas, minutos] = novoInicio.split(':').map(Number);
     const novaHoraFim = `${String((horas + 1) % 24).padStart(2, '0')}:${String(minutos).padStart(2, '0')}`;
-    setReservaEditando({ ...reservaEditando, inicioStr: novoInicio, fimStr: novaHoraFim });
+    setReservaEditando(prev => prev ? { ...prev, inicioStr: novoInicio, fimStr: novaHoraFim } : null);
   };
 
   const handleAgendar = async (e: React.FormEvent) => {
@@ -107,7 +117,8 @@ export default function ReservaSalas() {
     }
   };
 
-  const formatarHora = (dataStr: string) => {
+  const formatarHora = (dataStr: Date | string | null) => {
+    if (!dataStr) return "";
     return new Date(dataStr).toLocaleTimeString('pt-BR', {
       hour: '2-digit',
       minute: '2-digit',
@@ -115,7 +126,7 @@ export default function ReservaSalas() {
     });
   };
 
-  const formatarDataParaInput = (dataStr: string) => {
+  const formatarDataParaInput = (dataStr: Date | string) => {
     return new Date(dataStr).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
   };
 
@@ -426,7 +437,7 @@ export default function ReservaSalas() {
               </div>
               <div className="flex flex-col gap-3 pt-6">
                 <button
-                  onClick={() => editarReservaAction(reservaEditando.id, { data: reservaEditando.dataStr, inicio: reservaEditando.inicioStr, fim: reservaEditando.fimStr, sala: reservaEditando.sala }).then((res: any) => {
+                  onClick={() => editarReservaAction(reservaEditando.id, { data: reservaEditando.dataStr, inicio: reservaEditando.inicioStr, fim: reservaEditando.fimStr, sala: reservaEditando.sala }).then((res) => {
                     if (res.success) { toast.success("Protocolo Atualizado!"); setReservaEditando(null); atualizar(); } else { toast.error(res.error); }
                   })}
                   className={`cursor-pointer w-full h-14 ${style.bg} text-white rounded-2xl font-black uppercase text-[10px] tracking-[0.3em] hover:brightness-110 transition-all shadow-lg shadow-black/40`}

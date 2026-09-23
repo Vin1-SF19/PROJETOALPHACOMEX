@@ -4,11 +4,12 @@ import { useState } from "react";
 import { Megaphone, X, Send, PowerOff } from "lucide-react";
 import { toast } from "sonner";
 import { dispararAvisoAction, encerrarAvisoAction } from "@/actions/avisos";
+import type { TemaAlpha } from "@/lib/temas";
 
 interface ModalBroadcastProps {
   isOpen: boolean;
   onClose: () => void;
-  style: any;
+  style: TemaAlpha;
 }
 
 export function ModalBroadcast({ isOpen, onClose, style }: ModalBroadcastProps) {

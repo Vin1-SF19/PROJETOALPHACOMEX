@@ -9,6 +9,7 @@
  */
 import type { Prisma } from "@prisma/client";
 import db from "@/lib/prisma";
+import { checarAcessoBpmCard, exigirAcessoModuloBpm } from "@/lib/bpm/ownership";
 
 type ClienteDb = Prisma.TransactionClient | typeof db;
 
@@ -70,7 +71,15 @@ export async function listarPendenciasBpm(
   isAdminOuDiretoria: boolean,
   client: ClienteDb = db,
 ): Promise<ItemPendencia[]> {
-  const cards = await cardsDoUsuario(userId, isAdminOuDiretoria, client);
+  await exigirAcessoModuloBpm(userId, client);
+  const candidatos = await cardsDoUsuario(userId, isAdminOuDiretoria, client);
+  // A seleção inicial não concede acesso: o guard relê permissão efetiva,
+  // Boas-vindas, visibilidade da etapa e vínculo usando o mesmo cliente.
+  const cards: typeof candidatos = [];
+  for (const card of candidatos) {
+    const acesso = await checarAcessoBpmCard(card.id, userId, null, "visualizar", client);
+    if (acesso.autorizado) cards.push(card);
+  }
   if (cards.length === 0) return [];
   const cardIds = cards.map((c) => c.id);
   const cardPorId = new Map(cards.map((c) => [c.id, c]));

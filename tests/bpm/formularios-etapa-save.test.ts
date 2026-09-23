@@ -156,7 +156,7 @@ function transactionClient() {
 
 describe("contrato e salvamento diferencial do formulário de etapa", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     mocks.auth.mockResolvedValue({ user: { id: "7", role: "Admin" } });
     mocks.access.mockResolvedValue(undefined);
     mocks.stageFindFirst.mockResolvedValue({
@@ -199,6 +199,117 @@ describe("contrato e salvamento diferencial do formulário de etapa", () => {
     const parsed = salvarFormularioEtapaSchema.parse(input());
     expect(parsed.secoes[0].componentes[1].capability).toBe("STAGE_CHECKLIST");
     expect(parsed.secoes[0].componentes[2].capability).toBe("FOLLOW_UP_SCHEDULER");
+  });
+
+  it.each([
+    { pipelineId: " " },
+    { etapaId: "" },
+    { versaoEsperada: 1.5 },
+    { secoes: undefined },
+    { ordem: -1 },
+  ])("rejeita payload inválido antes de acessar o banco: %j", async (patch) => {
+    expect(await SalvarFormularioEtapaBpm({ ...input(), ...patch })).toMatchObject({ success: false });
+    expect(mocks.access).not.toHaveBeenCalled();
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it.each(["secao", "componente", "chave", "posicao"])("rejeita duplicidade ou posição arbitrária: %s", async (tipo) => {
+    const changed = input();
+    if (tipo === "secao") changed.secoes.push({ ...changed.secoes[0], chave: "outra" });
+    if (tipo === "componente") changed.secoes[0].componentes[1].id = FIELD_COMPONENT_ID;
+    if (tipo === "chave") changed.secoes[0].componentes[1].chave = "field-1";
+    if (tipo === "posicao") Object.assign(changed.secoes[0].componentes[0], { ordem: -1 });
+    expect(await SalvarFormularioEtapaBpm(changed)).toMatchObject({ success: false });
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])("nega permissão inclusive quando revogada dentro da transação: %s", async (revogada) => {
+    if (revogada) mocks.access.mockResolvedValueOnce(undefined);
+    mocks.access.mockRejectedValue(new Error("Sem permissão"));
+    expect(await SalvarFormularioEtapaBpm(input("Alterado"))).toMatchObject({ success: false });
+    expect(mocks.stageFindFirst).not.toHaveBeenCalled();
+    expect(mocks.formUpdateMany).not.toHaveBeenCalled();
+    expect(mocks.notify).not.toHaveBeenCalled();
+  });
+
+  it("nega etapa de outro pipeline", async () => {
+    mocks.stageFindFirst.mockResolvedValue(null);
+    const result = await SalvarFormularioEtapaBpm(input());
+    expect(result.error).toContain("ETAPA_FORA_PIPELINE");
+    expect(mocks.formUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("nega campo inexistente e componente de outro formulário", async () => {
+    mocks.fieldFindMany.mockResolvedValueOnce([]);
+    expect((await SalvarFormularioEtapaBpm(input())).error).toContain("CAMPO_FORA_FORMULARIO_ETAPA");
+    const changed = input();
+    changed.secoes[0].componentes[0].id = "foreign-component";
+    expect((await SalvarFormularioEtapaBpm(changed)).error).toContain("COMPONENTE_FORA_FORMULARIO");
+    expect(mocks.formUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("persiste movimento entre seções, preserva seção vazia e notifica os consumidores", async () => {
+    const original = persistedForm();
+    original.secoes.push({ ...original.secoes[0], id: "section-2", chave: "segunda", ordem: 1, componentes: [] });
+    mocks.stageFindFirst.mockResolvedValue({ id: STAGE_ID, nome: "Novos leads", capabilitiesJson: '["FOLLOW_UP_SCHEDULER"]', formulario: original });
+    const changed = input();
+    const moved = changed.secoes[0].componentes.reverse();
+    moved[0].configJson = '{"label":"Contato"}';
+    changed.secoes[0].componentes = [];
+    changed.secoes.push({ id: "section-2", chave: "segunda", titulo: "Segunda", componentes: moved });
+    expect(await SalvarFormularioEtapaBpm(changed)).toMatchObject({ success: true });
+    for (const [ordem, componente] of moved.entries()) {
+      expect(mocks.componentUpdate).toHaveBeenCalledWith({
+        where: { id: componente.id },
+        data: { secaoId: "section-2", ordem, tipo: componente.tipo, campoId: componente.campoId, capability: componente.capability, configJson: componente.configJson },
+      });
+    }
+    expect(mocks.componentCreate).not.toHaveBeenCalled();
+    expect(mocks.componentDeleteMany).not.toHaveBeenCalled();
+    expect(mocks.sectionDeleteMany).not.toHaveBeenCalled();
+    expect(mocks.auditCreate).toHaveBeenCalledOnce();
+    expect(mocks.pipelineUpdate).toHaveBeenCalledOnce();
+    expect(mocks.revalidatePath).toHaveBeenCalledWith(`/PainelAlpha/AlphaCRM/admin/pipelines/${PIPELINE_ID}`);
+    expect(mocks.revalidatePath).toHaveBeenCalledWith(`/PainelAlpha/AlphaCRM/pipeline/${PIPELINE_ID}`);
+    expect(mocks.notify).toHaveBeenCalledWith({ pipelineId: PIPELINE_ID, tipo: "PIPELINE_ALTERADO" });
+  });
+
+  it("rejeita disputa no compare-and-swap antes de escrever componentes", async () => {
+    mocks.formUpdateMany.mockResolvedValue({ count: 0 });
+    expect((await SalvarFormularioEtapaBpm(input("Alterado"))).error).toContain("CONFLITO_VERSAO_FORMULARIO");
+    expect(mocks.componentUpdate).not.toHaveBeenCalled();
+    expect(mocks.auditCreate).not.toHaveBeenCalled();
+    expect(mocks.notify).not.toHaveBeenCalled();
+  });
+
+  it.each(["componente", "auditoria"])("propaga falha de %s para rollback e não anuncia publicação", async (falha) => {
+    // Adaptador transacional em memória: somente publica o estado após o callback concluir.
+    const committed = { versao: 1, componentes: 0 };
+    let staged = { ...committed };
+    let rolledBack = false;
+    mocks.formUpdateMany.mockImplementation(async () => { staged.versao++; return { count: 1 }; });
+    mocks.componentUpdate.mockImplementation(async () => {
+      staged.componentes++;
+      if (falha === "componente" && staged.componentes === 2) throw new Error("Falha simulada");
+      return { id: FIELD_COMPONENT_ID };
+    });
+    if (falha === "auditoria") mocks.auditCreate.mockRejectedValue(new Error("Falha simulada"));
+    mocks.transaction.mockImplementation(async (callback: (tx: ReturnType<typeof transactionClient>) => Promise<unknown>) => {
+      staged = { ...committed };
+      try {
+        const result = await callback(transactionClient());
+        Object.assign(committed, staged);
+        return result;
+      } catch (error) {
+        rolledBack = true;
+        throw error;
+      }
+    });
+    expect(await SalvarFormularioEtapaBpm(input("Alterado"))).toMatchObject({ success: false });
+    expect(rolledBack).toBe(true);
+    expect(committed).toEqual({ versao: 1, componentes: 0 });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+    expect(mocks.notify).not.toHaveBeenCalled();
   });
 
   it("aceita e preserva rótulo visual sem alterar a identidade do componente", async () => {

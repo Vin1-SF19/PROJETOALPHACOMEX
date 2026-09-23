@@ -1,0 +1,17 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /home/ialpha/projetos/alpha-comex/painel-alpha
+
+
+ Test Files  2 passed (2)
+      Tests  22 passed (22)
+   Start at  00:11:15
+   Duration  361ms (transform 260ms, setup 0ms, import 324ms, tests 13ms, environment 0ms)
+
+npm notice
+npm notice New minor version of npm available! 11.6.1 -> 11.20.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.20.0
+npm notice To update run: npm install -g npm@11.20.0
+npm notice

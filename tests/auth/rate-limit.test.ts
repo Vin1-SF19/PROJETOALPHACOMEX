@@ -17,6 +17,7 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 import {
+  AUTH_RATE_LIMIT_POLICIES,
   authRateLimitKey,
   consumeAuthRateLimit,
   getAuthRequestAddress,
@@ -45,6 +46,17 @@ describe("rate limit compartilhado de autenticação", () => {
     expect(first).toBe(second);
     expect(first).toMatch(/^[a-f0-9]{64}$/);
     expect(first).not.toContain("usuario");
+  });
+
+  it("separa as cotas compartilhadas de cadastro, tributo e convite", () => {
+    expect(AUTH_RATE_LIMIT_POLICIES.pre_analise_cadastro).toMatchObject({ limit: 30, windowMs: 60_000 });
+    expect(AUTH_RATE_LIMIT_POLICIES.pre_analise_tributario).toMatchObject({ limit: 12, windowMs: 60_000 });
+    expect(AUTH_RATE_LIMIT_POLICIES.pre_analise_convite).toMatchObject({ limit: 5, windowMs: 60_000 });
+    expect(new Set([
+      authRateLimitKey("pre_analise_cadastro", "123"),
+      authRateLimitKey("pre_analise_tributario", "123"),
+      authRateLimitKey("pre_analise_convite", "123"),
+    ]).size).toBe(3);
   });
 
   it("libera uma tentativa sem bloqueio", async () => {

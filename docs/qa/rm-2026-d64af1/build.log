@@ -1,0 +1,35 @@
+
+> alpha_sistema@0.1.0 build
+> prisma generate && npm run build:player && NODE_OPTIONS=--max-old-space-size=3072 next build --webpack
+
+Environment variables loaded from .env
+Prisma schema loaded from prisma/schema.prisma
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+
+✔ Generated Prisma Client (v6.19.3) to ./node_modules/@prisma/client in 986ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Need your database queries to be 1000x faster? Accelerate offers you that and more: https://pris.ly/tip-2-accelerate
+
+
+> alpha_sistema@0.1.0 build:player
+> node scripts/build-apresentacoes-player.mjs
+
+[build-apresentacoes-player] bundlando JS...
+[build-apresentacoes-player] JS: 3076.6 KB
+[build-apresentacoes-player] compilando CSS...
+[build-apresentacoes-player] CSS: 1839.8 KB
+[build-apresentacoes-player] gerado em src/generated/apresentacoes-player-bundle.ts
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+▲ Next.js 16.1.6 (webpack)
+- Experiments (use with caution):
+  · cpus: 1
+  · serverActions
+  ✓ webpackMemoryOptimizations
+
+  Creating an optimized production build ...

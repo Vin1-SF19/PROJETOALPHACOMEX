@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronUp,
@@ -12,9 +12,11 @@ import {
   Undo2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ListaCamposFormulario } from "./ListaCamposFormulario";
+import { moverItemFormulario } from "@/lib/bpm/ordem-formulario";
 
 import { PipelineEditorStateBoundary, usePipelineEditorState } from "./PipelineEditorStateProvider";
-import { CriarCampoBpm } from "@/actions/bpm/Campos";
+import { CriarCampoBpm, ExcluirCampoBpm } from "@/actions/bpm/Campos";
 import { SalvarFormularioEtapaBpm } from "@/actions/bpm/FormulariosEtapa";
 import { FormularioEtapaRenderer } from "@/app/PainelAlpha/AlphaCRM/CardModal/FormularioEtapaRenderer";
 import {
@@ -31,7 +33,8 @@ import {
 } from "@/lib/bpm/formularios-etapa";
 
 type CampoFormulario = { id: string; nome: string; tipo: string };
-type ComponenteFormulario = {
+export type ComponenteFormulario = {
+  clientId?: string;
   id?: string;
   chave: string;
   tipo: string;
@@ -41,7 +44,7 @@ type ComponenteFormulario = {
   ordem?: number;
   campo?: CampoFormulario | null;
 };
-type SecaoFormulario = {
+export type SecaoFormulario = {
   id?: string;
   chave: string;
   titulo: string;
@@ -85,7 +88,6 @@ const TIPOS_CAMPO = [
   ["booleano", "Sim ou não"],
   ["selecao", "Seleção única"],
   ["multiselecao", "Seleção múltipla"],
-  ["usuario", "Usuário"],
   ["cnpj", "CNPJ"],
   ["cpf", "CPF"],
   ["email", "E-mail"],
@@ -108,7 +110,7 @@ function mensagemErroCampo(error: unknown): string {
 function secoesDaEtapa(etapa: EtapaFormulario | undefined): SecaoFormulario[] {
   return (etapa?.formulario?.secoes ?? []).map((secao) => ({
     ...secao,
-    componentes: secao.componentes.map((componente) => ({ ...componente })),
+    componentes: secao.componentes.map((componente) => ({ ...componente, clientId: componente.clientId ?? `${secao.chave}:${componente.chave}` })),
   }));
 }
 
@@ -191,6 +193,11 @@ function FormularioEtapaWorkspaceContent({
   const [opcoesNovoCampo, setOpcoesNovoCampo] = usePipelineEditorState(`${draftKey}:opcoes`, "");
   const [novoCampoObrigatorio, setNovoCampoObrigatorio] = usePipelineEditorState(`${draftKey}:obrigatorio`, false);
   const [criandoCampo, setCriandoCampo] = usePipelineEditorState(`${draftKey}:criando`, false);
+  const [campoParaExcluir, setCampoParaExcluir] = useState<string | null>(null);
+  const [camposExcluidos, setCamposExcluidos] = useState<string[]>([]);
+  const [excluindoCampo, setExcluindoCampo] = useState(false);
+  const publicandoRef = useRef(false);
+  const bloqueado = publicationBlocked || salvando || criandoCampo || excluindoCampo;
 
   useEffect(() => {
     if (etapaEscolhida !== etapaId) setEtapaId(etapaId);
@@ -204,12 +211,21 @@ function FormularioEtapaWorkspaceContent({
     () =>
       camposLocais.filter(
         (campo) =>
+          !camposExcluidos.includes(campo.id) &&
           campo.ativo !== false &&
           campo.etapaConfiguracoes?.some(
             (config) => config.etapaId === etapaId && config.visivel,
           ),
       ),
-    [camposLocais, etapaId],
+    [camposExcluidos, camposLocais, etapaId],
+  );
+  const camposDisponiveis = useMemo(
+    () => camposAplicaveis.filter(
+      (campo) => !secoes.some((secaoAtual) =>
+        secaoAtual.componentes.some((componente) => componente.campoId === campo.id),
+      ),
+    ),
+    [camposAplicaveis, secoes],
   );
   const editandoCard = modo === "card";
   const formularioPreview = useMemo(
@@ -259,6 +275,7 @@ function FormularioEtapaWorkspaceContent({
   }
 
   function alterarSecao(indice: number, patch: Partial<SecaoFormulario>) {
+    if (bloqueado) return;
     setSecoes((atuais) =>
       atuais.map((secao, atual) =>
         atual === indice ? { ...secao, ...patch } : secao,
@@ -395,30 +412,30 @@ function FormularioEtapaWorkspaceContent({
     }
   }
 
-  function moverComponenteParaSecao(
-    indiceSecao: number,
-    indiceComponente: number,
-    indiceDestino: number,
-  ) {
-    if (indiceSecao === indiceDestino) return;
-    setSecoes((atuais) => {
-      const copia = atuais.map((secao) => ({
-        ...secao,
-        componentes: [...secao.componentes],
-      }));
-      const [componente] = copia[indiceSecao].componentes.splice(
-        indiceComponente,
-        1,
-      );
-      if (!componente || !copia[indiceDestino]) return atuais;
-      copia[indiceDestino].componentes.push(componente);
-      return copia;
-    });
-    setSujo(true);
+  async function excluirCampoAplicavel() {
+    if (!campoParaExcluir || excluindoCampo || publicationBlocked) return;
+    const campo = camposDisponiveis.find((item) => item.id === campoParaExcluir);
+    if (!campo) return;
+    setExcluindoCampo(true);
+    try {
+      const resposta = await ExcluirCampoBpm({ campoId: campo.id });
+      if (!resposta.success) {
+        toast.error(mensagemErroCampo(resposta.error));
+        return;
+      }
+      setCamposExcluidos((atuais) => [...new Set([...atuais, campo.id])]);
+      setCampoParaExcluir(null);
+      toast.success(`Campo “${campo.nome}” excluído`);
+    } catch {
+      toast.error("Não foi possível excluir o campo. Tente novamente.");
+    } finally {
+      setExcluindoCampo(false);
+    }
   }
 
   async function salvar() {
-    if (!etapa || publicationBlocked || salvando || criandoCampo) return;
+    if (!etapa || publicationBlocked || salvando || criandoCampo || publicandoRef.current) return;
+    publicandoRef.current = true;
     setSalvando(true);
     try {
       const resposta = await SalvarFormularioEtapaBpm({
@@ -468,6 +485,7 @@ function FormularioEtapaWorkspaceContent({
     } catch {
       toast.error("Não foi possível salvar o formulário. Tente novamente.");
     } finally {
+      publicandoRef.current = false;
       setSalvando(false);
     }
   }
@@ -540,6 +558,7 @@ function FormularioEtapaWorkspaceContent({
               <input
                 type="checkbox"
                 checked={ativo}
+                disabled={bloqueado}
                 onChange={(event) => {
                   setAtivo(event.target.checked);
                   setSujo(true);
@@ -578,6 +597,32 @@ function FormularioEtapaWorkspaceContent({
           </p>
         )}
 
+        <ListaCamposFormulario
+          secoes={secoes}
+          bloqueado={bloqueado}
+          metadados={(componente) => {
+            const campo = campoPorId.get(componente.campoId ?? "") ?? componente.campo;
+            return {
+              nome: campo?.nome ?? obterDefinicaoComponenteFormulario(componente.capability)?.label ?? componente.chave,
+              tipo: campo ? TIPOS_CAMPO.find(([tipo]) => tipo === campo.tipo)?.[1] ?? campo.tipo : componente.tipo === "CHECKLIST" ? "Checklist" : "Componente especializado",
+              obrigatorio: campoPorId.get(componente.campoId ?? "")?.etapaConfiguracoes?.find((config) => config.etapaId === etapaId)?.obrigatorio ?? false,
+              rotulo: rotuloPersonalizado(componente),
+            };
+          }}
+          onMover={(origem, destino) => {
+            if (bloqueado) return false;
+            const resultado = moverItemFormulario(secoes, origem, destino);
+            if (resultado.erro) { toast.error(resultado.erro); return false; }
+            setSecoes((atuais) => moverItemFormulario(atuais, origem, destino).secoes);
+            setSujo(true);
+            return true;
+          }}
+          onRotulo={(secao, indice, rotulo) => alterarSecao(secao, { componentes: secoes[secao].componentes.map((item, i) => i === indice ? aplicarRotulo(item, rotulo) : item) })}
+          onRemover={(secao, indice) => alterarSecao(secao, { componentes: secoes[secao].componentes.filter((_, i) => i !== indice) })}
+        />
+        <details>
+          <summary className="cursor-pointer text-sm text-muted-foreground">Adicionar campos e configurar seções</summary>
+          <fieldset disabled={bloqueado} className="mt-3 space-y-3">
         {secoes.length === 0 ? (
           <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-slate-500">
             Nenhuma seção. Adicione a primeira seção para compor{" "}
@@ -638,126 +683,6 @@ function FormularioEtapaWorkspaceContent({
                   </button>
                 </div>
                 <div className="mt-3 space-y-2 border-l border-white/10 pl-4">
-                  {secao.componentes.map((componente, indiceComponente) => (
-                    <div
-                      key={
-                        componente.id ??
-                        `${componente.chave}-${indiceComponente}`
-                      }
-                      className={
-                        editandoCard
-                          ? "grid gap-2 rounded-lg bg-white/[0.03] px-3 py-2 text-sm"
-                          : "grid gap-2 rounded-lg bg-white/[0.03] px-3 py-2 text-sm sm:grid-cols-[auto_minmax(140px,1fr)_minmax(150px,0.8fr)_auto] sm:items-center"
-                      }
-                    >
-                      <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-500">
-                        {componente.tipo}
-                      </span>
-                      <div className="min-w-0">
-                        <input
-                          aria-label={`Rótulo de ${componente.campo?.nome ?? componente.capability ?? componente.chave}`}
-                          value={rotuloPersonalizado(componente)}
-                          placeholder={
-                            componente.campo?.nome ??
-                            componente.capability ??
-                            componente.chave
-                          }
-                          maxLength={120}
-                          onChange={(event) =>
-                            alterarSecao(indiceSecao, {
-                              componentes: secao.componentes.map(
-                                (item, atual) =>
-                                  atual === indiceComponente
-                                    ? aplicarRotulo(item, event.target.value)
-                                    : item,
-                              ),
-                            })
-                          }
-                          className="min-h-9 w-full rounded-lg border border-white/10 bg-slate-900 px-2 text-xs text-white placeholder:text-slate-500"
-                        />
-                        <span className="mt-0.5 block truncate text-[10px] text-slate-600">
-                          {componente.campo?.nome ??
-                            componente.capability ??
-                            componente.chave}
-                        </span>
-                      </div>
-                      <select
-                        aria-label="Mover componente para outra seção"
-                        value={indiceSecao}
-                        onChange={(event) =>
-                          moverComponenteParaSecao(
-                            indiceSecao,
-                            indiceComponente,
-                            Number(event.target.value),
-                          )
-                        }
-                        className="min-h-9 min-w-0 rounded-lg border border-white/10 bg-slate-900 px-2 text-xs text-slate-300"
-                      >
-                        {secoes.map((secaoDestino, indiceDestino) => (
-                          <option
-                            key={secaoDestino.id ?? secaoDestino.chave}
-                            value={indiceDestino}
-                          >
-                            {indiceDestino === indiceSecao
-                              ? "Nesta seção"
-                              : `Mover para ${secaoDestino.titulo}`}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          type="button"
-                          aria-label="Mover componente para cima"
-                          disabled={indiceComponente === 0}
-                          onClick={() =>
-                            alterarSecao(indiceSecao, {
-                              componentes: mover(
-                                secao.componentes,
-                                indiceComponente,
-                                -1,
-                              ),
-                            })
-                          }
-                          className="p-1 text-slate-500 disabled:opacity-30"
-                        >
-                          <ChevronUp size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          aria-label="Mover componente para baixo"
-                          disabled={
-                            indiceComponente === secao.componentes.length - 1
-                          }
-                          onClick={() =>
-                            alterarSecao(indiceSecao, {
-                              componentes: mover(
-                                secao.componentes,
-                                indiceComponente,
-                                1,
-                              ),
-                            })
-                          }
-                          className="p-1 text-slate-500 disabled:opacity-30"
-                        >
-                          <ChevronDown size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          aria-label="Remover componente da apresentação"
-                          onClick={() =>
-                            alterarSecao(indiceSecao, {
-                              componentes: secao.componentes.filter(
-                                (_, atual) => atual !== indiceComponente,
-                              ),
-                            })
-                          }
-                          className="p-1 text-rose-300"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
                   <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                     <Plus size={14} aria-hidden="true" />
                     <select
@@ -769,16 +694,7 @@ function FormularioEtapaWorkspaceContent({
                       className="min-h-9 min-w-52 flex-1 rounded-lg border border-white/10 bg-slate-900 px-2 text-xs text-slate-300"
                     >
                       <option value="">Adicionar campo aplicável…</option>
-                      {camposAplicaveis
-                        .filter(
-                          (campo) =>
-                            !secoes.some((secaoAtual) =>
-                              secaoAtual.componentes.some(
-                                (componente) => componente.campoId === campo.id,
-                              ),
-                            ),
-                        )
-                        .map((campo) => (
+                      {camposDisponiveis.map((campo) => (
                           <option key={campo.id} value={campo.id}>
                             {campo.nome} · {campo.tipo}
                           </option>
@@ -791,6 +707,14 @@ function FormularioEtapaWorkspaceContent({
                       className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-cyan-400/30 px-3 font-semibold text-cyan-200 hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <Plus size={13} aria-hidden="true" /> Criar novo campo
+                    </button>
+                    <button
+                      type="button"
+                      disabled={publicationBlocked || camposDisponiveis.length === 0}
+                      onClick={() => setCampoParaExcluir(camposDisponiveis[0]?.id ?? null)}
+                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-rose-400/30 px-3 font-semibold text-rose-200 hover:bg-rose-400/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Trash2 size={13} aria-hidden="true" /> Excluir campo aplicável
                     </button>
                   </div>
                 </div>
@@ -805,6 +729,8 @@ function FormularioEtapaWorkspaceContent({
         >
           <Plus size={14} /> Adicionar seção
         </button>
+          </fieldset>
+        </details>
       </div>
 
       {editandoCard && (
@@ -981,6 +907,55 @@ function FormularioEtapaWorkspaceContent({
                 <Plus size={15} />
               )}
               Criar e adicionar
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={campoParaExcluir !== null}
+        onOpenChange={(aberto) => {
+          if (!aberto && !excluindoCampo) setCampoParaExcluir(null);
+        }}
+      >
+        <DialogContent className="border-white/10 bg-slate-950 text-white sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Excluir campo aplicável</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              A exclusão é permanente e só será concluída se o campo não tiver dados associados.
+            </DialogDescription>
+          </DialogHeader>
+          <label className="grid gap-1.5 text-sm text-slate-200">
+            Campo
+            <select
+              aria-label="Campo aplicável para exclusão"
+              value={campoParaExcluir ?? ""}
+              disabled={excluindoCampo}
+              onChange={(event) => setCampoParaExcluir(event.target.value || null)}
+              className="min-h-10 rounded-lg border border-white/10 bg-slate-900 px-3 text-white"
+            >
+              {camposDisponiveis.map((campo) => (
+                <option key={campo.id} value={campo.id}>{campo.nome} · {campo.tipo}</option>
+              ))}
+            </select>
+          </label>
+          <DialogFooter>
+            <button
+              type="button"
+              disabled={excluindoCampo}
+              onClick={() => setCampoParaExcluir(null)}
+              className="min-h-10 rounded-lg border border-white/10 px-4 text-sm text-slate-300 hover:bg-white/5 disabled:opacity-40"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={excluindoCampo || !campoParaExcluir}
+              onClick={() => void excluirCampoAplicavel()}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-rose-500 px-4 text-sm font-bold text-white disabled:opacity-40"
+            >
+              {excluindoCampo ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+              Excluir definitivamente
             </button>
           </DialogFooter>
         </DialogContent>

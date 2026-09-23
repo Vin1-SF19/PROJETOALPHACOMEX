@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useSyncExternalStore } from "react";
 import Link from "next/link";
 import {
   Globe, ShieldCheck, ArrowRight, Cpu,
@@ -13,15 +13,25 @@ import Pusher from "pusher-js";
 import { getTema, TemaAlpha } from "@/lib/temas";
 import { MODULOS_REGISTRY, CATEGORIAS, ModuloRegistryItem } from "@/lib/modulos-registry";
 import { isAdminRole } from "@/lib/roles";
+import type { Session } from "next-auth";
 
-export default function PainelAlphaClient({ session, chamadosIniciais, configBanco, permissoesEfetivas }: any) {
-  const [mounted, setMounted] = useState(false);
+const subscribeToHydration = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
+
+type PainelAlphaClientProps = {
+  session: Session | null;
+  chamadosIniciais?: Array<{ id: number; _count?: { mensagens?: number } }>;
+  configBanco?: { tema?: string | null; densidade?: string | null } | null;
+  permissoesEfetivas?: string[];
+};
+
+export default function PainelAlphaClient({ session, chamadosIniciais, configBanco, permissoesEfetivas }: PainelAlphaClientProps) {
+  const mounted = useSyncExternalStore(subscribeToHydration, getClientSnapshot, getServerSnapshot);
   const [searchTerm, setSearchTerm] = useState("");
   const [notificacoesLive, setNotificacoesLive] = useState(0);
 
-  useEffect(() => { setMounted(true); }, []);
-
-  const userName   = session?.user?.nome || session?.user?.name || "Operador";
+  const userName   = session?.user?.nome || "Operador";
   const userRole   = session?.user?.role || "USER";
   const isAdmin    = isAdminRole(userRole);
   const isRh       = userRole === "RECURSOS HUMANOS";
@@ -35,7 +45,6 @@ export default function PainelAlphaClient({ session, chamadosIniciais, configBan
     // Fallback: stale JWT (only used if page was server-rendered without permissoesEfetivas)
     const p = session?.user?.permissoes;
     if (Array.isArray(p)) return p.map((x: string) => String(x));
-    if (typeof p === "string" && p.length > 0) return p.split(",").map((x: string) => x.trim());
     return [];
   }, [session, permissoesEfetivas]);
 
@@ -45,7 +54,7 @@ export default function PainelAlphaClient({ session, chamadosIniciais, configBan
 
   const totalNotificacoes = useMemo(() => {
     const lista = chamadosIniciais || [];
-    const doBanco = lista.reduce((acc: number, c: any) => acc + (c._count?.mensagens || 0), 0);
+    const doBanco = lista.reduce((acc, c) => acc + (c._count?.mensagens || 0), 0);
     return doBanco + (notificacoesLive || 0);
   }, [chamadosIniciais, notificacoesLive]);
 
@@ -60,14 +69,14 @@ export default function PainelAlphaClient({ session, chamadosIniciais, configBan
       cluster: pusherCluster,
       forceTLS: true,
     });
-    chamadosIniciais.forEach((c: any) => {
+    chamadosIniciais.forEach((c) => {
       const ch = pusher.subscribe(`chat-${c.id}`);
-      ch.bind("nova-mensagem", (data: any) => {
+      ch.bind("nova-mensagem", (data: { autorId?: string | number }) => {
         if (data.autorId !== session?.user?.id) setNotificacoesLive(prev => prev + 1);
       });
     });
     return () => {
-      chamadosIniciais.forEach((c: any) => pusher.unsubscribe(`chat-${c.id}`));
+      chamadosIniciais.forEach((c) => pusher.unsubscribe(`chat-${c.id}`));
       pusher.disconnect();
     };
   }, [mounted, chamadosIniciais, session?.user?.id]);

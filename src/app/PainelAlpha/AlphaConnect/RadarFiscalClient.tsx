@@ -5,8 +5,10 @@ import { HeaderRadar } from "./HeaderRadar";
 import { TabelaRadar } from "./TabelaRadar";
 import { toast } from "sonner";
 import { excluirEmpresasAction } from "@/actions/RadarFiscal";
+import type { RadarFiscalItem } from "./types";
+import type { TemaAlpha } from "@/lib/temas";
 
-export default function RadarFiscalClient({ initialDados, style }: { initialDados: any[], style: any }) {
+export default function RadarFiscalClient({ initialDados, style }: { initialDados: RadarFiscalItem[], style: TemaAlpha }) {
     const [filtro, setFiltro] = useState("todos");
     const [selecionados, setSelecionados] = useState<number[]>([]);
 
@@ -42,7 +44,7 @@ export default function RadarFiscalClient({ initialDados, style }: { initialDado
                 if (filtro === "anexo2") return anexo.includes("2");
                 if (filtro === "premium") return qualif === "PREMIUM";
                 if (filtro === "qualificado") return qualif === "QUALIFICADO";
-                if (filtro === "desqualificado") return ["NORMAL", "N/A", ""].includes(qualif) || !qualif;
+                if (filtro === "desqualificado") return ["DESQUALIFICADO", "NORMAL"].includes(qualif);
                 if (filtro === "presumido") return regime.includes("PRESUMIDO");
                 if (filtro === "real") return regime.includes("REAL");
                 if (filtro === "simples") return regime.includes("SIMPLES");

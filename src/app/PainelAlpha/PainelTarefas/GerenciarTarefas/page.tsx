@@ -12,8 +12,15 @@ import { BuscarDiretrizPorSala, SalvarDiretrizSala } from '@/actions/Reservas';
 import { ButtonLoading } from '@/components/ButtonLoading';
 
 const DIAS_NOMES = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+type TarefaDaTela = Awaited<ReturnType<typeof BuscarTarefasPorUsuario>>[number] & {
+    diasSemana?: number[];
+    alerta?: string | null;
+    horarioReal?: string | null;
+    concluidaem?: string | null;
+};
+type ReservaDaTela = { id: number; inicio: Date | string };
 
-const StatCard = ({ label, valor, icon, color }: any) => (
+const StatCard = ({ label, valor, icon, color }: { label: string; valor: number | string; icon: React.ReactNode; color: string }) => (
     <div className="bg-slate-900/40 border border-white/5 p-6 rounded-[2rem] relative overflow-hidden">
         <div className={`text-${color}-500 mb-3`}>{icon}</div>
         <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{label}</p>
@@ -26,7 +33,7 @@ export default function AdminTarefas() {
     const userIdUrl = searchParams.get('id');
     const { data: session } = useSession();
 
-    const [tarefas, setTarefas] = useState<any[]>([]);
+    const [tarefas, setTarefas] = useState<TarefaDaTela[]>([]);
     const [loading, setLoading] = useState(true);
     const [busca, setBusca] = useState("");
     const [filtroStatus, setFiltroStatus] = useState('todas');
@@ -38,7 +45,7 @@ export default function AdminTarefas() {
     const [isPending, setIsPending] = useState(false);
     const [loadingDados, setLoadingDados] = useState(false);
     const [periodoEficiencia, setPeriodoEficiencia] = useState<'dia' | 'semana' | 'mes'>('dia');
-    const [reservas, setReservas] = useState<any[]>([]);
+    const [reservas, setReservas] = useState<ReservaDaTela[]>([]);
     const [reservasConcluidas, setReservasConcluidas] = useState<string[]>([]);
     const [dataSelecionada, setDataSelecionada] = useState(new Date());
     const [editandoId, setEditandoId] = useState<string | null>(null);
@@ -82,9 +89,13 @@ export default function AdminTarefas() {
     };
 
 
-    useEffect(() => { carregarDados(); }, [userIdUrl]);
+    useEffect(() => {
+        let active = true;
+        queueMicrotask(() => { if (active) void carregarDados(); });
+        return () => { active = false; };
+    }, [userIdUrl]);
 
-    const calcularOcorrencia = (t: any, dataAlvo: Date) => {
+    const calcularOcorrencia = (t: TarefaDaTela, dataAlvo: Date) => {
         const alvo = new Date(dataAlvo);
         alvo.setHours(0, 0, 0, 0);
 
@@ -96,7 +107,7 @@ export default function AdminTarefas() {
 
         if (t.dataInicio) {
             const dataLimpa = String(t.dataInicio).split('T')[0];
-            let dataOcorrencia = new Date(dataLimpa + 'T00:00:00');
+            const dataOcorrencia = new Date(dataLimpa + 'T00:00:00');
 
             if (!t.intervaloDias || t.intervaloDias === 0) {
                 return dataOcorrencia.getTime() === alvo.getTime();
@@ -132,12 +143,12 @@ export default function AdminTarefas() {
 
         let acumuladorTotal = 0;
         let acumuladorConcluidas = 0;
-        let dataCursor = new Date(dataInicioP);
+        const dataCursor = new Date(dataInicioP);
 
         while (dataCursor <= dataReferencia) {
             const tarefasDoDia = (tarefas || []).filter(t => calcularOcorrencia(t, dataCursor));
 
-            const reservasDoDia = (reservas || []).filter((res: any) => {
+            const reservasDoDia = (reservas || []).filter((res) => {
                 const dRes = new Date(res.inicio);
                 return dRes.getFullYear() === dataCursor.getFullYear() &&
                     dRes.getMonth() === dataCursor.getMonth() &&
@@ -147,7 +158,7 @@ export default function AdminTarefas() {
             acumuladorTotal += tarefasDoDia.length + reservasDoDia.length;
 
             acumuladorConcluidas += tarefasDoDia.filter(t => t.feita).length;
-            acumuladorConcluidas += reservasDoDia.filter((res: any) =>
+            acumuladorConcluidas += reservasDoDia.filter((res) =>
                 (reservasConcluidas || []).includes(String(res.id)) ||
                 (reservasConcluidas || []).includes(`reserva-${res.id}`)
             ).length;
@@ -183,7 +194,7 @@ export default function AdminTarefas() {
         dataAlvo.setHours(0, 0, 0, 0);
         const dataAlvoISO = dataAlvo.toISOString().split('T')[0];
 
-        const filtradas = tarefas.reduce((acc: any[], t) => {
+        const filtradas = tarefas.reduce<TarefaDaTela[]>((acc, t) => {
             let concluidaNoDia = false;
             if (t.feita && t.concluidaEm) {
                 const dConcl = new Date(t.concluidaEm);
@@ -319,7 +330,7 @@ export default function AdminTarefas() {
         setIsPending(false);
     };
 
-    const handleAbrirEdicao = (tarefa: any) => {
+    const handleAbrirEdicao = (tarefa: TarefaDaTela) => {
         setEditandoId(tarefa.id);
         setNovaTarefa({
             texto: tarefa.texto,
@@ -328,7 +339,7 @@ export default function AdminTarefas() {
             fixa: tarefa.fixa,
             intervaloDias: tarefa.intervaloDias,
             diasSemana: tarefa.diasSemana || [],
-            dataInicio: new Date(tarefa.dataInicio),
+            dataInicio: tarefa.dataInicio ? new Date(tarefa.dataInicio.toString()) : new Date(),
             horario: tarefa.horario || "",
             alerta: tarefa.alerta || "1H_ANTES"
         });
@@ -707,7 +718,7 @@ export default function AdminTarefas() {
                                                                                 <span className="text-white font-black">{t.dataInicio ? fmtDate(t.dataInicio) : '--'}</span>
                                                                             </div>
 
-                                                                            {t.intervaloDias > 0 && (
+                                                                            {t.intervaloDias != null && t.intervaloDias > 0 && (
                                                                                 <div className="flex justify-between items-center p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20 text-[11px]">
                                                                                     <span className="text-emerald-500/70 font-bold uppercase">Ciclo de Repetição:</span>
                                                                                     <span className="text-emerald-500 font-black">{t.intervaloDias} Dias</span>

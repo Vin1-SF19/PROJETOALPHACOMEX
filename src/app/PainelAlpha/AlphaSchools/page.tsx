@@ -8,27 +8,30 @@ import { getTema } from "@/lib/temas";
 import { getPresetCompletoAction } from '@/actions/questoes';
 import { buscarProgressosUsuario } from '@/actions/questoes';
 
+type PresetCompleto = NonNullable<Awaited<ReturnType<typeof getPresetCompletoAction>>>;
+
 export default function PaginaAlphaSchools() {
     const { data: session } = useSession();
     const [view, setView] = useState<'welcome' | 'sala'>('welcome');
-    const [presetData, setPresetData] = useState<any>(null);
+    const [presetData, setPresetData] = useState<PresetCompleto | null>(null);
     const [idsAssistidos, setIdsAssistidos] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
 
-    const temaNome = (session?.user as any)?.tema_interface || "blue";
+    const temaNome = session?.user?.tema_interface || "blue";
     const style = getTema(temaNome);
 
     const entrarNaSala = async () => {
-        const user = session?.user as any;
+        const user = session?.user;
         const presetId = user?.presetId;
 
-        if (presetId && user?.id) {
+        const userId = Number(user?.id);
+        if (presetId && Number.isInteger(userId) && userId > 0) {
             setLoading(true);
             const data = await getPresetCompletoAction(presetId);
             
             if (data) {
-                const videoIds = data.videos?.map((v: any) => v.id) || [];
-                const assistidos = await buscarProgressosUsuario(user.id, videoIds);
+                const videoIds = data.videos?.map((v) => v.id) || [];
+                const assistidos = await buscarProgressosUsuario(userId, videoIds);
                 
                 setIdsAssistidos(assistidos);
                 setPresetData(data);
@@ -43,7 +46,7 @@ export default function PaginaAlphaSchools() {
             <SalaDeAulaAlpha
                 preset={presetData}
                 temaConfig={style}
-                userId={(session?.user as any).id}
+                userId={session?.user?.id || ""}
                 progressosIniciais={idsAssistidos}
                 onVoltar={() => setView('welcome')}
             />

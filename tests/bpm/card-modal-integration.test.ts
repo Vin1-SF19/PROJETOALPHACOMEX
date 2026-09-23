@@ -22,6 +22,7 @@ const painelReuniao = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelReuniao.
 const resumoEtapas = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelResumoEtapas.tsx");
 const novoCard = ler("src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/NovoCardModal.tsx");
 const cardsAction = ler("src/actions/bpm/Cards.ts");
+const cardsConsultas = ler("src/actions/bpm/CardsConsultas.ts");
 
 describe("CRM - wiring do modal por etapa", () => {
   it("propaga revisao realtime sem remontar o modal", () => {
@@ -32,7 +33,7 @@ describe("CRM - wiring do modal por etapa", () => {
 
   it("fecha o modal de forma controlada quando o realtime revoga o acesso ao card", () => {
     expect(modal).toContain("function resultadoRevogaAcessoCard");
-    expect(modal).toContain('resultado.error === "Não autorizado"');
+    expect(modal).toContain('"Não autorizado", "NÃO_AUTORIZADO"');
     expect(modal).toContain("const acessoRevogadoRef = useRef(false)");
     expect(modal).toContain('toast.error("Seu acesso a este card foi removido.")');
     expect(modal).toContain("if (resultadoRevogaAcessoCard(cardRes))");
@@ -96,8 +97,8 @@ describe("CRM - wiring do modal por etapa", () => {
 
   it("lista responsaveis elegiveis no contexto do pipeline", () => {
     expect(novoCard).toContain("ListarUsuariosResponsavelBpm(pipelineId)");
-    expect(cardsAction).toContain("export async function ListarUsuariosResponsavelBpm(pipelineId: string)");
-    expect(cardsAction).toContain("usuarioElegivelResponsavelBpm(pipelineId, usuario.id)");
+    expect(cardsConsultas).toContain("export async function ListarUsuariosResponsavelBpm(pipelineId: string)");
+    expect(cardsConsultas).toContain("usuarioElegivelResponsavelBpm(pipelineId, usuario.id)");
   });
 
   it("oferece criacao somente na etapa canonica Novos Leads", () => {
@@ -155,7 +156,7 @@ describe("CRM - wiring do modal por etapa", () => {
 
   it("limita o novo card aos dados-base e preserva cadastro de empresa", () => {
     expect(novoCard).toContain("novaEmpresa:");
-    expect(novoCard).toContain("empresaId: empresaSelecionada!.id");
+    expect(novoCard).toContain("empresaId: empresaSelecionada.id");
     expect(novoCard).not.toContain("servico:");
     expect(novoCard).toContain("Os detalhes da etapa são preenchidos ao abrir o card, na aba Formulário da Etapa.");
     expect(novoCard).not.toContain("CampoBpm");
@@ -199,7 +200,7 @@ describe("CRM - wiring do modal por etapa", () => {
     expect(statusPosFechamento).toContain("setConflitoRealtime(true)");
     expect(statusPosFechamento).toContain("Seu rascunho foi preservado");
     expect(statusPosFechamento).toContain("statusPosFechamento: status");
-    expect(statusPosFechamento).toContain("versaoEsperadaEm: versaoBase");
+    expect(statusPosFechamento).toContain("versaoEsperadaEm: getVersion(cardId, versaoBaseAtual)");
     expect(statusPosFechamento).toContain("if (houveConflito) onAtualizado()");
     expect(slotFormulario).toContain("versaoPersistidaEm={card.updatedAt}");
   });

@@ -5,11 +5,12 @@ import { X, Globe, Type, Check, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import Image from "next/image";
 import { adicionarSistemaCoreAction } from "@/actions/colaboradores";
+import type { TemaAlpha } from "@/lib/temas";
 
 interface Props {
     isOpen: boolean;
     onClose: () => void;
-    style: any;
+    style: TemaAlpha;
 }
 
 const FAVICONS = [

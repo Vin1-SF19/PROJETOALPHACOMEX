@@ -1,0 +1,51 @@
+{
+  "focused": {
+    "command": [
+      "npx",
+      "vitest",
+      "run",
+      "tests/bpm/cpf-pendencias-react.test.ts",
+      "tests/bpm/cpf-fechamento-react.test.ts",
+      "tests/bpm/arquivo-persistencia-react.test.ts",
+      "tests/bpm/edicao-campos-card.test.ts",
+      "tests/bpm/autosave-fixed-recovery-react.test.ts",
+      "tests/bpm/autosave-recovery-react.test.ts",
+      "tests/bpm/card-save-flow.test.ts",
+      "tests/bpm/formulario-etapa.test.ts",
+      "tests/bpm/anexos-idempotencia.test.ts",
+      "tests/bpm/upload-validacao.test.ts"
+    ],
+    "exit": 0
+  },
+  "scope-lint": {
+    "command": [
+      "npx",
+      "eslint",
+      "tests/bpm/autosave-recovery-react.test.ts"
+    ],
+    "exit": 0
+  },
+  "typecheck": {
+    "command": [
+      "npm",
+      "run",
+      "typecheck"
+    ],
+    "exit": 0
+  },
+  "lint": {
+    "command": [
+      "npm",
+      "run",
+      "lint"
+    ],
+    "exit": 1
+  },
+  "test": {
+    "command": [
+      "npm",
+      "test"
+    ],
+    "exit": 1
+  }
+}

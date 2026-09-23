@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   getOwnerInfoMap: vi.fn(),
   recordAgentOwner: vi.fn(),
   userOwnsAgent: vi.fn(),
+  userCanUseAgent: vi.fn(),
   removeAgentOwner: vi.fn(),
 }));
 
@@ -47,6 +48,7 @@ vi.mock("@/lib/onyx/ownership", () => ({
   getOwnerInfoMap: mocks.getOwnerInfoMap,
   recordAgentOwner: mocks.recordAgentOwner,
   userOwnsAgent: mocks.userOwnsAgent,
+  userCanUseAgent: mocks.userCanUseAgent,
   removeAgentOwner: mocks.removeAgentOwner,
 }));
 
@@ -64,6 +66,7 @@ describe("rotas Onyx com token individual", () => {
     mocks.getAgent.mockResolvedValue({ id: 42, name: "Agente" });
     mocks.getImageGenToolId.mockResolvedValue(99);
     mocks.getOwnerInfoMap.mockResolvedValue(new Map());
+    mocks.userCanUseAgent.mockResolvedValue(true);
     mocks.createAgent.mockResolvedValue({ id: 43, name: "Novo agente" });
     mocks.recordAgentOwner.mockResolvedValue(undefined);
   });

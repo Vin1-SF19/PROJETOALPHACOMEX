@@ -3,11 +3,18 @@
 import { useState } from "react";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { CardAgente } from "./CardAgentes";
+import type { ColaboradorVault, RecursoVault, SistemaVault } from "../types";
 
-export function GradeAgentes({ colaboradores, sistemas, recursos }: any) {
+interface GradeAgentesProps {
+    colaboradores: ColaboradorVault[];
+    sistemas: SistemaVault[];
+    recursos: RecursoVault[];
+}
+
+export function GradeAgentes({ colaboradores, sistemas, recursos }: GradeAgentesProps) {
     const [busca, setBusca] = useState("");
 
-    const filtrados = colaboradores.filter((c: any) =>
+    const filtrados = colaboradores.filter((c) =>
         c.nome.toLowerCase().includes(busca.toLowerCase()) ||
         c.role?.toLowerCase().includes(busca.toLowerCase()) ||
         c.cargo?.toLowerCase().includes(busca.toLowerCase())
@@ -31,12 +38,12 @@ export function GradeAgentes({ colaboradores, sistemas, recursos }: any) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filtrados.map((colab: any) => (
+                {filtrados.map((colab) => (
                     <CardAgente 
                         key={colab.id} 
                         colab={colab} 
                         sistemas={sistemas} 
-                        recursos={recursos.filter((r: any) => String(r.colaborador_id) === String(colab.id))} 
+                        recursos={recursos.filter((r) => String(r.colaborador_id) === String(colab.id))}
                     />
                 ))}
             </div>

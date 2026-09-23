@@ -7,7 +7,10 @@ export type AuthRateLimitScope =
   | "login_ip"
   | "login_identifier"
   | "recovery_ip"
-  | "recovery_identifier";
+  | "recovery_identifier"
+  | "pre_analise_cadastro"
+  | "pre_analise_tributario"
+  | "pre_analise_convite";
 
 type AuthRateLimitPolicy = {
   limit: number;
@@ -20,6 +23,9 @@ export const AUTH_RATE_LIMIT_POLICIES: Record<AuthRateLimitScope, AuthRateLimitP
   login_identifier: { limit: 5, windowMs: 15 * 60_000, blockMs: 15 * 60_000 },
   recovery_ip: { limit: 20, windowMs: 60 * 60_000, blockMs: 60 * 60_000 },
   recovery_identifier: { limit: 5, windowMs: 60 * 60_000, blockMs: 60 * 60_000 },
+  pre_analise_cadastro: { limit: 30, windowMs: 60_000, blockMs: 60_000 },
+  pre_analise_tributario: { limit: 12, windowMs: 60_000, blockMs: 60_000 },
+  pre_analise_convite: { limit: 5, windowMs: 60_000, blockMs: 60_000 },
 };
 
 type RateLimitRow = {

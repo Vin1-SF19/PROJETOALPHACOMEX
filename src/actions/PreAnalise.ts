@@ -1,13 +1,46 @@
 "use server";
 
 import db from "@/lib/prisma";
+import { auth } from "../../auth";
+import { canAccessPreAnalise } from "@/lib/pre-analise/access";
+import { validarCnpj } from "@/lib/gerador-documentos/cnpj";
+import type { Prisma } from "@prisma/client";
 
-export async function upsertConsulta(payload: any) {
-    const { rfb, empresaqui, radar, extra } = payload;
+type CadastroConsulta = {
+    cnpj: string;
+    razaoSocial: string;
+    nomeFantasia?: string | null;
+    situacao?: string | null;
+    uf?: string | null;
+    municipio?: string | null;
+    capitalSocial?: string | number | null;
+};
 
-    if (!rfb?.dados?.cnpj) return { error: "CNPJ não identificado" };
+type ConsultaPayload = {
+    rfb: { dados: CadastroConsulta };
+    empresaqui?: { dados?: { cnpj?: string | null; regimeEA?: string | null; qualificacao?: string | null } | null };
+    radar?: { dados?: { submodalidade?: string | null } | null };
+    extra?: { nomeResponsavel?: string; telefone?: string; observacoes?: string };
+};
+
+async function acessoPermitido() {
+    return await canAccessPreAnalise(await auth(), "tributario");
+}
+
+export async function upsertConsulta(payload: unknown) {
+    if (!await acessoPermitido()) return { error: "Não autorizado" };
+    if (!payload || typeof payload !== "object") return { error: "Dados inválidos" };
+    const input = payload as ConsultaPayload;
+    const { rfb, empresaqui, radar, extra } = input;
+
+    if (typeof rfb?.dados?.cnpj !== "string" || typeof rfb.dados.razaoSocial !== "string") {
+        return { error: "Dados cadastrais incompletos" };
+    }
 
     const cnpjLimpo = rfb.dados.cnpj.replace(/\D/g, "");
+    if (!validarCnpj(cnpjLimpo)) return { error: "CNPJ inválido" };
+    const cnpjTributario = String(empresaqui?.dados?.cnpj ?? "").replace(/\D/g, "");
+    if (cnpjTributario && cnpjTributario !== cnpjLimpo) return { error: "CNPJ divergente na consulta tributária" };
 
     try {
         // Fase 3.4 do Cliente Master — resolve o Cliente já cadastrado por CNPJ,
@@ -24,11 +57,11 @@ export async function upsertConsulta(payload: any) {
                 situacao: rfb.dados.situacao,
                 uf: rfb.dados.uf,
                 municipio: rfb.dados.municipio,
-                regimeEA: empresaqui?.dados?.regimeEA,
-                qualificacao: empresaqui?.dados?.qualificacao,
+                regimeEA: empresaqui?.dados?.regimeEA ?? null,
+                qualificacao: empresaqui?.dados?.qualificacao ?? null,
                 submodalidade: radar?.dados?.submodalidade,
                 capitalSocial: Number(rfb.dados.capitalSocial) || 0,
-                dadosBrutos: payload,
+                dadosBrutos: payload as Prisma.InputJsonValue,
                 nomeResponsavel: extra?.nomeResponsavel,
                 telefoneContato: extra?.telefone,
                 observacoes: extra?.observacoes,
@@ -41,11 +74,11 @@ export async function upsertConsulta(payload: any) {
                 situacao: rfb.dados.situacao,
                 uf: rfb.dados.uf,
                 municipio: rfb.dados.municipio,
-                regimeEA: empresaqui?.dados?.regimeEA,
-                qualificacao: empresaqui?.dados?.qualificacao,
+                regimeEA: empresaqui?.dados?.regimeEA ?? null,
+                qualificacao: empresaqui?.dados?.qualificacao ?? null,
                 submodalidade: radar?.dados?.submodalidade,
                 capitalSocial: Number(rfb.dados.capitalSocial) || 0,
-                dadosBrutos: payload,
+                dadosBrutos: payload as Prisma.InputJsonValue,
                 nomeResponsavel: extra?.nomeResponsavel,
                 telefoneContato: extra?.telefone,
                 observacoes: extra?.observacoes,
@@ -60,9 +93,10 @@ export async function upsertConsulta(payload: any) {
     }
 }
 
-export async function atualizarRadar(cnpj: string, radarDados: any) {
+export async function atualizarRadar(cnpj: string, radarDados: Record<string, unknown> & { submodalidade?: string | null }) {
+    if (!await acessoPermitido()) return { error: "Não autorizado" };
     const cnpjLimpo = cnpj.replace(/\D/g, "");
-    if (!cnpjLimpo) return { error: "CNPJ inválido" };
+    if (!validarCnpj(cnpjLimpo)) return { error: "CNPJ inválido" };
 
     try {
         const existing = await db.consultaPreAnalise.findUnique({
@@ -74,7 +108,9 @@ export async function atualizarRadar(cnpj: string, radarDados: any) {
             return { error: "Consulta não encontrada no banco" };
         }
 
-        const dadosAtuais = (existing.dadosBrutos as any) || {};
+        const dadosAtuais = existing.dadosBrutos && typeof existing.dadosBrutos === "object" && !Array.isArray(existing.dadosBrutos)
+            ? existing.dadosBrutos as Record<string, unknown>
+            : {};
         const novosDados = {
             ...dadosAtuais,
             radar: { dados: radarDados, consultadoEm: new Date().toISOString() },
@@ -84,7 +120,7 @@ export async function atualizarRadar(cnpj: string, radarDados: any) {
             where: { cnpj: cnpjLimpo },
             data: {
                 submodalidade: radarDados?.submodalidade ?? null,
-                dadosBrutos: novosDados,
+                dadosBrutos: novosDados as Prisma.InputJsonValue,
             },
         });
 
@@ -96,6 +132,7 @@ export async function atualizarRadar(cnpj: string, radarDados: any) {
 }
 
 export async function buscarHistorico() {
+    if (!await acessoPermitido()) return { error: "Não autorizado" };
     try {
         const consultas = await db.consultaPreAnalise.findMany({
             take: 20,

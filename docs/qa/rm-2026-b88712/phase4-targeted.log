@@ -1,0 +1,43 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /home/ialpha/projetos/alpha-comex/painel-alpha
+
+ ❯ tests/bpm/cpf-pendencias-react.test.ts (11 tests | 1 failed) 173ms
+   × volta a salvar no blur após falha de rede sem perder o rascunho 14ms
+ ❯ tests/bpm/cpf-fechamento-react.test.ts (3 tests | 1 failed) 173ms
+   × Escape fecha imediatamente sem confirmação 47ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/bpm/cpf-fechamento-react.test.ts > Escape fecha imediatamente sem confirmação
+AssertionError: expected "vi.fn()" to be called once, but got 2 times
+ ❯ tests/bpm/cpf-fechamento-react.test.ts:45:19
+     43|   await close();
+     44|   expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+     45|   expect(onClose).toHaveBeenCalledOnce();
+       |                   ^
+     46|   expect(toast.warning).not.toHaveBeenCalled();
+     47| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/bpm/cpf-pendencias-react.test.ts > volta a salvar no blur após falha de rede sem perder o rascunho
+AssertionError: expected "vi.fn()" to be called 2 times, but got 1 times
+ ❯ tests/bpm/cpf-pendencias-react.test.ts:111:28
+    109|   expect(saves.getPendingFields()).toEqual(["CPF"]);
+    110|   await blur();
+    111|   expect(AtualizarCardBpm).toHaveBeenCalledTimes(2);
+       |                            ^
+    112|   expect(saves.getPendingFields()).toEqual([]);
+    113|   expect(container.querySelector("input")!.value).toBe("52998224725");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed | 2 passed (4)
+      Tests  2 failed | 22 passed (24)
+   Start at  20:04:25
+   Duration  941ms (transform 738ms, setup 0ms, import 1.36s, tests 373ms, environment 393ms)
+

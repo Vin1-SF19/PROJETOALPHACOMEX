@@ -7,11 +7,13 @@ import { BotaoUploadExcel } from "./BotaoUploadExcel";
 import { BotaoExportarTabelaCompleta } from "./BotaoExportarTabelaCompleta";
 import { FiltroRadar } from "./FiltroRadar";
 import { ModalHistorico } from "./Historico";
+import type { RadarFiscalItem } from "./types";
+import type { TemaAlpha } from "@/lib/temas";
 
 
 interface HeaderRadarProps {
-    style: any;
-    dados: any[];
+    style: TemaAlpha;
+    dados: RadarFiscalItem[];
     filtro: string;
     onFilter: (val: string) => void;
     onDelete: () => Promise<void>;

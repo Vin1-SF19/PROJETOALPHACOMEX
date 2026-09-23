@@ -13,11 +13,22 @@ import {
     Loader2
 } from 'lucide-react';
 import { marcarVideoConcluidoAction } from '@/actions/questoes';
+import type { getPresetCompletoAction } from '@/actions/questoes';
+import type { TemaAlpha } from '@/lib/temas';
 import { toast } from 'sonner';
 
+type PresetCompleto = NonNullable<Awaited<ReturnType<typeof getPresetCompletoAction>>>;
+type VideoAula = PresetCompleto['videos'][number];
+
 export default function SalaDeAulaAlpha({ preset, temaConfig, onVoltar, userId,
-    progressosIniciais = [] }: any) {
-    const [videoAtivo, setVideoAtivo] = useState<any>(null);
+    progressosIniciais = [] }: {
+        preset: PresetCompleto;
+        temaConfig: TemaAlpha;
+        onVoltar: () => void;
+        userId: string;
+        progressosIniciais?: string[];
+    }) {
+    const [videoAtivo, setVideoAtivo] = useState<VideoAula | null>(null);
     const [videosAssitidos, setVideosAssistidos] = useState<string[]>(progressosIniciais);
 
     const videos = preset?.videos || [];
@@ -74,7 +85,7 @@ export default function SalaDeAulaAlpha({ preset, temaConfig, onVoltar, userId,
                         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
                         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
                     >
-                        {videos.map((video: any, index: number) => (
+                        {videos.map((video, index: number) => (
                             <motion.div
                                 key={video.id}
                                 whileHover={{ y: -10 }}
@@ -173,7 +184,7 @@ export default function SalaDeAulaAlpha({ preset, temaConfig, onVoltar, userId,
                         <div className="lg:col-span-4 space-y-4">
                             <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.3em] px-4">Próximas Aulas</h3>
                             <div className="space-y-3">
-                                {videos.map((v: any, idx: number) => (
+                                {videos.map((v, idx: number) => (
                                     <div
                                         key={v.id}
                                         onClick={() => setVideoAtivo(v)}

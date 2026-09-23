@@ -14,22 +14,34 @@ import { toast } from 'sonner';
 import { buscarReservasAtivas, BuscarTodasDiretrizes } from '@/actions/Reservas';
 import { buscarListaCompra, buscarProdutos } from "@/actions/Estoque";
 
+type Tarefa = Awaited<ReturnType<typeof BuscarTarefasPorUsuario>>[number];
+type Reserva = Awaited<ReturnType<typeof buscarReservasAtivas>>[number];
+type Produto = Awaited<ReturnType<typeof buscarProdutos>>[number];
+type ItemCompra = Awaited<ReturnType<typeof buscarListaCompra>>[number];
+type Diretriz = Awaited<ReturnType<typeof BuscarTodasDiretrizes>>[number];
+type ItemAgenda = {
+    id: string; texto: string; descricao?: string | null; feita: boolean;
+    prioridade: string; horario?: string | null; dataInicio?: string | null;
+    intervaloDias?: number | null; diaSemana?: number | null; concluidaEm?: string | null;
+    fixa?: boolean; isReserva?: boolean; temCopa?: boolean; responsavel?: string;
+};
+
 export default function PainelTarefas() {
     const { data: session } = useSession();
 
     const [agora, setAgora] = useState(new Date());
     const [dataSelecionada, setDataSelecionada] = useState<Date>(new Date());
-    const [tarefas, setTarefas] = useState<any[]>([]);
-    const [reservas, setReservas] = useState<any[]>([]);
+    const [tarefas, setTarefas] = useState<Tarefa[]>([]);
+    const [reservas, setReservas] = useState<Reserva[]>([]);
     const [loading, setLoading] = useState(true);
     const [filtro, setFiltro] = useState<'todas' | 'pendentes' | 'concluidas'>('pendentes');
-    const [modalConfirmacao, setModalConfirmacao] = useState<{ show: boolean, tarefa: any | null }>({ show: false, tarefa: null });
-    const [modalDescricao, setModalDescricao] = useState<{ show: boolean, tarefa: any | null }>({ show: false, tarefa: null });
+    const [modalConfirmacao, setModalConfirmacao] = useState<{ show: boolean, tarefa: ItemAgenda | null }>({ show: false, tarefa: null });
+    const [modalDescricao, setModalDescricao] = useState<{ show: boolean, tarefa: ItemAgenda | null }>({ show: false, tarefa: null });
     const [isPending, setIsPending] = useState(false);
     const [abaAtual, setAbaAtual] = useState<"TAREFAS" | "COMPRAS">("TAREFAS");
 
-    const [produtos, setProdutos] = useState<any[]>([]);
-    const [listaCompraDoBanco, setListaCompraDoBanco] = useState<any[]>([]);
+    const [produtos, setProdutos] = useState<Produto[]>([]);
+    const [listaCompraDoBanco, setListaCompraDoBanco] = useState<ItemCompra[]>([]);
 
     useEffect(() => {
         async function carregarEstoque() {
@@ -63,15 +75,9 @@ export default function PainelTarefas() {
 
     const [mounted, setMounted] = useState(false);
 
-    const [diretrizes, setDiretrizes] = useState<any[]>([]); const [modalDiretriz, setModalDiretriz] = useState<{
+    const [diretrizes, setDiretrizes] = useState<Diretriz[]>([]); const [modalDiretriz, setModalDiretriz] = useState<{
         show: boolean;
-        tarefa: {
-            texto: string;
-            id: string;
-            descricao: string;
-            horario: string;
-            responsavel: string;
-        } | null;
+        tarefa: ItemAgenda | null;
     }>({ show: false, tarefa: null });
 
     const [reservasConcluidas, setReservasConcluidas] = useState<string[]>([]);
@@ -94,7 +100,9 @@ export default function PainelTarefas() {
     }, [session]);
 
     useEffect(() => {
-        setMounted(true);
+        let active = true;
+        queueMicrotask(() => { if (active) setMounted(true); });
+        return () => { active = false; };
     }, []);
 
     const DIAS = [
@@ -106,10 +114,10 @@ export default function PainelTarefas() {
         { nome: "Sábado", curto: "SAB" },
     ];
 
-    const carregarTudo = async () => {
-        const currentUserId = (session?.user as any)?.id;
+    async function carregarTudo() {
+        const currentUserId = session?.user?.id;
         if (!currentUserId) return;
-        const user = session?.user as any;
+        const user = session?.user;
         if (!user?.id) return;
 
 
@@ -127,12 +135,12 @@ export default function PainelTarefas() {
         } finally {
             setLoading(false);
         }
-    };
+    }
 
 
     const carregarTarefas = async () => {
         if (!session?.user?.id) return;
-        const user = session?.user as any;
+        const user = session?.user;
         if (!user?.id) return;
 
 
@@ -149,9 +157,10 @@ export default function PainelTarefas() {
     };
 
     useEffect(() => {
-        carregarTarefas();
+        let active = true;
+        queueMicrotask(() => { if (active) void carregarTarefas(); });
         const timer = setInterval(() => setAgora(new Date()), 1000);
-        return () => clearInterval(timer);
+        return () => { active = false; clearInterval(timer); };
     }, [session]);
 
     const tarefasExibidas = useMemo(() => {
@@ -163,7 +172,7 @@ export default function PainelTarefas() {
         const mesAlvo = dataAlvo.getMonth();
         const diaAlvo = dataAlvo.getDate();
 
-        const reservasComoTarefas = reservas
+        const reservasComoTarefas: ItemAgenda[] = reservas
             .filter(res => {
                 const dRes = new Date(res.inicio);
                 return dRes.getFullYear() === anoAlvo &&
@@ -187,7 +196,7 @@ export default function PainelTarefas() {
                 };
             });
 
-        const tarefasFiltradas = tarefas.reduce((acc: any[], t) => {
+        const tarefasFiltradas = tarefas.reduce<ItemAgenda[]>((acc, t) => {
             let concluidaNoDia = false;
 
             if (t.feita && t.concluidaEm) {
@@ -211,14 +220,14 @@ export default function PainelTarefas() {
                 if (Number(t.diaSemana) === diaSemanaAlvo) deveAparecer = true;
             } else if (t.dataInicio) {
                 const dataLimpa = String(t.dataInicio).split('T')[0];
-                let dataOcorrencia = new Date(dataLimpa + 'T00:00:00');
+                const dataOcorrencia = new Date(dataLimpa + 'T00:00:00');
 
                 if (!t.intervaloDias || t.intervaloDias === 0) {
                     if (dataOcorrencia.getFullYear() === anoAlvo &&
                         dataOcorrencia.getMonth() === mesAlvo &&
                         dataOcorrencia.getDate() === diaAlvo) deveAparecer = true;
                 } else if (dataAlvoTime >= dataOcorrencia.getTime()) {
-                    let tempOcorrencia = new Date(dataOcorrencia);
+                    const tempOcorrencia = new Date(dataOcorrencia);
                     while (tempOcorrencia.getTime() <= dataAlvoTime) {
                         if (tempOcorrencia.getTime() === dataAlvoTime) {
                             deveAparecer = true;
@@ -289,7 +298,7 @@ export default function PainelTarefas() {
 
 
 
-    const calcularOcorrencia = (t: any, dataAlvo: Date) => {
+    const calcularOcorrencia = (t: Tarefa, dataAlvo: Date) => {
         const alvo = new Date(dataAlvo);
         alvo.setHours(0, 0, 0, 0);
 
@@ -301,7 +310,7 @@ export default function PainelTarefas() {
 
         if (t.dataInicio) {
             const dataLimpa = String(t.dataInicio).split('T')[0];
-            let dataOcorrencia = new Date(dataLimpa + 'T00:00:00');
+            const dataOcorrencia = new Date(dataLimpa + 'T00:00:00');
 
             if (!t.intervaloDias || t.intervaloDias === 0) {
                 return dataOcorrencia.getTime() === alvo.getTime();
@@ -333,12 +342,12 @@ export default function PainelTarefas() {
             }
             if (t.dataInicio) {
                 const dataLimpa = String(t.dataInicio).split('T')[0];
-                let dOcorrencia = new Date(dataLimpa + 'T00:00:00');
+                const dOcorrencia = new Date(dataLimpa + 'T00:00:00');
                 if (!t.intervaloDias || t.intervaloDias === 0) {
                     return dOcorrencia.getTime() === dataAlvoTime;
                 }
                 if (dataAlvoTime < dOcorrencia.getTime()) return false;
-                let temp = new Date(dOcorrencia);
+                const temp = new Date(dOcorrencia);
                 while (temp.getTime() <= dataAlvoTime) {
                     if (temp.getTime() === dataAlvoTime) return true;
                     temp.setDate(temp.getDate() + Number(t.intervaloDias));
@@ -638,7 +647,7 @@ export default function PainelTarefas() {
                     </div>
 
                     <AnimatePresence>
-                        {modalConfirmacao.show && (
+                        {modalConfirmacao.show && modalConfirmacao.tarefa && (
                             <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
                                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setModalConfirmacao({ show: false, tarefa: null })} className="absolute inset-0 bg-black/90 backdrop-blur-md" />
                                 <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-xs bg-slate-950 border border-white/10 p-10 rounded-[3rem] text-center shadow-2xl">
@@ -748,7 +757,7 @@ export default function PainelTarefas() {
                                                                 const intervalo = Number(modalDescricao.tarefa?.intervaloDias);
                                                                 if (!intervalo) return <p className="text-xs sm:text-sm font-black text-white">Único</p>;
 
-                                                                let proxima = new Date(String(modalDescricao.tarefa?.dataInicio).split('T')[0] + 'T00:00:00');
+                                                                const proxima = new Date(String(modalDescricao.tarefa?.dataInicio).split('T')[0] + 'T00:00:00');
                                                                 const ref = new Date(dataSelecionada);
                                                                 ref.setHours(0, 0, 0, 0);
 

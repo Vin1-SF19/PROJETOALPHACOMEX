@@ -2,11 +2,17 @@
 
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import type { Tarefa } from "@prisma/client";
+
+type TarefaBusca = Pick<Tarefa,
+    "id" | "texto" | "descricao" | "feita" | "fixa" | "prioridade" |
+    "diaSemana" | "intervaloDias" | "horario" | "userId"
+> & { dataInicio: string | null; createdAt: string; concluidaEm: string | null };
 
 export async function CriarTarefa(data: {
     texto: string,
     descricao?: string,
-    userId: any,
+    userId: string | number,
     fixa: boolean,
     diaSemana: number | null;
     intervaloDias?: number | null;
@@ -47,8 +53,10 @@ export async function CriarTarefa(data: {
 
         revalidatePath("/PainelAlpha/PainelTarefas");
         return { success: true };
-    } catch (error: any) {
-        if (error.code === 'P2023' || error.message?.includes("Inconsistent column data")) {
+    } catch (error) {
+        const codigo = typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
+        const mensagem = error instanceof Error ? error.message : "";
+        if (codigo === 'P2023' || mensagem.includes("Inconsistent column data")) {
             revalidatePath("/PainelAlpha/PainelTarefas/PainelTarefasSG");
             revalidatePath("/PainelAlpha/PainelTarefas/PainelTarefasC");
             return { success: true };
@@ -59,12 +67,13 @@ export async function CriarTarefa(data: {
 }
 
 export async function BuscarTarefasPorUsuario(userId: string, role: string) {
+    void role;
     try {
         const idNumerico = parseInt(userId, 10);
         
         if (isNaN(idNumerico)) return [];
 
-        const tarefas: any[] = await db.$queryRawUnsafe(`
+        const tarefas = await db.$queryRawUnsafe<TarefaBusca[]>(`
             SELECT 
                 id, 
                 texto, 
@@ -150,7 +159,6 @@ export async function EditarTarefa(id: string, data: {
 }) {
     try {
 
-        const feitaStatus = 0;
         const diaSemanaFinal = data.diasSemana && data.diasSemana.length > 0 ? data.diasSemana[0] : null;
 
         await db.$executeRawUnsafe(`

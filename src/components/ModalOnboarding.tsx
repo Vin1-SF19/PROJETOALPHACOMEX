@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "./ui/dialog";
@@ -81,7 +81,7 @@ function formatarTelefone(raw: string | null | undefined): string | null {
 
 export default function ModalOnboarding({ open, onClose, usuario, senhaTemporaria, templates = [] }: Props) {
   const [templateAtualId, setTemplateAtualId] = useState<number | null>(null);
-  const [mensagem, setMensagem] = useState("");
+  const [mensagemEditada, setMensagemEditada] = useState<{ chave: string; valor: string } | null>(null);
   const [copiadoMsg, setCopiadoMsg] = useState(false);
   const [copiadoLogin, setCopiadoLogin] = useState(false);
   const [copiadoSenha, setCopiadoSenha] = useState(false);
@@ -95,11 +95,15 @@ export default function ModalOnboarding({ open, onClose, usuario, senhaTemporari
     ?? templatePadrao?.mensagem
     ?? DEFAULT_MENSAGEM;
 
-  useEffect(() => {
-    if (usuario) {
-      setMensagem(substituirPlaceholders(textoBase, usuario, senhaTemporaria));
-    }
-  }, [usuario, senhaTemporaria, textoBase]);
+  const chaveMensagem = `${usuario?.id ?? ""}:${senhaTemporaria}:${textoBase}`;
+  const mensagemPadrao = usuario ? substituirPlaceholders(textoBase, usuario, senhaTemporaria) : "";
+  const mensagem = mensagemEditada?.chave === chaveMensagem ? mensagemEditada.valor : mensagemPadrao;
+  const setMensagem = (valor: string | ((atual: string) => string)) => {
+    setMensagemEditada({
+      chave: chaveMensagem,
+      valor: typeof valor === "function" ? valor(mensagem) : valor,
+    });
+  };
 
   if (!usuario) return null;
 
@@ -148,7 +152,6 @@ export default function ModalOnboarding({ open, onClose, usuario, senhaTemporari
 
   const mudarTemplate = (t: OnboardingTemplate) => {
     setTemplateAtualId(t.id);
-    if (usuario) setMensagem(substituirPlaceholders(t.mensagem, usuario, senhaTemporaria));
   };
 
   return (

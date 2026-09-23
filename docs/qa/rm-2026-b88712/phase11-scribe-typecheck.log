@@ -1,0 +1,13 @@
+
+> alpha_sistema@0.1.0 typecheck
+> NODE_OPTIONS=--max-old-space-size=8192 tsc --noEmit
+
+tests/bpm/autosave-tipos-imediatos-react.test.ts(47,45): error TS2352: Conversion of type '{ success: true; data: { id: string; updatedAt: Date; camposEtapa: never[]; }; }' to type '{ success: boolean; error: string; data?: undefined; } | { success: boolean; data: { emailClienteReuniao: string | null; anexos: { url: string; id: string; nome: string; createdAt: Date; tipo: string | null; cardId: string; tamanho: number | null; enviadoPorId: number; campoId: string | null; }[]; ... 34 more ...; t...' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ success: true; data: { id: string; updatedAt: Date; camposEtapa: never[]; }; }' is not comparable to type '{ success: boolean; data: { emailClienteReuniao: string | null; anexos: { url: string; id: string; nome: string; createdAt: Date; tipo: string | null; cardId: string; tamanho: number | null; enviadoPorId: number; campoId: string | null; }[]; ... 34 more ...; transcricaoReuniao: string | null; }; error?: undefined; }'.
+    Types of property 'data' are incompatible.
+      Type '{ id: string; updatedAt: Date; camposEtapa: never[]; }' is missing the following properties from type '{ emailClienteReuniao: string | null; anexos: { url: string; id: string; nome: string; createdAt: Date; tipo: string | null; cardId: string; tamanho: number | null; enviadoPorId: number; campoId: string | null; }[]; ... 34 more ...; transcricaoReuniao: string | null; }': emailClienteReuniao, anexos, formularioEtapa, permissaoEtapa, and 30 more.
+npm notice
+npm notice New minor version of npm available! 11.6.1 -> 11.20.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.20.0
+npm notice To update run: npm install -g npm@11.20.0
+npm notice

@@ -89,7 +89,7 @@ export default function FiltrosPopover({
     const [aberto, setAberto] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
     const [empresas, setEmpresas] = useState<EmpresaRadar[]>([]);
-    const normalize = (val: any) => String(val || "").toUpperCase();
+    const normalize = (val: unknown) => String(val || "").toUpperCase();
 
 
 

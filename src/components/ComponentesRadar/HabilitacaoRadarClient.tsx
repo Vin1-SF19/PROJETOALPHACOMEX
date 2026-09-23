@@ -45,21 +45,21 @@ type EmpresaRadar = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const fmt = (v: any) => {
+const fmt = (v: string | number | Date | null | undefined) => {
   if (!v) return "";
   const d = new Date(v);
   return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString("pt-BR");
 };
 
-const fmtDisplay = (v: any) => {
+const fmtDisplay = (v: string | number | Date | null | undefined) => {
   if (!v) return "N/A";
   const d = new Date(v);
   return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString("pt-BR", { timeZone: "UTC" });
 };
 
-const normSub = (v: any) => String(v || "").toUpperCase();
+const normSub = (v: unknown) => String(v || "").toUpperCase();
 
-const fmtBRL = (v: any) => {
+const fmtBRL = (v: unknown) => {
   const num = Number(String(v || "0").replace(/[^\d,.]/g, "").replace(",", "."));
   if (!num || isNaN(num)) return "—";
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(num);
@@ -77,7 +77,7 @@ export function HabilitacaoRadarClient() {
   const [temaNome, setTemaNome] = useState("blue");
   useEffect(() => {
     const saved = localStorage.getItem("alpha-theme-temp");
-    const user = session?.user as any;
+    const user = session?.user;
     setTemaNome(saved || user?.tema_interface || "blue");
   }, [session]);
   const visual = getTema(temaNome);
@@ -93,9 +93,9 @@ export function HabilitacaoRadarClient() {
   const [statusLote, setStatusLote] = useState("");
   const cancelarProcessamento = useRef<boolean>(false);
   const pausarRef = useRef<boolean>(false);
-  const [infosimples, setInfosimples] = useState<any>(null);
+  const [infosimples, setInfosimples] = useState<{ saldo?: number; consumo?: number } | null>(null);
   const [isOffline, setIsOffline] = useState(false);
-  const [empresaSelecionada, setEmpresaSelecionada] = useState<any | null>(null);
+  const [empresaSelecionada, setEmpresaSelecionada] = useState<EmpresaRadar | null>(null);
   const [showModalReconsulta, setShowModalReconsulta] = useState(false);
 
   // ── Filter state ────────────────────────────────────────────────────────────
@@ -275,7 +275,7 @@ export function HabilitacaoRadarClient() {
   async function handleBuscar(
     cnpjOpcional?: string,
     isReconsulta = false,
-    dadosOriginais?: any,
+    dadosOriginais?: Partial<EmpresaRadar>,
     isLote = false
   ) {
     const alvo = cnpjOpcional || cnpj;
@@ -374,8 +374,8 @@ export function HabilitacaoRadarClient() {
     setEmpresas((prev) => {
       const existentes = new Set(prev.map((e) => e.cnpj));
       const novos = registros
-        .filter((r: any) => !existentes.has(r.cnpj))
-        .map((r: any, i: number) => ({
+        .filter((r: Record<string, string>) => !existentes.has(r.cnpj))
+        .map((r: Record<string, string>, i: number) => ({
           numero: prev.length + i + 1,
           dataConsulta: r.data_consulta
             ? new Date(r.data_consulta).toLocaleDateString("pt-BR")
@@ -606,10 +606,10 @@ export function HabilitacaoRadarClient() {
     setLoading(true);
     const tid = toast.loading("Sincronizando com a nuvem...");
     try {
-      const res = (await salvarPlanilhaCompleta(empresas, nome)) as any;
+      const res = await salvarPlanilhaCompleta(empresas, nome);
       if (res?.success) {
-        const n = res.novos || 0;
-        const ex = res.existentes || 0;
+        const n = res.totalCriados || 0;
+        const ex = res.totalExistentes || 0;
         if (n === 0 && ex > 0) toast.info("Todos os dados já estão na nuvem!", { id: tid });
         else
           toast.success(`${n} novos salvos. (${ex} já estavam)`, {
@@ -766,7 +766,7 @@ export function HabilitacaoRadarClient() {
             className="flex items-center gap-3 px-4 h-11 bg-black/30 backdrop-blur-sm rounded-xl border transition-all"
             style={{
               borderColor:
-                infosimples?.saldo < 100
+                (infosimples?.saldo ?? 0) < 100
                   ? "rgba(239,68,68,0.4)"
                   : "rgba(255,255,255,0.06)",
             }}
@@ -777,7 +777,7 @@ export function HabilitacaoRadarClient() {
               </span>
               <span
                 className="text-sm font-mono font-black"
-                style={{ color: infosimples?.saldo < 100 ? "#f87171" : "#34d399" }}
+                style={{ color: (infosimples?.saldo ?? 0) < 100 ? "#f87171" : "#34d399" }}
               >
                 {isOffline ? (
                   <span className="flex items-center gap-1 text-[9px] text-slate-500">
@@ -806,8 +806,8 @@ export function HabilitacaoRadarClient() {
               className="h-2 w-2 rounded-full ml-1"
               style={{
                 background:
-                  infosimples?.saldo < 100 ? "#ef4444" : "#10b981",
-                animation: infosimples?.saldo < 100 ? "ping 1s linear infinite" : "none",
+                  (infosimples?.saldo ?? 0) < 100 ? "#ef4444" : "#10b981",
+                animation: (infosimples?.saldo ?? 0) < 100 ? "ping 1s linear infinite" : "none",
               }}
             />
           </div>

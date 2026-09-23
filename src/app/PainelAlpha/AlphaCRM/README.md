@@ -112,3 +112,11 @@ Ver `docs/components/gradient-blob-card.md` para detalhes completos.
 - `framer-motion` — animações (partículas, borda animada)
 - `lucide-react` — ícones
 - `@/lib/utils` (`cn`) — merge de classes
+
+## Contratos operacionais (RM-2026-8BA322)
+
+- As consultas leves de empresa e responsáveis ficam em `src/actions/bpm/CardsConsultas.ts`; o comando de arquivamento fica em `CardsExcluir.ts`. `Cards.ts` reexporta os três nomes públicos para preservar os imports dos clientes. Autorização e transação continuam dentro de cada action.
+- `ExcluirAnexoBpm` remove o metadado numa transação e registra uma pendência de limpeza do Blob na mesma transação. A rotina `/api/bpm/jobs/automacoes`, autenticada por `CRON_SECRET`, reconcilia a pendência; falhas individuais permanecem para retry. Uploads sem metadado registrado ficam 24 horas antes da limpeza. O armazenamento usa `CRM_READ_WRITE_TOKEN`; referências legadas públicas não são apagadas por esse fluxo.
+- Agendamento Google que falha depois de criar evento tenta cancelá-lo, após verificar se algum card já usa o vínculo. Reagendamento cujo commit local falha tenta restaurar horário e participantes anteriores, respeitando o ETag remoto e o mesmo Meet. Falhas de compensação são registradas no histórico para retry pelo mesmo cron; divergência externa requer revisão humana.
+- O board carrega todos os cards ativos do pipeline. A medição read-only de 2026-09-23 encontrou 7 cards em 1 pipeline. Nessa cardinalidade, paginação acrescentaria complexidade aos filtros, drag and drop e realtime sem ganho medido. Reavaliar quando algum pipeline atingir 200 cards ativos ou a resposta autenticada de `ListarCardsPipelineBpm` superar 500 ms no p95; medir cardinalidade, consulta, renderização e consistência do board antes de mudar o contrato.
+- `vitest --coverage` inclui `src/actions/bpm` e `src/lib/bpm`. O deploy de staging executa `npm run typecheck` antes do build, porque o build Next deste projeto ignora validação de tipos.

@@ -7,14 +7,16 @@ import { atualizarAgenteSistemaAction } from "@/actions/colaboradores";
 import Image from "next/image";
 import { ModalVincularAcesso } from "./VincularAcesso";
 import { CampoAlpha } from "@/components/CampoAlpha";
+import type { TemaAlpha } from "@/lib/temas";
+import type { ColaboradorVault, RecursoVault, SistemaVault } from "../types";
 
 interface Props {
     isOpen: boolean;
     onClose: () => void;
-    agente: any;
-    style: any;
-    sistemas: any[];
-    recursos?: any[];
+    agente: ColaboradorVault;
+    style: TemaAlpha;
+    sistemas: SistemaVault[];
+    recursos?: RecursoVault[];
 }
 
 export function ModalEditarAgente({ isOpen, onClose, agente, style, sistemas, recursos = [] }: Props) {
@@ -85,7 +87,7 @@ export function ModalEditarAgente({ isOpen, onClose, agente, style, sistemas, re
                                     name="cargo"
                                     type="select"
                                     icon={Briefcase}
-                                    defaultValue={agente.cargo}
+                                    defaultValue={agente.cargo ?? undefined}
                                     options={["CEO", "DIRETOR", "GERENTE", "SUPERVISOR", "AGENTE ALPHA", "ESTAGIÁRIO"]}
                                 />
 
@@ -115,7 +117,7 @@ export function ModalEditarAgente({ isOpen, onClose, agente, style, sistemas, re
                                     name="data"
                                     type="date"
                                     icon={Calendar}
-                                    defaultValue={agente.data_contratacao}
+                                    defaultValue={agente.data_contratacao ?? undefined}
                                 />
 
                                 <CampoAlpha
@@ -123,7 +125,7 @@ export function ModalEditarAgente({ isOpen, onClose, agente, style, sistemas, re
                                     name="status"
                                     type="select"
                                     icon={Power}
-                                    defaultValue={agente.status}
+                                    defaultValue={agente.status ?? undefined}
                                     options={["ATIVO", "INATIVO"]}
                                 />
                             </div>
@@ -170,7 +172,7 @@ export function ModalEditarAgente({ isOpen, onClose, agente, style, sistemas, re
                                                     </div>
                                                     <button
                                                         type="button"
-                                                        onClick={() => toggleSenha(rec.id)}
+                                                        onClick={() => toggleSenha(String(rec.id))}
                                                         className="p-2 hover:bg-white/5 rounded-lg text-slate-500 hover:text-white transition-all"
                                                     >
                                                         {verSenhas[rec.id] ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -212,4 +214,3 @@ export function ModalEditarAgente({ isOpen, onClose, agente, style, sistemas, re
         </>
     );
 }
-

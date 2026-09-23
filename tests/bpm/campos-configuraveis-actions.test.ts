@@ -9,6 +9,10 @@ const mocks = vi.hoisted(() => ({
   campoUpdate: vi.fn(),
   campoFindUniqueOrThrow: vi.fn(),
   campoFindUnique: vi.fn(),
+  campoDelete: vi.fn(),
+  valorCardCount: vi.fn(),
+  valorGlobalCount: vi.fn(),
+  anexoCount: vi.fn(),
   etapaFindMany: vi.fn(),
   pipelineFindMany: vi.fn(),
   pipelineUpdate: vi.fn(),
@@ -21,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   mapeamentoFindUnique: vi.fn(),
   mapeamentoUpsert: vi.fn(),
   mapeamentoUpdate: vi.fn(),
+  mapeamentoDeleteMany: vi.fn(),
   transaction: vi.fn(),
 }));
 
@@ -44,6 +49,7 @@ import {
   ConfigurarMapeamentoCampoBpm,
   CriarCampoBpm,
   DesativarMapeamentoCampoBpm,
+  ExcluirCampoBpm,
 } from "@/actions/bpm/Campos";
 
 const PIPELINE_ID = "clw0000000000000pipeline";
@@ -56,7 +62,10 @@ function clienteTx() {
   return {
     bpmPipeline: { findMany: mocks.pipelineFindMany, update: mocks.pipelineUpdate },
     bpmEtapa: { findMany: mocks.etapaFindMany },
-    bpmCampo: { create: mocks.campoCreate, update: mocks.campoUpdate, findUniqueOrThrow: mocks.campoFindUniqueOrThrow },
+    bpmCampo: { create: mocks.campoCreate, update: mocks.campoUpdate, delete: mocks.campoDelete, findUnique: mocks.campoFindUnique, findUniqueOrThrow: mocks.campoFindUniqueOrThrow },
+    bpmCardCampoValor: { count: mocks.valorCardCount },
+    bpmCampoValorGlobal: { count: mocks.valorGlobalCount },
+    bpmCardAnexo: { count: mocks.anexoCount },
     bpmCampoOpcao: { createMany: mocks.opcaoCreateMany },
     bpmCampoPipeline: { createMany: mocks.campoPipelineCreateMany },
     bpmCampoEtapaConfig: { createMany: mocks.campoEtapaConfigCreateMany },
@@ -65,6 +74,7 @@ function clienteTx() {
       findMany: mocks.mapeamentoFindMany,
       upsert: mocks.mapeamentoUpsert,
       update: mocks.mapeamentoUpdate,
+      deleteMany: mocks.mapeamentoDeleteMany,
     },
     bpmPipelineConfigAuditoria: { create: mocks.auditoriaCreate },
   };
@@ -90,6 +100,10 @@ describe("ações de gestão configurável de campos", () => {
       mapeamentoDestino: null,
     });
     mocks.mapeamentoUpsert.mockResolvedValue({ id: "clw000000000000000mapa" });
+    mocks.valorCardCount.mockResolvedValue(0);
+    mocks.valorGlobalCount.mockResolvedValue(0);
+    mocks.anexoCount.mockResolvedValue(0);
+    mocks.campoDelete.mockResolvedValue({ id: CAMPO_DESTINO_ID });
     mocks.transaction.mockImplementation(async (callback: (tx: ReturnType<typeof clienteTx>) => unknown) => callback(clienteTx()));
   });
 
@@ -243,6 +257,51 @@ describe("ações de gestão configurável de campos", () => {
       editavel: false,
     });
     expect(canonico.success).toBe(true);
+  });
+
+  it("exclui definitivamente campo sem dados, audita e avança a configuração", async () => {
+    mocks.campoFindUnique.mockResolvedValue({
+      id: CAMPO_DESTINO_ID,
+      nome: "Campo descartável",
+      pipelineId: PIPELINE_ID,
+      pipelinesAssociados: [{ pipelineId: OUTRO_PIPELINE_ID }],
+    });
+
+    const resultado = await ExcluirCampoBpm({ campoId: CAMPO_DESTINO_ID });
+
+    expect(resultado).toEqual({ success: true });
+    expect(mocks.mapeamentoDeleteMany).toHaveBeenCalledWith({
+      where: { OR: [{ campoOrigemId: CAMPO_DESTINO_ID }, { campoDestinoId: CAMPO_DESTINO_ID }] },
+    });
+    expect(mocks.campoDelete).toHaveBeenCalledWith({ where: { id: CAMPO_DESTINO_ID } });
+    expect(mocks.auditoriaCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ campoAlterado: "campo_excluido", pipelineId: PIPELINE_ID, adminId: 7 }),
+    });
+    expect(mocks.pipelineUpdate).toHaveBeenCalledTimes(2);
+    expect(mocks.notificar).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ["valor de card", "valorCardCount"],
+    ["valor global", "valorGlobalCount"],
+    ["anexo", "anexoCount"],
+  ] as const)("bloqueia exclusão quando há %s associado", async (_cenario, contador) => {
+    mocks.campoFindUnique.mockResolvedValue({
+      id: CAMPO_DESTINO_ID,
+      nome: "Campo em uso",
+      pipelineId: PIPELINE_ID,
+      pipelinesAssociados: [],
+    });
+    mocks[contador].mockResolvedValue(1);
+
+    const resultado = await ExcluirCampoBpm({ campoId: CAMPO_DESTINO_ID });
+
+    expect(resultado).toEqual({
+      success: false,
+      error: "Este campo possui dados associados e não pode ser excluído",
+    });
+    expect(mocks.campoDelete).not.toHaveBeenCalled();
+    expect(mocks.mapeamentoDeleteMany).not.toHaveBeenCalled();
   });
 
   it("rejeita mapeamento entre tipos diferentes antes da transação", async () => {

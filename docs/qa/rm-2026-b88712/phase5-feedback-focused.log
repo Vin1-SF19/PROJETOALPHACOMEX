@@ -1,0 +1,32 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /home/ialpha/projetos/alpha-comex/painel-alpha
+
+ ❯ tests/bpm/cpf-pendencias-react.test.ts (20 tests | 1 failed) 252ms
+   × campo dinâmico multiselecao da etapa salva no change sem blur nem avanço do relógio 11ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/bpm/cpf-pendencias-react.test.ts > campo dinâmico multiselecao da etapa salva no change sem blur nem avanço do relógio
+TypeError: Cannot write private member #selectionStart to an object whose class did not declare it
+ ❯ HTMLDivElement.set value node_modules/happy-dom/src/nodes/html-input-element/HTMLInputElement.ts:865:25
+ ❯ tests/bpm/cpf-pendencias-react.test.ts:225:84
+    223|         input.dispatchEvent(new Event("change", { bubbles: true }));
+    224|       } else {
+    225|         Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "v…
+       |                                                                                    ^
+    226|         input.dispatchEvent(new Event("input", { bubbles: true }));
+    227|       }
+ ❯ Proxy.process.env.NODE_ENV.exports.act node_modules/react/cjs/react.development.js:814:22
+ ❯ tests/bpm/cpf-pendencias-react.test.ts:219:11
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 7 passed (8)
+      Tests  1 failed | 85 passed (86)
+   Start at  20:42:32
+   Duration  1.36s (transform 1.77s, setup 0ms, import 3.19s, tests 594ms, environment 532ms)
+

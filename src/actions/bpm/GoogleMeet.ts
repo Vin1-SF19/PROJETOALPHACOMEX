@@ -20,6 +20,7 @@ import {
 } from "@/lib/google-calendar/usuario-google";
 import { dadosCacheDeEvento } from "@/lib/google-calendar/cache-eventos";
 import { GoogleCalendarError } from "@/lib/google-calendar/errors";
+import { cancelarCriacaoSemVinculo, registrarCompensacaoGooglePendente, reverterReagendamentoSemPersistencia, type EventoCriadoSemVinculo, type ReagendamentoPendente } from "@/lib/bpm/google-meet-compensacao";
 import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
 import { dataHoraObrigatoriaBpmSchema } from "@/lib/validations/bpm";
 import {
@@ -30,6 +31,26 @@ import {
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 const DURACAO_PADRAO_MINUTOS = 60; // decisão confirmada com o usuário (plano-novos-leads-bpm.md, Bloco 2)
 const ERRO_ETAPA_REUNIAO = "O Google Meet só pode ser agendado ou reagendado na etapa Agendar Reunião.";
+
+async function compensarCriacaoComRegistro(evento: EventoCriadoSemVinculo) {
+  try {
+    await cancelarCriacaoSemVinculo(evento);
+  } catch (error) {
+    console.error("[AgendarReuniaoGoogleMeetBpm] Compensação pendente", { evento, error });
+    await registrarCompensacaoGooglePendente(evento.cardId, "REUNIAO_CRIACAO_COMPENSACAO_PENDENTE", evento);
+  }
+}
+
+async function compensarReagendamentoComRegistro(pendente: ReagendamentoPendente) {
+  try {
+    await reverterReagendamentoSemPersistencia(pendente);
+  } catch (error) {
+    console.error("[ReagendarReuniaoBpm] Rollback pendente", { pendente, error });
+    await registrarCompensacaoGooglePendente(
+      pendente.cardId, "REUNIAO_REAGENDAMENTO_COMPENSACAO_PENDENTE", pendente,
+    );
+  }
+}
 
 function cardEstaNaEtapaDeReuniao(card: { etapa: { nome: string } } | null): boolean {
   return Boolean(card && etapaEhAgendarReuniao(card.etapa.nome));
@@ -55,14 +76,15 @@ async function confirmarLinkMeetCriado(params: {
       googleEventId: params.googleEventId,
     });
     if (ultimoEvento.linkMeet) {
-      await db.googleCalendarEventoCache.update({
+      await db.googleCalendarEventoCache.upsert({
         where: {
           calendarioId_googleEventId: {
             calendarioId: params.calendarioId,
             googleEventId: params.googleEventId,
           },
         },
-        data: dadosCacheDeEvento(ultimoEvento),
+        create: { calendarioId: params.calendarioId, googleEventId: params.googleEventId, ...dadosCacheDeEvento(ultimoEvento) },
+        update: dadosCacheDeEvento(ultimoEvento),
       });
       return ultimoEvento.linkMeet;
     }
@@ -83,6 +105,7 @@ async function confirmarLinkMeetCriado(params: {
 }
 
 async function reagendarEventoVinculado(params: {
+  cardId: string;
   googleEventId: string;
   googleCalendarId: string;
   googleMeetLink: string;
@@ -93,20 +116,34 @@ async function reagendarEventoVinculado(params: {
   const vinculos = await db.googleCalendarEventoCache.findMany({
     where: {
       googleEventId: params.googleEventId,
-      linkMeet: params.googleMeetLink,
       calendario: { googleCalendarId: params.googleCalendarId, gravavel: true },
     },
     select: {
       calendarioId: true,
-      etag: true,
       calendario: { select: { timezone: true } },
     },
     take: 2,
   });
-  if (vinculos.length !== 1) {
-    return { success: false as const, error: "Não foi possível confirmar o organizador e o espaço desta reunião. Revise o vínculo na Agenda Alpha." };
+  if (vinculos.length > 1) {
+    return { success: false as const, error: "Mais de um calendário está vinculado a esta reunião. Revise o vínculo na Agenda Alpha antes de reagendar." };
   }
-  const vinculo = vinculos[0];
+  // O cache pode expirar ou ainda não conter o link do Meet. Ele não é a
+  // autoridade sobre o espaço: a confirmação abaixo é feita no próprio Google.
+  let vinculo = vinculos[0];
+  if (!vinculo) {
+    const calendarios = await db.googleCalendarSelecionado.findMany({
+      where: { googleCalendarId: params.googleCalendarId, gravavel: true },
+      select: { id: true, timezone: true },
+      take: 2,
+    });
+    if (calendarios.length > 1) {
+      return { success: false as const, error: "Mais de um calendário pode conter esta reunião. Revise o vínculo na Agenda Alpha antes de reagendar." };
+    }
+    if (calendarios.length === 0) {
+      return { success: false as const, error: "O calendário desta reunião não está disponível para edição. Revise a conexão e a permissão de escrita na Agenda Alpha." };
+    }
+    vinculo = { calendarioId: calendarios[0].id, calendario: { timezone: calendarios[0].timezone } };
+  }
   const usuarioGoogle = await obterUsuarioGoogleAtivoPorCalendario(vinculo.calendarioId);
   if (!usuarioGoogle.ok) {
     return { success: false as const, error: "A Agenda Alpha do organizador não está ativa." };
@@ -117,8 +154,11 @@ async function reagendarEventoVinculado(params: {
     calendarId: params.googleCalendarId,
     googleEventId: params.googleEventId,
   });
-  if (eventoAtual.linkMeet !== params.googleMeetLink) {
+  if (eventoAtual.status === "cancelled" || eventoAtual.linkMeet !== params.googleMeetLink) {
     return { success: false as const, error: "O espaço do Google Meet foi alterado fora do painel. Revise o evento antes de reagendar." };
+  }
+  if (!eventoAtual.inicio.dataHora || !eventoAtual.fim.dataHora) {
+    return { success: false as const, error: "O evento Google não tem horário válido para rollback seguro." };
   }
 
   const eventoAtualizado = await atualizarEventoParcialGoogle({
@@ -134,19 +174,32 @@ async function reagendarEventoVinculado(params: {
       participantes: combinarParticipantesReuniao(eventoAtual.participantes, params.emailCliente),
     },
   });
+  const compensacao: ReagendamentoPendente = {
+    cardId: params.cardId,
+    calendarioId: vinculo.calendarioId,
+    googleCalendarId: params.googleCalendarId,
+    googleEventId: params.googleEventId,
+    googleMeetLink: params.googleMeetLink,
+    inicioAnterior: eventoAtual.inicio.dataHora,
+    fimAnterior: eventoAtual.fim.dataHora,
+    inicioNovo: params.inicio.toISOString(),
+    participantesAnteriores: eventoAtual.participantes.map((p) => p.email),
+    timezone: vinculo.calendario.timezone || "America/Sao_Paulo",
+  };
   if (eventoAtualizado.linkMeet !== params.googleMeetLink) {
-    return { success: false as const, error: "O Google devolveu um espaço de reunião diferente. O card não foi alterado; revise o evento na Agenda Alpha." };
+    return { success: false as const, error: "O Google devolveu um espaço de reunião diferente. O card não foi alterado; revise o evento na Agenda Alpha.", compensacao };
   }
-  await db.googleCalendarEventoCache.update({
+  await db.googleCalendarEventoCache.upsert({
     where: {
       calendarioId_googleEventId: {
         calendarioId: vinculo.calendarioId,
         googleEventId: params.googleEventId,
       },
     },
-    data: dadosCacheDeEvento(eventoAtualizado),
-  });
-  return { success: true as const };
+    create: { calendarioId: vinculo.calendarioId, googleEventId: params.googleEventId, ...dadosCacheDeEvento(eventoAtualizado) },
+    update: dadosCacheDeEvento(eventoAtualizado),
+  }).catch((error) => console.error("[ReagendarReuniaoBpm] Cache Google será sincronizado depois", error));
+  return { success: true as const, compensacao };
 }
 
 const agendarSchema = z.object({
@@ -189,6 +242,7 @@ async function resolverCalendarioPrincipal(userId: number) {
 }
 
 export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
+  let eventoCriado: EventoCriadoSemVinculo | null = null;
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
@@ -259,6 +313,7 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
     });
 
     if (!resultado.success) return { success: false, error: resultado.error };
+    eventoCriado = { cardId, userId, calendarioId: calendario.id, googleCalendarId: calendario.googleCalendarId, googleEventId: resultado.data.googleEventId };
 
     const eventoCache = await db.googleCalendarEventoCache.findUnique({
       where: {
@@ -311,6 +366,25 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
       if (atualizado.count !== 1) {
         return { success: false as const, error: "O card mudou enquanto a reunião era agendada. Recarregue e tente novamente." };
       }
+      await tx.bpmCardReuniao.upsert({
+        where: { cardId_chave: { cardId, chave: "principal" } },
+        create: {
+          cardId,
+          chave: "principal",
+          status: "AGENDADA",
+          agendadaEm: inicio,
+          googleEventId: resultado.data.googleEventId,
+          googleCalendarId: calendario.googleCalendarId,
+          googleMeetLink,
+        },
+        update: {
+          status: "AGENDADA",
+          agendadaEm: inicio,
+          googleEventId: resultado.data.googleEventId,
+          googleCalendarId: calendario.googleCalendarId,
+          googleMeetLink,
+        },
+      });
       await registrarHistoricoCard(
         {
           cardId,
@@ -322,12 +396,17 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
       );
       return { success: true as const };
     });
-    if (!persistencia.success) return persistencia;
+    if (!persistencia.success) {
+      await compensarCriacaoComRegistro(eventoCriado);
+      return persistencia;
+    }
+    eventoCriado = null;
 
     revalidatePath(`${ROTA_BASE}/pipeline`);
     await notificarPipelineBpm({ cardId, tipo: "REUNIAO_ALTERADA" });
     return { success: true, data: { googleEventId: resultado.data.googleEventId } };
   } catch (error) {
+    if (eventoCriado) await compensarCriacaoComRegistro(eventoCriado);
     console.error("[AgendarReuniaoGoogleMeetBpm]", error instanceof GoogleCalendarError
       ? { kind: error.kind, status: error.status, message: error.message }
       : { message: error instanceof Error ? error.message : "Erro desconhecido" });
@@ -343,6 +422,7 @@ const reagendarSchema = z.object({
 });
 
 export async function ReagendarReuniaoBpm(dados: unknown) {
+  let compensacao: ReagendamentoPendente | null = null;
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
@@ -413,6 +493,7 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
     }
     await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
     const resultado = await reagendarEventoVinculado({
+      cardId,
       googleCalendarId: card.googleCalendarId,
       googleEventId: card.googleEventId,
       googleMeetLink: card.googleMeetLink,
@@ -421,7 +502,13 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
       emailCliente,
     });
 
-    if (!resultado.success) return { success: false, error: resultado.error };
+    if (!resultado.success) {
+      if ("compensacao" in resultado && resultado.compensacao) {
+        await compensarReagendamentoComRegistro(resultado.compensacao);
+      }
+      return { success: false, error: resultado.error };
+    }
+    compensacao = resultado.compensacao;
 
     const persistencia = await db.$transaction(async (tx) => {
       await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard", tx);
@@ -458,6 +545,25 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
       if (atualizado.count !== 1) {
         return { success: false as const, error: "O card mudou enquanto a reunião era reagendada. Recarregue e tente novamente." };
       }
+      await tx.bpmCardReuniao.upsert({
+        where: { cardId_chave: { cardId, chave: "principal" } },
+        create: {
+          cardId,
+          chave: "principal",
+          status: "AGENDADA",
+          agendadaEm: inicio,
+          googleEventId: card.googleEventId,
+          googleCalendarId: card.googleCalendarId,
+          googleMeetLink: card.googleMeetLink,
+        },
+        update: {
+          status: "AGENDADA",
+          agendadaEm: inicio,
+          googleEventId: card.googleEventId,
+          googleCalendarId: card.googleCalendarId,
+          googleMeetLink: card.googleMeetLink,
+        },
+      });
       await registrarHistoricoCard(
         {
           cardId,
@@ -475,12 +581,17 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
       );
       return { success: true as const };
     });
-    if (!persistencia.success) return persistencia;
+    if (!persistencia.success) {
+      await compensarReagendamentoComRegistro(compensacao);
+      return persistencia;
+    }
+    compensacao = null;
 
     revalidatePath(`${ROTA_BASE}/pipeline`);
     await notificarPipelineBpm({ cardId, tipo: "REUNIAO_ALTERADA" });
     return { success: true };
   } catch (error) {
+    if (compensacao) await compensarReagendamentoComRegistro(compensacao);
     console.error("[ReagendarReuniaoBpm]", error instanceof GoogleCalendarError
       ? { kind: error.kind, status: error.status, message: error.message }
       : { message: error instanceof Error ? error.message : "Erro desconhecido" });

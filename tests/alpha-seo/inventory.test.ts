@@ -1,5 +1,6 @@
 import path from "node:path";
 import { access } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   buildAlphaSeoSourceManifest,
@@ -9,9 +10,11 @@ import {
 } from "@/lib/alpha-seo/inventory";
 
 const SOURCE_ROOT = path.resolve(process.cwd(), "..", "open-seo-main");
+// Historical OpenSEO checkout is supplied separately; keep parity checks active when present.
+const hasSourceCheckout = existsSync(path.join(SOURCE_ROOT, "src/server/mcp/server.ts"));
 
 describe("Alpha SEO source inventory", () => {
-  it("freezes 46/46 unique named source registrations without synthetic tools", async () => {
+  it.skipIf(!hasSourceCheckout)("freezes 46/46 unique named source registrations without synthetic tools", async () => {
     const manifest = await buildAlphaSeoSourceManifest(SOURCE_ROOT);
     expect(manifest.counts.mcpRegisteredTools).toBe(46);
     expect(manifest.mcp.reconciliation).toMatchObject({
@@ -59,7 +62,7 @@ describe("Alpha SEO source inventory", () => {
     });
   });
 
-  it("is deterministic and sanitizes the absolute source location", async () => {
+  it.skipIf(!hasSourceCheckout)("is deterministic and sanitizes the absolute source location", async () => {
     const first = serializeAlphaSeoManifest(
       await buildAlphaSeoSourceManifest(SOURCE_ROOT),
     );

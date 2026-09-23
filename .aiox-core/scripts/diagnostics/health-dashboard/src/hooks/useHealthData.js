@@ -52,9 +52,12 @@ function useHealthData(options = {}) {
   }, [loadData]);
 
   useEffect(() => {
-    if (autoLoad) {
-      loadData();
-    }
+    if (!autoLoad) return;
+    let active = true;
+    queueMicrotask(() => {
+      if (active) void loadData();
+    });
+    return () => { active = false; };
   }, [autoLoad, loadData]);
 
   return {

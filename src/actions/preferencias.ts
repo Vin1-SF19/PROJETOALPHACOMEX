@@ -30,7 +30,7 @@ export async function toggleBibbleAction(ativo: boolean) {
   if (!session?.user?.id) return { success: false };
 
   try {
-    await (db.usuarios as any).update({
+    await db.usuarios.update({
       where: { id: Number(session.user.id) },
       data: { bibble_ativo: ativo },
     });

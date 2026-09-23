@@ -7,10 +7,12 @@ import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'sonner';
 
+type Usuario = Awaited<ReturnType<typeof BuscarTodosUsuarios>>["data"][number];
+
 export default function PaginaUsuarios() {
     const [loading, setLoading] = useState(true);
     const [busca, setBusca] = useState("");
-    const [usuariosBase, setUsuariosBase] = useState<any[]>([]);
+    const [usuariosBase, setUsuariosBase] = useState<Usuario[]>([]);
     const [buscaFiltroAdicionar, setBuscaFiltroAdicionar] = useState("");
     const [showAddMenu, setShowAddMenu] = useState(false);
     const [vinculadosIds, setVinculadosIds] = useState<string[]>([]);
@@ -41,7 +43,7 @@ export default function PaginaUsuarios() {
         }
     }, [vinculadosIds, loading]);
 
-    const toggleVinculo = (user: any) => {
+    const toggleVinculo = (user: Usuario) => {
         const idStr = String(user.id);
         if (vinculadosIds.includes(idStr)) {
             setVinculadosIds(prev => prev.filter(id => id !== idStr));

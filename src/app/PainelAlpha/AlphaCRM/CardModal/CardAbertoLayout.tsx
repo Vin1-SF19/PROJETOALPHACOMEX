@@ -49,6 +49,7 @@ export interface CardAbertoLayoutProps {
   realtimeRevision: number;
   onClose: () => void;
   onAtualizado: () => void;
+  onCardExcluido?: (cardId: string) => void;
   onAbrirCard: (cardId: string) => void;
   onInteracaoCriada: (interacao: Interacao) => void;
   /** Slot: formulário da etapa ativa (renderizado pelo CardOpenFormSlot ou equivalente) */
@@ -78,6 +79,7 @@ export function CardAbertoLayout({
   realtimeRevision,
   onClose,
   onAtualizado,
+  onCardExcluido,
   onAbrirCard,
   onInteracaoCriada,
   children,
@@ -191,6 +193,7 @@ export function CardAbertoLayout({
                   <button
                     type="button"
                     aria-label="Excluir card"
+                    disabled={excluindo}
                     className="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                   >
                     <Trash2 size={15} aria-hidden="true" />
@@ -202,7 +205,7 @@ export function CardAbertoLayout({
                     <AlertDialogDescription>
                       Tem certeza que deseja excluir o card{" "}
                       <strong>{card.empresa.nomeFantasia || card.empresa.razaoSocial}</strong>?
-                      Esta ação é irreversível e removerá todos os campos, tarefas e anexos vinculados.
+                      O card será arquivado e sairá do board. Esta ação é irreversível pela interface.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -215,11 +218,16 @@ export function CardAbertoLayout({
                         try {
                           const res = await ExcluirCardBpm(card.id);
                           if (res.success) {
-                            toast.success("Card excluído com sucesso");
+                            toast.success("Card arquivado com sucesso");
+                            onCardExcluido?.(card.id);
+                            onAtualizado();
                             onClose();
                           } else {
-                            toast.error(res.error ?? "Erro ao excluir card");
+                            const msg = (res as { mensagem?: string }).mensagem ?? res.error ?? "Erro ao excluir card";
+                            toast.error(msg);
                           }
+                        } catch {
+                          toast.error("Não foi possível arquivar o card. Tente novamente.");
                         } finally {
                           setExcluindo(false);
                         }

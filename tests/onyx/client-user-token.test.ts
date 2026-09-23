@@ -75,18 +75,10 @@ describe("client Onyx com token individual", () => {
     );
   });
 
-  it("preserva o PAT de servico quando uma chamada tecnica nao informa token", async () => {
+  it("bloqueia chamadas sem token individual mesmo com PAT de servico configurado", async () => {
     const client = await loadClient();
-    fetchMock.mockResolvedValueOnce(jsonResponse([]));
-
-    await client.listAgents();
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      "https://onyx.example.com/api/persona",
-      expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: "Bearer service-token" }),
-      }),
-    );
+    await expect(client.listAgents()).rejects.toMatchObject({ status: 503 });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("aceita token individual mesmo sem PAT global configurado", async () => {

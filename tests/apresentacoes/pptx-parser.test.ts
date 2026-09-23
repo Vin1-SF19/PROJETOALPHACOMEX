@@ -411,17 +411,16 @@ describe("extrairApresentacaoPptx — blipFill dentro de p:sp (imagem como preen
     expect(forma).toMatchObject({ tipo: "imagem", mimeType: "image/svg+xml", nomeArquivo: "image2.svg" });
   });
 
-  it("custGeom curvo + blipFill: recorta a imagem original pelo path real (clipPath), virando SVG novo", async () => {
+  it("custGeom curvo + blipFill: preserva o raster e fornece o path para recorte no mapeamento", async () => {
     const resultado = await montar();
     const forma = resultado.slides[0].formas[2];
     expect(forma.tipo).toBe("imagem");
     if (forma.tipo !== "imagem") return;
-    expect(forma.mimeType).toBe("image/svg+xml");
-    expect(forma.nomeArquivo).toMatch(/-recortada\.svg$/);
-    const svg = Buffer.from(forma.bytes).toString("utf-8");
-    expect(svg).toContain("<clipPath");
-    expect(svg).toContain("<image");
-    expect(svg).toContain("data:image/png;base64,");
+    expect(forma.mimeType).toBe("image/png");
+    expect(forma.nomeArquivo).toBe("image1.png");
+    expect(Buffer.from(forma.bytes).toString("base64")).toBe(PNG_1X1_BASE64);
+    expect(forma.recorte?.pathSvg).toContain("C");
+    expect(forma.recorte).toMatchObject({ viewBoxW: 1000000, viewBoxH: 1000000 });
   });
 
   it("custGeom curvo + solidFill (sem blipFill): fallback de última instância vira SVG com o path colorido", async () => {

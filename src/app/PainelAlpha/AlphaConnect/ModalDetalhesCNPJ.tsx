@@ -1,13 +1,23 @@
 import { X, Building2, ShieldCheck, History, Landmark, MapPin, Receipt, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { BotaoExportarExcel } from "./BotaoExportarExcel";
+import type { RadarFiscalItem } from "./types";
 
-export default function ModalDetalhesCNPJ({ item, onClose }: { item: any, onClose: () => void }) {
-    const [mounted, setMounted] = useState(false);
+const subscribeToHydration = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
+type Cnae = { code?: string; codigo?: string; text?: string; descricao?: string };
+type HistoricoRegime = { Ano?: string | number; ano?: string | number; periodo?: string; regime?: string; Regime?: string };
+
+function Badge({ label, color }: { label: string, color: string }) {
+    return <span className={`px-3 py-1 rounded-full border text-[9px] font-black uppercase ${color}`}>{label}</span>;
+}
+
+export default function ModalDetalhesCNPJ({ item, onClose }: { item: RadarFiscalItem, onClose: () => void }) {
+    const mounted = useSyncExternalStore(subscribeToHydration, getClientSnapshot, getServerSnapshot);
 
     useEffect(() => {
-        setMounted(true);
         document.body.style.overflow = 'hidden';
         return () => {
             document.body.style.overflow = 'unset';
@@ -16,7 +26,7 @@ export default function ModalDetalhesCNPJ({ item, onClose }: { item: any, onClos
 
     if (!item || !mounted) return null;
 
-    const parseData = (data: any) => {
+    const parseData = (data: unknown) => {
         try {
             return typeof data === 'string' ? JSON.parse(data) : data;
         } catch {
@@ -26,13 +36,6 @@ export default function ModalDetalhesCNPJ({ item, onClose }: { item: any, onClos
 
     const historico = parseData(item.historico_regime || item.historicoRegime || []);
     const cnaes = parseData(item.cnaes || item.cnaes_secundarios || []);
-
-    const Badge = ({ label, color }: { label: string, color: string }) => (
-        <span className={`px-3 py-1 rounded-full border text-[9px] font-black uppercase ${color}`}>
-            {label}
-        </span>
-    );
-
 
     const modalContent = (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
@@ -47,8 +50,8 @@ export default function ModalDetalhesCNPJ({ item, onClose }: { item: any, onClos
                                 {item.razao_social || item.razaoSocial}
                             </h2>
                             <Badge
-                                label={item.qualificacao || "NORMAL"}
-                                color={item.qualificacao === 'PREMIUM' ? 'text-amber-400 border-amber-400/20 bg-amber-400/5' : 'text-emerald-400 border-emerald-400/20'}
+                                label={item.qualificacao || "NÃO INFORMADO"}
+                                color={!item.qualificacao ? 'text-slate-400 border-slate-400/20 bg-slate-400/5' : item.qualificacao === 'PREMIUM' ? 'text-amber-400 border-amber-400/20 bg-amber-400/5' : 'text-emerald-400 border-emerald-400/20'}
                             />
                         </div>
                         <p className="text-[11px] font-mono text-slate-500 tracking-[0.2em]">
@@ -209,7 +212,7 @@ export default function ModalDetalhesCNPJ({ item, onClose }: { item: any, onClos
                                                 !codigosAnexo2.includes(c.code || c.codigo)
                                             );
 
-                                            const TagCnae = ({ cnae, color }: { cnae: any, color: string }) => (
+                                            const TagCnae = ({ cnae, color }: { cnae: Cnae, color: string }) => (
                                                 <div className="group relative cursor-help">
                                                     <span className={`px-2 py-1 bg-white/5 border border-white/10 rounded text-[9px] font-mono ${color} hover:bg-white/10 transition-all`}>
                                                         {cnae.code || cnae.codigo}
@@ -269,7 +272,7 @@ export default function ModalDetalhesCNPJ({ item, onClose }: { item: any, onClos
                                 <ShieldCheck size={16} /> Atividades Econômicas
                             </h3>
                             <div className="grid grid-cols-1 gap-2">
-                                {cnaes.map((cnae: any, idx: number) => (
+                                {cnaes.map((cnae: Cnae, idx: number) => (
                                     <div key={idx} className="bg-white/5 p-4 rounded-xl flex items-center gap-4 border border-white/5">
                                         <span className="text-emerald-400 font-mono text-[10px] shrink-0">{cnae.codigo || cnae.code}</span>
                                         <span className="text-white text-[10px] uppercase font-bold">{cnae.descricao || cnae.text}</span>
@@ -287,7 +290,7 @@ export default function ModalDetalhesCNPJ({ item, onClose }: { item: any, onClos
 
                             <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                                 {[2018, 2019, 2020, 2021, 2022, 2023, 2024].map(ano => {
-                                    const registro = historico.find((h: any) =>
+                                    const registro = historico.find((h: HistoricoRegime) =>
                                         String(h.Ano || h.ano || h.periodo).includes(String(ano))
                                     );
 

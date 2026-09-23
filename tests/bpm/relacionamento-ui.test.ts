@@ -8,7 +8,7 @@ import { PipelineEditorStateProvider } from "@/app/PainelAlpha/AlphaCRM/admin/pi
 import { SalvarFormularioEtapaBpm } from "@/actions/bpm/FormulariosEtapa";
 
 vi.mock("@/actions/bpm/Anexos", () => ({ RegistrarAnexoBpm: vi.fn() }));
-vi.mock("@/actions/bpm/Campos", () => ({ CriarCampoBpm: vi.fn() }));
+vi.mock("@/actions/bpm/Campos", () => ({ CriarCampoBpm: vi.fn(), ExcluirCampoBpm: vi.fn() }));
 vi.mock("@/actions/bpm/FormulariosEtapa", () => ({ SalvarFormularioEtapaBpm: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/FormularioEtapaRenderer", () => ({ FormularioEtapaRenderer: () => null }));
@@ -50,8 +50,27 @@ it("mantém relacionamento na composição/publicação e remove apenas da cria�
   const tipo = document.querySelector<HTMLSelectElement>('[role="dialog"] select')!;
   expect([...tipo.options].map((option) => option.value)).toEqual([
     "texto", "texto_longo", "numero", "moeda", "percentual", "data", "data_hora", "booleano",
-    "selecao", "multiselecao", "usuario", "cnpj", "cpf", "email", "telefone", "url", "arquivo",
+    "selecao", "multiselecao", "cnpj", "cpf", "email", "telefone", "url", "arquivo",
   ]);
+});
+
+it("mantém campo Usuário existente renderizável apesar de removê-lo da criação", async () => {
+  const onChange = vi.fn();
+  const campoUsuario = { ...campo, id: "usuario-existente", nome: "Responsável legado", tipo: "usuario" };
+  await act(async () => root.render(h(CampoBpmInput, {
+    campo: campoUsuario,
+    value: "42",
+    onChange,
+    className: "",
+  })));
+  const input = container.querySelector<HTMLInputElement>("input")!;
+  expect(input.type).toBe("number");
+  expect(input.value).toBe("42");
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "51");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  expect(onChange).toHaveBeenCalledWith("51");
 });
 
 it.each([false, true])("renderiza valor existente com readOnly=%s", async (readOnly) => {

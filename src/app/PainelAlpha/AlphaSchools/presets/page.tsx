@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { getTema } from "@/lib/temas";
 import AlphaPresetsConfig from "../AlphaPresets";
 import { isAdminRole } from "@/lib/roles";
@@ -12,8 +12,8 @@ export default function PresetsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  const [videos, setVideos] = useState<any[]>([]);
-  const [usuarios, setUsuarios] = useState<any[]>([]);
+  const videos: [] = [];
+  const usuarios: [] = [];
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -31,7 +31,7 @@ export default function PresetsPage() {
     );
   }
 
-  const user = session?.user as any;
+  const user = session?.user;
   const temaConfig = getTema(user?.tema_interface || "blue");
 
   return (

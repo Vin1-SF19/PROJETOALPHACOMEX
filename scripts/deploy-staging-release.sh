@@ -22,6 +22,8 @@ fi
 echo "[stage] Buildando o workspace..."
 (
   cd "$source_root"
+  echo "[stage] Validando os tipos independentemente do build..."
+  npm run typecheck
   NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=8192}" npm run build
 )
 
@@ -36,7 +38,12 @@ echo "[stage] Criando release isolada $release_path..."
 rsync -a \
   --exclude='.git/' \
   --exclude='.next/' \
+  --exclude='.next-dev/' \
+  --exclude='.next-test/' \
   --exclude='node_modules/' \
+  --exclude='.cache/' \
+  --exclude='coverage/' \
+  --exclude='test-results/' \
   --exclude='.central-roadmap-production/' \
   --exclude='database-backups/' \
   --exclude='logs/' \
@@ -116,8 +123,8 @@ set +m
 
 smoke_ok=false
 for _attempt in $(seq 1 30); do
-  if curl -sS -o /dev/null --max-time 3 "http://127.0.0.1:$smoke_port/" \
-    && curl -sS -o /dev/null --max-time 3 "http://127.0.0.1:$smoke_port/PainelAlpha/AlphaCRM/automacoes"; then
+  if curl -fsSL -o /dev/null --max-time 3 "http://127.0.0.1:$smoke_port/" \
+    && curl -fsSL -o /dev/null --max-time 3 "http://127.0.0.1:$smoke_port/PainelAlpha/AlphaCRM/automacoes"; then
     smoke_ok=true
     break
   fi
@@ -145,7 +152,7 @@ sudo systemctl restart "$service_name"
 deployed=false
 for _attempt in $(seq 1 30); do
   if systemctl is-active --quiet "$service_name" \
-    && curl -sS -o /dev/null --max-time 3 "$health_url"; then
+    && curl -fsSL -o /dev/null --max-time 3 "$health_url"; then
     deployed=true
     break
   fi

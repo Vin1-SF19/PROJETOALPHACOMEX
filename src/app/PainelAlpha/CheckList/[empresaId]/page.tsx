@@ -17,7 +17,7 @@ export default async function EmpresaChecklistPage({
   const [result, userDb] = await Promise.all([
     getEmpresaChecklist(empresaId),
     db.usuarios.findUnique({
-      where: { id: Number((session.user as any)?.id) },
+      where: { id: Number(session.user.id) },
       select: { tema_interface: true },
     }),
   ]);
@@ -32,10 +32,10 @@ export default async function EmpresaChecklistPage({
 
   return (
     <ChecklistView
-      empresa={result.data as any}
-      userNome={(session.user as any)?.nome ?? (session.user as any)?.name ?? "Analista"}
+      empresa={result.data}
+      userNome={session.user.nome ?? "Analista"}
       tema={userDb?.tema_interface ?? "blue"}
-      role={(session.user as any)?.role ?? ""}
+      role={session.user.role ?? ""}
     />
   );
 }

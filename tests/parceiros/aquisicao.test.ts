@@ -82,11 +82,11 @@ describe("Aquisição de Parceiros — MoverLeadAquisicaoParceiro (máquina de e
     expect(prismaMock.$transaction).toHaveBeenCalled();
   });
 
-  it("rejeita pular 2 etapas de uma vez", async () => {
+  it("permite mover diretamente para outra etapa ativa no Kanban", async () => {
     prismaMock.parceiroLead.findUnique.mockResolvedValue({ id: "lead1", status: "NOVO_LEAD" });
     const r = await MoverLeadAquisicaoParceiro({ leadId: "clfake000000000000000000", statusDestino: "EM_QUALIFICACAO" });
-    expect(r.success).toBe(false);
-    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(r.success).toBe(true);
+    expect(prismaMock.$transaction).toHaveBeenCalled();
   });
 
   it("permite corrigir para uma etapa anterior", async () => {

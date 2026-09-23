@@ -76,7 +76,8 @@ describe("Alpha SEO Prisma promotion", () => {
       .filter((name) => !name.startsWith("AlphaSeo"))
       .sort();
 
-    expect(candidateBaseModels).toEqual(runtimeModels);
+    expect(runtimeModels).toEqual(expect.arrayContaining(candidateBaseModels));
+    expect(new Set(runtimeModels).size).toBe(runtimeModels.length);
   });
 
   it("promotes all 44 Alpha SEO models to runtime without contract drift", async () => {

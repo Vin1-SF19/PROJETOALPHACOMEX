@@ -51,10 +51,10 @@ export function ModalJustificativaMeta({
     const [mes, setMes] = useState(mesAtual);
     const [ano, setAno] = useState(anoAtual);
     const [vigente, setVigente] = useState<JustificativaMetaItem | null>(null);
-    const [carregandoVigente, setCarregandoVigente] = useState(false);
+    const [carregandoVigente, setCarregandoVigente] = useState(true);
 
     const [historico, setHistorico] = useState<JustificativaMetaItem[] | null>(null);
-    const [carregandoHistorico, setCarregandoHistorico] = useState(false);
+    const [carregandoHistorico, setCarregandoHistorico] = useState(true);
     const [itemHistoricoSelecionado, setItemHistoricoSelecionado] = useState<JustificativaMetaItem | null>(null);
 
     const [arquivoSelecionado, setArquivoSelecionado] = useState<File | null>(null);
@@ -65,26 +65,37 @@ export function ModalJustificativaMeta({
 
     useEffect(() => {
         if (!open) return;
-        setCarregandoVigente(true);
-        setItemHistoricoSelecionado(null);
         void (async () => {
             const resultado = await BuscarJustificativaVigente(mes, ano);
             setVigente(resultado.success ? resultado.data : null);
             setCarregandoVigente(false);
         })();
-        // eslint-disable-next-line react-hooks/set-state-in-effect
     }, [open, mes, ano]);
 
     useEffect(() => {
         if (!open || !podeGerenciar) return;
-        setCarregandoHistorico(true);
         void (async () => {
             const resultado = await ListarHistoricoJustificativas();
             setHistorico(resultado.success ? resultado.data : []);
             setCarregandoHistorico(false);
         })();
-        // eslint-disable-next-line react-hooks/set-state-in-effect
     }, [open, podeGerenciar]);
+
+    function alterarPeriodo(campo: "mes" | "ano", valor: number) {
+        setCarregandoVigente(true);
+        setItemHistoricoSelecionado(null);
+        if (campo === "mes") setMes(valor);
+        else setAno(valor);
+    }
+
+    function alterarAbertura(aberto: boolean) {
+        if (!aberto) {
+            setCarregandoVigente(true);
+            setCarregandoHistorico(true);
+            setItemHistoricoSelecionado(null);
+        }
+        onOpenChange(aberto);
+    }
 
     function recarregarVigente() {
         void (async () => {
@@ -191,7 +202,7 @@ export function ModalJustificativaMeta({
     const itemExibido = itemHistoricoSelecionado ?? vigente;
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog open={open} onOpenChange={alterarAbertura}>
             <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] overflow-y-auto border-white/10 bg-slate-950 sm:max-w-3xl">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-slate-200">
@@ -219,8 +230,8 @@ export function ModalJustificativaMeta({
                                 mes={mes}
                                 ano={ano}
                                 anos={anos}
-                                onMesChange={setMes}
-                                onAnoChange={setAno}
+                                onMesChange={(valor) => alterarPeriodo("mes", valor)}
+                                onAnoChange={(valor) => alterarPeriodo("ano", valor)}
                                 arquivoSelecionado={arquivoSelecionado}
                                 enviando={enviando}
                                 onSelecionarArquivo={selecionarArquivo}

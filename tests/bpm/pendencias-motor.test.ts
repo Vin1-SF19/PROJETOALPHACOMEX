@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const prismaMock = vi.hoisted(() => ({
-  bpmCard: { findMany: vi.fn() },
+  bpmCard: { findMany: vi.fn(), findUnique: vi.fn() },
+  usuarios: { findUnique: vi.fn() },
+  setorPermissao: { findMany: vi.fn() },
+  usuarioPermissaoOverride: { findMany: vi.fn() },
+  bpmCardMembro: { findUnique: vi.fn() },
   bpmTarefa: { findMany: vi.fn() },
   bpmCardChecklist: { findMany: vi.fn() },
   bpmCampoEtapaConfig: { findMany: vi.fn() },
@@ -27,6 +31,11 @@ const CARD_BASE = {
 describe("listarPendenciasBpm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prismaMock.usuarios.findUnique.mockResolvedValue({ id: 1, role: "COMERCIAL", status: "ATIVO", permissoes: "crm" });
+    prismaMock.setorPermissao.findMany.mockResolvedValue([]);
+    prismaMock.usuarioPermissaoOverride.findMany.mockResolvedValue([]);
+    prismaMock.bpmCard.findUnique.mockResolvedValue({ etapa: { nome: "Em tratativa", visibilidades: [] } });
+    prismaMock.bpmCardMembro.findUnique.mockResolvedValue({ role: "PARTICIPANTE" });
     prismaMock.bpmTarefa.findMany.mockResolvedValue([]);
     prismaMock.bpmCardChecklist.findMany.mockResolvedValue([]);
     prismaMock.bpmCampoEtapaConfig.findMany.mockResolvedValue([]);
@@ -54,6 +63,31 @@ describe("listarPendenciasBpm", () => {
     expect(prismaMock.bpmCard.findMany).toHaveBeenLastCalledWith(
       expect.objectContaining({ where: { status: "ATIVO" } }),
     );
+  });
+
+  it("recusa permissão CRM revogada antes de listar cards", async () => {
+    prismaMock.usuarioPermissaoOverride.findMany.mockResolvedValue([{ modulo: "crm", acao: "REMOVE" }]);
+    await expect(listarPendenciasBpm(1, true)).rejects.toThrow("Não autorizado");
+    expect(prismaMock.bpmCard.findMany).not.toHaveBeenCalled();
+  });
+
+  it.each(["sem vínculo", "etapa oculta", "Boas-vindas"])("não expõe dados: %s", async (caso) => {
+    prismaMock.bpmCard.findMany.mockResolvedValue([CARD_BASE]);
+    if (caso === "sem vínculo") prismaMock.bpmCardMembro.findUnique.mockResolvedValue(null);
+    if (caso === "etapa oculta") prismaMock.bpmCard.findUnique.mockResolvedValue({ etapa: { nome: "Em tratativa", visibilidades: [{ perfil: "COMERCIAL", podeVer: false, podeAgir: false }] } });
+    if (caso === "Boas-vindas") {
+      prismaMock.usuarios.findUnique.mockResolvedValue({ id: 1, role: "CEO", status: "ATIVO", permissoes: "crm" });
+      prismaMock.bpmCard.findUnique.mockResolvedValue({ etapa: { nome: "Boas-vindas", visibilidades: [] } });
+    }
+    await expect(listarPendenciasBpm(1, true)).resolves.toEqual([]);
+    expect(prismaMock.bpmTarefa.findMany).not.toHaveBeenCalled();
+  });
+
+  it("permite à diretoria consultar Boas-vindas", async () => {
+    prismaMock.usuarios.findUnique.mockResolvedValue({ id: 1, role: "Admin", status: "ATIVO", permissoes: null });
+    prismaMock.bpmCard.findUnique.mockResolvedValue({ etapa: { nome: "Boas-vindas", visibilidades: [] } });
+    prismaMock.bpmCard.findMany.mockResolvedValue([{ ...CARD_BASE, proximoContatoEm: new Date(0) }]);
+    expect(await listarPendenciasBpm(1, true)).toHaveLength(1);
   });
 
   it("marca próximo contato vencido quando a data já passou", async () => {

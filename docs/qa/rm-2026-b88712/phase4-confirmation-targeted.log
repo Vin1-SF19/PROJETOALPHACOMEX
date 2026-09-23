@@ -1,0 +1,29 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /home/ialpha/projetos/alpha-comex/painel-alpha
+
+ ❯ tests/bpm/cpf-pendencias-react.test.ts (14 tests | 1 failed) 229ms
+   × retry de upload atualiza link do painel reaberto sem perder texto novo 23ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/bpm/cpf-pendencias-react.test.ts > retry de upload atualiza link do painel reaberto sem perder texto novo
+AssertionError: expected null not to be null
+ ❯ tests/bpm/cpf-pendencias-react.test.ts:177:74
+    175|   if (!action || typeof action !== "object" || !("onClick" in action))…
+    176|   await act(async () => { action.onClick({} as React.MouseEvent<HTMLBu…
+    177|   expect(container.querySelector('a[href="/api/bpm/anexos/anexo"]')).n…
+       |                                                                          ^
+    178|   expect(fetchMock).toHaveBeenCalledTimes(2);
+    179|   vi.unstubAllGlobals();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 8 passed (9)
+      Tests  1 failed | 76 passed (77)
+   Start at  20:17:37
+   Duration  924ms (transform 915ms, setup 0ms, import 1.37s, tests 434ms, environment 686ms)
+

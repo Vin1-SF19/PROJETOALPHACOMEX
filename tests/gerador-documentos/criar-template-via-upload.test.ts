@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   createTemplate: vi.fn(),
   createManyClasula: vi.fn(),
   transaction: vi.fn(),
+  converterParaHtml: vi.fn(),
+  executeRaw: vi.fn(),
 }));
 
 vi.mock("../../auth", () => ({ auth: mocks.auth }));
@@ -19,6 +21,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({
   default: {
     $transaction: mocks.transaction,
+    $executeRaw: mocks.executeRaw,
     documentoTemplate: { create: mocks.createTemplate },
     documentoClasula: { createMany: mocks.createManyClasula },
   },
@@ -45,6 +48,10 @@ vi.mock("@/lib/gerador-documentos/onyx", () => ({
   reescreverClasulaViaIA: vi.fn(),
 }));
 
+vi.mock("@/lib/gerador-documentos/html", () => ({
+  converterParaHtml: mocks.converterParaHtml,
+}));
+
 import { CriarTemplateViaUpload } from "@/actions/gerador-documentos";
 
 function criarFormData(file: File | null): FormData {
@@ -65,6 +72,8 @@ describe("CriarTemplateViaUpload", () => {
     mocks.auth.mockResolvedValue({ user: { id: "10", role: "User" } });
     mocks.getPermissoesEfetivas.mockResolvedValue(["geradorDocumentos"]);
     process.env.BLOB_READ_WRITE_TOKEN = "fake-token";
+    mocks.converterParaHtml.mockResolvedValue("<p>Contrato entre as partes...</p>");
+    mocks.executeRaw.mockResolvedValue(1);
   });
 
   it("rejeita quando nenhum arquivo é enviado no FormData", async () => {
@@ -166,7 +175,9 @@ describe("CriarTemplateViaUpload", () => {
     const resultado = await CriarTemplateViaUpload(criarFormData(arquivoValido({ nome: "Contrato Prestação.pdf" })));
 
     expect(resultado).toEqual({ success: true, templateId: "template-1" });
-    expect(mocks.put).toHaveBeenCalledTimes(1);
+    expect(mocks.put).toHaveBeenCalledTimes(2);
+    expect(mocks.converterParaHtml).toHaveBeenCalledTimes(1);
+    expect(mocks.executeRaw).toHaveBeenCalledTimes(1);
     expect(mocks.identificarVariaveisEClasulasViaIA).toHaveBeenCalledWith("Contrato entre as partes...", "onyx-token");
   });
 

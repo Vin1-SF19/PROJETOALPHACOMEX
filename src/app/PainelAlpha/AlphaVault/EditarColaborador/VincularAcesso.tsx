@@ -4,13 +4,15 @@ import { useState } from "react";
 import { X, Lock, Mail, Check } from "lucide-react";
 import { toast } from "sonner";
 import { adicionarRecursoVaultAction } from "@/actions/colaboradores";
+import type { sistemas_core } from "@prisma/client";
+import type { TemaAlpha } from "@/lib/temas";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   agenteId: string;
-  sistemas: any[];
-  style: any;
+  sistemas: Pick<sistemas_core, "id" | "nome">[];
+  style: TemaAlpha;
 }
 
 export function ModalVincularAcesso({ isOpen, onClose, agenteId, sistemas, style }: Props) {

@@ -3,7 +3,7 @@
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
-export async function createPresetAction(dados: any) {
+export async function createPresetAction(dados: { nome: string; videosIds: string[]; usuariosIds: string[]; perguntas?: unknown[] }) {
   try {
     const { nome, videosIds, usuariosIds } = dados;
     const idsNumericos = usuariosIds.map((id: string) => Number(id));

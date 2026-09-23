@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Video, Users, Database, Tag, Search, CheckCircle2,
@@ -9,59 +9,66 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { salvarConfiguracoesCompletasAction, getPresetCompletoAction, buscarTodosUsuariosAction } from '@/actions/questoes';
+import type { getTagsAction } from '@/actions/questoes';
+import type { TemaAlpha } from '@/lib/temas';
+
+type PresetCompleto = NonNullable<Awaited<ReturnType<typeof getPresetCompletoAction>>>;
+type UsuarioDisponivel = Awaited<ReturnType<typeof buscarTodosUsuariosAction>>[number];
+type TagDisponivel = Awaited<ReturnType<typeof getTagsAction>>[number];
+type UsuarioVinculado = { id: number; usuario: string; nome?: string; email?: string };
 
 export default function ModalConfiguracaoPreset({
   presetId,
   tagsDisponiveis,
   temaConfig,
   onClose
-}: any) {
+}: { presetId: string; tagsDisponiveis: TagDisponivel[]; temaConfig: TemaAlpha; onClose: () => void }) {
 
-  const [loading, setLoading] = useState(true);
+  const [loadedPresetId, setLoadedPresetId] = useState<string | null>(null);
+  const loading = loadedPresetId !== String(presetId);
   const [saving, setSaving] = useState(false);
   const [buscaAlunos, setBuscaAlunos] = useState("");
   const [showAddAluno, setShowAddAluno] = useState(false);
-  const [listaUsuariosBanco, setListaUsuariosBanco] = useState<any[]>([]);
+  const [listaUsuariosBanco, setListaUsuariosBanco] = useState<UsuarioDisponivel[]>([]);
 
-  const [videos, setVideos] = useState<any[]>([]);
-  const [usuarios, setUsuarios] = useState<any[]>([]);
+  const [videos, setVideos] = useState<PresetCompleto['videos']>([]);
+  const [usuarios, setUsuarios] = useState<UsuarioVinculado[]>([]);
   const [tagsSelecionadas, setTagsSelecionadas] = useState<string[]>([]);
 
   const [showExpurgo, setShowExpurgo] = useState(false);
 
-  const carregarDados = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [dataPreset, dataUsers] = await Promise.all([
+  useEffect(() => {
+    let ativo = true;
+    void Promise.all([
         getPresetCompletoAction(presetId),
         buscarTodosUsuariosAction()
-      ]);
-
+      ]).then(([dataPreset, dataUsers]) => {
+      if (!ativo) return;
       if (dataPreset) {
         setVideos(dataPreset.videos || []);
         setUsuarios(dataPreset.usuarios || []);
-        setTagsSelecionadas(dataPreset.tags?.map((t: any) => String(t.id)) || []);
+        setTagsSelecionadas(dataPreset.tags?.map((t) => String(t.id)) || []);
       }
       setListaUsuariosBanco(dataUsers);
-    } catch (error) {
+    }).catch(() => {
+      if (!ativo) return;
       toast.error("Erro ao carregar dados.");
-    } finally {
-      setLoading(false);
-    }
+    }).finally(() => {
+      if (ativo) setLoadedPresetId(String(presetId));
+    });
+    return () => { ativo = false; };
   }, [presetId]);
-
-  useEffect(() => { carregarDados(); }, [carregarDados]);
 
   // CÁLCULO DE PERGUNTAS TOTAIS
   const perguntasDoPreset = useMemo(() => {
     return tagsDisponiveis
-      .filter((t: any) => tagsSelecionadas.includes(String(t.id)))
-      .flatMap((t: any) => (t.perguntas || []).map((p: any) => ({ ...p, tagName: t.nome })));
+      .filter((t) => tagsSelecionadas.includes(String(t.id)))
+      .flatMap((t) => (t.perguntas || []).map((p) => ({ ...p, tagName: t.nome })));
   }, [tagsSelecionadas, tagsDisponiveis]);
 
   const totalPerguntas = perguntasDoPreset.length;
 
-  const toggleTag = (id: any) => {
+  const toggleTag = (id: string) => {
     const idStr = String(id);
     setTagsSelecionadas(prev =>
       prev.includes(idStr) ? prev.filter(t => t !== idStr) : [...prev, idStr]
@@ -76,8 +83,8 @@ export default function ModalConfiguracaoPreset({
     setVideos(novaLista);
   };
 
-  const adicionarAluno = (user: any) => {
-    if (!usuarios.find((u: any) => String(u.id) === String(user.id))) {
+  const adicionarAluno = (user: UsuarioDisponivel) => {
+    if (!usuarios.find((u) => String(u.id) === String(user.id))) {
       setUsuarios([...usuarios, user]);
     } else {
       toast.error("Aluno já vinculado.");
@@ -96,8 +103,8 @@ export default function ModalConfiguracaoPreset({
 
     const res = await salvarConfiguracoesCompletasAction(
         presetId,
-        videos.map((v: any) => v.id),
-        usuarios.map((u: any) => String(u.id)),
+        videos.map((v) => v.id),
+        usuarios.map((u) => String(u.id)),
         tagsSelecionadas
     );
 
@@ -140,7 +147,7 @@ export default function ModalConfiguracaoPreset({
 
               <div className="max-h-[40vh] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
                 <p className="text-[9px] font-black text-slate-600 uppercase mb-4 tracking-widest text-center italic">Desmarque tags no menu principal para reduzir</p>
-                {tagsDisponiveis.filter((t: any) => tagsSelecionadas.includes(String(t.id))).map((tag: any) => (
+                {tagsDisponiveis.filter((t) => tagsSelecionadas.includes(String(t.id))).map((tag) => (
                   <div key={tag.id} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
                     <span className="text-[10px] font-black uppercase text-white">{tag.nome}</span>
                     <div className="flex items-center gap-4">
@@ -311,7 +318,7 @@ export default function ModalConfiguracaoPreset({
               </AnimatePresence>
 
               <div className="grid grid-cols-2 gap-3">
-                {usuarios.map((u: any) => (
+                {usuarios.map((u) => (
                   <motion.div
                     layout
                     key={u.id}
@@ -322,7 +329,7 @@ export default function ModalConfiguracaoPreset({
                       <span className="text-[9px] font-black text-slate-300 uppercase truncate">{u.usuario}</span>
                     </div>
                     <button
-                      onClick={() => setUsuarios(usuarios.filter((x: any) => x.id !== u.id))}
+                      onClick={() => setUsuarios(usuarios.filter((x) => x.id !== u.id))}
                       className="p-2 text-slate-700 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
                     >
                       <Trash2 size={12} />
@@ -336,7 +343,7 @@ export default function ModalConfiguracaoPreset({
           {/* GRADE DE TAGS */}
           <div className="lg:col-span-7 p-10 overflow-y-auto bg-black/40 space-y-8 custom-scrollbar">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {tagsDisponiveis.map((tag: any) => {
+              {tagsDisponiveis.map((tag) => {
                 const isSelected = tagsSelecionadas.includes(String(tag.id));
                 const qtdQuestoes = tag.perguntas?.length || 0;
 

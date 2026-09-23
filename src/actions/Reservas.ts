@@ -73,7 +73,7 @@ export async function liberarSala(id: number) {
   }
 }
 
-export async function cancelarReserva(id: any) {
+export async function cancelarReserva(id: number | string) {
   try {
     const idLimpo = Number(id);
     if (isNaN(idLimpo)) return { success: false, error: "ID inválido" };

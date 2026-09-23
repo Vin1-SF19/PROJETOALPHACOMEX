@@ -124,6 +124,8 @@ export function BotaoUploadExcel() {
                     pulados,
                 }));
 
+                let concluidos = 0;
+                let falhas = 0;
                 for (let i = 0; i < paraConsultar.length; i++) {
                     if (abortRef.current) break;
                     const cnpjAtual = paraConsultar[i];
@@ -132,16 +134,20 @@ export function BotaoUploadExcel() {
                     try {
                         const response = await fetch(`/api/RadarFiscal?cnpj=${cnpjAtual}`);
                         if (!response.ok) {
+                            falhas += 1;
                             if (response.status === 429) {
                                 toast.error(`LIMITE DA RECEITA ATINGIDO — CNPJ ${cnpjAtual}`);
                             }
                         } else {
                             const dadosBrutos = await response.json();
-                            if (dadosBrutos && !dadosBrutos.error) {
-                                await protocolarNoRadarAction(dadosBrutos);
-                            }
+                            if (dadosBrutos && !dadosBrutos.error && dadosBrutos.consultaStatus === "completa") {
+                                const resultado = await protocolarNoRadarAction(dadosBrutos);
+                                if (resultado.success) concluidos += 1;
+                                else falhas += 1;
+                            } else falhas += 1;
                         }
                     } catch (err) {
+                        falhas += 1;
                         console.error(`CNPJ ${cnpjAtual}:`, err);
                     }
 
@@ -151,7 +157,8 @@ export function BotaoUploadExcel() {
                 }
 
                 if (!abortRef.current) {
-                    toast.success(`LOTE FINALIZADO — ${paraConsultar.length} consultados, ${pulados} pulados (já no banco)`);
+                    if (falhas > 0) toast.warning(`LOTE CONCLUÍDO — ${concluidos} gravados, ${falhas} falharam, ${pulados} já no banco`);
+                    else toast.success(`LOTE FINALIZADO — ${concluidos} gravados, ${pulados} pulados (já no banco)`);
                 }
             } catch {
                 toast.error("ERRO CRÍTICO AO LER PLANILHA");

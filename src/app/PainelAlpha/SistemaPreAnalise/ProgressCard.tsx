@@ -24,7 +24,6 @@ export default function ProgressCard({ label, status, icon, onRetry }: Props) {
         if (intervalRef.current) clearInterval(intervalRef.current);
 
         if (status === "loading") {
-            setProgress(0);
             intervalRef.current = setInterval(() => {
                 setProgress(prev => {
                     const next = prev + Math.random() * 14 + 4;
@@ -32,16 +31,12 @@ export default function ProgressCard({ label, status, icon, onRetry }: Props) {
                     return next;
                 });
             }, 220);
-        } else if (status === "success" || status === "error") {
-            setProgress(100);
-        } else {
-            setProgress(0);
         }
 
         return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
     }, [status]);
 
-    const pct = Math.round(Math.min(progress, 100));
+    const pct = status === "idle" ? 0 : status === "loading" ? Math.round(Math.min(progress, 87)) : 100;
 
     return (
         <div className={`relative overflow-hidden rounded-3xl border transition-all duration-500 ${

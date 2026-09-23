@@ -14,8 +14,8 @@ interface Modulo {
     id: string;
     nome: string;
     imagemUrl: string;
-    descricao?: string;
-    aprendizado?: string;
+    descricao?: string | null;
+    aprendizado?: string | null;
     bloqueado: boolean;
     requerModuloId?: string | null;
     percentualMinimo?: number;

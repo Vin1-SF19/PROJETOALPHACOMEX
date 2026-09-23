@@ -6,8 +6,12 @@ import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { toast } from "sonner";
 import { salvarPlanilhaNoBancoAction } from "@/actions/HistoricoPlanilhaFiscal";
+import type { RadarFiscalItem } from "./types";
 
-export function BotaoExportarTabelaCompleta({ dados }: { dados: any[] }) {
+type Cnae = { code?: string; codigo?: string };
+type HistoricoRegime = { ano?: string | number; Ano?: string | number; periodo?: string; regime?: string; Regime?: string };
+
+export function BotaoExportarTabelaCompleta({ dados }: { dados: RadarFiscalItem[] }) {
     const [modalAberto, setModalAberto] = useState(false);
     const [nomeArquivo, setNomeArquivo] = useState("RELATORIO_RADAR_COMPLETO");
     const [salvarBanco, setSalvarBanco] = useState(false);
@@ -45,18 +49,18 @@ export function BotaoExportarTabelaCompleta({ dados }: { dados: any[] }) {
             ];
 
             dados.forEach(item => {
-                const parseJSON = (val: any) => {
+                const parseJSON = (val: unknown) => {
                     try { return typeof val === 'string' ? JSON.parse(val) : val; }
                     catch { return null; }
                 };
 
                 const cnaesObj = parseJSON(item.cnaes);
                 const listaCnaes = [...(cnaesObj?.principal || []), ...(cnaesObj?.secundarios || [])]
-                    .map((c: any) => c.code || c.codigo).filter(Boolean).join(" | ");
+                    .map((c: Cnae) => c.code || c.codigo).filter(Boolean).join(" | ");
 
                 const histObj = parseJSON(item.historico_regime || item.historicoRegime);
-                const listaHist = Array.isArray(histObj) 
-                    ? histObj.map((h: any) => `${h.ano || h.periodo || h.Ano}: ${h.regime || h.Regime}`).join(" | ") 
+                const listaHist = Array.isArray(histObj)
+                    ? histObj.map((h: HistoricoRegime) => `${h.ano || h.periodo || h.Ano}: ${h.regime || h.Regime}`).join(" | ")
                     : "---";
 
                 const row = worksheet.addRow({

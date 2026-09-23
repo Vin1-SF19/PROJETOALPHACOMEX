@@ -77,17 +77,11 @@ export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accen
     if (etapaDestinoId === card.etapa.id || movendoEtapa) return;
     setMovendoEtapa(true);
     try {
-      // O autosave dos campos da etapa só dispara no onBlur do input. Se o
-      // usuário editou um campo e clicou direto em "avançar" sem que o blur
-      // natural do navegador tivesse ocorrido ainda, o valor existe no estado
-      // da tela mas nunca chegou a ser registrado na fila de saves — e a
-      // validação de movimento, que lê o valor persistido, o veria vazio.
-      // Forçar o blur aqui garante que qualquer edição pendente seja salva
-      // antes do flushSaves, então a tela e a validação nunca divergem.
+      // Antecipa o blur e o debounce somente deste card antes de mover.
       if (document.activeElement instanceof HTMLElement) {
         document.activeElement.blur();
       }
-      const savesConcluidos = await flushSaves();
+      const savesConcluidos = await flushSaves(card.id);
       if (!savesConcluidos) {
         toast.error("Não foi possível salvar os campos. O card não foi movido.");
         return;

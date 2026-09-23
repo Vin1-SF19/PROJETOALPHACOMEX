@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { isAdminRole } from '@/lib/roles'
 
 const SETORES_VALIDOS = ["T.I", "Comercial", "Operacional", "Financeiro", "Recursos-Humanos", "Serviços Gerais"]
+const mensagemErro = (error: unknown) => error instanceof Error ? error.message : String(error)
 
 export async function getAllCursos() {
     try {
@@ -123,8 +124,8 @@ export async function criarCurso(payload: unknown) {
         })
         revalidatePath('/PainelAlpha/AlphaSkills')
         return { success: true, id: curso.id }
-    } catch (error: any) {
-        return { success: false, error: error.message }
+    } catch (error) {
+        return { success: false, error: mensagemErro(error) }
     }
 }
 
@@ -170,8 +171,8 @@ export async function editarCurso(payload: unknown) {
         })
         revalidatePath('/PainelAlpha/AlphaSkills')
         return { success: true }
-    } catch (error: any) {
-        return { success: false, error: error.message }
+    } catch (error) {
+        return { success: false, error: mensagemErro(error) }
     }
 }
 
@@ -184,8 +185,8 @@ export async function deletarCurso(id: string) {
         await db.curso.delete({ where: { id } })
         revalidatePath('/PainelAlpha/AlphaSkills')
         return { success: true }
-    } catch (error: any) {
-        return { success: false, error: error.message }
+    } catch (error) {
+        return { success: false, error: mensagemErro(error) }
     }
 }
 
@@ -202,8 +203,8 @@ export async function vincularModuloACurso(cursoId: string, moduloId: string) {
         })
         revalidatePath('/PainelAlpha/AlphaSkills')
         return { success: true }
-    } catch (error: any) {
-        return { success: false, error: error.message }
+    } catch (error) {
+        return { success: false, error: mensagemErro(error) }
     }
 }
 
@@ -218,8 +219,8 @@ export async function desvincularModuloDeCurso(cursoId: string, moduloId: string
         })
         revalidatePath('/PainelAlpha/AlphaSkills')
         return { success: true }
-    } catch (error: any) {
-        return { success: false, error: error.message }
+    } catch (error) {
+        return { success: false, error: mensagemErro(error) }
     }
 }
 
@@ -239,7 +240,7 @@ export async function updateModuloOrderInCurso(cursoId: string, moduloIds: strin
         )
         revalidatePath('/PainelAlpha/AlphaSkills')
         return { success: true }
-    } catch (error: any) {
-        return { success: false, error: error.message }
+    } catch (error) {
+        return { success: false, error: mensagemErro(error) }
     }
 }

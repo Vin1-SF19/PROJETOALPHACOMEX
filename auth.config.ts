@@ -13,7 +13,7 @@ export const authConfig = {
       if (isPrivateRoute) {
         if (!isLoggedIn) return false;
 
-        const senhaTemporaria = !!(auth?.user as any)?.senhaTemporaria;
+        const senhaTemporaria = !!auth?.user?.senhaTemporaria;
         const isMudarSenhaPage = nextUrl.pathname === "/PainelAlpha/mudar-senha";
 
         if (senhaTemporaria && !isMudarSenhaPage) {

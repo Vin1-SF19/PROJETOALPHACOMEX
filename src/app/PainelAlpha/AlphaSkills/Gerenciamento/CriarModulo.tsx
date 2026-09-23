@@ -71,16 +71,16 @@ export default function ModalModulos({ isOpen, onClose }: { isOpen: boolean; onC
         }
     }, [isOpen]);
 
-    const fetchModulos = async () => {
+    async function fetchModulos() {
         const data = await getModulos();
         setModulos(data as ModuloItem[]);
         router.refresh();
-    };
+    }
 
-    const fetchCursos = async () => {
+    async function fetchCursos() {
         const data = await listarCursosParaSelect();
         setCursosDisponiveis(data as CursoOption[]);
-    };
+    }
 
     const cancelarEdicao = () => {
         setEditandoId(null);

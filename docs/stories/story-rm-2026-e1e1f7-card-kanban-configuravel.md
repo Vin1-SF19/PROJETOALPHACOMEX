@@ -228,3 +228,11 @@ Validações desta retomada: validação documental e `git diff --check` dos doc
 ### Change Log
 
 - 2026-09-22: configuração visual do card fechado consolidada por etapa na aba `Card do Kanban`, prévia alinhada ao renderer real, proteção contra perda de rascunho e remoção de detalhes hardcoded quando há composição publicada.
+
+## Reconciliacao do checkpoint Vault — 2026-09-23
+
+Os registros `BLOCKED` da Fase 3 acima descrevem tentativas anteriores, nao o estado atual. O diario do projeto registra a execucao manual aprovada em 2026-09-19: backup completo e restaurado para verificacao, preflight, ensaio da migration em copia descartavel, aplicacao no Turso de producao e validacao posterior. O commit `14f7d01c` inclui o model Prisma, a migration `20260919150500_bpm_etapa_card_view_config` e a implementacao inicial.
+
+Nesta revisao, uma consulta **somente de leitura** com a configuracao Turso de `.env.local` confirmou a tabela `BpmEtapaCardViewConfig`, suas sete colunas, duas FKs com `CASCADE`, o indice unico `(pipelineId, etapaId)`, tres registros atuais e nenhuma violacao de `PRAGMA foreign_key_check`. O dump especifico de 2026-09-19 ainda confere em tamanho e SHA-256 com o manifesto; o diario registra `integrity_check=ok` em restauracao descartavel na data da aplicacao. Esse backup tem mais de 48 horas e nao autorizaria uma nova mudanca estrutural hoje. **Nao reaplicar a migration.**
+
+A fase de banco deste objetivo esta concluida. Permanecem pendentes a projecao real dos elementos CHECKLIST, CADENCIA e PENDENCIAS, a homologacao autenticada do editor/board e a revisao do lote antes da producao. Nenhuma escrita no banco foi feita nesta reconciliacao.

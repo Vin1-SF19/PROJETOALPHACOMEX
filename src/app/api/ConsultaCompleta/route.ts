@@ -229,8 +229,8 @@ export async function GET(req: Request) {
       capitalSocial:    salvo.capital_social,
       dataConsulta:     salvo.data_consulta,
     });
-  } catch (error: any) {
-    console.error("ERRO CONSULTACOMPLETA:", error.message);
+  } catch (error) {
+    console.error("ERRO CONSULTACOMPLETA:", error);
     return NextResponse.json({ error: "Falha interna" }, { status: 500 });
   }
 }

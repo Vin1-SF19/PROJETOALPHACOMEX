@@ -5,15 +5,21 @@ import { useState } from 'react';
 import { deleteVideo } from '@/actions/GetVideos';
 import { toast } from 'sonner';
 
-export default function ModalExcluir({ isOpen, onClose, video, onSuccess }: { isOpen: boolean, onClose: () => void, video: any, onSuccess: () => void}) {
+type VideoExcluivel = { id: string; url: string; thumbUrl: string | null; titulo: string };
+
+export default function ModalExcluir({ isOpen, onClose, video, onSuccess }: { isOpen: boolean, onClose: () => void, video: VideoExcluivel | null, onSuccess: () => void}) {
     const [loading, setLoading] = useState(false);
 
     if (!isOpen) return null;
 
     const handleDelete = async () => {
         setLoading(true);
+        if (!video) {
+            setLoading(false);
+            return;
+        }
         try {
-            const res = await deleteVideo(video.id, video.url, video.thumbUrl);
+            const res = await deleteVideo(video.id, video.url, video.thumbUrl ?? undefined);
             
             if (res?.success) {
                 toast.success("Vídeo removido da nuvem!");
@@ -38,7 +44,7 @@ export default function ModalExcluir({ isOpen, onClose, video, onSuccess }: { is
                 </div>
                 <h3 className="text-white font-black uppercase text-sm mb-2">Confirmar Exclusão?</h3>
                 <p className="text-slate-500 text-[10px] uppercase font-bold mb-8">
-                    Esta ação é permanente e removerá o vídeo "{video?.titulo}" de todos os setores.
+                    Esta ação é permanente e removerá o vídeo &quot;{video?.titulo}&quot; de todos os setores.
                 </p>
                 <div className="flex gap-3">
                     <button onClick={onClose} className="cursor-pointer flex-1 py-4 text-[10px] font-black text-slate-500 uppercase">Cancelar</button>

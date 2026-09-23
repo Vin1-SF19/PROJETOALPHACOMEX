@@ -12,22 +12,32 @@ import GerenciadorBancoQuestoes from './presets/GerenciadorBancoQuestoes';
 import ModalConfiguracaoPreset from './presets/ModalConfiguracaoPreset';
 import { getTagsAction } from '@/actions/questoes';
 import { useRouter } from 'next/navigation';
+import type { TemaAlpha } from '@/lib/temas';
 
+type UsuarioPreset = Awaited<ReturnType<typeof getUsers>>[number] & { name?: string; setor?: string };
+type VideoPreset = Awaited<ReturnType<typeof getVideos>>[number];
+type PresetListado = Awaited<ReturnType<typeof getPresets>>[number];
+type TagPreset = Awaited<ReturnType<typeof getTagsAction>>[number];
 
-export default function AlphaPresetsConfig({ temaConfig, videosDoSkills, userName }: any) {
+export default function AlphaPresetsConfig({ temaConfig, userName }: {
+  temaConfig: TemaAlpha;
+  userName?: string;
+  videosDoSkills?: VideoPreset[];
+  usuariosCadastrados?: UsuarioPreset[];
+}) {
   const { data: session, status } = useSession();
   const [loading, setLoading] = useState(true);
-  const [usersList, setUsersList] = useState<any[]>([]);
+  const [usersList, setUsersList] = useState<UsuarioPreset[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loadingVideos, setLoadingVideos] = useState(true);
-  const [videosList, setVideosList] = useState<any[]>([]);
+  const [videosList, setVideosList] = useState<VideoPreset[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [presetsExistentes, setPresetsExistentes] = useState<any[]>([]);
-  const [presetEmEdicao, setPresetEmEdicao] = useState<any | null>(null);
-  const [bancoDeQuestoes, setBancoDeQuestoes] = useState<any[]>([]);
+  const [presetsExistentes, setPresetsExistentes] = useState<PresetListado[]>([]);
+  const [presetEmEdicao, setPresetEmEdicao] = useState<PresetListado | null>(null);
+  const [bancoDeQuestoes] = useState<TagPreset['perguntas']>([]);
   const [selecionadas, setSelecionadas] = useState<string[]>([]);
   const [showBancoQuestoes, setShowBancoQuestoes] = useState(false);
-  const [todasAsTags, setTodasAsTags] = useState<any[]>([]);
+  const [todasAsTags, setTodasAsTags] = useState<TagPreset[]>([]);
   const router = useRouter();
   const [confirmarDelete, setConfirmarDelete] = useState<string | null>(null);
 
@@ -152,7 +162,7 @@ export default function AlphaPresetsConfig({ temaConfig, videosDoSkills, userNam
   };
 
   const userImage = session?.user?.imagemUrl;
-  const fotoFinal = userImage || session?.user?.imagemUrl || (session?.user as any)?.image;
+  const fotoFinal = userImage || session?.user?.imagemUrl;
   const initials = userName?.substring(0, 2).toUpperCase() || "OP";
 
   return (
@@ -196,7 +206,7 @@ export default function AlphaPresetsConfig({ temaConfig, videosDoSkills, userNam
                     <Loader2 className="animate-spin mb-2" size={20} />
                     <span className="text-[8px] font-black uppercase tracking-widest">Sincronizando banco de vídeos...</span>
                   </div>
-                ) : videosList.map((video: any) => (
+                ) : videosList.map((video) => (
                   <label
                     key={video.id}
                     className={`flex items-center gap-4 p-3 rounded-xl border transition-all cursor-pointer group ${novoPreset.videosSelecionados.includes(video.id)
@@ -223,7 +233,7 @@ export default function AlphaPresetsConfig({ temaConfig, videosDoSkills, userNam
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
                       <span className={`text-[11px] font-black uppercase italic truncate ${novoPreset.videosSelecionados.includes(video.id) ? temaConfig.text : 'text-slate-300'
                         }`}>
-                        {video.titulo || video.nome}
+                        {video.titulo}
                       </span>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-[7px] font-black text-slate-600 uppercase tracking-[0.2em] px-1.5 py-0.5 bg-black/40 rounded-md border border-white/5">
@@ -334,9 +344,10 @@ export default function AlphaPresetsConfig({ temaConfig, videosDoSkills, userNam
                 <span className="text-[10px] font-black uppercase tracking-widest">Sincronizando Banco...</span>
               </div>
             ) : filteredUsers.map((user) => {
-              // Verifica se o usuário já tem algum preset (precisa que o seu getUsers traga o count ou a lista de presets)
-              const estaOcupado = user.presets && user.presets.length > 0;
-              const selecionado = novoPreset.usuariosVinculados.includes(user.id);
+              const estaOcupado = presetsExistentes.some((preset) =>
+                preset.usuarios.some((vinculado) => vinculado.id === user.id)
+              );
+              const selecionado = novoPreset.usuariosVinculados.includes(String(user.id));
 
               return (
                 <label
@@ -369,7 +380,7 @@ export default function AlphaPresetsConfig({ temaConfig, videosDoSkills, userNam
                   <input
                     type="checkbox"
                     checked={selecionado}
-                    onChange={() => toggleUser(user.id)}
+                    onChange={() => toggleUser(String(user.id))}
                     className="w-5 h-5 accent-orange-600 cursor-pointer"
                   />
                 </label>

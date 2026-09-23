@@ -205,7 +205,7 @@ describe("Integração — wiring dos consumidores visuais", () => {
       'import { formatCNPJ, formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";',
     );
     expect(source).not.toContain("function formatarCnpjInput");
-    expect(source).toContain("formatarCNPJProgressivo(novaEmpresa.cnpj)");
+    expect(source).toContain("formatarCNPJProgressivo(form.cnpj)");
     expect(source).toContain("formatCNPJ(empresa.cnpj) ?? empresa.cnpj");
   });
 
@@ -225,8 +225,9 @@ describe("Integração — wiring dos consumidores visuais", () => {
   });
 
   it("BuscarEmpresasBpm usa normalização compartilhada na busca", () => {
-    const source = ler("src/actions/bpm/Cards.ts");
-    expect(source).toContain("normalizarCNPJ(termoSeguro)");
-    expect(source).toContain("cnpjNovaEmpresa = normalizarCNPJ(novaEmpresa.cnpj)");
+    const consultas = ler("src/actions/bpm/CardsConsultas.ts");
+    const comandos = ler("src/actions/bpm/Cards.ts");
+    expect(consultas).toContain("normalizarCNPJ(termoSeguro)");
+    expect(comandos).toContain("cnpjNovaEmpresa = normalizarCNPJ(novaEmpresa.cnpj)");
   });
 });

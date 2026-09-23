@@ -4,7 +4,23 @@ import React, { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Lock, Play, LayoutGrid } from 'lucide-react';
 
-export default function TrilhaCarrossel({ setor, onSelectModulo }: any) {
+type ModuloTrilha = {
+  id: string;
+  nome: string;
+  imagemUrl: string;
+  descricao?: string | null;
+  aprendizado?: string | null;
+  bloqueado: boolean;
+  requerModuloId?: string | null;
+  percentualMinimo?: number;
+  isLiberado: boolean;
+  nomeAnterior?: string;
+  nomeExibicao?: string;
+  ordemNoCurso?: number;
+  setor?: string;
+};
+
+export default function TrilhaCarrossel({ setor, onSelectModulo }: { setor: { nome: string; items: ModuloTrilha[] }; onSelectModulo: (modulo: ModuloTrilha) => void }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
@@ -87,7 +103,7 @@ export default function TrilhaCarrossel({ setor, onSelectModulo }: any) {
           ref={scrollRef}
           className="flex gap-4 md:gap-6 overflow-x-auto no-scrollbar snap-x snap-mandatory scroll-smooth pb-8 px-1"
         >
-          {setor.items.map((mod: any) => (
+          {setor.items.map((mod) => (
             <motion.div
               key={mod.id}
               whileHover={mod.isLiberado ? { y: -8 } : {}}
@@ -110,7 +126,7 @@ export default function TrilhaCarrossel({ setor, onSelectModulo }: any) {
                   {/* Aviso dinâmico */}
                   <p className="text-[8px] text-orange-500/80 uppercase mt-3 font-bold leading-relaxed max-w-[180px]">
                     Conclua o módulo <br />
-                    <span className="text-white">"{mod.nomeAnterior}"</span> <br />
+                    <span className="text-white">&quot;{mod.nomeAnterior}&quot;</span> <br />
                     para liberar este conteúdo.
                   </p>
                 </div>

@@ -9,6 +9,8 @@ import { useSession } from "next-auth/react"
 import { Switch } from "@/components/ui/switch";
 import { upload } from '@vercel/blob/client';
 
+type DocumentoPasta = { setor?: string; PastaArquivos?: string; tipo?: string };
+
 const SETORES = ["Diretrizes", "T.I", "OPERACIONAL", "COMERCIAL", "RECURSOS HUMANOS", "FINANCEIRO", "JURÍDICO", "PARCEIRO", "SERVIÇOS GERAIS"];
 
 const PASTAS_ESTATICAS: Record<string, string[]> = {
@@ -42,11 +44,11 @@ export default function AdminUploadDocs() {
       if (!setorSelecionado) return;
       try {
         const res = await fetch("/api/documentos");
-        const docs = await res.json();
+        const docs = await res.json() as DocumentoPasta[];
         if (Array.isArray(docs)) {
           const filtradas = docs
-            .filter((d: any) => d.setor?.toUpperCase() === setorSelecionado.toUpperCase())
-            .map((d: any) => (d.PastaArquivos || d.tipo || "").toUpperCase().trim())
+            .filter((d) => d.setor?.toUpperCase() === setorSelecionado.toUpperCase())
+            .map((d) => (d.PastaArquivos || d.tipo || "").toUpperCase().trim())
             .filter((p: string) => p !== "" && p !== "PDF" && p !== "VIDEO");
 
           setPastasDoBanco(Array.from(new Set(filtradas)));
@@ -107,7 +109,7 @@ export default function AdminUploadDocs() {
       } else {
         toast.error(res.error || "ERRO AO GRAVAR NO BANCO");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("ERRO_FINAL:", err);
       toast.error("FALHA NA COMUNICAÇÃO ALPHA.");
     } finally {

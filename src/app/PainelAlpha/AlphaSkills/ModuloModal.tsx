@@ -5,11 +5,29 @@ import { motion } from 'framer-motion';
 import { X, Clock, Play, Lock, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-export default function ModuloModal({ modulo, videos, onClose }: any) {
+type VideoModulo = {
+  id: string;
+  titulo: string;
+  url: string;
+  thumbUrl?: string | null;
+  modulo?: { id: string; nome: string }[];
+  moduloId?: string;
+};
+type ModuloResumo = {
+  id: string;
+  nome: string;
+  nomeExibicao?: string;
+  setor?: string;
+  descricao?: string | null;
+  isLiberado: boolean;
+  imagemUrl?: string | null;
+};
+
+export default function ModuloModal({ modulo, videos, onClose }: { modulo: ModuloResumo; videos: VideoModulo[]; onClose: () => void }) {
   const router = useRouter();
 
-  const aulasDoModulo = videos.filter((v: any) =>
-    v.modulo?.some((m: any) => String(m.id) === String(modulo.id)) || v.moduloId === modulo.id
+  const aulasDoModulo = videos.filter((v) =>
+    v.modulo?.some((m) => String(m.id) === String(modulo.id)) || v.moduloId === modulo.id
   );
 
   return (

@@ -1,8 +1,26 @@
 import * as XLSX from "xlsx";
 import { useRef } from "react";
 
+type EmpresaImportada = {
+    cnpj: string;
+    dataConsulta: string;
+    contribuinte: string;
+    situacao: string;
+    dataSituacao: string;
+    submodalidade: string;
+    razaoSocial: string;
+    nomeFantasia: string;
+    municipio: string;
+    uf: string;
+    dataConstituicao: string;
+    regimeTributario: string;
+    data_opcao: string;
+    capitalSocial: string;
+    optante: boolean;
+};
+
 type Props = {
-    onImportar: (dados: any[]) => void;
+    onImportar: (dados: EmpresaImportada[]) => void;
     processando: boolean;
     onCancelar: () => void;
     statusLote?: string;      
@@ -13,7 +31,7 @@ type Props = {
 export default function ImportarPlanilha({ onImportar, processando, onCancelar }: Props) {
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-    const tratarDataExcel = (valor: any) => {
+    const tratarDataExcel = (valor: unknown) => {
         if (!valor || valor === "" || valor === "N/A" || valor === "undefined") return "";
         if (valor instanceof Date) return valor.toISOString();
         return String(valor).trim();
@@ -23,13 +41,13 @@ export default function ImportarPlanilha({ onImportar, processando, onCancelar }
         const files = event.target.files;
         if (!files || files.length === 0) return;
 
-        let empresasImportadas: any[] = [];
+        const empresasImportadas: EmpresaImportada[] = [];
 
         for (const file of Array.from(files)) {
             const buffer = await file.arrayBuffer();
             const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+            const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
 
             rows.forEach((row) => {
                 const valorCnpj = row["CNPJ"] || row["cnpj"] || Object.values(row)[0];
@@ -52,6 +70,7 @@ export default function ImportarPlanilha({ onImportar, processando, onCancelar }
                     regimeTributario: String(row["Regime Tributário"] || row["Regime Tributario"] || row["regimeTributario"] || ""),
                     data_opcao: tratarDataExcel(row["Data Opção"] || row["data_opcao"] || row["DataSimples"]),
                     capitalSocial: String(row["Capital Social"] || row["capitalSocial"] || row["Capital"] || "0"),
+                    optante: false,
                 });
             });
         }

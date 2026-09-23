@@ -84,7 +84,26 @@ const styles = StyleSheet.create({
   }
 });
 
-export const FichaAlphaPDF = ({ dados, userLogado, logoPath }: { dados: any, userLogado: string, logoPath?: string }) => {
+export type DadosEmpresa = {
+  razaoSocial?: string; nomeFantasia?: string; cnpj?: string; uf?: string;
+  dataConstituicao?: string; capitalSocial?: string | number;
+  natureza_juridica?: string;
+  capital_social?: string | number;
+  dados?: { capital_social?: string | number; dados?: { capitalSocial?: string | number } };
+};
+
+export type FichaAlphaDados = {
+  rfb?: { dados?: DadosEmpresa } & DadosEmpresa;
+  radar?: { dados?: { situacao?: string | null; submodalidade?: string | null }; situacao?: string | null; submodalidade?: string | null; dataSituacao?: Date | string | null } | null;
+  empresaqui?: { dados?: { regimeEA?: string | null }; regimeEA?: string | null };
+  extra?: {
+    origemLead?: string; origemLeadDetalhe?: string; dataSituacao?: string;
+    horaSituacao?: string; nomeResponsavel?: string; telefone?: string;
+    email?: string; mesProtocolo?: string; observacoes?: string;
+  };
+};
+
+export const FichaAlphaPDF = ({ dados, userLogado, logoPath }: { dados: FichaAlphaDados, userLogado: string, logoPath?: string }) => {
   const rfb = dados?.rfb?.dados || dados?.rfb || {};
   const radar = dados?.radar || {};
   const eq = dados?.empresaqui?.dados || dados?.empresaqui || {};

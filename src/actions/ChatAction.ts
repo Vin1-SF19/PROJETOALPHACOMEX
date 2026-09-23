@@ -83,7 +83,7 @@ export async function enviarMensagemChatAction(destinatarioId: number, texto: st
     });
 
     return { success: true, data: novaMsg };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Erro ao enviar mensagem:", error);
     return { error: "Falha na transmissão" };
   }

@@ -10,15 +10,15 @@ import { toast } from 'sonner';
 import { isAdminRole } from '@/lib/roles';
 
 
-export default function AlphaSchoolsWelcome({ onEnter }: any) {
+export default function AlphaSchoolsWelcome({ onEnter }: { onEnter: () => Promise<void>; loading?: boolean }) {
     const { data: session } = useSession();
     const [loading, setLoading] = useState(false);
 
-    const temaNome = (session?.user as any)?.tema_interface || "blue";
+    const temaNome = session?.user?.tema_interface || "blue";
     const style = getTema(temaNome);
     const isAdmin = isAdminRole(session?.user?.role);
     
-    const temPreset = !!(session?.user as any)?.presetId;
+    const temPreset = !!session?.user?.presetId;
 
     const handleAcessoProva = async () => {
         if (!temPreset) {
@@ -77,8 +77,8 @@ export default function AlphaSchoolsWelcome({ onEnter }: any) {
                             </h1>
 
                             <p className="text-slate-400 text-lg font-medium leading-relaxed mb-10 max-w-sm">
-                                Olá, <span className="text-white font-bold">{(session?.user as any)?.nome || 'Agente'}</span>. 
-                                {temPreset 
+                                Olá, <span className="text-white font-bold">{session?.user?.nome || 'Agente'}</span>.
+                                {temPreset
                                     ? " Seu preset de treinamento foi localizado. Prepare-se para a certificação." 
                                     : " Seu perfil ainda não foi vinculado a uma trilha de treinamento no sistema."}
                             </p>

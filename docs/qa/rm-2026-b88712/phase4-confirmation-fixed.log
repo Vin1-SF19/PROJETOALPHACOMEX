@@ -1,0 +1,33 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /home/ialpha/projetos/alpha-comex/painel-alpha
+
+ ❯ tests/bpm/autosave-fixed-recovery-react.test.ts (4 tests | 1 failed) 117ms
+   × recupera summary após falhar, fechar e reabrir 9ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/bpm/autosave-fixed-recovery-react.test.ts > recupera summary após falhar, fechar e reabrir
+TypeError: Cannot read properties of null (reading 'type')
+ ❯ set value node_modules/happy-dom/src/nodes/html-input-element/HTMLInputElement.ts:841:15
+ ❯ tests/bpm/autosave-fixed-recovery-react.test.ts:69:63
+     67|     const element = input();
+     68|     const prototype = element instanceof HTMLSelectElement ? HTMLSelec…
+     69|     Object.getOwnPropertyDescriptor(prototype, "value")!.set!.call(ele…
+       |                                                               ^
+     70|     element.dispatchEvent(new Event(element instanceof HTMLSelectEleme…
+     71|   });
+ ❯ Proxy.process.env.NODE_ENV.exports.act node_modules/react/cjs/react.development.js:814:22
+ ❯ edit tests/bpm/autosave-fixed-recovery-react.test.ts:66:9
+ ❯ tests/bpm/autosave-fixed-recovery-react.test.ts:80:29
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  20:19:35
+   Duration  395ms (transform 52ms, setup 0ms, import 137ms, tests 117ms, environment 83ms)
+

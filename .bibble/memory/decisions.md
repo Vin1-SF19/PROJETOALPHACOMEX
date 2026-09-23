@@ -1,5 +1,11 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-09-22 — RM-2026-B88712 — autosave universal por campo, sem confirmação de saída
+
+**Decisão:** o card do CRM não usa confirmação de saída ("Sair sem salvar"/"Campos não salvos"). A persistência é por autosave por campo: debounce de ~500 ms para texto (digitação contínua), disparo imediato para seleções, booleanos, datas e arquivos. Blur antecipa o save sem duplicar. Ao fechar (X, ESC, clique externo), `flushSaves(cardId)` captura e enfileira imediatamente todas as revisões pendentes; a confirmação de rede permanece assíncrona. O `CardSaveProvider` foi movido do modal para `layout.tsx` do CRM, sobrevivendo ao fechamento e à navegação interna. Recuperação de rascunhos é em memória do provider.
+
+**Consequência:** nenhum valor editado é perdido ao sair do card, independentemente do tipo de campo ou do caminho de fechamento. A guarda de follow-up e a validação de Lost permanecem inalteradas. Movimento de etapa continua condicionado ao sucesso real do flush.
+
 ### 2026-09-09 — RM-2026-EB2898 — contador simples no agregado, sem revisões persistidas
 
 **Decisão:** adicionar `BpmPipeline.configVersion Int @default(1)` e usar CAS por `pipelineId + baseVersion` na publicação principal. O contador, os filhos e a auditoria participam da mesma transação; efeitos externos ficam após o commit. Não criar tabela de revisão, snapshot persistido, checksum ou camada Draft/PUBLISHED.
@@ -1541,3 +1547,44 @@ de segurança.
 
 ### 2026-09-22 — RM-2026-6F4E3F: override de GLOBAL com fonte
 Fonte automática identifica proveniência possível, não autorização. Override não vazio reside no card; vazio retorna à fonte canônica. GLOBAL personalizado mantém armazenamento compartilhado. Flags explícitas de definição, etapa, perfil e mapeamento continuam protegendo edição; campos protegidos continuam canônicos. Nenhuma sincronização de override para a empresa.
+
+### 2026-09-22 — Scribe — RM-2026-B88712: autosave do card CRM
+
+**Decisão consolidada:** o card do CRM não usa confirmação de saída para descartar campos; a persistência é por autosave por campo, com debounce de ~500 ms para digitação (inclusive números) e disparo imediato para seleção, multisseleção, booleano, data/data-hora e arquivo. Blur antecipa o save; fechar inicia flush e fecha sem aguardar a rede. A guarda de negócio de follow-up permanece.
+
+**Contrato:** reutilizar `useCardSave`/`CardSaveProvider` em `src/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext.tsx`, hospedado no layout autenticado do CRM. Fila, versão confirmada, falhas e rascunhos são isolados por card. `AtualizarCardBpm` em `src/actions/bpm/Cards.ts` persiste valores; `Campos.ts` administra definições. Avançar etapa exige `await flushSaves(card.id)` com sucesso. Agendar reunião e concluir follow-up continuam ações explícitas.
+
+**Limite:** recuperação em memória durante a vida do provider; não há garantia de recuperação após reload/fechamento do navegador. Booleano continua select Sim/Não. Status Done da story encerra o escopo local aceito por Sage, sem aprovação dos gates globais ou publicação.
+
+
+## RM-2026-1FFBAA — Fase 3, implementação parcial (2026-09-22)
+
+Blueprint recebido das fases anteriores e revalidado localmente. Preservada a implementação de arquivamento já existente no working tree. `BpmCard.status` é String e o board seleciona ATIVO; nenhuma migration, alteração de dados, Git mutável ou integração externa executada. Política: manter arquivamento em vez de delete físico, preservando dependências. O schema mistura Cascade e Restrict; o diagnóstico anterior de que todas as relações eram Restrict estava incorreto. Versão implantada e quatro dependências do incidente não foram verificadas.
+
+Implementado: motor de pendências exige acesso efetivo ao módulo e aplica checarAcessoBpmCard(visualizar) antes das consultas dependentes, preservando Boas-vindas, visibilidade e vínculo. O booleano administrativo de seleção não concede acesso. ExcluirCardBpm valida entrada com Zod. UI solicita atualização do board após sucesso e informa arquivamento. O cálculo existente de podeGerenciarMembros já restringe a responsáveis/administradores com ação na etapa; a divergência alegada não foi reproduzida.
+
+Validação: 33 testes direcionados passaram (excluir-card, membros-card-ownership e pendencias-motor), incluindo cinco novos cenários comportamentais de autorização com guard real e persistência simulada. npm run typecheck passou. npm run lint, npm test e npm run build foram executados com limite de 50 segundos; consultar logs locais em .cache/rm-2026-1ffbaa. Não há aprovação Forge/Probe/Anubis/Lens completa nesta execução.
+
+- [x] Central aplica guard canônico antes de consultar dependências.
+- [x] Preservado arquivamento e adicionado Zod/atualização da UI.
+- [x] Testes direcionados e typecheck executados com sucesso.
+- [ ] Teste comportamental da action com banco descartável e dependências reais (o teste excluir-card atual é estrutural, não comprova esse aceite).
+- [ ] Validar ciclo de vida das automações após arquivamento e auditoria da ação.
+- [ ] Testes comportamentais dos estados da UI e gates completos.
+
+Auditoria de entrega: caminhos inspecionados /PainelAlpha/AlphaCRM/pendencias → ListarPendenciasBpm → motor → PendenciasWorkspace e board → CardAbertoLayout → ExcluirCardBpm. Consumidores: usuários autorizados do CRM. Acesso pelo código confirmado; fluxo autenticado em navegador não executado. Não declarar DELIVERY_READY integral.
+
+AUTO_ADJUSTMENT_REQUIRED: falta comprovar retenção e comportamento da remoção com dependências reais e o fluxo autenticado após arquivamento.
+AUTO_ADJUSTMENT_ACCEPTANCE: executar teste da action com banco descartável, verificar automações/auditoria e validar remoção do board com estados de sucesso/erro.
+
+File list desta execução: src/actions/bpm/Cards.ts; src/lib/bpm/pendencias/motor.ts; src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx; tests/bpm/pendencias-motor.test.ts; docs/stories/story-rm-2026-1ffbaa-resolver-exclusao-autorizacao.md; .bibble/memory/decisions.md; .bibble/memory/known-errors.md; .bibble/memory/journal.md.
+
+Resultado: FAIL por aceites ainda não comprovados, não por atribuir falhas globais a esta alteração.
+
+## RM-2026-B2F97B — exclusão verificável (2026-09-23)
+
+O comando canônico `ExcluirCardBpm` mantém soft-delete transacional. A sessão que exclui recebe remoção local imediata; Pusher continua responsável pela sincronização das demais sessões e sua falha de transporte não reverte a exclusão. `NÃO_AUTORIZADO`, `DEPENDENCIA_EXISTENTE` (restrições `P2003`/`P2014`) e `FALHA_TECNICA` têm mensagens públicas distintas, com detalhes técnicos somente no log do servidor. Reunião e follow-up passam a atualizar campos diretos e registros normalizados na mesma transação. Não houve migration nem mudança de schema. Evidências e limites do teste visual autenticado: `docs/stories/story-rm-2026-b2f97b-confiabilidade-exclusao-crm.md`.
+
+## RM-2026-8BA322 — contratos operacionais do CRM (2026-09-23)
+
+Cobertura Vitest inclui actions e bibliotecas BPM; staging roda typecheck independente antes do build. A exclusão de anexo registra limpeza Blob na mesma transação do metadado; uploads não registrados expiram após 24 horas e o cron BPM reconcilia falhas. Agendamento Google tenta cancelar evento sem vínculo e reagendamento tenta restaurar estado anterior sem sobrescrever mudanças externas; o cron repete pendências e marca divergências para revisão. A medição de 7 cards ativos em um pipeline não justifica paginação agora; reavaliar com 200 cards ou p95 autenticado acima de 500 ms. Consultas de empresa/responsáveis e arquivamento foram extraídos de Cards.ts com wrappers async públicos. Nenhuma migration ou alteração de schema. Evidência: docs/stories/story-rm-2026-8ba322-reduzir-manutencao-e-risco-operacional.md.

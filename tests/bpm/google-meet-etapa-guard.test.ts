@@ -14,6 +14,7 @@ const prismaMock = vi.hoisted(() => ({
     findUnique: vi.fn(),
     findMany: vi.fn(),
     update: vi.fn(),
+    upsert: vi.fn(),
   },
   $transaction: vi.fn(),
 }));
@@ -51,6 +52,7 @@ describe("Google Meet: guard de etapa no backend", () => {
     vi.clearAllMocks();
     authMock.mockResolvedValue({ user: { id: "7", role: "COMERCIAL" } });
     acessoMock.mockResolvedValue(undefined);
+    prismaMock.googleCalendarEventoCache.upsert.mockResolvedValue({});
     prismaMock.bpmCard.findUnique.mockResolvedValue({
       id: CARD_ID,
       etapaId: "clw0000000000000etap",
@@ -151,6 +153,7 @@ describe("Google Meet: guard de etapa no backend", () => {
         findUnique: vi.fn().mockResolvedValue(card),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
+      bpmCardReuniao: { upsert: vi.fn() },
     };
     prismaMock.$transaction.mockImplementation(async (callback) => callback(tx));
 
@@ -162,6 +165,10 @@ describe("Google Meet: guard de etapa no backend", () => {
 
     expect(criarEventoMock).toHaveBeenCalledWith(expect.objectContaining({
       participantes: [EMAIL],
+    }));
+    expect(tx.bpmCardReuniao.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { cardId_chave: { cardId: CARD_ID, chave: "principal" } },
+      update: expect.objectContaining({ agendadaEm: DATA, googleEventId: "evento-1" }),
     }));
   });
 
@@ -192,6 +199,8 @@ describe("Google Meet: guard de etapa no backend", () => {
     obterEventoMock.mockResolvedValue({
       linkMeet: card.googleMeetLink,
       etag: "etag-google",
+      inicio: { dataHora: "2026-08-19T13:00:00.000Z" },
+      fim: { dataHora: "2026-08-19T14:00:00.000Z" },
       participantes: [
         { email: "convidado@exemplo.com" },
         { email: "CLIENTE@EXEMPLO.COM" },
@@ -206,6 +215,7 @@ describe("Google Meet: guard de etapa no backend", () => {
         findUnique: vi.fn().mockResolvedValue(card),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
+      bpmCardReuniao: { upsert: vi.fn() },
     };
     prismaMock.$transaction.mockImplementation(async (callback) => callback(tx));
 
@@ -220,5 +230,69 @@ describe("Google Meet: guard de etapa no backend", () => {
         participantes: ["convidado@exemplo.com", EMAIL],
       }),
     }));
+    expect(tx.bpmCardReuniao.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { cardId_chave: { cardId: CARD_ID, chave: "principal" } },
+      update: expect.objectContaining({ agendadaEm: DATA, googleEventId: "evento-1" }),
+    }));
   });
+});
+
+
+describe("RM-2026-D64AF1: recuperação segura do vínculo", () => {
+  const linkMeet = "https://meet.google.com/abc-defg-hij";
+  const card = {
+    id: CARD_ID, etapaId: "agendar", updatedAt: DATA,
+    etapa: { nome: "Agendar Reunião" }, googleEventId: "evento-1",
+    googleCalendarId: "organizador@exemplo.com", googleMeetLink: linkMeet,
+    dataReuniao: DATA, transcricaoReuniao: null,
+  };
+  const reagendar = () => ReagendarReuniaoBpm({ cardId: CARD_ID, dataHora: DATA, emailCliente: EMAIL });
+  beforeEach(() => {
+    vi.resetAllMocks();
+    authMock.mockResolvedValue({ user: { id: "7", role: "COMERCIAL" } });
+    prismaMock.bpmCard.findUnique.mockResolvedValue(card);
+    prismaMock.googleCalendarEventoCache.findMany.mockResolvedValue([]);
+    prismaMock.googleCalendarEventoCache.upsert.mockResolvedValue({});
+    prismaMock.googleCalendarSelecionado.findMany.mockResolvedValue([{ id: "cal-local", timezone: "America/Sao_Paulo" }]);
+    obterUsuarioPorCalendarioMock.mockResolvedValue({ ok: true, emailUsuario: "organizador@exemplo.com" });
+    obterEventoMock.mockResolvedValue({ linkMeet, etag: "atual", participantes: [], status: "confirmed", inicio: { dataHora: "2026-08-19T13:00:00.000Z" }, fim: { dataHora: "2026-08-19T14:00:00.000Z" } });
+    atualizarEventoMock.mockResolvedValue({ linkMeet });
+    prismaMock.$transaction.mockImplementation(async (cb) => cb({ bpmCard: {
+      findUnique: vi.fn().mockResolvedValue(card), updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    }, bpmCardReuniao: { upsert: vi.fn() } }));
+  });
+  it("recupera cache ausente após confirmar o mesmo Meet no Google", async () => {
+    expect(await reagendar()).toEqual({ success: true });
+    expect(obterUsuarioPorCalendarioMock).toHaveBeenCalledWith("cal-local");
+    expect(atualizarEventoMock).toHaveBeenCalledWith(expect.objectContaining({
+      emailUsuario: "organizador@exemplo.com", calendarId: card.googleCalendarId,
+      googleEventId: card.googleEventId, etagConhecido: "atual",
+    }));
+    expect(prismaMock.googleCalendarEventoCache.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({ calendarioId: "cal-local", googleEventId: "evento-1" }),
+    }));
+  });
+  it("não usa o link desatualizado do cache como condição de identidade", async () => {
+    prismaMock.googleCalendarEventoCache.findMany.mockResolvedValue([{ calendarioId: "cal-local", calendario: { timezone: null } }]);
+    expect(await reagendar()).toEqual({ success: true });
+    const consulta = prismaMock.googleCalendarEventoCache.findMany.mock.calls[0][0];
+    expect(consulta.where).not.toHaveProperty("linkMeet");
+    expect(consulta.where.calendario.gravavel).toBe(true);
+    expect(prismaMock.googleCalendarSelecionado.findMany).not.toHaveBeenCalled();
+  });
+  it.each(["ausente", "ambiguo", "cache-ambiguo", "inativo", "meet-divergente", "cancelado", "sem-acesso"])(
+    "bloqueia %s antes de PATCH ou persistência", async (cenario) => {
+      if (cenario === "ausente") prismaMock.googleCalendarSelecionado.findMany.mockResolvedValue([]);
+      if (cenario === "ambiguo") prismaMock.googleCalendarSelecionado.findMany.mockResolvedValue([{ id: "a" }, { id: "b" }]);
+      if (cenario === "cache-ambiguo") prismaMock.googleCalendarEventoCache.findMany.mockResolvedValue([{ calendarioId: "a" }, { calendarioId: "b" }]);
+      if (cenario === "inativo") obterUsuarioPorCalendarioMock.mockResolvedValue({ ok: false });
+      if (cenario === "meet-divergente") obterEventoMock.mockResolvedValue({ linkMeet: "outro" });
+      if (cenario === "cancelado") obterEventoMock.mockResolvedValue({ linkMeet, status: "cancelled" });
+      if (cenario === "sem-acesso") acessoMock.mockRejectedValue(new Error("Não autorizado"));
+      expect((await reagendar()).success).toBe(false);
+      expect(atualizarEventoMock).not.toHaveBeenCalled();
+      expect(prismaMock.googleCalendarEventoCache.upsert).not.toHaveBeenCalled();
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    },
+  );
 });

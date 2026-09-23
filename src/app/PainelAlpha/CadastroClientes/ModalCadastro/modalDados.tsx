@@ -58,9 +58,21 @@ type SocioDoModal = {
     _pendente?: "criar" | "editar" | "excluir";
 };
 
+type LogCS = ClienteCS["logCs"][number] & {
+    _pendente?: "criar" | "editar" | "excluir";
+    data_registro?: string | Date;
+    colaborador?: string;
+    createdAt?: string | Date;
+    ID?: string;
+};
+type LogFeedback = ClienteCS["logFeedback"][number] & {
+    _pendente?: "criar" | "editar" | "excluir";
+    data_registro?: string | Date;
+};
+
 export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGrupo, aoSalvar }: ModalGestaoClienteProps) {
     const { data: session } = useSession();
-    const style = getTema((session?.user as any)?.tema_interface || "blue");
+    const style = getTema(session?.user?.tema_interface || "blue");
 
     /**
      * `clienteGrupo` é a lista de TODOS os registros do mesmo CNPJ (um por
@@ -154,7 +166,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
     const [feedbackEditData, setFeedbackEditData] = useState("");
     const [salvandoEdicaoFeedback, setSalvandoEdicaoFeedback] = useState(false);
 
-    const [listaLogsFeedback, setListaLogsFeedback] = useState<any[]>(cliente?.logFeedback ?? []);
+    const [listaLogsFeedback, setListaLogsFeedback] = useState<LogFeedback[]>(cliente?.logFeedback ?? []);
     const [editandoDados, setEditandoDados] = useState(false);
 
     const SERVICOS_COM_EMBASAMENTO = ["Revisão RADAR - 150K", "Revisão RADAR - ILIMITADO"];
@@ -195,7 +207,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
     const [municipio, setMunicipio] = useState(cliente?.municipio || "");
 
 
-    const [listaLogsCS, setListaLogsCS] = useState<any[]>([]);
+    const [listaLogsCS, setListaLogsCS] = useState<LogCS[]>([]);
 
     const [listaSocios, setListaSocios] = useState<SocioDoModal[]>([]);
     const [showNovoSocio, setShowNovoSocio] = useState(false);
@@ -208,7 +220,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
 
     // Edição de log CS
     const [showEditCS, setShowEditCS] = useState(false);
-    const [csEditando, setCsEditando] = useState<any>(null);
+    const [csEditando, setCsEditando] = useState<LogCS | null>(null);
     const [csEditSentimento, setCsEditSentimento] = useState<"pos" | "neg" | "na" | null>(null);
     const [csEditObs, setCsEditObs] = useState("");
     const [csEditData, setCsEditData] = useState("");
@@ -235,7 +247,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                 data_registro: dataSelecionada,
             });
 
-            if (!res.success) {
+            if (!res.success || !res.data) {
                 toast.error(res.error || "Não foi possível salvar o CS.");
                 return;
             }
@@ -264,7 +276,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
         // Registro só existe no rascunho local (nunca foi salvo) — remove sem chamar o servidor.
         const aindaNaoSalvo = listaLogsCS.find((log) => log.id === logId)?._pendente === "criar";
         if (aindaNaoSalvo) {
-            setListaLogsCS((prev: any[]) => prev.filter((log) => log.id !== logId));
+            setListaLogsCS((prev) => prev.filter((log) => log.id !== logId));
             toast.success("Relato removido do rascunho!");
             return;
         }
@@ -275,7 +287,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
             if (res.success) {
                 toast.success("Relato removido!");
 
-                setListaLogsCS((prev: any[]) => prev.filter((log) => log.id !== logId));
+                setListaLogsCS((prev) => prev.filter((log) => log.id !== logId));
 
                 if (aoSalvar) aoSalvar();
             } else {
@@ -287,10 +299,12 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
     };
 
     useEffect(() => {
+        let active = true;
         if (isOpen && cliente?.socios) {
-            setListaSocios(cliente.socios);
+            queueMicrotask(() => { if (active) setListaSocios(cliente.socios); });
         }
         return () => {
+            active = false;
             setListaSocios([]);
             setShowNovoSocio(false);
             setSocioParaExcluir(null);
@@ -318,7 +332,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
     };
 
 
-    const handleIniciarEdicaoSocio = (s: any) => {
+    const handleIniciarEdicaoSocio = (s: SocioDoModal) => {
         setEditandoSocioId(s.id);
         setSocioEditForm({ nome: s.nome || "", telefone: s.telefone || "", dataNascimento: s.dataNascimento || "", vinculo: s.vinculo || "", obs: s.obs || "" });
     };
@@ -357,9 +371,9 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
         toast.info("Exclusão adicionada ao rascunho — clique em Salvar Alterações para confirmar.");
     };
 
-    const handleAbrirEditCS = (log: any) => {
+    const handleAbrirEditCS = (log: LogCS) => {
         setCsEditando(log);
-        setCsEditSentimento(log.sentimento || null);
+        setCsEditSentimento(log.sentimento === "pos" || log.sentimento === "neg" || log.sentimento === "na" ? log.sentimento : null);
         setCsEditObs(log.observacao || "");
         const dataRaw = log.data_registro || log.dataRegistro || log.createdAt;
         if (dataRaw) {
@@ -370,7 +384,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
     };
 
     const handleSalvarEditCS = async () => {
-        if (!csEditSentimento || csEditObs.length < 10) return toast.error("Dados inválidos");
+        if (!csEditando || !csEditSentimento || csEditObs.length < 10) return toast.error("Dados inválidos");
         if (salvandoEdicaoCS) return;
 
         setSalvandoEdicaoCS(true);
@@ -381,7 +395,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                 dataRegistro: csEditData,
             });
 
-            if (!res.success) {
+            if (!res.success || !res.data) {
                 toast.error(res.error || "Não foi possível atualizar o CS.");
                 return;
             }
@@ -411,10 +425,19 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
             for (const registro of registrosDoServicosSecao) {
                 inicial[registro.id] = formInicialDoRegistro(registro);
             }
-            setFormPorCard(inicial);
-            setFormasPagamentoPersonalizadas(listarFormasPagamentoPersonalizadas(
-                registrosDoServicosSecao.map((registro) => registro.formaPagamento || ""),
-            ));
+            let active = true;
+            queueMicrotask(() => {
+                if (!active) return;
+                setFormPorCard(inicial);
+                setFormasPagamentoPersonalizadas(listarFormasPagamentoPersonalizadas(
+                    registrosDoServicosSecao.map((registro) => registro.formaPagamento || ""),
+                ));
+            });
+            return () => {
+                active = false;
+                setFormPorCard({});
+                setConfirmacaoTrocaServico(null);
+            };
         }
         return () => {
             setFormPorCard({});
@@ -437,57 +460,77 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
 
     useEffect(() => {
         if (cliente) {
-            setCnpj(cliente.cnpj || "");
-            setRazaoSocial(cliente.razaoSocial);
-            setNomeFantasia(cliente.nomeFantasia || "");
-            setDataConstituicao(cliente.dataConstituicao || "");
-            setRegimeTributario(cliente.regimeTributario || "");
-            setUf(cliente.uf || "");
-            setMunicipio(cliente.municipio || "");
-            setEditandoDados(false);
+            let active = true;
+            queueMicrotask(() => {
+                if (!active) return;
+                setCnpj(cliente.cnpj || "");
+                setRazaoSocial(cliente.razaoSocial);
+                setNomeFantasia(cliente.nomeFantasia || "");
+                setDataConstituicao(cliente.dataConstituicao || "");
+                setRegimeTributario(cliente.regimeTributario || "");
+                setUf(cliente.uf || "");
+                setMunicipio(cliente.municipio || "");
+                setEditandoDados(false);
+            });
+            return () => { active = false; };
         }
     }, [cliente]);
 
 
     useEffect(() => {
-        setFeedbackSim(cliente?.feedbackGoogle ?? false);
-        setNomeFeedback(cliente?.nomeGoogle ?? "");
-        setListaLogsFeedback(cliente?.logFeedback ?? []);
+        let active = true;
+        queueMicrotask(() => {
+            if (!active) return;
+            setFeedbackSim(cliente?.feedbackGoogle ?? false);
+            setNomeFeedback(cliente?.nomeGoogle ?? "");
+            setListaLogsFeedback(cliente?.logFeedback ?? []);
+        });
+        return () => { active = false; };
     }, [cliente]);
 
     useEffect(() => {
+        let active = true;
         if (isOpen && cliente?.id) {
             const logsDoCliente = [...(cliente.logCs || [])].sort((a, b) => {
                 const dataA = new Date(a.dataRegistro).getTime();
                 const dataB = new Date(b.dataRegistro).getTime();
                 return dataB - dataA;
             });
-            setListaLogsCS(logsDoCliente);
+            queueMicrotask(() => { if (active) setListaLogsCS(logsDoCliente); });
         }
-        return () => setListaLogsCS([]);
+        return () => { active = false; setListaLogsCS([]); };
     }, [cliente?.id, isOpen]);
 
 
     useEffect(() => {
         if (cliente) {
-            setStatus(cliente.status || "Em Andamento");
-            setNps(cliente.nps || 0);
-            setFeedbackSim(cliente.feedbackGoogle || false);
-            setNomeFeedback(cliente.nomeGoogle || "");
+            let active = true;
+            queueMicrotask(() => {
+                if (!active) return;
+                setStatus(cliente.status || "Em Andamento");
+                setNps(cliente.nps || 0);
+                setFeedbackSim(cliente.feedbackGoogle || false);
+                setNomeFeedback(cliente.nomeGoogle || "");
+            });
+            return () => { active = false; };
         }
     }, [cliente, isOpen]);
 
     useEffect(() => {
         if (cliente && isOpen) {
-            setCnpj(cliente.cnpj || "");
-            setRazaoSocial(cliente.razaoSocial || "");
-            setNomeFantasia(cliente.nomeFantasia || "");
-            setDataConstituicao(cliente.dataConstituicao || "");
-            setRegimeTributario(cliente.regimeTributario || "");
-            setUf(cliente.uf || "");
-            setMunicipio(cliente.municipio || "");
-
-            setEditandoDados(false);
+            let active = true;
+            queueMicrotask(() => {
+                if (!active) return;
+                setCnpj(cliente.cnpj || "");
+                setRazaoSocial(cliente.razaoSocial || "");
+                setNomeFantasia(cliente.nomeFantasia || "");
+                setDataConstituicao(cliente.dataConstituicao || "");
+                setRegimeTributario(cliente.regimeTributario || "");
+                setUf(cliente.uf || "");
+                setMunicipio(cliente.municipio || "");
+                setEditandoDados(false);
+            });
+            return () => { active = false; };
         }
     }, [cliente, isOpen]);
 
@@ -503,8 +546,9 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
 
     useEffect(() => {
         if (!isOpen || !cliente) {
-            setContratosPorRegistro({});
-            return;
+            let active = true;
+            queueMicrotask(() => { if (active) setContratosPorRegistro({}); });
+            return () => { active = false; };
         }
 
         const registrosDoGrupo: ClienteCS[] = Array.isArray(clienteGrupo) ? clienteGrupo : (cliente ? [cliente] : []);
@@ -556,7 +600,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                 data_registro: dataSelecionada,
             });
 
-            if (!res.success) {
+            if (!res.success || !res.data) {
                 toast.error(res.error || "Não foi possível salvar o feedback.");
                 return;
             }
@@ -641,7 +685,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
         // Registro só existe no rascunho local (nunca foi salvo) — remove sem chamar o servidor.
         const aindaNaoSalvo = listaLogsFeedback.find((item) => item.id === logId)?._pendente === "criar";
         if (aindaNaoSalvo) {
-            setListaLogsFeedback((prev: any[]) => prev.filter(item => item.id !== logId));
+            setListaLogsFeedback((prev) => prev.filter(item => item.id !== logId));
             toast.success("Pedido removido do rascunho!");
             return;
         }
@@ -651,7 +695,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
 
             if (res.success) {
                 toast.success("Excluído com sucesso!");
-                setListaLogsFeedback((prev: any[]) => prev.filter(item => item.id !== logId));
+                setListaLogsFeedback((prev) => prev.filter(item => item.id !== logId));
             } else {
                 toast.error("Erro ao excluir do banco de dados.");
             }
@@ -1333,7 +1377,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
                                     {listaSocios.some((s) => s._pendente !== "excluir") ? (
-                                        listaSocios.filter((s) => s._pendente !== "excluir").map((s: any, i: number) => (
+                                        listaSocios.filter((s) => s._pendente !== "excluir").map((s, i: number) => (
                                             editandoSocioId === s.id ? (
                                                 <tr key={s.id || i} className="bg-indigo-500/5 border-l-2 border-indigo-500">
                                                     <td className="px-3 py-3">
@@ -1439,7 +1483,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        <span className="text-[11px] text-slate-500 italic leading-relaxed block max-w-xs truncate" title={s.obs}>
+                                                        <span className="text-[11px] text-slate-500 italic leading-relaxed block max-w-xs truncate" title={s.obs ?? undefined}>
                                                             {s.obs || "---"}
                                                         </span>
                                                     </td>
@@ -1508,7 +1552,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
                                     {listaLogsCS && listaLogsCS.length > 0 ? (
-                                        listaLogsCS.map((log: any, index: number) => (
+                                        listaLogsCS.map((log, index: number) => (
                                             <tr
                                                 key={`${cliente?.id}-${log.id || index}`}
                                                 className="hover:bg-white/[0.02] transition-colors group"
@@ -1520,7 +1564,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
 
                                                         const d = new Date(dataRaw);
                                                         if (isNaN(d.getTime())) {
-                                                            return dataRaw.split('T')[0].split('-').reverse().join('/');
+                                                            return String(dataRaw).split('T')[0].split('-').reverse().join('/');
                                                         }
 
                                                         return fmtDate(d);
@@ -1545,7 +1589,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                                 </td>
 
                                                 <td className="px-6 py-4">
-                                                    <p className="text-[11px] text-slate-400 italic max-w-xs truncate hover:text-white transition-colors cursor-help" title={log.observacao}>
+                                                    <p className="text-[11px] text-slate-400 italic max-w-xs truncate hover:text-white transition-colors cursor-help" title={log.observacao ?? undefined}>
                                                         {log.observacao || "---"}
                                                     </p>
                                                 </td>
@@ -1562,7 +1606,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                handleExcluirCS(log.id || log.ID);
+                                                                handleExcluirCS(log.id);
                                                             }}
                                                             className="cursor-pointer p-2 text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all duration-200 active:scale-90"
                                                             title="Excluir Registro"
@@ -1706,7 +1750,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
                                     {listaLogsFeedback && listaLogsFeedback.length > 0 ? (
-                                        listaLogsFeedback.map((log: any, index: number) => (
+                                        listaLogsFeedback.map((log, index: number) => (
                                             <tr key={log.id || index} className="hover:bg-white/[0.02] transition-colors group">
                                                 <td className="px-6 py-4 text-[11px] font-black text-blue-300">
                                                     {fmtDate(log.data_registro || log.dataRegistro)}
@@ -1727,7 +1771,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <p className="text-[11px] text-slate-400 italic truncate max-w-xs" title={log.observacao}>
+                                                    <p className="text-[11px] text-slate-400 italic truncate max-w-xs" title={log.observacao ?? undefined}>
                                                         {log.observacao}
                                                     </p>
                                                 </td>
@@ -2003,7 +2047,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                         <button
                                             key={btn.id}
                                             type="button"
-                                            onClick={() => setSentimentoFeedback(btn.id as any)}
+                                            onClick={() => setSentimentoFeedback(btn.id as "pos" | "neg" | "na")}
                                             className={`cursor-pointer flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-300 
                                                 ${sentimentoFeedback === btn.id
                                                     ? `bg-${btn.color}-500/10 border-${btn.color}-500 text-${btn.color}-400 shadow-lg`

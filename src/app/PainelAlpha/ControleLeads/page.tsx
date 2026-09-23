@@ -9,7 +9,7 @@ export default async function ControleLeadsPage() {
   const session = await auth();
 
 
-  const temaNome = (session?.user as any)?.tema_interface || "blue";
+  const temaNome = session?.user?.tema_interface || "blue";
   const style = getTema(temaNome);
 
   if (!session) {

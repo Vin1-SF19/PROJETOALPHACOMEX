@@ -1,0 +1,12 @@
+
+> alpha_sistema@0.1.0 typecheck
+> NODE_OPTIONS=--max-old-space-size=8192 tsc --noEmit
+
+tests/bpm/cpf-fechamento-react.test.ts(18,53): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type '{ card: React.ComponentProps<({ card, campoIds, campoLabels, instanceKey, titulo, accent, podeEditar, realtimeRevision, onAtualizado, }: Props) => React.JSX.Element>["card"]; accent: string; podeEditar: true; realtimeRevision: number; onAtualizado: Mock<...>; }' is not assignable to parameter of type 'Attributes & Props'.
+      Type '{ card: { emailClienteReuniao: string | null; anexos: { url: string; nome: string; id: string; createdAt: Date; tipo: string | null; cardId: string; tamanho: number | null; enviadoPorId: number; campoId: string | null; }[]; ... 34 more ...; transcricaoReuniao: string | null; }; accent: string; podeEditar: true; real...' is missing the following properties from type 'Props': campoIds, instanceKey
+tests/bpm/cpf-pendencias-react.test.ts(214,89): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type '{ card: { camposEtapa: { id: string; nome: string; tipo: string; opcoesJson: string; pipelineId: string; etapaId: string; obrigatorio: boolean; ordem: number; valor: string; editavel: boolean; }[]; emailClienteReuniao: string | null; ... 34 more ...; transcricaoReuniao: string | null; }; accent: string; podeEditar: ...' is not assignable to parameter of type 'Attributes & Props'.
+      Type '{ card: { camposEtapa: { id: string; nome: string; tipo: string; opcoesJson: string; pipelineId: string; etapaId: string; obrigatorio: boolean; ordem: number; valor: string; editavel: boolean; }[]; emailClienteReuniao: string | null; ... 34 more ...; transcricaoReuniao: string | null; }; accent: string; podeEditar: ...' is missing the following properties from type 'Props': campoIds, instanceKey

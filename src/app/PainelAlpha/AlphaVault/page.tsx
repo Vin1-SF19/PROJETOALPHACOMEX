@@ -6,6 +6,7 @@ import { LayoutGrid } from "lucide-react";
 import { BotoesHeader } from "@/components/Colaboradores/BotoesHeader";
 import { GradeAgentes } from "./GradeAgentes/GradeAgentes";
 import { isAdminRole } from "@/lib/roles";
+import type { ColaboradorExterno, RecursoVault, SistemaVault } from "./types";
 
 export const dynamic = "force-dynamic";
 
@@ -14,9 +15,9 @@ export default async function ColaboradoresPage() {
     
     if (!isAdminRole(session?.user?.role)) redirect("/");
 
-    const style = getTema((session?.user as any)?.tema_interface || "blue");
+    const style = getTema(session?.user?.tema_interface || "blue");
 
-    const recursosVault = await db.$queryRaw`
+    const recursosVault = await db.$queryRaw<RecursoVault[]>`
         SELECT 
             vr.*, 
             sc.nome as sistema_nome, 
@@ -24,7 +25,7 @@ export default async function ColaboradoresPage() {
             sc.link 
         FROM vault_recursos vr
         JOIN sistemas_core sc ON vr.sistema_id = sc.id
-    ` as any[];
+    `;
 
     const usuariosReais = await db.usuarios.findMany({
         select: {
@@ -39,11 +40,11 @@ export default async function ColaboradoresPage() {
         }
     });
 
-    const colaboradoresExternos = await db.$queryRaw`SELECT * FROM colaboradores_core` as any[];
-    const sistemas = await db.$queryRaw`SELECT * FROM sistemas_core` as any[];
+    const colaboradoresExternos = await db.$queryRaw<ColaboradorExterno[]>`SELECT * FROM colaboradores_core`;
+    const sistemas = await db.$queryRaw<SistemaVault[]>`SELECT * FROM sistemas_core`;
 
     const todosColaboradores = [
-        ...usuariosReais.map(u => ({ ...u, tipo: 'Usuario' })),
+        ...usuariosReais.map(u => ({ ...u, tipo: 'Usuario' as const })),
         ...colaboradoresExternos.map(c => ({
             id: `ext-${c.id}`,
             nome: c.nome,
@@ -52,7 +53,7 @@ export default async function ColaboradoresPage() {
             data_contratacao: c.data_contratacao,
             status: c.status,
             tema_interface: "blue",
-            tipo: 'Agente',
+            tipo: 'Agente' as const,
             email: null
         }))
     ].sort((a, b) => a.nome.localeCompare(b.nome));

@@ -792,4 +792,19 @@ Removida somente a opção Relacionamento de TIPOS_CAMPO na criação. Contratos
 
 
 ### CardSaveContext / CardFullViewModal — RM-2026-09A642
-Componentes existentes: pendências por instância do formulário, flush até fila estabilizar e confirmação AlertDialog com nomes dos campos. PainelCamposEtapaAtual confirma somente revisões efetivamente enviadas e usa valores relidos do servidor. Nenhum componente visual novo. Homologação de interação pendente; ver story do RM.
+Registro histórico RM-2026-09A642, superado em 2026-09-22 por RM-2026-B88712: havia pendências por instância, flush até estabilizar e confirmação AlertDialog. Atualmente o diálogo foi removido; ver entrada de autosave abaixo. PainelCamposEtapaAtual confirma somente revisões efetivamente enviadas e usa valores relidos do servidor. Nenhum componente visual novo. Homologação de interação pendente; ver story do RM.
+
+### 2026-09-22 — Scribe — RM-2026-B88712: hook consolidado e indicador de salvamento
+
+**Hook existente:** `useCardSave`, exportado por `src/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext.tsx`; exige `CardSaveProvider`, montado em `src/app/PainelAlpha/AlphaCRM/layout.tsx`. Não existe um novo hook paralelo `useAutosave`.
+
+**Reúso:** `scheduleSave(key, callback, delay=500)` agenda por chave; `registerSave(callback, cardId, recoveryKey)` serializa e relê o card após sucesso. Usar chaves `${cardId}:${campoId}`, `getDraft`/`setDraft`, `getVersion` e `subscribeConfirmation` para recuperação/reconciliação. ``flushScheduled(`${cardId}:`)`` dispara timers pendentes; `flushSaves(cardId)` aguarda a fila e verifica erros/pendências. Recuperação é em memória do provider.
+
+**Indicador existente:** bloco inline de `PainelCamposEtapaAtual.tsx`, não componente exportado. Mostra salvamento, Salvo após confirmação da revisão atual e erro com valor preservado; nova edição remove o sucesso. Reutilizar o contrato de estados e ícones existentes, sem inventar `SaveStatusIndicator`. O provider apresenta toast de erro com ação Tentar novamente. Campos fixos mantêm feedback próprio.
+
+**Consumidores:** painéis de campos, próximo contato, resumo de reunião, respostas de follow-up, status pós-fechamento e avanço de etapa; `CampoBpmInput.tsx` integra upload ao mesmo fluxo. Agendamento de reunião continua explícito.
+
+
+### RM-2026-04A236 — Fase 5 Nova
+
+ListaCamposFormulario: componente administrativo em src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/ListaCamposFormulario.tsx. Reutiliza Card, Badge e @dnd-kit; lista plana com metadados, sensores, anúncios e botões alternativos. Consumido por FormularioEtapaWorkspace.

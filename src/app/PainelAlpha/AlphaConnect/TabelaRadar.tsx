@@ -3,16 +3,18 @@
 import { useState } from "react";
 import ModalDetalhesCNPJ from "./ModalDetalhesCNPJ";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import type { RadarFiscalItem } from "./types";
+import type { TemaAlpha } from "@/lib/temas";
 
 interface TabelaRadarProps {
-    dados: any[];
-    style: any;
+    dados: RadarFiscalItem[];
+    style: TemaAlpha;
     selecionados: number[];
     onSelectionChange: (ids: number[]) => void;
 }
 
 export function TabelaRadar({ dados, style, selecionados, onSelectionChange }: TabelaRadarProps) {
-    const [detalheSelecionado, setDetalheSelecionado] = useState<any>(null);
+    const [detalheSelecionado, setDetalheSelecionado] = useState<RadarFiscalItem | null>(null);
     const [pagina, setPagina] = useState(1);
     const itensPorPagina = 20;
 
@@ -74,8 +76,8 @@ export function TabelaRadar({ dados, style, selecionados, onSelectionChange }: T
                                     />
                                 </td>
                                 <td className="p-6">
-                                    <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full border ${item.qualificacao === "PREMIUM" ? "text-amber-400 border-amber-400/30" : "text-emerald-400 border-emerald-400/30"}`}>
-                                        {item.qualificacao || "NORMAL"}
+                                    <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full border ${!item.qualificacao ? "text-slate-400 border-slate-400/30" : item.qualificacao === "PREMIUM" ? "text-amber-400 border-amber-400/30" : "text-emerald-400 border-emerald-400/30"}`}>
+                                        {item.qualificacao || "NÃO INFORMADO"}
                                     </span>
                                 </td>
                                 <td onClick={() => setDetalheSelecionado(item)} className="p-6 text-[11px] font-black text-white font-mono cursor-pointer hover:text-emerald-400 underline decoration-emerald-500/30 underline-offset-4">

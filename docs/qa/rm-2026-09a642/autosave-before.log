@@ -1,0 +1,57 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /home/ialpha/projetos/alpha-comex/painel-alpha
+
+ ❯ tests/bpm/cpf-pendencias-react.test.ts (9 tests | 2 failed) 98ms
+   × salva outro campo mesmo com CPF inválido pendente 11ms
+   × retorna o resultado da tentativa atual depois de falha 8ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/bpm/cpf-pendencias-react.test.ts > salva outro campo mesmo com CPF inválido pendente
+AssertionError: expected "vi.fn()" to be called with arguments: [ ObjectContaining{…} ]
+
+Number of calls: 0
+
+ ❯ tests/bpm/cpf-pendencias-react.test.ts:79:28
+     77|     input.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+     78|   });
+     79|   expect(AtualizarCardBpm).toHaveBeenCalledWith(expect.objectContainin…
+       |                            ^
+     80|   expect(saves.getPendingFields()).toEqual(["CPF"]);
+     81| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/bpm/cpf-pendencias-react.test.ts > retorna o resultado da tentativa atual depois de falha
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/bpm/cpf-pendencias-react.test.ts:84:54
+     82| it("retorna o resultado da tentativa atual depois de falha", async () …
+     83|   expect(await saves.registerSave(async () => false)).toBe(false);
+     84|   expect(await saves.registerSave(async () => true)).toBe(true);
+       |                                                      ^
+     85| });
+     86|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 7 passed (9)
+   Start at  19:35:10
+   Duration  409ms (transform 97ms, setup 0ms, import 164ms, tests 98ms, environment 87ms)
+
+npm notice
+npm notice New minor version of npm available! 11.6.1 -> 11.19.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.19.1
+npm notice To update run: npm install -g npm@11.19.1
+npm notice

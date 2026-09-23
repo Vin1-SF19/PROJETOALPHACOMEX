@@ -113,8 +113,8 @@ export async function getEmpresasChecklist(): Promise<{ data?: EmpresaComProgres
     });
 
     return { data };
-  } catch (err: any) {
-    return { error: err.message };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -126,8 +126,8 @@ export async function getPastasChecklist(): Promise<{ data?: PastaChecklistResum
       orderBy: { nome: "asc" },
     });
     return { data: pastas };
-  } catch (err: any) {
-    return { error: err.message };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -147,8 +147,8 @@ export async function criarPastaChecklist(nome: string): Promise<{ data?: PastaC
     });
     revalidatePath("/PainelAlpha/CheckList");
     return { data: pasta };
-  } catch (err: any) {
-    return { error: err.message };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -189,8 +189,8 @@ export async function getEmpresaChecklist(empresaId: string) {
     };
 
     return { data };
-  } catch (err: any) {
-    return { error: err.message };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -243,8 +243,8 @@ export async function criarChecklist(empresaId: string, tipo: TipoEmbasamento) {
     revalidatePath(`/PainelAlpha/CheckList/${eId}`);
     revalidatePath("/PainelAlpha/CheckList");
     return { data: checklist };
-  } catch (err: any) {
-    return { error: err.message };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -317,8 +317,8 @@ export async function atualizarEmpresaChecklist(dados: DadosEmpresaChecklist) {
     revalidatePath("/PainelAlpha/CheckList");
     revalidatePath("/PainelAlpha/CheckList/" + parsed.empresaId);
     return { success: true };
-  } catch (err: any) {
-    return { error: err.message };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -349,8 +349,8 @@ export async function trocarEmbasamentoChecklist(empresaId: string, tipo: TipoEm
     revalidatePath("/PainelAlpha/CheckList");
     revalidatePath("/PainelAlpha/CheckList/" + parsed.empresaId);
     return { data: checklist };
-  } catch (err: any) {
-    return { error: err.message };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -415,8 +415,8 @@ export async function atualizarItemChecklist(
 
     revalidatePath(`/PainelAlpha/CheckList/${item.checklist.empresaId}`);
     return { data: item, progresso: progressoNovo };
-  } catch (err: any) {
-    return { error: err.message };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -458,8 +458,8 @@ export async function calcularProgresso(checklistId: string) {
     });
 
     return { data: { total, concluidos, percentual, porSecao } };
-  } catch (err: any) {
-    return { error: err.message };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -490,8 +490,8 @@ export async function adicionarDocumento(
     });
 
     return { data: doc };
-  } catch (err: any) {
-    return { error: err.message };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -508,8 +508,8 @@ export async function atualizarObservacaoDocumento(docId: string, observacao: st
     });
 
     return { success: true };
-  } catch (err: any) {
-    return { error: err.message };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -520,8 +520,8 @@ export async function removerDocumento(docId: string) {
     await requireSession();
     await db.documentoChecklist.delete({ where: { id: docId } });
     return { success: true };
-  } catch (err: any) {
-    return { error: err.message };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -535,8 +535,8 @@ export async function excluirDocumentoAnalista(docId: string) {
       data: { deletadoEm: new Date(), deletadoPorCliente: false },
     });
     return { success: true };
-  } catch (err: any) {
-    return { error: err.message };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -607,7 +607,7 @@ export async function getHistoricoDocumentosExcluidos(): Promise<{ data?: DocHis
       }));
 
     return { data };
-  } catch (err: any) {
-    return { error: err.message };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
   }
 }

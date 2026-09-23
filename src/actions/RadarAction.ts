@@ -3,8 +3,36 @@
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../auth";
+import type { consultas_radar } from "@prisma/client";
 
-const parseDateBR = (valor: any): Date | null => {
+type EmpresaRadarEntrada = {
+  cnpj?: string | number;
+  razao_social?: string;
+  razaoSocial?: string;
+  nome_fantasia?: string;
+  nomeFantasia?: string;
+  situacao_radar?: string;
+  situacao?: string;
+  submodalidade?: string;
+  data_situacao?: string | Date | null;
+  dataSituacao?: string | Date | null;
+  municipio?: string;
+  uf?: string;
+  data_constituicao?: string | Date | null;
+  dataConstituicao?: string | Date | null;
+  regime_tributario?: string;
+  regimeTributario?: string;
+  capital_social?: string | number;
+  capitalSocial?: string | number;
+  contribuinte?: string;
+  data_opcao?: string | Date | null;
+  DataSimples?: string | Date | null;
+  dataOpcao?: string | Date | null;
+  data_consulta?: string | Date | null;
+  dataConsulta?: string | Date | null;
+};
+
+const parseDateBR = (valor: unknown): Date | null => {
   if (!valor || valor === "" || valor === "N/A") return null;
   if (valor instanceof Date) return isNaN(valor.getTime()) ? null : valor;
   const dataString = String(valor).trim();
@@ -31,17 +59,17 @@ export async function registrarNovoArquivo(nome: string, total: number) {
       }
     });
     return { success: true, id: res.id };
-  } catch (error: any) {
-    if (error.code === 'P2002') return { success: false, error: "duplicado" };
+  } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === 'P2002') return { success: false, error: "duplicado" };
     return { success: false, error: "Erro ao criar arquivo" };
   }
 }
 
-export async function salvarDadosNoBanco(empresas: any[], arquivoId?: number) {
+export async function salvarDadosNoBanco(empresas: EmpresaRadarEntrada[], arquivoId?: number) {
   try {
     let novos = 0;
     let existentes = 0;
-    const resultadosProcessados: any[] = [];
+    const resultadosProcessados: consultas_radar[] = [];
 
     const promessas = empresas.map(async (emp) => {
       const cnpjLimpo = String(emp.cnpj || "").replace(/\D/g, "").padStart(14, "0").substring(0, 14);
@@ -58,7 +86,7 @@ export async function salvarDadosNoBanco(empresas: any[], arquivoId?: number) {
       const isApenasCnpj = !emp.razaoSocial && !emp.razao_social;
       if (isApenasCnpj && jaTemDadosReais) return;
 
-      const formatar = (v: any) => {
+      const formatar = (v: unknown) => {
         const d = parseDateBR(v);
         return d ? d.toISOString() : null;
       };
@@ -96,18 +124,19 @@ export async function salvarDadosNoBanco(empresas: any[], arquivoId?: number) {
     revalidatePath("/PainelAlpha/ConsultarRadar");
 
     return { success: true, novos, existentes, data: resultadosProcessados };
-  } catch (error: any) {
-    return { success: false, novos: 0, existentes: 0, error: error.message };
+  } catch (error) {
+    return { success: false, novos: 0, existentes: 0, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
 
-export async function salvarPlanilhaCompleta(empresas: any[], nomeDoArquivo: string, arquivoIdExistente?: number) {
+export async function salvarPlanilhaCompleta(empresas: EmpresaRadarEntrada[], nomeDoArquivo: string, arquivoIdExistente?: number) {
   if (!empresas || empresas.length === 0) return { success: false };
 
   try {
     let idDoArquivo = arquivoIdExistente;
     let totalCriados = 0;
+    let totalExistentes = 0;
 
     if (!idDoArquivo) {
       const resArquivo = await registrarNovoArquivo(nomeDoArquivo, empresas.length);
@@ -118,18 +147,22 @@ export async function salvarPlanilhaCompleta(empresas: any[], nomeDoArquivo: str
     const TAMANHO_LOTE = 20;
     for (let i = 0; i < empresas.length; i += TAMANHO_LOTE) {
       const lote = empresas.slice(i, i + TAMANHO_LOTE);
-      const res = await salvarDadosNoBanco(lote, idDoArquivo) as any;
-      if (res.success && res.novos) totalCriados += res.novos;
+      const res = await salvarDadosNoBanco(lote, idDoArquivo);
+      if (!res.success) {
+        return { success: false, error: res.error || "Falha ao salvar lote", idGerado: idDoArquivo, totalCriados, totalExistentes };
+      }
+      totalCriados += res.novos;
+      totalExistentes += res.existentes;
       await new Promise(r => setTimeout(r, 50));
     }
 
-    return { success: true, idGerado: idDoArquivo, totalCriados };
+    return { success: true, idGerado: idDoArquivo, totalCriados, totalExistentes };
   } catch (error) {
     return { success: false };
   }
 }
 
-export async function salvarConsultaIndividual(empresa: any) {
+export async function salvarConsultaIndividual(empresa: EmpresaRadarEntrada) {
   try {
     const cnpjLimpo = String(empresa.cnpj || "").replace(/\D/g, "");
 
@@ -137,7 +170,7 @@ export async function salvarConsultaIndividual(empresa: any) {
       return { success: false, error: "Dados incompletos" };
     }
 
-    const formatarData = (v: any) => {
+    const formatarData = (v: unknown) => {
       const d = parseDateBR(v);
       return d ? d.toISOString() : null;
     };
@@ -168,9 +201,10 @@ export async function salvarConsultaIndividual(empresa: any) {
     revalidatePath("/PainelAlpha/ConsultarRadar");
 
     return { success: true, data: registroAtualizado };
-  } catch (error: any) {
-    console.error("Erro ao salvar consulta:", error.message);
-    return { success: false, error: error.message };
+  } catch (error) {
+    const mensagem = error instanceof Error ? error.message : String(error);
+    console.error("Erro ao salvar consulta:", mensagem);
+    return { success: false, error: mensagem };
   }
 }
 
@@ -185,8 +219,8 @@ export async function deletarRegistrosBanco(cnpjs: string[]) {
     });
     revalidatePath("/PainelAlpha/HabilitacaoRadar");
     return { success: true, count: resultado.count };
-  } catch (error: any) {
-    return { success: false, error: error?.message || "Erro ao excluir", count: 0 };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Erro ao excluir", count: 0 };
   }
 }
 
@@ -225,9 +259,9 @@ export async function verificarCnpjsExistentes(cnpjs: string[]) {
       where: { cnpj: { in: cnpjs } }
     });
 
-    const formatar = (valor: any) => {
+    const formatar = (valor: unknown) => {
       if (!valor) return null;
-      return new Date(valor).toISOString();
+      return new Date(valor instanceof Date ? valor : String(valor)).toISOString();
     };
 
     const dataFormatada = empresasNoBanco.map((emp) => ({
@@ -253,4 +287,3 @@ export async function verificarCnpjsExistentes(cnpjs: string[]) {
     return { success: false, error: "Erro ao validar banco" };
   }
 }
-

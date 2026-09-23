@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2, Milestone } from "lucide-react";
 import { toast } from "sonner";
 import { AtualizarCardBpm } from "@/actions/bpm/Cards";
-import { useCardSave } from "./CardSaveContext";
+import { useCardSave } from "@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext";
 import {
   STATUS_POS_FECHAMENTO_OPCOES,
   obterStatusPosFechamentoConfig,
@@ -32,10 +32,13 @@ export function PainelStatusPosFechamento({
   accent,
   onAtualizado,
 }: PainelStatusPosFechamentoProps) {
+  const { registerSave, getVersion, getDraft, setDraft } = useCardSave();
+  const draftKey = `${cardId}:status`;
+  const recovered = getDraft(draftKey)?.valor;
   const statusReconhecido = statusPosFechamentoEhValido(statusPersistido)
     ? statusPersistido
     : null;
-  const [rascunho, setRascunho] = useState<StatusPosFechamento | null>(statusReconhecido);
+  const [rascunho, setRascunho] = useState<StatusPosFechamento | null>(statusPosFechamentoEhValido(recovered) ? recovered : statusReconhecido);
   const [base, setBase] = useState<StatusPosFechamento | null>(statusReconhecido);
   const versaoRemota = new Date(versaoPersistidaEm).toISOString();
   const [versaoBase, setVersaoBase] = useState(versaoRemota);
@@ -45,15 +48,15 @@ export function PainelStatusPosFechamento({
   } | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [conflitoRealtime, setConflitoRealtime] = useState(false);
-  const rascunhoSujoRef = useRef(false);
+  const rascunhoSujoRef = useRef(Boolean(recovered));
   const confirmacaoLocalPendenteRef = useRef<{
     status: StatusPosFechamento;
     versaoAnterior: string;
   } | null>(null);
-  const { registerSave } = useCardSave();
 
   useEffect(() => {
     const timer = setTimeout(() => {
+      if (!getDraft(draftKey)) rascunhoSujoRef.current = false;
       const confirmacaoLocal = confirmacaoLocalPendenteRef.current;
       if (confirmacaoLocal) {
         const propsAindaSaoSnapshotAnterior =
@@ -90,19 +93,19 @@ export function PainelStatusPosFechamento({
       setConflitoRealtime(false);
     }, 0);
     return () => clearTimeout(timer);
-  }, [base, statusReconhecido, versaoBase, versaoRemota, realtimeRevision]);
+  }, [base, statusReconhecido, versaoBase, versaoRemota, realtimeRevision, draftKey, getDraft]);
 
   const configAtual = obterStatusPosFechamentoConfig(rascunho);
 
   async function salvar(status: StatusPosFechamento) {
-    if (!podeEditar || status === base) return;
+    if (!podeEditar) return;
     const versaoBaseAtual = versaoBase;
     setSalvando(true);
     const sucesso = await registerSave(async () => {
       const resultado = await AtualizarCardBpm({
         cardId,
         statusPosFechamento: status,
-        versaoEsperadaEm: versaoBaseAtual,
+        versaoEsperadaEm: getVersion(cardId, versaoBaseAtual),
       });
       if (!resultado.success) {
         const mensagem = typeof resultado.error === "string"
@@ -118,13 +121,14 @@ export function PainelStatusPosFechamento({
         status,
         versaoAnterior: versaoBaseAtual,
       };
+      if (getDraft(draftKey)?.valor === status) setDraft(draftKey);
       rascunhoSujoRef.current = false;
       setBase(status);
       setConflitoRealtime(false);
       toast.success("Status pós-fechamento atualizado");
       onAtualizado();
       return true;
-    }).finally(() => {
+    }, cardId, draftKey).finally(() => {
       setSalvando(false);
     });
     return sucesso;
@@ -181,6 +185,7 @@ export function PainelStatusPosFechamento({
           onChange={(event) => {
             if (!statusPosFechamentoEhValido(event.target.value)) return;
             rascunhoSujoRef.current = event.target.value !== base;
+            setDraft(draftKey, { valor: event.target.value });
             setRascunho(event.target.value);
             void salvar(event.target.value);
           }}

@@ -10,8 +10,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 import XLSX from 'xlsx-js-style';
 import { getExportDataColaborador } from '@/actions/ComercialControle';
+import type { ComercialPerformance } from '@prisma/client';
+import type { ReactNode } from 'react';
 
-function MetricCard({ label, valor, cor }: any) {
+type ColaboradorMetricas = { id?: string; nome?: string; [key: string]: string | number | undefined };
+type GraficoItem = { name: string; value: number; color: string };
+
+function MetricCard({ label, valor, cor }: { label: string; valor: ReactNode; cor: string }) {
     return (
         <div className="bg-white/[0.03] p-8 rounded-[2rem] border border-white/5 flex flex-col justify-center transition-all hover:bg-white/[0.05]">
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2">{label}</p>
@@ -20,7 +25,7 @@ function MetricCard({ label, valor, cor }: any) {
     );
 }
 
-function CardDestaque({ titulo, valor, sub, icon, gradient }: any) {
+function CardDestaque({ titulo, valor, sub, icon, gradient }: { titulo: string; valor: ReactNode; sub: string; icon: ReactNode; gradient: string }) {
     return (
         <div className={`bg-slate-900/40 border border-white/5 p-6 rounded-[2rem] shadow-xl relative overflow-hidden group hover:border-white/20 transition-all duration-500 bg-gradient-to-br ${gradient}`}>
             <div className="relative z-10">
@@ -35,8 +40,8 @@ function CardDestaque({ titulo, valor, sub, icon, gradient }: any) {
     );
 }
 
-function PieChartIndividual({ data, titulo }: any) {
-    const total = data.reduce((a: any, b: any) => a + (Number(b.value) || 0), 0);
+function PieChartIndividual({ data, titulo }: { data: GraficoItem[]; titulo: string }) {
+    const total = data.reduce((a, b) => a + (Number(b.value) || 0), 0);
     return (
         <div className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] h-[300px] flex flex-col items-center group hover:bg-white/[0.04] transition-all">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 text-center">{titulo}</p>
@@ -44,7 +49,7 @@ function PieChartIndividual({ data, titulo }: any) {
                 <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                         <Pie data={data} innerRadius={55} outerRadius={75} paddingAngle={5} dataKey="value" stroke="none">
-                            {data.map((entry: any, index: number) => <Cell key={index} fill={entry.color} />)}
+                            {data.map((entry, index) => <Cell key={index} fill={entry.color} />)}
                         </Pie>
                         <Tooltip
                             contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', fontSize: '10px' }}
@@ -61,7 +66,7 @@ function PieChartIndividual({ data, titulo }: any) {
     );
 }
 
-function MiniCardComparativo({ titulo, atual, anteriores }: any) {
+function MiniCardComparativo({ titulo, atual, anteriores }: { titulo: string; atual: ReactNode; anteriores: ReactNode }) {
     return (
         <div className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl">
             <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-3 text-center">{titulo}</p>
@@ -80,7 +85,7 @@ function MiniCardComparativo({ titulo, atual, anteriores }: any) {
     );
 }
 
-function CardColaborador({ colab, anterior, mesAnteriorLabel }: any) {
+function CardColaborador({ colab, anterior, mesAnteriorLabel }: { colab: ColaboradorMetricas; anterior?: ColaboradorMetricas | null; mesAnteriorLabel: string }) {
     const totalContratosRev = (Number(colab.revisao) || 0);
     const totalContratosHab = (Number(colab.habilitacao) || 0);
     const naoAgendadas = Math.max(0, (Number(colab.leads) || 0) - (Number(colab.agendadas) || 0) - (Number(colab.leadsDesqualificados) || 0));
@@ -237,25 +242,38 @@ function CardColaborador({ colab, anterior, mesAnteriorLabel }: any) {
     );
 }
 
-export default function MarketingDashboard({ dadosEquipe = [], dadosEquipeAnterior = [] }: any) {
+function isColaboradorMetricas(item: unknown): item is ColaboradorMetricas {
+    return !!item && typeof item === 'object' && 'id' in item && typeof item.id === 'string';
+}
+
+export default function MarketingDashboard({ dadosEquipe = [], dadosEquipeAnterior = [] }: { dadosEquipe?: unknown[]; dadosEquipeAnterior?: unknown[] }) {
     const [colaboradorAtivo, setColaboradorAtivo] = useState<string>("GERAL");
     const router = useRouter();
     const searchParams = useSearchParams();
+    const equipe = useMemo(() => dadosEquipe.filter(isColaboradorMetricas), [dadosEquipe]);
+    const equipeAnterior = useMemo(() => dadosEquipeAnterior.filter(isColaboradorMetricas), [dadosEquipeAnterior]);
 
     const mesAtualUrl = parseInt(searchParams.get('mes') || new Date().getMonth().toString());
     const anoAtualUrl = parseInt(searchParams.get('ano') || new Date().getFullYear().toString());
     const meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
     const rankingVendas = useMemo(() => {
-        return [...dadosEquipe].map((c: any) => ({
+        return [...equipe].map((c) => ({
             id: c.id,
             nome: c.nome || 'Usuário',
             vendas: (Number(c.habilitacao) || 0) + (Number(c.revisao) || 0)
-        })).sort((a: any, b: any) => b.vendas - a.vendas);
-    }, [dadosEquipe]);
+        })).sort((a, b) => b.vendas - a.vendas);
+    }, [equipe]);
 
     const statsGerais = useMemo(() => {
-        return dadosEquipe.reduce((acc: any, curr: any) => ({
+        const inicial = {
+            nome: "VISÃO GERAL DA EQUIPE",
+            leads: 0, agendadas: 0, realizadas: 0, noShow: 0, habilitacao: 0, revisao: 0, leadsDesqualificados: 0,
+            hotLeadsHabilitacao: 0, hotLeadsRevisao: 0, TRAFEGO_PAGO: 0, CALLIX: 0, INDICACAO: 0,
+            EVENTOS: 0, CHINA: 0, hab_TRAFEGO: 0, hab_CALLIX: 0, hab_INDICACAO: 0, hab_EVENTOS: 0,
+            hab_CHINA: 0, rev_TRAFEGO: 0, rev_CALLIX: 0, rev_INDICACAO: 0, rev_EVENTOS: 0, rev_CHINA: 0,
+        };
+        return equipe.reduce<typeof inicial>((acc, curr) => ({
             nome: "VISÃO GERAL DA EQUIPE",
             leads: acc.leads + (Number(curr.leads) || 0),
             agendadas: acc.agendadas + (Number(curr.agendadas) || 0),
@@ -275,36 +293,32 @@ export default function MarketingDashboard({ dadosEquipe = [], dadosEquipeAnteri
             hab_CALLIX: acc.hab_CALLIX + (Number(curr.hab_CALLIX) || 0),
             hab_INDICACAO: acc.hab_INDICACAO + (Number(curr.hab_INDICACAO) || 0),
             hab_EVENTOS: acc.hab_EVENTOS + (Number(curr.hab_EVENTOS) || 0),
+            hab_CHINA: acc.hab_CHINA + (Number(curr.hab_CHINA) || 0),
             rev_TRAFEGO: acc.rev_TRAFEGO + (Number(curr.rev_TRAFEGO) || 0),
             rev_CALLIX: acc.rev_CALLIX + (Number(curr.rev_CALLIX) || 0),
             rev_INDICACAO: acc.rev_INDICACAO + (Number(curr.rev_INDICACAO) || 0),
             rev_EVENTOS: acc.rev_EVENTOS + (Number(curr.rev_EVENTOS) || 0),
             rev_CHINA: acc.rev_CHINA + (Number(curr.rev_CHINA) || 0),
 
-        }), {
-            leads: 0, agendadas: 0, realizadas: 0, noShow: 0, habilitacao: 0, revisao: 0, leadsDesqualificados: 0,
-            hotLeadsHabilitacao: 0, hotLeadsRevisao: 0, TRAFEGO_PAGO: 0, CALLIX: 0, INDICACAO: 0,
-            EVENTOS: 0, CHINA: 0, hab_TRAFEGO: 0, hab_CALLIX: 0, hab_INDICACAO: 0, hab_EVENTOS: 0,
-            hab_CHINA: 0, rev_TRAFEGO: 0, rev_CALLIX: 0, rev_INDICACAO: 0, rev_EVENTOS: 0, rev_CHINA: 0,
-        });
-    }, [dadosEquipe]);
+        }), inicial);
+    }, [equipe]);
 
     const statsGeraisAnterior = useMemo(() => {
-        return dadosEquipeAnterior.reduce((acc: any, curr: any) => ({
+        return equipeAnterior.reduce<{ revisao: number; habilitacao: number }>((acc, curr) => ({
             revisao: acc.revisao + (Number(curr.revisao) || 0),
             habilitacao: acc.habilitacao + (Number(curr.habilitacao) || 0),
         }), { revisao: 0, habilitacao: 0 });
-    }, [dadosEquipeAnterior]);
+    }, [equipeAnterior]);
 
     const dadosSelecionados = useMemo(() => {
         if (colaboradorAtivo === "GERAL") return statsGerais;
-        return dadosEquipe.find((c: any) => c.id === colaboradorAtivo);
-    }, [dadosEquipe, colaboradorAtivo, statsGerais]);
+        return equipe.find((c) => c.id === colaboradorAtivo);
+    }, [equipe, colaboradorAtivo, statsGerais]);
 
     const dadosAnterioresSelecionados = useMemo(() => {
         if (colaboradorAtivo === "GERAL") return statsGeraisAnterior;
-        return dadosEquipeAnterior.find((c: any) => c.id === colaboradorAtivo) || null;
-    }, [colaboradorAtivo, dadosEquipeAnterior, statsGeraisAnterior]);
+        return equipeAnterior.find((c) => c.id === colaboradorAtivo) || null;
+    }, [colaboradorAtivo, equipeAnterior, statsGeraisAnterior]);
 
     const mesAnteriorIndex = useMemo(() => mesAtualUrl === 0 ? 11 : mesAtualUrl - 1, [mesAtualUrl]);
 
@@ -313,7 +327,7 @@ export default function MarketingDashboard({ dadosEquipe = [], dadosEquipeAnteri
         const nomeAlvo = isGeral ? "GERAL" : dadosSelecionados?.nome;
         if (!nomeAlvo) return alert("Especialista não identificado.");
         try {
-            let dadosBrutos: any[] = [];
+            let dadosBrutos: ComercialPerformance[] = [];
             if (isGeral) {
                 const promessas = rankingVendas.map(colab => getExportDataColaborador(colab.nome, mesAtualUrl, anoAtualUrl));
                 const resultados = await Promise.all(promessas);
@@ -330,7 +344,7 @@ export default function MarketingDashboard({ dadosEquipe = [], dadosEquipeAnteri
                 { id: "CHINA", label: "CHINA", cor: "E7E6E6" },
                 { id: "TOTAL", label: "TOTAL GERAL", cor: "BDBDBD" }
             ];
-            const metricasLabel = [
+            const metricasLabel: Array<{ label: string; chave: keyof ComercialPerformance }> = [
                 { label: "Leads Recebidos", chave: "leadsRecebidos" },
                 { label: "Leads Desqualificados", chave: "leadsDesqualificados" },
                 { label: "Agendamentos", chave: "reunioesAgendadas" },
@@ -341,8 +355,8 @@ export default function MarketingDashboard({ dadosEquipe = [], dadosEquipeAnteri
                 { label: "Hot Habilitação", chave: "HotLeadsHabilitacao" },
                 { label: "Hot Revisão", chave: "HotLeadsRevisao" },
             ];
-            const matrizFinal: any[] = [];
-            const merges: any[] = [];
+            const matrizFinal: unknown[][] = [];
+            const merges: Array<{ s: { r: number; c: number }; e: { r: number; c: number } }> = [];
             const headerRow = ["CANAL:", "MÉTRICAS:"];
             for (let i = 1; i <= 31; i++) headerRow.push(String(i));
             headerRow.push("SOMA TOTAL");
@@ -350,19 +364,19 @@ export default function MarketingDashboard({ dadosEquipe = [], dadosEquipeAnteri
             canaisConfig.forEach((canal) => {
                 const linhaInicial = matrizFinal.length;
                 metricasLabel.forEach((metrica, idx) => {
-                    const rowData: any[] = [
+                    const rowData: unknown[] = [
                         { v: idx === 0 ? canal.label : "", s: { alignment: { vertical: "center", horizontal: "center" }, fill: { fgColor: { rgb: canal.cor } }, font: { bold: true, sz: 10 } } },
                         { v: metrica.label, s: { fill: { fgColor: { rgb: canal.cor } }, font: { sz: 9 } } }
                     ];
                     let somaTotalLinha = 0;
                     for (let dia = 1; dia <= 31; dia++) {
-                        const registrosDia = dadosBrutos.filter((d: any) => {
+                        const registrosDia = dadosBrutos.filter((d) => {
                             const date = new Date(d.dataRegistro);
                             const diaMatch = date.getUTCDate() === dia;
                             if (canal.id === "TOTAL") return diaMatch;
                             return diaMatch && d.canal === canal.id;
                         });
-                        const valor = registrosDia.reduce((sum: number, r: any) => sum + (Number(r[metrica.chave]) || 0), 0);
+                        const valor = registrosDia.reduce((sum, r) => sum + (Number(r[metrica.chave]) || 0), 0);
                         rowData.push({ v: valor, s: { alignment: { horizontal: "center" }, fill: { fgColor: { rgb: canal.cor } }, border: { bottom: { style: "thin", color: { rgb: "FFFFFF" } } } } });
                         somaTotalLinha += valor;
                     }

@@ -1,5 +1,7 @@
 "use server";
 import { randomUUID } from "node:crypto";
+import { BuscarEmpresasBpm as buscarEmpresas, ListarUsuariosResponsavelBpm as listarResponsaveis } from "./CardsConsultas";
+import { ExcluirCardBpm as excluirCard } from "./CardsExcluir";
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
@@ -13,7 +15,6 @@ import { formatCNPJ, normalizarCNPJ } from "@/lib/format-cnpj";
 import {
   exigirAcessoBpmCard,
   exigirAcessoBpmPipeline,
-  exigirAcessoModuloBpm,
   checarAcessoConfigPipeline,
   checarAcessoDiretoriaBpm,
   isAdminRole,
@@ -34,6 +35,7 @@ import { executarAutomacoesCentraisDoCardAgora } from "@/lib/bpm/automacoes/orqu
 import { automacaoMigradaEstaAtiva, NOMES_AUTOMACOES_MIGRADAS } from "@/lib/bpm/automacoes/migracao-hardcoded";
 import { salvarValoresGlobaisPersonalizadosCampos } from "@/lib/bpm/campos-configuraveis-server";
 import { desserializarComposicaoCardKanban, type CardKanbanComposicao } from "@/lib/bpm/card-kanban";
+import { projetarResumosKanbanOperacionais } from "@/lib/bpm/card-kanban-projecao";
 import type { CardKanbanValores } from "@/components/bpm/kanban/CardKanbanRenderer";
 
 import { buscarServicosContratados } from "@/actions/Clientes";
@@ -262,63 +264,6 @@ function validarMotivoLostNosCampos(
   });
 }
 
-/** Busca leve de empresa por razão social/nome fantasia/CNPJ para o seletor do modal de novo card. */
-export async function BuscarEmpresasBpm(termo: string) {
-  try {
-    const session = await auth();
-    if (!session?.user?.id) return { success: false, error: "Não autorizado", data: [] };
-    await exigirAcessoModuloBpm(Number(session.user.id));
-    const termoSeguro = termo.trim().slice(0, 120);
-    if (termoSeguro.length < 2) return { success: true, data: [] };
-
-    const empresas = await db.cliente.findMany({
-      where: {
-        OR: [
-          { razaoSocial: { contains: termoSeguro } },
-          { nomeFantasia: { contains: termoSeguro } },
-          { cnpj: { contains: normalizarCNPJ(termoSeguro) || termoSeguro } },
-        ],
-      },
-      select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true },
-      take: 20,
-      orderBy: { razaoSocial: "asc" },
-    });
-
-    return { success: true, data: empresas };
-  } catch (error) {
-    console.error("[BuscarEmpresasBpm]", error);
-    return { success: false, error: "Erro ao buscar empresas", data: [] };
-  }
-}
-
-/** Lista somente usuários ativos e elegíveis como responsáveis no pipeline. */
-export async function ListarUsuariosResponsavelBpm(pipelineId: string) {
-  try {
-    const session = await auth();
-    if (!session?.user?.id) return { success: false, error: "Não autorizado", data: [] };
-    if (!pipelineId?.trim()) {
-      return { success: false, error: "Pipeline inválido", data: [] };
-    }
-    await exigirAcessoBpmPipeline(pipelineId, Number(session.user.id));
-    const candidatos = await db.usuarios.findMany({
-      where: { status: "ATIVO" },
-      select: { id: true, nome: true },
-      orderBy: { nome: "asc" },
-    });
-    const elegibilidades = await Promise.all(
-      candidatos.map((usuario) =>
-        usuarioElegivelResponsavelBpm(pipelineId, usuario.id),
-      ),
-    );
-    const usuarios = candidatos.filter((_, indice) => elegibilidades[indice]);
-
-    return { success: true, data: usuarios };
-  } catch (error) {
-    console.error("[ListarUsuariosResponsavelBpm]", error);
-    return { success: false, error: "Erro ao buscar usuários", data: [] };
-  }
-}
-
 export async function ListarCardsPipelineBpm(pipelineId: string) {
   try {
     const session = await auth();
@@ -389,6 +334,12 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
         )
         .map(([etapaId]) => etapaId),
     );
+    const etapasComOperacionais = new Set(
+      [...composicaoPorEtapa.entries()]
+        .filter(([, composicao]) => composicao.some((elemento) =>
+          elemento.kind === "NATIVE" && ["CHECKLIST", "CADENCIA", "PENDENCIAS"].includes(elemento.key)))
+        .map(([etapaId]) => etapaId),
+    );
 
     // D-021: card sempre tem empresa vinculada — select sempre inclui a empresa.
     const cards = await db.bpmCard.findMany({
@@ -445,6 +396,62 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
         },
       },
       orderBy: { createdAt: "desc" },
+    });
+
+    const cardsComOperacionais = cards.filter((card) => etapasComOperacionais.has(card.etapaId));
+    const idsComOperacionais = cardsComOperacionais.map((card) => card.id);
+    const precisaPendencias = cardsComOperacionais.some((card) =>
+      composicaoPorEtapa.get(card.etapaId)?.some((elemento) =>
+        elemento.kind === "NATIVE" && elemento.key === "PENDENCIAS"));
+    const [checklistsOperacionais, templatesOperacionais, cadenciasOperacionais, camposObrigatorios, valoresObrigatorios] = idsComOperacionais.length
+      ? await Promise.all([
+          db.bpmCardChecklist.findMany({
+            where: { cardId: { in: idsComOperacionais } },
+            select: { cardId: true, templateId: true, itens: { select: { status: true, obrigatorio: true } } },
+          }),
+          db.bpmChecklistTemplate.findMany({
+            where: {
+              ativo: true,
+              AND: [
+                { OR: [{ pipelineId: null }, { pipelineId }] },
+                { OR: [{ cardId: null }, { cardId: { in: idsComOperacionais } }] },
+              ],
+            },
+            select: {
+              id: true, nome: true, pipelineId: true, etapaId: true, cardId: true,
+              etapas: { select: { etapaId: true } },
+              itens: { select: { obrigatorio: true } },
+            },
+          }),
+          db.bpmCardCadencia.findMany({
+            where: { cardId: { in: idsComOperacionais }, status: "ATIVA", proximaExecucaoEm: { not: null } },
+            select: { cardId: true, status: true, proximaExecucaoEm: true },
+          }),
+          precisaPendencias ? db.bpmCampoEtapaConfig.findMany({
+            where: { etapaId: { in: [...etapasComOperacionais] }, obrigatorio: true, visivel: true, campo: { ativo: true } },
+            select: {
+              etapaId: true, condicaoVisibilidadeJson: true, condicaoObrigatoriedadeJson: true,
+              campo: { select: {
+                id: true, nome: true, pipelineId: true, escopo: true,
+                fonteEntidade: true, valorPadrao: true,
+                pipelinesAssociados: { select: { pipelineId: true } },
+              } },
+            },
+          }) : Promise.resolve([]),
+          precisaPendencias ? db.bpmCardCampoValor.findMany({
+            where: { cardId: { in: idsComOperacionais } },
+            select: { cardId: true, campoId: true, valor: true },
+          }) : Promise.resolve([]),
+        ])
+      : [[], [], [], [], []];
+    const resumosOperacionais = projetarResumosKanbanOperacionais({
+      cards: cardsComOperacionais,
+      pipelineId,
+      checklists: checklistsOperacionais,
+      templates: templatesOperacionais,
+      cadencias: cadenciasOperacionais,
+      camposObrigatorios,
+      valoresCampos: valoresObrigatorios,
     });
 
     const agora = new Date();
@@ -515,6 +522,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
       empresaNome: string;
       cnpj: string | null;
       telefoneVirtual?: string | null;
+      cardId?: string;
       campoValores: { valor: string | null; campo: { id: string; nome: string } }[];
     }): CardKanbanValores {
       const campoValorPorId = new Map(
@@ -535,9 +543,19 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
           } else if (elemento.key === "TELEFONE") {
             const telefone = params.telefoneVirtual ?? telefonesPorEmpresa.get(params.empresaId) ?? null;
             nativos.TELEFONE = telefone ? { status: "ok", valor: telefone } : { status: "vazio" };
+          } else if (elemento.key === "CHECKLIST") {
+            nativos.CHECKLIST = params.cardId
+              ? resumosOperacionais.get(params.cardId)?.checklist ?? { status: "vazio" }
+              : { status: "vazio" };
+          } else if (elemento.key === "CADENCIA") {
+            nativos.CADENCIA = params.cardId
+              ? resumosOperacionais.get(params.cardId)?.cadencia ?? { status: "vazio" }
+              : { status: "vazio" };
+          } else if (elemento.key === "PENDENCIAS") {
+            nativos.PENDENCIAS = params.cardId
+              ? resumosOperacionais.get(params.cardId)?.pendencias ?? { status: "vazio" }
+              : { status: "vazio" };
           } else {
-            // CHECKLIST/CADENCIA/PENDENCIAS: catálogo pronto, projeção ainda não
-            // alimentada nesta entrega — ver relatório de conclusão da RM.
             nativos[elemento.key] = { status: "indisponivel" };
           }
         } else {
@@ -575,6 +593,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
           ? construirValoresCardKanban({
               composicao: composicaoCardKanban,
               empresaId: card.empresa.id,
+              cardId: card.id,
               empresaNome: card.empresa.razaoSocial || card.empresa.nomeFantasia || "",
               cnpj: card.empresa.cnpj,
               campoValores: card.campoValores,
@@ -661,7 +680,9 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
 export async function ObterCardBpm(cardId: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+    if (!session?.user?.id) {
+      return { success: false, error: "NÃO_AUTORIZADO", mensagem: "Você não tem permissão para visualizar este card." };
+    }
     const userId = Number(session.user.id);
 
     const acessoCard = await exigirAcessoBpmCard(
@@ -1091,7 +1112,14 @@ export async function CriarCardBpm(dados: unknown) {
   }
 }
 
-export async function AtualizarCardBpm(dados: unknown) {
+type ResultadoAtualizarCardBpm =
+  | { success: true }
+  | { success: false; error: string | {
+    formErrors: string[];
+    fieldErrors: Record<string, string[] | undefined>;
+  } };
+
+export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualizarCardBpm> {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
@@ -1279,6 +1307,27 @@ export async function AtualizarCardBpm(dados: unknown) {
         );
         if (!validacao.success) throw new Error(`CAMPO_INVALIDO:${validacao.error}`);
         valoresValidados = validacao.valores;
+        // Uma referência de arquivo só é válida depois do upload autenticado
+        // e do registro do anexo neste mesmo card e campo.
+        const referenciasArquivo = camposAplicaveis.filter(
+          (campo) => campo.tipo === "arquivo" && valoresValidados[campo.id],
+        );
+        if (referenciasArquivo.length > 0) {
+          const anexos = await tx.bpmCardAnexo.findMany({
+            where: {
+              cardId,
+              OR: referenciasArquivo.map((campo) => ({
+                id: valoresValidados[campo.id], campoId: campo.id,
+              })),
+            },
+            select: { id: true, campoId: true },
+          });
+          if (referenciasArquivo.some((campo) => !anexos.some(
+            (anexo) => anexo.id === valoresValidados[campo.id] && anexo.campoId === campo.id,
+          ))) {
+            throw new Error("CAMPO_INVALIDO:Arquivo não vinculado a este campo do card.");
+          }
+        }
         if (configuracaoLostAtual) {
           const validacaoLostAtual = validarMotivoLost({
             configuracao: configuracaoLostAtual,
@@ -1303,6 +1352,14 @@ export async function AtualizarCardBpm(dados: unknown) {
         data: { ...campos, updatedAt: new Date() },
       });
       if (atualizacao.count !== 1) throw new Error("CONFLITO_ATUALIZACAO_CARD");
+
+      if (campos.proximoContatoEm !== undefined) {
+        await tx.bpmCardFollowUpEstado.upsert({
+          where: { cardId },
+          create: { cardId, proximoContatoEm: campos.proximoContatoEm },
+          update: { proximoContatoEm: campos.proximoContatoEm },
+        });
+      }
 
       if (camposValores) {
         const idsGlobais = await salvarValoresGlobaisPersonalizadosCampos(cardId, valoresValidados, tx);
@@ -1996,6 +2053,13 @@ async function executarMovimentoLegadoDesativado(
     if (movimento.count !== 1) {
       throw new Error("CONFLITO_MOVIMENTO_CARD");
     }
+    if (proximoContatoEm !== undefined) {
+      await tx.bpmCardFollowUpEstado.upsert({
+        where: { cardId },
+        create: { cardId, proximoContatoEm },
+        update: { proximoContatoEm },
+      });
+    }
     const historicoMovimento = await tx.bpmCardHistorico.create({
       data: {
         cardId,
@@ -2341,62 +2405,8 @@ export async function ListarCardsEmpresaPorPipeline(cardId: string, pipelineId: 
   }
 }
 
-/**
- * Exclui um card do BPM (hard delete) — todos os filhos são removidos em cascade
- * pelo schema Prisma (BpmCardCampoValor, BpmCardMembro, BpmTarefa, BpmCardAnexo,
- * BpmCardHistorico, BpmInteracaoCard, BpmChecklistFollowUp, BpmCardVinculo).
- *
- * Permissão: `excluirCard` — autorizada para card-roles RESPONSAVEL/ADMINISTRADOR
- * e para Admin/CEO/TI global (bypass em `checarAcessoBpmCard`).
- */
-export async function ExcluirCardBpm(cardId: string) {
-  try {
-    const session = await auth();
-    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
-    const userId = Number(session.user.id);
-    const userRole = session.user.role ?? null;
-
-    if (!cardId || typeof cardId !== "string" || cardId.trim().length === 0) {
-      return { success: false, error: "Card inválido" };
-    }
-
-    // Verificação de permissão no servidor (nunca confiar no client)
-    await exigirAcessoBpmCard(cardId, userId, userRole, "excluirCard");
-
-    // Obter pipelineId antes do delete (para notificação/revalidação)
-    const cardAntes = await db.bpmCard.findUnique({
-      where: { id: cardId },
-      select: { pipelineId: true },
-    });
-    if (!cardAntes) return { success: false, error: "Card não encontrado" };
-
-    // Hard delete — cascades no schema cuidam dos filhos
-    await db.$transaction(async (tx) => {
-      // Revalida a permissão dentro da mesma transação para que uma mudança
-      // concorrente na visibilidade da etapa não abra uma janela TOCTOU.
-      await exigirAcessoBpmCard(
-        cardId,
-        userId,
-        userRole,
-        "excluirCard",
-        tx,
-      );
-      await tx.bpmCard.delete({ where: { id: cardId } });
-    });
-
-    // Notificar em tempo real + revalidar cache
-    await notificarPipelineBpm({ pipelineId: cardAntes.pipelineId, cardId, tipo: "CARD_EXCLUIDO" });
-    revalidatePath(`${ROTA_BASE}/pipeline/${cardAntes.pipelineId}`);
-    revalidatePath(ROTA_BASE);
-
-    return { success: true };
-  } catch (error) {
-    console.error("[ExcluirCardBpm]", error);
-    const msg = error instanceof Error && error.message === "Não autorizado"
-      ? "Não autorizado"
-      : "Erro ao excluir card";
-    return { success: false, error: msg };
-  }
-}
 
 export { isAdminRole };
+export async function BuscarEmpresasBpm(termo: string) { return buscarEmpresas(termo); }
+export async function ListarUsuariosResponsavelBpm(pipelineId: string) { return listarResponsaveis(pipelineId); }
+export async function ExcluirCardBpm(cardId: string) { return excluirCard(cardId); }

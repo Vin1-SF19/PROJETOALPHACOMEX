@@ -4,12 +4,13 @@ import { useState } from "react";
 import { X, User, Shield, Briefcase, Calendar, Check } from "lucide-react";
 import { toast } from "sonner";
 import { adicionarColaboradorCoreAction } from "@/actions/colaboradores";
+import type { TemaAlpha } from "@/lib/temas";
 
 
 interface Props {
     isOpen: boolean;
     onClose: () => void;
-    style: any;
+    style: TemaAlpha;
 }
 
 export function ModalAdicionarColaborador({ isOpen, onClose, style }: Props) {

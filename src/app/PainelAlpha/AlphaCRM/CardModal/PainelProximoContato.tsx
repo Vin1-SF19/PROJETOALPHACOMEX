@@ -6,8 +6,8 @@ import { toast } from "sonner";
 import { AtualizarCardBpm, ObterCardBpm } from "@/actions/bpm/Cards";
 import { criarRastreadorRascunho } from "@/lib/bpm/rascunho-versionado";
 import { formatarDataHoraLocalBpm, parseDataHoraLocalBpm } from "@/lib/format-date";
-import { BpmDateTimeField } from "./BpmDateTimeField";
-import { useCardSave } from "./CardSaveContext";
+import { BpmDateTimeField } from "@/app/PainelAlpha/AlphaCRM/CardModal/BpmDateTimeField";
+import { useCardSave } from "@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 
@@ -19,18 +19,20 @@ interface PainelProximoContatoProps {
 }
 
 export function PainelProximoContato({ card, onAtualizado, podeEditar, realtimeRevision }: PainelProximoContatoProps) {
-  const [valor, setValor] = useState(() => formatarDataHoraLocalBpm(card.proximoContatoEm));
+  const { registerSave, scheduleSave, getDraft, setDraft, getVersion } = useCardSave();
+  const draftKey = `${card.id}:proximoContato`;
+  const [valor, setValor] = useState(() => getDraft(draftKey)?.valor ?? formatarDataHoraLocalBpm(card.proximoContatoEm));
   const [salvando, setSalvando] = useState(false);
   const [conflitoRealtime, setConflitoRealtime] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const sujoRef = useRef(false);
+  const sujoRef = useRef(Boolean(getDraft(draftKey)));
   const valorPersistidoRef = useRef(formatarDataHoraLocalBpm(card.proximoContatoEm));
-  const rascunhoRef = useRef(criarRastreadorRascunho(formatarDataHoraLocalBpm(card.proximoContatoEm)));
+  const rascunhoRef = useRef(criarRastreadorRascunho(valor));
   const savesPendentesRef = useRef(0);
-  const { registerSave } = useCardSave();
 
   useEffect(() => {
     const timer = setTimeout(() => {
+      if (!getDraft(draftKey)) sujoRef.current = false;
       if (sujoRef.current) {
         const valorRecebido = formatarDataHoraLocalBpm(card.proximoContatoEm);
         if (valorRecebido !== valorPersistidoRef.current) setConflitoRealtime(true);
@@ -43,7 +45,7 @@ export function PainelProximoContato({ card, onAtualizado, podeEditar, realtimeR
       setConflitoRealtime(false);
     }, 0);
     return () => clearTimeout(timer);
-  }, [card.proximoContatoEm, realtimeRevision]);
+  }, [card.proximoContatoEm, realtimeRevision, draftKey, getDraft]);
 
   async function persistir(proximoContatoEm: string | null) {
     if (!podeEditar) return;
@@ -63,12 +65,14 @@ export function PainelProximoContato({ card, onAtualizado, podeEditar, realtimeR
       const resultado = await AtualizarCardBpm({
         cardId: card.id,
         proximoContatoEm: dataPersistida?.toISOString() ?? null,
+        versaoEsperadaEm: getVersion(card.id, new Date(card.updatedAt).toISOString()),
       });
       if (!resultado.success) {
         toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível atualizar o próximo contato");
         return false;
       }
       valorPersistidoRef.current = snapshot.valor;
+      if (getDraft(draftKey)?.valor === snapshot.valor) setDraft(draftKey);
       if (rascunhoRef.current.corresponde(snapshot)) {
         sujoRef.current = false;
         setConflitoRealtime(false);
@@ -77,7 +81,7 @@ export function PainelProximoContato({ card, onAtualizado, podeEditar, realtimeR
       toast.success(proximoContatoEm ? "Próximo contato atualizado" : "Próximo contato removido");
       onAtualizado();
       return true;
-    }).finally(() => {
+    }, card.id, draftKey).finally(() => {
       savesPendentesRef.current -= 1;
       if (savesPendentesRef.current === 0) setSalvando(false);
     });
@@ -105,7 +109,9 @@ export function PainelProximoContato({ card, onAtualizado, podeEditar, realtimeR
             sujoRef.current = true;
             rascunhoRef.current.alterar(novoValor);
             setValor(novoValor);
+            setDraft(draftKey, { valor: novoValor });
             setErro(null);
+            scheduleSave(`${card.id}:proximoContato`, () => void persistir(novoValor || null), 0);
           }}
           onCommit={(novoValor) => void persistir(novoValor || null)}
         />

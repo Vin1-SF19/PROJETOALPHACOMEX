@@ -109,14 +109,14 @@ export default function ModalCurso({ isOpen, onClose }: { isOpen: boolean; onClo
         }
     }, [isOpen]);
 
-    const fetchDados = async () => {
+    async function fetchDados() {
         const [cursosData, modulosData] = await Promise.all([
             getAllCursos(),
             getModulos(),
         ]);
         setCursos(cursosData as CursoItem[]);
         setModulos(modulosData as ModuloItem[]);
-    };
+    }
 
     const resetForm = () => {
         setEditandoId(null);

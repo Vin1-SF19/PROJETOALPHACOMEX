@@ -66,19 +66,18 @@ export default function SecaoUpload({ onSuccess }: { onSuccess: () => void }) {
     const [buscaSingle, setBuscaSingle] = useState("");
     const [buscaLote, setBuscaLote] = useState("");
 
-    const fetchModulos = async () => {
-        const data = await getModulos();
-        const mapped = (data as any[]).map((m) => ({
-            id: m.id,
-            nome: m.nome,
-            setor: m.setor,
-            cursoNome: m.cursos?.[0]?.curso?.nome ?? null,
-        }));
-        setModulosDisponiveis(mapped);
-    };
-
     useEffect(() => {
-        fetchModulos();
+        let ativo = true;
+        void getModulos().then((data) => {
+            if (!ativo) return;
+            setModulosDisponiveis(data.map((m) => ({
+                id: m.id,
+                nome: m.nome,
+                setor: m.setor,
+                cursoNome: m.cursos?.[0]?.curso?.nome ?? null,
+            })));
+        });
+        return () => { ativo = false; };
     }, [modalModuloOpen]);
 
     const modulosFiltradosSingle = useMemo(() =>

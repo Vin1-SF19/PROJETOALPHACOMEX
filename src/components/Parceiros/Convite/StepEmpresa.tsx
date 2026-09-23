@@ -15,6 +15,8 @@ const respCompleto = (r: RepresentanteExtra) =>
   r.nome.trim().length >= 2 && r.cpf.replace(/\D/g, "").length === 11 && !!r.dataNascimento;
 
 interface Props {
+  token: string;
+  pin: string;
   cnpj: string;
   razaoSocial: string;
   nomeFantasia: string;
@@ -39,7 +41,7 @@ interface Props {
 }
 
 export default function StepEmpresa({
-  cnpj, razaoSocial, nomeFantasia, sobre, souRepresentante, representantesExtra, cpf, dataNascimento, onChange, onBack, onNext,
+  token, pin, cnpj, razaoSocial, nomeFantasia, sobre, souRepresentante, representantesExtra, cpf, dataNascimento, onChange, onBack, onNext,
 }: Props) {
   const [buscando, setBuscando] = useState(false);
   const [erroBusca, setErroBusca] = useState<string | null>(null);
@@ -55,7 +57,11 @@ export default function StepEmpresa({
     setErroBusca(null);
     setBuscando(true);
     try {
-      const r = await fetch(`/api/ReceitaFederal?cnpj=${cnpjLimpo}`);
+      const r = await fetch("/api/convite/consulta-cnpj", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, pin, cnpj: cnpjLimpo }),
+      });
       const d = await r.json();
       if (!r.ok || d.error) {
         setErroBusca(d.error || "Não foi possível buscar os dados do CNPJ");

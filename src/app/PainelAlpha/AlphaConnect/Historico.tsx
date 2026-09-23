@@ -6,21 +6,29 @@ import { X, Download, FileSpreadsheet, Clock, Trash2, Loader2 } from "lucide-rea
 import { getHistoricoPlanilhas, baixarPlanilhaDoBanco, excluirPlanilhaBanco } from "@/actions/HistoricoPlanilhaFiscal";
 import { saveAs } from "file-saver";
 import { toast } from "sonner";
+import type { historico_planilha_fiscal } from "@prisma/client";
+
+type HistoricoPlanilha = Pick<historico_planilha_fiscal, "id" | "nome" | "data">;
 
 export function ModalHistorico({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
-    const [lista, setLista] = useState<any[]>([]);
+    const [lista, setLista] = useState<HistoricoPlanilha[]>([]);
     const [carregando, setCarregando] = useState(false);
     const [processandoId, setProcessandoId] = useState<number | null>(null);
 
     const carregarHistorico = async () => {
         setCarregando(true);
         const res = await getHistoricoPlanilhas();
-        setLista(res);
+        setLista(res as HistoricoPlanilha[]);
         setCarregando(false);
     };
 
     useEffect(() => {
-        if (isOpen) carregarHistorico();
+        if (!isOpen) return;
+        let active = true;
+        queueMicrotask(() => {
+            if (active) void carregarHistorico();
+        });
+        return () => { active = false; };
     }, [isOpen]);
 
     const handleDownload = async (id: number) => {

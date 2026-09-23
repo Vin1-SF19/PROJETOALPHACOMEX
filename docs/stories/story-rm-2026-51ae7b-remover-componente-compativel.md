@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress — fase 3 implementada localmente; gates globais falharam e aceite funcional autenticado permanece pendente.
+Pronta para testes — implementação preexistente revisada e cobertura React adicionada nesta retomada.
 
 - Projeto: Painel Alpha / Alpha CRM. Data: 2026-09-22.
 - Responsável pela fase: Nova, por atribuição explícita do pipeline.
@@ -112,3 +112,23 @@ Gates executados:
 - Build/Forge, Probe e revisão Lens não executados nesta fase; pendentes junto do aceite autenticado. Não há aprovação técnica global.
 
 Evidências locais: .roadmap-worker/rm-2026-51ae7b-phase3/{implementation.diff,lint.log,typecheck.log,test.log,focused.log,localLint.log}. O diff registra exclusivamente a alteração desta sessão sobre o working tree anterior. RESULT: FAIL por gates de qualidade, com implementação local concluída.
+
+## Retomada terminal 4/10 — 2026-09-22
+
+O código de produção que remove o seletor já estava no `HEAD` pelo commit
+`e51d88c9`; ele foi revisado, não reescrito nesta retomada. O trabalho novo foi:
+
+- [x] Adicionar teste React comprovando a ausência do texto/seletor acessível
+      “Adicionar componente compatível”.
+- [x] Comprovar no mesmo teste que “Adicionar campo aplicável” permanece e
+      “Criar novo campo” ainda abre o diálogo correto.
+- [x] Seis suítes focadas: 59/59 testes aprovados.
+- [x] ESLint do workspace e do teste React: aprovado.
+- [x] Typecheck completo: aprovado.
+- [ ] Navegação autenticada permanece para homologação.
+
+Arquivo realmente alterado nesta retomada além desta story:
+`tests/bpm/pipeline-editor-react.test.ts`.
+
+Resultado do desenvolvimento: **PASS no escopo**. Objetivo liberado para **Em
+testes** e objetivo 5/10 autorizado a iniciar.

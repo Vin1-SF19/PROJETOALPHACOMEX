@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ClipboardCheck, Loader2, Search, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ClipboardCheck, Loader2, X } from "lucide-react";
 import { BuscarEmpresasBpm, ListarUsuariosResponsavelBpm } from "@/actions/bpm/Cards";
 import { formatCNPJ, formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";
 
@@ -61,17 +61,24 @@ export default function NovoCardModal({
   onClose,
   onCriado,
 }: Props) {
-  const [buscaEmpresa, setBuscaEmpresa] = useState("");
-  const [empresas, setEmpresas] = useState<EmpresaOpcao[]>([]);
+  const [form, setForm] = useState<NovaEmpresaForm>(NOVA_EMPRESA_VAZIA);
   const [empresaSelecionada, setEmpresaSelecionada] = useState<EmpresaOpcao | null>(null);
+  const [empresasSugestoes, setEmpresasSugestoes] = useState<EmpresaOpcao[]>([]);
+  const [dropdownAberto, setDropdownAberto] = useState(false);
   const [usuarios, setUsuarios] = useState<UsuarioOpcao[]>([]);
   const [responsavelId, setResponsavelId] = useState<number | null>(currentUserId);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
-  const [modoCadastro, setModoCadastro] = useState(false);
-  const [novaEmpresa, setNovaEmpresa] = useState<NovaEmpresaForm>(NOVA_EMPRESA_VAZIA);
   const [buscandoCnpj, setBuscandoCnpj] = useState(false);
   const [erroBuscaCnpj, setErroBuscaCnpj] = useState<string | null>(null);
+  const cnpjRequest = useRef(0);
+
+  function cancelarBuscaCnpj() {
+    cnpjRequest.current += 1;
+    setBuscandoCnpj(false);
+  }
+
+  useEffect(() => () => { cnpjRequest.current += 1; }, []);
 
   useEffect(() => {
     const fecharComEscape = (evento: KeyboardEvent) => {
@@ -92,63 +99,99 @@ export default function NovoCardModal({
     });
   }, [pipelineId]);
 
+  // Autocomplete de Razão Social → busca empresas existentes
   useEffect(() => {
+    let active = true;
     const timeout = setTimeout(() => {
-      if (buscaEmpresa.trim().length >= 2) {
-        BuscarEmpresasBpm(buscaEmpresa).then((res) => {
-          if (res.success && res.data) setEmpresas(res.data);
+      const termo = form.razaoSocial.trim();
+      if (termo.length >= 2 && !empresaSelecionada) {
+        BuscarEmpresasBpm(termo).then((res) => {
+          if (!active) return;
+          if (res.success && res.data) {
+            setEmpresasSugestoes(res.data);
+            setDropdownAberto(res.data.length > 0);
+          } else {
+            setEmpresasSugestoes([]);
+            setDropdownAberto(false);
+          }
         });
       } else {
-        setEmpresas([]);
+        setEmpresasSugestoes([]);
+        setDropdownAberto(false);
       }
     }, 300);
-    return () => clearTimeout(timeout);
-  }, [buscaEmpresa]);
+    return () => { active = false; clearTimeout(timeout); };
+  }, [form.razaoSocial, empresaSelecionada]);
 
-  async function buscarCnpjReceita() {
-    const cnpjLimpo = normalizarCNPJ(novaEmpresa.cnpj);
-    if (cnpjLimpo.length !== 14) {
-      setErroBuscaCnpj("Informe um CNPJ válido (14 dígitos)");
-      return;
-    }
+  // Auto-buscar CNPJ na Receita Federal quando 14 dígitos completos
+  async function buscarCnpjReceita(cnpjValor: string, requestId: number) {
+    const cnpjLimpo = normalizarCNPJ(cnpjValor);
+    if (cnpjLimpo.length !== 14) return;
     setErroBuscaCnpj(null);
     setBuscandoCnpj(true);
     try {
       const resposta = await fetch(`/api/ReceitaFederal?cnpj=${cnpjLimpo}`);
       const dados = await resposta.json();
+      if (requestId !== cnpjRequest.current) return;
       if (!resposta.ok || dados.error) {
         setErroBuscaCnpj(dados.error || "Não foi possível buscar os dados do CNPJ");
         return;
       }
-      setNovaEmpresa((anterior) => ({
+      setForm((anterior) => ({
         ...anterior,
         razaoSocial: dados.razaoSocial || anterior.razaoSocial,
         nomeFantasia: dados.nomeFantasia || anterior.nomeFantasia,
         uf: dados.uf || anterior.uf,
         municipio: dados.municipio || anterior.municipio,
       }));
+      setEmpresaSelecionada(null);
     } catch {
-      setErroBuscaCnpj("Erro ao buscar CNPJ. Tente novamente.");
+      if (requestId === cnpjRequest.current)
+        setErroBuscaCnpj("Erro ao buscar CNPJ. Tente novamente.");
     } finally {
-      setBuscandoCnpj(false);
+      if (requestId === cnpjRequest.current) setBuscandoCnpj(false);
     }
+  }
+
+  // Handler do input CNPJ: auto-busca ao completar 14 dígitos
+  function handleCnpjChange(valor: string) {
+    cancelarBuscaCnpj();
+    const cnpjLimpo = normalizarCNPJ(valor);
+    setForm((anterior) => ({ ...anterior, cnpj: cnpjLimpo }));
+    setEmpresaSelecionada(null);
+    if (cnpjLimpo.length === 14) {
+      void buscarCnpjReceita(cnpjLimpo, cnpjRequest.current);
+    }
+  }
+
+  // Selecionar empresa do dropdown
+  function selecionarEmpresa(empresa: EmpresaOpcao) {
+    cancelarBuscaCnpj();
+    setEmpresaSelecionada(empresa);
+    setForm((anterior) => ({
+      ...anterior,
+      cnpj: empresa.cnpj ? normalizarCNPJ(empresa.cnpj) : anterior.cnpj,
+      razaoSocial: empresa.razaoSocial,
+      nomeFantasia: empresa.nomeFantasia || "",
+      municipio: "",
+      uf: "",
+    }));
+    setEmpresasSugestoes([]);
+    setDropdownAberto(false);
   }
 
   async function handleSalvar() {
     setErro(null);
 
-    if (modoCadastro) {
-      if (normalizarCNPJ(novaEmpresa.cnpj).length !== 14) {
+    if (!empresaSelecionada) {
+      if (normalizarCNPJ(form.cnpj).length !== 14) {
         setErro("Informe um CNPJ válido (14 dígitos).");
         return;
       }
-      if (!novaEmpresa.razaoSocial.trim()) {
+      if (!form.razaoSocial.trim()) {
         setErro("Informe a razão social da empresa.");
         return;
       }
-    } else if (!empresaSelecionada) {
-      setErro("Selecione uma empresa — todo card precisa estar vinculado a uma empresa.");
-      return;
     }
     if (!responsavelId) {
       setErro("Selecione um responsável.");
@@ -158,17 +201,17 @@ export default function NovoCardModal({
     setSalvando(true);
     try {
       const resultado = await onCriado({
-        ...(modoCadastro
-          ? {
+        ...(empresaSelecionada
+          ? { empresaId: empresaSelecionada.id }
+          : {
               novaEmpresa: {
-                cnpj: normalizarCNPJ(novaEmpresa.cnpj),
-                razaoSocial: novaEmpresa.razaoSocial.trim(),
-                nomeFantasia: novaEmpresa.nomeFantasia.trim() || undefined,
-                uf: novaEmpresa.uf.trim() || undefined,
-                municipio: novaEmpresa.municipio.trim() || undefined,
+                cnpj: normalizarCNPJ(form.cnpj),
+                razaoSocial: form.razaoSocial.trim(),
+                nomeFantasia: form.nomeFantasia.trim() || undefined,
+                uf: form.uf.trim() || undefined,
+                municipio: form.municipio.trim() || undefined,
               },
-            }
-          : { empresaId: empresaSelecionada!.id }),
+            }),
         pipelineId,
         etapaId,
         responsavelId,
@@ -208,51 +251,89 @@ export default function NovoCardModal({
           </section>
 
           <FieldRow label="Empresa *" htmlFor="novo-card-empresa">
-            {modoCadastro ? (
-              <div className="space-y-2 rounded-xl border border-white/10 bg-slate-800/60 p-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Cadastrar empresa nova</span>
-                  <button type="button" onClick={() => { setModoCadastro(false); setNovaEmpresa(NOVA_EMPRESA_VAZIA); setErroBuscaCnpj(null); }} className="text-xs text-slate-400 hover:text-white">Buscar existente</button>
-                </div>
-                <div className="flex gap-2">
-                  <input id="novo-card-empresa" autoFocus aria-label="CNPJ" inputMode="numeric" maxLength={18} className={`${inputCls} font-mono`} placeholder="00.000.000/0000-00" value={formatarCNPJProgressivo(novaEmpresa.cnpj)} onChange={(e) => setNovaEmpresa((anterior) => ({ ...anterior, cnpj: normalizarCNPJ(e.target.value) }))} />
-                  <button type="button" aria-label="Buscar CNPJ" onClick={buscarCnpjReceita} disabled={buscandoCnpj} className="h-9 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white shrink-0 transition-all disabled:opacity-50 flex items-center justify-center">
-                    {buscandoCnpj ? <Loader2 size={14} aria-hidden="true" className="animate-spin" /> : <Search size={14} aria-hidden="true" />}
-                  </button>
-                </div>
-                {erroBuscaCnpj && <p role="alert" className="text-[11px] text-rose-400">{erroBuscaCnpj}</p>}
-                <input aria-label="Razão social" className={inputCls} placeholder="Razão social *" value={novaEmpresa.razaoSocial} onChange={(e) => setNovaEmpresa((anterior) => ({ ...anterior, razaoSocial: e.target.value }))} />
-                <input aria-label="Nome fantasia" className={inputCls} placeholder="Nome fantasia" value={novaEmpresa.nomeFantasia} onChange={(e) => setNovaEmpresa((anterior) => ({ ...anterior, nomeFantasia: e.target.value }))} />
-                <div className="grid grid-cols-3 gap-2">
-                  <input aria-label="Município" className={`${inputCls} col-span-2`} placeholder="Município" value={novaEmpresa.municipio} onChange={(e) => setNovaEmpresa((anterior) => ({ ...anterior, municipio: e.target.value }))} />
-                  <input aria-label="UF" className={inputCls} placeholder="UF" maxLength={2} value={novaEmpresa.uf} onChange={(e) => setNovaEmpresa((anterior) => ({ ...anterior, uf: e.target.value.toUpperCase() }))} />
-                </div>
+            <div className="space-y-2 rounded-xl border border-white/10 bg-slate-800/60 p-3">
+              {/* CNPJ — auto-busca na Receita Federal ao completar 14 dígitos */}
+              <div className="flex gap-2">
+                <input
+                  id="novo-card-empresa"
+                  autoFocus
+                  aria-label="CNPJ"
+                  inputMode="numeric"
+                  maxLength={18}
+                  className={`${inputCls} font-mono`}
+                  placeholder="00.000.000/0000-00"
+                  value={formatarCNPJProgressivo(form.cnpj)}
+                  onChange={(e) => handleCnpjChange(e.target.value)}
+                />
+                {buscandoCnpj && (
+                  <span className="flex items-center px-2">
+                    <Loader2 size={14} aria-hidden="true" className="animate-spin text-blue-400" />
+                  </span>
+                )}
               </div>
-            ) : empresaSelecionada ? (
-              <div className="flex items-center justify-between bg-slate-800 border border-white/10 rounded-xl px-3 py-2">
-                <span className="text-sm text-white">{empresaSelecionada.nomeFantasia || empresaSelecionada.razaoSocial}</span>
-                <button type="button" onClick={() => setEmpresaSelecionada(null)} className="text-xs text-slate-400 hover:text-white">Trocar</button>
-              </div>
-            ) : (
+              {erroBuscaCnpj && <p role="alert" className="text-[11px] text-rose-400">{erroBuscaCnpj}</p>}
+
+              {/* Razão Social — autocomplete de empresas existentes */}
               <div className="relative">
-                <input id="novo-card-empresa" autoFocus className={inputCls} placeholder="Buscar por nome ou CNPJ..." value={buscaEmpresa} onChange={(e) => setBuscaEmpresa(e.target.value)} />
-                {empresas.length > 0 && (
-                  <div className="absolute z-10 top-full mt-1 w-full bg-slate-800 border border-white/10 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
-                    {empresas.map((empresa) => (
-                      <button key={empresa.id} type="button" onClick={() => { setEmpresaSelecionada(empresa); setEmpresas([]); setBuscaEmpresa(""); }} className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-white/5">
+                <input
+                  aria-label="Razão social"
+                  className={inputCls}
+                  placeholder="Razão social *"
+                  value={form.razaoSocial}
+                  onChange={(e) => {
+                    cancelarBuscaCnpj();
+                    setForm((anterior) => ({ ...anterior, razaoSocial: e.target.value }));
+                    setEmpresaSelecionada(null);
+                  }}
+                  onFocus={() => {
+                    if (empresasSugestoes.length > 0) setDropdownAberto(true);
+                  }}
+                />
+                {dropdownAberto && empresasSugestoes.length > 0 && (
+                  <div className="absolute z-10 top-full mt-1 w-full bg-slate-800 border border-white/10 rounded-xl overflow-hidden max-h-48 overflow-y-auto shadow-lg">
+                    {empresasSugestoes.map((empresa) => (
+                      <button
+                        key={empresa.id}
+                        type="button"
+                        onClick={() => selecionarEmpresa(empresa)}
+                        className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-white/5"
+                      >
                         {empresa.nomeFantasia || empresa.razaoSocial}
                         <span className="block text-[10px] text-slate-500">{formatCNPJ(empresa.cnpj) ?? empresa.cnpj}</span>
                       </button>
                     ))}
                   </div>
                 )}
-                {buscaEmpresa.trim().length >= 2 && empresas.length === 0 && (
-                  <button type="button" onClick={() => { setModoCadastro(true); setNovaEmpresa((anterior) => ({ ...anterior, razaoSocial: buscaEmpresa })); setBuscaEmpresa(""); }} className="mt-1.5 w-full text-left px-3 py-2 rounded-xl text-xs text-blue-400 hover:bg-blue-500/10 border border-dashed border-blue-500/30">
-                    Não encontrada — cadastrar empresa nova
-                  </button>
-                )}
               </div>
-            )}
+
+              {/* Nome Fantasia */}
+              <input
+                aria-label="Nome fantasia"
+                className={inputCls}
+                placeholder="Nome fantasia"
+                value={form.nomeFantasia}
+                onChange={(e) => { cancelarBuscaCnpj(); setForm((anterior) => ({ ...anterior, nomeFantasia: e.target.value })); }}
+              />
+
+              {/* Município + UF */}
+              <div className="grid grid-cols-3 gap-2">
+                <input
+                  aria-label="Município"
+                  className={`${inputCls} col-span-2`}
+                  placeholder="Município"
+                  value={form.municipio}
+                  onChange={(e) => { cancelarBuscaCnpj(); setForm((anterior) => ({ ...anterior, municipio: e.target.value })); }}
+                />
+                <input
+                  aria-label="UF"
+                  className={inputCls}
+                  placeholder="UF"
+                  maxLength={2}
+                  value={form.uf}
+                  onChange={(e) => { cancelarBuscaCnpj(); setForm((anterior) => ({ ...anterior, uf: e.target.value.toUpperCase() })); }}
+                />
+              </div>
+            </div>
           </FieldRow>
 
           <FieldRow label="Responsável *" htmlFor="novo-card-responsavel">

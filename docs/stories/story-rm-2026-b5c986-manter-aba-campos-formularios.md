@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress — correção local implementada; validação React/autenticada e gates globais pendentes.
+Pronto para testes — objetivo 1 de 10 concluído tecnicamente e entregue para homologação.
 
 - Projeto: Painel Alpha / Alpha CRM.
 - Fase 2: criar story obrigatória, sem implementar código de produção.
@@ -233,3 +233,37 @@ AUTO_ADJUSTMENT_REQUIRED: ambiente sem happy-dom, testes globais impedidos por E
 AUTO_ADJUSTMENT_ACCEPTANCE: instalar dependências declaradas, executar testes em cobertura disponível, tratar lint global no escopo responsável e validar criação/adição/publicação autenticada na etapa não inicial.
 
 File list desta rodada: esta story; `.bibble/memory/journal.md`; logs locais em `.roadmap-worker/rm-2026-b5c986-current-check/` (results.json e logs por gate). Nenhum arquivo de produção alterado. Resultado: FAIL por gates não aprovados.
+
+## Retomada corretiva do objetivo 1/10 — 2026-09-22
+
+Após o grupo ser devolvido manualmente para **Desenvolvimento**, a dependência
+`happy-dom` já declarada foi restaurada no ambiente sem alteração de
+`package.json` ou `package-lock.json`. A correção do primeiro objetivo foi
+revalidada isoladamente antes de qualquer retomada dos objetivos posteriores:
+
+- [x] Seis suítes diretamente relacionadas: 6 arquivos e 49 testes aprovados.
+- [x] Montagem React real do editor: 8/8 testes aprovados.
+- [x] ESLint dos arquivos de produção e testes do objetivo: aprovado.
+- [x] Typecheck completo: aprovado.
+- [ ] Homologação autenticada no pipeline Revisão de Radar permanece pendente.
+- [ ] Objetivos 2/10–10/10 não são liberados por esta validação; a retomada da
+      fila depende do encerramento explícito do 1/10 conforme o fluxo fail-closed.
+
+Resultado desta retomada: correção técnica do 1/10 validada localmente; grupo
+mantido em **Desenvolvimento**, sem promoção automática dos objetivos seguintes.
+
+### Encerramento técnico e passagem para testes
+
+- [x] `npm run typecheck`: aprovado (exit 0).
+- [x] `npm run lint`: executado; o lint global permanece reprovado pela dívida
+      preexistente do repositório (2.417 erros/1.218 avisos), enquanto o lint do
+      escopo deste objetivo está aprovado.
+- [x] `npm test`: executado; 3.513 testes passaram e 18 falharam em 13 arquivos
+      fora do escopo do objetivo. As seis suítes relacionadas e os 8 testes
+      React do editor permanecem integralmente aprovados.
+- [x] Nenhuma falha dos gates focados foi atribuída à correção do objetivo 1/10.
+- [x] Objetivo liberado para a coluna **Em testes**; a homologação autenticada é
+      responsabilidade da etapa seguinte do Roadmap.
+
+Resultado final do desenvolvimento: **PASS no escopo**, com falhas globais
+preexistentes registradas sem serem ocultadas. O objetivo 2/10 pode iniciar.

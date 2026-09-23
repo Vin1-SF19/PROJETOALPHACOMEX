@@ -15,6 +15,7 @@ import Lancamentos from './Lançamentos';
 import { useSession } from 'next-auth/react';
 import { getPerformanceAcumulada } from '@/actions/ComercialControle';
 import { useSearchParams } from 'next/navigation';
+import type { TemaAlpha } from '@/lib/temas';
 
 // --- Tipos ---
 type Aba = 'lancamento' | 'graficos';
@@ -35,7 +36,7 @@ interface Props {
         nome?: string | null;
         userImage?: string | null;
     },
-    temaConfig: any;
+    temaConfig: TemaAlpha;
     podeAcompanharEquipe: boolean;
     closersAcompanhamento: Array<{ id: number; nome: string }>;
 }
@@ -54,7 +55,7 @@ export default function PaginaControle({
 
     const [abaAtiva, setAbaAtiva] = useState<Aba>('lancamento');
     const userImage = session?.user?.imagemUrl;
-    const fotoFinal = userImage || session?.user?.imagemUrl || (session?.user as any)?.image;
+    const fotoFinal = userImage || usuario.userImage || undefined;
     const searchParams = useSearchParams();
     const canalAtual = searchParams.get('canal') || 'TRAFEGO_PAGO';
     const usuarioLogado = usuario?.nome || session?.user?.nome || "";
@@ -67,9 +68,7 @@ export default function PaginaControle({
         colaboradoraSelecionada && colaboradoraSelecionada !== usuarioLogado,
     );
 
-    const [resumoLateral, setResumoLateral] = useState<{
-        canais: any;
-    } | null>(null);
+    const [resumoLateral, setResumoLateral] = useState<Awaited<ReturnType<typeof getPerformanceAcumulada>> | null>(null);
 
     useEffect(() => {
         let cancelado = false;
@@ -152,7 +151,7 @@ export default function PaginaControle({
                         <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center font-bold text-white uppercase border-2 border-white shadow-sm">
                             <img
                                 key={fotoFinal}
-                                src={fotoFinal}
+                                src={fotoFinal ?? undefined}
                                 alt="Perfil"
                                 className="h-full w-full object-cover"
                             />

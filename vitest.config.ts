@@ -19,6 +19,8 @@ export default defineConfig({
         "src/lib/cs-nps/importar-dados.ts",
         "src/lib/cs-nps/preflight-xlsx.ts",
         "src/app/PainelAlpha/CadastroClientes/importacao/calculos.ts",
+        "src/actions/bpm/**/*.ts",
+        "src/lib/bpm/**/*.ts",
       ],
     },
   },

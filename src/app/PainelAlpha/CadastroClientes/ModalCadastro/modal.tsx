@@ -162,7 +162,7 @@ export default function ModalCadastroCliente({ isOpen, onClose }: { isOpen: bool
 
     if (!isOpen) return null;
 
-    const ModalDuplicata = () => (
+    const modalDuplicataContent = (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm">
             <CsNpsModal3DShell className="relative bg-[#0b1220] border border-amber-500/30 rounded-[2rem] p-8 max-w-sm w-full mx-4 shadow-2xl shadow-amber-900/20">
                 <div className="flex flex-col items-center text-center gap-4">
@@ -200,7 +200,7 @@ export default function ModalCadastroCliente({ isOpen, onClose }: { isOpen: bool
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-            {modalDuplicata.aberto && <ModalDuplicata />}
+            {modalDuplicata.aberto && modalDuplicataContent}
             <CsNpsModal3DShell className="bg-[#0b1220] border border-white/10 w-full max-w-5xl max-h-[95vh] overflow-y-auto rounded-[2.5rem] shadow-2xl relative custom-scrollbar">
 
                 {/* HEADER */}

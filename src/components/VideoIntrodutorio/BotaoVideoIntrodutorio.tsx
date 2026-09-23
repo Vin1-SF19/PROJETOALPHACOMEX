@@ -31,14 +31,16 @@ interface BotaoVideoIntrodutorioProps {
  */
 export function BotaoVideoIntrodutorio({ modulo, isAdmin, configInicial, aoAlternarModal, abrirAutomaticamente }: BotaoVideoIntrodutorioProps) {
   const router = useRouter();
-  const [modalOpen, setModalOpen] = useState(false);
+  const [modalOverride, setModalOverride] = useState<{ abrirAutomaticamente: boolean; aberto: boolean } | null>(null);
+  const modalOpen = modalOverride?.abrirAutomaticamente === Boolean(abrirAutomaticamente)
+    ? modalOverride.aberto
+    : Boolean(abrirAutomaticamente);
   const config = configInicial;
 
   const visivelParaNaoAdmin = !!config && !config.expirado;
 
   useEffect(() => {
     if (!abrirAutomaticamente) return;
-    setModalOpen(true);
     aoAlternarModal?.(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [abrirAutomaticamente]);
@@ -46,12 +48,12 @@ export function BotaoVideoIntrodutorio({ modulo, isAdmin, configInicial, aoAlter
   if (!isAdmin && !visivelParaNaoAdmin) return null;
 
   const abrirModal = () => {
-    setModalOpen(true);
+    setModalOverride({ abrirAutomaticamente: Boolean(abrirAutomaticamente), aberto: true });
     aoAlternarModal?.(true);
   };
 
   const fecharModal = () => {
-    setModalOpen(false);
+    setModalOverride({ abrirAutomaticamente: Boolean(abrirAutomaticamente), aberto: false });
     aoAlternarModal?.(false);
   };
 

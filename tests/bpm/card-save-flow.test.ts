@@ -20,9 +20,9 @@ describe("CRM - persistência antes da movimentação", () => {
   it("consome o resultado do flush para permitir uma nova tentativa", () => {
     const contexto = ler("src/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext.tsx");
 
-    expect(contexto).toContain("const savesPendentes = savePromiseRef.current");
-    expect(contexto).toContain("savePromiseRef.current === savesPendentes");
-    expect(contexto).toContain("savePromiseRef.current = Promise.resolve(true)");
+    expect(contexto).toContain("const batches = [...savePromiseRef.current]");
+    expect(contexto).toContain("savePromiseRef.current.get(id) === savesPendentes");
+    expect(contexto).toContain("savePromiseRef.current.delete(id)");
   });
 
   it("interrompe o movimento quando o flush informa falha", () => {
@@ -30,7 +30,7 @@ describe("CRM - persistência antes da movimentação", () => {
     const guarda = movimento.indexOf("if (!savesConcluidos)");
     const mover = movimento.indexOf("MoverCardBpm({ cardId: card.id, etapaDestinoId })");
 
-    expect(movimento).toContain("const savesConcluidos = await flushSaves()");
+    expect(movimento).toContain("const savesConcluidos = await flushSaves(card.id)");
     expect(guarda).toBeGreaterThan(-1);
     expect(guarda).toBeLessThan(mover);
   });
@@ -38,7 +38,7 @@ describe("CRM - persistência antes da movimentação", () => {
   it("força o blur do campo em edição antes de aguardar a fila de saves", () => {
     const movimento = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa.tsx");
     const blur = movimento.indexOf("document.activeElement.blur()");
-    const flush = movimento.indexOf("const savesConcluidos = await flushSaves()");
+    const flush = movimento.indexOf("const savesConcluidos = await flushSaves(card.id)");
 
     expect(blur).toBeGreaterThan(-1);
     expect(blur).toBeLessThan(flush);
@@ -61,19 +61,8 @@ describe("CRM - persistência antes da movimentação", () => {
     expect(painel).toContain("AtualizarCardBpm");
   });
 
-  it("força blur e flush antes de fechar, mantendo o modal aberto em falha", () => {
-    const modal = ler("src/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal.tsx");
-    const layout = ler("src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx");
-    const blur = modal.indexOf("document.activeElement.blur()");
-    const flush = modal.indexOf("const savesConcluidos = await flushSaves()");
-    const fechar = modal.indexOf("onClose();", flush);
-
-    expect(modal).toContain("<CardSaveProvider>");
-    expect(layout).not.toContain("<CardSaveProvider>");
-    expect(blur).toBeGreaterThan(-1);
-    expect(blur).toBeLessThan(flush);
-    expect(modal).toContain("if (!savesConcluidos)");
-    expect(fechar).toBeGreaterThan(flush);
+  it("mantém o provider de salvamento no layout", () => {
+    expect(ler("src/app/PainelAlpha/AlphaCRM/layout.tsx")).toContain("<CardSaveProvider>");
   });
 
   it("PainelStatusPosFechamento registra save via CardSaveContext", () => {

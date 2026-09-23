@@ -1,0 +1,22 @@
+{
+  "lint": {
+    "command": "npm run lint",
+    "exitCode": 1
+  },
+  "typecheck": {
+    "command": "npm run typecheck",
+    "exitCode": 0
+  },
+  "test": {
+    "command": "npm test",
+    "exitCode": 1
+  },
+  "focused": {
+    "command": "npx vitest run tests/bpm/cpf-fechamento-react.test.ts tests/bpm/cpf-pendencias-react.test.ts tests/bpm/edicao-campos-card.test.ts tests/bpm/arquivo-persistencia-react.test.ts tests/bpm/autosave-recovery-react.test.ts tests/bpm/autosave-fixed-recovery-react.test.ts tests/bpm/card-save-flow.test.ts tests/bpm/rascunho-data-hora.test.ts",
+    "exitCode": 0
+  },
+  "scope-lint": {
+    "command": "npx eslint tests/bpm/cpf-fechamento-react.test.ts tests/bpm/cpf-pendencias-react.test.ts tests/bpm/edicao-campos-card.test.ts tests/bpm/arquivo-persistencia-react.test.ts tests/bpm/autosave-recovery-react.test.ts tests/bpm/autosave-fixed-recovery-react.test.ts tests/bpm/card-save-flow.test.ts tests/bpm/rascunho-data-hora.test.ts",
+    "exitCode": 0
+  }
+}

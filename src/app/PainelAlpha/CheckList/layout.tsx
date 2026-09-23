@@ -9,7 +9,7 @@ export default async function CheckListLayout({
   children: React.ReactNode;
 }) {
   const session = await auth();
-  const userId = Number((session?.user as any)?.id ?? 0);
+  const userId = Number(session?.user?.id ?? 0);
 
   const userDb = userId
     ? await db.usuarios.findUnique({

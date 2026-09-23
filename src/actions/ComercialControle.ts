@@ -97,7 +97,22 @@ export async function getPerformanceColaborador(colaboradoraId: string, data: Da
   }
 }
 
-export async function upsertPerformance(dados: any) {
+const PerformanceInputSchema = z.object({
+  dataRegistro: z.coerce.date(),
+  canal: z.string().min(1),
+  servico: z.string().min(1),
+  leadsRecebidos: z.unknown().optional(),
+  leadsDesqualificados: z.unknown().optional(),
+  reunioesAgendadas: z.unknown().optional(),
+  reunioesRealizadas: z.unknown().optional(),
+  noShow: z.unknown().optional(),
+  contratosHabilitacao: z.unknown().optional(),
+  contratosRevisao: z.unknown().optional(),
+  HotLeadsHabilitacao: z.unknown().optional(),
+  HotLeadsRevisao: z.unknown().optional(),
+});
+
+export async function upsertPerformance(entrada: unknown) {
   try {
     const session = await auth();
     const u = session?.user as { nome?: string; usuario?: string } | undefined;
@@ -106,7 +121,8 @@ export async function upsertPerformance(dados: any) {
       return { success: false, error: "Usuário não autenticado." };
     }
 
-    const dataNormalizada = startOfDay(new Date(dados.dataRegistro));
+    const dados = PerformanceInputSchema.parse(entrada);
+    const dataNormalizada = startOfDay(dados.dataRegistro);
 
     const registro = await db.comercialPerformance.upsert({
       where: {
@@ -222,7 +238,7 @@ export async function getPerformanceAcumulada(colaboradoraId: string, mes: numbe
       }
     });
 
-    const soma = (regs: any[]) => regs.reduce((acc, reg) => ({
+    const soma = (regs: typeof registrosMes) => regs.reduce((acc, reg) => ({
       leads: acc.leads + contagem(reg.leadsRecebidos),
       leadsDesqualificados: acc.leadsDesqualificados + contagem(reg.leadsDesqualificados),
       agendadas: acc.agendadas + contagem(reg.reunioesAgendadas),
@@ -315,21 +331,22 @@ export async function getPerformanceEquipeCompleta(mes: number, ano: number) {
       }
     });
 
-    const agrupado = registros.reduce((acc: any, reg) => {
+    const novoResumo = (id: string) => ({
+      id,
+      nome: id,
+      leads: 0,
+      agendadas: 0,
+      realizadas: 0,
+      habilitacao: 0,
+      revisao: 0,
+      hotLeadsHabilitacao: 0,
+      hotLeadsRevisao: 0,
+    });
+    const agrupado = registros.reduce<Record<string, ReturnType<typeof novoResumo>>>((acc, reg) => {
       const id = reg.colaboradoraId; 
       
       if (!acc[id]) {
-        acc[id] = {
-          id: id,
-          nome: id,
-          leads: 0,
-          agendadas: 0,
-          realizadas: 0,
-          habilitacao: 0,
-          revisao: 0,
-          hotLeadsHabilitacao: 0,
-          hotLeadsRevisao: 0
-        };
+        acc[id] = novoResumo(id);
       }
 
       acc[id].leads += reg.leadsRecebidos || 0;
@@ -363,25 +380,26 @@ export async function getPerformanceMarketing(mes: number, ano: number) {
       where: { dataRegistro: { gte: inicioMes, lte: fimMes } }
     });
 
-    const agrupado = registros.reduce((acc: any, reg) => {
+    const novoResumo = (id: string) => ({
+      id,
+      nome: id,
+      leads: 0,
+      leadsDesqualificados: 0,
+      agendadas: 0,
+      realizadas: 0,
+      noShow: 0,
+      habilitacao: 0,
+      revisao: 0,
+      hotLeadsHabilitacao: 0,
+      hotLeadsRevisao: 0,
+      TRAFEGO_PAGO: 0, CALLIX: 0, INDICACAO: 0, EVENTOS: 0, CHINA: 0,
+      hab_TRAFEGO: 0, hab_CALLIX: 0, hab_INDICACAO: 0, hab_EVENTOS: 0, hab_CHINA: 0,
+      rev_TRAFEGO: 0, rev_CALLIX: 0, rev_INDICACAO: 0, rev_EVENTOS: 0, rev_CHINA: 0,
+    });
+    const agrupado = registros.reduce<Record<string, ReturnType<typeof novoResumo>>>((acc, reg) => {
       const id = reg.colaboradoraId; 
       if (!acc[id]) {
-        acc[id] = {
-          id: id, 
-          nome: id, 
-          leads: 0, 
-          leadsDesqualificados: 0,
-          agendadas: 0,
-          realizadas: 0,
-          noShow: 0,
-          habilitacao: 0, 
-          revisao: 0,
-          hotLeadsHabilitacao: 0, 
-          hotLeadsRevisao: 0,
-          TRAFEGO_PAGO: 0, CALLIX: 0, INDICACAO: 0, EVENTOS: 0, CHINA: 0,
-          hab_TRAFEGO: 0, hab_CALLIX: 0, hab_INDICACAO: 0, hab_EVENTOS: 0, hab_CHINA: 0,
-          rev_TRAFEGO: 0, rev_CALLIX: 0, rev_INDICACAO: 0, rev_EVENTOS: 0, rev_CHINA: 0
-        };
+        acc[id] = novoResumo(id);
       }
 
       acc[id].leads += contagem(reg.leadsRecebidos);
@@ -398,7 +416,9 @@ export async function getPerformanceMarketing(mes: number, ano: number) {
 
       const canal = reg.canal; 
       if (canal) {
-        if (acc[id].hasOwnProperty(canal)) acc[id][canal] += contagem(reg.leadsRecebidos);
+        if (canal === "TRAFEGO_PAGO" || canal === "CALLIX" || canal === "INDICACAO" || canal === "EVENTOS" || canal === "CHINA") {
+          acc[id][canal] += contagem(reg.leadsRecebidos);
+        }
 
         if (canal === "TRAFEGO_PAGO") acc[id].hab_TRAFEGO += contagem(reg.contratosHabilitacao);
         if (canal === "CALLIX")       acc[id].hab_CALLIX += contagem(reg.contratosHabilitacao);

@@ -2,7 +2,7 @@
 import { criarRastreadorRascunho } from "@/lib/bpm/rascunho-versionado";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, ClipboardPaste, Loader2, SlidersHorizontal } from "lucide-react";
+import { AlertTriangle, Check, ClipboardPaste, Loader2, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { AtualizarCardBpm, ObterCardBpm } from "@/actions/bpm/Cards";
 import { CampoBpmInput } from "@/app/PainelAlpha/AlphaCRM/CampoBpmInput";
@@ -42,6 +42,7 @@ export function PainelCamposEtapaAtual({
   realtimeRevision,
   onAtualizado,
 }: Props) {
+  const { registerSave, setPendingFields, scheduleSave, flushScheduled, getVersion, confirmVersion, getDraft, setDraft, subscribeConfirmation } = useCardSave();
   const idInstancia = `${card.id}-${instanceKey}`;
   const ordemCampos = new Map(campoIds.map((id, indice) => [id, indice]));
   const camposDoComponente = card.camposEtapa
@@ -49,9 +50,9 @@ export function PainelCamposEtapaAtual({
     .sort((a, b) => (ordemCampos.get(a.id) ?? 0) - (ordemCampos.get(b.id) ?? 0));
   const [revisaoInicial] = useState(realtimeRevision);
   const [valoresCamposAtuais, setValoresCamposAtuais] = useState<Record<string, string>>(() =>
-    Object.fromEntries(camposDoComponente.map((campo) => [campo.id, campo.valor ?? ""])),
+    getDraft(idInstancia) ?? Object.fromEntries(camposDoComponente.map((campo) => [campo.id, campo.valor ?? ""])),
   );
-  const [baseCamposAtuais, setBaseCamposAtuais] = useState<Record<string, string>>(() =>
+  const [, setBaseCamposAtuais] = useState<Record<string, string>>(() =>
     Object.fromEntries(camposDoComponente.map((campo) => [campo.id, campo.valor ?? ""])),
   );
   const [camposEtapaBase, setCamposEtapaBase] = useState(camposDoComponente);
@@ -65,17 +66,44 @@ export function PainelCamposEtapaAtual({
   const [camposRemotosPendentes, setCamposRemotosPendentes] = useState<CamposEtapaCard | null>(null);
   const [conflitoCamposAtuais, setConflitoCamposAtuais] = useState(false);
   const camposAtuaisSujosRef = useRef(false);
-  const [salvandoCamposAtuais, setSalvandoCamposAtuais] = useState(false);
-  const { registerSave, setPendingFields } = useCardSave();
+  const [savesCamposPendentes, setSavesCamposPendentes] = useState(0);
+
+  const [estadoSave, setEstadoSave] = useState<"pendente" | "salvo" | "erro" | null>(null);
+  const revisaoEdicao = useRef(0);
   const valoresRef = useRef(valoresCamposAtuais);
   const rastreadores = useRef(new Map<string, ReturnType<typeof criarRastreadorRascunho>>());
-  function atualizarPendencias() {
+  useEffect(() => subscribeConfirmation(card.id, (confirmed, key) => {
+    if (!key?.startsWith(`${card.id}:arquivo:`)) return;
+    const campoId = key.slice(`${card.id}:arquivo:`.length);
+    const campo = confirmed.camposEtapa.find((item) => item.id === campoId);
+    if (!campo || !(campoId in valoresRef.current)) return;
+    const valor = campo.valor ?? "";
+    valoresRef.current = { ...valoresRef.current, [campoId]: valor };
+    snapshotAtivoRef.current = {
+      valores: { ...snapshotAtivoRef.current.valores, [campoId]: valor },
+      versao: new Date(confirmed.updatedAt).toISOString(),
+    };
+    versaoBaseCamposRef.current = snapshotAtivoRef.current.versao;
+    const draft = getDraft(idInstancia);
+    if (draft) setDraft(idInstancia, { ...draft, [campoId]: valor });
+    setValoresCamposAtuais(valoresRef.current);
+    setBaseCamposAtuais(snapshotAtivoRef.current.valores);
+  }), [card.id, idInstancia, getDraft, setDraft, subscribeConfirmation]);
+
+  function atualizarPendencias(antesDaConfirmacao?: Record<string, string>) {
+    // Uma montagem anterior não pode apagar o rascunho editado após reabrir.
+    const compartilhado = getDraft(idInstancia);
+    if (antesDaConfirmacao && compartilhado && Object.entries(compartilhado)
+      .some(([id, valor]) => valor !== antesDaConfirmacao[id])) return;
     const pendentes = camposEtapaBase.filter((campo) =>
       (valoresRef.current[campo.id] ?? "") !== (snapshotAtivoRef.current.valores[campo.id] ?? ""));
     camposAtuaisSujosRef.current = pendentes.length > 0;
-    setPendingFields(idInstancia, pendentes.map((campo) => campoLabels[campo.id] ?? campo.nome));
+    setDraft(idInstancia, pendentes.length ? { ...valoresRef.current } : undefined);
+    setPendingFields(`${card.id}:${idInstancia}`, pendentes.map((campo) => campoLabels[campo.id] ?? campo.nome));
   }
   function alterarCampo(id: string, valor: string) {
+    revisaoEdicao.current += 1;
+    setEstadoSave("pendente");
     let rastreador = rastreadores.current.get(id);
     if (!rastreador) {
       rastreador = criarRastreadorRascunho(valoresRef.current[id] ?? "");
@@ -85,6 +113,9 @@ export function PainelCamposEtapaAtual({
     valoresRef.current = { ...valoresRef.current, [id]: valor };
     atualizarPendencias();
     setValoresCamposAtuais(valoresRef.current);
+    const tipo = camposEtapaBase.find((campo) => campo.id === id)?.tipo;
+    scheduleSave(`${card.id}:${id}`, () => void salvarCamposAtuais(id),
+      ["selecao", "multiselecao", "booleano", "data", "data_hora", "arquivo"].includes(tipo ?? "") ? 0 : 500);
   }
   const configuracaoLostUi = prepararCamposMotivoLostUiCanonico(
     card.etapa.chave,
@@ -101,9 +132,6 @@ export function PainelCamposEtapaAtual({
   const alertaAlinhamento = card.etapa.chave === BPM_STAGE_KEYS.ALINHAMENTO_ESTRATEGICO
     && Boolean(resumoAlinhamento)
     && !(valoresCamposAtuais[resumoAlinhamento?.id ?? ""] ?? "").trim();
-  const camposAtuaisAlterados = camposAtuaisVisiveis.some(
-    (campo) => (valoresCamposAtuais[campo.id] ?? "") !== (baseCamposAtuais[campo.id] ?? ""),
-  );
   const snapshotCamposEtapa = JSON.stringify(camposDoComponente);
   const versaoRemotaCampos = new Date(card.updatedAt).toISOString();
   useEffect(() => {
@@ -111,11 +139,12 @@ export function PainelCamposEtapaAtual({
     const novosValores = Object.fromEntries(camposRemotos.map((campo) => [campo.id, campo.valor ?? ""]));
     const snapshotRemoto = { valores: novosValores, versao: versaoRemotaCampos };
     const timer = setTimeout(() => {
+      if (snapshotRemoto.versao < snapshotAtivoRef.current.versao) return;
       // A própria confirmação pode chegar pelo realtime após uma nova edição.
       // A mesma versão já confirmada não representa conflito externo.
-      if (camposAtuaisSujosRef.current && snapshotRemoto.versao === snapshotAtivoRef.current.versao) return;
+      if ((camposAtuaisSujosRef.current || getDraft(idInstancia)) && snapshotRemoto.versao === snapshotAtivoRef.current.versao) return;
       const resolucao = resolverSnapshotCamposRealtime({
-        rascunhoSujo: camposAtuaisSujosRef.current,
+        rascunhoSujo: camposAtuaisSujosRef.current || Boolean(getDraft(idInstancia)),
         snapshotAtual: snapshotAtivoRef.current,
         snapshotRemoto,
       });
@@ -137,12 +166,13 @@ export function PainelCamposEtapaAtual({
       setConflitoCamposAtuais(false);
     }, 0);
     return () => clearTimeout(timer);
-  }, [snapshotCamposEtapa, versaoRemotaCampos, realtimeRevision]);
+  }, [snapshotCamposEtapa, versaoRemotaCampos, realtimeRevision, getDraft, idInstancia]);
   function usarDadosAtualizadosCampos() {
     if (!snapshotRemotoPendente || !camposRemotosPendentes) return;
     valoresRef.current = snapshotRemotoPendente.valores;
     rastreadores.current.clear();
-    setPendingFields(idInstancia, []);
+    setPendingFields(`${card.id}:${idInstancia}`, []);
+    setDraft(idInstancia);
     setValoresCamposAtuais(snapshotRemotoPendente.valores);
     setBaseCamposAtuais(snapshotRemotoPendente.valores);
     setVersaoBaseCampos(snapshotRemotoPendente.versao);
@@ -154,27 +184,37 @@ export function PainelCamposEtapaAtual({
     camposAtuaisSujosRef.current = false;
     setConflitoCamposAtuais(false);
   }
-  async function salvarCamposAtuais() {
-    if (!podeEditar || !camposAtuaisAlterados || conflitoCamposAtuais) return;
-    if (complementoLostPendente) {
+  useEffect(() => () => flushScheduled(`${card.id}:`), [card.id, flushScheduled]);
+  async function salvarCamposAtuais(campoId?: string) {
+    if (!podeEditar || conflitoCamposAtuais) return;
+    const valoresAtuais = getDraft(idInstancia) ?? valoresRef.current;
+    const configuracaoAtual = prepararCamposMotivoLostUiCanonico(card.etapa.chave, camposEtapaBase, valoresAtuais);
+    if (configuracaoAtual.exigeComplemento && configuracaoAtual.campoComplementoId
+      && !valoresAtuais[configuracaoAtual.campoComplementoId]?.trim()) {
       toast.error(MOTIVO_LOST_OUTRO_OBRIGATORIO_MENSAGEM);
       return;
     }
-    const camposAlterados = camposAtuaisVisiveis.filter(
-      (campo) => (valoresCamposAtuais[campo.id] ?? "") !== (baseCamposAtuais[campo.id] ?? ""),
-    );
-    // Valores apenas hidratados da entidade mestre (por exemplo Cliente.cnpj)
-    // não viram cópias em BpmCardCampoValor quando outro campo é salvo.
-    const validacao = validarValoresCamposBpm(camposAlterados, montarPayloadCamposDestino(camposAlterados, valoresCamposAtuais));
-    if (!validacao.success) { toast.error(validacao.error); return; }
-    const camposValores = validacao.valores;
-    const revisoes = new Map(camposAlterados.map((campo) => [campo.id, rastreadores.current.get(campo.id)?.capturar()]));
-    setSalvandoCamposAtuais(true);
+    const revisaoEnviada = revisaoEdicao.current;
+    const revisoes = new Map(configuracaoAtual.camposVisiveis.map((campo) => [campo.id, rastreadores.current.get(campo.id)?.capturar()]));
+    setSavesCamposPendentes((total) => total + 1);
     const promise = registerSave(async () => {
+      // Compare após os saves anteriores: uma reversão pode coincidir com a base
+      // antiga no blur, mas precisar de persistência quando chegar sua vez.
+      const camposValores: Record<string, string> = {};
+      let possuiValorInvalido = false;
+      for (const campo of configuracaoAtual.camposVisiveis) {
+        if (campoId && campo.id !== campoId && !configuracaoAtual.exigeComplemento) continue;
+        if (campo.somenteLeitura || campo.editavel === false
+          || (valoresAtuais[campo.id] ?? "") === (snapshotAtivoRef.current.valores[campo.id] ?? "")) continue;
+        const validacao = validarValoresCamposBpm([campo], montarPayloadCamposDestino([campo], valoresAtuais));
+        if (!validacao.success) { possuiValorInvalido = true; toast.error(validacao.error); continue; }
+        Object.assign(camposValores, validacao.valores);
+      }
+      if (!Object.keys(camposValores).length) return !possuiValorInvalido;
       const resultado = await AtualizarCardBpm({
         cardId: card.id,
         camposValores,
-        versaoEsperadaEm: versaoBaseCamposRef.current,
+        versaoEsperadaEm: getVersion(card.id, versaoBaseCamposRef.current),
       });
       if (!resultado.success) {
         toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível salvar os campos da etapa");
@@ -186,10 +226,11 @@ export function PainelCamposEtapaAtual({
         return false;
       }
       const novaVersao = new Date(cardAtualizado.data.updatedAt).toISOString();
-      toast.success("Campos da etapa atualizados");
+      confirmVersion(card.id, novaVersao);
       const confirmados = Object.fromEntries(cardAtualizado.data.camposEtapa
         .filter((campo) => Object.hasOwn(camposValores, campo.id))
         .map((campo) => [campo.id, campo.valor ?? ""]));
+      const antesDaConfirmacao = valoresRef.current;
       for (const [id, valor] of Object.entries(confirmados)) {
         const revisao = revisoes.get(id);
         if (revisao && rastreadores.current.get(id)?.corresponde(revisao)) {
@@ -205,17 +246,18 @@ export function PainelCamposEtapaAtual({
       };
       versaoBaseCamposRef.current = novaVersao;
       setVersaoBaseCampos(novaVersao);
-      atualizarPendencias();
+      atualizarPendencias(antesDaConfirmacao);
+      if (revisaoEdicao.current === revisaoEnviada && !getDraft(idInstancia) && !possuiValorInvalido) {
+        setEstadoSave("salvo");
+      }
       setConflitoCamposAtuais(false);
       onAtualizado();
-      return true;
-    }).then((salvo) => {
-      if (!salvo) toast.error("Há alterações não confirmadas. Revise os campos antes de sair.");
-      return salvo;
-    }).finally(() => {
-      setSalvandoCamposAtuais(false);
+      return !possuiValorInvalido;
+    }, undefined, `${card.id}:campo:${campoId ?? instanceKey}`).finally(() => {
+      setSavesCamposPendentes((total) => total - 1);
     });
-    await promise;
+    const sucesso = await promise;
+    if (!sucesso && revisaoEdicao.current === revisaoEnviada) setEstadoSave("erro");
   }
   const inputCls = "w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-600 outline-none focus:border-white/25 transition-colors";
   return (
@@ -288,11 +330,29 @@ export function PainelCamposEtapaAtual({
                   onChange={(valor) => {
                     alterarCampo(campo.id, valor);
                   }}
-                  onBlur={() => void salvarCamposAtuais()}
+                  onBlur={() => { scheduleSave(`${card.id}:${campo.id}`, () => void salvarCamposAtuais(campo.id), 0); }}
                   className={inputCls}
                   disabled={!podeEditar}
                   readOnly={somenteLeitura}
                   cardId={card.id}
+                  arquivoAtual={campo.tipo === "arquivo"
+                    ? card.anexos.find((anexo) => anexo.id === valoresCamposAtuais[campo.id]) ?? null
+                    : null}
+                  registerFileSave={(save) => registerSave(save, card.id, `${card.id}:arquivo:${campo.id}`)}
+                  onFileConfirmed={(arquivo) => {
+                    const antes = { ...valoresRef.current };
+                    const proximos = { ...valoresRef.current, [campo.id]: arquivo.id };
+                    valoresRef.current = proximos;
+                    rastreadores.current.get(campo.id)?.sincronizar(arquivo.id);
+                    snapshotAtivoRef.current = {
+                      ...snapshotAtivoRef.current,
+                      valores: { ...snapshotAtivoRef.current.valores, [campo.id]: arquivo.id },
+                    };
+                    setValoresCamposAtuais(proximos);
+                    setBaseCamposAtuais((atual) => ({ ...atual, [campo.id]: arquivo.id }));
+                    atualizarPendencias(antes);
+                    onAtualizado();
+                  }}
                 />
                 {complementoPendente && (
                   <p id={descricaoId} role="alert" className="text-[11px] text-amber-300">
@@ -303,7 +363,12 @@ export function PainelCamposEtapaAtual({
             );
               })}
             </fieldset>
-          {salvandoCamposAtuais && <p className="flex items-center gap-2 text-[11px] text-slate-500"><Loader2 size={13} className="animate-spin" /> Salvando alterações...</p>}
+          <p role="status" aria-live="polite" className="flex items-center gap-2 text-[11px] text-slate-400">
+            {savesCamposPendentes > 0 ? <><Loader2 size={13} className="animate-spin" aria-hidden="true" /> Salvando alterações...</>
+              : estadoSave === "salvo" && !conflitoCamposAtuais ? <><Check size={13} aria-hidden="true" /> Salvo</>
+              : estadoSave === "erro" ? <><AlertTriangle size={13} aria-hidden="true" /> Erro ao salvar. Sua alteração foi preservada.</>
+              : estadoSave === "pendente" ? "Alterações pendentes" : null}
+          </p>
           {!podeEditar && <p className="text-[11px] text-slate-500">Somente o responsável ou um administrador pode editar estes campos.</p>}
         </div>
       )}

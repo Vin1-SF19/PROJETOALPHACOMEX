@@ -1,0 +1,420 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /home/ialpha/projetos/alpha-comex/painel-alpha
+
+ ❯ tests/bpm/card-modal-integration.test.ts (23 tests | 1 failed) 11ms
+     × limita o novo card aos dados-base e preserva cadastro de empresa 6ms
+stderr | tests/bpm/excluir-card-action.test.ts > arquivamento com SQLite descartável > preserva dependências e rollback (falha de auditoria: true)
+[ExcluirCardBpm] Error: audit failure
+    at Object.<anonymous> (/home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/excluir-card-action.test.ts:131:33)
+    at Object.Mock [as create] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/spy/dist/index.js:332:34)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:2429:33
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Object.<anonymous> (/home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/excluir-card-action.test.ts:134:26)
+
+ ❯ tests/bpm/excluir-card-action.test.ts (14 tests | 2 failed) 18ms
+     × preserva dependências e rollback (falha de auditoria: false) 3ms
+     × preserva dependências e rollback (falha de auditoria: true) 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/bpm/card-modal-integration.test.ts > CRM - wiring do modal por etapa > limita o novo card aos dados-base e preserva cadastro de empresa
+AssertionError: expected '"use client";\n\nimport { useEffect, …' to contain 'empresaId: empresaSelecionada!.id'
+
+- Expected
++ Received
+
+- empresaId: empresaSelecionada!.id
++ "use client";
++
++ import { useEffect, useState } from "react";
++ import { ClipboardCheck, Loader2, X } from "lucide-react";
++ import { BuscarEmpresasBpm, ListarUsuariosResponsavelBpm } from "@/actions/bpm/Cards";
++ import { formatCNPJ, formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";
++
++ interface EmpresaOpcao {
++   id: number;
++   razaoSocial: string;
++   nomeFantasia: string | null;
++   cnpj: string | null;
++ }
++
++ interface NovaEmpresaForm {
++   cnpj: string;
++   razaoSocial: string;
++   nomeFantasia: string;
++   uf: string;
++   municipio: string;
++ }
++
++ interface UsuarioOpcao {
++   id: number;
++   nome: string;
++ }
++
++ interface Props {
++   pipelineId: string;
++   etapaId: string;
++   currentUserId: number | null;
++   accent: string;
++   onClose: () => void;
++   onCriado: (dados: unknown) => Promise<{ success: true } | { success: false; error: string }>;
++ }
++
++ const NOVA_EMPRESA_VAZIA: NovaEmpresaForm = {
++   cnpj: "",
++   razaoSocial: "",
++   nomeFantasia: "",
++   uf: "",
++   municipio: "",
++ };
++
++ const inputCls = "w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-600 outline-none focus:border-white/20";
++
++ function FieldRow({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
++   return (
++     <div className="space-y-1">
++       <label htmlFor={htmlFor} className="text-[11px] text-slate-400 font-medium">{label}</label>
++       {children}
++     </div>
++   );
++ }
++
++ export default function NovoCardModal({
++   pipelineId,
++   etapaId,
++   currentUserId,
++   accent,
++   onClose,
++   onCriado,
++ }: Props) {
++   const [form, setForm] = useState<NovaEmpresaForm>(NOVA_EMPRESA_VAZIA);
++   const [empresaSelecionada, setEmpresaSelecionada] = useState<EmpresaOpcao | null>(null);
++   const [empresasSugestoes, setEmpresasSugestoes] = useState<EmpresaOpcao[]>([]);
++   const [dropdownAberto, setDropdownAberto] = useState(false);
++   const [usuarios, setUsuarios] = useState<UsuarioOpcao[]>([]);
++   const [responsavelId, setResponsavelId] = useState<number | null>(currentUserId);
++   const [erro, setErro] = useState<string | null>(null);
++   const [salvando, setSalvando] = useState(false);
++   const [buscandoCnpj, setBuscandoCnpj] = useState(false);
++   const [erroBuscaCnpj, setErroBuscaCnpj] = useState<string | null>(null);
++
++   useEffect(() => {
++     const fecharComEscape = (evento: KeyboardEvent) => {
++       if (evento.key === "Escape" && !salvando) onClose();
++     };
++     document.addEventListener("keydown", fecharComEscape);
++     return () => document.removeEventListener("keydown", fecharComEscape);
++   }, [onClose, salvando]);
++
++   useEffect(() => {
++     ListarUsuariosResponsavelBpm(pipelineId).then((res) => {
++       if (res.success && res.data) {
++         setUsuarios(res.data);
++         setResponsavelId((atual) =>
++           atual && res.data.some((usuario) => usuario.id === atual) ? atual : null,
++         );
++       }
++     });
++   }, [pipelineId]);
++
++   // Autocomplete de Razão Social → busca empresas existentes
++   useEffect(() => {
++     const timeout = setTimeout(() => {
++       const termo = form.razaoSocial.trim();
++       if (termo.length >= 2 && !empresaSelecionada) {
++         BuscarEmpresasBpm(termo).then((res) => {
++           if (res.success && res.data) {
++             setEmpresasSugestoes(res.data);
++             setDropdownAberto(res.data.length > 0);
++           } else {
++             setEmpresasSugestoes([]);
++             setDropdownAberto(false);
++           }
++         });
++       } else {
++         setEmpresasSugestoes([]);
++         setDropdownAberto(false);
++       }
++     }, 300);
++     return () => clearTimeout(timeout);
++   }, [form.razaoSocial, empresaSelecionada]);
++
++   // Auto-buscar CNPJ na Receita Federal quando 14 dígitos completos
++   async function buscarCnpjReceita(cnpjValor: string) {
++     const cnpjLimpo = normalizarCNPJ(cnpjValor);
++     if (cnpjLimpo.length !== 14) return;
++     setErroBuscaCnpj(null);
++     setBuscandoCnpj(true);
++     try {
++       const resposta = await fetch(`/api/ReceitaFederal?cnpj=${cnpjLimpo}`);
++       const dados = await resposta.json();
++       if (!resposta.ok || dados.error) {
++         setErroBuscaCnpj(dados.error || "Não foi possível buscar os dados do CNPJ");
++         return;
++       }
++       setForm((anterior) => ({
++         ...anterior,
++         razaoSocial: dados.razaoSocial || anterior.razaoSocial,
++         nomeFantasia: dados.nomeFantasia || anterior.nomeFantasia,
++         uf: dados.uf || anterior.uf,
++         municipio: dados.municipio || anterior.municipio,
++       }));
++       setEmpresaSelecionada(null);
++     } catch {
++       setErroBuscaCnpj("Erro ao buscar CNPJ. Tente novamente.");
++     } finally {
++       setBuscandoCnpj(false);
++     }
++   }
++
++   // Handler do input CNPJ: auto-busca ao completar 14 dígitos
++   function handleCnpjChange(valor: string) {
++     const cnpjLimpo = normalizarCNPJ(valor);
++     setForm((anterior) => ({ ...anterior, cnpj: cnpjLimpo }));
++     setEmpresaSelecionada(null);
++     if (cnpjLimpo.length === 14) {
++       buscarCnpjReceita(cnpjLimpo);
++     }
++   }
++
++   // Selecionar empresa do dropdown
++   function selecionarEmpresa(empresa: EmpresaOpcao) {
++     setEmpresaSelecionada(empresa);
++     setForm((anterior) => ({
++       ...anterior,
++       cnpj: empresa.cnpj ? normalizarCNPJ(empresa.cnpj) : anterior.cnpj,
++       razaoSocial: empresa.razaoSocial,
++       nomeFantasia: empresa.nomeFantasia || "",
++       municipio: "",
++       uf: "",
++     }));
++     setEmpresasSugestoes([]);
++     setDropdownAberto(false);
++   }
++
++   async function handleSalvar() {
++     setErro(null);
++
++     if (!empresaSelecionada) {
++       if (normalizarCNPJ(form.cnpj).length !== 14) {
++         setErro("Informe um CNPJ válido (14 dígitos).");
++         return;
++       }
++       if (!form.razaoSocial.trim()) {
++         setErro("Informe a razão social da empresa.");
++         return;
++       }
++     }
++     if (!responsavelId) {
++       setErro("Selecione um responsável.");
++       return;
++     }
++
++     setSalvando(true);
++     try {
++       const resultado = await onCriado({
++         ...(empresaSelecionada
++           ? { empresaId: empresaSelecionada.id }
++           : {
++               novaEmpresa: {
++                 cnpj: normalizarCNPJ(form.cnpj),
++                 razaoSocial: form.razaoSocial.trim(),
++                 nomeFantasia: form.nomeFantasia.trim() || undefined,
++                 uf: form.uf.trim() || undefined,
++                 municipio: form.municipio.trim() || undefined,
++               },
++             }),
++         pipelineId,
++         etapaId,
++         responsavelId,
++       });
++       if (!resultado.success) setErro(resultado.error);
++     } catch {
++       setErro("Não foi possível criar o card. Tente novamente.");
++     } finally {
++       setSalvando(false);
++     }
++   }
++
++   return (
++     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
++       <div role="dialog" aria-modal="true" aria-labelledby="novo-card-titulo" className="w-full max-w-lg bg-slate-900 rounded-2xl border border-white/10 overflow-hidden">
++         <div className="flex items-center justify-between p-5 border-b border-white/5">
++           <h3 id="novo-card-titulo" className="font-bold text-white">Novo Card</h3>
++           <button type="button" onClick={onClose} disabled={salvando} aria-label="Fechar modal" className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-50">
++             <X size={16} aria-hidden="true" />
++           </button>
++         </div>
++
++         <div className="p-5 space-y-3 max-h-[70vh] overflow-y-auto">
++           {erro && <div role="alert" className="px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">{erro}</div>}
++
++           <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-3" aria-label="Orientação sobre o novo card">
++             <div className="flex items-start gap-2.5">
++               <ClipboardCheck size={16} aria-hidden="true" className="mt-0.5 shrink-0" style={{ color: `rgb(${accent})` }} />
++               <div>
++                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Criar em</p>
++                 <p className="text-sm font-semibold text-white">Novos Leads</p>
++                 <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
++                   Os detalhes da etapa são preenchidos ao abrir o card, na aba Formulário da Etapa.
++                 </p>
++               </div>
++             </div>
++           </section>
++
++           <FieldRow label="Empresa *" htmlFor="novo-card-empresa">
++             <div className="space-y-2 rounded-xl border border-white/10 bg-slate-800/60 p-3">
++               {/* CNPJ — auto-busca na Receita Federal ao completar 14 dígitos */}
++               <div className="flex gap-2">
++                 <input
++                   id="novo-card-empresa"
++                   autoFocus
++                   aria-label="CNPJ"
++                   inputMode="numeric"
++                   maxLength={18}
++                   className={`${inputCls} font-mono`}
++                   placeholder="00.000.000/0000-00"
++                   value={formatarCNPJProgressivo(form.cnpj)}
++                   onChange={(e) => handleCnpjChange(e.target.value)}
++                 />
++                 {buscandoCnpj && (
++                   <span className="flex items-center px-2">
++                     <Loader2 size={14} aria-hidden="true" className="animate-spin text-blue-400" />
++                   </span>
++                 )}
++               </div>
++               {erroBuscaCnpj && <p role="alert" className="text-[11px] text-rose-400">{erroBuscaCnpj}</p>}
++
++               {/* Razão Social — autocomplete de empresas existentes */}
++               <div className="relative">
++                 <input
++                   aria-label="Razão social"
++                   className={inputCls}
++                   placeholder="Razão social *"
++                   value={form.razaoSocial}
++                   onChange={(e) => {
++                     setForm((anterior) => ({ ...anterior, razaoSocial: e.target.value }));
++                     setEmpresaSelecionada(null);
++                   }}
++                   onFocus={() => {
++                     if (empresasSugestoes.length > 0) setDropdownAberto(true);
++                   }}
++                 />
++                 {dropdownAberto && empresasSugestoes.length > 0 && (
++                   <div className="absolute z-10 top-full mt-1 w-full bg-slate-800 border border-white/10 rounded-xl overflow-hidden max-h-48 overflow-y-auto shadow-lg">
++                     {empresasSugestoes.map((empresa) => (
++                       <button
++                         key={empresa.id}
++                         type="button"
++                         onClick={() => selecionarEmpresa(empresa)}
++                         className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-white/5"
++                       >
++                         {empresa.nomeFantasia || empresa.razaoSocial}
++                         <span className="block text-[10px] text-slate-500">{formatCNPJ(empresa.cnpj) ?? empresa.cnpj}</span>
++                       </button>
++                     ))}
++                   </div>
++                 )}
++               </div>
++
++               {/* Nome Fantasia */}
++               <input
++                 aria-label="Nome fantasia"
++                 className={inputCls}
++                 placeholder="Nome fantasia"
++                 value={form.nomeFantasia}
++                 onChange={(e) => setForm((anterior) => ({ ...anterior, nomeFantasia: e.target.value }))}
++               />
++
++               {/* Município + UF */}
++               <div className="grid grid-cols-3 gap-2">
++                 <input
++                   aria-label="Município"
++                   className={`${inputCls} col-span-2`}
++                   placeholder="Município"
++                   value={form.municipio}
++                   onChange={(e) => setForm((anterior) => ({ ...anterior, municipio: e.target.value }))}
++                 />
++                 <input
++                   aria-label="UF"
++                   className={inputCls}
++                   placeholder="UF"
++                   maxLength={2}
++                   value={form.uf}
++                   onChange={(e) => setForm((anterior) => ({ ...anterior, uf: e.target.value.toUpperCase() }))}
++                 />
++               </div>
++             </div>
++           </FieldRow>
++
++           <FieldRow label="Responsável *" htmlFor="novo-card-responsavel">
++             <select id="novo-card-responsavel" className={inputCls} value={responsavelId ?? ""} onChange={(e) => setResponsavelId(e.target.value ? Number(e.target.value) : null)}>
++               <option value="">Selecione...</option>
++               {usuarios.map((usuario) => <option key={usuario.id} value={usuario.id}>{usuario.nome}</option>)}
++             </select>
++           </FieldRow>
++
++
++         </div>
++
++         <div className="flex gap-2 p-5 border-t border-white/5">
++           <button type="button" onClick={onClose} disabled={salvando} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm text-slate-400 hover:text-white disabled:opacity-50">Cancelar</button>
++           <button type="button" onClick={handleSalvar} disabled={salvando} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50" style={{ background: `rgba(${accent},0.85)` }}>
++             {salvando ? "Salvando..." : "Criar Card"}
++           </button>
++         </div>
++       </div>
++     </div>
++   );
++ }
++
+
+ ❯ tests/bpm/card-modal-integration.test.ts:158:22
+    156|   it("limita o novo card aos dados-base e preserva cadastro de empresa…
+    157|     expect(novoCard).toContain("novaEmpresa:");
+    158|     expect(novoCard).toContain("empresaId: empresaSelecionada!.id");
+       |                      ^
+    159|     expect(novoCard).not.toContain("servico:");
+    160|     expect(novoCard).toContain("Os detalhes da etapa são preenchidos a…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  tests/bpm/excluir-card-action.test.ts > arquivamento com SQLite descartável > preserva dependências e rollback (falha de auditoria: false)
+ FAIL  tests/bpm/excluir-card-action.test.ts > arquivamento com SQLite descartável > preserva dependências e rollback (falha de auditoria: true)
+LibsqlError: SQLITE_ERROR: no such table: BpmCard
+ ❯ mapSqliteError node_modules/@libsql/client/lib-esm/sqlite3.js:435:16
+ ❯ executeStmt node_modules/@libsql/client/lib-esm/sqlite3.js:338:15
+ ❯ Sqlite3Client.execute node_modules/@libsql/client/lib-esm/sqlite3.js:83:16
+ ❯ tests/bpm/excluir-card-action.test.ts:139:25
+    137|    });
+    138|    expect(await ExcluirCardBpm("card")).toMatchObject({ success: !falh…
+    139|    expect((await sqlite.execute("SELECT status FROM BpmCard")).rows[0]…
+       |                         ^
+    140|    expect((await sqlite.execute("SELECT * FROM Historico")).rows).toHa…
+    141|    for (const tabela of dependencias) expect((await sqlite.execute(`SE…
+
+Caused by: SqliteError: no such table: BpmCard
+ ❯ convertError node_modules/libsql/index.js:59:12
+ ❯ Database.prepare node_modules/libsql/index.js:131:13
+ ❯ executeStmt node_modules/@libsql/client/lib-esm/sqlite3.js:309:28
+ ❯ Sqlite3Client.execute node_modules/@libsql/client/lib-esm/sqlite3.js:83:16
+ ❯ tests/bpm/excluir-card-action.test.ts:139:25
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'SQLITE_ERROR', rawCode: 1 }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+
+ Test Files  2 failed | 2 passed (4)
+      Tests  3 failed | 63 passed (66)
+   Start at  23:54:47
+   Duration  299ms (transform 343ms, setup 0ms, import 520ms, tests 43ms, environment 0ms)
+
+npm notice
+npm notice New minor version of npm available! 11.6.1 -> 11.20.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.20.0
+npm notice To update run: npm install -g npm@11.20.0
+npm notice

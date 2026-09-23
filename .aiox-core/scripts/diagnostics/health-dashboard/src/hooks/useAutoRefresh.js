@@ -41,15 +41,19 @@ function useAutoRefresh(options = {}) {
 
   // Setup auto-refresh interval
   useEffect(() => {
+    let active = true;
     if (isEnabled && !isRefreshing) {
       intervalRef.current = setInterval(() => {
         refresh();
       }, interval);
 
-      setNextRefresh(Date.now() + interval);
+      queueMicrotask(() => {
+        if (active) setNextRefresh(Date.now() + interval);
+      });
     }
 
     return () => {
+      active = false;
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }

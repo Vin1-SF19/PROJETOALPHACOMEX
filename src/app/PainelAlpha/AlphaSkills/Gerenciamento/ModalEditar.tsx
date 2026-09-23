@@ -3,15 +3,28 @@
 import { useState, useEffect } from 'react';
 import { X, Save, Upload, Loader2, Film, Image as ImageIcon, CheckCircle2, Check, AlignLeft, FolderKanban } from 'lucide-react';
 import { upload } from '@vercel/blob/client';
-import { updateVideoData } from '@/actions/GetVideos';
+import { getVideos, updateVideoData } from '@/actions/GetVideos';
 import { getModulos } from '@/actions/GetVideos'; // Importante importar a action
 import { toast } from 'sonner';
 
-export default function ModalEditar({ isOpen, onClose, video, onSuccess }: { isOpen: boolean, onClose: () => void, video: any, onSuccess: () => void }) {
-    const [titulo, setTitulo] = useState("");
-    const [descricao, setDescricao] = useState("");
-    const [modulosDisponiveis, setModulosDisponiveis] = useState<any[]>([]);
-    const [modulosSelecionados, setModulosSelecionados] = useState<any[]>([]);
+type Modulo = Awaited<ReturnType<typeof getModulos>>[number];
+type ModuloSelecionado = Pick<Modulo, "id" | "nome" | "setor">;
+type Video = Pick<Awaited<ReturnType<typeof getVideos>>[number], "id" | "titulo" | "descricao" | "url" | "thumbUrl"> & {
+    modulo?: ModuloSelecionado[];
+};
+
+export default function ModalEditar({ isOpen, onClose, video, onSuccess }: { isOpen: boolean, onClose: () => void, video: Video | null, onSuccess: () => void }) {
+    if (!isOpen || !video) return null;
+    return <ModalEditarConteudo key={video.id} video={video} onClose={onClose} onSuccess={onSuccess} />;
+}
+
+function ModalEditarConteudo({ onClose, video, onSuccess }: { onClose: () => void, video: Video, onSuccess: () => void }) {
+    const [titulo, setTitulo] = useState(video.titulo);
+    const [descricao, setDescricao] = useState(video.descricao || "");
+    const [modulosDisponiveis, setModulosDisponiveis] = useState<Modulo[]>([]);
+    const [modulosSelecionados, setModulosSelecionados] = useState<ModuloSelecionado[]>(
+        Array.isArray(video.modulo) ? video.modulo : video.modulo ? [video.modulo] : []
+    );
 
     const [loading, setLoading] = useState(false);
     const [newVideo, setNewVideo] = useState<File | null>(null);
@@ -22,28 +35,10 @@ export default function ModalEditar({ isOpen, onClose, video, onSuccess }: { isO
             const dados = await getModulos();
             setModulosDisponiveis(dados);
         };
-        if (isOpen) fetchModulos();
-    }, [isOpen]);
+        fetchModulos();
+    }, []);
 
-
-    useEffect(() => {
-        if (video && isOpen) {
-            setTitulo(video.titulo);
-            setDescricao(video.descricao || "");
-    
-            // AJUSTE AQUI: O vídeo agora traz um array chamado 'modulo' (devido ao N:N)
-            if (video.modulo && Array.isArray(video.modulo)) {
-                setModulosSelecionados(video.modulo);
-            } else if (video.modulo) {
-                // Caso venha como objeto único por algum motivo
-                setModulosSelecionados([video.modulo]);
-            } else {
-                setModulosSelecionados([]);
-            }
-        }
-    }, [video, isOpen]);
-
-    const toggleModulo = (modulo: any) => {
+    const toggleModulo = (modulo: Modulo) => {
         setModulosSelecionados(prev =>
             prev.find(m => m.id === modulo.id)
                 ? prev.filter(m => m.id !== modulo.id)
@@ -95,8 +90,6 @@ export default function ModalEditar({ isOpen, onClose, video, onSuccess }: { isO
             setLoading(false);
         }
     };
-
-    if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">

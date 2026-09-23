@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -6,37 +6,38 @@ const source = (relative: string) => readFileSync(resolve(relative), "utf8");
 
 describe("ExcluirCardBpm — Server Action", () => {
   it("usa exigirAcessoBpmCard com a ação excluirCard", () => {
-    const cards = source("src/actions/bpm/Cards.ts");
-    expect(cards).toContain('exigirAcessoBpmCard(cardId, userId, userRole, "excluirCard")');
+    const cards = source("src/actions/bpm/CardsExcluir.ts");
+    expect(cards).toContain('exigirAcessoBpmCard(cardId, authenticatedUserId, userRole, "excluirCard")');
   });
 
   it("valida cardId antes de qualquer operação", () => {
-    const cards = source("src/actions/bpm/Cards.ts");
+    const cards = source("src/actions/bpm/CardsExcluir.ts");
     expect(cards).toContain("Card inválido");
   });
 
-  it("usa db.$transaction para o delete atômico", () => {
-    const cards = source("src/actions/bpm/Cards.ts");
-    expect(cards).toContain("tx.bpmCard.delete");
+  it("usa db.$transaction para o arquivamento atômico (soft-delete)", () => {
+    const cards = source("src/actions/bpm/CardsExcluir.ts");
+    expect(cards).toContain("tx.bpmCard.update");
+    expect(cards).toContain('status: "ARQUIVADO"');
   });
 
   it("retorna mensagem amigável em caso de erro", () => {
-    const cards = source("src/actions/bpm/Cards.ts");
-    expect(cards).toContain('"Erro ao excluir card"');
+    const cards = source("src/actions/bpm/CardsExcluir.ts");
+    expect(cards).toContain('"Ocorreu um erro ao excluir o card. Tente novamente."');
   });
 
   it("retorna 'Não autorizado' quando a permissão é negada", () => {
-    const cards = source("src/actions/bpm/Cards.ts");
+    const cards = source("src/actions/bpm/CardsExcluir.ts");
     expect(cards).toContain('"Não autorizado"');
   });
 
   it("notifica em tempo real com tipo CARD_EXCLUIDO", () => {
-    const cards = source("src/actions/bpm/Cards.ts");
+    const cards = source("src/actions/bpm/CardsExcluir.ts");
     expect(cards).toContain('tipo: "CARD_EXCLUIDO"');
   });
 
   it("revalida o caminho do pipeline após exclusão", () => {
-    const cards = source("src/actions/bpm/Cards.ts");
+    const cards = source("src/actions/bpm/CardsExcluir.ts");
     expect(cards).toContain("revalidatePath(`${ROTA_BASE}/pipeline/${cardAntes.pipelineId}`)");
   });
 });

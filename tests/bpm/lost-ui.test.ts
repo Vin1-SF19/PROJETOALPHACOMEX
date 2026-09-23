@@ -78,9 +78,9 @@ describe("CRM Lost - apresentação condicional do motivo Outro", () => {
     expect(novoCard).not.toContain("Motivo de Lost");
     expect(camposEtapa).toContain("prepararCamposMotivoLostUiCanonico(");
     expect(camposEtapa).toContain("card.etapa.chave");
-    expect(camposEtapa).toContain("versaoEsperadaEm: versaoBaseCampos");
+    expect(camposEtapa).toContain("versaoEsperadaEm: getVersion(card.id, versaoBaseCamposRef.current)");
     expect(camposEtapa).toContain("resolverSnapshotCamposRealtime({");
-    expect(camposEtapa).toContain("if (!podeEditar || !camposAtuaisAlterados || conflitoCamposAtuais) return");
+    expect(camposEtapa).toContain("if (!podeEditar || conflitoCamposAtuais) return");
     expect(camposEtapa).toContain("Usar dados atualizados");
     expect(proximaEtapa).toContain("MoverCardBpm({ cardId: card.id, etapaDestinoId })");
   });

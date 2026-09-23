@@ -1,0 +1,12 @@
+
+> alpha_sistema@0.1.0 typecheck
+> NODE_OPTIONS=--max-old-space-size=8192 tsc --noEmit
+
+tests/bpm/formulario-lista-plana.test.ts(15,95): error TS2322: Type '{ ordem: number; componentes: { id: string; ordem: number; clientId?: string | undefined; chave: string; tipo: string; campoId: string | null; capability: string | null; configJson: string | null; campo?: CampoFormulario | ... 1 more ... | undefined; }[]; id?: string | undefined; chave: string; titulo: string; }[]' is not assignable to type '{ id: string; chave: string; titulo: string; ordem: number; componentes: { id: string; chave: string; tipo: string; campoId: string | null; capability: string | null; configJson: string | null; ordem: number; }[]; }[]'.
+  Type '{ ordem: number; componentes: { id: string; ordem: number; clientId?: string; chave: string; tipo: string; campoId: string | null; capability: string | null; configJson: string | null; campo?: CampoFormulario | null; }[]; id?: string; chave: string; titulo: string; }' is not assignable to type '{ id: string; chave: string; titulo: string; ordem: number; componentes: { id: string; chave: string; tipo: string; campoId: string | null; capability: string | null; configJson: string | null; ordem: number; }[]; }'.
+    Types of property 'id' are incompatible.
+      Type 'string | undefined' is not assignable to type 'string'.
+        Type 'undefined' is not assignable to type 'string'.
+tests/bpm/formulario-lista-plana.test.ts(16,21): error TS2339: Property 'componentes' does not exist on type 'FormularioEtapaResolvido'.
+tests/bpm/formulario-lista-plana.test.ts(16,41): error TS7006: Parameter 'item' implicitly has an 'any' type.
+tests/bpm/formulario-lista-plana.test.ts(16,78): error TS7006: Parameter 'item' implicitly has an 'any' type.

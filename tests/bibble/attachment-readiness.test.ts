@@ -82,12 +82,16 @@ describe("Bibble attachment send guard", () => {
       join(process.cwd(), "src/app/api/bibble/chat/route.ts"),
       "utf8",
     );
+    const runner = readFileSync(
+      join(process.cwd(), "src/lib/bibble/chat-stream-runner.ts"),
+      "utf8",
+    );
     expect(route).toContain("const toolsForTurn = hasAttachments ? [] : toolsToUse;");
     expect(route).toContain("!hasAttachments && mensagemSolicitaAbrirChamado(message)");
-    expect(route).toContain("if (tools.length > 0)");
-    expect(route).toContain("const streamRes = await callCompletion(");
+    expect(runner).toContain("if (tools.length > 0)");
+    expect(runner).toContain("const streamRes = await callCompletion(");
     expect(route).toContain("export const maxDuration = 120;");
-    expect(route).toContain("successful: !truncated");
+    expect(runner).toContain("successful: !truncated");
   });
 
   it("restores the exact turn and returns before persistence on stream failure", () => {

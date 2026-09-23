@@ -1,14 +1,22 @@
 "use server";
 import db from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
+
+type FiltrosRadar = {
+    filtroSituacao?: string;
+    filtroSubmodalidade?: string;
+    ordem?: "asc" | "desc";
+    ordemData?: "antigos" | "recentes";
+};
 
 export async function getConsultasPaginadas(
     page: number = 1,
     limit: number = 20,
-    filtros: any = {}
+    filtros: FiltrosRadar = {}
 ) {
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: Prisma.consultas_radarWhereInput = {};
 
     if (filtros.filtroSituacao && filtros.filtroSituacao !== "todos") {
         where.situacao_radar = filtros.filtroSituacao;
@@ -18,7 +26,7 @@ export async function getConsultasPaginadas(
         where.submodalidade = filtros.filtroSubmodalidade;
     }
 
-    let orderBy: any = { data_consulta: 'desc' };
+    let orderBy: Prisma.consultas_radarOrderByWithRelationInput = { data_consulta: 'desc' };
 
     if (filtros.ordem === "asc") orderBy = { razao_social: 'asc' };
     if (filtros.ordem === "desc") orderBy = { razao_social: 'desc' };
@@ -64,11 +72,11 @@ export async function getConsultasPaginadas(
     }
 }
 
-export async function getConsultasHoje(filtros: any = {}) {
+export async function getConsultasHoje(filtros: FiltrosRadar = {}) {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
-    const where: any = {
+    const where: Prisma.consultas_radarWhereInput = {
         data_consulta: { gte: hoje }
     };
 
@@ -81,7 +89,7 @@ export async function getConsultasHoje(filtros: any = {}) {
     }
 
     // Ordenação
-    let orderBy: any = { data_consulta: 'desc' };
+    let orderBy: Prisma.consultas_radarOrderByWithRelationInput = { data_consulta: 'desc' };
     if (filtros.ordem === "asc") orderBy = { razao_social: 'asc' };
     if (filtros.ordem === "desc") orderBy = { razao_social: 'desc' };
 
@@ -103,4 +111,3 @@ export async function getConsultasHoje(filtros: any = {}) {
         return { success: false, data: [] };
     }
 }
-

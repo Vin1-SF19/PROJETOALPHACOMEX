@@ -488,11 +488,64 @@ export async function AtualizarCampoBpm(dados: unknown) {
   }
 }
 
-/** Compatibilidade: "excluir" agora é desativação reversível e nunca apaga valores. */
 export async function ExcluirCampoBpm(dados: unknown) {
-  const parsed = excluirCampoSchema.safeParse(dados);
-  if (!parsed.success) return { success: false, error: parsed.error.flatten() };
-  return AtualizarCampoBpm({ campoId: parsed.data.campoId, ativo: false });
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+    const userId = Number(session.user.id);
+    await exigirAcessoConfigPipeline(userId, "configurarCampos");
+
+    const parsed = excluirCampoSchema.safeParse(dados);
+    if (!parsed.success) return { success: false, error: parsed.error.flatten() };
+
+    const pipelineIds = await db.$transaction(async (tx) => {
+      await exigirAcessoConfigPipeline(userId, "configurarCampos", tx);
+      const campo = await tx.bpmCampo.findUnique({
+        where: { id: parsed.data.campoId },
+        select: {
+          id: true,
+          nome: true,
+          pipelineId: true,
+          pipelinesAssociados: { select: { pipelineId: true } },
+        },
+      });
+      if (!campo) throw new Error("CAMPO_NAO_ENCONTRADO: Campo não encontrado");
+
+      const [valoresCard, valoresGlobais, anexos] = await Promise.all([
+        tx.bpmCardCampoValor.count({ where: { campoId: campo.id } }),
+        tx.bpmCampoValorGlobal.count({ where: { campoId: campo.id } }),
+        tx.bpmCardAnexo.count({ where: { campoId: campo.id } }),
+      ]);
+      if (valoresCard + valoresGlobais + anexos > 0) {
+        throw new Error("CAMPO_COM_DADOS: Este campo possui dados associados e não pode ser excluído");
+      }
+
+      const afetados = [
+        campo.pipelineId,
+        ...campo.pipelinesAssociados.map((item) => item.pipelineId),
+      ];
+      await tx.bpmPipelineConfigAuditoria.create({
+        data: {
+          pipelineId: campo.pipelineId,
+          adminId: userId,
+          campoAlterado: "campo_excluido",
+          valorAnteriorJson: JSON.stringify({ id: campo.id, nome: campo.nome }),
+        },
+      });
+      await tx.bpmCampoMapeamento.deleteMany({
+        where: { OR: [{ campoOrigemId: campo.id }, { campoDestinoId: campo.id }] },
+      });
+      await tx.bpmCampo.delete({ where: { id: campo.id } });
+      for (const pipelineId of afetados) await avancarConfigVersionBpm(tx, pipelineId);
+      return afetados;
+    });
+
+    await notificarPipelines(pipelineIds);
+    return { success: true };
+  } catch (error) {
+    console.error("[ExcluirCampoBpm]", error);
+    return { success: false, error: mensagemErro(error, "Erro ao excluir campo") };
+  }
 }
 
 export async function AtivarDesativarCampoBpm(dados: unknown) {

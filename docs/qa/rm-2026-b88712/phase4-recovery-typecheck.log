@@ -1,0 +1,11 @@
+
+> alpha_sistema@0.1.0 typecheck
+> NODE_OPTIONS=--max-old-space-size=8192 tsc --noEmit
+
+tests/bpm/autosave-recovery-react.test.ts(23,65): error TS2322: Type 'string | number | bigint | true | Iterable<ReactNode> | Promise<AwaitedReactNode> | Action' is not assignable to type 'object'.
+  Type 'string' is not assignable to type 'object'.
+npm notice
+npm notice New minor version of npm available! 11.6.1 -> 11.19.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.19.1
+npm notice To update run: npm install -g npm@11.19.1
+npm notice

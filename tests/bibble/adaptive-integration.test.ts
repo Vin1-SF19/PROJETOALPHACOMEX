@@ -13,12 +13,14 @@ describe("Bibble adaptive integration", () => {
     const route = await readFile("src/app/api/bibble/chat/route.ts", "utf8");
     const memory = await readFile("src/lib/bibble/behavioral-memory.ts", "utf8");
     const classifier = await readFile("src/lib/bibble/adaptive-style.ts", "utf8");
-    expect(route).toContain("const history = await dependencies.loadHistory(userId)");
-    expect(route).toContain("adaptiveStyle: buildAdaptiveStylePrompt(profile, preferences, message)");
+    const adaptiveTurn = await readFile("src/lib/bibble/adaptive-turn.ts", "utf8");
+    expect(adaptiveTurn).toContain("const history = await dependencies.loadHistory(userId)");
+    expect(adaptiveTurn).toContain("adaptiveStyle: buildAdaptiveStylePrompt(profile, preferences, message)");
     expect(route).toContain("const adaptiveResult = await deriveAdaptiveStyleForTurn");
     expect(classifier).not.toMatch(/callCompletion|fetch\(|openai|ollama/i);
     expect(memory).not.toMatch(/callCompletion|fetch\(/i);
-    expect(route.match(/runStream\(/g)?.length).toBe(2);
+    expect(route.match(/runStream\(/g)?.length).toBe(1);
+    expect(route).toContain("void runStream(");
   });
 
   it("keeps Onyx payload free of profile and exposes accessible controls", async () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
   motion,
   useMotionValue,
@@ -18,14 +18,20 @@ const STAR_CONFIG: Record<StarLayer, { amount: number; size: number; color: stri
 };
 
 function createStars({ amount, size, color }: (typeof STAR_CONFIG)[StarLayer]) {
-  return Array.from({ length: amount }, () => {
-    const x = Math.floor(Math.random() * 2560);
-    const y = Math.floor(Math.random() * 2200);
+  return Array.from({ length: amount }, (_, indice) => {
+    const x = (indice * 977 + amount * 37) % 2560;
+    const y = (indice * 1483 + amount * 53) % 2200;
     const glow = size > 1 ? `, 0 0 ${size * 3}px ${color}` : "";
 
     return `${x}px ${y}px 0 ${color}${glow}`;
   }).join(", ");
 }
+
+const STARS: Record<StarLayer, string> = {
+  distant: createStars(STAR_CONFIG.distant),
+  medium: createStars(STAR_CONFIG.medium),
+  near: createStars(STAR_CONFIG.near),
+};
 
 export default function ChecklistBackground({ accentRgb }: { accentRgb: string }) {
   const reduceMotion = useReducedMotion();
@@ -51,20 +57,6 @@ export default function ChecklistBackground({ accentRgb }: { accentRgb: string }
     damping: 18,
     mass: 0.8,
   });
-  const [stars, setStars] = useState<Record<StarLayer, string>>({
-    distant: "",
-    medium: "",
-    near: "",
-  });
-
-  useEffect(() => {
-    setStars({
-      distant: createStars(STAR_CONFIG.distant),
-      medium: createStars(STAR_CONFIG.medium),
-      near: createStars(STAR_CONFIG.near),
-    });
-  }, []);
-
   useEffect(() => {
     if (reduceMotion || !window.matchMedia("(pointer: fine)").matches) return;
 
@@ -110,7 +102,7 @@ export default function ChecklistBackground({ accentRgb }: { accentRgb: string }
               style={{
                 width: config.size,
                 height: config.size,
-                boxShadow: stars[layer],
+                boxShadow: STARS[layer],
                 opacity: layer === "distant" ? 0.62 : layer === "medium" ? 0.82 : 1,
               }}
               animate={

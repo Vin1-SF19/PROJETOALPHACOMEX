@@ -1,4 +1,4 @@
-export const deveExecutarNoDia = (tarefa: any, dataAlvo: Date) => {
+export const deveExecutarNoDia = (tarefa: { diaSemana: number | null; intervaloDias: number | null; dataInicio: Date | string | null }, dataAlvo: Date) => {
     const alvo = new Date(dataAlvo);
     alvo.setHours(0, 0, 0, 0);
 

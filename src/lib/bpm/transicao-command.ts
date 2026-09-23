@@ -553,7 +553,14 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
 
       const movimento = await tx.bpmCard.updateMany({
         where: { id: card.id, etapaId: card.etapaId, versao: card.versao },
-        data: { etapaId: destino.id, status: lifecycle, concluidoEm, versao: { increment: 1 }, updatedAt: agora },
+        data: {
+          etapaId: destino.id,
+          status: lifecycle,
+          concluidoEm,
+          versao: { increment: 1 },
+          updatedAt: agora,
+          ...(input.proximoContatoEm !== undefined ? { proximoContatoEm: input.proximoContatoEm } : {}),
+        },
       });
       if (movimento.count !== 1) erro("CONCURRENT_TRANSITION", "Outra operação moveu este card. Recarregue e tente novamente.");
 

@@ -373,6 +373,7 @@ export async function SalvarFormularioEtapaBpm(input: unknown) {
     });
 
     revalidatePath(`/PainelAlpha/AlphaCRM/admin/pipelines/${pipelineId}`);
+    revalidatePath(`/PainelAlpha/AlphaCRM/pipeline/${pipelineId}`);
     if (resultado.alterado) {
       try {
         await notificarPipelineBpm({

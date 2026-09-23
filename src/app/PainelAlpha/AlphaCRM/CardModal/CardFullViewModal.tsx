@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
-
-
-
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+
+
+
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 import { isAdminRole } from "@/lib/roles";
@@ -29,14 +29,14 @@ import { type EstadoFollowUpModal } from "@/lib/bpm/card-modal-ui";
 import { formularioPossuiTarget } from "@/lib/bpm/formulario-renderer";
 import { BPM_CAPABILITIES } from "@/lib/bpm/ontology";
 import { CardAbertoLayout } from "./CardAbertoLayout";
-import { CardSaveProvider, useCardSave } from "./CardSaveContext";
+import { useCardSave } from "./CardSaveContext";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type EtapaOpcao = { id: string; chave?: string | null; nome: string; ordem: number; script: string | null };
 type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
 
 function resultadoRevogaAcessoCard(resultado: Awaited<ReturnType<typeof ObterCardBpm>>) {
-  return (!resultado.success && resultado.error === "Não autorizado") || (resultado.success && !resultado.data);
+  return (!resultado.success && ["Não autorizado", "NÃO_AUTORIZADO"].includes(resultado.error ?? "")) || (resultado.success && !resultado.data);
 }
 
 interface Props {
@@ -47,16 +47,19 @@ interface Props {
   currentUserRole: string | null;
   onClose: () => void;
   onAtualizado: () => void;
+  onCardExcluido?: (cardId: string) => void;
   onAbrirCard: (cardId: string) => void;
   abrirChecklistInicial?: boolean;
 }
 
-function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, currentUserId, currentUserRole, onClose, onAtualizado, onAbrirCard, abrirChecklistInicial = false }: Props) {
-  const { flushSaves, getPendingFields } = useCardSave();
-  const [camposNaoSalvos, setCamposNaoSalvos] = useState<string[]>([]);
+function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, currentUserId, currentUserRole, onClose, onAtualizado, onCardExcluido, onAbrirCard, abrirChecklistInicial = false }: Props) {
+  const { flushSaves, flushScheduled, getPendingFields, subscribeConfirmation } = useCardSave();
   const fechandoRef = useRef(false);
   const focoAnteriorRef = useRef<HTMLElement | null>(null);
+  const [camposNaoSalvos, setCamposNaoSalvos] = useState<string[]>([]);
+  useEffect(() => () => flushScheduled(`${cardId}:`), [cardId, flushScheduled]);
   const [card, setCard] = useState<CardDetalhe | null>(null);
+  useEffect(() => subscribeConfirmation(cardId, (confirmed) => setCard(confirmed)), [cardId, subscribeConfirmation]);
   const [etapas, setEtapas] = useState<EtapaOpcao[]>([]);
   const [interacoes, setInteracoes] = useState<Interacao[]>([]);
   const [erro, setErro] = useState<string | null>(null);
@@ -195,7 +198,7 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
     const savesConcluidos = await flushSaves();
     fechandoRef.current = false;
     if (!savesConcluidos) {
-      const pendentes = getPendingFields();
+      const pendentes = getPendingFields(cardId);
       setCamposNaoSalvos(pendentes.length ? pendentes : ["Alterações cujo salvamento não foi confirmado"]);
       return;
     }
@@ -209,6 +212,14 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
     }}>
       <SheetContent
         side="bottom"
+        onEscapeKeyDown={(event) => {
+          event.preventDefault();
+          void solicitarFechamento();
+        }}
+        onPointerDownOutside={(event) => {
+          event.preventDefault();
+          void solicitarFechamento();
+        }}
         className="h-[94vh] max-h-[94vh] rounded-t-[2rem] border-t border-white/10 bg-[radial-gradient(ellipse_120%_60%_at_50%_-10%,rgba(var(--accent-rgb),0.12),transparent_60%)] p-0 overflow-hidden sm:max-w-none"
         style={{ ["--accent-rgb" as string]: accent }}
       >
@@ -228,9 +239,19 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
               <CardAbertoLayout
                 card={card} etapas={etapas} interacoes={interacoes}
                 accent={accent} currentUserId={currentUserId} currentUserRole={currentUserRole}
-                realtimeRevision={realtimeRevision} onClose={onClose}
+                realtimeRevision={realtimeRevision} onClose={solicitarFechamento}
                 onAtualizado={handleAtualizado}
-                onAbrirCard={onAbrirCard}
+                onCardExcluido={onCardExcluido}
+                onAbrirCard={async (id) => {
+                  if (fechandoRef.current) return;
+                  flushScheduled(`${cardId}:`);
+                  if (!await flushSaves()) {
+                    const pendentes = getPendingFields(cardId);
+                    setCamposNaoSalvos(pendentes.length ? pendentes : ["Alterações cujo salvamento não foi confirmado"]);
+                    return;
+                  }
+                  onAbrirCard(id);
+                }}
                 onInteracaoCriada={(nova) => setInteracoes((prev) => [nova, ...prev])}
               >
                 <PainelRegistrar card={card} etapaAtual={etapaAtual} accent={accent}
@@ -264,9 +285,5 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
 }
 
 export default function CardFullViewModal(props: Props) {
-  return (
-    <CardSaveProvider>
-      <CardFullViewModalContent {...props} />
-    </CardSaveProvider>
-  );
+  return <CardFullViewModalContent key={props.cardId} {...props} />;
 }

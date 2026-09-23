@@ -4,9 +4,10 @@ import { useState } from "react";
 import { Plus, UserPlus } from "lucide-react";
 import { ModalAdicionarColaborador } from "@/app/PainelAlpha/AlphaVault/AdicionarColaborador/ModalAdicionarColaborador";
 import { ModalAdicionarSistema } from "@/app/PainelAlpha/AlphaVault/AdicionarSistema/ModalAdicionarSistema";
+import type { TemaAlpha } from "@/lib/temas";
 
 
-export function BotoesHeader({ style }: { style: any }) {
+export function BotoesHeader({ style }: { style: TemaAlpha }) {
   const [modalColabAberto, setModalColabAberto] = useState(false);
   const [modalSistemaAberto, setModalSistemaAberto] = useState(false); 
 

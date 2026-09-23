@@ -58,10 +58,11 @@ describe("CRM - configurações centralizadas e card editável", () => {
     );
 
     expect(builder).toContain("Título da seção");
-    expect(builder).toContain("Rótulo de ${");
-    expect(builder).toContain("moverComponenteParaSecao");
-    expect(builder).toContain("Mover componente para outra seção");
-    expect(builder).toContain("Remover componente da apresentação");
+    const lista = ler("src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/ListaCamposFormulario.tsx");
+    expect(builder).toContain("<ListaCamposFormulario");
+    expect(builder).toContain("moverItemFormulario");
+    expect(lista).toContain("Rótulo de ${");
+    expect(lista).toContain("da apresentação");
     expect(builder).toContain("Publicar composição");
     expect(builder).toContain("Preview do card");
     expect(builder).toContain("Configuração — ${etapa.nome}");

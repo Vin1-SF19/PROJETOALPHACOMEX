@@ -6,7 +6,11 @@ import { registrarAnexoSchema } from "@/lib/validations/bpm";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
-import { criarReferenciaAnexoBpm, validarReciboUploadAnexoBpm } from "@/lib/bpm/anexos-storage";
+import { criarReferenciaAnexoBpm, extrairPathnamePrivadoAnexoBpm, validarReciboUploadAnexoBpm } from "@/lib/bpm/anexos-storage";
+import { ACAO_LIMPEZA_ANEXO_PENDENTE, limparBlobAnexoPendente } from "@/lib/bpm/anexos-lifecycle";
+
+import { carregarCamposAplicaveisCardEtapa } from "@/lib/bpm/requisitos-etapa-server";
+import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -35,21 +39,17 @@ export async function RegistrarAnexoBpm(dados: unknown) {
     await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "enviarArquivo");
 
     const resultado = await db.$transaction(async (tx) => {
-      await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "enviarArquivo", tx);
+      const acesso = await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "enviarArquivo", tx);
       if (campoId) {
-        const campo = await tx.bpmCampo.findFirst({
-          where: {
-            id: campoId,
-            tipo: "arquivo",
-            ativo: true,
-            OR: [
-              { pipeline: { cards: { some: { id: cardId } } } },
-              { pipelinesAssociados: { some: { pipeline: { cards: { some: { id: cardId } } } } } },
-            ],
-          },
-          select: { id: true },
-        });
-        if (!campo) throw new Error("CAMPO_ARQUIVO_INVALIDO");
+        const card = await tx.bpmCard.findUnique({ where: { id: cardId }, select: { pipelineId: true, etapaId: true } });
+        if (!card) throw new Error("CAMPO_ARQUIVO_INVALIDO");
+        const perfil = acesso.isAdminGlobal || acesso.role === "ADMINISTRADOR"
+          ? "ADMIN" : acesso.role === "RESPONSAVEL" ? "RESPONSAVEL" : "MEMBRO";
+        const campos = await carregarCamposAplicaveisCardEtapa(cardId, card.pipelineId, card.etapaId, tx, perfil);
+        const campo = campos.find((item) => item.id === campoId && item.tipo === "arquivo");
+        if (!campo || !validarValoresCamposBpm([campo], { [campoId]: "" }).success) {
+          throw new Error("CAMPO_ARQUIVO_INVALIDO");
+        }
       }
       const referencia = criarReferenciaAnexoBpm(recibo.pathname);
       // O mesmo recibo assinado sempre descreve o mesmo pathname. Em caso de
@@ -58,7 +58,10 @@ export async function RegistrarAnexoBpm(dados: unknown) {
       const existente = await tx.bpmCardAnexo.findFirst({
         where: { cardId, url: referencia },
       });
-      if (existente) return { anexo: existente, criado: false };
+      if (existente) {
+        if ((existente.campoId ?? null) !== (campoId ?? null)) throw new Error("CAMPO_ARQUIVO_INVALIDO");
+        return { anexo: existente, criado: false };
+      }
       const criado = await tx.bpmCardAnexo.create({
         data: {
           cardId,
@@ -102,7 +105,7 @@ export async function RegistrarAnexoBpm(dados: unknown) {
     // requisições concorrentes podem chegar ao create juntas. A restrição
     // composta resolve a corrida; a perdedora devolve o mesmo anexo de modo
     // idempotente, sem criar outro histórico ou emitir outro evento realtime.
-    if (erroDeUnicidadeAnexo(error)) {
+    if (erroDeUnicidadeAnexo(error) && !registrarAnexoSchema.safeParse(dados).data?.campoId) {
       try {
         const session = await auth();
         if (!session?.user?.id) return { success: false, error: "Não autorizado" };
@@ -159,7 +162,7 @@ export async function ExcluirAnexoBpm(anexoId: string) {
 
     await exigirAcessoBpmCard(anexo.cardId, userId, session.user.role ?? null, "excluirArquivo");
 
-    await db.$transaction(async (tx) => {
+    const pendenteId = await db.$transaction(async (tx) => {
       await exigirAcessoBpmCard(anexo.cardId, userId, session.user.role ?? null, "excluirArquivo", tx);
       await tx.bpmCardAnexo.delete({ where: { id: anexoId } });
       await registrarHistoricoCard(
@@ -171,7 +174,27 @@ export async function ExcluirAnexoBpm(anexoId: string) {
         },
         tx,
       );
+      if (!extrairPathnamePrivadoAnexoBpm(anexo.url)) return null;
+      const pendente = await tx.bpmCardHistorico.create({
+        data: {
+          cardId: anexo.cardId,
+          acao: ACAO_LIMPEZA_ANEXO_PENDENTE,
+          usuarioId: userId,
+          valorAnteriorJson: anexo.url,
+        },
+        select: { id: true },
+      });
+      return pendente.id;
     });
+
+    if (pendenteId) {
+      try {
+        await limparBlobAnexoPendente(pendenteId);
+      } catch (error) {
+        // A exclusão do metadado já foi commitada. O cron repetirá a limpeza.
+        console.error("[ExcluirAnexoBpm] Blob pendente de reconciliação", { pendenteId, error });
+      }
+    }
 
     revalidatePath(`${ROTA_BASE}/pipeline`);
     await notificarPipelineBpm({ cardId: anexo.cardId, tipo: "ANEXO_ALTERADO" });

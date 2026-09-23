@@ -18,13 +18,14 @@ export default async function AlphaSkillsPage() {
 
     const podeGerenciar = permissoes.includes('skillsGerenciamento');
 
-    const progress = (progressRaw || []).map((p: any) => ({
+    const progress = (progressRaw || []).map((p) => ({
         aulaId: String(p.aulaId),
         concluido: Boolean(p.concluido)
     }));
 
     // Collect all unique modules across all courses
-    const allModulosMap = new Map<string, any>();
+    type ModuloCurso = (typeof cursos)[number]["modulos"][number];
+    const allModulosMap = new Map<string, ModuloCurso>();
     cursos.forEach(c =>
         c.modulos.forEach(m => {
             if (!allModulosMap.has(m.id)) allModulosMap.set(m.id, m);
@@ -34,10 +35,17 @@ export default async function AlphaSkillsPage() {
     const allModulosOrdenados = [...allModulos].sort((a, b) => (a.ordemNoCurso || 0) - (b.ordemNoCurso || 0));
 
     // Process isLiberado globally
-    const modulosProcessadosMap = new Map<string, any>();
+    const prepararModulo = (mod: ModuloCurso) => ({
+        ...mod,
+        imagemUrl: mod.imagemUrl ?? "",
+        descricao: mod.descricao ?? undefined,
+        aprendizado: mod.aprendizado ?? undefined,
+    });
+    type ModuloExibicao = ReturnType<typeof prepararModulo> & { isLiberado: boolean; nomeAnterior?: string };
+    const modulosProcessadosMap = new Map<string, ModuloExibicao>();
     allModulos.forEach(mod => {
         if (!mod.bloqueado) {
-            modulosProcessadosMap.set(mod.id, { ...mod, isLiberado: true });
+            modulosProcessadosMap.set(mod.id, { ...prepararModulo(mod), isLiberado: true });
             return;
         }
 
@@ -48,21 +56,21 @@ export default async function AlphaSkillsPage() {
         }
 
         if (!idRequisito) {
-            modulosProcessadosMap.set(mod.id, { ...mod, isLiberado: true });
+            modulosProcessadosMap.set(mod.id, { ...prepararModulo(mod), isLiberado: true });
             return;
         }
 
-        const aulasRequisito = vids.filter((v: any) =>
-            v.modulo?.some((m: any) => String(m.id) === String(idRequisito))
+        const aulasRequisito = vids.filter((v) =>
+            v.modulo?.some((m) => String(m.id) === String(idRequisito))
         );
         const concluidas = progress.filter(p =>
-            aulasRequisito.some((a: any) => String(a.id) === String(p.aulaId)) && p.concluido
+            aulasRequisito.some((a) => String(a.id) === String(p.aulaId)) && p.concluido
         );
         const pct = aulasRequisito.length > 0 ? (concluidas.length / aulasRequisito.length) * 100 : 0;
         const meta = mod.percentualMinimo || 100;
 
         modulosProcessadosMap.set(mod.id, {
-            ...mod,
+            ...prepararModulo(mod),
             isLiberado: pct >= meta,
             nomeAnterior: allModulos.find(m => String(m.id) === String(idRequisito))?.nome
         });
@@ -71,7 +79,7 @@ export default async function AlphaSkillsPage() {
     // Rebuild courses with processed modules
     const cursosProcessados = cursos.map(curso => ({
         ...curso,
-        modulos: curso.modulos.map(m => modulosProcessadosMap.get(m.id) || { ...m, isLiberado: true })
+        modulos: curso.modulos.map(m => modulosProcessadosMap.get(m.id) || { ...prepararModulo(m), isLiberado: true })
     }));
 
     return (

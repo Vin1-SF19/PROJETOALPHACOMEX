@@ -55,11 +55,11 @@ type Props = {
   onExportarExcel: (nome: string) => void;
   onReconsultarErros: () => void;
   processando: boolean;
-  empresas: any[];
+  empresas: unknown[];
   selecionados: Set<string>;
   ordem: "todos" | "asc" | "desc" | null;
   ordemData: "todos" | "recentes" | "antigos" | null;
-  empresasExibidas: any[];
+  empresasExibidas: unknown[];
   handleAlternarOrdemNome: () => void;
   handleAlternarOrdemData: () => void;
   handleRemoverSelecionados: () => void;
@@ -70,7 +70,7 @@ type Props = {
   totalEmpresas: number;
   setOrdem: (v: "todos" | "asc" | "desc" | null) => void;
   setOrdemData: (v: "todos" | "recentes" | "antigos" | null) => void;
-  onSalvarBanco: (nome: string) => Promise<any>;
+  onSalvarBanco: (nome: string) => Promise<{ success?: boolean; error?: string } | void>;
   filtroStatus: "todos" | "erro" | "sucesso";
   setFiltroStatus: (v: "todos" | "erro" | "sucesso") => void;
   cnpjsSelecionadosNoBanco: string[];
@@ -439,7 +439,7 @@ export default function ModalButtons({
                     />
                     <div
                       className="w-11 h-6 bg-slate-800 rounded-full peer after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:h-5 after:w-5 after:bg-white after:rounded-full after:transition-all peer-checked:after:translate-x-full"
-                      style={{ ["--tw-peer-checked-bg" as any]: `rgb(${visual.accent})` }}
+                      style={{ "--tw-peer-checked-bg": `rgb(${visual.accent})` } as React.CSSProperties}
                     >
                       <style>{`input:checked + div { background-color: rgba(${visual.accent}, 0.8) !important; }`}</style>
                     </div>
@@ -474,7 +474,7 @@ export default function ModalButtons({
             </div>
             <p className="text-slate-400 text-sm mb-5">
               Já existe uma planilha chamada{" "}
-              <span className="text-white font-bold">"{nomeArquivo}"</span>. Escolha um novo
+              <span className="text-white font-bold">&quot;{nomeArquivo}&quot;</span>. Escolha um novo
               nome:
             </p>
             <input

@@ -4,13 +4,13 @@ import { useSession } from "next-auth/react";
 import { useEffect } from "react";
 import { getTema } from "@/lib/temas";
 
-export function ThemeProviderAlpha({ children, configIncial }: any) {
+export function ThemeProviderAlpha({ children, configIncial }: { children: React.ReactNode; configIncial?: { tema?: string | null } }) {
   const { data: session } = useSession();
 
   useEffect(() => {
     
     const temaLocal = localStorage.getItem("alpha-theme-temp");
-    const userObj = session?.user as any;
+    const userObj = session?.user;
     const temaNome = temaLocal || userObj?.tema_interface || configIncial?.tema || "blue";
     
     const estilo = getTema(temaNome);

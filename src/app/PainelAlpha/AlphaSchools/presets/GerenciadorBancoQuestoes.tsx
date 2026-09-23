@@ -4,25 +4,27 @@ import { Tag, Plus, Loader2, ChevronLeft, ListChecks, AlignLeft } from 'lucide-r
 import { createTagAction, getTagsAction } from '@/actions/questoes';
 import { toast } from 'sonner';
 import FormularioPerguntas from './Questoes';
+import type { TemaAlpha } from '@/lib/temas';
 
+type TagQuestao = Awaited<ReturnType<typeof getTagsAction>>[number];
 
-export default function GerenciadorQuestoes({ temaConfig }: any) {
+export default function GerenciadorQuestoes({ temaConfig }: { temaConfig: TemaAlpha }) {
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
-    const [tags, setTags] = useState<any[]>([]);
+    const [tags, setTags] = useState<TagQuestao[]>([]);
     const [novaTagName, setNovaTagName] = useState("");
     
-    const [tagAtiva, setTagAtiva] = useState<any | null>(null);
+    const [tagAtiva, setTagAtiva] = useState<TagQuestao | null>(null);
 
     useEffect(() => {
         carregarTags();
     }, []);
 
-    const carregarTags = async () => {
+    async function carregarTags() {
         const data = await getTagsAction();
         setTags(data);
         setLoading(false);
-    };
+    }
 
     const handleCriarTag = async () => {
         if (!novaTagName) return;

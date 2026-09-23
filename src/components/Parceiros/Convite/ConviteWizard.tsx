@@ -238,6 +238,8 @@ export default function ConviteWizard({ token, termo }: Props) {
             )}
             {step === 5 && (
               <StepEmpresa
+                token={token}
+                pin={form.pin}
                 cnpj={form.cnpj}
                 razaoSocial={form.razaoSocial}
                 nomeFantasia={form.nomeFantasia}

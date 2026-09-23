@@ -8,18 +8,22 @@ import { isAdminRole } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
+function obterLimiteOnline() {
+  return new Date(Date.now() - 20000).toISOString();
+}
+
 export default async function UsuariosOnlinePage() {
   const session = await auth();
   if (!isAdminRole(session?.user?.role)) redirect("/");
 
-  const style = getTema((session?.user as any)?.tema_interface || "blue");
+  const style = getTema(session?.user?.tema_interface || "blue");
   
   const todosUsuarios = await db.usuarios.findMany({
     select: { id: true, nome: true, email: true, role: true, tema_interface: true, ultimo_aviso: true },
     orderBy: { nome: 'asc' }
   });
 
-  const limiteOnline = new Date(Date.now() - 20000).toISOString();
+  const limiteOnline = obterLimiteOnline();
 
   return (
     <main className="min-h-screen bg-[#02040a] p-10 lg:p-20 text-white relative overflow-hidden font-sans">
