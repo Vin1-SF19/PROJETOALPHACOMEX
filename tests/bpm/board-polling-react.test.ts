@@ -113,7 +113,7 @@ it("não recoloca o card após exclusão local quando uma consulta antiga termin
     });
     expect(container.textContent).toContain("Nenhum card neste pipeline");
 
-    await act(async () => responder({ success: true, data: [card] }));
+    await act(async () => responder({ success: true, data: [card] } as unknown as Awaited<ReturnType<typeof ListarCardsPipelineBpm>>));
     expect(container.textContent).toContain("Nenhum card neste pipeline");
   } finally {
     await act(async () => root.unmount());
