@@ -236,3 +236,23 @@ Os registros `BLOCKED` da Fase 3 acima descrevem tentativas anteriores, nao o es
 Nesta revisao, uma consulta **somente de leitura** com a configuracao Turso de `.env.local` confirmou a tabela `BpmEtapaCardViewConfig`, suas sete colunas, duas FKs com `CASCADE`, o indice unico `(pipelineId, etapaId)`, tres registros atuais e nenhuma violacao de `PRAGMA foreign_key_check`. O dump especifico de 2026-09-19 ainda confere em tamanho e SHA-256 com o manifesto; o diario registra `integrity_check=ok` em restauracao descartavel na data da aplicacao. Esse backup tem mais de 48 horas e nao autorizaria uma nova mudanca estrutural hoje. **Nao reaplicar a migration.**
 
 A fase de banco deste objetivo esta concluida. Permanecem pendentes a projecao real dos elementos CHECKLIST, CADENCIA e PENDENCIAS, a homologacao autenticada do editor/board e a revisao do lote antes da producao. Nenhuma escrita no banco foi feita nesta reconciliacao.
+
+## Ajuste do editor e da prévia — 2026-09-23
+
+- [x] Prévia usa o próprio `KanbanCard` do board com uma empresa real da etapa quando disponível; sem empresa, usa dados demonstrativos no mesmo componente.
+- [x] Editor pode partir dos dados visíveis de um card já existente e ordenar/remover/adicionar campos antes de publicar.
+- [x] Catálogo inclui nome fantasia, serviço, status pós-fechamento, próximo contato, próxima tarefa, anotação rápida e totais de tarefas/anexos; esses dados respeitam a composição publicada por etapa.
+- [x] Etapa sem composição mostra o layout anterior na prévia e permite salvar uma composição vazia de forma explícita.
+- [x] A configuração é lida por etapa para todos os cards, inclusive os existentes, na recarga do board. Nenhum seed, backfill ou escrita direta em banco foi realizado.
+- [x] `npm run lint`: exit 0, 1192 avisos globais; `npm run typecheck`: exit 0; `npm test`: 500 arquivos e 3766 testes aprovados; `npm run build`: exit 0 após o último ajuste da prévia.
+
+### File List deste ajuste
+
+- `src/actions/bpm/CardKanban.ts` — valores reais e autorizados para a empresa exibida na prévia.
+- `src/actions/bpm/Cards.ts` — projeção dos novos elementos compactos.
+- `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx` — card compartilhado com a prévia e remoção dos detalhes fixos quando há composição.
+- `src/components/bpm/kanban/CardKanbanRenderer.tsx` — rótulos e ícones dos novos elementos.
+- `src/components/bpm/kanban/CardKanbanWorkspace.tsx` — editor, dados reais e prévia fiel ao board.
+- `src/lib/bpm/card-kanban.ts` — catálogo dos elementos editáveis.
+- `tests/bpm/card-kanban-registry.test.ts` — contrato do catálogo atualizado.
+- `docs/stories/story-rm-2026-e1e1f7-card-kanban-configuravel.md` — checklist e File List.

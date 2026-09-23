@@ -1,4 +1,4 @@
-import { AlertTriangle, Building2, CalendarClock, ClipboardList, Phone } from "lucide-react";
+import { AlertTriangle, Building2, CalendarClock, ClipboardList, Phone, Paperclip, StickyNote } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import type { CardKanbanComposicao, CardKanbanNativeKey } from "@/lib/bpm/card-kanban";
@@ -29,6 +29,14 @@ const ICONE_NATIVO: Partial<Record<CardKanbanNativeKey, typeof Building2>> = {
   CHECKLIST: ClipboardList,
   CADENCIA: CalendarClock,
   PENDENCIAS: AlertTriangle,
+  NOME_FANTASIA: Building2,
+  SERVICO: ClipboardList,
+  STATUS_POS_FECHAMENTO: AlertTriangle,
+  PROXIMO_CONTATO: CalendarClock,
+  PROXIMA_TAREFA: CalendarClock,
+  ANOTACAO_RAPIDA: StickyNote,
+  TAREFAS: ClipboardList,
+  ANEXOS: Paperclip,
 };
 
 function Badge({
@@ -85,6 +93,14 @@ export function CardKanbanRenderer({
         CHECKLIST: "Procedimento",
         CADENCIA: "Cadência",
         PENDENCIAS: "Pendências",
+        NOME_FANTASIA: "Nome fantasia",
+        SERVICO: "Serviço",
+        STATUS_POS_FECHAMENTO: "Status",
+        PROXIMO_CONTATO: "Próximo contato",
+        PROXIMA_TAREFA: "Próxima tarefa",
+        ANOTACAO_RAPIDA: "Anotação",
+        TAREFAS: "Tarefas",
+        ANEXOS: "Anexos",
       };
       return [
         {

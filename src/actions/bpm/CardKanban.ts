@@ -13,11 +13,61 @@ import {
   type CardKanbanComposicao,
 } from "@/lib/bpm/card-kanban";
 import { avancarConfigVersionBpm } from "@/lib/bpm/config-version";
-import { exigirAcessoConfigPipeline } from "@/lib/bpm/ownership";
+import { exigirAcessoBpmPipeline, exigirAcessoConfigPipeline } from "@/lib/bpm/ownership";
+import { formatCNPJ } from "@/lib/format-cnpj";
+import { paraExibicaoTelefone } from "@/lib/validations/cs-nps";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import db from "@/lib/prisma";
 
 const idSchema = z.string().trim().min(1).max(200);
+
+/** Valores reais de um card da etapa para a prévia do editor, inclusive campos ainda não publicados. */
+export async function ObterValoresExemploCardKanban(pipelineId: string, etapaId: string, cardId: string) {
+  try {
+    const ids = z.tuple([idSchema, idSchema, idSchema]).safeParse([pipelineId, etapaId, cardId]);
+    if (!ids.success) return { success: false as const, error: "Identificador inválido" };
+    const session = await auth();
+    const userId = Number(session?.user?.id);
+    if (!Number.isSafeInteger(userId) || userId <= 0)
+      return { success: false as const, error: "Não autorizado" };
+    await exigirAcessoConfigPipeline(userId, "configurarEtapas");
+    await exigirAcessoBpmPipeline(pipelineId, userId);
+    const card = await db.bpmCard.findFirst({
+      where: { id: cardId, pipelineId, etapaId, status: "ATIVO" },
+      select: {
+        empresa: { select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true } },
+        campoValores: {
+          where: { campo: { ativo: true, etapaConfiguracoes: { some: { etapaId, visivel: true } },
+            OR: [{ pipelineId }, { pipelinesAssociados: { some: { pipelineId } } }] } },
+          select: { valor: true, campo: { select: { id: true, nome: true } } },
+        },
+      },
+    });
+    if (!card) return { success: false as const, error: "Card não encontrado nesta etapa" };
+    const vinculos = await db.pessoaClienteVinculo.findMany({
+      where: { clienteId: card.empresa.id },
+      select: { pessoa: { select: { celular: true } } },
+      orderBy: { pessoa: { nome: "asc" } },
+    });
+    const telefone = vinculos.map((vinculo) => paraExibicaoTelefone(vinculo.pessoa.celular).trim()).find(Boolean) ?? "";
+    return {
+      success: true as const,
+      data: {
+        nativos: {
+          EMPRESA_NOME: { status: "ok" as const, valor: card.empresa.razaoSocial || card.empresa.nomeFantasia || "" },
+          CNPJ: { status: card.empresa.cnpj ? "ok" as const : "vazio" as const, valor: formatCNPJ(card.empresa.cnpj) ?? "" },
+          TELEFONE: { status: telefone ? "ok" as const : "vazio" as const, valor: telefone },
+        },
+        campos: Object.fromEntries(card.campoValores.map((item) => [item.campo.id,
+          { status: item.valor?.trim() ? "ok" as const : "vazio" as const, valor: item.valor ?? "" }])),
+        camposLabel: Object.fromEntries(card.campoValores.map((item) => [item.campo.id, item.campo.nome])),
+      },
+    };
+  } catch (error) {
+    console.error("[ObterValoresExemploCardKanban]", error);
+    return { success: false as const, error: "Não foi possível carregar os valores do card" };
+  }
+}
 
 function falhar(codigo: string, mensagem: string): never {
   throw new Error(`${codigo}: ${mensagem}`);

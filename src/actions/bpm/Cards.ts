@@ -35,6 +35,7 @@ import { executarAutomacoesCentraisDoCardAgora } from "@/lib/bpm/automacoes/orqu
 import { automacaoMigradaEstaAtiva, NOMES_AUTOMACOES_MIGRADAS } from "@/lib/bpm/automacoes/migracao-hardcoded";
 import { salvarValoresGlobaisPersonalizadosCampos } from "@/lib/bpm/campos-configuraveis-server";
 import { desserializarComposicaoCardKanban, type CardKanbanComposicao } from "@/lib/bpm/card-kanban";
+import { obterStatusPosFechamentoVisivel } from "@/lib/bpm/status-pos-fechamento";
 import { projetarResumosKanbanOperacionais } from "@/lib/bpm/card-kanban-projecao";
 import type { CardKanbanValores } from "@/components/bpm/kanban/CardKanbanRenderer";
 
@@ -282,6 +283,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
             where: { ativo: true },
             select: {
               id: true,
+              nome: true,
               visibilidades: {
                 select: { perfil: true, podeVer: true, podeAgir: true },
               },
@@ -524,6 +526,8 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
       telefoneVirtual?: string | null;
       cardId?: string;
       campoValores: { valor: string | null; campo: { id: string; nome: string } }[];
+      card?: (typeof cards)[number];
+      etapaNome?: string;
     }): CardKanbanValores {
       const campoValorPorId = new Map(
         params.campoValores.map((registro) => [registro.campo.id, registro.valor]),
@@ -555,6 +559,21 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
             nativos.PENDENCIAS = params.cardId
               ? resumosOperacionais.get(params.cardId)?.pendencias ?? { status: "vazio" }
               : { status: "vazio" };
+          } else if (params.card && params.etapaNome) {
+            const card = params.card;
+            const data = (valor: Date | null | undefined) => valor
+              ? new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(valor)
+              : "";
+            const valor = elemento.key === "NOME_FANTASIA" ? card.empresa.nomeFantasia
+              : elemento.key === "SERVICO" ? card.servico
+              : elemento.key === "STATUS_POS_FECHAMENTO" ? obterStatusPosFechamentoVisivel({ etapaNome: params.etapaNome, status: card.statusPosFechamento })?.label
+              : elemento.key === "PROXIMO_CONTATO" ? data(card.proximoContatoEm)
+              : elemento.key === "PROXIMA_TAREFA" ? data(card.tarefas.find((tarefa) => tarefa.prazo)?.prazo)
+              : elemento.key === "ANOTACAO_RAPIDA" ? card.tarefas.find((tarefa) => tarefa.tipo === "LEMBRETE_RAPIDO")?.titulo
+              : elemento.key === "TAREFAS" ? String(card._count.tarefas)
+              : elemento.key === "ANEXOS" ? String(card._count.anexos)
+              : null;
+            nativos[elemento.key] = valor ? { status: "ok", valor } : { status: "vazio" };
           } else {
             nativos[elemento.key] = { status: "indisponivel" };
           }
@@ -597,6 +616,8 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
               empresaNome: card.empresa.razaoSocial || card.empresa.nomeFantasia || "",
               cnpj: card.empresa.cnpj,
               campoValores: card.campoValores,
+              card,
+              etapaNome: pipelineInfo?.etapas.find((etapa) => etapa.id === card.etapaId)?.nome ?? "",
             })
           : undefined,
       };

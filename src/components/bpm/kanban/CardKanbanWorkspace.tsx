@@ -1,24 +1,29 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronUp, Loader2, Plus, RotateCcw, Save, Trash2, Video } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
+import { DndContext } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { toast } from "sonner";
 
 import {
   ListarCatalogoCardKanban,
   ObterConfiguracaoCardKanban,
   SalvarConfiguracaoCardKanban,
+  ObterValoresExemploCardKanban,
 } from "@/actions/bpm/CardKanban";
+import { ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
+import { KanbanCard, type CardBpm } from "@/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient";
 import {
   composicaoCardKanbanSemAlteracao,
   elementoCardKanbanChaveEstavel,
   type CardKanbanComposicao,
   type CardKanbanElemento,
 } from "@/lib/bpm/card-kanban";
-import { CardKanbanRenderer, type CardKanbanValores } from "@/components/bpm/kanban/CardKanbanRenderer";
+import type { CardKanbanValores } from "@/components/bpm/kanban/CardKanbanRenderer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { GradientBlobCard } from "@/components/ui/gradient-blob-card";
 import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
+import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
 
 type CatalogoItem = { chave: string; label: string; elemento: CardKanbanElemento };
 type EtapaCardKanban = { id: string; nome: string; cor?: string | null };
@@ -56,60 +61,47 @@ function valoresDeExemplo(composicao: CardKanbanComposicao, labelsPorChave: Map<
   return { nativos, campos, camposLabel };
 }
 
-/**
- * Espelha o shell visual do card real do board (GradientBlobCard + composição)
- * para que a pré-visualização mostre exatamente o que vai aparecer no
- * pipeline, incluindo o widget de Agendar Reunião quando ele estiver na
- * composição (substitui o corpo padrão do card, igual ao board real).
- */
+/** Usa o mesmo componente do board, com dados reais quando há empresa na etapa. */
 function CardKanbanPreview({
   etapaNome,
   accent,
   composicao,
   valores,
+  cardExemplo,
+  usarLayoutAtual,
 }: {
   etapaNome: string;
   accent: string;
   composicao: CardKanbanComposicao;
   valores: CardKanbanValores;
+  cardExemplo: CardBpm | null;
+  usarLayoutAtual: boolean;
 }) {
-  const agendarReuniao = composicao.some(
-    (elemento) => elemento.kind === "NATIVE" && elemento.key === "AGENDAMENTO_REUNIAO",
-  );
+  const demonstracao: CardBpm = {
+    id: "preview-card-demonstrativo", etapaId: "preview", servico: null, status: "ATIVO",
+    origem: "real", nolossLeadId: null, createdAt: new Date(), primeiraVisualizacaoEm: new Date(),
+    dataReuniao: null, googleMeetLink: null, statusPosFechamento: null,
+    empresa: { id: 0, razaoSocial: "Empresa demonstrativa", nomeFantasia: null, cnpj: null },
+    responsavel: { id: 0, nome: "Responsável" }, membros: [],
+    _count: { tarefas: 0, anexos: 0 }, tarefas: [], podeAgirEtapa: false,
+  };
+  const cardBase = cardExemplo ?? demonstracao;
+  const cardPreview: CardBpm = { ...cardBase,
+    cardViewComposicao: usarLayoutAtual ? undefined : composicao,
+    cardViewValores: usarLayoutAtual ? undefined : valores };
   return (
-    <div className="mx-auto w-full max-w-xs">
-      <GradientBlobCard accent={accent}>
-        <div className="space-y-2.5">
-          {agendarReuniao ? (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs text-slate-300">
-                <span className="font-medium">Data e hora</span>
-                <span className="ml-auto tabular-nums text-slate-200">Não definida</span>
-              </div>
-              <div className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-xs font-semibold text-slate-200">
-                <Video size={14} aria-hidden="true" />
-                Agendar pelo Google Meet
-              </div>
-              <CardKanbanRenderer composicao={composicao} valores={valores} />
-            </div>
-          ) : (
-            <>
-              {composicao.length > 0 ? (
-                <CardKanbanRenderer composicao={composicao} valores={valores} />
-              ) : (
-                <p className="rounded-xl border border-dashed border-white/10 px-3 py-3 text-center text-[11px] text-slate-500">
-                  Nenhum campo configurado — o card mostra só os controles estruturais.
-                </p>
-              )}
-            </>
-          )}
-          <div className="flex items-center justify-between border-t border-white/[0.06] pt-2.5 text-[10px] text-slate-500">
-            <span>Sem pendências</span>
-            <span className="size-5 rounded-full border border-white/10 bg-white/[0.05]" aria-hidden="true" />
+    <div className="mx-auto w-full max-w-[260px]" aria-label={`Pré-visualização com ${cardBase.empresa.razaoSocial}`}>
+      <DndContext>
+        <SortableContext items={[cardPreview.id]} strategy={verticalListSortingStrategy}>
+          <div className="pointer-events-none">
+            <KanbanCard card={cardPreview} etapaNome={etapaNome} accent={accent}
+              novosLeads={etapaEhNovosLeads(etapaNome)} arrastoDesabilitado onAbrir={() => {}} />
           </div>
-        </div>
-      </GradientBlobCard>
-      <p className="mt-2 text-center text-[10px] text-slate-500">Etapa: {etapaNome}</p>
+        </SortableContext>
+      </DndContext>
+      <p className="mt-2 text-center text-[10px] text-slate-500">
+        {cardExemplo ? `Empresa da etapa: ${cardExemplo.empresa.razaoSocial}` : "Empresa demonstrativa"}
+      </p>
     </div>
   );
 }
@@ -132,6 +124,8 @@ export function CardKanbanWorkspace({
   const [composicaoSalva, setComposicaoSalva] = useState<CardKanbanComposicao>([]);
   const [versao, setVersao] = useState<number | null>(null);
   const [selecaoParaAdicionar, setSelecaoParaAdicionar] = useState<string>("");
+  const [cardExemplo, setCardExemplo] = useState<CardBpm | null>(null);
+  const [valoresReais, setValoresReais] = useState<CardKanbanValores | null>(null);
 
   const etapaAtual = etapas.find((etapa) => etapa.id === etapaId);
 
@@ -142,9 +136,12 @@ export function CardKanbanWorkspace({
     }
     setCarregando(true);
     setErro(null);
-    const [catalogoResultado, configuracaoResultado] = await Promise.all([
+    setCardExemplo(null);
+    setValoresReais(null);
+    const [catalogoResultado, configuracaoResultado, cardsResultado] = await Promise.all([
       ListarCatalogoCardKanban(pipelineId, etapaId),
       ObterConfiguracaoCardKanban(pipelineId, etapaId),
+      ListarCardsPipelineBpm(pipelineId),
     ]);
     if (!catalogoResultado.success) {
       setErro(catalogoResultado.error);
@@ -160,6 +157,20 @@ export function CardKanbanWorkspace({
     setComposicao(configuracaoResultado.data.composicao);
     setComposicaoSalva(configuracaoResultado.data.composicao);
     setVersao(configuracaoResultado.data.versao);
+    if (cardsResultado.success) {
+      const exemplo = (cardsResultado.data as CardBpm[]).find((card) => card.etapaId === etapaId && card.origem === "real") ?? null;
+      if (exemplo) {
+        setCardExemplo(exemplo);
+        const valoresResultado = await ObterValoresExemploCardKanban(pipelineId, etapaId, exemplo.id);
+        if (valoresResultado.success) {
+          setValoresReais({
+            nativos: { ...exemplo.cardViewValores?.nativos, ...valoresResultado.data.nativos },
+            campos: { ...exemplo.cardViewValores?.campos, ...valoresResultado.data.campos },
+            camposLabel: { ...exemplo.cardViewValores?.camposLabel, ...valoresResultado.data.camposLabel },
+          });
+        }
+      }
+    }
     setCarregando(false);
   }, [pipelineId, etapaId]);
 
@@ -178,11 +189,12 @@ export function CardKanbanWorkspace({
     [catalogo, chavesEmUso],
   );
   const valoresPreview = useMemo(
-    () => valoresDeExemplo(composicao, labelsPorChave),
-    [composicao, labelsPorChave],
+    () => valoresReais ?? valoresDeExemplo(composicao, labelsPorChave),
+    [composicao, labelsPorChave, valoresReais],
   );
   const etapaEhSiteLeads = etapaAtual ? etapaEhNovosLeads(etapaAtual.nome) : false;
   const possuiAlteracoes = !composicaoCardKanbanSemAlteracao(composicaoSalva, composicao);
+  const podeSalvar = versao === null || possuiAlteracoes;
 
   function selecionarEtapa(novoEtapaId: string) {
     if (novoEtapaId === etapaId) return;
@@ -218,6 +230,29 @@ export function CardKanbanWorkspace({
     if (!item) return;
     setComposicao((atual) => [...atual, item.elemento]);
     setSelecaoParaAdicionar("");
+  }
+
+  function usarCamposDoCardAtual() {
+    if (!cardExemplo) return;
+    const nativos = [
+      "EMPRESA_NOME",
+      ...(cardExemplo.empresa.nomeFantasia ? ["NOME_FANTASIA"] : []),
+      ...(cardExemplo.empresa.cnpj ? ["CNPJ"] : []),
+      ...(cardExemplo.servico ? ["SERVICO"] : []),
+      ...(etapaAtual && etapaEhAgendarReuniao(etapaAtual.nome) ? ["AGENDAMENTO_REUNIAO"] : []),
+      ...(cardExemplo.statusPosFechamento ? ["STATUS_POS_FECHAMENTO"] : []),
+      ...(cardExemplo.proximoContatoEm ? ["PROXIMO_CONTATO"] : []),
+      ...(cardExemplo.tarefas.some((tarefa) => tarefa.prazo) ? ["PROXIMA_TAREFA"] : []),
+      ...(cardExemplo.tarefas.some((tarefa) => tarefa.tipo === "LEMBRETE_RAPIDO") ? ["ANOTACAO_RAPIDA"] : []),
+      ...(cardExemplo._count.tarefas > 0 ? ["TAREFAS"] : []),
+      ...(cardExemplo._count.anexos > 0 ? ["ANEXOS"] : []),
+    ];
+    const camposVisiveis = new Set(cardExemplo.campoValores?.filter((item) => item.valor?.trim()).map((item) => item.campo.nome) ?? []);
+    setComposicao(catalogo.filter((item) =>
+      item.elemento.kind === "NATIVE"
+        ? nativos.includes(item.elemento.key)
+        : camposVisiveis.has(item.label),
+    ).map((item) => item.elemento));
   }
 
   async function salvar() {
@@ -281,6 +316,13 @@ export function CardKanbanWorkspace({
                 Escolha e ordene os campos exibidos no card fechado desta etapa. Sem seleção, o card mostra
                 apenas os controles estruturais (abertura, arrasto, tarefas e anexos).
               </p>
+              {versao === null && <p className="mt-2 text-xs text-amber-200">Esta etapa ainda usa o layout anterior. Escolha os campos e salve para aplicar a composição a todos os cards, inclusive os existentes. Também é possível salvar uma composição vazia.</p>}
+              {versao === null && cardExemplo && composicao.length === 0 && (
+                <button type="button" onClick={usarCamposDoCardAtual}
+                  className="mt-2 rounded-lg border border-cyan-400/30 px-3 py-1.5 text-xs font-semibold text-cyan-200 hover:bg-cyan-400/10">
+                  Começar com os dados deste card
+                </button>
+              )}
               {etapaEhSiteLeads && (
                 <p className="mt-2 rounded-xl border border-sky-400/20 bg-sky-500/[0.06] px-3 py-2 text-[11px] text-sky-200">
                   Esta é a etapa que recebe leads do site antes de virarem card real. A mesma composição
@@ -374,7 +416,7 @@ export function CardKanbanWorkspace({
               <button
                 type="button"
                 onClick={() => void salvar()}
-                disabled={!possuiAlteracoes || salvando}
+                disabled={!podeSalvar || salvando}
                 className="flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-4 py-2 text-sm font-semibold text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
               >
                 {salvando ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
@@ -395,7 +437,10 @@ export function CardKanbanWorkspace({
               accent={accent}
               composicao={composicao}
               valores={valoresPreview}
+              cardExemplo={cardExemplo}
+              usarLayoutAtual={versao === null && !possuiAlteracoes}
             />
+            {!cardExemplo && <p className="mt-3 text-center text-xs text-slate-400">Ainda não há empresa cadastrada nesta etapa; a prévia usa dados demonstrativos.</p>}
           </section>
         </div>
       )}

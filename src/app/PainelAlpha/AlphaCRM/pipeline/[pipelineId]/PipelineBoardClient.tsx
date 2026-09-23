@@ -84,7 +84,7 @@ interface PipelineBpm {
   automacoesGlobais?: AutomacaoBoard[];
 }
 
-interface CardBpm {
+export interface CardBpm {
   id: string;
   etapaId: string;
   servico: string | null;
@@ -183,7 +183,7 @@ function BadgeProximoContato({ proximoContatoEm }: { proximoContatoEm: Date | st
   );
 }
 
-function KanbanCard({
+export function KanbanCard({
   card,
   etapaNome,
   accent,
@@ -432,18 +432,18 @@ function KanbanCard({
                 )}
               </>
             )}
-            {!novosLeads && statusConfig && (
+            {card.cardViewComposicao === undefined && !novosLeads && statusConfig && (
               <span className={cn("rounded-lg border px-2 py-1 text-[9px] font-bold uppercase tracking-wide", statusConfig.badgeClassName)}>
                 {statusConfig.label}
               </span>
             )}
-            {card.proximoContatoEm !== undefined && (
+            {card.cardViewComposicao === undefined && card.proximoContatoEm !== undefined && (
               <BadgeProximoContato proximoContatoEm={card.proximoContatoEm} />
             )}
           </div>
         )}
 
-        {((!novosLeads && proximaTarefaComPrazo) || anotacaoRapidaPendente) && (
+        {card.cardViewComposicao === undefined && ((!novosLeads && proximaTarefaComPrazo) || anotacaoRapidaPendente) && (
           <div className="space-y-1.5 border-t border-white/[0.06] pt-2.5">
             {!novosLeads && proximaTarefaComPrazo && (
               <div className="flex items-center gap-1.5 text-[10px] font-semibold text-sky-200" title={`Próximo prazo: ${proximaTarefaComPrazo.titulo}`}>
@@ -493,21 +493,21 @@ function KanbanCard({
         {!ehLeadVirtual && (
           <div className="flex items-center justify-between border-t border-white/[0.06] pt-2.5">
             <div className="flex min-h-6 items-center gap-2 text-[10px] font-medium text-slate-400">
-              {!novosLeads && card._count.tarefas > 0 && (
+              {card.cardViewComposicao === undefined && !novosLeads && card._count.tarefas > 0 && (
                 <span className="inline-flex items-center gap-1" title={`${card._count.tarefas} tarefa(s)`}>
                   <ClipboardList size={12} aria-hidden="true" />
                   <span className="tabular-nums">{card._count.tarefas}</span>
                   <span className="sr-only">tarefa(s)</span>
                 </span>
               )}
-              {!novosLeads && card._count.anexos > 0 && (
+              {card.cardViewComposicao === undefined && !novosLeads && card._count.anexos > 0 && (
                 <span className="inline-flex items-center gap-1" title={`${card._count.anexos} anexo(s)`}>
                   <Paperclip size={12} aria-hidden="true" />
                   <span className="tabular-nums">{card._count.anexos}</span>
                   <span className="sr-only">anexo(s)</span>
                 </span>
               )}
-              {!novosLeads && card._count.tarefas === 0 && card._count.anexos === 0 && (
+              {card.cardViewComposicao === undefined && !novosLeads && card._count.tarefas === 0 && card._count.anexos === 0 && (
                 <span className="text-slate-500">Sem pendências</span>
               )}
             </div>
