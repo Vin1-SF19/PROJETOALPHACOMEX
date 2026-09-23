@@ -288,6 +288,16 @@ describe("RM-2026-D64AF1: recuperação segura do vínculo", () => {
     expect(prismaMock.googleCalendarEventoCache.findMany).not.toHaveBeenCalled();
     expect(prismaMock.googleCalendarSelecionado.findMany).not.toHaveBeenCalled();
   });
+  it("aceita URLs diferentes para o mesmo código Meet antes e depois do PATCH", async () => {
+    obterEventoMock.mockResolvedValue({
+      linkMeet: `${linkMeet}?authuser=0`, etag: "atual", participantes: [], status: "confirmed",
+      inicio: { dataHora: "2026-08-19T13:00:00.000Z" },
+      fim: { dataHora: "2026-08-19T14:00:00.000Z" },
+    });
+    atualizarEventoMock.mockResolvedValue({ linkMeet: `${linkMeet}/?authuser=1` });
+    expect(await reagendar()).toEqual({ success: true });
+    expect(atualizarEventoMock).toHaveBeenCalledOnce();
+  });
   it("informa quando o evento não está na agenda de quem solicitou", async () => {
     obterEventoMock.mockRejectedValue(new GoogleCalendarError("Não encontrado", { kind: "not_found" }));
     expect(await reagendar()).toEqual({
@@ -301,7 +311,7 @@ describe("RM-2026-D64AF1: recuperação segura do vínculo", () => {
       if (cenario === "ausente") prismaMock.googleCalendarSelecionado.findFirst.mockResolvedValue(null);
       if (cenario === "outra-conta") obterUsuarioPorCalendarioMock.mockResolvedValue({ ok: true, userId: 8, emailUsuario: "outro@exemplo.com" });
       if (cenario === "inativo") obterUsuarioPorCalendarioMock.mockResolvedValue({ ok: false });
-      if (cenario === "meet-divergente") obterEventoMock.mockResolvedValue({ linkMeet: "outro" });
+      if (cenario === "meet-divergente") obterEventoMock.mockResolvedValue({ linkMeet: "https://meet.google.com/xyz-abcd-efg" });
       if (cenario === "cancelado") obterEventoMock.mockResolvedValue({ linkMeet, status: "cancelled" });
       if (cenario === "sem-acesso") acessoMock.mockRejectedValue(new Error("Não autorizado"));
       expect((await reagendar()).success).toBe(false);

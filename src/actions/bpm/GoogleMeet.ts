@@ -22,6 +22,7 @@ import { dadosCacheDeEvento } from "@/lib/google-calendar/cache-eventos";
 import { GoogleCalendarError } from "@/lib/google-calendar/errors";
 import { cancelarCriacaoSemVinculo, registrarCompensacaoGooglePendente, reverterReagendamentoSemPersistencia, type EventoCriadoSemVinculo, type ReagendamentoPendente } from "@/lib/bpm/google-meet-compensacao";
 import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
+import { extrairCodigoMeet } from "@/lib/bpm/transcricao-reuniao";
 import { dataHoraObrigatoriaBpmSchema } from "@/lib/validations/bpm";
 import {
   combinarParticipantesReuniao,
@@ -54,6 +55,11 @@ async function compensarReagendamentoComRegistro(pendente: ReagendamentoPendente
 
 function cardEstaNaEtapaDeReuniao(card: { etapa: { nome: string } } | null): boolean {
   return Boolean(card && etapaEhAgendarReuniao(card.etapa.nome));
+}
+
+function mesmoEspacoMeet(linkDoCard: string, linkDoGoogle: string | null): boolean {
+  const codigoDoCard = extrairCodigoMeet(linkDoCard);
+  return Boolean(codigoDoCard && codigoDoCard === extrairCodigoMeet(linkDoGoogle));
 }
 
 async function confirmarLinkMeetCriado(params: {
@@ -145,7 +151,7 @@ async function reagendarEventoVinculado(params: {
     }
     throw error;
   }
-  if (eventoAtual.status === "cancelled" || eventoAtual.linkMeet !== params.googleMeetLink) {
+  if (eventoAtual.status === "cancelled" || !mesmoEspacoMeet(params.googleMeetLink, eventoAtual.linkMeet)) {
     return { success: false as const, error: "O espaço do Google Meet foi alterado fora do painel. Revise o evento antes de reagendar." };
   }
   if (!eventoAtual.inicio.dataHora || !eventoAtual.fim.dataHora) {
@@ -177,7 +183,7 @@ async function reagendarEventoVinculado(params: {
     participantesAnteriores: eventoAtual.participantes.map((p) => p.email),
     timezone: vinculo.timezone || "America/Sao_Paulo",
   };
-  if (eventoAtualizado.linkMeet !== params.googleMeetLink) {
+  if (!mesmoEspacoMeet(params.googleMeetLink, eventoAtualizado.linkMeet)) {
     return { success: false as const, error: "O Google devolveu um espaço de reunião diferente. O card não foi alterado; revise o evento na Agenda Alpha.", compensacao };
   }
   await db.googleCalendarEventoCache.upsert({

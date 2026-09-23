@@ -83,3 +83,29 @@ O usuário confirmou que o reagendamento deve usar a API do Google na agenda da 
 - `npm test`: 500 arquivos passaram; 3766 testes passaram, 4 ignorados e 1 todo.
 - `npm run build`: passou.
 - A verificação com conta Google real ainda depende de smoke autenticado; os testes locais usam mocks da API.
+
+## Ajuste posterior — identidade do espaço Meet
+
+O usuário reportou o bloqueio "O espaço do Google Meet foi alterado fora do painel" após o ajuste da conta solicitante. A comparação literal de URLs não representa a identidade do espaço quando parâmetros de consulta diferem. O recurso `Events` do Google também pode fornecer `hangoutLink` sem um `conferenceData.entryPoints` de vídeo.
+
+### Aceites e checklist
+- [x] Comparar o código Meet validado de ambos os links antes e depois do PATCH.
+- [x] Usar `hangoutLink` da resposta da API quando o entry point de vídeo estiver ausente.
+- [x] Continuar bloqueando código Meet diferente, link inválido ou evento cancelado antes de alterar o evento.
+- [x] Cobrir URLs equivalentes e fallback da API com testes.
+- [x] Registrar gates da execução deste ajuste.
+
+### File list deste ajuste
+- `src/actions/bpm/GoogleMeet.ts`
+- `src/lib/google-calendar/client.ts`
+- `tests/bpm/google-meet-etapa-guard.test.ts`
+- `tests/google-calendar/client-etag.test.ts`
+- `docs/stories/story-rm-2026-d64af1-reagendar-reuniao.md`
+
+### Validação deste ajuste
+- Testes focados: 29/29 passaram, incluindo o código Meet realmente diferente; ESLint dos arquivos alterados: sem erros.
+- `npm run typecheck`: passou.
+- `npm run lint`: passou com 0 erros e 1192 avisos no repositório.
+- `npm test`: 500 arquivos passaram; 3768 testes passaram, 4 ignorados e 1 todo.
+- `npm run build`: passou; `git diff --check`: passou.
+- Ainda não há evidência do conteúdo do evento Google específico que gerou a mensagem em produção; é necessário smoke autenticado para confirmar esse caso.

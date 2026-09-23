@@ -198,7 +198,9 @@ function paraGoogleEventoDataDTO(data: calendar_v3.Schema$EventDateTime | undefi
 
 function mapEventoParaDTO(evento: calendar_v3.Schema$Event): GoogleEventoDTO {
   const entradasConferencia = evento.conferenceData?.entryPoints ?? [];
-  const linkMeet = entradasConferencia.find((entrada) => entrada.entryPointType === "video")?.uri ?? null;
+  const linkMeet = entradasConferencia.find((entrada) => entrada.entryPointType === "video")?.uri
+    ?? evento.hangoutLink
+    ?? null;
 
   return {
     googleEventId: evento.id ?? "",

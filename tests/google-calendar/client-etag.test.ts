@@ -191,6 +191,24 @@ describe("Google Calendar optimistic concurrency headers", () => {
     });
   });
 
+  it("usa hangoutLink quando o Google não devolve o entryPoint de vídeo", async () => {
+    getMock.mockResolvedValueOnce({
+      data: {
+        id: "evt-1",
+        etag: '"v3"',
+        hangoutLink: "https://meet.google.com/abc-defg-hij",
+        start: { dateTime: "2026-07-30T13:00:00Z" },
+        end: { dateTime: "2026-07-30T14:00:00Z" },
+      },
+    });
+    const evento = await obterEvento({
+      emailUsuario: "user@alpha.com",
+      calendarId: "primary",
+      googleEventId: "evt-1",
+    });
+    expect(evento.linkMeet).toBe("https://meet.google.com/abc-defg-hij");
+  });
+
   it("sends If-Match on events.patch", async () => {
     await atualizarEventoParcial({
       emailUsuario: "user@alpha.com",
