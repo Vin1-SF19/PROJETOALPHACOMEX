@@ -1,4 +1,5 @@
 import db from "@/lib/prisma";
+import { cache } from "react";
 
 export const STATUS_USUARIO_ATIVO = "ATIVO";
 
@@ -18,7 +19,9 @@ type EstadoAcessoPainel = {
   authSessionVersion: number;
 };
 
-async function obterEstadoAcessoPainel(userId: unknown): Promise<EstadoAcessoPainel | null> {
+// Compartilha a leitura entre auth() do root, layout e página somente durante
+// a renderização atual. Uma nova requisição sempre revalida o token no banco.
+const obterEstadoAcessoPainel = cache(async (userId: unknown): Promise<EstadoAcessoPainel | null> => {
   const id = Number(userId);
 
   if (!Number.isSafeInteger(id) || id <= 0) {
@@ -36,7 +39,7 @@ async function obterEstadoAcessoPainel(userId: unknown): Promise<EstadoAcessoPai
     console.error("Falha ao validar o status de acesso do usuário:", error);
     return null;
   }
-}
+});
 
 export async function usuarioPodeAcessarPainel(userId: unknown): Promise<boolean> {
   const estado = await obterEstadoAcessoPainel(userId);

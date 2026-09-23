@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 
 import { MODULOS_REGISTRY } from "@/lib/modulos-registry";
 import db from "@/lib/prisma";
@@ -9,8 +10,8 @@ export const KNOWN_MODULE_PERMISSIONS = new Set([
   "roadmapProduction",
 ]);
 
-/** Leitura server-only reutilizável por Server Actions, Route Handlers e CLI. */
-export async function readEffectiveModulePermissions(userId: number): Promise<string[]> {
+/** Leitura server-only; durante uma renderização, layout e página compartilham o resultado. */
+export const readEffectiveModulePermissions = cache(async (userId: number): Promise<string[]> => {
   const user = await db.usuarios.findUnique({
     where: { id: userId },
     select: { role: true, permissoes: true },
@@ -35,4 +36,4 @@ export async function readEffectiveModulePermissions(userId: number): Promise<st
     else if (override.acao === "REMOVE") effective.delete(override.modulo);
   }
   return Array.from(effective);
-}
+});

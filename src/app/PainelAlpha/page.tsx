@@ -18,10 +18,19 @@ export default async function PainelAlpha() {
     "Operador";
   const userImage = (session.user as { imagemUrl?: string }).imagemUrl || null;
 
-  const [userRecord, permissions] = await Promise.all([db.usuarios.findUnique({
-    where: { id: userId },
-    select: { tema_interface: true },
-  }), getPermissoesEfetivas(userId)]);
+  const [userRecord, permissions, sessoesIniciais] = await Promise.all([
+    db.usuarios.findUnique({
+      where: { id: userId },
+      select: { tema_interface: true },
+    }),
+    getPermissoesEfetivas(userId),
+    db.bibbleSession.findMany({
+      where: { userId },
+      orderBy: { updatedAt: "desc" },
+      take: 100,
+      select: { id: true, title: true, projectId: true, createdAt: true, updatedAt: true },
+    }),
+  ]);
   const temaName = userRecord?.tema_interface ?? "blue";
   const currentHour = Number(
     new Intl.DateTimeFormat("pt-BR", {
@@ -30,13 +39,6 @@ export default async function PainelAlpha() {
       timeZone: "America/Sao_Paulo",
     }).format(new Date())
   );
-
-  const sessoesIniciais = await db.bibbleSession.findMany({
-    where: { userId },
-    orderBy: { updatedAt: "desc" },
-    take: 100,
-    select: { id: true, title: true, projectId: true, createdAt: true, updatedAt: true },
-  });
 
   return (
     <div className="h-dvh overflow-hidden bg-background">
