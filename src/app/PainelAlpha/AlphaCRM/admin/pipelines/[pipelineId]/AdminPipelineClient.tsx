@@ -954,6 +954,7 @@ export default function AdminPipelineClient({
           <div className="border-t border-white/10 pt-7">
             <FormularioEtapaWorkspace
               pipelineId={pipeline.id}
+              pipelineNome={pipeline.nome}
               etapas={etapas}
               campos={campos}
               onFormularioAtualizado={handleFormularioAtualizado}

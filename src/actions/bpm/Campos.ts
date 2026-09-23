@@ -10,6 +10,7 @@ import {
   excluirCampoSchema,
 } from "@/lib/validations/bpm";
 import { exigirAcessoConfigPipeline } from "@/lib/bpm/ownership";
+import { z } from "zod";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import {
   chaveOpcaoCampo,
@@ -212,6 +213,51 @@ export async function ListarCamposConfiguraveisBpm(pipelineId: string) {
   }
 }
 
+/** Resumo de uso sem expor valores ou nomes de clientes ao editor administrativo. */
+export async function ObterUsoCamposBpm(pipelineId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false as const, error: "Não autorizado" };
+    if (!z.string().cuid().safeParse(pipelineId).success) {
+      return { success: false as const, error: "Pipeline inválido" };
+    }
+    await exigirAcessoConfigPipeline(Number(session.user.id), "configurarCampos");
+    const campos = await db.bpmCampo.findMany({
+      where: {
+        OR: [
+          { pipelineId },
+          { pipelinesAssociados: { some: { pipelineId } } },
+        ],
+      },
+      select: {
+        id: true,
+        _count: {
+          select: {
+            valores: true,
+            valoresGlobais: true,
+            anexos: true,
+            componentesFormulario: true,
+            etapaConfiguracoes: true,
+          },
+        },
+      },
+    });
+    return {
+      success: true as const,
+      data: Object.fromEntries(campos.map((campo) => [campo.id, {
+        valoresCard: campo._count.valores,
+        valoresGlobais: campo._count.valoresGlobais,
+        anexos: campo._count.anexos,
+        formularios: campo._count.componentesFormulario,
+        etapas: campo._count.etapaConfiguracoes,
+      }])),
+    };
+  } catch (error) {
+    console.error("[ObterUsoCamposBpm]", error);
+    return { success: false as const, error: mensagemErro(error, "Não foi possível analisar o uso dos campos") };
+  }
+}
+
 export async function CriarCampoBpm(dados: unknown) {
   try {
     const session = await auth();
@@ -223,6 +269,12 @@ export async function CriarCampoBpm(dados: unknown) {
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
     const entrada = parsed.data;
     validarCondicoesEtapas(entrada.etapaConfiguracoes);
+
+    if (entrada.etapaConfiguracoes?.some((config) =>
+      (config.obrigatorio || config.obrigatorioEntrada || config.obrigatorioSaida)
+      && (!config.visivel || !config.editavel || config.somenteLeitura))) {
+      return { success: false, error: "Campo obrigatório precisa estar visível e editável na etapa" };
+    }
     if (entrada.escopo === "GLOBAL" && entrada.fonteEntidade && !fonteCampoPermitida(entrada.fonteEntidade, entrada.fonteAtributo)) {
       return { success: false, error: "Fonte ou atributo canônico não permitido" };
     }
@@ -323,11 +375,18 @@ export async function AtualizarCampoBpm(dados: unknown) {
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
     const entrada = parsed.data;
     validarCondicoesEtapas(entrada.etapaConfiguracoes);
+    if (entrada.etapaConfiguracoes?.some((config) =>
+      (config.obrigatorio || config.obrigatorioEntrada || config.obrigatorioSaida)
+      && (!config.visivel || !config.editavel || config.somenteLeitura))) {
+      return { success: false, error: "Campo obrigatório precisa estar visível e editável na etapa" };
+    }
 
     const anterior = await db.bpmCampo.findUnique({
       where: { id: entrada.campoId },
       include: {
         valores: { select: { valor: true } },
+        valoresGlobais: { select: { valor: true } },
+        _count: { select: { valoresGlobais: true, anexos: true } },
         opcoes: true,
         pipelinesAssociados: true,
         etapaConfiguracoes: true,
@@ -343,15 +402,16 @@ export async function AtualizarCampoBpm(dados: unknown) {
     if (escopoFinal === "GLOBAL" && entidadeFinal && !fonteCampoPermitida(entidadeFinal, atributoFinal)) {
       return { success: false, error: "Fonte ou atributo canônico não permitido" };
     }
-    if (entrada.tipo && entrada.tipo !== anterior.tipo && anterior.valores.length > 0) {
-      return { success: false, error: "Não é possível alterar o tipo de um campo que já possui valores" };
+    if (entrada.tipo && entrada.tipo !== anterior.tipo
+      && (anterior.valores.length > 0 || anterior._count.valoresGlobais > 0 || anterior._count.anexos > 0)) {
+      return { success: false, error: "Não é possível alterar o tipo de um campo com valores ou anexos" };
     }
 
     const novasOpcoes = entrada.opcoes === undefined ? undefined : opcoesEstruturadas(entrada.opcoes ?? []);
     if (novasOpcoes !== undefined) {
       const preservadas = new Set(novasOpcoes.flatMap((item) => [item.chave, item.rotulo]));
       const removidas = new Set(anterior.opcoes.filter((item) => !preservadas.has(item.chave)).flatMap((item) => [item.chave, item.rotulo]));
-      if (removidas.size && anterior.valores.some((item) => valorUsaOpcao(item.valor, removidas))) {
+      if (removidas.size && [...anterior.valores, ...anterior.valoresGlobais].some((item) => valorUsaOpcao(item.valor, removidas))) {
         return { success: false, error: "Não é possível remover uma opção que já está em uso" };
       }
     }
@@ -373,6 +433,22 @@ export async function AtualizarCampoBpm(dados: unknown) {
     const resultado = await db.$transaction(async (tx) => {
       await exigirAcessoConfigPipeline(userId, "configurarCampos", tx);
       const todosPipelines = await validarDimensoesCampo(tx as typeof db, anterior.pipelineId, pipelineIdsEntrada, etapaIds);
+      if (entrada.etapaConfiguracoes) {
+        const novasConfigs = new Map(entrada.etapaConfiguracoes.map((config) => [config.etapaId, config]));
+        for (const configAnterior of anterior.etapaConfiguracoes) {
+          const nova = novasConfigs.get(configAnterior.etapaId);
+          if (nova?.visivel) continue;
+          const referenciasPublicadas = await tx.bpmFormularioComponente.count({
+            where: {
+              campoId: anterior.id,
+              secao: { formulario: { etapaId: configAnterior.etapaId, ativo: true } },
+            },
+          });
+          if (referenciasPublicadas > 0) {
+            throw new Error("CAMPO_FORMULARIO_PUBLICADO: Retire o campo do formulário publicado antes de ocultá-lo nesta etapa");
+          }
+        }
+      }
       const atualizado = await tx.bpmCampo.update({
         where: { id: entrada.campoId },
         data: {

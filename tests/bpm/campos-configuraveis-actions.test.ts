@@ -9,7 +9,9 @@ const mocks = vi.hoisted(() => ({
   campoUpdate: vi.fn(),
   campoFindUniqueOrThrow: vi.fn(),
   campoFindUnique: vi.fn(),
+  campoFindMany: vi.fn(),
   campoDelete: vi.fn(),
+  formComponentCount: vi.fn(),
   valorCardCount: vi.fn(),
   valorGlobalCount: vi.fn(),
   anexoCount: vi.fn(),
@@ -35,7 +37,7 @@ vi.mock("@/lib/bpm/ownership", () => ({ exigirAcessoConfigPipeline: mocks.exigir
 vi.mock("@/lib/bpm/realtime-server", () => ({ notificarPipelineBpm: mocks.notificar }));
 vi.mock("@/lib/prisma", () => ({
   default: {
-    bpmCampo: { findUnique: mocks.campoFindUnique },
+    bpmCampo: { findUnique: mocks.campoFindUnique, findMany: mocks.campoFindMany },
     bpmCampoMapeamento: {
       findMany: mocks.mapeamentoFindMany,
       findUnique: mocks.mapeamentoFindUnique,
@@ -46,6 +48,7 @@ vi.mock("@/lib/prisma", () => ({
 
 import {
   AtualizarCampoBpm,
+  ObterUsoCamposBpm,
   ConfigurarMapeamentoCampoBpm,
   CriarCampoBpm,
   DesativarMapeamentoCampoBpm,
@@ -66,6 +69,7 @@ function clienteTx() {
     bpmCardCampoValor: { count: mocks.valorCardCount },
     bpmCampoValorGlobal: { count: mocks.valorGlobalCount },
     bpmCardAnexo: { count: mocks.anexoCount },
+    bpmFormularioComponente: { count: mocks.formComponentCount },
     bpmCampoOpcao: { createMany: mocks.opcaoCreateMany },
     bpmCampoPipeline: { createMany: mocks.campoPipelineCreateMany },
     bpmCampoEtapaConfig: { createMany: mocks.campoEtapaConfigCreateMany },
@@ -103,6 +107,7 @@ describe("ações de gestão configurável de campos", () => {
     mocks.valorCardCount.mockResolvedValue(0);
     mocks.valorGlobalCount.mockResolvedValue(0);
     mocks.anexoCount.mockResolvedValue(0);
+    mocks.formComponentCount.mockResolvedValue(0);
     mocks.campoDelete.mockResolvedValue({ id: CAMPO_DESTINO_ID });
     mocks.transaction.mockImplementation(async (callback: (tx: ReturnType<typeof clienteTx>) => unknown) => callback(clienteTx()));
   });
@@ -229,6 +234,68 @@ describe("ações de gestão configurável de campos", () => {
         opcoes: agregado.opcoes,
       },
     });
+  });
+
+  it("resume uso do campo sem expor valores ou anexos", async () => {
+    mocks.campoFindMany.mockResolvedValue([{
+      id: CAMPO_DESTINO_ID,
+      _count: { valores: 3, valoresGlobais: 1, anexos: 2, componentesFormulario: 2, etapaConfiguracoes: 4 },
+    }]);
+    expect(await ObterUsoCamposBpm(PIPELINE_ID)).toEqual({
+      success: true,
+      data: { [CAMPO_DESTINO_ID]: { valoresCard: 3, valoresGlobais: 1, anexos: 2, formularios: 2, etapas: 4 } },
+    });
+    expect(mocks.campoFindMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { OR: [{ pipelineId: PIPELINE_ID }, { pipelinesAssociados: { some: { pipelineId: PIPELINE_ID } } }] },
+    }));
+  });
+
+  it("impede mudar o tipo de campo com anexo ou valor global", async () => {
+    mocks.campoFindUnique.mockResolvedValue({
+      id: CAMPO_DESTINO_ID, pipelineId: PIPELINE_ID, tipo: "texto", escopo: "CARD",
+      fonteEntidade: null, fonteAtributo: null, entidadeGlobal: null,
+      valores: [], opcoes: [], pipelinesAssociados: [], etapaConfiguracoes: [], acessos: [],
+      _count: { valoresGlobais: 1, anexos: 1 },
+    });
+    expect(await AtualizarCampoBpm({ campoId: CAMPO_DESTINO_ID, tipo: "arquivo" })).toEqual({
+      success: false, error: "Não é possível alterar o tipo de um campo com valores ou anexos",
+    });
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("não remove opção usada por valor global", async () => {
+    mocks.campoFindUnique.mockResolvedValue({
+      id: CAMPO_DESTINO_ID, pipelineId: PIPELINE_ID, tipo: "selecao", escopo: "GLOBAL",
+      fonteEntidade: null, fonteAtributo: null, entidadeGlobal: "CLIENTE", ativo: true,
+      valores: [], valoresGlobais: [{ valor: "Remover" }],
+      _count: { valoresGlobais: 1, anexos: 0 },
+      opcoes: [
+        { chave: "manter", rotulo: "Manter", ativo: true },
+        { chave: "remover", rotulo: "Remover", ativo: true },
+      ],
+      pipelinesAssociados: [], etapaConfiguracoes: [], acessos: [],
+    });
+    expect(await AtualizarCampoBpm({ campoId: CAMPO_DESTINO_ID, opcoes: ["Manter"] })).toEqual({
+      success: false, error: "Não é possível remover uma opção que já está em uso",
+    });
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("não oculta campo enquanto formulário publicado ainda o referencia", async () => {
+    mocks.campoFindUnique.mockResolvedValue({
+      id: CAMPO_DESTINO_ID, pipelineId: PIPELINE_ID, tipo: "texto", escopo: "CARD",
+      fonteEntidade: null, fonteAtributo: null, entidadeGlobal: null, ativo: true,
+      valores: [], valoresGlobais: [], _count: { valoresGlobais: 0, anexos: 0 },
+      opcoes: [], pipelinesAssociados: [], acessos: [],
+      etapaConfiguracoes: [{ etapaId: ETAPA_ID, visivel: true }],
+    });
+    mocks.formComponentCount.mockResolvedValue(1);
+    const resultado = await AtualizarCampoBpm({ campoId: CAMPO_DESTINO_ID, etapaConfiguracoes: [{
+      etapaId: ETAPA_ID, visivel: false, editavel: true, somenteLeitura: false,
+      obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false, ordem: 0,
+    }] });
+    expect(resultado).toEqual({ success: false, error: "Retire o campo do formulário publicado antes de ocultá-lo nesta etapa" });
+    expect(mocks.campoUpdate).not.toHaveBeenCalled();
   });
 
   it("rejeita seleção customizada ativa sem opções e aceita fonte canônica", async () => {

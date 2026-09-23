@@ -5,11 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PipelineEditorStateProvider, usePipelineEditorState } from "@/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/PipelineEditorStateProvider";
 import { FormularioEtapaWorkspace, type FormularioEtapaAdmin } from "@/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/FormularioEtapaWorkspace";
 
-vi.mock("@/actions/bpm/Campos", () => ({ CriarCampoBpm: vi.fn(), ExcluirCampoBpm: vi.fn() }));
+vi.mock("@/actions/bpm/Campos", () => ({ CriarCampoBpm: vi.fn(), AtualizarCampoBpm: vi.fn(), ExcluirCampoBpm: vi.fn(), ObterUsoCamposBpm: vi.fn() }));
 vi.mock("@/actions/bpm/FormulariosEtapa", () => ({ SalvarFormularioEtapaBpm: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/FormularioEtapaRenderer", () => ({ FormularioEtapaRenderer: () => null }));
-import { CriarCampoBpm, ExcluirCampoBpm } from "@/actions/bpm/Campos";
+import { CriarCampoBpm, ExcluirCampoBpm, ObterUsoCamposBpm } from "@/actions/bpm/Campos";
 import { SalvarFormularioEtapaBpm } from "@/actions/bpm/FormulariosEtapa";
 import { toast } from "sonner";
 
@@ -17,7 +17,7 @@ const stages = ["first", "second"].map((id) => ({ id, nome: id, ativo: true, for
   id: `form-${id}`, ativo: true, versao: 1,
   secoes: [{ chave: id, titulo: `Section ${id}`, componentes: [] }],
 } }));
-const field = { id: "existing", nome: "Existing", tipo: "texto", etapaConfiguracoes: [{ etapaId: "second", visivel: true }] };
+const field = { id: "existing", nome: "Existing", tipo: "texto", etapaConfiguracoes: [{ etapaId: "second", visivel: true, editavel: true }] };
 let root: Root;
 let container: HTMLDivElement;
 let version: number;
@@ -48,6 +48,7 @@ async function addExisting() {
 function title() { return container.querySelector<HTMLInputElement>('input[aria-label="Título da seção 1"]')?.value; }
 beforeEach(async () => {
   vi.clearAllMocks();
+  vi.mocked(ObterUsoCamposBpm).mockResolvedValue({ success: true, data: { [field.id]: { valoresCard: 0, valoresGlobais: 0, anexos: 0, formularios: 0, etapas: 0 } } });
   Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
   version = 1; pipeline = "p1"; currentStages = structuredClone(stages);
@@ -56,6 +57,24 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
 
 describe("workspace React com remontagem versionada", () => {
+  it("publica a exigência de avanço junto com a composição da etapa", async () => {
+    const stage = currentStages[1] as unknown as { formulario: FormularioEtapaAdmin };
+    stage.formulario.secoes[0].componentes.push({ chave: "existing", tipo: "CAMPO", campoId: field.id, capability: null, configJson: null, campo: field });
+    pipeline = "published-pipeline";
+    await render(); await click("Fields"); await click("second");
+    expect(container.querySelector('input[aria-label="Rótulo de Existing"]')).toBeTruthy();
+    await click("Existing");
+    const label = [...container.querySelectorAll("label")].find((item) => item.textContent?.includes("Exigir para avançar"));
+    const checkbox = label?.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    expect(checkbox?.disabled).toBe(false);
+    await act(async () => checkbox!.click());
+    vi.mocked(SalvarFormularioEtapaBpm).mockResolvedValue({ success: true, data: stage.formulario } as Awaited<ReturnType<typeof SalvarFormularioEtapaBpm>>);
+    await click("Publicar composição");
+    expect(SalvarFormularioEtapaBpm).toHaveBeenCalledWith(expect.objectContaining({
+      etapaId: "second",
+      obrigacoes: expect.arrayContaining([expect.objectContaining({ campoId: field.id, obrigatorioSaida: true })]),
+    }));
+  });
   it("remove componente compatível e preserva adicionar/criar campo", async () => {
     expect(container.textContent).not.toContain("Adicionar componente compatível");
     expect(container.querySelector('[aria-label^="Adicionar componente à seção"]')).toBeNull();
@@ -66,7 +85,8 @@ describe("workspace React com remontagem versionada", () => {
 
   it("confirma e exclui campo aplicável sem removê-lo apenas da composição", async () => {
     vi.mocked(ExcluirCampoBpm).mockResolvedValue({ success: true });
-    await click("Excluir campo aplicável");
+    await click("Existing");
+    await click("Excluir campo sem uso");
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain("exclusão é permanente");
     await click("Excluir definitivamente");
     expect(ExcluirCampoBpm).toHaveBeenCalledWith({ campoId: field.id });
@@ -79,7 +99,8 @@ describe("workspace React com remontagem versionada", () => {
       success: false,
       error: "Este campo possui dados associados e não pode ser excluído",
     });
-    await click("Excluir campo aplicável");
+    await click("Existing");
+    await click("Excluir campo sem uso");
     await click("Excluir definitivamente");
     expect(container.querySelector(`option[value="${field.id}"]`)).toBeTruthy();
     expect(document.querySelector('[role="dialog"]')).toBeTruthy();

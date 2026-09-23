@@ -86,7 +86,7 @@ describe("CRM - formulário unificado por etapa", () => {
     expect(builder).toContain("etapaConfiguracoes: [");
     expect(builder).toContain("etapaId: etapa.id");
     expect(builder).toContain("Criar e adicionar");
-    expect(builder).toContain("Obrigatório nesta etapa");
+    expect(builder).toContain("Exigir para avançar");
   });
 
   it("remove o bloco Tentando contato do painel esquerdo", () => {

@@ -61,7 +61,7 @@ export async function SalvarFormularioEtapaBpm(input: unknown) {
       return { success: false, error: "Não autorizado" } as const;
 
     await exigirAcessoConfigPipeline(userId, "configurarCampos");
-    const { pipelineId, etapaId, versaoEsperada, ativo, secoes } = parsed.data;
+    const { pipelineId, etapaId, versaoEsperada, ativo, secoes, obrigacoes = [] } = parsed.data;
 
     const resultado = await db.$transaction(async (tx) => {
       await exigirAcessoConfigPipeline(userId, "configurarCampos", tx);
@@ -132,7 +132,7 @@ export async function SalvarFormularioEtapaBpm(input: unknown) {
               pipelineId: true,
               etapaConfiguracoes: {
                 where: { etapaId },
-                select: { id: true, visivel: true },
+                select: { id: true, visivel: true, editavel: true, somenteLeitura: true, obrigatorio: true, obrigatorioEntrada: true, obrigatorioSaida: true },
               },
               pipelinesAssociados: {
                 where: { pipelineId },
@@ -184,6 +184,49 @@ export async function SalvarFormularioEtapaBpm(input: unknown) {
             etapa.nome,
             "a configuração canônica marca o campo como não visível",
           );
+      }
+
+      for (const obrigacao of obrigacoes) {
+        const campo = campoPorId.get(obrigacao.campoId);
+        if (!campo) falhar("OBRIGACAO_FORA_FORMULARIO", "Uma obrigação aponta para campo ausente do formulário da etapa.");
+        const config = campo.etapaConfiguracoes[0];
+        if ((obrigacao.obrigatorio || obrigacao.obrigatorioEntrada || obrigacao.obrigatorioSaida)
+          && (!ativo || !campo.ativo || !config?.visivel || !config.editavel || config.somenteLeitura)) {
+          falhar("OBRIGACAO_CAMPO_INACESSIVEL", `O campo "${campo.nome}" precisa estar ativo, visível e editável para ser obrigatório.`);
+        }
+      }
+
+      if (!ativo) {
+        const obrigatoriasAtuais = await tx.bpmCampoEtapaConfig.findMany({
+          where: {
+            etapaId,
+            OR: [{ obrigatorio: true }, { obrigatorioEntrada: true }, { obrigatorioSaida: true }],
+          },
+          select: { campoId: true, campo: { select: { nome: true } } },
+        });
+        const pendente = obrigatoriasAtuais.find((item) => {
+          const nova = obrigacoes.find((obrigacao) => obrigacao.campoId === item.campoId);
+          return !nova || nova.obrigatorio || nova.obrigatorioEntrada || nova.obrigatorioSaida;
+        });
+        if (pendente) falhar("OBRIGACAO_FORMULARIO_INATIVO", `Desative a obrigatoriedade de "${pendente.campo.nome}" antes de desativar o formulário.`);
+      }
+
+      const idsAnteriores = (anterior?.secoes ?? []).flatMap((secao) => secao.componentes
+        .filter((componente) => componente.tipo === "CAMPO" && componente.campoId)
+        .map((componente) => componente.campoId!));
+      const idsRemovidos = idsAnteriores.filter((id) => !campoIds.includes(id));
+      if (idsRemovidos.length) {
+        const obrigatoriosRemovidos = await tx.bpmCampoEtapaConfig.findMany({
+          where: {
+            etapaId,
+            campoId: { in: idsRemovidos },
+            OR: [{ obrigatorio: true }, { obrigatorioEntrada: true }, { obrigatorioSaida: true }],
+          },
+          select: { campo: { select: { nome: true } } },
+        });
+        if (obrigatoriosRemovidos.length) {
+          falhar("OBRIGACAO_CAMPO_REMOVIDO", `Desative a obrigatoriedade de "${obrigatoriosRemovidos[0].campo.nome}" antes de retirar o campo do formulário.`);
+        }
       }
 
       const secoesExistentes = new Map(
@@ -249,7 +292,13 @@ export async function SalvarFormularioEtapaBpm(input: unknown) {
 
       if (
         anterior &&
-        formularioEtapaSemAlteracao(anterior, { ativo, secoes })
+        formularioEtapaSemAlteracao(anterior, { ativo, secoes }) &&
+        obrigacoes.every((item) => {
+          const config = campoPorId.get(item.campoId)?.etapaConfiguracoes[0];
+          return config?.obrigatorio === item.obrigatorio
+            && config?.obrigatorioEntrada === item.obrigatorioEntrada
+            && config?.obrigatorioSaida === item.obrigatorioSaida;
+        })
       ) {
         const formulario = await tx.bpmEtapaFormulario.findUniqueOrThrow({
           where: { id: anterior.id },
@@ -355,6 +404,18 @@ export async function SalvarFormularioEtapaBpm(input: unknown) {
         });
       }
 
+      for (const obrigacao of obrigacoes) {
+        const atualizada = await tx.bpmCampoEtapaConfig.updateMany({
+          where: { campoId: obrigacao.campoId, etapaId },
+          data: {
+            obrigatorio: obrigacao.obrigatorio,
+            obrigatorioEntrada: obrigacao.obrigatorioEntrada,
+            obrigatorioSaida: obrigacao.obrigatorioSaida,
+          },
+        });
+        if (atualizada.count !== 1) falhar("OBRIGACAO_CONFIG_AUSENTE", "A configuração do campo mudou. Recarregue o formulário antes de publicar.");
+      }
+
       const formulario = await tx.bpmEtapaFormulario.findUniqueOrThrow({
         where: { id: formularioId },
         include: formularioInclude,
@@ -388,7 +449,7 @@ export async function SalvarFormularioEtapaBpm(input: unknown) {
   } catch (error) {
     const mensagem =
       error instanceof Error &&
-      /^(ETAPA_FORA_PIPELINE|CAMPO_FORA_FORMULARIO_ETAPA|CAPABILITY_FORA_ETAPA|CONFLITO_VERSAO_FORMULARIO|SECAO_FORA_FORMULARIO|COMPONENTE_FORA_FORMULARIO|IDENTIDADE_SECAO_INCOMPATIVEL|IDENTIDADE_COMPONENTE_INCOMPATIVEL|CHAVE_SECAO_EM_USO|RECONCILIACAO_SECAO_FALHOU):/.test(
+      /^(ETAPA_FORA_PIPELINE|CAMPO_FORA_FORMULARIO_ETAPA|CAPABILITY_FORA_ETAPA|CONFLITO_VERSAO_FORMULARIO|SECAO_FORA_FORMULARIO|COMPONENTE_FORA_FORMULARIO|IDENTIDADE_SECAO_INCOMPATIVEL|IDENTIDADE_COMPONENTE_INCOMPATIVEL|CHAVE_SECAO_EM_USO|RECONCILIACAO_SECAO_FALHOU|OBRIGACAO_FORA_FORMULARIO|OBRIGACAO_CAMPO_INACESSIVEL|OBRIGACAO_CAMPO_REMOVIDO|OBRIGACAO_CONFIG_AUSENTE|OBRIGACAO_FORMULARIO_INATIVO):/.test(
         error.message,
       )
         ? error.message

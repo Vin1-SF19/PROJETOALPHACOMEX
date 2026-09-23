@@ -19,19 +19,21 @@ interface ListaProps {
   onMover: (origem: string, destino: string) => boolean;
   onRotulo: (secao: number, indice: number, rotulo: string) => void;
   onRemover: (secao: number, indice: number) => void;
+  onSelecionar?: (componente: ComponenteFormulario) => void;
 }
 interface ItemProps {
   id: string; meta: Metadados; bloqueado: boolean; primeiro: boolean; ultimo: boolean;
   mover: (direcao: number) => void; rotulo: (valor: string) => void; remover: () => void;
+  selecionar?: () => void;
 }
-function ItemCampo({ id, meta, bloqueado, primeiro, ultimo, mover, rotulo, remover }: ItemProps) {
+function ItemCampo({ id, meta, bloqueado, primeiro, ultimo, mover, rotulo, remover, selecionar }: ItemProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging, isOver } = useSortable({ id, disabled: bloqueado });
   const botao = "inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40";
   return <li ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }}>
     <Card className={cn("min-h-14 flex-row flex-wrap items-center gap-2 px-2 py-3 hover:border-primary/30", isDragging && "relative z-10 opacity-90 shadow-lg ring-2 ring-ring", isOver && !isDragging && "ring-1 ring-ring/50")}>
       <button type="button" ref={setActivatorNodeRef} {...attributes} {...listeners} disabled={bloqueado} aria-label={`Arrastar ${meta.nome}`} className={cn(botao, "w-14 shrink-0 touch-none cursor-grab active:cursor-grabbing sm:w-12 disabled:cursor-not-allowed")}><GripVertical size={18} aria-hidden /></button>
       <div className="min-w-0 flex-1 basis-32">
-        <p className="truncate text-sm font-medium text-foreground">{meta.nome}</p>
+        <button type="button" onClick={selecionar} disabled={bloqueado} className="truncate text-left text-sm font-medium text-foreground hover:text-cyan-200 focus-visible:outline-2 focus-visible:outline-cyan-400 disabled:opacity-40">{meta.nome}</button>
         <p className="text-xs text-muted-foreground">{meta.tipo}</p>
         <Badge variant={meta.obrigatorio ? "default" : "secondary"}>{meta.obrigatorio ? "Obrigatório" : "Opcional"}</Badge>
         <input aria-label={`Rótulo de ${meta.nome}`} disabled={bloqueado} value={meta.rotulo} placeholder={meta.nome} maxLength={120} onChange={(event) => rotulo(event.target.value)} className="mt-2 min-h-11 w-full rounded-lg border border-border bg-background px-2 text-xs text-foreground" />
@@ -46,7 +48,7 @@ function ItemCampo({ id, meta, bloqueado, primeiro, ultimo, mover, rotulo, remov
   </li>;
 }
 
-export function ListaCamposFormulario({ secoes, bloqueado, metadados, onMover, onRotulo, onRemover }: ListaProps) {
+export function ListaCamposFormulario({ secoes, bloqueado, metadados, onMover, onRotulo, onRemover, onSelecionar }: ListaProps) {
   const itens = itensFormulario(secoes);
   const [anuncio, setAnuncio] = useState("");
   const sensores = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
@@ -69,7 +71,7 @@ export function ListaCamposFormulario({ secoes, bloqueado, metadados, onMover, o
     }}>
       <SortableContext items={itens.map((item) => item.id)} strategy={verticalListSortingStrategy}>
         <ul aria-label="Campos do formulário" className="space-y-2">
-          {itens.map((item, i) => <ItemCampo key={item.id} id={item.id} meta={metadados(item.componente)} bloqueado={bloqueado} primeiro={i === 0} ultimo={i === itens.length - 1} mover={(direcao) => mover(item.id, itens[i + direcao].id)} rotulo={(valor) => onRotulo(item.secao, item.indice, valor)} remover={() => onRemover(item.secao, item.indice)} />)}
+          {itens.map((item, i) => <ItemCampo key={item.id} id={item.id} meta={metadados(item.componente)} bloqueado={bloqueado} primeiro={i === 0} ultimo={i === itens.length - 1} mover={(direcao) => mover(item.id, itens[i + direcao].id)} rotulo={(valor) => onRotulo(item.secao, item.indice, valor)} remover={() => onRemover(item.secao, item.indice)} selecionar={() => onSelecionar?.(item.componente)} />)}
         </ul>
       </SortableContext>
     </DndContext>

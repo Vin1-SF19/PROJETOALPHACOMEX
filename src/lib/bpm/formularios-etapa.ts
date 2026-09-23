@@ -218,6 +218,12 @@ export const salvarFormularioEtapaSchema = z
     etapaId: persistedIdSchema,
     versaoEsperada: z.number().int().positive().nullable(),
     ativo: z.boolean(),
+    obrigacoes: z.array(z.object({
+      campoId: persistedIdSchema,
+      obrigatorio: z.boolean(),
+      obrigatorioEntrada: z.boolean(),
+      obrigatorioSaida: z.boolean(),
+    }).strict()).max(100).optional(),
     secoes: z
       .array(
         z
@@ -233,6 +239,10 @@ export const salvarFormularioEtapaSchema = z
   })
   .strict()
   .superRefine((formulario, context) => {
+    const idsObrigacoes = (formulario.obrigacoes ?? []).map((item) => item.campoId);
+    if (new Set(idsObrigacoes).size !== idsObrigacoes.length) {
+      context.addIssue({ code: "custom", path: ["obrigacoes"], message: "Cada campo deve ter apenas uma configuração de obrigatoriedade." });
+    }
     const chavesSecao = formulario.secoes.map((secao) => secao.chave);
     if (new Set(chavesSecao).size !== chavesSecao.length) {
       context.addIssue({

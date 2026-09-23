@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   transaction: vi.fn(),
   stageFindFirst: vi.fn(),
   fieldFindMany: vi.fn(),
+  fieldStageFindMany: vi.fn(),
+  fieldStageUpdateMany: vi.fn(),
   formFindUniqueOrThrow: vi.fn(),
   formUpdateMany: vi.fn(),
   formCreate: vi.fn(),
@@ -135,6 +137,7 @@ function transactionClient() {
     bpmPipeline: { update: mocks.pipelineUpdate },
     bpmEtapa: { findFirst: mocks.stageFindFirst },
     bpmCampo: { findMany: mocks.fieldFindMany },
+    bpmCampoEtapaConfig: { findMany: mocks.fieldStageFindMany, updateMany: mocks.fieldStageUpdateMany },
     bpmEtapaFormulario: {
       findUniqueOrThrow: mocks.formFindUniqueOrThrow,
       updateMany: mocks.formUpdateMany,
@@ -171,11 +174,13 @@ describe("contrato e salvamento diferencial do formulário de etapa", () => {
         nome: "CNPJ",
         ativo: true,
         pipelineId: PIPELINE_ID,
-        etapaConfiguracoes: [{ id: "config-1", visivel: true }],
+        etapaConfiguracoes: [{ id: "config-1", visivel: true, editavel: true, somenteLeitura: false, obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false }],
         pipelinesAssociados: [],
       },
     ]);
     mocks.formFindUniqueOrThrow.mockResolvedValue(persistedForm());
+    mocks.fieldStageFindMany.mockResolvedValue([]);
+    mocks.fieldStageUpdateMany.mockResolvedValue({ count: 1 });
     mocks.formUpdateMany.mockResolvedValue({ count: 1 });
     mocks.sectionUpdate.mockResolvedValue({ id: SECTION_ID });
     mocks.componentUpdate.mockResolvedValue({ id: FIELD_COMPONENT_ID });
@@ -199,6 +204,37 @@ describe("contrato e salvamento diferencial do formulário de etapa", () => {
     const parsed = salvarFormularioEtapaSchema.parse(input());
     expect(parsed.secoes[0].componentes[1].capability).toBe("STAGE_CHECKLIST");
     expect(parsed.secoes[0].componentes[2].capability).toBe("FOLLOW_UP_SCHEDULER");
+  });
+
+  it("publica obrigação de saída junto da composição na mesma transação", async () => {
+    const changed = { ...input(), obrigacoes: [{ campoId: FIELD_ID, obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: true }] };
+    expect(await SalvarFormularioEtapaBpm(changed)).toMatchObject({ success: true });
+    expect(mocks.fieldStageUpdateMany).toHaveBeenCalledWith({
+      where: { campoId: FIELD_ID, etapaId: STAGE_ID },
+      data: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: true },
+    });
+    expect(mocks.formUpdateMany).toHaveBeenCalledOnce();
+  });
+
+  it("recusa obrigação de campo ausente do formulário antes de publicar", async () => {
+    const changed = { ...input(), obrigacoes: [{ campoId: "outro-campo", obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: true }] };
+    expect((await SalvarFormularioEtapaBpm(changed)).error).toContain("OBRIGACAO_FORA_FORMULARIO");
+    expect(mocks.formUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("impede remover campo obrigatório da composição sem desativar a obrigação", async () => {
+    mocks.fieldStageFindMany.mockResolvedValue([{ campo: { nome: "CNPJ" } }]);
+    const changed = input("Sem CNPJ");
+    changed.secoes[0].componentes = changed.secoes[0].componentes.filter((item) => item.campoId !== FIELD_ID);
+    expect((await SalvarFormularioEtapaBpm(changed)).error).toContain("OBRIGACAO_CAMPO_REMOVIDO");
+    expect(mocks.componentDeleteMany).not.toHaveBeenCalled();
+  });
+
+  it("impede desativar formulário enquanto houver obrigação ativa", async () => {
+    mocks.fieldStageFindMany.mockResolvedValue([{ campoId: FIELD_ID, campo: { nome: "CNPJ" } }]);
+    const changed = { ...input(), ativo: false };
+    expect((await SalvarFormularioEtapaBpm(changed)).error).toContain("OBRIGACAO_FORMULARIO_INATIVO");
+    expect(mocks.formUpdateMany).not.toHaveBeenCalled();
   });
 
   it.each([

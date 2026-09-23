@@ -6,9 +6,10 @@ import { CampoBpmInput } from "@/app/PainelAlpha/AlphaCRM/CampoBpmInput";
 import { FormularioEtapaWorkspace, type FormularioEtapaAdmin } from "@/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/FormularioEtapaWorkspace";
 import { PipelineEditorStateProvider } from "@/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/PipelineEditorStateProvider";
 import { SalvarFormularioEtapaBpm } from "@/actions/bpm/FormulariosEtapa";
+import { ObterUsoCamposBpm } from "@/actions/bpm/Campos";
 
 vi.mock("@/actions/bpm/Anexos", () => ({ RegistrarAnexoBpm: vi.fn() }));
-vi.mock("@/actions/bpm/Campos", () => ({ CriarCampoBpm: vi.fn(), ExcluirCampoBpm: vi.fn() }));
+vi.mock("@/actions/bpm/Campos", () => ({ CriarCampoBpm: vi.fn(), AtualizarCampoBpm: vi.fn(), ExcluirCampoBpm: vi.fn(), ObterUsoCamposBpm: vi.fn() }));
 vi.mock("@/actions/bpm/FormulariosEtapa", () => ({ SalvarFormularioEtapaBpm: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/FormularioEtapaRenderer", () => ({ FormularioEtapaRenderer: () => null }));
@@ -18,6 +19,7 @@ let root: Root;
 let container: HTMLDivElement;
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(ObterUsoCamposBpm).mockResolvedValue({ success: true, data: {} });
   Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
   container = document.createElement("div"); document.body.append(container);
   root = createRoot(container);
