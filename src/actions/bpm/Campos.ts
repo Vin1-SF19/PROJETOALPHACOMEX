@@ -433,6 +433,14 @@ export async function AtualizarCampoBpm(dados: unknown) {
     const resultado = await db.$transaction(async (tx) => {
       await exigirAcessoConfigPipeline(userId, "configurarCampos", tx);
       const todosPipelines = await validarDimensoesCampo(tx as typeof db, anterior.pipelineId, pipelineIdsEntrada, etapaIds);
+      if (anterior.ativo && entrada.ativo === false) {
+        const referenciasPublicadas = await tx.bpmFormularioComponente.count({
+          where: { campoId: anterior.id, secao: { formulario: { ativo: true } } },
+        });
+        if (referenciasPublicadas > 0) {
+          throw new Error("CAMPO_FORMULARIO_PUBLICADO: Retire o campo dos formulários publicados antes de desativá-lo");
+        }
+      }
       if (entrada.etapaConfiguracoes) {
         const novasConfigs = new Map(entrada.etapaConfiguracoes.map((config) => [config.etapaId, config]));
         for (const configAnterior of anterior.etapaConfiguracoes) {

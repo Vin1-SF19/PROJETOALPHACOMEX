@@ -208,3 +208,36 @@ O usuário removeu a composição de acompanhamento da etapa Agendar reunião e 
 - O registro de auditoria da versão 2 continha Acompanhamento com Agendamento de reunião, Procedimentos da etapa e Próximo contato. A restauração pontual acrescentou essa seção sem substituir os campos atuais: formulário v5, `configVersion` 84, auditoria `fe925945-d169-4d82-8876-be3556575f07`, zero violações de FK.
 - O catálogo do CRM tem 16 tipos de campo e sete blocos operacionais do formulário aberto. O usuário esclareceu que tarefas, histórico, anexos e navegação já têm áreas próprias; elas foram retiradas do catálogo visual. O card fechado mantém um link para seu editor dedicado. Os blocos de outra etapa aparecem no inventário, mas a action canônica mantém a restrição de capability publicada para evitar ações incompatíveis.
 - O editor ganhou cabeçalho, estados de disponibilidade, itens de composição com hierarquia visual, confirmação antes de retirar blocos operacionais e link contextual para o card do Kanban. `npm run lint` passou com zero erros e 1192 avisos preexistentes; `npm run typecheck` passou; `npm test` passou com 504 arquivos e 3796 testes aprovados, quatro ignorados e um todo; `npm run build` passou após a confirmação de retirada.
+
+## Solicitação de 24/09/2026 — referências inválidas em Reunião Agendada
+
+O usuário relatou “Componente indisponível: O campo não está visível/aplicável na configuração canônica da etapa” nos cards de Reunião Agendada. Leitura do Turso identificou `Radar atual` e `Status da sede` inativos, ainda publicados como componentes do formulário. As mesmas referências aparecem também em Boas-vindas e Em análise do pipeline Operacional: seis componentes em três formulários, todos sem obrigações ou valores de card associados.
+
+### Critérios de aceitação
+
+1. Os componentes que apontam para esses dois campos inativos deixam de aparecer nos três formulários, sem alterar campos ativos, valores, tarefas ou demais seções.
+2. A publicação registra nova versão e auditoria; uma verificação independente confirma zero referências inválidas e zero violações de FK.
+3. O servidor impede desativar um campo ainda usado por formulário ativo e informa ao administrador que deve retirá-lo do formulário primeiro.
+
+### Checklist
+
+- [x] Preparar limpeza restrita com inventário, backup e verificação de versão.
+- [x] Executar a limpeza pontual e conferir versões, auditoria e integridade.
+- [x] Implementar guarda no servidor e teste de regressão.
+- [x] Rodar lint, typecheck, testes e build; atualizar File List.
+
+### File List complementar
+
+- `src/actions/bpm/Campos.ts`
+- `tests/bpm/campos-configuraveis-actions.test.ts`
+- `scripts/bpm-limpar-componentes-inativos-2026-09-24.mjs`
+- `docs/stories/story-alpha-crm-formularios-edicao-limpeza-radar.md`
+
+### Evidência da correção
+
+- Turso remoto: componentes inválidos identificados por leitura direta. `Radar atual` e `Status da sede` tinham `BpmCampo.ativo=0` e `BpmCampoEtapaConfig.visivel=1` nos três formulários. Havia 6 referências, 0 valores de card, 0 obrigações da etapa e 0 requisitos ativos para esses campos.
+- Backup dedicado em `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-24T18-13-27-754Z.sql`, SHA-256 `2c488d2988762638abc717f6d6c25d948cd76c93a37ba4e9c343a4eb812a88ba`, 154.030.961 bytes; restauração isolada validada com 331 tabelas e 159.152 linhas, integridade e FKs aprovadas.
+- Dry-run do script confirmou 6 componentes e 3 formulários sem valores. A execução pontual removeu apenas as seis referências, preservando os dois campos desativados e quaisquer dados históricos. Formulário Reunião Agendada v3→v4; Boas-vindas e Em análise v2→v3. `configVersion` de Revisão de Radar 85→86 e de Operacional 3→4.
+- Auditorias `19767bdc-a12c-475c-9137-c0eac14e96b8` e `d8f6e2e4-f378-47f9-937a-6941b63b896b` registraram as referências removidas. Leitura independente: 0 referências inválidas em formulários ativos, 0 violações de FK.
+- Rollback: reintroduzir seletivamente os seis componentes a partir da auditoria/backup, somente após reativar ou remapear os campos; uma restauração total do banco sobrescreveria gravações posteriores.
+- Gates: `npm run lint` passou com 0 erros e 1.192 warnings existentes; `npm run typecheck` e `npm run build` passaram. A primeira suíte completa sofreu timeouts ambientais em dois testes não relacionados; ambos passaram isolados. `npm test -- --testTimeout 60000` passou com 505 arquivos, 3.808 testes aprovados, 4 ignorados e 1 todo. O teste focado de gestão de campos passou com 19 casos.

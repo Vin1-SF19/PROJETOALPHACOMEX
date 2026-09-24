@@ -298,6 +298,19 @@ describe("ações de gestão configurável de campos", () => {
     expect(mocks.campoUpdate).not.toHaveBeenCalled();
   });
 
+  it("não desativa campo enquanto formulário publicado ainda o referencia", async () => {
+    mocks.campoFindUnique.mockResolvedValue({
+      id: CAMPO_DESTINO_ID, pipelineId: PIPELINE_ID, tipo: "texto", escopo: "CARD",
+      fonteEntidade: null, fonteAtributo: null, entidadeGlobal: null, ativo: true,
+      valores: [], valoresGlobais: [], _count: { valoresGlobais: 0, anexos: 0 },
+      opcoes: [], pipelinesAssociados: [], acessos: [], etapaConfiguracoes: [],
+    });
+    mocks.formComponentCount.mockResolvedValue(1);
+    const resultado = await AtualizarCampoBpm({ campoId: CAMPO_DESTINO_ID, ativo: false });
+    expect(resultado).toEqual({ success: false, error: "Retire o campo dos formulários publicados antes de desativá-lo" });
+    expect(mocks.campoUpdate).not.toHaveBeenCalled();
+  });
+
   it("rejeita seleção customizada ativa sem opções e aceita fonte canônica", async () => {
     const invalido = await CriarCampoBpm({
       pipelineId: PIPELINE_ID,
