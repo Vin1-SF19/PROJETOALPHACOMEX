@@ -119,3 +119,37 @@ O usuário pediu retirar do catálogo de “Adicionar seção” os campos com �
 - `npm test`: 502 arquivos, 3788 testes aprovados, 4 ignorados, 1 todo.
 - `npm run build`: passou com os avisos preexistentes do módulo PDF Bibble.
 - Dry-run do script e simulação local do backup: passaram.
+
+## Solicitação de 24/09/2026 — requisitos visíveis ao mover o card
+
+Ao mover Agendar reunião → Reunião Agendada, a configuração persistida da etapa de destino exige Radar pretendido, Estado e Vendedor responsável. O card aberto apresenta apenas o formulário da etapa de origem, e o botão de avanço chama `MoverCardBpm` sem recolher os campos da transição. Estado é um campo compartilhado do Financeiro, marcado obrigatório e somente leitura na etapa de destino.
+
+### Critérios de aceitação
+
+1. Antes de mover, o card consulta os requisitos da transição. Campos pendentes e editáveis aparecem para preenchimento e são enviados atomicamente com a mudança de etapa.
+2. Campo pendente somente leitura exibe o motivo e direciona o administrador para a configuração da etapa; o usuário não fica diante de uma mensagem sem campo acessível.
+3. O editor de Campos e formulários permite desativar obrigações já publicadas mesmo quando o campo está atualmente somente leitura. Ativar obrigação para campo não editável continua bloqueado no servidor.
+4. As regras são lidas da configuração persistida de cada pipeline/etapa. A edição conserva IDs, valores existentes e os demais campos compartilhados.
+
+### Tarefas
+
+- [x] Inventariar o formulário e as configurações da transição em produção sem escrita.
+- [x] Expor os requisitos na UI e salvar valores pela action canônica.
+- [x] Permitir limpar regras legadas de campos somente leitura na UI.
+- [x] Testar fluxo de transição e editor; rodar gates do projeto.
+
+### File List complementar
+
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa.tsx`
+- `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/AdminPipelineClient.tsx`
+- `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/FormularioEtapaWorkspace.tsx`
+- `tests/bpm/autosave-recovery-react.test.ts`
+- `tests/bpm/formularios-etapa-save.test.ts`
+- `tests/bpm/transicao-requisitos-card-react.test.ts`
+
+### Evidência da solicitação
+
+- Inventário somente leitura do Turso: os três campos pendentes estão em `BpmCampoEtapaConfig` de Reunião Agendada com `obrigatorio=1`; todos têm componente no formulário publicado da etapa. Radar pretendido e Vendedor responsável são editáveis; Estado é campo compartilhado com Financeiro, somente leitura global e na etapa. Não há `BpmRequisito` ativo para esses três nomes.
+- O card consulta `ObterRequisitosTransicaoBpm` após confirmar seus autosaves. Se há campos pendentes, oferece editor antes do movimento; `SalvarRequisitosEMoverCardBpm` grava valores editados e move atomicamente. Campo somente leitura mostra acesso direto ao editor do pipeline, selecionando etapa e campo pela URL.
+- A UI de Campos e formulários agora permite desligar uma obrigação marcada mesmo em campo somente leitura. O servidor continua rejeitando ativação de obrigação em campo inacessível. Nenhuma configuração de produção foi alterada automaticamente.
+- Testes focados cobrem preenchimento e movimento, bloqueio de campo somente leitura e remoção de obrigação legada. `npm run lint` passou com 0 erros e 1192 avisos existentes; `npm run typecheck` passou; `npm test` passou com 503 arquivos e 3791 testes aprovados, 4 ignorados e 1 todo; `npm run build` passou com os avisos preexistentes do módulo PDF. Validação autenticada em navegador ainda pendente.

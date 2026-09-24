@@ -8,8 +8,9 @@ import PainelProximaEtapa from "@/app/PainelAlpha/AlphaCRM/CardModal/PainelProxi
 import { MoverCardBpm } from "@/actions/bpm/Cards";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/actions/bpm/Checklists", () => ({ ObterResumoChecklistCardBpm: vi.fn(async () => ({ success: false })) }));
+vi.mock("@/app/PainelAlpha/AlphaCRM/CampoBpmInput", () => ({ CampoBpmInput: () => null }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
-vi.mock("@/actions/bpm/Cards", () => ({ MoverCardBpm: vi.fn(async () => ({ success: true })), ObterCardBpm: vi.fn(async () => ({ success: true, data: { updatedAt: "2026-09-22T12:00:00Z" } })) }));
+vi.mock("@/actions/bpm/Cards", () => ({ MoverCardBpm: vi.fn(async () => ({ success: true })), ObterRequisitosTransicaoBpm: vi.fn(async () => ({ success: true, data: { etapaDestino: { id: "destino", nome: "Avançar" }, campos: [], faltantes: [], guardas: [] } })), SalvarRequisitosEMoverCardBpm: vi.fn(async () => ({ success: true })), ObterCardBpm: vi.fn(async () => ({ success: true, data: { updatedAt: "2026-09-22T12:00:00Z" } })) }));
 let root: Root;
 let host: HTMLDivElement;
 let context: ReturnType<typeof useCardSave>;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
@@ -206,6 +206,9 @@ export default function AdminPipelineClient({
   const [conflitoPublicacao, setConflitoPublicacao] = useState(false);
   const [novaEtapaNome, setNovaEtapaNome] = useState("");
   const [abaAtiva, setAbaAtiva] = usePipelineEditorState(`${pipeline.id}:tab`, "overview");
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "fields") setAbaAtiva("fields");
+  }, [setAbaAtiva]);
   const [etapaSelecionadaId, setEtapaSelecionadaId] = useState<string | null>(
     null,
   );

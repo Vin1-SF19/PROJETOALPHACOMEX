@@ -77,6 +77,8 @@ type EtapaFormulario = {
 
 type CampoAplicavel = CampoFormulario & {
   ativo?: boolean;
+  editavel?: boolean;
+  somenteLeitura?: boolean;
   pipelineId?: string;
   pipelinesAssociados?: Array<{ pipelineId: string; pipeline?: { nome: string } }>;
   etapaConfiguracoes?: Array<{
@@ -222,6 +224,7 @@ function FormularioEtapaWorkspaceContent({
   const [camposExcluidos, setCamposExcluidos] = useState<string[]>([]);
   const [excluindoCampo, setExcluindoCampo] = useState(false);
   const [campoSelecionadoId, setCampoSelecionadoId] = useState<string | null>(null);
+  const deepLinkAplicado = useRef(false);
   const [nomeEdicao, setNomeEdicao] = useState("");
   const [salvandoCampo, setSalvandoCampo] = useState(false);
   const [habilitandoCampo, setHabilitandoCampo] = useState(false);
@@ -232,6 +235,25 @@ function FormularioEtapaWorkspaceContent({
   const [mostrarPreview, setMostrarPreview] = useState(true);
   const publicandoRef = useRef(false);
   const bloqueado = publicationBlocked || salvando || criandoCampo || excluindoCampo || salvandoCampo || habilitandoCampo;
+
+  useEffect(() => {
+    if (deepLinkAplicado.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("tab") !== "fields") return;
+    const etapaDaUrl = params.get("etapaId");
+    if (!etapaDaUrl || !etapas.some((item) => item.id === etapaDaUrl)) return;
+    const campoDaUrl = campos.find((item) => item.id === params.get("campoId"));
+    const timer = window.setTimeout(() => {
+      if (deepLinkAplicado.current) return;
+      deepLinkAplicado.current = true;
+      setEtapaId(etapaDaUrl);
+      if (campoDaUrl) {
+        setCampoSelecionadoId(campoDaUrl.id);
+        setNomeEdicao(campoDaUrl.nome);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [etapas, campos, setEtapaId]);
 
   useEffect(() => {
     let vigente = true;
@@ -949,7 +971,9 @@ function FormularioEtapaWorkspaceContent({
                 const regraObrigacao = chave === "obrigatorio" || chave === "obrigatorioSaida" || chave === "obrigatorioEntrada";
                 const marcado = regraObrigacao ? Boolean(obrigacoesSelecionadas?.[chave]) : Boolean(configSelecionada?.[chave]);
                 const possuiObrigacaoPublicada = Boolean(configSelecionada?.obrigatorio || configSelecionada?.obrigatorioEntrada || configSelecionada?.obrigatorioSaida);
-                const indisponivel = bloqueado || (regraObrigacao && (!estaNoRascunho || !configSelecionada?.visivel || !configSelecionada?.editavel)) || (chave === "visivel" && publicadoNaEtapa && marcado) || (chave === "editavel" && possuiObrigacaoPublicada && marcado);
+                // Permite retirar uma obrigação legada mesmo quando o campo já está somente leitura.
+                // A restrição de editabilidade vale apenas para ativar uma nova obrigação.
+                const indisponivel = bloqueado || (regraObrigacao && !marcado && (!estaNoRascunho || !configSelecionada?.visivel || !configSelecionada?.editavel || configSelecionada?.somenteLeitura || campoSelecionado.editavel === false || campoSelecionado.somenteLeitura)) || (chave === "visivel" && publicadoNaEtapa && marcado) || (chave === "editavel" && possuiObrigacaoPublicada && marcado);
                 return <label key={chave} className="mt-3 flex items-start gap-2.5 rounded-lg border border-white/10 bg-slate-900/40 p-2.5 text-xs text-slate-200"><input type="checkbox" checked={marcado} disabled={indisponivel} onChange={(event) => atualizarRegra(chave, event.target.checked)} className="mt-0.5 accent-cyan-400" /><span><span className="font-semibold">{rotulo}</span><span className="mt-0.5 block text-[11px] text-slate-500">{ajuda}</span></span></label>;
               })}
               {!publicadoNaEtapa && estaNoRascunho && <p className="mt-2 text-[11px] text-amber-200">Defina as obrigações agora; elas serão ativadas ao publicar o formulário.</p>}

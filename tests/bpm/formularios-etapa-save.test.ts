@@ -216,6 +216,21 @@ describe("contrato e salvamento diferencial do formulário de etapa", () => {
     expect(mocks.formUpdateMany).toHaveBeenCalledOnce();
   });
 
+  it("permite retirar uma obrigação legada de campo somente leitura, preservando o campo", async () => {
+    mocks.fieldFindMany.mockResolvedValue([{
+      id: FIELD_ID, nome: "Estado", ativo: true, pipelineId: PIPELINE_ID,
+      etapaConfiguracoes: [{ id: "config-1", visivel: true, editavel: false, somenteLeitura: true, obrigatorio: true, obrigatorioEntrada: false, obrigatorioSaida: false }],
+      pipelinesAssociados: [],
+    }]);
+    const changed = { ...input(), obrigacoes: [{ campoId: FIELD_ID, obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false }] };
+    expect(await SalvarFormularioEtapaBpm(changed)).toMatchObject({ success: true });
+    expect(mocks.fieldStageUpdateMany).toHaveBeenCalledWith({
+      where: { campoId: FIELD_ID, etapaId: STAGE_ID },
+      data: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false },
+    });
+    expect(mocks.componentDeleteMany).not.toHaveBeenCalled();
+  });
+
   it("recusa obrigação de campo ausente do formulário antes de publicar", async () => {
     const changed = { ...input(), obrigacoes: [{ campoId: "outro-campo", obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: true }] };
     expect((await SalvarFormularioEtapaBpm(changed)).error).toContain("OBRIGACAO_FORA_FORMULARIO");
