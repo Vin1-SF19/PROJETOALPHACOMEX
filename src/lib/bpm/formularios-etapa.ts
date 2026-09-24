@@ -119,6 +119,19 @@ export function listarCatalogoComponentesFormulario(capabilitiesJson?: string | 
     }));
 }
 
+/** Inventário da biblioteca inteira para o editor, inclusive blocos de outras etapas. */
+export function listarInventarioComponentesFormulario(capabilitiesJson?: string | null) {
+  const permitidas = parseBpmCapabilities(capabilitiesJson);
+  return Object.values(BPM_FORM_COMPONENT_REGISTRY).map((item) => ({
+    tipo: item.tipo,
+    target: item.target,
+    label: item.label,
+    description: item.description,
+    disponivel: item.tipo === "CHECKLIST" || permitidas.has(item.target),
+    multiple: item.multiple,
+  }));
+}
+
 const persistedIdSchema = z.string().trim().min(1).max(200);
 
 const componenteFormularioSchema = z

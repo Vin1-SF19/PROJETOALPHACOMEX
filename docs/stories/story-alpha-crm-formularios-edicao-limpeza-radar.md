@@ -172,3 +172,39 @@ O usuário esclareceu que Radar pretendido e Estado não devem bloquear a entrad
 - Para reverter, o administrador pode reativar as duas obrigações no editor de Campos e formulários; o estado anterior e o novo estão no registro de auditoria. Nenhum valor do card ou do cadastro do cliente foi alterado.
 - A legenda do editor foi ajustada para explicar que “Obrigatório na etapa” também bloqueia transições. O editor já oferece controles separados para obrigação na etapa, entrada e saída.
 - Gates após a alteração: lint sem erros, typecheck, 504 arquivos e 3.793 testes aprovados na suíte completa e build concluída.
+
+## Solicitação de 24/09/2026 — recuperar acompanhamento e tornar o catálogo visível
+
+O usuário removeu a composição de acompanhamento da etapa Agendar reunião e pediu a volta da data e hora, o inventário das opções disponíveis no sistema e uma interface de Campos e formulários mais clara e agradável.
+
+### Critérios de aceitação
+
+1. Restaurar o componente de agendamento a partir da auditoria, preservando os dois campos publicados posteriormente, os valores dos cards e o evento do Google Meet.
+2. Exibir no editor todos os componentes especializados registrados para formulários, permitindo adicionar os compatíveis com a etapa e mostrando a razão dos indisponíveis ou já usados.
+3. Manter o editor de Campos e formulários focado nos controles da etapa; áreas próprias do card, como tarefas, histórico, anexos e navegação, permanecem nas suas abas dedicadas.
+4. Apresentar campos, componentes e seções com hierarquia visual, estado de disponibilidade e ações identificáveis em desktop e mobile.
+5. Continuar usando a validação e a publicação canônicas do formulário, sem alteração de schema ou migração.
+6. Remover um bloco operacional exige confirmação que explica o efeito no card e a preservação dos dados já salvos.
+
+### Checklist
+
+- [x] Inventariar o formulário atual, a auditoria e o valor da reunião de Francisco em leitura.
+- [x] Restaurar Acompanhamento com verificação de versão e auditoria.
+- [x] Expor catálogo e redesenhar a composição na UI.
+- [x] Validar testes, lint, typecheck e build.
+
+### File List complementar
+
+- `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/FormularioEtapaWorkspace.tsx`
+- `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/ListaCamposFormulario.tsx`
+- `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/AdminPipelineClient.tsx`
+- `src/lib/bpm/formularios-etapa.ts`
+- `tests/bpm/formulario-renderer.test.ts`
+- `docs/stories/story-alpha-crm-formularios-edicao-limpeza-radar.md`
+
+### Evidência de recuperação
+
+- O card Francisco mantinha `dataReuniao=2026-09-24T14:00:00Z` e `googleEventId`; o formulário v4 da etapa Agendar reunião estava ativo, mas continha só dois campos e nenhuma seção Acompanhamento.
+- O registro de auditoria da versão 2 continha Acompanhamento com Agendamento de reunião, Procedimentos da etapa e Próximo contato. A restauração pontual acrescentou essa seção sem substituir os campos atuais: formulário v5, `configVersion` 84, auditoria `fe925945-d169-4d82-8876-be3556575f07`, zero violações de FK.
+- O catálogo do CRM tem 16 tipos de campo e sete blocos operacionais do formulário aberto. O usuário esclareceu que tarefas, histórico, anexos e navegação já têm áreas próprias; elas foram retiradas do catálogo visual. O card fechado mantém um link para seu editor dedicado. Os blocos de outra etapa aparecem no inventário, mas a action canônica mantém a restrição de capability publicada para evitar ações incompatíveis.
+- O editor ganhou cabeçalho, estados de disponibilidade, itens de composição com hierarquia visual, confirmação antes de retirar blocos operacionais e link contextual para o card do Kanban. `npm run lint` passou com zero erros e 1192 avisos preexistentes; `npm run typecheck` passou; `npm test` passou com 504 arquivos e 3796 testes aprovados, quatro ignorados e um todo; `npm run build` passou após a confirmação de retirada.

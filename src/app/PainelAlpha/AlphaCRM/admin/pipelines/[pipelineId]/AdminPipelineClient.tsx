@@ -207,7 +207,8 @@ export default function AdminPipelineClient({
   const [novaEtapaNome, setNovaEtapaNome] = useState("");
   const [abaAtiva, setAbaAtiva] = usePipelineEditorState(`${pipeline.id}:tab`, "overview");
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("tab") === "fields") setAbaAtiva("fields");
+    const abaDaUrl = new URLSearchParams(window.location.search).get("tab");
+    if (abaDaUrl === "fields" || abaDaUrl === "card") setAbaAtiva(abaDaUrl);
   }, [setAbaAtiva]);
   const [etapaSelecionadaId, setEtapaSelecionadaId] = useState<string | null>(
     null,

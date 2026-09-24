@@ -10,6 +10,7 @@ import {
 import {
   BPM_FORM_COMPONENT_REGISTRY,
   listarCatalogoComponentesFormulario,
+  listarInventarioComponentesFormulario,
   salvarFormularioEtapaSchema,
 } from "@/lib/bpm/formularios-etapa";
 import { BPM_CAPABILITIES } from "@/lib/bpm/ontology";
@@ -285,6 +286,17 @@ describe("P0-3 - resolver canônico do formulário de etapa", () => {
       BPM_CAPABILITIES.STAGE_CHECKLIST,
       BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER,
     ]);
+  });
+
+  it("inventaria todos os blocos e sinaliza quais a etapa permite", () => {
+    const inventario = listarInventarioComponentesFormulario(JSON.stringify([BPM_CAPABILITIES.MEETING_SCHEDULER]));
+    expect(inventario).toHaveLength(Object.keys(BPM_FORM_COMPONENT_REGISTRY).length);
+    expect(inventario.find((item) => item.target === BPM_CAPABILITIES.MEETING_SCHEDULER)?.disponivel).toBe(true);
+    expect(inventario.find((item) => item.target === BPM_CAPABILITIES.MEETING_TRANSCRIPT)?.disponivel).toBe(false);
+    expect(inventario.find((item) => item.target === BPM_CAPABILITIES.STAGE_CHECKLIST)?.disponivel).toBe(true);
+    const builder = readFileSync(resolve(process.cwd(), "src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/FormularioEtapaWorkspace.tsx"), "utf8");
+    expect(builder).toContain("blocosOperacionais.map");
+    expect(builder).toContain("adicionarBloco(bloco.target)");
   });
 
   it("card e preview usam o renderer compartilhado; preview permanece inerte", () => {
