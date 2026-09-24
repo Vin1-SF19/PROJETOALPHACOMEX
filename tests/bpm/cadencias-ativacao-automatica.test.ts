@@ -5,8 +5,10 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/bpm/historico-server", () => ({ registrarHistoricoCard: vi.fn() }));
 vi.mock("@/lib/bpm/realtime-server", () => ({ notificarPipelineBpm: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ default: { $transaction: vi.fn() } }));
+vi.mock("@/lib/bpm/automacoes/eventos", () => ({ publicarEventoBpm: vi.fn() }));
 
 import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
+import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { ativarCadenciasNaEntradaBpm, chaveExecucaoCicloCadencia } from "@/lib/bpm/cadencias/ativacao-automatica";
 
 type Cadencia = { id: string; nome: string; passos: Array<{ ordem: number; intervaloDias: number }> };
@@ -57,6 +59,11 @@ describe("ativarCadenciasNaEntradaBpm", () => {
       cadenciaId: "cad-1", proximaExecucaoEm: new Date("2026-09-10T12:00:00.000Z"),
     }) });
     expect(registrarHistoricoCard).toHaveBeenCalledTimes(2);
+    // Cada cadência iniciada vira evento de domínio para o Motor Central.
+    expect(publicarEventoBpm).toHaveBeenCalledTimes(2);
+    expect(publicarEventoBpm).toHaveBeenCalledWith(expect.objectContaining({
+      tipo: "CADENCIA_INICIADA", cardId: "card-1", valorNovo: expect.objectContaining({ cadenciaId: "cad-1" }),
+    }), tx);
   });
 
   it("inclui cadência de pipeline somente numa entrada real no pipeline", async () => {

@@ -19,6 +19,7 @@ import { executarHttpSeguro } from "./safe-http";
 import { publicarEventoBpm } from "./eventos";
 import { validarGrafoAutomacao, validarParametrosAcaoCentral, type GrafoAutomacao, type NoAutomacao, type TipoAcaoCentral } from "./central-schemas";
 import { executarAcaoLegadaNoMotorCentral } from "./executor";
+import { renderizarPlaceholdersAutomacaoBpm } from "./placeholders";
 import type { AcaoAutomacaoBpm } from "./schemas";
 
 const LIMITE_TENTATIVAS = 3;
@@ -73,6 +74,20 @@ async function carregarExecucao(id: string) {
   });
 }
 
+/** Variáveis `{{...}}` disponíveis em todos os textos das ações centrais. */
+function placeholdersDoCard(card: ExecucaoCentral["card"]): Record<string, string> {
+  return {
+    "card.id": card.id,
+    "card.servico": card.servico ?? "",
+    "empresa.razaoSocial": card.empresa?.razaoSocial ?? "",
+    "empresa.nomeFantasia": card.empresa?.nomeFantasia ?? "",
+    "empresa.cnpj": card.empresa?.cnpj ?? "",
+    "responsavel.nome": card.responsavel?.nome ?? "",
+    "pipeline.nome": card.pipeline?.nome ?? "",
+    "coluna.nome": card.etapa?.nome ?? "",
+  };
+}
+
 function proximoNo(no: NoAutomacao): string | null {
   return no.tipo === "ACAO" ? no.proximoId ?? null : no.tipo === "ESPERA" ? no.proximoId : null;
 }
@@ -91,6 +106,8 @@ async function publicarEventoDaAcao(execucao: ExecucaoCentral, tipo: Parameters<
 async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCentral, bruto: unknown) {
   const parametros = validarParametrosAcaoCentral(tipo, bruto) as Record<string, unknown>;
   const card = execucao.card;
+  const variaveis = placeholdersDoCard(card);
+  const texto = (valor: unknown) => renderizarPlaceholdersAutomacaoBpm(String(valor), variaveis);
   if (["ENVIAR_EMAIL", "GERAR_CONTRATO", "GERAR_FICHA", "MATERIALIZAR_CHECKLIST", "DISTRIBUIR_RESPONSAVEL", "IDENTIFICAR_OPORTUNIDADE"].includes(tipo)) {
     return executarAcaoLegadaNoMotorCentral({
       execucaoId: execucao.id, automacaoId: execucao.automacaoId, automacaoNome: execucao.automacao.nome,
@@ -105,6 +122,7 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
     const anterior = await db.bpmCardCampoValor.findUnique({ where: { cardId_campoId: { cardId: card.id, campoId } } });
     await db.bpmCardCampoValor.upsert({ where: { cardId_campoId: { cardId: card.id, campoId } }, create: { cardId: card.id, campoId, valor }, update: { valor } });
     await publicarEventoDaAcao(execucao, "CAMPO_ALTERADO", "CAMPO", campoId, { campoId, valor: anterior?.valor ?? null }, { campoId, valor });
+    await notificarPipelineBpm({ pipelineId: card.pipelineId, cardId: card.id, tipo: "CARD_ATUALIZADO" });
     return { campoId, valor };
   }
   if (tipo === "MOVER_CARD") {
@@ -146,8 +164,13 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
     const subStatusId = String(parametros.subStatusId);
     const sub = await db.bpmSubStatus.findFirst({ where: { id: subStatusId, etapaId: card.etapaId, ativo: true }, select: { id: true, nome: true } });
     if (!sub) throw new Error("Substatus inválido para a etapa atual");
-    await db.bpmCardHistorico.create({ data: { cardId: card.id, acao: "SUBSTATUS_ALTERADO", automacaoOrigem: execucao.automacaoId, valorNovoJson: JSON.stringify({ subStatusId: sub.id, nome: sub.nome, execucaoId: execucao.id }) } });
-    await publicarEventoDaAcao(execucao, "CARD_ATUALIZADO", "CARD", card.id, undefined, { subStatusId: sub.id, subStatusNome: sub.nome });
+    const estadoAnterior = await db.bpmCardEstado.findUnique({ where: { cardId: card.id }, select: { subStatusId: true } });
+    await db.$transaction([
+      db.bpmCardEstado.upsert({ where: { cardId: card.id }, create: { cardId: card.id, subStatusId: sub.id }, update: { subStatusId: sub.id } }),
+      db.bpmCardHistorico.create({ data: { cardId: card.id, acao: "SUBSTATUS_ALTERADO", automacaoOrigem: execucao.automacaoId, valorAnteriorJson: JSON.stringify({ subStatusId: estadoAnterior?.subStatusId ?? null }), valorNovoJson: JSON.stringify({ subStatusId: sub.id, nome: sub.nome, execucaoId: execucao.id }) } }),
+    ]);
+    await publicarEventoDaAcao(execucao, "CARD_ATUALIZADO", "CARD", card.id, { subStatusId: estadoAnterior?.subStatusId ?? null }, { subStatusId: sub.id, subStatusNome: sub.nome });
+    await notificarPipelineBpm({ pipelineId: card.pipelineId, cardId: card.id, tipo: "CARD_ATUALIZADO" });
     return sub;
   }
   if (tipo === "CRIAR_TAREFA") {
@@ -168,7 +191,7 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
         await tx.bpmCard.update({ where: { id: card.id }, data: { standbyFollowUpUltimoEm: agora } });
       }
       return tx.bpmTarefa.create({ data: {
-        cardId: card.id, titulo: String(parametros.titulo), descricao: parametros.descricao ? String(parametros.descricao) : null,
+        cardId: card.id, titulo: texto(parametros.titulo), descricao: parametros.descricao ? texto(parametros.descricao) : null,
         responsavelId, prazo: temPrazo ? new Date(agora.getTime() + prazoMinutos * 60_000) : null,
         alertaEm: alertaMinutos === null ? null : new Date(agora.getTime() + alertaMinutos * 60_000),
         tipo: String(parametros.tipo), prioridade: String(parametros.prioridade),
@@ -187,7 +210,7 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
     const restantes = Math.max(0, meta - realizadas);
     if (!restantes) return { tarefasCriadas: 0, realizadas };
     const diaCiclo = calcularDiaCicloNovosLeads(card.createdAt);
-    const preencher = (modelo: string, indice: number) => modelo
+    const preencher = (modelo: string, indice: number) => texto(modelo)
       .replaceAll("{{indice}}", String(indice))
       .replaceAll("{{meta}}", String(meta))
       .replaceAll("{{diaCiclo}}", String(diaCiclo));
@@ -229,7 +252,8 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
   }
   if (tipo === "CRIAR_ALERTA" || tipo === "ADICIONAR_ANOTACAO") {
     const acao = tipo === "CRIAR_ALERTA" ? "ALERTA_AUTOMACAO" : "ANOTACAO_AUTOMACAO";
-    const historico = await db.bpmCardHistorico.create({ data: { cardId: card.id, acao, automacaoOrigem: execucao.automacaoId, valorNovoJson: JSON.stringify({ texto: parametros.texto, execucaoId: execucao.id }) } });
+    const historico = await db.bpmCardHistorico.create({ data: { cardId: card.id, acao, automacaoOrigem: execucao.automacaoId, valorNovoJson: JSON.stringify({ texto: texto(parametros.texto), execucaoId: execucao.id }) } });
+    await notificarPipelineBpm({ pipelineId: card.pipelineId, cardId: card.id, tipo: "CARD_ATUALIZADO" });
     return { historicoId: historico.id };
   }
   if (tipo === "CRIAR_CARD_OUTRO_PIPELINE") {
@@ -309,11 +333,11 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
   if (tipo === "COMUNICACAO_EXISTENTE") {
     if (parametros.canal === "EMAIL") {
       if (!process.env.RESEND_API_KEY || !parametros.destinatario) throw new Error("Canal de e-mail não configurado");
-      const resposta = await new Resend(process.env.RESEND_API_KEY).emails.send({ from: process.env.BPM_AUTOMACOES_EMAIL_FROM ?? "Painel Alpha <onboarding@resend.dev>", to: String(parametros.destinatario), subject: `Automação: ${execucao.automacao.nome}`, text: String(parametros.mensagem) }, { idempotencyKey: `bpm-central:${execucao.id}` });
+      const resposta = await new Resend(process.env.RESEND_API_KEY).emails.send({ from: process.env.BPM_AUTOMACOES_EMAIL_FROM ?? "Painel Alpha <onboarding@resend.dev>", to: texto(parametros.destinatario), subject: `Automação: ${execucao.automacao.nome}`, text: texto(parametros.mensagem) }, { idempotencyKey: `bpm-central:${execucao.id}` });
       if (resposta.error) throw new Error(resposta.error.message);
       return { canal: "EMAIL", messageId: resposta.data?.id ?? null };
     }
-    const historico = await db.bpmCardHistorico.create({ data: { cardId: card.id, acao: "COMUNICACAO_PENDENTE", automacaoOrigem: execucao.automacaoId, valorNovoJson: JSON.stringify({ canal: parametros.canal, templateId: parametros.templateId, mensagem: parametros.mensagem }) } });
+    const historico = await db.bpmCardHistorico.create({ data: { cardId: card.id, acao: "COMUNICACAO_PENDENTE", automacaoOrigem: execucao.automacaoId, valorNovoJson: JSON.stringify({ canal: parametros.canal, templateId: parametros.templateId, mensagem: texto(parametros.mensagem) }) } });
     return { canal: parametros.canal, status: "PENDENTE", historicoId: historico.id };
   }
   const resultado = await executarHttpSeguro(parametros, `bpm-central:${execucao.id}`);
@@ -329,7 +353,14 @@ async function executarGrafo(execucao: ExecucaoCentral, grafo: GrafoAutomacao, c
   while (nodeId) {
     const no = porId.get(nodeId); if (!no) throw new Error(`Nó ${nodeId} não encontrado`);
     const concluido = execucao.passos.find((passo) => passo.nodeId === nodeId && passo.status === "CONCLUIDO");
-    if (concluido) { nodeId = proximoNo(no); continue; }
+    if (concluido) {
+      // Nó de condição já avaliado: retoma pelo ramo escolhido na primeira
+      // avaliação, em vez de encerrar o fluxo como SUCESSO sem executar o ramo.
+      nodeId = no.tipo === "CONDICAO"
+        ? (() => { const r = parseObjeto(concluido.resultadoJson); return typeof r.proximoNodeId === "string" ? r.proximoNodeId : null; })()
+        : proximoNo(no);
+      continue;
+    }
     const passo = await db.bpmAutomacaoPassoExecucao.upsert({
       where: { execucaoId_nodeId: { execucaoId: execucao.id, nodeId } },
       create: { execucaoId: execucao.id, nodeId, tipo: no.tipo, ordem: ordem++, status: "EXECUTANDO", tentativas: 1, iniciadoEm: new Date() },
@@ -383,7 +414,13 @@ async function processarUma(id: string) {
     return "adiada" as const;
   }
   try {
-    if (!execucao.automacao.ativa || execucao.automacaoVersao.status !== "ATIVA") throw new Error("Automação ou versão não está ativa");
+    // Automação pausada/arquivada ou versão substituída: encerra sem efeito e
+    // sem retentativas — não é uma falha operacional.
+    if (!execucao.automacao.ativa || execucao.automacaoVersao.status !== "ATIVA") {
+      const motivo = !execucao.automacao.ativa ? "AUTOMACAO_INATIVA" : "VERSAO_SUBSTITUIDA";
+      await db.bpmAutomacaoExecucao.update({ where: { id }, data: { status: "IGNORADA", resultadoJson: JSON.stringify({ motivo }), executadoEm: new Date(), claimToken: null } });
+      return "ignorada" as const;
+    }
     const grafo = validarGrafoAutomacao(JSON.parse(execucao.automacaoVersao.grafoJson));
     const contexto = await montarContextoAvaliacaoDoCard(execucao.card);
     if (execucao.automacaoVersao.condicaoJson) {

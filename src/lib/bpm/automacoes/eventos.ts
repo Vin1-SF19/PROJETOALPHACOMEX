@@ -77,6 +77,13 @@ function parseJson(valor: string | null): Record<string, unknown> {
   } catch { return {}; }
 }
 
+/** Compara valores de campo ignorando o tipo serializado (ex.: 10 e "10"). */
+function mesmoValorCampo(a: unknown, b: unknown): boolean {
+  if (a === undefined || b === undefined) return false;
+  if (a === null || b === null) return a === b;
+  return String(a).trim() === String(b).trim();
+}
+
 function correspondeAoGatilho(params: {
   gatilhoTipo: string;
   configJson: string;
@@ -102,7 +109,7 @@ function correspondeAoGatilho(params: {
     return eventoTipo === "CARD_MOVIDO" && escopoCorresponde(eventoAnterior.etapaId);
   }
   if (gatilhoTipo === "CAMPO_VALOR_ASSUMIDO") {
-    return eventoTipo === "CAMPO_ALTERADO" && escopoCorresponde(params.etapaAtualCardId) && eventoNovo.campoId === config.campoId && Object.is(eventoNovo.valor, config.valor);
+    return eventoTipo === "CAMPO_ALTERADO" && escopoCorresponde(params.etapaAtualCardId) && eventoNovo.campoId === config.campoId && mesmoValorCampo(eventoNovo.valor, config.valor);
   }
   if (gatilhoTipo === "CAMPO_ALTERADO" && config.campoId) return eventoTipo === gatilhoTipo && escopoCorresponde(params.etapaAtualCardId) && eventoNovo.campoId === config.campoId;
   if ((gatilhoTipo === "TAREFA_CRIADA" || gatilhoTipo === "TAREFA_CONCLUIDA") && config.tipoTarefa) {
@@ -120,7 +127,7 @@ function correspondeAoGatilho(params: {
 export async function materializarExecucoesEventosBpm(limite = 100, client: ClienteEventos = db, filtro?: { cardId?: string }) {
   const versoes = await client.bpmAutomacaoVersao.findMany({
     where: { status: "ATIVA", automacao: { ativa: true } },
-    select: { id: true, automacaoId: true, gatilhoTipo: true, gatilhoConfigJson: true, automacao: { select: { etapaId: true, pipelineId: true } } },
+    select: { id: true, automacaoId: true, gatilhoTipo: true, gatilhoConfigJson: true, ativadaEm: true, createdAt: true, automacao: { select: { etapaId: true, pipelineId: true } } },
   });
   let criadas = 0;
   let avaliados = 0;
@@ -130,6 +137,9 @@ export async function materializarExecucoesEventosBpm(limite = 100, client: Clie
     const eventos = await client.bpmEventoDominio.findMany({
       where: {
         tipo: tipoEvento, cardId: filtro?.cardId ?? { not: null }, pipelineId: versao.automacao.pipelineId,
+        // Uma versão só reage a eventos ocorridos depois de ativada. Sem este
+        // corte, criar/editar/religar reprocessava todo o histórico do pipeline.
+        ocorridoEm: { gte: versao.ativadaEm ?? versao.createdAt },
         profundidade: { lt: 10 }, execucoes: { none: { automacaoVersaoId: versao.id } },
       },
       orderBy: { ocorridoEm: "asc" }, take: Math.min(Math.max(limite, 1), 500),

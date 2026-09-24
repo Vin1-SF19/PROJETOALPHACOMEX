@@ -24,8 +24,9 @@ import {
 } from "@/lib/bpm/automacoes/distribuicao-oportunidades";
 import type { GrupoCondicao } from "@/lib/bpm/regras/types";
 import { publicarVersaoCentralDaDefinicaoSimples } from "@/lib/bpm/automacoes/centralizacao";
+import { encerrarExecucoesEmAndamentoAutomacao, filtroExecucoesRelevantes, validarReferenciasPublicacaoAutomacao } from "@/lib/bpm/automacoes/publicacao";
 
-const ROTA_AUTOMACOES = "/PainelAlpha/AlphaCRM/automacoes";
+const ROTA_AUTOMACOES = "/PainelAlpha/AlphaCRM/admin/automacoes";
 const idSchema = z.string().cuid();
 
 function lerVariaveisTemplate(valor: unknown) {
@@ -243,7 +244,7 @@ export async function ListarHistoricoAutomacaoBpm(automacaoId: string) {
     const automacao = await db.bpmAutomacao.findUnique({ where: { id }, select: { id: true } });
     if (!automacao) throw new Error("Automação não encontrada");
     const execucoes = await db.bpmAutomacaoExecucao.findMany({
-      where: { automacaoId: id },
+      where: { automacaoId: id, ...filtroExecucoesRelevantes },
       orderBy: { createdAt: "desc" },
       take: 50,
       select: {
@@ -321,6 +322,7 @@ export async function ListarWorkspaceAutomacoesBpm() {
               },
             },
             execucoes: {
+              where: filtroExecucoesRelevantes,
               orderBy: { createdAt: "desc" },
               take: 1,
               select: {
@@ -334,7 +336,7 @@ export async function ListarWorkspaceAutomacoesBpm() {
                 evento: { select: { tipo: true, atorTipo: true, ocorridoEm: true } },
               },
             },
-            _count: { select: { execucoes: true } },
+            _count: { select: { execucoes: { where: filtroExecucoesRelevantes } } },
           },
         },
       },
@@ -511,9 +513,20 @@ export async function AlternarAutomacaoBpm(automacaoId: string, ativa: boolean) 
     const id = idSchema.parse(automacaoId);
     const atual = await db.bpmAutomacao.findUnique({ where: { id } });
     if (!atual) throw new Error("Automação não encontrada");
+    const versaoAtiva = await db.bpmAutomacaoVersao.findFirst({ where: { automacaoId: id, status: "ATIVA" }, orderBy: { versao: "desc" } });
+    // Religar exige referências válidas (ex.: cópia duplicada para outro pipeline).
+    if (ativa && versaoAtiva) {
+      await validarReferenciasPublicacaoAutomacao(atual, versaoAtiva.gatilhoTipo, versaoAtiva.gatilhoConfigJson, versaoAtiva.grafoJson);
+    }
     await db.$transaction([
       db.bpmAutomacao.update({ where: { id }, data: { ativa } }),
-      ...(!ativa ? [db.bpmAutomacaoAgenda.updateMany({ where: { automacaoVersao: { automacaoId: id }, ativo: true }, data: { ativo: false } })] : []),
+      ...(!ativa ? [
+        db.bpmAutomacaoAgenda.updateMany({ where: { automacaoVersao: { automacaoId: id }, ativo: true }, data: { ativo: false } }),
+        db.bpmAutomacaoExecucao.updateMany({ where: { automacaoId: id, automacaoVersaoId: { not: null }, status: { in: ["PENDENTE", "AGUARDANDO"] } }, data: { status: "IGNORADA", resultadoJson: JSON.stringify({ motivo: "AUTOMACAO_PAUSADA" }), executadoEm: new Date(), claimToken: null } }),
+      ] : []),
+      // Ao religar, a versão passa a valer a partir de agora: eventos ocorridos
+      // durante a pausa não são reprocessados.
+      ...(ativa && !atual.ativa && versaoAtiva ? [db.bpmAutomacaoVersao.update({ where: { id: versaoAtiva.id }, data: { ativadaEm: new Date() } })] : []),
       db.bpmPipelineConfigAuditoria.create({
         data: {
           pipelineId: atual.pipelineId,
@@ -524,9 +537,8 @@ export async function AlternarAutomacaoBpm(automacaoId: string, ativa: boolean) 
         },
       }),
     ]);
-    if (ativa) {
-      const versao = await db.bpmAutomacaoVersao.findFirst({ where: { automacaoId: id, status: "ATIVA" }, orderBy: { versao: "desc" }, select: { id: true } });
-      if (versao) await (await import("@/lib/bpm/automacoes/agenda")).sincronizarAgendasVersaoAutomacao(versao.id);
+    if (ativa && versaoAtiva) {
+      await (await import("@/lib/bpm/automacoes/agenda")).sincronizarAgendasVersaoAutomacao(versaoAtiva.id);
     }
     revalidatePath(ROTA_AUTOMACOES);
     return { success: true as const };
@@ -551,6 +563,8 @@ export async function ExcluirAutomacaoBpm(automacaoId: string) {
         },
       });
       await tx.bpmAutomacao.update({ where: { id }, data: { ativa: false } });
+      await tx.bpmAutomacaoAgenda.updateMany({ where: { automacaoVersao: { automacaoId: id }, ativo: true }, data: { ativo: false } });
+      await encerrarExecucoesEmAndamentoAutomacao(tx, { automacaoId: id, motivo: "AUTOMACAO_ARQUIVADA" });
     });
     revalidatePath(ROTA_AUTOMACOES);
     return { success: true as const };

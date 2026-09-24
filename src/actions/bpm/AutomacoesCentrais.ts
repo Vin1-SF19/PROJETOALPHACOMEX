@@ -12,8 +12,9 @@ import { gatilhoConfigSchema, salvarVersaoAutomacaoSchema, validarGrafoAutomacao
 import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
 import { sincronizarAgendasVersaoAutomacao } from "@/lib/bpm/automacoes/agenda";
 import { reprocessarExecucaoAutomacaoCentral } from "@/lib/bpm/automacoes/central-runtime";
+import { encerrarExecucoesEmAndamentoAutomacao, filtroExecucoesRelevantes, validarReferenciasPublicacaoAutomacao } from "@/lib/bpm/automacoes/publicacao";
 
-const ROTA = "/PainelAlpha/AlphaCRM/automacoes";
+const ROTA = "/PainelAlpha/AlphaCRM/admin/automacoes";
 const idSchema = z.string().cuid();
 
 async function exigirAdmin() {
@@ -27,30 +28,6 @@ async function exigirAdmin() {
 function erroPublico(error: unknown) {
   if (error instanceof z.ZodError) return "Configuração inválida";
   return error instanceof Error ? error.message.slice(0, 500) : "Não foi possível concluir a operação";
-}
-
-async function validarReferenciasPublicacao(automacao: { pipelineId: string; etapaId: string }, gatilhoTipo: string, gatilhoConfigJson: string, grafoJson: string) {
-  const gatilho = gatilhoConfigSchema.parse(JSON.parse(gatilhoConfigJson));
-  const grafo = validarGrafoAutomacao(JSON.parse(grafoJson));
-  const etapasIds = [...new Set([
-    ...(gatilho.etapasIds ?? []),
-    ...(gatilho.etapaId ? [gatilho.etapaId] : []),
-    ...(gatilho.escopo === "GLOBAL_PIPELINE" ? [] : [automacao.etapaId]),
-  ])];
-  if (gatilho.escopo !== "GLOBAL_PIPELINE" && etapasIds.length === 0) throw new Error("Selecione ao menos uma etapa para o gatilho");
-  if (etapasIds.length > 0 && await db.bpmEtapa.count({ where: { id: { in: etapasIds }, pipelineId: automacao.pipelineId, ativo: true } }) !== etapasIds.length) throw new Error("O gatilho usa uma etapa inválida");
-  if (gatilho.campoId && !await db.bpmCampo.findFirst({ where: { id: gatilho.campoId, pipelineId: automacao.pipelineId }, select: { id: true } })) throw new Error("O gatilho usa um campo inválido");
-  if (gatilhoTipo === "WEBHOOK_RECEBIDO" && (!gatilho.webhookEndpointId || !await db.bpmWebhookEndpoint.findFirst({ where: { id: gatilho.webhookEndpointId, ativo: true, OR: [{ pipelineId: null }, { pipelineId: automacao.pipelineId }] }, select: { id: true } }))) throw new Error("Selecione um webhook ativo e compatível");
-  for (const no of grafo.nos) {
-    if (no.tipo !== "ACAO") continue;
-    const p = no.parametros;
-    if ((no.acaoTipo === "ALTERAR_CAMPO" || no.acaoTipo === "ATUALIZAR_CARD_RELACIONADO") && p.campoId && !await db.bpmCampo.findUnique({ where: { id: String(p.campoId) }, select: { id: true } })) throw new Error(`O nó ${no.id} usa um campo inválido`);
-    if (no.acaoTipo === "MOVER_CARD" && !await db.bpmEtapa.findFirst({ where: { id: String(p.etapaId), pipelineId: automacao.pipelineId, ativo: true }, select: { id: true } })) throw new Error(`O nó ${no.id} usa uma etapa inválida`);
-    if (no.acaoTipo === "ALTERAR_SUBSTATUS" && !await db.bpmSubStatus.findFirst({ where: { id: String(p.subStatusId), ativo: true }, select: { id: true } })) throw new Error(`O nó ${no.id} usa um substatus inválido`);
-    if ((no.acaoTipo === "ATRIBUIR_RESPONSAVEL" || no.acaoTipo === "CRIAR_TAREFA") && p.responsavelId && !await db.usuarios.findFirst({ where: { id: Number(p.responsavelId), status: "ATIVO" }, select: { id: true } })) throw new Error(`O nó ${no.id} usa um responsável inválido`);
-    if (no.acaoTipo === "CRIAR_CARD_OUTRO_PIPELINE" && !await db.bpmEtapa.findFirst({ where: { id: String(p.etapaId), pipelineId: String(p.pipelineId), ativo: true }, select: { id: true } })) throw new Error(`O nó ${no.id} usa pipeline/etapa inválidos`);
-    if (no.acaoTipo === "CRIAR_SLA" && !await db.bpmSlaConfig.findFirst({ where: { id: String(p.slaConfigId), ativa: true, OR: [{ pipelineId: null }, { pipelineId: automacao.pipelineId }] }, select: { id: true } })) throw new Error(`O nó ${no.id} usa um SLA inválido`);
-  }
 }
 
 const salvarDefinicaoCentralSchema = z.object({
@@ -80,7 +57,7 @@ export async function SalvarDefinicaoAutomacaoCentralBpm(payload: unknown) {
       select: { id: true },
     });
     if (!etapa) throw new Error("Pipeline ou etapa de referência inválida");
-    await validarReferenciasPublicacao(
+    await validarReferenciasPublicacaoAutomacao(
       { pipelineId: dados.pipelineId, etapaId: dados.etapaAncoraId },
       dados.gatilhoTipo,
       JSON.stringify(gatilhoConfig),
@@ -125,6 +102,9 @@ export async function SalvarDefinicaoAutomacaoCentralBpm(payload: unknown) {
       const ultima = await tx.bpmAutomacaoVersao.aggregate({ where: { automacaoId: automacao.id }, _max: { versao: true } });
       await tx.bpmAutomacaoVersao.updateMany({ where: { automacaoId: automacao.id, status: "ATIVA" }, data: { status: "ARQUIVADA", arquivadaEm: agora } });
       await tx.bpmAutomacaoAgenda.updateMany({ where: { automacaoVersao: { automacaoId: automacao.id }, ativo: true }, data: { ativo: false } });
+      // As esperas da versão anterior foram desativadas acima: encerra as
+      // execuções dela em vez de deixá-las presas em AGUARDANDO.
+      if (atual) await encerrarExecucoesEmAndamentoAutomacao(tx, { automacaoId: automacao.id, motivo: "VERSAO_SUBSTITUIDA" });
       const versao = await tx.bpmAutomacaoVersao.create({ data: {
         automacaoId: automacao.id,
         versao: (ultima._max.versao ?? 0) + 1,
@@ -181,11 +161,13 @@ export async function AtivarVersaoAutomacaoCentralBpm(versaoId: string) {
     const userId = await exigirAdmin(); const id = idSchema.parse(versaoId);
     const versao = await db.bpmAutomacaoVersao.findUnique({ where: { id }, include: { automacao: true } });
     if (!versao) throw new Error("Versão não encontrada");
-    await validarReferenciasPublicacao(versao.automacao, versao.gatilhoTipo, versao.gatilhoConfigJson, versao.grafoJson);
+    await validarReferenciasPublicacaoAutomacao(versao.automacao, versao.gatilhoTipo, versao.gatilhoConfigJson, versao.grafoJson);
     if (versao.condicaoJson) grupoCondicaoSchema.parse(JSON.parse(versao.condicaoJson));
     await db.$transaction(async (tx) => {
       await tx.bpmAutomacaoVersao.updateMany({ where: { automacaoId: versao.automacaoId, status: "ATIVA", id: { not: id } }, data: { status: "ARQUIVADA", arquivadaEm: new Date() } });
       await tx.bpmAutomacaoVersao.update({ where: { id }, data: { status: "ATIVA", ativadaEm: new Date(), arquivadaEm: null } });
+      await tx.bpmAutomacaoAgenda.updateMany({ where: { automacaoVersao: { automacaoId: versao.automacaoId }, automacaoVersaoId: { not: id }, ativo: true }, data: { ativo: false } });
+      await encerrarExecucoesEmAndamentoAutomacao(tx, { automacaoId: versao.automacaoId, manterVersaoId: id, motivo: "VERSAO_SUBSTITUIDA" });
       await tx.bpmAutomacao.update({ where: { id: versao.automacaoId }, data: { ativa: true, gatilhoTipo: versao.gatilhoTipo } });
       await tx.bpmPipelineConfigAuditoria.create({ data: { pipelineId: versao.automacao.pipelineId, adminId: userId, campoAlterado: "AUTOMACAO_VERSAO_ATIVADA", valorNovoJson: JSON.stringify({ automacaoId: versao.automacaoId, versaoId: id, versao: versao.versao }) } });
     });
@@ -199,7 +181,8 @@ const filtrosSchema = z.object({ status: z.string().max(40).optional(), automaca
 export async function ListarMonitoramentoAutomacoesCentraisBpm(filtros?: unknown) {
   try {
     await exigirAdmin(); const f = filtrosSchema.parse(filtros);
-    const where = { automacaoVersaoId: { not: null }, ...(f.status ? { status: f.status } : {}), ...(f.automacaoId ? { automacaoId: f.automacaoId } : {}) };
+    // Sem filtro de status, oculta eventos que não correspondem ao gatilho.
+    const where = { automacaoVersaoId: { not: null }, ...(f.status ? { status: f.status } : filtroExecucoesRelevantes), ...(f.automacaoId ? { automacaoId: f.automacaoId } : {}) };
     const [total, execucoes, versoes, endpoints] = await Promise.all([
       db.bpmAutomacaoExecucao.count({ where }),
       db.bpmAutomacaoExecucao.findMany({ where, orderBy: { createdAt: "desc" }, skip: (f.pagina - 1) * f.porPagina, take: f.porPagina, include: { automacao: { select: { nome: true } }, automacaoVersao: { select: { versao: true } }, passos: { orderBy: { ordem: "asc" } } } }),

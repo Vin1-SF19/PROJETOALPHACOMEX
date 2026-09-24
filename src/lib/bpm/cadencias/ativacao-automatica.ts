@@ -3,6 +3,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import db from "@/lib/prisma";
 
 const DIA_MS = 86_400_000;
@@ -161,6 +162,16 @@ export async function ativarCadenciasNaEntradaBpm(
     }
 
     resultado.cadenciaIds.push(cadencia.id);
+    if (acao === "CADENCIA_INICIADA") {
+      const chaveEvento = `cadencia-iniciada:${input.cardId}:${cadencia.id}:${agora.getTime()}`;
+      await publicarEventoBpm({
+        tipo: "CADENCIA_INICIADA", entidadeTipo: "CARD", entidadeId: input.cardId,
+        cardId: input.cardId, pipelineId: input.pipelineDestinoId,
+        valorNovo: { etapaId: input.etapaDestinoId, cadenciaId: cadencia.id, nomeCadencia: cadencia.nome },
+        atorTipo: input.usuarioId ? "USUARIO" : "SISTEMA", atorUserId: input.usuarioId,
+        correlationId: chaveEvento, idempotencyKey: chaveEvento,
+      }, tx);
+    }
     await registrarHistoricoCard({
       cardId: input.cardId,
       acao,

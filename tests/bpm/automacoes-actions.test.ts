@@ -118,7 +118,7 @@ describe("actions da aba Automações", () => {
       }),
     });
     expect(mocks.auditoriaCreate).toHaveBeenCalled();
-    expect(mocks.revalidatePath).toHaveBeenCalledWith("/PainelAlpha/AlphaCRM/automacoes");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/PainelAlpha/AlphaCRM/admin/automacoes");
     expect(resultado).toEqual({ success: true, data: { id: AUTOMACAO_ID } });
   });
 
