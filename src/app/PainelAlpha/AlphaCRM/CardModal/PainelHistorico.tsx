@@ -31,6 +31,7 @@ import { PainelChecklistsCard } from "./PainelChecklistsCard";
 import { EditorAnotacaoCard } from "./EditorAnotacaoCard";
 import { formatarBytes, iconePorAcao } from "./PainelHistoricoShared";
 import { formularioPossuiChecklist } from "@/lib/bpm/formulario-renderer";
+import { separarTarefasCard } from "@/lib/bpm/tarefas-card";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
@@ -70,7 +71,9 @@ export default function PainelHistorico({
   const [abaEsquerda, setAbaEsquerda] = useState("etapas");
   const inputAnexoRef = useRef<HTMLInputElement>(null);
   const etapasAnteriores = etapasAnterioresParaResumo(etapas, card.etapa.id);
-  const checklistHabilitado = formularioPossuiChecklist(card.formularioEtapa);
+  const { tarefas: tarefasDoCard, procedimentos: tarefasDeProcedimento } = separarTarefasCard(card.tarefas);
+  const checklistHabilitado = formularioPossuiChecklist(card.formularioEtapa)
+    || tarefasDeProcedimento.length > 0;
 
   useEffect(() => {
     function abrirPendencias(event: Event) {
@@ -140,8 +143,8 @@ export default function PainelHistorico({
           <TabsTrigger value="tarefas" className="flex-none gap-1.5">
             <ListTodo size={13} />
             Tarefas
-            {card.tarefas.length > 0 && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300">{card.tarefas.length}</span>
+            {tarefasDoCard.length > 0 && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300">{tarefasDoCard.length}</span>
             )}
           </TabsTrigger>
           {checklistHabilitado && (
@@ -177,7 +180,7 @@ export default function PainelHistorico({
           <PainelTarefasPorTipo
             cardId={card.id}
             responsavelId={card.responsavel?.id ?? null}
-            tarefas={card.tarefas}
+            tarefas={tarefasDoCard}
             accent={accent}
             podeTrabalharTarefas={podeTrabalharTarefas}
             onAtualizado={onAtualizado}

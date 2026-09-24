@@ -68,3 +68,54 @@ Como administrador do CRM, quero editar ou retirar campos e seções obrigatóri
 - `npm run build`: passou; avisos preexistentes do módulo PDF Bibble.
 - `node scripts/bpm-limpar-revisao-radar-2026-09-23.mjs`: dry-run somente leitura passou com o inventário esperado.
 - Validação visual autenticada em navegador ainda pendente.
+
+## Solicitação complementar de 24/09/2026 — restauração dos formulários e separação do card
+
+O usuário pediu retirar do catálogo de “Adicionar seção” os campos com “teste” no nome, manter os campos legados e reconstruir os formulários pela auditoria, preservando a edição pela UI. Também relatou que Tarefas e Procedimentos apareceram misturados no card.
+
+### Critérios de aceitação
+
+1. Campos com “teste” no nome deixam de ser oferecidos no catálogo; valores históricos permanecem recuperáveis. Campos legados continuam disponíveis.
+2. O formulário de Novos leads é reconstruído pela última composição legada anterior aos testes, com identidades de campo existentes e edição/publicação normal pela UI. As demais etapas já publicadas permanecem inalteradas.
+3. Tarefas derivadas de procedimentos aparecem somente na aba Procedimento do card; tarefas independentes continuam na aba Tarefas. O usuário não cria novos procedimentos pela aba de tarefas.
+4. A alteração de dados de produção só ocorre após inventário, backup completo recente, relatório Vault e autorização específica.
+
+### Progresso
+
+- [x] Inventariar seções/campos e versões da auditoria em modo leitura.
+- [x] Identificar tarefas derivadas por `cardChecklistId` e separar as abas no card.
+- [x] Preparar restauração dos formulários e arquivamento seguro dos campos de teste.
+- [x] Confirmar escopo de produção após relatório Vault e executar somente se autorizado.
+- [x] Rodar lint, typecheck, testes e build.
+
+### File List complementar
+
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelTarefasPorTipo.tsx`
+- `src/lib/bpm/tarefas-card.ts`
+- `tests/bpm/tarefas-card.test.ts`
+- `tests/bpm/tarefas-tipo.test.ts`
+- `scripts/bpm-restaurar-formularios-radar-2026-09-24.mjs`
+
+### Inventário e plano Vault complementar
+
+- Ambiente: Turso remoto de produção; pipeline Revisão de Radar `cmsd9yvb90000dzggt1gjl980`; etapa Novos leads `cmsd9yvb90003dzgg34vyurim`.
+- Formulário atual v34: duas seções recentes, três componentes. Somente esta etapa foi editada nos 31 logs de `formulario_etapa`; os demais formulários publicados continuam com suas composições antigas.
+- Snapshot de auditoria v2 anterior aos testes: “Dados da etapa” com Qualificação, Canal de origem, Nome do responsável, CNPJ, Radar pretendido e Confirmar serviço; “Acompanhamento” com Próximo contato e Procedimentos da etapa. As identidades dos seis campos e dos oito componentes são preservadas ao restaurar; o editor da UI continuará publicando novas alterações.
+- O backup antigo de 19/09 tinha quatro obrigações em Novos leads (Nome do responsável, CNPJ, Radar pretendido e Confirmar serviço), enquanto a configuração atual não tem nenhuma. O script restaura a composição e mantém as obrigações atuais zeradas, para não bloquear o único card restante; elas poderão ser ajustadas na UI. Os 26 campos experimentais não possuem obrigações nem requisitos de avanço ativos.
+- Catálogo do pipeline: 55 campos, 29 legados anteriores a 21/09/2026 e 26 campos experimentais criados desde então, dos quais 22 têm `test` ou `teste` no nome. Os outros quatro são “texto curto”, “acompanhamento 2”, “cnpj2” e uma cópia recente de “CNPJ”. O plano arquiva os 26, preservando todos os valores históricos e sem remover as definições do banco.
+- Dois componentes atuais de Novos leads usam campos experimentais; nenhum deles está em formulário de outra etapa. Há duas tarefas derivadas de procedimentos no banco; a separação do card usa `cardChecklistId` e não muda esses dados.
+- Backup completo novo: `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-24T12-33-39-250Z.sql`, 153.246.206 bytes, SHA-256 `4ef2c455f044db8bc331074c38fabf6c6fe8a9be76e2f996577bc707506e8d30`. Restauração isolada validou 331 tabelas, `integrity_check=ok` e zero violações de FK. Backup e manifesto são ignorados pelo Git.
+- Script restrito faz dry-run por padrão e bloqueia execução se versão/inventário mudarem. Simulação da mesma sequência de exclusão/recriação de seções e arquivamento sobre cópia isolada do backup: 2 seções, 8 componentes, 26 campos arquivados e zero violações de FK.
+- O script trava a identidade e o nome dos 26 campos por hash, verifica ausência de obrigação/requisito e deixa intactos os dados históricos. A execução direta por CLI ainda não cria linha de auditoria da aplicação, pois essa tabela exige a identidade autenticada de um administrador; script, backup e inventário documentam esta operação separadamente.
+- Rollback previsto: restaurar seletivamente o formulário v34 e o estado ativo dos 26 campos a partir do backup em uma operação transacional separada; restauração integral no banco vivo exige congelar gravações e novo consentimento porque sobrescreveria alterações posteriores.
+- Em 24/09/2026, o usuário autorizou explicitamente arquivar os 26 campos recentes, inclusive os quatro sem “teste” no nome, restaurar a composição legada e manter as obrigações zeradas. Dry-run repetido imediatamente antes da execução confirmou formulário v34 e os 26 campos. A execução transacional remota concluiu.
+- Verificação independente após execução: formulário ativo v35 com 2 seções (“Dados da etapa” e “Acompanhamento”), 8 componentes e 6 campos legados; 26 campos recentes inativos; zero obrigações operacionais; 15 valores históricos dos campos arquivados preservados (15 antes e depois); 15 valores do card Francisco preservados; somente Francisco continua no pipeline; `PRAGMA foreign_key_check` sem violações.
+
+### Gates da solicitação complementar
+
+- `npm run lint`: 0 erros, 1192 avisos preexistentes.
+- `npm run typecheck`: passou.
+- `npm test`: 502 arquivos, 3788 testes aprovados, 4 ignorados, 1 todo.
+- `npm run build`: passou com os avisos preexistentes do módulo PDF Bibble.
+- Dry-run do script e simulação local do backup: passaram.

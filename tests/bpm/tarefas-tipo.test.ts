@@ -45,11 +45,11 @@ describe("BPM - tarefas por tipo", () => {
     }).success).toBe(false);
   });
 
-  it("conecta os seis formulários e o alerta persistido no card", () => {
+  it("mostra tarefas independentes no card e mantém procedimentos em sua própria aba", () => {
     const painel = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelTarefasPorTipo.tsx");
     const historico = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx");
     const job = ler("src/lib/bpm/alertas-tarefas.ts");
-    expect(painel).toContain("BPM_TAREFA_TIPOS.map");
+    expect(painel).toContain('BPM_TAREFA_TIPOS.filter((opcao) => opcao !== "CHECKLIST").map');
     expect(painel).toContain('tipo === "CHECKLIST"');
     expect(painel).toContain('tipo === "LIGACAO"');
     expect(painel).toContain('tipo === "WHATSAPP"');
@@ -59,6 +59,8 @@ describe("BPM - tarefas por tipo", () => {
     expect(painel).toContain("parseDataHoraLocalBpm");
     expect(painel).toContain("const prazoData = tarefa.prazo ?");
     expect(historico).toContain("<PainelTarefasPorTipo");
+    expect(historico).toContain("separarTarefasCard(card.tarefas)");
+    expect(historico).toContain("tarefas={tarefasDoCard}");
     expect(historico).toContain("podeTrabalharTarefas={podeTrabalharTarefas}");
     expect(painel).toContain("podeTrabalharTarefas: boolean");
     expect(painel).toContain("disabled={!podeTrabalharTarefas || tarefa.status === \"CONCLUIDA\"}");

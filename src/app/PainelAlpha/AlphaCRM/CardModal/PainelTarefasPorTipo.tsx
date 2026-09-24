@@ -150,7 +150,7 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
         <div className="space-y-3 rounded-2xl border border-white/10 bg-black/15 p-3">
           <div className="flex items-center justify-between gap-3"><p className="text-xs font-bold text-white">Nova tarefa</p><button type="button" onClick={() => { setAberto(false); limparFormulario(); }} className="text-slate-500 hover:text-white"><X size={15} /></button></div>
           <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-            {BPM_TAREFA_TIPOS.map((opcao) => (
+            {BPM_TAREFA_TIPOS.filter((opcao) => opcao !== "CHECKLIST").map((opcao) => (
               <button key={opcao} type="button" onClick={() => setTipo(opcao)} className={`rounded-xl border px-2 py-2 text-left text-[11px] font-semibold transition ${tipo === opcao ? "border-white/30 bg-white/10 text-white" : "border-white/[0.06] bg-white/[0.02] text-slate-400 hover:bg-white/[0.05]"}`}>
                 <span className="flex items-center gap-1.5"><IconeTipo tipo={opcao} size={13} />{obterConfigTipoTarefa(opcao).label}</span>
               </button>
