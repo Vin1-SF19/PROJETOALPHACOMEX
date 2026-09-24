@@ -18,7 +18,7 @@ import { chaveExecucaoCicloCadencia } from "@/lib/bpm/cadencias/ativacao-automat
  * - Cron existente (src/app/api/bpm/jobs/automacoes/route.ts)
  * - CLI: npm run bpm:cadencias
  */
-export async function processarCadenciasBpm(): Promise<{
+export async function processarCadenciasBpm(opcoes: { cardId?: string } = {}): Promise<{
   processadas: number;
   falhas: number;
   avisos: string[];
@@ -29,6 +29,7 @@ export async function processarCadenciasBpm(): Promise<{
   // 1. Encontrar vínculos ATIVOS com próxima execução vencida
   const vinculosVencidos = await db.bpmCardCadencia.findMany({
     where: {
+      ...(opcoes.cardId ? { cardId: opcoes.cardId } : {}),
       status: "ATIVA",
       proximaExecucaoEm: { lte: agora },
       cadencia: { ativa: true },
@@ -263,4 +264,13 @@ export async function processarCadenciasBpm(): Promise<{
   }
 
   return { processadas, falhas, avisos };
+}
+
+/** Executa passos vencidos do card logo após criação/movimento; o cron segue como retentativa. */
+export async function processarCadenciasImediatasDoCardBpm(cardId: string): Promise<void> {
+  for (let rodada = 0; rodada < 25; rodada++) {
+    const resultado = await processarCadenciasBpm({ cardId });
+    if (resultado.processadas === 0 || resultado.falhas > 0) return;
+  }
+  console.warn("[Cadencias] Limite de passos imediatos atingido", { cardId });
 }

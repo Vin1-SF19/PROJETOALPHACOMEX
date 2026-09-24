@@ -228,6 +228,7 @@ function FormularioEtapaWorkspaceContent({
   const [camposExcluidos, setCamposExcluidos] = useState<string[]>([]);
   const [excluindoCampo, setExcluindoCampo] = useState(false);
   const [campoSelecionadoId, setCampoSelecionadoId] = useState<string | null>(null);
+  const [blocoSelecionado, setBlocoSelecionado] = useState<{ secaoChave: string; chave: string } | null>(null);
   const deepLinkAplicado = useRef(false);
   const [nomeEdicao, setNomeEdicao] = useState("");
   const [salvandoCampo, setSalvandoCampo] = useState(false);
@@ -334,6 +335,9 @@ function FormularioEtapaWorkspaceContent({
     [camposAplicaveis],
   );
   const campoSelecionado = camposLocais.find((campo) => campo.id === campoSelecionadoId) ?? null;
+  const componenteSelecionado = blocoSelecionado
+    ? secoes.find((secao) => secao.chave === blocoSelecionado.secaoChave)?.componentes.find((item) => item.chave === blocoSelecionado.chave) ?? null
+    : null;
   const indiceSecaoCampoSelecionado = campoSelecionadoId ? secoes.findIndex((secao) => secao.componentes.some((item) => item.campoId === campoSelecionadoId)) : -1;
   const configSelecionada = campoSelecionado?.etapaConfiguracoes?.find((config) => config.etapaId === etapaId);
   const obrigacoesSelecionadas = campoSelecionado ? obrigacoesDraft[campoSelecionado.id] ?? { obrigatorio: configSelecionada?.obrigatorio ?? false, obrigatorioEntrada: configSelecionada?.obrigatorioEntrada ?? false, obrigatorioSaida: configSelecionada?.obrigatorioSaida ?? false } : null;
@@ -345,8 +349,23 @@ function FormularioEtapaWorkspaceContent({
   const componentesEmUso = new Set(secoes.flatMap((secao) => secao.componentes.map((item) => item.capability).filter(Boolean)));
 
   function selecionarCampo(campo: CampoAplicavel) {
+    setBlocoSelecionado(null);
     setCampoSelecionadoId(campo.id);
     setNomeEdicao(campo.nome);
+  }
+
+  function atualizarObrigatoriedadeBloco(obrigatorioSaida: boolean) {
+    if (!blocoSelecionado || !componenteSelecionado) return;
+    setSecoes((atuais) => atuais.map((secao) => secao.chave !== blocoSelecionado.secaoChave ? secao : {
+      ...secao,
+      componentes: secao.componentes.map((item) => {
+        if (item.chave !== blocoSelecionado.chave) return item;
+        const config = configComponente(item);
+        config.obrigatorioSaida = obrigatorioSaida;
+        return { ...item, configJson: JSON.stringify(config) };
+      }),
+    }));
+    setSujo(true);
   }
 
   async function atualizarCampo(patch: { nome?: string; etapaConfiguracoes?: NonNullable<CampoAplicavel["etapaConfiguracoes"]> }) {
@@ -765,7 +784,7 @@ function FormularioEtapaWorkspaceContent({
             <input value={buscaCampo} onChange={(event) => setBuscaCampo(event.target.value)} placeholder="Buscar campo" className="w-full bg-transparent text-sm text-white outline-none placeholder:text-slate-500" />
           </label>
           <label className="mt-3 block text-xs font-semibold text-slate-400">Seção selecionada
-            <select aria-label="Selecionar seção do formulário" value={secaoSelecionada?.chave ?? ""} onChange={(event) => { setSecaoSelecionadaChave(event.target.value); setCampoSelecionadoId(null); }} disabled={!secoes.length} className="mt-1 min-h-10 w-full rounded-lg border border-white/10 bg-slate-900 px-2 text-sm text-white">
+            <select aria-label="Selecionar seção do formulário" value={secaoSelecionada?.chave ?? ""} onChange={(event) => { setSecaoSelecionadaChave(event.target.value); setCampoSelecionadoId(null); setBlocoSelecionado(null); }} disabled={!secoes.length} className="mt-1 min-h-10 w-full rounded-lg border border-white/10 bg-slate-900 px-2 text-sm text-white">
               {secoes.map((secao, index) => <option key={secao.chave} value={secao.chave}>{secao.titulo || `Seção ${index + 1}`}</option>)}
             </select>
           </label>
@@ -880,7 +899,14 @@ function FormularioEtapaWorkspaceContent({
             if (campoId) setObrigacoesDraft((atuais) => ({ ...atuais, [campoId]: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false } }));
             alterarSecao(indiceSecaoSelecionada, { componentes: secaoSelecionada.componentes.filter((_, i) => i !== indice) });
           }}
-          onSelecionar={(componente) => { const campo = camposLocais.find((item) => item.id === componente.campoId); if (campo) selecionarCampo(campo); }}
+          onSelecionar={(componente) => {
+            const campo = camposLocais.find((item) => item.id === componente.campoId);
+            if (campo) selecionarCampo(campo);
+            else if (componente.capability && secaoSelecionada) {
+              setCampoSelecionadoId(null);
+              setBlocoSelecionado({ secaoChave: secaoSelecionada.chave, chave: componente.chave });
+            }
+          }}
         />
         <div className="border-t border-white/10 pt-4">
           <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white"><Settings2 size={16} className="text-cyan-300" /> Seções do card</h4>
@@ -973,8 +999,16 @@ function FormularioEtapaWorkspaceContent({
 
       <aside className="min-w-0 space-y-4 xl:col-start-2 2xl:grid 2xl:grid-cols-2 2xl:items-start 2xl:gap-4 2xl:space-y-0" aria-label="Propriedades e prévia">
         <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-          <h3 className="flex items-center gap-2 text-sm font-bold text-white"><Pencil size={16} className="text-cyan-300" /> Propriedades do campo</h3>
-          {!campoSelecionado ? <p className="mt-3 text-xs leading-5 text-slate-400">Selecione o nome de um campo na composição para editar seu nome, regras e verificar onde ele é usado.</p> : <div className="mt-4 space-y-4">
+          <h3 className="flex items-center gap-2 text-sm font-bold text-white"><Pencil size={16} className="text-cyan-300" /> Propriedades do componente</h3>
+          {componenteSelecionado?.capability && <div className="mt-4 space-y-3 text-xs text-slate-300">
+            <p className="font-semibold text-white">{obterDefinicaoComponenteFormulario(componenteSelecionado.capability)?.label ?? componenteSelecionado.chave}</p>
+            <p>Este bloco pertence ao formulário de <strong>{etapa.nome}</strong>. A regra passa a valer após publicar a composição.</p>
+            {["MEETING_SCHEDULER", "MEETING_TRANSCRIPT", "FOLLOW_UP_SCHEDULER", "FOLLOW_UP_CHECKLIST", "STAGE_CHECKLIST"].includes(componenteSelecionado.capability) && <label className="flex items-start gap-2.5 rounded-lg border border-white/10 bg-slate-900/40 p-2.5">
+              <input type="checkbox" checked={configComponente(componenteSelecionado).obrigatorioSaida !== false} disabled={bloqueado} onChange={(event) => atualizarObrigatoriedadeBloco(event.target.checked)} className="mt-0.5 accent-cyan-400" />
+              <span><span className="font-semibold">Exigir na transição</span><span className="mt-0.5 block text-[11px] text-slate-500">Quando ativo, este requisito bloqueia a mudança de etapa até ser atendido. Retirar o bloco do formulário também remove a obrigação.</span></span>
+            </label>}
+          </div>}
+          {!campoSelecionado && !componenteSelecionado ? <p className="mt-3 text-xs leading-5 text-slate-400">Selecione um campo ou bloco na composição para configurar suas regras.</p> : campoSelecionado && <div className="mt-4 space-y-4">
             {indiceSecaoCampoSelecionado >= 0 && secoes.length > 1 && <label className="block text-xs font-semibold text-slate-300">Mover campo para seção
               <select value={secoes[indiceSecaoCampoSelecionado].chave} disabled={bloqueado} onChange={(event) => {
                 const destino = event.target.value;

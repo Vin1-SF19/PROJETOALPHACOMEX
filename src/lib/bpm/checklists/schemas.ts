@@ -40,6 +40,7 @@ export const salvarTemplateChecklistSchema = dadosTemplateSchema.extend({
   }
 });
 export const alternarTemplateChecklistSchema = z.object({ id: idSchema, ativo: z.boolean() });
+export const excluirTemplateChecklistSchema = z.object({ id: idSchema, updatedAt: z.coerce.date() });
 export const criarItemTemplateChecklistSchema = itemTemplateChecklistSchema.extend({ templateId: idSchema });
 export const atualizarItemTemplateChecklistSchema = itemTemplateChecklistSchema.extend({ id: idSchema });
 export const removerItemTemplateChecklistSchema = z.object({ id: idSchema });

@@ -5,6 +5,7 @@ import type { Prisma } from "@prisma/client";
 
 import db from "@/lib/prisma";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
+import { camposPublicadosPorEtapa, capacidadesObrigatoriasPorEtapa } from "@/lib/bpm/campos-formulario-publicado";
 import {
   carregarValoresCanonicosCampos,
   salvarValoresGlobaisPersonalizadosCampos,
@@ -18,6 +19,7 @@ import { avaliarGrupo } from "@/lib/bpm/regras/avaliador";
 import { montarContextoAvaliacaoDoCard } from "@/lib/bpm/regras/contexto";
 import {
   BPM_PIPELINE_KEYS,
+  BPM_CAPABILITIES,
   BPM_STAGE_KEYS,
   transitionOriginForRequester,
   type BpmTransitionRequester,
@@ -32,6 +34,7 @@ import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { enfileirarAutomacoesMovimentoBpm } from "@/lib/bpm/automacoes/fila";
 import { sincronizarSlaMovimentoBpm } from "@/lib/bpm/sla";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
+import { processarCadenciasImediatasDoCardBpm } from "@/lib/bpm/cadencias/executor";
 
 export type AtorTransicaoBpm = {
   tipo: BpmTransitionRequester;
@@ -256,6 +259,9 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       acessos: perfilCampo ? { where: { perfil: perfilCampo } } : false,
     },
   });
+  const camposFormulario = await camposPublicadosPorEtapa([card.etapaId, destino.id], tx);
+  const capacidadesObrigatorias = await capacidadesObrigatoriasPorEtapa([card.etapaId, destino.id], tx);
+  const exige = (etapaId: string, capability: string) => capacidadesObrigatorias.get(etapaId)?.has(capability) === true;
   const camposSubmetidos = campoIdsSubmetidos.length
     ? await tx.bpmCampo.findMany({
         where: {
@@ -352,6 +358,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
   }
   for (const campo of camposRequisito) {
     for (const config of campo.etapaConfiguracoes) {
+      if (!camposFormulario.get(config.etapaId)?.has(campo.id)) continue;
       const aplicaNaOrigem = config.etapaId === card.etapaId
         && (config.obrigatorio || config.obrigatorioSaida || Boolean(config.condicaoObrigatoriedadeJson));
       const aplicaNoDestino = config.etapaId === destino.id
@@ -379,9 +386,9 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
 
   const proximoContato = input.proximoContatoEm === undefined ? card.proximoContatoEm : input.proximoContatoEm;
   if (card.pipeline.chave === BPM_PIPELINE_KEYS.COMERCIAL && (
-    card.etapa.chave === BPM_STAGE_KEYS.NOVOS_LEADS
-    || destino.chave === BPM_STAGE_KEYS.EM_TRATATIVA
-    || destino.chave === BPM_STAGE_KEYS.SEM_VIABILIDADE
+    (card.etapa.chave === BPM_STAGE_KEYS.NOVOS_LEADS && exige(card.etapaId, BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER))
+    || ([BPM_STAGE_KEYS.EM_TRATATIVA, BPM_STAGE_KEYS.SEM_VIABILIDADE].some((chave) => chave === destino.chave)
+      && exige(destino.id, BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER))
   )) {
     const erroContato = obterErroProximoContatoParaMovimento(proximoContato);
     if (erroContato) pendencias.push("Próximo contato");
@@ -392,7 +399,8 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
   }
 
   const meeting = card.reunioes[0];
-  if (card.etapa.chave === BPM_STAGE_KEYS.AGENDAR_REUNIAO && destino.chave === BPM_STAGE_KEYS.REUNIAO_AGENDADA) {
+  if (card.etapa.chave === BPM_STAGE_KEYS.AGENDAR_REUNIAO && destino.chave === BPM_STAGE_KEYS.REUNIAO_AGENDADA
+    && exige(card.etapaId, BPM_CAPABILITIES.MEETING_SCHEDULER)) {
     if (!meeting?.agendadaEm || Number.isNaN(meeting.agendadaEm.getTime())) {
       erro("MEETING_REQUIRED", "Preencha Data e Hora da reunião antes de avançar para Reunião Agendada.");
     }
@@ -404,8 +412,8 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     etapaDestinoChave: destino.chave,
     transcricaoReuniao: card.transcricaoReuniao,
   });
-  if (erroTranscricao) erro("TRANSCRIPT_REQUIRED", erroTranscricao);
-  if (card.etapa.chave === BPM_STAGE_KEYS.EM_TRATATIVA) {
+  if (erroTranscricao && exige(card.etapaId, BPM_CAPABILITIES.MEETING_TRANSCRIPT)) erro("TRANSCRIPT_REQUIRED", erroTranscricao);
+  if (card.etapa.chave === BPM_STAGE_KEYS.EM_TRATATIVA && exige(card.etapaId, BPM_CAPABILITIES.FOLLOW_UP_CHECKLIST)) {
     const ultimo = await tx.bpmChecklistFollowUp.findFirst({ where: { cardId: card.id }, orderBy: [{ criadoEm: "desc" }, { id: "desc" }], select: { completo: true } });
     if (!ultimo?.completo) erro("FOLLOW_UP_CHECKLIST_PENDING", "Conclua o procedimento do último follow-up antes de sair de Em Tratativa.");
   }
@@ -439,12 +447,14 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
 
   const erroRegra = await obterErroRegrasParaMovimento({ card, etapaDestinoId: destino.id, client: tx });
   if (erroRegra) erro("BUSINESS_RULE_BLOCKED", erroRegra);
-  const erroChecklist = await obterErroChecklistParaMovimento({
-    id: card.id,
-    pipelineId: card.pipelineId,
-    etapaId: card.etapaId,
-  }, tx);
-  if (erroChecklist) erro("CHECKLIST_BLOCKED", erroChecklist);
+  if (exige(card.etapaId, BPM_CAPABILITIES.STAGE_CHECKLIST)) {
+    const erroChecklist = await obterErroChecklistParaMovimento({
+      id: card.id,
+      pipelineId: card.pipelineId,
+      etapaId: card.etapaId,
+    }, tx);
+    if (erroChecklist) erro("CHECKLIST_BLOCKED", erroChecklist);
+  }
 
   const automaticosPorId: Record<string, string> = {};
   for (const [chave, value] of Object.entries(financeiro.automaticValues)) {
@@ -679,6 +689,11 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
         });
       } catch (queueError) {
         console.error("[TransitionCommand/outbox-consumer]", queueError);
+      }
+      try {
+        await processarCadenciasImediatasDoCardBpm(result.cardId);
+      } catch (cadenciaError) {
+        console.error("[TransitionCommand/cadencia-imediata]", cadenciaError);
       }
     }
     const { pipelineId: _pipelineId, ...publicData } = result;

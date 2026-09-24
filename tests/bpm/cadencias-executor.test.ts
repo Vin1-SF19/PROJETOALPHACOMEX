@@ -13,7 +13,7 @@ vi.mock("@/lib/bpm/realtime-server", () => ({ notificarPipelineBpm: vi.fn() }));
 import db from "@/lib/prisma";
 import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
-import { processarCadenciasBpm } from "@/lib/bpm/cadencias/executor";
+import { processarCadenciasBpm, processarCadenciasImediatasDoCardBpm } from "@/lib/bpm/cadencias/executor";
 
 const mockDb = db as unknown as {
   bpmCardCadencia: { findMany: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> };
@@ -64,6 +64,19 @@ beforeEach(() => {
 });
 
 describe("processarCadenciasBpm", () => {
+  it("processa os passos vencidos somente do card recém-criado ou movido", async () => {
+    const v = vinculo();
+    mockDb.bpmCardCadencia.findMany.mockResolvedValueOnce([v]).mockResolvedValueOnce([]);
+    const tx = executarTx(v);
+
+    await processarCadenciasImediatasDoCardBpm("card-1");
+
+    expect(tx.bpmTarefa.create).toHaveBeenCalledTimes(1);
+    expect(mockDb.bpmCardCadencia.findMany).toHaveBeenCalledTimes(2);
+    expect(mockDb.bpmCardCadencia.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ cardId: "card-1", status: "ATIVA" }),
+    }));
+  });
   it("busca apenas vínculos de definições ativas", async () => {
     await processarCadenciasBpm();
     expect(mockDb.bpmCardCadencia.findMany).toHaveBeenCalledWith(expect.objectContaining({

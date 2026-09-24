@@ -103,7 +103,14 @@ describe("requisitos configurados antes da mudança de etapa", () => {
     } });
     try {
       await act(async () => root.render(h(PainelProximaEtapa, {
-        card: { ...card, etapa: { id: "origem", chave: "reuniao_agendada" } } as React.ComponentProps<typeof PainelProximaEtapa>["card"],
+        card: { ...card, etapa: { id: "origem", chave: "reuniao_agendada" },
+          formularioEtapa: { id: "form-1", versao: 1, ativo: true, status: "READY", diagnosticos: [], secoes: [{
+            id: "sec-1", chave: "resumo", titulo: "Resumo", componentes: [{
+              id: "component-1", chave: "transcricao", tipo: "CAPABILITY", campoId: null,
+              capability: "MEETING_TRANSCRIPT", rendererId: null, config: {}, valido: true, visivel: true,
+            }],
+          }] },
+        } as unknown as React.ComponentProps<typeof PainelProximaEtapa>["card"],
         etapas: [{ id: "destino", chave: "em_tratativa", nome: "Em tratativa", ordem: 3, script: null }],
         podeMoverEtapa: true, accent: "1,2,3", onMovido: vi.fn(),
       })));

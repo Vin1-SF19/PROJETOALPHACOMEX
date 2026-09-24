@@ -12,6 +12,7 @@ import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import {
   adicionarItemExclusivoChecklistSchema,
   alternarTemplateChecklistSchema,
+  excluirTemplateChecklistSchema,
   atualizarItemChecklistCardSchema,
   atualizarItemTemplateChecklistSchema,
   atualizarTemplateChecklistSchema,
@@ -141,6 +142,7 @@ export async function ListarTemplatesChecklistBpm() {
   try {
     await exigirAdminChecklist();
     const templates = await db.bpmChecklistTemplate.findMany({
+      where: { excluidoEm: null },
       orderBy: [{ createdAt: "desc" }, { id: "asc" }],
       take: 250,
       select: {
@@ -167,6 +169,7 @@ export async function ListarWorkspaceChecklistsBpm() {
     await exigirAdminChecklist();
     const [templates, pipelines, cards] = await Promise.all([
       db.bpmChecklistTemplate.findMany({
+        where: { excluidoEm: null },
         orderBy: [{ createdAt: "desc" }, { id: "asc" }],
         take: 250,
         select: {
@@ -262,9 +265,9 @@ export async function AtualizarTemplateChecklistBpm(payload: unknown) {
       const etapaIds = etapas.map((etapa) => etapa.id);
       const existente = await tx.bpmChecklistTemplate.findUnique({
         where: { id: dados.id },
-        select: { id: true, pipelineId: true, etapaId: true },
+        select: { id: true, pipelineId: true, etapaId: true, excluidoEm: true },
       });
-      if (!existente) throw new Error("Template não encontrado");
+      if (!existente || existente.excluidoEm) throw new Error("Template não encontrado");
 
       await tx.bpmChecklistTemplate.update({
         where: { id: dados.id },
@@ -314,9 +317,9 @@ export async function SalvarTemplateChecklistBpm(payload: unknown) {
       const etapaIds = etapas.map((etapa) => etapa.id);
       const existente = await tx.bpmChecklistTemplate.findUnique({
         where: { id: dados.id },
-        select: { id: true, pipelineId: true, etapaId: true, updatedAt: true, itens: { select: { id: true } }, etapas: { select: { etapaId: true } } },
+        select: { id: true, pipelineId: true, etapaId: true, excluidoEm: true, updatedAt: true, itens: { select: { id: true } }, etapas: { select: { etapaId: true } } },
       });
-      if (!existente) throw new Error("Template não encontrado");
+      if (!existente || existente.excluidoEm) throw new Error("Template não encontrado");
       if (dados.updatedAt && existente.updatedAt.getTime() !== dados.updatedAt.getTime()) throw new Error("CONFLITO_CHECKLIST_TEMPLATE");
       const idsExistentes = new Set(existente.itens.map((item) => item.id));
       const idsRecebidos = dados.itens.flatMap((item) => item.id ? [item.id] : []);
@@ -373,10 +376,43 @@ export async function AlternarTemplateChecklistBpm(payload: unknown) {
   try {
     await exigirAdminChecklist();
     const dados = alternarTemplateChecklistSchema.parse(payload);
-    const existente = await db.bpmChecklistTemplate.findUnique({ where: { id: dados.id }, select: { id: true } });
-    if (!existente) throw new Error("Template não encontrado");
+    const existente = await db.bpmChecklistTemplate.findUnique({ where: { id: dados.id }, select: { id: true, excluidoEm: true } });
+    if (!existente || existente.excluidoEm) throw new Error("Template não encontrado");
     await db.bpmChecklistTemplate.update({ where: { id: dados.id }, data: { ativo: dados.ativo }, select: { id: true } });
     revalidatePath(ROTA_ADMIN);
+    return { success: true as const };
+  } catch (error) {
+    return { success: false as const, error: erroPublico(error) };
+  }
+}
+
+/** Exclusão lógica (soft delete) de um template de procedimento: inativa o template, preserva instâncias e registra auditoria. */
+export async function ExcluirTemplateChecklistBpm(payload: unknown) {
+  try {
+    const { userId } = await exigirAdminChecklist();
+    const dados = excluirTemplateChecklistSchema.parse(payload);
+    const pipelineId = await db.$transaction(async (tx) => {
+      await exigirAcessoConfigPipeline(userId, "configurarChecklists", tx);
+      const existente = await tx.bpmChecklistTemplate.findUnique({
+        where: { id: dados.id },
+        select: { id: true, ativo: true, pipelineId: true, excluidoEm: true, updatedAt: true },
+      });
+      if (!existente || existente.excluidoEm) throw new Error("Template não encontrado");
+      if (existente.updatedAt.getTime() !== dados.updatedAt.getTime()) throw new Error("CONFLITO_CHECKLIST_TEMPLATE");
+      await tx.bpmChecklistTemplate.update({ where: { id: dados.id }, data: { ativo: false, excluidoEm: new Date() }, select: { id: true } });
+      if (existente.pipelineId) {
+        await tx.bpmPipelineConfigAuditoria.create({ data: {
+          pipelineId: existente.pipelineId,
+          adminId: userId,
+          campoAlterado: "checklist_template_excluido",
+          valorAnteriorJson: JSON.stringify({ templateId: dados.id, ativo: existente.ativo }),
+          valorNovoJson: JSON.stringify({ templateId: dados.id, ativo: false }),
+        } });
+      }
+      return existente.pipelineId;
+    }, { isolationLevel: "Serializable" });
+    revalidatePath(ROTA_ADMIN);
+    await notificarTemplateConfirmado(pipelineId);
     return { success: true as const };
   } catch (error) {
     return { success: false as const, error: erroPublico(error) };

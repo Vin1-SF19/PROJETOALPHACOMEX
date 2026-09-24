@@ -5325,6 +5325,7 @@ model BpmChecklistTemplate {
   nome         String
   descricao    String?
   ativo        Boolean @default(true)
+  excluidoEm   DateTime?
   pipelineId   String?
   etapaId      String?
   servico      String?
@@ -5539,6 +5540,7 @@ model BpmCadencia {
   pipelineId  String?
   etapaId     String? // histórico legado; escopo operacional vive em BpmCadenciaEtapa
   ativa       Boolean @default(true)
+  excluidoEm  DateTime?
   versao      Int     @default(1)
   criadoPorId Int?
 

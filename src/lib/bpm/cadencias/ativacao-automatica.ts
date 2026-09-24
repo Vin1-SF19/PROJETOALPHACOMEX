@@ -89,6 +89,7 @@ export async function ativarCadenciasNaEntradaBpm(
   const cadencias = await tx.bpmCadencia.findMany({
     where: {
       ativa: true,
+      excluidoEm: null,
       pipelineId: input.pipelineDestinoId,
       OR: escopos,
       passos: { some: { ativo: true } },

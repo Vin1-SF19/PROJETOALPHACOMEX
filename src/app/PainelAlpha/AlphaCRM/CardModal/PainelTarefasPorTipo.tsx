@@ -19,10 +19,11 @@ interface Props {
   accent: string;
   podeTrabalharTarefas: boolean;
   onAtualizado: () => void;
+  permitirCriar?: boolean;
 }
 
 const inputCls = "w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-white/25";
-const TITULOS_OBRIGATORIOS: readonly BpmTarefaTipo[] = ["TAREFA", "LEMBRETE_RAPIDO", "EMAIL", "CHECKLIST"];
+const TITULOS_OBRIGATORIOS: readonly BpmTarefaTipo[] = ["TAREFA", "LEMBRETE_RAPIDO", "EMAIL"];
 
 function errosValidacaoTarefa(erro: unknown): { campos: Record<string, string>; geral: string | null } {
   if (typeof erro === "string") return { campos: {}, geral: erro };
@@ -46,7 +47,7 @@ function IconeTipo({ tipo, size = 15 }: { tipo: string; size?: number }) {
   return <Bell size={size} />;
 }
 
-export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, podeTrabalharTarefas, onAtualizado }: Props) {
+export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, podeTrabalharTarefas, onAtualizado, permitirCriar = true }: Props) {
   const [aberto, setAberto] = useState(false);
   const [tipo, setTipo] = useState<BpmTarefaTipo>("TAREFA");
   const [titulo, setTitulo] = useState("");
@@ -55,7 +56,6 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
   const [telefone, setTelefone] = useState("");
   const [emailDestino, setEmailDestino] = useState("");
   const [mensagem, setMensagem] = useState("");
-  const [itensChecklist, setItensChecklist] = useState("");
   const [prazo, setPrazo] = useState("");
   const [alertaEm, setAlertaEm] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -74,7 +74,7 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
 
   function limparFormulario() {
     setTitulo(""); setDescricao(""); setContato(""); setTelefone(""); setEmailDestino("");
-    setMensagem(""); setItensChecklist(""); setPrazo(""); setAlertaEm("");
+    setMensagem(""); setPrazo(""); setAlertaEm("");
     setErros({}); setErroGeral(null);
   }
 
@@ -105,9 +105,6 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
         telefone: telefone.trim() || undefined,
         emailDestino: emailDestino.trim() || undefined,
         mensagem: mensagem.trim() || undefined,
-        checklistItens: tipo === "CHECKLIST"
-          ? itensChecklist.split("\n").map((item) => item.trim()).filter(Boolean)
-          : undefined,
         responsavelId: responsavelId ?? undefined,
         prazo: prazoPersistido,
         alertaEm: alertaPersistido,
@@ -185,7 +182,7 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
         );
       })}
 
-      {!aberto ? (
+      {permitirCriar && (!aberto ? (
         <button type="button" onClick={() => setAberto(true)} disabled={!podeTrabalharTarefas} className="mt-1 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 px-3 py-2.5 text-xs font-bold text-slate-300 transition hover:border-white/30 hover:bg-white/[0.03] disabled:cursor-not-allowed disabled:opacity-50">
           <Plus size={14} /> Criar tarefa por tipo
         </button>
@@ -200,7 +197,6 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
             ))}
           </div>
 
-          {tipo === "CHECKLIST" && <><input className={inputCls} placeholder="Título do procedimento" value={titulo} onChange={(e) => { setTitulo(e.target.value); limparErro("titulo"); }} /><textarea className={`${inputCls} min-h-24 resize-none`} placeholder="Um item por linha" value={itensChecklist} onChange={(e) => { setItensChecklist(e.target.value); limparErro("checklistItens"); }} /></>}
           {tipo === "LIGACAO" && <><input className={inputCls} placeholder="Contato (opcional)" value={contato} onChange={(e) => { setContato(e.target.value); limparErro("contato"); }} /><input className={inputCls} placeholder="Telefone" value={telefone} onChange={(e) => { setTelefone(e.target.value); limparErro("telefone"); }} /><textarea className={`${inputCls} min-h-20 resize-none`} placeholder="Objetivo da ligação" value={descricao} onChange={(e) => { setDescricao(e.target.value); limparErro("descricao"); }} /></>}
           {tipo === "WHATSAPP" && <><input className={inputCls} placeholder="Contato" value={contato} onChange={(e) => { setContato(e.target.value); limparErro("contato"); }} /><textarea className={`${inputCls} min-h-24 resize-none`} placeholder="Mensagem a enviar" value={mensagem} onChange={(e) => { setMensagem(e.target.value); limparErro("mensagem"); }} /></>}
           {tipo === "EMAIL" && <><input className={inputCls} type="email" placeholder="E-mail do destinatário" value={emailDestino} onChange={(e) => { setEmailDestino(e.target.value); limparErro("emailDestino"); }} /><input className={inputCls} placeholder="Assunto" value={titulo} onChange={(e) => { setTitulo(e.target.value); limparErro("titulo"); }} /><textarea className={`${inputCls} min-h-24 resize-none`} placeholder="Mensagem do e-mail" value={mensagem} onChange={(e) => { setMensagem(e.target.value); limparErro("mensagem"); }} /></>}
@@ -214,7 +210,7 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
           {mensagemErro && <div role="alert" className="rounded-xl border border-rose-400/30 bg-rose-400/10 p-3 text-xs text-rose-200"><p className="font-semibold">{mensagemErro}</p>{errosNoResumo.length > 0 && <ul className="mt-1 list-disc space-y-0.5 pl-4">{errosNoResumo.map(([campo, mensagem]) => <li key={campo}>{mensagem}</li>)}</ul>}</div>}
           <button type="button" onClick={() => void salvar()} disabled={salvando || !podeTrabalharTarefas} aria-busy={salvando} className="w-full rounded-xl py-2.5 text-sm font-bold text-white disabled:opacity-50" style={{ background: `rgb(${accent})` }}>{salvando ? "Criando..." : `Criar ${obterConfigTipoTarefa(tipo).label}`}</button>
         </div>
-      )}
+      ))}
     </div>
   );
 }

@@ -286,6 +286,15 @@ export function formularioPossuiTarget(
   );
 }
 
+export function formularioExigeCapacidade(
+  formulario: FormularioEtapaResolvido | null | undefined,
+  target: string,
+): boolean {
+  return formulario?.secoes.some((secao) => secao.componentes.some((componente) =>
+    componente.valido && componente.capability === target && componente.config.obrigatorioSaida !== false,
+  )) ?? false;
+}
+
 export function formularioPossuiChecklist(formulario: FormularioEtapaResolvido): boolean {
   return formularioPossuiTarget(formulario, BPM_STAGE_CHECKLIST_TARGET);
 }

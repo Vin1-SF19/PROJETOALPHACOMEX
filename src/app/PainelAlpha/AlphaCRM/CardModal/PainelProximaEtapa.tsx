@@ -9,8 +9,8 @@ import { ObterResumoChecklistCardBpm } from "@/actions/bpm/Checklists";
 import { CampoBpmInput } from "@/app/PainelAlpha/AlphaCRM/CampoBpmInput";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCardSave } from "./CardSaveContext";
-import { ERRO_DATA_REUNIAO_OBRIGATORIA } from "@/lib/bpm/agendar-reuniao";
-import { BPM_STAGE_KEYS } from "@/lib/bpm/ontology";
+import { BPM_CAPABILITIES, BPM_STAGE_KEYS } from "@/lib/bpm/ontology";
+import { formularioExigeCapacidade } from "@/lib/bpm/formulario-renderer";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type EtapaOpcao = { id: string; chave?: string | null; nome: string; ordem: number; script: string | null };
@@ -35,9 +35,9 @@ export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accen
     templates: string[];
     primeiroItemId: string | null;
   } | null>(null);
-  const aguardandoDataHora = card.etapa.chave === BPM_STAGE_KEYS.AGENDAR_REUNIAO && !card.dataReuniao;
   const aguardandoTranscricao = card.etapa.chave === BPM_STAGE_KEYS.REUNIAO_AGENDADA
-    && !card.transcricaoReuniao?.trim();
+    && !card.transcricaoReuniao?.trim()
+    && formularioExigeCapacidade(card.formularioEtapa, BPM_CAPABILITIES.MEETING_TRANSCRIPT);
 
   const carregarPendencias = useCallback(async () => {
     const resposta = await ObterResumoChecklistCardBpm({ cardId: card.id });
@@ -233,17 +233,12 @@ export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accen
       
       {etapas.map((etapa) => {
         const ativa = etapa.id === card.etapa.id;
-        const bloqueadaPorDataHora = aguardandoDataHora && etapa.chave === BPM_STAGE_KEYS.REUNIAO_AGENDADA;
-        const motivoBloqueio = bloqueadaPorDataHora
-          ? ERRO_DATA_REUNIAO_OBRIGATORIA
-          : undefined;
         return (
           <button
             key={etapa.id}
             onClick={() => handleMover(etapa.id)}
-            disabled={movendoEtapa || !podeMoverEtapa || bloqueadaPorDataHora}
+            disabled={movendoEtapa || !podeMoverEtapa}
             aria-busy={movendoEtapa}
-            title={motivoBloqueio}
             className="w-full flex items-center justify-between gap-2 text-left px-3 py-2 rounded-xl text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 not-disabled:hover:bg-white/[0.07]"
             style={
               ativa

@@ -72,8 +72,10 @@ export default function PainelHistorico({
   const inputAnexoRef = useRef<HTMLInputElement>(null);
   const etapasAnteriores = etapasAnterioresParaResumo(etapas, card.etapa.id);
   const { tarefas: tarefasDoCard, procedimentos: tarefasDeProcedimento } = separarTarefasCard(card.tarefas);
-  const checklistHabilitado = formularioPossuiChecklist(card.formularioEtapa)
-    || tarefasDeProcedimento.length > 0;
+  const procedimentosLegados = tarefasDeProcedimento.filter((tarefa) => !tarefa.cardChecklistId);
+  const checklistConfigurado = formularioPossuiChecklist(card.formularioEtapa)
+    || tarefasDeProcedimento.some((tarefa) => Boolean(tarefa.cardChecklistId));
+  const checklistHabilitado = checklistConfigurado || procedimentosLegados.length > 0;
 
   useEffect(() => {
     function abrirPendencias(event: Event) {
@@ -189,13 +191,23 @@ export default function PainelHistorico({
 
         {checklistHabilitado && (
           <TabsContent value="checklist" forceMount className="min-h-0 flex-1 overflow-y-auto data-[state=inactive]:hidden">
-            <PainelChecklistsCard
+            {checklistConfigurado && <PainelChecklistsCard
               card={card}
               accent={accent}
               podeEditar={podeEditar}
               realtimeRevision={realtimeRevision}
               onAtualizado={onAtualizado}
-            />
+              ocultarVazio={procedimentosLegados.length > 0}
+            />}
+            {procedimentosLegados.length > 0 && <PainelTarefasPorTipo
+              cardId={card.id}
+              responsavelId={card.responsavel?.id ?? null}
+              tarefas={procedimentosLegados}
+              accent={accent}
+              podeTrabalharTarefas={podeTrabalharTarefas}
+              onAtualizado={onAtualizado}
+              permitirCriar={false}
+            />}
           </TabsContent>
         )}
 

@@ -190,7 +190,7 @@ export async function AtualizarCadenciaBpm(input: unknown) {
         where: { id },
         include: { etapas: { select: { etapaId: true } } },
       });
-      if (!atual) throw new Error("CADENCIA_NAO_ENCONTRADA");
+      if (!atual || atual.excluidoEm) throw new Error("CADENCIA_NAO_ENCONTRADA");
       const pipelineId = data.pipelineId === undefined ? atual.pipelineId : data.pipelineId;
       const etapaIds = etapaIdsInformadas
         ?? atual.etapas.map((item) => item.etapaId);
@@ -237,7 +237,7 @@ export async function AtivarDesativarCadenciaBpm(input: unknown) {
         where: { id: parsed.data.id },
         include: { etapas: { select: { etapaId: true } } },
       });
-      if (!atual) throw new Error("CADENCIA_NAO_ENCONTRADA");
+      if (!atual || atual.excluidoEm) throw new Error("CADENCIA_NAO_ENCONTRADA");
       if (parsed.data.ativa) {
         const etapaIds = atual.etapas.map((item) => item.etapaId);
         await validarEtapasCadencia({ pipelineId: atual.pipelineId, etapaIds, cadenciaId: atual.id }, tx);
@@ -254,6 +254,47 @@ export async function AtivarDesativarCadenciaBpm(input: unknown) {
   } catch (error) {
     registrarErroCadencia("AtivarDesativarCadenciaBpm", error);
     return { success: false, error: erroCadencia(error, "Erro ao ativar/desativar cadência") };
+  }
+}
+
+/** Oculta a definição e libera suas colunas, preservando vínculos e tarefas já criados. */
+export async function ExcluirCadenciaBpm(input: unknown) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false as const, error: "Não autorizado" };
+    const userId = Number(session.user.id);
+    const parsed = cadenciaIdSchema.safeParse(input);
+    if (!parsed.success) return { success: false as const, error: "Cadência inválida" };
+
+    const pipelineId = await db.$transaction(async (tx) => {
+      await exigirAcessoConfigPipeline(userId, "configurarCadencias", tx);
+      const atual = await tx.bpmCadencia.findUnique({
+        where: { id: parsed.data },
+        select: { id: true, pipelineId: true, excluidoEm: true, etapas: { select: { etapaId: true } } },
+      });
+      if (!atual || atual.excluidoEm) throw new Error("CADENCIA_NAO_ENCONTRADA");
+      await tx.bpmCadencia.update({
+        where: { id: atual.id },
+        data: { ativa: false, excluidoEm: new Date() },
+      });
+      await tx.bpmCadenciaEtapa.deleteMany({ where: { cadenciaId: atual.id } });
+      if (atual.pipelineId) {
+        await tx.bpmPipelineConfigAuditoria.create({ data: {
+          pipelineId: atual.pipelineId,
+          adminId: userId,
+          campoAlterado: "cadencia_excluida",
+          valorNovoJson: JSON.stringify({ cadenciaId: atual.id, etapaIds: atual.etapas.map((item) => item.etapaId) }),
+        } });
+        await avancarConfigVersionBpm(tx, atual.pipelineId);
+      }
+      return atual.pipelineId;
+    }, { isolationLevel: "Serializable" });
+    revalidatePath(ROTA_ADMIN_CADENCIAS);
+    if (pipelineId) await notificarPipelineBpm({ pipelineId, tipo: "PIPELINE_ALTERADO" });
+    return { success: true as const };
+  } catch (error) {
+    registrarErroCadencia("ExcluirCadenciaBpm", error);
+    return { success: false as const, error: erroCadencia(error, "Erro ao excluir cadência") };
   }
 }
 
@@ -281,10 +322,10 @@ export async function ConfigurarCadenciaEtapaBpm(input: unknown) {
       const selecionada = cadenciaId
         ? await tx.bpmCadencia.findUnique({
             where: { id: cadenciaId },
-            select: { id: true, pipelineId: true },
+            select: { id: true, pipelineId: true, excluidoEm: true },
           })
         : null;
-      if (cadenciaId && !selecionada) throw new Error("CADENCIA_NAO_ENCONTRADA");
+      if (cadenciaId && (!selecionada || selecionada.excluidoEm)) throw new Error("CADENCIA_NAO_ENCONTRADA");
       if (selecionada?.pipelineId && selecionada.pipelineId !== pipelineId) {
         throw new Error("CADENCIA_FORA_PIPELINE");
       }
@@ -332,6 +373,7 @@ export async function ListarCadenciasBpm() {
     await exigirAcessoConfigPipeline(userId, "configurarCadencias");
 
     const cadencias = await db.bpmCadencia.findMany({
+      where: { excluidoEm: null },
       orderBy: { createdAt: "desc" },
       include: {
         pipeline: { select: { id: true, nome: true } },
@@ -360,8 +402,8 @@ export async function ObterCadenciaBpm(cadenciaId: string) {
     const parsedId = cadenciaIdSchema.safeParse(cadenciaId);
     if (!parsedId.success) return { success: false, error: "Cadência inválida" };
 
-    const cadencia = await db.bpmCadencia.findUnique({
-      where: { id: parsedId.data },
+    const cadencia = await db.bpmCadencia.findFirst({
+      where: { id: parsedId.data, excluidoEm: null },
       include: {
         pipeline: { select: { id: true, nome: true } },
         etapas: {

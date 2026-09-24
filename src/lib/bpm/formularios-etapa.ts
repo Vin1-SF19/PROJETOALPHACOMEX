@@ -6,6 +6,7 @@ export const BPM_STAGE_CHECKLIST_TARGET = BPM_CAPABILITIES.STAGE_CHECKLIST;
 
 const presentationConfigSchema = z.object({
   label: z.string().trim().min(1).max(120).optional(),
+  obrigatorioSaida: z.boolean().optional(),
 }).strict();
 export const BPM_FORM_FIELD_CONFIG_SCHEMA = presentationConfigSchema;
 

@@ -13,7 +13,8 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   if (!recibosAnexoBpmConfigurados()) {
-    return NextResponse.json({ success: false, error: "Recibos de anexos não configurados" }, { status: 503 });
+    console.error("[POST /api/bpm/upload] CRM_ANEXO_RECEIPT_SECRET ausente");
+    return NextResponse.json({ success: false, error: "Envio de anexos indisponível. Avise o administrador para configurar a segurança dos anexos." }, { status: 503 });
   }
   const session = await auth();
   if (!session?.user?.id) {
