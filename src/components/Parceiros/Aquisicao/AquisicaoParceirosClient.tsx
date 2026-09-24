@@ -254,6 +254,7 @@ function KanbanColuna({
   cor,
   itens,
   onAbrirLead,
+  buscaGlobalAtiva = false,
   tracejada = false,
 }: {
   status: string;
@@ -261,6 +262,7 @@ function KanbanColuna({
   cor: string;
   itens: Lead[];
   onAbrirLead: (lead: Lead) => void;
+  buscaGlobalAtiva?: boolean;
   tracejada?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
@@ -296,7 +298,7 @@ function KanbanColuna({
         <SortableContext items={itensVisiveis.map((l) => l.id)} strategy={verticalListSortingStrategy}>
           {itensVisiveis.length === 0 ? (
             <div className="h-full flex items-center justify-center">
-              <p className="text-[10px] text-slate-600">{termoNormalizado ? "Nenhum lead encontrado" : "Vazio"}</p>
+              <p className="text-[10px] text-slate-600">{termoNormalizado || buscaGlobalAtiva ? "Nenhum lead encontrado" : "Vazio"}</p>
             </div>
           ) : (
             itensVisiveis.map((lead) => <LeadCard key={lead.id} lead={lead} cor={cor} onAbrirLead={onAbrirLead} />)
@@ -322,11 +324,16 @@ export default function AquisicaoParceirosClient({
   const accent = tema.accent;
   const reduceMotion = useReducedMotion();
   const [leads, setLeads] = useState<Lead[]>(leadsIniciais);
+  const [termoBuscaGeral, setTermoBuscaGeral] = useState("");
   const [leadFoco, setLeadFoco] = useState<Lead | null>(null);
   const [novoLeadOpen, setNovoLeadOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const podeEditar = permissao.isAdmin || permissao.podeEditar;
+  const termoGeralNormalizado = termoBuscaGeral.trim().toLocaleLowerCase("pt-BR");
+  const leadsVisiveis = useMemo(() => termoGeralNormalizado
+    ? leads.filter((lead) => (lead.nomeFantasia || lead.nome).toLocaleLowerCase("pt-BR").includes(termoGeralNormalizado))
+    : leads, [leads, termoGeralNormalizado]);
 
   async function recarregar() {
     const r = await ListarLeadsAquisicaoParceiros();
@@ -334,12 +341,12 @@ export default function AquisicaoParceirosClient({
   }
 
   const colunasFunil = useMemo(() => {
-    return ETAPAS.map((col, i) => ({ ...col, cor: CORES_ETAPA[i % CORES_ETAPA.length], itens: leads.filter((l) => l.status === col.status) }));
-  }, [leads]);
+    return ETAPAS.map((col, i) => ({ ...col, cor: CORES_ETAPA[i % CORES_ETAPA.length], itens: leadsVisiveis.filter((l) => l.status === col.status) }));
+  }, [leadsVisiveis]);
 
   const colunasSaida = useMemo(() => {
-    return SAIDAS.map((col) => ({ ...col, itens: leads.filter((l) => l.status === col.status) }));
-  }, [leads]);
+    return SAIDAS.map((col) => ({ ...col, itens: leadsVisiveis.filter((l) => l.status === col.status) }));
+  }, [leadsVisiveis]);
 
   // Drag-and-drop — mesmo padrão de BlueprintKanban.tsx: PointerSensor só (sem teclado,
   // consistente com os outros 2 Kanbans do projeto), optimistic update local, servidor
@@ -439,10 +446,25 @@ export default function AquisicaoParceirosClient({
         )}
       </header>
 
+      <div className="relative z-10 shrink-0 px-6 pt-4">
+        <div className="relative w-full max-w-[280px]">
+          <Search size={14} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <input
+            type="search"
+            aria-label="Pesquisar leads em todas as etapas"
+            value={termoBuscaGeral}
+            onChange={(event) => setTermoBuscaGeral(event.target.value)}
+            placeholder="Pesquisar em todas as etapas..."
+            className="h-9 w-full rounded-xl border border-white/10 bg-black/30 pl-9 pr-9 text-xs text-slate-200 outline-none placeholder:text-slate-500 focus:border-white/30"
+          />
+          {termoBuscaGeral && <button type="button" onClick={() => setTermoBuscaGeral("")} aria-label="Limpar pesquisa geral" className="absolute right-2 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-md text-slate-500 hover:text-white"><X size={13} /></button>}
+        </div>
+      </div>
+
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={(e) => void handleDragEnd(e)}>
         <div className="relative z-10 flex-1 min-h-0 p-6 flex gap-4 overflow-x-auto overflow-y-hidden">
           {colunasFunil.map((col) => (
-            <KanbanColuna key={col.status} status={col.status} label={col.label} cor={col.cor} itens={col.itens} onAbrirLead={setLeadFoco} />
+            <KanbanColuna key={col.status} status={col.status} label={col.label} cor={col.cor} itens={col.itens} onAbrirLead={setLeadFoco} buscaGlobalAtiva={Boolean(termoGeralNormalizado)} />
           ))}
 
           {/* Divisor visual — separa o fluxo principal das saídas laterais */}
@@ -453,7 +475,7 @@ export default function AquisicaoParceirosClient({
           </div>
 
           {colunasSaida.map((col) => (
-            <KanbanColuna key={col.status} status={col.status} label={col.label} cor={col.cor} itens={col.itens} onAbrirLead={setLeadFoco} tracejada />
+            <KanbanColuna key={col.status} status={col.status} label={col.label} cor={col.cor} itens={col.itens} onAbrirLead={setLeadFoco} buscaGlobalAtiva={Boolean(termoGeralNormalizado)} tracejada />
           ))}
         </div>
 
