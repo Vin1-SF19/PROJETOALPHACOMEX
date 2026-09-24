@@ -770,3 +770,9 @@ Resultado: FAIL — implementação parcial, aceites de integração ainda pende
 
 
 RM-2026-1FFBAA: fixture @libsql/client file::memory: perdeu tabelas após fechamento da transação; teste passou a usar arquivo temporário exclusivo em .cache, removido em finally. As quatro FKs Restrict são eventos, agendas, transições e templates; membros/histórico usam Cascade. Diagnóstico do incidente em produção permanece não comprovado.
+
+## `npx tsc --noEmit` aborta com "JavaScript heap out of memory"
+**Sintoma:** `FATAL ERROR: Ineffective mark-compacts near heap limit` (exit 134) logo após `prisma generate`.
+**Causa:** o client Prisma gerado + o codebase passam do heap padrão (~4 GB) do Node.
+**Fix:** usar `npm run typecheck` (já define `NODE_OPTIONS=--max-old-space-size=8192`). Não é erro de tipo.
+**Adicionado em:** 2026-09-24 (Forge, Meta Alpha no Alpha Metas)

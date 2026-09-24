@@ -6589,3 +6589,33 @@ RM-2026-E1E1F7: commit 14f7d01c e 13 fases concluídas confirmados. Promoção a
 RM-2026-09A642: autosave/CPF e confirmação de fechamento reinspecionados; 84/84 testes focados, typecheck e lint do escopo aprovados. O staging segue bloqueado pela atribuição de arquivos compartilhados entre RMs; nenhuma homologação autenticada ou deploy foi reivindicado. RM-2026-A33407: corrigida resposta tardia da busca por CNPJ no modal Novo Card; 24/24 testes focados, typecheck e lint aprovados. A fila de staging continua exigindo árvore isolada.
 
 RM-2026-1FFBAA: fases 3–10 retomadas a partir do código existente; 50/50 testes focados, typecheck e lint do escopo aprovados. Fixture SQLite reduzida não comprova banco Prisma real. RM-2026-D64AF1: 22/22 testes de reunião, typecheck e lint aprovados; Google real pendente de Testes. RM-2026-04A236: 58/58 testes de lista, publicação e renderer, typecheck e lint aprovados; fluxo autenticado pendente de Testes. Esses três objetivos receberam relatórios de conclusão no ALPAK. RM-2026-A33407 recebeu relatório e depois staging automático bloqueou por digest anterior de NovoCardModal.tsx; código e testes locais continuam aprovados. Nenhum deploy foi feito nesta sessão.
+
+## 2026-09-24 — Alpha Metas: termômetro só de closers + ramal "Total geral" + super meta visível
+
+**Agentes:** Scout → Echo/Nova → Forge → Kowalski
+**Arquivos:** `src/actions/Metas.ts`, `src/app/PainelAlpha/Metas/MetasClient.tsx`, `tests/metas/metas-painel-equipe.test.ts`.
+
+- `getDadosMetas` agora seleciona `role`. `ColaboradorMeta.liderComercial` foi adicionado. `totalVendas` passou a contar só closers (role `COMERCIAL`) e é ele que alimenta o termômetro principal e as celebrações da equipe. O novo `totalVendasGeral` soma todo o time visível, incluindo `Lider Comercial`.
+- `TermometroMetaEquipe` ganhou um ramal lateral (`data-team-goal-total-branch`) que mede o total geral contra a super meta (ou a meta, se não houver super meta) e mostra a leitura "16/40".
+- Bug da super meta: o `overflow-hidden` do tubo externo cortava o rótulo, que ainda estava em 5–6px. O recorte agora é só do wrapper interno do preenchimento. O número aparece logo abaixo da barra limitadora, com fundo. O marcador da meta normal fica limitado a 75% para não colidir com ele.
+- Gates: tsc exit 0, eslint escopo exit 0, build exit 0, `tests/metas` 72/72. Sem schema, sem Vault, nada commitado.
+
+## 2026-09-24 — Gerenciamento de Leads: líderes comerciais no input Closer
+
+**Arquivos:** `src/actions/ContratoComercial.ts`, `tests/comercial/colaboradores-comerciais.test.ts` (novo).
+
+- `getColaboradoresComerciais` agora busca `role in ["COMERCIAL", "Lider Comercial"]` (ativos). Essa lista alimenta o input Closer do formulário Novo Cliente e o filtro de colaboradores do `ModalGerenciamentoLeads`.
+- `closerNome` é texto livre no contrato: não cria usuário e não mexe no schema. Sem Vault.
+- Gates: tsc exit 0, eslint escopo sem erros, `tests/comercial` 37/37, build (ver log da sessão). Nada commitado.
+
+## 2026-09-24 — Alpha Metas: campo "Meta Alpha" no modal de configuração
+
+**Tags:** #database #decision
+**Agentes:** Scout → Echo/Nova → Forge → Vault → Kowalski
+**Arquivos:** `prisma/schema.prisma` (`MetaEquipe.metaAlphaMensal`), `prisma/migrations/20260924230000_add_meta_alpha_mensal/migration.sql`, `src/actions/Metas.ts`, `src/app/PainelAlpha/Metas/MetasClient.tsx`, `tests/metas/metas-painel-equipe.test.ts`.
+
+- O modal Configurar Metas ganhou o input "Meta Alpha · closers + líderes". `upsertMetaEquipe(meta, superMeta, metaAlpha, mes, ano)` valida inteiro ≥ 0. `getDadosMetas` e `getColaboradoresParaConfigurar` passaram a retornar `metaAlphaEquipe`.
+- O ramal do termômetro virou "Meta Alpha" e usa `alvoGeral = metaAlpha > 0 ? metaAlpha : alvo`. Sem Meta Alpha definida, cai para a super meta (ou meta) das closers.
+- **Vault:** autorização explícita do usuário. Backup fresco em `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-24T20-14-49-598Z.sql`: verificado, 331 tabelas, 158.777 linhas, sha256 `4ca8f34c…`. ADD COLUMN aplicado no Turso de produção via `scripts/apply-turso-migration.mjs`. `meta_equipe` continua com 5 linhas antes e depois, coluna `INTEGER NOT NULL DEFAULT 0`. O Turso não tem `_prisma_migrations`: as migrations são manuais.
+- Rollback: `ALTER TABLE "meta_equipe" DROP COLUMN "metaAlphaMensal";` + reverter o código.
+- Gates: `npm run typecheck` exit 0 (`npx tsc` direto dá OOM, catalogado em known-errors), eslint sem erros, build exit 0, `tests/metas` 72/72. Nada commitado nem publicado.

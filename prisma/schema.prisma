@@ -2309,6 +2309,8 @@ model MetaEquipe {
   id              Int      @id @default(autoincrement())
   metaMensal      Int      @default(0)
   superMetaMensal Int      @default(0)
+  /// Alvo do termômetro "Total geral" (closers + líderes comerciais).
+  metaAlphaMensal Int      @default(0)
   mes             Int
   ano             Int
   createdAt       DateTime @default(now())

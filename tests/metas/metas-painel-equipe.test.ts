@@ -52,6 +52,7 @@ describe("consultas do painel Alpha Metas", () => {
         usuario: "closer.alpha",
         imagemUrl: null,
         tema_interface: "blue",
+        role: "COMERCIAL",
       },
       {
         id: 20,
@@ -59,6 +60,7 @@ describe("consultas do painel Alpha Metas", () => {
         usuario: "lider.alpha",
         imagemUrl: null,
         tema_interface: "indigo",
+        role: "Lider Comercial",
       },
     ]);
     prismaMock.contratoComercial.groupBy.mockResolvedValue([
@@ -81,16 +83,43 @@ describe("consultas do painel Alpha Metas", () => {
         usuario: true,
         imagemUrl: true,
         tema_interface: true,
+        role: true,
       },
       orderBy: { nome: "asc" },
     });
     expect(resultado).toMatchObject({
       success: true,
-      totalVendas: 3,
+      totalVendas: 0,
+      totalVendasGeral: 3,
       colaboradores: [
-        expect.objectContaining({ nome: "Líder Alpha", vendas: 3, meta: 5, superMeta: 8 }),
-        expect.objectContaining({ nome: "Closer Alpha", vendas: 0, superMeta: 0 }),
+        expect.objectContaining({ nome: "Líder Alpha", vendas: 3, meta: 5, superMeta: 8, liderComercial: true }),
+        expect.objectContaining({ nome: "Closer Alpha", vendas: 0, superMeta: 0, liderComercial: false }),
       ],
+    });
+  });
+
+  it("conta só closers no termômetro principal e todo o time no total geral", async () => {
+    prismaMock.usuarios.findMany.mockResolvedValue([
+      { id: 10, nome: "Closer A", usuario: "a", imagemUrl: null, tema_interface: "blue", role: "COMERCIAL" },
+      { id: 11, nome: "Closer B", usuario: "b", imagemUrl: null, tema_interface: "blue", role: "COMERCIAL" },
+      { id: 20, nome: "Líder", usuario: "l", imagemUrl: null, tema_interface: "blue", role: "Lider Comercial" },
+    ]);
+    prismaMock.contratoComercial.groupBy.mockResolvedValue([
+      { usuarioId: 10, _count: { id: 9 } },
+      { usuarioId: 11, _count: { id: 5 } },
+      { usuarioId: 20, _count: { id: 2 } },
+    ]);
+    prismaMock.metaEquipe.findFirst.mockResolvedValue({ metaMensal: 30, superMetaMensal: 40, metaAlphaMensal: 45 });
+
+    const resultado = await getDadosMetas(9, 2026);
+
+    expect(resultado).toMatchObject({
+      success: true,
+      totalVendas: 14,
+      totalVendasGeral: 16,
+      metaEquipe: 30,
+      superMetaEquipe: 40,
+      metaAlphaEquipe: 45,
     });
   });
 
@@ -149,17 +178,25 @@ describe("persistência de super metas", () => {
     });
   });
 
-  it("salva meta e super meta geral e rejeita super meta inferior", async () => {
-    await expect(upsertMetaEquipe(36, 48, 9, 2026)).resolves.toEqual({ success: true });
+  it("salva meta, super meta e Meta Alpha gerais e rejeita valores inválidos", async () => {
+    await expect(upsertMetaEquipe(36, 48, 60, 9, 2026)).resolves.toEqual({ success: true });
     expect(prismaMock.metaEquipe.upsert).toHaveBeenCalledWith({
       where: { mes_ano: { mes: 9, ano: 2026 } },
-      update: { metaMensal: 36, superMetaMensal: 48 },
-      create: { metaMensal: 36, superMetaMensal: 48, mes: 9, ano: 2026 },
+      update: { metaMensal: 36, superMetaMensal: 48, metaAlphaMensal: 60 },
+      create: { metaMensal: 36, superMetaMensal: 48, metaAlphaMensal: 60, mes: 9, ano: 2026 },
     });
 
-    await expect(upsertMetaEquipe(36, 30, 9, 2026)).resolves.toEqual({
+    await expect(upsertMetaEquipe(36, 30, 60, 9, 2026)).resolves.toEqual({
       success: false,
       error: "Super meta inválida",
+    });
+    await expect(upsertMetaEquipe(36, 48, -1, 9, 2026)).resolves.toEqual({
+      success: false,
+      error: "Meta Alpha inválida",
+    });
+    await expect(upsertMetaEquipe(36, 48, 1.5, 9, 2026)).resolves.toEqual({
+      success: false,
+      error: "Meta Alpha inválida",
     });
     expect(prismaMock.metaEquipe.upsert).toHaveBeenCalledTimes(1);
   });
@@ -229,6 +266,8 @@ describe("estrutura visual da meta coletiva", () => {
     expect(source).not.toContain("data-team-goal-bar");
     expect(scoreboard.match(/<TermometroMetaEquipe/g)).toHaveLength(1);
     expect(scoreboard).toContain("totalVendas={totalVendas}");
+    expect(scoreboard).toContain("totalGeral={totalVendasGeral}");
+    expect(scoreboard).toContain("metaAlpha={metaAlphaEquipe}");
     expect(scoreboard).toContain("meta={metaEquipe}");
     expect(scoreboard).toContain("superMeta={superMetaEquipe}");
   });
@@ -251,6 +290,21 @@ describe("estrutura visual da meta coletiva", () => {
     expect(termometro).not.toContain('left-[-13px]');
     expect(termometro).toContain("{totalVendas}");
     expect(termometro).not.toContain("<Users");
+    expect(termometro).toContain("data-team-goal-total-branch");
+    expect(termometro).toContain("data-team-goal-total-reading");
+    expect(termometro).toContain("const alvoGeral = metaAlpha > 0 ? metaAlpha : alvo;");
+  });
+
+  it("mostra o número da super meta logo abaixo da barra limitadora, sem recorte do tubo", () => {
+    const termometro = entre(
+      "function TermometroMetaEquipe",
+      "// ─── Tela de celebração individual",
+    );
+    const marcador = entre("data-team-goal-super-marker", "</div>");
+
+    expect(marcador.indexOf("bg-amber-300")).toBeLessThan(marcador.indexOf("Super Meta {superMeta}"));
+    expect(termometro).not.toContain("text-[5px]");
+    expect(termometro).toContain("w-8 sm:w-10 rounded-t-full");
   });
 
   it("move a meta normal debaixo do nome para o bloco ao lado da super meta", () => {

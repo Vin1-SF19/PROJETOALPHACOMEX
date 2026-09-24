@@ -4,7 +4,8 @@ import db from "@/lib/prisma";
 import { auth } from "../../auth";
 import { podeGerenciarMetas } from "@/lib/metas-permissoes";
 
-const ROLES_EQUIPE_COMERCIAL = ["COMERCIAL", "Lider Comercial"];
+const ROLE_LIDER_COMERCIAL = "Lider Comercial";
+const ROLES_EQUIPE_COMERCIAL = ["COMERCIAL", ROLE_LIDER_COMERCIAL];
 
 function metasValidas(metaMensal: number, superMetaMensal: number) {
     return Number.isInteger(metaMensal)
@@ -23,6 +24,7 @@ export interface ColaboradorMeta {
     vendas: number;
     meta: number;
     superMeta: number;
+    liderComercial: boolean;
 }
 
 export interface DadosMetasResult {
@@ -30,7 +32,12 @@ export interface DadosMetasResult {
     colaboradores: ColaboradorMeta[];
     metaEquipe: number;
     superMetaEquipe: number;
+    /** Alvo do termômetro "Total geral". */
+    metaAlphaEquipe: number;
+    /** Vendas das closers — alimenta o termômetro principal e as celebrações da equipe. */
     totalVendas: number;
+    /** Vendas de todo o time visível, incluindo líderes comerciais. */
+    totalVendasGeral: number;
     mes: number;
     ano: number;
 }
@@ -56,7 +63,7 @@ export async function getDadosMetas(
                     role: { in: ROLES_EQUIPE_COMERCIAL },
                     meta_visivel_painel: true,
                 },
-                select: { id: true, nome: true, usuario: true, imagemUrl: true, tema_interface: true },
+                select: { id: true, nome: true, usuario: true, imagemUrl: true, tema_interface: true, role: true },
                 orderBy: { nome: "asc" },
             }),
             db.contratoComercial.groupBy({
@@ -87,6 +94,7 @@ export async function getDadosMetas(
                 vendas: fechados?._count?.id ?? 0,
                 meta: metaReg?.metaMensal ?? 0,
                 superMeta: metaReg?.superMetaMensal ?? 0,
+                liderComercial: usuario.role === ROLE_LIDER_COMERCIAL,
             };
         });
 
@@ -97,7 +105,11 @@ export async function getDadosMetas(
             colaboradores,
             metaEquipe: metaEquipe?.metaMensal ?? 0,
             superMetaEquipe: metaEquipe?.superMetaMensal ?? 0,
-            totalVendas: colaboradores.reduce((acc, c) => acc + c.vendas, 0),
+            metaAlphaEquipe: metaEquipe?.metaAlphaMensal ?? 0,
+            totalVendas: colaboradores
+                .filter((c) => !c.liderComercial)
+                .reduce((acc, c) => acc + c.vendas, 0),
+            totalVendasGeral: colaboradores.reduce((acc, c) => acc + c.vendas, 0),
             mes,
             ano,
         };
@@ -139,6 +151,7 @@ export async function getColaboradoresParaConfigurar() {
             })),
             metaEquipe: metaEquipe?.metaMensal ?? 0,
             superMetaEquipe: metaEquipe?.superMetaMensal ?? 0,
+            metaAlphaEquipe: metaEquipe?.metaAlphaMensal ?? 0,
             mes,
             ano,
         };
@@ -192,6 +205,7 @@ export async function upsertMetaUsuario(
 export async function upsertMetaEquipe(
     metaMensal: number,
     superMetaMensal: number,
+    metaAlphaMensal: number,
     mes: number,
     ano: number,
 ) {
@@ -200,12 +214,14 @@ export async function upsertMetaEquipe(
         return { success: false, error: "Não autorizado" };
     if (!metasValidas(metaMensal, superMetaMensal))
         return { success: false, error: "Super meta inválida" };
+    if (!Number.isInteger(metaAlphaMensal) || metaAlphaMensal < 0)
+        return { success: false, error: "Meta Alpha inválida" };
 
     try {
         await db.metaEquipe.upsert({
             where: { mes_ano: { mes, ano } },
-            update: { metaMensal, superMetaMensal },
-            create: { metaMensal, superMetaMensal, mes, ano },
+            update: { metaMensal, superMetaMensal, metaAlphaMensal },
+            create: { metaMensal, superMetaMensal, metaAlphaMensal, mes, ano },
         });
         return { success: true };
     } catch (error) {

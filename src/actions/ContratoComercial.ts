@@ -525,7 +525,8 @@ export async function getColaboradoresComerciais() {
 
     try {
         const usuarios = await db.usuarios.findMany({
-            where: { role: "COMERCIAL", status: "ATIVO" },
+            // Líderes comerciais também fecham contratos e precisam aparecer como closer.
+            where: { role: { in: ["COMERCIAL", "Lider Comercial"] }, status: "ATIVO" },
             select: { id: true, nome: true, imagemUrl: true },
             orderBy: { nome: "asc" },
         });
