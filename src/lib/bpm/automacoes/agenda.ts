@@ -106,7 +106,7 @@ export async function materializarAgendasAutomacoesBpm(limite = 100) {
   for (const agenda of agendas) {
     if (agenda.tipo === "ESPERA") {
       const estado = parseObjeto(agenda.recorrenciaJson); const execucaoId = typeof estado.execucaoId === "string" ? estado.execucaoId : null;
-      if (execucaoId) await db.bpmAutomacaoExecucao.updateMany({ where: { id: execucaoId, status: "AGUARDANDO" }, data: { status: "PENDENTE", disponivelEm: agora, resultadoJson: JSON.stringify({ proximoNodeId: estado.proximoNodeId }) } });
+      if (execucaoId) await db.bpmAutomacaoExecucao.updateMany({ where: { id: execucaoId, status: "AGUARDANDO" }, data: { status: "PENDENTE", disponivelEm: agora, tentativas: 0, resultadoJson: JSON.stringify({ proximoNodeId: estado.proximoNodeId }) } });
       await db.bpmAutomacaoAgenda.update({ where: { id: agenda.id }, data: { ativo: false, ultimaMaterializacaoEm: agora } }); materializadas++; continue;
     }
     if (!agenda.cardId || agenda.automacaoVersao.status !== "ATIVA" || !agenda.automacaoVersao.automacao.ativa) { await db.bpmAutomacaoAgenda.update({ where: { id: agenda.id }, data: { ativo: false } }); continue; }
@@ -119,46 +119,81 @@ export async function materializarAgendasAutomacoesBpm(limite = 100) {
   return { encontradas: agendas.length, materializadas };
 }
 
-export async function materializarGatilhosTemporaisBpm(limite = 100) {
+const LOTE_CARDS_TEMPORAIS = 500;
+const JANELA_TAREFAS_MS = 7 * 86_400_000;
+
+type EventoTemporal = { chave: string; publicar: () => Promise<unknown> };
+
+/**
+ * Publica apenas eventos ainda inexistentes. A consulta prévia em lote evita
+ * milhares de tentativas de insert duplicado a cada ciclo do cron.
+ */
+async function publicarEventosNovos(candidatos: EventoTemporal[]) {
+  let criados = 0;
+  for (let i = 0; i < candidatos.length; i += 200) {
+    const lote = candidatos.slice(i, i + 200);
+    const existentes = await db.bpmEventoDominio.findMany({ where: { idempotencyKey: { in: lote.map((item) => item.chave) } }, select: { idempotencyKey: true } });
+    const conhecidas = new Set(existentes.map((item) => item.idempotencyKey));
+    for (const item of lote) {
+      if (conhecidas.has(item.chave)) continue;
+      if (await item.publicar()) criados++;
+    }
+  }
+  return criados;
+}
+
+export async function materializarGatilhosTemporaisBpm(limite = 500) {
   const agora = new Date();
+  const inicioJanela = new Date(agora.getTime() - JANELA_TAREFAS_MS);
+  const take = Math.min(Math.max(limite, 1), 500);
+  // Mais recentes primeiro: tarefas já publicadas não ocupam o lote para sempre.
   const [versoes, tarefas, alertas] = await Promise.all([
     db.bpmAutomacaoVersao.findMany({ where: { status: "ATIVA", gatilhoTipo: "TEMPO_NA_ETAPA_ATINGIDO", automacao: { ativa: true } }, include: { automacao: true } }),
-    db.bpmTarefa.findMany({ where: { status: "PENDENTE", prazo: { lte: agora } }, include: { card: { select: { pipelineId: true } } }, take: Math.min(Math.max(limite, 1), 500) }),
-    db.bpmTarefa.findMany({ where: { status: "PENDENTE", alertaEm: { lte: agora }, alertaDisparadoEm: null }, include: { card: { select: { pipelineId: true } } }, take: Math.min(Math.max(limite, 1), 500) }),
+    db.bpmTarefa.findMany({ where: { status: "PENDENTE", prazo: { lte: agora, gte: inicioJanela } }, include: { card: { select: { pipelineId: true } } }, orderBy: { prazo: "desc" }, take }),
+    db.bpmTarefa.findMany({ where: { status: "PENDENTE", alertaEm: { lte: agora, gte: inicioJanela }, alertaDisparadoEm: null }, include: { card: { select: { pipelineId: true } } }, orderBy: { alertaEm: "desc" }, take }),
   ]);
-  let criados = 0;
+  const candidatos: EventoTemporal[] = [];
   for (const versao of versoes) {
     const config = gatilhoConfigSchema.parse(parseObjeto(versao.gatilhoConfigJson));
     const minutos = config.tempo?.unidade === "MINUTOS" ? config.tempo.quantidade : config.minutos ?? 60;
     const etapasIds = [...new Set([...(config.etapasIds ?? []), ...(config.etapaId ? [config.etapaId] : [])])];
-    const cards = await db.bpmCard.findMany({ where: { pipelineId: versao.automacao.pipelineId, status: "ATIVO", ...(config.escopo === "GLOBAL_PIPELINE" ? {} : { etapaId: { in: etapasIds.length ? etapasIds : [versao.automacao.etapaId] } }) }, select: { id: true, pipelineId: true, etapaId: true, createdAt: true }, take: Math.min(Math.max(limite, 1), 500) });
-    const historicos = cards.length ? await db.bpmCardHistorico.findMany({ where: { cardId: { in: cards.map((card) => card.id) }, acao: { in: ["CARD_MOVIDO", "CARD_MOVIDO_POR_AUTOMACAO", "MOVIDO_AUTOMACAO"] } }, select: { cardId: true, createdAt: true, valorNovoJson: true }, orderBy: { createdAt: "desc" } }) : [];
-    const porCard = new Map<string, typeof historicos>();
-    for (const historico of historicos) porCard.set(historico.cardId, [...(porCard.get(historico.cardId) ?? []), historico]);
-    for (const card of cards) {
-      const inicio = config.tempo?.ancora === "CRIACAO_CARD"
-        ? card.createdAt
-        : resolverInicioCicloNaEtapa(card.etapaId, card.createdAt, porCard.get(card.id) ?? []);
-      const atingido = config.tempo?.unidade === "DIAS_UTEIS"
-        ? contarDiasUteisDecorridos(inicio, agora) >= config.tempo.quantidade
-        : config.tempo?.unidade === "DIAS_CORRIDOS"
-          ? agora.getTime() - inicio.getTime() >= config.tempo.quantidade * 86_400_000
-          : agora.getTime() - inicio.getTime() >= minutos * 60_000;
-      if (!atingido) continue;
-      const chave = `tempo-etapa:${versao.id}:${card.id}:${card.etapaId}:${inicio.getTime()}`;
-      const evento = await publicarEventoBpm({ tipo: "TEMPO_NA_ETAPA_ATINGIDO", entidadeTipo: "CARD", entidadeId: card.id, cardId: card.id, pipelineId: card.pipelineId, valorNovo: { etapaId: card.etapaId, minutos, tempo: config.tempo }, atorTipo: "SISTEMA", correlationId: chave, idempotencyKey: chave });
-      if (evento) criados++;
+    const ativadaEm = versao.ativadaEm ?? versao.createdAt;
+    const filtroCards = { pipelineId: versao.automacao.pipelineId, status: "ATIVO", ...(config.escopo === "GLOBAL_PIPELINE" ? {} : { etapaId: { in: etapasIds.length ? etapasIds : [versao.automacao.etapaId] } }) };
+    // Percorre todos os cards elegíveis em páginas; antes, só os 100 primeiros
+    // (sem ordem definida) eram avaliados e o restante nunca disparava.
+    let cursor: string | undefined;
+    for (;;) {
+      const cards = await db.bpmCard.findMany({ where: filtroCards, select: { id: true, pipelineId: true, etapaId: true, createdAt: true }, orderBy: { id: "asc" }, take: LOTE_CARDS_TEMPORAIS, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}) });
+      if (cards.length === 0) break;
+      cursor = cards[cards.length - 1].id;
+      const historicos = await db.bpmCardHistorico.findMany({ where: { cardId: { in: cards.map((card) => card.id) }, acao: { in: ["CARD_MOVIDO", "CARD_MOVIDO_POR_AUTOMACAO", "MOVIDO_AUTOMACAO"] } }, select: { cardId: true, createdAt: true, valorNovoJson: true }, orderBy: { createdAt: "desc" } });
+      const porCard = new Map<string, typeof historicos>();
+      for (const historico of historicos) porCard.set(historico.cardId, [...(porCard.get(historico.cardId) ?? []), historico]);
+      for (const card of cards) {
+        const inicio = config.tempo?.ancora === "CRIACAO_CARD"
+          ? card.createdAt
+          : resolverInicioCicloNaEtapa(card.etapaId, card.createdAt, porCard.get(card.id) ?? []);
+        const atingidoEm = (referencia: Date) => config.tempo?.unidade === "DIAS_UTEIS"
+          ? contarDiasUteisDecorridos(inicio, referencia) >= config.tempo.quantidade
+          : config.tempo?.unidade === "DIAS_CORRIDOS"
+            ? referencia.getTime() - inicio.getTime() >= config.tempo.quantidade * 86_400_000
+            : referencia.getTime() - inicio.getTime() >= minutos * 60_000;
+        // Só dispara para cards que cruzaram o limite depois da ativação da
+        // versão: ativar/editar/religar não gera ações em massa retroativas.
+        if (!atingidoEm(agora) || atingidoEm(ativadaEm)) continue;
+        const chave = `tempo-etapa:${versao.id}:${card.id}:${card.etapaId}:${inicio.getTime()}`;
+        candidatos.push({ chave, publicar: () => publicarEventoBpm({ tipo: "TEMPO_NA_ETAPA_ATINGIDO", entidadeTipo: "CARD", entidadeId: card.id, cardId: card.id, pipelineId: card.pipelineId, valorNovo: { etapaId: card.etapaId, minutos, tempo: config.tempo }, atorTipo: "SISTEMA", correlationId: chave, idempotencyKey: chave }) });
+      }
+      if (cards.length < LOTE_CARDS_TEMPORAIS) break;
     }
   }
   for (const tarefa of tarefas) {
     const chave = `prazo-tarefa:${tarefa.id}:${tarefa.prazo?.toISOString()}`;
-    const evento = await publicarEventoBpm({ tipo: "TAREFA_PRAZO_ATINGIDO", entidadeTipo: "TAREFA", entidadeId: tarefa.id, cardId: tarefa.cardId, pipelineId: tarefa.card.pipelineId, valorNovo: { tarefaId: tarefa.id, tipo: tarefa.tipo, prazo: tarefa.prazo }, atorTipo: "SISTEMA", correlationId: chave, idempotencyKey: chave });
-    if (evento) criados++;
+    candidatos.push({ chave, publicar: () => publicarEventoBpm({ tipo: "TAREFA_PRAZO_ATINGIDO", entidadeTipo: "TAREFA", entidadeId: tarefa.id, cardId: tarefa.cardId, pipelineId: tarefa.card.pipelineId, valorNovo: { tarefaId: tarefa.id, tipo: tarefa.tipo, prazo: tarefa.prazo }, atorTipo: "SISTEMA", correlationId: chave, idempotencyKey: chave }) });
   }
   for (const tarefa of alertas) {
     const chave = `alerta-tarefa:${tarefa.id}:${tarefa.alertaEm?.toISOString()}`;
-    const evento = await publicarEventoBpm({ tipo: "TAREFA_ALERTA_ATINGIDO", entidadeTipo: "TAREFA", entidadeId: tarefa.id, cardId: tarefa.cardId, pipelineId: tarefa.card.pipelineId, valorNovo: { tarefaId: tarefa.id, tipo: tarefa.tipo, alertaEm: tarefa.alertaEm }, atorTipo: "SISTEMA", correlationId: chave, idempotencyKey: chave });
-    if (evento) criados++;
+    candidatos.push({ chave, publicar: () => publicarEventoBpm({ tipo: "TAREFA_ALERTA_ATINGIDO", entidadeTipo: "TAREFA", entidadeId: tarefa.id, cardId: tarefa.cardId, pipelineId: tarefa.card.pipelineId, valorNovo: { tarefaId: tarefa.id, tipo: tarefa.tipo, alertaEm: tarefa.alertaEm }, atorTipo: "SISTEMA", correlationId: chave, idempotencyKey: chave }) });
   }
-  return { criados };
+  return { criados: await publicarEventosNovos(candidatos) };
 }

@@ -135,9 +135,18 @@ describe("gatilhos duráveis", () => {
   });
 
   it("grava o evento real de deferimento para reavaliação segura", async () => {
-    const banco = client();
+    const CARD_ID = "cm1card0000000000000000088";
+    const banco = {
+      ...client(),
+      bpmCard: { findMany: vi.fn().mockResolvedValue([{ id: CARD_ID, pipelineId: PIPELINE_ID, etapaId: ETAPA_ID }]) },
+      bpmEventoDominio: { create: vi.fn().mockResolvedValue({ id: "evento-1" }), findUnique: vi.fn() },
+    };
     const total = await enfileirarAutomacoesDeferimentoBpm({ clienteId: 1, clienteServicoId: 88, servico: "Radar" }, banco as never);
     expect(total).toBe(1);
+    // O deferimento também vira evento de domínio para o Motor Central.
+    expect(banco.bpmEventoDominio.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+      tipo: "PROCESSO_DEFERIDO", cardId: CARD_ID, idempotencyKey: `processo-deferido:88:${CARD_ID}`,
+    }) });
     expect(banco.bpmAutomacaoExecucao.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ eventoChave: "DEFERIMENTO:88", gatilhoTipo: "PROCESSO_DEFERIDO" }),
     });

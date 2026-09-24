@@ -4,6 +4,7 @@ import type { Prisma } from "@prisma/client";
 
 import db from "@/lib/prisma";
 import { resolverInicioCicloNaEtapa } from "@/lib/bpm/agendar-reuniao";
+import { publicarEventoBpm } from "./eventos";
 
 type ClienteFila = Prisma.TransactionClient | typeof db;
 
@@ -148,6 +149,15 @@ export async function enfileirarAutomacoesDeferimentoBpm(
   });
   let criadas = 0;
   for (const card of cards) {
+    // Motor Central: o deferimento vira evento de domínio para que automações
+    // versionadas com gatilho PROCESSO_DEFERIDO também disparem.
+    const chaveEvento = `processo-deferido:${dados.clienteServicoId}:${card.id}`;
+    await publicarEventoBpm({
+      tipo: "PROCESSO_DEFERIDO", entidadeTipo: "CARD", entidadeId: card.id,
+      cardId: card.id, pipelineId: card.pipelineId,
+      valorNovo: { etapaId: card.etapaId, clienteServicoId: dados.clienteServicoId, servico: dados.servico },
+      atorTipo: "SISTEMA", correlationId: chaveEvento, idempotencyKey: chaveEvento,
+    }, client);
     const automacoes = await client.bpmAutomacao.findMany({
       where: {
         pipelineId: card.pipelineId,
