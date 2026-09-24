@@ -231,7 +231,9 @@ function FormularioEtapaWorkspaceContent({
   const [usoCampos, setUsoCampos] = useState<Record<string, UsoCampo> | null>(null);
   const [erroUso, setErroUso] = useState(false);
   const [buscaCampo, setBuscaCampo] = useState("");
-  const [secaoDestino, setSecaoDestino] = useState(0);
+  const [secaoSelecionadaChave, setSecaoSelecionadaChave] = usePipelineEditorState(`${draftKey}:secao-selecionada`, secoes[0]?.chave ?? "");
+  const indiceSecaoSelecionada = Math.max(0, secoes.findIndex((secao) => secao.chave === secaoSelecionadaChave));
+  const secaoSelecionada = secoes[indiceSecaoSelecionada];
   const [mostrarPreview, setMostrarPreview] = useState(true);
   const publicandoRef = useRef(false);
   const bloqueado = publicationBlocked || salvando || criandoCampo || excluindoCampo || salvandoCampo || habilitandoCampo;
@@ -289,14 +291,6 @@ function FormularioEtapaWorkspaceContent({
       ),
     [camposExcluidos, camposLocais, etapaId],
   );
-  const camposDisponiveis = useMemo(
-    () => camposAplicaveis.filter(
-      (campo) => !secoes.some((secaoAtual) =>
-        secaoAtual.componentes.some((componente) => componente.campoId === campo.id),
-      ),
-    ),
-    [camposAplicaveis, secoes],
-  );
   const editandoCard = modo === "card";
   const formularioPreview = useMemo(
     () =>
@@ -306,7 +300,7 @@ function FormularioEtapaWorkspaceContent({
               id: etapa.formulario?.id ?? `preview-form-${etapa.id}`,
               ativo,
               versao: etapa.formulario?.versao ?? 1,
-              secoes: secoes.map((secao, ordem) => ({
+              secoes: (secaoSelecionada ? [secaoSelecionada] : []).map((secao, ordem) => ({
                 id: secao.id ?? `preview-section-${secao.chave}-${ordem}`,
                 chave: secao.chave,
                 titulo: secao.titulo,
@@ -329,13 +323,14 @@ function FormularioEtapaWorkspaceContent({
           : null,
         camposCanonicos: camposAplicaveis,
       }),
-    [ativo, camposAplicaveis, etapa, secoes],
+    [ativo, camposAplicaveis, etapa, secaoSelecionada],
   );
   const campoPorId = useMemo(
     () => new Map(camposAplicaveis.map((campo) => [campo.id, campo])),
     [camposAplicaveis],
   );
   const campoSelecionado = camposLocais.find((campo) => campo.id === campoSelecionadoId) ?? null;
+  const indiceSecaoCampoSelecionado = campoSelecionadoId ? secoes.findIndex((secao) => secao.componentes.some((item) => item.campoId === campoSelecionadoId)) : -1;
   const configSelecionada = campoSelecionado?.etapaConfiguracoes?.find((config) => config.etapaId === etapaId);
   const obrigacoesSelecionadas = campoSelecionado ? obrigacoesDraft[campoSelecionado.id] ?? { obrigatorio: configSelecionada?.obrigatorio ?? false, obrigatorioEntrada: configSelecionada?.obrigatorioEntrada ?? false, obrigatorioSaida: configSelecionada?.obrigatorioSaida ?? false } : null;
   const usoSelecionado = campoSelecionadoId ? usoCampos?.[campoSelecionadoId] : null;
@@ -430,10 +425,12 @@ function FormularioEtapaWorkspaceContent({
 
   function adicionarSecao() {
     const sufixo = `${Date.now()}-${secoes.length}`;
+    const chave = `secao-${sufixo}`;
     setSecoes((atuais) => [
       ...atuais,
-      { chave: `secao-${sufixo}`, titulo: "Nova seção", componentes: [] },
+      { chave, titulo: "Nova seção", componentes: [] },
     ]);
+    setSecaoSelecionadaChave(chave);
     setSujo(true);
   }
 
@@ -714,8 +711,8 @@ function FormularioEtapaWorkspaceContent({
         </div>
         <div className="border-t border-white/10 pt-4">
           <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300"><Layers3 size={15} /> Tipos de campo</h4>
-          <p className="mt-1 text-xs text-slate-500">Clique em um tipo para criar um campo na seção escolhida.</p>
-          <div className="mt-3 grid max-h-72 gap-1.5 overflow-y-auto pr-1">{TIPOS_CAMPO.map(([tipo, rotulo]) => <button key={tipo} type="button" disabled={bloqueado || !secoes.length} onClick={() => { abrirNovoCampo(Math.min(secaoDestino, secoes.length - 1)); setTipoNovoCampo(tipo); }} className="flex min-h-10 items-center gap-2 rounded-lg border border-cyan-400/10 bg-cyan-400/5 px-3 text-left text-xs text-slate-200 hover:border-cyan-400/40 hover:bg-cyan-400/10 focus-visible:outline-2 focus-visible:outline-cyan-400 disabled:opacity-40"><FileText size={14} className="shrink-0 text-cyan-300" />{rotulo}</button>)}</div>
+          <p className="mt-1 text-xs text-slate-500">Clique em um tipo para criar um campo na seção selecionada.</p>
+          <div className="mt-3 grid max-h-72 gap-1.5 overflow-y-auto pr-1">{TIPOS_CAMPO.map(([tipo, rotulo]) => <button key={tipo} type="button" disabled={bloqueado || !secoes.length} onClick={() => { abrirNovoCampo(indiceSecaoSelecionada); setTipoNovoCampo(tipo); }} className="flex min-h-10 items-center gap-2 rounded-lg border border-cyan-400/10 bg-cyan-400/5 px-3 text-left text-xs text-slate-200 hover:border-cyan-400/40 hover:bg-cyan-400/10 focus-visible:outline-2 focus-visible:outline-cyan-400 disabled:opacity-40"><FileText size={14} className="shrink-0 text-cyan-300" />{rotulo}</button>)}</div>
           <h4 className="mt-5 border-t border-white/10 pt-4 text-xs font-bold uppercase tracking-wider text-slate-300">Campos existentes</h4>
           <p className="mt-1 text-xs text-slate-500">Reutilize sem perder valores ou anexos.</p>
           <label className="mt-3 flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-slate-900 px-3 text-slate-400">
@@ -723,16 +720,16 @@ function FormularioEtapaWorkspaceContent({
             <span className="sr-only">Buscar campo</span>
             <input value={buscaCampo} onChange={(event) => setBuscaCampo(event.target.value)} placeholder="Buscar campo" className="w-full bg-transparent text-sm text-white outline-none placeholder:text-slate-500" />
           </label>
-          <label className="mt-3 block text-xs font-semibold text-slate-400">Adicionar à seção
-            <select value={secaoDestino} onChange={(event) => setSecaoDestino(Number(event.target.value))} disabled={!secoes.length} className="mt-1 min-h-10 w-full rounded-lg border border-white/10 bg-slate-900 px-2 text-sm text-white">
-              {secoes.map((secao, index) => <option key={secao.chave} value={index}>{secao.titulo || `Seção ${index + 1}`}</option>)}
+          <label className="mt-3 block text-xs font-semibold text-slate-400">Seção selecionada
+            <select aria-label="Selecionar seção do formulário" value={secaoSelecionada?.chave ?? ""} onChange={(event) => { setSecaoSelecionadaChave(event.target.value); setCampoSelecionadoId(null); }} disabled={!secoes.length} className="mt-1 min-h-10 w-full rounded-lg border border-white/10 bg-slate-900 px-2 text-sm text-white">
+              {secoes.map((secao, index) => <option key={secao.chave} value={secao.chave}>{secao.titulo || `Seção ${index + 1}`}</option>)}
             </select>
           </label>
           <div className="mt-3 max-h-[45vh] space-y-1.5 overflow-y-auto pr-1">
-            {camposFiltrados.map((campo) => <div key={campo.id} className="flex min-h-11 items-center gap-1 rounded-xl border border-white/10 bg-slate-900/70 p-1 text-xs text-slate-200"><button type="button" onClick={() => selecionarCampo(campo)} className="min-w-0 flex-1 rounded-lg px-2 py-1 text-left hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-cyan-400"><span className="block truncate">{campo.nome}</span><span className="block text-[10px] text-slate-500">{TIPOS_CAMPO.find(([tipo]) => tipo === campo.tipo)?.[1] ?? campo.tipo}{campo.etapaConfiguracoes?.some((item) => item.etapaId === etapaId && item.visivel) ? "" : " · fora desta etapa"}</span></button><button type="button" disabled={bloqueado || !secoes.length} onClick={() => void adicionarCampoDaBiblioteca(Math.min(secaoDestino, secoes.length - 1), campo)} aria-label={`Adicionar ${campo.nome} à seção`} className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg text-cyan-200 hover:bg-cyan-400/10 disabled:opacity-40"><Plus size={15} aria-hidden="true" /></button></div>)}
+            {camposFiltrados.map((campo) => <div key={campo.id} className="flex min-h-11 items-center gap-1 rounded-xl border border-white/10 bg-slate-900/70 p-1 text-xs text-slate-200"><button type="button" onClick={() => selecionarCampo(campo)} className="min-w-0 flex-1 rounded-lg px-2 py-1 text-left hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-cyan-400"><span className="block truncate">{campo.nome}</span><span className="block text-[10px] text-slate-500">{TIPOS_CAMPO.find(([tipo]) => tipo === campo.tipo)?.[1] ?? campo.tipo}{campo.etapaConfiguracoes?.some((item) => item.etapaId === etapaId && item.visivel) ? "" : " · fora desta etapa"}</span></button><button type="button" disabled={bloqueado || !secoes.length} onClick={() => void adicionarCampoDaBiblioteca(indiceSecaoSelecionada, campo)} aria-label={`Adicionar ${campo.nome} à seção`} className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg text-cyan-200 hover:bg-cyan-400/10 disabled:opacity-40"><Plus size={15} aria-hidden="true" /></button></div>)}
             {!camposFiltrados.length && <p className="py-3 text-xs text-slate-500">Nenhum campo disponível para esta busca.</p>}
           </div>
-          <button type="button" disabled={bloqueado || !secoes.length} onClick={() => abrirNovoCampo(Math.min(secaoDestino, secoes.length - 1))} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-cyan-400/30 text-xs font-semibold text-cyan-200 hover:bg-cyan-400/10 disabled:opacity-40"><Plus size={15} /> Criar campo</button>
+          <button type="button" disabled={bloqueado || !secoes.length} onClick={() => abrirNovoCampo(indiceSecaoSelecionada)} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-cyan-400/30 text-xs font-semibold text-cyan-200 hover:bg-cyan-400/10 disabled:opacity-40"><Plus size={15} /> Criar campo</button>
         </div>
       </div>
 
@@ -802,7 +799,7 @@ function FormularioEtapaWorkspaceContent({
           </div>
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-cyan-400/15 bg-cyan-400/5 px-3 py-2 text-xs text-slate-300"><span><span className="font-semibold text-cyan-200">{secoes.length} seções</span> · {secoes.reduce((total, secao) => total + secao.componentes.length, 0)} componentes nesta etapa</span><button type="button" onClick={() => setMostrarPreview((atual) => !atual)} className="inline-flex min-h-9 items-center gap-2 rounded-lg px-2 text-cyan-200 hover:bg-cyan-400/10"><Eye size={14} /> {mostrarPreview ? "Ocultar prévia" : "Ver prévia"}</button></div>
         <ListaCamposFormulario
-          secoes={secoes}
+          secoes={secaoSelecionada ? [secaoSelecionada] : []}
           bloqueado={bloqueado}
           metadados={(componente) => {
             const campo = campoPorId.get(componente.campoId ?? "") ?? componente.campo;
@@ -821,13 +818,13 @@ function FormularioEtapaWorkspaceContent({
             setSujo(true);
             return true;
           }}
-          onRotulo={(secao, indice, rotulo) => alterarSecao(secao, { componentes: secoes[secao].componentes.map((item, i) => i === indice ? aplicarRotulo(item, rotulo) : item) })}
-          onRemover={(secao, indice) => {
-            const campoId = secoes[secao].componentes[indice]?.campoId;
+          onRotulo={(_, indice, rotulo) => alterarSecao(indiceSecaoSelecionada, { componentes: secaoSelecionada.componentes.map((item, i) => i === indice ? aplicarRotulo(item, rotulo) : item) })}
+          onRemover={(_, indice) => {
+            const campoId = secaoSelecionada.componentes[indice]?.campoId;
             const uso = campoId ? usoCampos?.[campoId] : null;
             if (campoId && uso && uso.valoresCard + uso.valoresGlobais + uso.anexos > 0) toast.success("Ao publicar, o campo sairá do formulário; valores e anexos existentes serão preservados.");
             if (campoId) setObrigacoesDraft((atuais) => ({ ...atuais, [campoId]: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false } }));
-            alterarSecao(secao, { componentes: secoes[secao].componentes.filter((_, i) => i !== indice) });
+            alterarSecao(indiceSecaoSelecionada, { componentes: secaoSelecionada.componentes.filter((_, i) => i !== indice) });
           }}
           onSelecionar={(componente) => { const campo = camposLocais.find((item) => item.id === componente.campoId); if (campo) selecionarCampo(campo); }}
         />
@@ -842,26 +839,26 @@ function FormularioEtapaWorkspaceContent({
           </div>
         ) : (
           <div className="space-y-3">
-            {secoes.map((secao, indiceSecao) => (
+            {secaoSelecionada && (
               <div
-                key={secao.id ?? secao.chave}
+                key={secaoSelecionada.id ?? secaoSelecionada.chave}
                 className="rounded-xl border border-white/10 bg-slate-950/35 p-3"
               >
                 <div className="flex items-center gap-2">
                   <input
-                    aria-label={`Título da seção ${indiceSecao + 1}`}
-                    value={secao.titulo}
+                    aria-label={`Título da seção ${indiceSecaoSelecionada + 1}`}
+                    value={secaoSelecionada.titulo}
                     onChange={(event) =>
-                      alterarSecao(indiceSecao, { titulo: event.target.value })
+                      alterarSecao(indiceSecaoSelecionada, { titulo: event.target.value })
                     }
                     className="min-w-0 flex-1 rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm font-semibold text-white"
                   />
                   <button
                     type="button"
                     aria-label="Mover seção para cima"
-                    disabled={indiceSecao === 0}
+                    disabled={indiceSecaoSelecionada === 0}
                     onClick={() => {
-                      setSecoes((atuais) => mover(atuais, indiceSecao, -1));
+                      setSecoes((atuais) => mover(atuais, indiceSecaoSelecionada, -1));
                       setSujo(true);
                     }}
                     className="rounded-lg p-2 text-slate-400 hover:bg-white/5 disabled:opacity-30"
@@ -871,9 +868,9 @@ function FormularioEtapaWorkspaceContent({
                   <button
                     type="button"
                     aria-label="Mover seção para baixo"
-                    disabled={indiceSecao === secoes.length - 1}
+                    disabled={indiceSecaoSelecionada === secoes.length - 1}
                     onClick={() => {
-                      setSecoes((atuais) => mover(atuais, indiceSecao, 1));
+                      setSecoes((atuais) => mover(atuais, indiceSecaoSelecionada, 1));
                       setSujo(true);
                     }}
                     className="rounded-lg p-2 text-slate-400 hover:bg-white/5 disabled:opacity-30"
@@ -884,11 +881,12 @@ function FormularioEtapaWorkspaceContent({
                     type="button"
                     aria-label="Remover seção"
                     onClick={() => {
-                      const campoIds = secao.componentes.flatMap((componente) => componente.campoId ? [componente.campoId] : []);
+                      const campoIds = secaoSelecionada.componentes.flatMap((componente) => componente.campoId ? [componente.campoId] : []);
                       if (campoIds.length) setObrigacoesDraft((atuais) => ({ ...atuais, ...Object.fromEntries(campoIds.map((campoId) => [campoId, { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false }])) }));
                       setSecoes((atuais) =>
-                        atuais.filter((_, atual) => atual !== indiceSecao),
+                        atuais.filter((_, atual) => atual !== indiceSecaoSelecionada),
                       );
+                      setSecaoSelecionadaChave(secoes[indiceSecaoSelecionada + 1]?.chave ?? secoes[indiceSecaoSelecionada - 1]?.chave ?? "");
                       setSujo(true);
                     }}
                     className="rounded-lg p-2 text-rose-300 hover:bg-rose-400/10"
@@ -897,40 +895,14 @@ function FormularioEtapaWorkspaceContent({
                   </button>
                 </div>
                 <div className="mt-3 space-y-2 border-l border-white/10 pl-4">
-                  {secao.componentes.some((componente) => {
+                  {secaoSelecionada.componentes.some((componente) => {
                     if (!componente.campoId) return false;
                     const uso = usoCampos?.[componente.campoId];
                     return !uso || uso.valoresCard + uso.valoresGlobais + uso.anexos > 0;
                   }) && <p className="text-[11px] text-amber-200">Esta seção contém campo com dados ou uso ainda não analisado. Atualize o campo existente para preservar seus valores e anexos.</p>}
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                    <Plus size={14} aria-hidden="true" />
-                    <select
-                      aria-label={`Adicionar campo à seção ${secao.titulo}`}
-                      value=""
-                      onChange={(event) =>
-                        adicionarCampo(indiceSecao, event.target.value)
-                      }
-                      className="min-h-9 min-w-52 flex-1 rounded-lg border border-white/10 bg-slate-900 px-2 text-xs text-slate-300"
-                    >
-                      <option value="">Adicionar campo aplicável…</option>
-                      {camposDisponiveis.map((campo) => (
-                          <option key={campo.id} value={campo.id}>
-                            {campo.nome} · {campo.tipo}
-                          </option>
-                        ))}
-                    </select>
-                    <button
-                      type="button"
-                      disabled={publicationBlocked}
-                      onClick={() => abrirNovoCampo(indiceSecao)}
-                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-cyan-400/30 px-3 font-semibold text-cyan-200 hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <Plus size={13} aria-hidden="true" /> Criar novo campo
-                    </button>
-                  </div>
                 </div>
               </div>
-            ))}
+            )}
           </div>
         )}
         <button
@@ -949,6 +921,23 @@ function FormularioEtapaWorkspaceContent({
         <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
           <h3 className="flex items-center gap-2 text-sm font-bold text-white"><Pencil size={16} className="text-cyan-300" /> Propriedades do campo</h3>
           {!campoSelecionado ? <p className="mt-3 text-xs leading-5 text-slate-400">Selecione o nome de um campo na composição para editar seu nome, regras e verificar onde ele é usado.</p> : <div className="mt-4 space-y-4">
+            {indiceSecaoCampoSelecionado >= 0 && secoes.length > 1 && <label className="block text-xs font-semibold text-slate-300">Mover campo para seção
+              <select value={secoes[indiceSecaoCampoSelecionado].chave} disabled={bloqueado} onChange={(event) => {
+                const destino = event.target.value;
+                const origem = indiceSecaoCampoSelecionado;
+                setSecoes((atuais) => {
+                  const componente = atuais[origem]?.componentes.find((item) => item.campoId === campoSelecionadoId);
+                  if (!componente || !atuais.some((secao) => secao.chave === destino)) return atuais;
+                  return atuais.map((secao, indice) => indice === origem
+                    ? { ...secao, componentes: secao.componentes.filter((item) => item !== componente) }
+                    : secao.chave === destino ? { ...secao, componentes: [...secao.componentes, componente] } : secao);
+                });
+                setSecaoSelecionadaChave(destino);
+                setSujo(true);
+              }} className="mt-1 min-h-10 w-full rounded-lg border border-white/10 bg-slate-900 px-3 text-sm text-white">
+                {secoes.map((secao) => <option key={secao.chave} value={secao.chave}>{secao.titulo}</option>)}
+              </select>
+            </label>}
             <div className="rounded-xl border border-white/10 bg-slate-900/60 p-3">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Campo compartilhado</p>
               <p className="mt-1 text-xs text-slate-300">Nome e tipo pertencem ao mesmo campo em todas as etapas e pipelines vinculados. Regras abaixo valem para <strong>{etapa.nome}</strong>.</p>

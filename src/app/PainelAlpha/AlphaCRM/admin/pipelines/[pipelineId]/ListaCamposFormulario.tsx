@@ -59,7 +59,7 @@ export function ListaCamposFormulario({ secoes, bloqueado, metadados, onMover, o
   const nome = (id: string | number) => { const item = itens.find((item) => item.id === id); return item ? metadados(item.componente).nome : "Campo"; };
   return <div className="max-w-2xl">
     <p role="status" aria-live="polite" className="sr-only">{anuncio}</p>
-    {!itens.length && <p className="py-8 text-center text-sm text-muted-foreground">Nenhum campo nesta etapa. Adicione campos para compor o formulário.</p>}
+    {!itens.length && <p className="py-8 text-center text-sm text-muted-foreground">Nenhum campo nesta seção. Adicione campos pelo catálogo lateral.</p>}
     <DndContext sensors={sensores} collisionDetection={closestCenter} onDragEnd={({ active, over }) => { if (over) mover(String(active.id), String(over.id)); }} accessibility={{
       screenReaderInstructions: { draggable: "Para reordenar um campo, pressione espaço, use as setas para mover e pressione espaço novamente para soltar. Escape cancela." },
       announcements: {

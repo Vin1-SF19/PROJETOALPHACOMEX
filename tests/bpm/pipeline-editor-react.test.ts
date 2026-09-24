@@ -41,9 +41,9 @@ async function click(label: string) {
   await act(async () => button!.click());
 }
 async function addExisting() {
-  const select = container.querySelector<HTMLSelectElement>('select[aria-label="Adicionar campo à seção Section second"]');
-  expect(select).toBeTruthy();
-  await act(async () => { select!.value = field.id; select!.dispatchEvent(new Event("change", { bubbles: true })); });
+  const button = container.querySelector<HTMLButtonElement>('[aria-label="Adicionar Existing à seção"]');
+  expect(button).toBeTruthy();
+  await act(async () => button!.click());
 }
 function title() { return container.querySelector<HTMLInputElement>('input[aria-label="Título da seção 1"]')?.value; }
 beforeEach(async () => {
@@ -106,9 +106,48 @@ describe("workspace React com remontagem versionada", () => {
   it("remove componente compatível e preserva adicionar/criar campo", async () => {
     expect(container.textContent).not.toContain("Adicionar componente compatível");
     expect(container.querySelector('[aria-label^="Adicionar componente à seção"]')).toBeNull();
-    expect(container.querySelector<HTMLSelectElement>('[aria-label="Adicionar campo à seção Section second"]')).toBeTruthy();
-    await click("Criar novo campo");
+    expect(container.querySelector('[aria-label^="Adicionar campo à seção"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Adicionar Existing à seção"]')).toBeTruthy();
+    await click("Criar campo");
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Criar campo para second");
+  });
+
+  it("mostra apenas a seção selecionada e publica todas as seções", async () => {
+    const stage = currentStages[1] as unknown as { formulario: FormularioEtapaAdmin };
+    stage.formulario.secoes.push({ chave: "other", titulo: "Outra seção", componentes: [] });
+    pipeline = "pipeline-com-secoes";
+    await render(); await click("Fields"); await click("second");
+    expect(title()).toBe("Section second");
+    expect(container.querySelector('input[aria-label="Título da seção 2"]')).toBeNull();
+    const seletor = container.querySelector<HTMLSelectElement>('[aria-label="Selecionar seção do formulário"]')!;
+    await act(async () => { seletor.value = "other"; seletor.dispatchEvent(new Event("change", { bubbles: true })); });
+    expect(container.querySelector<HTMLInputElement>('input[aria-label="Título da seção 2"]')?.value).toBe("Outra seção");
+    expect(title()).toBeUndefined();
+    await addExisting();
+    vi.mocked(SalvarFormularioEtapaBpm).mockResolvedValue({ success: true, data: stage.formulario } as Awaited<ReturnType<typeof SalvarFormularioEtapaBpm>>);
+    await click("Publicar composição");
+    const payload = vi.mocked(SalvarFormularioEtapaBpm).mock.lastCall?.[0] as { secoes: FormularioEtapaAdmin["secoes"] };
+    expect(payload.secoes).toHaveLength(2);
+    expect(payload.secoes[0].componentes).toHaveLength(0);
+    expect(payload.secoes[1].componentes[0].campoId).toBe(field.id);
+  });
+
+  it("permite mover campo entre seções mesmo mostrando apenas uma por vez", async () => {
+    const stage = currentStages[1] as unknown as { formulario: FormularioEtapaAdmin };
+    stage.formulario.secoes.push({ chave: "other", titulo: "Outra seção", componentes: [] });
+    pipeline = "pipeline-mover-secoes";
+    await render(); await click("Fields"); await click("second");
+    await addExisting();
+    const mover = [...container.querySelectorAll("label")].find((item) => item.textContent?.includes("Mover campo para seção"))?.querySelector("select");
+    expect(mover).toBeTruthy();
+    await act(async () => { mover!.value = "other"; mover!.dispatchEvent(new Event("change", { bubbles: true })); });
+    expect(container.querySelector<HTMLInputElement>('input[aria-label="Título da seção 2"]')?.value).toBe("Outra seção");
+    expect(container.querySelectorAll('input[aria-label="Rótulo de Existing"]')).toHaveLength(1);
+    vi.mocked(SalvarFormularioEtapaBpm).mockResolvedValue({ success: true, data: stage.formulario } as Awaited<ReturnType<typeof SalvarFormularioEtapaBpm>>);
+    await click("Publicar composição");
+    const payload = vi.mocked(SalvarFormularioEtapaBpm).mock.lastCall?.[0] as { secoes: FormularioEtapaAdmin["secoes"] };
+    expect(payload.secoes[0].componentes).toHaveLength(0);
+    expect(payload.secoes[1].componentes[0].campoId).toBe(field.id);
   });
 
   it("confirma e exclui campo aplicável sem removê-lo apenas da composição", async () => {
@@ -118,7 +157,7 @@ describe("workspace React com remontagem versionada", () => {
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain("exclusão é permanente");
     await click("Excluir definitivamente");
     expect(ExcluirCampoBpm).toHaveBeenCalledWith({ campoId: field.id });
-    expect(container.querySelector(`option[value="${field.id}"]`)).toBeNull();
+    expect(container.querySelector('[aria-label="Adicionar Existing à seção"]')).toBeNull();
     expect(toast.success).toHaveBeenCalledWith("Campo “Existing” excluído");
   });
 
@@ -130,7 +169,7 @@ describe("workspace React com remontagem versionada", () => {
     await click("Existing");
     await click("Excluir campo sem uso");
     await click("Excluir definitivamente");
-    expect(container.querySelector(`option[value="${field.id}"]`)).toBeTruthy();
+    expect(container.querySelector('[aria-label="Adicionar Existing à seção"]')).toBeTruthy();
     expect(document.querySelector('[role="dialog"]')).toBeTruthy();
     expect(toast.error).toHaveBeenCalledWith("Este campo possui dados associados e não pode ser excluído");
   });
@@ -158,7 +197,7 @@ describe("workspace React com remontagem versionada", () => {
   it.each([true, false])("criar campo suporta refresh antes da resposta: %s", async (refreshFirst) => {
     let resolve!: (value: Awaited<ReturnType<typeof CriarCampoBpm>>) => void;
     vi.mocked(CriarCampoBpm).mockReturnValue(new Promise((done) => { resolve = done; }));
-    await click("Criar novo campo");
+    await click("Criar campo");
     const input = document.querySelector<HTMLInputElement>('input[placeholder="Ex.: Número do processo"]')!;
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "Created");
@@ -184,7 +223,7 @@ describe("workspace React com remontagem versionada", () => {
   });
   it("preserva rascunho após falha de criação e permite tentar novamente", async () => {
     await addExisting();
-    await click("Criar novo campo");
+    await click("Criar campo");
     const input = document.querySelector<HTMLInputElement>('input[placeholder="Ex.: Número do processo"]')!;
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "Retry");

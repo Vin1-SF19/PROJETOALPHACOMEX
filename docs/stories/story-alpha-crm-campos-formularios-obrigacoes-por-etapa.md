@@ -36,6 +36,7 @@ Como administrador do Alpha CRM, quero configurar pela interface os campos, seç
 9. O formulário publicado controla a composição de cada seção configurável dentro do card da etapa, sem duplicar controles em painéis diferentes. Campos ainda sem valor aparecem para preenchimento; valores já preenchidos e anexos permanecem íntegros. Etapas com controles nativos, em especial Agendar Reunião, Lost e Fechado, preservam seus fluxos e guards específicos.
 10. A UI usa a linguagem visual do Painel Alpha e rótulos/instruções simples. Estado vazio orienta a criar uma seção ou adicionar campo; erros identificam o item e a correção possível; foco, contraste, nomes acessíveis e rolagem funcionam em desktop e mobile.
 11. A solução oferece uso operacional independente da UI para as operações de configuração e inspeção necessárias, conforme CLI First da Constitution; a UI consome os mesmos contratos autoritativos. Não criar decisões de obrigatoriedade apenas no cliente.
+12. O seletor lateral de seção define qual seção aparece na montagem e na prévia. Criar e adicionar campos ficam no catálogo lateral, aplicados à seção selecionada; mover um campo entre seções continua disponível nas propriedades; a publicação preserva todas as seções da etapa.
 
 ## Tasks / Subtasks
 
@@ -47,6 +48,7 @@ Como administrador do Alpha CRM, quero configurar pela interface os campos, seç
 - [x] Testar fluxos de edição segura, anexos, concorrência, troca de contexto e guards; validar as interações automatizadas do editor.
 - [ ] Validar visualmente em navegador desktop/mobile e teclado em ambiente autenticado.
 - [x] Executar `npm run lint`, `npm run typecheck`, `npm test` e `npm run build`; registrar resultados reais e atualizar checklist/File List antes de concluir.
+- [x] Mostrar uma seção por vez no editor e na prévia, mantendo criação e adição de campos no catálogo lateral (AC 12).
 
 ## Dev Notes
 
@@ -79,6 +81,7 @@ Como administrador do Alpha CRM, quero configurar pela interface os campos, seç
 - [x] Implementação e testes concluídos com evidência real.
 - [ ] Qualidade, integração no card e experiência visual aprovadas.
 - [x] File List final atualizada com todos os arquivos efetivamente alterados.
+- [x] Seleção lateral de seção e fluxo único de criação validados com teste de duas seções.
 
 ## File List
 
@@ -103,12 +106,14 @@ Como administrador do Alpha CRM, quero configurar pela interface os campos, seç
 | --- | --- | --- | --- |
 | 2026-09-23 | 0.1 | Story criada a partir do pedido e da imagem de referência, com análise de uso e segurança de dados existentes. | River |
 | 2026-09-23 | 0.2 | Editor reformulado, análise de uso e publicação atômica das obrigações; testes BPM e interface atualizados. | Codex |
+| 2026-09-24 | 0.3 | Editor e prévia mostram a seção escolhida; criação e adição de campos ficam no catálogo lateral. | Codex |
 
 ## Dev Agent Record
 
 - Agent Model Used: Codex GPT-6.
 - Debug Log References: `npm run lint` (0 erros, 1192 avisos existentes), `npm run typecheck` (passou), `npm test` (501 arquivos, 3784 testes aprovados; 4 ignorados, 1 todo), `npm run build` (passou; avisos no módulo PDF não relacionado).
 - Completion Notes: sem migration ou escrita em banco; arquivos, valores e IDs preservados. CLI de edição e inspeção independente da UI (AC 11) e validação visual em navegador autenticado permanecem pendentes.
+- Refinamento de 2026-09-24: `npm run lint` passou (0 erros, 1192 avisos), `npm run typecheck` passou, `npm test` passou (504 arquivos, 3794 testes; 4 ignorados e 1 todo), e `npm run build` passou após repetir por lock temporário de outro build. Após o ajuste de transferência entre seções, teste focado (16/16), lint dos arquivos alterados e typecheck passaram. A prévia mostra apenas a seção selecionada; o payload de publicação mantém todas as seções. Nenhuma migration ou escrita em banco foi executada.
 
 ## QA Results
 

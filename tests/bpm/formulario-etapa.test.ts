@@ -73,7 +73,7 @@ describe("CRM - formulário unificado por etapa", () => {
     expect(builder).toContain("versaoEsperada: versaoBase");
     expect(builder).toContain("id: secao.id");
     expect(builder).toContain("id: componente.id");
-    expect(builder).toContain("!secoes.some((secaoAtual)");
+    expect(builder).toContain("!secoes.some((secao) =>");
     expect(saveAction).toContain("etapaConfiguracoes[0]");
     expect(saveAction).toContain("CONFLITO_VERSAO_FORMULARIO");
     expect(saveAction).not.toContain("bpmFormularioSecao.deleteMany({\n        where: { formularioId");
@@ -81,7 +81,7 @@ describe("CRM - formulário unificado por etapa", () => {
 
 
   it("permite criar um campo customizado diretamente na seção atual", () => {
-    expect(builder).toContain("Criar novo campo");
+    expect(builder).toContain("Criar campo");
     expect(builder).toContain("CriarCampoBpm({");
     expect(builder).toContain("etapaConfiguracoes: [");
     expect(builder).toContain("etapaId: etapa.id");

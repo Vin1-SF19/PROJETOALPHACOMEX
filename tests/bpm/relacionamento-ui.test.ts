@@ -40,15 +40,14 @@ it("mantém relacionamento na composição/publicação e remove apenas da cria�
       onFormularioAtualizado: () => {},
     }),
   })));
-  const select = container.querySelector<HTMLSelectElement>('select[aria-label="Adicionar campo à seção Seção"]')!;
-  expect(select).toBeTruthy();
-  expect([...select.options].some((option) => option.value === campo.id)).toBe(true);
-  await act(async () => { select.value = campo.id; select.dispatchEvent(new Event("change", { bubbles: true })); });
+  const adicionar = container.querySelector<HTMLButtonElement>('[aria-label="Adicionar Parceiro à seção"]')!;
+  expect(adicionar).toBeTruthy();
+  await act(async () => adicionar.click());
   expect(container.querySelector('input[aria-label="Rótulo de Parceiro"]')).toBeTruthy();
   vi.mocked(SalvarFormularioEtapaBpm).mockResolvedValue({ success: true, data: formulario } as Awaited<ReturnType<typeof SalvarFormularioEtapaBpm>>);
   await click("Publicar composição");
   expect(JSON.stringify(vi.mocked(SalvarFormularioEtapaBpm).mock.calls)).toContain('"rel"');
-  await click("Criar novo campo");
+  await click("Criar campo");
   const tipo = document.querySelector<HTMLSelectElement>('[role="dialog"] select')!;
   expect([...tipo.options].map((option) => option.value)).toEqual([
     "texto", "texto_longo", "numero", "moeda", "percentual", "data", "data_hora", "booleano",
