@@ -47,9 +47,9 @@ let saves: ReturnType<typeof useCardSave>;
 let root: Root;
 let host: HTMLDivElement;
 const noop = () => {};
-function Harness({ kind, show }: { kind: Kind; show: boolean }) {
+function Harness({ kind, show, initialSummary = "Original" }: { kind: Kind; show: boolean; initialSummary?: string }) {
   const context = useCardSave();
-  const [card, setCard] = useState({ id: "card", googleEventId: "event", updatedAt: new Date("2026-09-22T10:00:00Z"), proximoContatoEm: backend.contact, transcricaoReuniao: "Original" } as unknown as Card);
+  const [card, setCard] = useState({ id: "card", googleEventId: "event", updatedAt: new Date("2026-09-22T10:00:00Z"), proximoContatoEm: backend.contact, transcricaoReuniao: initialSummary } as unknown as Card);
   useEffect(() => { saves = context; return context.subscribeConfirmation("card", setCard); }, [context]);
   if (!show) return null;
   if (kind === "contact") return h(PainelProximoContato, { card, onAtualizado: noop, podeEditar: true, realtimeRevision: 0 });
@@ -91,4 +91,17 @@ it.each<[Kind, string]>([["contact", "2026-09-23T14:00"], ["summary", "Resumo ed
   expect(saves.getDraft(`card:${({ contact: "proximoContato", summary: "resumo", status: "status", followup: "followup" })[kind]}`)).toBeUndefined();
   expect(host.textContent).not.toContain("mudou externamente");
   expect(host.textContent).not.toContain("mudou enquanto");
+});
+
+it("permite registrar resumo quando a transcrição da reunião começa vazia", async () => {
+  backend.fail = false;
+  backend.resumo = "";
+  await act(async () => root.render(h(CardSaveProvider, { children: h(Harness, { kind: "summary", show: true, initialSummary: "" }) })));
+  const resumo = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="Resumo da reunião"]');
+  expect(resumo).toBeTruthy();
+  expect(resumo?.value).toBe("");
+  await edit("Resumo registrado após a reunião");
+  await act(async () => { await saves.flushSaves(); });
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5)); });
+  expect(backend.resumo).toBe("Resumo registrado após a reunião");
 });

@@ -78,6 +78,15 @@ export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accen
     }));
   }
 
+  function irParaTranscricao() {
+    setRequisitos(null);
+    window.setTimeout(() => {
+      const campo = document.getElementById(`resumo-reuniao-${card.id}`);
+      campo?.scrollIntoView({ behavior: "smooth", block: "center" });
+      campo?.focus({ preventScroll: true });
+    }, 0);
+  }
+
   function confirmarMovimento(res: Awaited<ReturnType<typeof MoverCardBpm>>) {
       if (res.success) {
         setRequisitos(null);
@@ -173,6 +182,11 @@ export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accen
           </DialogHeader>
           <div className="space-y-4">
             {requisitos?.guardas.map((guarda) => <p key={guarda} role="alert" className="rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-xs text-amber-100">{guarda}</p>)}
+            {aguardandoTranscricao && requisitos?.guardas.some((guarda) => guarda.includes("transcrição")) && (
+              <button type="button" onClick={irParaTranscricao} className="min-h-11 rounded-lg border border-amber-300/30 px-3 text-xs font-bold text-amber-100 hover:bg-amber-300/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300">
+                Ir para a transcrição da reunião
+              </button>
+            )}
             {camposPendentes.map((campo) => <label key={campo.id} className="block space-y-1.5 text-xs text-slate-300">
               <span className="font-semibold">{campo.nome} <span className="text-amber-300">*</span></span>
               <span className="block text-[11px] text-slate-500">{campo.etapaAplicacaoNome} · {campo.contexto === "ORIGEM" ? "exigido na saída" : "exigido na entrada"}</span>
@@ -207,23 +221,27 @@ export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accen
           </div>
         </div>
       )}
+      {aguardandoTranscricao && etapas.some((etapa) => [BPM_STAGE_KEYS.EM_TRATATIVA, BPM_STAGE_KEYS.SEM_VIABILIDADE].some((chave) => chave === etapa.chave)) && (
+        <div role="status" className="mb-3 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-3 py-3 text-[11px] leading-relaxed text-amber-100">
+          <p className="font-bold">Transcrição da reunião pendente</p>
+          <p className="mt-1 text-amber-200/80">Para avançar, busque a transcrição do Meet ou registre o resumo da reunião no acompanhamento do card.</p>
+          <button type="button" onClick={irParaTranscricao} className="mt-2 min-h-11 rounded-lg border border-amber-300/30 px-3 font-bold text-amber-100 transition hover:bg-amber-300/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300">
+            Ir para a transcrição
+          </button>
+        </div>
+      )}
       
       {etapas.map((etapa) => {
         const ativa = etapa.id === card.etapa.id;
         const bloqueadaPorDataHora = aguardandoDataHora && etapa.chave === BPM_STAGE_KEYS.REUNIAO_AGENDADA;
-        const bloqueadaPorTranscricao = aguardandoTranscricao
-          && [BPM_STAGE_KEYS.EM_TRATATIVA, BPM_STAGE_KEYS.SEM_VIABILIDADE]
-            .some((chave) => chave === etapa.chave);
         const motivoBloqueio = bloqueadaPorDataHora
           ? ERRO_DATA_REUNIAO_OBRIGATORIA
-          : bloqueadaPorTranscricao
-            ? "A transcrição da reunião ainda não foi recebida."
-            : undefined;
+          : undefined;
         return (
           <button
             key={etapa.id}
             onClick={() => handleMover(etapa.id)}
-            disabled={movendoEtapa || !podeMoverEtapa || bloqueadaPorDataHora || bloqueadaPorTranscricao}
+            disabled={movendoEtapa || !podeMoverEtapa || bloqueadaPorDataHora}
             aria-busy={movendoEtapa}
             title={motivoBloqueio}
             className="w-full flex items-center justify-between gap-2 text-left px-3 py-2 rounded-xl text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 not-disabled:hover:bg-white/[0.07]"

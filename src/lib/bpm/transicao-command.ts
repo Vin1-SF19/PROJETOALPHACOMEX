@@ -11,6 +11,7 @@ import {
 } from "@/lib/bpm/campos-configuraveis-server";
 import { obterErroChecklistParaMovimento } from "@/lib/bpm/checklists/integracao";
 import { obterErroProximoContatoParaMovimento } from "@/lib/bpm/proximo-contato";
+import { obterErroTranscricaoParaMovimento } from "@/lib/bpm/reuniao-agendada";
 import { obterErroRegrasParaMovimento } from "@/lib/bpm/regras/guarda-movimento";
 import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
 import { avaliarGrupo } from "@/lib/bpm/regras/avaliador";
@@ -157,7 +158,6 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       etapa: { select: { id: true, chave: true, nome: true, capabilitiesJson: true } },
       estadoOntologico: { include: { subStatus: { select: { id: true, etapaId: true, chave: true } } } },
       reunioes: { where: { chave: "principal" }, take: 1 },
-      followUpEstado: true,
       servicoContexto: true,
       campoValores: { select: { campoId: true, valor: true } },
       anexos: { select: { nome: true } },
@@ -377,8 +377,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     }
   }
 
-  const followUp = card.followUpEstado;
-  const proximoContato = input.proximoContatoEm === undefined ? followUp?.proximoContatoEm ?? null : input.proximoContatoEm;
+  const proximoContato = input.proximoContatoEm === undefined ? card.proximoContatoEm : input.proximoContatoEm;
   if (card.pipeline.chave === BPM_PIPELINE_KEYS.COMERCIAL && (
     card.etapa.chave === BPM_STAGE_KEYS.NOVOS_LEADS
     || destino.chave === BPM_STAGE_KEYS.EM_TRATATIVA
@@ -398,9 +397,14 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       erro("MEETING_REQUIRED", "Preencha Data e Hora da reunião antes de avançar para Reunião Agendada.");
     }
   }
-  if (card.etapa.chave === BPM_STAGE_KEYS.REUNIAO_AGENDADA && vazio(meeting?.transcricao)) {
-    erro("TRANSCRIPT_REQUIRED", "A transcrição da reunião é obrigatória para avançar.");
-  }
+  const erroTranscricao = obterErroTranscricaoParaMovimento({
+    etapaOrigemNome: card.etapa.nome,
+    etapaDestinoNome: destino.nome,
+    etapaOrigemChave: card.etapa.chave,
+    etapaDestinoChave: destino.chave,
+    transcricaoReuniao: card.transcricaoReuniao,
+  });
+  if (erroTranscricao) erro("TRANSCRIPT_REQUIRED", erroTranscricao);
   if (card.etapa.chave === BPM_STAGE_KEYS.EM_TRATATIVA) {
     const ultimo = await tx.bpmChecklistFollowUp.findFirst({ where: { cardId: card.id }, orderBy: [{ criadoEm: "desc" }, { id: "desc" }], select: { completo: true } });
     if (!ultimo?.completo) erro("FOLLOW_UP_CHECKLIST_PENDING", "Conclua o procedimento do último follow-up antes de sair de Em Tratativa.");

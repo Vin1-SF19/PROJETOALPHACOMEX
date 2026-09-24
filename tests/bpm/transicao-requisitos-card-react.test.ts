@@ -90,4 +90,35 @@ describe("requisitos configurados antes da mudança de etapa", () => {
     expect([...host.querySelectorAll("button")].find((item) => item.textContent?.includes("Salvar e mover"))?.disabled).toBe(true);
     expect(api.saveAndMove).not.toHaveBeenCalled();
   });
+
+  it("mostra a transcrição pendente e leva ao campo de resumo ao tentar avançar", async () => {
+    const campo = document.createElement("textarea");
+    campo.id = "resumo-reuniao-card-1";
+    campo.scrollIntoView = vi.fn();
+    document.body.append(campo);
+    api.preflight.mockResolvedValue({ success: true, data: {
+      etapaDestino: { id: "destino", nome: "Em tratativa" },
+      campos: [], faltantes: [],
+      guardas: ["A transcrição da reunião ainda não foi recebida. Sincronize a transcrição antes de avançar."],
+    } });
+    try {
+      await act(async () => root.render(h(PainelProximaEtapa, {
+        card: { ...card, etapa: { id: "origem", chave: "reuniao_agendada" } } as React.ComponentProps<typeof PainelProximaEtapa>["card"],
+        etapas: [{ id: "destino", chave: "em_tratativa", nome: "Em tratativa", ordem: 3, script: null }],
+        podeMoverEtapa: true, accent: "1,2,3", onMovido: vi.fn(),
+      })));
+      expect(host.textContent).toContain("Transcrição da reunião pendente");
+      const mover = [...host.querySelectorAll("button")].find((item) => item.textContent === "Em tratativa")!;
+      expect(mover.disabled).toBe(false);
+      await act(async () => mover.click());
+      expect(api.preflight).toHaveBeenCalledWith("card-1", "destino");
+      expect(host.textContent).toContain("A transcrição da reunião ainda não foi recebida");
+      expect(api.move).not.toHaveBeenCalled();
+      const ir = [...host.querySelectorAll("button")].find((item) => item.textContent === "Ir para a transcrição da reunião")!;
+      await act(async () => { ir.click(); await new Promise((resolve) => setTimeout(resolve, 5)); });
+      expect(document.activeElement).toBe(campo);
+    } finally {
+      campo.remove();
+    }
+  });
 });

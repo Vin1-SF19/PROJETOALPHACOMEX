@@ -53,4 +53,21 @@ describe("Reunião Agendada", () => {
       transcricaoReuniao: "[14:00:00] Ana: conteúdo",
     })).toBeNull();
   });
+
+  it("mantém a regra pelas chaves mesmo se o nome exibido da etapa mudar", () => {
+    expect(obterErroTranscricaoParaMovimento({
+      etapaOrigemNome: "Reunião confirmada",
+      etapaDestinoNome: "Negociação",
+      etapaOrigemChave: "reuniao_agendada",
+      etapaDestinoChave: "em_tratativa",
+      transcricaoReuniao: null,
+    })).toContain("transcrição");
+    expect(obterErroTranscricaoParaMovimento({
+      etapaOrigemNome: "Reunião confirmada",
+      etapaDestinoNome: "Acompanhar",
+      etapaOrigemChave: "reuniao_agendada",
+      etapaDestinoChave: "standby_follow_up",
+      transcricaoReuniao: null,
+    })).toBeNull();
+  });
 });

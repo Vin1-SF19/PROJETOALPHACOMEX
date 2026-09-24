@@ -319,14 +319,14 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
             )}
           </div>
 
-          {resumo.trim() ? (
-            <div className="space-y-1.5">
+          <div className="space-y-1.5">
               <label htmlFor={`resumo-reuniao-${card.id}`} className="text-[10px] font-medium text-slate-400">
                 Resumo da reunião
               </label>
               <textarea
                 id={`resumo-reuniao-${card.id}`}
                 value={resumo}
+                placeholder="Registre aqui o resumo da reunião ou busque a transcrição do Meet abaixo."
                 onChange={(event) => {
                   resumoSujoRef.current = true;
                   resumoRascunhoRef.current.alterar(event.target.value);
@@ -340,19 +340,16 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
                 className="min-h-32 w-full resize-y rounded-xl border border-white/10 bg-black/20 p-3 text-[11px] leading-relaxed text-slate-300 outline-none transition-colors focus:border-white/20 disabled:cursor-not-allowed disabled:opacity-60"
               />
               <p className="text-[10px] text-slate-500" role="status" aria-live="polite">
-                {salvandoResumo ? "Salvando resumo…" : "A transcrição do Meet pode ser ajustada antes de avançar."}
+                {salvandoResumo ? "Salvando resumo…" : resumo.trim()
+                  ? "A transcrição do Meet pode ser ajustada antes de avançar."
+                  : "O Google pode levar alguns minutos após a reunião. Você também pode registrar o resumo aqui."}
               </p>
               {conflitoResumo && (
                 <p className="rounded-xl border border-sky-500/25 bg-sky-500/[0.07] p-3 text-xs text-sky-200" role="status">
                   O resumo mudou externamente. Seu rascunho foi preservado.
                 </p>
               )}
-            </div>
-          ) : (
-            <p className="text-[10px] leading-relaxed text-slate-500">
-              O Google pode levar alguns minutos após o fim da reunião para gerar o arquivo.
-            </p>
-          )}
+          </div>
 
           {motivoPendente && (
             <p className="rounded-lg border border-amber-400/20 bg-amber-400/10 px-2.5 py-2 text-[10px] leading-relaxed text-amber-200" role="status">

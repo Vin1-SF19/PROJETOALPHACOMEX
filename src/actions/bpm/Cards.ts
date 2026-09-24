@@ -1528,7 +1528,7 @@ async function carregarContextoMovimento(
     client.bpmCard.findUnique({
       where: { id: cardId },
       include: {
-        etapa: { select: { nome: true } },
+        etapa: { select: { nome: true, chave: true } },
         pipeline: { select: { nome: true } },
       },
     }),
@@ -1654,6 +1654,8 @@ async function carregarGuardasNativasMovimento(params: {
   pipelineNome?: string;
   etapaOrigemNome: string;
   etapaDestinoNome: string;
+  etapaOrigemChave?: string | null;
+  etapaDestinoChave?: string | null;
   dataReuniao: Date | null;
   transcricaoReuniao: string | null;
   proximoContatoEm: Date | null;
@@ -1672,6 +1674,8 @@ async function carregarGuardasNativasMovimento(params: {
     obterErroTranscricaoParaMovimento({
       etapaOrigemNome: params.etapaOrigemNome,
       etapaDestinoNome: params.etapaDestinoNome,
+      etapaOrigemChave: params.etapaOrigemChave,
+      etapaDestinoChave: params.etapaDestinoChave,
       transcricaoReuniao: params.transcricaoReuniao,
     }),
     obterErroProximoContatoParaEntrada({
@@ -1742,6 +1746,8 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
       pipelineNome: card.pipeline?.nome,
       etapaOrigemNome: card.etapa.nome,
       etapaDestinoNome: etapaDestino.nome,
+      etapaOrigemChave: card.etapa.chave,
+      etapaDestinoChave: etapaDestino.chave,
       dataReuniao: card.dataReuniao,
       transcricaoReuniao: card.transcricaoReuniao,
       proximoContatoEm: card.proximoContatoEm,
