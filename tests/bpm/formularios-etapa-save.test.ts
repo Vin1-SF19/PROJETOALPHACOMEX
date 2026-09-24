@@ -222,19 +222,38 @@ describe("contrato e salvamento diferencial do formulário de etapa", () => {
     expect(mocks.formUpdateMany).not.toHaveBeenCalled();
   });
 
-  it("impede remover campo obrigatório da composição sem desativar a obrigação", async () => {
-    mocks.fieldStageFindMany.mockResolvedValue([{ campo: { nome: "CNPJ" } }]);
+  it("remove campo obrigatório e limpa a regra na mesma transação", async () => {
+    mocks.fieldStageFindMany.mockResolvedValue([{ campoId: FIELD_ID }]);
     const changed = input("Sem CNPJ");
     changed.secoes[0].componentes = changed.secoes[0].componentes.filter((item) => item.campoId !== FIELD_ID);
-    expect((await SalvarFormularioEtapaBpm(changed)).error).toContain("OBRIGACAO_CAMPO_REMOVIDO");
-    expect(mocks.componentDeleteMany).not.toHaveBeenCalled();
+    expect(await SalvarFormularioEtapaBpm(changed)).toMatchObject({ success: true });
+    expect(mocks.componentDeleteMany).toHaveBeenCalled();
+    expect(mocks.fieldStageUpdateMany).toHaveBeenCalledWith({
+      where: { etapaId: STAGE_ID, campoId: { in: [FIELD_ID] } },
+      data: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false },
+    });
   });
 
-  it("impede desativar formulário enquanto houver obrigação ativa", async () => {
-    mocks.fieldStageFindMany.mockResolvedValue([{ campoId: FIELD_ID, campo: { nome: "CNPJ" } }]);
+  it("desativa formulário e limpa todas as obrigações na mesma transação", async () => {
+    mocks.fieldStageFindMany.mockResolvedValue([{ campoId: FIELD_ID }]);
     const changed = { ...input(), ativo: false };
-    expect((await SalvarFormularioEtapaBpm(changed)).error).toContain("OBRIGACAO_FORMULARIO_INATIVO");
-    expect(mocks.formUpdateMany).not.toHaveBeenCalled();
+    expect(await SalvarFormularioEtapaBpm(changed)).toMatchObject({ success: true });
+    expect(mocks.formUpdateMany).toHaveBeenCalled();
+    expect(mocks.fieldStageUpdateMany).toHaveBeenCalledWith({
+      where: { etapaId: STAGE_ID, campoId: { in: [FIELD_ID] } },
+      data: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false },
+    });
+  });
+
+  it("esvazia o formulário e limpa também obrigações de campos fora da composição", async () => {
+    mocks.fieldStageFindMany.mockResolvedValue([{ campoId: FIELD_ID }, { campoId: "legado" }]);
+    const changed = { ...input("Vazio"), secoes: [] };
+    expect(await SalvarFormularioEtapaBpm(changed)).toMatchObject({ success: true });
+    expect(mocks.fieldStageFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.not.objectContaining({ campoId: expect.anything() }) }));
+    expect(mocks.fieldStageUpdateMany).toHaveBeenCalledWith({
+      where: { etapaId: STAGE_ID, campoId: { in: [FIELD_ID, "legado"] } },
+      data: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false },
+    });
   });
 
   it.each([

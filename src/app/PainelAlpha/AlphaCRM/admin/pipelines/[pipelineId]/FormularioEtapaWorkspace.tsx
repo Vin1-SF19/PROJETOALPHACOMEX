@@ -588,7 +588,7 @@ function FormularioEtapaWorkspaceContent({
         ativo,
         obrigacoes: Object.entries(obrigacoesDraft)
           .filter(([campoId]) => secoes.some((secao) => secao.componentes.some((item) => item.campoId === campoId)))
-          .map(([campoId, obrigacao]) => ({ campoId, ...obrigacao })),
+          .map(([campoId, obrigacao]) => ({ campoId, ...(ativo ? obrigacao : { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false }) })),
         secoes: secoes.map((secao) => ({
           id: secao.id,
           chave: secao.chave,
@@ -645,13 +645,24 @@ function FormularioEtapaWorkspaceContent({
 
   return (
     <section
-      className="grid gap-4 xl:grid-cols-[230px_minmax(0,1fr)_minmax(260px,310px)]"
+      className="grid gap-4 xl:grid-cols-[248px_minmax(0,1fr)]"
       aria-labelledby="formulario-etapa-title"
     >
-      <div className="space-y-4 rounded-2xl border border-white/10 bg-slate-950/60 p-3 xl:self-start">
+      <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/10 bg-slate-950/80 px-5 py-4 xl:col-span-2">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300">Configurações · Campos e formulários</p>
+          <h2 id="formulario-etapa-title" className="mt-1 text-xl font-semibold text-white">Formulário de fase</h2>
+          <p className="mt-1 text-xs text-slate-400">Escolha a fase, monte o card e publique as regras para avançar.</p>
+        </div>
+        <label className="min-w-56 text-xs font-semibold text-slate-300">Fase atual
+          <select aria-label="Selecionar etapa do formulário" value={etapaId} onChange={(event) => selecionar(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-cyan-400/20 bg-slate-900 px-3 text-sm font-semibold text-cyan-100 focus-visible:outline-2 focus-visible:outline-cyan-400">
+            {etapas.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
+          </select>
+        </label>
+      </header>
+      <div className="space-y-4 rounded-2xl border border-white/10 bg-slate-950/85 p-3 xl:self-start">
         {pipelineNome && <div className="px-2"><p className="text-xs font-semibold text-cyan-200">Pipeline: {pipelineNome}</p><Link href="/PainelAlpha/AlphaCRM/admin" onClick={(event) => { if (sujo) { event.preventDefault(); toast.error("Publique ou descarte as alterações antes de trocar de pipeline."); } }} className="mt-2 inline-flex min-h-9 items-center text-xs font-semibold text-slate-300 underline underline-offset-4 hover:text-white">Trocar pipeline</Link></div>}
         <h3
-          id="formulario-etapa-title"
           className="px-2 pb-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-500"
         >
           Etapa do pipeline
@@ -680,8 +691,11 @@ function FormularioEtapaWorkspaceContent({
           ))}
         </div>
         <div className="border-t border-white/10 pt-4">
-          <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300"><Layers3 size={15} /> Catálogo de campos</h4>
-          <p className="mt-1 text-xs text-slate-500">Escolha uma seção no centro e adicione um campo existente ou crie um novo.</p>
+          <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300"><Layers3 size={15} /> Tipos de campo</h4>
+          <p className="mt-1 text-xs text-slate-500">Clique em um tipo para criar um campo na seção escolhida.</p>
+          <div className="mt-3 grid max-h-72 gap-1.5 overflow-y-auto pr-1">{TIPOS_CAMPO.map(([tipo, rotulo]) => <button key={tipo} type="button" disabled={bloqueado || !secoes.length} onClick={() => { abrirNovoCampo(Math.min(secaoDestino, secoes.length - 1)); setTipoNovoCampo(tipo); }} className="flex min-h-10 items-center gap-2 rounded-lg border border-cyan-400/10 bg-cyan-400/5 px-3 text-left text-xs text-slate-200 hover:border-cyan-400/40 hover:bg-cyan-400/10 focus-visible:outline-2 focus-visible:outline-cyan-400 disabled:opacity-40"><FileText size={14} className="shrink-0 text-cyan-300" />{rotulo}</button>)}</div>
+          <h4 className="mt-5 border-t border-white/10 pt-4 text-xs font-bold uppercase tracking-wider text-slate-300">Campos existentes</h4>
+          <p className="mt-1 text-xs text-slate-500">Reutilize sem perder valores ou anexos.</p>
           <label className="mt-3 flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-slate-900 px-3 text-slate-400">
             <Search size={15} aria-hidden="true" />
             <span className="sr-only">Buscar campo</span>
@@ -697,11 +711,10 @@ function FormularioEtapaWorkspaceContent({
             {!camposFiltrados.length && <p className="py-3 text-xs text-slate-500">Nenhum campo disponível para esta busca.</p>}
           </div>
           <button type="button" disabled={bloqueado || !secoes.length} onClick={() => abrirNovoCampo(Math.min(secaoDestino, secoes.length - 1))} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-cyan-400/30 text-xs font-semibold text-cyan-200 hover:bg-cyan-400/10 disabled:opacity-40"><Plus size={15} /> Criar campo</button>
-          <details className="mt-3 border-t border-white/10 pt-3 text-xs text-slate-400"><summary className="cursor-pointer font-semibold text-slate-300">Tipos disponíveis</summary><div className="mt-2 grid grid-cols-2 gap-1.5">{TIPOS_CAMPO.map(([tipo, rotulo]) => <button key={tipo} type="button" disabled={bloqueado || !secoes.length} onClick={() => { abrirNovoCampo(Math.min(secaoDestino, secoes.length - 1)); setTipoNovoCampo(tipo); }} className="min-h-9 rounded-lg border border-white/10 bg-slate-900 px-2 text-left hover:border-cyan-400/40 hover:text-cyan-200 disabled:opacity-40">{rotulo}</button>)}</div></details>
         </div>
       </div>
 
-      <div className="min-w-0 space-y-4 rounded-2xl border border-white/10 bg-slate-900/50 p-4">
+      <div className="min-w-0 space-y-5 rounded-[28px] border border-amber-300/10 bg-[radial-gradient(ellipse_at_top,rgba(251,191,36,0.09),rgba(8,18,32,0.96)_68%)] p-4 shadow-2xl lg:p-7">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="flex items-center gap-2 font-bold text-white">
@@ -760,6 +773,11 @@ function FormularioEtapaWorkspaceContent({
           </p>
         )}
 
+        <div className="mx-auto w-full max-w-3xl rounded-[24px] border border-white/10 bg-slate-950/95 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.22)] sm:p-6">
+          <div className="mb-5 rounded-xl border border-amber-300/10 bg-amber-200/[0.04] px-4 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-200/70">Fase atual</p>
+            <p className="mt-1 text-base font-semibold text-white">{etapa.nome}</p>
+          </div>
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-cyan-400/15 bg-cyan-400/5 px-3 py-2 text-xs text-slate-300"><span><span className="font-semibold text-cyan-200">{secoes.length} seções</span> · {secoes.reduce((total, secao) => total + secao.componentes.length, 0)} componentes nesta etapa</span><button type="button" onClick={() => setMostrarPreview((atual) => !atual)} className="inline-flex min-h-9 items-center gap-2 rounded-lg px-2 text-cyan-200 hover:bg-cyan-400/10"><Eye size={14} /> {mostrarPreview ? "Ocultar prévia" : "Ver prévia"}</button></div>
         <ListaCamposFormulario
           secoes={secoes}
@@ -785,9 +803,8 @@ function FormularioEtapaWorkspaceContent({
           onRemover={(secao, indice) => {
             const campoId = secoes[secao].componentes[indice]?.campoId;
             const uso = campoId ? usoCampos?.[campoId] : null;
-            const regraPublicada = camposLocais.find((item) => item.id === campoId)?.etapaConfiguracoes?.find((item) => item.etapaId === etapaId);
-            if (regraPublicada && (regraPublicada.obrigatorio || regraPublicada.obrigatorioEntrada || regraPublicada.obrigatorioSaida)) { toast.error("Desative e publique as obrigações do campo antes de retirá-lo da seção."); return; }
-            if (campoId && (!uso || uso.valoresCard + uso.valoresGlobais + uso.anexos > 0)) { toast.error("Campo com dados ou análise pendente: mantenha a referência na seção."); return; }
+            if (campoId && uso && uso.valoresCard + uso.valoresGlobais + uso.anexos > 0) toast.success("Ao publicar, o campo sairá do formulário; valores e anexos existentes serão preservados.");
+            if (campoId) setObrigacoesDraft((atuais) => ({ ...atuais, [campoId]: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false } }));
             alterarSecao(secao, { componentes: secoes[secao].componentes.filter((_, i) => i !== indice) });
           }}
           onSelecionar={(componente) => { const campo = camposLocais.find((item) => item.id === componente.campoId); if (campo) selecionarCampo(campo); }}
@@ -796,9 +813,10 @@ function FormularioEtapaWorkspaceContent({
           <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white"><Settings2 size={16} className="text-cyan-300" /> Seções do card</h4>
           <fieldset disabled={bloqueado} className="mt-3 space-y-3">
         {secoes.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-slate-500">
-            Nenhuma seção. Adicione a primeira seção para compor{" "}
-            {editandoCard ? "o card" : "o formulário"}.
+          <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/25 bg-cyan-400/[0.025] px-6 py-10 text-center">
+            <div className="mb-4 flex size-16 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-200"><Layers3 size={28} /></div>
+            <p className="max-w-sm text-base font-semibold text-white">Comece a criar o formulário desta fase</p>
+            <p className="mt-2 max-w-sm text-xs leading-5 text-slate-400">Adicione uma seção e escolha os campos no catálogo ao lado. As regras passam a valer ao publicar.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -843,13 +861,9 @@ function FormularioEtapaWorkspaceContent({
                   <button
                     type="button"
                     aria-label="Remover seção"
-                    disabled={secao.componentes.some((componente) => {
-                      if (!componente.campoId) return false;
-                      const uso = usoCampos?.[componente.campoId];
-                      const regra = camposLocais.find((item) => item.id === componente.campoId)?.etapaConfiguracoes?.find((item) => item.etapaId === etapaId);
-                      return !uso || uso.valoresCard + uso.valoresGlobais + uso.anexos > 0 || Boolean(regra?.obrigatorio || regra?.obrigatorioEntrada || regra?.obrigatorioSaida);
-                    })}
                     onClick={() => {
+                      const campoIds = secao.componentes.flatMap((componente) => componente.campoId ? [componente.campoId] : []);
+                      if (campoIds.length) setObrigacoesDraft((atuais) => ({ ...atuais, ...Object.fromEntries(campoIds.map((campoId) => [campoId, { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false }])) }));
                       setSecoes((atuais) =>
                         atuais.filter((_, atual) => atual !== indiceSecao),
                       );
@@ -906,9 +920,10 @@ function FormularioEtapaWorkspaceContent({
         </button>
           </fieldset>
         </div>
+        </div>
       </div>
 
-      <aside className="min-w-0 space-y-4 xl:self-start" aria-label="Propriedades e prévia">
+      <aside className="min-w-0 space-y-4 xl:col-start-2 2xl:grid 2xl:grid-cols-2 2xl:items-start 2xl:gap-4 2xl:space-y-0" aria-label="Propriedades e prévia">
         <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
           <h3 className="flex items-center gap-2 text-sm font-bold text-white"><Pencil size={16} className="text-cyan-300" /> Propriedades do campo</h3>
           {!campoSelecionado ? <p className="mt-3 text-xs leading-5 text-slate-400">Selecione o nome de um campo na composição para editar seu nome, regras e verificar onde ele é usado.</p> : <div className="mt-4 space-y-4">
@@ -934,10 +949,10 @@ function FormularioEtapaWorkspaceContent({
                 const regraObrigacao = chave === "obrigatorio" || chave === "obrigatorioSaida" || chave === "obrigatorioEntrada";
                 const marcado = regraObrigacao ? Boolean(obrigacoesSelecionadas?.[chave]) : Boolean(configSelecionada?.[chave]);
                 const possuiObrigacaoPublicada = Boolean(configSelecionada?.obrigatorio || configSelecionada?.obrigatorioEntrada || configSelecionada?.obrigatorioSaida);
-                const indisponivel = bloqueado || (regraObrigacao && (!publicadoNaEtapa || !estaNoRascunho || !configSelecionada?.visivel || !configSelecionada?.editavel)) || (chave === "visivel" && publicadoNaEtapa && marcado) || (chave === "editavel" && possuiObrigacaoPublicada && marcado);
+                const indisponivel = bloqueado || (regraObrigacao && (!estaNoRascunho || !configSelecionada?.visivel || !configSelecionada?.editavel)) || (chave === "visivel" && publicadoNaEtapa && marcado) || (chave === "editavel" && possuiObrigacaoPublicada && marcado);
                 return <label key={chave} className="mt-3 flex items-start gap-2.5 rounded-lg border border-white/10 bg-slate-900/40 p-2.5 text-xs text-slate-200"><input type="checkbox" checked={marcado} disabled={indisponivel} onChange={(event) => atualizarRegra(chave, event.target.checked)} className="mt-0.5 accent-cyan-400" /><span><span className="font-semibold">{rotulo}</span><span className="mt-0.5 block text-[11px] text-slate-500">{ajuda}</span></span></label>;
               })}
-              {!publicadoNaEtapa && <p className="mt-2 text-[11px] text-amber-200">Publique o campo nesta etapa para habilitar as obrigações.</p>}
+              {!publicadoNaEtapa && estaNoRascunho && <p className="mt-2 text-[11px] text-amber-200">Defina as obrigações agora; elas serão ativadas ao publicar o formulário.</p>}
               {publicadoNaEtapa && <p className="mt-2 text-[11px] text-slate-500">Para ocultar, retire o campo da composição publicada após desativar suas obrigações. Para torná-lo somente leitura, desative e publique as obrigações primeiro.</p>}
             </div>
             <div className="border-t border-white/10 pt-3 text-xs text-slate-300">

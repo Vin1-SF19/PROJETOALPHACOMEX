@@ -69,8 +69,10 @@ describe("CRM - configurações centralizadas e card editável", () => {
     expect(builder).toContain("formulario={formularioPreview}");
     expect(builder).toContain("Prévia com alterações ainda não salvas");
     expect(builder).toContain(
-      "xl:grid-cols-[230px_minmax(0,1fr)_minmax(260px,310px)]",
+      "xl:grid-cols-[248px_minmax(0,1fr)]",
     );
+    expect(builder).toContain('aria-label="Selecionar etapa do formulário"');
+    expect(builder).toContain("Comece a criar o formulário desta fase");
     expect(builder).toContain("Salvar card");
     expect(builder).toContain("descartarAlteracoesFormulario");
     expect(builder).toContain("Salve ou descarte as alterações antes de trocar de etapa");

@@ -196,38 +196,20 @@ export async function SalvarFormularioEtapaBpm(input: unknown) {
         }
       }
 
-      if (!ativo) {
-        const obrigatoriasAtuais = await tx.bpmCampoEtapaConfig.findMany({
-          where: {
-            etapaId,
-            OR: [{ obrigatorio: true }, { obrigatorioEntrada: true }, { obrigatorioSaida: true }],
-          },
-          select: { campoId: true, campo: { select: { nome: true } } },
-        });
-        const pendente = obrigatoriasAtuais.find((item) => {
-          const nova = obrigacoes.find((obrigacao) => obrigacao.campoId === item.campoId);
-          return !nova || nova.obrigatorio || nova.obrigatorioEntrada || nova.obrigatorioSaida;
-        });
-        if (pendente) falhar("OBRIGACAO_FORMULARIO_INATIVO", `Desative a obrigatoriedade de "${pendente.campo.nome}" antes de desativar o formulário.`);
-      }
-
       const idsAnteriores = (anterior?.secoes ?? []).flatMap((secao) => secao.componentes
         .filter((componente) => componente.tipo === "CAMPO" && componente.campoId)
         .map((componente) => componente.campoId!));
-      const idsRemovidos = idsAnteriores.filter((id) => !campoIds.includes(id));
-      if (idsRemovidos.length) {
-        const obrigatoriosRemovidos = await tx.bpmCampoEtapaConfig.findMany({
+      const idsRemovidos = [...new Set(idsAnteriores.filter((id) => !campoIds.includes(id)))];
+      const limparTodaEtapa = !ativo || campoIds.length === 0;
+      const obrigatoriasParaLimpar = limparTodaEtapa || idsRemovidos.length
+        ? await tx.bpmCampoEtapaConfig.findMany({
           where: {
             etapaId,
-            campoId: { in: idsRemovidos },
+            ...(limparTodaEtapa ? {} : { campoId: { in: idsRemovidos } }),
             OR: [{ obrigatorio: true }, { obrigatorioEntrada: true }, { obrigatorioSaida: true }],
           },
-          select: { campo: { select: { nome: true } } },
-        });
-        if (obrigatoriosRemovidos.length) {
-          falhar("OBRIGACAO_CAMPO_REMOVIDO", `Desative a obrigatoriedade de "${obrigatoriosRemovidos[0].campo.nome}" antes de retirar o campo do formulário.`);
-        }
-      }
+          select: { campoId: true },
+        }) : [];
 
       const secoesExistentes = new Map(
         (anterior?.secoes ?? []).map((secao) => [secao.id, secao]),
@@ -293,6 +275,7 @@ export async function SalvarFormularioEtapaBpm(input: unknown) {
       if (
         anterior &&
         formularioEtapaSemAlteracao(anterior, { ativo, secoes }) &&
+        obrigatoriasParaLimpar.length === 0 &&
         obrigacoes.every((item) => {
           const config = campoPorId.get(item.campoId)?.etapaConfiguracoes[0];
           return config?.obrigatorio === item.obrigatorio
@@ -415,6 +398,12 @@ export async function SalvarFormularioEtapaBpm(input: unknown) {
         });
         if (atualizada.count !== 1) falhar("OBRIGACAO_CONFIG_AUSENTE", "A configuração do campo mudou. Recarregue o formulário antes de publicar.");
       }
+      if (obrigatoriasParaLimpar.length) {
+        await tx.bpmCampoEtapaConfig.updateMany({
+          where: { etapaId, campoId: { in: obrigatoriasParaLimpar.map((item) => item.campoId) } },
+          data: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false },
+        });
+      }
 
       const formulario = await tx.bpmEtapaFormulario.findUniqueOrThrow({
         where: { id: formularioId },
@@ -449,7 +438,7 @@ export async function SalvarFormularioEtapaBpm(input: unknown) {
   } catch (error) {
     const mensagem =
       error instanceof Error &&
-      /^(ETAPA_FORA_PIPELINE|CAMPO_FORA_FORMULARIO_ETAPA|CAPABILITY_FORA_ETAPA|CONFLITO_VERSAO_FORMULARIO|SECAO_FORA_FORMULARIO|COMPONENTE_FORA_FORMULARIO|IDENTIDADE_SECAO_INCOMPATIVEL|IDENTIDADE_COMPONENTE_INCOMPATIVEL|CHAVE_SECAO_EM_USO|RECONCILIACAO_SECAO_FALHOU|OBRIGACAO_FORA_FORMULARIO|OBRIGACAO_CAMPO_INACESSIVEL|OBRIGACAO_CAMPO_REMOVIDO|OBRIGACAO_CONFIG_AUSENTE|OBRIGACAO_FORMULARIO_INATIVO):/.test(
+      /^(ETAPA_FORA_PIPELINE|CAMPO_FORA_FORMULARIO_ETAPA|CAPABILITY_FORA_ETAPA|CONFLITO_VERSAO_FORMULARIO|SECAO_FORA_FORMULARIO|COMPONENTE_FORA_FORMULARIO|IDENTIDADE_SECAO_INCOMPATIVEL|IDENTIDADE_COMPONENTE_INCOMPATIVEL|CHAVE_SECAO_EM_USO|RECONCILIACAO_SECAO_FALHOU|OBRIGACAO_FORA_FORMULARIO|OBRIGACAO_CAMPO_INACESSIVEL|OBRIGACAO_CONFIG_AUSENTE):/.test(
         error.message,
       )
         ? error.message

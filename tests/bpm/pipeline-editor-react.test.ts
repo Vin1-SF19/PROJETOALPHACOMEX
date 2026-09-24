@@ -57,6 +57,34 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
 
 describe("workspace React com remontagem versionada", () => {
+  it("permite definir obrigação de avanço no primeiro rascunho do campo", async () => {
+    await addExisting();
+    await click("Existing");
+    const label = [...container.querySelectorAll("label")].find((item) => item.textContent?.includes("Exigir para avançar"));
+    const checkbox = label?.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    expect(checkbox?.disabled).toBe(false);
+    await act(async () => checkbox!.click());
+    vi.mocked(SalvarFormularioEtapaBpm).mockResolvedValue({ success: true, data: stages[1].formulario } as unknown as Awaited<ReturnType<typeof SalvarFormularioEtapaBpm>>);
+    await click("Publicar composição");
+    expect(SalvarFormularioEtapaBpm).toHaveBeenCalledWith(expect.objectContaining({
+      obrigacoes: expect.arrayContaining([expect.objectContaining({ campoId: field.id, obrigatorioSaida: true })]),
+    }));
+  });
+  it("retira campo com valores do formulário sem apagar seus dados", async () => {
+    const stage = currentStages[1] as unknown as { formulario: FormularioEtapaAdmin };
+    stage.formulario.secoes[0].componentes.push({ chave: "existing", tipo: "CAMPO", campoId: field.id, capability: null, configJson: null, campo: field });
+    vi.mocked(ObterUsoCamposBpm).mockResolvedValue({ success: true, data: { [field.id]: { valoresCard: 3, valoresGlobais: 0, anexos: 1, formularios: 1, etapas: 1 } } });
+    pipeline = "pipeline-com-dados";
+    await render(); await click("Fields"); await click("second");
+    const remover = container.querySelector<HTMLButtonElement>('[aria-label="Remover Existing da apresentação"]');
+    expect(remover?.disabled).toBe(false);
+    await act(async () => remover!.click());
+    expect(container.querySelector('input[aria-label="Rótulo de Existing"]')).toBeNull();
+    vi.mocked(SalvarFormularioEtapaBpm).mockResolvedValue({ success: true, data: stage.formulario } as Awaited<ReturnType<typeof SalvarFormularioEtapaBpm>>);
+    await click("Publicar composição");
+    const payload = vi.mocked(SalvarFormularioEtapaBpm).mock.lastCall?.[0] as { secoes: Array<{ componentes: Array<{ campoId: string | null }> }> } | undefined;
+    expect(payload?.secoes.flatMap((secao) => secao.componentes).some((item) => item.campoId === field.id)).toBe(false);
+  });
   it("publica a exigência de avanço junto com a composição da etapa", async () => {
     const stage = currentStages[1] as unknown as { formulario: FormularioEtapaAdmin };
     stage.formulario.secoes[0].componentes.push({ chave: "existing", tipo: "CAMPO", campoId: field.id, capability: null, configJson: null, campo: field });
