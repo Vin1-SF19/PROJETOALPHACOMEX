@@ -22,6 +22,21 @@ interface Props {
 }
 
 const inputCls = "w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-white/25";
+const TITULOS_OBRIGATORIOS: readonly BpmTarefaTipo[] = ["TAREFA", "LEMBRETE_RAPIDO", "EMAIL", "CHECKLIST"];
+
+function errosValidacaoTarefa(erro: unknown): { campos: Record<string, string>; geral: string | null } {
+  if (typeof erro === "string") return { campos: {}, geral: erro };
+  if (!erro || typeof erro !== "object") return { campos: {}, geral: "Não foi possível criar a tarefa. Tente novamente." };
+  const dados = erro as { fieldErrors?: Record<string, unknown>; formErrors?: unknown };
+  const campos = Object.fromEntries(Object.entries(dados.fieldErrors ?? {}).flatMap(([campo, mensagens]) => {
+    const mensagem = Array.isArray(mensagens) ? mensagens.find((item): item is string => typeof item === "string") : null;
+    return mensagem ? [[campo, mensagem]] : [];
+  }));
+  const mensagemGeral = Array.isArray(dados.formErrors)
+    ? dados.formErrors.find((item): item is string => typeof item === "string")
+    : null;
+  return { campos, geral: mensagemGeral ?? (Object.keys(campos).length ? null : "Não foi possível criar a tarefa. Tente novamente.") };
+}
 
 function IconeTipo({ tipo, size = 15 }: { tipo: string; size?: number }) {
   if (tipo === "CHECKLIST") return <ClipboardCheck size={size} />;
@@ -44,51 +59,79 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
   const [prazo, setPrazo] = useState("");
   const [alertaEm, setAlertaEm] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [erros, setErros] = useState<Record<string, string>>({});
+  const [erroGeral, setErroGeral] = useState<string | null>(null);
+
+  function limparErro(campo: string) {
+    setErros((atuais) => {
+      if (!atuais[campo]) return atuais;
+      const proximos = { ...atuais };
+      delete proximos[campo];
+      return proximos;
+    });
+    setErroGeral(null);
+  }
 
   function limparFormulario() {
     setTitulo(""); setDescricao(""); setContato(""); setTelefone(""); setEmailDestino("");
     setMensagem(""); setItensChecklist(""); setPrazo(""); setAlertaEm("");
+    setErros({}); setErroGeral(null);
   }
 
   async function salvar() {
     if (salvando || !podeTrabalharTarefas) return;
     const prazoPersistido = parseDataHoraLocalBpm(prazo);
     const alertaPersistido = parseDataHoraLocalBpm(alertaEm);
-    if (!prazoPersistido || !alertaPersistido) {
-      toast.error("Informe prazo e alerta.");
-      return;
+    const errosLocais: Record<string, string> = {};
+    if (TITULOS_OBRIGATORIOS.includes(tipo) && !titulo.trim()) errosLocais.titulo = "Título é obrigatório.";
+    if (!prazoPersistido) errosLocais.prazo = "Informe uma data e hora válidas para o prazo.";
+    if (!alertaPersistido) errosLocais.alertaEm = "Informe uma data e hora válidas para o alerta.";
+    if (prazoPersistido && alertaPersistido && alertaPersistido > prazoPersistido) {
+      errosLocais.alertaEm = "O alerta deve ocorrer antes ou no mesmo horário do prazo.";
     }
-    if (alertaPersistido > prazoPersistido) {
-      toast.error("O alerta deve ocorrer antes ou no mesmo horário do prazo.");
+    if (Object.keys(errosLocais).length) {
+      setErros(errosLocais);
+      setErroGeral(null);
       return;
     }
     setSalvando(true);
-    const resultado = await CriarTarefaBpm({
-      cardId,
-      tipo,
-      titulo: titulo.trim() || undefined,
-      descricao: descricao.trim() || undefined,
-      contato: contato.trim() || undefined,
-      telefone: telefone.trim() || undefined,
-      emailDestino: emailDestino.trim() || undefined,
-      mensagem: mensagem.trim() || undefined,
-      checklistItens: tipo === "CHECKLIST"
-        ? itensChecklist.split("\n").map((item) => item.trim()).filter(Boolean)
-        : undefined,
-      responsavelId: responsavelId ?? undefined,
-      prazo: prazoPersistido,
-      alertaEm: alertaPersistido,
-    });
-    setSalvando(false);
-    if (!resultado.success) {
-      toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível criar a tarefa.");
-      return;
+    try {
+      const resultado = await CriarTarefaBpm({
+        cardId,
+        tipo,
+        titulo: titulo.trim() || undefined,
+        descricao: descricao.trim() || undefined,
+        contato: contato.trim() || undefined,
+        telefone: telefone.trim() || undefined,
+        emailDestino: emailDestino.trim() || undefined,
+        mensagem: mensagem.trim() || undefined,
+        checklistItens: tipo === "CHECKLIST"
+          ? itensChecklist.split("\n").map((item) => item.trim()).filter(Boolean)
+          : undefined,
+        responsavelId: responsavelId ?? undefined,
+        prazo: prazoPersistido,
+        alertaEm: alertaPersistido,
+      });
+      if (!resultado.success) {
+        const falha = errosValidacaoTarefa(resultado.error);
+        setErros(falha.campos);
+        setErroGeral(falha.geral);
+        return;
+      }
+      toast.success(`${obterConfigTipoTarefa(tipo).label} criada.`);
+      limparFormulario();
+      setAberto(false);
+      onAtualizado();
+    } catch {
+      setErroGeral("Não foi possível conectar para criar a tarefa. Tente novamente.");
+    } finally {
+      setSalvando(false);
     }
-    toast.success(`${obterConfigTipoTarefa(tipo).label} criada.`);
-    limparFormulario();
-    setAberto(false);
-    onAtualizado();
   }
+
+  const errosNoResumo = Object.entries(erros).filter(([campo]) =>
+    campo !== "prazo" && campo !== "alertaEm" && !(tipo === "TAREFA" && campo === "titulo"));
+  const mensagemErro = erroGeral ?? (Object.keys(erros).length ? "Revise os campos indicados." : null);
 
   return (
     <div className="mt-2 space-y-2">
@@ -151,23 +194,24 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
           <div className="flex items-center justify-between gap-3"><p className="text-xs font-bold text-white">Nova tarefa</p><button type="button" onClick={() => { setAberto(false); limparFormulario(); }} className="text-slate-500 hover:text-white"><X size={15} /></button></div>
           <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
             {BPM_TAREFA_TIPOS.filter((opcao) => opcao !== "CHECKLIST").map((opcao) => (
-              <button key={opcao} type="button" onClick={() => setTipo(opcao)} className={`rounded-xl border px-2 py-2 text-left text-[11px] font-semibold transition ${tipo === opcao ? "border-white/30 bg-white/10 text-white" : "border-white/[0.06] bg-white/[0.02] text-slate-400 hover:bg-white/[0.05]"}`}>
+              <button key={opcao} type="button" onClick={() => { setTipo(opcao); setErros({}); setErroGeral(null); }} className={`rounded-xl border px-2 py-2 text-left text-[11px] font-semibold transition ${tipo === opcao ? "border-white/30 bg-white/10 text-white" : "border-white/[0.06] bg-white/[0.02] text-slate-400 hover:bg-white/[0.05]"}`}>
                 <span className="flex items-center gap-1.5"><IconeTipo tipo={opcao} size={13} />{obterConfigTipoTarefa(opcao).label}</span>
               </button>
             ))}
           </div>
 
-          {tipo === "CHECKLIST" && <><input className={inputCls} placeholder="Título do procedimento" value={titulo} onChange={(e) => setTitulo(e.target.value)} /><textarea className={`${inputCls} min-h-24 resize-none`} placeholder="Um item por linha" value={itensChecklist} onChange={(e) => setItensChecklist(e.target.value)} /></>}
-          {tipo === "LIGACAO" && <><input className={inputCls} placeholder="Contato (opcional)" value={contato} onChange={(e) => setContato(e.target.value)} /><input className={inputCls} placeholder="Telefone" value={telefone} onChange={(e) => setTelefone(e.target.value)} /><textarea className={`${inputCls} min-h-20 resize-none`} placeholder="Objetivo da ligação" value={descricao} onChange={(e) => setDescricao(e.target.value)} /></>}
-          {tipo === "WHATSAPP" && <><input className={inputCls} placeholder="Contato" value={contato} onChange={(e) => setContato(e.target.value)} /><textarea className={`${inputCls} min-h-24 resize-none`} placeholder="Mensagem a enviar" value={mensagem} onChange={(e) => setMensagem(e.target.value)} /></>}
-          {tipo === "EMAIL" && <><input className={inputCls} type="email" placeholder="E-mail do destinatário" value={emailDestino} onChange={(e) => setEmailDestino(e.target.value)} /><input className={inputCls} placeholder="Assunto" value={titulo} onChange={(e) => setTitulo(e.target.value)} /><textarea className={`${inputCls} min-h-24 resize-none`} placeholder="Mensagem do e-mail" value={mensagem} onChange={(e) => setMensagem(e.target.value)} /></>}
-          {tipo === "TAREFA" && <><input className={inputCls} placeholder="Título da tarefa" value={titulo} onChange={(e) => setTitulo(e.target.value)} /><textarea className={`${inputCls} min-h-20 resize-none`} placeholder="Descrição" value={descricao} onChange={(e) => setDescricao(e.target.value)} /></>}
-          {tipo === "LEMBRETE_RAPIDO" && <><input className={inputCls} placeholder="Do que você precisa lembrar?" value={titulo} onChange={(e) => setTitulo(e.target.value)} /><textarea className={`${inputCls} min-h-20 resize-none`} placeholder="Contexto opcional" value={descricao} onChange={(e) => setDescricao(e.target.value)} /></>}
+          {tipo === "CHECKLIST" && <><input className={inputCls} placeholder="Título do procedimento" value={titulo} onChange={(e) => { setTitulo(e.target.value); limparErro("titulo"); }} /><textarea className={`${inputCls} min-h-24 resize-none`} placeholder="Um item por linha" value={itensChecklist} onChange={(e) => { setItensChecklist(e.target.value); limparErro("checklistItens"); }} /></>}
+          {tipo === "LIGACAO" && <><input className={inputCls} placeholder="Contato (opcional)" value={contato} onChange={(e) => { setContato(e.target.value); limparErro("contato"); }} /><input className={inputCls} placeholder="Telefone" value={telefone} onChange={(e) => { setTelefone(e.target.value); limparErro("telefone"); }} /><textarea className={`${inputCls} min-h-20 resize-none`} placeholder="Objetivo da ligação" value={descricao} onChange={(e) => { setDescricao(e.target.value); limparErro("descricao"); }} /></>}
+          {tipo === "WHATSAPP" && <><input className={inputCls} placeholder="Contato" value={contato} onChange={(e) => { setContato(e.target.value); limparErro("contato"); }} /><textarea className={`${inputCls} min-h-24 resize-none`} placeholder="Mensagem a enviar" value={mensagem} onChange={(e) => { setMensagem(e.target.value); limparErro("mensagem"); }} /></>}
+          {tipo === "EMAIL" && <><input className={inputCls} type="email" placeholder="E-mail do destinatário" value={emailDestino} onChange={(e) => { setEmailDestino(e.target.value); limparErro("emailDestino"); }} /><input className={inputCls} placeholder="Assunto" value={titulo} onChange={(e) => { setTitulo(e.target.value); limparErro("titulo"); }} /><textarea className={`${inputCls} min-h-24 resize-none`} placeholder="Mensagem do e-mail" value={mensagem} onChange={(e) => { setMensagem(e.target.value); limparErro("mensagem"); }} /></>}
+          {tipo === "TAREFA" && <><label className="block space-y-1 text-xs text-slate-300"><span>Título da tarefa <span className="text-rose-300">*</span></span><input className={`${inputCls} ${erros.titulo ? "border-rose-400/60" : ""}`} value={titulo} onChange={(e) => { setTitulo(e.target.value); limparErro("titulo"); }} aria-required="true" aria-invalid={Boolean(erros.titulo)} aria-describedby={erros.titulo ? `tarefa-titulo-erro-${cardId}` : undefined} /></label>{erros.titulo && <p id={`tarefa-titulo-erro-${cardId}`} role="alert" className="text-xs text-rose-300">{erros.titulo}</p>}<textarea className={`${inputCls} min-h-20 resize-none`} placeholder="Descrição" value={descricao} onChange={(e) => setDescricao(e.target.value)} /></>}
+          {tipo === "LEMBRETE_RAPIDO" && <><input className={inputCls} placeholder="Do que você precisa lembrar?" value={titulo} onChange={(e) => { setTitulo(e.target.value); limparErro("titulo"); }} /><textarea className={`${inputCls} min-h-20 resize-none`} placeholder="Contexto opcional" value={descricao} onChange={(e) => { setDescricao(e.target.value); limparErro("descricao"); }} /></>}
 
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <BpmDateTimeField id={`tarefa-prazo-${cardId}`} label="Prazo" value={prazo} onChange={setPrazo} required disabled={salvando || !podeTrabalharTarefas} />
-            <BpmDateTimeField id={`tarefa-alerta-${cardId}`} label="Alerta" value={alertaEm} onChange={setAlertaEm} required disabled={salvando || !podeTrabalharTarefas} />
+            <BpmDateTimeField id={`tarefa-prazo-${cardId}`} label="Prazo" value={prazo} onChange={(valor) => { setPrazo(valor); limparErro("prazo"); }} required disabled={salvando || !podeTrabalharTarefas} error={erros.prazo} />
+            <BpmDateTimeField id={`tarefa-alerta-${cardId}`} label="Alerta" value={alertaEm} onChange={(valor) => { setAlertaEm(valor); limparErro("alertaEm"); }} required disabled={salvando || !podeTrabalharTarefas} error={erros.alertaEm} />
           </div>
+          {mensagemErro && <div role="alert" className="rounded-xl border border-rose-400/30 bg-rose-400/10 p-3 text-xs text-rose-200"><p className="font-semibold">{mensagemErro}</p>{errosNoResumo.length > 0 && <ul className="mt-1 list-disc space-y-0.5 pl-4">{errosNoResumo.map(([campo, mensagem]) => <li key={campo}>{mensagem}</li>)}</ul>}</div>}
           <button type="button" onClick={() => void salvar()} disabled={salvando || !podeTrabalharTarefas} aria-busy={salvando} className="w-full rounded-xl py-2.5 text-sm font-bold text-white disabled:opacity-50" style={{ background: `rgb(${accent})` }}>{salvando ? "Criando..." : `Criar ${obterConfigTipoTarefa(tipo).label}`}</button>
         </div>
       )}

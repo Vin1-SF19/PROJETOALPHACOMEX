@@ -153,3 +153,22 @@ Ao mover Agendar reunião → Reunião Agendada, a configuração persistida da 
 - O card consulta `ObterRequisitosTransicaoBpm` após confirmar seus autosaves. Se há campos pendentes, oferece editor antes do movimento; `SalvarRequisitosEMoverCardBpm` grava valores editados e move atomicamente. Campo somente leitura mostra acesso direto ao editor do pipeline, selecionando etapa e campo pela URL.
 - A UI de Campos e formulários agora permite desligar uma obrigação marcada mesmo em campo somente leitura. O servidor continua rejeitando ativação de obrigação em campo inacessível. Nenhuma configuração de produção foi alterada automaticamente.
 - Testes focados cobrem preenchimento e movimento, bloqueio de campo somente leitura e remoção de obrigação legada. `npm run lint` passou com 0 erros e 1192 avisos existentes; `npm run typecheck` passou; `npm test` passou com 503 arquivos e 3791 testes aprovados, 4 ignorados e 1 todo; `npm run build` passou com os avisos preexistentes do módulo PDF. Validação autenticada em navegador ainda pendente.
+
+## Solicitação de 24/09/2026 — obrigações da entrada em Reunião Agendada
+
+O usuário esclareceu que Radar pretendido e Estado não devem bloquear a entrada nessa etapa. Estado é a UF canônica do cliente e está vazia no card de Francisco. Vendedor responsável permanece um campo de texto separado do responsável e dos membros do card, e continua obrigatório.
+
+### Checklist
+
+- [x] Confirmar em leitura a origem, o valor e as três regras persistidas da etapa.
+- [x] Retirar somente as obrigações de Radar pretendido e Estado na etapa Reunião Agendada, preservando Vendedor responsável.
+- [x] Registrar auditoria com a conta indicada pelo usuário e verificar versões, regras e chaves estrangeiras após a transação.
+- [x] Validar a cópia explicativa do editor e executar os gates do projeto.
+
+### Evidência e operação
+
+- Alteração pontual de configuração em produção, sem mudança estrutural ou mutação em massa: `BpmCampoEtapaConfig.obrigatorio` passou de 1 para 0 apenas em `alpha.radar.pretendido` e `alpha.estado` para a etapa `cmsd9yvb90005dzgg8fj8vzeu`. `alpha.vendedor.a` permaneceu em 1.
+- Formulário da etapa avançou de v2 para v3; `BpmPipeline.configVersion`, de 76 para 77. Auditoria `72a74a43-5031-45ee-b164-280b58333a10`, `adminId=8` (Vinicius de Souza Floriano, conta indicada pelo usuário). Verificação independente encontrou as duas regras desligadas, Vendedor responsável obrigatório e zero violações de FK.
+- Para reverter, o administrador pode reativar as duas obrigações no editor de Campos e formulários; o estado anterior e o novo estão no registro de auditoria. Nenhum valor do card ou do cadastro do cliente foi alterado.
+- A legenda do editor foi ajustada para explicar que “Obrigatório na etapa” também bloqueia transições. O editor já oferece controles separados para obrigação na etapa, entrada e saída.
+- Gates após a alteração: lint sem erros, typecheck, 504 arquivos e 3.793 testes aprovados na suíte completa e build concluída.

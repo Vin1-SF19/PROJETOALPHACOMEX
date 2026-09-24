@@ -964,7 +964,7 @@ function FormularioEtapaWorkspaceContent({
               {([
                 ["visivel", "Visível no card", "Exibe o campo nesta etapa."],
                 ["editavel", "Editável", "Permite preencher ou alterar o valor."],
-                ["obrigatorio", "Obrigatório ao preencher", "Marca o campo como obrigatório no formulário."],
+                ["obrigatorio", "Obrigatório na etapa", "Bloqueia a transição quando este campo está vazio na etapa de origem ou de destino."],
                 ["obrigatorioSaida", "Exigir para avançar", "Bloqueia a saída desta etapa sem valor."],
                 ["obrigatorioEntrada", "Exigir para entrar", "Bloqueia a entrada nesta etapa sem valor."],
               ] as const).map(([chave, rotulo, ajuda]) => {

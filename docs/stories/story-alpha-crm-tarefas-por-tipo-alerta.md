@@ -53,3 +53,30 @@ Criar tarefas operacionais do card por tipo, cada uma com formulário próprio, 
 - `vercel.json`
 - `tests/bpm/tarefas-tipo.test.ts`
 - `tests/bpm/tarefas-tipo-actions.test.ts`
+
+## Solicitação de 24/09/2026 — motivo visível ao criar tarefa
+
+O card de Francisco recusava tarefa sem título com “Não foi possível criar a tarefa.”. A action devolvia `fieldErrors.titulo`, mas o formulário trocava qualquer erro estruturado por uma mensagem genérica.
+
+### Critérios de aceitação
+
+1. Título ausente em tarefa comum é indicado junto ao campo antes da chamada ao servidor.
+2. Prazo e alerta inválidos são indicados junto aos respectivos seletores.
+3. Erros estruturados devolvidos pelo servidor são exibidos ao usuário com o motivo específico; erro de conexão não deixa o botão preso em “Criando...”.
+
+### Checklist
+
+- [x] Confirmar o motivo da falha no schema sem criar registros.
+- [x] Implementar feedback visual e tratar erros estruturados da action.
+- [x] Cobrir título vazio e erro estruturado em teste de interface.
+- [x] Rodar lint, typecheck, suíte completa e build após as alterações.
+
+### File List complementar
+
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelTarefasPorTipo.tsx`
+- `tests/bpm/tarefas-criacao-feedback-react.test.ts`
+
+### Verificação
+
+- Teste focado: 2 casos aprovados (título ausente e erro estruturado do servidor).
+- Lint: 0 erros; typecheck: passou; suíte completa: 504 arquivos e 3.793 testes aprovados, 4 ignorados e 1 todo; build: passou.
