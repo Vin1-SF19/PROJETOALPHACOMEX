@@ -51,7 +51,7 @@ describe("BPM - card restrito na etapa Agendar reunião", () => {
 
   it("exige e envia o e-mail acessível do cliente no mesmo formulário", () => {
     expect(cardsAction).toContain("emailClienteReuniao");
-    expect(cardsAction).toContain("selecionarEmailClienteReuniao");
+    expect(cardsAction).toContain("selecionarEmailReuniaoDoCard");
     expect(painelReuniao).toContain("E-mail do cliente");
     expect(painelReuniao).toContain('type="email"');
     expect(painelReuniao).toContain('autoComplete="email"');

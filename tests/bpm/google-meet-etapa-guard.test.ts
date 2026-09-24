@@ -175,7 +175,7 @@ describe("Google Meet: guard de etapa no backend", () => {
     }));
     expect(tx.bpmCardReuniao.upsert).toHaveBeenCalledWith(expect.objectContaining({
       where: { cardId_chave: { cardId: CARD_ID, chave: "principal" } },
-      update: expect.objectContaining({ agendadaEm: DATA, googleEventId: "evento-1" }),
+      update: expect.objectContaining({ agendadaEm: DATA, googleEventId: "evento-1", emailCliente: EMAIL }),
     }));
   });
 
@@ -238,7 +238,7 @@ describe("Google Meet: guard de etapa no backend", () => {
     }));
     expect(tx.bpmCardReuniao.upsert).toHaveBeenCalledWith(expect.objectContaining({
       where: { cardId_chave: { cardId: CARD_ID, chave: "principal" } },
-      update: expect.objectContaining({ agendadaEm: DATA, googleEventId: "evento-1" }),
+      update: expect.objectContaining({ agendadaEm: DATA, googleEventId: "evento-1", emailCliente: EMAIL }),
     }));
   });
 });

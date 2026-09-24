@@ -1,7 +1,6 @@
 "use client";
 
 import { ObterCardBpm } from "@/actions/bpm/Cards";
-import { ClipboardCheck } from "lucide-react";
 import { PainelCamposEtapaAtual } from "./PainelCamposEtapaAtual";
 import { PainelChecklistFollowUp } from "./PainelChecklistFollowUp";
 import { PainelProximoContato } from "./PainelProximoContato";
@@ -31,9 +30,19 @@ export function CardOpenFormSlot({
   onAtualizado,
   onEstadoFollowUpChange = () => {},
 }: CardOpenFormSlotProps) {
+  const formulario = {
+    ...card.formularioEtapa,
+    secoes: card.formularioEtapa.secoes
+      .map((secao) => ({
+        ...secao,
+        componentes: secao.componentes.filter((componente) => componente.rendererId !== "stage-checklist"),
+      }))
+      .filter((secao) => secao.componentes.length > 0),
+  };
+
   return (
     <FormularioEtapaRenderer
-      formulario={card.formularioEtapa}
+      formulario={formulario}
       mode="runtime"
       bindings={{
         renderCampos: ({ campoIds, campoLabels, secaoTitulo, runKey }) => (
@@ -51,17 +60,6 @@ export function CardOpenFormSlot({
         ),
         renderComponente: (componente) => {
           switch (componente.rendererId) {
-            case "stage-checklist":
-              return (
-                <button
-                  type="button"
-                  onClick={() => window.dispatchEvent(new CustomEvent("bpm:abrir-pendencias-checklist", { detail: { cardId: card.id } }))}
-                  className="flex min-h-12 w-full items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 text-left text-sm text-slate-200 hover:bg-white/[0.05]"
-                >
-                  <ClipboardCheck size={17} style={{ color: `rgb(${accent})` }} />
-                  Abrir procedimentos da etapa
-                </button>
-              );
             case "meeting-scheduler":
               return <PainelReuniao card={card} accent={accent} podeEditar={podeEditar} onAtualizado={onAtualizado} />;
             case "meeting-transcript":

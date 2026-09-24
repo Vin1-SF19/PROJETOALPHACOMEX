@@ -373,6 +373,7 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
           googleEventId: resultado.data.googleEventId,
           googleCalendarId: calendario.googleCalendarId,
           googleMeetLink,
+          emailCliente,
         },
         update: {
           status: "AGENDADA",
@@ -380,6 +381,7 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
           googleEventId: resultado.data.googleEventId,
           googleCalendarId: calendario.googleCalendarId,
           googleMeetLink,
+          emailCliente,
         },
       });
       await registrarHistoricoCard(
@@ -553,6 +555,7 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
           googleEventId: card.googleEventId,
           googleCalendarId: card.googleCalendarId,
           googleMeetLink: card.googleMeetLink,
+          emailCliente,
         },
         update: {
           status: "AGENDADA",
@@ -560,6 +563,7 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
           googleEventId: card.googleEventId,
           googleCalendarId: card.googleCalendarId,
           googleMeetLink: card.googleMeetLink,
+          emailCliente,
         },
       });
       await registrarHistoricoCard(

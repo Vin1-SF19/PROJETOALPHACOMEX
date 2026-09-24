@@ -5273,6 +5273,7 @@ model BpmCardReuniao {
   googleEventId    String?
   googleCalendarId String?
   googleMeetLink   String?
+  emailCliente     String?
   transcricao      String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt

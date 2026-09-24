@@ -3,6 +3,8 @@ import {
   combinarParticipantesReuniao,
   emailClienteReuniaoSchema,
   selecionarEmailClienteReuniao,
+  selecionarEmailReuniaoDoCard,
+  selecionarEmailConvidadoUnico,
 } from "@/lib/bpm/email-reuniao";
 
 const vinculo = (email: string | null, principal = false, ativo = true) => ({
@@ -53,5 +55,37 @@ describe("e-mail do cliente na reunião", () => {
       "convidado@exemplo.com",
       "cliente@exemplo.com",
     ]);
+  });
+
+  it("reabre a reunião com o e-mail usado no evento, mesmo com contato diferente ou ambíguo", () => {
+    const contatos = [vinculo("contato@exemplo.com"), vinculo("outro@exemplo.com")];
+    expect(selecionarEmailReuniaoDoCard("evento-1", {
+      googleEventId: "evento-1", emailCliente: " CLIENTE@EXEMPLO.COM ",
+    }, contatos)).toBe("cliente@exemplo.com");
+    expect(selecionarEmailReuniaoDoCard("evento-1", {
+      googleEventId: "evento-1", emailCliente: "NOVO@EXEMPLO.COM",
+    }, contatos)).toBe("novo@exemplo.com");
+  });
+
+  it("usa o contato apenas antes do agendamento ou em registro legado sem e-mail", () => {
+    const contatos = [vinculo("contato@exemplo.com")];
+    expect(selecionarEmailReuniaoDoCard(null, null, contatos)).toBe("contato@exemplo.com");
+    expect(selecionarEmailReuniaoDoCard("evento-1", {
+      googleEventId: "evento-1", emailCliente: null,
+    }, contatos)).toBe("contato@exemplo.com");
+    expect(selecionarEmailReuniaoDoCard("evento-2", {
+      googleEventId: "evento-1", emailCliente: "antigo@exemplo.com",
+    }, contatos)).toBe("contato@exemplo.com");
+  });
+
+  it("recupera um convidado inequívoco de reunião antiga sem escolher entre vários", () => {
+    expect(selecionarEmailConvidadoUnico([
+      { email: "organizador@exemplo.com", organizador: true },
+      { email: " CLIENTE@EXEMPLO.COM ", organizador: false },
+    ])).toBe("cliente@exemplo.com");
+    expect(selecionarEmailConvidadoUnico([
+      { email: "um@exemplo.com", organizador: false },
+      { email: "dois@exemplo.com", organizador: false },
+    ])).toBeNull();
   });
 });

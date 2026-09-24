@@ -106,7 +106,8 @@ import { executarTransicaoBpm } from "@/lib/bpm/transicao-command";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { obterErroChecklistParaMovimento } from "@/lib/bpm/checklists/integracao";
-import { selecionarEmailClienteReuniao } from "@/lib/bpm/email-reuniao";
+import { selecionarEmailReuniaoDoCard } from "@/lib/bpm/email-reuniao";
+import { obterEmailReuniaoLegada } from "@/lib/bpm/email-reuniao-legado-server";
 import { BPM_CAPABILITIES, BPM_STAGE_KEYS } from "@/lib/bpm/ontology";
 import {
   formularioPossuiTarget,
@@ -756,6 +757,11 @@ export async function ObterCardBpm(cardId: string) {
         },
         tarefas: { orderBy: { createdAt: "desc" }, include: { responsavel: { select: { id: true, nome: true } } } },
         anexos: { orderBy: { createdAt: "desc" } },
+        reunioes: {
+          where: { chave: "principal" },
+          select: { emailCliente: true, googleEventId: true },
+          take: 1,
+        },
         historico: {
           orderBy: { createdAt: "desc" },
           take: 50,
@@ -837,9 +843,24 @@ export async function ObterCardBpm(cardId: string) {
           take: LIMITE_CONTATOS_EMAIL + 1,
         })
       : [];
-    const emailClienteReuniao = vinculosEmail.length <= LIMITE_CONTATOS_EMAIL
-      ? selecionarEmailClienteReuniao(vinculosEmail)
-      : null;
+    let emailClienteReuniao = selecionarEmailReuniaoDoCard(
+      card.googleEventId,
+      card.reunioes[0] ?? null,
+      vinculosEmail.length <= LIMITE_CONTATOS_EMAIL ? vinculosEmail : [],
+    );
+    if (
+      card.googleEventId
+      && card.googleCalendarId
+      && !card.reunioes[0]?.emailCliente
+      && formularioPossuiTarget(formularioEtapa, BPM_CAPABILITIES.MEETING_SCHEDULER)
+    ) {
+      const emailLegado = await obterEmailReuniaoLegada({
+        userId,
+        googleCalendarId: card.googleCalendarId,
+        googleEventId: card.googleEventId,
+      });
+      if (emailLegado) emailClienteReuniao = emailLegado;
+    }
 
     // Indicador "nunca acessado" — primeiro acesso por QUALQUER usuário apaga a marcação.
     if (!card.primeiraVisualizacaoEm) {

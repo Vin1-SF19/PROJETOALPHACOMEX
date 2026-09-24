@@ -56,7 +56,8 @@ describe("CRM - formulário unificado por etapa", () => {
   });
 
   it("delega a exclusividade visual à composição publicada", () => {
-    expect(slotFormulario).toContain("formulario={card.formularioEtapa}");
+    expect(slotFormulario).toContain("formulario={formulario}");
+    expect(slotFormulario).toContain('componente.rendererId !== "stage-checklist"');
     expect(slotFormulario).toContain("componente.rendererId");
     expect(slotFormulario).not.toMatch(/etapaEh[A-Z]/);
     expect(slotFormulario).not.toContain("card.etapa.nome");

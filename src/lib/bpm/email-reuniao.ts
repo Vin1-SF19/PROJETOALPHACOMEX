@@ -36,6 +36,32 @@ export function selecionarEmailClienteReuniao(vinculos: VinculoEmailReuniao[]): 
   return todos.length === 1 ? todos[0] : null;
 }
 
+/** O destinatário usado neste evento tem precedência sobre o contato sugerido. */
+export function selecionarEmailReuniaoDoCard(
+  googleEventId: string | null,
+  reuniao: { googleEventId: string | null; emailCliente: string | null } | null,
+  vinculos: VinculoEmailReuniao[],
+): string | null {
+  if (googleEventId && reuniao?.googleEventId === googleEventId) {
+    const persistido = emailClienteReuniaoSchema.safeParse(reuniao.emailCliente);
+    if (persistido.success) return persistido.data;
+  }
+  return selecionarEmailClienteReuniao(vinculos);
+}
+
+/** Recuperação de eventos anteriores à persistência do destinatário no card. */
+export function selecionarEmailConvidadoUnico(
+  participantes: Array<{ email: string; organizador: boolean }>,
+): string | null {
+  const convidados = Array.from(new Set(participantes
+    .filter((participante) => !participante.organizador)
+    .flatMap((participante) => {
+      const email = emailClienteReuniaoSchema.safeParse(participante.email);
+      return email.success ? [email.data] : [];
+    })));
+  return convidados.length === 1 ? convidados[0] : null;
+}
+
 /** Mantém os convidados existentes e inclui o cliente uma única vez. */
 export function combinarParticipantesReuniao(
   existentes: Array<{ email: string }>,
