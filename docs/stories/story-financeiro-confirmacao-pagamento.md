@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — implementação e gates locais concluídos; publicação de configuração no Turso aguarda autorização específica.
+Ready for Review — código e configuração publicados; smoke com card real ainda pendente.
 
 ## Executor Assignment
 
@@ -56,7 +56,7 @@ Ready for Review — implementação e gates locais concluídos; publicação de
 - [x] **Definir configuração de validação** (AC 2–5, 11): condicional de confirmação, origem do valor esperado, limites numéricos, comparação e comprovação manual conforme política aprovada; publicação pendente.
 - [x] **Configurar estados combinados** (AC 6, 7, 9): mapear a assinatura e o pagamento para as quatro saídas sem sobrepor os status individuais; respeitar pagamento no êxito; publicação pendente.
 - [x] **Configurar automações** (AC 8, 10): confirmação, tarefa de NF idempotente, verificação da assinatura, recálculo e cobrança por vencimento somente com política definida; publicação pendente.
-- [ ] **Testar fluxo real** (AC 1–11): salvamento, transição, idempotência, valores iguais/divergentes, quatro estados, pagamento no êxito, comprovante configurado e vencimento. Conferir execução/histórico das automações.
+- [ ] **Testar fluxo real** (AC 1–11): salvamento, transição, idempotência, valores iguais/divergentes, quatro estados, pagamento no êxito, comprovante configurado e vencimento. Conferir execução/histórico das automações. O smoke sintético da configuração publicada passou; falta card real.
 - [ ] **Publicação protegida e gates**: antes de alterar banco/configuração, Vault, backup validado, autorização específica e rollback; depois executar `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` e smoke autenticado. Atualizar este checklist e File List.
 
 ## Dev Notes
@@ -91,7 +91,7 @@ Ready for Review — implementação e gates locais concluídos; publicação de
 - [x] Inventário atual: etapa Pagamento v3 com 13 campos publicados, duplicidade de comprovante, sem requisito/automação própria; zero cards ativos nela. Identidades canônicas e plano de código em análise.
 - [x] Implementação, regressões locais e gates estáticos concluídos.
 - [ ] Smoke autenticado do formulário e das automações no ambiente publicado.
-- [ ] Checkpoint Vault e publicação concluídos, se necessária mutação protegida.
+- [x] Checkpoint Vault, autorização específica e publicação concluídos: Turso Financeiro v43 → v44, Pagamento v3 → v4, 20 requisitos e 8 automações ativos.
 
 ## Dev Agent Record
 
@@ -112,7 +112,10 @@ Ready for Review — implementação e gates locais concluídos; publicação de
 | 2026-09-25 | 0.1 | Draft de Confirmação de Pagamento e estados conjuntos | River (@sm) |
 | 2026-09-25 | 0.2 | Política de êxito, plano de configuração e suporte a regras/automações | Codex |
 | 2026-09-25 | 0.3 | Saída exige fonte de valor válida; tarefa única usa ID determinístico e evento atômico | Codex |
+| 2026-09-25 | 0.4 | Publicação protegida no Turso e smoke sintético da configuração ativa | Codex |
 
 ## QA Results
 
-`npm run lint`: passou, com 1.192 avisos existentes e zero erros. `npm run typecheck`: passou. Após as correções de QA, `npm test`: 517 arquivos, 3.852 testes passaram, quatro ignorados e um todo. `npm run build` passou após direcionar o cache da worktree para disco persistente; a primeira tentativa no `/tmp` falhou por cota de escrita. QA do diff corrigido: **CONCERNS**, sem bloqueante estático; teste real do fluxo publicado e concorrência permanece pendente. O smoke autenticado e a publicação continuam sujeitos à autorização específica do banco.
+`npm run lint`: passou, com 1.192 avisos existentes e zero erros. `npm run typecheck`: passou. Após as correções de QA, `npm test`: 517 arquivos, 3.852 testes passaram, quatro ignorados e um todo. `npm run build` passou após direcionar o cache da worktree para disco persistente; a primeira tentativa no `/tmp` falhou por cota de escrita. QA do diff corrigido: **CONCERNS**, sem bloqueante estático; teste real do fluxo publicado e concorrência permanece pendente.
+
+Após autorização específica, a publicação transacional criou dois campos, 20 requisitos e oito automações. A primeira tentativa falhou na validação do formato de uma condição e reverteu integralmente; a segunda concluiu. A leitura posterior confirmou Financeiro v44, os três formulários incrementados, dois campos ativos, 20 requisitos e oito automações ativas. Smoke somente leitura da configuração publicada confirmou os quatro status conjuntos, bloqueio de pagamento pendente/divergente e ausência de cobrança de êxito antes do evento. Nenhum card ativo estava na etapa Pagamento para smoke autenticado real.

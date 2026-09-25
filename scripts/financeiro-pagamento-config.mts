@@ -191,7 +191,7 @@ const requisitos = [
   { chave: "saida_liquido_divergente", alvoTipo: "REGRA", fase: "EXIT_STAGE", condicao: grupo(preenchido(ids.liquido), preenchido(ids.esperado), folha(ref(ids.esperado), "diferente", undefined, ref(ids.liquido), "numero")), mensagem: "Valor esperado está desatualizado em relação ao valor líquido" },
   { chave: "saida_bruto_divergente", alvoTipo: "REGRA", fase: "EXIT_STAGE", condicao: grupo(folha(ref(ids.liquido), "vazio"), preenchido(ids.bruto), preenchido(ids.esperado), folha(ref(ids.esperado), "diferente", undefined, ref(ids.bruto), "numero")), mensagem: "Valor esperado está desatualizado em relação ao valor bruto" },
   { chave: "saida_liquido_retencoes", alvoTipo: "CAMPO", campoId: ids.liquido, fase: "EXIT_STAGE", condicao: grupo(preenchido(ids.retencoes), folha(ref(ids.retencoes), "maior", 0, undefined, "numero")), mensagem: "Calcule o valor líquido antes de avançar com retenções" },
-  { chave: "saida_bruto_origem", alvoTipo: "CAMPO", campoId: ids.bruto, fase: "EXIT_STAGE", condicao: folha(ref(ids.liquido), "vazio"), mensagem: "Informe o valor bruto ou líquido de origem antes de avançar" },
+  { chave: "saida_bruto_origem", alvoTipo: "CAMPO", campoId: ids.bruto, fase: "EXIT_STAGE", condicao: grupo(folha(ref(ids.liquido), "vazio")), mensagem: "Informe o valor bruto ou líquido de origem antes de avançar" },
 ];
 for (const [ordem, item] of requisitos.entries()) {
   grupoCondicaoSchema.parse(item.condicao);
