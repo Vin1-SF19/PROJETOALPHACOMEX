@@ -2,11 +2,14 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { Resend } from "resend";
+import type { Prisma } from "@prisma/client";
 
 import db from "@/lib/prisma";
 import { calcularPrazoFinal } from "@/lib/bpm/sla";
 import { executarTransicaoBpm } from "@/lib/bpm/transicao-command";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
+import { carregarValoresCanonicosCampos } from "@/lib/bpm/campos-configuraveis-server";
+import { idTarefaUnicaPorTipo } from "@/lib/bpm/automacoes/idempotencia-tarefa";
 import { calcularDiaCicloNovosLeads, contarDiasUteisDecorridos, intervaloDiaCivilSaoPaulo } from "@/lib/bpm/novos-leads";
 import { sincronizarTranscricaoCardBpm } from "@/lib/bpm/transcricao-reuniao-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
@@ -96,7 +99,7 @@ function proximoNo(no: NoAutomacao): string | null {
   return no.tipo === "ACAO" ? no.proximoId ?? null : no.tipo === "ESPERA" ? no.proximoId : null;
 }
 
-async function publicarEventoDaAcao(execucao: ExecucaoCentral, tipo: Parameters<typeof publicarEventoBpm>[0] extends never ? never : string, entidadeTipo: string, entidadeId: string, anterior?: unknown, novo?: unknown) {
+async function publicarEventoDaAcao(execucao: ExecucaoCentral, tipo: Parameters<typeof publicarEventoBpm>[0] extends never ? never : string, entidadeTipo: string, entidadeId: string, anterior?: unknown, novo?: unknown, client?: Prisma.TransactionClient) {
   const eventoPai = execucao.evento;
   await publicarEventoBpm({
     tipo, entidadeTipo, entidadeId, cardId: execucao.cardId, pipelineId: execucao.card.pipelineId,
@@ -104,7 +107,7 @@ async function publicarEventoDaAcao(execucao: ExecucaoCentral, tipo: Parameters<
     correlationId: execucao.correlationId ?? eventoPai?.correlationId ?? execucao.id,
     causationId: eventoPai?.id ?? execucao.id, profundidade: (eventoPai?.profundidade ?? 0) + 1,
     idempotencyKey: `automacao:${execucao.id}:${entidadeTipo}:${entidadeId}:${tipo}`,
-  });
+  }, client);
 }
 
 async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCentral, bruto: unknown) {
@@ -129,19 +132,36 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
       select: { id: true, nome: true, tipo: true, opcoesJson: true },
     });
     if (!campo) throw new Error("Campo ativo não pertence ao pipeline do card");
-    const anterior = await db.bpmCardCampoValor.findUnique({ where: { cardId_campoId: { cardId: card.id, campoId } } });
-    if (parametros.somenteSeVazio === true && anterior?.valor?.trim()) {
-      return { campoId, valor: anterior.valor, ignorada: true, motivo: "CAMPO_JA_PREENCHIDO" };
+    let brutoValor = parametros.valor === null ? "" : texto(parametros.valor);
+    const origemId = /^\{\{campo\.([a-z0-9]+)\}\}$/.exec(brutoValor)?.[1];
+    if (!origemId && brutoValor.includes("{{campo.")) throw new Error("Referência de campo inválida");
+    if (origemId) {
+      const origem = await db.bpmCampo.findFirst({ where: { id: origemId, ativo: true, OR: [
+        { pipelineId: card.pipelineId }, { pipelinesAssociados: { some: { pipelineId: card.pipelineId } } },
+      ] }, select: { id: true, escopo: true, fonteEntidade: true, fonteAtributo: true, entidadeGlobal: true } });
+      if (!origem) throw new Error("Campo de origem não pertence ao pipeline do card");
+      const [valorCard, canonico] = await Promise.all([
+        db.bpmCardCampoValor.findUnique({ where: { cardId_campoId: { cardId: card.id, campoId: origemId } }, select: { valor: true } }),
+        carregarValoresCanonicosCampos(card.id, [origem]),
+      ]);
+      brutoValor = String(canonico[origemId] ?? valorCard?.valor ?? "");
     }
-    const brutoValor = parametros.valor === null ? "" : texto(parametros.valor);
     const validacao = validarValoresCamposBpm([campo], { [campoId]: brutoValor });
     if (!validacao.success) throw new Error(validacao.error);
     const valor = validacao.valores[campoId] || null;
-    if ((anterior?.valor ?? "") === (valor ?? "")) return { campoId, valor, ignorada: true, motivo: "VALOR_IGUAL" };
-    await db.bpmCardCampoValor.upsert({ where: { cardId_campoId: { cardId: card.id, campoId } }, create: { cardId: card.id, campoId, valor }, update: { valor } });
-    await publicarEventoDaAcao(execucao, "CAMPO_ALTERADO", "CAMPO", campoId, { campoId, valor: anterior?.valor ?? null }, { campoId, valor });
+    const resultado = await db.$transaction(async (tx) => {
+      const anterior = await tx.bpmCardCampoValor.findUnique({ where: { cardId_campoId: { cardId: card.id, campoId } } });
+      if (parametros.somenteSeVazio === true && anterior?.valor?.trim()) {
+        return { campoId, valor: anterior.valor, ignorada: true, motivo: "CAMPO_JA_PREENCHIDO" };
+      }
+      if ((anterior?.valor ?? "") === (valor ?? "")) return { campoId, valor, ignorada: true, motivo: "VALOR_IGUAL" };
+      await tx.bpmCardCampoValor.upsert({ where: { cardId_campoId: { cardId: card.id, campoId } }, create: { cardId: card.id, campoId, valor }, update: { valor } });
+      await publicarEventoDaAcao(execucao, "CAMPO_ALTERADO", "CAMPO", campoId, { campoId, valor: anterior?.valor ?? null }, { campoId, valor }, tx);
+      return { campoId, valor };
+    });
+    if (resultado.ignorada) return resultado;
     await notificarPipelineBpm({ pipelineId: card.pipelineId, cardId: card.id, tipo: "CARD_ATUALIZADO" });
-    return { campoId, valor };
+    return resultado;
   }
   if (tipo === "MOVER_CARD") {
     const etapaId = String(parametros.etapaId);
@@ -183,23 +203,29 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
     const temPrazo = parametros.prazoMinutos !== undefined;
     const prazoMinutos = Number(parametros.prazoMinutos ?? 0);
     const alertaMinutos = parametros.alertaMinutos === undefined ? null : Number(parametros.alertaMinutos);
-    if (parametros.naoDuplicarPendenteTipo) {
-      const existente = await db.bpmTarefa.findFirst({ where: { cardId: card.id, tipo: String(parametros.tipo), status: "PENDENTE" }, select: { id: true } });
-      if (existente) return { tarefaId: existente.id, existente: true };
-    }
     const agora = new Date();
     const tarefa = await db.$transaction(async (tx) => {
+      if (parametros.naoDuplicarTipo || parametros.naoDuplicarPendenteTipo) {
+        const existente = await tx.bpmTarefa.findFirst({ where: {
+          cardId: card.id, tipo: String(parametros.tipo),
+          ...(parametros.naoDuplicarTipo ? {} : { status: "PENDENTE" }),
+        }, select: { id: true } });
+        if (existente) return { id: existente.id, existente: true };
+      }
       if (parametros.registrarExecucaoEmCampo === "standbyFollowUpUltimoEm") {
         await tx.bpmCard.update({ where: { id: card.id }, data: { standbyFollowUpUltimoEm: agora } });
       }
-      return tx.bpmTarefa.create({ data: {
+      const criada = await tx.bpmTarefa.create({ data: {
+        ...(parametros.naoDuplicarTipo ? { id: idTarefaUnicaPorTipo(card.id, String(parametros.tipo)) } : {}),
         cardId: card.id, titulo: texto(parametros.titulo), descricao: parametros.descricao ? texto(parametros.descricao) : null,
         responsavelId, prazo: temPrazo ? new Date(agora.getTime() + prazoMinutos * 60_000) : null,
         alertaEm: alertaMinutos === null ? null : new Date(agora.getTime() + alertaMinutos * 60_000),
         tipo: String(parametros.tipo), prioridade: String(parametros.prioridade),
       } });
+      await publicarEventoDaAcao(execucao, "TAREFA_CRIADA", "TAREFA", criada.id, undefined, { tarefaId: criada.id, tipo: criada.tipo, titulo: criada.titulo }, tx);
+      return criada;
     });
-    await publicarEventoDaAcao(execucao, "TAREFA_CRIADA", "TAREFA", tarefa.id, undefined, { tarefaId: tarefa.id, tipo: tarefa.tipo, titulo: tarefa.titulo });
+    if ("existente" in tarefa) return { tarefaId: tarefa.id, existente: true };
     await notificarPipelineBpm({ pipelineId: card.pipelineId, cardId: card.id, tipo: "TAREFA_ALTERADA" });
     return { tarefaId: tarefa.id };
   }

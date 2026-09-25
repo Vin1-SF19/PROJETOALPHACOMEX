@@ -2,6 +2,7 @@ import { z } from "zod";
 import { CAMPOS_FIXOS_POR_FONTE, LIMITES_REGRAS, OPERADORES_REGRAS, TIPOS_VALOR, type GrupoCondicao, type ValorRegra } from "./types";
 
 export const campoReferenciaSchema = z.discriminatedUnion("fonte", [
+  z.object({ fonte: z.literal("agora"), campo: z.enum(CAMPOS_FIXOS_POR_FONTE.agora) }),
   z.object({ fonte: z.literal("card"), campo: z.enum(CAMPOS_FIXOS_POR_FONTE.card) }),
   z.object({ fonte: z.literal("cliente"), campo: z.enum(CAMPOS_FIXOS_POR_FONTE.cliente) }),
   z.object({ fonte: z.literal("processo"), campo: z.enum(CAMPOS_FIXOS_POR_FONTE.processo) }),
@@ -17,10 +18,11 @@ export const valorRegraSchema: z.ZodType<ValorRegra> = z.lazy(() => z.union([
 ]));
 export const condicaoFolhaSchema = z.object({
   tipo: z.literal("condicao"), campo: campoReferenciaSchema, operador: operadorSchema,
-  valor: z.unknown().optional(), tipoEsperado: tipoValorSchema.optional(),
+  valor: z.unknown().optional(), valorCampo: campoReferenciaSchema.optional(), tipoEsperado: tipoValorSchema.optional(),
 }).superRefine((condicao, contexto) => {
   const semOperando = condicao.operador === "preenchido" || condicao.operador === "vazio";
-  if (!semOperando && condicao.valor === undefined) contexto.addIssue({ code: "custom", path: ["valor"], message: "Operador exige valor de comparação" });
+  if (!semOperando && condicao.valor === undefined && !condicao.valorCampo) contexto.addIssue({ code: "custom", path: ["valor"], message: "Operador exige valor de comparação" });
+  if (condicao.valor !== undefined && condicao.valorCampo) contexto.addIssue({ code: "custom", path: ["valorCampo"], message: "Escolha valor fixo ou outro campo" });
   if ((condicao.operador === "estaEm" || condicao.operador === "naoEstaEm") && !Array.isArray(condicao.valor)) contexto.addIssue({ code: "custom", path: ["valor"], message: "Operador exige uma lista" });
   if (Array.isArray(condicao.valor) && condicao.valor.length > LIMITES_REGRAS.listaMaxima) contexto.addIssue({ code: "custom", path: ["valor"], message: `Lista excede ${LIMITES_REGRAS.listaMaxima} itens` });
 });
@@ -50,7 +52,7 @@ export const regraBpmSchema = z.object({
 });
 export type RegraBpmInput = z.infer<typeof regraBpmSchema>;
 export const contextoAvaliacaoSchema = z.object({
-  card: z.record(z.string(), z.unknown()), cliente: z.record(z.string(), z.unknown()).optional(), processo: z.record(z.string(), z.unknown()).optional(),
+  agora: z.record(z.string(), z.unknown()).optional(), card: z.record(z.string(), z.unknown()), cliente: z.record(z.string(), z.unknown()).optional(), processo: z.record(z.string(), z.unknown()).optional(),
   contratacao: z.record(z.string(), z.unknown()).optional(), relacionada: z.record(z.string(), z.unknown()).optional(), checklist: z.record(z.string(), z.unknown()).optional(), camposDinamicos: z.record(z.string().cuid(), z.unknown()).optional(),
 }).strict();
 export const fixtureCliSchema = z.object({ contexto: contextoAvaliacaoSchema, regra: regraBpmSchema }).strict();

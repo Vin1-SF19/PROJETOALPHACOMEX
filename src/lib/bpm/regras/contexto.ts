@@ -41,7 +41,7 @@ export async function montarContextoAvaliacaoDoCard(
   card: CardParaContexto,
   client: Prisma.TransactionClient | typeof db = db,
 ): Promise<ContextoAvaliacao> {
-  const [cliente, valoresCampos, checklist] = await Promise.all([
+  const [cliente, valoresCampos, checklist, servicoContratado] = await Promise.all([
     client.cliente.findUnique({
       where: { id: card.empresaId },
       select: {
@@ -67,12 +67,20 @@ export async function montarContextoAvaliacaoDoCard(
       pipelineId: card.pipelineId,
       etapaId: card.etapaId,
     }, client),
+    client.bpmCardServicoContexto.findUnique({
+      where: { cardId: card.id },
+      select: { clienteServico: { select: { servico: true, status: true, dataExito: true, formaPagamento: true, valorContrato: true } } },
+    }),
   ]);
   const camposDinamicos = Object.fromEntries(
     valoresCampos.map((item) => [item.campoId, item.valor]),
   );
 
   return {
+    agora: {
+      data: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()),
+      instante: new Date().toISOString(),
+    },
     card: {
       id: card.id,
       pipelineId: card.pipelineId,
@@ -89,6 +97,13 @@ export async function montarContextoAvaliacaoDoCard(
       statusPosFechamento: card.statusPosFechamento,
     },
     cliente: cliente ?? undefined,
+    contratacao: {
+      servico: servicoContratado?.clienteServico?.servico ?? card.servico,
+      status: servicoContratado?.clienteServico?.status ?? null,
+      dataExito: servicoContratado?.clienteServico?.dataExito ?? null,
+      formaPagamento: servicoContratado?.clienteServico?.formaPagamento ?? null,
+      valorContrato: servicoContratado?.clienteServico?.valorContrato ?? null,
+    },
     checklist: {
       total: checklist.total,
       concluidos: checklist.concluidos,

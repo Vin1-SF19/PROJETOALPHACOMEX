@@ -11,6 +11,7 @@ export const TIPOS_VALOR = ["texto", "numero", "booleano", "lista", "nulo", "dat
 export type TipoValor = (typeof TIPOS_VALOR)[number];
 
 export const CAMPOS_FIXOS_POR_FONTE = {
+  agora: ["data", "instante"],
   card: ["id", "pipelineId", "etapaId", "responsavelId", "servico", "status", "createdAt", "updatedAt", "concluidoEm", "primeiraVisualizacaoEm", "proximoContatoEm", "dataReuniao", "statusPosFechamento"],
   cliente: ["id", "cnpj", "razaoSocial", "nomeFantasia", "dataConstituicao", "uf", "municipio", "regimeTributario", "capitalSocial", "situacaoCadastral", "status"],
   processo: ["pipelineId", "pipelineNome", "etapaOrigemId", "etapaOrigemNome", "etapaDestinoId", "etapaDestinoNome", "origemMovimentacao"],
@@ -36,6 +37,7 @@ export const LIMITES_REGRAS = {
 
 export type ValorRegra = string | number | boolean | null | ValorRegra[];
 export type ContextoAvaliacao = {
+  agora?: Record<string, unknown>;
   card: Record<string, unknown>;
   cliente?: Record<string, unknown>;
   processo?: Record<string, unknown>;
@@ -44,7 +46,7 @@ export type ContextoAvaliacao = {
   checklist?: Record<string, unknown>;
   camposDinamicos?: Record<string, unknown>;
 };
-export type CondicaoFolha = { tipo: "condicao"; campo: CampoReferencia; operador: OperadorRegra; valor?: unknown; tipoEsperado?: TipoValor };
+export type CondicaoFolha = { tipo: "condicao"; campo: CampoReferencia; operador: OperadorRegra; valor?: unknown; valorCampo?: CampoReferencia; tipoEsperado?: TipoValor };
 export type GrupoCondicao = { operador: "AND" | "OR"; condicoes: (CondicaoFolha | GrupoCondicao)[] };
 export type OperacaoCalculo = "soma" | "subtracao" | "multiplicacao" | "divisao";
 export type TabelaDecisao = { linhas: { condicao: GrupoCondicao; resultado: ValorRegra }[]; padrao?: ValorRegra };

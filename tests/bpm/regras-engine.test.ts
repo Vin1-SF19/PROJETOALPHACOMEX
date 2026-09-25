@@ -51,6 +51,27 @@ describe("operadores e coerção explícita", () => {
     expect(avaliarCondicao(condicao(criadoEm, "dataDepois", "2026-09-04"), contexto)).toBe(true);
     expect(avaliarRegra(regra({ tipo: "bloqueio_movimentacao", mensagem: "não" }, condicao(criadoEm, "dataDepois", "09/04/2026")), contexto)).toMatchObject({ permitida: false, erros: [{ codigo: "TIPO_INCOMPATIVEL" }] });
   });
+
+  it("compara dois campos dinâmicos tipados sem usar rótulos", () => {
+    const esperado = { fonte: "campo_dinamico", campo: "cmf12345678901234567890123" } as const;
+    const recebido = { fonte: "campo_dinamico", campo: "cmf12345678901234567890124" } as const;
+    const doisValores = { ...contexto, camposDinamicos: { [esperado.campo]: "100.50", [recebido.campo]: "100.49" } };
+    const comparacao: CondicaoFolha = { tipo: "condicao", campo: recebido, operador: "diferente", valorCampo: esperado, tipoEsperado: "numero" };
+    expect(avaliarCondicao(comparacao, doisValores)).toBe(true);
+    expect(avaliarCondicao(comparacao, { ...doisValores, camposDinamicos: { [esperado.campo]: "100.50", [recebido.campo]: "100.50" } })).toBe(false);
+    expect(regraBpmSchema.safeParse(regra({ tipo: "bloqueio_movimentacao", mensagem: "Divergência" }, comparacao)).success).toBe(true);
+  });
+
+  it("compara vencimento com a data atual sem tratar ausência de êxito como atraso", () => {
+    const vencimento = { fonte: "campo_dinamico", campo: "cmf12345678901234567890125" } as const;
+    const hoje = { fonte: "agora", campo: "data" } as const;
+    const grupo: GrupoCondicao = { operador: "AND", condicoes: [
+      { tipo: "condicao", campo: vencimento, operador: "menorOuIgual", valorCampo: hoje, tipoEsperado: "data" },
+      { tipo: "condicao", campo: { fonte: "contratacao", campo: "dataExito" }, operador: "preenchido" },
+    ] };
+    expect(avaliarGrupo(grupo, { ...contexto, agora: { data: "2026-09-25" }, contratacao: { dataExito: null }, camposDinamicos: { [vencimento.campo]: "2026-09-24" } })).toBe(false);
+    expect(avaliarGrupo(grupo, { ...contexto, agora: { data: "2026-09-25" }, contratacao: { dataExito: "2026-09-23" }, camposDinamicos: { [vencimento.campo]: "2026-09-24" } })).toBe(true);
+  });
 });
 
 describe("árvores e resultados", () => {
