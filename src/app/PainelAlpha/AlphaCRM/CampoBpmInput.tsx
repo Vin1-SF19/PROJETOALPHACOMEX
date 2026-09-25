@@ -48,6 +48,15 @@ function lerOpcoes(opcoesJson: string | null): string[] {
   }
 }
 
+function dataHoraParaInput(valor: string): string {
+  if (!valor) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) return "";
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return "";
+  const parte = (numero: number) => String(numero).padStart(2, "0");
+  return `${data.getFullYear()}-${parte(data.getMonth() + 1)}-${parte(data.getDate())}T${parte(data.getHours())}:${parte(data.getMinutes())}`;
+}
+
 export function CampoBpmInput({
   campo,
   value,
@@ -158,11 +167,25 @@ export function CampoBpmInput({
     );
   }
 
-  if (campo.tipo === "arquivo") {
+  if (campo.tipo === "arquivo" || campo.tipo === "url_ou_arquivo") {
     return (
       <div className="space-y-1">
+        {campo.tipo === "url_ou_arquivo" && (
+          <input
+            id={`campo-bpm-${campo.id}`}
+            className={className}
+            type="url"
+            placeholder="https://... ou envie um arquivo abaixo"
+            value={value.startsWith("https://") ? value : ""}
+            disabled={bloqueado}
+            aria-invalid={invalid || undefined}
+            aria-describedby={describedBy}
+            onChange={(event) => onChange(event.target.value)}
+            onBlur={onBlur}
+          />
+        )}
         <input
-          id={`campo-bpm-${campo.id}`}
+          id={campo.tipo === "arquivo" ? `campo-bpm-${campo.id}` : undefined}
           className={className}
           type="file"
           disabled={bloqueado || enviandoArquivo || !cardId}
@@ -203,12 +226,12 @@ export function CampoBpmInput({
         />
         {value && (
           <a
-            href={arquivoAtual?.url ?? `/api/bpm/anexos/${value}`}
+            href={value.startsWith("https://") ? value : arquivoAtual?.url ?? `/api/bpm/anexos/${value}`}
             target="_blank"
             rel="noopener noreferrer"
             className="block truncate text-[11px] text-emerald-300 hover:underline"
           >
-            {arquivoAtual?.nome ?? "Abrir arquivo vinculado"}
+            {value.startsWith("https://") ? "Abrir link do contrato" : arquivoAtual?.nome ?? "Abrir arquivo vinculado"}
           </a>
         )}
       </div>
@@ -254,6 +277,7 @@ export function CampoBpmInput({
   }
 
   return (
+    <>
     <input
       id={`campo-bpm-${campo.id}`}
       className={className}
@@ -275,7 +299,7 @@ export function CampoBpmInput({
       max={campo.tipo === "percentual" ? 100 : undefined}
       inputMode={["cpf", "telefone"].includes(campo.tipo) ? "numeric" : undefined}
       maxLength={campo.tipo === "cpf" ? 14 : undefined}
-      value={value}
+      value={campo.tipo === "data_hora" ? dataHoraParaInput(value) : value}
       disabled={bloqueado}
       onChange={(event) => {
         const proximo = event.target.value;
@@ -283,9 +307,13 @@ export function CampoBpmInput({
           const numero = Number(proximo);
           if (!Number.isFinite(numero) || numero < 0 || numero > 100) return;
         }
-        onChange(proximo);
+        onChange(campo.tipo === "data_hora" && proximo ? new Date(proximo).toISOString() : proximo);
       }}
       onBlur={onBlur}
     />
+    {campo.tipo === "data_hora" && /^\d{4}-\d{2}-\d{2}$/.test(value) && (
+      <small>Registro anterior: {value}, sem horário. Informe a hora do envio para atualizar.</small>
+    )}
+    </>
   );
 }

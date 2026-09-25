@@ -129,11 +129,15 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
       select: { id: true, nome: true, tipo: true, opcoesJson: true },
     });
     if (!campo) throw new Error("Campo ativo não pertence ao pipeline do card");
+    const anterior = await db.bpmCardCampoValor.findUnique({ where: { cardId_campoId: { cardId: card.id, campoId } } });
+    if (parametros.somenteSeVazio === true && anterior?.valor?.trim()) {
+      return { campoId, valor: anterior.valor, ignorada: true, motivo: "CAMPO_JA_PREENCHIDO" };
+    }
     const brutoValor = parametros.valor === null ? "" : texto(parametros.valor);
     const validacao = validarValoresCamposBpm([campo], { [campoId]: brutoValor });
     if (!validacao.success) throw new Error(validacao.error);
     const valor = validacao.valores[campoId] || null;
-    const anterior = await db.bpmCardCampoValor.findUnique({ where: { cardId_campoId: { cardId: card.id, campoId } } });
+    if ((anterior?.valor ?? "") === (valor ?? "")) return { campoId, valor, ignorada: true, motivo: "VALOR_IGUAL" };
     await db.bpmCardCampoValor.upsert({ where: { cardId_campoId: { cardId: card.id, campoId } }, create: { cardId: card.id, campoId, valor }, update: { valor } });
     await publicarEventoDaAcao(execucao, "CAMPO_ALTERADO", "CAMPO", campoId, { campoId, valor: anterior?.valor ?? null }, { campoId, valor });
     await notificarPipelineBpm({ pipelineId: card.pipelineId, cardId: card.id, tipo: "CARD_ATUALIZADO" });

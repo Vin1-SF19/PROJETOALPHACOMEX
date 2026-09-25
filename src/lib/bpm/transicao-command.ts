@@ -361,6 +361,21 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       ? (canonicos[campoId] || null)
       : value);
   }
+  const referenciasArquivo = [...camposPorId.values()].flatMap((campo) => {
+    const valor = valoresEfetivosPorId.get(campo.id)?.trim();
+    return campo.tipo === "url_ou_arquivo" && valor && !valor.startsWith("https://")
+      ? [{ campoId: campo.id, id: valor }] : [];
+  });
+  if (referenciasArquivo.length) {
+    const anexosValidos = await tx.bpmCardAnexo.findMany({
+      where: { cardId: card.id, OR: referenciasArquivo },
+      select: { id: true, campoId: true },
+    });
+    if (referenciasArquivo.some((referencia) => !anexosValidos.some((anexo) =>
+      anexo.id === referencia.id && anexo.campoId === referencia.campoId))) {
+      erro("INVALID_ATTACHMENT_REFERENCE", "Arquivo não vinculado ao campo deste card.");
+    }
+  }
 
   const contextoRegra = await montarContextoAvaliacaoDoCard(card, tx);
   contextoRegra.camposDinamicos = {
@@ -376,8 +391,23 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       if (!validada.success) erro("INVALID_REQUIREMENT", `Requisito inválido: ${requisito.chave}.`);
       if (!avaliarGrupo(validada.data, contextoRegra)) continue;
     }
-    if (requisito.alvoTipo === "CAMPO" && requisito.campoId && vazio(valoresEfetivosPorId.get(requisito.campoId))) {
-      pendencias.push(requisito.campo?.nome ?? requisito.alvoChave ?? requisito.mensagem);
+    if (requisito.alvoTipo === "CAMPO" && requisito.campoId) {
+      const valor = valoresEfetivosPorId.get(requisito.campoId);
+      if (vazio(valor)) {
+        pendencias.push(requisito.campo?.nome ?? requisito.alvoChave ?? requisito.mensagem);
+      } else {
+        const campo = camposPorId.get(requisito.campoId);
+        if (campo && !validarValoresCamposBpm([{
+          id: campo.id, nome: campo.nome, tipo: campo.tipo, opcoesJson: campo.opcoesJson,
+          escopo: campo.escopo, fonteEntidade: campo.fonteEntidade, editavel: true, somenteLeitura: false,
+        }], { [campo.id]: valor ?? "" }).success) {
+          pendencias.push(requisito.campo?.nome ?? campo.nome);
+        }
+      }
+    }
+    if (requisito.alvoTipo === "REGRA") {
+      if (!requisito.condicaoJson) erro("INVALID_REQUIREMENT", `Requisito inválido: ${requisito.chave}.`);
+      pendencias.push(requisito.mensagem);
     }
   }
   for (const campo of camposRequisito) {

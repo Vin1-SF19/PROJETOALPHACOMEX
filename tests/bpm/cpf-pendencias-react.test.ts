@@ -235,7 +235,9 @@ it.each([
         input.dispatchEvent(new Event("input", { bubbles: true }));
       }
     });
-    expect(AtualizarCardBpm).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ camposValores: { dinamico: valor } }));
+    expect(AtualizarCardBpm).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      camposValores: { dinamico: tipo === "data_hora" ? new Date(valor).toISOString() : valor },
+    }));
   } finally { vi.useRealTimers(); }
 });
 

@@ -26,7 +26,8 @@ import {
 } from "@/lib/bpm/automacoes/fila";
 import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { executarAutomacoesCentraisDoCardAgora } from "@/lib/bpm/automacoes/orquestrador";
-import { salvarValoresGlobaisPersonalizadosCampos } from "@/lib/bpm/campos-configuraveis-server";
+import { carregarValoresCanonicosCampos, salvarValoresGlobaisPersonalizadosCampos } from "@/lib/bpm/campos-configuraveis-server";
+import { prepararSalvamentoConfigurado } from "@/lib/bpm/validacao-salvamento-configurado";
 import { camposPublicadosPorEtapa, capacidadesObrigatoriasPorEtapa } from "@/lib/bpm/campos-formulario-publicado";
 import { desserializarComposicaoCardKanban, type CardKanbanComposicao } from "@/lib/bpm/card-kanban";
 import { obterStatusPosFechamentoVisivel } from "@/lib/bpm/status-pos-fechamento";
@@ -1283,6 +1284,7 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
       }
 
       let valoresValidados: Record<string, string> = {};
+      let valoresAnteriores: Record<string, string | null> = {};
       if (
         etapaEhLost(cardAtual.etapa.nome)
         || (camposValores && Object.keys(camposValores).length > 0)
@@ -1316,7 +1318,8 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
         // Uma referência de arquivo só é válida depois do upload autenticado
         // e do registro do anexo neste mesmo card e campo.
         const referenciasArquivo = camposAplicaveis.filter(
-          (campo) => campo.tipo === "arquivo" && valoresValidados[campo.id],
+          (campo) => (campo.tipo === "arquivo" || campo.tipo === "url_ou_arquivo"
+            && !valoresValidados[campo.id]?.startsWith("https://")) && valoresValidados[campo.id],
         );
         if (referenciasArquivo.length > 0) {
           const anexos = await tx.bpmCardAnexo.findMany({
@@ -1342,6 +1345,26 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
           if (!validacaoLostAtual.success) {
             throw new Error(`MOTIVO_LOST_INVALIDO:${validacaoLostAtual.error}`);
           }
+        }
+        if (Object.keys(valoresValidados).length > 0) {
+          valoresValidados = await prepararSalvamentoConfigurado({
+            card: cardAtual,
+            valoresSubmetidos: valoresValidados,
+            client: tx,
+          });
+          const ids = Object.keys(valoresValidados);
+          const [camposDefinidos, valoresPersistidos] = await Promise.all([
+            tx.bpmCampo.findMany({
+              where: { id: { in: ids } },
+              select: { id: true, escopo: true, fonteEntidade: true, fonteAtributo: true, entidadeGlobal: true },
+            }),
+            tx.bpmCardCampoValor.findMany({ where: { cardId, campoId: { in: ids } }, select: { campoId: true, valor: true } }),
+          ]);
+          const globais = await carregarValoresCanonicosCampos(cardId, camposDefinidos, tx);
+          valoresAnteriores = {
+            ...Object.fromEntries(valoresPersistidos.map((item) => [item.campoId, item.valor])),
+            ...globais,
+          };
         }
       }
 
@@ -1411,9 +1434,11 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
         causationId: historicoAtualizacao.id, idempotencyKey: `card-atualizado:${historicoAtualizacao.id}`,
       }, tx);
       for (const [campoId, valor] of Object.entries(valoresValidados)) {
+        if ((valoresAnteriores[campoId] ?? "") === valor) continue;
         await publicarEventoBpm({
           tipo: "CAMPO_ALTERADO", entidadeTipo: "CAMPO", entidadeId: campoId,
-          cardId, pipelineId: cardAtual.pipelineId, valorNovo: { campoId, valor },
+          cardId, pipelineId: cardAtual.pipelineId,
+          valorAnterior: { campoId, valor: valoresAnteriores[campoId] ?? null }, valorNovo: { campoId, valor },
           atorTipo: "USUARIO", atorUserId: userId, correlationId,
           causationId: historicoAtualizacao.id, idempotencyKey: `campo-alterado:${historicoAtualizacao.id}:${campoId}`,
         }, tx);
@@ -1461,6 +1486,10 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
           ? CONFIGURACAO_LOST_INVALIDA_MENSAGEM
         : error instanceof Error && error.message.startsWith("CAMPO_INVALIDO:")
           ? error.message.slice("CAMPO_INVALIDO:".length)
+        : error instanceof Error && error.message.startsWith("REQUISITOS_PENDENTES:")
+          ? error.message.slice("REQUISITOS_PENDENTES:".length)
+        : error instanceof Error && error.message.startsWith("CONFIGURACAO_INVALIDA:")
+          ? error.message.slice("CONFIGURACAO_INVALIDA:".length)
         : error instanceof Error && error.message.startsWith("CONTRATO_INVALIDO:")
           ? error.message.slice("CONTRATO_INVALIDO:".length)
         : error instanceof Error && error.message.startsWith("MOTIVO_LOST_INVALIDO:")

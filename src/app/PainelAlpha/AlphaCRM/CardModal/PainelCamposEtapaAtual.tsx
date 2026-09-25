@@ -395,7 +395,7 @@ export function PainelCamposEtapaAtual({
                   disabled={!podeEditar}
                   readOnly={somenteLeitura}
                   cardId={card.id}
-                  arquivoAtual={campo.tipo === "arquivo"
+                  arquivoAtual={campo.tipo === "arquivo" || campo.tipo === "url_ou_arquivo"
                     ? card.anexos.find((anexo) => anexo.id === valoresCamposAtuais[campo.id]) ?? null
                     : null}
                   registerFileSave={(save) => registerSave(save, card.id, `${card.id}:arquivo:${campo.id}`)}
