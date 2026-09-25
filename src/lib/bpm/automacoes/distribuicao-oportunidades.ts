@@ -20,7 +20,6 @@ import {
   enfileirarAutomacoesCriacaoTarefaBpm,
 } from "@/lib/bpm/automacoes/fila";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
-import { campoFinanceiroSomenteLeitura } from "@/lib/bpm/pipeline-financeiro";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 
 type ClienteExecucao = Prisma.TransactionClient | typeof db;
@@ -488,12 +487,12 @@ export async function executarOportunidadeBpm(params: {
       resultadoAcao = { anotacaoId: anotacao.id };
     } else if (acao.tipo === "ALTERAR_CAMPO") {
       const campo = await tx.bpmCampo.findFirst({
-        where: { id: acao.campoId, pipelineId: card.pipelineId },
-        select: { id: true, nome: true, tipo: true, opcoesJson: true },
+        where: { id: acao.campoId, pipelineId: card.pipelineId, ativo: true },
+        select: { id: true, nome: true, tipo: true, opcoesJson: true, editavel: true, somenteLeitura: true },
       });
       if (!campo) throw new Error("Campo configurado não pertence ao pipeline do card");
-      if (campoFinanceiroSomenteLeitura(campo.nome)) {
-        throw new Error("Campo financeiro automático não pode ser alterado por oportunidade");
+      if (campo.somenteLeitura || campo.editavel === false) {
+        throw new Error("Campo configurado é somente leitura");
       }
       const validacao = validarValoresCamposBpm([campo], { [campo.id]: acao.valor });
       if (!validacao.success) throw new Error(validacao.error);

@@ -20,21 +20,13 @@ import {
   isAdminRole,
   usuarioElegivelResponsavelBpm,
 } from "@/lib/bpm/ownership";
-import {
-  executarAutomacaoFechamentoComercial,
-  executarAutomacaoTarefaNotaFiscal,
-} from "@/lib/bpm/automacoes";
-import type { CardFilhoCriado } from "@/lib/bpm/automacoes";
 export type { CardFilhoCriado } from "@/lib/bpm/automacoes";
 import {
   enfileirarAutomacoesCriacaoCardBpm,
-  enfileirarAutomacoesMovimentoBpm,
 } from "@/lib/bpm/automacoes/fila";
 import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { executarAutomacoesCentraisDoCardAgora } from "@/lib/bpm/automacoes/orquestrador";
-import { automacaoMigradaEstaAtiva, NOMES_AUTOMACOES_MIGRADAS } from "@/lib/bpm/automacoes/migracao-hardcoded";
 import { salvarValoresGlobaisPersonalizadosCampos } from "@/lib/bpm/campos-configuraveis-server";
-import { atualizarCalculoNovoContrato, atualizarElaboracaoContrato } from "@/lib/bpm/novo-contrato-financeiro-server";
 import { camposPublicadosPorEtapa, capacidadesObrigatoriasPorEtapa } from "@/lib/bpm/campos-formulario-publicado";
 import { desserializarComposicaoCardKanban, type CardKanbanComposicao } from "@/lib/bpm/card-kanban";
 import { obterStatusPosFechamentoVisivel } from "@/lib/bpm/status-pos-fechamento";
@@ -47,7 +39,6 @@ import {
   carregarCamposAplicaveisCardEtapa,
   carregarCamposAplicaveisEtapa,
   carregarSnapshotsCopiaCamposCard,
-  verificarTransicaoPermitidaBpm,
   type PerfilAcessoCampoBpm,
 } from "@/lib/bpm/requisitos-etapa-server";
 import {
@@ -60,8 +51,6 @@ import {
   META_LIGACOES_NOVOS_LEADS,
 } from "@/lib/bpm/novos-leads";
 import {
-  ACESSO_BOAS_VINDAS_NEGADO_MENSAGEM,
-  etapaEhBoasVindas,
   NOME_ETAPA_BOAS_VINDAS,
 } from "@/lib/bpm/boas-vindas";
 import {
@@ -82,15 +71,11 @@ import {
 } from "@/lib/bpm/em-tratativa";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 import {
-  configuracaoEntradaFechadoEhValida,
   CONFIGURACAO_FECHADO_INVALIDA_MENSAGEM,
   etapaEhFechado,
-  STATUS_POS_FECHAMENTO_INICIAL,
 } from "@/lib/bpm/status-pos-fechamento";
 import {
   CONFIGURACAO_LOST_INVALIDA_MENSAGEM,
-  campoEhMotivoLost,
-  campoEhMotivoLostOutro,
   etapaEhLost,
   resolverConfiguracaoLost,
   validarMotivoLost,
@@ -98,12 +83,10 @@ import {
   type ConfiguracaoLost,
 } from "@/lib/bpm/lost";
 import { obterErroTransicaoMonitoramento } from "@/lib/bpm/monitoramento";
-import { obterErroRegrasParaMovimento } from "@/lib/bpm/regras/guarda-movimento";
 import {
   etapaEhAlinhamentoEstrategico,
   obterErroCamposAlinhamentoParaSaida,
 } from "@/lib/bpm/alinhamento-estrategico";
-import { campoFinanceiroSomenteLeitura, etapaFinanceiraValida, validateFinancialTransition } from "@/lib/bpm/pipeline-financeiro";
 import { executarTransicaoBpm } from "@/lib/bpm/transicao-command";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { processarCadenciasImediatasDoCardBpm } from "@/lib/bpm/cadencias/executor";
@@ -120,7 +103,6 @@ import {
   criarSlaInstancia,
   obterStatusSlaCards,
   prioridadeStatusSla,
-  sincronizarSlaMovimentoBpm,
 } from "@/lib/bpm/sla";
 
 function resolverPerfilAcessoCampo(acesso: { isAdminGlobal: boolean; role: string | null }): PerfilAcessoCampoBpm {
@@ -250,23 +232,6 @@ function mesclarCamposPorId<T extends { id: string }>(
   const porId = new Map(campos.map((campo) => [campo.id, campo]));
   for (const campo of adicionais) porId.set(campo.id, campo);
   return [...porId.values()];
-}
-
-function validarMotivoLostNosCampos(
-  campos: readonly CampoLostCarregado[],
-  valores: Readonly<Record<string, string | null | undefined>>,
-) {
-  const motivos = campos.filter((campo) => campoEhMotivoLost(campo.nome));
-  const complementos = campos.filter((campo) =>
-    campoEhMotivoLostOutro(campo.nome),
-  );
-  if (motivos.length !== 1 || complementos.length !== 1) {
-    return { success: false as const, error: CONFIGURACAO_LOST_INVALIDA_MENSAGEM };
-  }
-  return validarMotivoLost({
-    configuracao: { motivo: motivos[0], complemento: complementos[0] },
-    valores,
-  });
 }
 
 export async function ListarCardsPipelineBpm(pipelineId: string) {
@@ -1205,15 +1170,6 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
       },
     });
     if (!cardAnterior) return { success: false, error: "Card não encontrado" };
-    if (cardAnterior.pipeline?.nome === "Financeiro" && camposValores && Object.keys(camposValores).length > 0) {
-      const camposAutomaticos = await db.bpmCampo.findMany({
-        where: { id: { in: Object.keys(camposValores) }, pipelineId: cardAnterior.pipelineId },
-        select: { nome: true },
-      });
-      if (camposAutomaticos.some((campo) => campoFinanceiroSomenteLeitura(campo.nome))) {
-        return { success: false, error: "Campos financeiros automáticos não podem ser alterados manualmente." };
-      }
-    }
     if (
       etapaEhLost(cardAnterior.etapa.nome)
       && camposValores !== undefined
@@ -1431,16 +1387,6 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
             create: { cardId, campoId, valor },
             update: { valor },
           });
-        }
-        if (cardAnterior.pipeline?.chave === "financeiro"
-          && cardAnterior.etapa?.chave === "solicitacao_contrato"
-          && Object.keys(valoresValidados).length > 0) {
-          await atualizarCalculoNovoContrato(tx, cardId, cardAtual.pipelineId);
-        }
-        if (cardAnterior.pipeline?.chave === "financeiro"
-          && cardAnterior.etapa?.chave === "elaboracao_contrato"
-          && Object.keys(valoresValidados).length > 0) {
-          await atualizarElaboracaoContrato(tx, cardId, cardAtual.pipelineId, Object.keys(valoresValidados));
         }
       }
 
@@ -1813,439 +1759,6 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
   }
 }
 
-/**
- * Implementação anterior preservada temporariamente apenas como referência de
- * caracterização. Nenhum caller runtime a utiliza após a convergência para o
- * TransitionCommand canônico.
- */
-async function executarMovimentoLegadoDesativado(
-  dados: DadosMovimentoComRequisitos,
-  userId: number,
-  userRole: string | null,
-) {
-  const { cardId, etapaDestinoId, camposValores, proximoContatoEm, origemMovimentacao = "MANUAL" } = dados;
-  const acessoOrigem = await exigirAcessoBpmCard(
-    cardId,
-    userId,
-    userRole,
-    "moverEtapa",
-  );
-  const contexto = await carregarContextoMovimento(cardId, etapaDestinoId);
-  if ("error" in contexto) return { success: false, error: contexto.error };
-  const { card, etapaDestino } = contexto;
-  if (!resolverVisibilidadeEtapa(
-    acessoOrigem.perfilGlobal,
-    etapaDestino.visibilidades,
-  ).podeAgir) {
-    return {
-      success: false,
-      error: `Seu perfil não pode agir na etapa "${etapaDestino.nome}".`,
-    };
-  }
-  let camposFinanceirosPorId: Array<{ id: string; nome: string }> = [];
-  let validacaoFinanceira: ReturnType<typeof validateFinancialTransition> = { applicable: false, blocked: false, pendingFields: [], automaticValues: {} };
-  if (etapaFinanceiraValida(card.etapa.nome) && etapaFinanceiraValida(etapaDestino.nome)) {
-    const financeiro = await db.bpmCard.findUnique({ where: { id: cardId }, select: { pipeline: { select: { nome: true } }, campoValores: { select: { valor: true, campo: { select: { nome: true } } } }, anexos: { select: { nome: true } } } });
-    const valoresFinanceiros: Record<string, string | null> = Object.fromEntries((financeiro?.campoValores ?? []).map((item) => [item.campo.nome, item.valor]));
-    camposFinanceirosPorId = await db.bpmCampo.findMany({ where: { pipelineId: card.pipelineId }, select: { id: true, nome: true } });
-    for (const [campoId, valor] of Object.entries(camposValores)) { const nome = camposFinanceirosPorId.find((campo) => campo.id === campoId)?.nome; if (nome) valoresFinanceiros[nome] = valor }
-    validacaoFinanceira = validateFinancialTransition({ pipelineName: financeiro?.pipeline.nome ?? "", fromStage: card.etapa.nome, toStage: etapaDestino.nome, values: valoresFinanceiros, attachmentNames: financeiro?.anexos.map((anexo) => anexo.nome) });
-  }
-  if (validacaoFinanceira.blocked) return { success: false, error: validacaoFinanceira.pendingFields.length > 0 ? `${validacaoFinanceira.message} Campos pendentes: ${validacaoFinanceira.pendingFields.join(", ")}.` : validacaoFinanceira.message };
-  if (etapaEhBoasVindas(etapaDestino.nome) && !(await checarAcessoDiretoriaBpm(userId))) {
-    return { success: false, error: ACESSO_BOAS_VINDAS_NEGADO_MENSAGEM };
-  }
-  if (card.etapaId === etapaDestinoId) return { success: true };
-
-  const transicaoPermitida = await verificarTransicaoPermitidaBpm(
-    card.etapaId,
-    etapaDestinoId,
-    origemMovimentacao,
-  );
-  if (!transicaoPermitida.permitida) {
-    return { success: false, error: transicaoPermitida.motivo ?? "Movimento não permitido para esta transição." };
-  }
-
-  const camposTransicao = await carregarCamposTransicao({
-    cardId,
-    pipelineId: card.pipelineId,
-    etapaOrigemId: card.etapaId,
-    etapaOrigemNome: card.etapa.nome,
-    etapaDestinoId,
-    etapaDestinoNome: etapaDestino.nome,
-  }, db, resolverPerfilAcessoCampo(acessoOrigem));
-  if (
-    etapaEhFechado(etapaDestino.nome)
-    && !configuracaoEntradaFechadoEhValida(camposTransicao)
-  ) {
-    return { success: false, error: CONFIGURACAO_FECHADO_INVALIDA_MENSAGEM };
-  }
-  const idsTransicao = new Set(camposTransicao.map((campo) => campo.id));
-  if (Object.keys(camposValores).some((campoId) => !idsTransicao.has(campoId))) {
-    return {
-      success: false,
-      error: "Um ou mais campos não pertencem aos requisitos desta transição.",
-    };
-  }
-  const validacaoCampos = validarValoresCamposBpm(camposTransicao, camposValores);
-  if (!validacaoCampos.success) return validacaoCampos;
-  const valoresValidados = validacaoCampos.valores;
-  if (etapaEhLost(etapaDestino.nome)) {
-    const validacaoLost = validarMotivoLostNosCampos(
-      camposTransicao,
-      valoresValidados,
-    );
-    if (!validacaoLost.success) return validacaoLost;
-  }
-
-  const proximoContatoEfetivo = proximoContatoEm === undefined
-    ? card.proximoContatoEm
-    : proximoContatoEm;
-  // "Próximo Contato" não é um BpmCampo dinâmico (é BpmCard.proximoContatoEm),
-  // mas para o pipeline Revisão de Radar é tão obrigatório pra sair de uma
-  // etapa quanto os campos dinâmicos — reportado junto na mesma mensagem em
-  // vez de um erro separado descoberto só depois que os outros são corrigidos.
-  const proximoContatoAusente = pipelineEhRevisaoRadar(card.pipeline?.nome)
-    && etapaEhNovosLeads(card.etapa.nome)
-    && !proximoContatoEfetivo;
-
-  const valoresEfetivos = new Map(
-    camposTransicao.map((campo) => [campo.id, valoresValidados[campo.id] ?? campo.valor]),
-  );
-  const faltantes = camposTransicao.filter(
-    (campo) => campo.obrigatorio && !valoresEfetivos.get(campo.id)?.trim(),
-  );
-  if (faltantes.length > 0 || proximoContatoAusente) {
-    const faltantesOrigem = faltantes.filter(
-      (campo) => campo.contexto === "ORIGEM" || campo.contexto === "AMBOS",
-    );
-    const nomesPendentes = [
-      ...faltantes.map((campo) => campo.nome),
-      ...(proximoContatoAusente ? ["Próximo Contato"] : []),
-    ];
-    return {
-      success: false,
-      error: faltantesOrigem.length > 0 || proximoContatoAusente
-        ? `Não é possível sair de ${card.etapa.nome}: campos obrigatórios pendentes (${nomesPendentes.join(", ")}).`
-        : `Não é possível avançar: campos obrigatórios pendentes (${nomesPendentes.join(", ")})`,
-    };
-  }
-
-  const camposEtapaOrigem = await carregarCamposOrigemParaGuard({
-    cardId,
-    pipelineId: card.pipelineId,
-    etapaOrigemId: card.etapaId,
-    etapaOrigemNome: card.etapa.nome,
-  });
-  const guardas = await carregarGuardasNativasMovimento({
-    cardId,
-    pipelineNome: card.pipeline?.nome,
-    etapaOrigemNome: card.etapa.nome,
-    etapaDestinoNome: etapaDestino.nome,
-    dataReuniao: card.dataReuniao,
-    transcricaoReuniao: card.transcricaoReuniao,
-    proximoContatoEm: proximoContatoEfetivo,
-    camposEtapaOrigem,
-  });
-  if (guardas.length > 0) return { success: false, error: guardas[0] };
-
-  const erroRegraBpm = await obterErroRegrasParaMovimento({ card, etapaDestinoId });
-  if (erroRegraBpm) return { success: false, error: erroRegraBpm };
-  const erroChecklist = await obterErroChecklistParaMovimento({
-    id: card.id,
-    pipelineId: card.pipelineId,
-    etapaId: card.etapaId,
-  });
-  if (erroChecklist) return { success: false, error: erroChecklist };
-
-  const resultadoMovimento = await db.$transaction(async (tx) => {
-    const acessoOrigemAtual = await exigirAcessoBpmCard(
-      cardId,
-      userId,
-      userRole,
-      "moverEtapa",
-      tx,
-    );
-    const contextoAtual = await carregarContextoMovimento(cardId, etapaDestinoId, tx);
-    if ("error" in contextoAtual) {
-      throw new Error(`MOVIMENTO_INVALIDO:${contextoAtual.error}`);
-    }
-    const { card: cardAtual, etapaDestino: destinoAtual } = contextoAtual;
-    if (!resolverVisibilidadeEtapa(
-      acessoOrigemAtual.perfilGlobal,
-      destinoAtual.visibilidades,
-    ).podeAgir) {
-      throw new Error(
-        `MOVIMENTO_INVALIDO:Seu perfil não pode agir na etapa "${destinoAtual.nome}".`,
-      );
-    }
-    let validacaoFinanceiraAtual: ReturnType<typeof validateFinancialTransition> = { applicable: false, blocked: false, pendingFields: [], automaticValues: {} };
-    if (etapaFinanceiraValida(cardAtual.etapa.nome) && etapaFinanceiraValida(destinoAtual.nome)) {
-      const financeiroAtual = await tx.bpmCard.findUnique({ where: { id: cardId }, select: { pipeline: { select: { nome: true } }, campoValores: { select: { valor: true, campo: { select: { nome: true } } } }, anexos: { select: { nome: true } } } });
-      const valoresFinanceirosAtuais: Record<string, string | null> = Object.fromEntries((financeiroAtual?.campoValores ?? []).map((item) => [item.campo.nome, item.valor]));
-      for (const [campoId, valor] of Object.entries(camposValores)) { const nome = camposFinanceirosPorId.find((campo) => campo.id === campoId)?.nome; if (nome) valoresFinanceirosAtuais[nome] = valor }
-      validacaoFinanceiraAtual = validateFinancialTransition({ pipelineName: financeiroAtual?.pipeline.nome ?? "", fromStage: cardAtual.etapa.nome, toStage: destinoAtual.nome, values: valoresFinanceirosAtuais, attachmentNames: financeiroAtual?.anexos.map((anexo) => anexo.nome) });
-    }
-    if (validacaoFinanceiraAtual.blocked) throw new Error(`MOVIMENTO_INVALIDO:${validacaoFinanceiraAtual.pendingFields.length > 0 ? `${validacaoFinanceiraAtual.message} Campos pendentes: ${validacaoFinanceiraAtual.pendingFields.join(", ")}.` : validacaoFinanceiraAtual.message}`);
-    if (etapaEhBoasVindas(destinoAtual.nome) && !(await checarAcessoDiretoriaBpm(userId, tx))) {
-      throw new Error(`MOVIMENTO_INVALIDO:${ACESSO_BOAS_VINDAS_NEGADO_MENSAGEM}`);
-    }
-    const erroRegraBpmAtual = await obterErroRegrasParaMovimento({ card: cardAtual, etapaDestinoId, client: tx });
-    if (erroRegraBpmAtual) throw new Error(`MOVIMENTO_INVALIDO:${erroRegraBpmAtual}`);
-    const erroChecklistAtual = await obterErroChecklistParaMovimento({
-      id: cardAtual.id,
-      pipelineId: cardAtual.pipelineId,
-      etapaId: cardAtual.etapaId,
-    }, tx);
-    if (erroChecklistAtual) throw new Error(`MOVIMENTO_INVALIDO:${erroChecklistAtual}`);
-    if (
-      cardAtual.etapaId !== card.etapaId
-      || cardAtual.status !== card.status
-      || cardAtual.updatedAt.getTime() !== card.updatedAt.getTime()
-    ) {
-      throw new Error("CONFLITO_MOVIMENTO_CARD");
-    }
-
-    const camposAtuais = await carregarCamposTransicao({
-      cardId,
-      pipelineId: cardAtual.pipelineId,
-      etapaOrigemId: cardAtual.etapaId,
-      etapaOrigemNome: cardAtual.etapa.nome,
-      etapaDestinoId,
-      etapaDestinoNome: destinoAtual.nome,
-    }, tx, resolverPerfilAcessoCampo(acessoOrigemAtual));
-    if (
-      etapaEhFechado(destinoAtual.nome)
-      && !configuracaoEntradaFechadoEhValida(camposAtuais)
-    ) {
-      throw new Error("CONFIGURACAO_FECHADO_INVALIDA");
-    }
-    const idsAtuais = new Set(camposAtuais.map((campo) => campo.id));
-    if (Object.keys(camposValores).some((campoId) => !idsAtuais.has(campoId))) {
-      throw new Error("MOVIMENTO_INVALIDO:Um ou mais campos não pertencem aos requisitos desta transição.");
-    }
-    if (Object.keys(camposValores).some((campoId) => {
-      const campo = camposAtuais.find((item) => item.id === campoId);
-      return campo?.somenteLeitura === true || campo?.editavel === false;
-    })) {
-      throw new Error("MOVIMENTO_INVALIDO:Um ou mais campos informados são somente leitura.");
-    }
-    const valoresParaValidar = etapaEhFechado(destinoAtual.nome)
-      ? Object.fromEntries(
-          camposAtuais.filter((campo) => !campo.somenteLeitura && campo.editavel !== false).map((campo) => [
-            campo.id,
-            camposValores[campo.id] ?? campo.valor ?? "",
-          ]),
-        )
-      : camposValores;
-    const validacaoAtual = validarValoresCamposBpm(camposAtuais, valoresParaValidar);
-    if (!validacaoAtual.success) {
-      throw new Error(`MOVIMENTO_INVALIDO:${validacaoAtual.error}`);
-    }
-    if (etapaEhLost(destinoAtual.nome)) {
-      const validacaoLostAtual = validarMotivoLostNosCampos(
-        camposAtuais,
-        validacaoAtual.valores,
-      );
-      if (!validacaoLostAtual.success) {
-        const prefixo = validacaoLostAtual.error === CONFIGURACAO_LOST_INVALIDA_MENSAGEM
-          ? "CONFIGURACAO_LOST_INVALIDA"
-          : `MOVIMENTO_INVALIDO:${validacaoLostAtual.error}`;
-        throw new Error(prefixo);
-      }
-    }
-    const valoresEfetivosAtuais = new Map(
-      camposAtuais.map((campo) => [
-        campo.id,
-        validacaoAtual.valores[campo.id] ?? campo.valor,
-      ]),
-    );
-    const faltantesAtuais = camposAtuais.filter(
-      (campo) => campo.obrigatorio && !valoresEfetivosAtuais.get(campo.id)?.trim(),
-    );
-    if (faltantesAtuais.length > 0) {
-      throw new Error(
-        `MOVIMENTO_INVALIDO:Campos obrigatórios pendentes (${faltantesAtuais.map((campo) => campo.nome).join(", ")}).`,
-      );
-    }
-    const proximoContatoAtual = proximoContatoEm === undefined
-      ? cardAtual.proximoContatoEm
-      : proximoContatoEm;
-    const camposEtapaOrigemAtuais = await carregarCamposOrigemParaGuard({
-      cardId,
-      pipelineId: cardAtual.pipelineId,
-      etapaOrigemId: cardAtual.etapaId,
-      etapaOrigemNome: cardAtual.etapa.nome,
-    }, tx);
-    const guardasAtuais = await carregarGuardasNativasMovimento({
-      cardId,
-      pipelineNome: cardAtual.pipeline?.nome,
-      etapaOrigemNome: cardAtual.etapa.nome,
-      etapaDestinoNome: destinoAtual.nome,
-      dataReuniao: cardAtual.dataReuniao,
-      transcricaoReuniao: cardAtual.transcricaoReuniao,
-      proximoContatoEm: proximoContatoAtual,
-      camposEtapaOrigem: camposEtapaOrigemAtuais,
-    }, tx);
-    if (guardasAtuais.length > 0) {
-      throw new Error(`MOVIMENTO_INVALIDO:${guardasAtuais[0]}`);
-    }
-
-    const valoresSubmetidosValidados = Object.fromEntries(
-      Object.keys(camposValores).map((campoId) => [
-        campoId,
-        validacaoAtual.valores[campoId],
-      ]),
-    );
-    const idsGlobais = await salvarValoresGlobaisPersonalizadosCampos(cardId, valoresSubmetidosValidados, tx);
-    const snapshotsCopia = typeof carregarSnapshotsCopiaCamposCard === "function"
-      ? await carregarSnapshotsCopiaCamposCard(cardId, cardAtual.pipelineId, etapaDestinoId, tx)
-      : {};
-    for (const [campoId, valor] of Object.entries(snapshotsCopia)) {
-      if (Object.hasOwn(valoresSubmetidosValidados, campoId)) continue;
-      await tx.bpmCardCampoValor.upsert({
-        where: { cardId_campoId: { cardId, campoId } },
-        create: { cardId, campoId, valor },
-        update: {},
-      });
-    }
-    for (const [campoId, valor] of Object.entries(valoresSubmetidosValidados)) {
-      if (idsGlobais.has(campoId)) continue;
-      await tx.bpmCardCampoValor.upsert({
-        where: { cardId_campoId: { cardId, campoId } },
-        create: { cardId, campoId, valor },
-        update: { valor },
-      });
-    }
-    if (validacaoFinanceiraAtual.applicable) for (const [nome, valor] of Object.entries(validacaoFinanceiraAtual.automaticValues)) { const campo = camposFinanceirosPorId.find((item) => item.nome === nome); if (campo) await tx.bpmCardCampoValor.upsert({ where: { cardId_campoId: { cardId, campoId: campo.id } }, create: { cardId, campoId: campo.id, valor }, update: { valor } }) }
-    const inicializarStatusPosFechamento = etapaEhFechado(destinoAtual.nome)
-      && cardAtual.statusPosFechamento === null;
-    const movimento = await tx.bpmCard.updateMany({
-      where: {
-        id: cardId,
-        etapaId: cardAtual.etapaId,
-        status: cardAtual.status,
-        updatedAt: cardAtual.updatedAt,
-      },
-      data: {
-        etapaId: etapaDestinoId,
-        updatedAt: new Date(),
-        ...(inicializarStatusPosFechamento
-          ? { statusPosFechamento: STATUS_POS_FECHAMENTO_INICIAL }
-          : {}),
-        ...(proximoContatoEm !== undefined ? { proximoContatoEm } : {}),
-      },
-    });
-    if (movimento.count !== 1) {
-      throw new Error("CONFLITO_MOVIMENTO_CARD");
-    }
-    if (proximoContatoEm !== undefined) {
-      await tx.bpmCardFollowUpEstado.upsert({
-        where: { cardId },
-        create: { cardId, proximoContatoEm },
-        update: { proximoContatoEm },
-      });
-    }
-    const historicoMovimento = await tx.bpmCardHistorico.create({
-      data: {
-        cardId,
-        acao: "CARD_MOVIDO",
-        usuarioId: userId,
-        valorAnteriorJson: JSON.stringify({ etapaId: cardAtual.etapaId }),
-        valorNovoJson: JSON.stringify({
-          etapaId: etapaDestinoId,
-          camposPreenchidos: Object.keys(valoresSubmetidosValidados),
-          ...(etapaEhFechado(destinoAtual.nome)
-            ? {
-                statusPosFechamento: cardAtual.statusPosFechamento
-                  ?? STATUS_POS_FECHAMENTO_INICIAL,
-              }
-            : {}),
-          ...(proximoContatoEm !== undefined ? { proximoContatoEm } : {}),
-        }),
-      },
-    });
-    await publicarEventoBpm({
-      tipo: "CARD_MOVIDO", entidadeTipo: "CARD", entidadeId: cardId,
-      cardId, pipelineId: cardAtual.pipelineId,
-      valorAnterior: { etapaId: cardAtual.etapaId }, valorNovo: { etapaId: etapaDestinoId, camposPreenchidos: Object.keys(valoresSubmetidosValidados) },
-      atorTipo: origemMovimentacao === "AUTOMACAO" ? "AUTOMACAO" : "USUARIO",
-      atorUserId: origemMovimentacao === "AUTOMACAO" ? undefined : userId,
-      correlationId: randomUUID(), causationId: historicoMovimento.id,
-      idempotencyKey: `card-movido:${historicoMovimento.id}`,
-    }, tx);
-    await sincronizarSlaMovimentoBpm({
-      cardId,
-      etapaOrigemId: cardAtual.etapaId,
-      etapaOrigemNome: cardAtual.etapa.nome,
-      etapaDestinoNome: destinoAtual.nome,
-      client: tx,
-    });
-    return {
-      pipelineId: cardAtual.pipelineId,
-      etapaOrigemId: cardAtual.etapaId,
-      eventoId: historicoMovimento.id,
-    };
-  });
-
-  const cardsFilhosCriados: CardFilhoCriado[] = [];
-
-  // A fila configurável é isolada do commit do movimento: se a infraestrutura
-  // da fila estiver indisponível, o card permanece movido e o erro fica visível
-  // nos logs operacionais, sem derrubar a ação do usuário.
-  try {
-    await enfileirarAutomacoesMovimentoBpm({
-      cardId,
-      pipelineId: resultadoMovimento.pipelineId,
-      etapaOrigemId: resultadoMovimento.etapaOrigemId,
-      etapaDestinoId,
-      eventoId: resultadoMovimento.eventoId,
-    });
-  } catch (error) {
-    console.error("[enfileirarAutomacoesMovimentoBpm]", error);
-  }
-
-  // Durante a migração, o fallback antigo só permanece ativo até a definição
-  // equivalente existir no Motor Central. Isso mantém o rollout reversível sem
-  // permitir que os dois executores produzam o mesmo efeito.
-  const [fechamentoCentral, notaFiscalCentral] = await Promise.all([
-    automacaoMigradaEstaAtiva(NOMES_AUTOMACOES_MIGRADAS.fechamento),
-    automacaoMigradaEstaAtiva(NOMES_AUTOMACOES_MIGRADAS.notaFiscal),
-  ]);
-  if (fechamentoCentral || notaFiscalCentral) {
-    try {
-      const vinculosAntes = fechamentoCentral
-        ? new Set((await db.bpmCardVinculo.findMany({ where: { cardOrigemId: cardId }, select: { id: true } })).map((item) => item.id))
-        : new Set<string>();
-      await executarAutomacoesCentraisDoCardAgora(cardId);
-      if (fechamentoCentral) {
-        const criados = await db.bpmCardVinculo.findMany({
-          where: { cardOrigemId: cardId, id: { notIn: [...vinculosAntes] } },
-          select: { cardDestino: { select: { id: true, pipelineId: true, pipeline: { select: { nome: true } } } } },
-        });
-        cardsFilhosCriados.push(...criados.map(({ cardDestino }) => ({ cardId: cardDestino.id, pipelineId: cardDestino.pipelineId, pipelineNome: cardDestino.pipeline.nome })));
-      }
-    } catch (error) {
-      console.error("[executarAutomacoesCentraisDoCardAgora]", error);
-    }
-  }
-  if (!fechamentoCentral) {
-    try { cardsFilhosCriados.push(...(await executarAutomacaoFechamentoComercial(cardId, userId))); }
-    catch (error) { console.error("[executarAutomacaoFechamentoComercial]", error); }
-  }
-  if (!notaFiscalCentral) {
-    try { await executarAutomacaoTarefaNotaFiscal(cardId, userId); }
-    catch (error) { console.error("[executarAutomacaoTarefaNotaFiscal]", error); }
-  }
-  await notificarPipelineBpm({ pipelineId: resultadoMovimento.pipelineId, cardId, tipo: "CARD_MOVIDO" });
-  revalidatePath(`${ROTA_BASE}/pipeline/${resultadoMovimento.pipelineId}`);
-  revalidatePath(ROTA_BASE);
-  revalidatePath(`${ROTA_BASE}/tarefas`);
-  return cardsFilhosCriados.length > 0
-    ? { success: true, cardsFilhosCriados }
-    : { success: true };
-}
-
 async function executarMovimentoCanonico(
   dados: DadosMovimentoComRequisitos & {
     etapaOrigemEsperadaId?: string;
@@ -2305,9 +1818,6 @@ async function executarMovimentoCanonico(
   return cardsFilhosCriados.length ? { success: true, cardsFilhosCriados } : { success: true };
 }
 
-// Mantém a implementação de caracterização referenciada enquanto o histórico
-// de migração para o TransitionCommand ainda for necessário.
-void executarMovimentoLegadoDesativado;
 
 export async function SalvarRequisitosEMoverCardBpm(dados: unknown) {
   try {

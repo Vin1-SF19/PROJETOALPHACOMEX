@@ -114,7 +114,7 @@ export function AutomacaoCentralFormDialog({
     if (["GERAR_FICHA", "MATERIALIZAR_CHECKLIST", "MARCAR_ALERTA_TAREFA", "SINCRONIZAR_TRANSCRICAO_REUNIAO"].includes(tipo)) return {};
     if (tipo === "ADICIONAR_ANOTACAO" || tipo === "CRIAR_ALERTA") return { texto: "" };
     if (tipo === "CRIAR_TAREFA") return { titulo: "", tipo: "TAREFA", prioridade: "NORMAL", naoDuplicarPendenteTipo: false };
-    if (tipo === "MOVER_CARD") return { etapaId: pipeline?.etapas[0]?.id ?? "", validarRequisitos: true, exigirProximoContatoVazio: false };
+    if (tipo === "MOVER_CARD") return { etapaId: pipeline?.etapas[0]?.id ?? "", exigirProximoContatoVazio: false };
     if (tipo === "ATRIBUIR_RESPONSAVEL") return { responsavelId: catalogos.usuarios[0]?.id ?? 0 };
     if (tipo === "ALTERAR_CAMPO") return { campoId: catalogoPipeline?.campos[0]?.id ?? "", valor: "" };
     if (tipo === "ENVIAR_EMAIL") return { para: "", assunto: "", corpo: "", cc: [] };
@@ -255,7 +255,7 @@ export function AutomacaoCentralFormDialog({
 
             {acaoAtual?.tipo === "MOVER_CARD" && <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-xs text-slate-300">Etapa de destino<Select value={String(acaoAtual.parametros.etapaId ?? "")} onValueChange={(valor) => atualizarParametros({ etapaId: valor })}><SelectTrigger className="mt-1"><SelectValue placeholder="Selecione a etapa" /></SelectTrigger><SelectContent>{(pipeline?.etapas ?? []).map((etapa) => <SelectItem key={etapa.id} value={etapa.id}>{etapa.nome}</SelectItem>)}</SelectContent></Select></label>
-              <div className="space-y-2 rounded-lg border border-white/[0.07] p-3"><label className="flex items-center justify-between gap-3 text-xs text-slate-300">Validar requisitos da etapa<Switch checked={acaoAtual.parametros.validarRequisitos !== false} onCheckedChange={(valor) => atualizarParametros({ validarRequisitos: valor })} /></label><label className="flex items-center justify-between gap-3 text-xs text-slate-300">Só mover sem próximo contato<Switch checked={acaoAtual.parametros.exigirProximoContatoVazio === true} onCheckedChange={(valor) => atualizarParametros({ exigirProximoContatoVazio: valor })} /></label></div>
+              <div className="space-y-2 rounded-lg border border-white/[0.07] p-3"><label className="flex items-center justify-between gap-3 text-xs text-slate-300">Só mover sem próximo contato<Switch checked={acaoAtual.parametros.exigirProximoContatoVazio === true} onCheckedChange={(valor) => atualizarParametros({ exigirProximoContatoVazio: valor })} /></label></div>
             </div>}
 
             {acaoAtual?.tipo === "ALTERAR_CAMPO" && <div className="grid gap-3 sm:grid-cols-2">

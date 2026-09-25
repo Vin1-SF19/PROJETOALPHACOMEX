@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
 
 import { BPM_CAPABILITIES, parseBpmCapabilities } from "@/lib/bpm/ontology";
 
@@ -237,6 +238,7 @@ export const salvarFormularioEtapaSchema = z
       obrigatorio: z.boolean(),
       obrigatorioEntrada: z.boolean(),
       obrigatorioSaida: z.boolean(),
+      condicaoObrigatoriedadeJson: z.string().max(20_000).nullable().optional(),
     }).strict()).max(100).optional(),
     secoes: z
       .array(
@@ -253,6 +255,16 @@ export const salvarFormularioEtapaSchema = z
   })
   .strict()
   .superRefine((formulario, context) => {
+    for (const [indice, obrigacao] of (formulario.obrigacoes ?? []).entries()) {
+      if (!obrigacao.condicaoObrigatoriedadeJson) continue;
+      try {
+        if (!grupoCondicaoSchema.safeParse(JSON.parse(obrigacao.condicaoObrigatoriedadeJson)).success) {
+          context.addIssue({ code: "custom", path: ["obrigacoes", indice, "condicaoObrigatoriedadeJson"], message: "Condição de obrigatoriedade inválida." });
+        }
+      } catch {
+        context.addIssue({ code: "custom", path: ["obrigacoes", indice, "condicaoObrigatoriedadeJson"], message: "Condição de obrigatoriedade inválida." });
+      }
+    }
     const idsObrigacoes = (formulario.obrigacoes ?? []).map((item) => item.campoId);
     if (new Set(idsObrigacoes).size !== idsObrigacoes.length) {
       context.addIssue({ code: "custom", path: ["obrigacoes"], message: "Cada campo deve ter apenas uma configuração de obrigatoriedade." });

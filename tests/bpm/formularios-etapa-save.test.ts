@@ -211,9 +211,24 @@ describe("contrato e salvamento diferencial do formulário de etapa", () => {
     expect(await SalvarFormularioEtapaBpm(changed)).toMatchObject({ success: true });
     expect(mocks.fieldStageUpdateMany).toHaveBeenCalledWith({
       where: { campoId: FIELD_ID, etapaId: STAGE_ID },
-      data: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: true },
+      data: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: true, condicaoObrigatoriedadeJson: null },
     });
     expect(mocks.formUpdateMany).toHaveBeenCalledOnce();
+  });
+
+  it("publica condição validada junto da obrigatoriedade", async () => {
+    const condicaoObrigatoriedadeJson = JSON.stringify({
+      operador: "AND",
+      condicoes: [{ tipo: "condicao", campo: { fonte: "cliente", campo: "cnpj" }, operador: "preenchido" }],
+    });
+    const changed = { ...input(), obrigacoes: [{ campoId: FIELD_ID, obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false, condicaoObrigatoriedadeJson }] };
+    expect(await SalvarFormularioEtapaBpm(changed)).toMatchObject({ success: true });
+    expect(mocks.fieldStageUpdateMany).toHaveBeenCalledWith({
+      where: { campoId: FIELD_ID, etapaId: STAGE_ID },
+      data: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false, condicaoObrigatoriedadeJson },
+    });
+    expect(await SalvarFormularioEtapaBpm({ ...input(), obrigacoes: [{ ...changed.obrigacoes[0], condicaoObrigatoriedadeJson: "{invalido" }] }))
+      .toMatchObject({ success: false });
   });
 
   it("permite retirar uma obrigação legada de campo somente leitura, preservando o campo", async () => {
@@ -226,7 +241,7 @@ describe("contrato e salvamento diferencial do formulário de etapa", () => {
     expect(await SalvarFormularioEtapaBpm(changed)).toMatchObject({ success: true });
     expect(mocks.fieldStageUpdateMany).toHaveBeenCalledWith({
       where: { campoId: FIELD_ID, etapaId: STAGE_ID },
-      data: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false },
+      data: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false, condicaoObrigatoriedadeJson: null },
     });
     expect(mocks.componentDeleteMany).not.toHaveBeenCalled();
   });
@@ -245,7 +260,7 @@ describe("contrato e salvamento diferencial do formulário de etapa", () => {
     expect(mocks.componentDeleteMany).toHaveBeenCalled();
     expect(mocks.fieldStageUpdateMany).toHaveBeenCalledWith({
       where: { etapaId: STAGE_ID, campoId: { in: [FIELD_ID] } },
-      data: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false },
+      data: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false, condicaoObrigatoriedadeJson: null },
     });
   });
 
@@ -256,7 +271,7 @@ describe("contrato e salvamento diferencial do formulário de etapa", () => {
     expect(mocks.formUpdateMany).toHaveBeenCalled();
     expect(mocks.fieldStageUpdateMany).toHaveBeenCalledWith({
       where: { etapaId: STAGE_ID, campoId: { in: [FIELD_ID] } },
-      data: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false },
+      data: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false, condicaoObrigatoriedadeJson: null },
     });
   });
 
@@ -267,7 +282,7 @@ describe("contrato e salvamento diferencial do formulário de etapa", () => {
     expect(mocks.fieldStageFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.not.objectContaining({ campoId: expect.anything() }) }));
     expect(mocks.fieldStageUpdateMany).toHaveBeenCalledWith({
       where: { etapaId: STAGE_ID, campoId: { in: [FIELD_ID, "legado"] } },
-      data: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false },
+      data: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false, condicaoObrigatoriedadeJson: null },
     });
   });
 

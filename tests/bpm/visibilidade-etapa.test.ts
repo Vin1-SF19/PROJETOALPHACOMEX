@@ -76,11 +76,11 @@ describe("integração da visibilidade por coluna no CRM/BPM", () => {
   it("centraliza o enforcement no ownership e protege a etapa de destino", () => {
     const ownership = readFileSync("src/lib/bpm/ownership.ts", "utf8");
     const cards = readFileSync("src/actions/bpm/Cards.ts", "utf8");
+    const command = readFileSync("src/lib/bpm/transicao-command.ts", "utf8");
     expect(ownership).toContain("acaoBpmExigeSomenteVisualizacao(acao)");
     expect(ownership).toContain("card.etapa.visibilidades");
     expect(cards).toContain("etapaId: { in: etapasVisiveis }");
-    expect(cards).toContain("acessoOrigemAtual.perfilGlobal");
-    expect(cards).toContain("destinoAtual.visibilidades");
+    expect(command).toContain("resolverVisibilidadeEtapa(acesso.perfilGlobal, destino.visibilidades)");
   });
 
   it("expõe a configuração no admin do pipeline e desabilita arrasto sem ação", () => {

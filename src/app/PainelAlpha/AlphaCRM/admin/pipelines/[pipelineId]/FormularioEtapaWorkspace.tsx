@@ -216,6 +216,10 @@ function FormularioEtapaWorkspaceContent({
     const config = campo.etapaConfiguracoes?.find((item) => item.etapaId === etapaId);
     return [campo.id, { obrigatorio: config?.obrigatorio ?? false, obrigatorioEntrada: config?.obrigatorioEntrada ?? false, obrigatorioSaida: config?.obrigatorioSaida ?? false }];
   })));
+  const [condicoesDraft, setCondicoesDraft] = usePipelineEditorState<Record<string, string>>(`${draftKey}:condicoes`, () => Object.fromEntries(campos.map((campo) => {
+    const config = campo.etapaConfiguracoes?.find((item) => item.etapaId === etapaId);
+    return [campo.id, config?.condicaoObrigatoriedadeJson ?? ""];
+  })));
   const [camposCriados, setCamposLocais] = usePipelineEditorState<CampoAplicavel[]>(`${scope}:campos`, []);
   const camposLocais = useMemo(() => [...new Map([...campos, ...camposCriados].map((campo) => [campo.id, campo])).values()], [campos, camposCriados]);
   const [secaoNovoCampo, setSecaoNovoCampo] = usePipelineEditorState<number | null>(`${draftKey}:nova-secao`, null);
@@ -282,8 +286,12 @@ function FormularioEtapaWorkspaceContent({
         const config = campo.etapaConfiguracoes?.find((item) => item.etapaId === etapaId);
         return [campo.id, { obrigatorio: config?.obrigatorio ?? false, obrigatorioEntrada: config?.obrigatorioEntrada ?? false, obrigatorioSaida: config?.obrigatorioSaida ?? false }];
       })));
+      setCondicoesDraft(Object.fromEntries(campos.map((campo) => {
+        const config = campo.etapaConfiguracoes?.find((item) => item.etapaId === etapaId);
+        return [campo.id, config?.condicaoObrigatoriedadeJson ?? ""];
+      })));
     }
-  }, [etapa, etapaId, etapaEscolhida, sujo, salvando, criandoCampo, versaoBase, setEtapaId, setSecoes, setAtivo, setVersaoBase, setObrigacoesDraft, campos]);
+  }, [etapa, etapaId, etapaEscolhida, sujo, salvando, criandoCampo, versaoBase, setEtapaId, setSecoes, setAtivo, setVersaoBase, setObrigacoesDraft, setCondicoesDraft, campos]);
   const camposAplicaveis = useMemo(
     () =>
       camposLocais.filter(
@@ -445,6 +453,10 @@ function FormularioEtapaWorkspaceContent({
     setObrigacoesDraft(Object.fromEntries(camposLocais.map((campo) => {
       const config = campo.etapaConfiguracoes?.find((item) => item.etapaId === etapaId);
       return [campo.id, { obrigatorio: config?.obrigatorio ?? false, obrigatorioEntrada: config?.obrigatorioEntrada ?? false, obrigatorioSaida: config?.obrigatorioSaida ?? false }];
+    })));
+    setCondicoesDraft(Object.fromEntries(camposLocais.map((campo) => {
+      const config = campo.etapaConfiguracoes?.find((item) => item.etapaId === etapaId);
+      return [campo.id, config?.condicaoObrigatoriedadeJson ?? ""];
     })));
   }
 
@@ -648,7 +660,7 @@ function FormularioEtapaWorkspaceContent({
         ativo,
         obrigacoes: Object.entries(obrigacoesDraft)
           .filter(([campoId]) => secoes.some((secao) => secao.componentes.some((item) => item.campoId === campoId)))
-          .map(([campoId, obrigacao]) => ({ campoId, ...(ativo ? obrigacao : { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false }) })),
+          .map(([campoId, obrigacao]) => ({ campoId, ...(ativo ? { ...obrigacao, condicaoObrigatoriedadeJson: condicoesDraft[campoId]?.trim() || null } : { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false, condicaoObrigatoriedadeJson: null }) })),
         secoes: secoes.map((secao) => ({
           id: secao.id,
           chave: secao.chave,
@@ -1053,6 +1065,28 @@ function FormularioEtapaWorkspaceContent({
                 const indisponivel = bloqueado || (regraObrigacao && !marcado && (!estaNoRascunho || !configSelecionada?.visivel || !configSelecionada?.editavel || configSelecionada?.somenteLeitura || campoSelecionado.editavel === false || campoSelecionado.somenteLeitura)) || (chave === "visivel" && publicadoNaEtapa && marcado) || (chave === "editavel" && possuiObrigacaoPublicada && marcado);
                 return <label key={chave} className="mt-3 flex items-start gap-2.5 rounded-lg border border-white/10 bg-slate-900/40 p-2.5 text-xs text-slate-200"><input type="checkbox" checked={marcado} disabled={indisponivel} onChange={(event) => atualizarRegra(chave, event.target.checked)} className="mt-0.5 accent-cyan-400" /><span><span className="font-semibold">{rotulo}</span><span className="mt-0.5 block text-[11px] text-slate-500">{ajuda}</span></span></label>;
               })}
+              <div className="mt-3 grid gap-2 rounded-lg border border-white/10 bg-slate-900/40 p-2.5 text-xs text-slate-300">
+                <label>Exigir quando outro campo for igual a
+                  <select value={lerCondicaoIgualSimples(condicoesDraft[campoSelecionado.id] ?? "")?.campoId ?? ""} disabled={bloqueado || !estaNoRascunho}
+                    onChange={(event) => { const atual = lerCondicaoIgualSimples(condicoesDraft[campoSelecionado.id] ?? ""); setCondicoesDraft((rascunho) => ({ ...rascunho, [campoSelecionado.id]: condicaoIgualJson(event.target.value, atual?.valor || "Sim") })); setSujo(true); }}
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-slate-900 p-2 text-white">
+                    <option value="">Sem condição simples</option>
+                    {camposLocais.filter((campo) => campo.id !== campoSelecionado.id && campo.ativo !== false).map((campo) => <option key={campo.id} value={campo.id}>{campo.nome}</option>)}
+                  </select>
+                </label>
+                <label>Valor que ativa a obrigação
+                  <input value={lerCondicaoIgualSimples(condicoesDraft[campoSelecionado.id] ?? "")?.valor ?? ""} disabled={bloqueado || !estaNoRascunho || !lerCondicaoIgualSimples(condicoesDraft[campoSelecionado.id] ?? "")?.campoId}
+                    onChange={(event) => { const atual = lerCondicaoIgualSimples(condicoesDraft[campoSelecionado.id] ?? ""); setCondicoesDraft((rascunho) => ({ ...rascunho, [campoSelecionado.id]: condicaoIgualJson(atual?.campoId ?? "", event.target.value) })); setSujo(true); }}
+                    placeholder="Sim" className="mt-1 w-full rounded-lg border border-white/10 bg-slate-900 p-2 text-white" />
+                </label>
+              </div>
+              <label className="mt-3 block text-xs text-slate-300">Condição avançada (JSON)
+                <textarea value={condicoesDraft[campoSelecionado.id] ?? ""} disabled={bloqueado || !estaNoRascunho}
+                  onChange={(event) => { setCondicoesDraft((atuais) => ({ ...atuais, [campoSelecionado.id]: event.target.value })); setSujo(true); }}
+                  placeholder='{"operador":"AND","condicoes":[{"tipo":"condicao","campo":{"fonte":"campo_dinamico","campo":"ID_DO_CAMPO"},"operador":"igual","valor":"Sim"}]}'
+                  className="mt-1 min-h-24 w-full rounded-lg border border-white/10 bg-slate-900 p-2 font-mono text-xs text-white disabled:opacity-50" />
+                <span className="mt-1 block text-[11px] text-slate-500">Use o ID de outro campo publicado na condição. Deixe vazio para não exigir condicionalmente.</span>
+              </label>
               {!publicadoNaEtapa && estaNoRascunho && <p className="mt-2 text-[11px] text-amber-200">Defina as obrigações agora; elas serão ativadas ao publicar o formulário.</p>}
               {publicadoNaEtapa && <p className="mt-2 text-[11px] text-slate-500">Para ocultar, retire o campo da composição publicada após desativar suas obrigações. Para torná-lo somente leitura, desative e publique as obrigações primeiro.</p>}
             </div>
@@ -1319,4 +1353,20 @@ function FormularioEtapaWorkspaceSelection(props: Parameters<typeof FormularioEt
 
 export function FormularioEtapaWorkspace(props: Parameters<typeof FormularioEtapaWorkspaceContent>[0]) {
   return <PipelineEditorStateBoundary key={props.pipelineId}><FormularioEtapaWorkspaceSelection {...props} /></PipelineEditorStateBoundary>;
+}
+function lerCondicaoIgualSimples(json: string): { campoId: string; valor: string } | null {
+  if (!json.trim()) return null;
+  try {
+    const grupo = JSON.parse(json);
+    const condicao = grupo?.operador === "AND" && grupo.condicoes?.length === 1 ? grupo.condicoes[0] : null;
+    return condicao?.tipo === "condicao" && condicao.campo?.fonte === "campo_dinamico" && condicao.operador === "igual" && typeof condicao.valor === "string"
+      ? { campoId: condicao.campo.campo, valor: condicao.valor }
+      : null;
+  } catch { return null; }
+}
+
+function condicaoIgualJson(campoId: string, valor: string): string {
+  return campoId && valor.trim()
+    ? JSON.stringify({ operador: "AND", condicoes: [{ tipo: "condicao", campo: { fonte: "campo_dinamico", campo: campoId }, operador: "igual", valor: valor.trim() }] })
+    : "";
 }

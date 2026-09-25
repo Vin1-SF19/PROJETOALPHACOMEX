@@ -35,6 +35,23 @@ function configEtapa(etapaId: string, patch: Record<string, unknown> = {}) {
 }
 
 describe("campos aplicáveis por etapa", () => {
+  it("não preenche campo financeiro pelo rótulo quando não há fonte configurada", async () => {
+    const buscarCard = vi.fn().mockResolvedValue(null);
+    const client = criarCliente({
+      bpmPipeline: { findUnique: vi.fn().mockResolvedValue({ chave: "financeiro" }) },
+      bpmCard: { findUnique: buscarCard },
+    });
+    const campos = await carregarCamposAplicaveisCardEtapa(
+      "card-1", "pipeline-1", "etapa-1", client as never, undefined,
+      [{ id: "campo-1", nome: "Razão Social", chave: "campo-1", pipelineId: "pipeline-1", etapaId: "etapa-1", tipo: "texto", opcoesJson: null,
+        obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false, ordem: 0, ativo: true, escopo: "CARD", valorPadrao: null,
+        fonteEntidade: null, fonteAtributo: null, entidadeGlobal: null, visivel: true, editavel: true, somenteLeitura: false,
+        configVersao: 1, condicaoVisibilidadeJson: null, condicaoObrigatoriedadeJson: null }],
+    );
+    expect(campos[0].valor).toBeNull();
+    expect(buscarCard).not.toHaveBeenCalled();
+  });
+
   it("mantém campo canônico no diagnóstico estrutural mesmo quando o perfil não pode vê-lo", async () => {
     const client = criarCliente({
       bpmCampo: {

@@ -24,9 +24,6 @@ import {
 } from "lucide-react";
 import { PublicarConfiguracaoPipelineBpm } from "@/actions/bpm/ConfiguracaoPipeline";
 import type { TemaAlpha } from "@/lib/temas";
-import {
-  FINANCIAL_PIPELINE_NAME,
-} from "@/lib/bpm/pipeline-financeiro";
 import { VisibilidadeEtapasSection } from "./VisibilidadeEtapasSection";
 import {
   EtapaAvancadaSection,
@@ -584,11 +581,6 @@ export default function AdminPipelineClient({
             automacoes={automacoes}
             onNavigate={navegarPara}
           />
-          {pipeline.nome === FINANCIAL_PIPELINE_NAME && (
-            <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200" role="status">
-              Configure as seis etapas, os campos e os formulários nas abas deste editor.
-            </div>
-          )}
         </TabsContent>
 
         <TabsContent value="stages" className="space-y-4">

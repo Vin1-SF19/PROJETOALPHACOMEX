@@ -132,7 +132,7 @@ export async function SalvarFormularioEtapaBpm(input: unknown) {
               pipelineId: true,
               etapaConfiguracoes: {
                 where: { etapaId },
-                select: { id: true, visivel: true, editavel: true, somenteLeitura: true, obrigatorio: true, obrigatorioEntrada: true, obrigatorioSaida: true },
+                select: { id: true, visivel: true, editavel: true, somenteLeitura: true, obrigatorio: true, obrigatorioEntrada: true, obrigatorioSaida: true, condicaoObrigatoriedadeJson: true },
               },
               pipelinesAssociados: {
                 where: { pipelineId },
@@ -190,9 +190,34 @@ export async function SalvarFormularioEtapaBpm(input: unknown) {
         const campo = campoPorId.get(obrigacao.campoId);
         if (!campo) falhar("OBRIGACAO_FORA_FORMULARIO", "Uma obrigação aponta para campo ausente do formulário da etapa.");
         const config = campo.etapaConfiguracoes[0];
-        if ((obrigacao.obrigatorio || obrigacao.obrigatorioEntrada || obrigacao.obrigatorioSaida)
+        if ((obrigacao.obrigatorio || obrigacao.obrigatorioEntrada || obrigacao.obrigatorioSaida || obrigacao.condicaoObrigatoriedadeJson)
           && (!ativo || !campo.ativo || !config?.visivel || !config.editavel || config.somenteLeitura)) {
           falhar("OBRIGACAO_CAMPO_INACESSIVEL", `O campo "${campo.nome}" precisa estar ativo, visível e editável para ser obrigatório.`);
+        }
+      }
+      const referenciasCondicionais = new Set<string>();
+      const visitarCondicao = (item: unknown): void => {
+        if (!item || typeof item !== "object") return;
+        const objeto = item as Record<string, unknown>;
+        const campo = objeto.campo as Record<string, unknown> | undefined;
+        if (campo?.fonte === "campo_dinamico" && typeof campo.campo === "string") referenciasCondicionais.add(campo.campo);
+        if (Array.isArray(objeto.condicoes)) objeto.condicoes.forEach(visitarCondicao);
+      };
+      for (const obrigacao of obrigacoes) {
+        if (obrigacao.condicaoObrigatoriedadeJson) visitarCondicao(JSON.parse(obrigacao.condicaoObrigatoriedadeJson));
+      }
+      const referenciasExternas = [...referenciasCondicionais].filter((id) => !campoIds.includes(id));
+      if (referenciasExternas.length) {
+        const publicados = await tx.bpmCampo.findMany({
+          where: {
+            id: { in: referenciasExternas }, ativo: true,
+            OR: [{ pipelineId }, { pipelinesAssociados: { some: { pipelineId } } }],
+            componentesFormulario: { some: { secao: { formulario: { ativo: true, etapa: { pipelineId } } } } },
+          },
+          select: { id: true },
+        });
+        if (publicados.length !== referenciasExternas.length) {
+          falhar("CONDICAO_CAMPO_NAO_PUBLICADO", "A condição usa um campo que não está ativo e publicado neste pipeline.");
         }
       }
 
@@ -206,7 +231,7 @@ export async function SalvarFormularioEtapaBpm(input: unknown) {
           where: {
             etapaId,
             ...(limparTodaEtapa ? {} : { campoId: { in: idsRemovidos } }),
-            OR: [{ obrigatorio: true }, { obrigatorioEntrada: true }, { obrigatorioSaida: true }],
+            OR: [{ obrigatorio: true }, { obrigatorioEntrada: true }, { obrigatorioSaida: true }, { condicaoObrigatoriedadeJson: { not: null } }],
           },
           select: { campoId: true },
         }) : [];
@@ -280,7 +305,8 @@ export async function SalvarFormularioEtapaBpm(input: unknown) {
           const config = campoPorId.get(item.campoId)?.etapaConfiguracoes[0];
           return config?.obrigatorio === item.obrigatorio
             && config?.obrigatorioEntrada === item.obrigatorioEntrada
-            && config?.obrigatorioSaida === item.obrigatorioSaida;
+            && config?.obrigatorioSaida === item.obrigatorioSaida
+            && (config?.condicaoObrigatoriedadeJson ?? null) === (item.condicaoObrigatoriedadeJson ?? null);
         })
       ) {
         const formulario = await tx.bpmEtapaFormulario.findUniqueOrThrow({
@@ -394,6 +420,7 @@ export async function SalvarFormularioEtapaBpm(input: unknown) {
             obrigatorio: obrigacao.obrigatorio,
             obrigatorioEntrada: obrigacao.obrigatorioEntrada,
             obrigatorioSaida: obrigacao.obrigatorioSaida,
+            condicaoObrigatoriedadeJson: obrigacao.condicaoObrigatoriedadeJson ?? null,
           },
         });
         if (atualizada.count !== 1) falhar("OBRIGACAO_CONFIG_AUSENTE", "A configuração do campo mudou. Recarregue o formulário antes de publicar.");
@@ -401,7 +428,7 @@ export async function SalvarFormularioEtapaBpm(input: unknown) {
       if (obrigatoriasParaLimpar.length) {
         await tx.bpmCampoEtapaConfig.updateMany({
           where: { etapaId, campoId: { in: obrigatoriasParaLimpar.map((item) => item.campoId) } },
-          data: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false },
+          data: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false, condicaoObrigatoriedadeJson: null },
         });
       }
 

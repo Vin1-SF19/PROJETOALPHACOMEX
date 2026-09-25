@@ -5,8 +5,8 @@ import { Resend } from "resend";
 
 import db from "@/lib/prisma";
 import { calcularPrazoFinal } from "@/lib/bpm/sla";
-import { carregarCamposObrigatoriosEtapa, verificarTransicaoPermitidaBpm } from "@/lib/bpm/requisitos-etapa-server";
-import { listarCamposObrigatoriosFaltantes } from "@/lib/bpm/requisitos-etapa";
+import { executarTransicaoBpm } from "@/lib/bpm/transicao-command";
+import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 import { calcularDiaCicloNovosLeads, contarDiasUteisDecorridos, intervaloDiaCivilSaoPaulo } from "@/lib/bpm/novos-leads";
 import { sincronizarTranscricaoCardBpm } from "@/lib/bpm/transcricao-reuniao-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
@@ -77,7 +77,10 @@ async function carregarExecucao(id: string) {
 
 /** Variáveis `{{...}}` disponíveis em todos os textos das ações centrais. */
 function placeholdersDoCard(card: ExecucaoCentral["card"]): Record<string, string> {
+  const agora = new Date();
   return {
+    "agora.data": new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(agora),
+    "agora.instante": agora.toISOString(),
     "card.id": card.id,
     "card.servico": card.servico ?? "",
     "empresa.razaoSocial": card.empresa?.razaoSocial ?? "",
@@ -117,9 +120,19 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
     });
   }
   if (tipo === "ALTERAR_CAMPO") {
-    const campoId = String(parametros.campoId); const valor = parametros.valor === null ? null : String(parametros.valor);
-    const campo = await db.bpmCampo.findFirst({ where: { id: campoId, pipelineId: card.pipelineId }, select: { id: true } });
-    if (!campo) throw new Error("Campo não pertence ao pipeline do card");
+    const campoId = String(parametros.campoId);
+    const campo = await db.bpmCampo.findFirst({
+      where: { id: campoId, ativo: true, OR: [
+        { pipelineId: card.pipelineId },
+        { pipelinesAssociados: { some: { pipelineId: card.pipelineId } } },
+      ] },
+      select: { id: true, nome: true, tipo: true, opcoesJson: true },
+    });
+    if (!campo) throw new Error("Campo ativo não pertence ao pipeline do card");
+    const brutoValor = parametros.valor === null ? "" : texto(parametros.valor);
+    const validacao = validarValoresCamposBpm([campo], { [campoId]: brutoValor });
+    if (!validacao.success) throw new Error(validacao.error);
+    const valor = validacao.valores[campoId] || null;
     const anterior = await db.bpmCardCampoValor.findUnique({ where: { cardId_campoId: { cardId: card.id, campoId } } });
     await db.bpmCardCampoValor.upsert({ where: { cardId_campoId: { cardId: card.id, campoId } }, create: { cardId: card.id, campoId, valor }, update: { valor } });
     await publicarEventoDaAcao(execucao, "CAMPO_ALTERADO", "CAMPO", campoId, { campoId, valor: anterior?.valor ?? null }, { campoId, valor });
@@ -132,33 +145,17 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
     if (!etapa) throw new Error("Etapa de destino inválida");
     const anterior = card.etapaId;
     if (parametros.exigirProximoContatoVazio && card.proximoContatoEm) return { ignorada: true, motivo: "PROXIMO_CONTATO_PREENCHIDO" };
-    if (parametros.validarRequisitos !== false && anterior !== etapaId) {
-      const transicao = await verificarTransicaoPermitidaBpm(anterior, etapaId, "AUTOMACAO");
-      if (!transicao.permitida) return { ignorada: true, motivo: transicao.motivo ?? "TRANSICAO_NAO_PERMITIDA" };
-      const obrigatorios = await carregarCamposObrigatoriosEtapa(card.pipelineId, anterior);
-      if (obrigatorios.length) {
-        const valores = await db.bpmCardCampoValor.findMany({ where: { cardId: card.id, campoId: { in: obrigatorios.map((campo) => campo.id) } }, select: { campoId: true, valor: true } });
-        const faltantes = listarCamposObrigatoriosFaltantes(obrigatorios, Object.fromEntries(valores.map((valor) => [valor.campoId, valor.valor])));
-        if (faltantes.length) return { ignorada: true, motivo: "CAMPOS_OBRIGATORIOS", campos: faltantes.map((campo) => campo.nome) };
-      }
-    }
-    if (anterior !== etapaId) {
-      await db.$transaction(async (tx) => {
-        await tx.bpmCard.update({ where: { id: card.id }, data: { etapaId } });
-        await tx.bpmCardHistorico.create({ data: { cardId: card.id, acao: "MOVIDO_AUTOMACAO", automacaoOrigem: execucao.automacaoId, valorAnteriorJson: JSON.stringify({ etapaId: anterior }), valorNovoJson: JSON.stringify({ etapaId, execucaoId: execucao.id }) } });
-        await ativarCadenciasNaEntradaBpm({
-          cardId: card.id,
-          pipelineAnteriorId: card.pipelineId,
-          etapaAnteriorId: anterior,
-          pipelineDestinoId: card.pipelineId,
-          etapaDestinoId: etapaId,
-          evento: "CARD_MOVIDO",
-          automacaoOrigem: execucao.automacaoId,
-        }, tx);
-      });
-      await publicarEventoDaAcao(execucao, "CARD_MOVIDO", "CARD", card.id, { etapaId: anterior }, { etapaId });
-      await notificarPipelineBpm({ pipelineId: card.pipelineId, cardId: card.id, tipo: "CARD_MOVIDO" });
-    }
+    if (anterior === etapaId) return { etapaAnteriorId: anterior, etapaId };
+    const movimento = await executarTransicaoBpm({
+      cardId: card.id,
+      etapaOrigemEsperadaId: anterior,
+      etapaDestinoId: etapaId,
+      idempotencyKey: `automacao:${execucao.id}:mover:${etapaId}`,
+      correlationId: execucao.correlationId ?? execucao.id,
+      causationId: execucao.evento?.id ?? execucao.id,
+      ator: { tipo: "AUTOMACAO", automacaoId: execucao.automacaoId, automacaoExecucaoId: execucao.id },
+    });
+    if (!movimento.success) throw new Error(movimento.error);
     return { etapaAnteriorId: anterior, etapaId };
   }
   if (tipo === "ALTERAR_SUBSTATUS") {

@@ -51,6 +51,6 @@ describe("Alinhamento Estratégico agendado", () => {
     expect(painel).toContain("Usar template do resumo");
     expect(board).toContain("alertaAlinhamento");
     expect(cards).toContain("obterErroCamposAlinhamentoParaSaida");
-    expect(cards).toContain("camposEtapaOrigemAtuais");
+    expect(cards).toContain("camposEtapaOrigem");
   });
 });

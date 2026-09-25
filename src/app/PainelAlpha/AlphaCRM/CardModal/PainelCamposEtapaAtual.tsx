@@ -16,7 +16,7 @@ import {
 } from "@/lib/bpm/card-modal-ui";
 import { TEMPLATE_RESUMO_ALINHAMENTO } from "@/lib/bpm/alinhamento-estrategico";
 import { BPM_FIELD_KEYS, BPM_STAGE_KEYS } from "@/lib/bpm/ontology";
-import { FINANCIAL_FIELD_KEYS, campoFinanceiroCalculadoPorChave } from "@/lib/bpm/pipeline-financeiro";
+import { FINANCIAL_FIELD_KEYS } from "@/lib/bpm/pipeline-financeiro";
 import { useCardSave } from "@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext";
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type CamposEtapaCard = CardDetalhe["camposEtapa"];
@@ -208,7 +208,7 @@ export function PainelCamposEtapaAtual({
       let possuiValorInvalido = false;
       for (const campo of configuracaoAtual.camposVisiveis) {
         if (campoId && campo.id !== campoId && !configuracaoAtual.exigeComplemento) continue;
-        if (campo.somenteLeitura || campo.editavel === false || campoFinanceiroCalculadoPorChave(campo.chave)
+        if (campo.somenteLeitura || campo.editavel === false
           || (valoresAtuais[campo.id] ?? "") === (snapshotAtivoRef.current.valores[campo.id] ?? "")) continue;
         const validacao = validarValoresCamposBpm([campo], montarPayloadCamposDestino([campo], valoresAtuais));
         if (!validacao.success) { possuiValorInvalido = true; toast.error(validacao.error); continue; }
@@ -362,8 +362,7 @@ export function PainelCamposEtapaAtual({
               )}
               {camposAtuaisVisiveis.map((campo) => {
             const complementoPendente = campo.id === configuracaoLostUi.campoComplementoId && complementoLostPendente;
-            const somenteLeitura = campo.somenteLeitura === true || campo.editavel === false
-              || (card.pipeline?.nome === "Financeiro" && campoFinanceiroCalculadoPorChave(campo.chave));
+            const somenteLeitura = campo.somenteLeitura === true || campo.editavel === false;
             const fonteAutomatica = campo.escopo === "GLOBAL" && Boolean(campo.fonteEntidade);
             const descricaoId = complementoPendente ? `campo-bpm-${campo.id}-erro` : undefined;
             return (

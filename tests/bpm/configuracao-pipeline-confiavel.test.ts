@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const ler = (arquivo: string) => readFileSync(arquivo, "utf8");
@@ -53,13 +53,12 @@ describe("configuração funcional do pipeline", () => {
     expect(ler("src/actions/bpm/Etapas.ts")).toContain("registrarAuditoriaPipeline(tx,");
   });
 
-  it("não altera configuração em GET e converte o preset financeiro para contratos canônicos", () => {
+  it("não altera configuração em GET e não expõe preset financeiro", () => {
     const paginaAdmin = ler("src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/page.tsx");
     const paginaBoard = ler("src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/page.tsx");
-    const financeiro = ler("src/actions/bpm/PipelineFinanceiro.ts");
     expect(paginaAdmin).not.toContain("garantirSchemaFinanceiro");
     expect(paginaBoard).not.toContain("garantirSchemaFinanceiro");
-    expect(financeiro).toContain("tx.bpmCampoEtapaConfig.upsert");
-    expect(financeiro).toContain("tx.bpmTransicaoEtapa.upsert");
+    expect(existsSync("src/actions/bpm/PipelineFinanceiro.ts")).toBe(false);
+    expect(existsSync("src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/ConfigurarEtapasFinanceiroButton.tsx")).toBe(false);
   });
 });

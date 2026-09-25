@@ -67,7 +67,8 @@ describe("P0-1 — fontes canônicas do CRM/BPM", () => {
 
   it("requisitos de campo são derivados da configuração canônica", () => {
     const command = ler("src/lib/bpm/transicao-command.ts");
-    expect(command).toContain("campoId: null");
+    expect(command).not.toContain("campoId: null,");
+    expect(command).toContain("requisitosAplicaveis.flatMap");
     expect(command).toContain("config.obrigatorioSaida");
     expect(command).toContain("config.obrigatorioEntrada");
     expect(command).toContain("config.condicaoObrigatoriedadeJson");

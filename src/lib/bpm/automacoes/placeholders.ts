@@ -1,6 +1,8 @@
 const PLACEHOLDER_PATTERN = /{{\s*([a-zA-Z0-9_.]+)\s*}}/g;
 
 export const PLACEHOLDERS_AUTOMACAO_BPM = [
+  "agora.data",
+  "agora.instante",
   "card.id",
   "card.servico",
   "empresa.razaoSocial",

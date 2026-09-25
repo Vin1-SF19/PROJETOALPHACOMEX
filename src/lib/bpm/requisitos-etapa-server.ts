@@ -18,6 +18,7 @@ import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
 import { avaliarGrupo } from "@/lib/bpm/regras/avaliador";
 import { montarContextoAvaliacaoDoCard } from "@/lib/bpm/regras/contexto";
 import type { ContextoAvaliacao } from "@/lib/bpm/regras/types";
+import { BPM_PIPELINE_KEYS } from "@/lib/bpm/ontology";
 
 type ClienteRequisitosEtapa = Pick<
   typeof db,
@@ -327,10 +328,15 @@ export async function carregarCamposAplicaveisCardEtapa(
     valoresCanonicos,
     mapeamentos: mapeamentos as MapeamentoCampo[],
   });
-  const precisaDadosMestres = campos.some((campo) =>
+  const candidatoFontePorNome = campos.some((campo) =>
     campoBpmPossuiFonteMestre(campo.nome)
     && !valorPorCampo.get(campo.id)?.trim()
   );
+  const pipelineDelegate = (client as Partial<typeof db>).bpmPipeline;
+  const pipeline = candidatoFontePorNome && pipelineDelegate
+    ? await pipelineDelegate.findUnique({ where: { id: pipelineId }, select: { chave: true } })
+    : null;
+  const precisaDadosMestres = candidatoFontePorNome && pipeline?.chave !== BPM_PIPELINE_KEYS.FINANCEIRO;
   const cardComEmpresa = precisaDadosMestres
     ? await client.bpmCard.findUnique({
         where: { id: cardId },
@@ -390,7 +396,7 @@ export async function carregarCamposAplicaveisCardEtapa(
         ? valorPersistido
         : (valoresCanonicos[campo.id] || null))
       : (resolvidos.efetivos[campo.id] || valorPersistido || campo.valorPadrao || null);
-    const valor = campo.escopo === "CARD" && !mapeamento && !valorPersistido
+    const valor = precisaDadosMestres && campo.escopo === "CARD" && !mapeamento && !valorPersistido
       ? resolverValorEfetivoCampoBpm({ nomeCampo: campo.nome, valorPersistido: valorNovoContrato, dadosMestres })
       : valorNovoContrato;
     return {

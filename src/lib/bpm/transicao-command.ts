@@ -24,12 +24,6 @@ import {
   transitionOriginForRequester,
   type BpmTransitionRequester,
 } from "@/lib/bpm/ontology";
-import {
-  FINANCIAL_FIELD_KEYS,
-  campoFinanceiroCalculadoPorChave,
-  validateCanonicalFinancialTransition,
-} from "@/lib/bpm/pipeline-financeiro";
-import { atualizarElaboracaoContrato } from "@/lib/bpm/novo-contrato-financeiro-server";
 import { exigirAcessoBpmCard, checarAcessoDiretoriaBpm } from "@/lib/bpm/ownership";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
@@ -216,7 +210,6 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     where: {
       pipelineId: card.pipelineId,
       ativo: true,
-      campoId: null,
       OR: [
         { transicaoId: transicao.id },
         { etapaId: null },
@@ -234,18 +227,30 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     },
     orderBy: [{ ordem: "asc" }, { chave: "asc" }],
   });
+  const camposFormulario = await camposPublicadosPorEtapa([card.etapaId, destino.id], tx);
+  const camposPublicadosDoPipeline = requisitos.some((item) => item.campoId)
+    ? await (async () => {
+        const etapas = await tx.bpmEtapa.findMany({ where: { pipelineId: card.pipelineId, ativo: true }, select: { id: true } });
+        const publicados = await camposPublicadosPorEtapa(etapas.map((etapa) => etapa.id), tx);
+        return new Set([...publicados.values()].flatMap((ids) => [...ids]));
+      })()
+    : null;
   const requisitosAplicaveis = requisitos.filter((item) =>
-    requisitoAplica(item, transicao.id, card.etapaId, destino.id),
+    requisitoAplica(item, transicao.id, card.etapaId, destino.id)
+    && (!item.campoId || Boolean(item.campo?.ativo
+      && camposPublicadosDoPipeline?.has(item.campoId))),
   );
   const camposRequisito = await tx.bpmCampo.findMany({
     where: {
       ativo: true,
-      OR: [
-        { pipelineId: card.pipelineId },
-        { pipelinesAssociados: { some: { pipelineId: card.pipelineId } } },
-      ],
-      etapaConfiguracoes: {
-        some: {
+      AND: [
+        { OR: [
+          { pipelineId: card.pipelineId },
+          { pipelinesAssociados: { some: { pipelineId: card.pipelineId } } },
+        ] },
+        { OR: [
+          { id: { in: requisitosAplicaveis.flatMap((item) => item.campoId ? [item.campoId] : []) } },
+          { etapaConfiguracoes: { some: {
           etapaId: { in: [card.etapaId, destino.id] },
           visivel: true,
           OR: [
@@ -254,8 +259,9 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
             { obrigatorioSaida: true },
             { condicaoObrigatoriedadeJson: { not: null } },
           ],
-        },
-      },
+          } } },
+        ] },
+      ],
     },
     include: {
       opcoes: { where: { ativo: true }, orderBy: { ordem: "asc" } },
@@ -263,7 +269,6 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       acessos: perfilCampo ? { where: { perfil: perfilCampo } } : false,
     },
   });
-  const camposFormulario = await camposPublicadosPorEtapa([card.etapaId, destino.id], tx);
   const capacidadesObrigatorias = await capacidadesObrigatoriasPorEtapa([card.etapaId, destino.id], tx);
   const exige = (etapaId: string, capability: string) => capacidadesObrigatorias.get(etapaId)?.has(capability) === true;
   const camposSubmetidos = campoIdsSubmetidos.length
@@ -288,34 +293,27 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     erro("FIELD_OUTSIDE_STAGE_CONFIG", "Um ou mais campos não possuem configuração canônica para esta transição.");
   }
   const camposPorId = new Map([...camposRequisito, ...camposSubmetidos].map((campo) => [campo.id, campo]));
-  // A validação financeira consulta valores já salvos em etapas anteriores.
-  // Eles podem ser opcionais na etapa atual e, por isso, não estar entre os
-  // requisitos nem no payload enviado pelo formulário desta transição.
-  if (card.pipeline.chave === BPM_PIPELINE_KEYS.FINANCEIRO) {
-    const camposFinanceiros = await tx.bpmCampo.findMany({
+  // Condições podem consultar campos de etapas anteriores. Incluímos apenas
+  // identidades ativas que pertencem a algum formulário publicado do pipeline;
+  // a presença aqui não torna o campo obrigatório.
+  const camposPublicados = await tx.bpmCampo.findMany({
       where: {
         ativo: true,
-        chave: { in: [...new Set(Object.values(FINANCIAL_FIELD_KEYS))] },
-        OR: [
-          { pipelineId: card.pipelineId },
-          { pipelinesAssociados: { some: { pipelineId: card.pipelineId } } },
-        ],
+        OR: [{ pipelineId: card.pipelineId }, { pipelinesAssociados: { some: { pipelineId: card.pipelineId } } }],
+        componentesFormulario: { some: { secao: { formulario: { ativo: true, etapa: { pipelineId: card.pipelineId } } } } },
       },
       include: {
         opcoes: { where: { ativo: true }, orderBy: { ordem: "asc" } },
         etapaConfiguracoes: { where: { etapaId: { in: [card.etapaId, destino.id] } } },
         acessos: perfilCampo ? { where: { perfil: perfilCampo } } : false,
       },
-    });
-    for (const campo of camposFinanceiros) camposPorId.set(campo.id, campo);
-  }
-
+  });
+  for (const campo of camposPublicados) camposPorId.set(campo.id, campo);
   for (const campo of camposSubmetidos) {
     const config = campo.etapaConfiguracoes.find((item) => item.etapaId === destino.id)
       ?? campo.etapaConfiguracoes.find((item) => item.etapaId === card.etapaId);
     const acesso = campo.acessos[0];
     const bloqueadoPorPolicy = campo.editavel === false || campo.somenteLeitura
-      || (card.pipeline.chave === BPM_PIPELINE_KEYS.FINANCEIRO && campoFinanceiroCalculadoPorChave(campo.chave))
       || config?.editavel === false || config?.somenteLeitura
       || (input.ator.tipo === "MANUAL" && (acesso?.visivel === false || acesso?.editavel === false || acesso?.somenteLeitura));
     if (bloqueadoPorPolicy) {
@@ -455,38 +453,10 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     }
   }
 
-  const valoresPorChave = Object.fromEntries([...camposPorId.values()].flatMap((campo) =>
-    campo.chave ? [[campo.chave, valoresEfetivosPorId.get(campo.id) ?? null] as const] : [],
-  ));
-  const optionsByFieldKey = Object.fromEntries([...camposPorId.values()].flatMap((campo) => {
-    if (!campo.chave || campo.tipo !== "selecao") return [];
-    let opcoes = campo.opcoes.map((opcao) => opcao.rotulo);
-    if (!opcoes.length && campo.opcoesJson) {
-      try {
-        const parsed: unknown = JSON.parse(campo.opcoesJson);
-        if (Array.isArray(parsed)) opcoes = parsed.filter((item): item is string => typeof item === "string");
-      } catch { /* catálogo inválido mantém a seleção sem opções válidas */ }
-    }
-    return [[campo.chave, opcoes] as const];
-  }));
-  const financeiro = validateCanonicalFinancialTransition({
-    pipelineKey: card.pipeline.chave ?? "",
-    fromStageKey: card.etapa.chave ?? "",
-    toStageKey: destino.chave ?? "",
-    valuesByFieldKey: valoresPorChave,
-    optionsByFieldKey,
-    attachmentNames: card.anexos.map((anexo) => anexo.nome),
-    parceiroVinculado: Boolean(card.indicacaoOrigem?.parceiroId
-      || card.vinculosDestino.some((vinculo) => vinculo.cardOrigem.indicacaoOrigem?.parceiroId)),
+  const erroRegra = await obterErroRegrasParaMovimento({
+    card, etapaDestinoId: destino.id, client: tx,
+    valoresEfetivosPorId: Object.fromEntries(valoresEfetivosPorId),
   });
-  if (financeiro.blocked) {
-    const labels = financeiro.pendingFields.map((key) => camposPorId.size
-      ? [...camposPorId.values()].find((campo) => campo.chave === key)?.nome ?? key
-      : key);
-    erro("FINANCIAL_POLICY_BLOCKED", `${financeiro.message ?? "Transição financeira bloqueada"}${labels.length ? ` Campos pendentes: ${labels.join(", ")}.` : ""}`, labels);
-  }
-
-  const erroRegra = await obterErroRegrasParaMovimento({ card, etapaDestinoId: destino.id, client: tx });
   if (erroRegra) erro("BUSINESS_RULE_BLOCKED", erroRegra);
   if (exige(card.etapaId, BPM_CAPABILITIES.STAGE_CHECKLIST)) {
     const erroChecklist = await obterErroChecklistParaMovimento({
@@ -497,21 +467,12 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     if (erroChecklist) erro("CHECKLIST_BLOCKED", erroChecklist);
   }
 
-  const automaticosPorId: Record<string, string> = {};
-  for (const [chave, value] of Object.entries(financeiro.automaticValues)) {
-    const campo = [...camposPorId.values()].find((item) => item.chave === chave)
-      ?? await tx.bpmCampo.findUnique({ where: { chave } });
-    if (!campo) erro("FINANCIAL_FIELD_MISSING", `Campo financeiro canônico ausente: ${chave}.`);
-    automaticosPorId[campo.id] = value;
-  }
-
   return {
     idempotente: false as const,
     card,
     destino,
     transicao,
     valoresValidados: formato.valores,
-    valoresAutomaticos: automaticosPorId,
     proximoContato,
   };
 }
@@ -576,7 +537,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
       const concluidoEm = lifecycle === "CONCLUIDO" ? (card.concluidoEm ?? agora) : null;
       const outcome = lifecycle === "ATIVO" ? null : (transicao.outcomeDestino ?? card.estadoOntologico?.outcome ?? null);
 
-      const valores = { ...prepared.valoresValidados, ...prepared.valoresAutomaticos };
+      const valores = prepared.valoresValidados;
       const idsGlobais = await salvarValoresGlobaisPersonalizadosCampos(card.id, valores, tx);
       for (const [campoId, valor] of Object.entries(valores)) {
         if (idsGlobais.has(campoId)) continue;
@@ -585,10 +546,6 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
           create: { cardId: card.id, campoId, valor },
           update: { valor },
         });
-      }
-      if (card.pipeline.chave === BPM_PIPELINE_KEYS.FINANCEIRO
-        && card.etapa.chave === BPM_STAGE_KEYS.ELABORACAO_CONTRATO) {
-        await atualizarElaboracaoContrato(tx, card.id, card.pipelineId, Object.keys(prepared.valoresValidados));
       }
 
       if (input.proximoContatoEm !== undefined) {
@@ -748,6 +705,3 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
     return mensagemErroDesconhecido(errorValue);
   }
 }
-
-// Mantem a lista de chaves importada e validada pelo compilador junto do comando.
-void FINANCIAL_FIELD_KEYS;

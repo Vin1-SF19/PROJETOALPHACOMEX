@@ -78,14 +78,15 @@ describe("Boas-vindas — atenção e acesso exclusivo da diretoria", () => {
 
   it("aplica a regra às listagens indiretas e sinaliza visualmente o card não acessado", () => {
     const cards = readFileSync(resolve("src/actions/bpm/Cards.ts"), "utf8");
+    const command = readFileSync(resolve("src/lib/bpm/transicao-command.ts"), "utf8");
     const empresas = readFileSync(resolve("src/actions/bpm/Empresas.ts"), "utf8");
     const tarefas = readFileSync(resolve("src/actions/bpm/Tarefas.ts"), "utf8");
     const dashboard = readFileSync(resolve("src/actions/bpm/Dashboard.ts"), "utf8");
     const board = readFileSync(resolve("src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx"), "utf8");
 
     expect(cards).toContain("checarAcessoDiretoriaBpm(userId)");
-    expect(cards).toContain("etapaEhBoasVindas(etapaDestino.nome)");
-    expect(cards).toContain("etapaEhBoasVindas(destinoAtual.nome)");
+    expect(command).toContain("destino.chave === BPM_STAGE_KEYS.BOAS_VINDAS");
+    expect(command).toContain("checarAcessoDiretoriaBpm(input.ator.userId, tx)");
     expect(empresas).toContain("NOME_ETAPA_BOAS_VINDAS");
     expect(tarefas).toContain("NOME_ETAPA_BOAS_VINDAS");
     expect(dashboard).toContain("filtroCardBoasVindas");

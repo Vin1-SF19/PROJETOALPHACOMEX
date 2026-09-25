@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ default: {} }));
@@ -11,6 +12,12 @@ import { executarHttpSeguro } from "@/lib/bpm/automacoes/safe-http";
 const FIM = { id: "fim", tipo: "FIM" as const };
 
 describe("Motor Central de Automações", () => {
+  it("move cards pelo comando canônico mesmo se o parâmetro legado pedir dispensa de requisitos", () => {
+    const runtime = readFileSync("src/lib/bpm/automacoes/central-runtime.ts", "utf8");
+    expect(runtime).toContain("await executarTransicaoBpm({");
+    expect(runtime).not.toContain("parametros.validarRequisitos !== false");
+  });
+
   it("valida fluxo sequencial e branch IF/THEN/ELSE", () => {
     const grafo = validarGrafoAutomacao({
       inicioId: "if", nos: [

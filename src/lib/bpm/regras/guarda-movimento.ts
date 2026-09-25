@@ -17,6 +17,7 @@ export async function obterErroRegrasParaMovimento(params: {
   card: CardParaGuardaRegras;
   etapaDestinoId: string;
   client?: Prisma.TransactionClient | typeof db;
+  valoresEfetivosPorId?: Record<string, string | null>;
 }): Promise<string | null> {
   try {
     const client = params.client ?? db;
@@ -28,6 +29,9 @@ export async function obterErroRegrasParaMovimento(params: {
     });
     if (regras.length === 0) return null;
     const contexto = await montarContextoAvaliacaoDoCard(params.card, client);
+    if (params.valoresEfetivosPorId) {
+      contexto.camposDinamicos = { ...contexto.camposDinamicos, ...params.valoresEfetivosPorId };
+    }
     const resultado = avaliarRegras(regras, contexto);
     return resultado.permitida ? null : (resultado.motivo ?? "Movimentação bloqueada por regra configurada.");
   } catch (error) {

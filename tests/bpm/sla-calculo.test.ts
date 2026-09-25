@@ -48,11 +48,11 @@ describe("motor de cálculo de SLA", () => {
   });
 
   it("mantém a sincronização de SLA dentro da transação de movimento", () => {
-    const cards = readFileSync(resolve(process.cwd(), "src/actions/bpm/Cards.ts"), "utf8");
-    expect(cards).toContain("sincronizarSlaMovimentoBpm({");
-    expect(cards.indexOf("sincronizarSlaMovimentoBpm({")).toBeGreaterThan(cards.indexOf("const resultadoMovimento = await db.$transaction"));
-    expect(cards).toContain("etapaOrigemNome: cardAtual.etapa.nome");
-    expect(cards).toContain("etapaDestinoNome: destinoAtual.nome");
+    const command = readFileSync(resolve(process.cwd(), "src/lib/bpm/transicao-command.ts"), "utf8");
+    expect(command).toContain("await sincronizarSlaMovimentoBpm({");
+    expect(command.indexOf("await sincronizarSlaMovimentoBpm({")).toBeGreaterThan(command.indexOf("const result = await db.$transaction(async (tx)"));
+    expect(command).toContain("etapaOrigemNome: card.etapa.nome");
+    expect(command).toContain("etapaDestinoNome: destino.nome");
   });
 
   it("expõe pausa e retomada com acumulação em milissegundos", async () => {

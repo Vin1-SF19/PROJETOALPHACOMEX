@@ -52,16 +52,18 @@ describe("remoção das regras financeiras configuráveis", () => {
     expect(contexto).toContain("FILTRO_SEM_REGRAS_FINANCEIRAS_DESCONTINUADAS");
   });
 
-  it("preserva o Pipeline Financeiro, as regras BPM e as comissões autônomas", () => {
+  it("preserva o pipeline configurável, as regras BPM e as comissões autônomas", () => {
     const pipeline = ler("src/lib/bpm/pipeline-financeiro.ts");
+    const transicao = ler("src/lib/bpm/transicao-command.ts");
     const regras = ler("src/actions/bpm/Regras.ts");
     const comissoes = ler("src/lib/commissions/entry-generator.ts");
 
-    expect(pipeline).toContain("validateCanonicalFinancialTransition");
-    expect(pipeline).toContain("calcularRetencoesFinanceiras");
+    expect(pipeline).not.toContain("validateCanonicalFinancialTransition");
+    expect(transicao).not.toContain("validateCanonicalFinancialTransition");
+    expect(transicao).toContain("camposPublicadosPorEtapa");
     expect(regras).toContain("ListarWorkspaceRegrasBpm");
     expect(comissoes).toContain("gerarLancamentosParaEvento");
-    expect(existsSync(resolve(raiz, "tests/bpm/pipeline-financeiro.test.ts"))).toBe(true);
+    expect(existsSync(resolve(raiz, "tests/bpm/pipeline-financeiro.test.ts"))).toBe(false);
     expect(
       existsSync(
         resolve(
