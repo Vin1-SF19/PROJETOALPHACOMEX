@@ -35,6 +35,12 @@ describe("operadores e coerção explícita", () => {
     [condicao(criadoEm, "dataAntes", "2026-09-05T00:00:00Z"), true], [condicao(criadoEm, "dataDepois", "2026-09-04T00:00:00Z"), true],
   ])("avalia %#", (entrada, esperado) => expect(avaliarCondicao(entrada, contexto)).toBe(esperado));
 
+  it("não trata serviço ainda vazio como erro de tipo na condição de Radar", () => {
+    const semServico = { ...contexto, card: { ...contexto.card, servico: null } };
+    expect(avaliarCondicao(condicao(servico, "contem", "Radar"), semServico)).toBe(false);
+    expect(avaliarCondicao(condicao(servico, "naoContem", "Radar"), semServico)).toBe(true);
+  });
+
   it("trata campo inexistente como erro e tipos incompatíveis como bloqueio seguro", () => {
     const ausente = regra({ tipo: "bloqueio_movimentacao", mensagem: "não" }, condicao({ fonte: "card", campo: "concluidoEm" }, "igual", "x"));
     expect(avaliarRegra(ausente, contexto)).toMatchObject({ permitida: false, erros: [{ codigo: "CAMPO_INEXISTENTE" }] });

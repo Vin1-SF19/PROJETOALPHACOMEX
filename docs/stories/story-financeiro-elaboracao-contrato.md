@@ -46,6 +46,8 @@ Ready for Review — código da integração RADAR publicado e configuração da
 - [ ] Verificar o fluxo autenticado com card real, inclusive cards antigos, anexos e erro nominal por campo (AC 1 a 8). Configuração publicada após autorização específica; verificação em leitura confirmou campos e automação ativos.
 - [x] Rodar `npm run lint`, `npm run typecheck`, `npm test` e `npm run build`; atualizar checklist e File List antes da conclusão local (lint: 0 erros, avisos preexistentes; testes na worktree seletiva: 511 arquivos/3.828 casos aprovados; build concluído).
 - [x] Corrigir o diagnóstico de movimento para aplicar `obrigatorioEntrada` somente na entrada do destino, sem exigir indicadores que devem ser preenchidos durante a elaboração; teste de regressão e quality gates locais aprovados (AC 9).
+- [x] Corrigir a transição Solicitação → Elaboração para avaliar requisitos `DURING_STAGE` apenas da origem, representar campos publicados ainda sem resposta como vazios e aceitar serviço nulo na condição `contém Radar`. Avaliação somente leitura dos dois cards reais da etapa 1 retornou `success: true`, sem movê-los (AC 9).
+- [x] Validar a correção local: lint sem erros (1.192 avisos preexistentes), typecheck, 519 arquivos/3.867 testes aprovados, build e `git diff --check` aprovados. Smoke autenticado com movimento real permanece pendente.
 - [ ] Confirmar no card autenticado que a entrada em Elaboração é liberada e os campos aparecem dentro da segunda etapa (AC 1, 9). O código da correção foi publicado e o deployment ficou pronto; falta o teste visual autenticado.
 - [x] Criar rascunho automático no Gerador, com dados da contratação, contratada correta, título solicitado e idempotência por card/template (AC 10).
 - [x] Publicar três campos de pagamento no formulário da primeira etapa, visíveis e obrigatórios na saída para RADAR, e automação de entrada exclusiva de RADAR (AC 10). Verificação em leitura confirmou os três campos ativos, formulário v6 e automação ativa.
@@ -62,6 +64,7 @@ Ready for Review — código da integração RADAR publicado e configuração da
 - **Contexto acumulado:** `accumulated-context.md` e `.aiox/gotchas.json` não existem nesta worktree. `[AUTO-DECISION]` Coerência conferida pela story anterior, story base, Constitution e código observado, sem inventar conteúdo ausente.
 - **Integração externa:** `[AUTO-DECISION]` Tratar “quando aplicável” como uso de integração já configurada e identificada no inventário; não escolher provedor ou criar contrato externo sem requisito adicional.
 - **Diagnóstico real de 25/09:** não há card ativo na segunda etapa. Os três cards de teste da primeira etapa falhavam ao avaliar a entrada porque (1) a transação HTTP no Turso expirava em 5 segundos e (2) `transicao-command.ts` cobrava os dois booleanos obrigatórios da etapa de destino já na entrada. Após ampliar o timeout e respeitar `obrigatorioEntrada`, a avaliação somente leitura dos três cards retornou `success: true`, sem movê-los.
+- **Reteste de 25/09 (transição genérica):** dois cards estão na Solicitação e nenhum na Elaboração. O requisito `DURING_STAGE` da Elaboração era avaliado já na entrada; sua condição consultava `Contrato elaborado`, ainda sem valor, e gerava `CAMPO_INEXISTENTE`, convertido em `TRANSITION_FAILED` genérico. Após corrigir o escopo, o card sem serviço revelou outra exceção: `contém Radar` com valor nulo gerava `TIPO_INCOMPATIVEL`. Os dois casos foram corrigidos em código; avaliação somente leitura de ambos os cards retornou sucesso. Movimento real autenticado permanece pendente.
 - **Reteste informado pelo usuário:** o diálogo `Antes de mover para Elaboração do Contrato` ainda cobrava os dois indicadores da segunda etapa na entrada, embora o comando de transição já respeitasse `obrigatorioEntrada`. O inventário de produção confirmou os dois campos ativos, visíveis, editáveis e publicados no formulário da segunda etapa, com `obrigatorio=true` e `obrigatorioEntrada=false`; todos os requisitos publicados para a etapa estão em `DURING_STAGE`. A causa é a projeção divergente do diálogo, que usava `destino.obrigatorio` como exigência de entrada. Nenhuma alteração no banco é necessária.
 - **Plano de publicação:** `scripts/financeiro-elaboracao-config.mts` é somente leitura sem `--apply`. Seleciona a etapa ativa `cmsd9yw74000ddzggndlvgbun`, altera tipos de `Data do envio` para `data_hora` e `Link/arquivo` para `url_ou_arquivo`, configura duas datas automáticas, 18 requisitos e 15 automações. A etapa homônima `elaboracao_contrato_legacy` está inativa e sem cards; não será modificada.
 - **Vault:** backup completo `database-backups/pre-change/painelalpha_turso_pre_change_elaboracao_config_2026-09-25T17-42-13-450Z.db` validado por restauração (`integrity_check=ok`, 331 tabelas, 171.275 linhas, FK=0), SHA-256 `ad960a4aff973d18301e88a6f8060583ada72eb08983888205696cd5346a3d5a`. Snapshot seletivo `database-backups/pre-change/elaboracao-config-before-2026-09-25T17-42-33-799Z.json`. O inventário somente leitura deste reteste confirmou os campos e requisitos publicados; a correção atual não altera o banco.
@@ -97,6 +100,8 @@ Ready for Review — código da integração RADAR publicado e configuração da
 - `scripts/financeiro-elaboracao-config.mts` — plano de leitura e publicação protegida da configuração.
 - `src/lib/bpm/validacao-salvamento-configurado.ts` — padrões temporais e requisitos publicados no salvamento.
 - `src/lib/bpm/transicao-command.ts` — requisito `REGRA` e referência autenticada de arquivo na transição.
+- `src/lib/bpm/requisitos-etapa.ts` — escopo de requisitos durante a transição.
+- `src/lib/bpm/regras/avaliador.ts` — comparação `contém` com valor nulo.
 - `src/actions/bpm/Cards.ts` — requisito no salvamento, eventos de alteração e arquivo vinculado.
 - `src/lib/bpm/requisitos-etapa.ts` — obrigatoriedade contextual de origem/entrada no diagnóstico da transição.
 - `src/actions/bpm/Anexos.ts` — upload em campo de link ou arquivo.
@@ -110,6 +115,7 @@ Ready for Review — código da integração RADAR publicado e configuração da
 - `src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx` — arquivo atual do novo tipo.
 - `tests/bpm/validacao-salvamento-configurado.test.ts` — padrões e requisitos no salvamento.
 - `tests/bpm/requisitos-transicao-obrigatoriedade.test.ts` — regressão da entrada em Elaboração sem indicadores futuros já preenchidos.
+- `tests/bpm/regras-engine.test.ts` — regressão da condição `contém Radar` com serviço nulo.
 - `tests/bpm/edicao-campos-card.test.ts` — mocks da persistência parcial diante do novo validador.
 - `tests/bpm/cpf-pendencias-react.test.ts` — persistência UTC de campo `data_hora`.
 - `src/lib/bpm/automacoes/schemas.ts` — opções configuráveis da ação de contrato.

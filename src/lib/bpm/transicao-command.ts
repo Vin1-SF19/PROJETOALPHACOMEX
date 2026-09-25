@@ -5,6 +5,7 @@ import type { Prisma } from "@prisma/client";
 
 import db from "@/lib/prisma";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
+import { requisitoAplicaAoMover } from "@/lib/bpm/requisitos-etapa";
 import { camposPublicadosPorEtapa, capacidadesObrigatoriasPorEtapa } from "@/lib/bpm/campos-formulario-publicado";
 import {
   carregarValoresCanonicosCampos,
@@ -91,18 +92,6 @@ function erro(code: string, message: string, pendencias?: string[]): never {
 function origemCompativel(origem: string, solicitante: BpmTransitionRequester): boolean {
   const canonica = transitionOriginForRequester(solicitante);
   return origem === "AMBOS" || origem === canonica;
-}
-
-function requisitoAplica(
-  requisito: { etapaId: string | null; transicaoId: string | null; fase: string },
-  transicaoId: string,
-  etapaOrigemId: string,
-  etapaDestinoId: string,
-): boolean {
-  if (requisito.transicaoId && requisito.transicaoId !== transicaoId) return false;
-  if (requisito.fase === "EXIT_STAGE") return !requisito.etapaId || requisito.etapaId === etapaOrigemId;
-  if (requisito.fase === "ENTER_STAGE") return !requisito.etapaId || requisito.etapaId === etapaDestinoId;
-  return !requisito.etapaId || requisito.etapaId === etapaOrigemId || requisito.etapaId === etapaDestinoId;
 }
 
 function vazio(valor: string | null | undefined): boolean {
@@ -233,7 +222,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       })()
     : null;
   const requisitosAplicaveis = requisitos.filter((item) =>
-    requisitoAplica(item, transicao.id, card.etapaId, destino.id)
+    requisitoAplicaAoMover(item, transicao.id, card.etapaId, destino.id)
     && (!item.campoId || Boolean(item.campo?.ativo
       && camposPublicadosDoPipeline?.has(item.campoId))),
   );
@@ -376,6 +365,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
 
   const contextoRegra = await montarContextoAvaliacaoDoCard(card, tx);
   contextoRegra.camposDinamicos = {
+    ...Object.fromEntries([...camposPorId.keys()].map((campoId) => [campoId, null])),
     ...(contextoRegra.camposDinamicos ?? {}),
     ...Object.fromEntries(valoresEfetivosPorId),
   };

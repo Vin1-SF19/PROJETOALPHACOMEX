@@ -97,6 +97,9 @@ export function avaliarCondicao(condicao: CondicaoFolha, contexto: ContextoAvali
   if (bruto === null && (condicao.operador === "igual" || condicao.operador === "diferente")) {
     return condicao.operador === "diferente" ? condicao.valor !== null : condicao.valor === null;
   }
+  if (bruto === null && (condicao.operador === "contem" || condicao.operador === "naoContem")) {
+    return condicao.operador === "naoContem";
+  }
 
   const tipo: TipoValor = condicao.operador === "dataAntes" || condicao.operador === "dataDepois" ? "data" : condicao.tipoEsperado ?? inferirTipo(bruto);
   const atual = exigirCoercao(bruto, tipo, "Valor do campo");

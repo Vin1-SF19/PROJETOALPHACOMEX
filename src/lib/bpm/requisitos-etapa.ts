@@ -5,6 +5,24 @@ export type CampoObrigatorioBpm = {
 
 export type OrigemMovimentacaoBpm = "MANUAL" | "AUTOMACAO";
 
+type EscopoRequisitoTransicao = {
+  etapaId: string | null;
+  transicaoId: string | null;
+  fase: string;
+};
+
+/** Requisitos da etapa de destino só valem na entrada quando publicados como ENTER_STAGE. */
+export function requisitoAplicaAoMover(
+  requisito: EscopoRequisitoTransicao,
+  transicaoId: string,
+  etapaOrigemId: string,
+  etapaDestinoId: string,
+): boolean {
+  if (requisito.transicaoId && requisito.transicaoId !== transicaoId) return false;
+  if (requisito.fase === "ENTER_STAGE") return !requisito.etapaId || requisito.etapaId === etapaDestinoId;
+  return !requisito.etapaId || requisito.etapaId === etapaOrigemId;
+}
+
 type ObrigacaoCampoTransicao = {
   obrigatorio?: boolean;
   obrigatorioEntrada?: boolean;
