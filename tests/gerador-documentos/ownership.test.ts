@@ -29,6 +29,7 @@ import {
   exigirOwnershipDocumento,
   exigirOwnershipDocumentoPorToken,
 } from "@/lib/gerador-documentos/ownership";
+import { CONTRATO_PADRAO_ID } from "@/lib/gerador-documentos/contrato-padrao-id";
 
 describe("exigirAcessoModulo", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -83,6 +84,18 @@ describe("exigirOwnershipTemplate", () => {
     await expect(
       exigirOwnershipTemplate("inexistente", { userId: 1, role: "User", isAdmin: false }),
     ).rejects.toThrow("Template não encontrado");
+  });
+
+  it("contrato padrão é legível por qualquer usuário autorizado ao módulo", async () => {
+    mocks.findUniqueTemplate.mockResolvedValue({ id: CONTRATO_PADRAO_ID, criadoPorId: 8, status: "ATIVO" });
+    const template = await exigirOwnershipTemplate(CONTRATO_PADRAO_ID, { userId: 99, role: "User", isAdmin: false }, { leitura: true });
+    expect(template.id).toBe(CONTRATO_PADRAO_ID);
+  });
+
+  it("contrato padrão não pode ser modificado nem pelo proprietário", async () => {
+    mocks.findUniqueTemplate.mockResolvedValue({ id: CONTRATO_PADRAO_ID, criadoPorId: 8, status: "ATIVO" });
+    await expect(exigirOwnershipTemplate(CONTRATO_PADRAO_ID, { userId: 8, role: "Admin", isAdmin: true }))
+      .rejects.toThrow("O contrato padrão não pode ser alterado");
   });
 });
 

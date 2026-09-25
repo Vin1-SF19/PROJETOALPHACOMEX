@@ -14,11 +14,13 @@ import { GerarDocumento, BuscarClientesParaContratante } from "@/actions/gerador
 import { ListarEmpresasContratadas } from "@/actions/empresas-contratadas";
 import { ModalNovaEmpresaContratada, type EmpresaContratadaResumo } from "./ModalNovaEmpresaContratada";
 import type { VariavelTemplate } from "@/lib/gerador-documentos/schemas";
+import { CONTRATO_PADRAO_ID } from "@/lib/gerador-documentos/contrato-padrao-id";
 
 interface TemplateParaGeracao {
   id: string;
   titulo: string;
   variaveis: VariavelTemplate[];
+  valoresIniciais?: Record<string, string>;
 }
 
 interface ClienteResumo {
@@ -50,8 +52,9 @@ function prePreencherVariaveis(
 
 export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao }) {
   const router = useRouter();
+  const contratoPadrao = template.id === CONTRATO_PADRAO_ID;
   const [titulo, setTitulo] = useState(template.titulo);
-  const [valores, setValores] = useState<Record<string, string | boolean>>({});
+  const [valores, setValores] = useState<Record<string, string | boolean>>(template.valoresIniciais ?? {});
   const [isPending, startTransition] = useTransition();
 
   const [buscaCliente, setBuscaCliente] = useState("");
@@ -64,10 +67,11 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
   const [modalEmpresaOpen, setModalEmpresaOpen] = useState(false);
 
   useEffect(() => {
+    if (contratoPadrao) return;
     ListarEmpresasContratadas().then((res) => {
       if (res.success) setEmpresasContratadas(res.data);
     });
-  }, []);
+  }, [contratoPadrao]);
 
   useEffect(() => {
     if (clienteSelecionado) return;
@@ -94,6 +98,9 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
     setValores((prev) =>
       prePreencherVariaveis(prev, template.variaveis, {
         cnpj: cliente.cnpj,
+        contratante_cnpj: cliente.cnpj,
+        contratante_nome: cliente.razaoSocial,
+        contratante_email: cliente.email,
         documento: cliente.cnpj,
         razaoSocial: cliente.razaoSocial,
         nomeFantasia: cliente.nomeFantasia,
@@ -147,7 +154,11 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
       toast.error("Informe o título do documento");
       return;
     }
-    if (!clienteSelecionado && !empresaContratadaId) {
+    if (contratoPadrao && !clienteSelecionado) {
+      toast.error("Selecione o contratante antes de gerar", { duration: 4000 });
+      return;
+    }
+    if (!contratoPadrao && !clienteSelecionado && !empresaContratadaId) {
       toast.error("Selecione ao menos o contratante ou a contratada antes de gerar", { duration: 4000 });
       return;
     }
@@ -158,7 +169,7 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
         titulo: titulo.trim(),
         variaveis: valores,
         clienteId: clienteSelecionado?.id,
-        empresaContratadaId: empresaContratadaId ?? undefined,
+        empresaContratadaId: contratoPadrao ? undefined : empresaContratadaId ?? undefined,
       });
       if (!resultado.success) {
         toast.error(resultado.error);
@@ -243,7 +254,7 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
           )}
         </section>
 
-        <section className="flex flex-col gap-1.5">
+        {!contratoPadrao && <section className="flex flex-col gap-1.5">
           <Label htmlFor="select-contratada">Contratada (empresa)</Label>
           <div className="flex items-center gap-2">
             <Select value={empresaContratadaId ?? undefined} onValueChange={handleSelecionarContratada}>
@@ -311,7 +322,7 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
               </div>
             );
           })()}
-        </section>
+        </section>}
 
         {template.variaveis.map((variavel) => (
           <div key={variavel.nome} className="flex flex-col gap-1.5">
@@ -344,7 +355,7 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
         </Button>
       </div>
 
-      <ModalNovaEmpresaContratada open={modalEmpresaOpen} onOpenChange={setModalEmpresaOpen} onCriada={handleEmpresaCriada} />
+      {!contratoPadrao && <ModalNovaEmpresaContratada open={modalEmpresaOpen} onOpenChange={setModalEmpresaOpen} onCriada={handleEmpresaCriada} />}
     </div>
   );
 }

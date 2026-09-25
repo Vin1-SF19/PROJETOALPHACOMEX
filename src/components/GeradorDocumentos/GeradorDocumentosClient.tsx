@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArquivarTemplateDocumento } from "@/actions/gerador-documentos";
 import { filtrarDocumentosPorBusca } from "@/lib/gerador-documentos/busca";
 import { NovoTemplateDialog } from "./NovoTemplateDialog";
+import { CONTRATO_PADRAO_ID } from "@/lib/gerador-documentos/contrato-padrao-id";
 
 export interface TemplateResumo {
   id: string;
@@ -205,7 +206,9 @@ function TemplateCard({
     <Card className="flex flex-col gap-3 p-5">
       <div className="flex items-start justify-between gap-2">
         <h3 className="font-medium text-neutral-900 dark:text-neutral-100">{template.titulo}</h3>
-        {template.categoria && <Badge variant="secondary">{template.categoria}</Badge>}
+        {template.id === CONTRATO_PADRAO_ID
+          ? <Badge variant="secondary">Padrão para todos</Badge>
+          : template.categoria && <Badge variant="secondary">{template.categoria}</Badge>}
       </div>
       {template.descricao && (
         <p className="line-clamp-2 text-sm text-neutral-500 dark:text-neutral-400">{template.descricao}</p>
@@ -216,17 +219,17 @@ function TemplateCard({
         <span>{template._count.documentos} documento(s) gerado(s)</span>
       </div>
       <div className="mt-2 flex items-center gap-2">
-        <Link href={`/PainelAlpha/GeradorDocumentos/${template.id}`} className="flex-1">
-          <Button variant="secondary" className="w-full">
-            Gerenciar
-          </Button>
-        </Link>
+        {template.id !== CONTRATO_PADRAO_ID && (
+          <Link href={`/PainelAlpha/GeradorDocumentos/${template.id}`} className="flex-1">
+            <Button variant="secondary" className="w-full">Gerenciar</Button>
+          </Link>
+        )}
         {template.status === "ATIVO" && (
           <Link href={`/PainelAlpha/GeradorDocumentos/gerar?templateId=${template.id}`}>
             <Button>Gerar documento</Button>
           </Link>
         )}
-        {onArquivar && (
+        {onArquivar && template.id !== CONTRATO_PADRAO_ID && (
           <Button variant="ghost" size="icon" onClick={onArquivar} disabled={disabled} aria-label="Arquivar template">
             <Archive className="h-4 w-4" />
           </Button>

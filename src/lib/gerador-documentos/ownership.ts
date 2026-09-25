@@ -2,6 +2,7 @@ import db from "@/lib/prisma";
 import { isAdminRole } from "@/lib/roles";
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
 import { auth } from "../../../auth";
+import { CONTRATO_PADRAO_ID } from "./contrato-padrao-id";
 
 const MODULO_PERMISSION = "geradorDocumentos";
 
@@ -47,12 +48,17 @@ export async function exigirAcessoModulo(
 export async function exigirOwnershipTemplate(
   templateId: string,
   ctx: ContextoGeradorDocumentos,
+  opcoes?: { leitura?: boolean },
 ) {
   const template = await db.documentoTemplate.findUnique({
     where: { id: templateId },
     select: { id: true, criadoPorId: true, status: true },
   });
   if (!template) throw new Error("Template não encontrado");
+  if (template.id === CONTRATO_PADRAO_ID) {
+    if (!opcoes?.leitura) throw new Error("O contrato padrão não pode ser alterado");
+    return template;
+  }
   if (!ctx.isAdmin && template.criadoPorId !== ctx.userId) {
     throw new Error("Não autorizado");
   }
