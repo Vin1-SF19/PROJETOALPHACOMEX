@@ -4,8 +4,16 @@ import type { ComponentProps } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import PipelineBoardClient from "@/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient";
-import { ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
+import { MoverCardBpm, ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
 
+const drag = vi.hoisted(() => ({ current: null as null | import("react").ComponentProps<typeof import("@dnd-kit/core").DndContext> }));
+vi.mock("@dnd-kit/core", async (original) => {
+  const actual = await original<typeof import("@dnd-kit/core")>();
+  return { ...actual, DndContext: (props: import("react").ComponentProps<typeof actual.DndContext>) => {
+    drag.current = props;
+    return h(actual.DndContext, props);
+  } };
+});
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/lib/pusher", () => ({ pusherClient: null }));
 vi.mock("@/actions/bpm/Cards", () => ({
@@ -138,6 +146,40 @@ it("não recoloca o card após exclusão local quando uma consulta antiga termin
 
     await act(async () => responder({ success: true, data: [card] } as unknown as Awaited<ReturnType<typeof ListarCardsPipelineBpm>>));
     expect(container.textContent).toContain("Nenhum card neste pipeline");
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+  }
+});
+
+
+it.each(["success", "failure", "sync-failure"])("mostra pending após drop até resolver: %s", async (outcome) => {
+  Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
+  let resolveMove!: (value: Awaited<ReturnType<typeof MoverCardBpm>>) => void;
+  vi.mocked(MoverCardBpm).mockImplementation(() => new Promise((resolve) => { resolveMove = resolve; }));
+  vi.mocked(ListarCardsPipelineBpm).mockResolvedValue(outcome === "sync-failure"
+    ? { success: false, error: "offline", data: [] }
+    : { success: true, data: [{ ...card, etapaId: outcome === "failure" ? "etapa-1" : "etapa-2" }] } as unknown as Awaited<ReturnType<typeof ListarCardsPipelineBpm>>);
+  const { container, root, props } = montarBoard();
+  props.pipeline.etapas = [{ id: "etapa-1", nome: "Origem", ordem: 0 }, { id: "etapa-2", nome: "Destino", ordem: 1 }];
+  const active = { id: card.id };
+  const over = { id: "etapa-2" };
+  try {
+    await act(async () => root.render(h(PipelineBoardClient, props)));
+    await act(async () => { drag.current!.onDragStart!({ active } as import("@dnd-kit/core").DragStartEvent); });
+    await act(async () => { drag.current!.onDragOver!({ active, over } as import("@dnd-kit/core").DragOverEvent); });
+    let finished: unknown;
+    await act(async () => { finished = drag.current!.onDragEnd!({ active, over } as import("@dnd-kit/core").DragEndEvent); });
+    expect(container.textContent).toContain("Movendo card…");
+    expect(container.querySelectorAll('[aria-busy="true"]')).toHaveLength(1);
+    expect(MoverCardBpm).toHaveBeenCalledOnce();
+    await act(async () => {
+      resolveMove({ success: outcome !== "failure" } as Awaited<ReturnType<typeof MoverCardBpm>>);
+      await finished;
+    });
+    expect(container.textContent).not.toContain("Movendo card…");
+    expect(container.querySelector('[aria-busy="true"]')).toBeNull();
+    if (outcome === "sync-failure") expect(container.textContent).toContain("Movimento salvo");
   } finally {
     await act(async () => root.unmount());
     container.remove();

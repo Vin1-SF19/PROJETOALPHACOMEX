@@ -1,5 +1,134 @@
 # JOURNAL — Histórico Cronológico de Sessões
 
+## 2026-09-24 — Kowalski — RM-2026-8996E2 — Fase 10 (CLOSURE) — Arquivamento do plano
+
+**Tags:** #crm #alpha-crm #loading #arquivamento #sem-migration #nao-publicado
+
+**Rastreabilidade:** pedido "Adicionar respostas visuais de loading" (Painel Alpha) → auditoria de contexto (Fase 0) → blueprint Scout L1/L2, L3 opcional descartado (Fase 1) → story `docs/stories/story-rm-2026-8996e2-respostas-visuais-loading.md` com AC1–AC10 (Fase 2) → implementação Nova (Fase 3) → Forge (sandbox BLOCKED por ambiente; reconciliação manual PASS) → Probe → Anubis → Lens → Sage → Scribe (Fase 9) → este arquivamento.
+
+**Solução utilizável:** spinner no lugar do X + "Salvando alterações…" enquanto `flushSaves()` roda (`CardFullViewModal.tsx`); overlay "Movendo card…" no card afetado até `MoverCardBpm` resolver ou fazer rollback (`PipelineBoardClient.tsx`). Detalhes de arquivos, decisões e gates: registro da Fase 9 logo abaixo.
+
+**DELIVERY_READY:** Menu lateral → Alpha CRM → `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → arrastar card nativo para outra etapa; abrir card → fechar por X, Escape ou clique externo. Validado por código e testes, não por smoke autenticado.
+
+**Evidências de gate (proveniência):** reconciliação manual Forge no terminal do projeto — vitest 505 arquivos/3.808 testes PASS, build exit 0 (78/78), typecheck e lint aprovados; logs em `/tmp/alpha-rm-vitest-long-timeout.log` e `/tmp/alpha-rm-build.log` (fora do repositório). Direcionados: 51/51 PASS. Esta fase não executou comandos (somente Read/Grep/Edit).
+
+**Implementação validada ≠ publicação:** nenhum commit, push ou deploy ocorreu. `/virtus` fica disponível somente por chamada manual do usuário; não foi ativado. Vault não se aplica (sem schema/migration/mutação em massa); qualquer mudança de banco futura segue sujeita ao Vault e não é autorizada por este encerramento.
+
+**Pendências reais (não impeditivas, nenhuma oculta):** smoke autenticado desktop/mobile com rede lenta; 3 testes de regressão sugeridos pela Sage; 2 achados menores do Lens (abrir card durante "Movendo card…"; `onAbrirCard` sem feedback); divergência de memória RM-2026-B88712 sobre fechamento imediato; commit/PR/screenshot manuais; suíte global com cobertura bloqueada localmente por `EBUSY` em `coverage` (sem cobertura, passou na reconciliação Forge).
+
+**Arquivos desta fase:** `.bibble/memory/journal.md` (este registro), `docs/stories/story-rm-2026-8996e2-respostas-visuais-loading.md` (checklist e File List da Fase 10).
+
+## 2026-09-24 — Scribe — RM-2026-8996E2 — Fase 9 (CLOSURE) — Status CONCLUÍDA (smoke pendente)
+
+**Tags:** #crm #alpha-crm #loading #spinner #fechamento-card #drag-drop #sem-migration #concluido
+
+**Objetivo:** Adicionar respostas visuais de loading no Alpha CRM — spinner no botão de fechar (X) do card durante `flushSaves()` e overlay "Movendo card…" no card afetado durante a resolução do servidor após o drop no kanban.
+
+**Story:** `docs/stories/story-rm-2026-8996e2-respostas-visuais-loading.md` (Status: Implementação local concluída; smoke autenticado pendente)
+
+**Decisão técnica:** Indicadores de loading em estado React local, ligados às Promises reais (`flushSaves()` e `MoverCardBpm`), limpos em `finally`. Sem indicador global agregado (L3 não adotado). Sem alteração de `sheet.tsx`, `CardSaveContext`, API, schema ou rota.
+
+**Arquivos alterados (entrega completa):**
+
+| # | Arquivo | Alteração |
+|---|---------|-----------|
+| 1 | `src/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal.tsx` | + estado `fechando`/`fechandoRef`; X → `Loader2` durante `flushSaves()`; `aria-busy`, `role="status"`, `motion-reduce:animate-none`; `finally` limpa em todos os caminhos |
+| 2 | `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx` | + estado `cardMovendoId`; overlay "Movendo card…" no card afetado; ligado antes de `MoverCardBpm`, limpo em rollback e `finally`; `aria-busy`, `role="status"` |
+| 3 | `tests/bpm/cpf-fechamento-react.test.ts` | + testes AC1–AC4 (X/Escape/clique externo, reentrada, sucesso, falha) |
+| 4 | `tests/bpm/board-polling-react.test.ts` | + testes AC5–AC7 (overlay, sucesso, falha, sincronização pendente) |
+| 5 | `docs/stories/story-rm-2026-8996e2-respostas-visuais-loading.md` | Story completa com critérios AC1–AC10, checklist, evidências, fechamento |
+| 6 | `.bibble/memory/decisions.md` | + decisão RM-2026-8996E2 |
+| 7 | `.bibble/memory/known-errors.md` | + armadilha DragOverlay pós-drop |
+| 8 | `.bibble/memory/codebase-map.md` | + ressalva factual do fechamento atual |
+| 9 | `.bibble/memory/journal.md` | + este registro |
+
+**Resultados dos gates (consolidado):**
+
+| Gate | Resultado |
+|------|-----------|
+| `npm run lint` | exit 0 |
+| `npm run typecheck` | exit 0 |
+| `npx vitest run` (5 arquivos direcionados) | 51/51 PASS |
+| `npx vitest run --testTimeout 30000` (suíte global, Forge) | 505 arquivos, 3.808 testes PASS (4 skipped, 1 todo) |
+| `npm run build` (Forge) | exit 0, 78/78 páginas |
+| Probe (8 pontos) | PASS |
+| Anubis (segurança) | PASS — somente visual, guardas preservadas |
+| Lens (revisão) | PASS — 2 achados menores não bloqueantes |
+| Sage (aceite) | PASS — AC1–AC10, smoke manual pendente |
+
+**Evidência do caminho de consumo (DELIVERY_READY):**
+
+Menu lateral → Alpha CRM → `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → Kanban → arrastar card nativo para outra etapa (overlay "Movendo card…"); abrir card → editar → fechar por X, Escape ou clique externo (spinner no X + "Salvando alterações…").
+
+**Checkpoint Vault:** NÃO APLICÁVEL. Nenhum schema, migration ou mutação em massa.
+
+**Pendências (não bloqueantes):**
+
+1. Smoke autenticado desktop/mobile com rede lenta: sucesso, falha forçada + nova tentativa, arrastes rápidos seguidos, persistência ao reabrir/recarregar.
+2. Testes sugeridos pela Sage (não bloqueantes): falha ao fechar → Cancelar → novo X; flush que lança erro → nova tentativa; arraste com falha → segundo arraste.
+3. Lens (menor): card pode ser aberto enquanto "Movendo card…" está ativo; `onAbrirCard` executa `flushSaves()` sem feedback.
+4. Divergência de memória: `decisions.md`/`known-errors.md` (RM-2026-B88712) descrevem fechamento imediato sem "Campos não salvos", mas o código atual aguarda o flush e mantém o diálogo. Não resolvida nesta RM.
+5. Commit/PR e screenshot: manuais.
+
+**Estado da entrega:** Implementação validada localmente (typecheck, lint, testes, auditoria de segurança, revisão Lens, matriz QA, aceite Sage). **Nenhuma publicação em produção ocorreu.** Não houve commit, push, deploy ou ativação de Virtus.
+
+**Publicação futura:** `/virtus` permanece disponível exclusivamente por acionamento manual do administrador.
+
+**Arquivos desta fase:** `.bibble/memory/journal.md` (este registro).
+
+## 2026-09-22 — Kowalski — RM-2026-E96332 — Fase 12 (CLOSURE) — Status CONCLUÍDA
+
+**Tags:** #checklists #procedimentos #soft-delete #trash2 #alpha-crm #sem-migration #concluido
+
+**Objetivo:** Ícone de lixeira (`Trash2`) para excluir procedimentos (templates de checklist `BpmChecklistTemplate`) nas configurações do Alpha CRM, com confirmação explícita, soft delete (`ativo: false`), auditoria e revalidação.
+
+**Story:** `docs/stories/story-rm-2026-e96332-exclusao-procedimentos.md` (Status: CONCLUÍDA)
+
+**Decisão técnica:** Opção A — reaproveitar `ativo=false` + auditoria distinta (`campoAlterado: "checklist_template_excluido"`). Zero migration, reversível, preserva integridade referencial de `BpmCardChecklist`/`BpmCardChecklistItem`.
+
+**Arquivos alterados (entrega completa):**
+
+| # | Arquivo | Alteração |
+|---|---------|-----------|
+| 1 | `src/lib/bpm/checklists/schemas.ts` | + `excluirTemplateChecklistSchema` (`id` cuid + `updatedAt` Date) |
+| 2 | `src/actions/bpm/Checklists.ts` | + import schema, + action `ExcluirTemplateChecklistBpm` (auth, transação Serializable, optimistic locking, soft delete, auditoria, revalidatePath, realtime) |
+| 3 | `src/components/bpm/checklists/ChecklistsWorkspace.tsx` | + estado `excluindo`/`excluindoPendente`, + handler `confirmarExclusao`, + botão `Trash2` por template, + `Dialog` de confirmação (bloqueio Esc/clique fora, aviso "em uso por N cards", `showCloseButton={false}`) |
+| 4 | `docs/stories/story-rm-2026-e96332-exclusao-procedimentos.md` | Story completa com critérios, checklist, evidências, documentação de fechamento |
+| 5 | `.bibble/memory/decisions.md` | + decisão RM-2026-E96332 |
+| 6 | `.bibble/memory/codebase-map.md` | + referência a `ExcluirTemplateChecklistBpm` e botão `Trash2` |
+| 7 | `.bibble/memory/integration-points.md` | + seção de integração (arquivos, propósito, caminho, editado quando) |
+
+**Resultados dos gates (consolidado):**
+
+| Gate | Fase(s) | Resultado |
+|------|---------|-----------|
+| `typecheck` (`npx tsc --noEmit`) | 4, 5, 6, 7, 8, 9, 10, 11 | exit 0 em todas |
+| `eslint` (3 arquivos do objetivo) | 4, 5, 6, 7, 8, 9, 10, 11 | exit 0 em todas |
+| `tests` (`tests/bpm`) | 6, 10 | 1161 pass / 0 asserção falha (Fase 6); 9 pass em `checklists-actions` + `checklists-service` (Fase 10) |
+| `roadmap_tests` | 6 | exit 0 (41 testes) |
+| `build` | — | não executável nas sessões de gate (fora do allowlist; falha anterior de ambiente: rede `fonts.googleapis.com` + permissão `.env`) |
+| Auditoria de segurança (Anubis) | 8 | PASS — 20 requisitos verificados, 0 achados críticos |
+| Revisão Lens | 9 | PASS — 1 achado MÉDIA (teste dedicado pendente), 0 ALTA/CRÍTICA |
+| Matriz QA (Probe) | 7, 10 | PASS — 13 critérios de aceite: 12 ✅, 1 ⚠️ (teste dedicado) |
+
+**Evidência do caminho de consumo (DELIVERY_READY):**
+
+`/PainelAlpha/AlphaCRM/admin/checklists` → cartão do template → ícone `Trash2` (ao lado de "Editar") → modal de confirmação (nome do template, aviso de consequências, aviso "em uso por N cards" quando `_count.instancias > 0`, botões "Cancelar" / "Excluir procedimento", Esc/clique fora bloqueados) → `ExcluirTemplateChecklistBpm({ id, updatedAt })` → auth (`exigirAdminChecklist`) + `configurarChecklists` + `updatedAt` (conflito → `CONFLITO_CHECKLIST_TEMPLATE`) + `ativo: false` + `bpmPipelineConfigAuditoria.create` + `revalidatePath(ROTA_ADMIN)` + `notificarTemplateConfirmado` → `router.refresh()` → lista revalidada, template aparece "Inativo".
+
+**Checkpoint Vault:** NÃO APLICÁVEL (Fase 3). A estratégia (Opção A) é CRUD unitário sobre estruturas existentes — zero migration, zero backfill, zero mutação em massa. Nenhum backup foi gerado nem exigido. Nenhum comprovante de aprovação de banco foi utilizado.
+
+**Pendências (não bloqueantes):**
+
+1. `tests/bpm/checklists-exclusao.test.ts` — não existe. Casos: autorização (admin/não-admin), conflito `updatedAt`, idempotência (excluir 2×), não-materialização em card novo, instâncias antigas preservadas. **Atribuição: Echo/Nova.**
+2. `npm run build` — não executável nas sessões de gate (fora do allowlist; falha anterior de ambiente). Validação manual pendente em ambiente com rede e `.env` acessível.
+3. Distinção visual "excluído" vs. "inativo" — limitação conhecida da Opção A; evolução futura (Opção B: colunas `excluidoEm`/`excluidoPorId`).
+
+**Estado da entrega:** Implementação validada localmente (typecheck, lint, testes, auditoria de segurança, revisão Lens, matriz QA). **Nenhuma publicação em produção ocorreu.** Não houve commit, push, deploy ou ativação de Virtus nesta sessão.
+
+**Publicação futura:** `/virtus` permanece disponível exclusivamente por acionamento manual do administrador. Não foi ativado automaticamente. A publicação em produção exige: (1) commit seletivo dos arquivos listados acima; (2) Conventional Commit; (3) push; (4) monitoramento de deployment; (5) smoke test autenticado.
+
+**Arquivos desta fase:** `.bibble/memory/journal.md` (este registro).
+
 ## 2026-09-22 — Scribe — RM-2026-B88712 — Fase 11 (encerramento) — Status Done
 
 Encerramento local do RM-2026-B88712 (Autosave universal do formulário do card + remoção do modal "Sair sem salvar"). Aceite Sage recebido com ressalvas: gates globais (lint 2.417 erros, 19 testes) são preexistentes e não atribuíveis a esta mudança; homologação autenticada em navegador permanece pendente.
@@ -6589,6 +6718,147 @@ RM-2026-E1E1F7: commit 14f7d01c e 13 fases concluídas confirmados. Promoção a
 RM-2026-09A642: autosave/CPF e confirmação de fechamento reinspecionados; 84/84 testes focados, typecheck e lint do escopo aprovados. O staging segue bloqueado pela atribuição de arquivos compartilhados entre RMs; nenhuma homologação autenticada ou deploy foi reivindicado. RM-2026-A33407: corrigida resposta tardia da busca por CNPJ no modal Novo Card; 24/24 testes focados, typecheck e lint aprovados. A fila de staging continua exigindo árvore isolada.
 
 RM-2026-1FFBAA: fases 3–10 retomadas a partir do código existente; 50/50 testes focados, typecheck e lint do escopo aprovados. Fixture SQLite reduzida não comprova banco Prisma real. RM-2026-D64AF1: 22/22 testes de reunião, typecheck e lint aprovados; Google real pendente de Testes. RM-2026-04A236: 58/58 testes de lista, publicação e renderer, typecheck e lint aprovados; fluxo autenticado pendente de Testes. Esses três objetivos receberam relatórios de conclusão no ALPAK. RM-2026-A33407 recebeu relatório e depois staging automático bloqueou por digest anterior de NovoCardModal.tsx; código e testes locais continuam aprovados. Nenhum deploy foi feito nesta sessão.
+
+
+## 2026-09-23 — Nova — RM-2026-8996E2, Fase 2 documental
+
+Criada story única `docs/stories/story-rm-2026-8996e2-respostas-visuais-loading.md`, pronta para a fase executora, com pedido recebido, blueprint Scout, dez aceites rastreáveis, dependências, checklist e File List inicial. Escopo: feedback durante fechamento/salvamento e movimentação nativa no Kanban; indicador agregado opcional excluído. Nenhum componente ou código funcional alterado.
+
+Reinspeção confirmou que `onDragEnd` elimina `activeId` antes da espera: indicador somente no DragOverlay seria insuficiente. Story exige integração no card do board após drop e um único close acessível no modal. Divergência entre decisions.md (fechamento imediato) e código atual (flush aguardado/diálogo) explicitamente documentada para preservar o contrato vigente sem ampliar esta RM.
+
+DELIVERY_READY: artefato documental no caminho acima para executor/verificadores; usuário do CRM consumirá o feedback pela rota existente `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → card/modal/fechar ou arrastar no board. Caminho inspecionado; indicadores ainda não implementados e smoke autenticado pendente.
+
+Gates reais: lint exit 0 (0 erros, 1.192 warnings globais); typecheck exit 0; npm test exit 1 antes da suíte por EBUSY em coverage, reproduzindo `docs/qa/rm-2026-1ffbaa/test.log`. Validação documental de unicidade, referências e critérios PASS. Build e testes funcionais reservados à implementação. Logs: `.cache/rm-2026-8996e2-phase2/`. Nenhum banco ou Git mutável executado; alterações existentes preservadas.
+
+File List desta fase: story acima (criada), `.bibble/memory/journal.md` (registro aditivo), logs locais dos gates. Resultado PASS somente da preparação documental.
+
+
+## 2026-09-23 — Nova — RM-2026-4646B3, Fase 2: story pronta
+
+Criada `docs/stories/story-rm-2026-4646b3-cpf-aviso-autodismiss.md`, sem story duplicada, com oito aceites, dependências, checklist, File List e estratégia de validação. Somente documentação; nenhum componente criado ou código funcional alterado. Registro aditivo preserva trabalho anterior.
+
+Reinspeção confirmou `duration: Infinity` e provider no layout do CRM. Story exige 5000 ms locais (não 8000/10000 sugeridos pelo Scout), preservação de rascunho/retry e duração de outros módulos. CPF inválido não comprova falso aviso; validador verifica dígitos verificadores e não deve ser afrouxado. Causa do falso aviso depende de reprodução na implementação. Divergência entre memória de fechamento imediato e modal atual com flush/diálogo registrada.
+
+DELIVERY_READY: story acessível pelo arquivo acima para executor/verificadores; consumo funcional existente pela rota `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → card → modal → formulário da etapa → CPF. Caminho inspecionado em código; correção e smoke autenticado pendentes. Nenhuma lacuna de infraestrutura ou autoajuste necessário identificado.
+
+Gates: lint exit 0 (0 erros, 1.192 warnings); typecheck exit 0; npm test exit 1 antes da suíte por EBUSY em coverage, também presente em `docs/qa/rm-2026-1ffbaa/test.log`. Suíte global não aprovada. Logs locais em `.cache/rm-2026-4646b3-phase2/`. Build e testes funcionais reservados à implementação. Resultado PASS apenas documental; sem banco ou Git mutável.
+
+File List: story nova acima e este journal (acréscimo); logs locais dos gates.
+
+
+## 2026-09-23 — Nova — RM-2026-4646B3, revalidação da Fase 2
+
+Story existente preservada, oito aceites conferidos e caminho de formulário detalhado até CardOpenFormSlot/FormularioEtapaRenderer. Nenhuma duplicidade ou infraestrutura faltante. Resultado PASS apenas documental, pronta para execução; correção e smoke autenticado pendentes. Lint e typecheck exit 0; npm test exit 1 por EBUSY em coverage antes da suíte, corroborado pelo log anterior da RM-2026-1FFBAA. Logs atuais em `.cache/rm-2026-4646b3-phase2/revalidation/`; logs da preparação anterior indisponíveis nesta inspeção. File List: story `docs/stories/story-rm-2026-4646b3-cpf-aviso-autodismiss.md`, este journal e logs locais. Nenhum código funcional, banco ou Git mutável alterado.
+
+
+### 2026-09-23 — Nova — RM-2026-8996E2 Fase 3
+L1/L2 implementados no modal e board, sem componente novo: flush com feedback e finally, overlay no card pendente após drop. 32 testes pertinentes passaram; lint local sem erros. Gates globais e pendências de homologação registrados na story. Preservada divergência entre memória de autosave e contrato atual de fechamento. Sem banco ou Git mutável.
+
+
+### 2026-09-24 — Scribe — RM-2026-8996E2 Fase 9 (fechamento documental)
+Story reconciliada: status, checklist (smoke manual reaberto como pendente), typecheck histórico da Fase 3 marcado como superado, números de gates esclarecidos (Forge: 505 arquivos/3.808 testes, build 78/78). Registrados caminho dos indicadores, operações, evidências, pendências Lens/Sage e divergência com RM-2026-B88712. Decisão em decisions.md; armadilha do DragOverlay em known-errors.md. codebase-map/integration-points/components sem mudança. Nenhum comando, banco ou Git mutável.
+
+
+### 2026-09-23 — Nova — RM-2026-4646B3 Fase 3
+Corrigida pendência por máscara do CPF e duração local dos erros (5s, fechamento manual, retry). Nenhum componente novo. 101 testes direcionados PASS; lint direcionado/global, typecheck e build PASS. npm test falhou em 5 testes globais fora do escopo; 3778 passaram. Smoke autenticado pendente. Detalhes/file list: docs/stories/story-rm-2026-4646b3-cpf-aviso-autodismiss.md. Sem banco nem Git mutável; alterações anteriores preservadas.
+
+
+### 2026-09-24 — Nova — RM-2026-76D6E4, fase 3
+Implementação existente de exclusão definitiva preservada; adicionados testes React de cancelamento e proteção contra confirmação repetida. 41 testes focados passaram, lint e typecheck passaram; suíte global: 3.801 passed e duas falhas fora do CRM (EACCES em .env.example e URL de banco ausente em Notas). Caminho integrado no workspace de campos confirmado; smoke autenticado pendente. Sem banco real, backup, migration ou Git mutável. Evidências e file list na story da RM e em .cache/rm-2026-76d6e4-phase3/.
+
+Complemento dos gates RM-2026-76D6E4: build isolado exit 0 (78 páginas), com avisos de ambiente/pdfjs; inclusões temporárias de tsconfig removidas.
+
+
+### 2026-09-24 — Scribe — RM-2026-76D6E4 Fase 9 (fechamento documental)
+Fechamento da memória da RM: `decisions.md` já registra a decisão (exclusão com dados por confirmação de impacto revalidada no servidor, sem migration, exclusão real no Turso proibida nesta RM). Adicionadas entradas em `codebase-map.md` (action `ExcluirCampoBpm` + schema `excluirCampoSchema` + UI do diálogo) e `integration-points.md` (caminho de integração do diálogo de exclusão). `known-errors.md` sem novo erro (limitação de design, não bug). Story checklist/file list já atualizados (smoke autenticado pendente). Nenhum comando, banco ou Git mutável.
+
+
+## 2026-09-24 — Scout — Diagnóstico da tela Admin › Automações (Motor Central)
+
+Somente leitura; nenhum código, banco ou Git alterado. 36/36 testes de automação passaram (`automacoes-*`, `automacao-monitoramento`, `arquivamento-automacao`), mas não cobrem as falhas abaixo.
+Falhas críticas encontradas por inspeção: (1) `materializarExecucoesEventosBpm` não filtra eventos por `ativadaEm` da versão — criar/editar/reativar uma automação reprocessa eventos históricos do pipeline; (2) `executarGrafo` encerra como SUCESSO ao reencontrar nó CONDICAO já concluído numa retentativa (`proximoNo` retorna null para CONDICAO); (3) cada retomada de ESPERA consome `tentativas`, e com 3 esperas a execução fica PENDENTE para sempre (a fila filtra `tentativas < 3`); (4) ALTERAR_SUBSTATUS só grava histórico, não altera `BpmCardEstado.subStatusId`; (5) `materializarGatilhosTemporaisBpm` usa `take` sem `orderBy` (starvation com >100 cards/tarefas).
+Lacunas de UI: condições, tempo, recorrência, campo/valor e webhook só via JSON; "Arquivar" = pausar; sem pausar/excluir webhook; aba Versões nunca mostra "Ativar" (não há UI de rascunho nem rollback); duplicar/ativar não revalida referências.
+Gatilhos PROCESSO_DEFERIDO e CADENCIA_INICIADA não são publicados como evento de domínio → nunca disparam no Motor Central.
+
+
+---
+
+## 2026-09-24 18:31 — RM-2026-8996E2: revalidação documental da Fase 9
+
+**Tags:** #integration #decision
+**Agentes envolvidos:** Scribe (registro conforme Kowalski)
+**Arquivos tocados:** `docs/stories/story-rm-2026-8996e2-respostas-visuais-loading.md`, `.bibble/memory/codebase-map.md`, `.bibble/memory/journal.md`.
+
+### Contexto
+Reexecução do fechamento documental; registros anteriores já existiam, com trechos de preparação ainda apresentados como estado atual.
+
+### O que foi feito
+- Reconciliados checklist, consumidor, caminho validado e File List com diff dos dois componentes/dois testes. Testes somente executados separados dos modificados; mudanças alheias preservadas.
+- Mantida proveniência dos números históricos; ressalva no mapa sobre fechamento que aguarda flush e mantém diálogo, divergente do registro B88712.
+
+### Decisões tomadas
+- Nenhuma decisão funcional nova; preservar os registros específicos existentes em decisions/known-errors e não criar catálogo para componente ou integração inexistente.
+
+### Problemas encontrados / resolvidos
+- Lint e typecheck exit 0; npm test com timeout 30000 parou por EBUSY em coverage antes dos testes. Alternativa sem cobertura nos cinco arquivos pertinentes: 51/51 PASS. Logs em `.cache/rm-2026-8996e2-phase9/`. Build não repetido; aprovação histórica Forge atribuída ao resumo recebido.
+
+### Pendências
+- Suíte global com cobertura quando a pasta estiver disponível; smoke autenticado desktop/mobile com rede lenta e persistência real, melhorias Lens/Sage e divergência histórica do fechamento. Commit/PR/screenshot manuais; nenhuma publicação ou alteração de banco.
+
+### Refletido também em
+- Story: evidências e limites desta reexecução; codebase-map: ressalva factual com referência à story. Decisions/known-errors já documentados anteriormente; integration-points/components sem novidade.
+
+---
+
+## 2026-09-24 — RM-2026-76D6E4: fechamento documental (Fase 9)
+
+**Tags:** #decision #security
+**Agentes envolvidos:** Scribe (fechamento), a partir das aprovações de Forge, Probe, Anubis, Lens e Sage
+**Arquivos tocados:** `docs/stories/story-rm-2026-76d6e4-exclusao-definitiva-campo-crm.md`, `.bibble/memory/decisions.md`, `.bibble/memory/journal.md`.
+
+### Contexto
+Exclusão definitiva de campo do Alpha CRM mesmo com dados vinculados. O código já estava implementado e testado na Fase 3. As Fases 4 a 8 aprovaram só pela leitura do código.
+
+### O que foi feito
+- Decisão registrada: a exclusão com dados passa a exigir confirmação de impacto revalidada no servidor e substitui o bloqueio da RM-2026-E4F8AF.
+- Na story, o diagnóstico anterior à mudança foi marcado como tal (observação da Lens) e o fechamento ganhou checklist e File List.
+
+### Problemas encontrados / resolvidos
+- Nenhum erro novo resolvido. As falhas globais de `tests/notas` e `tests/bibble/voice-proxy` são ambientais e não fazem parte desta RM.
+
+### Pendências
+- Smoke autenticado com fixtures no ambiente de testes. Excluir campos no Turso real continua proibido nesta RM. Commit e PR só via `/virtus`, chamado manualmente. As observações que não bloqueiam (Anubis/Lens/Sage) estão listadas na story.
+
+### Refletido também em
+- decisions.md e a story. codebase-map, integration-points e known-errors não mudaram: não há rota, módulo ou estrutura nova, e nenhum erro foi resolvido.
+
+
+### 2026-09-24 — Scribe — RM-2026-76D6E4, revalidação da Fase 9
+
+Inspeção direta confirmou a rota administrativa, a composição do workspace, o diálogo e a chamada de `ExcluirCampoBpm`. Corrigidas a atribuição de `.strict()` (somente `usoConfirmado`) e a limitação de restauração dos blobs em `decisions.md`; a story agora identifica o diagnóstico anterior e a File List efetiva. Preservadas as entradas anteriores e todas as alterações de código. Sem módulo/rota/estrutura nova, os mapas não exigiram edição. Sem correção de código nesta sessão, `known-errors.md` permaneceu intacto.
+
+Arquivos desta revalidação: esta memória, `.bibble/memory/decisions.md` e `docs/stories/story-rm-2026-76d6e4-exclusao-definitiva-campo-crm.md`. Consumo validado por inspeção: admin → `/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]` → Campos e formulários → campo fora da composição → Análise de uso → Preparar exclusão definitiva → Excluir definitivamente. Smoke autenticado com fixtures continua pendente. Nenhum banco real, migration, exclusão, commit ou push executado.
+
+
+Gates executados nesta revalidação Scribe (2026-09-24):
+- `npm run lint`: exit 0; 0 erros e 1.192 warnings.
+- `npm run typecheck`: exit 0.
+- `npm test -- --coverage.reportsDirectory=.cache/scribe-76d6e4-blghb3jn/coverage` (caminho absoluto equivalente na execução): exit 1; 503 arquivos passaram e 2 falharam; 3.806 testes passaram, 2 falharam, 4 skipped e 1 todo. Falhas observadas: `tests/bibble/voice-proxy.test.ts` (`EACCES` ao abrir `.env.example`) e `tests/notas/acesso-e-lixeira.test.ts` (`URL_INVALID`, URL vazia). São as mesmas classes de falha relatadas anteriormente; não foram corrigidas nesta fase documental. A suíte global não está aprovada.
+- `git diff --check` nos Markdown versionados editados: exit 0; story não versionada conferida separadamente quanto a espaços finais e checklist/File List.
+- Build e smoke no navegador não executados nesta fase. Resultados anteriores de build/backup continuam sendo registros históricos, não novas verificações.
+
+Evidências locais dos comandos: `.cache/scribe-76d6e4-blghb3jn/{lint,typecheck,test}.log`. SCRIBE_DONE refere-se ao fechamento documental; não aprova publicação nem exclusão real.
+
+
+## 2026-09-24 — Echo/Forge/Sage — Correções de backend do Motor Central de automações (sem mudança visual)
+
+Pedido do usuário: melhorias só no back; protótipo visual rejeitado ("não gostei desse teu visual") — não aplicar redesign.
+Corrigido: corte temporal por `ativadaEm` (fim do replay retroativo; religar zera o corte); retentativa após CONDICAO; ESPERA não consome tentativas; inativa → IGNORADA; pausar/arquivar/nova versão encerram execuções em andamento; ALTERAR_SUBSTATUS grava `BpmCardEstado.subStatusId`; gatilhos temporais paginados, sem disparo retroativo e com checagem de chaves em lote; religar valida referências; eventos PROCESSO_DEFERIDO e CADENCIA_INICIADA publicados; variáveis `{{...}}` em tarefa/anotação/alerta/comunicação; CAMPO_VALOR_ASSUMIDO compara sem tipo; contadores/histórico/monitor ocultam IGNORADA por gatilho não correspondente; revalidatePath aponta para `/admin/automacoes`; notificação realtime em alterar campo/anotação/substatus.
+Novo: `src/lib/bpm/automacoes/publicacao.ts` (validação de referências movida de AutomacoesCentrais.ts + helpers). Sem schema/migration/Vault.
+Gates: typecheck exit 0, eslint escopo exit 0, build exit 0, `tests/bpm` 1197/1197 (2 arquivos falharam só sob carga do build paralelo e passaram isolados). Testes novos: `automacoes-correcoes-motor.test.ts` (7). Ajustados: cadencias-ativacao-automatica, distribuicao-oportunidades, automacoes-actions.
+Pendente (fora do escopo, exige Vault): status ARQUIVADA real. Nada commitado; sem deploy.
+
+Publicação: commit 598efced na branch fix/crm-motor-automacoes-backend, merge e21fc087 na main e push para origin/main em 2026-09-24 (autorizado pelo usuário). 129/129 testes de automação/cadência/transição após o merge. Deploy da Vercel não verificado nesta sessão.
 
 ## 2026-09-24 — Alpha Metas: termômetro só de closers + ramal "Total geral" + super meta visível
 

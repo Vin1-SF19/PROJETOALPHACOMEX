@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, XIcon } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 
 
@@ -55,6 +55,7 @@ interface Props {
 function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, currentUserId, currentUserRole, onClose, onAtualizado, onCardExcluido, onAbrirCard, abrirChecklistInicial = false }: Props) {
   const { flushSaves, flushScheduled, getPendingFields, subscribeConfirmation } = useCardSave();
   const fechandoRef = useRef(false);
+  const [fechando, setFechando] = useState(false);
   const focoAnteriorRef = useRef<HTMLElement | null>(null);
   const [camposNaoSalvos, setCamposNaoSalvos] = useState<string[]>([]);
   useEffect(() => () => flushScheduled(`${cardId}:`), [cardId, flushScheduled]);
@@ -192,17 +193,24 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
     }
     if (fechandoRef.current || camposNaoSalvos.length) return;
     fechandoRef.current = true;
+    setFechando(true);
     focoAnteriorRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-    await Promise.resolve();
-    const savesConcluidos = await flushSaves();
-    fechandoRef.current = false;
-    if (!savesConcluidos) {
-      const pendentes = getPendingFields(cardId);
-      setCamposNaoSalvos(pendentes.length ? pendentes : ["Alterações cujo salvamento não foi confirmado"]);
-      return;
+    try {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      await Promise.resolve();
+      const savesConcluidos = await flushSaves();
+      if (!savesConcluidos) {
+        const pendentes = getPendingFields(cardId);
+        setCamposNaoSalvos(pendentes.length ? pendentes : ["Alterações cujo salvamento não foi confirmado"]);
+        return;
+      }
+      onClose();
+    } catch {
+      setCamposNaoSalvos(["Não foi possível confirmar o salvamento. Tente novamente."]);
+    } finally {
+      fechandoRef.current = false;
+      setFechando(false);
     }
-    onClose();
   }
 
   return (
@@ -220,9 +228,27 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
           event.preventDefault();
           void solicitarFechamento();
         }}
-        className="h-[94vh] max-h-[94vh] rounded-t-[2rem] border-t border-white/10 bg-[radial-gradient(ellipse_120%_60%_at_50%_-10%,rgba(var(--accent-rgb),0.12),transparent_60%)] p-0 overflow-hidden sm:max-w-none"
+        className="[&>button:last-child]:hidden h-[94vh] max-h-[94vh] rounded-t-[2rem] border-t border-white/10 bg-[radial-gradient(ellipse_120%_60%_at_50%_-10%,rgba(var(--accent-rgb),0.12),transparent_60%)] p-0 overflow-hidden sm:max-w-none"
         style={{ ["--accent-rgb" as string]: accent }}
       >
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+          <span role="status" aria-live="polite" className="text-xs text-slate-200">
+            {fechando ? "Salvando alterações…" : ""}
+          </span>
+          <button
+            type="button"
+            aria-label="Fechar"
+            aria-busy={fechando}
+            aria-disabled={fechando}
+            onClick={() => { void solicitarFechamento(); }}
+            className="rounded-full p-1.5 text-slate-400 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+          >
+            {fechando
+              ? <Loader2 aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />
+              : <XIcon aria-hidden="true" className="size-4" />}
+            <span className="sr-only">Fechar</span>
+          </button>
+        </div>
         {carregando ? (
           <>
             <SheetTitle className="sr-only">Carregando card</SheetTitle>
@@ -237,6 +263,7 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
           </>
         ) : (
               <CardAbertoLayout
+                key={card.id}
                 card={card} etapas={etapas} interacoes={interacoes}
                 accent={accent} currentUserId={currentUserId} currentUserRole={currentUserRole}
                 realtimeRevision={realtimeRevision} onClose={solicitarFechamento}

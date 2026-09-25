@@ -90,6 +90,7 @@ export function CardAbertoLayout({
   const dadosEmpresaDrawer = useDadosEmpresaDrawer(card.id);
   const { openPerfilEmpresa } = usePerfilEmpresa();
 
+
   useEffect(() => {
     let cancelado = false;
     ListarPipelinesBpm().then((res) => {
@@ -302,6 +303,7 @@ export function CardAbertoLayout({
                 podeEditar={podeEditar}
                 realtimeRevision={realtimeRevision}
                 onInteracaoCriada={onInteracaoCriada}
+                onAbrirCard={onAbrirCard}
                 anotacoes={interacoes.filter((interacao) => interacao.tipo === "ANOTACAO" || Boolean(interacao.observacoes))}
               />
             </TabsContent>
@@ -312,6 +314,7 @@ export function CardAbertoLayout({
                   pipelineId={pipeline.id}
                   pipelineNome={pipeline.nome}
                   accent={accent}
+                  realtimeRevision={realtimeRevision}
                   onAbrirCard={onAbrirCard}
                 />
               </TabsContent>

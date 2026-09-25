@@ -6,7 +6,7 @@ const ler = (arquivo: string) => readFileSync(resolve(process.cwd(), arquivo), "
 
 describe("BPM - tabs do card exibem pipelines reais (RM-2026-A4294C)", () => {
   const layout = ler("src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx");
-  const acoes = ler("src/actions/bpm/Cards.ts");
+  const acoes = ler("src/actions/bpm/Jornada.ts");
   const painel = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistoricoPipeline.tsx");
 
   it("não usa mais serviços comerciais como fonte das tabs", () => {
@@ -40,13 +40,15 @@ describe("BPM - tabs do card exibem pipelines reais (RM-2026-A4294C)", () => {
     expect(pipelines).toContain("incluirInativos ? undefined : { ativo: true }");
   });
 
-  it("ListarCardsEmpresaPorPipeline filtra por empresa e pipelineId, excluindo o card atual", () => {
-    expect(acoes).toContain("export async function ListarCardsEmpresaPorPipeline(cardId: string, pipelineId: string)");
-    expect(acoes).toContain("empresaId: card.empresaId, pipelineId, id: { not: cardId }");
+  it("consulta a cadeia de vínculos com autorização em cada card", () => {
+    expect(acoes).toContain("export async function ObterJornadaCardPipeline(cardId: string, pipelineId: string)");
+    expect(acoes).toContain("exigirAcessoBpmCard(id, userId, role, \"visualizarHistorico\")");
+    expect(acoes).toContain("id: { in: autorizados }, pipelineId");
+    expect(acoes).not.toContain("empresaId:");
   });
 
   it("painel de outro pipeline trata estado vazio sem erro/tela em branco", () => {
-    expect(painel).toContain("Esta empresa não possui outros cards em");
-    expect(painel).toContain("onAbrirCard(c.id)");
+    expect(painel).toContain("Este card ainda não passou por");
+    expect(painel).toContain("onAbrirCard(passagem.cardId)");
   });
 });

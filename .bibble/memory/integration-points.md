@@ -1,5 +1,45 @@
 # INTEGRATION POINTS — Pontos de Integração
 
+## Exclusão definitiva de campo com dados — diálogo de confirmação, action e limpeza de blob (RM-2026-76D6E4)
+
+**Arquivos:** `src/lib/validations/bpm.ts` (`excluirCampoSchema` com `confirmarDescarteDados`/`usoConfirmado`), `src/actions/bpm/Campos.ts` (`ExcluirCampoBpm`), `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/FormularioEtapaWorkspace.tsx` (diálogo de exclusão), `src/lib/bpm/anexos-lifecycle.ts` (limpeza de blob reutilizada).
+
+**Propósito:** permitir ao admin excluir definitivamente um campo do Alpha CRM mesmo com valores/anexos vinculados, com confirmação de impacto revalidada no servidor e limpeza dos blobs privados agendada.
+
+**Caminho de integração:**
+
+1. `FormularioEtapaWorkspace.tsx` (aba "Campos e formulários") lista os campos fora da composição atual; o diálogo "Excluir campo aplicável" mostra nome/ID e as cinco contagens de `ObterUsoCamposBpm` e o botão "Excluir definitivamente".
+2. "Excluir definitivamente" chama `ExcluirCampoBpm({ campoId, confirmarDescarteDados: true, usoConfirmado })`.
+3. `ExcluirCampoBpm` valida sessão + `exigirAcessoConfigPipeline(userId, "configurarCampos")` (fora e dentro da transação), Zod `excluirCampoSchema`, revalida as cinco contagens (`USO_CAMPO_ALTERADO` se divergirem) e exige confirmação quando há vínculos (`CONFIRMACAO_DESCARTE_OBRIGATORIA`).
+4. Na transação: auditoria `campo_excluido`, `deleteMany` de anexos (`SetNull`) + histórico `ANEXO_EXCLUIDO`/`ANEXO_BLOB_LIMPEZA_PENDENTE`, `deleteMany` de mapeamentos (`Restrict`), `bpmCampo.delete`; valores/valores globais/componentes/opções/acessos/configurações saem por cascade. `avancarConfigVersionBpm` por pipeline afetado.
+5. Pós-commit: `limparBlobAnexoPendente` por blob privado (falha → cron repete); `notificarPipelines`. Sucesso: `toast.success` + campo sai da lista. Erro: `toast.error` + análise de uso recarregada.
+
+**Editado quando:** mudança no contrato de confirmação de impacto, na política de limpeza de blob, na permissão `configurarCampos` ou na regra de "campo fora da composição".
+
+**Última atualização:** 2026-09-24 por Scribe (RM-2026-76D6E4, Fase 9 — fechamento)
+
+---
+
+## Exclusão de procedimento (soft delete) — ícone lixeira, modal, action e auditoria (RM-2026-E96332)
+
+**Arquivos:** `src/lib/bpm/checklists/schemas.ts` (`excluirTemplateChecklistSchema`), `src/actions/bpm/Checklists.ts` (`ExcluirTemplateChecklistBpm`), `src/components/bpm/checklists/ChecklistsWorkspace.tsx` (botão `Trash2` + `Dialog` de confirmação), `src/app/PainelAlpha/AlphaCRM/admin/checklists/page.tsx` (rota protegida).
+
+**Propósito:** permitir ao admin/gestor excluir um template de procedimento (soft delete `ativo:false`) com confirmação explícita, preservando instâncias históricas e registrando auditoria distinta.
+
+**Caminho de integração:**
+
+1. `page.tsx` chama `auth()` + `isAdminRole` + `ListarWorkspaceChecklistsBpm()` (que chama `exigirAdminChecklist()` → `exigirAcessoConfigPipeline(userId, "configurarChecklists")`). Não-admin é redirecionado.
+2. `ChecklistsWorkspace.tsx` renderiza botão `Trash2` por template (ao lado de "Editar"), com `aria-label="Excluir {nome}"`, `disabled={pendente || excluindoPendente}`.
+3. Clique abre `Dialog` de confirmação: nome do template, aviso de consequências, aviso "em uso por N cards" (quando `_count.instancias > 0`), botões "Cancelar" / "Excluir procedimento". Bloqueio Esc/clique fora via `onEscapeKeyDown`/`onPointerDownOutside`/`onInteractOutside` → `preventDefault()`. `showCloseButton={false}`.
+4. "Excluir procedimento" chama `ExcluirTemplateChecklistBpm({ id, updatedAt })` → `exigirAdminChecklist()` → transação `Serializable`: verificar template, validar `updatedAt` (conflito → `CONFLITO_CHECKLIST_TEMPLATE`), `ativo: false`, `bpmPipelineConfigAuditoria.create` (`campoAlterado: "checklist_template_excluido"`) → `revalidatePath(ROTA_ADMIN)` → `notificarTemplateConfirmado(pipelineId)`.
+5. Sucesso: `toast.success("Procedimento excluído")` + `router.refresh()`. Erro: `toast.error(mensagem específica)` + dialog permanece aberto.
+
+**Editado quando:** mudança no contrato de exclusão, nova coluna de soft delete (Opção B), mudança na política de perfis `configurarChecklists`, ou alteração no filtro `ativo: true` de `materializarChecklistsAplicaveisCard`.
+
+**Última atualização:** 2026-09-22 por Scribe (RM-2026-E96332, Fase 11 — consolidação)
+
+---
+
 ## Autosave universal do card CRM — provider, hook e consumidores (RM-2026-B88712)
 
 **Arquivos:** `src/app/PainelAlpha/AlphaCRM/layout.tsx` (provider), `src/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext.tsx` (hook `useCardSave`), `CardModal/{PainelCamposEtapaAtual,PainelProximoContato,PainelReuniao,PainelChecklistFollowUp,PainelStatusPosFechamento,PainelProximaEtapa,CardFullViewModal}.tsx`, `CampoBpmInput.tsx`.

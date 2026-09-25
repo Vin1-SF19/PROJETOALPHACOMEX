@@ -72,3 +72,28 @@ O admin de Pipeline (`AdminPipelineClient.tsx`) permitia **criar** campos e **al
 
 ---
 Documento gerado automaticamente pelo Roadmap Alpha. Aprovação e commit permanecem manuais.
+
+## Extensão — lista dinâmica de e-mails (2026-09-25)
+
+Como administrador do Alpha CRM, quero criar em **Campos e formulários** um campo de lista de e-mails para que, no formulário do card Kanban, o usuário possa adicionar e remover quantos endereços forem necessários.
+
+### Critérios de aceite
+
+- [x] O catálogo de tipos oferece **Lista de e-mails** sem exigir migração de banco.
+- [x] O formulário do card renderiza inputs de e-mail dinâmicos com ações de adicionar e remover.
+- [x] O valor é persistido como array JSON no armazenamento textual já existente.
+- [x] O servidor valida todos os endereços, normaliza letras minúsculas e elimina vazios e duplicados.
+- [x] Estado somente leitura/desabilitado também bloqueia adicionar e remover itens.
+- [x] Testes focados e lint do escopo aprovados.
+
+### File list da extensão
+
+- `src/lib/validations/bpm.ts`
+- `src/lib/bpm/campos-dinamicos.ts`
+- `src/app/PainelAlpha/AlphaCRM/CampoBpmInput.tsx`
+- `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/FormularioEtapaWorkspace.tsx`
+- `tests/bpm/crud-campos-bpm.test.ts`
+- `tests/bpm/lista-email-campo.test.ts`
+- `docs/stories/story-rm-2026-43aa46-crud-campos-pipeline.md`
+
+Sem alteração de schema, migração, seed ou dados em massa. Rollback: remover `lista_email` do catálogo, renderer e validação, preservando os demais tipos de campo.

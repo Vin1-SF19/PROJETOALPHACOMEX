@@ -22,7 +22,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { AlertTriangle, Bot, Building2, CalendarClock, ClipboardList, Paperclip, Plus, RefreshCw, StickyNote, Users, Video } from "lucide-react";
+import { Loader2, AlertTriangle, Bot, Building2, CalendarClock, ClipboardList, Paperclip, Plus, RefreshCw, StickyNote, Users, Video } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MoverCardBpm, CriarCardBpm, ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
 import { PromoverNolossLead } from "@/actions/bpm/NolossLeads";
@@ -193,6 +193,7 @@ export function KanbanCard({
   arrastoDesabilitado,
   onAbrir,
   index = 0,
+  movendo = false,
 }: {
   card: CardBpm;
   etapaNome: string;
@@ -201,6 +202,7 @@ export function KanbanCard({
   arrastoDesabilitado: boolean;
   onAbrir: (cardId: string) => void;
   index?: number;
+  movendo?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
@@ -242,6 +244,7 @@ export function KanbanCard({
   return (
     <div
       ref={setNodeRef}
+      aria-busy={movendo}
       style={style}
       {...attributes}
       {...listeners}
@@ -250,7 +253,7 @@ export function KanbanCard({
         ? `${nomeEmpresa}. ${card.encaminhamentoPendente ? "Encaminhamento pendente" : "Card encaminhado"}, somente leitura.`
         : statusConfig ? `${nomeEmpresa}. Status pós-fechamento: ${statusConfig.label}` : nomeEmpresa}
       className={cn(
-        "select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
+        "relative select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
         encaminhado ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
         card.sla?.status === "ATRASADO" && "rounded-2xl ring-2 ring-rose-500/55 shadow-lg shadow-rose-950/40",
         (alertaBoasVindas || alertaAlinhamento) && "animate-pulse",
@@ -266,6 +269,12 @@ export function KanbanCard({
         isDragging && "cursor-grabbing border-white/20 shadow-2xl shadow-black/40 ring-1 ring-white/15",
       )}
     >
+      {movendo && (
+        <span role="status" className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-2xl bg-slate-950/90 text-xs text-slate-200">
+          <Loader2 aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />
+          Movendo card…
+        </span>
+      )}
       <GradientBlobCard
         accent={accent}
         className="rounded-2xl"
@@ -546,9 +555,9 @@ export function KanbanCard({
 }
 
 function KanbanColumn({
-  etapa, cor, cards, accent, arrastoDesabilitado, onAdd, onAbrirCard,
+  etapa, cor, cards, accent, arrastoDesabilitado, cardMovendoId, onAdd, onAbrirCard,
 }: {
-  etapa: EtapaBpm; cor: string; cards: CardBpm[]; accent: string; arrastoDesabilitado: boolean; onAdd?: () => void; onAbrirCard: (cardId: string) => void;
+  etapa: EtapaBpm; cor: string; cards: CardBpm[]; accent: string; arrastoDesabilitado: boolean; cardMovendoId: string | null; onAdd?: () => void; onAbrirCard: (cardId: string) => void;
 }) {
   const novosLeads = etapaEhNovosLeads(etapa.nome);
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id: etapa.id });
@@ -612,6 +621,7 @@ function KanbanColumn({
               arrastoDesabilitado={arrastoDesabilitado || !c.podeAgirEtapa}
               onAbrir={onAbrirCard}
               index={i}
+              movendo={cardMovendoId === c.id}
             />
           ))}
         </div>
@@ -621,9 +631,9 @@ function KanbanColumn({
 }
 
 function LazyPipelineColumn({
-  etapa, cor, cards, accent, arrastoDesabilitado, onAdd, onAbrirCard, atualizandoManual,
+  etapa, cor, cards, accent, arrastoDesabilitado, cardMovendoId, onAdd, onAbrirCard, atualizandoManual,
 }: {
-  etapa: EtapaBpm; cor: string; cards: CardBpm[]; accent: string; arrastoDesabilitado: boolean; onAdd?: () => void; onAbrirCard: (cardId: string) => void; atualizandoManual: boolean;
+  etapa: EtapaBpm; cor: string; cards: CardBpm[]; accent: string; arrastoDesabilitado: boolean; cardMovendoId: string | null; onAdd?: () => void; onAbrirCard: (cardId: string) => void; atualizandoManual: boolean;
 }) {
   const [ref, inView] = useLazyColumn(200);
   const showSkeleton = atualizandoManual || !inView;
@@ -639,6 +649,7 @@ function LazyPipelineColumn({
             cor={cor}
             cards={cards}
             accent={accent}
+            cardMovendoId={cardMovendoId}
             arrastoDesabilitado={arrastoDesabilitado}
             onAdd={onAdd}
             onAbrirCard={onAbrirCard}
@@ -685,6 +696,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
   const [erro, setErro] = useState<string | null>(null);
   const [novoCardAberto, setNovoCardAberto] = useState(false);
   const [promocaoLeadPendente, setPromocaoLeadPendente] = useState<PromocaoLeadPendente | null>(null);
+  const [cardMovendoId, setCardMovendoId] = useState<string | null>(null);
   const [movimentoPendente, setMovimentoPendente] = useState(false);
   const [atualizandoManual, setAtualizandoManual] = useState(false);
   const [realtimeRevision, setRealtimeRevision] = useState(0);
@@ -887,6 +899,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
       snapshotArrastoRef.current = null;
       movimentoPendenteRef.current = false;
       setMovimentoPendente(false);
+      setCardMovendoId(null);
 
       if (sincronizacaoRealtimePendenteRef.current) {
         sincronizacaoRealtimePendenteRef.current = false;
@@ -944,6 +957,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
       }
     }
 
+    setCardMovendoId(activeCard.id);
     let motivoRejeicao = "Nao foi possivel mover o card";
     try {
       const resultado = await resolverMovimentoOtimistaBoard({
@@ -972,6 +986,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
       snapshotArrastoRef.current = null;
       movimentoPendenteRef.current = false;
       setMovimentoPendente(false);
+      setCardMovendoId(null);
 
       if (sincronizacaoRealtimePendenteRef.current) {
         sincronizacaoRealtimePendenteRef.current = false;
@@ -1085,6 +1100,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
                 cor={CORES_ETAPA[i % CORES_ETAPA.length]}
                 cards={getByEtapa(etapa.id)}
                 accent={accent}
+                cardMovendoId={cardMovendoId}
                 arrastoDesabilitado={movimentoPendente}
                 onAdd={etapa.id === etapaNovosLeads?.id ? () => setNovoCardAberto(true) : undefined}
                 onAbrirCard={abrirCard}

@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
+import { toast, type ExternalToast } from "sonner";
 import { cn } from "@/lib/utils";
 import { campoBpmEhCnpj } from "@/lib/bpm/campos-dinamicos";
 import { formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";
 import { RegistrarAnexoBpm } from "@/actions/bpm/Anexos";
+import { VisualizadorAnexoCard, type AnexoParaVisualizar } from "@/components/bpm/anexos/VisualizadorAnexoCard";
 
 export interface CampoBpmEditavel {
   id: string;
@@ -31,7 +32,8 @@ interface CampoBpmInputProps {
   invalid?: boolean;
   describedBy?: string;
   cardId?: string;
-  arquivoAtual?: { id: string; nome: string; url: string } | null;
+  errorToastOptions?: Pick<ExternalToast, "duration" | "closeButton">;
+  arquivoAtual?: { id: string; nome: string; url: string; tipo?: string | null } | null;
   registerFileSave?: (save: () => Promise<boolean>) => Promise<boolean>;
   onFileConfirmed?: (arquivo: { id: string; nome: string; url: string }) => void;
 }
@@ -57,6 +59,18 @@ function dataHoraParaInput(valor: string): string {
   return `${data.getFullYear()}-${parte(data.getMonth() + 1)}-${parte(data.getDate())}T${parte(data.getHours())}:${parte(data.getMinutes())}`;
 }
 
+function lerListaEmails(valor: string): string[] {
+  if (!valor) return [""];
+  try {
+    const emails: unknown = JSON.parse(valor);
+    if (Array.isArray(emails)) {
+      const validos = emails.filter((email): email is string => typeof email === "string");
+      return validos.length ? validos : [""];
+    }
+  } catch { /* valor legado ou malformado é apresentado como uma linha editável */ }
+  return [valor];
+}
+
 export function CampoBpmInput({
   campo,
   value,
@@ -68,11 +82,13 @@ export function CampoBpmInput({
   invalid = false,
   describedBy,
   cardId,
+  errorToastOptions,
   arquivoAtual,
   registerFileSave,
   onFileConfirmed,
 }: CampoBpmInputProps) {
   const [enviandoArquivo, setEnviandoArquivo] = useState(false);
+  const [anexoSelecionado, setAnexoSelecionado] = useState<AnexoParaVisualizar | null>(null);
   const bloqueado = disabled || readOnly;
   const opcoes = campo.tipo === "booleano"
     ? ["Sim", "Não"]
@@ -215,7 +231,7 @@ export function CampoBpmInput({
               toast.success("Arquivo vinculado ao campo");
               return true;
               } catch (error) {
-                toast.error(error instanceof Error ? error.message : "Não foi possível enviar o arquivo");
+                toast.error(error instanceof Error ? error.message : "Não foi possível enviar o arquivo", errorToastOptions);
                 return false;
               }
             };
@@ -224,16 +240,21 @@ export function CampoBpmInput({
             setEnviandoArquivo(false);
           }}
         />
-        {value && (
+        {value.startsWith("https://") ? (
           <a
-            href={value.startsWith("https://") ? value : arquivoAtual?.url ?? `/api/bpm/anexos/${value}`}
+            href={value}
             target="_blank"
             rel="noopener noreferrer"
             className="block truncate text-[11px] text-emerald-300 hover:underline"
           >
-            {value.startsWith("https://") ? "Abrir link do contrato" : arquivoAtual?.nome ?? "Abrir arquivo vinculado"}
+            Abrir link do contrato
           </a>
-        )}
+        ) : value ? (
+          <button type="button" onClick={() => setAnexoSelecionado({ id: arquivoAtual?.id ?? value, nome: arquivoAtual?.nome ?? "Arquivo vinculado", tipo: arquivoAtual?.tipo ?? null })} className="block max-w-full truncate text-left text-[11px] text-emerald-300 hover:underline">
+            {arquivoAtual?.nome ?? "Abrir arquivo vinculado"}
+          </button>
+        ) : null}
+        <VisualizadorAnexoCard anexo={anexoSelecionado} onClose={() => setAnexoSelecionado(null)} />
       </div>
     );
   }
@@ -273,6 +294,47 @@ export function CampoBpmInput({
         onChange={(event) => onChange(event.target.value)}
         onBlur={onBlur}
       />
+    );
+  }
+
+  if (campo.tipo === "lista_email") {
+    const emails = lerListaEmails(value);
+    const atualizar = (proximos: string[]) => onChange(JSON.stringify(proximos));
+    return (
+      <div id={`campo-bpm-${campo.id}`} role="group" aria-describedby={describedBy} className="space-y-2">
+        {emails.map((email, indice) => (
+          <div key={indice} className="flex items-center gap-2">
+            <input
+              className={className}
+              type="email"
+              aria-label={`${campo.nome} ${indice + 1}`}
+              aria-invalid={invalid || undefined}
+              value={email}
+              disabled={bloqueado}
+              placeholder="email@exemplo.com"
+              onChange={(event) => atualizar(emails.map((atual, posicao) => posicao === indice ? event.target.value : atual))}
+              onBlur={onBlur}
+            />
+            <button
+              type="button"
+              disabled={bloqueado || emails.length === 1}
+              aria-label={`Remover e-mail ${indice + 1}`}
+              onClick={() => { atualizar(emails.filter((_, posicao) => posicao !== indice)); onBlur?.(); }}
+              className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg border border-red-400/20 text-red-300 hover:bg-red-400/10 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <span aria-hidden="true">−</span>
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          disabled={bloqueado}
+          onClick={() => atualizar([...emails, ""])}
+          className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-cyan-400/20 px-3 text-xs font-medium text-cyan-200 hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <span aria-hidden="true">+</span> Adicionar e-mail
+        </button>
+      </div>
     );
   }
 

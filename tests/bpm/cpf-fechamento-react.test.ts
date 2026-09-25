@@ -57,9 +57,13 @@ it.each(["X", "Escape", "externo"])("%s aguarda confirmação do salvamento ante
     }
   });
   expect(onClose).not.toHaveBeenCalled();
+  expect(document.querySelector('[aria-label="Fechar"]')?.getAttribute("aria-busy")).toBe("true");
+  expect(document.body.textContent).toContain("Salvando alterações…");
+  await act(async () => { button("Fechar").click(); });
   expect(AtualizarCardBpm).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ camposValores: { nome: "Texto final" } }));
   await act(async () => { concluirSave({ success: true } as Awaited<ReturnType<typeof AtualizarCardBpm>>); });
   expect(onClose).toHaveBeenCalledOnce();
+  expect(document.querySelector('[aria-label="Fechar"]')?.getAttribute("aria-busy")).toBe("false");
   expect(document.querySelector('[role="alertdialog"]')).toBeNull();
   expect(toast.warning).not.toHaveBeenCalled();
 });
@@ -68,6 +72,7 @@ it("mostra as pendências quando o salvamento falha", async () => {
   vi.mocked(AtualizarCardBpm).mockResolvedValue({ success: false } as Awaited<ReturnType<typeof AtualizarCardBpm>>);
   await act(async () => { button("Fechar").click(); });
   expect(onClose).not.toHaveBeenCalled();
+  expect(document.querySelector('[aria-label="Fechar"]')?.getAttribute("aria-busy")).toBe("false");
   expect(document.body.textContent).toContain("Campos não salvos");
   expect(document.querySelector('[role="alertdialog"]')).not.toBeNull();
 });

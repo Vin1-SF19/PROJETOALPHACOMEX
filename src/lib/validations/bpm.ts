@@ -22,6 +22,7 @@ export const BPM_CAMPO_TIPO = [
   "cnpj",
   "cpf",
   "email",
+  "lista_email",
   "telefone",
   "url",
   "arquivo",
@@ -292,6 +293,14 @@ export const atualizarCampoSchema = z.object({
 
 export const excluirCampoSchema = z.object({
   campoId: z.string().cuid(),
+  confirmarDescarteDados: z.literal(true).optional(),
+  usoConfirmado: z.object({
+    valoresCard: z.number().int().nonnegative(),
+    valoresGlobais: z.number().int().nonnegative(),
+    anexos: z.number().int().nonnegative(),
+    formularios: z.number().int().nonnegative(),
+    etapas: z.number().int().nonnegative(),
+  }).strict().optional(),
 });
 
 export const excluirCardSchema = z.object({

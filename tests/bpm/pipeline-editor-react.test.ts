@@ -153,25 +153,68 @@ describe("workspace React com remontagem versionada", () => {
   it("confirma e exclui campo aplicável sem removê-lo apenas da composição", async () => {
     vi.mocked(ExcluirCampoBpm).mockResolvedValue({ success: true });
     await click("Existing");
-    await click("Excluir campo sem uso");
+    await click("Preparar exclusão definitiva");
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain("exclusão é permanente");
     await click("Excluir definitivamente");
-    expect(ExcluirCampoBpm).toHaveBeenCalledWith({ campoId: field.id });
+    expect(ExcluirCampoBpm).toHaveBeenCalledWith({
+      campoId: field.id,
+      confirmarDescarteDados: true,
+      usoConfirmado: { valoresCard: 0, valoresGlobais: 0, anexos: 0, formularios: 0, etapas: 0 },
+    });
     expect(container.querySelector('[aria-label="Adicionar Existing à seção"]')).toBeNull();
+    expect(toast.success).toHaveBeenCalledWith("Campo “Existing” excluído");
+  });
+
+  it("permite confirmar exclusão com valores e anexos após mostrar o impacto", async () => {
+    const uso = { valoresCard: 3, valoresGlobais: 2, anexos: 1, formularios: 1, etapas: 1 };
+    vi.mocked(ObterUsoCamposBpm).mockResolvedValue({ success: true, data: { [field.id]: uso } });
+    vi.mocked(ExcluirCampoBpm).mockResolvedValue({ success: true });
+    pipeline = "pipeline-exclusao-com-dados";
+    await render(); await click("Fields"); await click("second"); await click("Existing");
+    await click("Preparar exclusão definitiva");
+    const dialog = document.querySelector('[role="dialog"]');
+    expect(dialog?.textContent).toContain("3 valores em cards");
+    expect(dialog?.textContent).toContain("1 anexos");
+    await click("Excluir definitivamente");
+    expect(ExcluirCampoBpm).toHaveBeenCalledWith({ campoId: field.id, confirmarDescarteDados: true, usoConfirmado: uso });
+  });
+
+  it("cancelar a exclusão preserva o campo sem chamar a action", async () => {
+    await click("Existing");
+    await click("Preparar exclusão definitiva");
+    await click("Cancelar");
+    expect(ExcluirCampoBpm).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Adicionar Existing à seção"]')).toBeTruthy();
+  });
+
+  it("impede confirmação repetida enquanto a exclusão está pendente", async () => {
+    let concluir!: (resposta: Awaited<ReturnType<typeof ExcluirCampoBpm>>) => void;
+    vi.mocked(ExcluirCampoBpm).mockImplementationOnce(() => new Promise((resolve) => { concluir = resolve; }));
+    await click("Existing");
+    await click("Preparar exclusão definitiva");
+    await click("Excluir definitivamente");
+    const dialog = document.querySelector('[role="dialog"]');
+    const confirmar = [...dialog!.querySelectorAll("button")].find((button) => button.textContent?.includes("Excluir definitivamente"));
+    expect(confirmar?.disabled).toBe(true);
+    await click("Excluir definitivamente");
+    expect(ExcluirCampoBpm).toHaveBeenCalledTimes(1);
+    await act(async () => concluir({ success: true }));
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(toast.success).toHaveBeenCalledWith("Campo “Existing” excluído");
   });
 
   it("mantém o campo e o modal quando o servidor bloqueia dados associados", async () => {
     vi.mocked(ExcluirCampoBpm).mockResolvedValue({
       success: false,
-      error: "Este campo possui dados associados e não pode ser excluído",
+      error: "O uso do campo mudou. Atualize a análise e confirme novamente",
     });
     await click("Existing");
-    await click("Excluir campo sem uso");
+    await click("Preparar exclusão definitiva");
     await click("Excluir definitivamente");
     expect(container.querySelector('[aria-label="Adicionar Existing à seção"]')).toBeTruthy();
     expect(document.querySelector('[role="dialog"]')).toBeTruthy();
-    expect(toast.error).toHaveBeenCalledWith("Este campo possui dados associados e não pode ser excluído");
+    expect(toast.error).toHaveBeenCalledWith("O uso do campo mudou. Atualize a análise e confirme novamente");
   });
 
   it("troca a etapa sem transplantar seções; preserva rascunho e aba após remontagem", async () => {

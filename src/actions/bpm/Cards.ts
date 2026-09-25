@@ -27,6 +27,7 @@ import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { executarAutomacoesCentraisDoCardAgora } from "@/lib/bpm/automacoes/orquestrador";
 import { carregarValoresCanonicosCampos, salvarValoresGlobaisPersonalizadosCampos } from "@/lib/bpm/campos-configuraveis-server";
 import { prepararSalvamentoConfigurado } from "@/lib/bpm/validacao-salvamento-configurado";
+import { registrarConclusaoContratoFinanceiro } from "@/lib/bpm/financeiro-assinatura-server";
 import { camposPublicadosPorEtapa, capacidadesObrigatoriasPorEtapa } from "@/lib/bpm/campos-formulario-publicado";
 import { desserializarComposicaoCardKanban, type CardKanbanComposicao } from "@/lib/bpm/card-kanban";
 import { obterStatusPosFechamentoVisivel } from "@/lib/bpm/status-pos-fechamento";
@@ -1288,7 +1289,7 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
       );
       const cardAtual = await tx.bpmCard.findUnique({
         where: { id: cardId },
-        include: { etapa: { select: { nome: true } } },
+        include: { etapa: { select: { nome: true } }, pipeline: { select: { chave: true } } },
       });
       if (
         !cardAtual
@@ -1448,6 +1449,10 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
             update: { valor },
           });
         }
+      }
+
+      if (cardAtual.pipeline?.chave === "financeiro" && Object.keys(valoresValidados).length > 0) {
+        await registrarConclusaoContratoFinanceiro(tx, cardId, cardAtual.pipelineId, userId);
       }
 
       const historicoAtualizacao = await tx.bpmCardHistorico.create({

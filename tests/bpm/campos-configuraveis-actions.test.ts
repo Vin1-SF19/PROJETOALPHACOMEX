@@ -15,6 +15,11 @@ const mocks = vi.hoisted(() => ({
   valorCardCount: vi.fn(),
   valorGlobalCount: vi.fn(),
   anexoCount: vi.fn(),
+  anexoFindMany: vi.fn(),
+  anexoDeleteMany: vi.fn(),
+  campoEtapaConfigCount: vi.fn(),
+  historicoCreate: vi.fn(),
+  limparBlob: vi.fn(),
   etapaFindMany: vi.fn(),
   pipelineFindMany: vi.fn(),
   pipelineUpdate: vi.fn(),
@@ -35,6 +40,8 @@ vi.mock("../../auth", () => ({ auth: mocks.auth }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("@/lib/bpm/ownership", () => ({ exigirAcessoConfigPipeline: mocks.exigirConfig }));
 vi.mock("@/lib/bpm/realtime-server", () => ({ notificarPipelineBpm: mocks.notificar }));
+vi.mock("@/lib/bpm/anexos-storage", () => ({ extrairPathnamePrivadoAnexoBpm: (url: string) => url.startsWith("blob:") ? url : null }));
+vi.mock("@/lib/bpm/anexos-lifecycle", () => ({ ACAO_LIMPEZA_ANEXO_PENDENTE: "ANEXO_BLOB_LIMPEZA_PENDENTE", limparBlobAnexoPendente: mocks.limparBlob }));
 vi.mock("@/lib/prisma", () => ({
   default: {
     bpmCampo: { findUnique: mocks.campoFindUnique, findMany: mocks.campoFindMany },
@@ -68,11 +75,12 @@ function clienteTx() {
     bpmCampo: { create: mocks.campoCreate, update: mocks.campoUpdate, delete: mocks.campoDelete, findUnique: mocks.campoFindUnique, findUniqueOrThrow: mocks.campoFindUniqueOrThrow },
     bpmCardCampoValor: { count: mocks.valorCardCount },
     bpmCampoValorGlobal: { count: mocks.valorGlobalCount },
-    bpmCardAnexo: { count: mocks.anexoCount },
+    bpmCardAnexo: { count: mocks.anexoCount, findMany: mocks.anexoFindMany, deleteMany: mocks.anexoDeleteMany },
+    bpmCardHistorico: { create: mocks.historicoCreate },
     bpmFormularioComponente: { count: mocks.formComponentCount },
     bpmCampoOpcao: { createMany: mocks.opcaoCreateMany },
     bpmCampoPipeline: { createMany: mocks.campoPipelineCreateMany },
-    bpmCampoEtapaConfig: { createMany: mocks.campoEtapaConfigCreateMany },
+    bpmCampoEtapaConfig: { createMany: mocks.campoEtapaConfigCreateMany, count: mocks.campoEtapaConfigCount },
     bpmCampoAcesso: { createMany: mocks.acessoCreateMany },
     bpmCampoMapeamento: {
       findMany: mocks.mapeamentoFindMany,
@@ -107,6 +115,11 @@ describe("ações de gestão configurável de campos", () => {
     mocks.valorCardCount.mockResolvedValue(0);
     mocks.valorGlobalCount.mockResolvedValue(0);
     mocks.anexoCount.mockResolvedValue(0);
+    mocks.anexoFindMany.mockResolvedValue([]);
+    mocks.anexoDeleteMany.mockResolvedValue({ count: 0 });
+    mocks.campoEtapaConfigCount.mockResolvedValue(0);
+    mocks.historicoCreate.mockResolvedValue({ id: "history-1" });
+    mocks.limparBlob.mockResolvedValue(true);
     mocks.formComponentCount.mockResolvedValue(0);
     mocks.campoDelete.mockResolvedValue({ id: CAMPO_DESTINO_ID });
     mocks.transaction.mockImplementation(async (callback: (tx: ReturnType<typeof clienteTx>) => unknown) => callback(clienteTx()));
@@ -364,8 +377,7 @@ describe("ações de gestão configurável de campos", () => {
   it.each([
     ["valor de card", "valorCardCount"],
     ["valor global", "valorGlobalCount"],
-    ["anexo", "anexoCount"],
-  ] as const)("bloqueia exclusão quando há %s associado", async (_cenario, contador) => {
+  ] as const)("exige confirmação para descartar %s associado", async (_cenario, contador) => {
     mocks.campoFindUnique.mockResolvedValue({
       id: CAMPO_DESTINO_ID,
       nome: "Campo em uso",
@@ -378,10 +390,59 @@ describe("ações de gestão configurável de campos", () => {
 
     expect(resultado).toEqual({
       success: false,
-      error: "Este campo possui dados associados e não pode ser excluído",
+      error: "Confirme a exclusão dos dados relacionados",
     });
     expect(mocks.campoDelete).not.toHaveBeenCalled();
     expect(mocks.mapeamentoDeleteMany).not.toHaveBeenCalled();
+  });
+
+  it("descarta apenas dados e anexo do campo confirmado e agenda limpeza do blob", async () => {
+    mocks.campoFindUnique.mockResolvedValue({
+      id: CAMPO_DESTINO_ID, nome: "Campo em uso", pipelineId: PIPELINE_ID,
+      pipelinesAssociados: [],
+    });
+    mocks.valorCardCount.mockResolvedValue(1);
+    mocks.valorGlobalCount.mockResolvedValue(2);
+    mocks.anexoFindMany.mockResolvedValue([{ id: "anexo-1", cardId: "card-1", nome: "arquivo.pdf", url: "blob:campo.pdf" }]);
+
+    const resultado = await ExcluirCampoBpm({
+      campoId: CAMPO_DESTINO_ID,
+      confirmarDescarteDados: true,
+      usoConfirmado: { valoresCard: 1, valoresGlobais: 2, anexos: 1, formularios: 0, etapas: 0 },
+    });
+
+    expect(resultado).toEqual({ success: true });
+    expect(mocks.anexoDeleteMany).toHaveBeenCalledWith({ where: { campoId: CAMPO_DESTINO_ID } });
+    expect(mocks.campoDelete).toHaveBeenCalledWith({ where: { id: CAMPO_DESTINO_ID } });
+    expect(mocks.historicoCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ acao: "ANEXO_BLOB_LIMPEZA_PENDENTE", cardId: "card-1" }), select: { id: true } });
+    expect(mocks.limparBlob).toHaveBeenCalledWith("history-1");
+  });
+
+  it("recusa impacto desatualizado antes de remover o campo", async () => {
+    mocks.campoFindUnique.mockResolvedValue({ id: CAMPO_DESTINO_ID, nome: "Campo em uso", pipelineId: PIPELINE_ID, pipelinesAssociados: [] });
+    mocks.valorCardCount.mockResolvedValue(2);
+    const resultado = await ExcluirCampoBpm({
+      campoId: CAMPO_DESTINO_ID,
+      confirmarDescarteDados: true,
+      usoConfirmado: { valoresCard: 1, valoresGlobais: 0, anexos: 0, formularios: 0, etapas: 0 },
+    });
+    expect(resultado).toEqual({ success: false, error: "O uso do campo mudou. Atualize a análise e confirme novamente" });
+    expect(mocks.anexoDeleteMany).not.toHaveBeenCalled();
+    expect(mocks.campoDelete).not.toHaveBeenCalled();
+  });
+
+  it("não limpa o blob quando a exclusão transacional do campo falha", async () => {
+    mocks.campoFindUnique.mockResolvedValue({ id: CAMPO_DESTINO_ID, nome: "Campo em uso", pipelineId: PIPELINE_ID, pipelinesAssociados: [] });
+    mocks.anexoFindMany.mockResolvedValue([{ id: "anexo-1", cardId: "card-1", nome: "arquivo.pdf", url: "blob:campo.pdf" }]);
+    mocks.campoDelete.mockRejectedValue(new Error("FK_FAILURE"));
+    const resultado = await ExcluirCampoBpm({
+      campoId: CAMPO_DESTINO_ID,
+      confirmarDescarteDados: true,
+      usoConfirmado: { valoresCard: 0, valoresGlobais: 0, anexos: 1, formularios: 0, etapas: 0 },
+    });
+    expect(resultado.success).toBe(false);
+    expect(mocks.limparBlob).not.toHaveBeenCalled();
+    expect(mocks.notificar).not.toHaveBeenCalled();
   });
 
   it("rejeita mapeamento entre tipos diferentes antes da transação", async () => {

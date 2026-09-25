@@ -25,13 +25,14 @@ import PainelTimelineCard from "./PainelTimelineCard";
 import { PainelCadenciasCard } from "@/components/bpm/cadencias/PainelCadenciasCard";
 
 import { PainelResumoEtapas } from "./PainelResumoEtapas";
+import PainelHistoricoPipeline from "./PainelHistoricoPipeline";
 import { PainelTarefasPorTipo } from "./PainelTarefasPorTipo";
-import { etapasAnterioresParaResumo } from "@/lib/bpm/resumo-etapas";
 import { PainelChecklistsCard } from "./PainelChecklistsCard";
 import { EditorAnotacaoCard } from "./EditorAnotacaoCard";
 import { formatarBytes, iconePorAcao } from "./PainelHistoricoShared";
 import { formularioPossuiChecklist } from "@/lib/bpm/formulario-renderer";
 import { separarTarefasCard } from "@/lib/bpm/tarefas-card";
+import { VisualizadorAnexoCard, type AnexoParaVisualizar } from "@/components/bpm/anexos/VisualizadorAnexoCard";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
@@ -51,6 +52,7 @@ interface Props {
   realtimeRevision: number;
   onInteracaoCriada: (interacao: Interacao) => void;
   anotacoes: Interacao[];
+  onAbrirCard: (cardId: string) => void;
 }
 
 export default function PainelHistorico({
@@ -65,12 +67,13 @@ export default function PainelHistorico({
   realtimeRevision,
   onInteracaoCriada,
   anotacoes,
+  onAbrirCard,
 }: Props) {
   const [enviandoAnexo, setEnviandoAnexo] = useState(false);
   const [arrastandoAnexo, setArrastandoAnexo] = useState(false);
   const [abaEsquerda, setAbaEsquerda] = useState("etapas");
+  const [anexoSelecionado, setAnexoSelecionado] = useState<AnexoParaVisualizar | null>(null);
   const inputAnexoRef = useRef<HTMLInputElement>(null);
-  const etapasAnteriores = etapasAnterioresParaResumo(etapas, card.etapa.id);
   const { tarefas: tarefasDoCard, procedimentos: tarefasDeProcedimento } = separarTarefasCard(card.tarefas);
   const procedimentosLegados = tarefasDeProcedimento.filter((tarefa) => !tarefa.cardChecklistId);
   const checklistConfigurado = formularioPossuiChecklist(card.formularioEtapa)
@@ -157,10 +160,7 @@ export default function PainelHistorico({
           )}
           <TabsTrigger value="etapas" className="flex-none gap-1.5">
             <CheckCircle2 size={13} />
-            Etapas concluídas
-            {etapasAnteriores.length > 0 && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300">{etapasAnteriores.length}</span>
-            )}
+            Jornada
           </TabsTrigger>
           <TabsTrigger value="anexos" className="flex-none gap-1.5">
             <Paperclip size={13} />
@@ -212,14 +212,20 @@ export default function PainelHistorico({
         )}
 
         <TabsContent value="etapas" className="min-h-0 flex-1 overflow-y-auto">
-          <PainelResumoEtapas key={card.etapa.id} card={card} etapas={etapas} accent={accent} ocultarTitulo />
+          <div className="space-y-3">
+            <PainelHistoricoPipeline cardId={card.id} pipelineId={card.pipelineId} pipelineNome={card.pipeline.nome} accent={accent} realtimeRevision={realtimeRevision} onAbrirCard={onAbrirCard} />
+            <details className="rounded-2xl border border-white/[0.06] p-3">
+              <summary className="cursor-pointer text-xs font-semibold text-slate-300">Dados das etapas anteriores</summary>
+              <div className="mt-3"><PainelResumoEtapas key={card.etapa.id} card={card} etapas={etapas} accent={accent} ocultarTitulo /></div>
+            </details>
+          </div>
         </TabsContent>
 
         <TabsContent value="anexos" className="min-h-0 flex-1 overflow-y-auto">
           <div className="space-y-1.5">
             {card.anexos.map((a) => (
               <div key={a.id} className="flex items-center justify-between gap-2 bg-white/[0.03] border border-white/5 rounded-xl px-3 py-2">
-                <a href={`/api/bpm/anexos/${a.id}`} target="_blank" rel="noopener noreferrer" className="text-sm text-white hover:underline truncate">{a.nome}</a>
+                <button type="button" onClick={() => setAnexoSelecionado({ id: a.id, nome: a.nome, tipo: a.tipo })} className="min-w-0 truncate text-left text-sm text-white hover:underline">{a.nome}</button>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-[10px] text-slate-500">{formatarBytes(a.tamanho)}</span>
                   {podeExcluirAnexo && (
@@ -301,6 +307,7 @@ export default function PainelHistorico({
         podeEditar={podeEditar}
         onInteracaoCriada={onInteracaoCriada}
       />
+      <VisualizadorAnexoCard anexo={anexoSelecionado} onClose={() => setAnexoSelecionado(null)} />
     </div>
   );
 }

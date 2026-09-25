@@ -3,6 +3,7 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
+import { avaliarFormalizacaoFinanceira } from "@/lib/bpm/financeiro-formalizacao";
 import { camposPublicadosPorEtapa } from "@/lib/bpm/campos-formulario-publicado";
 import { carregarValoresCanonicosCampos } from "@/lib/bpm/campos-configuraveis-server";
 import { avaliarGrupo } from "@/lib/bpm/regras/avaliador";
@@ -50,11 +51,12 @@ export async function prepararSalvamentoConfigurado(params: {
   const publicados = publicadosPorEtapa.get(card.etapaId) ?? new Set<string>();
   const configs = await client.bpmCampoEtapaConfig.findMany({
     where: { etapaId: card.etapaId, visivel: true, campoId: { in: [...publicados] }, campo: { ativo: true } },
-    include: { campo: { select: { id: true, nome: true, tipo: true, opcoesJson: true } } },
+    include: { campo: { select: { id: true, nome: true, chave: true, tipo: true, opcoesJson: true } } },
   });
+  const statusAssinatura = configs.find((config) => config.campo.chave === "alpha.financeiro.status.contrato.assinatura");
   const possuiAutomacao = configs.some((config) => config.condicaoObrigatoriedadeJson
     && (config.valorPadrao === "{{agora.data}}" || config.valorPadrao === "{{agora.instante}}"));
-  if (!possuiAutomacao && requisitos.length === 0) return params.valoresSubmetidos;
+  if (!possuiAutomacao && requisitos.length === 0 && !statusAssinatura) return params.valoresSubmetidos;
 
   const publicadosPipeline = await camposPublicadosPorEtapa(etapas.map((etapa) => etapa.id), client);
   const idsPublicados = new Set([...publicadosPipeline.values()].flatMap((ids) => [...ids]));
@@ -62,7 +64,7 @@ export async function prepararSalvamentoConfigurado(params: {
     where: { id: { in: [...idsPublicados] }, ativo: true,
       OR: [{ pipelineId: card.pipelineId }, { pipelinesAssociados: { some: { pipelineId: card.pipelineId } } }],
     },
-    select: { id: true, nome: true, escopo: true, fonteEntidade: true, fonteAtributo: true, entidadeGlobal: true },
+    select: { id: true, nome: true, chave: true, escopo: true, fonteEntidade: true, fonteAtributo: true, entidadeGlobal: true },
   });
   const contexto = await montarContextoAvaliacaoDoCard(card, client);
   const canonicos = await carregarValoresCanonicosCampos(card.id, campos, client);
@@ -83,6 +85,39 @@ export async function prepararSalvamentoConfigurado(params: {
     if (!validacao.success) throw new Error(`CAMPO_INVALIDO:${validacao.error}`);
     valores[config.campoId] = validacao.valores[config.campoId];
     contexto.camposDinamicos[config.campoId] = valores[config.campoId];
+  }
+
+  const valoresContexto = contexto.camposDinamicos ?? {};
+  if (statusAssinatura && Object.hasOwn(params.valoresSubmetidos, statusAssinatura.campoId)
+    && valoresContexto[statusAssinatura.campoId] !== "Assinado") {
+    const assinaturaAnterior = await client.bpmCardHistorico.findFirst({
+      where: { cardId: card.id, acao: "CONTRATO_CONCLUIDO" }, select: { id: true },
+    });
+    if (assinaturaAnterior) {
+      throw new Error("REQUISITOS_PENDENTES:Assinatura já confirmada; a reversão exige um procedimento auditado.");
+    }
+  }
+  if (statusAssinatura && valoresContexto[statusAssinatura.campoId] === "Assinado") {
+    const campoPorChave = (chave: string) => campos.find((campo) => campo.chave === chave);
+    const dataCampo = campoPorChave("alpha.data.da.assinatura");
+    const anexoCampo = campoPorChave("alpha.contrato.assinado.anexo");
+    const anexoId = anexoCampo ? String(valoresContexto[anexoCampo.id] ?? "").trim() : "";
+    const anexo = anexoCampo && anexoId
+      ? await client.bpmCardAnexo.findFirst({
+          where: { id: anexoId, cardId: card.id, campoId: anexoCampo.id },
+          select: { id: true },
+        })
+      : null;
+    const avaliacao = avaliarFormalizacaoFinanceira({
+      statusAssinatura: "Assinado",
+      dataAssinatura: dataCampo ? String(valoresContexto[dataCampo.id] ?? "") : null,
+      anexoAssinadoId: anexoId,
+      anexoAssinadoVinculado: Boolean(anexo),
+      pagamentoConfirmado: null,
+    });
+    if (avaliacao.contrato !== "Concluído") {
+      throw new Error(`REQUISITOS_PENDENTES:Campos/requisitos pendentes (${avaliacao.pendencias.filter((item) => item !== "Pagamento confirmado").join(", ")}).`);
+    }
   }
 
   const pendencias: string[] = [];

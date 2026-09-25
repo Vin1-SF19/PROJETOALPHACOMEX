@@ -190,7 +190,7 @@ it("retry de upload atualiza link do painel reaberto apesar do snapshot inicial 
   const action = args?.[1]?.action;
   if (!action || typeof action !== "object" || !("onClick" in action)) throw new Error("Retry ausente");
   await act(async () => { action.onClick({} as React.MouseEvent<HTMLButtonElement>); await saves.flushSaves(); });
-  expect(container.querySelector('a[href="/api/bpm/anexos/anexo"]')).not.toBeNull();
+  expect([...container.querySelectorAll("button")].some((botao) => botao.textContent?.includes("Abrir arquivo vinculado"))).toBe(true);
   expect(fetchMock).toHaveBeenCalledTimes(2);
   vi.unstubAllGlobals();
 });
@@ -302,5 +302,28 @@ it("confirmação antiga durante novo debounce nunca mostra Salvo", async () => 
   });
   expect(container.querySelector('[role="status"]')!.textContent).toBe("Alterações pendentes");
   expect(container.querySelector("input")!.value).toBe("123");
+  expect(saves.getPendingFields()).toEqual(["CPF"]);
+});
+
+
+it.each(["52998224725", "01234567890"])("máscara de CPF já confirmado %s não cria pendência nem gravação", async (valor) => {
+  const persisted = { ...card, camposEtapa: [{ ...campo, valor }] };
+  await act(async () => root.render(h(CardSaveProvider, null, [h(Probe, { key: "probe" }), h(PainelCamposEtapaAtual, {
+    key: "persisted", card: persisted, campoIds: ["cpf"], instanceKey: "persisted", accent: "1,2,3", podeEditar: true, realtimeRevision: 0, onAtualizado: vi.fn(),
+  })])));
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5)); });
+  expect(saves.getPendingFields()).toEqual([]);
+  await edit(valor.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4"));
+  expect(saves.getPendingFields()).toEqual([]);
+  expect(container.querySelector('[role="status"]')!.textContent).not.toContain("pendentes");
+  await blur();
+  expect(AtualizarCardBpm).not.toHaveBeenCalled();
+});
+
+it("erros do formulário usam 5s e fechamento manual sem limpar a pendência", async () => {
+  await edit("11111111111"); await blur();
+  for (const call of vi.mocked(toast.error).mock.calls) {
+    expect(call[1]).toEqual(expect.objectContaining({ duration: 5000, closeButton: true }));
+  }
   expect(saves.getPendingFields()).toEqual(["CPF"]);
 });

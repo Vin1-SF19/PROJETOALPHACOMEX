@@ -17,7 +17,13 @@ import {
 import { TEMPLATE_RESUMO_ALINHAMENTO } from "@/lib/bpm/alinhamento-estrategico";
 import { BPM_FIELD_KEYS, BPM_STAGE_KEYS } from "@/lib/bpm/ontology";
 import { FINANCIAL_FIELD_KEYS } from "@/lib/bpm/pipeline-financeiro";
+import { avaliarFormalizacaoFinanceira } from "@/lib/bpm/financeiro-formalizacao";
 import { useCardSave } from "@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext";
+const erroFormulario = { duration: 5000, closeButton: true };
+// Só a apresentação do CPF é ignorada; outros tipos mantêm comparação literal.
+function valorComparavel(tipo: string, valor = "") {
+  return tipo === "cpf" ? valor.replace(/[.\-\s]/g, "") : valor;
+}
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type CamposEtapaCard = CardDetalhe["camposEtapa"];
 interface Props {
@@ -54,7 +60,7 @@ export function PainelCamposEtapaAtual({
   const [valoresCamposAtuais, setValoresCamposAtuais] = useState<Record<string, string>>(() =>
     getDraft(idInstancia) ?? Object.fromEntries(camposDoComponente.map((campo) => [campo.id, campo.valor ?? ""])),
   );
-  const [, setBaseCamposAtuais] = useState<Record<string, string>>(() =>
+  const [valoresConfirmados, setBaseCamposAtuais] = useState<Record<string, string>>(() =>
     Object.fromEntries(camposDoComponente.map((campo) => [campo.id, campo.valor ?? ""])),
   );
   const [camposEtapaBase, setCamposEtapaBase] = useState(camposDoComponente);
@@ -100,12 +106,14 @@ export function PainelCamposEtapaAtual({
     if (antesDaConfirmacao && compartilhado && Object.entries(compartilhado)
       .some(([id, valor]) => valor !== antesDaConfirmacao[id])) return;
     const pendentes = camposEtapaBase.filter((campo) =>
-      (valoresRef.current[campo.id] ?? "") !== (snapshotAtivoRef.current.valores[campo.id] ?? ""));
+      valorComparavel(campo.tipo, valoresRef.current[campo.id]) !== valorComparavel(campo.tipo, snapshotAtivoRef.current.valores[campo.id]));
     camposAtuaisSujosRef.current = pendentes.length > 0;
     setDraft(idInstancia, pendentes.length ? { ...valoresRef.current } : undefined);
     setPendingFields(`${card.id}:${idInstancia}`, pendentes.map((campo) => campoLabels[campo.id] ?? campo.nome));
   }
   function alterarCampo(id: string, valor: string) {
+    const campo = camposEtapaBase.find((item) => item.id === id);
+    if (campo?.tipo === "cpf" && valorComparavel("cpf", valor) === valorComparavel("cpf", valoresRef.current[id])) return;
     revisaoEdicao.current += 1;
     setEstadoSave("pendente");
     let rastreador = rastreadores.current.get(id);
@@ -195,7 +203,7 @@ export function PainelCamposEtapaAtual({
     const configuracaoAtual = prepararCamposMotivoLostUiCanonico(card.etapa.chave, camposEtapaBase, valoresAtuais);
     if (configuracaoAtual.exigeComplemento && configuracaoAtual.campoComplementoId
       && !valoresAtuais[configuracaoAtual.campoComplementoId]?.trim()) {
-      toast.error(MOTIVO_LOST_OUTRO_OBRIGATORIO_MENSAGEM);
+      toast.error(MOTIVO_LOST_OUTRO_OBRIGATORIO_MENSAGEM, erroFormulario);
       return;
     }
     const revisaoEnviada = revisaoEdicao.current;
@@ -209,9 +217,9 @@ export function PainelCamposEtapaAtual({
       for (const campo of configuracaoAtual.camposVisiveis) {
         if (campoId && campo.id !== campoId && !configuracaoAtual.exigeComplemento) continue;
         if (campo.somenteLeitura || campo.editavel === false
-          || (valoresAtuais[campo.id] ?? "") === (snapshotAtivoRef.current.valores[campo.id] ?? "")) continue;
+          || valorComparavel(campo.tipo, valoresAtuais[campo.id]) === valorComparavel(campo.tipo, snapshotAtivoRef.current.valores[campo.id])) continue;
         const validacao = validarValoresCamposBpm([campo], montarPayloadCamposDestino([campo], valoresAtuais));
-        if (!validacao.success) { possuiValorInvalido = true; toast.error(validacao.error); continue; }
+        if (!validacao.success) { possuiValorInvalido = true; toast.error(validacao.error, erroFormulario); continue; }
         Object.assign(camposValores, validacao.valores);
       }
       if (!Object.keys(camposValores).length) return !possuiValorInvalido;
@@ -221,14 +229,15 @@ export function PainelCamposEtapaAtual({
         versaoEsperadaEm: getVersion(card.id, versaoBaseCamposRef.current),
       });
       if (!resultado.success) {
-        toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível salvar os campos da etapa");
+        toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível salvar os campos da etapa", erroFormulario);
         return false;
       }
-      // A action confirma a gravação na própria transação.
+      // A action confirma a gravação na própria transação. O fallback mantém
+      // compatibilidade com respostas antigas durante uma atualização gradual.
       const confirmacao = resultado.data;
       const cardAtualizado = confirmacao ? null : await ObterCardBpm(card.id);
       if (!confirmacao && (!cardAtualizado?.success || !cardAtualizado.data)) {
-        toast.error("Os campos foram salvos, mas não foi possível confirmar a versão atual do card.");
+        toast.error("Os campos foram salvos, mas não foi possível confirmar a versão atual do card.", erroFormulario);
         return false;
       }
       const novaVersao = new Date(confirmacao?.updatedAt ?? cardAtualizado!.data!.updatedAt).toISOString();
@@ -259,13 +268,24 @@ export function PainelCamposEtapaAtual({
       setConflitoCamposAtuais(false);
       onAtualizado();
       return !possuiValorInvalido;
-    }, card.id, `${card.id}:campo:${campoId ?? instanceKey}`, false).finally(() => {
+    }, card.id, `${card.id}:campo:${campoId ?? instanceKey}`, erroFormulario, false).finally(() => {
       setSavesCamposPendentes((total) => total - 1);
     });
     const sucesso = await promise;
     if (!sucesso && revisaoEdicao.current === revisaoEnviada) setEstadoSave("erro");
   }
   const campoCnpj = camposAtuaisVisiveis.find((campo) => campo.chave === FINANCIAL_FIELD_KEYS.CNPJ);
+  const campoAssinatura = camposAtuaisVisiveis.find((campo) => campo.chave === "alpha.financeiro.status.contrato.assinatura");
+  const campoDataAssinatura = camposAtuaisVisiveis.find((campo) => campo.chave === "alpha.data.da.assinatura");
+  const campoContratoAssinado = camposAtuaisVisiveis.find((campo) => campo.chave === "alpha.contrato.assinado.anexo");
+  const anexoAssinadoId = campoContratoAssinado ? valoresConfirmados[campoContratoAssinado.id] : null;
+  const requisitoContrato = campoAssinatura && avaliarFormalizacaoFinanceira({
+    statusAssinatura: valoresConfirmados[campoAssinatura.id],
+    dataAssinatura: campoDataAssinatura ? valoresConfirmados[campoDataAssinatura.id] : null,
+    anexoAssinadoId,
+    anexoAssinadoVinculado: Boolean(anexoAssinadoId && card.anexos.some((anexo) => anexo.id === anexoAssinadoId && anexo.campoId === campoContratoAssinado?.id)),
+    pagamentoConfirmado: null,
+  }).contrato;
   const cnpjDaEtapa = campoCnpj ? valoresCamposAtuais[campoCnpj.id] ?? "" : "";
   async function consultarCnpjNovoContrato(mostrarErro: boolean) {
     if (!podeEditar || !campoCnpj || buscandoCnpj) return;
@@ -276,7 +296,7 @@ export function PainelCamposEtapaAtual({
     const resposta = await ConsultarCnpjNovoContrato(card.id, cnpj);
     setBuscandoCnpj(false);
     if (!resposta.success) {
-      if (mostrarErro) toast.error(resposta.error, { duration: 5000, closeButton: true });
+      if (mostrarErro) toast.error(resposta.error, erroFormulario);
       return;
     }
     const dadosPorChave: Record<string, string> = {
@@ -342,6 +362,13 @@ export function PainelCamposEtapaAtual({
           <p><strong>Chamada de alinhamento pendente.</strong> Cole o resumo da reunião para liberar o avanço da etapa.</p>
         </div>
       )}
+      {requisitoContrato && (
+        <div role="status" className={requisitoContrato === "Concluído"
+          ? "rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs font-semibold text-emerald-200"
+          : "rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-semibold text-amber-200"}>
+          {requisitoContrato === "Concluído" ? "CONTRATO CONCLUÍDO" : "Contrato pendente de assinatura válida"}
+        </div>
+      )}
       {camposAtuaisVisiveis.length === 0 ? (
         <p className="text-xs text-slate-500">Esta etapa não possui campos configurados.</p>
       ) : (
@@ -400,7 +427,8 @@ export function PainelCamposEtapaAtual({
                   arquivoAtual={campo.tipo === "arquivo" || campo.tipo === "url_ou_arquivo"
                     ? card.anexos.find((anexo) => anexo.id === valoresCamposAtuais[campo.id]) ?? null
                     : null}
-                  registerFileSave={(save) => registerSave(save, card.id, `${card.id}:arquivo:${campo.id}`)}
+                  errorToastOptions={erroFormulario}
+                  registerFileSave={(save) => registerSave(save, card.id, `${card.id}:arquivo:${campo.id}`, erroFormulario)}
                   onFileConfirmed={(arquivo) => {
                     const antes = { ...valoresRef.current };
                     const proximos = { ...valoresRef.current, [campo.id]: arquivo.id };

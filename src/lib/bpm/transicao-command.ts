@@ -6,6 +6,8 @@ import type { Prisma } from "@prisma/client";
 import db from "@/lib/prisma";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 import { requisitoAplicaAoMover } from "@/lib/bpm/requisitos-etapa";
+import { avaliarFormalizacaoFinanceira } from "@/lib/bpm/financeiro-formalizacao";
+import { registrarConclusaoContratoFinanceiro } from "@/lib/bpm/financeiro-assinatura-server";
 import { camposPublicadosPorEtapa, capacidadesObrigatoriasPorEtapa } from "@/lib/bpm/campos-formulario-publicado";
 import {
   carregarValoresCanonicosCampos,
@@ -347,6 +349,16 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       ? (canonicos[campoId] || null)
       : value);
   }
+  if (card.pipeline.chave === BPM_PIPELINE_KEYS.FINANCEIRO) {
+    const statusAssinatura = [...camposPorId.values()].find((campo) => campo.chave === "alpha.financeiro.status.contrato.assinatura");
+    if (statusAssinatura && Object.hasOwn(formato.valores, statusAssinatura.id)
+      && formato.valores[statusAssinatura.id] !== "Assinado") {
+      const assinaturaAnterior = await tx.bpmCardHistorico.findFirst({
+        where: { cardId: card.id, acao: "CONTRATO_CONCLUIDO" }, select: { id: true },
+      });
+      if (assinaturaAnterior) erro("SIGNED_CONTRACT_REVERSAL", "Assinatura já confirmada; a reversão exige um procedimento auditado.");
+    }
+  }
   const referenciasArquivo = [...camposPorId.values()].flatMap((campo) => {
     const valor = valoresEfetivosPorId.get(campo.id)?.trim();
     return campo.tipo === "url_ou_arquivo" && valor && !valor.startsWith("https://")
@@ -424,6 +436,31 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       }
       if (obrigatorio && vazio(valoresEfetivosPorId.get(campo.id))) pendencias.push(campo.nome);
     }
+  }
+
+  if (card.pipeline.chave === BPM_PIPELINE_KEYS.FINANCEIRO
+    && destino.chave === BPM_STAGE_KEYS.CONTRATACAO_FINALIZADA) {
+    const campoPorChave = (chave: string) => [...camposPorId.values()].find((campo) => campo.chave === chave);
+    const valor = (chave: string) => {
+      const campo = campoPorChave(chave);
+      return campo ? valoresEfetivosPorId.get(campo.id) : null;
+    };
+    const campoAnexo = campoPorChave("alpha.contrato.assinado.anexo");
+    const anexoId = valor("alpha.contrato.assinado.anexo")?.trim() ?? null;
+    const anexoVinculado = campoAnexo && anexoId
+      ? await tx.bpmCardAnexo.findFirst({
+          where: { id: anexoId, cardId: card.id, campoId: campoAnexo.id },
+          select: { id: true },
+        })
+      : null;
+    const formalizacao = avaliarFormalizacaoFinanceira({
+      statusAssinatura: valor("alpha.financeiro.status.contrato.assinatura"),
+      dataAssinatura: valor("alpha.data.da.assinatura"),
+      anexoAssinadoId: anexoId,
+      anexoAssinadoVinculado: Boolean(anexoVinculado),
+      pagamentoConfirmado: valor("alpha.pagamento.confirmado"),
+    });
+    pendencias.push(...formalizacao.pendencias);
   }
 
   const proximoContato = input.proximoContatoEm === undefined ? card.proximoContatoEm : input.proximoContatoEm;
@@ -563,6 +600,9 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
           create: { cardId: card.id, campoId, valor },
           update: { valor },
         });
+      }
+      if (card.pipeline.chave === BPM_PIPELINE_KEYS.FINANCEIRO && Object.keys(valores).length > 0) {
+        await registrarConclusaoContratoFinanceiro(tx, card.id, card.pipelineId, input.ator.userId ?? null);
       }
 
       if (input.proximoContatoEm !== undefined) {

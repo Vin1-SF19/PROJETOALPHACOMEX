@@ -161,6 +161,19 @@ export function validarValoresCamposBpm(
       validados[campoId] = valor.toLowerCase();
       continue;
     }
+    if (campo.tipo === "lista_email") {
+      let emails: unknown;
+      try { emails = JSON.parse(valor); } catch { emails = null; }
+      if (!Array.isArray(emails) || emails.some((email) => typeof email !== "string")) {
+        return { success: false, error: `O campo "${campo.nome}" deve conter uma lista de e-mails válida.` };
+      }
+      const normalizados = emails.map((email) => email.trim().toLowerCase()).filter(Boolean);
+      if (normalizados.some((email) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
+        return { success: false, error: `O campo "${campo.nome}" possui um e-mail inválido.` };
+      }
+      validados[campoId] = JSON.stringify([...new Set(normalizados)]);
+      continue;
+    }
     if (campo.tipo === "url") {
       try { new URL(valor); } catch { return { success: false, error: `O campo "${campo.nome}" deve conter uma URL válida.` }; }
       validados[campoId] = valor;

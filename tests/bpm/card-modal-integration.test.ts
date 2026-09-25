@@ -174,7 +174,7 @@ describe("CRM - wiring do modal por etapa", () => {
     expect(historico).not.toContain("CriarVinculoCardBpm");
     expect(historico).not.toContain('title="Vínculos"');
     expect(historico).not.toContain("vinculosOrigem");
-    expect(historico).not.toContain("onAbrirCard={onAbrirCard}");
+    expect(historico).toContain("<PainelHistoricoPipeline");
   });
 
   it("mantem o resumo progressivo das etapas no lado esquerdo do card", () => {

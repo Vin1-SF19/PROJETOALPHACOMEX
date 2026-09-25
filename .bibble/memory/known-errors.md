@@ -5,6 +5,15 @@
 
 ---
 
+### DragOverlay não serve como indicador de persistência após o drop (RM-2026-8996E2)
+**Sintoma:** o feedback de movimentação ligado ao `DragOverlay`/`activeId` some ao soltar o card, enquanto `MoverCardBpm` e a reconciliação ainda estão pendentes; o card parece “congelado” sem nenhum sinal.
+**Causa raiz:** `onDragEnd` em `PipelineBoardClient.tsx` chama `setActiveId(null)` antes de aguardar o servidor.
+**Fix aplicado:** estado separado `cardMovendoId`, ligado logo antes de `MoverCardBpm` e limpo no rollback (`restaurarArrasto`) e no `finally`, com guarda de snapshot para uma execução antiga não limpar um arraste mais novo. Ele é passado ao `KanbanCard` como `movendo` e mostra o overlay “Movendo card…”.
+**Como evitar:** indicador de operação assíncrona pós-interação deve seguir a Promise real, não o ciclo de vida visual do arraste.
+**Adicionado em:** 2026-09-24 (Scribe, fechamento RM-2026-8996E2)
+
+---
+
 ### Autosave dependente de blur — campos perdidos ao sair do card (RM-2026-B88712)
 **Sintoma:** campos editados no card do CRM (texto, número, moeda, CPF, CNPJ, e-mail, URL, telefone, data, booleano, select, multiselect) não persistiam ao fechar o card por X, ESC ou clique externo — o usuário perdia a edição. Templates e seleção isolada de data também deixavam pendências fora da fila.
 **Causa raiz:** `alterarCampo` em `PainelCamposEtapaAtual.tsx` atualizava apenas o rascunho local; o save estava conectado exclusivamente ao `onBlur` do campo. `flushSaves` aguardava operações já registradas, mas não iniciava saves ainda fora da fila. O `CardSaveProvider` vivia dentro do modal, sem recuperação durável após desmontagem.
@@ -770,6 +779,15 @@ Resultado: FAIL — implementação parcial, aceites de integração ainda pende
 
 
 RM-2026-1FFBAA: fixture @libsql/client file::memory: perdeu tabelas após fechamento da transação; teste passou a usar arquivo temporário exclusivo em .cache, removido em finally. As quatro FKs Restrict são eventos, agendas, transições e templates; membros/histórico usam Cascade. Diagnóstico do incidente em produção permanece não comprovado.
+
+
+### RM-2026-4646B3 — CPF com mudança apenas de máscara
+Comparação literal e onChange marcavam pontuação como edição. PainelCamposEtapaAtual agora compara CPF sem pontuação/espaços, preservando outros tipos, snapshot confirmado e revisão de saves concorrentes. Erros do formulário usam opções locais Sonner de 5000ms/closeButton; sumir toast não limpa dirty. Validação CPF não alterada. Testes de reprodução e Sonner real registrados na story.
+
+### Motor Central de automações: versões reprocessavam histórico e retentativas perdiam passos (corrigido 2026-09-24)
+**Sintoma:** criar/editar/religar automação executava ações para eventos antigos; retentativa após nó CONDICAO marcava SUCESSO sem executar o ramo; fluxos com 3+ ESPERA ficavam PENDENTE para sempre; pausar gerava FALHA em vez de IGNORADA; TEMPO_NA_ETAPA/prazo de tarefa ignoravam cards além dos 100 primeiros.
+**Fix:** `materializarExecucoesEventosBpm` filtra `ocorridoEm >= versao.ativadaEm ?? createdAt` (religar atualiza `ativadaEm`); `executarGrafo` retoma CONDICAO concluída pelo `proximoNodeId` salvo no passo; retomada de ESPERA zera `tentativas`; execução de automação/versão inativa vira IGNORADA; pausar/arquivar/nova versão encerram PENDENTE/AGUARDANDO via `encerrarExecucoesEmAndamentoAutomacao` (`src/lib/bpm/automacoes/publicacao.ts`); gatilhos temporais paginam cards, só disparam para quem cruzou o limite após a ativação e checam chaves existentes em lote.
+**Lição:** qualquer materializador baseado em "eventos sem execução para esta versão" precisa de corte temporal pela ativação da versão. Testes: `tests/bpm/automacoes-correcoes-motor.test.ts`. Fixtures de teste com ids não-cuid quebram `publicarEventoBpm` (Zod) — use ids no formato cuid ao cobrir código que publica eventos.
 
 ## `npx tsc --noEmit` aborta com "JavaScript heap out of memory"
 **Sintoma:** `FATAL ERROR: Ineffective mark-compacts near heap limit` (exit 134) logo após `prisma generate`.

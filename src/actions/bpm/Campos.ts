@@ -21,6 +21,8 @@ import {
 import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
 import type { Prisma } from "@prisma/client";
 import { avancarConfigVersionBpm } from "@/lib/bpm/config-version";
+import { extrairPathnamePrivadoAnexoBpm } from "@/lib/bpm/anexos-storage";
+import { ACAO_LIMPEZA_ANEXO_PENDENTE, limparBlobAnexoPendente } from "@/lib/bpm/anexos-lifecycle";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -117,8 +119,8 @@ function possuiOpcoesJsonValidas(opcoesJson: string | null | undefined) {
 
 function mensagemErro(error: unknown, fallback: string) {
   if (!(error instanceof Error)) return fallback;
-  if (error.message.includes("administradores") || error.message.startsWith("CAMPO_")) {
-    return error.message.replace(/^CAMPO_[A-Z_]+:\s*/, "");
+  if (error.message.includes("administradores") || /^(?:CAMPO_|USO_CAMPO_ALTERADO:|CONFIRMACAO_DESCARTE_OBRIGATORIA:)/.test(error.message)) {
+    return error.message.replace(/^[A-Z_]+:\s*/, "");
   }
   return fallback;
 }
@@ -582,7 +584,7 @@ export async function ExcluirCampoBpm(dados: unknown) {
     const parsed = excluirCampoSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
 
-    const pipelineIds = await db.$transaction(async (tx) => {
+    const resultado = await db.$transaction(async (tx) => {
       await exigirAcessoConfigPipeline(userId, "configurarCampos", tx);
       const campo = await tx.bpmCampo.findUnique({
         where: { id: parsed.data.campoId },
@@ -595,13 +597,23 @@ export async function ExcluirCampoBpm(dados: unknown) {
       });
       if (!campo) throw new Error("CAMPO_NAO_ENCONTRADO: Campo não encontrado");
 
-      const [valoresCard, valoresGlobais, anexos] = await Promise.all([
+      const [valoresCard, valoresGlobais, anexos, formularios, etapas] = await Promise.all([
         tx.bpmCardCampoValor.count({ where: { campoId: campo.id } }),
         tx.bpmCampoValorGlobal.count({ where: { campoId: campo.id } }),
-        tx.bpmCardAnexo.count({ where: { campoId: campo.id } }),
+        tx.bpmCardAnexo.findMany({ where: { campoId: campo.id }, select: { id: true, cardId: true, nome: true, url: true } }),
+        tx.bpmFormularioComponente.count({ where: { campoId: campo.id } }),
+        tx.bpmCampoEtapaConfig.count({ where: { campoId: campo.id } }),
       ]);
-      if (valoresCard + valoresGlobais + anexos > 0) {
-        throw new Error("CAMPO_COM_DADOS: Este campo possui dados associados e não pode ser excluído");
+      const usoAtual = { valoresCard, valoresGlobais, anexos: anexos.length, formularios, etapas };
+      const usoConfirmado = parsed.data.usoConfirmado;
+      if (usoConfirmado && Object.keys(usoAtual).some((chave) =>
+        usoAtual[chave as keyof typeof usoAtual] !== usoConfirmado[chave as keyof typeof usoAtual]
+      )) {
+        throw new Error("USO_CAMPO_ALTERADO: O uso do campo mudou. Atualize a análise e confirme novamente");
+      }
+      if (Object.values(usoAtual).some((quantidade) => quantidade > 0) &&
+        (!parsed.data.confirmarDescarteDados || !usoConfirmado)) {
+        throw new Error("CONFIRMACAO_DESCARTE_OBRIGATORIA: Confirme a exclusão dos dados relacionados");
       }
 
       const afetados = [
@@ -613,18 +625,52 @@ export async function ExcluirCampoBpm(dados: unknown) {
           pipelineId: campo.pipelineId,
           adminId: userId,
           campoAlterado: "campo_excluido",
-          valorAnteriorJson: JSON.stringify({ id: campo.id, nome: campo.nome }),
+          valorAnteriorJson: JSON.stringify({ id: campo.id, nome: campo.nome, uso: usoAtual }),
         },
       });
+      // O FK de anexos usa SetNull; removê-los explicitamente evita que o
+      // conteúdo do campo excluído continue acessível como anexo sem campo.
+      await tx.bpmCardAnexo.deleteMany({ where: { campoId: campo.id } });
+      const limpezaPendenteIds: string[] = [];
+      for (const anexo of anexos) {
+        await tx.bpmCardHistorico.create({
+          data: {
+            cardId: anexo.cardId,
+            acao: "ANEXO_EXCLUIDO",
+            usuarioId: userId,
+            valorAnteriorJson: JSON.stringify({ nome: anexo.nome, campoId: campo.id }),
+          },
+        });
+        if (extrairPathnamePrivadoAnexoBpm(anexo.url)) {
+          const pendente = await tx.bpmCardHistorico.create({
+            data: {
+              cardId: anexo.cardId,
+              acao: ACAO_LIMPEZA_ANEXO_PENDENTE,
+              usuarioId: userId,
+              valorAnteriorJson: anexo.url,
+            },
+            select: { id: true },
+          });
+          limpezaPendenteIds.push(pendente.id);
+        }
+      }
       await tx.bpmCampoMapeamento.deleteMany({
         where: { OR: [{ campoOrigemId: campo.id }, { campoDestinoId: campo.id }] },
       });
       await tx.bpmCampo.delete({ where: { id: campo.id } });
       for (const pipelineId of afetados) await avancarConfigVersionBpm(tx, pipelineId);
-      return afetados;
+      return { pipelineIds: afetados, limpezaPendenteIds };
     });
 
-    await notificarPipelines(pipelineIds);
+    for (const pendenteId of resultado.limpezaPendenteIds) {
+      try {
+        await limparBlobAnexoPendente(pendenteId);
+      } catch (error) {
+        // O metadado já foi removido; o cron repete a limpeza pendente.
+        console.error("[ExcluirCampoBpm] Blob pendente de reconciliação", { pendenteId, error });
+      }
+    }
+    await notificarPipelines(resultado.pipelineIds);
     return { success: true };
   } catch (error) {
     console.error("[ExcluirCampoBpm]", error);

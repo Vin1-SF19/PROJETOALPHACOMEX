@@ -4,6 +4,7 @@
 
 Ready for Review — código da integração RADAR publicado e configuração da Solicitação/Elaboração ativada no Turso; falta teste visual autenticado com card real.
 
+
 ## Story
 
 **Como** integrante do Financeiro, **quero** conferir os dados recebidos de Solicitação de Contrato, registrar a elaboração e o envio para assinatura, **para** acompanhar a assinatura de um contrato que reflita a contratação validada.
@@ -32,6 +33,7 @@ Ready for Review — código da integração RADAR publicado e configuração da
 8. [ ] Quando existir integração de elaboração/assinatura de contratos aplicável ao card, o fluxo usa o contrato e o estado dessa integração sem duplicar registro ou envio. Se não houver integração configurada, o fluxo manual dos itens 1 a 7 permanece funcional. A escolha de provedor, credenciais e disparo externo dependem de contrato de integração existente e não são presumidos por esta story.
 9. [ ] Entrar em `Elaboração do Contrato` não exige que `Contrato elaborado` ou `Contrato enviado para assinatura` já estejam preenchidos. O diálogo de movimento exige somente campos marcados para entrada; os dois indicadores permanecem no formulário do card após a entrada, para preenchimento e validação durante a etapa.
 10. [ ] Ao entrar na etapa, somente para serviço RADAR, uma automação configurada cria uma única instância em conferência no Gerador de Documentos a partir do contrato padrão, vinculada à empresa do card e nomeada `CONTRATO DE PRESTAÇÃO DE SERVIÇOS + <Razão Social>`. Dados cadastrais e financeiros vêm dos campos validados em `Solicitação de Contrato`. A contratada é o cadastro ativo `ALPHA - COMEX, SERVICOS ADMINISTRATIVOS ESPECIALIZADOS E COWORKING LTDA`; a qualificação do modelo não conserva a empresa antiga. O formulário da **primeira etapa** solicita valor inicial, valor final e desconto para RADAR antes do avanço, sem bloquear outros serviços nem pressupor divisão ou desconto. Data de assinatura ainda desconhecida aparece como pendência de conferência no rascunho.
+11. [x] Ao clicar no contrato gerado na lista de anexos do card, uma prévia abre em modal, inclusive quando o PDF ainda não foi gerado. PDF, imagem e texto comuns também abrem no modal; arquivos sem prévia oferecem abertura/download. O contrato é lido com a permissão do card, sem exigir acesso separado ao módulo Gerador de Documentos, e a API confere o vínculo entre documento e card.
 
 ## Tarefas / checklist de execução
 
@@ -51,7 +53,12 @@ Ready for Review — código da integração RADAR publicado e configuração da
 - [ ] Confirmar no card autenticado que a entrada em Elaboração é liberada e os campos aparecem dentro da segunda etapa (AC 1, 9). O código da correção foi publicado e o deployment ficou pronto; falta o teste visual autenticado.
 - [x] Criar rascunho automático no Gerador, com dados da contratação, contratada correta, título solicitado e idempotência por card/template (AC 10).
 - [x] Publicar três campos de pagamento no formulário da primeira etapa, visíveis e obrigatórios na saída para RADAR, e automação de entrada exclusiva de RADAR (AC 10). Verificação em leitura confirmou os três campos ativos, formulário v6 e automação ativa.
+- [x] Adicionar visualização de contratos e anexos em modal no card, com rota de prévia autenticada pelo acesso ao card e texto de conferência quando não houver PDF (AC 11).
 - [x] Plano somente leitura validou formulário da Solicitação v5, template padrão versionado `cmthgdqel00000akvfblyma6y`, contratada ativa e três campos ainda ausentes. O modelo padrão descreve revisão de RADAR; a condição da automação confere `card.servico` contendo Radar. A versão atual do pipeline passou de 11 a 14 por edições concorrentes; o segundo backup e o snapshot seletivo cobrem v14.
+- [x] Publicar código `ceb738bf` após gates e confirmar deployment Production Vercel `6667061093` do mesmo SHA, com resposta HTTP 200.
+- [x] Publicar configuração após autorização específica do usuário e reler o Turso: 18 requisitos e 15 automações ativos, formulário versão 3, pipeline versão 10 e tipos `data_hora`/`url_ou_arquivo`.
+- [ ] Verificar o fluxo autenticado com cartão real, inclusive card antigo, anexo, acompanhamento e erro nominal por campo (AC 1 a 8).
+- [x] Rodar `npm run lint`, `npm run typecheck`, `npm test` e `npm run build`; atualizar checklist e File List antes da conclusão local (lint: 0 erros, avisos preexistentes; testes: 512 arquivos/3.840 casos aprovados; build concluído).
 
 ## Contexto e pontos de integração
 
@@ -68,6 +75,8 @@ Ready for Review — código da integração RADAR publicado e configuração da
 - **Reteste informado pelo usuário:** o diálogo `Antes de mover para Elaboração do Contrato` ainda cobrava os dois indicadores da segunda etapa na entrada, embora o comando de transição já respeitasse `obrigatorioEntrada`. O inventário de produção confirmou os dois campos ativos, visíveis, editáveis e publicados no formulário da segunda etapa, com `obrigatorio=true` e `obrigatorioEntrada=false`; todos os requisitos publicados para a etapa estão em `DURING_STAGE`. A causa é a projeção divergente do diálogo, que usava `destino.obrigatorio` como exigência de entrada. Nenhuma alteração no banco é necessária.
 - **Plano de publicação:** `scripts/financeiro-elaboracao-config.mts` é somente leitura sem `--apply`. Seleciona a etapa ativa `cmsd9yw74000ddzggndlvgbun`, altera tipos de `Data do envio` para `data_hora` e `Link/arquivo` para `url_ou_arquivo`, configura duas datas automáticas, 18 requisitos e 15 automações. A etapa homônima `elaboracao_contrato_legacy` está inativa e sem cards; não será modificada.
 - **Vault:** backup completo `database-backups/pre-change/painelalpha_turso_pre_change_elaboracao_config_2026-09-25T17-42-13-450Z.db` validado por restauração (`integrity_check=ok`, 331 tabelas, 171.275 linhas, FK=0), SHA-256 `ad960a4aff973d18301e88a6f8060583ada72eb08983888205696cd5346a3d5a`. Snapshot seletivo `database-backups/pre-change/elaboracao-config-before-2026-09-25T17-42-33-799Z.json`. O inventário somente leitura deste reteste confirmou os campos e requisitos publicados; a correção atual não altera o banco.
+- **Plano de publicação:** `scripts/financeiro-elaboracao-config.mts` é somente leitura sem `--apply`. Seleciona a etapa ativa `cmsd9yw74000ddzggndlvgbun`, altera tipos de `Data do envio` para `data_hora` e `Link/arquivo` para `url_ou_arquivo`, configura duas datas automáticas, 18 requisitos e 15 automações. A etapa homônima `elaboracao_contrato_legacy` está inativa e sem cards; não será modificada.
+- **Vault e publicação:** backup completo `database-backups/pre-change/painelalpha_turso_pre_change_elaboracao_config_2026-09-25T17-42-13-450Z.db` validado por restauração (`integrity_check=ok`, 331 tabelas, 171.275 linhas, FK=0), SHA-256 `ad960a4aff973d18301e88a6f8060583ada72eb08983888205696cd5346a3d5a`. Snapshot pré-publicação `database-backups/pre-change/financeiro-elaboracao-config-1790359530426.json`. Usuário autorizou especificamente esta publicação em 25/09/2026; script retornou `APPLIED`. Leitura pós-publicação confirmou 18/18 requisitos ativos, 15/15 automações com versão ativa, formulário versão 3, pipeline versão 10 e tipos esperados. Nenhum cartão foi mutado pelo script.
 - **Limite de verificação:** nenhum card real foi movido ou editado nesta implementação. A automação de geração de contrato existe no catálogo, mas não está configurada para a segunda etapa e depende de um template selecionado pelo administrador.
 - **Contrato RADAR:** o DOCX padrão contém qualificação antiga de `ALPHA COMEX BRASIL LTDA`. A nova ação substitui essa qualificação na instância, preserva o arquivo fonte, usa o cadastro ativo `ALPHA - COMEX, SERVICOS ADMINISTRATIVOS ESPECIALIZADOS E COWORKING LTDA`, vincula documento e anexo interno ao card e impede criação repetida quando já houver documento vinculado. As variáveis mapeadas usam IDs de campos na configuração da automação; os dados ausentes são marcados para conferência e impedem finalização até preenchimento. O pedido do usuário colocou valor inicial, valor final e desconto na **primeira** etapa, antes da entrada na Elaboração. O serviço sem RADAR não executa este modelo.
 - **Vault RADAR:** backup completo imediatamente anterior à publicação `database-backups/pre-change/painelalpha_turso_pre_change_radar_contrato_pagamento_2026-09-25T20-14-28-265Z.db` (173.723.648 bytes, SHA-256 `269d07a9cdc27348763991ebe4a23e93abf30754399b040a4a03d61e72444e88`) validado por restauração local: integridade OK, FK=0, 331 tabelas, 174.876 linhas. Manifesto `.manifest.json` homônimo e snapshot seletivo v20 `database-backups/pre-change/radar-contrato-pagamento-config-before-v20-2026-09-25T20-15-40-017Z.json` (SHA-256 `62d1002da840de4f2169173bad0de9dda628e2d3c924b2b0011ea06497cf63e6`). Snapshot automático adicional da aplicação: `database-backups/pre-change/financeiro-contrato-radar-before-1790367422660.json`.
@@ -129,11 +138,17 @@ Ready for Review — código da integração RADAR publicado e configuração da
 - `src/lib/gerador-documentos/ownership.ts` — acesso ao documento vinculado condicionado ao acesso ao card e ao módulo.
 - `src/components/GeradorDocumentos/ConferenciaClient.tsx` — formulário de conferência das variáveis do contrato automático.
 - `src/app/api/bpm/anexos/[anexoId]/route.ts` — redirecionamento autenticado do anexo interno de contrato para a conferência.
+- `src/app/api/bpm/anexos/[anexoId]/preview/route.ts` — prévia autenticada do contrato vinculado ao card e PDF inline quando disponível.
+- `src/components/bpm/anexos/VisualizadorAnexoCard.tsx` — modal de contrato, PDF, imagem e texto, com fallback para outros arquivos.
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx`, `src/app/PainelAlpha/AlphaCRM/CampoBpmInput.tsx` — abertura do modal na lista de anexos e nos campos de arquivo do card.
+- `tests/bpm/anexo-preview-route.test.ts`, `tests/bpm/arquivo-persistencia-react.test.ts`, `tests/bpm/authorization-actions.test.ts` — autorização da prévia, vínculo e abertura pelo campo.
 - `src/app/PainelAlpha/GeradorDocumentos/[templateId]/download/route.ts` e `src/app/api/gerador-documentos/[id]/download/route.ts` — leitura do PDF sob a mesma autorização de documento vinculado.
 - `scripts/financeiro-contrato-radar-config.mts` — plano e aplicação protegida dos três campos na Solicitação e da automação RADAR.
 - `tests/gerador-documentos/contrato-padrao-contratada.test.ts` — qualificação da empresa e preservação do modelo fonte.
 - `tests/gerador-documentos/contrato-conferencia.test.ts` — complemento de variáveis sem sobrescrever edições manuais.
 - `tests/gerador-documentos/ownership.test.ts` — acesso restrito por vínculo ao card, com permissões de edição.
+- `tests/bpm/edicao-campos-card.test.ts` — mocks da persistência parcial diante do novo validador.
+- `tests/bpm/cpf-pendencias-react.test.ts` — persistência UTC de campo `data_hora`.
 
 ### Change Log
 
@@ -146,6 +161,8 @@ Ready for Review — código da integração RADAR publicado e configuração da
 | 2026-09-25 | 0.5 | Integração local da geração automática do contrato RADAR, plano de configuração da primeira etapa e backup Vault validado; publicação pendente de checkpoint específico | Codex |
 | 2026-09-25 | 0.6 | Backup Vault renovado na configuração v14, conferência dos gates e plano de publicação RADAR atualizado | Codex |
 | 2026-09-25 | 0.7 | Código publicado, backup/snapshot Vault v20 validado e configuração RADAR ativada com verificação em leitura | Codex |
+| 2026-09-25 | 0.4 | Código publicado em produção, configuração aplicada no Turso e leitura posterior conferida; smoke autenticado pendente | Codex |
+| 2026-09-25 | 0.8 | Prévia autenticada de contrato e anexos em modal no card | Codex |
 
 ## Validação do draft
 

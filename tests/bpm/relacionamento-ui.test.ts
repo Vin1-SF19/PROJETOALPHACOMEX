@@ -51,7 +51,7 @@ it("mantém relacionamento na composição/publicação e remove apenas da cria�
   const tipo = document.querySelector<HTMLSelectElement>('[role="dialog"] select')!;
   expect([...tipo.options].map((option) => option.value)).toEqual([
     "texto", "texto_longo", "numero", "moeda", "percentual", "data", "data_hora", "booleano",
-    "selecao", "multiselecao", "cnpj", "cpf", "email", "telefone", "url", "arquivo",
+    "selecao", "multiselecao", "cnpj", "cpf", "email", "lista_email", "telefone", "url", "arquivo",
   ]);
 });
 

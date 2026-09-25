@@ -1,7 +1,7 @@
 "use client";
 
 import { ObterCardBpm } from "@/actions/bpm/Cards";
-import { toast } from "sonner";
+import { toast, type ExternalToast } from "sonner";
 import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode } from "react";
 
 type ConfirmedCard = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
@@ -18,7 +18,7 @@ interface CardSaveContextValue {
   setPendingFields: (instance: string, fields: string[]) => void;
   getPendingFields: (cardId?: string) => string[];
   /** Enfileira um save para preservar a ordem e a versão-base do card. */
-  registerSave: (save: () => Promise<boolean>, cardId?: string, recoveryKey?: string, refreshAfterSave?: boolean) => Promise<boolean>;
+  registerSave: (save: () => Promise<boolean>, cardId?: string, recoveryKey?: string, errorOptions?: Pick<ExternalToast, "duration" | "closeButton">, refreshAfterSave?: boolean) => Promise<boolean>;
   /** Aguarda todos os saves e informa se a persistência foi concluída. */
   flushSaves: (cardId?: string) => Promise<boolean>;
 }
@@ -80,7 +80,7 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
 
   const recovery = useRef(new Map<string, () => Promise<boolean>>());
   const failures = useRef(new Map<string, string | undefined>());
-  const registerSave = useCallback(function enqueue(save: () => Promise<boolean>, cardId?: string, recoveryKey?: string, refreshAfterSave = true): Promise<boolean> {
+  const registerSave = useCallback(function enqueue(save: () => Promise<boolean>, cardId?: string, recoveryKey?: string, errorOptions?: Pick<ExternalToast, "duration" | "closeButton">, refreshAfterSave = true): Promise<boolean> {
     if (recoveryKey) recovery.current.set(recoveryKey, save);
     const scope = cardId ?? "";
     const anteriores = savePromiseRef.current.get(scope) ?? Promise.resolve(true);
@@ -102,21 +102,23 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
           failures.current.set(recoveryKey, cardId);
           toast.error("Erro ao salvar. A alteração foi preservada nesta sessão.", {
             duration: Infinity,
+            ...errorOptions,
             action: { label: "Tentar novamente", onClick: () => {
               const previous = recovery.current.get(recoveryKey);
               flushScheduled(cardId ? `${cardId}:` : "");
               const latest = recovery.current.get(recoveryKey);
               // O flush pode ter enfileirado uma revisão mais recente.
-              if (latest && latest === previous) void enqueue(latest, cardId, recoveryKey, refreshAfterSave);
+              if (latest && latest === previous) void enqueue(latest, cardId, recoveryKey, errorOptions, refreshAfterSave);
             } },
           });
         }
       } else if (!success && !recoveryKey) {
-        toast.error("Erro ao salvar. Reabra o card para recuperar o rascunho.");
+        toast.error("Erro ao salvar. Reabra o card para recuperar o rascunho.", errorOptions);
       }
       return success;
     });
-    // A falha anterior continua em `failures` até o retry.
+    // A falha anterior continua em `failures` até o retry. Não contaminar a
+    // próxima tentativa com o resultado antigo: ela pode ter sido recuperada.
     savePromiseRef.current.set(scope, tentativa);
     return tentativa;
   }, [confirmVersion, flushScheduled]);

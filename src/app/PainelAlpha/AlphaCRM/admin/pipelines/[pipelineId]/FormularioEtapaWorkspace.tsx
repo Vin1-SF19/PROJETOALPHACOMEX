@@ -116,6 +116,7 @@ const TIPOS_CAMPO = [
   ["cnpj", "CNPJ"],
   ["cpf", "CPF"],
   ["email", "E-mail"],
+  ["lista_email", "Lista de e-mails"],
   ["telefone", "Telefone"],
   ["url", "Link/URL"],
   ["arquivo", "Arquivo"],
@@ -629,15 +630,28 @@ function FormularioEtapaWorkspaceContent({
   async function excluirCampoAplicavel() {
     if (!campoParaExcluir || excluindoCampo || publicationBlocked) return;
     const campo = camposLocais.find((item) => item.id === campoParaExcluir);
-    if (!campo) return;
+    const usoConfirmado = usoCampos?.[campoParaExcluir];
+    if (!campo || !usoConfirmado) return;
     setExcluindoCampo(true);
     try {
-      const resposta = await ExcluirCampoBpm({ campoId: campo.id });
+      const resposta = await ExcluirCampoBpm({
+        campoId: campo.id,
+        confirmarDescarteDados: true,
+        usoConfirmado,
+      });
       if (!resposta.success) {
         toast.error(mensagemErroCampo(resposta.error));
+        const usoAtualizado = await ObterUsoCamposBpm(pipelineId);
+        if (usoAtualizado.success && usoAtualizado.data) setUsoCampos(usoAtualizado.data);
         return;
       }
       setCamposExcluidos((atuais) => [...new Set([...atuais, campo.id])]);
+      setUsoCampos((atuais) => {
+        if (!atuais) return atuais;
+        const proximo = { ...atuais };
+        delete proximo[campo.id];
+        return proximo;
+      });
       setCampoSelecionadoId(null);
       setCampoParaExcluir(null);
       toast.success(`Campo “${campo.nome}” excluído`);
@@ -1093,8 +1107,8 @@ function FormularioEtapaWorkspaceContent({
             <div className="border-t border-white/10 pt-3 text-xs text-slate-300">
               <h4 className="font-semibold text-white">Análise de uso</h4>
               {usoSelecionado ? <p className="mt-2 leading-5">{usoSelecionado.valoresCard} valores em cards · {usoSelecionado.valoresGlobais} valores globais · {usoSelecionado.anexos} anexos · {usoSelecionado.formularios} formulários · {usoSelecionado.etapas} etapas</p> : <p className="mt-2 text-slate-500">{erroUso ? "Análise indisponível. Exclusão bloqueada por segurança." : "Carregando usos…"}</p>}
-              {usoSelecionado && (usoSelecionado.valoresCard + usoSelecionado.valoresGlobais + usoSelecionado.anexos + usoSelecionado.formularios + usoSelecionado.etapas > 0) && <p className="mt-2 text-amber-200">Este campo está em uso. Edite suas propriedades sem mudar seu ID ou remover dados.</p>}
-              <button type="button" disabled={bloqueado || !usoSelecionado || Object.values(usoSelecionado).some((valor) => valor > 0) || estaNoRascunho} onClick={() => setCampoParaExcluir(campoSelecionado.id)} className="mt-3 inline-flex min-h-9 items-center gap-2 rounded-lg border border-rose-400/30 px-3 text-rose-200 hover:bg-rose-400/10 disabled:cursor-not-allowed disabled:opacity-40"><Trash2 size={14} /> Excluir campo sem uso</button>
+              {usoSelecionado && (usoSelecionado.valoresCard + usoSelecionado.valoresGlobais + usoSelecionado.anexos + usoSelecionado.formularios + usoSelecionado.etapas > 0) && <p className="mt-2 text-amber-200">A exclusão definitiva apaga os valores e anexos deste campo. Revise o impacto antes de confirmar.</p>}
+              <button type="button" disabled={bloqueado || !usoSelecionado || estaNoRascunho} onClick={() => setCampoParaExcluir(campoSelecionado.id)} className="mt-3 inline-flex min-h-9 items-center gap-2 rounded-lg border border-rose-400/30 px-3 text-rose-200 hover:bg-rose-400/10 disabled:cursor-not-allowed disabled:opacity-40"><Trash2 size={14} /> Preparar exclusão definitiva</button>
             </div>
           </div>}
         </div>
@@ -1300,9 +1314,14 @@ function FormularioEtapaWorkspaceContent({
           <DialogHeader>
             <DialogTitle>Excluir campo aplicável</DialogTitle>
             <DialogDescription className="text-slate-400">
-              A exclusão é permanente e só será concluída se o campo não tiver dados associados.
+              A exclusão é permanente. Os valores e anexos vinculados ao campo serão apagados; as referências em formulários e etapas serão removidas. Outros campos e colunas permanecem.
             </DialogDescription>
           </DialogHeader>
+          {campoParaExcluir && usoCampos?.[campoParaExcluir] && (
+            <p className="text-sm text-amber-200" role="status">
+              Campo “{camposLocais.find((campo) => campo.id === campoParaExcluir)?.nome}” ({campoParaExcluir}): {usoCampos[campoParaExcluir].valoresCard} valores em cards, {usoCampos[campoParaExcluir].valoresGlobais} valores globais, {usoCampos[campoParaExcluir].anexos} anexos, {usoCampos[campoParaExcluir].formularios} formulários e {usoCampos[campoParaExcluir].etapas} etapas.
+            </p>
+          )}
           <label className="grid gap-1.5 text-sm text-slate-200">
             Campo
             <select
@@ -1314,7 +1333,7 @@ function FormularioEtapaWorkspaceContent({
             >
               {camposLocais.filter((campo) => {
                 const uso = usoCampos?.[campo.id];
-                return uso && Object.values(uso).every((valor) => valor === 0) && !secoes.some((secao) => secao.componentes.some((item) => item.campoId === campo.id));
+                return uso && !secoes.some((secao) => secao.componentes.some((item) => item.campoId === campo.id));
               }).map((campo) => (
                 <option key={campo.id} value={campo.id}>{campo.nome} · {campo.tipo}</option>
               ))}
@@ -1331,7 +1350,7 @@ function FormularioEtapaWorkspaceContent({
             </button>
             <button
               type="button"
-              disabled={excluindoCampo || !campoParaExcluir}
+              disabled={excluindoCampo || !campoParaExcluir || !usoCampos?.[campoParaExcluir]}
               onClick={() => void excluirCampoAplicavel()}
               className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-rose-500 px-4 text-sm font-bold text-white disabled:opacity-40"
             >

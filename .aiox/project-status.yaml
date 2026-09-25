@@ -1,21 +1,19 @@
 status:
   branch: main
   modifiedFiles:
-    - .bibble/memory/architecture.md
+    - .bibble/memory/codebase-map.md
     - .bibble/memory/decisions.md
+    - .bibble/memory/integration-points.md
     - .bibble/memory/journal.md
-    - .gitignore
-    - bibblesquad
-  modifiedFilesTotalCount: 98
+    - .bibble/memory/known-errors.md
+  modifiedFilesTotalCount: 25
   recentCommits:
-    - >-
-      refactor: extrair rate-limit do webhook do Google Calendar para módulo
-      próprio
-    - 'fix(bpm): buscar "Radar pretendido" na query de campos do board'
+    - 'fix(crm): validar elaboracao do contrato financeiro'
+    - 'fix(metas): contabilizar vendas de usuarios ocultos nos totais'
   currentEpic: Agenda Alpha
   currentStory: story-agenda-alpha-operacional-tarefas-status
-  lastUpdate: '2026-09-22T14:46:42.947Z'
+  lastUpdate: '2026-09-25T16:44:10.680Z'
   isGitRepo: true
-timestamp: 1790088402949
+timestamp: 1790354650681
 ttl: 60
-gitFingerprint: 1789060307076.414:1790082245840.3494
+gitFingerprint: 1790281600741.8083:1790352127427.1892
