@@ -106,3 +106,13 @@ it("campo autorizado vincula o arquivo e oferece download protegido", async () =
   expect(resultado).toMatchObject({ success: true, data: { url: "/api/bpm/anexos/anexo" } });
   expect(prismaMock.bpmCardCampoValor.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: { valor: "anexo" } }));
 });
+
+it("mantém sucesso após o commit se a notificação de anexo falhar", async () => {
+  vi.clearAllMocks();
+  camposMock.mockResolvedValue([{ id: CAMPO_ID, nome: "Arquivo", tipo: "arquivo", editavel: true }]);
+  prismaMock.bpmCardAnexo.findFirst.mockResolvedValue(null);
+  prismaMock.bpmCardAnexo.create.mockResolvedValue({ id: "anexo", cardId: CARD_ID, campoId: CAMPO_ID });
+  notificarMock.mockRejectedValueOnce(new Error("notificação indisponível"));
+  const resultado = await RegistrarAnexoBpm({ cardId: CARD_ID, campoId: CAMPO_ID, recibo: RECIBO });
+  expect(resultado).toMatchObject({ success: true, data: { id: "anexo" } });
+});

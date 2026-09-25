@@ -19,7 +19,7 @@ interface PainelProximoContatoProps {
 }
 
 export function PainelProximoContato({ card, onAtualizado, podeEditar, realtimeRevision }: PainelProximoContatoProps) {
-  const { registerSave, scheduleSave, getDraft, setDraft, getVersion } = useCardSave();
+  const { registerSave, scheduleSave, getDraft, setDraft, getVersion, confirmVersion } = useCardSave();
   const draftKey = `${card.id}:proximoContato`;
   const [valor, setValor] = useState(() => getDraft(draftKey)?.valor ?? formatarDataHoraLocalBpm(card.proximoContatoEm));
   const [salvando, setSalvando] = useState(false);
@@ -71,6 +71,7 @@ export function PainelProximoContato({ card, onAtualizado, podeEditar, realtimeR
         toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível atualizar o próximo contato");
         return false;
       }
+      if (resultado.data) confirmVersion(card.id, new Date(resultado.data.updatedAt).toISOString());
       valorPersistidoRef.current = snapshot.valor;
       if (getDraft(draftKey)?.valor === snapshot.valor) setDraft(draftKey);
       if (rascunhoRef.current.corresponde(snapshot)) {
@@ -81,7 +82,7 @@ export function PainelProximoContato({ card, onAtualizado, podeEditar, realtimeR
       toast.success(proximoContatoEm ? "Próximo contato atualizado" : "Próximo contato removido");
       onAtualizado();
       return true;
-    }, card.id, draftKey).finally(() => {
+    }, card.id, draftKey, undefined, false).finally(() => {
       savesPendentesRef.current -= 1;
       if (savesPendentesRef.current === 0) setSalvando(false);
     });

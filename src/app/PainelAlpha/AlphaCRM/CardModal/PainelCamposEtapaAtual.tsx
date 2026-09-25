@@ -76,7 +76,7 @@ export function PainelCamposEtapaAtual({
   const camposAtuaisSujosRef = useRef(false);
   const [savesCamposPendentes, setSavesCamposPendentes] = useState(0);
 
-  const [estadoSave, setEstadoSave] = useState<"pendente" | "salvo" | "erro" | null>(null);
+  const [estadoSave, setEstadoSave] = useState<"pendente" | "salvo" | "erro" | "invalido" | null>(null);
   const [buscandoCnpj, setBuscandoCnpj] = useState(false);
   const cnpjConsultadoRef = useRef("");
   const revisaoEdicao = useRef(0);
@@ -222,7 +222,10 @@ export function PainelCamposEtapaAtual({
         if (!validacao.success) { possuiValorInvalido = true; toast.error(validacao.error, erroFormulario); continue; }
         Object.assign(camposValores, validacao.valores);
       }
-      if (!Object.keys(camposValores).length) return !possuiValorInvalido;
+      if (!Object.keys(camposValores).length) {
+        if (possuiValorInvalido && revisaoEdicao.current === revisaoEnviada) setEstadoSave("invalido");
+        return true;
+      }
       const resultado = await AtualizarCardBpm({
         cardId: card.id,
         camposValores,
@@ -262,12 +265,12 @@ export function PainelCamposEtapaAtual({
       versaoBaseCamposRef.current = novaVersao;
       setVersaoBaseCampos(novaVersao);
       atualizarPendencias(antesDaConfirmacao);
-      if (revisaoEdicao.current === revisaoEnviada && !getDraft(idInstancia) && !possuiValorInvalido) {
-        setEstadoSave("salvo");
+      if (revisaoEdicao.current === revisaoEnviada) {
+        setEstadoSave(possuiValorInvalido ? "invalido" : getDraft(idInstancia) ? "pendente" : "salvo");
       }
       setConflitoCamposAtuais(false);
       onAtualizado();
-      return !possuiValorInvalido;
+      return true;
     }, card.id, `${card.id}:campo:${campoId ?? instanceKey}`, erroFormulario, false).finally(() => {
       setSavesCamposPendentes((total) => total - 1);
     });
@@ -457,6 +460,7 @@ export function PainelCamposEtapaAtual({
             {savesCamposPendentes > 0 ? <><Loader2 size={13} className="animate-spin" aria-hidden="true" /> Salvando alterações...</>
               : estadoSave === "salvo" && !conflitoCamposAtuais ? <><Check size={13} aria-hidden="true" /> Salvo</>
               : estadoSave === "erro" ? <><AlertTriangle size={13} aria-hidden="true" /> Erro ao salvar. Sua alteração foi preservada.</>
+              : estadoSave === "invalido" ? <><AlertTriangle size={13} aria-hidden="true" /> Revise o campo indicado. Os demais valores válidos foram salvos.</>
               : estadoSave === "pendente" ? "Alterações pendentes" : null}
           </p>
           {!podeEditar && <p className="text-[11px] text-slate-500">Somente o responsável ou um administrador pode editar estes campos.</p>}

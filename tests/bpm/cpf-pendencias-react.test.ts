@@ -42,9 +42,11 @@ it("CPF inválido mantém pendência em fechamentos repetidos", async () => {
   await edit("111.111.111-11"); await blur();
   expect(AtualizarCardBpm).not.toHaveBeenCalled();
   expect(toast.error).toHaveBeenCalledWith(
-    "Erro ao salvar. A alteração foi preservada nesta sessão.",
-    expect.objectContaining({ action: expect.objectContaining({ label: "Tentar novamente" }) }),
+    'O campo "CPF" deve conter um CPF válido.',
+    expect.objectContaining({ closeButton: true }),
   );
+  expect(toast.error).toHaveBeenCalledTimes(1);
+  expect(container.querySelector('[role="status"]')?.textContent).toContain("Revise o campo indicado");
   expect(await saves.flushSaves(card.id)).toBe(false); expect(await saves.flushSaves(card.id)).toBe(false);
   expect(saves.getPendingFields()).toEqual(["CPF"]);
 });

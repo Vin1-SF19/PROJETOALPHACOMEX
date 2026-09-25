@@ -60,6 +60,22 @@ it("a seção seguinte usa a versão confirmada pela primeira na fila", async ()
   expect(observed).toEqual(["2026-09-22T12:00:00.000Z"]);
 });
 
+it("não informa falha de gravação quando só a releitura do card falha", async () => {
+  const { ObterCardBpm } = await import("@/actions/bpm/Cards");
+  vi.mocked(ObterCardBpm).mockResolvedValueOnce({ success: false, error: "offline" });
+  expect(await context.registerSave(async () => true, "card", "card:campo")).toBe(true);
+  expect(await context.flushSaves("card")).toBe(true);
+  expect(toast.error).not.toHaveBeenCalled();
+});
+
+it("mantém disponível a recuperação de falha real mesmo com opções de toast do formulário", async () => {
+  await context.registerSave(async () => false, "card", "card:campo", { duration: 5000, closeButton: true });
+  expect(toast.error).toHaveBeenCalledWith(
+    "Erro ao salvar. A alteração foi preservada nesta sessão.",
+    expect.objectContaining({ duration: Infinity, closeButton: true, action: expect.objectContaining({ label: "Tentar novamente" }) }),
+  );
+});
+
 it("retry antecipa debounce novo sem reenviar a revisão antiga", async () => {
   const old = vi.fn(async () => false);
   await context.registerSave(old, "card", "card:resumo");

@@ -32,7 +32,7 @@ export function PainelStatusPosFechamento({
   accent,
   onAtualizado,
 }: PainelStatusPosFechamentoProps) {
-  const { registerSave, getVersion, getDraft, setDraft } = useCardSave();
+  const { registerSave, getVersion, confirmVersion, getDraft, setDraft } = useCardSave();
   const draftKey = `${cardId}:status`;
   const recovered = getDraft(draftKey)?.valor;
   const statusReconhecido = statusPosFechamentoEhValido(statusPersistido)
@@ -117,6 +117,7 @@ export function PainelStatusPosFechamento({
         if (houveConflito) onAtualizado();
         return false;
       }
+      if (resultado.data) confirmVersion(cardId, new Date(resultado.data.updatedAt).toISOString());
       confirmacaoLocalPendenteRef.current = {
         status,
         versaoAnterior: versaoBaseAtual,
@@ -128,7 +129,7 @@ export function PainelStatusPosFechamento({
       toast.success("Status pós-fechamento atualizado");
       onAtualizado();
       return true;
-    }, cardId, draftKey).finally(() => {
+    }, cardId, draftKey, undefined, false).finally(() => {
       setSalvando(false);
     });
     return sucesso;

@@ -87,10 +87,17 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
     const tentativa = anteriores.then(async () => {
       const success = await save();
       if (success && cardId && refreshAfterSave) {
-        const result = await ObterCardBpm(cardId);
-        if (!result.success || !result.data) return false;
-        confirmVersion(cardId, new Date(result.data.updatedAt).toISOString());
-        for (const listener of listeners.current.get(cardId) ?? []) listener(result.data, recoveryKey);
+        // A leitura atualiza a tela e a versão compartilhada; uma falha nela
+        // não desfaz a gravação já confirmada pela action.
+        try {
+          const result = await ObterCardBpm(cardId);
+          if (result.success && result.data) {
+            confirmVersion(cardId, new Date(result.data.updatedAt).toISOString());
+            for (const listener of listeners.current.get(cardId) ?? []) listener(result.data, recoveryKey);
+          }
+        } catch (error) {
+          console.error("[CardSaveProvider/refreshAfterSave]", error);
+        }
       }
       return success;
     }).catch(() => false).then((success) => {
@@ -101,8 +108,8 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
         } else {
           failures.current.set(recoveryKey, cardId);
           toast.error("Erro ao salvar. A alteração foi preservada nesta sessão.", {
-            duration: Infinity,
             ...errorOptions,
+            duration: Infinity,
             action: { label: "Tentar novamente", onClick: () => {
               const previous = recovery.current.get(recoveryKey);
               flushScheduled(cardId ? `${cardId}:` : "");

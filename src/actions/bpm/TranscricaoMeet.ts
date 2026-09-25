@@ -42,11 +42,12 @@ export async function SalvarResumoReuniaoBpm(dados: unknown) {
       return { success: false as const, error: "O card mudou enquanto era editado. Recarregue e tente novamente." };
     }
 
+    const proximaVersao = new Date(Math.max(Date.now(), card.updatedAt.getTime() + 1));
     await db.$transaction(async (tx) => {
       await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard", tx);
       const atualizada = await tx.bpmCard.updateMany({
         where: { id: cardId, updatedAt: versaoEsperadaEm, googleEventId: card.googleEventId },
-        data: { transcricaoReuniao: resumo },
+        data: { transcricaoReuniao: resumo, updatedAt: proximaVersao },
       });
       if (atualizada.count !== 1) throw new Error("CONFLITO_ATUALIZACAO_CARD");
       await tx.bpmCardHistorico.create({
@@ -60,9 +61,13 @@ export async function SalvarResumoReuniaoBpm(dados: unknown) {
       });
     });
 
-    revalidatePath(`${ROTA_BASE}/pipeline/${card.pipelineId}`);
-    await notificarPipelineBpm({ pipelineId: card.pipelineId, cardId, tipo: "REUNIAO_ALTERADA" });
-    return { success: true as const };
+    try {
+      revalidatePath(`${ROTA_BASE}/pipeline/${card.pipelineId}`);
+      await notificarPipelineBpm({ pipelineId: card.pipelineId, cardId, tipo: "REUNIAO_ALTERADA" });
+    } catch (notificationError) {
+      console.error("[SalvarResumoReuniaoBpm/pos-salvamento]", notificationError);
+    }
+    return { success: true as const, data: { updatedAt: proximaVersao } };
   } catch (erro) {
     const error = erro instanceof Error ? erro.message : "";
     return {

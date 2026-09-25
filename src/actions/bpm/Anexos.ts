@@ -93,8 +93,12 @@ export async function RegistrarAnexoBpm(dados: unknown) {
     });
 
     if (resultado.criado) {
-      revalidatePath(`${ROTA_BASE}/pipeline`);
-      await notificarPipelineBpm({ cardId, tipo: "ANEXO_ALTERADO" });
+      try {
+        revalidatePath(`${ROTA_BASE}/pipeline`);
+        await notificarPipelineBpm({ cardId, tipo: "ANEXO_ALTERADO" });
+      } catch (notificationError) {
+        console.error("[RegistrarAnexoBpm/pos-salvamento]", notificationError);
+      }
     }
     return {
       success: true,

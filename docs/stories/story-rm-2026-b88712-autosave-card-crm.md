@@ -3,7 +3,7 @@
 **Objetivo do Roadmap:** Autosave universal do formulário do card + remoção do modal 'Sair sem salvar'
 **Projeto:** Painel Alpha
 **Módulo:** Alpha CRM / BPM
-**Status:** Done
+**Status:** Ready for Review — correção adicional de 2026-09-25 validada localmente; smoke autenticado pendente.
 **Encerramento local:** 2026-09-22 — Scribe, Fase 11. Aceite Sage recebido com ressalvas; gates globais e homologação autenticada continuam pendentes.
 
 ## Contexto
@@ -635,3 +635,36 @@ AUTO_ADJUSTMENT_ACCEPTANCE: corrigir o fixture respeitando o contrato tipado, ex
 **File List desta correção:** `src/actions/bpm/Cards.ts`, `src/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext.tsx`, `src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx`, `tests/bpm/edicao-campos-card.test.ts`, `tests/bpm/cpf-pendencias-react.test.ts`, `tests/bpm/card-save-flow.test.ts` e esta story. Nenhuma estrutura ou dado do banco foi alterado.
 
 **Verificação final:** no diretório de trabalho, `npm run lint` PASS (0 erros; 1.192 avisos), `npm run typecheck` PASS, `npm test` PASS (514 arquivos; 3.852 testes aprovados, 4 ignorados, 1 todo) e `npm run build` PASS. Os 83 testes direcionados passaram. Na seleção isolada para commit, os 80 testes direcionados e o typecheck passaram. `git diff --check` PASS. Uma execução intermediária de testes encontrou o cliente Prisma em regeneração durante um build concorrente; a repetição sequencial passou. Não houve teste autenticado com banco real.
+
+## Correção adicional — autosave sequencial e resultado da gravação (2026-09-25)
+
+**Relato:** vários campos editados em sequência geram erros; às vezes os valores são gravados enquanto um toast informa falha.
+
+### Checklist
+
+- [x] Autosave parcial deixa os requisitos `DURING_STAGE` e a formalização completa para a transição, preservando validação do valor enviado, autorização, referência de arquivo e prevenção de reversão após assinatura auditada.
+- [x] Confirmação de gravação usa o recibo da action; falha de releitura ou notificação após commit não é classificada como falha de persistência.
+- [x] Valor inválido mostra o erro específico do campo e permanece pendente sem produzir um segundo toast genérico de falha da gravação dos valores válidos.
+- [x] Versão confirmada é compartilhada entre painéis de contato, status, reunião e follow-up; toast de recuperação continua disponível para falhas reais.
+- [x] Cenários de autosave parcial, releitura falha, anexo pós-commit e recuperação de upload cobertos por testes direcionados.
+- [x] `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` e `git diff --check` executados após a correção.
+- [ ] Smoke autenticado com edição sequencial em card real e conferência de valores/toasts após recarregar.
+
+### File List
+
+- `src/lib/bpm/validacao-salvamento-configurado.ts`
+- `src/actions/bpm/Anexos.ts`, `src/actions/bpm/FollowUp.ts`, `src/actions/bpm/TranscricaoMeet.ts`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelChecklistFollowUp.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximoContato.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelReuniao.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelStatusPosFechamento.tsx`
+- `tests/bpm/validacao-salvamento-configurado.test.ts`
+- `tests/bpm/cpf-pendencias-react.test.ts`
+- `tests/bpm/autosave-recovery-react.test.ts`
+- `tests/bpm/anexos-idempotencia.test.ts`
+
+### QA Results
+
+Testes direcionados passaram, incluindo repetição do cenário de recuperação do upload. Gates finais: `npm run lint` PASS (0 erros; 1.192 avisos preexistentes), `npm run typecheck` PASS, `npm test` PASS (525 arquivos; 3.889 testes aprovados, 4 ignorados, 1 todo), `npm run build` PASS e `git diff --check` PASS. Não houve alteração de estrutura nem mutação de dados do banco. A validação autenticada com card real permanece pendente.

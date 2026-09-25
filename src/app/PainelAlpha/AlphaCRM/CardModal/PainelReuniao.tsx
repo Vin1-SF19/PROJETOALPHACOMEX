@@ -27,7 +27,7 @@ interface Props {
 }
 
 export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarFormulario = true }: Props) {
-  const { registerSave, scheduleSave, getVersion, getDraft, setDraft } = useCardSave();
+  const { registerSave, scheduleSave, getVersion, confirmVersion, getDraft, setDraft } = useCardSave();
   const [dataHora, setDataHora] = useState(() => formatarDataHoraLocalBpm(card.dataReuniao));
   const [erroDataHora, setErroDataHora] = useState<string | null>(null);
   const [emailCliente, setEmailCliente] = useState(card.emailClienteReuniao ?? "");
@@ -180,6 +180,7 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
         toast.error(resultado.error);
         return false;
       }
+      if (resultado.data) confirmVersion(card.id, new Date(resultado.data.updatedAt).toISOString());
       resumoPersistidoRef.current = snapshot.valor;
       if (getDraft(draftKey)?.valor === snapshot.valor) setDraft(draftKey);
       if (resumoRascunhoRef.current.corresponde(snapshot)) {
@@ -189,7 +190,7 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
       toast.success("Resumo da reunião salvo");
       onAtualizado();
       return true;
-    }, card.id, draftKey);
+    }, card.id, draftKey, undefined, false);
   }
 
   return (

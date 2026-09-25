@@ -53,9 +53,9 @@ describe("salvamento governado por configuração", () => {
     expect(segundo[dataId]).toBeUndefined();
   });
 
-  it("cobra o documento quando o envio é marcado pela condição publicada", async () => {
+  it("aceita o autosave parcial do indicador; documento continua obrigatório no avanço", async () => {
     const requisito = { chave: "contrato-link", alvoTipo: "CAMPO", campoId: linkId, campo: { id: linkId, nome: "Link/arquivo do contrato", ativo: true }, condicaoJson: quandoEnviado };
     await expect(prepararSalvamentoConfigurado({ card: card as never, valoresSubmetidos: { [enviadoId]: "Sim" }, client: cliente([requisito]) as never }))
-      .rejects.toThrow("Link/arquivo do contrato");
+      .resolves.toEqual({ [enviadoId]: "Sim" });
   });
 });

@@ -3,7 +3,6 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
-import { avaliarFormalizacaoFinanceira } from "@/lib/bpm/financeiro-formalizacao";
 import { camposPublicadosPorEtapa } from "@/lib/bpm/campos-formulario-publicado";
 import { carregarValoresCanonicosCampos } from "@/lib/bpm/campos-configuraveis-server";
 import { avaliarGrupo } from "@/lib/bpm/regras/avaliador";
@@ -30,7 +29,7 @@ function valorAutomatico(valorPadrao: string, agora: Date): string | null {
   return null;
 }
 
-/** Aplica padrões temporais e requisitos DURING_STAGE publicados ao salvar campos. */
+/** Aplica padrões temporais ao autosave; requisitos da etapa são avaliados ao avançar. */
 export async function prepararSalvamentoConfigurado(params: {
   card: Card;
   valoresSubmetidos: Record<string, string>;
@@ -39,14 +38,9 @@ export async function prepararSalvamentoConfigurado(params: {
 }): Promise<Record<string, string>> {
   const { card, client } = params;
   const agora = params.agora ?? new Date();
-  const [publicadosPorEtapa, etapas, requisitos] = await Promise.all([
+  const [publicadosPorEtapa, etapas] = await Promise.all([
     camposPublicadosPorEtapa([card.etapaId], client),
     client.bpmEtapa.findMany({ where: { pipelineId: card.pipelineId, ativo: true }, select: { id: true } }),
-    client.bpmRequisito.findMany({
-      where: { pipelineId: card.pipelineId, ativo: true, fase: "DURING_STAGE", OR: [{ etapaId: card.etapaId }, { etapaId: null }] },
-      include: { campo: { select: { id: true, nome: true, ativo: true } } },
-      orderBy: [{ ordem: "asc" }, { chave: "asc" }],
-    }),
   ]);
   const publicados = publicadosPorEtapa.get(card.etapaId) ?? new Set<string>();
   const configs = await client.bpmCampoEtapaConfig.findMany({
@@ -56,7 +50,7 @@ export async function prepararSalvamentoConfigurado(params: {
   const statusAssinatura = configs.find((config) => config.campo.chave === "alpha.financeiro.status.contrato.assinatura");
   const possuiAutomacao = configs.some((config) => config.condicaoObrigatoriedadeJson
     && (config.valorPadrao === "{{agora.data}}" || config.valorPadrao === "{{agora.instante}}"));
-  if (!possuiAutomacao && requisitos.length === 0 && !statusAssinatura) return params.valoresSubmetidos;
+  if (!possuiAutomacao && !statusAssinatura) return params.valoresSubmetidos;
 
   const publicadosPipeline = await camposPublicadosPorEtapa(etapas.map((etapa) => etapa.id), client);
   const idsPublicados = new Set([...publicadosPipeline.values()].flatMap((ids) => [...ids]));
@@ -97,46 +91,5 @@ export async function prepararSalvamentoConfigurado(params: {
       throw new Error("REQUISITOS_PENDENTES:Assinatura já confirmada; a reversão exige um procedimento auditado.");
     }
   }
-  if (statusAssinatura && valoresContexto[statusAssinatura.campoId] === "Assinado") {
-    const campoPorChave = (chave: string) => campos.find((campo) => campo.chave === chave);
-    const dataCampo = campoPorChave("alpha.data.da.assinatura");
-    const anexoCampo = campoPorChave("alpha.contrato.assinado.anexo");
-    const anexoId = anexoCampo ? String(valoresContexto[anexoCampo.id] ?? "").trim() : "";
-    const anexo = anexoCampo && anexoId
-      ? await client.bpmCardAnexo.findFirst({
-          where: { id: anexoId, cardId: card.id, campoId: anexoCampo.id },
-          select: { id: true },
-        })
-      : null;
-    const avaliacao = avaliarFormalizacaoFinanceira({
-      statusAssinatura: "Assinado",
-      dataAssinatura: dataCampo ? String(valoresContexto[dataCampo.id] ?? "") : null,
-      anexoAssinadoId: anexoId,
-      anexoAssinadoVinculado: Boolean(anexo),
-      pagamentoConfirmado: null,
-    });
-    if (avaliacao.contrato !== "Concluído") {
-      throw new Error(`REQUISITOS_PENDENTES:Campos/requisitos pendentes (${avaliacao.pendencias.filter((item) => item !== "Pagamento confirmado").join(", ")}).`);
-    }
-  }
-
-  const pendencias: string[] = [];
-  for (const requisito of requisitos) {
-    if (requisito.condicaoJson
-      && !avaliarGrupo(condicaoValida(requisito.condicaoJson, requisito.chave), contexto)) continue;
-    if (requisito.alvoTipo === "REGRA") {
-      if (!requisito.condicaoJson) throw new Error(`CONFIGURACAO_INVALIDA:Regra ${requisito.chave} sem condição.`);
-      pendencias.push(requisito.mensagem);
-      continue;
-    }
-    if (requisito.alvoTipo !== "CAMPO" || !requisito.campoId) continue;
-    if (!requisito.campo?.ativo || !idsPublicados.has(requisito.campoId)) {
-      throw new Error(`CONFIGURACAO_INVALIDA:Campo não publicado no requisito ${requisito.chave}.`);
-    }
-    if (!String(contexto.camposDinamicos[requisito.campoId] ?? "").trim()) {
-      pendencias.push(requisito.campo.nome);
-    }
-  }
-  if (pendencias.length) throw new Error(`REQUISITOS_PENDENTES:Campos/requisitos pendentes (${[...new Set(pendencias)].join(", ")}).`);
   return valores;
 }

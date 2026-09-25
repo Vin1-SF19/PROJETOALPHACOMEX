@@ -107,9 +107,10 @@ export async function SalvarChecklistFollowUpBpm(dados: unknown) {
         );
       }
 
+      const proximaVersao = new Date(Math.max(Date.now(), card.updatedAt.getTime() + 1));
       const trava = await tx.bpmCard.updateMany({
         where: { id: cardId, etapaId: card.etapaId, updatedAt: card.updatedAt },
-        data: { updatedAt: new Date() },
+        data: { updatedAt: proximaVersao },
       });
       if (trava.count !== 1) throw new Error("FOLLOW_UP_CONFLITO");
 
@@ -199,7 +200,7 @@ export async function SalvarChecklistFollowUpBpm(dados: unknown) {
             valorNovoJson: JSON.stringify({ checklistId: atualizado.id, completo }),
           },
         });
-        return { checklist: atualizado, pendencias: validacao.pendencias, pipelineId: card.pipelineId };
+        return { checklist: atualizado, pendencias: validacao.pendencias, pipelineId: card.pipelineId, cardUpdatedAt: proximaVersao };
       }
 
       await tx.bpmInteracaoCard.create({
@@ -236,21 +237,26 @@ export async function SalvarChecklistFollowUpBpm(dados: unknown) {
           valorNovoJson: JSON.stringify({ checklistId: criado.id, completo }),
         },
       });
-      return { checklist: criado, pendencias: validacao.pendencias, pipelineId: card.pipelineId };
+      return { checklist: criado, pendencias: validacao.pendencias, pipelineId: card.pipelineId, cardUpdatedAt: proximaVersao };
     });
 
-    revalidatePath(`${ROTA_BASE}/card/${cardId}`);
-    revalidatePath(`${ROTA_BASE}/pipeline/${resultado.pipelineId}`);
-    await notificarPipelineBpm({
-      pipelineId: resultado.pipelineId,
-      cardId,
-      tipo: "CARD_ATUALIZADO",
-    });
+    try {
+      revalidatePath(`${ROTA_BASE}/card/${cardId}`);
+      revalidatePath(`${ROTA_BASE}/pipeline/${resultado.pipelineId}`);
+      await notificarPipelineBpm({
+        pipelineId: resultado.pipelineId,
+        cardId,
+        tipo: "CARD_ATUALIZADO",
+      });
+    } catch (notificationError) {
+      console.error("[SalvarChecklistFollowUpBpm/pos-salvamento]", notificationError);
+    }
     return {
       success: true,
       data: {
         ...serializarChecklist(resultado.checklist),
         pendencias: resultado.pendencias,
+        cardUpdatedAt: resultado.cardUpdatedAt,
       },
     };
   } catch (error) {

@@ -41,7 +41,7 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
   const revisaoRef = useRef(0);
   const draftSujoRef = useRef(false);
   const revisaoAnteriorRef = useRef(realtimeRevision);
-  const { registerSave, scheduleSave, getDraft, setDraft, subscribeConfirmation } = useCardSave();
+  const { registerSave, scheduleSave, getDraft, setDraft, confirmVersion, subscribeConfirmation } = useCardSave();
   const draftKey = `${cardId}:followup`;
   useEffect(() => subscribeConfirmation(cardId, (_card, key) => {
     if (key !== draftKey || getDraft(draftKey)) return;
@@ -115,6 +115,7 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
         toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível salvar o follow-up");
         return false;
       }
+      if (resultado.data.cardUpdatedAt) confirmVersion(cardId, new Date(resultado.data.cardUpdatedAt).toISOString());
       const savedDraft = Object.fromEntries(Object.entries(respostasAtual).map(([id, value]) => [id, JSON.stringify(value)]));
       if (JSON.stringify(getDraft(draftKey)) === JSON.stringify(savedDraft)) setDraft(draftKey);
       setEstado({ estado: resultado.data.estado, checklist: resultado.data.checklist });
@@ -128,7 +129,7 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
       toast.success(concluir ? "Follow-up concluído" : estadoAnterior === "NAO_INICIADO" ? "Follow-up iniciado" : "Rascunho do follow-up salvo");
       onAtualizado();
       return true;
-    }, cardId, draftKey).finally(() => {
+    }, cardId, draftKey, undefined, false).finally(() => {
       setSalvando(false);
     });
   }
