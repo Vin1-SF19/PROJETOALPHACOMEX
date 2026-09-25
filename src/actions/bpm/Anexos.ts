@@ -46,7 +46,7 @@ export async function RegistrarAnexoBpm(dados: unknown) {
         const perfil = acesso.isAdminGlobal || acesso.role === "ADMINISTRADOR"
           ? "ADMIN" : acesso.role === "RESPONSAVEL" ? "RESPONSAVEL" : "MEMBRO";
         const campos = await carregarCamposAplicaveisCardEtapa(cardId, card.pipelineId, card.etapaId, tx, perfil);
-        const campo = campos.find((item) => item.id === campoId && item.tipo === "arquivo");
+        const campo = campos.find((item) => item.id === campoId && (item.tipo === "arquivo" || item.tipo === "url_ou_arquivo"));
         if (!campo || !validarValoresCamposBpm([campo], { [campoId]: "" }).success) {
           throw new Error("CAMPO_ARQUIVO_INVALIDO");
         }

@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   findUniqueTemplate: vi.fn(),
   findUniqueDocumento: vi.fn(),
+  findFirstAnexo: vi.fn(),
+  exigirAcessoBpmCard: vi.fn(),
   getPermissoesEfetivas: vi.fn(),
   auth: vi.fn(),
 }));
@@ -11,8 +13,11 @@ vi.mock("@/lib/prisma", () => ({
   default: {
     documentoTemplate: { findUnique: mocks.findUniqueTemplate },
     documentoGerado: { findUnique: mocks.findUniqueDocumento },
+    bpmCardAnexo: { findFirst: mocks.findFirstAnexo },
   },
 }));
+
+vi.mock("@/lib/bpm/ownership", () => ({ exigirAcessoBpmCard: mocks.exigirAcessoBpmCard }));
 
 vi.mock("@/actions/PermissoesSetor", () => ({
   getPermissoesEfetivas: mocks.getPermissoesEfetivas,
@@ -100,7 +105,7 @@ describe("exigirOwnershipTemplate", () => {
 });
 
 describe("exigirOwnershipDocumento", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); mocks.findFirstAnexo.mockResolvedValue(null); });
 
   it("dono do documento é autorizado", async () => {
     mocks.findUniqueDocumento.mockResolvedValue({ id: "d1", criadoPorId: 5, status: "CONFERENCIA", templateId: "t1" });
@@ -114,10 +119,19 @@ describe("exigirOwnershipDocumento", () => {
       exigirOwnershipDocumento("d1", { userId: 6, role: "User", isAdmin: false }),
     ).rejects.toThrow("Não autorizado");
   });
+
+  it("integrante com acesso de edição ao card vinculado pode conferir o contrato", async () => {
+    mocks.findUniqueDocumento.mockResolvedValue({ id: "d1", criadoPorId: 5, status: "CONFERENCIA", templateId: CONTRATO_PADRAO_ID, tokenAcesso: "token-card", variaveisJson: { __bpmCardId: "card-financeiro" } });
+    mocks.findFirstAnexo.mockResolvedValue({ cardId: "card-financeiro" });
+    mocks.exigirAcessoBpmCard.mockResolvedValue({ autorizado: true });
+    await expect(exigirOwnershipDocumento("d1", { userId: 6, role: "Financeiro", isAdmin: false })).resolves.toMatchObject({ id: "d1" });
+    expect(mocks.exigirAcessoBpmCard).toHaveBeenCalledWith("card-financeiro", 6, "Financeiro", "editarCard");
+    expect(mocks.findFirstAnexo).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ cardId: "card-financeiro" }) }));
+  });
 });
 
 describe("exigirOwnershipDocumentoPorToken", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); mocks.findFirstAnexo.mockResolvedValue(null); });
 
   it("token sozinho NÃO autoriza — precisa ser o dono também (link não-público, decisão do objetivo original)", async () => {
     mocks.findUniqueDocumento.mockResolvedValue({ id: "d1", criadoPorId: 5, status: "CONFERENCIA", templateId: "t1" });

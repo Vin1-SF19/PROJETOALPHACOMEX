@@ -129,11 +129,15 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
       select: { id: true, nome: true, tipo: true, opcoesJson: true },
     });
     if (!campo) throw new Error("Campo ativo não pertence ao pipeline do card");
+    const anterior = await db.bpmCardCampoValor.findUnique({ where: { cardId_campoId: { cardId: card.id, campoId } } });
+    if (parametros.somenteSeVazio === true && anterior?.valor?.trim()) {
+      return { campoId, valor: anterior.valor, ignorada: true, motivo: "CAMPO_JA_PREENCHIDO" };
+    }
     const brutoValor = parametros.valor === null ? "" : texto(parametros.valor);
     const validacao = validarValoresCamposBpm([campo], { [campoId]: brutoValor });
     if (!validacao.success) throw new Error(validacao.error);
     const valor = validacao.valores[campoId] || null;
-    const anterior = await db.bpmCardCampoValor.findUnique({ where: { cardId_campoId: { cardId: card.id, campoId } } });
+    if ((anterior?.valor ?? "") === (valor ?? "")) return { campoId, valor, ignorada: true, motivo: "VALOR_IGUAL" };
     await db.bpmCardCampoValor.upsert({ where: { cardId_campoId: { cardId: card.id, campoId } }, create: { cardId: card.id, campoId, valor }, update: { valor } });
     await publicarEventoDaAcao(execucao, "CAMPO_ALTERADO", "CAMPO", campoId, { campoId, valor: anterior?.valor ?? null }, { campoId, valor });
     await notificarPipelineBpm({ pipelineId: card.pipelineId, cardId: card.id, tipo: "CARD_ATUALIZADO" });
@@ -256,12 +260,24 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
   }
   if (tipo === "CRIAR_CARD_OUTRO_PIPELINE") {
     const pipelineId = String(parametros.pipelineId); const etapaId = String(parametros.etapaId);
+    const pipelineDestino = await db.bpmPipeline.findFirst({ where: { id: pipelineId, ativo: true }, select: { chave: true } });
+    if (!pipelineDestino) return { ignorada: true, motivo: "PIPELINE_DESTINO_INATIVO" };
     const etapa = await db.bpmEtapa.findFirst({ where: { id: etapaId, pipelineId, ativo: true }, select: { id: true } });
     if (!etapa) throw new Error("Pipeline/etapa de destino inválidos");
-    const pipelineDestino = await db.bpmPipeline.findUnique({ where: { id: pipelineId }, select: { chave: true } });
+    const vinculoExistente = await db.bpmCardVinculo.findFirst({
+      where: { cardOrigemId: card.id, cardDestino: { pipelineId, status: { not: "ARQUIVADO" } } },
+      select: { cardDestinoId: true },
+    });
+    if (vinculoExistente) return { cardId: vinculoExistente.cardDestinoId, existente: true };
     if (parametros.somenteSeNaoExistirAtivo) {
       const existente = await db.bpmCard.findFirst({ where: { empresaId: card.empresaId, pipelineId, status: "ATIVO" }, select: { id: true } });
-      if (existente) return { cardId: existente.id, existente: true };
+      if (existente) {
+        if (parametros.vincularAoOriginal !== false) {
+          await db.bpmCardVinculo.upsert({ where: { cardOrigemId_cardDestinoId: { cardOrigemId: card.id, cardDestinoId: existente.id } },
+            create: { cardOrigemId: card.id, cardDestinoId: existente.id }, update: {} });
+        }
+        return { cardId: existente.id, existente: true };
+      }
     }
     const novo = await db.$transaction(async (tx) => {
       const criado = await tx.bpmCard.create({ data: { empresaId: card.empresaId, pipelineId, etapaId, responsavelId: Number(parametros.responsavelId ?? card.responsavelId), servico: parametros.servico ? String(parametros.servico) : card.servico, membros: { create: { userId: Number(parametros.responsavelId ?? card.responsavelId), role: "RESPONSAVEL" } } } });

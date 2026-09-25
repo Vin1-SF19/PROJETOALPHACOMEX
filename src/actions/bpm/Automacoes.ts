@@ -18,6 +18,7 @@ import {
   parametrosOportunidadeSchema,
 } from "@/lib/bpm/automacoes/schemas";
 import { VariavelTemplateSchema } from "@/lib/gerador-documentos/schemas";
+import { CONTRATO_PADRAO_ID, VARIAVEIS_CONTRATO_PADRAO } from "@/lib/gerador-documentos/contrato-padrao";
 import {
   simularDistribuicaoBpm,
   simularOportunidadeBpm,
@@ -55,6 +56,7 @@ function erroPublico(error: unknown): string {
     "Pipeline ou coluna inválida",
     "Automação não encontrada",
     "Template de contrato inválido",
+    "Contratada inválida",
     "Serviço alvo inválido",
     "Responsável comercial inválido",
     "Responsável configurado inválido",
@@ -84,6 +86,11 @@ async function validarTemplateContrato(acaoTipo: string, parametros: unknown) {
     select: { id: true },
   });
   if (!template) throw new Error("Template de contrato inválido");
+  const contratadaId = (parametros as { empresaContratadaId?: unknown }).empresaContratadaId;
+  if (templateId === CONTRATO_PADRAO_ID && typeof contratadaId !== "string") throw new Error("Contratada inválida");
+  if (typeof contratadaId === "string" && !await db.empresaContratada.findFirst({ where: { id: contratadaId, status: "ATIVO" }, select: { id: true } })) {
+    throw new Error("Contratada inválida");
+  }
 }
 
 function idsCamposDinamicos(condicao: GrupoCondicao | null | undefined): string[] {
@@ -175,10 +182,11 @@ async function validarConfiguracaoEspecial(dados: z.infer<typeof salvarAutomacao
 export async function ListarCatalogosAutomacoesBpm() {
   try {
     await exigirAdminAutomacoes();
-    const [usuarios, servicos, parceiros, pipelines] = await Promise.all([
+    const [usuarios, servicos, parceiros, empresasContratadas, pipelines] = await Promise.all([
       listarUsuariosVinculaveisBpm(),
       db.servicosComerciais.findMany({ where: { ativo: true }, orderBy: { nome: "asc" }, select: { id: true, nome: true } }),
       db.parceiro.findMany({ where: { ativo: true }, orderBy: { nome: "asc" }, select: { id: true, nome: true, nomeFantasia: true } }),
+      db.empresaContratada.findMany({ where: { status: "ATIVO" }, orderBy: { razaoSocial: "asc" }, select: { id: true, razaoSocial: true, cnpj: true } }),
       db.bpmPipeline.findMany({
         where: { ativo: true },
         orderBy: { nome: "asc" },
@@ -189,9 +197,9 @@ export async function ListarCatalogosAutomacoesBpm() {
         },
       }),
     ]);
-    return { success: true as const, data: { usuarios, servicos, parceiros, pipelines } };
+    return { success: true as const, data: { usuarios, servicos, parceiros, pipelines, empresasContratadas } };
   } catch (error) {
-    return { success: false as const, error: erroPublico(error), data: { usuarios: [], servicos: [], parceiros: [], pipelines: [] } };
+    return { success: false as const, error: erroPublico(error), data: { usuarios: [], servicos: [], parceiros: [], pipelines: [], empresasContratadas: [] } };
   }
 }
 
@@ -411,7 +419,7 @@ export async function ListarTemplatesAutomacoesBpm() {
       data: templates.map((template) => {
         return {
           ...template,
-          variaveis: lerVariaveisTemplate(template.variaveisJson),
+          variaveis: template.id === CONTRATO_PADRAO_ID ? VARIAVEIS_CONTRATO_PADRAO : lerVariaveisTemplate(template.variaveisJson),
           variaveisJson: undefined,
         };
       }),

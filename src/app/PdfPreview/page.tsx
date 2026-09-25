@@ -1,13 +1,8 @@
 'use client';
 
-import React from 'react';
 import dynamic from 'next/dynamic';
-import { FichaAlphaPDF } from '@/components/GerarFicha';
 
-const PDFViewer = dynamic(
-  () => import('@react-pdf/renderer').then((mod) => mod.PDFViewer),
-  { ssr: false }
-);
+const PdfPreviewClient = dynamic(() => import('@/components/PdfPreviewClient'), { ssr: false });
 
 export default function PdfPreviewPage() {
   const dadosMock = {
@@ -33,8 +28,6 @@ export default function PdfPreviewPage() {
   };
 
   return (
-    <PDFViewer style={{ width: '100%', height: '100vh' }}>
-      <FichaAlphaPDF dados={dadosMock} userLogado="VINICIUS" />
-    </PDFViewer>
+    <PdfPreviewClient dados={dadosMock} />
   );
 }

@@ -94,6 +94,9 @@ export function avaliarCondicao(condicao: CondicaoFolha, contexto: ContextoAvali
   if (condicao.operador === "vazio") return vazio(bruto);
   if (condicao.operador === "preenchido") return !vazio(bruto);
   if (bruto === undefined) throw new ErroRegra(`Campo inexistente: ${condicao.campo.fonte}:${condicao.campo.campo}`, "CAMPO_INEXISTENTE");
+  if (bruto === null && (condicao.operador === "igual" || condicao.operador === "diferente")) {
+    return condicao.operador === "diferente" ? condicao.valor !== null : condicao.valor === null;
+  }
 
   const tipo: TipoValor = condicao.operador === "dataAntes" || condicao.operador === "dataDepois" ? "data" : condicao.tipoEsperado ?? inferirTipo(bruto);
   const atual = exigirCoercao(bruto, tipo, "Valor do campo");

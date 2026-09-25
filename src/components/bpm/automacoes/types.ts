@@ -71,6 +71,7 @@ export type CatalogosAutomacao = {
   usuarios: { id: number; nome: string; imagemUrl: string | null }[];
   servicos: { id: number; nome: string }[];
   parceiros: { id: number; nome: string; nomeFantasia: string | null }[];
+  empresasContratadas: { id: string; razaoSocial: string; cnpj: string }[];
   pipelines: {
     id: string;
     nome: string;

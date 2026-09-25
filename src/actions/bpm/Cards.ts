@@ -16,7 +16,6 @@ import {
   exigirAcessoBpmCard,
   exigirAcessoBpmPipeline,
   checarAcessoConfigPipeline,
-  checarAcessoDiretoriaBpm,
   isAdminRole,
   usuarioElegivelResponsavelBpm,
 } from "@/lib/bpm/ownership";
@@ -26,7 +25,8 @@ import {
 } from "@/lib/bpm/automacoes/fila";
 import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { executarAutomacoesCentraisDoCardAgora } from "@/lib/bpm/automacoes/orquestrador";
-import { salvarValoresGlobaisPersonalizadosCampos } from "@/lib/bpm/campos-configuraveis-server";
+import { carregarValoresCanonicosCampos, salvarValoresGlobaisPersonalizadosCampos } from "@/lib/bpm/campos-configuraveis-server";
+import { prepararSalvamentoConfigurado } from "@/lib/bpm/validacao-salvamento-configurado";
 import { camposPublicadosPorEtapa, capacidadesObrigatoriasPorEtapa } from "@/lib/bpm/campos-formulario-publicado";
 import { desserializarComposicaoCardKanban, type CardKanbanComposicao } from "@/lib/bpm/card-kanban";
 import { obterStatusPosFechamentoVisivel } from "@/lib/bpm/status-pos-fechamento";
@@ -41,6 +41,7 @@ import {
   carregarSnapshotsCopiaCamposCard,
   type PerfilAcessoCampoBpm,
 } from "@/lib/bpm/requisitos-etapa-server";
+import { campoObrigatorioAoMover } from "@/lib/bpm/requisitos-etapa";
 import {
   calcularDiaCicloNovosLeads,
   contarDiasUteisDecorridos,
@@ -50,9 +51,6 @@ import {
   intervaloDiaCivilSaoPaulo,
   META_LIGACOES_NOVOS_LEADS,
 } from "@/lib/bpm/novos-leads";
-import {
-  NOME_ETAPA_BOAS_VINDAS,
-} from "@/lib/bpm/boas-vindas";
 import {
   obterErroDataReuniaoParaMovimento,
 } from "@/lib/bpm/agendar-reuniao";
@@ -242,7 +240,6 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
       && await checarAcessoConfigPipeline(userId, "visualizarPipeline");
     if (!session?.user?.id) return { success: false, error: "Não autorizado", data: [] };
     await exigirAcessoBpmPipeline(pipelineId, Number(session.user.id));
-    const diretoria = await checarAcessoDiretoriaBpm(userId);
     const [pipelineInfo, usuarioAtual] = await Promise.all([
       db.bpmPipeline.findUnique({
         where: { id: pipelineId },
@@ -253,6 +250,10 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
             select: {
               id: true,
               nome: true,
+              ehFinal: true,
+              automacoes: { where: { ativa: true }, select: { versoes: {
+                where: { status: "ATIVA" }, select: { grafoJson: true },
+              } } },
               visibilidades: {
                 select: { perfil: true, podeVer: true, podeAgir: true },
               },
@@ -271,6 +272,13 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
         resolverVisibilidadeEtapa(usuarioAtual?.role, etapa.visibilidades),
       ]),
     );
+    const etapasComSaida = new Set((pipelineInfo?.etapas ?? []).filter((etapa) => etapa.automacoes?.some((automacao) =>
+      automacao.versoes.some((versao) => {
+        try {
+          const grafo = JSON.parse(versao.grafoJson) as { nos?: { acaoTipo?: string }[] };
+          return grafo.nos?.some((no) => no.acaoTipo === "CRIAR_CARD_OUTRO_PIPELINE") ?? false;
+        } catch { return false; }
+      }))).map((etapa) => etapa.id));
     const etapasVisiveis = [...visibilidadePorEtapa.entries()]
       .filter(([, permissao]) => permissao.podeVer)
       .map(([etapaId]) => etapaId);
@@ -316,9 +324,8 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
     const cards = await db.bpmCard.findMany({
       where: {
         pipelineId,
-        status: "ATIVO",
+        OR: [{ status: "ATIVO" }, { status: "CONCLUIDO", etapa: { ehFinal: true } }],
         etapaId: { in: etapasVisiveis },
-        ...(diretoria ? {} : { etapa: { nome: { not: NOME_ETAPA_BOAS_VINDAS } } }),
         ...(admin ? {} : { membros: { some: { userId } } }),
       },
       select: {
@@ -332,6 +339,12 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
         dataReuniao: true,
         googleMeetLink: true,
         statusPosFechamento: true,
+        vinculosOrigem: {
+          where: { cardDestino: { pipeline: { ativo: true }, status: { not: "ARQUIVADO" } } },
+          select: { cardDestino: { select: { id: true, pipelineId: true,
+            pipeline: { select: { nome: true } }, etapa: { select: { nome: true } },
+          } } },
+        },
         empresa: { select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true } },
         responsavel: { select: { id: true, nome: true } },
         membros: {
@@ -368,6 +381,14 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
       },
       orderBy: { createdAt: "desc" },
     });
+
+    const idsDestinos = [...new Set(cards.flatMap((card) => card.vinculosOrigem.map((vinculo) => vinculo.cardDestino.id)))];
+    const destinosVisiveis = new Set((await Promise.all(idsDestinos.map(async (id) => {
+      try {
+        await exigirAcessoBpmCard(id, userId, session.user.role ?? null, "visualizar");
+        return id;
+      } catch { return null; }
+    }))).filter((id): id is string => Boolean(id)));
 
     const cardsComOperacionais = cards.filter((card) => etapasComOperacionais.has(card.etapaId));
     const idsComOperacionais = cardsComOperacionais.map((card) => card.id);
@@ -555,14 +576,26 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
       return { nativos, campos, camposLabel };
     }
 
-    const cardsReais = cards.map((card) => {
+    const cardsReais = cards.filter((card) => card.status === "ATIVO"
+      || (pipelineInfo?.etapas.find((etapa) => etapa.id === card.etapaId)?.ehFinal
+        && (card.vinculosOrigem.length > 0 || etapasComSaida.has(card.etapaId))))
+      .map((card) => {
+      const { vinculosOrigem, ...cardSemVinculos } = card;
       const ehNovoLead = card.etapaId === etapaNovosLeads?.id;
       const sla = [...(slaPorCard.get(card.id) ?? [])]
         .filter((item) => item.status !== "CONCLUIDO")
         .sort((a, b) => prioridadeStatusSla(b.status) - prioridadeStatusSla(a.status))[0] ?? null;
       const composicaoCardKanban = composicaoPorEtapa.get(card.etapaId);
+      const etapaFinal = Boolean(pipelineInfo?.etapas.find((etapa) => etapa.id === card.etapaId)?.ehFinal);
+      const encaminhamentos = etapaFinal
+        ? vinculosOrigem.map(({ cardDestino }) => destinosVisiveis.has(cardDestino.id)
+          ? { pipeline: cardDestino.pipeline.nome, etapa: cardDestino.etapa.nome }
+          : { pipeline: null, etapa: null })
+        : [];
+      const encaminhamentoPendente = etapaFinal && etapasComSaida.has(card.etapaId)
+        && card.status === "CONCLUIDO" && encaminhamentos.length === 0;
       return {
-        ...card,
+        ...cardSemVinculos,
         sla,
         origem: "real" as const,
         nolossLeadId: null as string | null,
@@ -575,7 +608,10 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
           ? calcularDiaCicloNovosLeads(card.createdAt, agora)
           : 1,
         podeAgirEtapa:
-          visibilidadePorEtapa.get(card.etapaId)?.podeAgir ?? false,
+          (visibilidadePorEtapa.get(card.etapaId)?.podeAgir ?? false) && encaminhamentos.length === 0
+            && !(etapaFinal && card.status === "CONCLUIDO"),
+        encaminhamentos,
+        encaminhamentoPendente,
         cardViewComposicao: composicaoCardKanban,
         cardViewValores: composicaoCardKanban
           ? construirValoresCardKanban({
@@ -861,6 +897,7 @@ export async function ObterCardBpm(cardId: string) {
         anexos: card.anexos.map((anexo) => ({ ...anexo, url: `/api/bpm/anexos/${anexo.id}` })),
         camposEtapa,
         formularioEtapa,
+        encaminhado: acessoCard.bloqueadoPorEncaminhamento === true,
         permissaoEtapa: {
           podeVer: true,
           podeAgir: acessoCard.podeAgirEtapa,
@@ -1283,6 +1320,7 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
       }
 
       let valoresValidados: Record<string, string> = {};
+      let valoresAnteriores: Record<string, string | null> = {};
       if (
         etapaEhLost(cardAtual.etapa.nome)
         || (camposValores && Object.keys(camposValores).length > 0)
@@ -1316,7 +1354,8 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
         // Uma referência de arquivo só é válida depois do upload autenticado
         // e do registro do anexo neste mesmo card e campo.
         const referenciasArquivo = camposAplicaveis.filter(
-          (campo) => campo.tipo === "arquivo" && valoresValidados[campo.id],
+          (campo) => (campo.tipo === "arquivo" || campo.tipo === "url_ou_arquivo"
+            && !valoresValidados[campo.id]?.startsWith("https://")) && valoresValidados[campo.id],
         );
         if (referenciasArquivo.length > 0) {
           const anexos = await tx.bpmCardAnexo.findMany({
@@ -1342,6 +1381,26 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
           if (!validacaoLostAtual.success) {
             throw new Error(`MOTIVO_LOST_INVALIDO:${validacaoLostAtual.error}`);
           }
+        }
+        if (Object.keys(valoresValidados).length > 0) {
+          valoresValidados = await prepararSalvamentoConfigurado({
+            card: cardAtual,
+            valoresSubmetidos: valoresValidados,
+            client: tx,
+          });
+          const ids = Object.keys(valoresValidados);
+          const [camposDefinidos, valoresPersistidos] = await Promise.all([
+            tx.bpmCampo.findMany({
+              where: { id: { in: ids } },
+              select: { id: true, escopo: true, fonteEntidade: true, fonteAtributo: true, entidadeGlobal: true },
+            }),
+            tx.bpmCardCampoValor.findMany({ where: { cardId, campoId: { in: ids } }, select: { campoId: true, valor: true } }),
+          ]);
+          const globais = await carregarValoresCanonicosCampos(cardId, camposDefinidos, tx);
+          valoresAnteriores = {
+            ...Object.fromEntries(valoresPersistidos.map((item) => [item.campoId, item.valor])),
+            ...globais,
+          };
         }
       }
 
@@ -1412,9 +1471,11 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
         causationId: historicoAtualizacao.id, idempotencyKey: `card-atualizado:${historicoAtualizacao.id}`,
       }, tx);
       for (const [campoId, valor] of Object.entries(valoresValidados)) {
+        if ((valoresAnteriores[campoId] ?? "") === valor) continue;
         await publicarEventoBpm({
           tipo: "CAMPO_ALTERADO", entidadeTipo: "CAMPO", entidadeId: campoId,
-          cardId, pipelineId: cardAtual.pipelineId, valorNovo: { campoId, valor },
+          cardId, pipelineId: cardAtual.pipelineId,
+          valorAnterior: { campoId, valor: valoresAnteriores[campoId] ?? null }, valorNovo: { campoId, valor },
           atorTipo: "USUARIO", atorUserId: userId, correlationId,
           causationId: historicoAtualizacao.id, idempotencyKey: `campo-alterado:${historicoAtualizacao.id}:${campoId}`,
         }, tx);
@@ -1471,6 +1532,10 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
           ? CONFIGURACAO_LOST_INVALIDA_MENSAGEM
         : error instanceof Error && error.message.startsWith("CAMPO_INVALIDO:")
           ? error.message.slice("CAMPO_INVALIDO:".length)
+        : error instanceof Error && error.message.startsWith("REQUISITOS_PENDENTES:")
+          ? error.message.slice("REQUISITOS_PENDENTES:".length)
+        : error instanceof Error && error.message.startsWith("CONFIGURACAO_INVALIDA:")
+          ? error.message.slice("CONFIGURACAO_INVALIDA:".length)
         : error instanceof Error && error.message.startsWith("CONTRATO_INVALIDO:")
           ? error.message.slice("CONTRATO_INVALIDO:".length)
         : error instanceof Error && error.message.startsWith("MOTIVO_LOST_INVALIDO:")
@@ -1576,10 +1641,6 @@ async function carregarCamposTransicao(params: {
   }
   camposDestino = camposDestino.filter((campo) => camposFormulario.get(params.etapaDestinoId)?.has(campo.id));
   const camposOrigem = camposOrigemPublicados.filter((campo) => campo.obrigatorio || campo.obrigatorioSaida);
-  camposDestino = camposDestino.map((campo) => ({
-    ...campo,
-    obrigatorio: campo.obrigatorio || Boolean(campo.obrigatorioEntrada),
-  }));
   const origemPorId = new Map(camposOrigem.map((campo) => [campo.id, campo]));
   const destinoPorId = new Map(camposDestino.map((campo) => [campo.id, campo]));
   const ids = new Set([...origemPorId.keys(), ...destinoPorId.keys()]);
@@ -1596,12 +1657,7 @@ async function carregarCamposTransicao(params: {
         : "DESTINO";
     return {
       ...campo,
-      obrigatorio: Boolean(
-        origem?.obrigatorio
-        || origem?.obrigatorioSaida
-        || destino?.obrigatorio
-        || destino?.obrigatorioEntrada
-      ),
+      obrigatorio: campoObrigatorioAoMover({ origem, destino }),
       valor: destino?.valor ?? origem?.valor ?? null,
       contexto,
       etapaAplicacaoNome: contexto === "ORIGEM"

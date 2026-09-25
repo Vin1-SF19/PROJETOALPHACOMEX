@@ -15,7 +15,7 @@ function nomeSeguroParaHeader(nome: string): string {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ anexoId: string }> },
 ) {
   const session = await auth();
@@ -37,6 +37,13 @@ export async function GET(
     );
   } catch {
     return new Response("Sem permissão", { status: 403 });
+  }
+
+  // Documento gerado pertence ao módulo autenticado de conferência; o token
+  // identifica a rota, mas a própria página ainda verifica acesso e ownership.
+  if (anexo.tipo === "application/x-painel-alpha-documento"
+    && /^\/PainelAlpha\/GeradorDocumentos\/conferencia\/[0-9a-f-]{36}$/.test(anexo.url)) {
+    return Response.redirect(new URL(anexo.url, request.url), 302);
   }
 
   const pathnamePrivado = extrairPathnamePrivadoAnexoBpm(anexo.url);

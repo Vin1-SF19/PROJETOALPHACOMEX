@@ -166,6 +166,15 @@ export function validarValoresCamposBpm(
       validados[campoId] = valor;
       continue;
     }
+    if (campo.tipo === "url_ou_arquivo") {
+      if (!/^c[a-z0-9]{24,}$/i.test(valor)) {
+        try {
+          if (new URL(valor).protocol !== "https:") throw new Error("Protocolo inválido");
+        } catch { return { success: false, error: `O campo "${campo.nome}" deve conter um link HTTPS ou arquivo vinculado.` }; }
+      }
+      validados[campoId] = valor;
+      continue;
+    }
     if (campo.tipo === "telefone") {
       const digitos = valor.replace(/\D/g, "");
       if (digitos.length < 10 || digitos.length > 15) return { success: false, error: `O campo "${campo.nome}" deve conter um telefone válido.` };

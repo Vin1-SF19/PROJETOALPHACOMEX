@@ -5,6 +5,24 @@ export type CampoObrigatorioBpm = {
 
 export type OrigemMovimentacaoBpm = "MANUAL" | "AUTOMACAO";
 
+type ObrigacaoCampoTransicao = {
+  obrigatorio?: boolean;
+  obrigatorioEntrada?: boolean;
+  obrigatorioSaida?: boolean;
+};
+
+/** Campo normal da etapa destino só passa a ser exigido depois que o card entra nela. */
+export function campoObrigatorioAoMover(params: {
+  origem?: ObrigacaoCampoTransicao;
+  destino?: ObrigacaoCampoTransicao;
+}): boolean {
+  return Boolean(
+    params.origem?.obrigatorio
+    || params.origem?.obrigatorioSaida
+    || params.destino?.obrigatorioEntrada,
+  );
+}
+
 export function deduplicarCamposObrigatorios(
   campos: CampoObrigatorioBpm[],
 ): CampoObrigatorioBpm[] {
@@ -19,4 +37,3 @@ export function listarCamposObrigatoriosFaltantes(
     (campo) => !valores[campo.id]?.trim(),
   );
 }
-

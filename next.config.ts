@@ -9,7 +9,9 @@ const nextConfig = {
     NEXT_PUBLIC_PUSHER_KEY: process.env.NEXT_PUBLIC_PUSHER_KEY,
     NEXT_PUBLIC_PUSHER_CLUSTER: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
   },
-  transpilePackages: ["pusher-js", "@react-pdf/renderer"],
+  // Next ja externaliza @react-pdf/renderer no servidor. Transpila-lo embute o
+  // Yoga WASM no bundle e quebra renderToBuffer em producao (reading 'S').
+  transpilePackages: ["pusher-js"],
   serverExternalPackages: ["pdf-parse"],
   // pdf-parse carrega o worker do pdfjs-dist (embutido, node_modules aninhado)
   // via import() dinâmico com caminho variável — o file tracing do Next.js não

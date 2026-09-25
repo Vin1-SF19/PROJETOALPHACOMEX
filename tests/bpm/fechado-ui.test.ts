@@ -30,7 +30,7 @@ describe("CRM Fechado - representacao no board", () => {
   });
 
   it("preserva os estados de nunca acessado, drag, hover e comunicacao textual", () => {
-    expect(board).toContain("isDragging ? 0.4 : 1");
+    expect(board).toContain("isDragging ? 0.4 : encaminhado ? 0.58 : 1");
     expect(board).toContain("border-cyan-400/50 hover:border-cyan-400/70");
     expect(board).toContain('title="Nunca acessado"');
     expect(board).toContain("`${nomeEmpresa}. Status pós-fechamento: ${statusConfig.label}`");

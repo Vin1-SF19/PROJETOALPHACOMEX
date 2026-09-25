@@ -138,7 +138,28 @@ describe("GET /PainelAlpha/GeradorDocumentos/[id]/download", () => {
     expect(res.headers.get("Content-Type")).toBe("application/pdf");
     expect(res.headers.get("Content-Disposition")).toContain("inline");
     expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(res.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
 
+    vi.unstubAllGlobals();
+  });
+
+  it("recarregar a prévia não consome o limite de downloads", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "98765", role: "ADMIN" } });
+    mockFindUnique.mockResolvedValue({ id: "doc-revisado", criadoPorId: 98765, titulo: "Contrato", pdfUrl: "https://blob.example.com/revisao.pdf" });
+    const pdfBuffer = Buffer.from("%PDF-1.4 revisado");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => pdfBuffer.buffer.slice(pdfBuffer.byteOffset, pdfBuffer.byteOffset + pdfBuffer.byteLength),
+    }));
+
+    const params = { params: Promise.resolve({ templateId: "doc-revisado" }) };
+    for (let revisao = 0; revisao < 6; revisao += 1) {
+      expect((await GET(new Request(`http://localhost/api?disposition=inline&revision=${revisao}`), params)).status).toBe(200);
+    }
+    for (let tentativa = 0; tentativa < 5; tentativa += 1) {
+      expect((await GET(new Request("http://localhost/api"), params)).status).toBe(200);
+    }
+    expect((await GET(new Request("http://localhost/api"), params)).status).toBe(429);
     vi.unstubAllGlobals();
   });
 });

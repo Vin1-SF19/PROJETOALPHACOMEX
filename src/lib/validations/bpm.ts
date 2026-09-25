@@ -25,6 +25,7 @@ export const BPM_CAMPO_TIPO = [
   "telefone",
   "url",
   "arquivo",
+  "url_ou_arquivo",
   "relacionamento",
 ] as const;
 

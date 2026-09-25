@@ -49,7 +49,11 @@ export const gatilhoConfigSchema = z.object({
   }).strict().optional(),
 }).strict();
 
-const alterarCampoSchema = z.object({ campoId: z.string().cuid(), valor: z.union([z.string().max(20_000), z.number(), z.boolean(), z.null()]) }).strict();
+const alterarCampoSchema = z.object({
+  campoId: z.string().cuid(),
+  valor: z.union([z.string().max(20_000), z.number(), z.boolean(), z.null()]),
+  somenteSeVazio: z.boolean().default(false),
+}).strict();
 const moverCardSchema = z.object({
   etapaId: z.string().cuid(),
   validarRequisitos: z.boolean().default(true),

@@ -10,7 +10,8 @@ const notificarPipelineBpmMock = vi.hoisted(() => vi.fn());
 const prismaMock = vi.hoisted(() => ({
   bpmCard: { findUnique: vi.fn(), updateMany: vi.fn() },
   bpmCardFollowUpEstado: { upsert: vi.fn() },
-  bpmCardCampoValor: { upsert: vi.fn() },
+  bpmCardCampoValor: { upsert: vi.fn(), findMany: vi.fn() },
+  bpmCampo: { findMany: vi.fn() },
   bpmCardAnexo: { findMany: vi.fn() },
   bpmCardHistorico: { create: vi.fn() },
   bpmCardMembro: { updateMany: vi.fn(), upsert: vi.fn() },
@@ -21,6 +22,14 @@ vi.mock("../../auth", () => ({ auth: authMock }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
+vi.mock("@/lib/bpm/validacao-salvamento-configurado", () => ({
+  prepararSalvamentoConfigurado: vi.fn(async ({ valoresSubmetidos }) => valoresSubmetidos),
+}));
+vi.mock("@/lib/bpm/campos-configuraveis-server", () => ({
+  carregarValoresCanonicosCampos: vi.fn().mockResolvedValue({}),
+  salvarValoresGlobaisPersonalizadosCampos: vi.fn().mockResolvedValue(new Set()),
+}));
+vi.mock("@/lib/bpm/automacoes/eventos", () => ({ publicarEventoBpm: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/bpm/realtime-server", () => ({
   notificarPipelineBpm: notificarPipelineBpmMock,
 }));
@@ -87,6 +96,8 @@ describe("CRM - edição dos campos definidos da etapa", () => {
     prismaMock.bpmCard.findUnique.mockResolvedValue(cardNaEtapaAtual());
     prismaMock.bpmCard.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.bpmCardCampoValor.upsert.mockResolvedValue({});
+    prismaMock.bpmCardCampoValor.findMany.mockResolvedValue([]);
+    prismaMock.bpmCampo.findMany.mockResolvedValue([]);
     prismaMock.bpmCardAnexo.findMany.mockResolvedValue([{ id: "clw0000000000000anex", campoId: CAMPO_ID }]);
     prismaMock.bpmCardHistorico.create.mockResolvedValue({});
     notificarPipelineBpmMock.mockResolvedValue(undefined);

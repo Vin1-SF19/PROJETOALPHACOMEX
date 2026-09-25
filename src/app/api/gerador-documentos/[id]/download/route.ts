@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { get } from "@vercel/blob";
 import { auth } from "../../../../../../auth";
-import db from "@/lib/prisma";
+import { exigirAcessoModulo, exigirOwnershipDocumento } from "@/lib/gerador-documentos/ownership";
 
 /**
  * GET /api/gerador-documentos/[id]/download
@@ -24,16 +24,16 @@ export async function GET(
     return NextResponse.json({ success: false, error: "Não autenticado" }, { status: 401 });
   }
 
-  const documento = await db.documentoGerado.findUnique({
-    where: { id },
-    select: { id: true, titulo: true, pdfUrl: true, criadoPorId: true },
-  });
-  if (!documento) {
-    return NextResponse.json({ success: false, error: "Documento não encontrado" }, { status: 404 });
-  }
-
-  const isAdmin = (session.user as { role?: string }).role === "Admin" || (session.user as { role?: string }).role === "CEO";
-  if (!isAdmin && documento.criadoPorId !== Number((session.user as { id?: string }).id)) {
+  let documento;
+  try {
+    const userId = Number((session.user as { id?: string }).id);
+    const role = (session.user as { role?: string }).role ?? null;
+    const ctx = await exigirAcessoModulo(userId, role);
+    documento = await exigirOwnershipDocumento(id, ctx, "visualizar");
+  } catch (error) {
+    if (error instanceof Error && error.message === "Documento não encontrado") {
+      return NextResponse.json({ success: false, error: "Documento não encontrado" }, { status: 404 });
+    }
     return NextResponse.json({ success: false, error: "Não autorizado" }, { status: 403 });
   }
 

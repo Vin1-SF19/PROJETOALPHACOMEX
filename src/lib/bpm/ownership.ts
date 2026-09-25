@@ -1,7 +1,6 @@
 import db from "@/lib/prisma";
 
 import { isAdminRole, isSameRole } from "@/lib/roles";
-import { etapaEhBoasVindas, usuarioEhDiretoriaBpm } from "@/lib/bpm/boas-vindas";
 import {
   acaoBpmExigeSomenteVisualizacao,
   resolverVisibilidadeEtapa,
@@ -176,19 +175,6 @@ export async function exigirAcessoModuloBpm(
   if (!(await checarAcessoModuloBpm(userId, client))) throw new Error("Não autorizado");
 }
 
-/**
- * Diretoria do pipeline Operacional. Não use `isAdminRole` aqui: CEO/TI têm
- * privilégios administrativos no produto, mas não podem ver a triagem de
- * Boas-vindas, que é reservada à conta de diretoria (`Admin`).
- */
-export async function checarAcessoDiretoriaBpm(
-  userId: number,
-  client: ClienteAcessoBpm = db,
-): Promise<boolean> {
-  const acesso = await carregarUsuarioEPermissoesBpm(userId, client);
-  return Boolean(acesso && usuarioEhDiretoriaBpm(acesso.usuario.role));
-}
-
 export async function checarAcessoBpmPipeline(
   pipelineId: string,
   userId: number,
@@ -355,6 +341,7 @@ export interface AcessoBpmCard {
   role: string | null;
   perfilGlobal: string | null;
   podeAgirEtapa: boolean;
+  bloqueadoPorEncaminhamento?: boolean;
 }
 
 /**
@@ -379,13 +366,19 @@ export async function checarAcessoBpmCard(
     client.bpmCard.findUnique({
       where: { id: cardId },
       select: {
+        status: true,
         etapa: {
           select: {
             nome: true,
+            ehFinal: true,
             visibilidades: {
               select: { perfil: true, podeVer: true, podeAgir: true },
             },
           },
+        },
+        vinculosOrigem: {
+          where: { cardDestino: { pipeline: { ativo: true }, status: { not: "ARQUIVADO" } } },
+          select: { id: true }, take: 1,
         },
       },
     }),
@@ -393,11 +386,13 @@ export async function checarAcessoBpmCard(
   if (!acessoModulo || !card) {
     return { autorizado: false, isAdminGlobal: false, role: null, perfilGlobal: null, podeAgirEtapa: false };
   }
-  if (etapaEhBoasVindas(card.etapa.nome) && !usuarioEhDiretoriaBpm(acessoModulo.usuario.role)) {
-    return { autorizado: false, isAdminGlobal: false, role: null, perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false };
-  }
+  const bloqueadoPorEncaminhamento = card.etapa.ehFinal
+    && (card.status === "CONCLUIDO" || Boolean(card.vinculosOrigem?.length));
+  const apenasVisualizacao = acaoBpmExigeSomenteVisualizacao(acao);
   if (isAdminRole(acessoModulo.usuario.role)) {
-    return { autorizado: true, isAdminGlobal: true, role: "ADMINISTRADOR", perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: true };
+    return { autorizado: apenasVisualizacao || !bloqueadoPorEncaminhamento, isAdminGlobal: true,
+      role: "ADMINISTRADOR", perfilGlobal: acessoModulo.usuario.role,
+      podeAgirEtapa: !bloqueadoPorEncaminhamento, bloqueadoPorEncaminhamento };
   }
   if (!possuiPermissaoCrm(acessoModulo.permissoes)) {
     return { autorizado: false, isAdminGlobal: false, role: null, perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false };
@@ -407,11 +402,12 @@ export async function checarAcessoBpmCard(
     acessoModulo.usuario.role,
     card.etapa.visibilidades,
   );
-  const permitidoNaEtapa = acaoBpmExigeSomenteVisualizacao(acao)
+  const permitidoNaEtapa = apenasVisualizacao
     ? permissaoEtapa.podeVer
-    : permissaoEtapa.podeAgir;
+    : permissaoEtapa.podeAgir && !bloqueadoPorEncaminhamento;
   if (!permitidoNaEtapa) {
-    return { autorizado: false, isAdminGlobal: false, role: null, perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false };
+    return { autorizado: false, isAdminGlobal: false, role: null, perfilGlobal: acessoModulo.usuario.role,
+      podeAgirEtapa: false, bloqueadoPorEncaminhamento };
   }
 
   const membro = await client.bpmCardMembro.findUnique({
@@ -429,7 +425,8 @@ export async function checarAcessoBpmCard(
     isAdminGlobal: false,
     role: membro.role,
     perfilGlobal: acessoModulo.usuario.role,
-    podeAgirEtapa: permissaoEtapa.podeAgir,
+    podeAgirEtapa: permissaoEtapa.podeAgir && !bloqueadoPorEncaminhamento,
+    bloqueadoPorEncaminhamento,
   };
 }
 
@@ -449,7 +446,7 @@ export async function exigirAcessoBpmCard(
     client,
   );
   if (!acesso.autorizado) {
-    throw new Error("Não autorizado");
+    throw new Error(acesso.bloqueadoPorEncaminhamento ? "Card encaminhado; somente leitura." : "Não autorizado");
   }
   return acesso;
 }

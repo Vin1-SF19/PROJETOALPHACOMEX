@@ -3,13 +3,12 @@ import db from "@/lib/prisma";
 import { auth } from "../../../auth";
 import {
   checarAcessoConfigPipeline,
-  checarAcessoDiretoriaBpm,
   exigirAcessoBpmCard,
   exigirAcessoModuloBpm,
 } from "@/lib/bpm/ownership";
-import { NOME_ETAPA_BOAS_VINDAS } from "@/lib/bpm/boas-vindas";
 import { paraExibicaoTelefone } from "@/lib/validations/cs-nps";
 import { normalizarDadosEmpresaBpm, type ClienteEmpresaFonte } from "@/lib/bpm/dados-empresa";
+import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 
 const SELECT_SERVICO_CLIENTE = {
   servico: true,
@@ -253,9 +252,15 @@ export async function ObterPerfilEmpresaBpm(empresaId: number) {
     if (Number.isFinite(userId)) await exigirAcessoModuloBpm(userId);
     const admin = Number.isFinite(userId)
       && await checarAcessoConfigPipeline(userId, "visualizarPipeline");
-    const diretoria = Number.isFinite(userId)
-      && await checarAcessoDiretoriaBpm(userId);
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+    const [usuarioAtual, etapas] = await Promise.all([
+      db.usuarios.findUnique({ where: { id: userId }, select: { role: true } }),
+      db.bpmEtapa.findMany({ select: { id: true, visibilidades: {
+        select: { perfil: true, podeVer: true, podeAgir: true },
+      } } }),
+    ]);
+    const etapaIdsVisiveis = etapas.filter((etapa) =>
+      resolverVisibilidadeEtapa(usuarioAtual?.role, etapa.visibilidades).podeVer).map((etapa) => etapa.id);
 
     const empresa = await db.cliente.findUnique({
       where: { id: empresaId },
@@ -266,7 +271,7 @@ export async function ObterPerfilEmpresaBpm(empresaId: number) {
     const cards = await db.bpmCard.findMany({
       where: {
         empresaId,
-        ...(diretoria ? {} : { etapa: { nome: { not: NOME_ETAPA_BOAS_VINDAS } } }),
+        etapaId: { in: etapaIdsVisiveis },
         ...(admin ? {} : { membros: { some: { userId } } }),
       },
       select: {

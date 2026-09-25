@@ -116,7 +116,7 @@ export function AutomacaoCentralFormDialog({
     if (tipo === "CRIAR_TAREFA") return { titulo: "", tipo: "TAREFA", prioridade: "NORMAL", naoDuplicarPendenteTipo: false };
     if (tipo === "MOVER_CARD") return { etapaId: pipeline?.etapas[0]?.id ?? "", exigirProximoContatoVazio: false };
     if (tipo === "ATRIBUIR_RESPONSAVEL") return { responsavelId: catalogos.usuarios[0]?.id ?? 0 };
-    if (tipo === "ALTERAR_CAMPO") return { campoId: catalogoPipeline?.campos[0]?.id ?? "", valor: "" };
+    if (tipo === "ALTERAR_CAMPO") return { campoId: catalogoPipeline?.campos[0]?.id ?? "", valor: "", somenteSeVazio: false };
     if (tipo === "ENVIAR_EMAIL") return { para: "", assunto: "", corpo: "", cc: [] };
     if (tipo === "COMUNICACAO_EXISTENTE") return { canal: "EMAIL", mensagem: "", destinatario: "" };
     if (tipo === "HTTP" || tipo === "WEBHOOK") return { url: "https://", metodo: "POST", headers: {}, timeoutMs: 10_000 };
@@ -240,6 +240,13 @@ export function AutomacaoCentralFormDialog({
                   </Select>
                 </label>
                 <label className="text-xs text-slate-300">Título do contrato<Input className="mt-1" value={String(acaoAtual.parametros.titulo ?? "")} onChange={(event) => atualizarParametros({ titulo: event.target.value })} /></label>
+                <label className="text-xs text-slate-300">Contratada
+                  <Select value={String(acaoAtual.parametros.empresaContratadaId ?? "")} onValueChange={(valor) => atualizarParametros({ empresaContratadaId: valor })}>
+                    <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione a empresa contratada" /></SelectTrigger>
+                    <SelectContent>{catalogos.empresasContratadas.map((empresa) => <SelectItem key={empresa.id} value={empresa.id}>{empresa.razaoSocial}</SelectItem>)}</SelectContent>
+                  </Select>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-slate-300"><Switch checked={acaoAtual.parametros.permitirPendencias === true} onCheckedChange={(valor) => atualizarParametros({ permitirPendencias: valor })} />Criar em conferência quando houver dados pendentes</label>
                 {templates.length === 0 && <p className="text-xs text-amber-300 sm:col-span-2">Nenhum template ativo foi encontrado no Gerador de Documentos.</p>}
                 {template?.variaveis.map((variavel) => <label key={variavel.nome} className="text-xs text-slate-300">{variavel.label}{variavel.obrigatorio ? " *" : ""}<Input className="mt-1" placeholder={variavel.placeholder} value={String(variaveis[variavel.nome] ?? "")} onChange={(event) => atualizarParametros({ variaveis: { ...variaveis, [variavel.nome]: event.target.value } })} /></label>)}
               </div>;
@@ -261,6 +268,7 @@ export function AutomacaoCentralFormDialog({
             {acaoAtual?.tipo === "ALTERAR_CAMPO" && <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-xs text-slate-300">Campo do pipeline<Select value={String(acaoAtual.parametros.campoId ?? "")} onValueChange={(valor) => atualizarParametros({ campoId: valor })}><SelectTrigger className="mt-1"><SelectValue placeholder="Selecione o campo" /></SelectTrigger><SelectContent>{(catalogoPipeline?.campos ?? []).map((campo) => <SelectItem key={campo.id} value={campo.id}>{campo.nome}</SelectItem>)}</SelectContent></Select></label>
               <label className="text-xs text-slate-300">Novo valor<Input className="mt-1" value={String(acaoAtual.parametros.valor ?? "")} onChange={(event) => atualizarParametros({ valor: event.target.value })} /></label>
+              <label className="flex items-center gap-2 text-xs text-slate-300"><Switch checked={acaoAtual.parametros.somenteSeVazio === true} onCheckedChange={(valor) => atualizarParametros({ somenteSeVazio: valor })} />Preencher apenas se vazio</label>
             </div>}
 
             {acaoAtual?.tipo === "ATRIBUIR_RESPONSAVEL" && <label className="block text-xs text-slate-300">Novo responsável<Select value={String(acaoAtual.parametros.responsavelId ?? "")} onValueChange={(valor) => atualizarParametros({ responsavelId: Number(valor) })}><SelectTrigger className="mt-1"><SelectValue placeholder="Selecione um usuário" /></SelectTrigger><SelectContent>{catalogos.usuarios.map((usuario) => <SelectItem key={usuario.id} value={String(usuario.id)}>{usuario.nome}</SelectItem>)}</SelectContent></Select></label>}
