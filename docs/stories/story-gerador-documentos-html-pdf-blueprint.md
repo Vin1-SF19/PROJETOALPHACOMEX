@@ -379,6 +379,13 @@ O renderer preserva a estrutura reconhecível pelo HTML do Tika, mas não reprod
 - [x] Validar cláusulas, logo e geração de PDF em teste automatizado.
 - [x] Isolar o teste unitário de Notas do banco real para executar o gate `npm test` sem conexão externa.
 
+### Falha de renderização em produção (2026-09-25)
+
+- [x] Identificar nos logs a exceção do Yoga (`reading 'S'`) em geração e finalização.
+- [x] Remover `@react-pdf/renderer` de `transpilePackages` e isolar a prévia de PDF no cliente.
+- [x] Gerar o contrato inteiro em `next start` por rota temporária local: HTTP 200, `%PDF`, 98.275 bytes.
+- [x] Rodar lint, typecheck, testes e build após remover a rota temporária.
+
 ### File List
 
 - `src/lib/gerador-documentos/docx-style.ts`
@@ -396,6 +403,8 @@ O renderer preserva a estrutura reconhecível pelo HTML do Tika, mas não reprod
 - `public/fonts/gerador-documentos/P052-Italic.otf`
 - `public/fonts/gerador-documentos/LICENSE-URW.txt`
 - `next.config.ts`
+- `src/app/PdfPreview/page.tsx`
+- `src/components/PdfPreviewClient.tsx`
 - `tests/gerador-documentos/contrato-padrao.test.ts`
 - `tests/gerador-documentos/ownership.test.ts`
 - `tests/notas/acesso-e-lixeira.test.ts`
