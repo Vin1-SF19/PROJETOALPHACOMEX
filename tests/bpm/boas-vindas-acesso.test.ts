@@ -3,7 +3,12 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { checarAcessoBpmCard } from "@/lib/bpm/ownership";
-import { etapaEhBoasVindas } from "@/lib/bpm/boas-vindas";
+import {
+  etapaEhBoasVindas,
+  pipelineEhOperacional,
+  usuarioPodeVincularPessoaBoasVindasOperacional,
+  vinculoPessoaBoasVindasOperacionalRestrito,
+} from "@/lib/bpm/boas-vindas";
 
 function cliente(params: { role: string; membro?: boolean; podeVer?: boolean }) {
   return {
@@ -22,6 +27,16 @@ describe("Boas-vindas — permissões configuradas", () => {
   it("mantém a identificação da etapa para o alerta visual", () => {
     expect(etapaEhBoasVindas(" BOAS-VINDAS ")).toBe(true);
     expect(etapaEhBoasVindas("Em análise")).toBe(false);
+  });
+
+  it("restringe o vínculo de pessoas à diretoria na Boas-vindas do Operacional", () => {
+    expect(pipelineEhOperacional(" operacional ")).toBe(true);
+    expect(vinculoPessoaBoasVindasOperacionalRestrito("Operacional", "BOAS-VINDAS")).toBe(true);
+    expect(usuarioPodeVincularPessoaBoasVindasOperacional("Admin")).toBe(true);
+    expect(usuarioPodeVincularPessoaBoasVindasOperacional("DIRETOR")).toBe(true);
+    expect(usuarioPodeVincularPessoaBoasVindasOperacional("TI")).toBe(false);
+    expect(usuarioPodeVincularPessoaBoasVindasOperacional("COMERCIAL")).toBe(false);
+    expect(vinculoPessoaBoasVindasOperacionalRestrito("Comercial", "Boas-vindas")).toBe(false);
   });
 
   it("permite à conta TI visualizar o card encaminhado conforme o acesso administrativo global", async () => {
