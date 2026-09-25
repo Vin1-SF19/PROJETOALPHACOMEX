@@ -95,7 +95,7 @@ function CardKanbanPreview({
         <SortableContext items={[cardPreview.id]} strategy={verticalListSortingStrategy}>
           <div className="pointer-events-none">
             <KanbanCard card={cardPreview} etapaNome={etapaNome} accent={accent}
-              novosLeads={etapaEhNovosLeads(etapaNome)} arrastoDesabilitado onAbrir={() => {}} />
+              novosLeads={etapaEhNovosLeads(etapaNome)} arrastoDesabilitado onAbrir={() => {}} onAgendarReuniao={() => {}} />
           </div>
         </SortableContext>
       </DndContext>

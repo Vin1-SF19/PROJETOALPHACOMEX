@@ -141,7 +141,8 @@ Ready for Review — código da integração RADAR publicado e configuração da
 - `src/app/api/bpm/anexos/[anexoId]/preview/route.ts` — prévia autenticada do contrato vinculado ao card e PDF inline quando disponível.
 - `src/components/bpm/anexos/VisualizadorAnexoCard.tsx` — modal de contrato, PDF, imagem e texto, com fallback para outros arquivos.
 - `src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx`, `src/app/PainelAlpha/AlphaCRM/CampoBpmInput.tsx` — abertura do modal na lista de anexos e nos campos de arquivo do card.
-- `tests/bpm/anexo-preview-route.test.ts`, `tests/bpm/arquivo-persistencia-react.test.ts`, `tests/bpm/authorization-actions.test.ts` — autorização da prévia, vínculo e abertura pelo campo.
+- `tests/bpm/anexo-preview-route.test.ts`, `tests/bpm/visualizador-anexo-card.test.ts`, `tests/bpm/arquivo-persistencia-react.test.ts`, `tests/bpm/authorization-actions.test.ts`, `tests/bpm/cpf-pendencias-react.test.ts` — autorização da prévia, vínculo, modal e abertura pelo campo.
+- `tests/bpm/relacionamento-ui.test.ts` — atualização da expectativa para o tipo `lista_email` já disponível na criação de campo.
 - `src/app/PainelAlpha/GeradorDocumentos/[templateId]/download/route.ts` e `src/app/api/gerador-documentos/[id]/download/route.ts` — leitura do PDF sob a mesma autorização de documento vinculado.
 - `scripts/financeiro-contrato-radar-config.mts` — plano e aplicação protegida dos três campos na Solicitação e da automação RADAR.
 - `tests/gerador-documentos/contrato-padrao-contratada.test.ts` — qualificação da empresa e preservação do modelo fonte.

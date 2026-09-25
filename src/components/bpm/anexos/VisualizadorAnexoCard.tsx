@@ -13,33 +13,31 @@ export function VisualizadorAnexoCard({ anexo, onClose }: {
   anexo: AnexoParaVisualizar | null;
   onClose: () => void;
 }) {
-  const [contrato, setContrato] = useState<ContratoPreview | null>(null);
-  const [carregando, setCarregando] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
-  const [verPdf, setVerPdf] = useState(false);
+  const [resultado, setResultado] = useState<{ id: string; contrato: ContratoPreview | null; erro: string | null } | null>(null);
+  const [visualizacao, setVisualizacao] = useState<{ id: string; pdf: boolean } | null>(null);
+  const anexoId = anexo?.id;
   const gerado = anexo?.tipo === "application/x-painel-alpha-documento";
   const arquivoUrl = anexo ? `/api/bpm/anexos/${encodeURIComponent(anexo.id)}` : "";
   const previewUrl = anexo ? `${arquivoUrl}/preview` : "";
+  const contrato = resultado && resultado.id === anexoId ? resultado.contrato : null;
+  const erro = resultado && resultado.id === anexoId ? resultado.erro : null;
+  const carregando = Boolean(gerado && anexoId && resultado?.id !== anexoId);
+  const verPdf = Boolean(visualizacao && visualizacao.id === anexoId && visualizacao.pdf);
 
   useEffect(() => {
-    if (!anexo || !gerado) return;
+    if (!anexoId || !gerado) return;
     const controller = new AbortController();
-    setContrato(null);
-    setErro(null);
-    setVerPdf(false);
-    setCarregando(true);
     fetch(`${previewUrl}`, { signal: controller.signal })
       .then(async (resposta) => {
         if (!resposta.ok) throw new Error("Não foi possível visualizar este contrato.");
         return resposta.json() as Promise<ContratoPreview>;
       })
-      .then(setContrato)
+      .then((data) => { if (!controller.signal.aborted) setResultado({ id: anexoId, contrato: data, erro: null }); })
       .catch((falha: unknown) => {
-        if (!controller.signal.aborted) setErro(falha instanceof Error ? falha.message : "Falha ao carregar contrato.");
-      })
-      .finally(() => { if (!controller.signal.aborted) setCarregando(false); });
+        if (!controller.signal.aborted) setResultado({ id: anexoId, contrato: null, erro: falha instanceof Error ? falha.message : "Falha ao carregar contrato." });
+      });
     return () => controller.abort();
-  }, [anexo, gerado, previewUrl]);
+  }, [anexoId, gerado, previewUrl]);
 
   const tipo = anexo?.tipo ?? "";
   const imagem = tipo.startsWith("image/");
@@ -69,7 +67,7 @@ export function VisualizadorAnexoCard({ anexo, onClose }: {
               <div className="flex shrink-0 flex-wrap items-center gap-2 text-xs text-slate-400">
                 <span>{contrato.status === "FINALIZADO" ? "Finalizado" : "Em conferência"}</span>
                 {contrato.pdfDisponivel && (
-                  <button type="button" onClick={() => setVerPdf((atual) => !atual)} className="rounded-md border border-white/15 px-2.5 py-1 text-sky-200 hover:bg-white/10">
+                  <button type="button" onClick={() => setVisualizacao({ id: anexoId!, pdf: !verPdf })} className="rounded-md border border-white/15 px-2.5 py-1 text-sky-200 hover:bg-white/10">
                     {verPdf ? "Ver texto" : "Ver PDF"}
                   </button>
                 )}

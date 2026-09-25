@@ -87,3 +87,31 @@ Adicionar ao formulário existente de **Agendar Reunião** um e-mail obrigatóri
 - `.bibble/memory/integration-points.md`
 - `.bibble/memory/journal.md`
 - `docs/stories/story-rm-2026-13ca69-email-agendar-reuniao.md`
+
+## Correção do atalho no Kanban — 2026-09-25
+
+Relato: no pipeline Revisão de Radar, o widget **Agendar pelo Google Meet** aparecia em **Reunião Agendada** e seu botão apenas abria o card, sem conduzir o usuário ao formulário.
+
+### Causa confirmada
+
+- A composição configurável do card tinha precedência sobre a etapa real, permitindo que `AGENDAMENTO_REUNIAO` promovesse o widget para a coluna errada.
+- O handler do botão chamava somente `onAbrir(card.id)`; não existia intenção de navegação/foco no formulário de agendamento.
+
+### Critérios e resultado
+
+- [x] O widget é exibido exclusivamente quando o card está na etapa **Agendar reunião**, independentemente de composição antiga em outra etapa.
+- [x] **Reunião Agendada** não renderiza o atalho de criação/reagendamento no Kanban.
+- [x] O clique abre o card na aba de formulário, rola até a seção e foca **Data e hora da reunião**.
+- [x] A abertura comum do card continua sem foco forçado.
+- [x] Propagação de clique e pointer continua bloqueada para não iniciar abertura duplicada/arrasto.
+- [x] Quatro suítes focadas aprovadas: 60 testes.
+
+### File list da correção
+
+- `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal.tsx`
+- `src/components/bpm/kanban/CardKanbanWorkspace.tsx`
+- `tests/bpm/card-campos-agendar-reuniao.test.ts`
+- `docs/stories/story-rm-2026-13ca69-email-agendar-reuniao.md`
+
+Sem alteração de banco, integração Google, autenticação ou regras de transição.

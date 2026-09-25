@@ -12,6 +12,10 @@ import {
   exigirAcessoBpmCard,
   listarUsuariosVinculaveisBpm,
 } from "@/lib/bpm/ownership";
+import {
+  usuarioPodeVincularPessoaBoasVindasOperacional,
+  vinculoPessoaBoasVindasOperacionalRestrito,
+} from "@/lib/bpm/boas-vindas";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 
@@ -24,6 +28,25 @@ type MembroPersistido = {
 
 function ordenarIds(userIds: Iterable<number>): number[] {
   return [...userIds].sort((a, b) => a - b);
+}
+
+async function exigirPermissaoVinculoBoasVindasOperacional(
+  cardId: string,
+  role: string | null | undefined,
+  client: Pick<typeof db, "bpmCard"> = db,
+): Promise<void> {
+  const card = await client.bpmCard.findUnique({
+    where: { id: cardId },
+    select: { pipeline: { select: { nome: true } }, etapa: { select: { nome: true } } },
+  });
+  if (
+    card?.pipeline
+    && card.etapa
+    && vinculoPessoaBoasVindasOperacionalRestrito(card.pipeline.nome, card.etapa.nome)
+    && !usuarioPodeVincularPessoaBoasVindasOperacional(role)
+  ) {
+    throw new Error("VINCULO_BOAS_VINDAS_DIRETORIA");
+  }
 }
 
 /**
@@ -46,6 +69,7 @@ export async function ListarUsuariosVinculaveisCardBpm(dados: unknown) {
       session.user.role ?? null,
       "adicionarParticipantes",
     );
+    await exigirPermissaoVinculoBoasVindasOperacional(parsed.data.cardId, session.user.role);
     const candidatos = await listarUsuariosVinculaveisBpm();
     return { success: true, data: candidatos };
   } catch (error) {
@@ -95,6 +119,7 @@ export async function AtualizarMembrosCardBpm(dados: unknown) {
         "adicionarParticipantes",
         tx,
       );
+      await exigirPermissaoVinculoBoasVindasOperacional(cardId, session.user.role, tx);
       const cardAtual = await tx.bpmCard.findUnique({
         where: { id: cardId },
         select: { pipelineId: true, responsavelId: true, updatedAt: true },
@@ -214,6 +239,8 @@ export async function AtualizarMembrosCardBpm(dados: unknown) {
     console.error("[AtualizarMembrosCardBpm]", error);
     const mensagem = error instanceof Error && error.message === "Não autorizado"
       ? "Não autorizado"
+      : error instanceof Error && error.message === "VINCULO_BOAS_VINDAS_DIRETORIA"
+        ? "Somente Diretor ou Admin podem vincular pessoas aos cards de Boas-vindas."
       : error instanceof Error && error.message === "MEMBRO_CARD_INELEGIVEL"
         ? "Uma ou mais pessoas não estão ativas ou não possuem acesso ao CRM."
         : error instanceof Error && error.message === "CONFLITO_MEMBROS_CARD"

@@ -192,6 +192,7 @@ export function KanbanCard({
   novosLeads,
   arrastoDesabilitado,
   onAbrir,
+  onAgendarReuniao,
   index = 0,
   movendo = false,
 }: {
@@ -201,6 +202,7 @@ export function KanbanCard({
   novosLeads: boolean;
   arrastoDesabilitado: boolean;
   onAbrir: (cardId: string) => void;
+  onAgendarReuniao: (cardId: string) => void;
   index?: number;
   movendo?: boolean;
 }) {
@@ -212,12 +214,10 @@ export function KanbanCard({
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : encaminhado ? 0.58 : 1, animationDelay: `${index * 40}ms` };
 
   const ehLeadVirtual = card.origem === "noloss";
-  // RM-2026-E1E1F7: etapa com composição explícita decide pelo config
-  // (elemento nativo AGENDAMENTO_REUNIAO); sem config, preserva o
-  // comportamento legado por nome de etapa.
-  const agendarReuniao = card.cardViewComposicao !== undefined
-    ? card.cardViewComposicao.some((elemento) => elemento.kind === "NATIVE" && elemento.key === "AGENDAMENTO_REUNIAO")
-    : etapaEhAgendarReuniao(etapaNome);
+  // Agendamento é uma ação operacional exclusiva da etapa Agendar reunião.
+  // Uma composição antiga/configurada na etapa seguinte não pode promover o
+  // botão para Reunião Agendada, onde ficam apenas acompanhamento/transcrição.
+  const agendarReuniao = etapaEhAgendarReuniao(etapaNome);
   const naoAcessado = !card.primeiraVisualizacaoEm;
   const alertaBoasVindas = !ehLeadVirtual && etapaEhBoasVindas(etapaNome) && naoAcessado;
   const canalOrigem = card.campoValores?.find((campo) => campo.campo.nome === "Canal de origem")?.valor;
@@ -330,7 +330,7 @@ export function KanbanCard({
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
-                    onAbrir(card.id);
+                    onAgendarReuniao(card.id);
                   }}
                   onPointerDown={(event) => event.stopPropagation()}
                   className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
@@ -555,9 +555,9 @@ export function KanbanCard({
 }
 
 function KanbanColumn({
-  etapa, cor, cards, accent, arrastoDesabilitado, cardMovendoId, onAdd, onAbrirCard,
+  etapa, cor, cards, accent, arrastoDesabilitado, cardMovendoId, onAdd, onAbrirCard, onAgendarReuniao,
 }: {
-  etapa: EtapaBpm; cor: string; cards: CardBpm[]; accent: string; arrastoDesabilitado: boolean; cardMovendoId: string | null; onAdd?: () => void; onAbrirCard: (cardId: string) => void;
+  etapa: EtapaBpm; cor: string; cards: CardBpm[]; accent: string; arrastoDesabilitado: boolean; cardMovendoId: string | null; onAdd?: () => void; onAbrirCard: (cardId: string) => void; onAgendarReuniao: (cardId: string) => void;
 }) {
   const novosLeads = etapaEhNovosLeads(etapa.nome);
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id: etapa.id });
@@ -620,6 +620,7 @@ function KanbanColumn({
               novosLeads={novosLeads}
               arrastoDesabilitado={arrastoDesabilitado || !c.podeAgirEtapa}
               onAbrir={onAbrirCard}
+              onAgendarReuniao={onAgendarReuniao}
               index={i}
               movendo={cardMovendoId === c.id}
             />
@@ -631,9 +632,9 @@ function KanbanColumn({
 }
 
 function LazyPipelineColumn({
-  etapa, cor, cards, accent, arrastoDesabilitado, cardMovendoId, onAdd, onAbrirCard, atualizandoManual,
+  etapa, cor, cards, accent, arrastoDesabilitado, cardMovendoId, onAdd, onAbrirCard, onAgendarReuniao, atualizandoManual,
 }: {
-  etapa: EtapaBpm; cor: string; cards: CardBpm[]; accent: string; arrastoDesabilitado: boolean; cardMovendoId: string | null; onAdd?: () => void; onAbrirCard: (cardId: string) => void; atualizandoManual: boolean;
+  etapa: EtapaBpm; cor: string; cards: CardBpm[]; accent: string; arrastoDesabilitado: boolean; cardMovendoId: string | null; onAdd?: () => void; onAbrirCard: (cardId: string) => void; onAgendarReuniao: (cardId: string) => void; atualizandoManual: boolean;
 }) {
   const [ref, inView] = useLazyColumn(200);
   const showSkeleton = atualizandoManual || !inView;
@@ -653,6 +654,7 @@ function LazyPipelineColumn({
             arrastoDesabilitado={arrastoDesabilitado}
             onAdd={onAdd}
             onAbrirCard={onAbrirCard}
+            onAgendarReuniao={onAgendarReuniao}
           />
         </div>
       )}
@@ -691,6 +693,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
   const [cards, setCards] = useState<CardBpm[]>(cardsIniciais);
   const [responsavelFiltro, setResponsavelFiltro] = useState<string | null>(null);
   const [cardSelecionadoId, setCardSelecionadoId] = useState<string | null>(null);
+  const [cardAgendamentoId, setCardAgendamentoId] = useState<string | null>(null);
   const [nolossLeadAberto, setNolossLeadAberto] = useState<CardBpm | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -844,11 +847,19 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
       return;
     }
     cardSelecionadoIdRef.current = cardId;
+    setCardAgendamentoId(null);
     setCardSelecionadoId(cardId);
   }, [cards]);
 
+  const abrirAgendamento = useCallback((cardId: string) => {
+    cardSelecionadoIdRef.current = cardId;
+    setCardAgendamentoId(cardId);
+    setCardSelecionadoId(cardId);
+  }, []);
+
   const fecharCard = useCallback(() => {
     cardSelecionadoIdRef.current = null;
+    setCardAgendamentoId(null);
     setCardSelecionadoId(null);
   }, []);
 
@@ -1104,6 +1115,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
                 arrastoDesabilitado={movimentoPendente}
                 onAdd={etapa.id === etapaNovosLeads?.id ? () => setNovoCardAberto(true) : undefined}
                 onAbrirCard={abrirCard}
+                onAgendarReuniao={abrirAgendamento}
                 atualizandoManual={atualizandoManual}
               />
             ))}
@@ -1155,6 +1167,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
           }}
           onCardExcluido={removerCardLocal}
           onAbrirCard={abrirCard}
+          focarAgendamentoInicial={cardAgendamentoId === cardSelecionadoId}
         />
       )}
 

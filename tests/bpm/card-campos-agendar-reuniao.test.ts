@@ -22,9 +22,7 @@ describe("BPM - card restrito na etapa Agendar reunião", () => {
       board.indexOf("          ) : (\n            <>", board.indexOf("{agendarReuniao && !ehLeadVirtual ? (")),
     );
 
-    expect(board).toContain("const agendarReuniao = card.cardViewComposicao !== undefined");
-    expect(board).toContain('elemento.key === "AGENDAMENTO_REUNIAO"');
-    expect(board).toContain(": etapaEhAgendarReuniao(etapaNome)");
+    expect(board).toContain("const agendarReuniao = etapaEhAgendarReuniao(etapaNome)");
     expect(ramoAgendar).toContain("Data e hora");
     expect(ramoAgendar).toContain("card.dataReuniao");
     expect(ramoAgendar).toContain("Agendar pelo Google Meet");
@@ -38,8 +36,12 @@ describe("BPM - card restrito na etapa Agendar reunião", () => {
     expect(board).toContain("href={card.googleMeetLink}");
     expect(board).toContain('target="_blank"');
     expect(board).toContain("Abrir Google Meet");
-    expect(board).toContain("onAbrir(card.id)");
+    expect(board).toContain("onAgendarReuniao(card.id)");
     expect(board).toContain("onPointerDown={(event) => event.stopPropagation()}");
+    expect(board).toContain("focarAgendamentoInicial={cardAgendamentoId === cardSelecionadoId}");
+    const modal = ler("src/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal.tsx");
+    expect(modal).toContain("focarPainelReuniao()");
+    expect(modal).toContain("reuniao-data-hora-${cardId}");
   });
 
   it("preserva o agendamento real, loading e feedback de sucesso ou erro no modal", () => {

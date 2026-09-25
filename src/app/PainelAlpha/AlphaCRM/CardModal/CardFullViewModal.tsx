@@ -9,6 +9,10 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 import { isAdminRole } from "@/lib/roles";
+import {
+  usuarioPodeVincularPessoaBoasVindasOperacional,
+  vinculoPessoaBoasVindasOperacionalRestrito,
+} from "@/lib/bpm/boas-vindas";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { ObterPipelineBpm } from "@/actions/bpm/Pipelines";
 import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
@@ -50,9 +54,10 @@ interface Props {
   onCardExcluido?: (cardId: string) => void;
   onAbrirCard: (cardId: string) => void;
   abrirChecklistInicial?: boolean;
+  focarAgendamentoInicial?: boolean;
 }
 
-function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, currentUserId, currentUserRole, onClose, onAtualizado, onCardExcluido, onAbrirCard, abrirChecklistInicial = false }: Props) {
+function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, currentUserId, currentUserRole, onClose, onAtualizado, onCardExcluido, onAbrirCard, abrirChecklistInicial = false, focarAgendamentoInicial = false }: Props) {
   const { flushSaves, flushScheduled, getPendingFields, subscribeConfirmation } = useCardSave();
   const fechandoRef = useRef(false);
   const [fechando, setFechando] = useState(false);
@@ -68,6 +73,7 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
   const [estadoFollowUpPorCard, setEstadoFollowUpPorCard] = useState<Record<string, EstadoFollowUpModal>>({});
   const acessoRevogadoRef = useRef(false);
   const checklistInicialAbertoRef = useRef<string | null>(null);
+  const agendamentoInicialFocadoRef = useRef<string | null>(null);
   const dadosEmpresaDrawer = useDadosEmpresaDrawer(cardId);
   const fecharPorAcessoRevogado = useCallback(() => {
     if (acessoRevogadoRef.current) return;
@@ -128,6 +134,16 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
   }, [abrirChecklistInicial, card?.id, cardId]);
 
   useEffect(() => {
+    if (!focarAgendamentoInicial || card?.id !== cardId || agendamentoInicialFocadoRef.current === cardId) return;
+    agendamentoInicialFocadoRef.current = cardId;
+    const timeout = window.setTimeout(() => {
+      focarPainelReuniao();
+      document.getElementById(`reuniao-data-hora-${cardId}`)?.focus({ preventScroll: true });
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [card?.id, cardId, focarAgendamentoInicial, focarPainelReuniao]);
+
+  useEffect(() => {
     if (realtimeRevision === 0) return;
     let cancelado = false;
     Promise.all([ObterCardBpm(cardId), ListarInteracoesCardBpm(cardId)]).then(([cardRes, interacoesRes]) => {
@@ -163,9 +179,10 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
   const podeMoverEtapa = podeTrabalharNoCard;
   const podeEditar = podeTrabalharNoCard;
   const podeTrabalharTarefas = podeTrabalharNoCard;
-  const podeGerenciarMembros = !card?.encaminhado && (isAdminRole(currentUserRole)
-    || meuVinculo?.role === "RESPONSAVEL"
-    || meuVinculo?.role === "ADMINISTRADOR");
+  const vinculoBoasVindasRestrito = Boolean(card && vinculoPessoaBoasVindasOperacionalRestrito(card.pipeline.nome, card.etapa.nome));
+  const podeGerenciarMembros = !card?.encaminhado && (vinculoBoasVindasRestrito
+    ? usuarioPodeVincularPessoaBoasVindasOperacional(currentUserRole)
+    : isAdminRole(currentUserRole) || meuVinculo?.role === "RESPONSAVEL" || meuVinculo?.role === "ADMINISTRADOR");
   const etapaAtual = card ? etapas.find((e) => e.id === card.etapa.id) ?? null : null;
 
   const transicoesDaEtapaAtual = card?.etapa.transicoesEtapaOrigem ?? [];
