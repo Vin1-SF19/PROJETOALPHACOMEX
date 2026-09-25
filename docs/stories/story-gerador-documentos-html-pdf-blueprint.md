@@ -1,5 +1,7 @@
 # Blueprint — Pipeline HTML + PDF (RM-2026-94CBF6, Fase 1)
 
+Status: Ready for Review
+
 > Agente: Nova (Scout) | Data: 2026-08-31
 > Artigo I da Constituição — blueprint obrigatório antes de implementação.
 
