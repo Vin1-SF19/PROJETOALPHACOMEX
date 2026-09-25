@@ -24,7 +24,7 @@ import {
   transitionOriginForRequester,
   type BpmTransitionRequester,
 } from "@/lib/bpm/ontology";
-import { exigirAcessoBpmCard, checarAcessoDiretoriaBpm } from "@/lib/bpm/ownership";
+import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { enfileirarAutomacoesMovimentoBpm } from "@/lib/bpm/automacoes/fila";
@@ -128,9 +128,6 @@ async function validarAutorizacao(
   const acesso = await exigirAcessoBpmCard(card.id, input.ator.userId, input.ator.userRole ?? null, "moverEtapa", tx);
   if (!resolverVisibilidadeEtapa(acesso.perfilGlobal, destino.visibilidades).podeAgir) {
     erro("UNAUTHORIZED_DESTINATION", `Seu perfil não pode agir na etapa "${destino.nome}".`);
-  }
-  if (destino.chave === BPM_STAGE_KEYS.BOAS_VINDAS && !(await checarAcessoDiretoriaBpm(input.ator.userId, tx))) {
-    erro("UNAUTHORIZED_DESTINATION", "Somente a diretoria pode atribuir processos na etapa Boas-vindas.");
   }
   if (acesso.isAdminGlobal || acesso.role === "ADMINISTRADOR") return "ADMIN";
   return acesso.role === "RESPONSAVEL" ? "RESPONSAVEL" : "MEMBRO";

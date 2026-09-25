@@ -71,20 +71,16 @@ describe("listarPendenciasBpm", () => {
     expect(prismaMock.bpmCard.findMany).not.toHaveBeenCalled();
   });
 
-  it.each(["sem vínculo", "etapa oculta", "Boas-vindas"])("não expõe dados: %s", async (caso) => {
+  it.each(["sem vínculo", "etapa oculta"])("não expõe dados: %s", async (caso) => {
     prismaMock.bpmCard.findMany.mockResolvedValue([CARD_BASE]);
     if (caso === "sem vínculo") prismaMock.bpmCardMembro.findUnique.mockResolvedValue(null);
     if (caso === "etapa oculta") prismaMock.bpmCard.findUnique.mockResolvedValue({ etapa: { nome: "Em tratativa", visibilidades: [{ perfil: "COMERCIAL", podeVer: false, podeAgir: false }] } });
-    if (caso === "Boas-vindas") {
-      prismaMock.usuarios.findUnique.mockResolvedValue({ id: 1, role: "CEO", status: "ATIVO", permissoes: "crm" });
-      prismaMock.bpmCard.findUnique.mockResolvedValue({ etapa: { nome: "Boas-vindas", visibilidades: [] } });
-    }
     await expect(listarPendenciasBpm(1, true)).resolves.toEqual([]);
     expect(prismaMock.bpmTarefa.findMany).not.toHaveBeenCalled();
   });
 
-  it("permite à diretoria consultar Boas-vindas", async () => {
-    prismaMock.usuarios.findUnique.mockResolvedValue({ id: 1, role: "Admin", status: "ATIVO", permissoes: null });
+  it("permite à conta TI consultar Boas-vindas", async () => {
+    prismaMock.usuarios.findUnique.mockResolvedValue({ id: 1, role: "TI", status: "ATIVO", permissoes: null });
     prismaMock.bpmCard.findUnique.mockResolvedValue({ etapa: { nome: "Boas-vindas", visibilidades: [] } });
     prismaMock.bpmCard.findMany.mockResolvedValue([{ ...CARD_BASE, proximoContatoEm: new Date(0) }]);
     expect(await listarPendenciasBpm(1, true)).toHaveLength(1);

@@ -1,7 +1,6 @@
 import db from "@/lib/prisma";
 
 import { isAdminRole, isSameRole } from "@/lib/roles";
-import { etapaEhBoasVindas, usuarioEhDiretoriaBpm } from "@/lib/bpm/boas-vindas";
 import {
   acaoBpmExigeSomenteVisualizacao,
   resolverVisibilidadeEtapa,
@@ -174,19 +173,6 @@ export async function exigirAcessoModuloBpm(
   client: ClienteAcessoBpm = db,
 ): Promise<void> {
   if (!(await checarAcessoModuloBpm(userId, client))) throw new Error("Não autorizado");
-}
-
-/**
- * Diretoria do pipeline Operacional. Não use `isAdminRole` aqui: CEO/TI têm
- * privilégios administrativos no produto, mas não podem ver a triagem de
- * Boas-vindas, que é reservada à conta de diretoria (`Admin`).
- */
-export async function checarAcessoDiretoriaBpm(
-  userId: number,
-  client: ClienteAcessoBpm = db,
-): Promise<boolean> {
-  const acesso = await carregarUsuarioEPermissoesBpm(userId, client);
-  return Boolean(acesso && usuarioEhDiretoriaBpm(acesso.usuario.role));
 }
 
 export async function checarAcessoBpmPipeline(
@@ -399,9 +385,6 @@ export async function checarAcessoBpmCard(
   ]);
   if (!acessoModulo || !card) {
     return { autorizado: false, isAdminGlobal: false, role: null, perfilGlobal: null, podeAgirEtapa: false };
-  }
-  if (etapaEhBoasVindas(card.etapa.nome) && !usuarioEhDiretoriaBpm(acessoModulo.usuario.role)) {
-    return { autorizado: false, isAdminGlobal: false, role: null, perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false };
   }
   const bloqueadoPorEncaminhamento = card.etapa.ehFinal
     && (card.status === "CONCLUIDO" || Boolean(card.vinculosOrigem?.length));

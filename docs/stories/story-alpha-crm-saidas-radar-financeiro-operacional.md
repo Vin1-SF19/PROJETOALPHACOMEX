@@ -24,6 +24,7 @@ Ready for Manual Acceptance — código e configuração publicados; cadeia de d
 6. O bloqueio é aplicado também pelo servidor: ações diretas de salvar ou mover um card de origem já encaminhado não contornam a apresentação da interface. A visualização do card e de seu histórico continua disponível.
 7. A automação, o bloqueio e a tag respeitam as permissões existentes de cada pipeline e não expõem dados de um card de destino a quem não pode vê-lo. A ausência de destino válido ou uma falha de criação mantém a origem em estado diagnosticável, sem indicar falsamente que o encaminhamento foi concluído.
 8. A correção cobre o cenário que falhou no teste do usuário, incluindo a verificação de gatilho, versão publicada, execução/erro, evento de entrada na última etapa e destino configurado. Um teste integrado demonstra a sequência Radar → Financeiro → Operacional e o estado das duas origens.
+9. O card Operacional criado aparece em Boas-vindas para uma conta com acesso ao pipeline e à etapa conforme as permissões configuradas. O nome da etapa não impõe uma restrição adicional fixa a Admin; contas administrativas globais, incluindo TI, seguem a mesma regra das demais etapas.
 
 ## Escopo e decisões registradas
 
@@ -51,6 +52,7 @@ Ready for Manual Acceptance — código e configuração publicados; cadeia de d
 - `prisma/schema.prisma` contém `BpmCardVinculo` (`cardOrigemId`, `cardDestinoId`, par único). A necessidade de migration **não está estabelecida**; preferir os modelos existentes após diagnóstico.
 - Inventário Turso de 25/09/2026: o pipeline `comercial` é **Revisão de Radar** e sua etapa final `Fechado` já cria Financeiro e o pipeline `radar` antigo/inativo. O Financeiro `Concluídos` tem 1 card `CONCLUIDO`, evento `CARD_MOVIDO` em 17:44:46 UTC e **nenhuma** automação para Operacional. A consulta do board filtrava somente `ATIVO`, ocultando esse card. O Operacional tem etapa inicial `Boas-vindas` e nenhum card.
 - O plano somente leitura `scripts/bpm-handoff-config.mts` cria a automação na saída final Financeiro → entrada Operacional, arquiva o nó antigo do Radar inativo na automação Comercial e delimita o reprocessamento ao único evento de conclusão do card testado. O código preserva vínculos quando o destino ativo já existe e ignora destino de pipeline inativo.
+- Reteste do cadastro informado pelo usuário: empresa `501` possui cadeia Comercial `cmufv344o00000bgmb9vp1h4p` → Financeiro `cmugxle5800060agmhtfqtnjg` → Operacional `cmuhb951900040agmeci9evnw`. O destino está ATIVO em Boas-vindas, mas era ocultado da conta TI responsável pela origem por um bloqueio fixo de nome/role no servidor; o card Operacional foi atribuído ao Admin. A correção remove o bloqueio fixo e usa as permissões e vínculos existentes.
 - Vault: backup completo dedicado `database-backups/pre-change/painelalpha_turso_pre_change_financeiro_operacional_2026-09-25T18-18-55-914Z.db`, restauração verificada (331 tabelas, 171.450 linhas, FK=0, integridade OK), SHA-256 `ddd7da3b6410e0364ca33834657f404b09e6104c7a4d0bb4693888367c3a9dfd`. Snapshot seletivo `database-backups/pre-change/financeiro-operacional-config-before-2026-09-25T18-19-11-189Z.json`. Nenhuma mutação aplicada.
 - `docs/stories/story-financeiro-novo-contrato.md` define a entrada vinculada Radar → Financeiro. `docs/stories/story-rm-2026-fe6c53-desenho-pipelines.md` define `BpmTransicaoEtapa` como autoridade única e saídas explícitas.
 - O arquivo `accumulated-context.md` e `.aiox/gotchas.json` não foram encontrados no checkout durante o draft; o contexto cruzado foi obtido das stories e do diagnóstico acima.
@@ -79,6 +81,8 @@ Ready for Manual Acceptance — código e configuração publicados; cadeia de d
 - [x] Configuração publicada após checkpoint Vault e autorização específica do usuário.
 - [x] Smoke de dados do fluxo existente: card Comercial concluído ligado ao Financeiro concluído, ligado ao novo card Operacional ativo em Boas-vindas; execução Financeiro → Operacional com SUCESSO, sem duplicidade.
 - [ ] Conferência visual autenticada dos dois boards pelo usuário.
+- [x] Reteste técnico somente leitura com os dados de produção: a conta TI `42` tem acesso ao pipeline, pode visualizar a etapa configurada e o card `cmuhb951900040agmeci9evnw` é retornado pela consulta do board com o código corrigido.
+- [ ] Reteste visual autenticado de Boas-vindas pela conta TI após publicar a correção de visibilidade.
 
 ## Dev Agent Record
 
@@ -91,6 +95,9 @@ Ready for Manual Acceptance — código e configuração publicados; cadeia de d
 - `scripts/bpm-handoff-config.mts` — plano somente leitura e publicação protegida da configuração.
 - `tests/bpm/ownership-security.test.ts`, `tests/bpm/board-polling-react.test.ts` — bloqueio e tag no board.
 - `tests/bpm/fechado-ui.test.ts` — expectativa do estilo de arrasto atualizada para cards encaminhados.
+- `src/actions/bpm/Dashboard.ts`, `src/actions/bpm/Empresas.ts`, `src/actions/bpm/Tarefas.ts`, `src/actions/bpm/Pendencias.ts` — remoção da restrição fixa de Boas-vindas nas consultas agregadas; perfil de empresa e tarefas agora também filtram pela visibilidade configurada da etapa.
+- `src/lib/bpm/transicao-command.ts`, `src/lib/bpm/boas-vindas.ts`, `src/lib/timeline/aggregator.ts` — permissões configuradas como fonte de autorização; nome da etapa preservado somente para alerta visual.
+- `tests/bpm/boas-vindas-acesso.test.ts`, `tests/bpm/excluir-card-action.test.ts`, `tests/bpm/pendencias-motor.test.ts`, `tests/bpm/tarefas-checklist-actions.test.ts` — expectativas de autorização e consultas atualizadas.
 
 ### Change Log
 
@@ -99,7 +106,10 @@ Ready for Manual Acceptance — código e configuração publicados; cadeia de d
 | 2026-09-25 | 0.1 | Draft do encaminhamento e persistência visual das saídas | River (@sm) |
 | 2026-09-25 | 0.2 | Diagnóstico real, plano Vault e implementação local de bloqueio e localização | Codex |
 | 2026-09-25 | 0.3 | Deploy d7b4b600 e publicação protegida no Turso; reprocessamento do evento concluído com sucesso | Codex |
+| 2026-09-25 | 0.4 | Diagnóstico do card ABIAN: destino criado, mas oculto da conta TI pelo bloqueio fixo de Boas-vindas; correção local da visibilidade; 512 arquivos e 3.832 testes, lint, typecheck e build aprovados | Codex |
 
 ## QA Results
 
 Lint e typecheck passaram; `npm test` passou com 511 arquivos, 3.830 testes aprovados, 4 ignorados e 1 marcado TODO em uma cópia local do backup; build de produção passou. Vercel confirmou deploy do commit `d7b4b600cec2e0cec2f0fd9ecf4394d46adf31de`. A automação Financeiro → Operacional `cmuhb4zog0001oiihhrpkzy2g` executou o evento `cmuh93isd000f0agmn0sjbe1r` com SUCESSO e criou o card `cmuhb951900040agmeci9evnw` em Boas-vindas, vinculado ao Financeiro `cmugxle5800060agmhtfqtnjg`. Um único card ativo da empresa foi encontrado no Operacional. A automação Comercial v3 tem apenas o destino Financeiro.
+
+Na correção de visibilidade do cadastro ABIAN, lint terminou com 0 erros, typecheck e build passaram; `npm test` passou com 512 arquivos e 3.832 testes. Com o código corrigido e leitura do banco de produção, a conta TI `42` tem acesso ao pipeline Operacional, a Boas-vindas e ao card criado. Publicação e conferência visual autenticada pendentes.

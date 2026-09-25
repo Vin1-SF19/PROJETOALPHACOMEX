@@ -3,7 +3,6 @@ import { extractCrmEvents } from './extractors/crm';
 import { extractCsNpsEvents } from './extractors/cs-nps';
 import { extractComissoesEvents } from './extractors/comissoes';
 import { isAdminRole } from '@/lib/roles';
-import { usuarioEhDiretoriaBpm } from '@/lib/bpm/boas-vindas';
 
 interface ModulePermission {
   module: string;
@@ -34,7 +33,7 @@ export async function aggregateClientEvents(
   role: string | null | undefined,
   userId: number,
 ): Promise<TimelineResponse> {
-  const isAdminOrDiretoria = isAdminRole(role) || usuarioEhDiretoriaBpm(role);
+  const isAdminOrDiretoria = isAdminRole(role);
 
   const extractors: Record<string, () => Promise<TimelineEvent[]>> = {
     crm: () => extractCrmEvents(clientId, { userId, isAdminOrDiretoria }),

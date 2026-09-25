@@ -68,12 +68,11 @@ describe("arquivamento: action e guard reais", () => {
   expect(await ExcluirCardBpm("  ")).toMatchObject({ success: false, error: "Card inválido" });
   expect(mocks.db.$transaction).not.toHaveBeenCalled();
  });
- it.each(["PARTICIPANTE", "sem vínculo", "revogado", "oculta", "Boas-vindas"])("nega %s sem escrita", async (caso) => {
+ it.each(["PARTICIPANTE", "sem vínculo", "revogado", "oculta"])("nega %s sem escrita", async (caso) => {
   if (caso === "PARTICIPANTE") mocks.db.bpmCardMembro.findUnique.mockResolvedValue({ role: caso });
   if (caso === "sem vínculo") mocks.db.bpmCardMembro.findUnique.mockResolvedValue(null);
   if (caso === "revogado") mocks.db.usuarioPermissaoOverride.findMany.mockResolvedValue([{ modulo: "crm", acao: "REMOVE" }]);
   if (caso === "oculta") mocks.db.bpmCard.findUnique.mockResolvedValue({ etapa: { nome: "Etapa", visibilidades: [{ perfil: "COMERCIAL", podeVer: false, podeAgir: false }] } });
-  if (caso === "Boas-vindas") mocks.db.bpmCard.findUnique.mockResolvedValue({ etapa: { nome: "Boas-vindas", visibilidades: [] } });
   expect(await ExcluirCardBpm("card")).toMatchObject({ success: false });
   expect(mocks.db.bpmCard.update).not.toHaveBeenCalled();
  });

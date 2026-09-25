@@ -4,10 +4,8 @@ import { auth } from "../../../auth";
 import {
   checarAcessoBpmPipeline,
   checarAcessoConfigPipeline,
-  checarAcessoDiretoriaBpm,
   exigirAcessoModuloBpm,
 } from "@/lib/bpm/ownership";
-import { NOME_ETAPA_BOAS_VINDAS } from "@/lib/bpm/boas-vindas";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 
 /**
@@ -22,7 +20,6 @@ export async function ObterDashboardBpm() {
     const userId = Number(session.user.id);
     await exigirAcessoModuloBpm(userId);
     const admin = await checarAcessoConfigPipeline(userId, "visualizarPipeline");
-    const diretoria = await checarAcessoDiretoriaBpm(userId);
     const [usuarioAtual, etapas] = await Promise.all([
       db.usuarios.findUnique({ where: { id: userId }, select: { role: true } }),
       db.bpmEtapa.findMany({
@@ -42,13 +39,7 @@ export async function ObterDashboardBpm() {
       ).podeVer)
       .map((etapa) => etapa.id);
     const filtroEtapasVisiveis = { etapaId: { in: etapaIdsVisiveis } };
-    const filtroCardBoasVindas = diretoria
-      ? {}
-      : { etapa: { nome: { not: NOME_ETAPA_BOAS_VINDAS } } };
-    const filtroCardVisivel = {
-      ...filtroCardBoasVindas,
-      ...filtroEtapasVisiveis,
-    };
+    const filtroCardVisivel = filtroEtapasVisiveis;
 
     const [pipelines, contagemPorPipelineStatus] = await Promise.all([
       db.bpmPipeline.findMany({

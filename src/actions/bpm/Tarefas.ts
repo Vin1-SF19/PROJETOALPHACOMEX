@@ -6,19 +6,18 @@ import { auth } from "../../../auth";
 import { criarTarefaSchema, concluirTarefaSchema, criarTarefaPresetSchema } from "@/lib/validations/bpm";
 import {
   checarAcessoConfigPipeline,
-  checarAcessoDiretoriaBpm,
   exigirAcessoBpmCard,
   exigirAcessoBpmPipeline,
   exigirAcessoConfigPipeline,
   exigirAcessoModuloBpm,
 } from "@/lib/bpm/ownership";
-import { NOME_ETAPA_BOAS_VINDAS } from "@/lib/bpm/boas-vindas";
 import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import { tipoTarefaEhValido } from "@/lib/bpm/tarefas-tipo";
 import { enfileirarAutomacoesCriacaoTarefaBpm } from "@/lib/bpm/automacoes/fila";
 import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { criarSlaInstancia } from "@/lib/bpm/sla";
+import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import {
   MENSAGEM_TAREFA_CHECKLIST_PENDENTE,
   reconciliarTarefaChecklist,
@@ -348,14 +347,20 @@ export async function ListarTarefasGlobaisBpm(filtros?: { status?: string; respo
     const userId = Number(session.user.id);
     await exigirAcessoModuloBpm(userId);
     const admin = await checarAcessoConfigPipeline(userId, "visualizarPipeline");
-    const diretoria = await checarAcessoDiretoriaBpm(userId);
+    const [usuarioAtual, etapas] = await Promise.all([
+      db.usuarios.findUnique({ where: { id: userId }, select: { role: true } }),
+      db.bpmEtapa.findMany({ select: { id: true, visibilidades: {
+        select: { perfil: true, podeVer: true, podeAgir: true },
+      } } }),
+    ]);
+    const etapaIdsVisiveis = etapas.filter((etapa) =>
+      resolverVisibilidadeEtapa(usuarioAtual?.role, etapa.visibilidades).podeVer).map((etapa) => etapa.id);
 
     let cardIdsPermitidos: string[] | undefined;
     if (!admin) {
       const membros = await db.bpmCardMembro.findMany({
         where: {
           userId,
-          ...(diretoria ? {} : { card: { etapa: { nome: { not: NOME_ETAPA_BOAS_VINDAS } } } }),
         },
         select: { cardId: true },
       });
@@ -366,7 +371,7 @@ export async function ListarTarefasGlobaisBpm(filtros?: { status?: string; respo
       where: {
         ...(filtros?.status ? { status: filtros.status } : {}),
         ...(filtros?.responsavelId ? { responsavelId: filtros.responsavelId } : {}),
-        ...(diretoria ? {} : { card: { etapa: { nome: { not: NOME_ETAPA_BOAS_VINDAS } } } }),
+        card: { etapaId: { in: etapaIdsVisiveis } },
         ...(cardIdsPermitidos ? { cardId: { in: cardIdsPermitidos } } : {}),
       },
       select: {

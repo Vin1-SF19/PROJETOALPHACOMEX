@@ -16,7 +16,6 @@ import {
   exigirAcessoBpmCard,
   exigirAcessoBpmPipeline,
   checarAcessoConfigPipeline,
-  checarAcessoDiretoriaBpm,
   isAdminRole,
   usuarioElegivelResponsavelBpm,
 } from "@/lib/bpm/ownership";
@@ -51,9 +50,6 @@ import {
   intervaloDiaCivilSaoPaulo,
   META_LIGACOES_NOVOS_LEADS,
 } from "@/lib/bpm/novos-leads";
-import {
-  NOME_ETAPA_BOAS_VINDAS,
-} from "@/lib/bpm/boas-vindas";
 import {
   obterErroDataReuniaoParaMovimento,
 } from "@/lib/bpm/agendar-reuniao";
@@ -243,7 +239,6 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
       && await checarAcessoConfigPipeline(userId, "visualizarPipeline");
     if (!session?.user?.id) return { success: false, error: "Não autorizado", data: [] };
     await exigirAcessoBpmPipeline(pipelineId, Number(session.user.id));
-    const diretoria = await checarAcessoDiretoriaBpm(userId);
     const [pipelineInfo, usuarioAtual] = await Promise.all([
       db.bpmPipeline.findUnique({
         where: { id: pipelineId },
@@ -330,7 +325,6 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
         pipelineId,
         OR: [{ status: "ATIVO" }, { status: "CONCLUIDO", etapa: { ehFinal: true } }],
         etapaId: { in: etapasVisiveis },
-        ...(diretoria ? {} : { etapa: { nome: { not: NOME_ETAPA_BOAS_VINDAS } } }),
         ...(admin ? {} : { membros: { some: { userId } } }),
       },
       select: {

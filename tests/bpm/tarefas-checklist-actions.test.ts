@@ -26,7 +26,6 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/lib/bpm/ownership", () => ({
   exigirAcessoBpmCard: mocks.acesso,
   checarAcessoConfigPipeline: vi.fn(),
-  checarAcessoDiretoriaBpm: vi.fn(),
   exigirAcessoBpmPipeline: vi.fn(),
   exigirAcessoConfigPipeline: vi.fn(),
   exigirAcessoModuloBpm: vi.fn(),
