@@ -44,6 +44,7 @@ export const ACOES_HISTORICO_CATALOGADAS = [
   "CHECKLIST_MATERIALIZADO",
   "CHECKLIST_STATUS_ALTERADO",
   "COMUNICACAO_PENDENTE",
+  "CONTRATO_ENVIADO_ASSINATURA",
   "DISTRIBUICAO_AUTOMATICA",
   "FOLLOW_UP_ATUALIZADO",
   "FOLLOW_UP_CONCLUIDO",
@@ -315,6 +316,10 @@ function descreverCatalogado(
     case "TAREFA_CHECKLIST_REABERTA": return "Tarefa reaberta porque o procedimento voltou a ter pendências";
     case "TAREFA_CHECKLIST_CONCLUIDA": return "Tarefa concluída automaticamente com o procedimento";
     case "COMUNICACAO_PENDENTE": return `Comunicação por ${nome("canal", "canal configurado")} aguardando envio`;
+    case "CONTRATO_ENVIADO_ASSINATURA": {
+      const envio = dataFormatada(novo, "enviadoEm");
+      return `Contrato enviado para assinatura${envio ? ` em ${envio}` : ""}`;
+    }
     case "DISTRIBUICAO_AUTOMATICA": return `Responsável definido automaticamente: ${nomeUsuario(numero(novo, "responsavelId"), contexto)}`;
     case "FOLLOW_UP_ATUALIZADO": return "Follow-up atualizado";
     case "FOLLOW_UP_CONCLUIDO": return "Follow-up concluído";

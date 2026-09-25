@@ -34,7 +34,7 @@ import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { executarAutomacoesCentraisDoCardAgora } from "@/lib/bpm/automacoes/orquestrador";
 import { automacaoMigradaEstaAtiva, NOMES_AUTOMACOES_MIGRADAS } from "@/lib/bpm/automacoes/migracao-hardcoded";
 import { salvarValoresGlobaisPersonalizadosCampos } from "@/lib/bpm/campos-configuraveis-server";
-import { atualizarCalculoNovoContrato } from "@/lib/bpm/novo-contrato-financeiro-server";
+import { atualizarCalculoNovoContrato, atualizarElaboracaoContrato } from "@/lib/bpm/novo-contrato-financeiro-server";
 import { camposPublicadosPorEtapa, capacidadesObrigatoriasPorEtapa } from "@/lib/bpm/campos-formulario-publicado";
 import { desserializarComposicaoCardKanban, type CardKanbanComposicao } from "@/lib/bpm/card-kanban";
 import { obterStatusPosFechamentoVisivel } from "@/lib/bpm/status-pos-fechamento";
@@ -1437,6 +1437,11 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
           && Object.keys(valoresValidados).length > 0) {
           await atualizarCalculoNovoContrato(tx, cardId, cardAtual.pipelineId);
         }
+        if (cardAnterior.pipeline?.chave === "financeiro"
+          && cardAnterior.etapa?.chave === "elaboracao_contrato"
+          && Object.keys(valoresValidados).length > 0) {
+          await atualizarElaboracaoContrato(tx, cardId, cardAtual.pipelineId, Object.keys(valoresValidados));
+        }
       }
 
       const historicoAtualizacao = await tx.bpmCardHistorico.create({
@@ -1489,7 +1494,7 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
           update: { role: "RESPONSAVEL" },
         });
       }
-    });
+    }, { maxWait: 10_000, timeout: 60_000 });
 
     revalidatePath(`${ROTA_BASE}/pipeline/${cardAnterior.pipelineId}`);
     await notificarPipelineBpm({
@@ -1510,6 +1515,8 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
           ? CONFIGURACAO_LOST_INVALIDA_MENSAGEM
         : error instanceof Error && error.message.startsWith("CAMPO_INVALIDO:")
           ? error.message.slice("CAMPO_INVALIDO:".length)
+        : error instanceof Error && error.message.startsWith("CONTRATO_INVALIDO:")
+          ? error.message.slice("CONTRATO_INVALIDO:".length)
         : error instanceof Error && error.message.startsWith("MOTIVO_LOST_INVALIDO:")
           ? error.message.slice("MOTIVO_LOST_INVALIDO:".length)
           : error instanceof Error && error.message === "RESPONSAVEL_INVALIDO"

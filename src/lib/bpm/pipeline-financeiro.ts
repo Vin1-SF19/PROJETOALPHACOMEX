@@ -206,6 +206,43 @@ export function campoFinanceiroCalculadoPorChave(chave: string | null | undefine
   return Boolean(chave && calculados.includes(chave));
 }
 
+/** Regras da elaboração aplicadas tanto ao salvamento quanto ao avanço. */
+export function avaliarElaboracaoContrato(values: Record<string, string | null>, now = new Date(), attachmentNames: readonly string[] = []) {
+  const k = FINANCIAL_FIELD_KEYS;
+  const pendencias: string[] = [];
+  const automaticValues: Record<string, string> = {};
+  const elaborado = sim(values[k.CONTRATO_ELABORADO]);
+  const enviado = sim(values[k.CONTRATO_ENVIADO]);
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(now);
+  if (elaborado) {
+    for (const key of [k.CNPJ, k.RAZAO_SOCIAL, k.RUA, k.NUMERO, k.BAIRRO, k.CEP,
+      k.MUNICIPIO, k.ESTADO, k.EMAIL, k.REGIME_CLIENTE, k.SERVICO,
+      k.FORMA_PAGAMENTO, k.CONDICAO]) {
+      if (!normalizar(values[key])) pendencias.push(key);
+    }
+    if (!(numero(values[k.VALOR_BRUTO]) > 0)) pendencias.push(k.VALOR_BRUTO);
+    if (normalizar(values[k.CNPJ]) && !cnpjValido(normalizar(values[k.CNPJ]))) pendencias.push(k.CNPJ);
+    if (normalizar(values[k.CEP]).replace(/\D/g, "").length !== 8) pendencias.push(k.CEP);
+    if (normalizar(values[k.ESTADO]) && !UFS.includes(normalizar(values[k.ESTADO]).toUpperCase() as (typeof UFS)[number])) pendencias.push(k.ESTADO);
+    if (normalizar(values[k.EMAIL]) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizar(values[k.EMAIL]))) pendencias.push(k.EMAIL);
+    if (!normalizar(values[k.DATA_ELABORACAO])) automaticValues[k.DATA_ELABORACAO] = today;
+  }
+  if (enviado) {
+    if (!elaborado) pendencias.push(k.CONTRATO_ELABORADO);
+    const temContrato = Boolean(normalizar(values[k.LINK_CONTRATO])) || attachmentNames.some((name) => /contrato/i.test(name));
+    if (!temContrato) pendencias.push(k.LINK_CONTRATO);
+    if (elaborado && temContrato) {
+      if (!normalizar(values[k.DATA_ENVIO])) automaticValues[k.DATA_ENVIO] = today;
+      if (normalizar(values[k.STATUS_ASSINATURA]) !== "Assinado") {
+        automaticValues[k.STATUS_ASSINATURA] = "Aguardando assinatura";
+      }
+    }
+  }
+  return { pendencias: [...new Set(pendencias)], automaticValues };
+}
+
 export function calcularNovoContratoFinanceiro(values: Record<string, string | null>): {
   pendencias: string[];
   automaticValues: Record<string, string>;
@@ -317,8 +354,9 @@ export function validateCanonicalFinancialTransition(input: CanonicalFinancialTr
   } else if (index === 1) {
     if (!sim(v[k.CONTRATO_ELABORADO])) missing.push(k.CONTRATO_ELABORADO);
     if (!sim(v[k.CONTRATO_ENVIADO])) missing.push(k.CONTRATO_ENVIADO);
-    require(k.DATA_ELABORACAO,k.LINK_CONTRATO);
-    automaticValues[k.DATA_ENVIO] = normalizar(v[k.DATA_ENVIO]) || today;
+    const elaboracao = avaliarElaboracaoContrato(v, input.now, input.attachmentNames);
+    missing.push(...elaboracao.pendencias);
+    Object.assign(automaticValues, elaboracao.automaticValues);
   } else if (index === 2) {
     if (normalizar(v[k.STATUS_ASSINATURA]).toLowerCase() !== "assinado") missing.push(k.STATUS_ASSINATURA);
     if (!normalizar(v[k.CONTRATO_ASSINADO]) && !input.attachmentNames?.some((name) => /contrato/i.test(name))) missing.push(k.CONTRATO_ASSINADO);

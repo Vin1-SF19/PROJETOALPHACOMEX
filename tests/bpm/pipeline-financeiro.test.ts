@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FINANCIAL_FIELDS, FINANCIAL_FIELD_KEYS, FINANCIAL_STAGES, calcularNovoContratoFinanceiro, calcularRetencoesFinanceiras, campoFinanceiroSomenteLeitura, financialStageKeyFromLabel, validateCanonicalFinancialTransition, validateFinancialTransition } from "@/lib/bpm/pipeline-financeiro";
+import { FINANCIAL_FIELDS, FINANCIAL_FIELD_KEYS, FINANCIAL_STAGES, avaliarElaboracaoContrato, calcularNovoContratoFinanceiro, calcularRetencoesFinanceiras, campoFinanceiroSomenteLeitura, financialStageKeyFromLabel, validateCanonicalFinancialTransition, validateFinancialTransition } from "@/lib/bpm/pipeline-financeiro";
 import { cnpjEhValido } from "@/lib/format-cnpj";
 
 function gerarCnpjValido(): string {
@@ -14,6 +14,37 @@ function gerarCnpjValido(): string {
   throw new Error("Nenhum CNPJ válido encontrado no intervalo de busca");
 }
 describe("pipeline financeiro", () => {
+  it("valida a elaboração com os dados da contratação e registra datas no momento do envio", () => {
+    const k = FINANCIAL_FIELD_KEYS;
+    const base = {
+      [k.CNPJ]: gerarCnpjValido(), [k.RAZAO_SOCIAL]: "Cliente teste", [k.RUA]: "Rua A",
+      [k.NUMERO]: "1", [k.BAIRRO]: "Centro", [k.CEP]: "01310100",
+      [k.MUNICIPIO]: "São Paulo", [k.ESTADO]: "SP", [k.EMAIL]: "a@teste.com",
+      [k.REGIME_CLIENTE]: "Simples Nacional", [k.SERVICO]: "Consultoria",
+      [k.VALOR_BRUTO]: "1000", [k.FORMA_PAGAMENTO]: "PIX", [k.CONDICAO]: "À vista",
+      [k.CONTRATO_ELABORADO]: "Sim", [k.CONTRATO_ENVIADO]: "Não",
+    };
+    const now = new Date("2026-09-25T15:30:00.000Z");
+    expect(avaliarElaboracaoContrato({ ...base, [k.SERVICO]: "" }, now).pendencias).toContain(k.SERVICO);
+    expect(avaliarElaboracaoContrato(base, now).automaticValues[k.DATA_ELABORACAO]).toBe("2026-09-25");
+    const enviado = { ...base, [k.CONTRATO_ENVIADO]: "Sim", [k.LINK_CONTRATO]: "https://example.test/contrato" };
+    expect(avaliarElaboracaoContrato(enviado, now).automaticValues).toMatchObject({
+      [k.DATA_ELABORACAO]: "2026-09-25", [k.DATA_ENVIO]: "2026-09-25", [k.STATUS_ASSINATURA]: "Aguardando assinatura",
+    });
+    expect(avaliarElaboracaoContrato({ ...enviado, [k.CONTRATO_ELABORADO]: "Não" }, now).pendencias).toContain(k.CONTRATO_ELABORADO);
+    expect(avaliarElaboracaoContrato({ ...enviado, [k.LINK_CONTRATO]: "" }, now).pendencias).toContain(k.LINK_CONTRATO);
+    expect(avaliarElaboracaoContrato({ ...enviado, [k.LINK_CONTRATO]: "" }, now, ["contrato.pdf"]).pendencias).not.toContain(k.LINK_CONTRATO);
+    expect(avaliarElaboracaoContrato({ ...enviado, [k.STATUS_ASSINATURA]: "Assinado" }, now).automaticValues[k.STATUS_ASSINATURA]).toBeUndefined();
+    const transition = validateCanonicalFinancialTransition({
+      pipelineKey: "financeiro", fromStageKey: "elaboracao_contrato", toStageKey: "formalizacao_contratacao",
+      valuesByFieldKey: enviado, now,
+    });
+    expect(transition.blocked).toBe(false);
+    expect(transition.automaticValues[k.DATA_ELABORACAO]).toBe("2026-09-25");
+    expect(transition.automaticValues[k.DATA_ENVIO]).toBe("2026-09-25");
+    expect(avaliarElaboracaoContrato({ ...enviado, [k.DATA_ELABORACAO]: "2026-09-20", [k.DATA_ENVIO]: "2026-09-21" }, now).automaticValues[k.DATA_ENVIO]).toBeUndefined();
+    expect(avaliarElaboracaoContrato(base, new Date("2026-09-25T02:00:00.000Z")).automaticValues[k.DATA_ELABORACAO]).toBe("2026-09-24");
+  });
   it("usa os campos ativos do formulário no avanço de Novo contrato", () => {
     const k = FINANCIAL_FIELD_KEYS;
     const valuesByFieldKey = {

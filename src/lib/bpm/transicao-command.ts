@@ -29,6 +29,7 @@ import {
   campoFinanceiroCalculadoPorChave,
   validateCanonicalFinancialTransition,
 } from "@/lib/bpm/pipeline-financeiro";
+import { atualizarElaboracaoContrato } from "@/lib/bpm/novo-contrato-financeiro-server";
 import { exigirAcessoBpmCard, checarAcessoDiretoriaBpm } from "@/lib/bpm/ownership";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
@@ -386,8 +387,9 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       if (!camposFormulario.get(config.etapaId)?.has(campo.id)) continue;
       const aplicaNaOrigem = config.etapaId === card.etapaId
         && (config.obrigatorio || config.obrigatorioSaida || Boolean(config.condicaoObrigatoriedadeJson));
-      const aplicaNoDestino = config.etapaId === destino.id
-        && (config.obrigatorio || config.obrigatorioEntrada || Boolean(config.condicaoObrigatoriedadeJson));
+      // Um campo obrigatório da etapa de destino é cobrado ao sair dela.
+      // Para cobrá-lo já na entrada, o administrador usa obrigatorioEntrada.
+      const aplicaNoDestino = config.etapaId === destino.id && config.obrigatorioEntrada;
       if (!config.visivel || (!aplicaNaOrigem && !aplicaNoDestino)) continue;
       if (config.condicaoVisibilidadeJson) {
         let parsed: unknown;
@@ -395,9 +397,9 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
         const validada = grupoCondicaoSchema.safeParse(parsed);
         if (!validada.success || !avaliarGrupo(validada.data, contextoRegra)) continue;
       }
-      let obrigatorio = config.obrigatorio
-        || (config.etapaId === card.etapaId && config.obrigatorioSaida)
-        || (config.etapaId === destino.id && config.obrigatorioEntrada);
+      let obrigatorio = config.etapaId === card.etapaId
+        ? config.obrigatorio || config.obrigatorioSaida
+        : config.obrigatorioEntrada;
       if (config.condicaoObrigatoriedadeJson) {
         let parsed: unknown;
         try { parsed = JSON.parse(config.condicaoObrigatoriedadeJson); } catch { erro("INVALID_FIELD_CONFIG", `Configuração inválida do campo ${campo.nome}.`); }
@@ -516,7 +518,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
 
 export async function avaliarTransicaoBpm(input: ComandoTransicaoBpm): Promise<ResultadoTransicaoBpm> {
   try {
-    const result = await db.$transaction((tx) => prepararTransicao(input, tx));
+    const result = await db.$transaction((tx) => prepararTransicao(input, tx), { maxWait: 10_000, timeout: 60_000 });
     if (result.idempotente) {
       return { success: true, data: {
         cardId: result.execucao.cardId,
@@ -583,6 +585,10 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
           create: { cardId: card.id, campoId, valor },
           update: { valor },
         });
+      }
+      if (card.pipeline.chave === BPM_PIPELINE_KEYS.FINANCEIRO
+        && card.etapa.chave === BPM_STAGE_KEYS.ELABORACAO_CONTRATO) {
+        await atualizarElaboracaoContrato(tx, card.id, card.pipelineId, Object.keys(prepared.valoresValidados));
       }
 
       if (input.proximoContatoEm !== undefined) {
@@ -715,7 +721,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
         idempotente: false,
         pipelineId: card.pipelineId,
       };
-    });
+    }, { maxWait: 10_000, timeout: 60_000 });
 
     if (!result.idempotente) {
       try {
