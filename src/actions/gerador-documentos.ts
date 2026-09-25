@@ -544,8 +544,10 @@ export async function GerarDocumento(payload: unknown) {
         pdfUrl = blob.url;
         await db.documentoGerado.update({ where: { id: documento.id }, data: { pdfUrl } });
       }
-    } catch {
-      // PDF generation is best-effort at this stage; FinalizarDocumento can retry
+    } catch (error) {
+      // O rascunho continua disponível para conferência, mas a falha precisa
+      // aparecer nos logs para distinguir renderização, Blob e persistência.
+      console.error("[GeradorDocumentos] Falha ao gerar ou salvar o PDF do rascunho:", error);
     }
 
     // HTML renderizado com variáveis (RM-2026-94CBF6): best-effort, não bloqueia
@@ -914,6 +916,7 @@ export async function FinalizarDocumento(documentoId: string) {
     revalidatePath(`${ROTA_BASE}/conferencia`);
     return { success: true as const, pdfDisponivel: true as const };
   } catch (error) {
-    return { success: false as const, error: mensagemErro(error) };
+    console.error("[GeradorDocumentos] Falha ao finalizar PDF:", error);
+    return { success: false as const, error: "Não foi possível finalizar o PDF. O documento continua em conferência." };
   }
 }

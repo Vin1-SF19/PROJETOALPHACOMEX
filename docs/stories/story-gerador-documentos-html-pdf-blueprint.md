@@ -365,18 +365,22 @@ O renderer preserva a estrutura reconhecível pelo HTML do Tika, mas não reprod
 - [x] Preservar a apresentação também após reescrita por IA e finalização.
 - [x] Verificar os dois templates DOCX ativos por leitura dos arquivos originais e gerar PDF de teste com o modelo real.
 - [x] Cobrir a extração de estilo e a renderização com teste automatizado.
+- [x] Se a fonte P052 não estiver disponível ou falhar na função publicada, repetir o PDF com fonte interna preservando a logo.
+- [x] Registrar a falha de geração/finalização e avisar quando o rascunho ficar sem PDF.
 
 ### File List
 
 - `src/lib/gerador-documentos/docx-style.ts`
 - `src/lib/gerador-documentos/pdf.tsx`
 - `src/actions/gerador-documentos.ts`
+- `src/components/GeradorDocumentos/GerarDocumentoForm.tsx`
 - `public/fonts/gerador-documentos/P052-Roman.otf`
 - `public/fonts/gerador-documentos/P052-Bold.otf`
 - `public/fonts/gerador-documentos/P052-Italic.otf`
 - `public/fonts/gerador-documentos/LICENSE-URW.txt`
 - `next.config.ts`
 - `tests/gerador-documentos/docx-style.test.ts`
+- `tests/gerador-documentos/pdf-fallback.test.ts`
 - `tests/gerador-documentos/reescrever-clausula.test.ts`
 - `docs/stories/story-gerador-documentos-html-pdf-blueprint.md`
 

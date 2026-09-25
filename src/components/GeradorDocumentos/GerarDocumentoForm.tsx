@@ -164,7 +164,8 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
         toast.error(resultado.error);
         return;
       }
-      toast.success("Documento gerado");
+      if (resultado.pdfDisponivel) toast.success("Documento gerado");
+      else toast.error("Documento criado, mas o PDF não foi gerado. Tente finalizar na conferência.", { duration: 6000 });
       router.push(resultado.urlConferencia);
     });
   }

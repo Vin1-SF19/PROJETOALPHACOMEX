@@ -1,5 +1,6 @@
 import React from "react";
 import path from "node:path";
+import { existsSync } from "node:fs";
 import { Document, Font, Image, Page, Text, View, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
 import type { EstiloDocxPdf } from "./docx-style";
 
@@ -25,17 +26,26 @@ const styles = StyleSheet.create({
   cabecalhoImagem: { position: "absolute", top: 0, left: 0, objectFit: "contain" },
 });
 
-Font.register({
-  family: "PalatinoModelo",
-  fonts: [
-    { src: path.join(process.cwd(), "public/fonts/gerador-documentos/P052-Roman.otf"), fontWeight: "normal" },
-    { src: path.join(process.cwd(), "public/fonts/gerador-documentos/P052-Bold.otf"), fontWeight: "bold" },
-    { src: path.join(process.cwd(), "public/fonts/gerador-documentos/P052-Italic.otf"), fontStyle: "italic" },
-  ],
-});
+const arquivosPalatino = {
+  normal: path.join(process.cwd(), "public/fonts/gerador-documentos/P052-Roman.otf"),
+  bold: path.join(process.cwd(), "public/fonts/gerador-documentos/P052-Bold.otf"),
+  italic: path.join(process.cwd(), "public/fonts/gerador-documentos/P052-Italic.otf"),
+};
+const palatinoDisponivel = Object.values(arquivosPalatino).every(existsSync);
+
+if (palatinoDisponivel) {
+  Font.register({
+    family: "PalatinoModelo",
+    fonts: [
+      { src: arquivosPalatino.normal, fontWeight: "normal" },
+      { src: arquivosPalatino.bold, fontWeight: "bold" },
+      { src: arquivosPalatino.italic, fontStyle: "italic" },
+    ],
+  });
+}
 
 function fontePdf(fonteDocx?: string): string {
-  if (/palatino|book antiqua/i.test(fonteDocx ?? "")) return "PalatinoModelo";
+  if (/palatino|book antiqua/i.test(fonteDocx ?? "")) return palatinoDisponivel ? "PalatinoModelo" : "Times-Roman";
   if (/times new roman|times/i.test(fonteDocx ?? "")) return "Times-Roman";
   return "Helvetica";
 }
@@ -157,6 +167,13 @@ function DocumentoPdfDocument({ titulo, clausulas, partes, numeroContrato, estil
 }
 
 export async function gerarPdfDocumento(params: DocumentoPdfProps): Promise<Buffer> {
-  const buffer = await renderToBuffer(<DocumentoPdfDocument {...params} />);
-  return Buffer.from(buffer);
+  try {
+    return Buffer.from(await renderToBuffer(<DocumentoPdfDocument {...params} />));
+  } catch (error) {
+    if (!/palatino|book antiqua/i.test(params.estiloDocx?.fonteCorpo ?? "")) throw error;
+    console.error("[GeradorDocumentos] Fonte do modelo falhou; repetindo com fonte PDF interna:", error);
+    return Buffer.from(await renderToBuffer(
+      <DocumentoPdfDocument {...params} estiloDocx={{ ...params.estiloDocx, fonteCorpo: "Times New Roman" }} />,
+    ));
+  }
 }
