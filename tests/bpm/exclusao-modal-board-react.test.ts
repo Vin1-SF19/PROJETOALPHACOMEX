@@ -7,8 +7,8 @@ import { CardSaveProvider } from "@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveC
 
 const card = vi.hoisted(() => ({
   id: "card-1",
-  pipeline: { id: "pipeline-1" },
-  etapa: { id: "etapa-1", transicoesEtapaOrigem: [] },
+  pipeline: { id: "pipeline-1", nome: "Comercial" },
+  etapa: { id: "etapa-1", nome: "Revisão", transicoesEtapaOrigem: [] },
   membros: [],
   formularioEtapa: { secoes: [] },
 }));

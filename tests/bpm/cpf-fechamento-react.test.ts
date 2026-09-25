@@ -6,7 +6,7 @@ import CardFullViewModal from "@/app/PainelAlpha/AlphaCRM/CardModal/CardFullView
 import { CardSaveProvider } from "@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext";
 import { toast } from "sonner";
 import { AtualizarCardBpm, ObterCardBpm } from "@/actions/bpm/Cards";
-const fixture = vi.hoisted(() => ({ id: "card", updatedAt: "2026-09-22T10:00:00Z", pipeline: { id: "pipeline" }, etapa: { id: "etapa", nome: "Revisão", chave: "RADAR", transicoesEtapaOrigem: [] }, membros: [], formularioEtapa: { secoes: [] }, camposEtapa: [{ id: "nome", nome: "Nome", tipo: "texto", valor: "", obrigatorio: false, ordem: 0, pipelineId: "pipeline", etapaId: "etapa", opcoesJson: null, editavel: true }] }));
+const fixture = vi.hoisted(() => ({ id: "card", updatedAt: "2026-09-22T10:00:00Z", pipeline: { id: "pipeline", nome: "Comercial" }, etapa: { id: "etapa", nome: "Revisão", chave: "RADAR", transicoesEtapaOrigem: [] }, membros: [], formularioEtapa: { secoes: [] }, camposEtapa: [{ id: "nome", nome: "Nome", tipo: "texto", valor: "", obrigatorio: false, ordem: 0, pipelineId: "pipeline", etapaId: "etapa", opcoesJson: null, editavel: true }] }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), warning: vi.fn() } }));
 vi.mock("@/actions/bpm/Cards", () => ({ AtualizarCardBpm: vi.fn(), ObterCardBpm: vi.fn(async () => ({ success: true, data: fixture })) }));
 vi.mock("@/actions/bpm/ConsultaCnpjFinanceiro", () => ({ ConsultarCnpjNovoContrato: vi.fn() }));

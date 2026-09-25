@@ -26,6 +26,10 @@ Dar destaque imediato aos cards de **Boas-vindas** ainda não acessados e impedi
 - `src/actions/bpm/Tarefas.ts`
 - `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`
 - `tests/bpm/boas-vindas-acesso.test.ts`
+- `tests/bpm/card-modal-integration.test.ts`
+- `tests/bpm/membros-card-ui.test.ts`
+- `tests/bpm/cpf-fechamento-react.test.ts`
+- `tests/bpm/exclusao-modal-board-react.test.ts`
 - `src/actions/bpm/Membros.ts`
 - `src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx`
 - `src/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal.tsx`
@@ -37,8 +41,10 @@ Dar destaque imediato aos cards de **Boas-vindas** ainda não acessados e impedi
 - [x] Suíte BPM — 41 arquivos / 243 testes
 - [x] ESLint focado nos arquivos alterados
 - [x] `git diff --check`
-- [ ] Typecheck global — bloqueado pelos 5 erros basais fora do CRM: validadores de Exclusão Fiscal (2), `HabilitacaoRadarClient` (1) e `sync-queue.test.ts` (2)
-- [ ] Lint/teste global — não executados; a cobertura BPM completa acima cobre o módulo alterado
+- [x] `npm run lint` — 0 erros, 1.191 avisos existentes
+- [x] `npm run typecheck` — aprovado
+- [x] `npm test` — 525 arquivos, 3.893 testes aprovados, 4 ignorados e 1 todo; fixtures de modal e expectativas de permissão atualizadas
+- [x] `npm run build` — aprovado
 
 ## Sem migration
 
