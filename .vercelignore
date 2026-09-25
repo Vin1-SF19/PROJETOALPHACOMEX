@@ -1,0 +1,14 @@
+# Keep generated builds, local evidence, and database backups out of the deployment upload.
+.next-*/
+.next/
+.tmp/
+tmp/
+logs/
+coverage/
+test-results/
+database-backups/
+docs/
+tests/
+*.log
+tsconfig.tsbuildinfo
+.env*

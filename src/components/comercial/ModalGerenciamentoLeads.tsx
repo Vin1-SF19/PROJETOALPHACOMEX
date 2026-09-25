@@ -92,6 +92,7 @@ interface Contrato {
     pagamentoConfirmadoEm: Date | null;
     contratoAssinado: boolean;
     contratoUrl: string | null;
+    contratoAssinadoFinanceiroUrl?: string | null;
     arquivado: boolean;
     arquivadoEm: Date | null;
     mes: number;
@@ -1376,6 +1377,11 @@ function TabelaEnviados({
                                             {/* Ações: obs + arquivar + excluir */}
                                             <td className="px-3 py-3 text-right">
                                                 <div className="flex items-center gap-1 justify-end">
+                                                    {c.contratoAssinadoFinanceiroUrl && (
+                                                        <a href={c.contratoAssinadoFinanceiroUrl} target="_blank" rel="noopener noreferrer" title="Abrir contrato assinado no Financeiro" className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/10">
+                                                            <Eye size={13} />
+                                                        </a>
+                                                    )}
                                                     <button
                                                         onClick={() => setObsAberto(c.id)}
                                                         title="Observações"
@@ -1570,8 +1576,8 @@ function TabelaFechados({
                                     <td className="px-3 py-3 text-[11px] font-black text-emerald-400 whitespace-nowrap">{formatBRL(c.valorContrato)}</td>
                                     <td className="px-3 py-3 text-[10px] text-slate-500 max-w-[150px] truncate">{c.servico}</td>
                                     <td className="px-3 py-3 text-right">
-                                        {c.contratoUrl ? (
-                                            <a href={c.contratoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 p-2 rounded-xl hover:bg-white/5 text-slate-500 hover:text-blue-400 transition-colors">
+                                        {(c.contratoAssinadoFinanceiroUrl || c.contratoUrl) ? (
+                                            <a href={c.contratoAssinadoFinanceiroUrl || c.contratoUrl || undefined} target="_blank" rel="noopener noreferrer" title={c.contratoAssinadoFinanceiroUrl ? "Abrir contrato assinado no Financeiro" : "Abrir contrato"} className="inline-flex items-center gap-1 p-2 rounded-xl hover:bg-white/5 text-slate-500 hover:text-blue-400 transition-colors">
                                                 <Eye size={14} />
                                             </a>
                                         ) : (
