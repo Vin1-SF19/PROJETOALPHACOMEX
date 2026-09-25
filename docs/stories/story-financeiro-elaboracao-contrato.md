@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — correção do diálogo publicada; integração de contrato RADAR e plano de configuração implementados e validados localmente. A publicação da nova configuração no Turso aguarda confirmação específica do usuário.
+Ready for Review — código da integração RADAR publicado e configuração da Solicitação/Elaboração ativada no Turso; falta teste visual autenticado com card real.
 
 ## Story
 
@@ -43,12 +43,12 @@ Ready for Review — correção do diálogo publicada; integração de contrato 
 - [x] Preparar automações configuráveis de alerta para alterações posteriores nos 14 dados relevantes (AC 6).
 - [x] Conferir integração existente: ação configurável `GERAR_CONTRATO` no Gerador de Documentos; nenhuma automação ativa vinculada à segunda etapa no Turso. O fluxo manual permanece (AC 8).
 - [x] Gerar plano somente leitura: 5 campos publicados, 18 requisitos e 15 automações; registrar backup completo e snapshot seletivo Vault.
-- [ ] Publicar configuração após autorização específica do usuário e verificar o fluxo autenticado, inclusive cards antigos, anexos e erro nominal por campo (AC 1 a 8).
+- [ ] Verificar o fluxo autenticado com card real, inclusive cards antigos, anexos e erro nominal por campo (AC 1 a 8). Configuração publicada após autorização específica; verificação em leitura confirmou campos e automação ativos.
 - [x] Rodar `npm run lint`, `npm run typecheck`, `npm test` e `npm run build`; atualizar checklist e File List antes da conclusão local (lint: 0 erros, avisos preexistentes; testes na worktree seletiva: 511 arquivos/3.828 casos aprovados; build concluído).
 - [x] Corrigir o diagnóstico de movimento para aplicar `obrigatorioEntrada` somente na entrada do destino, sem exigir indicadores que devem ser preenchidos durante a elaboração; teste de regressão e quality gates locais aprovados (AC 9).
 - [ ] Confirmar no card autenticado que a entrada em Elaboração é liberada e os campos aparecem dentro da segunda etapa (AC 1, 9). O código da correção foi publicado e o deployment ficou pronto; falta o teste visual autenticado.
 - [x] Criar rascunho automático no Gerador, com dados da contratação, contratada correta, título solicitado e idempotência por card/template (AC 10).
-- [x] Preparar configuração de três campos de pagamento no formulário da primeira etapa, visíveis e obrigatórios na saída para RADAR, e automação de entrada exclusiva de RADAR (AC 10). Publicação no banco segue pendente de checkpoint específico.
+- [x] Publicar três campos de pagamento no formulário da primeira etapa, visíveis e obrigatórios na saída para RADAR, e automação de entrada exclusiva de RADAR (AC 10). Verificação em leitura confirmou os três campos ativos, formulário v6 e automação ativa.
 - [x] Plano somente leitura validou formulário da Solicitação v5, template padrão versionado `cmthgdqel00000akvfblyma6y`, contratada ativa e três campos ainda ausentes. O modelo padrão descreve revisão de RADAR; a condição da automação confere `card.servico` contendo Radar. A versão atual do pipeline passou de 11 a 14 por edições concorrentes; o segundo backup e o snapshot seletivo cobrem v14.
 
 ## Contexto e pontos de integração
@@ -67,8 +67,9 @@ Ready for Review — correção do diálogo publicada; integração de contrato 
 - **Vault:** backup completo `database-backups/pre-change/painelalpha_turso_pre_change_elaboracao_config_2026-09-25T17-42-13-450Z.db` validado por restauração (`integrity_check=ok`, 331 tabelas, 171.275 linhas, FK=0), SHA-256 `ad960a4aff973d18301e88a6f8060583ada72eb08983888205696cd5346a3d5a`. Snapshot seletivo `database-backups/pre-change/elaboracao-config-before-2026-09-25T17-42-33-799Z.json`. O inventário somente leitura deste reteste confirmou os campos e requisitos publicados; a correção atual não altera o banco.
 - **Limite de verificação:** nenhum card real foi movido ou editado nesta implementação. A automação de geração de contrato existe no catálogo, mas não está configurada para a segunda etapa e depende de um template selecionado pelo administrador.
 - **Contrato RADAR:** o DOCX padrão contém qualificação antiga de `ALPHA COMEX BRASIL LTDA`. A nova ação substitui essa qualificação na instância, preserva o arquivo fonte, usa o cadastro ativo `ALPHA - COMEX, SERVICOS ADMINISTRATIVOS ESPECIALIZADOS E COWORKING LTDA`, vincula documento e anexo interno ao card e impede criação repetida quando já houver documento vinculado. As variáveis mapeadas usam IDs de campos na configuração da automação; os dados ausentes são marcados para conferência e impedem finalização até preenchimento. O pedido do usuário colocou valor inicial, valor final e desconto na **primeira** etapa, antes da entrada na Elaboração. O serviço sem RADAR não executa este modelo.
-- **Vault RADAR:** backup completo renovado `database-backups/pre-change/painelalpha_turso_pre_change_radar_contrato_pagamento_2026-09-25T20-00-41-599Z.db` (173.264.896 bytes, SHA-256 `5ea5c1dc6f8a8576d24449f0ff4a4ce175562da3b46dadd770184f5af7193045`) validado por restauração local: integridade OK, FK=0, 331 tabelas, 174.739 linhas. Manifesto `.manifest.json` homônimo e snapshot seletivo v14 `database-backups/pre-change/radar-contrato-pagamento-config-before-v14-2026-09-25T20-01-45-696Z.json` (SHA-256 `b3437b5b959662fd63fefdfb88207c0b601302f53fe2e6a5f4b1c37178f5d31f`). Nenhuma escrita no Turso para este pedido foi feita; publicação requer aprovação específica após revisão do plano.
-- **Concorrência observada:** a configuração do Financeiro avançou de v11 para v14 por edições no campo `Vendedor responsável`, sem mudança nos campos básicos de exibição/obrigatoriedade comparados por Vault. O backup renovado e o snapshot seletivo capturam v14; o script exige a versão exata do pipeline e do formulário antes da escrita e aborta se houver nova mudança.
+- **Vault RADAR:** backup completo imediatamente anterior à publicação `database-backups/pre-change/painelalpha_turso_pre_change_radar_contrato_pagamento_2026-09-25T20-14-28-265Z.db` (173.723.648 bytes, SHA-256 `269d07a9cdc27348763991ebe4a23e93abf30754399b040a4a03d61e72444e88`) validado por restauração local: integridade OK, FK=0, 331 tabelas, 174.876 linhas. Manifesto `.manifest.json` homônimo e snapshot seletivo v20 `database-backups/pre-change/radar-contrato-pagamento-config-before-v20-2026-09-25T20-15-40-017Z.json` (SHA-256 `62d1002da840de4f2169173bad0de9dda628e2d3c924b2b0011ea06497cf63e6`). Snapshot automático adicional da aplicação: `database-backups/pre-change/financeiro-contrato-radar-before-1790367422660.json`.
+- **Publicação RADAR:** usuário autorizou explicitamente os três campos e a automação no Turso. A versão do Financeiro avançou de v14 a v20 antes da escrita por edições de campos compartilhados; Vault confirmou que o plano RADAR permaneceu igual e renovou backup/snapshot. O script aplicou com guarda exata v20 e formulário v5. Leitura posterior confirmou pipeline v21, formulário v6, três campos ativos/obrigatórios na saída somente quando `card.servico` contém Radar e automação `ENTRAR_COLUNA` ativa com template/contratada corretos. Nenhum card foi movido.
+- **Concorrência observada:** a configuração do Financeiro avançou de v11 para v20 por edições em campos compartilhados (`Vendedor responsável`, `Regime tributário`, `Contato responsável/representante`). Vault confirmou que as 40 configurações lógicas das etapas Solicitação/Elaboração permaneceram equivalentes, embora alguns IDs de configuração tenham sido recriados. O script exigiu a versão exata v20 e o formulário v5 antes da escrita.
 - **Gates locais da nova integração:** `npm run lint` (0 erros, 1.192 avisos preexistentes), `npm run typecheck` (exit 0), `npm test` (515 arquivos, 3.837 casos aprovados; 4 skipped e 1 todo), `npm run build` (exit 0), `git diff --check` (exit 0). Após ajuste de autorização, os testes focados de ownership, download e reescrita passaram (28 casos).
 
 ## Testes de aceite
@@ -138,6 +139,7 @@ Ready for Review — correção do diálogo publicada; integração de contrato 
 | 2026-09-25 | 0.4 | Correção da exigência prematura dos indicadores no diálogo de entrada; 513 arquivos e 3.834 testes, lint, typecheck e build aprovados | Codex |
 | 2026-09-25 | 0.5 | Integração local da geração automática do contrato RADAR, plano de configuração da primeira etapa e backup Vault validado; publicação pendente de checkpoint específico | Codex |
 | 2026-09-25 | 0.6 | Backup Vault renovado na configuração v14, conferência dos gates e plano de publicação RADAR atualizado | Codex |
+| 2026-09-25 | 0.7 | Código publicado, backup/snapshot Vault v20 validado e configuração RADAR ativada com verificação em leitura | Codex |
 
 ## Validação do draft
 
