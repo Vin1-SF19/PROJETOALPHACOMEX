@@ -19,7 +19,7 @@ import { parserGenerico } from "./generico";
 export type { ParserExtrato } from "./types";
 
 export interface ParserDetectado {
-  bancoId: "itau" | "santander" | "mercadoPago" | "caixa";
+  bancoId: string;
   parser: ParserExtrato;
 }
 
@@ -95,6 +95,21 @@ export function detectarParserExtrato(texto: string): ParserDetectado | null {
     normalizado.includes("mercado pago")
   ) {
     return { bancoId: "mercadoPago", parser: parserMercadoPago };
+  }
+
+  const assinaturas: Array<[string, boolean]> = [
+    ["bancoBrasil", normalizado.includes("consultas - extrato de conta corrente") && normalizado.includes("bb rende facil")],
+    ["bradesco", normalizado.includes("data lancamento dcto. credito (r$) debito (r$) saldo (r$)") && normalizado.includes("invest facil")],
+    ["c6", normalizado.includes("extrato periodo") && normalizado.includes("data contabil tipo descricao valor") && normalizado.includes("cheque especial contratado")],
+    ["credcrea", normalizado.includes("cooperativa: credcrea") && normalizado.includes("debito (r$) descricao credito (r$)")],
+    ["inter", normalizado.includes("instituicao: banco inter") && normalizado.includes("saldo por transacao")],
+    ["nubank", normalizado.includes("nu pagamentos") && normalizado.includes("movimentacoes") && normalizado.includes("saldo final do periodo")],
+    ["pagBank", normalizado.includes("pagseguro internet s/a") && normalizado.includes("saldo do dia") && normalizado.includes("descricao data valor")],
+    ["sicoob", normalizado.includes("sicoob") && normalizado.includes("historico de movimentacao") && normalizado.includes("extrato conta corrente")],
+    ["sicredi", normalizado.includes("sicredi") && normalizado.includes("data descricao documento valor (r$) saldo (r$)")],
+  ];
+  for (const [bancoId, encontrou] of assinaturas) {
+    if (encontrou) return { bancoId, parser: PARSERS[bancoId] };
   }
 
   return null;

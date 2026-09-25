@@ -48,6 +48,9 @@ function parse(texto: string): TransacaoNormalizada[] {
   let ultimaTransacao: TransacaoNormalizada | null = null;
 
   for (const linhaBruta of linhas) {
+    // O PDF também traz uma seção de saldos de investimentos após o total da
+    // conta corrente. Ela contém datas e valores, mas não movimentações.
+    if (/^(Total\s|Últimos Lançamentos|Saldos Invest)/i.test(linhaBruta)) break;
     if (deveIgnorarLinha(linhaBruta)) continue;
     if (/saldo\s+anterior/i.test(linhaBruta)) continue;
 

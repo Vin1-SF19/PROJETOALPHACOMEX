@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Info, CheckCircle2 } from "lucide-react";
+import { X, Info, CheckCircle2, Landmark } from "lucide-react";
 import { BANCOS_CATALOGO, type BancoCatalogo } from "./lib/bancos-catalogo";
 import { modalVariants, MODAL_PERSPECTIVE } from "./lib/modal-variants";
 
@@ -16,6 +16,7 @@ interface ModalVincularBancoProps {
 export function ModalVincularBanco({ isOpen, onClose, onSave }: ModalVincularBancoProps) {
   const [bancoSel, setBancoSel] = useState<BancoCatalogo | null>(null);
   const [descricao, setDescricao] = useState("");
+  const [logosComErro, setLogosComErro] = useState<Set<string>>(() => new Set());
 
   return (
     <AnimatePresence>
@@ -52,7 +53,11 @@ export function ModalVincularBanco({ isOpen, onClose, onSave }: ModalVincularBan
                     : "border-white/5 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.05]"}`}
               >
                 <div className={`relative w-12 h-12 rounded-xl overflow-hidden transition-all duration-500 ${bancoSel?.id === banco.id ? "grayscale-0 scale-110" : "grayscale group-hover:grayscale-[0.5]"}`}>
-                  <Image src={banco.logo} alt={banco.nome} fill sizes="48px" className="object-contain" unoptimized />
+                  {logosComErro.has(banco.id) ? (
+                    <Landmark aria-label={banco.nome} className="h-full w-full p-2 text-slate-300" />
+                  ) : (
+                    <Image src={banco.logo} alt={banco.nome} fill sizes="48px" className="object-contain" unoptimized onError={() => setLogosComErro((atual) => new Set(atual).add(banco.id))} />
+                  )}
                 </div>
 
                 <span className={`text-[10px] font-black uppercase tracking-widest italic transition-colors duration-300 ${bancoSel?.id === banco.id ? "text-indigo-400" : "text-slate-500 group-hover:text-slate-300"}`}>

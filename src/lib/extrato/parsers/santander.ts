@@ -55,7 +55,7 @@ function limparDescricaoSantander(texto: string): string {
  * data explícita e recompõe descrições quebradas antes de ler o primeiro valor
  * monetário da linha lógica como valor da movimentação.
  */
-function parse(texto: string): TransacaoNormalizada[] {
+function parseDocumento(texto: string): TransacaoNormalizada[] {
   const ano = obterAnoDoExtrato(texto);
   const movimentacao = recortarMovimentacaoContaCorrente(texto);
   if (!ano || !movimentacao) return [];
@@ -116,6 +116,26 @@ function parse(texto: string): TransacaoNormalizada[] {
 
   concluirLinha();
   return transacoes;
+}
+
+function parse(texto: string): TransacaoNormalizada[] {
+  // Um mesmo PDF pode conter extratos mensais consecutivos. Cada mês tem sua
+  // própria seção de conta corrente e seu próprio ano de referência.
+  const paginas = texto.split(/(?=EXTRATO CONSOLIDADO INTELIGENTE\s*\n\s*(?:janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s*\/\s*\d{4})/i);
+  const documentos: string[] = [];
+  let mesAtual = "";
+  for (const pagina of paginas) {
+    const mes = pagina.match(new RegExp(`(?:${MESES})\\s*\\/\\s*\\d{4}`, "i"))?.[0].toLowerCase() ?? mesAtual;
+    if (mes !== mesAtual) {
+      documentos.push(pagina);
+      mesAtual = mes;
+    } else if (documentos.length) {
+      documentos[documentos.length - 1] += pagina;
+    } else {
+      documentos.push(pagina);
+    }
+  }
+  return documentos.flatMap(parseDocumento);
 }
 
 export const parserSantander: ParserExtrato = { parse };

@@ -64,13 +64,19 @@ function parseExtratoMensal(texto: string): TransacaoNormalizada[] | null {
   // em uma só linha. Recria os limites das linhas de data e da aplicação
   // automática, que não repete a data e vem depois da legenda "G = ...".
   const movimentacaoNormalizada = movimentacao
-    .replace(/(^|\s)(\d{2}\/\d{2}\s+)/g, "$1\n$2")
+    .replace(/(^|\s)(\d{2}\/\d{2}\s+)(?=[A-Za-zÀ-ÿ])/g, "$1\n$2")
     .replace(
       /\bG\s*=\s*aplica[cç][aã]o\s+programada\s+(Apl\s+Aplic\s+Aut\s+Mais)/gi,
       "\n$1",
     );
 
-  for (const linha of movimentacaoNormalizada.split("\n").map((item) => item.trim()).filter(Boolean)) {
+  for (const linhaOriginal of movimentacaoNormalizada.split("\n").map((item) => item.trim()).filter(Boolean)) {
+    // Na primeira página, a legenda ocupa a coluna esquerda e o pdf-parse
+    // mistura seu texto com quatro lançamentos da coluna de movimentações.
+    const linha = linhaOriginal
+      .replace(/^[GP]\s*=.*?\b(Sispag Fornecedores\s+[\d.]+,\d{2}-)\s*$/i, "$1")
+      .replace(/^Para demais siglas, consulte as Notas\s+(Sispag Fornecedores\s+[\d.]+,\d{2}-)\s*$/i, "$1")
+      .replace(/^Explicativas no final do extrato\s+(Sispag Fornecedores\s+[\d.]+,\d{2}-)\s*$/i, "$1");
     if (deveIgnorarLinhaMensal(linha)) continue;
 
     const matchData = linha.match(DATA_CURTA_INICIO);
