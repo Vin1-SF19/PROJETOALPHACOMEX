@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress — causa diagnosticada, implementação local e plano de configuração preparados; publicação protegida e smoke autenticado pendentes.
+Ready for Manual Acceptance — código e configuração publicados; cadeia de dados e execução verificadas. Conferência visual autenticada pelo usuário pendente.
 
 ## Executor Assignment
 
@@ -40,7 +40,7 @@ In Progress — causa diagnosticada, implementação local e plano de configura�
 - [x] **Definir estado de saída do card de origem** (AC 3–7): derivar bloqueio e localização do vínculo; guard de servidor para card de etapa final encaminhado/concluído.
 - [x] **Atualizar board e modal** (AC 3–5, 7): card atenuado, tag de pipeline/etapa ou localização restrita, indicação de encaminhamento pendente e controles indisponíveis.
 - [x] **Testar localmente** (AC 2–7): 3.830 testes passaram; o teste do board verifica a atualização da tag após a mudança de etapa do destino. Execução real e cadeia completa dependem da publicação protegida.
-- [ ] **Publicar configuração protegida, se necessária** (AC 1, 8): somente após Vault, backup e aprovação específica; conferir estado publicado, execução e rollback. Rodar `npm run lint`, `npm run typecheck`, `npm test` e `npm run build` e registrar resultados.
+- [x] **Publicar configuração protegida** (AC 1, 8): após Vault, backup verificado e aprovação específica, publicar e verificar execução/vínculo; gates locais concluídos.
 
 ## Dev Notes
 
@@ -76,8 +76,9 @@ In Progress — causa diagnosticada, implementação local e plano de configura�
 - [x] Checklist de draft aplicado: objetivo/contexto PASS; orientação técnica PARTIAL (inventário de produção pendente); referências PASS; autossuficiência PASS; testes PASS; CodeRabbit PASS.
 - [x] Inventário real da automação/etapas e causa da falha registrado.
 - [x] Implementação e gates locais concluídos: lint (0 erros, avisos preexistentes), typecheck, 3.830 testes e build passaram. A suíte usou uma cópia temporária do backup como banco local; nenhuma escrita foi feita no banco remoto.
-- [ ] Configuração publicada após checkpoint Vault, se houver mutação protegida.
-- [ ] Smoke autenticado do fluxo completo concluído.
+- [x] Configuração publicada após checkpoint Vault e autorização específica do usuário.
+- [x] Smoke de dados do fluxo existente: card Comercial concluído ligado ao Financeiro concluído, ligado ao novo card Operacional ativo em Boas-vindas; execução Financeiro → Operacional com SUCESSO, sem duplicidade.
+- [ ] Conferência visual autenticada dos dois boards pelo usuário.
 
 ## Dev Agent Record
 
@@ -97,7 +98,8 @@ In Progress — causa diagnosticada, implementação local e plano de configura�
 | --- | --- | --- | --- |
 | 2026-09-25 | 0.1 | Draft do encaminhamento e persistência visual das saídas | River (@sm) |
 | 2026-09-25 | 0.2 | Diagnóstico real, plano Vault e implementação local de bloqueio e localização | Codex |
+| 2026-09-25 | 0.3 | Deploy d7b4b600 e publicação protegida no Turso; reprocessamento do evento concluído com sucesso | Codex |
 
 ## QA Results
 
-Pendente.
+Lint e typecheck passaram; `npm test` passou com 511 arquivos, 3.830 testes aprovados, 4 ignorados e 1 marcado TODO em uma cópia local do backup; build de produção passou. Vercel confirmou deploy do commit `d7b4b600cec2e0cec2f0fd9ecf4394d46adf31de`. A automação Financeiro → Operacional `cmuhb4zog0001oiihhrpkzy2g` executou o evento `cmuh93isd000f0agmn0sjbe1r` com SUCESSO e criou o card `cmuhb951900040agmeci9evnw` em Boas-vindas, vinculado ao Financeiro `cmugxle5800060agmhtfqtnjg`. Um único card ativo da empresa foi encontrado no Operacional. A automação Comercial v3 tem apenas o destino Financeiro.
