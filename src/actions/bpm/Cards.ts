@@ -254,6 +254,10 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
             select: {
               id: true,
               nome: true,
+              ehFinal: true,
+              automacoes: { where: { ativa: true }, select: { versoes: {
+                where: { status: "ATIVA" }, select: { grafoJson: true },
+              } } },
               visibilidades: {
                 select: { perfil: true, podeVer: true, podeAgir: true },
               },
@@ -272,6 +276,13 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
         resolverVisibilidadeEtapa(usuarioAtual?.role, etapa.visibilidades),
       ]),
     );
+    const etapasComSaida = new Set((pipelineInfo?.etapas ?? []).filter((etapa) => etapa.automacoes?.some((automacao) =>
+      automacao.versoes.some((versao) => {
+        try {
+          const grafo = JSON.parse(versao.grafoJson) as { nos?: { acaoTipo?: string }[] };
+          return grafo.nos?.some((no) => no.acaoTipo === "CRIAR_CARD_OUTRO_PIPELINE") ?? false;
+        } catch { return false; }
+      }))).map((etapa) => etapa.id));
     const etapasVisiveis = [...visibilidadePorEtapa.entries()]
       .filter(([, permissao]) => permissao.podeVer)
       .map(([etapaId]) => etapaId);
@@ -317,7 +328,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
     const cards = await db.bpmCard.findMany({
       where: {
         pipelineId,
-        status: "ATIVO",
+        OR: [{ status: "ATIVO" }, { status: "CONCLUIDO", etapa: { ehFinal: true } }],
         etapaId: { in: etapasVisiveis },
         ...(diretoria ? {} : { etapa: { nome: { not: NOME_ETAPA_BOAS_VINDAS } } }),
         ...(admin ? {} : { membros: { some: { userId } } }),
@@ -333,6 +344,12 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
         dataReuniao: true,
         googleMeetLink: true,
         statusPosFechamento: true,
+        vinculosOrigem: {
+          where: { cardDestino: { pipeline: { ativo: true }, status: { not: "ARQUIVADO" } } },
+          select: { cardDestino: { select: { id: true, pipelineId: true,
+            pipeline: { select: { nome: true } }, etapa: { select: { nome: true } },
+          } } },
+        },
         empresa: { select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true } },
         responsavel: { select: { id: true, nome: true } },
         membros: {
@@ -369,6 +386,14 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
       },
       orderBy: { createdAt: "desc" },
     });
+
+    const idsDestinos = [...new Set(cards.flatMap((card) => card.vinculosOrigem.map((vinculo) => vinculo.cardDestino.id)))];
+    const destinosVisiveis = new Set((await Promise.all(idsDestinos.map(async (id) => {
+      try {
+        await exigirAcessoBpmCard(id, userId, session.user.role ?? null, "visualizar");
+        return id;
+      } catch { return null; }
+    }))).filter((id): id is string => Boolean(id)));
 
     const cardsComOperacionais = cards.filter((card) => etapasComOperacionais.has(card.etapaId));
     const idsComOperacionais = cardsComOperacionais.map((card) => card.id);
@@ -556,14 +581,26 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
       return { nativos, campos, camposLabel };
     }
 
-    const cardsReais = cards.map((card) => {
+    const cardsReais = cards.filter((card) => card.status === "ATIVO"
+      || (pipelineInfo?.etapas.find((etapa) => etapa.id === card.etapaId)?.ehFinal
+        && (card.vinculosOrigem.length > 0 || etapasComSaida.has(card.etapaId))))
+      .map((card) => {
+      const { vinculosOrigem, ...cardSemVinculos } = card;
       const ehNovoLead = card.etapaId === etapaNovosLeads?.id;
       const sla = [...(slaPorCard.get(card.id) ?? [])]
         .filter((item) => item.status !== "CONCLUIDO")
         .sort((a, b) => prioridadeStatusSla(b.status) - prioridadeStatusSla(a.status))[0] ?? null;
       const composicaoCardKanban = composicaoPorEtapa.get(card.etapaId);
+      const etapaFinal = Boolean(pipelineInfo?.etapas.find((etapa) => etapa.id === card.etapaId)?.ehFinal);
+      const encaminhamentos = etapaFinal
+        ? vinculosOrigem.map(({ cardDestino }) => destinosVisiveis.has(cardDestino.id)
+          ? { pipeline: cardDestino.pipeline.nome, etapa: cardDestino.etapa.nome }
+          : { pipeline: null, etapa: null })
+        : [];
+      const encaminhamentoPendente = etapaFinal && etapasComSaida.has(card.etapaId)
+        && card.status === "CONCLUIDO" && encaminhamentos.length === 0;
       return {
-        ...card,
+        ...cardSemVinculos,
         sla,
         origem: "real" as const,
         nolossLeadId: null as string | null,
@@ -576,7 +613,10 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
           ? calcularDiaCicloNovosLeads(card.createdAt, agora)
           : 1,
         podeAgirEtapa:
-          visibilidadePorEtapa.get(card.etapaId)?.podeAgir ?? false,
+          (visibilidadePorEtapa.get(card.etapaId)?.podeAgir ?? false) && encaminhamentos.length === 0
+            && !(etapaFinal && card.status === "CONCLUIDO"),
+        encaminhamentos,
+        encaminhamentoPendente,
         cardViewComposicao: composicaoCardKanban,
         cardViewValores: composicaoCardKanban
           ? construirValoresCardKanban({
@@ -862,6 +902,7 @@ export async function ObterCardBpm(cardId: string) {
         anexos: card.anexos.map((anexo) => ({ ...anexo, url: `/api/bpm/anexos/${anexo.id}` })),
         camposEtapa,
         formularioEtapa,
+        encaminhado: acessoCard.bloqueadoPorEncaminhamento === true,
         permissaoEtapa: {
           podeVer: true,
           podeAgir: acessoCard.podeAgirEtapa,

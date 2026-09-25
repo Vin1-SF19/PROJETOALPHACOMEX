@@ -112,6 +112,8 @@ export interface CardBpm {
   diasUteisDecorridos?: number;
   diaCiclo?: number;
   podeAgirEtapa: boolean;
+  encaminhamentos?: { pipeline: string | null; etapa: string | null }[];
+  encaminhamentoPendente?: boolean;
   sla?: {
     id: string;
     nome: string;
@@ -204,7 +206,8 @@ export function KanbanCard({
     id: card.id,
     disabled: arrastoDesabilitado,
   });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1, animationDelay: `${index * 40}ms` };
+  const encaminhado = Boolean(card.encaminhamentos?.length || card.encaminhamentoPendente);
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : encaminhado ? 0.58 : 1, animationDelay: `${index * 40}ms` };
 
   const ehLeadVirtual = card.origem === "noloss";
   // RM-2026-E1E1F7: etapa com composição explícita decide pelo config
@@ -243,9 +246,12 @@ export function KanbanCard({
       {...attributes}
       {...listeners}
       onClick={() => onAbrir(card.id)}
-      aria-label={ehLeadVirtual ? `${nomeEmpresa}. Lead do site, ainda sem card` : statusConfig ? `${nomeEmpresa}. Status pós-fechamento: ${statusConfig.label}` : nomeEmpresa}
+      aria-label={ehLeadVirtual ? `${nomeEmpresa}. Lead do site, ainda sem card` : encaminhado
+        ? `${nomeEmpresa}. ${card.encaminhamentoPendente ? "Encaminhamento pendente" : "Card encaminhado"}, somente leitura.`
+        : statusConfig ? `${nomeEmpresa}. Status pós-fechamento: ${statusConfig.label}` : nomeEmpresa}
       className={cn(
-        "cursor-grab active:cursor-grabbing select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
+        "select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
+        encaminhado ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
         card.sla?.status === "ATRASADO" && "rounded-2xl ring-2 ring-rose-500/55 shadow-lg shadow-rose-950/40",
         (alertaBoasVindas || alertaAlinhamento) && "animate-pulse",
         ehLeadVirtual
@@ -269,6 +275,19 @@ export function KanbanCard({
         )}
       >
         <div className="relative space-y-2.5">
+          {card.encaminhamentoPendente && (
+            <div role="status" className="rounded-lg border border-amber-300/30 bg-amber-400/10 px-2 py-1 text-[10px] font-semibold text-amber-100">
+              Encaminhamento pendente · confira a automação
+            </div>
+          )}
+          {card.encaminhamentos?.map((destino, indice) => (
+            <div key={`${destino.pipeline ?? "restrito"}-${indice}`} role="status"
+              className="rounded-lg border border-sky-300/25 bg-sky-400/10 px-2 py-1 text-[10px] font-semibold text-sky-100">
+              {destino.pipeline && destino.etapa
+                ? `Encaminhado para ${destino.pipeline} · ${destino.etapa}`
+                : "Encaminhado · localização restrita"}
+            </div>
+          ))}
           {!ehLeadVirtual && card.sla && (
             <div className="flex justify-end">
               <SlaStatusBadge sla={card.sla} />

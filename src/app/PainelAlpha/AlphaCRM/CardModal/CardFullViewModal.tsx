@@ -157,14 +157,14 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
 
   const meuVinculo = card?.membros.find((m) => m.userId === currentUserId);
   const podeAgirNaEtapa = card?.permissaoEtapa?.podeAgir ?? true;
-  const podeTrabalharNoCard = isAdminRole(currentUserRole)
-    || (Boolean(meuVinculo) && podeAgirNaEtapa);
+  const podeTrabalharNoCard = !card?.encaminhado && (isAdminRole(currentUserRole)
+    || (Boolean(meuVinculo) && podeAgirNaEtapa));
   const podeMoverEtapa = podeTrabalharNoCard;
   const podeEditar = podeTrabalharNoCard;
   const podeTrabalharTarefas = podeTrabalharNoCard;
-  const podeGerenciarMembros = isAdminRole(currentUserRole)
+  const podeGerenciarMembros = !card?.encaminhado && (isAdminRole(currentUserRole)
     || meuVinculo?.role === "RESPONSAVEL"
-    || meuVinculo?.role === "ADMINISTRADOR";
+    || meuVinculo?.role === "ADMINISTRADOR");
   const etapaAtual = card ? etapas.find((e) => e.id === card.etapa.id) ?? null : null;
 
   const transicoesDaEtapaAtual = card?.etapa.transicoesEtapaOrigem ?? [];

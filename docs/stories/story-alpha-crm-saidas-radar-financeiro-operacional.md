@@ -1,0 +1,103 @@
+# Story — Alpha CRM: saídas Radar → Financeiro → Operacional com rastreio da origem
+
+## Status
+
+In Progress — causa diagnosticada, implementação local e plano de configuração preparados; publicação protegida e smoke autenticado pendentes.
+
+## Executor Assignment
+
+- **Executor:** @dev
+- **Quality gate:** @qa, com revisão de @architect para identidade e transições entre pipelines.
+- **Ferramentas:** testes BPM, gates do projeto, diagnóstico somente leitura do runtime e configuração publicada.
+
+## Story
+
+**Como** usuário do Alpha CRM, **quero** que a conclusão do contrato encaminhe o trabalho para a primeira etapa do pipeline Operacional e que os cards de saída continuem visíveis no pipeline de origem com a localização atual indicada, **para** acompanhar o fluxo sem voltar a editar um card já encaminhado.
+
+## Critérios de aceite
+
+1. Ao alcançar a última etapa do Financeiro com o contrato concluído, a automação publicada encaminha o caso à **primeira etapa ativa do pipeline Operacional**, usando a configuração de saída. A ação é executada de fato no fluxo real; falhas são registradas e visíveis para diagnóstico.
+2. O encaminhamento preserva o vínculo entre o card Financeiro e o card Operacional. Repetir o evento ou reprocessar a execução não cria card Operacional duplicado para o mesmo encaminhamento nem perde o vínculo.
+3. Após a saída Radar → Financeiro, o card Radar continua aparecendo na etapa de saída do Radar. Ele fica bloqueado para edição e movimentação, visualmente mais opaco e com uma tag que mostra o **pipeline e a etapa atuais do card Financeiro vinculado**.
+4. Após a saída Financeiro → Operacional, o card Financeiro continua aparecendo na etapa de conclusão do Financeiro. Ele fica bloqueado para edição e movimentação, visualmente mais opaco e com uma tag que mostra o **pipeline e a etapa atuais do card Operacional vinculado**.
+5. A tag acompanha mudanças posteriores de etapa no pipeline de destino sem exigir edição no card de origem. A relação entre origem e destino é determinada pelos vínculos persistidos, não por nome de empresa ou por rótulo de etapa.
+6. O bloqueio é aplicado também pelo servidor: ações diretas de salvar ou mover um card de origem já encaminhado não contornam a apresentação da interface. A visualização do card e de seu histórico continua disponível.
+7. A automação, o bloqueio e a tag respeitam as permissões existentes de cada pipeline e não expõem dados de um card de destino a quem não pode vê-lo. A ausência de destino válido ou uma falha de criação mantém a origem em estado diagnosticável, sem indicar falsamente que o encaminhamento foi concluído.
+8. A correção cobre o cenário que falhou no teste do usuário, incluindo a verificação de gatilho, versão publicada, execução/erro, evento de entrada na última etapa e destino configurado. Um teste integrado demonstra a sequência Radar → Financeiro → Operacional e o estado das duas origens.
+
+## Escopo e decisões registradas
+
+- **Fonte do pedido:** mensagem do usuário nesta sessão: encaminhar contrato concluído para o início do Operacional e manter as duas saídas visíveis, bloqueadas, opacas e com tag de localização atual.
+- **[AUTO-DECISION] Interpretação de “redirecionar”:** usar o mecanismo existente de criação de card em outro pipeline, com vínculo ao card de origem, porque o usuário quer que o card original permaneça na etapa de saída. Confirmar no inventário e evitar converter o card de origem em card do destino.
+- **[AUTO-DECISION] Momento exato do gatilho:** identificar a condição publicada de “contrato concluído” antes de definir o evento. O nome da última etapa, isoladamente, não comprova conclusão; não criar regra por texto de etapa.
+- **[AUTO-DECISION] Situações sem destino:** apresentar falha de encaminhamento com diagnóstico; o card não pode exibir tag de destino inexistente. Reprocessamento deve ser seguro.
+- **Dependência de configuração:** antes de publicar ou alterar automação/arestas no Turso, seguir o checkpoint Vault do `AGENTS.md`: inventário, plano explícito, backup completo verificado com até 48 horas e confirmação específica do usuário para esta mutação. Aprovação anterior para outra etapa não cobre esta publicação.
+
+## Tarefas / subtarefas
+
+- [x] **Diagnosticar o caminho real** (AC 1, 8): inventariar etapas, versão publicada, eventos, execuções, vínculos e o card testado. A causa é a ausência de automação Financeiro → Operacional; o board também ocultava o card concluído.
+- [x] **Preparar o encaminhamento Financeiro → Operacional** (AC 1, 2, 7, 8): script declarativo com destino ativo, vínculo, deduplicação e reprocessamento delimitado do evento do card testado. Publicação e execução real pendentes de aprovação.
+- [x] **Definir estado de saída do card de origem** (AC 3–7): derivar bloqueio e localização do vínculo; guard de servidor para card de etapa final encaminhado/concluído.
+- [x] **Atualizar board e modal** (AC 3–5, 7): card atenuado, tag de pipeline/etapa ou localização restrita, indicação de encaminhamento pendente e controles indisponíveis.
+- [x] **Testar localmente** (AC 2–7): 3.830 testes passaram; o teste do board verifica a atualização da tag após a mudança de etapa do destino. Execução real e cadeia completa dependem da publicação protegida.
+- [ ] **Publicar configuração protegida, se necessária** (AC 1, 8): somente após Vault, backup e aprovação específica; conferir estado publicado, execução e rollback. Rodar `npm run lint`, `npm run typecheck`, `npm test` e `npm run build` e registrar resultados.
+
+## Dev Notes
+
+- `src/lib/bpm/automacoes/central-schemas.ts` já aceita `CRIAR_CARD_OUTRO_PIPELINE` com `pipelineId`, `etapaId`, `vincularAoOriginal` e `somenteSeNaoExistirAtivo`. `src/lib/bpm/automacoes/central-runtime.ts` cria `BpmCardVinculo` e publica `CARD_CRIADO`; deduplicação atual por empresa/pipeline/estado exige revisão para o cenário deste pedido.
+- `src/lib/bpm/automacoes/migracao-hardcoded.ts` possui precedente de criação vinculada Comercial/Radar → Financeiro. O fluxo deve respeitar a configuração publicada; não reintroduzir lógica financeira por rótulo no runtime.
+- `src/lib/bpm/transicao-command.ts` é o comando canônico de movimento. `docs/reports/diagnostico-fluxo-financeiro-2026-09-25.md` documenta retirada de guardas financeiras fixas e uso de arestas/requisitos publicados.
+- `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx` renderiza cards e movimento. `src/actions/bpm/Cards.ts` salva e consulta cards. Inspecionar os contratos atuais de leitura e autorização antes de definir a projeção da tag.
+- `prisma/schema.prisma` contém `BpmCardVinculo` (`cardOrigemId`, `cardDestinoId`, par único). A necessidade de migration **não está estabelecida**; preferir os modelos existentes após diagnóstico.
+- Inventário Turso de 25/09/2026: o pipeline `comercial` é **Revisão de Radar** e sua etapa final `Fechado` já cria Financeiro e o pipeline `radar` antigo/inativo. O Financeiro `Concluídos` tem 1 card `CONCLUIDO`, evento `CARD_MOVIDO` em 17:44:46 UTC e **nenhuma** automação para Operacional. A consulta do board filtrava somente `ATIVO`, ocultando esse card. O Operacional tem etapa inicial `Boas-vindas` e nenhum card.
+- O plano somente leitura `scripts/bpm-handoff-config.mts` cria a automação na saída final Financeiro → entrada Operacional, arquiva o nó antigo do Radar inativo na automação Comercial e delimita o reprocessamento ao único evento de conclusão do card testado. O código preserva vínculos quando o destino ativo já existe e ignora destino de pipeline inativo.
+- Vault: backup completo dedicado `database-backups/pre-change/painelalpha_turso_pre_change_financeiro_operacional_2026-09-25T18-18-55-914Z.db`, restauração verificada (331 tabelas, 171.450 linhas, FK=0, integridade OK), SHA-256 `ddd7da3b6410e0364ca33834657f404b09e6104c7a4d0bb4693888367c3a9dfd`. Snapshot seletivo `database-backups/pre-change/financeiro-operacional-config-before-2026-09-25T18-19-11-189Z.json`. Nenhuma mutação aplicada.
+- `docs/stories/story-financeiro-novo-contrato.md` define a entrada vinculada Radar → Financeiro. `docs/stories/story-rm-2026-fe6c53-desenho-pipelines.md` define `BpmTransicaoEtapa` como autoridade única e saídas explícitas.
+- O arquivo `accumulated-context.md` e `.aiox/gotchas.json` não foram encontrados no checkout durante o draft; o contexto cruzado foi obtido das stories e do diagnóstico acima.
+
+## Testing
+
+- Testes unitários do gatilho, vínculo e leitura da localização; integração do executor e dos comandos de salvar/mover; testes React do board/modal e teste de fluxo autenticado com os três pipelines.
+- Cenário principal: Radar concluído cria Financeiro; Radar permanece visível e bloqueado; Financeiro concluído cria Operacional na primeira etapa; Financeiro permanece visível e bloqueado; a mudança de etapa Operacional atualiza a tag no Financeiro.
+- Cenários adversos: evento duplicado, card destino ativo preexistente, destino ausente/inativo, automação despublicada/falha, chamadas diretas ao servidor e permissão insuficiente.
+
+## 🤖 CodeRabbit Integration
+
+- **Story Type Analysis:** Integração, com API, Frontend e configuração persistida; complexidade alta pela cadeia entre pipelines e idempotência.
+- **Specialized Agents:** @dev implementa; @architect revisa vínculo e estado; @qa valida testes; @ux-expert revisa bloqueio/tag; Vault antes de mutação protegida; @github-devops em PR/deploy.
+- **Quality Gates:** Pre-Commit (@dev): lint, typecheck, testes, build e review; Pre-PR (@github-devops): regressão de transições e autorização; Pre-Deployment (@github-devops): evidência Vault, configuração publicada e rollback.
+- **Self-Healing (Story 6.3.3):** @dev light, 2 iterações/15 min, corrige CRITICAL; @qa full, 3 iterações/30 min, corrige CRITICAL/HIGH e documenta MEDIUM; @github-devops check, apenas reporta.
+- **Focus Areas:** idempotência e vínculo correto, bloqueio de mutação no servidor, autorização da tag, execução assíncrona e diagnóstico de erro, consistência entre board e detalhe.
+
+## Checklist
+
+- [x] Pedido original e histórias adjacentes consultados; critérios de aceite rastreáveis e testáveis.
+- [x] Pontos de código e modelo existentes identificados sem assumir configuração real de produção.
+- [x] Checklist de draft aplicado: objetivo/contexto PASS; orientação técnica PARTIAL (inventário de produção pendente); referências PASS; autossuficiência PASS; testes PASS; CodeRabbit PASS.
+- [x] Inventário real da automação/etapas e causa da falha registrado.
+- [x] Implementação e gates locais concluídos: lint (0 erros, avisos preexistentes), typecheck, 3.830 testes e build passaram. A suíte usou uma cópia temporária do backup como banco local; nenhuma escrita foi feita no banco remoto.
+- [ ] Configuração publicada após checkpoint Vault, se houver mutação protegida.
+- [ ] Smoke autenticado do fluxo completo concluído.
+
+## Dev Agent Record
+
+### File List inicial
+
+- `docs/stories/story-alpha-crm-saidas-radar-financeiro-operacional.md` — esta story.
+- `src/lib/bpm/automacoes/central-runtime.ts` — validação do destino ativo e deduplicação com vínculo.
+- `src/lib/bpm/ownership.ts`, `src/actions/bpm/Cards.ts` — bloqueio no servidor e projeção dos cards de saída.
+- `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`, `src/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal.tsx` — card atenuado/tag e modal somente leitura.
+- `scripts/bpm-handoff-config.mts` — plano somente leitura e publicação protegida da configuração.
+- `tests/bpm/ownership-security.test.ts`, `tests/bpm/board-polling-react.test.ts` — bloqueio e tag no board.
+- `tests/bpm/fechado-ui.test.ts` — expectativa do estilo de arrasto atualizada para cards encaminhados.
+
+### Change Log
+
+| Data | Versão | Descrição | Autor |
+| --- | --- | --- | --- |
+| 2026-09-25 | 0.1 | Draft do encaminhamento e persistência visual das saídas | River (@sm) |
+| 2026-09-25 | 0.2 | Diagnóstico real, plano Vault e implementação local de bloqueio e localização | Codex |
+
+## QA Results
+
+Pendente.

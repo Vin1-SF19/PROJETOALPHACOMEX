@@ -92,6 +92,29 @@ it("para o polling ao desmontar o board", async () => {
   expect(ListarCardsPipelineBpm).not.toHaveBeenCalled();
 });
 
+it("mantém a origem concluída visível com localização atual e aparência atenuada", async () => {
+  Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
+  vi.useFakeTimers();
+  const { container, root, props } = montarBoard();
+  props.pipeline.etapas = [{ id: "etapa-1", nome: "Concluídos", ordem: 0 }];
+  props.cardsIniciais = [{ ...card, status: "CONCLUIDO", podeAgirEtapa: false,
+    encaminhamentos: [{ pipeline: "Operacional", etapa: "Boas-vindas" }] }];
+  vi.mocked(ListarCardsPipelineBpm).mockResolvedValue({ success: true, data: [{ ...props.cardsIniciais[0],
+    encaminhamentos: [{ pipeline: "Operacional", etapa: "Execução" }] }] } as never);
+  try {
+    await act(async () => root.render(h(PipelineBoardClient, props)));
+    const origem = container.querySelector<HTMLElement>('[aria-label*="Card encaminhado, somente leitura"]');
+    expect(origem).not.toBeNull();
+    expect(origem?.style.opacity).toBe("0.58");
+    expect(origem?.textContent).toContain("Encaminhado para Operacional · Boas-vindas");
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(origem?.textContent).toContain("Encaminhado para Operacional · Execução");
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+  }
+});
+
 it("não recoloca o card após exclusão local quando uma consulta antiga termina", async () => {
   Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
   vi.useFakeTimers();
