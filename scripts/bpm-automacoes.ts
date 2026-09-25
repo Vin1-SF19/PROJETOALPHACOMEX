@@ -5,6 +5,7 @@ import db from "../src/lib/prisma";
 import { materializarAgendasAutomacoesBpm, materializarGatilhosTemporaisBpm } from "../src/lib/bpm/automacoes/agenda";
 import { materializarExecucoesEventosBpm } from "../src/lib/bpm/automacoes/eventos";
 import { processarFilaAutomacoesCentraisBpm, reprocessarExecucaoAutomacaoCentral } from "../src/lib/bpm/automacoes/central-runtime";
+import { processarLembretesAssinaturaFinanceiro } from "../src/lib/bpm/financeiro-lembretes";
 
 function valorFlag(nome: string, padrao?: string) {
   const item = process.argv.find((arg) => arg.startsWith(`--${nome}=`));
@@ -28,7 +29,8 @@ async function run() {
   const temporais = await materializarGatilhosTemporaisBpm(limite * 5);
   const eventos = await materializarExecucoesEventosBpm(limite * 5);
   const fila = await processarFilaAutomacoesCentraisBpm(limite);
-  console.log(JSON.stringify({ agenda, temporais, eventos, fila }, null, 2));
+  const lembretesAssinatura = await processarLembretesAssinaturaFinanceiro();
+  console.log(JSON.stringify({ agenda, temporais, eventos, fila, lembretesAssinatura }, null, 2));
 }
 
 async function retry() {

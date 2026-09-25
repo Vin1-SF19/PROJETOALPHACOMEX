@@ -17,6 +17,7 @@ import {
 import { TEMPLATE_RESUMO_ALINHAMENTO } from "@/lib/bpm/alinhamento-estrategico";
 import { BPM_FIELD_KEYS, BPM_STAGE_KEYS } from "@/lib/bpm/ontology";
 import { FINANCIAL_FIELD_KEYS } from "@/lib/bpm/pipeline-financeiro";
+import { avaliarFormalizacaoFinanceira } from "@/lib/bpm/financeiro-formalizacao";
 import { useCardSave } from "@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext";
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type CamposEtapaCard = CardDetalhe["camposEtapa"];
@@ -54,7 +55,7 @@ export function PainelCamposEtapaAtual({
   const [valoresCamposAtuais, setValoresCamposAtuais] = useState<Record<string, string>>(() =>
     getDraft(idInstancia) ?? Object.fromEntries(camposDoComponente.map((campo) => [campo.id, campo.valor ?? ""])),
   );
-  const [, setBaseCamposAtuais] = useState<Record<string, string>>(() =>
+  const [valoresConfirmados, setBaseCamposAtuais] = useState<Record<string, string>>(() =>
     Object.fromEntries(camposDoComponente.map((campo) => [campo.id, campo.valor ?? ""])),
   );
   const [camposEtapaBase, setCamposEtapaBase] = useState(camposDoComponente);
@@ -264,6 +265,17 @@ export function PainelCamposEtapaAtual({
     if (!sucesso && revisaoEdicao.current === revisaoEnviada) setEstadoSave("erro");
   }
   const campoCnpj = camposAtuaisVisiveis.find((campo) => campo.chave === FINANCIAL_FIELD_KEYS.CNPJ);
+  const campoAssinatura = camposAtuaisVisiveis.find((campo) => campo.chave === "alpha.financeiro.status.contrato.assinatura");
+  const campoDataAssinatura = camposAtuaisVisiveis.find((campo) => campo.chave === "alpha.data.da.assinatura");
+  const campoContratoAssinado = camposAtuaisVisiveis.find((campo) => campo.chave === "alpha.contrato.assinado.anexo");
+  const anexoAssinadoId = campoContratoAssinado ? valoresConfirmados[campoContratoAssinado.id] : null;
+  const requisitoContrato = campoAssinatura && avaliarFormalizacaoFinanceira({
+    statusAssinatura: valoresConfirmados[campoAssinatura.id],
+    dataAssinatura: campoDataAssinatura ? valoresConfirmados[campoDataAssinatura.id] : null,
+    anexoAssinadoId,
+    anexoAssinadoVinculado: Boolean(anexoAssinadoId && card.anexos.some((anexo) => anexo.id === anexoAssinadoId && anexo.campoId === campoContratoAssinado?.id)),
+    pagamentoConfirmado: null,
+  }).contrato;
   const cnpjDaEtapa = campoCnpj ? valoresCamposAtuais[campoCnpj.id] ?? "" : "";
   async function consultarCnpjNovoContrato(mostrarErro: boolean) {
     if (!podeEditar || !campoCnpj || buscandoCnpj) return;
@@ -338,6 +350,13 @@ export function PainelCamposEtapaAtual({
         <div role="alert" className="flex items-start gap-2 rounded-xl border border-red-500/35 bg-red-500/10 p-3 text-xs text-red-100">
           <AlertTriangle size={15} className="mt-0.5 shrink-0 text-red-300" aria-hidden="true" />
           <p><strong>Chamada de alinhamento pendente.</strong> Cole o resumo da reunião para liberar o avanço da etapa.</p>
+        </div>
+      )}
+      {requisitoContrato && (
+        <div role="status" className={requisitoContrato === "Concluído"
+          ? "rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs font-semibold text-emerald-200"
+          : "rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-semibold text-amber-200"}>
+          {requisitoContrato === "Concluído" ? "CONTRATO CONCLUÍDO" : "Contrato pendente de assinatura válida"}
         </div>
       )}
       {camposAtuaisVisiveis.length === 0 ? (

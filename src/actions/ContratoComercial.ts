@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { criarRegistroClienteAPartirDeContrato } from "./Clientes";
 import { SERVICOS_COMERCIAIS_PADRAO } from "@/lib/comercial/servicos";
 import { pusherServer } from "@/lib/pusher-server.ts";
+import { buscarAnexosAssinadosFinanceiroPorContrato } from "@/lib/bpm/financeiro-metas";
 import {
     CANAL_INDICACAO_PARCEIRO,
     ParceiroNaoCadastradoInputSchema,
@@ -507,11 +508,24 @@ export async function getContratos(options: GetContratosOptions) {
             }),
         ]);
 
+        const anexosFinanceiro = await buscarAnexosAssinadosFinanceiroPorContrato(
+            [...enviados, ...fechados, ...arquivados].map((contrato) => contrato.id),
+        ).catch((error) => {
+            console.error("[getContratos/anexos-financeiro]", error);
+            return new Map<string, string>();
+        });
+        const apresentarContrato = (contrato: (typeof enviados)[number]) => ({
+            ...achatarContrato(contrato),
+            contratoAssinadoFinanceiroUrl: anexosFinanceiro.has(contrato.id)
+                ? `/api/contratos/${contrato.id}/assinado-financeiro`
+                : null,
+        });
+
         return {
             success: true as const,
-            enviados: enviados.map(achatarContrato),
-            fechados: fechados.map(achatarContrato),
-            arquivados: arquivados.map(achatarContrato),
+            enviados: enviados.map(apresentarContrato),
+            fechados: fechados.map(apresentarContrato),
+            arquivados: arquivados.map(apresentarContrato),
         };
     } catch (err) {
         console.error("getContratos:", err);
