@@ -66,8 +66,17 @@ const ROTA_BASE = "/PainelAlpha/GeradorDocumentos";
 
 const getSessao = getSessaoGeradorDocumentos;
 
+function lerJsonPersistido(valor: unknown): unknown {
+  if (typeof valor !== "string") return valor;
+  try {
+    return JSON.parse(valor);
+  } catch {
+    return valor;
+  }
+}
+
 function parseVariaveisJson(json: unknown): VariavelTemplate[] {
-  const parsed = z.array(VariavelTemplateSchema).safeParse(json);
+  const parsed = z.array(VariavelTemplateSchema).safeParse(lerJsonPersistido(json));
   return parsed.success ? parsed.data : [];
 }
 
@@ -765,27 +774,74 @@ export async function AtualizarVariaveisContratoPadrao(payload: unknown) {
     const fonte = await db.documentoGerado.findUnique({ where: { id: documento.id }, select: { variaveisJson: true } });
     const bruto = fonte?.variaveisJson;
     const anteriores = (typeof bruto === "string" ? JSON.parse(bruto) : bruto ?? {}) as Record<string, string | number | boolean | null>;
-    if (!anteriores.__bpmCardId || documento.pdfUrl) {
-      return { success: false as const, error: "Somente o rascunho automático sem PDF pode atualizar variáveis" };
+    if (!anteriores.__bpmCardId) {
+      return { success: false as const, error: "Somente o rascunho automático pode atualizar variáveis" };
     }
     const novos = { ...anteriores, ...input.valores };
     const clausulas = await db.documentoClasulaGerada.findMany({
-      where: { documentoId: documento.id }, select: { id: true, conteudo: true, conteudoOriginal: true, reescritoPorIA: true },
+      where: { documentoId: documento.id }, orderBy: { ordem: "asc" },
+      select: { id: true, ordem: true, titulo: true, conteudo: true, conteudoOriginal: true, reescritoPorIA: true },
     });
     const atualizacoes = clausulasAtualizaveisContrato({
       definicoes: VARIAVEIS_CONTRATO_PADRAO, anteriores, novos, clausulas,
     });
-    await db.$transaction([
-      db.documentoGerado.update({ where: { id: documento.id }, data: { variaveisJson: JSON.stringify(novos) } }),
-      ...atualizacoes.map((clausula) => db.documentoClasulaGerada.update({ where: { id: clausula.id }, data: { conteudo: clausula.conteudo } })),
+    const textosAtualizados = new Map(atualizacoes.map((clausula) => [clausula.id, clausula.conteudo]));
+    const clausulasFinais = clausulas.map((clausula) => ({
+      ...clausula,
+      conteudo: textosAtualizados.get(clausula.id) ?? clausula.conteudo,
+    }));
+    const estiloDocx = (await carregarContratoPadrao()).estiloDocx;
+    const bufferPdf = await gerarPdfDocumento({ titulo: documento.titulo, clausulas: clausulasFinais, estiloDocx });
+    const htmlAtualizado = criarHtmlDeClausulas(documento.titulo, clausulasFinais);
+    const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+    if (!blobToken) throw new Error("Armazenamento de arquivos não configurado");
+    const revisao = randomUUID();
+    const [htmlBlob, pdfBlob] = await Promise.all([
+      put(`gerador-documentos/documentos-html/${ctx.userId}/${documento.id}-${revisao}.html`, Buffer.from(htmlAtualizado, "utf-8"), {
+        access: "public", addRandomSuffix: false, token: blobToken, contentType: "text/html",
+      }),
+      put(`gerador-documentos/documentos-pdf/${ctx.userId}/${documento.id}-${revisao}.pdf`, bufferPdf, {
+        access: "public", addRandomSuffix: false, token: blobToken, contentType: "application/pdf",
+      }),
     ]);
+    let colunaHtmlDisponivel = false;
+    try {
+      await db.$queryRaw`SELECT "htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documento.id}`;
+      colunaHtmlDisponivel = true;
+    } catch {
+      // Compatibilidade com ambientes sem a coluna opcional.
+    }
+    await db.$transaction(async (tx) => {
+      const atualizado = await tx.documentoGerado.updateMany({
+        where: { id: documento.id, status: "CONFERENCIA", pdfUrl: documento.pdfUrl },
+        data: { variaveisJson: JSON.stringify(novos), pdfUrl: pdfBlob.url },
+      });
+      if (atualizado.count !== 1) throw new Error("O documento foi alterado em outra sessão. Recarregue a página.");
+      for (const alteracao of atualizacoes) {
+        const anterior = clausulas.find((item) => item.id === alteracao.id);
+        if (!anterior) throw new Error("Cláusula não encontrada no documento");
+        const resultado = await tx.documentoClasulaGerada.updateMany({
+          where: { id: alteracao.id, documentoId: documento.id, conteudo: anterior.conteudo },
+          data: { conteudo: alteracao.conteudo },
+        });
+        if (resultado.count !== 1) throw new Error("Uma cláusula foi alterada em outra sessão. Recarregue a página.");
+      }
+      if (colunaHtmlDisponivel) {
+        await tx.$executeRaw`UPDATE "DocumentoGerado" SET "htmlUrl" = ${htmlBlob.url} WHERE "id" = ${documento.id}`;
+      }
+    });
     revalidatePath(`${ROTA_BASE}/conferencia`);
     return { success: true as const, data: {
       variaveisJson: novos,
-      clausulas: await db.documentoClasulaGerada.findMany({ where: { documentoId: documento.id }, orderBy: { ordem: "asc" }, select: { id: true, ordem: true, titulo: true, conteudo: true, reescritoPorIA: true } }),
+      clausulas: clausulasFinais.map(({ id, ordem, titulo, conteudo, reescritoPorIA }) => ({ id, ordem, titulo, conteudo, reescritoPorIA })),
+      pdfDisponivel: true as const,
     } };
   } catch (error) {
-    return { success: false as const, error: mensagemErro(error) };
+    console.error("[GeradorDocumentos] Falha ao atualizar dados do contrato e PDF:", error);
+    const mensagem = mensagemErro(error);
+    return { success: false as const, error: mensagem === "Não foi possível concluir a operação"
+      ? "Não foi possível atualizar o PDF. Os dados do contrato não foram salvos; tente novamente."
+      : mensagem };
   }
 }
 
@@ -794,17 +850,103 @@ export async function EditarClasulaGerada(payload: unknown) {
     const { userId, role } = await getSessao();
     const ctx = await exigirAcessoModulo(userId, role);
     const input = EditarClasulaGeradaSchema.parse(payload);
-    await exigirOwnershipDocumento(input.documentoId, ctx);
+    const documento = await exigirOwnershipDocumento(input.documentoId, ctx);
+    if (documento.status === "FINALIZADO" || documento.status === "ARQUIVADO") {
+      return { success: false as const, error: "Este documento não pode mais ser editado" };
+    }
 
-    await db.documentoClasulaGerada.updateMany({
-      where: { id: input.clasulaId, documentoId: input.documentoId },
-      data: { conteudo: input.conteudo },
+    const todasClausulas = await db.documentoClasulaGerada.findMany({
+      where: { documentoId: documento.id },
+      orderBy: { ordem: "asc" },
+      select: { id: true, titulo: true, conteudo: true },
+    });
+    const clausula = todasClausulas.find((item) => item.id === input.clasulaId);
+    if (!clausula) return { success: false as const, error: "Cláusula não encontrada" };
+    if (clausula.conteudo === input.conteudo) {
+      return { success: true as const, pdfDisponivel: Boolean(documento.pdfUrl), atualizado: false as const };
+    }
+
+    const clausulasAtualizadas = todasClausulas.map((item) =>
+      item.id === clausula.id ? { ...item, conteudo: input.conteudo } : item,
+    );
+    let htmlAtual: string | null = null;
+    let htmlUrlPersistida: string | null = null;
+    let colunaHtmlDisponivel = false;
+    try {
+      const rows = await db.$queryRaw<Array<{ htmlUrl: string | null }>>`
+        SELECT "htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documento.id}
+      `;
+      colunaHtmlDisponivel = true;
+      htmlUrlPersistida = rows[0]?.htmlUrl ?? null;
+    } catch {
+      // Compatibilidade com ambientes onde a coluna opcional ainda não existe.
+    }
+    const htmlUrlAnterior = htmlUrlPersistida ?? derivarHtmlUrlDoPdf(documento.pdfUrl);
+    if (htmlUrlAnterior) {
+      try {
+        const resposta = await fetch(htmlUrlAnterior);
+        if (resposta.ok) htmlAtual = await resposta.text();
+      } catch {
+        // Documento legado sem HTML acessível: reconstruir a partir das cláusulas.
+      }
+    }
+    const substituicao = htmlAtual ? substituirClausulaNoHtml(htmlAtual, clausula.conteudo, input.conteudo) : null;
+    const htmlAtualizado = substituicao?.substituida
+      ? substituicao.html
+      : criarHtmlDeClausulas(documento.titulo, clausulasAtualizadas);
+
+    const templateOrigem = await db.documentoTemplate.findUnique({
+      where: { id: documento.templateId },
+      select: { arquivoOrigemUrl: true, arquivoOrigemNome: true },
+    });
+    const estiloDocx = documento.templateId === CONTRATO_PADRAO_ID
+      ? (await carregarContratoPadrao()).estiloDocx
+      : /\.docx$/i.test(templateOrigem?.arquivoOrigemNome ?? "")
+        ? await carregarEstiloDocxPdf(templateOrigem?.arquivoOrigemUrl)
+        : undefined;
+    const bufferPdf = estiloDocx
+      ? await gerarPdfDocumento({ titulo: documento.titulo, clausulas: clausulasAtualizadas, estiloDocx })
+      : await renderHtmlParaPdf(htmlAtualizado);
+
+    const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+    if (!blobToken) throw new Error("Armazenamento de arquivos não configurado");
+    const revisao = randomUUID();
+    const [htmlBlob, pdfBlob] = await Promise.all([
+      put(`gerador-documentos/documentos-html/${ctx.userId}/${documento.id}-${revisao}.html`, Buffer.from(htmlAtualizado, "utf-8"), {
+        access: "public", addRandomSuffix: false, token: blobToken, contentType: "text/html",
+      }),
+      put(`gerador-documentos/documentos-pdf/${ctx.userId}/${documento.id}-${revisao}.pdf`, bufferPdf, {
+        access: "public", addRandomSuffix: false, token: blobToken, contentType: "application/pdf",
+      }),
+    ]);
+
+    await db.$transaction(async (tx) => {
+      const atualizacao = await tx.documentoClasulaGerada.updateMany({
+        where: { id: clausula.id, documentoId: documento.id, conteudo: clausula.conteudo },
+        data: { conteudo: input.conteudo },
+      });
+      if (atualizacao.count !== 1) throw new Error("A cláusula foi alterada em outra sessão. Recarregue a página.");
+      const revisaoAtualizada = await tx.documentoGerado.updateMany({
+        where: { id: documento.id, pdfUrl: documento.pdfUrl, status: { in: ["RASCUNHO", "CONFERENCIA"] } },
+        data: { pdfUrl: pdfBlob.url },
+      });
+      if (revisaoAtualizada.count !== 1) throw new Error("O documento foi alterado em outra sessão. Recarregue a página.");
+      if (colunaHtmlDisponivel) {
+        await tx.$executeRaw`UPDATE "DocumentoGerado" SET "htmlUrl" = ${htmlBlob.url} WHERE "id" = ${documento.id}`;
+      }
     });
 
     revalidatePath(`${ROTA_BASE}/conferencia`);
-    return { success: true as const };
+    return { success: true as const, pdfDisponivel: true as const, atualizado: true as const };
   } catch (error) {
-    return { success: false as const, error: mensagemErro(error) };
+    console.error("[GeradorDocumentos] Falha ao atualizar cláusula e PDF:", error);
+    const mensagem = mensagemErro(error);
+    return {
+      success: false as const,
+      error: mensagem === "Não foi possível concluir a operação"
+        ? "Não foi possível atualizar o PDF. A alteração não foi salva; tente novamente."
+        : mensagem,
+    };
   }
 }
 
@@ -945,7 +1087,7 @@ export async function FinalizarDocumento(documentoId: string) {
     });
     if (!documento) return { success: false as const, error: "Documento não encontrado" };
 
-    const valoresSalvos = z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]).nullable()).safeParse(documento.variaveisJson);
+    const valoresSalvos = z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]).nullable()).safeParse(lerJsonPersistido(documento.variaveisJson));
     const usaContratoPadrao = documento.templateId === CONTRATO_PADRAO_ID && valoresSalvos.success && valoresSalvos.data.__modeloContratoPadrao === "docx-v1";
     const variaveisTemplate = usaContratoPadrao ? VARIAVEIS_CONTRATO_PADRAO : parseVariaveisJson(documento.template.variaveisJson);
     const faltando = validarVariaveisObrigatorias(variaveisTemplate, valoresSalvos.success ? valoresSalvos.data : {});

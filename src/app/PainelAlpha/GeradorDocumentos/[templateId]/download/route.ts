@@ -4,17 +4,18 @@ import { isAdminRole } from "@/lib/roles";
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
 import { exigirOwnershipDocumento } from "@/lib/gerador-documentos/ownership";
 
-// Rate limiting simples em memória (5 downloads/min por usuário) — mesmo padrão de contratos/upload
+// Limites separados: editar cláusulas recarrega a prévia PDF várias vezes.
 const downloadTimestamps = new Map<string, number[]>();
 
-function verificarRateLimit(userId: string): boolean {
+function verificarRateLimit(userId: string, disposition: "inline" | "attachment"): boolean {
   const agora = Date.now();
   const janela = 60 * 1000;
-  const limite = 5;
-  const registros = (downloadTimestamps.get(userId) || []).filter((t) => agora - t < janela);
+  const limite = disposition === "inline" ? 30 : 5;
+  const chave = `${userId}:${disposition}`;
+  const registros = (downloadTimestamps.get(chave) || []).filter((t) => agora - t < janela);
   if (registros.length >= limite) return false;
   registros.push(agora);
-  downloadTimestamps.set(userId, registros);
+  downloadTimestamps.set(chave, registros);
   return true;
 }
 
@@ -55,7 +56,8 @@ export async function GET(
     return NextResponse.json({ error: "PDF ainda não gerado para este documento" }, { status: 404 });
   }
 
-  if (!verificarRateLimit(String(userId))) {
+  const disposition = new URL(request.url).searchParams.get("disposition") === "inline" ? "inline" : "attachment";
+  if (!verificarRateLimit(String(userId), disposition)) {
     return NextResponse.json(
       { error: "Limite de downloads atingido. Tente novamente em alguns minutos." },
       { status: 429 },
@@ -70,14 +72,13 @@ export async function GET(
     }
     const buffer = Buffer.from(await res.arrayBuffer());
     const filename = `${documento.titulo.replace(/[^a-zA-Z0-9à-úÀ-Ú\s-]/g, "").trim() || "documento"}.pdf`;
-    const disposition = new URL(request.url).searchParams.get("disposition") === "inline" ? "inline" : "attachment";
-
     return new NextResponse(buffer, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `${disposition}; filename="${encodeURIComponent(filename)}"`,
         "Content-Length": String(buffer.length),
         "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "private, no-store, max-age=0",
       },
     });
   } catch {

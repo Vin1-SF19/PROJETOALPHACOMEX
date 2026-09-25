@@ -386,6 +386,16 @@ O renderer preserva a estrutura reconhecível pelo HTML do Tika, mas não reprod
 - [x] Gerar o contrato inteiro em `next start` por rota temporária local: HTTP 200, `%PDF`, 98.275 bytes.
 - [x] Rodar lint, typecheck, testes e build após remover a rota temporária.
 
+### Conferência sincronizada com o PDF
+
+- [x] Remover a seção “Visualização fiel do documento” e o download de HTML da conferência.
+- [x] Ao salvar uma cláusula editada, atualizar o texto persistido, o PDF e a prévia com a mesma revisão.
+- [x] Ao salvar os campos do contrato padrão automático, atualizar cláusulas, PDF, prévia e download mesmo se já houver PDF.
+- [x] Na finalização, ler o JSON persistido e manter o estilo DOCX e as cláusulas editadas no PDF final.
+- [x] Impedir download e finalização enquanto houver alterações ainda não salvas; permitir nova tentativa após falha.
+- [x] Fazer o download buscar a revisão atual do PDF sem cache antigo.
+- [x] Validar edição manual, sincronização dos artefatos, download e gates do projeto.
+
 ### File List
 
 - `src/lib/gerador-documentos/docx-style.ts`
@@ -396,6 +406,7 @@ O renderer preserva a estrutura reconhecível pelo HTML do Tika, mas não reprod
 - `src/actions/gerador-documentos.ts`
 - `src/components/GeradorDocumentos/GerarDocumentoForm.tsx`
 - `src/components/GeradorDocumentos/GeradorDocumentosClient.tsx`
+- `src/components/GeradorDocumentos/ConferenciaClient.tsx`
 - `src/app/PainelAlpha/GeradorDocumentos/[templateId]/page.tsx`
 - `docs/CONTRATO DE PRESTAÇÃO DE SERVIÇOS.docx`
 - `public/fonts/gerador-documentos/P052-Roman.otf`
@@ -411,6 +422,11 @@ O renderer preserva a estrutura reconhecível pelo HTML do Tika, mas não reprod
 - `tests/gerador-documentos/docx-style.test.ts`
 - `tests/gerador-documentos/pdf-fallback.test.ts`
 - `tests/gerador-documentos/reescrever-clausula.test.ts`
+- `tests/gerador-documentos/editar-clausula.test.ts`
+- `tests/gerador-documentos/variaveis-conferencia-pdf.test.ts`
+- `tests/gerador-documentos/finalizar-documento.test.ts`
+- `tests/gerador-documentos/download-pdf.test.ts`
+- `src/app/PainelAlpha/GeradorDocumentos/[templateId]/download/route.ts`
 - `docs/stories/story-gerador-documentos-html-pdf-blueprint.md`
 
 O DOCX usa Palatino Linotype, mas não incorpora os arquivos da fonte. O PDF usa P052, uma fonte de desenho compatível, distribuída com a licença incluída acima.

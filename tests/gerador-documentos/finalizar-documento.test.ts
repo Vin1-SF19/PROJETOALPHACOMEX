@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   gerarPdfDocumento: vi.fn(),
   renderHtmlParaPdf: vi.fn(),
   queryRaw: vi.fn(),
+  carregarContratoPadrao: vi.fn(),
 }));
 
 vi.mock("../../auth", () => ({ auth: mocks.auth }));
@@ -46,6 +47,10 @@ vi.mock("@/lib/gerador-documentos/pdf", () => ({
   gerarPdfDocumento: mocks.gerarPdfDocumento,
 }));
 vi.mock("@/lib/gerador-documentos/pdf-renderer", () => ({ renderHtmlParaPdf: mocks.renderHtmlParaPdf }));
+vi.mock("@/lib/gerador-documentos/contrato-padrao", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/gerador-documentos/contrato-padrao")>(),
+  carregarContratoPadrao: mocks.carregarContratoPadrao,
+}));
 
 vi.mock("@/lib/bibble/tika", () => ({ extractTextFromBuffer: vi.fn() }));
 vi.mock("@/lib/onyx/user-token", () => ({ getUserOnyxToken: vi.fn() }));
@@ -55,6 +60,8 @@ vi.mock("@/lib/gerador-documentos/onyx", () => ({
 }));
 
 import { FinalizarDocumento } from "@/actions/gerador-documentos";
+import { CONTRATO_PADRAO_ID } from "@/lib/gerador-documentos/contrato-padrao-id";
+import { VARIAVEIS_CONTRATO_PADRAO } from "@/lib/gerador-documentos/contrato-padrao";
 
 const DOCUMENTO_ID = "clx0000000000000000000000";
 
@@ -177,6 +184,32 @@ describe("FinalizarDocumento", () => {
     expect(mocks.gerarPdfDocumento).not.toHaveBeenCalled();
     expect(mocks.put).not.toHaveBeenCalled();
     expect(mocks.updateDocumento).not.toHaveBeenCalled();
+  });
+
+  it("lê o JSON persistido como string e mantém logo e fonte do contrato padrão na finalização", async () => {
+    const valores = Object.fromEntries(VARIAVEIS_CONTRATO_PADRAO.map((variavel) => [variavel.nome, "preenchido"]));
+    mocks.findUniqueDocumento.mockResolvedValue({
+      templateId: CONTRATO_PADRAO_ID,
+      titulo: "Contrato padrão",
+      variaveisJson: JSON.stringify({ ...valores, __modeloContratoPadrao: "docx-v1" }),
+      template: { variaveisJson: "[]", arquivoOrigemNome: null, arquivoOrigemUrl: null },
+      clausulas: [{ titulo: "Objeto", conteudo: "Cláusula editada." }],
+    });
+    const estiloDocx = { fonteCorpo: "Palatino Linotype", cabecalhoImagem: "logo" };
+    mocks.carregarContratoPadrao.mockResolvedValue({ estiloDocx });
+    mocks.gerarPdfDocumento.mockResolvedValue(Buffer.from("%PDF-com-logo"));
+    mocks.put.mockResolvedValue({ url: "https://blob.example/final.pdf" });
+    mocks.updateDocumento.mockResolvedValue({});
+
+    const resultado = await FinalizarDocumento(DOCUMENTO_ID);
+
+    expect(resultado.success).toBe(true);
+    expect(mocks.gerarPdfDocumento).toHaveBeenCalledWith({
+      titulo: "Contrato padrão",
+      clausulas: [{ titulo: "Objeto", conteudo: "Cláusula editada." }],
+      estiloDocx,
+    });
+    expect(mocks.renderHtmlParaPdf).not.toHaveBeenCalled();
   });
 
   it("usuário sem ownership do documento é bloqueado antes de buscar cláusulas", async () => {
