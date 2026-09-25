@@ -18,7 +18,7 @@ interface CardSaveContextValue {
   setPendingFields: (instance: string, fields: string[]) => void;
   getPendingFields: (cardId?: string) => string[];
   /** Enfileira um save para preservar a ordem e a versão-base do card. */
-  registerSave: (save: () => Promise<boolean>, cardId?: string, recoveryKey?: string) => Promise<boolean>;
+  registerSave: (save: () => Promise<boolean>, cardId?: string, recoveryKey?: string, refreshAfterSave?: boolean) => Promise<boolean>;
   /** Aguarda todos os saves e informa se a persistência foi concluída. */
   flushSaves: (cardId?: string) => Promise<boolean>;
 }
@@ -80,13 +80,13 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
 
   const recovery = useRef(new Map<string, () => Promise<boolean>>());
   const failures = useRef(new Map<string, string | undefined>());
-  const registerSave = useCallback(function enqueue(save: () => Promise<boolean>, cardId?: string, recoveryKey?: string): Promise<boolean> {
+  const registerSave = useCallback(function enqueue(save: () => Promise<boolean>, cardId?: string, recoveryKey?: string, refreshAfterSave = true): Promise<boolean> {
     if (recoveryKey) recovery.current.set(recoveryKey, save);
     const scope = cardId ?? "";
     const anteriores = savePromiseRef.current.get(scope) ?? Promise.resolve(true);
     const tentativa = anteriores.then(async () => {
       const success = await save();
-      if (success && cardId) {
+      if (success && cardId && refreshAfterSave) {
         const result = await ObterCardBpm(cardId);
         if (!result.success || !result.data) return false;
         confirmVersion(cardId, new Date(result.data.updatedAt).toISOString());
@@ -107,7 +107,7 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
               flushScheduled(cardId ? `${cardId}:` : "");
               const latest = recovery.current.get(recoveryKey);
               // O flush pode ter enfileirado uma revisão mais recente.
-              if (latest && latest === previous) void enqueue(latest, cardId, recoveryKey);
+              if (latest && latest === previous) void enqueue(latest, cardId, recoveryKey, refreshAfterSave);
             } },
           });
         }
@@ -116,11 +116,8 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
       }
       return success;
     });
-    // O chamador recebe sua tentativa; o flush conserva a segurança do lote inteiro.
-    savePromiseRef.current.set(scope, anteriores.then(async (savesAnterioresConcluidos) => {
-      const saveAtualConcluido = await tentativa;
-      return savesAnterioresConcluidos && saveAtualConcluido;
-    }));
+    // A falha anterior continua em `failures` até o retry.
+    savePromiseRef.current.set(scope, tentativa);
     return tentativa;
   }, [confirmVersion, flushScheduled]);
 

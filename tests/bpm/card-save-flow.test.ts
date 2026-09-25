@@ -11,9 +11,9 @@ describe("CRM - persistência antes da movimentação", () => {
     const campos = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx");
 
     expect(contexto).toContain("savePromiseRef.current")
-    expect(contexto).toContain("savesAnterioresConcluidos && saveAtualConcluido")
+    expect(contexto).toContain("savePromiseRef.current.set(scope, tentativa)")
     expect(campos).toContain("versaoBaseCamposRef.current");
-    expect(campos).toContain("const cardAtualizado = await ObterCardBpm(card.id)");
+    expect(campos).toContain("const confirmacao = resultado.data");
     expect(campos).toContain("versaoBaseCamposRef.current = novaVersao");
   });
 

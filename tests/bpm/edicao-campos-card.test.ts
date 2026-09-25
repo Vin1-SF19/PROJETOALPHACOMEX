@@ -42,6 +42,7 @@ vi.mock("@/lib/bpm/requisitos-etapa-server", () => ({
 }));
 
 import { AtualizarCardBpm } from "@/actions/bpm/Cards";
+import { revalidatePath } from "next/cache";
 
 const CARD_ID = "clw0000000000000card";
 const PIPELINE_ID = "clw0000000000000pipe";
@@ -111,6 +112,26 @@ describe("CRM - edição dos campos definidos da etapa", () => {
     expect(notificarPipelineBpmMock).not.toHaveBeenCalled();
   });
 
+  it("confirma a versão e os valores gravados mesmo se a invalidação de cache falhar depois do commit", async () => {
+    vi.mocked(revalidatePath).mockImplementationOnce(() => { throw new Error("cache indisponível"); });
+    const resultado = await AtualizarCardBpm({ cardId: CARD_ID, camposValores: { [CAMPO_ID]: "Novo" } });
+    expect(resultado).toEqual({
+      success: true,
+      data: { updatedAt: expect.any(Date), camposValores: { [CAMPO_ID]: "Novo" } },
+    });
+    expect(prismaMock.bpmCardCampoValor.upsert).toHaveBeenCalledOnce();
+    expect(notificarPipelineBpmMock).toHaveBeenCalledOnce();
+  });
+
+  it("avança a versão do card mesmo quando dois saves acontecem no mesmo milissegundo", async () => {
+    const versaoAtual = new Date(Date.now() + 1000);
+    prismaMock.bpmCard.findUnique.mockResolvedValue(cardNaEtapaAtual(versaoAtual));
+    const resultado = await AtualizarCardBpm({ cardId: CARD_ID, camposValores: { [CAMPO_ID]: "Novo" } });
+    expect(resultado.success).toBe(true);
+    if (!resultado.success) return;
+    expect(resultado.data?.updatedAt.getTime()).toBeGreaterThan(versaoAtual.getTime());
+  });
+
   it.each([
     ["texto", "Texto", "Texto"], ["texto_longo", "Linha\nOutra", "Linha\nOutra"],
     ["numero", 0, "0"], ["moeda", 12.5, "12.5"], ["percentual", 100, "100"],
@@ -131,7 +152,7 @@ describe("CRM - edição dos campos definidos da etapa", () => {
     ]);
     for (let tentativa = 0; tentativa < 2; tentativa++) {
       const resultado = await AtualizarCardBpm({ cardId: CARD_ID, camposValores: { [CAMPO_ID]: entrada } });
-      expect(resultado).toEqual({ success: true });
+      expect(resultado).toEqual(expect.objectContaining({ success: true }));
     }
     expect(prismaMock.bpmCardCampoValor.upsert).toHaveBeenCalledTimes(2);
     expect(prismaMock.bpmCardCampoValor.upsert).toHaveBeenLastCalledWith({
@@ -160,7 +181,7 @@ describe("CRM - edição dos campos definidos da etapa", () => {
 
   it("limpa referência de arquivo sem apagar ou consultar anexos", async () => {
     carregarCamposAplicaveisCardEtapaMock.mockResolvedValue([{ ...campoNulo, tipo: "arquivo" }]);
-    expect(await AtualizarCardBpm({ cardId: CARD_ID, camposValores: { [CAMPO_ID]: null } })).toEqual({ success: true });
+    expect(await AtualizarCardBpm({ cardId: CARD_ID, camposValores: { [CAMPO_ID]: null } })).toEqual(expect.objectContaining({ success: true }));
     expect(prismaMock.bpmCardAnexo.findMany).not.toHaveBeenCalled();
     expect(prismaMock.bpmCardCampoValor.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: { valor: "" } }));
   });
@@ -178,7 +199,7 @@ describe("CRM - edição dos campos definidos da etapa", () => {
       fonteEntidade: "CLIENTE", editavel: true, somenteLeitura: false,
     }]);
     const resultado = await AtualizarCardBpm({ cardId: CARD_ID, camposValores: { [CAMPO_ID]: valor }, versaoEsperadaEm: UPDATED_AT.toISOString() });
-    expect(resultado).toEqual({ success: true });
+    expect(resultado).toEqual(expect.objectContaining({ success: true }));
     expect(prismaMock.bpmCardCampoValor.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: { valor: valor.replace(/\D/g, "") } }));
   });
 
@@ -220,7 +241,7 @@ describe("CRM - edição dos campos definidos da etapa", () => {
 
   it("mantém o próximo contato do card e do estado de follow-up na mesma transação", async () => {
     const data = "2026-09-24T15:00:00.000Z";
-    expect(await AtualizarCardBpm({ cardId: CARD_ID, proximoContatoEm: data })).toEqual({ success: true });
+    expect(await AtualizarCardBpm({ cardId: CARD_ID, proximoContatoEm: data })).toEqual(expect.objectContaining({ success: true }));
     const proximoContatoEm = new Date(data);
     expect(prismaMock.bpmCard.updateMany).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ proximoContatoEm }),
@@ -239,7 +260,7 @@ describe("CRM - edição dos campos definidos da etapa", () => {
       versaoEsperadaEm: UPDATED_AT.toISOString(),
     });
 
-    expect(resultado).toEqual({ success: true });
+    expect(resultado).toEqual(expect.objectContaining({ success: true }));
     expect(prismaMock.bpmCard.updateMany).toHaveBeenCalledWith({
       where: expect.objectContaining({
         id: CARD_ID,
@@ -280,7 +301,7 @@ describe("CRM - edição dos campos definidos da etapa", () => {
       versaoEsperadaEm: UPDATED_AT.toISOString(),
     });
 
-    expect(resultado).toEqual({ success: true });
+    expect(resultado).toEqual(expect.objectContaining({ success: true }));
     expect(prismaMock.bpmCardCampoValor.upsert).toHaveBeenCalledWith({
       where: { cardId_campoId: { cardId: CARD_ID, campoId: CAMPO_ID } },
       create: { cardId: CARD_ID, campoId: CAMPO_ID, valor: "11222333000181" },
@@ -299,7 +320,7 @@ describe("CRM - edição dos campos definidos da etapa", () => {
       versaoEsperadaEm: UPDATED_AT.toISOString(),
     });
 
-    expect(resultado).toEqual({ success: true });
+    expect(resultado).toEqual(expect.objectContaining({ success: true }));
     expect(prismaMock.bpmCardCampoValor.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         create: expect.objectContaining({ valor: "11222333000181" }),

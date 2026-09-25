@@ -54,6 +54,17 @@ it("falha de rede não apaga pendências", async () => {
   expect(await saves.flushSaves(card.id)).toBe(false); expect(await saves.flushSaves(card.id)).toBe(false);
   expect(container.querySelector("input")!.value).toBe("52998224725");
 });
+it("retry bem-sucedido limpa a falha anterior do flush", async () => {
+  vi.mocked(AtualizarCardBpm).mockRejectedValueOnce(new Error("offline")).mockResolvedValue({
+    success: true,
+    data: { updatedAt: new Date("2026-09-22T10:01:00Z"), camposValores: { cpf: "52998224725" } },
+  });
+  await edit("52998224725"); await blur();
+  expect(await saves.flushSaves(card.id)).toBe(false);
+  await blur();
+  expect(await saves.flushSaves(card.id)).toBe(true);
+  expect(saves.getPendingFields()).toEqual([]);
+});
 it("save antigo não confirma edição mais recente", async () => {
   let resolveSave!: (value: Awaited<ReturnType<typeof AtualizarCardBpm>>) => void;
   vi.mocked(AtualizarCardBpm).mockReturnValue(new Promise((resolve) => { resolveSave = resolve; }));
@@ -254,6 +265,18 @@ it("mostra Salvo somente após confirmar no servidor e limpa sucesso na próxima
   expect(container.querySelector('[role="status"]')!.textContent).toBe(" Salvo");
   await edit("123");
   expect(container.querySelector('[role="status"]')!.textContent).not.toContain("Salvo");
+});
+
+it("confirma pelo recibo da action sem segunda leitura sujeita a falha", async () => {
+  vi.mocked(AtualizarCardBpm).mockResolvedValue({
+    success: true,
+    data: { updatedAt: new Date("2026-09-22T10:01:00Z"), camposValores: { cpf: "52998224725" } },
+  });
+  vi.mocked(ObterCardBpm).mockResolvedValue({ success: false, error: "offline" });
+  await edit("52998224725"); await blur();
+  expect(container.querySelector('[role="status"]')!.textContent).toContain("Salvo");
+  expect(saves.getPendingFields()).toEqual([]);
+  expect(ObterCardBpm).not.toHaveBeenCalled();
 });
 
 it.each(["action", "confirmação"])("não mostra Salvo quando falha a %s e preserva o valor", async (falha) => {

@@ -1128,7 +1128,7 @@ export async function CriarCardBpm(dados: unknown) {
 }
 
 type ResultadoAtualizarCardBpm =
-  | { success: true }
+  | { success: true; data?: { updatedAt: Date; camposValores: Record<string, string> } }
   | { success: false; error: string | {
     formErrors: string[];
     fieldErrors: Record<string, string[] | undefined>;
@@ -1241,7 +1241,7 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
     };
 
     const correlationId = randomUUID();
-    await db.$transaction(async (tx) => {
+    const confirmacao = await db.$transaction(async (tx) => {
       const acessoCardAtual = await exigirAcessoBpmCard(
         cardId,
         userId,
@@ -1345,6 +1345,7 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
         }
       }
 
+      const proximaVersao = new Date(Math.max(Date.now(), cardAtual.updatedAt.getTime() + 1));
       const atualizacao = await tx.bpmCard.updateMany({
         where: {
           id: cardId,
@@ -1355,7 +1356,7 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
         // Avanca explicitamente a versao mesmo quando a edicao contem apenas
         // campos dinamicos. Um update vazio nao aciona @updatedAt no Prisma e
         // permitiria que duas abas passassem pelo mesmo CAS.
-        data: { ...campos, updatedAt: new Date() },
+        data: { ...campos, updatedAt: proximaVersao },
       });
       if (atualizacao.count !== 1) throw new Error("CONFLITO_ATUALIZACAO_CARD");
 
@@ -1440,15 +1441,24 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
           update: { role: "RESPONSAVEL" },
         });
       }
+      return { updatedAt: proximaVersao, camposValores: valoresValidados };
     }, { maxWait: 10_000, timeout: 60_000 });
 
-    revalidatePath(`${ROTA_BASE}/pipeline/${cardAnterior.pipelineId}`);
-    await notificarPipelineBpm({
-      pipelineId: cardAnterior.pipelineId,
-      cardId,
-      tipo: "CARD_ATUALIZADO",
-    });
-    return { success: true };
+    try {
+      revalidatePath(`${ROTA_BASE}/pipeline/${cardAnterior.pipelineId}`);
+    } catch (notificationError) {
+      console.error("[AtualizarCardBpm/pos-salvamento/cache]", notificationError);
+    }
+    try {
+      await notificarPipelineBpm({
+        pipelineId: cardAnterior.pipelineId,
+        cardId,
+        tipo: "CARD_ATUALIZADO",
+      });
+    } catch (notificationError) {
+      console.error("[AtualizarCardBpm/pos-salvamento/realtime]", notificationError);
+    }
+    return { success: true, data: confirmacao };
   } catch (error) {
     console.error("[AtualizarCardBpm]", error);
     const msg = error instanceof Error && error.message === "Não autorizado"

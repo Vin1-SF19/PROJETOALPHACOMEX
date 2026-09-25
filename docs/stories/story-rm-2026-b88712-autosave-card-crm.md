@@ -615,3 +615,23 @@ AUTO_ADJUSTMENT_ACCEPTANCE: corrigir o fixture respeitando o contrato tipado, ex
 - [ ] Lint e testes globais: permanecem com as falhas anteriores documentadas acima; não foram reexecutados após a correção restrita ao fixture.
 
 **File List desta correção:** `tests/bpm/autosave-tipos-imediatos-react.test.ts` (fixture tipado) e esta story (evidência/checklist). O resultado FAIL da Fase 11 acima é histórico da execução anterior à correção; o typecheck final passou.
+
+## Correção de confiabilidade do salvamento — 2026-09-25
+
+**Relato:** alterações nos campos dos cards falham ao salvar e, em alguns casos, aparece erro mesmo depois de a gravação ocorrer.
+
+**Causas verificadas:** `AtualizarCardBpm` podia devolver erro após o commit se a invalidação de cache falhasse; o formulário fazia uma segunda leitura para confirmar uma escrita já concluída e tratava a falha dessa leitura como falha de gravação; a fila de saves propagava o resultado de uma tentativa antiga para o retry. O formulário também enfileirava campos sem escopo de card, impedindo que `flushSaves(cardId)` os acompanhasse.
+
+### Checklist
+
+- [x] A action devolve versão e valores confirmados pela transação e mantém sucesso após falha de notificação pós commit.
+- [x] A versão avança mesmo quando dois saves ocorrem no mesmo milissegundo.
+- [x] O formulário confirma a gravação pelo recibo da action e usa a leitura anterior apenas como fallback de compatibilidade.
+- [x] Autosaves de campos entram na fila do card; retry bem-sucedido limpa a falha anterior.
+- [x] Testes de regressão cobrem falha de cache após commit, confirmação sem segunda leitura e recuperação após falha de rede.
+- [x] `npm run lint`, `npm run typecheck` e `npm test` executados; resultados registrados abaixo.
+- [ ] Homologação autenticada em ambiente real com card e banco; não realizada nesta correção local.
+
+**File List desta correção:** `src/actions/bpm/Cards.ts`, `src/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext.tsx`, `src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx`, `tests/bpm/edicao-campos-card.test.ts`, `tests/bpm/cpf-pendencias-react.test.ts`, `tests/bpm/card-save-flow.test.ts` e esta story. Nenhuma estrutura ou dado do banco foi alterado.
+
+**Verificação final:** no diretório de trabalho, `npm run lint` PASS (0 erros; 1.192 avisos), `npm run typecheck` PASS, `npm test` PASS (514 arquivos; 3.852 testes aprovados, 4 ignorados, 1 todo) e `npm run build` PASS. Os 83 testes direcionados passaram. Na seleção isolada para commit, os 80 testes direcionados e o typecheck passaram. `git diff --check` PASS. Uma execução intermediária de testes encontrou o cliente Prisma em regeneração durante um build concorrente; a repetição sequencial passou. Não houve teste autenticado com banco real.

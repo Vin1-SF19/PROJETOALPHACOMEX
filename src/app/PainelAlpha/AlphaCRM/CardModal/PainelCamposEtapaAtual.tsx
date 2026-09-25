@@ -224,14 +224,16 @@ export function PainelCamposEtapaAtual({
         toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível salvar os campos da etapa");
         return false;
       }
-      const cardAtualizado = await ObterCardBpm(card.id);
-      if (!cardAtualizado.success || !cardAtualizado.data) {
+      // A action confirma a gravação na própria transação.
+      const confirmacao = resultado.data;
+      const cardAtualizado = confirmacao ? null : await ObterCardBpm(card.id);
+      if (!confirmacao && (!cardAtualizado?.success || !cardAtualizado.data)) {
         toast.error("Os campos foram salvos, mas não foi possível confirmar a versão atual do card.");
         return false;
       }
-      const novaVersao = new Date(cardAtualizado.data.updatedAt).toISOString();
+      const novaVersao = new Date(confirmacao?.updatedAt ?? cardAtualizado!.data!.updatedAt).toISOString();
       confirmVersion(card.id, novaVersao);
-      const confirmados = Object.fromEntries(cardAtualizado.data.camposEtapa
+      const confirmados = confirmacao?.camposValores ?? Object.fromEntries(cardAtualizado!.data!.camposEtapa
         .filter((campo) => Object.hasOwn(camposValores, campo.id))
         .map((campo) => [campo.id, campo.valor ?? ""]));
       const antesDaConfirmacao = valoresRef.current;
@@ -257,7 +259,7 @@ export function PainelCamposEtapaAtual({
       setConflitoCamposAtuais(false);
       onAtualizado();
       return !possuiValorInvalido;
-    }, undefined, `${card.id}:campo:${campoId ?? instanceKey}`).finally(() => {
+    }, card.id, `${card.id}:campo:${campoId ?? instanceKey}`, false).finally(() => {
       setSavesCamposPendentes((total) => total - 1);
     });
     const sucesso = await promise;
