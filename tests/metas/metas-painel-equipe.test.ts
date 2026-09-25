@@ -44,7 +44,7 @@ describe("consultas do painel Alpha Metas", () => {
     prismaMock.metaEquipe.findFirst.mockResolvedValue(null);
   });
 
-  it("busca closers e líderes visíveis para o placar", async () => {
+  it("busca closers e líderes para contar vendas, mas só exibe os visíveis", async () => {
     prismaMock.usuarios.findMany.mockResolvedValue([
       {
         id: 10,
@@ -53,6 +53,7 @@ describe("consultas do painel Alpha Metas", () => {
         imagemUrl: null,
         tema_interface: "blue",
         role: "COMERCIAL",
+        meta_visivel_painel: true,
       },
       {
         id: 20,
@@ -61,6 +62,7 @@ describe("consultas do painel Alpha Metas", () => {
         imagemUrl: null,
         tema_interface: "indigo",
         role: "Lider Comercial",
+        meta_visivel_painel: true,
       },
     ]);
     prismaMock.contratoComercial.groupBy.mockResolvedValue([
@@ -75,7 +77,6 @@ describe("consultas do painel Alpha Metas", () => {
     expect(prismaMock.usuarios.findMany).toHaveBeenCalledWith({
       where: {
         role: { in: rolesEquipe },
-        meta_visivel_painel: true,
       },
       select: {
         id: true,
@@ -84,6 +85,7 @@ describe("consultas do painel Alpha Metas", () => {
         imagemUrl: true,
         tema_interface: true,
         role: true,
+        meta_visivel_painel: true,
       },
       orderBy: { nome: "asc" },
     });
@@ -100,9 +102,9 @@ describe("consultas do painel Alpha Metas", () => {
 
   it("conta só closers no termômetro principal e todo o time no total geral", async () => {
     prismaMock.usuarios.findMany.mockResolvedValue([
-      { id: 10, nome: "Closer A", usuario: "a", imagemUrl: null, tema_interface: "blue", role: "COMERCIAL" },
-      { id: 11, nome: "Closer B", usuario: "b", imagemUrl: null, tema_interface: "blue", role: "COMERCIAL" },
-      { id: 20, nome: "Líder", usuario: "l", imagemUrl: null, tema_interface: "blue", role: "Lider Comercial" },
+      { id: 10, nome: "Closer A", usuario: "a", imagemUrl: null, tema_interface: "blue", role: "COMERCIAL", meta_visivel_painel: true },
+      { id: 11, nome: "Closer B", usuario: "b", imagemUrl: null, tema_interface: "blue", role: "COMERCIAL", meta_visivel_painel: true },
+      { id: 20, nome: "Líder", usuario: "l", imagemUrl: null, tema_interface: "blue", role: "Lider Comercial", meta_visivel_painel: true },
     ]);
     prismaMock.contratoComercial.groupBy.mockResolvedValue([
       { usuarioId: 10, _count: { id: 9 } },
@@ -120,6 +122,28 @@ describe("consultas do painel Alpha Metas", () => {
       metaEquipe: 30,
       superMetaEquipe: 40,
       metaAlphaEquipe: 45,
+    });
+  });
+
+  it("mantém vendas de closer e líder ocultos nos dois totais, sem mostrar suas linhas", async () => {
+    prismaMock.usuarios.findMany.mockResolvedValue([
+      { id: 10, nome: "Closer Visível", usuario: "cv", imagemUrl: null, tema_interface: "blue", role: "COMERCIAL", meta_visivel_painel: true },
+      { id: 11, nome: "Nathalia", usuario: "n", imagemUrl: null, tema_interface: "blue", role: "COMERCIAL", meta_visivel_painel: false },
+      { id: 20, nome: "Líder Oculta", usuario: "lo", imagemUrl: null, tema_interface: "blue", role: "Lider Comercial", meta_visivel_painel: false },
+    ]);
+    prismaMock.contratoComercial.groupBy.mockResolvedValue([
+      { usuarioId: 10, _count: { id: 2 } },
+      { usuarioId: 11, _count: { id: 4 } },
+      { usuarioId: 20, _count: { id: 3 } },
+    ]);
+
+    const resultado = await getDadosMetas(9, 2026);
+
+    expect(resultado).toMatchObject({
+      success: true,
+      totalVendas: 6,
+      totalVendasGeral: 9,
+      colaboradores: [expect.objectContaining({ nome: "Closer Visível", vendas: 2 })],
     });
   });
 

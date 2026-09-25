@@ -36,7 +36,7 @@ export interface DadosMetasResult {
     metaAlphaEquipe: number;
     /** Vendas das closers — alimenta o termômetro principal e as celebrações da equipe. */
     totalVendas: number;
-    /** Vendas de todo o time visível, incluindo líderes comerciais. */
+    /** Vendas de todo o time, incluindo líderes comerciais ocultos do placar. */
     totalVendasGeral: number;
     mes: number;
     ano: number;
@@ -61,9 +61,8 @@ export async function getDadosMetas(
             db.usuarios.findMany({
                 where: {
                     role: { in: ROLES_EQUIPE_COMERCIAL },
-                    meta_visivel_painel: true,
                 },
-                select: { id: true, nome: true, usuario: true, imagemUrl: true, tema_interface: true, role: true },
+                select: { id: true, nome: true, usuario: true, imagemUrl: true, tema_interface: true, role: true, meta_visivel_painel: true },
                 orderBy: { nome: "asc" },
             }),
             db.contratoComercial.groupBy({
@@ -82,7 +81,7 @@ export async function getDadosMetas(
             db.metaEquipe.findFirst({ where: { mes, ano } }),
         ]);
 
-        const colaboradores: ColaboradorMeta[] = comerciais.map((usuario) => {
+        const colaboradoresComVendas: ColaboradorMeta[] = comerciais.map((usuario) => {
             const fechados = contratosFechados.find((c) => c.usuarioId === usuario.id);
             const metaReg = metas.find((m) => m.colaboradoraId === usuario.nome);
             return {
@@ -98,6 +97,9 @@ export async function getDadosMetas(
             };
         });
 
+        // Mantém a ordem da consulta para aplicar a visibilidade apenas às linhas do placar.
+        const colaboradores: ColaboradorMeta[] = colaboradoresComVendas
+            .filter((_, index) => comerciais[index].meta_visivel_painel);
         colaboradores.sort((a, b) => b.vendas - a.vendas);
 
         return {
@@ -106,10 +108,10 @@ export async function getDadosMetas(
             metaEquipe: metaEquipe?.metaMensal ?? 0,
             superMetaEquipe: metaEquipe?.superMetaMensal ?? 0,
             metaAlphaEquipe: metaEquipe?.metaAlphaMensal ?? 0,
-            totalVendas: colaboradores
+            totalVendas: colaboradoresComVendas
                 .filter((c) => !c.liderComercial)
                 .reduce((acc, c) => acc + c.vendas, 0),
-            totalVendasGeral: colaboradores.reduce((acc, c) => acc + c.vendas, 0),
+            totalVendasGeral: colaboradoresComVendas.reduce((acc, c) => acc + c.vendas, 0),
             mes,
             ano,
         };

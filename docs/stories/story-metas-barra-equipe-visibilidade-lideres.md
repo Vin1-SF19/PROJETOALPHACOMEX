@@ -52,12 +52,13 @@ A evolução final adiciona uma super meta mensal persistida para cada integrant
 20. O termômetro usa a super meta como topo, marca a meta normal proporcionalmente no corpo e marca a super meta no topo; sem super meta, usa a meta normal como limite de compatibilidade.
 21. O backup completo pré-mudança é criado e validado antes da migration, conforme a política Vault.
 22. Registros históricos existentes recebem `superMetaMensal = 0`, sem alteração de seus valores de meta normal.
+23. Ocultar uma closer ou líder remove apenas sua linha individual; vendas válidas do usuário oculto continuam nos totais coletivos e no progresso dos termômetros correspondentes.
 
 ## Tasks / Subtasks
 
 - [x] Task 1 — Adaptar a consulta do placar e da configuração (AC: 9, 10, 12, 13)
   - [x] Incluir `Lider Comercial` no conjunto de usuários retornado por `getDadosMetas` e `getColaboradoresParaConfigurar`, sem ampliar as permissões de gestão.
-  - [x] Continuar aplicando `meta_visivel_painel: true` somente à consulta que alimenta o placar e manter todos os usuários elegíveis disponíveis na configuração.
+  - [x] Aplicar `meta_visivel_painel` somente às linhas individuais do placar e manter todos os usuários elegíveis disponíveis na configuração.
   - [x] Reutilizar `toggleMetaVisibilidade` e o campo existente `usuarios.meta_visivel_painel`, sem alteração estrutural de banco.
 - [x] Task 2 — Substituir a barra coletiva pelo termômetro lateral (AC: 1–6)
   - [x] Manter `Meta Equipe` fora dos cabeçalhos normal e TV.
@@ -81,7 +82,7 @@ A evolução final adiciona uma super meta mensal persistida para cada integrant
   - [x] Atualizar o teste de regressão do componente para assegurar `Meta Equipe` fora dos cabeçalhos, ausência da barra horizontal coletiva e um único termômetro na lateral do placar.
   - [x] Cobrir a orientação de baixo para cima, a leitura somente do realizado, os dois marcadores e o estado de meta batida.
   - [x] Cobrir ou validar de forma reproduzível que o som e a tela de parabenização continuam ligados ao atingimento da meta coletiva.
-  - [ ] Rodar `npm run lint`, `npm run typecheck`, `npm test` e `npm run build`.
+  - [x] Rodar `npm run lint`, `npm run typecheck`, `npm test` e `npm run build`; registrar a única falha de teste fora de Metas.
   - [x] Atualizar checklist, Completion Notes e File List desta story após a implementação do refinamento.
 - [x] Task 7 — Persistir super metas com segurança (AC: 13, 21, 22)
   - [x] Criar e validar backup completo pré-mudança do Turso de produção.
@@ -98,12 +99,15 @@ A evolução final adiciona uma super meta mensal persistida para cada integrant
 - [x] Task 10 — Celebrar a super meta (AC: 8)
   - [x] Criar som e apresentação extraordinários para a super meta coletiva.
   - [x] Manter deduplicação e sequência independentes das celebrações individuais e da meta normal.
+- [x] Task 11 — Preservar vendas de usuários ocultos nos totais (AC: 23)
+  - [x] Consultar closers e líderes independentemente da visibilidade e filtrar somente as linhas individuais.
+  - [x] Cobrir closer e líder ocultos no cálculo dos dois termômetros.
 
 ## Dev Notes
 
 ### Comportamento atual confirmado
 
-- Antes desta story, `getDadosMetas` consultava somente `role: "COMERCIAL"` com `meta_visivel_painel: true`; a implementação corrente já inclui `Lider Comercial`, mantém o filtro de visibilidade e entrega `totalVendas` e `metaEquipe`. O refinamento visual não deve alterar essa seleção. [Source: `src/actions/Metas.ts#getDadosMetas`]
+- Antes desta story, `getDadosMetas` consultava somente `role: "COMERCIAL"` com `meta_visivel_painel: true`; o pedido de 2026-09-25 substitui o filtro na consulta: `COMERCIAL` e `Lider Comercial` entram nos totais, enquanto a visibilidade controla somente as linhas individuais. [Source: `src/actions/Metas.ts#getDadosMetas`]
 - Antes desta story, `getColaboradoresParaConfigurar` limitava a listagem a `role: "COMERCIAL"`; a implementação corrente já inclui `Lider Comercial` sem filtrar `meta_visivel_painel`, permitindo que usuários ocultos continuem configuráveis. Esse comportamento deve ser preservado. [Source: `src/actions/Metas.ts#getColaboradoresParaConfigurar`]
 - `toggleMetaVisibilidade` já autoriza por `podeGerenciarMetas` e atualiza `usuarios.meta_visivel_painel`; não é necessária nova action ou alteração de schema. [Source: `src/actions/Metas.ts#toggleMetaVisibilidade`; `prisma/schema.prisma#model-usuarios`]
 - O modal `ModalConfigurar` usa `Eye`/`EyeOff`, estado `togglingId`, título dinâmico e toast de erro. As líderes devem passar pelo mesmo fluxo, sem controle paralelo. [Source: `src/app/PainelAlpha/Metas/MetasClient.tsx#ModalConfigurar`]
@@ -129,7 +133,7 @@ A evolução final adiciona uma super meta mensal persistida para cada integrant
 
 ### Testing
 
-- Testes de action com mocks devem confirmar que a consulta do placar usa as roles `COMERCIAL` e `Lider Comercial` e respeita `meta_visivel_painel: true`.
+- Testes de action com mocks devem confirmar que a consulta usa as roles `COMERCIAL` e `Lider Comercial`, mantém ocultos fora das linhas individuais e inclui suas vendas nos totais.
 - A consulta da configuração deve retornar líderes visíveis e ocultas, expondo o valor atual de `visivelNoPainel`.
 - A alternância deve atualizar somente o `id` recebido e retornar erro sem refletir o novo estado no cliente quando a persistência falhar.
 - O teste de UI/regressão deve distinguir cabeçalho, coluna lateral e linhas individuais, evitando uma validação frágil baseada apenas na presença textual de `Meta Equipe`.
@@ -240,6 +244,7 @@ A evolução final adiciona uma super meta mensal persistida para cada integrant
 | 2026-09-16 | 1.1.0 | Development started (autonomous mode) — Status: Ready → InProgress | @dev |
 | 2026-09-16 | 1.2.0 | Refinamento solicitado: barra horizontal coletiva substituída na especificação por termômetro lateral, com progresso de baixo para cima e leitura `realizado/meta`; celebração, líderes, autorizações e ausência de migration preservadas. Status mantido em InProgress | @po |
 | 2026-09-16 | 2.0.0 | Super metas individuais e coletiva adicionadas; termômetro passa a usar dois marcos e realizado isolado; migration autorizada, respaldada e aplicada | @dev |
+| 2026-09-25 | 2.0.1 | Visibilidade passa a afetar somente linhas individuais; vendas de closers e líderes ocultos permanecem nos totais coletivos | @dev |
 
 ## Dev Agent Record
 
@@ -258,6 +263,11 @@ Codex (GPT-5).
 - `npm run lint` — baseline global falha com 3.711 ocorrências em arquivos fora desta story; o lint focado dos arquivos alterados passa.
 - `npm test -- --run` — 3.276 testes aprovados, 1 todo e 20 falhas em 12 arquivos fora desta story; a suíte de Metas passa integralmente.
 - CodeRabbit CLI não está instalado em `~/.local/bin/coderabbit`; revisão automática não pôde ser executada.
+- 2026-09-25: `npx vitest run tests/metas/metas-painel-equipe.test.ts` — 14/14 aprovados, inclusive closer e líder ocultos.
+- 2026-09-25: `npm run lint` — concluído sem erros, com 1.192 warnings preexistentes; lint focado dos arquivos alterados sem warnings.
+- 2026-09-25: `npm run typecheck` — aprovado após o build; execução simultânea ao build falhou por arquivos transitórios de `.next/types`.
+- 2026-09-25: `npm run build` — aprovado.
+- 2026-09-25: `npm test` — 3.840 aprovados, 4 ignorados, 1 todo e 1 falha em `tests/notas/acesso-e-lixeira.test.ts` por URL de banco vazia (`URL_INVALID`); testes de Metas aprovados.
 
 ### Completion Notes List
 
@@ -270,9 +280,11 @@ Codex (GPT-5).
 - As barras individuais progridem até a super meta e exibem a meta normal imediatamente à esquerda de `realizado/super meta`.
 - Refinamento visual: a meta normal saiu do subtítulo do nome e passou a ficar imediatamente à esquerda de `realizado/super meta`; os rótulos dos marcos coletivo normal e super foram centralizados acima de suas linhas, dentro do tubo.
 - Consultas do placar e da configuração agora incluem `COMERCIAL` e `Lider Comercial`; autorização e persistência continuam usando os fluxos existentes.
+- Ocultar uma closer ou líder mantém suas vendas nos termômetros coletivos, incluindo o realizado da equipe e o total geral; somente a linha individual deixa de aparecer.
 - Rótulos, estado vazio e manual interno foram atualizados para representar closers e líderes comerciais.
 - A migration aditiva foi aplicada após backup completo validado; 39 registros individuais e 5 coletivos receberam `superMetaMensal = 0`, sem violações de chave estrangeira.
 - A implementação e os testes focados estão concluídos, mas a story permanece InProgress porque os gates globais de lint, typecheck e regressão já estão vermelhos fora do escopo desta entrega.
+- No ajuste de 2026-09-25, lint, typecheck e build passaram; o gate `npm test` permanece vermelho por uma falha em Notas ligada à configuração de banco de testes, fora dos arquivos de Metas.
 
 ### File List
 
@@ -280,11 +292,11 @@ Codex (GPT-5).
 - `plan/self-critique-metas-barra-equipe.json` (novo — autocritique do desenvolvimento)
 - `prisma/schema.prisma` (modificado — campos `superMetaMensal`)
 - `prisma/migrations/20260916220000_add_super_meta_mensal/migration.sql` (novo — migration aditiva aplicada)
-- `src/actions/Metas.ts` (modificado)
+- `src/actions/Metas.ts` (modificado — totais incluem usuários ocultos)
 - `src/app/PainelAlpha/Metas/MetasClient.tsx` (modificado)
 - `src/lib/bibble/tool-executor.ts` (modificado — leitura de super metas)
 - `src/lib/shared/module-knowledge/metas.ts` (modificado)
-- `tests/metas/metas-painel-equipe.test.ts` (novo)
+- `tests/metas/metas-painel-equipe.test.ts` (modificado — regressão de closer e líder ocultos)
 
 ## QA Results
 
