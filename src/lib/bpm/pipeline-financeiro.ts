@@ -1,3 +1,5 @@
+import { cnpjEhValido } from "@/lib/format-cnpj";
+
 export const FINANCIAL_PIPELINE_NAME = "Financeiro";
 export const FINANCIAL_PIPELINE_SCHEMA_VERSION = "2026.08.22.1";
 
@@ -128,8 +130,18 @@ export function calcularRetencoesFinanceiras(valorBruto: number, aliquotaIrrf: n
 }
 function normalizar(valor: string | null | undefined) { return valor?.trim() ?? "" }
 function numero(valor: string | null | undefined) { const text = normalizar(valor); const canonical = text.includes(",") ? text.replace(/\./g, "").replace(",", ".") : text; const parsed = Number(canonical); return Number.isFinite(parsed) ? parsed : 0 }
+function numeroDeclaradoValido(valor: string | null | undefined) {
+  const text = normalizar(valor);
+  if (!text) return false;
+  const canonical = text.includes(",") ? text.replace(/\./g, "").replace(",", ".") : text;
+  const parsed = Number(canonical);
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 100;
+}
 function sim(valor: string | null | undefined) { const text = normalizar(valor).toLowerCase(); return text === "sim" || text === "true" || text === "1" || text === "yes" }
-function cnpjValido(cnpj: string) { const digits = cnpj.replace(/\D/g, ""); if (digits.length !== 14) return false; if (digits === digits[0].repeat(14)) return false; let sum = 0; for (let i = 0; i < 12; i++) sum += Number(digits[i]) * (12 - i); if ((sum % 11) >= 2) return false; sum = 0; for (let i = 0; i < 13; i++) sum += Number(digits[i]) * (13 - i); return (sum % 11) < 2 }
+function escolhaBooleanaValida(valor: string | null | undefined) {
+  return ["sim", "não", "nao", "true", "false", "1", "0", "yes", "no"].includes(normalizar(valor).toLowerCase());
+}
+const cnpjValido = cnpjEhValido;
 
 export interface FinancialTransitionInput { pipelineName: string; fromStage: string; toStage: string; values: Record<string, string | null>; now?: Date; attachmentNames?: string[] }
 export interface FinancialTransitionResult { applicable: boolean; blocked: boolean; message?: string; pendingFields: string[]; automaticValues: Record<string, string> }
@@ -147,7 +159,8 @@ export const FINANCIAL_FIELD_KEYS = {
   EMAIL: "alpha.e.mail",
   REGIME_CLIENTE: "alpha.regime.tributario.cliente",
   SERVICO: "alpha.servico.contratado",
-  VALOR_BRUTO: "alpha.legacy.valor.bruto.contrato",
+  VALOR_BRUTO: "alpha.financeiro.valor.bruto.contrato",
+  VALOR_NEGOCIADO_ORIGEM: "alpha.valor.acordado.no.contrato",
   FORMA_PAGAMENTO: "alpha.forma.de.pagamento",
   CONDICAO: "alpha.condicao.negociada",
   VENDEDOR: "alpha.vendedor.a",
@@ -174,17 +187,74 @@ export const FINANCIAL_FIELD_KEYS = {
   VENCIMENTO: "alpha.vencimento",
   DADOS_PAGAMENTO: "alpha.link.dados.para.pagamento",
   MEMORIA_CALCULO: "alpha.memoria.calculo",
+  STATUS_FINANCEIRO: "alpha.status.financeiro",
   PAGAMENTO_CONFIRMADO: "alpha.pagamento.confirmado",
   VALOR_ESPERADO: "alpha.valor.esperado",
   DATA_PAGAMENTO: "alpha.data.do.pagamento",
   VALOR_RECEBIDO: "alpha.valor.recebido",
-  FORMA_PAGAMENTO_USADA: "alpha.legacy.forma.pagamento.utilizada",
+  FORMA_PAGAMENTO_USADA: "alpha.forma.de.pagamento",
   NF_EMITIDA: "alpha.nf.emitida",
   NUMERO_NF: "alpha.numero.da.nf",
   DATA_EMISSAO_NF: "alpha.data.de.emissao",
   VALOR_NF: "alpha.valor.da.nf",
   ARQUIVO_NF: "alpha.arquivo.link.da.nf",
 } as const;
+
+export function campoFinanceiroCalculadoPorChave(chave: string | null | undefined): boolean {
+  const k = FINANCIAL_FIELD_KEYS;
+  const calculados: readonly string[] = [k.VALOR_IRRF, k.VALOR_CSRF, k.TOTAL_RETENCOES, k.VALOR_LIQUIDO, k.MEMORIA_CALCULO];
+  return Boolean(chave && calculados.includes(chave));
+}
+
+export function calcularNovoContratoFinanceiro(values: Record<string, string | null>): {
+  pendencias: string[];
+  automaticValues: Record<string, string>;
+} {
+  const k = FINANCIAL_FIELD_KEYS;
+  const valorBruto = values[k.VALOR_BRUTO]?.trim() || values[k.VALOR_NEGOCIADO_ORIGEM];
+  const pendencias: string[] = [];
+  const require = (key: string) => { if (!normalizar(values[key])) pendencias.push(key); };
+  require(k.REGIME_CLIENTE);
+  require(k.REGIME_PRESTADOR);
+  require(k.IRRF_APLICAVEL);
+  require(k.CSRF_APLICAVEL);
+  if (normalizar(values[k.IRRF_APLICAVEL]) && !escolhaBooleanaValida(values[k.IRRF_APLICAVEL])) pendencias.push(k.IRRF_APLICAVEL);
+  if (normalizar(values[k.CSRF_APLICAVEL]) && !escolhaBooleanaValida(values[k.CSRF_APLICAVEL])) pendencias.push(k.CSRF_APLICAVEL);
+  if (!(numero(valorBruto) > 0)) pendencias.push(k.VALOR_BRUTO);
+  for (const [aplicavel, aliquota] of [
+    [k.IRRF_APLICAVEL, k.ALIQUOTA_IRRF],
+    [k.CSRF_APLICAVEL, k.ALIQUOTA_CSRF],
+  ]) {
+    if (!sim(values[aplicavel])) continue;
+    if (!numeroDeclaradoValido(values[aliquota])) {
+      pendencias.push(aliquota);
+    }
+  }
+  if (pendencias.length) return { pendencias, automaticValues: {} };
+  const calculo = calcularRetencoesFinanceiras(
+    numero(valorBruto),
+    sim(values[k.IRRF_APLICAVEL]) ? numero(values[k.ALIQUOTA_IRRF]) : 0,
+    sim(values[k.CSRF_APLICAVEL]) ? numero(values[k.ALIQUOTA_CSRF]) : 0,
+    {
+      regimePrestador: normalizar(values[k.REGIME_PRESTADOR]),
+      regimeTomador: normalizar(values[k.REGIME_CLIENTE]),
+    },
+  );
+  if (!(calculo.valorLiquido > 0)) return { pendencias: [k.VALOR_LIQUIDO], automaticValues: {} };
+  return {
+    pendencias: [],
+    automaticValues: {
+      [k.VALOR_IRRF]: String(calculo.valorIrrf),
+      [k.VALOR_CSRF]: String(calculo.valorCsrf),
+      [k.TOTAL_RETENCOES]: String(calculo.totalRetencoes),
+      [k.VALOR_LIQUIDO]: String(calculo.valorLiquido),
+      [k.MEMORIA_CALCULO]: calculo.memoriaCalculo,
+      ...(normalizar(values[k.VENCIMENTO]) && normalizar(values[k.DADOS_PAGAMENTO])
+        ? { [k.STATUS_FINANCEIRO]: "Aguardando pagamento" }
+        : {}),
+    },
+  };
+}
 
 export interface CanonicalFinancialTransitionInput {
   pipelineKey: string;
@@ -193,6 +263,8 @@ export interface CanonicalFinancialTransitionInput {
   valuesByFieldKey: Record<string, string | null>;
   now?: Date;
   attachmentNames?: string[];
+  parceiroVinculado?: boolean;
+  optionsByFieldKey?: Record<string, readonly string[]>;
 }
 
 const FINANCIAL_STAGE_SEQUENCE = [
@@ -212,19 +284,36 @@ export function validateCanonicalFinancialTransition(input: CanonicalFinancialTr
   }
   const k = FINANCIAL_FIELD_KEYS;
   const v = input.valuesByFieldKey;
+  const valorBruto = v[k.VALOR_BRUTO]?.trim() || v[k.VALOR_NEGOCIADO_ORIGEM];
   const missing: string[] = [];
   const automaticValues: Record<string, string> = {};
   const today = (input.now ?? new Date()).toISOString().slice(0, 10);
   const require = (...keys: string[]) => keys.forEach((key) => { if (!normalizar(v[key])) missing.push(key); });
   const requirePositive = (key: string) => { if (!(numero(v[key]) > 0)) missing.push(key); };
+  const requireConfiguredOption = (key: string) => {
+    const options = input.optionsByFieldKey?.[key];
+    if (options && normalizar(v[key]) && !options.includes(normalizar(v[key]))) missing.push(key);
+  };
 
   if (index === 0) {
-    require(k.CNPJ,k.RAZAO_SOCIAL,k.RUA,k.NUMERO,k.BAIRRO,k.CEP,k.MUNICIPIO,k.ESTADO,k.EMAIL,k.REGIME_CLIENTE,k.SERVICO,k.FORMA_PAGAMENTO,k.CONDICAO,k.VENDEDOR,k.ORIGEM,k.CONTATO);
-    requirePositive(k.VALOR_BRUTO);
-    if (normalizar(v[k.ORIGEM]).toLowerCase() === "parceiro") require(k.PARCEIRO);
+    require(k.CNPJ,k.RAZAO_SOCIAL,k.RUA,k.NUMERO,k.BAIRRO,k.CEP,k.MUNICIPIO,k.ESTADO,k.EMAIL,k.REGIME_CLIENTE,k.SERVICO,k.FORMA_PAGAMENTO,k.CONDICAO,k.VENDEDOR,k.ORIGEM);
+    if (!(numero(valorBruto) > 0)) missing.push(k.VALOR_BRUTO);
+    if (input.parceiroVinculado || normalizar(v[k.ORIGEM]).toLocaleLowerCase("pt-BR").includes("parceiro")) require(k.PARCEIRO);
     if (normalizar(v[k.CNPJ]) && !cnpjValido(normalizar(v[k.CNPJ]))) missing.push(k.CNPJ);
     if (normalizar(v[k.CEP]).replace(/\D/g, "").length !== 8) missing.push(k.CEP);
+    if (normalizar(v[k.ESTADO]) && !UFS.includes(normalizar(v[k.ESTADO]).toUpperCase() as (typeof UFS)[number])) missing.push(k.ESTADO);
     if (normalizar(v[k.EMAIL]) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizar(v[k.EMAIL]))) missing.push(k.EMAIL);
+    requireConfiguredOption(k.REGIME_CLIENTE);
+    requireConfiguredOption(k.FORMA_PAGAMENTO);
+    requireConfiguredOption(k.ORIGEM);
+    if (normalizar(v[k.IRRF_APLICAVEL]) && !escolhaBooleanaValida(v[k.IRRF_APLICAVEL])) missing.push(k.IRRF_APLICAVEL);
+    if (normalizar(v[k.CSRF_APLICAVEL]) && !escolhaBooleanaValida(v[k.CSRF_APLICAVEL])) missing.push(k.CSRF_APLICAVEL);
+    if (sim(v[k.IRRF_APLICAVEL]) && !numeroDeclaradoValido(v[k.ALIQUOTA_IRRF])) missing.push(k.ALIQUOTA_IRRF);
+    if (sim(v[k.CSRF_APLICAVEL]) && !numeroDeclaradoValido(v[k.ALIQUOTA_CSRF])) missing.push(k.ALIQUOTA_CSRF);
+    if (normalizar(v[k.STATUS_FINANCEIRO]) === "Aguardando pagamento") {
+      require(k.VENCIMENTO, k.DADOS_PAGAMENTO);
+      if (!(numero(v[k.VALOR_LIQUIDO]) > 0)) missing.push(k.VALOR_LIQUIDO);
+    }
   } else if (index === 1) {
     if (!sim(v[k.CONTRATO_ELABORADO])) missing.push(k.CONTRATO_ELABORADO);
     if (!sim(v[k.CONTRATO_ENVIADO])) missing.push(k.CONTRATO_ENVIADO);
@@ -234,10 +323,10 @@ export function validateCanonicalFinancialTransition(input: CanonicalFinancialTr
     if (normalizar(v[k.STATUS_ASSINATURA]).toLowerCase() !== "assinado") missing.push(k.STATUS_ASSINATURA);
     if (!normalizar(v[k.CONTRATO_ASSINADO]) && !input.attachmentNames?.some((name) => /contrato/i.test(name))) missing.push(k.CONTRATO_ASSINADO);
     require(k.REGIME_PRESTADOR,k.REGIME_CLIENTE,k.FORMA_PAGAMENTO,k.VENCIMENTO,k.DADOS_PAGAMENTO,k.IRRF_APLICAVEL,k.CSRF_APLICAVEL);
-    requirePositive(k.VALOR_BRUTO);
+    if (!(numero(valorBruto) > 0)) missing.push(k.VALOR_BRUTO);
     if (sim(v[k.IRRF_APLICAVEL]) && !(numero(v[k.ALIQUOTA_IRRF]) >= 0 && numero(v[k.ALIQUOTA_IRRF]) <= 100)) missing.push(k.ALIQUOTA_IRRF);
     if (sim(v[k.CSRF_APLICAVEL]) && !(numero(v[k.ALIQUOTA_CSRF]) >= 0 && numero(v[k.ALIQUOTA_CSRF]) <= 100)) missing.push(k.ALIQUOTA_CSRF);
-    const calc = calcularRetencoesFinanceiras(numero(v[k.VALOR_BRUTO]),sim(v[k.IRRF_APLICAVEL]) ? numero(v[k.ALIQUOTA_IRRF]) : 0,sim(v[k.CSRF_APLICAVEL]) ? numero(v[k.ALIQUOTA_CSRF]) : 0,{ regimePrestador: normalizar(v[k.REGIME_PRESTADOR]) || undefined, regimeTomador: normalizar(v[k.REGIME_CLIENTE]) || undefined, servico: normalizar(v[k.SERVICO]) || undefined, now: input.now });
+    const calc = calcularRetencoesFinanceiras(numero(valorBruto),sim(v[k.IRRF_APLICAVEL]) ? numero(v[k.ALIQUOTA_IRRF]) : 0,sim(v[k.CSRF_APLICAVEL]) ? numero(v[k.ALIQUOTA_CSRF]) : 0,{ regimePrestador: normalizar(v[k.REGIME_PRESTADOR]) || undefined, regimeTomador: normalizar(v[k.REGIME_CLIENTE]) || undefined, servico: normalizar(v[k.SERVICO]) || undefined, now: input.now });
     if (!(calc.valorLiquido > 0)) missing.push(k.VALOR_LIQUIDO);
     Object.assign(automaticValues,{ [k.DATA_ASSINATURA]: normalizar(v[k.DATA_ASSINATURA]) || today, [k.VALOR_IRRF]: String(calc.valorIrrf), [k.VALOR_CSRF]: String(calc.valorCsrf), [k.TOTAL_RETENCOES]: String(calc.totalRetencoes), [k.VALOR_LIQUIDO]: String(calc.valorLiquido), [k.VALOR_ESPERADO]: String(calc.valorLiquido), [k.MEMORIA_CALCULO]: calc.memoriaCalculo });
   } else if (index === 3) {

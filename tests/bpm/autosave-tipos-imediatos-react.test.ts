@@ -7,6 +7,7 @@ import { PainelCamposEtapaAtual } from "@/app/PainelAlpha/AlphaCRM/CardModal/Pai
 import { AtualizarCardBpm, ObterCardBpm } from "@/actions/bpm/Cards";
 
 vi.mock("@/actions/bpm/Cards", () => ({ AtualizarCardBpm: vi.fn(), ObterCardBpm: vi.fn() }));
+vi.mock("@/actions/bpm/ConsultaCnpjFinanceiro", () => ({ ConsultarCnpjNovoContrato: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock("@/actions/bpm/Anexos", () => ({ RegistrarAnexoBpm: vi.fn() }));
 

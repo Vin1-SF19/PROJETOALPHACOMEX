@@ -1,23 +1,63 @@
 import { describe, expect, it } from "vitest";
-import { FINANCIAL_FIELDS, FINANCIAL_STAGES, calcularRetencoesFinanceiras, campoFinanceiroSomenteLeitura, financialStageKeyFromLabel, validateFinancialTransition } from "@/lib/bpm/pipeline-financeiro";
+import { FINANCIAL_FIELDS, FINANCIAL_FIELD_KEYS, FINANCIAL_STAGES, calcularNovoContratoFinanceiro, calcularRetencoesFinanceiras, campoFinanceiroSomenteLeitura, financialStageKeyFromLabel, validateCanonicalFinancialTransition, validateFinancialTransition } from "@/lib/bpm/pipeline-financeiro";
+import { cnpjEhValido } from "@/lib/format-cnpj";
 
-function cnpjValidoLocal(cnpj: string) { const digits = cnpj.replace(/\D/g, ""); if (digits.length !== 14) return false; if (digits === digits[0].repeat(14)) return false; let sum = 0; for (let i = 0; i < 12; i++) sum += Number(digits[i]) * (12 - i); if ((sum % 11) >= 2) return false; sum = 0; for (let i = 0; i < 13; i++) sum += Number(digits[i]) * (13 - i); return (sum % 11) < 2 }
 function gerarCnpjValido(): string {
   for (let raiz = 100000000000; raiz < 100000000200; raiz += 1) {
     for (let d1 = 0; d1 <= 9; d1 += 1) {
       for (let d2 = 0; d2 <= 9; d2 += 1) {
         const candidato = `${raiz}${d1}${d2}`;
-        if (cnpjValidoLocal(candidato)) return candidato;
+        if (cnpjEhValido(candidato)) return candidato;
       }
     }
   }
   throw new Error("Nenhum CNPJ válido encontrado no intervalo de busca");
 }
 describe("pipeline financeiro", () => {
+  it("usa os campos ativos do formulário no avanço de Novo contrato", () => {
+    const k = FINANCIAL_FIELD_KEYS;
+    const valuesByFieldKey = {
+      [k.CNPJ]: gerarCnpjValido(), [k.RAZAO_SOCIAL]: "Empresa Teste",
+      [k.RUA]: "Rua A", [k.NUMERO]: "10", [k.BAIRRO]: "Centro",
+      [k.CEP]: "01310-100", [k.MUNICIPIO]: "São Paulo", [k.ESTADO]: "SP",
+      [k.EMAIL]: "contato@teste.com", [k.REGIME_CLIENTE]: "Simples Nacional",
+      [k.SERVICO]: "Consultoria", [k.VALOR_BRUTO]: "1000",
+      [k.FORMA_PAGAMENTO]: "PIX", [k.CONDICAO]: "À vista",
+      [k.VENDEDOR]: "Fulano", [k.ORIGEM]: "Parceiro",
+      [k.PARCEIRO]: "Parceiro A",
+    };
+    expect(k.VALOR_BRUTO).toBe("alpha.financeiro.valor.bruto.contrato");
+    expect(k.ORIGEM).toBe("alpha.canal.origem.do.cliente");
+    const input = { pipelineKey: "financeiro", fromStageKey: "solicitacao_contrato", toStageKey: "elaboracao_contrato", valuesByFieldKey };
+    expect(validateCanonicalFinancialTransition(input).blocked).toBe(false);
+    const semSnapshot = Object.fromEntries(Object.entries(valuesByFieldKey).filter(([chave]) => chave !== k.VALOR_BRUTO));
+    expect(validateCanonicalFinancialTransition({ ...input, valuesByFieldKey: { ...semSnapshot, [k.VALOR_NEGOCIADO_ORIGEM]: "1000" } }).blocked).toBe(false);
+    expect(validateCanonicalFinancialTransition({ ...input, valuesByFieldKey: { ...valuesByFieldKey, [k.ESTADO]: "XX", [k.PARCEIRO]: "" } }).pendingFields)
+      .toEqual(expect.arrayContaining([k.ESTADO, k.PARCEIRO]));
+    const indicacaoSemParceiro = { ...valuesByFieldKey, [k.ORIGEM]: "Indicação", [k.PARCEIRO]: "" };
+    expect(validateCanonicalFinancialTransition({ ...input, valuesByFieldKey: indicacaoSemParceiro }).blocked).toBe(false);
+    expect(validateCanonicalFinancialTransition({ ...input, valuesByFieldKey: indicacaoSemParceiro, parceiroVinculado: true }).pendingFields).toContain(k.PARCEIRO);
+    expect(validateCanonicalFinancialTransition({ ...input, optionsByFieldKey: { [k.FORMA_PAGAMENTO]: ["Boleto"] } }).pendingFields).toContain(k.FORMA_PAGAMENTO);
+  });
   it("mantém seis etapas na ordem contratada", () => { expect(FINANCIAL_STAGES).toHaveLength(6); expect(FINANCIAL_STAGES.map((stage) => stage.label)).toEqual(["Solicitação de Contrato", "Elaboração do Contrato", "Formalização", "Pagamento", "Nota Fiscal", "Concluídos"]) });
   it("mapeia as etapas legadas sem deslocar cards semanticamente", () => { expect(financialStageKeyFromLabel("Solicitação de Contrato")).toBe("solicitacao_contrato"); expect(financialStageKeyFromLabel("Contrato")).toBe("elaboracao_contrato"); expect(financialStageKeyFromLabel("Elaboração do Contrato")).toBe("elaboracao_contrato"); expect(financialStageKeyFromLabel("Formalização da Contratação")).toBe("formalizacao"); expect(financialStageKeyFromLabel("Emissão da Nota Fiscal")).toBe("nota_fiscal") });
   it("classifica todos os campos", () => { expect(FINANCIAL_FIELDS.length).toBeGreaterThan(40); expect(FINANCIAL_FIELDS.every((field) => ["OBRIGATORIO", "OBRIGATORIO_CONDICIONAL", "AUTOMATICO_CALCULADO"].includes(field.category))).toBe(true); expect(campoFinanceiroSomenteLeitura("Valor líquido para pagamento")).toBe(true) });
   it("calcula retenções com memória", () => { const result = calcularRetencoesFinanceiras(10000, 1.5, 4.65); expect(result).toMatchObject({ valorIrrf: 150, valorCsrf: 465, totalRetencoes: 615, valorLiquido: 9385 }); expect(JSON.parse(result.memoriaCalculo).resultados.valorLiquido).toBe(9385) });
+  it("calcula Novo contrato somente com retenções declaradas e libera status após dados de pagamento", () => {
+    const k = FINANCIAL_FIELD_KEYS;
+    const base = {
+      [k.REGIME_CLIENTE]: "Simples Nacional", [k.REGIME_PRESTADOR]: "Lucro Presumido",
+      [k.VALOR_BRUTO]: "1000", [k.IRRF_APLICAVEL]: "Sim", [k.CSRF_APLICAVEL]: "Não",
+    };
+    expect(calcularNovoContratoFinanceiro(base).pendencias).toContain(k.ALIQUOTA_IRRF);
+    const calculado = calcularNovoContratoFinanceiro({ ...base, [k.ALIQUOTA_IRRF]: "1,5" });
+    expect(calculado.automaticValues[k.VALOR_IRRF]).toBe("15");
+    expect(calculado.automaticValues[k.VALOR_CSRF]).toBe("0");
+    expect(calculado.automaticValues[k.VALOR_LIQUIDO]).toBe("985");
+    expect(calculado.automaticValues[k.STATUS_FINANCEIRO]).toBeUndefined();
+    expect(calcularNovoContratoFinanceiro({ ...base, [k.ALIQUOTA_IRRF]: "1,5", [k.VENCIMENTO]: "2026-10-10", [k.DADOS_PAGAMENTO]: "PIX" }).automaticValues[k.STATUS_FINANCEIRO])
+      .toBe("Aguardando pagamento");
+  });
   it("interpreta alíquota canônica com ponto sem multiplicá-la por dez", () => {
     const result = validateFinancialTransition({
       pipelineName: "Financeiro",

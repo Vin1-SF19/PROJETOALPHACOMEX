@@ -1,6 +1,7 @@
 import db from "@/lib/prisma";
 import { etapaEhFechado } from "@/lib/bpm/status-pos-fechamento";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
+import { copiarCamposCardVinculado } from "@/lib/bpm/copiar-campos-card-vinculado";
 
 /**
  * Automações do BPM (D-034): implementadas em código, não configuráveis via UI.
@@ -83,6 +84,9 @@ export async function executarAutomacaoFechamentoComercial(
       await tx.bpmCardVinculo.create({
         data: { cardOrigemId: card.id, cardDestinoId: novoCard.id },
       });
+      if (card.pipeline.chave === "comercial" && pipelineDestino.chave === "financeiro") {
+        await copiarCamposCardVinculado(tx, card.id, novoCard.id, pipelineDestino.id, primeiraEtapa.id);
+      }
 
       await tx.bpmCardHistorico.create({
         data: {

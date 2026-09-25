@@ -1,7 +1,9 @@
 import { createClient } from "@libsql/client";
 import { config } from "dotenv";
 import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { rmSync } from "node:fs";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
 config({ path: ".env.local" });
@@ -14,10 +16,14 @@ if (!rawUrl || !authToken) {
   throw new Error("TURSO_DATABASE_URL e TURSO_AUTH_TOKEN são obrigatórios em .env.local.");
 }
 
+const replicaDirectory = await mkdtemp(path.join(os.tmpdir(), "painelalpha-vault-replica."));
+process.once("exit", () => { rmSync(replicaDirectory, { recursive: true, force: true }); });
 const client = createClient({
-  url: rawUrl.replace(/^libsql:\/\//, "https://"),
+  url: `file:${path.join(replicaDirectory, "snapshot.db")}`,
+  syncUrl: rawUrl,
   authToken,
 });
+await client.sync();
 
 function quoteIdentifier(value) {
   return `"${String(value).replaceAll('"', '""')}"`;
@@ -39,9 +45,8 @@ const manifestPath = path.join(outputDirectory, `${baseName}.manifest.json`);
 
 await mkdir(outputDirectory, { recursive: true });
 
-// Schema e dados precisam vir do mesmo snapshot. Sem uma transação de leitura,
-// uma escrita concorrente entre os lotes poderia gerar um dump logicamente
-// inconsistente mesmo com hash e tamanho válidos.
+// A réplica local é sincronizada antes da leitura e oferece um snapshot estável
+// sem manter uma transação HTTP remota aberta durante a exportação.
 const transaction = await client.transaction("read");
 let schema;
 let tables;
@@ -112,3 +117,4 @@ await writeFile(
 
 console.info(JSON.stringify({ dumpPath, manifestPath, tables: tables.length, totalRows, sha256, sizeBytes: Buffer.byteLength(dump) }));
 await client.close();
+await rm(replicaDirectory, { recursive: true, force: true });

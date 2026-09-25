@@ -34,6 +34,7 @@ import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { executarAutomacoesCentraisDoCardAgora } from "@/lib/bpm/automacoes/orquestrador";
 import { automacaoMigradaEstaAtiva, NOMES_AUTOMACOES_MIGRADAS } from "@/lib/bpm/automacoes/migracao-hardcoded";
 import { salvarValoresGlobaisPersonalizadosCampos } from "@/lib/bpm/campos-configuraveis-server";
+import { atualizarCalculoNovoContrato } from "@/lib/bpm/novo-contrato-financeiro-server";
 import { camposPublicadosPorEtapa, capacidadesObrigatoriasPorEtapa } from "@/lib/bpm/campos-formulario-publicado";
 import { desserializarComposicaoCardKanban, type CardKanbanComposicao } from "@/lib/bpm/card-kanban";
 import { obterStatusPosFechamentoVisivel } from "@/lib/bpm/status-pos-fechamento";
@@ -1199,8 +1200,8 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
     const cardAnterior = await db.bpmCard.findUnique({
       where: { id: cardId },
       include: {
-        etapa: { select: { nome: true } },
-        pipeline: { select: { nome: true } },
+        etapa: { select: { nome: true, chave: true } },
+        pipeline: { select: { nome: true, chave: true } },
       },
     });
     if (!cardAnterior) return { success: false, error: "Card não encontrado" };
@@ -1430,6 +1431,11 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
             create: { cardId, campoId, valor },
             update: { valor },
           });
+        }
+        if (cardAnterior.pipeline?.chave === "financeiro"
+          && cardAnterior.etapa?.chave === "solicitacao_contrato"
+          && Object.keys(valoresValidados).length > 0) {
+          await atualizarCalculoNovoContrato(tx, cardId, cardAtual.pipelineId);
         }
       }
 

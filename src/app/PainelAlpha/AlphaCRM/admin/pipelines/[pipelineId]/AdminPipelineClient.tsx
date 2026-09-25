@@ -26,9 +26,7 @@ import { PublicarConfiguracaoPipelineBpm } from "@/actions/bpm/ConfiguracaoPipel
 import type { TemaAlpha } from "@/lib/temas";
 import {
   FINANCIAL_PIPELINE_NAME,
-  hasConfiguredFinancialPipeline,
 } from "@/lib/bpm/pipeline-financeiro";
-import { ConfigurarEtapasFinanceiroButton } from "./ConfigurarEtapasFinanceiroButton";
 import { VisibilidadeEtapasSection } from "./VisibilidadeEtapasSection";
 import {
   EtapaAvancadaSection,
@@ -586,22 +584,11 @@ export default function AdminPipelineClient({
             automacoes={automacoes}
             onNavigate={navegarPara}
           />
-          {pipeline.nome === FINANCIAL_PIPELINE_NAME &&
-            (hasConfiguredFinancialPipeline(etapas, campos) ? (
-              <div
-                className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200"
-                role="status"
-              >
-                Pipeline Financeiro configurado com as cinco etapas e campos
-                oficiais.
-              </div>
-            ) : (
-              <ConfigurarEtapasFinanceiroButton
-                pipelineId={pipeline.id}
-                accent={accent}
-                onConfigured={() => router.refresh()}
-              />
-            ))}
+          {pipeline.nome === FINANCIAL_PIPELINE_NAME && (
+            <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200" role="status">
+              Configure as seis etapas, os campos e os formulários nas abas deste editor.
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="stages" className="space-y-4">

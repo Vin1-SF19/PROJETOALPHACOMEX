@@ -11,6 +11,7 @@ import { calcularDiaCicloNovosLeads, contarDiasUteisDecorridos, intervaloDiaCivi
 import { sincronizarTranscricaoCardBpm } from "@/lib/bpm/transcricao-reuniao-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
+import { copiarCamposCardVinculado } from "@/lib/bpm/copiar-campos-card-vinculado";
 import { montarContextoAvaliacaoDoCard } from "@/lib/bpm/regras/contexto";
 import { avaliarGrupo } from "@/lib/bpm/regras/avaliador";
 import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
@@ -67,7 +68,7 @@ async function carregarExecucao(id: string) {
       card: {
         include: {
           empresa: { select: { razaoSocial: true, nomeFantasia: true, cnpj: true } },
-          responsavel: { select: { nome: true } }, pipeline: { select: { nome: true } }, etapa: { select: { nome: true } },
+          responsavel: { select: { nome: true } }, pipeline: { select: { nome: true, chave: true } }, etapa: { select: { nome: true } },
         },
       },
     },
@@ -260,6 +261,7 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
     const pipelineId = String(parametros.pipelineId); const etapaId = String(parametros.etapaId);
     const etapa = await db.bpmEtapa.findFirst({ where: { id: etapaId, pipelineId, ativo: true }, select: { id: true } });
     if (!etapa) throw new Error("Pipeline/etapa de destino inválidos");
+    const pipelineDestino = await db.bpmPipeline.findUnique({ where: { id: pipelineId }, select: { chave: true } });
     if (parametros.somenteSeNaoExistirAtivo) {
       const existente = await db.bpmCard.findFirst({ where: { empresaId: card.empresaId, pipelineId, status: "ATIVO" }, select: { id: true } });
       if (existente) return { cardId: existente.id, existente: true };
@@ -267,6 +269,9 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
     const novo = await db.$transaction(async (tx) => {
       const criado = await tx.bpmCard.create({ data: { empresaId: card.empresaId, pipelineId, etapaId, responsavelId: Number(parametros.responsavelId ?? card.responsavelId), servico: parametros.servico ? String(parametros.servico) : card.servico, membros: { create: { userId: Number(parametros.responsavelId ?? card.responsavelId), role: "RESPONSAVEL" } } } });
       if (parametros.vincularAoOriginal !== false) await tx.bpmCardVinculo.create({ data: { cardOrigemId: card.id, cardDestinoId: criado.id } });
+      if (card.pipeline.chave === "comercial" && pipelineDestino?.chave === "financeiro") {
+        await copiarCamposCardVinculado(tx, card.id, criado.id, pipelineId, etapaId);
+      }
       await ativarCadenciasNaEntradaBpm({
         cardId: criado.id,
         pipelineAnteriorId: null,

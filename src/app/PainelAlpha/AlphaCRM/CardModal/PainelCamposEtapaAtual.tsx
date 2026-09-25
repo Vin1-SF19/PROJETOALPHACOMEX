@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, ClipboardPaste, Loader2, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { AtualizarCardBpm, ObterCardBpm } from "@/actions/bpm/Cards";
+import { ConsultarCnpjNovoContrato } from "@/actions/bpm/ConsultaCnpjFinanceiro";
 import { CampoBpmInput } from "@/app/PainelAlpha/AlphaCRM/CampoBpmInput";
 import { MOTIVO_LOST_OUTRO_OBRIGATORIO_MENSAGEM } from "@/lib/bpm/lost";
 import {
@@ -15,6 +16,7 @@ import {
 } from "@/lib/bpm/card-modal-ui";
 import { TEMPLATE_RESUMO_ALINHAMENTO } from "@/lib/bpm/alinhamento-estrategico";
 import { BPM_FIELD_KEYS, BPM_STAGE_KEYS } from "@/lib/bpm/ontology";
+import { FINANCIAL_FIELD_KEYS, campoFinanceiroCalculadoPorChave } from "@/lib/bpm/pipeline-financeiro";
 import { useCardSave } from "@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext";
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type CamposEtapaCard = CardDetalhe["camposEtapa"];
@@ -69,6 +71,8 @@ export function PainelCamposEtapaAtual({
   const [savesCamposPendentes, setSavesCamposPendentes] = useState(0);
 
   const [estadoSave, setEstadoSave] = useState<"pendente" | "salvo" | "erro" | null>(null);
+  const [buscandoCnpj, setBuscandoCnpj] = useState(false);
+  const cnpjConsultadoRef = useRef("");
   const revisaoEdicao = useRef(0);
   const valoresRef = useRef(valoresCamposAtuais);
   const rastreadores = useRef(new Map<string, ReturnType<typeof criarRastreadorRascunho>>());
@@ -204,7 +208,7 @@ export function PainelCamposEtapaAtual({
       let possuiValorInvalido = false;
       for (const campo of configuracaoAtual.camposVisiveis) {
         if (campoId && campo.id !== campoId && !configuracaoAtual.exigeComplemento) continue;
-        if (campo.somenteLeitura || campo.editavel === false
+        if (campo.somenteLeitura || campo.editavel === false || campoFinanceiroCalculadoPorChave(campo.chave)
           || (valoresAtuais[campo.id] ?? "") === (snapshotAtivoRef.current.valores[campo.id] ?? "")) continue;
         const validacao = validarValoresCamposBpm([campo], montarPayloadCamposDestino([campo], valoresAtuais));
         if (!validacao.success) { possuiValorInvalido = true; toast.error(validacao.error); continue; }
@@ -259,6 +263,55 @@ export function PainelCamposEtapaAtual({
     const sucesso = await promise;
     if (!sucesso && revisaoEdicao.current === revisaoEnviada) setEstadoSave("erro");
   }
+  const campoCnpj = camposAtuaisVisiveis.find((campo) => campo.chave === FINANCIAL_FIELD_KEYS.CNPJ);
+  const cnpjDaEtapa = campoCnpj ? valoresCamposAtuais[campoCnpj.id] ?? "" : "";
+  async function consultarCnpjNovoContrato(mostrarErro: boolean) {
+    if (!podeEditar || !campoCnpj || buscandoCnpj) return;
+    const cnpj = cnpjDaEtapa.replace(/\D/g, "");
+    if (cnpj.length !== 14) return;
+    cnpjConsultadoRef.current = cnpj;
+    setBuscandoCnpj(true);
+    const resposta = await ConsultarCnpjNovoContrato(card.id, cnpj);
+    setBuscandoCnpj(false);
+    if (!resposta.success) {
+      if (mostrarErro) toast.error(resposta.error, { duration: 5000, closeButton: true });
+      return;
+    }
+    const dadosPorChave: Record<string, string> = {
+      [FINANCIAL_FIELD_KEYS.RAZAO_SOCIAL]: resposta.data.razaoSocial,
+      [FINANCIAL_FIELD_KEYS.RUA]: resposta.data.rua,
+      [FINANCIAL_FIELD_KEYS.NUMERO]: resposta.data.numero,
+      "alpha.complemento": resposta.data.complemento,
+      [FINANCIAL_FIELD_KEYS.BAIRRO]: resposta.data.bairro,
+      [FINANCIAL_FIELD_KEYS.CEP]: resposta.data.cep,
+      [FINANCIAL_FIELD_KEYS.MUNICIPIO]: resposta.data.municipio,
+      [FINANCIAL_FIELD_KEYS.ESTADO]: resposta.data.estado,
+    };
+    const proximos = { ...valoresRef.current };
+    let alterados = 0;
+    for (const campo of camposAtuaisVisiveis) {
+      const recebido = dadosPorChave[campo.chave ?? ""]?.trim();
+      if (!recebido || campo.somenteLeitura || campo.editavel === false || proximos[campo.id]?.trim()) continue;
+      proximos[campo.id] = recebido;
+      alterados += 1;
+    }
+    if (!alterados) return;
+    revisaoEdicao.current += 1;
+    valoresRef.current = proximos;
+    setValoresCamposAtuais(proximos);
+    setEstadoSave("pendente");
+    atualizarPendencias();
+    scheduleSave(`${card.id}:consulta-cnpj`, () => void salvarCamposAtuais(), 0);
+  }
+  const consultarCnpjRef = useRef(consultarCnpjNovoContrato);
+  useEffect(() => { consultarCnpjRef.current = consultarCnpjNovoContrato; });
+  useEffect(() => {
+    if (card.etapa.chave !== BPM_STAGE_KEYS.SOLICITACAO_CONTRATO || !podeEditar || !campoCnpj) return;
+    const cnpj = cnpjDaEtapa.replace(/\D/g, "");
+    if (cnpj.length !== 14 || cnpjConsultadoRef.current === cnpj) return;
+    const timer = setTimeout(() => { void consultarCnpjRef.current(false); }, 0);
+    return () => clearTimeout(timer);
+  }, [card.id, card.etapa.chave, podeEditar, campoCnpj, cnpjDaEtapa]);
   const inputCls = "w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-600 outline-none focus:border-white/25 transition-colors";
   return (
     <section
@@ -300,9 +353,17 @@ export function PainelCamposEtapaAtual({
             </div>
           )}
           <fieldset className="space-y-3 rounded-xl border border-white/[0.06] p-3">
+              {card.etapa.chave === BPM_STAGE_KEYS.SOLICITACAO_CONTRATO && campoCnpj && (
+                <button type="button" disabled={!podeEditar || buscandoCnpj || cnpjDaEtapa.replace(/\D/g, "").length !== 14}
+                  onClick={() => void consultarCnpjNovoContrato(true)}
+                  className="rounded-lg border border-sky-300/25 px-2 py-1 text-[10px] font-semibold text-sky-200 hover:bg-sky-300/10 disabled:opacity-50">
+                  {buscandoCnpj ? "Consultando CNPJ..." : "Consultar CNPJ e preencher dados disponíveis"}
+                </button>
+              )}
               {camposAtuaisVisiveis.map((campo) => {
             const complementoPendente = campo.id === configuracaoLostUi.campoComplementoId && complementoLostPendente;
-            const somenteLeitura = campo.somenteLeitura === true || campo.editavel === false;
+            const somenteLeitura = campo.somenteLeitura === true || campo.editavel === false
+              || (card.pipeline?.nome === "Financeiro" && campoFinanceiroCalculadoPorChave(campo.chave));
             const fonteAutomatica = campo.escopo === "GLOBAL" && Boolean(campo.fonteEntidade);
             const descricaoId = complementoPendente ? `campo-bpm-${campo.id}-erro` : undefined;
             return (

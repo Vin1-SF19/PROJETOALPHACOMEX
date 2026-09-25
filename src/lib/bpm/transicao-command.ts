@@ -26,6 +26,7 @@ import {
 } from "@/lib/bpm/ontology";
 import {
   FINANCIAL_FIELD_KEYS,
+  campoFinanceiroCalculadoPorChave,
   validateCanonicalFinancialTransition,
 } from "@/lib/bpm/pipeline-financeiro";
 import { exigirAcessoBpmCard, checarAcessoDiretoriaBpm } from "@/lib/bpm/ownership";
@@ -164,6 +165,8 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       servicoContexto: true,
       campoValores: { select: { campoId: true, valor: true } },
       anexos: { select: { nome: true } },
+      indicacaoOrigem: { select: { parceiroId: true } },
+      vinculosDestino: { select: { cardOrigem: { select: { indicacaoOrigem: { select: { parceiroId: true } } } } } },
     },
   });
   if (!card) erro("CARD_NOT_FOUND", "Card não encontrado.");
@@ -284,12 +287,34 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     erro("FIELD_OUTSIDE_STAGE_CONFIG", "Um ou mais campos não possuem configuração canônica para esta transição.");
   }
   const camposPorId = new Map([...camposRequisito, ...camposSubmetidos].map((campo) => [campo.id, campo]));
+  // A validação financeira consulta valores já salvos em etapas anteriores.
+  // Eles podem ser opcionais na etapa atual e, por isso, não estar entre os
+  // requisitos nem no payload enviado pelo formulário desta transição.
+  if (card.pipeline.chave === BPM_PIPELINE_KEYS.FINANCEIRO) {
+    const camposFinanceiros = await tx.bpmCampo.findMany({
+      where: {
+        ativo: true,
+        chave: { in: [...new Set(Object.values(FINANCIAL_FIELD_KEYS))] },
+        OR: [
+          { pipelineId: card.pipelineId },
+          { pipelinesAssociados: { some: { pipelineId: card.pipelineId } } },
+        ],
+      },
+      include: {
+        opcoes: { where: { ativo: true }, orderBy: { ordem: "asc" } },
+        etapaConfiguracoes: { where: { etapaId: { in: [card.etapaId, destino.id] } } },
+        acessos: perfilCampo ? { where: { perfil: perfilCampo } } : false,
+      },
+    });
+    for (const campo of camposFinanceiros) camposPorId.set(campo.id, campo);
+  }
 
   for (const campo of camposSubmetidos) {
     const config = campo.etapaConfiguracoes.find((item) => item.etapaId === destino.id)
       ?? campo.etapaConfiguracoes.find((item) => item.etapaId === card.etapaId);
     const acesso = campo.acessos[0];
     const bloqueadoPorPolicy = campo.editavel === false || campo.somenteLeitura
+      || (card.pipeline.chave === BPM_PIPELINE_KEYS.FINANCEIRO && campoFinanceiroCalculadoPorChave(campo.chave))
       || config?.editavel === false || config?.somenteLeitura
       || (input.ator.tipo === "MANUAL" && (acesso?.visivel === false || acesso?.editavel === false || acesso?.somenteLeitura));
     if (bloqueadoPorPolicy) {
@@ -431,12 +456,26 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
   const valoresPorChave = Object.fromEntries([...camposPorId.values()].flatMap((campo) =>
     campo.chave ? [[campo.chave, valoresEfetivosPorId.get(campo.id) ?? null] as const] : [],
   ));
+  const optionsByFieldKey = Object.fromEntries([...camposPorId.values()].flatMap((campo) => {
+    if (!campo.chave || campo.tipo !== "selecao") return [];
+    let opcoes = campo.opcoes.map((opcao) => opcao.rotulo);
+    if (!opcoes.length && campo.opcoesJson) {
+      try {
+        const parsed: unknown = JSON.parse(campo.opcoesJson);
+        if (Array.isArray(parsed)) opcoes = parsed.filter((item): item is string => typeof item === "string");
+      } catch { /* catálogo inválido mantém a seleção sem opções válidas */ }
+    }
+    return [[campo.chave, opcoes] as const];
+  }));
   const financeiro = validateCanonicalFinancialTransition({
     pipelineKey: card.pipeline.chave ?? "",
     fromStageKey: card.etapa.chave ?? "",
     toStageKey: destino.chave ?? "",
     valuesByFieldKey: valoresPorChave,
+    optionsByFieldKey,
     attachmentNames: card.anexos.map((anexo) => anexo.nome),
+    parceiroVinculado: Boolean(card.indicacaoOrigem?.parceiroId
+      || card.vinculosDestino.some((vinculo) => vinculo.cardOrigem.indicacaoOrigem?.parceiroId)),
   });
   if (financeiro.blocked) {
     const labels = financeiro.pendingFields.map((key) => camposPorId.size
