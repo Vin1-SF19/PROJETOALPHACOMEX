@@ -8,6 +8,7 @@ import { calcularProximaRecorrencia } from "@/lib/bpm/automacoes/agenda";
 import { materializarExecucoesEventosBpm, publicarEventoBpm, sanitizarPayloadAutomacao } from "@/lib/bpm/automacoes/eventos";
 import { chamadaHttpSchema, validarGrafoAutomacao, validarParametrosAcaoCentral } from "@/lib/bpm/automacoes/central-schemas";
 import { executarHttpSeguro } from "@/lib/bpm/automacoes/safe-http";
+import { idTarefaUnicaPorTipo } from "@/lib/bpm/automacoes/idempotencia-tarefa";
 
 const FIM = { id: "fim", tipo: "FIM" as const };
 
@@ -65,6 +66,14 @@ describe("Motor Central de Automações", () => {
     expect(validarParametrosAcaoCentral("CRIAR_TAREFAS_POR_META", { meta: 5, interacaoTipo: "LIGACAO", tarefaTipo: "LIGACAO", titulo: "Ligação {{indice}}", prioridade: "NORMAL", maximoDiasUteisDesdeCriacao: 8 })).toMatchObject({ meta: 5 });
     expect(validarParametrosAcaoCentral("MARCAR_ALERTA_TAREFA", {})).toEqual({});
     expect(validarParametrosAcaoCentral("SINCRONIZAR_TRANSCRICAO_REUNIAO", {})).toEqual({});
+  });
+
+  it("usa um ID estável para impedir duas tarefas do mesmo tipo no mesmo card", () => {
+    const primeiro = idTarefaUnicaPorTipo("card-a", "EMISSAO_NF");
+    expect(primeiro).toBe(idTarefaUnicaPorTipo("card-a", "EMISSAO_NF"));
+    expect(primeiro).not.toBe(idTarefaUnicaPorTipo("card-b", "EMISSAO_NF"));
+    expect(primeiro).not.toBe(idTarefaUnicaPorTipo("card-a", "COBRANCA_FINANCEIRA"));
+    expect(primeiro).toMatch(/^c[a-f0-9]{24}$/);
   });
 
   it("deduplica a publicação de evento pela chave de idempotência", async () => {

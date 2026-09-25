@@ -54,8 +54,9 @@ const OPERADOR_LABEL: Record<OperadorRegra, string> = {
 const OPERADORES_SEM_VALOR = new Set<OperadorRegra>(["preenchido", "vazio"]);
 const OPERADORES_LISTA = new Set<OperadorRegra>(["estaEm", "naoEstaEm"]);
 
-const FONTES: FonteCampo[] = ["card", "cliente", "processo", "contratacao", "relacionada", "checklist", "campo_dinamico"];
+const FONTES: FonteCampo[] = ["agora", "card", "cliente", "processo", "contratacao", "relacionada", "checklist", "campo_dinamico"];
 const FONTE_LABEL: Record<FonteCampo, string> = {
+  agora: "Data atual",
   card: "Card", cliente: "Cliente", processo: "Processo", contratacao: "Contratação",
   relacionada: "Entidade relacionada", checklist: "Procedimento", campo_dinamico: "Campo dinâmico (CUID)",
 };

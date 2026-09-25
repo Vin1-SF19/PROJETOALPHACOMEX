@@ -91,11 +91,13 @@ function comparar(a: ValorCoercido, b: ValorCoercido): number {
 
 export function avaliarCondicao(condicao: CondicaoFolha, contexto: ContextoAvaliacao): boolean {
   const bruto = resolverCampo(condicao.campo, contexto);
+  const valorComparacao = condicao.valorCampo ? resolverCampo(condicao.valorCampo, contexto) : condicao.valor;
   if (condicao.operador === "vazio") return vazio(bruto);
   if (condicao.operador === "preenchido") return !vazio(bruto);
   if (bruto === undefined) throw new ErroRegra(`Campo inexistente: ${condicao.campo.fonte}:${condicao.campo.campo}`, "CAMPO_INEXISTENTE");
+  if (valorComparacao === undefined) throw new ErroRegra("Campo de comparação inexistente", "CAMPO_INEXISTENTE");
   if (bruto === null && (condicao.operador === "igual" || condicao.operador === "diferente")) {
-    return condicao.operador === "diferente" ? condicao.valor !== null : condicao.valor === null;
+    return condicao.operador === "diferente" ? valorComparacao !== null : valorComparacao === null;
   }
   if (bruto === null && (condicao.operador === "contem" || condicao.operador === "naoContem")) {
     return condicao.operador === "naoContem";
@@ -106,17 +108,17 @@ export function avaliarCondicao(condicao: CondicaoFolha, contexto: ContextoAvali
 
   if (condicao.operador === "contem" || condicao.operador === "naoContem") {
     let contem = false;
-    if (atual.tipo === "texto") contem = atual.valor.toLocaleLowerCase("pt-BR").includes(String(condicao.valor).toLocaleLowerCase("pt-BR"));
-    else if (atual.tipo === "lista") contem = atual.valor.some((item) => item === condicao.valor);
+    if (atual.tipo === "texto") contem = atual.valor.toLocaleLowerCase("pt-BR").includes(String(valorComparacao).toLocaleLowerCase("pt-BR"));
+    else if (atual.tipo === "lista") contem = atual.valor.some((item) => item === valorComparacao);
     else throw new ErroRegra("Operador contém exige texto ou lista", "TIPO_INCOMPATIVEL");
     return condicao.operador === "contem" ? contem : !contem;
   }
   if (condicao.operador === "estaEm" || condicao.operador === "naoEstaEm") {
-    if (!Array.isArray(condicao.valor)) throw new ErroRegra("Operador está em exige lista", "TIPO_INCOMPATIVEL");
-    const encontrado = condicao.valor.some((item) => iguais(atual, exigirCoercao(item, tipo, "Item da lista")));
+    if (!Array.isArray(valorComparacao)) throw new ErroRegra("Operador está em exige lista", "TIPO_INCOMPATIVEL");
+    const encontrado = valorComparacao.some((item) => iguais(atual, exigirCoercao(item, tipo, "Item da lista")));
     return condicao.operador === "estaEm" ? encontrado : !encontrado;
   }
-  const esperado = exigirCoercao(condicao.valor, tipo, "Valor de comparação");
+  const esperado = exigirCoercao(valorComparacao, tipo, "Valor de comparação");
 
   switch (condicao.operador) {
     case "igual": return iguais(atual, esperado);

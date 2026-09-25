@@ -241,12 +241,7 @@ export function CampoBpmInput({
           }}
         />
         {value.startsWith("https://") ? (
-          <a
-            href={value}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block truncate text-[11px] text-emerald-300 hover:underline"
-          >
+          <a href={value} target="_blank" rel="noopener noreferrer" className="block truncate text-[11px] text-emerald-300 hover:underline">
             Abrir link do contrato
           </a>
         ) : value ? (

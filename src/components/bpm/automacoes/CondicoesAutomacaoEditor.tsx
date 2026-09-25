@@ -33,11 +33,12 @@ type Linha = {
   valor: string;
 };
 
-const FONTES: FonteCampo[] = ["card", "cliente", "processo", "contratacao", "relacionada", "checklist", "campo_dinamico"];
+const FONTES: FonteCampo[] = ["agora", "card", "cliente", "processo", "contratacao", "relacionada", "checklist", "campo_dinamico"];
 const SEM_VALOR = new Set<OperadorRegra>(["preenchido", "vazio"]);
 const LISTA = new Set<OperadorRegra>(["estaEm", "naoEstaEm"]);
 
 const FONTE_LABEL: Record<FonteCampo, string> = {
+  agora: "Data atual",
   card: "Card",
   cliente: "Cliente",
   processo: "Processo",

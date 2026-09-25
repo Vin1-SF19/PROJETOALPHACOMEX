@@ -68,6 +68,12 @@ export async function validarReferenciasPublicacaoAutomacao(
     if (no.tipo !== "ACAO") continue;
     const p = no.parametros;
     if (no.acaoTipo === "ALTERAR_CAMPO" && !await db.bpmCampo.findFirst({ where: { id: String(p.campoId), pipelineId: automacao.pipelineId }, select: { id: true } })) throw new Error(`O nó ${no.id} usa um campo que não pertence ao pipeline`);
+    if (no.acaoTipo === "ALTERAR_CAMPO" && typeof p.valor === "string") {
+      const origemId = /^\{\{campo\.([a-z0-9]+)\}\}$/.exec(p.valor)?.[1];
+      if (origemId && !await db.bpmCampo.findFirst({ where: { id: origemId, ativo: true, OR: [
+        { pipelineId: automacao.pipelineId }, { pipelinesAssociados: { some: { pipelineId: automacao.pipelineId } } },
+      ] }, select: { id: true } })) throw new Error(`O nó ${no.id} usa um campo de origem fora do pipeline`);
+    }
     if (no.acaoTipo === "ATUALIZAR_CARD_RELACIONADO" && p.campoId && !await db.bpmCampo.findUnique({ where: { id: String(p.campoId) }, select: { id: true } })) throw new Error(`O nó ${no.id} usa um campo inválido`);
     if (no.acaoTipo === "MOVER_CARD" && !await db.bpmEtapa.findFirst({ where: { id: String(p.etapaId), pipelineId: automacao.pipelineId, ativo: true }, select: { id: true } })) throw new Error(`O nó ${no.id} usa uma etapa inválida`);
     if (no.acaoTipo === "ALTERAR_SUBSTATUS" && !await db.bpmSubStatus.findFirst({ where: { id: String(p.subStatusId), ativo: true }, select: { id: true } })) throw new Error(`O nó ${no.id} usa um substatus inválido`);

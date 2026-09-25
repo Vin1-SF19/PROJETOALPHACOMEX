@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft — requisitos registrados; inventário da configuração publicada e política de cobrança/comprovação pendentes.
+Ready for Review — código e configuração publicados; smoke com card real ainda pendente.
 
 ## Executor Assignment
 
@@ -25,7 +25,7 @@ Draft — requisitos registrados; inventário da configuração publicada e pol�
 | Valor esperado | Derivado do valor líquido calculado quando há retenções |
 | Valor recebido | Obrigatório quando confirmado = Sim |
 | Forma de pagamento utilizada | Obrigatória quando confirmado = Sim |
-| Comprovante | Obrigatório quando a forma ou o processo exigir comprovação manual; política exata configurável e pendente de definição |
+| Comprovante | Obrigatório quando a forma utilizada for Manual; a lista permanece configurável |
 | Status financeiro | Reflete o estado do pagamento, inclusive `Aguardando pagamento` e `PAGAMENTO CONCLUÍDO` |
 
 ## Critérios de aceite
@@ -44,19 +44,19 @@ Draft — requisitos registrados; inventário da configuração publicada e pol�
 
 ## Decisões pendentes e limites
 
-- **[AUTO-DECISION] Prova manual:** a forma de pagamento ou processo que exige comprovante deve ser selecionável na configuração; o pedido não fixa a lista nem o tipo de arquivo aceito.
+- **Prova manual (usuário):** lista configurável de formas/processos; a opção manual exige comprovante. Usar o fluxo autenticado de arquivo do card.
 - **[AUTO-DECISION] Divergência:** o pedido permite “regularização/validação”, mas não define tolerância, responsável, trilha de aprovação ou pagamento parcial. Documentar essas decisões antes de publicar eventual exceção; a regra padrão bloqueia conclusão automática.
-- **[AUTO-DECISION] Cobrança:** prazo, destinatário, canal, recorrência e texto da cobrança dependem da política aprovada. A story exige o mecanismo configurável e teste do gatilho, sem fixar números ou disparar comunicação externa não especificada.
-- **[AUTO-DECISION] Pagamento no êxito:** usar o indicador/condição negociada já registrado no card e explicitar o evento de exigibilidade na configuração. Sem esse evento, não classificar ausência de antecipação como atraso.
+- **Cobrança (usuário):** no vencimento informado no card, criar alerta e tarefa interna. Nenhuma mensagem externa automática foi solicitada.
+- **Pagamento no êxito (usuário):** o card permanece em Pagamento até o recebimento; a ausência de antecipação não é inadimplência. O vencimento informado só pode gerar cobrança depois da data de êxito do serviço vinculado ao card. Sem vínculo/êxito, a cobrança fica suspensa.
 - **Banco/configuração:** publicação de campos, regras, automações ou mutação em massa no Turso requer o checkpoint Vault do `AGENTS.md`: plano com ambiente/impacto/rollback, backup completo validado de até 48 horas em `database-backups/pre-change/` e autorização humana explícita e específica para esta publicação. Aprovações anteriores não cobrem esta etapa.
 
 ## Tarefas / subtarefas
 
-- [ ] **Inventariar a etapa real** (AC 1–5): campos ativos/inativos, composição publicada, valores históricos, status/opções, cálculo líquido, indicadores `Pagamento no êxito`, comprovantes e regras/automações atuais. Registrar a identidade canônica de cada conceito.
-- [ ] **Definir configuração de validação** (AC 2–5, 11): condicional de confirmação, origem do valor esperado, limites numéricos, comparação e comprovação manual conforme política aprovada.
-- [ ] **Configurar estados combinados** (AC 6, 7, 9): mapear a assinatura e o pagamento para as quatro saídas sem sobrepor os status individuais; respeitar pagamento no êxito.
-- [ ] **Configurar automações** (AC 8, 10): confirmação, tarefa de NF idempotente, verificação da assinatura, recálculo e cobrança por vencimento somente com política definida.
-- [ ] **Testar fluxo real** (AC 1–11): salvamento, transição, idempotência, valores iguais/divergentes, quatro estados, pagamento no êxito, comprovante configurado e vencimento. Conferir execução/histórico das automações.
+- [x] **Inventariar a etapa real** (AC 1–5): campos ativos/inativos, composição publicada, valores históricos, status/opções, cálculo líquido, indicadores `Pagamento no êxito`, comprovantes e regras/automações atuais. Registrar a identidade canônica de cada conceito.
+- [x] **Definir configuração de validação** (AC 2–5, 11): condicional de confirmação, origem do valor esperado, limites numéricos, comparação e comprovação manual conforme política aprovada; publicação pendente.
+- [x] **Configurar estados combinados** (AC 6, 7, 9): mapear a assinatura e o pagamento para as quatro saídas sem sobrepor os status individuais; respeitar pagamento no êxito; publicação pendente.
+- [x] **Configurar automações** (AC 8, 10): confirmação, tarefa de NF idempotente, verificação da assinatura, recálculo e cobrança por vencimento somente com política definida; publicação pendente.
+- [ ] **Testar fluxo real** (AC 1–11): salvamento, transição, idempotência, valores iguais/divergentes, quatro estados, pagamento no êxito, comprovante configurado e vencimento. Conferir execução/histórico das automações. O smoke sintético da configuração publicada passou; falta card real.
 - [ ] **Publicação protegida e gates**: antes de alterar banco/configuração, Vault, backup validado, autorização específica e rollback; depois executar `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` e smoke autenticado. Atualizar este checklist e File List.
 
 ## Dev Notes
@@ -87,27 +87,35 @@ Draft — requisitos registrados; inventário da configuração publicada e pol�
 
 - [x] Pedido do usuário e stories adjacentes consolidados em critérios testáveis.
 - [x] Draft validado pelo checklist: objetivo/contexto PASS; orientação técnica PARTIAL (inventário real e políticas pendentes); referências PASS; autossuficiência PASS; testes PASS; CodeRabbit PASS.
-- [ ] Política de comprovação, cobrança e validação de divergência definida na configuração.
-- [ ] Inventário atual e plano de implementação registrados.
-- [ ] Implementação, regressões, gates e smoke autenticado concluídos.
-- [ ] Checkpoint Vault e publicação concluídos, se necessária mutação protegida.
+- [x] Política de comprovação e cobrança definida pelo usuário; divergência bloqueia até correção, sem validação excepcional presumida.
+- [x] Inventário atual: etapa Pagamento v3 com 13 campos publicados, duplicidade de comprovante, sem requisito/automação própria; zero cards ativos nela. Identidades canônicas e plano de código em análise.
+- [x] Implementação, regressões locais e gates estáticos concluídos.
+- [ ] Smoke autenticado do formulário e das automações no ambiente publicado.
+- [x] Checkpoint Vault, autorização específica e publicação concluídos: Turso Financeiro v43 → v44, Pagamento v3 → v4, 20 requisitos e 8 automações ativos.
 
 ## Dev Agent Record
 
-### File List inicial
+### File List
 
 - `docs/stories/story-financeiro-confirmacao-pagamento.md` — este draft.
-- `src/lib/bpm/transicao-command.ts`, `src/actions/bpm/Cards.ts` — candidatos para inspeção do salvamento/movimento.
-- `src/lib/bpm/automacoes/central-runtime.ts`, `src/lib/bpm/automacoes/central-schemas.ts` — candidatos para inspeção das automações.
-- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx` — candidato para apresentação dos campos/pendências.
-- `tests/bpm/` — testes a selecionar após inventário.
+- `scripts/financeiro-pagamento-config.mts` — plano somente leitura e publicação protegida por autorização, backup e versão.
+- `src/lib/bpm/regras/{types,schemas,avaliador,contexto}.ts` — comparação entre campos, data atual e êxito do serviço vinculado.
+- `src/lib/bpm/automacoes/{central-runtime,central-schemas,publicacao}.ts` — cópia de campo em automação, evento atômico e deduplicação da tarefa de NF.
+- `src/lib/bpm/automacoes/idempotencia-tarefa.ts` — identidade estável por card/tipo para tarefa única, sem migration.
+- `src/components/bpm/automacoes/CondicoesAutomacaoEditor.tsx`, `src/components/bpm/regras/RegraFormDialog.tsx` — fonte temporal na configuração visual.
+- `tests/bpm/regras-engine.test.ts`, `tests/bpm/regras-guarda-movimento.test.ts`, `tests/bpm/automacoes-central.test.ts` — regressões de comparação, vínculo e identidade estável da tarefa.
 
 ### Change Log
 
 | Data | Versão | Descrição | Autor |
 | --- | --- | --- | --- |
 | 2026-09-25 | 0.1 | Draft de Confirmação de Pagamento e estados conjuntos | River (@sm) |
+| 2026-09-25 | 0.2 | Política de êxito, plano de configuração e suporte a regras/automações | Codex |
+| 2026-09-25 | 0.3 | Saída exige fonte de valor válida; tarefa única usa ID determinístico e evento atômico | Codex |
+| 2026-09-25 | 0.4 | Publicação protegida no Turso e smoke sintético da configuração ativa | Codex |
 
 ## QA Results
 
-Pendente.
+`npm run lint`: passou, com 1.192 avisos existentes e zero erros. `npm run typecheck`: passou. Após as correções de QA, `npm test`: 517 arquivos, 3.852 testes passaram, quatro ignorados e um todo. `npm run build` passou após direcionar o cache da worktree para disco persistente; a primeira tentativa no `/tmp` falhou por cota de escrita. QA do diff corrigido: **CONCERNS**, sem bloqueante estático; teste real do fluxo publicado e concorrência permanece pendente.
+
+Após autorização específica, a publicação transacional criou dois campos, 20 requisitos e oito automações. A primeira tentativa falhou na validação do formato de uma condição e reverteu integralmente; a segunda concluiu. A leitura posterior confirmou Financeiro v44, os três formulários incrementados, dois campos ativos, 20 requisitos e oito automações ativas. Smoke somente leitura da configuração publicada confirmou os quatro status conjuntos, bloqueio de pagamento pendente/divergente e ausência de cobrança de êxito antes do evento. Nenhum card ativo estava na etapa Pagamento para smoke autenticado real.

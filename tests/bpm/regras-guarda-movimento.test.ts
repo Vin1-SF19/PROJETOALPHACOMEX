@@ -4,6 +4,7 @@ const prismaMock = vi.hoisted(() => ({
   bpmRegra: { findMany: vi.fn() },
   cliente: { findUnique: vi.fn() },
   bpmCardCampoValor: { findMany: vi.fn() },
+  bpmCardServicoContexto: { findUnique: vi.fn() },
 }));
 vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
 
@@ -31,6 +32,7 @@ describe("obterErroRegrasParaMovimento", () => {
     vi.clearAllMocks();
     prismaMock.cliente.findUnique.mockResolvedValue(null);
     prismaMock.bpmCardCampoValor.findMany.mockResolvedValue([]);
+    prismaMock.bpmCardServicoContexto.findUnique.mockResolvedValue(null);
   });
 
   it("não bloqueia quando não há regras ativas aplicáveis", async () => {
