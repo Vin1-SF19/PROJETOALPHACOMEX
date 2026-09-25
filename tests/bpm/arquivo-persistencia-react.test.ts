@@ -8,7 +8,7 @@ import { RegistrarAnexoBpm } from "@/actions/bpm/Anexos";
 vi.mock("@/actions/bpm/Anexos", () => ({ RegistrarAnexoBpm: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
-it("enfileira upload e registro antes do await e mostra nome/link confirmado", async () => {
+it("enfileira upload e registro antes do await e abre o arquivo confirmado no modal", async () => {
   Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
     success: true,
@@ -58,9 +58,10 @@ it("enfileira upload e registro antes do await e mostra nome/link confirmado", a
     className: "",
     cardId: "card-1",
   })));
-  const link = container.querySelector<HTMLAnchorElement>('a[href="/api/bpm/anexos/anexo-1"]');
-  expect(link?.textContent).toBe("contrato.pdf");
-  expect(link?.target).toBe("_blank");
+  const abrir = Array.from(container.querySelectorAll("button")).find((botao) => botao.textContent === "contrato.pdf");
+  expect(abrir).toBeDefined();
+  await act(async () => abrir?.click());
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("contrato.pdf");
 
   await act(async () => root.unmount());
   container.remove();

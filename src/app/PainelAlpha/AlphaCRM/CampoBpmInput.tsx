@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { campoBpmEhCnpj } from "@/lib/bpm/campos-dinamicos";
 import { formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";
 import { RegistrarAnexoBpm } from "@/actions/bpm/Anexos";
+import { VisualizadorAnexoCard, type AnexoParaVisualizar } from "@/components/bpm/anexos/VisualizadorAnexoCard";
 
 export interface CampoBpmEditavel {
   id: string;
@@ -31,7 +32,7 @@ interface CampoBpmInputProps {
   invalid?: boolean;
   describedBy?: string;
   cardId?: string;
-  arquivoAtual?: { id: string; nome: string; url: string } | null;
+  arquivoAtual?: { id: string; nome: string; url: string; tipo?: string | null } | null;
   registerFileSave?: (save: () => Promise<boolean>) => Promise<boolean>;
   onFileConfirmed?: (arquivo: { id: string; nome: string; url: string }) => void;
 }
@@ -73,6 +74,7 @@ export function CampoBpmInput({
   onFileConfirmed,
 }: CampoBpmInputProps) {
   const [enviandoArquivo, setEnviandoArquivo] = useState(false);
+  const [anexoSelecionado, setAnexoSelecionado] = useState<AnexoParaVisualizar | null>(null);
   const bloqueado = disabled || readOnly;
   const opcoes = campo.tipo === "booleano"
     ? ["Sim", "Não"]
@@ -224,16 +226,16 @@ export function CampoBpmInput({
             setEnviandoArquivo(false);
           }}
         />
-        {value && (
-          <a
-            href={value.startsWith("https://") ? value : arquivoAtual?.url ?? `/api/bpm/anexos/${value}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block truncate text-[11px] text-emerald-300 hover:underline"
-          >
-            {value.startsWith("https://") ? "Abrir link do contrato" : arquivoAtual?.nome ?? "Abrir arquivo vinculado"}
+        {value.startsWith("https://") ? (
+          <a href={value} target="_blank" rel="noopener noreferrer" className="block truncate text-[11px] text-emerald-300 hover:underline">
+            Abrir link do contrato
           </a>
-        )}
+        ) : value ? (
+          <button type="button" onClick={() => setAnexoSelecionado({ id: arquivoAtual?.id ?? value, nome: arquivoAtual?.nome ?? "Arquivo vinculado", tipo: arquivoAtual?.tipo ?? null })} className="block max-w-full truncate text-left text-[11px] text-emerald-300 hover:underline">
+            {arquivoAtual?.nome ?? "Abrir arquivo vinculado"}
+          </button>
+        ) : null}
+        <VisualizadorAnexoCard anexo={anexoSelecionado} onClose={() => setAnexoSelecionado(null)} />
       </div>
     );
   }

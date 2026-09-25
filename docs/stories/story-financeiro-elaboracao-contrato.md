@@ -33,6 +33,8 @@ Ready for Review — código da integração RADAR publicado e configuração da
 9. [ ] Entrar em `Elaboração do Contrato` não exige que `Contrato elaborado` ou `Contrato enviado para assinatura` já estejam preenchidos. O diálogo de movimento exige somente campos marcados para entrada; os dois indicadores permanecem no formulário do card após a entrada, para preenchimento e validação durante a etapa.
 10. [ ] Ao entrar na etapa, somente para serviço RADAR, uma automação configurada cria uma única instância em conferência no Gerador de Documentos a partir do contrato padrão, vinculada à empresa do card e nomeada `CONTRATO DE PRESTAÇÃO DE SERVIÇOS + <Razão Social>`. Dados cadastrais e financeiros vêm dos campos validados em `Solicitação de Contrato`. A contratada é o cadastro ativo `ALPHA - COMEX, SERVICOS ADMINISTRATIVOS ESPECIALIZADOS E COWORKING LTDA`; a qualificação do modelo não conserva a empresa antiga. O formulário da **primeira etapa** solicita valor inicial, valor final e desconto para RADAR antes do avanço, sem bloquear outros serviços nem pressupor divisão ou desconto. Data de assinatura ainda desconhecida aparece como pendência de conferência no rascunho.
 
+11. [x] Ao clicar no contrato gerado na lista de anexos do card, uma prévia abre em modal, inclusive quando o PDF ainda não foi gerado. PDF, imagem e texto comuns também abrem no modal; arquivos sem prévia oferecem abertura/download. O contrato é lido com a permissão do card, sem exigir acesso separado ao módulo Gerador de Documentos, e a API confere o vínculo entre documento e card.
+
 ## Tarefas / checklist de execução
 
 - [x] Inventariar, em somente leitura, a composição publicada da segunda etapa, campos ativos/inativos, chaves e requisitos; identificar precisamente os bloqueios no avanço (AC 1, 7).
@@ -50,6 +52,7 @@ Ready for Review — código da integração RADAR publicado e configuração da
 - [x] Validar a correção local: lint sem erros (1.192 avisos preexistentes), typecheck, 519 arquivos/3.867 testes aprovados, build e `git diff --check` aprovados. Smoke autenticado com movimento real permanece pendente.
 - [ ] Confirmar no card autenticado que a entrada em Elaboração é liberada e os campos aparecem dentro da segunda etapa (AC 1, 9). O código da correção foi publicado e o deployment ficou pronto; falta o teste visual autenticado.
 - [x] Criar rascunho automático no Gerador, com dados da contratação, contratada correta, título solicitado e idempotência por card/template (AC 10).
+- [x] Adicionar visualização de contratos e anexos em modal no card, com rota de prévia autenticada pelo acesso ao card e texto de conferência quando não houver PDF (AC 11).
 - [x] Publicar três campos de pagamento no formulário da primeira etapa, visíveis e obrigatórios na saída para RADAR, e automação de entrada exclusiva de RADAR (AC 10). Verificação em leitura confirmou os três campos ativos, formulário v6 e automação ativa.
 - [x] Plano somente leitura validou formulário da Solicitação v5, template padrão versionado `cmthgdqel00000akvfblyma6y`, contratada ativa e três campos ainda ausentes. O modelo padrão descreve revisão de RADAR; a condição da automação confere `card.servico` contendo Radar. A versão atual do pipeline passou de 11 a 14 por edições concorrentes; o segundo backup e o snapshot seletivo cobrem v14.
 
@@ -129,6 +132,10 @@ Ready for Review — código da integração RADAR publicado e configuração da
 - `src/lib/gerador-documentos/ownership.ts` — acesso ao documento vinculado condicionado ao acesso ao card e ao módulo.
 - `src/components/GeradorDocumentos/ConferenciaClient.tsx` — formulário de conferência das variáveis do contrato automático.
 - `src/app/api/bpm/anexos/[anexoId]/route.ts` — redirecionamento autenticado do anexo interno de contrato para a conferência.
+- `src/app/api/bpm/anexos/[anexoId]/preview/route.ts` — prévia autenticada do contrato vinculado ao card e PDF inline quando disponível.
+- `src/components/bpm/anexos/VisualizadorAnexoCard.tsx` — modal de contrato, PDF, imagem e texto, com fallback para outros arquivos.
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx`, `src/app/PainelAlpha/AlphaCRM/CampoBpmInput.tsx` — abertura do modal na lista de anexos e nos campos de arquivo do card.
+- `tests/bpm/anexo-preview-route.test.ts`, `tests/bpm/visualizador-anexo-card.test.ts`, `tests/bpm/arquivo-persistencia-react.test.ts`, `tests/bpm/authorization-actions.test.ts`, `tests/bpm/cpf-pendencias-react.test.ts` — autorização da prévia, vínculo, modal e abertura pelo campo.
 - `src/app/PainelAlpha/GeradorDocumentos/[templateId]/download/route.ts` e `src/app/api/gerador-documentos/[id]/download/route.ts` — leitura do PDF sob a mesma autorização de documento vinculado.
 - `scripts/financeiro-contrato-radar-config.mts` — plano e aplicação protegida dos três campos na Solicitação e da automação RADAR.
 - `tests/gerador-documentos/contrato-padrao-contratada.test.ts` — qualificação da empresa e preservação do modelo fonte.
@@ -146,6 +153,7 @@ Ready for Review — código da integração RADAR publicado e configuração da
 | 2026-09-25 | 0.5 | Integração local da geração automática do contrato RADAR, plano de configuração da primeira etapa e backup Vault validado; publicação pendente de checkpoint específico | Codex |
 | 2026-09-25 | 0.6 | Backup Vault renovado na configuração v14, conferência dos gates e plano de publicação RADAR atualizado | Codex |
 | 2026-09-25 | 0.7 | Código publicado, backup/snapshot Vault v20 validado e configuração RADAR ativada com verificação em leitura | Codex |
+| 2026-09-25 | 0.8 | Prévia autenticada de contrato e anexos em modal no card | Codex |
 
 ## Validação do draft
 

@@ -190,7 +190,7 @@ it("retry de upload atualiza link do painel reaberto apesar do snapshot inicial 
   const action = args?.[1]?.action;
   if (!action || typeof action !== "object" || !("onClick" in action)) throw new Error("Retry ausente");
   await act(async () => { action.onClick({} as React.MouseEvent<HTMLButtonElement>); await saves.flushSaves(); });
-  expect(container.querySelector('a[href="/api/bpm/anexos/anexo"]')).not.toBeNull();
+  expect([...container.querySelectorAll("button")].some((botao) => botao.textContent?.includes("Abrir arquivo vinculado"))).toBe(true);
   expect(fetchMock).toHaveBeenCalledTimes(2);
   vi.unstubAllGlobals();
 });

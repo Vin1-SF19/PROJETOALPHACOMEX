@@ -32,6 +32,7 @@ import { EditorAnotacaoCard } from "./EditorAnotacaoCard";
 import { formatarBytes, iconePorAcao } from "./PainelHistoricoShared";
 import { formularioPossuiChecklist } from "@/lib/bpm/formulario-renderer";
 import { separarTarefasCard } from "@/lib/bpm/tarefas-card";
+import { VisualizadorAnexoCard, type AnexoParaVisualizar } from "@/components/bpm/anexos/VisualizadorAnexoCard";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
@@ -69,6 +70,7 @@ export default function PainelHistorico({
   const [enviandoAnexo, setEnviandoAnexo] = useState(false);
   const [arrastandoAnexo, setArrastandoAnexo] = useState(false);
   const [abaEsquerda, setAbaEsquerda] = useState("etapas");
+  const [anexoSelecionado, setAnexoSelecionado] = useState<AnexoParaVisualizar | null>(null);
   const inputAnexoRef = useRef<HTMLInputElement>(null);
   const etapasAnteriores = etapasAnterioresParaResumo(etapas, card.etapa.id);
   const { tarefas: tarefasDoCard, procedimentos: tarefasDeProcedimento } = separarTarefasCard(card.tarefas);
@@ -219,7 +221,7 @@ export default function PainelHistorico({
           <div className="space-y-1.5">
             {card.anexos.map((a) => (
               <div key={a.id} className="flex items-center justify-between gap-2 bg-white/[0.03] border border-white/5 rounded-xl px-3 py-2">
-                <a href={`/api/bpm/anexos/${a.id}`} target="_blank" rel="noopener noreferrer" className="text-sm text-white hover:underline truncate">{a.nome}</a>
+                <button type="button" onClick={() => setAnexoSelecionado({ id: a.id, nome: a.nome, tipo: a.tipo })} className="min-w-0 truncate text-left text-sm text-white hover:underline">{a.nome}</button>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-[10px] text-slate-500">{formatarBytes(a.tamanho)}</span>
                   {podeExcluirAnexo && (
@@ -301,6 +303,7 @@ export default function PainelHistorico({
         podeEditar={podeEditar}
         onInteracaoCriada={onInteracaoCriada}
       />
+      <VisualizadorAnexoCard anexo={anexoSelecionado} onClose={() => setAnexoSelecionado(null)} />
     </div>
   );
 }

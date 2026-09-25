@@ -79,7 +79,9 @@ describe("CRM/BPM authorization regression guards", () => {
     const upload = source("src/app/api/bpm/upload/route.ts");
     const anexos = source("src/actions/bpm/Anexos.ts");
     const download = source("src/app/api/bpm/anexos/[anexoId]/route.ts");
+    const preview = source("src/app/api/bpm/anexos/[anexoId]/preview/route.ts");
     const historico = source("src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx");
+    const visualizador = source("src/components/bpm/anexos/VisualizadorAnexoCard.tsx");
     const cards = source("src/actions/bpm/Cards.ts");
     const pusher = source("src/app/api/pusher/auth/route.ts");
 
@@ -93,7 +95,10 @@ describe("CRM/BPM authorization regression guards", () => {
     expect(anexos).not.toContain("const { cardId, url");
     expect(download).toContain('"visualizar"');
     expect(download).toContain("get(pathnamePrivado ?? urlLegada!");
-    expect(historico).toContain("/api/bpm/anexos/${a.id}");
+    expect(preview).toContain('"visualizar"');
+    expect(preview).toContain("__bpmCardId !== anexo.cardId");
+    expect(historico).toContain("VisualizadorAnexoCard");
+    expect(visualizador).toContain("/api/bpm/anexos/${encodeURIComponent(anexo.id)}");
     expect(historico).not.toContain("href={a.url}");
     expect(cards).toContain("url: `/api/bpm/anexos/${anexo.id}`");
     expect(pusher).toContain("checarAcessoRealtimeBpmPipeline");
