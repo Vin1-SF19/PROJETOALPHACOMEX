@@ -41,6 +41,7 @@ import {
   carregarSnapshotsCopiaCamposCard,
   type PerfilAcessoCampoBpm,
 } from "@/lib/bpm/requisitos-etapa-server";
+import { campoObrigatorioAoMover } from "@/lib/bpm/requisitos-etapa";
 import {
   calcularDiaCicloNovosLeads,
   contarDiasUteisDecorridos,
@@ -1630,10 +1631,6 @@ async function carregarCamposTransicao(params: {
   }
   camposDestino = camposDestino.filter((campo) => camposFormulario.get(params.etapaDestinoId)?.has(campo.id));
   const camposOrigem = camposOrigemPublicados.filter((campo) => campo.obrigatorio || campo.obrigatorioSaida);
-  camposDestino = camposDestino.map((campo) => ({
-    ...campo,
-    obrigatorio: campo.obrigatorio || Boolean(campo.obrigatorioEntrada),
-  }));
   const origemPorId = new Map(camposOrigem.map((campo) => [campo.id, campo]));
   const destinoPorId = new Map(camposDestino.map((campo) => [campo.id, campo]));
   const ids = new Set([...origemPorId.keys(), ...destinoPorId.keys()]);
@@ -1650,12 +1647,7 @@ async function carregarCamposTransicao(params: {
         : "DESTINO";
     return {
       ...campo,
-      obrigatorio: Boolean(
-        origem?.obrigatorio
-        || origem?.obrigatorioSaida
-        || destino?.obrigatorio
-        || destino?.obrigatorioEntrada
-      ),
+      obrigatorio: campoObrigatorioAoMover({ origem, destino }),
       valor: destino?.valor ?? origem?.valor ?? null,
       contexto,
       etapaAplicacaoNome: contexto === "ORIGEM"

@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress — implementação configurável local e plano de publicação concluídos; usuário autorizou a publicação específica no Turso em 2026-09-25. Deploy do runtime, aplicação da configuração e smoke autenticado permanecem pendentes.
+In Progress — configuração da segunda etapa presente em produção. Correção local do diálogo de entrada pronta, com quality gates aprovados; deploy e smoke autenticado da movimentação pendentes.
 
 ## Story
 
@@ -30,6 +30,7 @@ In Progress — implementação configurável local e plano de publicação conc
 6. [ ] Mudança posterior em dado cadastral ou em Serviço contratado, Valor bruto do contrato, Forma de pagamento ou Condição negociada gera alerta visível no card para conferir se o contrato elaborado/enviado precisa ser atualizado. O alerta identifica os dados alterados e não substitui silenciosamente o contrato já registrado.
 7. [ ] O avanço real para `Formalização` aplica as mesmas regras dos itens 2 a 5 no servidor, sem salto de etapas. Com contrato elaborado, data de elaboração, envio válido, data/hora do envio e link/arquivo presentes, o avanço ocorre; com pendências, permanece na etapa e retorna a lista nominal de campos. Dados preenchidos no formulário ativo não podem ser rejeitados por exigência de chave legada, inativa ou rótulo hardcoded.
 8. [ ] Quando existir integração de elaboração/assinatura de contratos aplicável ao card, o fluxo usa o contrato e o estado dessa integração sem duplicar registro ou envio. Se não houver integração configurada, o fluxo manual dos itens 1 a 7 permanece funcional. A escolha de provedor, credenciais e disparo externo dependem de contrato de integração existente e não são presumidos por esta story.
+9. [ ] Entrar em `Elaboração do Contrato` não exige que `Contrato elaborado` ou `Contrato enviado para assinatura` já estejam preenchidos. O diálogo de movimento exige somente campos marcados para entrada; os dois indicadores permanecem no formulário do card após a entrada, para preenchimento e validação durante a etapa.
 
 ## Tarefas / checklist de execução
 
@@ -43,6 +44,8 @@ In Progress — implementação configurável local e plano de publicação conc
 - [x] Gerar plano somente leitura: 5 campos publicados, 18 requisitos e 15 automações; registrar backup completo e snapshot seletivo Vault.
 - [ ] Publicar configuração após autorização específica do usuário e verificar o fluxo autenticado, inclusive cards antigos, anexos e erro nominal por campo (AC 1 a 8).
 - [x] Rodar `npm run lint`, `npm run typecheck`, `npm test` e `npm run build`; atualizar checklist e File List antes da conclusão local (lint: 0 erros, avisos preexistentes; testes na worktree seletiva: 511 arquivos/3.828 casos aprovados; build concluído).
+- [x] Corrigir o diagnóstico de movimento para aplicar `obrigatorioEntrada` somente na entrada do destino, sem exigir indicadores que devem ser preenchidos durante a elaboração; teste de regressão e quality gates locais aprovados (AC 9).
+- [ ] Publicar a correção do diálogo e confirmar no card autenticado que a entrada em Elaboração é liberada e os campos aparecem dentro da segunda etapa (AC 1, 9).
 
 ## Contexto e pontos de integração
 
@@ -55,8 +58,9 @@ In Progress — implementação configurável local e plano de publicação conc
 - **Contexto acumulado:** `accumulated-context.md` e `.aiox/gotchas.json` não existem nesta worktree. `[AUTO-DECISION]` Coerência conferida pela story anterior, story base, Constitution e código observado, sem inventar conteúdo ausente.
 - **Integração externa:** `[AUTO-DECISION]` Tratar “quando aplicável” como uso de integração já configurada e identificada no inventário; não escolher provedor ou criar contrato externo sem requisito adicional.
 - **Diagnóstico real de 25/09:** não há card ativo na segunda etapa. Os três cards de teste da primeira etapa falhavam ao avaliar a entrada porque (1) a transação HTTP no Turso expirava em 5 segundos e (2) `transicao-command.ts` cobrava os dois booleanos obrigatórios da etapa de destino já na entrada. Após ampliar o timeout e respeitar `obrigatorioEntrada`, a avaliação somente leitura dos três cards retornou `success: true`, sem movê-los.
+- **Reteste informado pelo usuário:** o diálogo `Antes de mover para Elaboração do Contrato` ainda cobrava os dois indicadores da segunda etapa na entrada, embora o comando de transição já respeitasse `obrigatorioEntrada`. O inventário de produção confirmou os dois campos ativos, visíveis, editáveis e publicados no formulário da segunda etapa, com `obrigatorio=true` e `obrigatorioEntrada=false`; todos os requisitos publicados para a etapa estão em `DURING_STAGE`. A causa é a projeção divergente do diálogo, que usava `destino.obrigatorio` como exigência de entrada. Nenhuma alteração no banco é necessária.
 - **Plano de publicação:** `scripts/financeiro-elaboracao-config.mts` é somente leitura sem `--apply`. Seleciona a etapa ativa `cmsd9yw74000ddzggndlvgbun`, altera tipos de `Data do envio` para `data_hora` e `Link/arquivo` para `url_ou_arquivo`, configura duas datas automáticas, 18 requisitos e 15 automações. A etapa homônima `elaboracao_contrato_legacy` está inativa e sem cards; não será modificada.
-- **Vault:** backup completo `database-backups/pre-change/painelalpha_turso_pre_change_elaboracao_config_2026-09-25T17-42-13-450Z.db` validado por restauração (`integrity_check=ok`, 331 tabelas, 171.275 linhas, FK=0), SHA-256 `ad960a4aff973d18301e88a6f8060583ada72eb08983888205696cd5346a3d5a`. Snapshot seletivo `database-backups/pre-change/elaboracao-config-before-2026-09-25T17-42-33-799Z.json`. Nenhuma configuração aplicada. O usuário aprovou especificamente esta publicação em 2026-09-25; nenhuma configuração foi aplicada até este registro.
+- **Vault:** backup completo `database-backups/pre-change/painelalpha_turso_pre_change_elaboracao_config_2026-09-25T17-42-13-450Z.db` validado por restauração (`integrity_check=ok`, 331 tabelas, 171.275 linhas, FK=0), SHA-256 `ad960a4aff973d18301e88a6f8060583ada72eb08983888205696cd5346a3d5a`. Snapshot seletivo `database-backups/pre-change/elaboracao-config-before-2026-09-25T17-42-33-799Z.json`. O inventário somente leitura deste reteste confirmou os campos e requisitos publicados; a correção atual não altera o banco.
 - **Limite de verificação:** nenhum card real foi movido ou editado nesta implementação. A automação de geração de contrato existe no catálogo, mas não está configurada para a segunda etapa e depende de um template selecionado pelo administrador.
 
 ## Testes de aceite
@@ -85,6 +89,7 @@ In Progress — implementação configurável local e plano de publicação conc
 - `src/lib/bpm/validacao-salvamento-configurado.ts` — padrões temporais e requisitos publicados no salvamento.
 - `src/lib/bpm/transicao-command.ts` — requisito `REGRA` e referência autenticada de arquivo na transição.
 - `src/actions/bpm/Cards.ts` — requisito no salvamento, eventos de alteração e arquivo vinculado.
+- `src/lib/bpm/requisitos-etapa.ts` — obrigatoriedade contextual de origem/entrada no diagnóstico da transição.
 - `src/actions/bpm/Anexos.ts` — upload em campo de link ou arquivo.
 - `src/lib/bpm/campos-dinamicos.ts` — validação de data/hora e URL ou arquivo.
 - `src/lib/bpm/regras/avaliador.ts` — comparação segura de campo vazio em condição.
@@ -95,6 +100,7 @@ In Progress — implementação configurável local e plano de publicação conc
 - `src/app/PainelAlpha/AlphaCRM/CampoBpmInput.tsx` — entrada de data/hora e link/arquivo, aviso para data histórica.
 - `src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx` — arquivo atual do novo tipo.
 - `tests/bpm/validacao-salvamento-configurado.test.ts` — padrões e requisitos no salvamento.
+- `tests/bpm/requisitos-transicao-obrigatoriedade.test.ts` — regressão da entrada em Elaboração sem indicadores futuros já preenchidos.
 - `tests/bpm/edicao-campos-card.test.ts` — mocks da persistência parcial diante do novo validador.
 - `tests/bpm/cpf-pendencias-react.test.ts` — persistência UTC de campo `data_hora`.
 
@@ -105,6 +111,7 @@ In Progress — implementação configurável local e plano de publicação conc
 | 2026-09-25 | 0.1 | Draft da segunda etapa, critérios e validação preliminar | River (@sm) |
 | 2026-09-25 | 0.2 | Correções locais, diagnóstico da transição real em leitura e quality gates | Codex |
 | 2026-09-25 | 0.3 | Remoção das rotas hardcoded anterior, implementação configurável e plano Vault de publicação | Codex |
+| 2026-09-25 | 0.4 | Correção da exigência prematura dos indicadores no diálogo de entrada; 513 arquivos e 3.834 testes, lint, typecheck e build aprovados | Codex |
 
 ## Validação do draft
 
