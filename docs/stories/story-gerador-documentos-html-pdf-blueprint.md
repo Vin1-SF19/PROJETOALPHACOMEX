@@ -354,3 +354,30 @@ O renderer preserva a estrutura reconhecível pelo HTML do Tika, mas não reprod
 ### Entregabilidade
 
 `/PainelAlpha/GeradorDocumentos` → documento gerado → `/PainelAlpha/GeradorDocumentos/conferencia/[token]` → cláusula → “Reescrever com IA” → instrução → textarea, HTML fiel e PDF atualizados; ao recarregar, os três artefatos são obtidos das URLs persistidas.
+
+## 14. Ajuste solicitado — cabeçalho e fonte do DOCX no PDF
+
+### Critérios de aceite
+
+- [x] Extrair do DOCX original a imagem do cabeçalho, a fonte predominante e as margens.
+- [x] Repetir a imagem do cabeçalho nas páginas do PDF gerado.
+- [x] Renderizar o corpo em fonte compatível com a usada no DOCX.
+- [x] Preservar a apresentação também após reescrita por IA e finalização.
+- [x] Verificar os dois templates DOCX ativos por leitura dos arquivos originais e gerar PDF de teste com o modelo real.
+- [x] Cobrir a extração de estilo e a renderização com teste automatizado.
+
+### File List
+
+- `src/lib/gerador-documentos/docx-style.ts`
+- `src/lib/gerador-documentos/pdf.tsx`
+- `src/actions/gerador-documentos.ts`
+- `public/fonts/gerador-documentos/P052-Roman.otf`
+- `public/fonts/gerador-documentos/P052-Bold.otf`
+- `public/fonts/gerador-documentos/P052-Italic.otf`
+- `public/fonts/gerador-documentos/LICENSE-URW.txt`
+- `next.config.ts`
+- `tests/gerador-documentos/docx-style.test.ts`
+- `tests/gerador-documentos/reescrever-clausula.test.ts`
+- `docs/stories/story-gerador-documentos-html-pdf-blueprint.md`
+
+O DOCX usa Palatino Linotype, mas não incorpora os arquivos da fonte. O PDF usa P052, uma fonte de desenho compatível, distribuída com a licença incluída acima.

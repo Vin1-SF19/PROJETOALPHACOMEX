@@ -1,5 +1,7 @@
 import React from "react";
-import { Document, Page, Text, View, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
+import path from "node:path";
+import { Document, Font, Image, Page, Text, View, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
+import type { EstiloDocxPdf } from "./docx-style";
 
 /**
  * Gera o PDF final de um documento (contrato/proposta/etc) — mesmo conteúdo das
@@ -20,7 +22,23 @@ const styles = StyleSheet.create({
   clasulaTitulo: { fontSize: 11, fontWeight: "bold", marginBottom: 4 },
   clasulaConteudo: { fontSize: 10, textAlign: "justify" },
   rodape: { position: "absolute", bottom: 24, left: 40, fontSize: 7, color: "#64748B" },
+  cabecalhoImagem: { position: "absolute", top: 0, left: 0, objectFit: "contain" },
 });
+
+Font.register({
+  family: "PalatinoModelo",
+  fonts: [
+    { src: path.join(process.cwd(), "public/fonts/gerador-documentos/P052-Roman.otf"), fontWeight: "normal" },
+    { src: path.join(process.cwd(), "public/fonts/gerador-documentos/P052-Bold.otf"), fontWeight: "bold" },
+    { src: path.join(process.cwd(), "public/fonts/gerador-documentos/P052-Italic.otf"), fontStyle: "italic" },
+  ],
+});
+
+function fontePdf(fonteDocx?: string): string {
+  if (/palatino|book antiqua/i.test(fonteDocx ?? "")) return "PalatinoModelo";
+  if (/times new roman|times/i.test(fonteDocx ?? "")) return "Times-Roman";
+  return "Helvetica";
+}
 
 function formatarDataPdf(data: Date): string {
   return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" }).format(data);
@@ -70,13 +88,31 @@ interface DocumentoPdfProps {
   };
   /** Número de contrato (exibido no cabeçalho). */
   numeroContrato?: string;
+  estiloDocx?: EstiloDocxPdf;
 }
 
-function DocumentoPdfDocument({ titulo, clausulas, partes, numeroContrato }: DocumentoPdfProps) {
+function DocumentoPdfDocument({ titulo, clausulas, partes, numeroContrato, estiloDocx }: DocumentoPdfProps) {
+  const larguraCabecalho = Math.min(595, estiloDocx?.cabecalhoLargura ?? 595);
+  const alturaCabecalho = estiloDocx?.cabecalhoAltura
+    ? estiloDocx.cabecalhoAltura * larguraCabecalho / (estiloDocx.cabecalhoLargura ?? larguraCabecalho)
+    : 0;
+  const estiloPagina = estiloDocx ? {
+    ...styles.page,
+    fontFamily: fontePdf(estiloDocx.fonteCorpo),
+    fontSize: estiloDocx.tamanhoFonte ?? styles.page.fontSize,
+    paddingTop: Math.max(estiloDocx.margemSuperior ?? 40, alturaCabecalho + 8),
+    paddingRight: estiloDocx.margemDireita ?? 40,
+    paddingBottom: estiloDocx.margemInferior ?? 40,
+    paddingLeft: estiloDocx.margemEsquerda ?? 40,
+  } : styles.page;
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
-        <Text style={styles.titulo}>{titulo}</Text>
+      <Page size="A4" style={estiloPagina}>
+        {estiloDocx?.cabecalhoImagem && (
+          /* eslint-disable-next-line jsx-a11y/alt-text -- Image é o primitivo PDF. */
+          <Image fixed src={estiloDocx.cabecalhoImagem} style={{ ...styles.cabecalhoImagem, width: larguraCabecalho, height: alturaCabecalho || 86 }} />
+        )}
+        <Text style={estiloDocx?.tamanhoTitulo ? { ...styles.titulo, fontSize: estiloDocx.tamanhoTitulo } : styles.titulo}>{titulo}</Text>
 
         {numeroContrato && (
           <Text style={styles.dataContrato}>
@@ -109,8 +145,8 @@ function DocumentoPdfDocument({ titulo, clausulas, partes, numeroContrato }: Doc
 
         {clausulas.map((clasula, index) => (
           <View key={index} style={styles.clasula} wrap>
-            <Text style={styles.clasulaTitulo}>{clasula.titulo}</Text>
-            <Text style={styles.clasulaConteudo}>{clasula.conteudo}</Text>
+            <Text style={estiloDocx?.tamanhoFonte ? { ...styles.clasulaTitulo, fontSize: estiloDocx.tamanhoFonte } : styles.clasulaTitulo}>{clasula.titulo}</Text>
+            <Text style={estiloDocx?.tamanhoFonte ? { ...styles.clasulaConteudo, fontSize: estiloDocx.tamanhoFonte } : styles.clasulaConteudo}>{clasula.conteudo}</Text>
           </View>
         ))}
 

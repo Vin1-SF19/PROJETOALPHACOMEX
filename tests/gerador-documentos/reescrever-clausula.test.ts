@@ -9,6 +9,9 @@ const mocks = vi.hoisted(() => ({
   reescreverClasulaViaIA: vi.fn(),
   queryRaw: vi.fn(),
   renderHtmlParaPdf: vi.fn(),
+  gerarPdfDocumento: vi.fn(),
+  carregarEstiloDocxPdf: vi.fn(),
+  findUniqueTemplate: vi.fn(),
   put: vi.fn(),
   transaction: vi.fn(),
   updateClausula: vi.fn(),
@@ -26,12 +29,14 @@ vi.mock("@/lib/gerador-documentos/onyx", () => ({
   reescreverClasulaViaIA: mocks.reescreverClasulaViaIA,
 }));
 vi.mock("@/lib/gerador-documentos/pdf-renderer", () => ({ renderHtmlParaPdf: mocks.renderHtmlParaPdf }));
+vi.mock("@/lib/gerador-documentos/pdf", () => ({ gerarPdfDocumento: mocks.gerarPdfDocumento }));
+vi.mock("@/lib/gerador-documentos/docx-style", () => ({ carregarEstiloDocxPdf: mocks.carregarEstiloDocxPdf }));
 vi.mock("@vercel/blob", () => ({ put: mocks.put }));
 vi.mock("@/lib/bibble/tika", () => ({ extractTextFromBuffer: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({
   default: {
     documentoGerado: { findUnique: mocks.findUniqueDocumento },
-    documentoTemplate: { findUnique: vi.fn() },
+    documentoTemplate: { findUnique: mocks.findUniqueTemplate },
     documentoClasulaGerada: { findMany: mocks.findManyClausulas },
     $queryRaw: (...args: unknown[]) => mocks.queryRaw(...args),
     $transaction: (...args: unknown[]) => mocks.transaction(...args),
@@ -64,6 +69,7 @@ describe("ReescreverClasulaComIA", () => {
     mocks.getUserOnyxToken.mockResolvedValue("token-individual");
     mocks.queryRaw.mockResolvedValue([{ titulo: "Contrato", htmlUrl: "https://blob.example/documento.html" }]);
     mocks.renderHtmlParaPdf.mockResolvedValue(Buffer.from("%PDF-atualizado"));
+    mocks.findUniqueTemplate.mockResolvedValue(null);
     mocks.put
       .mockResolvedValueOnce({ url: "https://blob.example/documento-revisado.html" })
       .mockResolvedValueOnce({ url: "https://blob.example/documento-revisado.pdf" });
@@ -111,6 +117,31 @@ describe("ReescreverClasulaComIA", () => {
       where: { id: DOCUMENTO_ID },
       data: { pdfUrl: "https://blob.example/documento-revisado.pdf" },
     });
+  });
+
+  it("mantém o cabeçalho e a fonte do DOCX ao gerar PDF após reescrita", async () => {
+    mocks.reescreverClasulaViaIA.mockResolvedValue("A prestação será trimestral.");
+    mocks.findUniqueTemplate.mockResolvedValue({
+      arquivoOrigemNome: "Contrato.docx",
+      arquivoOrigemUrl: "https://modelo.public.blob.vercel-storage.com/contrato.docx",
+    });
+    const estiloDocx = { fonteCorpo: "Palatino Linotype", cabecalhoImagem: "data:image/png;base64,abc" };
+    mocks.carregarEstiloDocxPdf.mockResolvedValue(estiloDocx);
+    mocks.gerarPdfDocumento.mockResolvedValue(Buffer.from("%PDF-com-cabecalho"));
+
+    const resultado = await ReescreverClasulaComIA({
+      documentoId: DOCUMENTO_ID,
+      clasulaId: CLAUSULA_ID,
+      instrucao: "Troque a periodicidade para trimestral",
+    });
+
+    expect(resultado.success).toBe(true);
+    expect(mocks.carregarEstiloDocxPdf).toHaveBeenCalledWith("https://modelo.public.blob.vercel-storage.com/contrato.docx");
+    expect(mocks.gerarPdfDocumento).toHaveBeenCalledWith(expect.objectContaining({
+      estiloDocx,
+      clausulas: expect.arrayContaining([expect.objectContaining({ conteudo: "A prestação será trimestral." })]),
+    }));
+    expect(mocks.renderHtmlParaPdf).not.toHaveBeenCalled();
   });
 
   it("bloqueia falta de ownership antes de consultar cláusula ou chamar IA", async () => {

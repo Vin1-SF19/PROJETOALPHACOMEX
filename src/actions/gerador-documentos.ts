@@ -35,6 +35,7 @@ import { gerarPdfDocumento } from "@/lib/gerador-documentos/pdf";
 import { converterParaHtml } from "@/lib/gerador-documentos/html";
 import { renderHtmlComVariaveis } from "@/lib/gerador-documentos/html-render";
 import { renderHtmlParaPdf } from "@/lib/gerador-documentos/pdf-renderer";
+import { carregarEstiloDocxPdf } from "@/lib/gerador-documentos/docx-style";
 import {
   criarHtmlDeClausulas,
   derivarHtmlUrlDoPdf,
@@ -447,6 +448,10 @@ export async function GerarDocumento(payload: unknown) {
       return { success: false as const, error: "Este template está arquivado" };
     }
 
+    const estiloDocx = /\.docx$/i.test(template.arquivoOrigemNome ?? "")
+      ? await carregarEstiloDocxPdf(template.arquivoOrigemUrl)
+      : undefined;
+
     const variaveisTemplate = parseVariaveisJson(template.variaveisJson);
 
     const tokenAcesso = randomUUID();
@@ -526,6 +531,7 @@ export async function GerarDocumento(payload: unknown) {
         clausulas: clausulasRenderizadas,
         partes,
         numeroContrato: documento.id,
+        estiloDocx,
       });
 
       const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
@@ -578,17 +584,19 @@ export async function GerarDocumento(payload: unknown) {
             // HTML→PDF (RM-2026-94CBF6 Fase 3): gera PDF mais fiel a partir do HTML
             // Se o PDF baseado em cláusulas já foi gerado acima, este substitui (mais fiel).
             // Se falhar, mantém o PDF anterior (best-effort).
-            try {
-              const bufferPdfHtml = await renderHtmlParaPdf(htmlRenderizado);
-              const blobPdfHtml = await put(`gerador-documentos/documentos-pdf/${ctx.userId}/${documento.id}.pdf`, bufferPdfHtml, {
-                access: "public",
-                addRandomSuffix: false,
-                token: blobTokenHtml,
-              });
-              pdfUrl = blobPdfHtml.url;
-              await db.documentoGerado.update({ where: { id: documento.id }, data: { pdfUrl } });
-            } catch (pdfHtmlErr) {
-              console.warn("[GeradorDocumentos] Falha na renderização HTML→PDF (mantém PDF anterior):", pdfHtmlErr);
+            if (!estiloDocx) {
+              try {
+                const bufferPdfHtml = await renderHtmlParaPdf(htmlRenderizado);
+                const blobPdfHtml = await put(`gerador-documentos/documentos-pdf/${ctx.userId}/${documento.id}.pdf`, bufferPdfHtml, {
+                  access: "public",
+                  addRandomSuffix: false,
+                  token: blobTokenHtml,
+                });
+                pdfUrl = blobPdfHtml.url;
+                await db.documentoGerado.update({ where: { id: documento.id }, data: { pdfUrl } });
+              } catch (pdfHtmlErr) {
+                console.warn("[GeradorDocumentos] Falha na renderização HTML→PDF (mantém PDF anterior):", pdfHtmlErr);
+              }
             }
           }
         }
@@ -790,7 +798,16 @@ export async function ReescreverClasulaComIA(payload: unknown) {
       htmlAtualizado = criarHtmlDeClausulas(documento.titulo, clausulasAtualizadas);
     }
 
-    const bufferPdf = await renderHtmlParaPdf(htmlAtualizado);
+    const templateOrigem = await db.documentoTemplate.findUnique({
+      where: { id: documento.templateId },
+      select: { arquivoOrigemUrl: true, arquivoOrigemNome: true },
+    });
+    const estiloDocx = /\.docx$/i.test(templateOrigem?.arquivoOrigemNome ?? "")
+      ? await carregarEstiloDocxPdf(templateOrigem?.arquivoOrigemUrl)
+      : undefined;
+    const bufferPdf = estiloDocx
+      ? await gerarPdfDocumento({ titulo: documento.titulo, clausulas: clausulasAtualizadas, estiloDocx })
+      : await renderHtmlParaPdf(htmlAtualizado);
     const revisao = randomUUID();
     const [htmlBlob, pdfBlob] = await Promise.all([
       put(
@@ -840,7 +857,7 @@ export async function FinalizarDocumento(documentoId: string) {
         titulo: true,
         pdfUrl: true,
         variaveisJson: true,
-        template: { select: { variaveisJson: true } },
+        template: { select: { variaveisJson: true, arquivoOrigemUrl: true, arquivoOrigemNome: true } },
         clausulas: { orderBy: { ordem: "asc" }, select: { titulo: true, conteudo: true } },
       },
     });
@@ -868,7 +885,12 @@ export async function FinalizarDocumento(documentoId: string) {
       // Compatibilidade enquanto a coluna aditiva htmlUrl não existir no ambiente.
     }
     htmlUrl ??= derivarHtmlUrlDoPdf(documento.pdfUrl);
-    if (htmlUrl) {
+    const estiloDocx = /\.docx$/i.test(documento.template.arquivoOrigemNome ?? "")
+      ? await carregarEstiloDocxPdf(documento.template.arquivoOrigemUrl)
+      : undefined;
+    if (estiloDocx) {
+      bufferPdf = await gerarPdfDocumento({ titulo: documento.titulo, clausulas: documento.clausulas, estiloDocx });
+    } else if (htmlUrl) {
       const respostaHtml = await fetch(htmlUrl);
       if (!respostaHtml.ok) throw new Error("Não foi possível carregar o HTML fiel do documento");
       bufferPdf = await renderHtmlParaPdf(await respostaHtml.text());

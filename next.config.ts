@@ -24,6 +24,7 @@ const nextConfig = {
       // O trace automatico do Next nao detecta o caminho resolvido pelo loader,
       // entao o artefato precisa ser incluido explicitamente nas funcoes Vercel.
       "./node_modules/.prisma/client/query_compiler_bg.wasm",
+      "./public/fonts/gerador-documentos/*.otf",
     ],
   },
   experimental: {
