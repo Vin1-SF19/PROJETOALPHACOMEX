@@ -240,6 +240,13 @@ export function AutomacaoCentralFormDialog({
                   </Select>
                 </label>
                 <label className="text-xs text-slate-300">Título do contrato<Input className="mt-1" value={String(acaoAtual.parametros.titulo ?? "")} onChange={(event) => atualizarParametros({ titulo: event.target.value })} /></label>
+                <label className="text-xs text-slate-300">Contratada
+                  <Select value={String(acaoAtual.parametros.empresaContratadaId ?? "")} onValueChange={(valor) => atualizarParametros({ empresaContratadaId: valor })}>
+                    <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione a empresa contratada" /></SelectTrigger>
+                    <SelectContent>{catalogos.empresasContratadas.map((empresa) => <SelectItem key={empresa.id} value={empresa.id}>{empresa.razaoSocial}</SelectItem>)}</SelectContent>
+                  </Select>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-slate-300"><Switch checked={acaoAtual.parametros.permitirPendencias === true} onCheckedChange={(valor) => atualizarParametros({ permitirPendencias: valor })} />Criar em conferência quando houver dados pendentes</label>
                 {templates.length === 0 && <p className="text-xs text-amber-300 sm:col-span-2">Nenhum template ativo foi encontrado no Gerador de Documentos.</p>}
                 {template?.variaveis.map((variavel) => <label key={variavel.nome} className="text-xs text-slate-300">{variavel.label}{variavel.obrigatorio ? " *" : ""}<Input className="mt-1" placeholder={variavel.placeholder} value={String(variaveis[variavel.nome] ?? "")} onChange={(event) => atualizarParametros({ variaveis: { ...variaveis, [variavel.nome]: event.target.value } })} /></label>)}
               </div>;

@@ -36,6 +36,24 @@ export const VALORES_INICIAIS_CONTRATO_PADRAO: Record<string, string> = {
   desconto_extenso: "________",
 };
 
+/** A qualificação fixa do DOCX é substituída apenas na instância gerada. */
+export function qualificarContratadaContratoPadrao(
+  conteudo: string,
+  empresa: { razaoSocial: string; cnpj: string; logradouro: string | null; numero: string | null; bairro: string | null; municipio: string | null; uf: string | null; cep: string | null },
+): string {
+  const endereco = [empresa.logradouro, empresa.numero && `nº ${empresa.numero}`, empresa.bairro && `bairro ${empresa.bairro}`,
+    empresa.municipio && `município de ${empresa.municipio}`, empresa.uf && `estado de ${empresa.uf}`, empresa.cep && `CEP ${empresa.cep}`]
+    .filter(Boolean).join(", ");
+  if (!endereco) throw new Error("Endereço da contratada não cadastrado");
+  const inicio = "ALPHA COMEX BRASIL LTDA, pessoa jurídica de direito privado";
+  const fim = "neste ato denominado CONTRATADO e/ou CONTRATADA.";
+  const indiceInicio = conteudo.indexOf(inicio);
+  const indiceFim = conteudo.indexOf(fim, indiceInicio);
+  if (indiceInicio < 0 || indiceFim < 0) throw new Error("Qualificação da contratada não encontrada no contrato padrão");
+  const qualificacao = `${empresa.razaoSocial}, pessoa jurídica de direito privado, inscrita no CNPJ sob n° ${empresa.cnpj}, com sede à ${endereco}, ${fim}`;
+  return conteudo.slice(0, indiceInicio) + qualificacao + conteudo.slice(indiceFim + fim.length);
+}
+
 type NoXml = Record<string, unknown>;
 
 function textoDoParagrafo(nos: NoXml[]): string {

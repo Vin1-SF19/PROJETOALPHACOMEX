@@ -33,6 +33,8 @@ export const parametrosEmailSchema = z.object({
 export const parametrosContratoSchema = z.object({
   templateId: z.string().cuid(),
   titulo: z.string().trim().min(1).max(200),
+  empresaContratadaId: z.string().cuid().optional(),
+  permitirPendencias: z.boolean().default(false),
   variaveis: z.record(
     z.string().min(1).max(60),
     z.union([z.string().max(10_000), z.number(), z.boolean()]).nullable(),

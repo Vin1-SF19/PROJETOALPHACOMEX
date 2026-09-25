@@ -2,7 +2,7 @@ import { auth } from "../../../../../../auth";
 import { NextResponse } from "next/server";
 import { isAdminRole } from "@/lib/roles";
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
-import db from "@/lib/prisma";
+import { exigirOwnershipDocumento } from "@/lib/gerador-documentos/ownership";
 
 // Rate limiting simples em memória (5 downloads/min por usuário) — mesmo padrão de contratos/upload
 const downloadTimestamps = new Map<string, number[]>();
@@ -41,15 +41,13 @@ export async function GET(
     }
   }
 
-  // Ownership check (Artigo V)
-  const documento = await db.documentoGerado.findUnique({
-    where: { id: documentoId },
-    select: { id: true, criadoPorId: true, titulo: true, pdfUrl: true },
-  });
-  if (!documento) {
-    return NextResponse.json({ error: "Documento não encontrado" }, { status: 404 });
-  }
-  if (!isAdmin && documento.criadoPorId !== userId) {
+  let documento;
+  try {
+    documento = await exigirOwnershipDocumento(documentoId, { userId, role, isAdmin }, "visualizar");
+  } catch (error) {
+    if (error instanceof Error && error.message === "Documento não encontrado") {
+      return NextResponse.json({ error: "Documento não encontrado" }, { status: 404 });
+    }
     return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
   }
 

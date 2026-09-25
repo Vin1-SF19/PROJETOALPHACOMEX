@@ -8,7 +8,11 @@ import { z } from "zod";
 import db from "@/lib/prisma";
 import { gerarFichaServer } from "@/lib/bibble/gerar-ficha-server";
 import { gerarPdfDocumento } from "@/lib/gerador-documentos/pdf";
+import { carregarContratoPadrao, qualificarContratadaContratoPadrao } from "@/lib/gerador-documentos/contrato-padrao";
+import { valoresContratoParaConferencia } from "@/lib/gerador-documentos/contrato-conferencia";
+import { CONTRATO_PADRAO_ID } from "@/lib/gerador-documentos/contrato-padrao-id";
 import { renderizarConteudo } from "@/lib/gerador-documentos/render";
+import { carregarValoresCanonicosCampos } from "@/lib/bpm/campos-configuraveis-server";
 import { VariavelTemplateSchema } from "@/lib/gerador-documentos/schemas";
 import {
   escaparHtmlAutomacaoBpm,
@@ -113,15 +117,35 @@ async function enviarEmail(
   return { tipo: "EMAIL", destinatario: para, messageId: resposta.data?.id ?? null };
 }
 
-function resolverVariaveisContrato(
+async function resolverVariaveisContrato(
   parametros: ParametrosContratoBpm,
   contexto: ContextoExecucao,
 ) {
+  const ids = [...new Set(Object.values(parametros.variaveis)
+    .flatMap((valor) => typeof valor === "string"
+      ? [...valor.matchAll(/\{\{\s*campo\.([a-z0-9]+)\s*\}\}/g)].map((item) => item[1])
+      : []))];
+  const campos = ids.length ? await db.bpmCampo.findMany({
+    where: { id: { in: ids }, ativo: true, OR: [
+      { pipelineId: contexto.card.pipelineId },
+      { pipelinesAssociados: { some: { pipelineId: contexto.card.pipelineId } } },
+    ] },
+    select: { id: true, escopo: true, fonteEntidade: true, fonteAtributo: true, entidadeGlobal: true },
+  }) : [];
+  if (campos.length !== ids.length) throw new Error("Mapeamento do contrato contém campo inativo ou fora do pipeline");
+  const [valoresCard, canonicos] = await Promise.all([
+    ids.length ? db.bpmCardCampoValor.findMany({ where: { cardId: contexto.card.id, campoId: { in: ids } }, select: { campoId: true, valor: true } }) : [],
+    carregarValoresCanonicosCampos(contexto.card.id, campos),
+  ]);
+  const placeholders = {
+    ...contexto.placeholders,
+    ...Object.fromEntries(ids.map((id) => [`campo.${id}`, canonicos[id] ?? valoresCard.find((item) => item.campoId === id)?.valor ?? ""])),
+  };
   return Object.fromEntries(
     Object.entries(parametros.variaveis).map(([chave, valor]) => [
       chave,
       typeof valor === "string"
-        ? renderizarPlaceholdersAutomacaoBpm(valor, contexto.placeholders)
+        ? renderizarPlaceholdersAutomacaoBpm(valor, placeholders)
         : valor,
     ]),
   );
@@ -138,15 +162,26 @@ async function gerarContrato(
   });
   if (!template) throw new Error("Template de contrato não encontrado ou arquivado");
 
-  const definicoes = lerVariaveisTemplate(template.variaveisJson);
-  const variaveis = resolverVariaveisContrato(parametros, contexto);
+  const padrao = template.id === CONTRATO_PADRAO_ID ? await carregarContratoPadrao() : null;
+  const contratada = parametros.empresaContratadaId ? await db.empresaContratada.findFirst({
+    where: { id: parametros.empresaContratadaId, status: "ATIVO" },
+    select: { id: true, razaoSocial: true, cnpj: true, logradouro: true, numero: true, bairro: true, municipio: true, uf: true, cep: true },
+  }) : null;
+  if (parametros.empresaContratadaId && !contratada) throw new Error("Contratada configurada não encontrada ou arquivada");
+  if (padrao && !contratada) throw new Error("Contrato padrão exige contratada configurada");
+  const clausulas = padrao?.clausulas.map((clausula, indice) => ({
+    ...clausula,
+    conteudo: indice === 0 && contratada ? qualificarContratadaContratoPadrao(clausula.conteudo, contratada) : clausula.conteudo,
+  })) ?? template.clausulas;
+  const definicoes = padrao?.variaveis ?? lerVariaveisTemplate(template.variaveisJson);
+  const variaveis = await resolverVariaveisContrato(parametros, contexto);
   const faltantes = definicoes
     .filter((item) => item.obrigatorio)
     .filter((item) => {
       const valor = variaveis[item.nome];
       return valor === null || valor === undefined || String(valor).trim() === "";
     });
-  if (faltantes.length > 0) {
+  if (faltantes.length > 0 && !parametros.permitirPendencias) {
     throw new Error(`Variáveis obrigatórias ausentes: ${faltantes.map((item) => item.label).join(", ")}`);
   }
 
@@ -154,48 +189,70 @@ async function gerarContrato(
     parametros.titulo,
     contexto.placeholders,
   );
+  const anexosExistentes = await db.bpmCardAnexo.findMany({
+    where: { cardId: contexto.card.id, tipo: "application/x-painel-alpha-documento" },
+    select: { url: true },
+    orderBy: { createdAt: "asc" },
+  });
+  for (const anexo of anexosExistentes) {
+    const token = anexo.url.split("/").at(-1);
+    const existente = token ? await db.documentoGerado.findUnique({ where: { tokenAcesso: token }, select: { id: true, templateId: true, pdfUrl: true } }) : null;
+    if (existente?.templateId === template.id) return {
+      tipo: "CONTRATO", documentoId: existente.id, pdfUrl: existente.pdfUrl,
+      urlConferencia: anexo.url, existente: true,
+    };
+  }
   const tokenAcesso = randomUUID();
   const documento = await db.$transaction(async (tx) => {
     const criado = await tx.documentoGerado.create({
       data: {
         templateId: template.id,
         titulo,
-        variaveisJson: JSON.stringify(variaveis),
+        variaveisJson: JSON.stringify(padrao ? { ...variaveis, __modeloContratoPadrao: "docx-v1", __bpmCardId: contexto.card.id } : variaveis),
         tokenAcesso,
         criadoPorId,
         clienteId: contexto.card.empresaId,
+        empresaContratadaId: contratada?.id ?? null,
         status: "CONFERENCIA",
       },
     });
     await tx.documentoClasulaGerada.createMany({
-      data: template.clausulas.map((clausula) => ({
+      data: clausulas.map((clausula) => ({
         documentoId: criado.id,
         ordem: clausula.ordem,
         titulo: clausula.titulo,
-        conteudo: renderizarConteudo(clausula.conteudo, definicoes, variaveis),
+        conteudo: renderizarConteudo(clausula.conteudo, definicoes, valoresContratoParaConferencia(definicoes, variaveis)),
         conteudoOriginal: clausula.conteudo,
       })),
     });
+    await tx.bpmCardAnexo.create({ data: {
+      cardId: contexto.card.id,
+      url: `/PainelAlpha/GeradorDocumentos/conferencia/${tokenAcesso}`,
+      nome: titulo,
+      tipo: "application/x-painel-alpha-documento",
+      enviadoPorId: criadoPorId,
+    } });
     return criado;
   });
 
   let pdfUrl: string | null = null;
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
-  if (blobToken) {
+  if (blobToken && faltantes.length === 0) {
     try {
       const buffer = await gerarPdfDocumento({
         titulo,
-        clausulas: template.clausulas.map((clausula) => ({
+        clausulas: clausulas.map((clausula) => ({
           titulo: clausula.titulo,
           conteudo: renderizarConteudo(clausula.conteudo, definicoes, variaveis),
         })),
-        partes: {
+        partes: padrao ? undefined : {
           contratante: {
             razaoSocial: contexto.card.empresa.razaoSocial,
             cnpj: contexto.card.empresa.cnpj,
           },
         },
-        numeroContrato: documento.id,
+        numeroContrato: padrao ? undefined : documento.id,
+        estiloDocx: padrao?.estiloDocx,
       });
       const blob = await put(
         `gerador-documentos/pdfs-gerados/${criadoPorId}/${documento.id}.pdf`,
@@ -215,6 +272,7 @@ async function gerarContrato(
   return {
     tipo: "CONTRATO",
     documentoId: documento.id,
+    pendencias: faltantes.map((item) => item.label),
     pdfUrl,
     urlConferencia: `/PainelAlpha/GeradorDocumentos/conferencia/${tokenAcesso}`,
   };

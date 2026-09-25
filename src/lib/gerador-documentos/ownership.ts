@@ -3,6 +3,7 @@ import { isAdminRole } from "@/lib/roles";
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
 import { auth } from "../../../auth";
 import { CONTRATO_PADRAO_ID } from "./contrato-padrao-id";
+import { exigirAcessoBpmCard, type BpmAcao } from "@/lib/bpm/ownership";
 
 const MODULO_PERMISSION = "geradorDocumentos";
 
@@ -73,16 +74,33 @@ export async function exigirOwnershipTemplate(
 export async function exigirOwnershipDocumento(
   documentoId: string,
   ctx: ContextoGeradorDocumentos,
+  acaoCard: BpmAcao = "editarCard",
 ) {
   const documento = await db.documentoGerado.findUnique({
     where: { id: documentoId },
-    select: { id: true, criadoPorId: true, status: true, templateId: true, titulo: true, pdfUrl: true },
+    select: { id: true, criadoPorId: true, status: true, templateId: true, titulo: true, pdfUrl: true, tokenAcesso: true, variaveisJson: true },
   });
   if (!documento) throw new Error("Documento não encontrado");
   if (!ctx.isAdmin && documento.criadoPorId !== ctx.userId) {
-    throw new Error("Não autorizado");
+    if (!documento.tokenAcesso) throw new Error("Não autorizado");
+    await exigirAcessoDocumentoViaCard(documento.tokenAcesso, documento.variaveisJson, ctx, acaoCard);
   }
   return documento;
+}
+
+async function exigirAcessoDocumentoViaCard(tokenAcesso: string, variaveisJson: unknown, ctx: ContextoGeradorDocumentos, acao: BpmAcao) {
+  let cardId: unknown;
+  try {
+    const variaveis = typeof variaveisJson === "string" ? JSON.parse(variaveisJson) : variaveisJson;
+    cardId = variaveis && typeof variaveis === "object" && !Array.isArray(variaveis) ? (variaveis as Record<string, unknown>).__bpmCardId : null;
+  } catch { cardId = null; }
+  if (typeof cardId !== "string" || !cardId) throw new Error("Não autorizado");
+  const anexo = await db.bpmCardAnexo.findFirst({
+    where: { cardId, url: `/PainelAlpha/GeradorDocumentos/conferencia/${tokenAcesso}`, tipo: "application/x-painel-alpha-documento" },
+    select: { cardId: true },
+  });
+  if (!anexo) throw new Error("Não autorizado");
+  await exigirAcessoBpmCard(anexo.cardId, ctx.userId, ctx.role, acao);
 }
 
 export async function exigirOwnershipDocumentoPorToken(
@@ -91,11 +109,11 @@ export async function exigirOwnershipDocumentoPorToken(
 ) {
   const documento = await db.documentoGerado.findUnique({
     where: { tokenAcesso },
-    select: { id: true, criadoPorId: true, status: true, templateId: true },
+    select: { id: true, criadoPorId: true, status: true, templateId: true, variaveisJson: true },
   });
   if (!documento) throw new Error("Documento não encontrado");
   if (!ctx.isAdmin && documento.criadoPorId !== ctx.userId) {
-    throw new Error("Não autorizado");
+    await exigirAcessoDocumentoViaCard(tokenAcesso, documento.variaveisJson, ctx, "visualizar");
   }
   return documento;
 }

@@ -5,12 +5,14 @@ import { toast } from "sonner";
 import { CheckCircle2, Sparkles, FileCheck, Download, Loader2, FileWarning } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   EditarClasulaGerada,
   ReescreverClasulaComIA,
   FinalizarDocumento,
+  AtualizarVariaveisContratoPadrao,
 } from "@/actions/gerador-documentos";
 import { ReescreverIA } from "./ReescreverIA";
 
@@ -30,6 +32,8 @@ interface DocumentoConferencia {
   pdfDisponivel: boolean;
   htmlUrl?: string | null; // RM-2026-94CBF6 — HTML renderizado com variáveis preenchidas
   template: { titulo: string };
+  variaveisJson: unknown;
+  variaveisDefinicoes?: Array<{ nome: string; label: string; tipo: string; obrigatorio: boolean }>;
   clausulas: ClasulaGerada[];
 }
 
@@ -42,6 +46,9 @@ const STATUS_LABEL: Record<string, string> = {
 
 export function ConferenciaClient({ documento }: { documento: DocumentoConferencia }) {
   const [clausulas, setClausulas] = useState(documento.clausulas);
+  const definicoes = documento.variaveisDefinicoes ?? [];
+  const valoresIniciais = (typeof documento.variaveisJson === "string" ? JSON.parse(documento.variaveisJson) : documento.variaveisJson ?? {}) as Record<string, unknown>;
+  const [variaveis, setVariaveis] = useState<Record<string, string>>(Object.fromEntries(definicoes.map((item) => [item.nome, String(valoresIniciais[item.nome] ?? "")])));
   const [status, setStatus] = useState(documento.status);
   const [pdfDisponivel, setPdfDisponivel] = useState(documento.pdfDisponivel);
   const [pdfStatus, setPdfStatus] = useState<"loading" | "success" | "error">("loading");
@@ -102,6 +109,18 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
     });
   }
 
+  function handleSalvarVariaveis() {
+    startTransition(async () => {
+      const resultado = await AtualizarVariaveisContratoPadrao({ documentoId: documento.id, valores: variaveis });
+      if (!resultado.success) {
+        toast.error(resultado.error);
+        return;
+      }
+      setClausulas(resultado.data.clausulas);
+      toast.success("Dados do contrato atualizados");
+    });
+  }
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 md:px-8">
       <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -141,6 +160,32 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
         </div>
       )}
 
+      {!somenteLeitura && definicoes.length > 0 && !pdfDisponivel && (
+        <Card className="mb-6 space-y-4 p-5">
+          <div>
+            <h2 className="font-medium text-neutral-900 dark:text-neutral-100">Dados do contrato para conferência</h2>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">Confira os dados importados do Financeiro e preencha os pendentes antes de finalizar.</p>
+          </div>
+          <div className="rounded-md border border-neutral-200 p-3 text-sm dark:border-neutral-800">
+            <p><strong>Serviço:</strong> {String(valoresIniciais.__bpmServico ?? "Não informado")}</p>
+            <p><strong>Forma de pagamento:</strong> {String(valoresIniciais.__bpmFormaPagamento ?? "Não informada")}</p>
+            <p><strong>Condição negociada:</strong> {String(valoresIniciais.__bpmCondicaoNegociada ?? "Não informada")}</p>
+            <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">Confira se as cláusulas financeiras do modelo correspondem a essas condições antes de finalizar.</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {definicoes.map((item) => <label key={item.nome} className="text-xs text-neutral-600 dark:text-neutral-300">
+              {item.label}{item.obrigatorio ? " *" : ""}
+              <Input className="mt-1" type={item.tipo === "data" ? "date" : item.tipo === "moeda" ? "number" : "text"}
+                step={item.tipo === "moeda" ? "0.01" : undefined}
+                value={variaveis[item.nome] ?? ""}
+                onChange={(event) => setVariaveis((atual) => ({ ...atual, [item.nome]: event.target.value }))}
+                disabled={isPending} />
+            </label>)}
+          </div>
+          <Button type="button" onClick={handleSalvarVariaveis} disabled={isPending}>Atualizar dados do contrato</Button>
+        </Card>
+      )}
+
       {pdfDisponivel ? (
         <Card className="mb-6 flex flex-col gap-3 p-5">
           <h2 className="font-medium text-neutral-900 dark:text-neutral-100">PDF gerado</h2>
@@ -170,7 +215,7 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
       ) : (
         <div className="mb-6 flex items-center gap-2 rounded-lg bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300" role="alert">
           <FileWarning className="h-4 w-4 shrink-0" aria-hidden="true" />
-          O PDF não foi gerado. A visualização HTML continua disponível para conferência.
+          {definicoes.length > 0 ? "Confira os dados pendentes e finalize o documento para gerar o PDF." : "O PDF não foi gerado. A visualização HTML continua disponível para conferência."}
         </div>
       )}
 

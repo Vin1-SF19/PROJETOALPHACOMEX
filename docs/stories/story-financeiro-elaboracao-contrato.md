@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress — configuração da segunda etapa presente em produção. Correção local do diálogo de entrada pronta, com quality gates aprovados; deploy e smoke autenticado da movimentação pendentes.
+Ready for Review — correção do diálogo publicada; integração de contrato RADAR e plano de configuração implementados e validados localmente. A publicação da nova configuração no Turso aguarda confirmação específica do usuário.
 
 ## Story
 
@@ -31,6 +31,7 @@ In Progress — configuração da segunda etapa presente em produção. Correç�
 7. [ ] O avanço real para `Formalização` aplica as mesmas regras dos itens 2 a 5 no servidor, sem salto de etapas. Com contrato elaborado, data de elaboração, envio válido, data/hora do envio e link/arquivo presentes, o avanço ocorre; com pendências, permanece na etapa e retorna a lista nominal de campos. Dados preenchidos no formulário ativo não podem ser rejeitados por exigência de chave legada, inativa ou rótulo hardcoded.
 8. [ ] Quando existir integração de elaboração/assinatura de contratos aplicável ao card, o fluxo usa o contrato e o estado dessa integração sem duplicar registro ou envio. Se não houver integração configurada, o fluxo manual dos itens 1 a 7 permanece funcional. A escolha de provedor, credenciais e disparo externo dependem de contrato de integração existente e não são presumidos por esta story.
 9. [ ] Entrar em `Elaboração do Contrato` não exige que `Contrato elaborado` ou `Contrato enviado para assinatura` já estejam preenchidos. O diálogo de movimento exige somente campos marcados para entrada; os dois indicadores permanecem no formulário do card após a entrada, para preenchimento e validação durante a etapa.
+10. [ ] Ao entrar na etapa, somente para serviço RADAR, uma automação configurada cria uma única instância em conferência no Gerador de Documentos a partir do contrato padrão, vinculada à empresa do card e nomeada `CONTRATO DE PRESTAÇÃO DE SERVIÇOS + <Razão Social>`. Dados cadastrais e financeiros vêm dos campos validados em `Solicitação de Contrato`. A contratada é o cadastro ativo `ALPHA - COMEX, SERVICOS ADMINISTRATIVOS ESPECIALIZADOS E COWORKING LTDA`; a qualificação do modelo não conserva a empresa antiga. O formulário da **primeira etapa** solicita valor inicial, valor final e desconto para RADAR antes do avanço, sem bloquear outros serviços nem pressupor divisão ou desconto. Data de assinatura ainda desconhecida aparece como pendência de conferência no rascunho.
 
 ## Tarefas / checklist de execução
 
@@ -45,7 +46,10 @@ In Progress — configuração da segunda etapa presente em produção. Correç�
 - [ ] Publicar configuração após autorização específica do usuário e verificar o fluxo autenticado, inclusive cards antigos, anexos e erro nominal por campo (AC 1 a 8).
 - [x] Rodar `npm run lint`, `npm run typecheck`, `npm test` e `npm run build`; atualizar checklist e File List antes da conclusão local (lint: 0 erros, avisos preexistentes; testes na worktree seletiva: 511 arquivos/3.828 casos aprovados; build concluído).
 - [x] Corrigir o diagnóstico de movimento para aplicar `obrigatorioEntrada` somente na entrada do destino, sem exigir indicadores que devem ser preenchidos durante a elaboração; teste de regressão e quality gates locais aprovados (AC 9).
-- [ ] Publicar a correção do diálogo e confirmar no card autenticado que a entrada em Elaboração é liberada e os campos aparecem dentro da segunda etapa (AC 1, 9).
+- [ ] Confirmar no card autenticado que a entrada em Elaboração é liberada e os campos aparecem dentro da segunda etapa (AC 1, 9). O código da correção foi publicado e o deployment ficou pronto; falta o teste visual autenticado.
+- [x] Criar rascunho automático no Gerador, com dados da contratação, contratada correta, título solicitado e idempotência por card/template (AC 10).
+- [x] Preparar configuração de três campos de pagamento no formulário da primeira etapa, visíveis e obrigatórios na saída para RADAR, e automação de entrada exclusiva de RADAR (AC 10). Publicação no banco segue pendente de checkpoint específico.
+- [x] Plano somente leitura validou formulário da Solicitação v5, template padrão versionado `cmthgdqel00000akvfblyma6y`, contratada ativa e três campos ainda ausentes. O modelo padrão descreve revisão de RADAR; a condição da automação confere `card.servico` contendo Radar. A versão atual do pipeline passou de 11 a 14 por edições concorrentes; o segundo backup e o snapshot seletivo cobrem v14.
 
 ## Contexto e pontos de integração
 
@@ -62,6 +66,10 @@ In Progress — configuração da segunda etapa presente em produção. Correç�
 - **Plano de publicação:** `scripts/financeiro-elaboracao-config.mts` é somente leitura sem `--apply`. Seleciona a etapa ativa `cmsd9yw74000ddzggndlvgbun`, altera tipos de `Data do envio` para `data_hora` e `Link/arquivo` para `url_ou_arquivo`, configura duas datas automáticas, 18 requisitos e 15 automações. A etapa homônima `elaboracao_contrato_legacy` está inativa e sem cards; não será modificada.
 - **Vault:** backup completo `database-backups/pre-change/painelalpha_turso_pre_change_elaboracao_config_2026-09-25T17-42-13-450Z.db` validado por restauração (`integrity_check=ok`, 331 tabelas, 171.275 linhas, FK=0), SHA-256 `ad960a4aff973d18301e88a6f8060583ada72eb08983888205696cd5346a3d5a`. Snapshot seletivo `database-backups/pre-change/elaboracao-config-before-2026-09-25T17-42-33-799Z.json`. O inventário somente leitura deste reteste confirmou os campos e requisitos publicados; a correção atual não altera o banco.
 - **Limite de verificação:** nenhum card real foi movido ou editado nesta implementação. A automação de geração de contrato existe no catálogo, mas não está configurada para a segunda etapa e depende de um template selecionado pelo administrador.
+- **Contrato RADAR:** o DOCX padrão contém qualificação antiga de `ALPHA COMEX BRASIL LTDA`. A nova ação substitui essa qualificação na instância, preserva o arquivo fonte, usa o cadastro ativo `ALPHA - COMEX, SERVICOS ADMINISTRATIVOS ESPECIALIZADOS E COWORKING LTDA`, vincula documento e anexo interno ao card e impede criação repetida quando já houver documento vinculado. As variáveis mapeadas usam IDs de campos na configuração da automação; os dados ausentes são marcados para conferência e impedem finalização até preenchimento. O pedido do usuário colocou valor inicial, valor final e desconto na **primeira** etapa, antes da entrada na Elaboração. O serviço sem RADAR não executa este modelo.
+- **Vault RADAR:** backup completo renovado `database-backups/pre-change/painelalpha_turso_pre_change_radar_contrato_pagamento_2026-09-25T20-00-41-599Z.db` (173.264.896 bytes, SHA-256 `5ea5c1dc6f8a8576d24449f0ff4a4ce175562da3b46dadd770184f5af7193045`) validado por restauração local: integridade OK, FK=0, 331 tabelas, 174.739 linhas. Manifesto `.manifest.json` homônimo e snapshot seletivo v14 `database-backups/pre-change/radar-contrato-pagamento-config-before-v14-2026-09-25T20-01-45-696Z.json` (SHA-256 `b3437b5b959662fd63fefdfb88207c0b601302f53fe2e6a5f4b1c37178f5d31f`). Nenhuma escrita no Turso para este pedido foi feita; publicação requer aprovação específica após revisão do plano.
+- **Concorrência observada:** a configuração do Financeiro avançou de v11 para v14 por edições no campo `Vendedor responsável`, sem mudança nos campos básicos de exibição/obrigatoriedade comparados por Vault. O backup renovado e o snapshot seletivo capturam v14; o script exige a versão exata do pipeline e do formulário antes da escrita e aborta se houver nova mudança.
+- **Gates locais da nova integração:** `npm run lint` (0 erros, 1.192 avisos preexistentes), `npm run typecheck` (exit 0), `npm test` (515 arquivos, 3.837 casos aprovados; 4 skipped e 1 todo), `npm run build` (exit 0), `git diff --check` (exit 0). Após ajuste de autorização, os testes focados de ownership, download e reescrita passaram (28 casos).
 
 ## Testes de aceite
 
@@ -103,6 +111,22 @@ In Progress — configuração da segunda etapa presente em produção. Correç�
 - `tests/bpm/requisitos-transicao-obrigatoriedade.test.ts` — regressão da entrada em Elaboração sem indicadores futuros já preenchidos.
 - `tests/bpm/edicao-campos-card.test.ts` — mocks da persistência parcial diante do novo validador.
 - `tests/bpm/cpf-pendencias-react.test.ts` — persistência UTC de campo `data_hora`.
+- `src/lib/bpm/automacoes/schemas.ts` — opções configuráveis da ação de contrato.
+- `src/actions/bpm/Automacoes.ts` — catálogo de contratadas e variáveis atuais do contrato padrão na configuração.
+- `src/components/bpm/automacoes/types.ts` — tipo do catálogo de contratadas.
+- `src/components/bpm/automacoes/AutomacaoCentralFormDialog.tsx` — seleção da contratada e opção de rascunho com pendências.
+- `src/lib/bpm/automacoes/executor.ts` — uso do DOCX padrão, contratada cadastrada, mapeamento de campos do card e criação idempotente em conferência.
+- `src/lib/gerador-documentos/contrato-padrao.ts` — qualificação da contratada selecionada na instância.
+- `src/lib/gerador-documentos/contrato-conferencia.ts` — preenchimento explícito de pendências e preservação de cláusulas editadas.
+- `src/actions/gerador-documentos.ts` — conferência e complemento das variáveis pendentes antes da finalização.
+- `src/lib/gerador-documentos/ownership.ts` — acesso ao documento vinculado condicionado ao acesso ao card e ao módulo.
+- `src/components/GeradorDocumentos/ConferenciaClient.tsx` — formulário de conferência das variáveis do contrato automático.
+- `src/app/api/bpm/anexos/[anexoId]/route.ts` — redirecionamento autenticado do anexo interno de contrato para a conferência.
+- `src/app/PainelAlpha/GeradorDocumentos/[templateId]/download/route.ts` e `src/app/api/gerador-documentos/[id]/download/route.ts` — leitura do PDF sob a mesma autorização de documento vinculado.
+- `scripts/financeiro-contrato-radar-config.mts` — plano e aplicação protegida dos três campos na Solicitação e da automação RADAR.
+- `tests/gerador-documentos/contrato-padrao-contratada.test.ts` — qualificação da empresa e preservação do modelo fonte.
+- `tests/gerador-documentos/contrato-conferencia.test.ts` — complemento de variáveis sem sobrescrever edições manuais.
+- `tests/gerador-documentos/ownership.test.ts` — acesso restrito por vínculo ao card, com permissões de edição.
 
 ### Change Log
 
@@ -112,6 +136,8 @@ In Progress — configuração da segunda etapa presente em produção. Correç�
 | 2026-09-25 | 0.2 | Correções locais, diagnóstico da transição real em leitura e quality gates | Codex |
 | 2026-09-25 | 0.3 | Remoção das rotas hardcoded anterior, implementação configurável e plano Vault de publicação | Codex |
 | 2026-09-25 | 0.4 | Correção da exigência prematura dos indicadores no diálogo de entrada; 513 arquivos e 3.834 testes, lint, typecheck e build aprovados | Codex |
+| 2026-09-25 | 0.5 | Integração local da geração automática do contrato RADAR, plano de configuração da primeira etapa e backup Vault validado; publicação pendente de checkpoint específico | Codex |
+| 2026-09-25 | 0.6 | Backup Vault renovado na configuração v14, conferência dos gates e plano de publicação RADAR atualizado | Codex |
 
 ## Validação do draft
 

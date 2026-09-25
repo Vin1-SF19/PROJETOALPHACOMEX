@@ -13,6 +13,7 @@ import {
   exigirAcessoModulo,
   exigirOwnershipTemplate,
   exigirOwnershipDocumento,
+  exigirOwnershipDocumentoPorToken,
   getSessaoGeradorDocumentos,
   type ContextoGeradorDocumentos,
 } from "@/lib/gerador-documentos/ownership";
@@ -30,6 +31,7 @@ import {
   type CriarTemplateInput,
 } from "@/lib/gerador-documentos/schemas";
 import { renderizarConteudo, validarVariaveisObrigatorias } from "@/lib/gerador-documentos/render";
+import { clausulasAtualizaveisContrato } from "@/lib/gerador-documentos/contrato-conferencia";
 import { reescreverClasulaViaIA, identificarVariaveisEClasulasViaIA } from "@/lib/gerador-documentos/onyx";
 import { gerarPdfDocumento } from "@/lib/gerador-documentos/pdf";
 import { converterParaHtml } from "@/lib/gerador-documentos/html";
@@ -711,15 +713,13 @@ export async function ObterDocumentoConferencia(tokenAcesso: string) {
     const { userId, role } = await getSessao();
     const ctx = await exigirAcessoModulo(userId, role);
 
+    await exigirOwnershipDocumentoPorToken(tokenAcesso, ctx);
+
     const documento = await db.documentoGerado.findUnique({
       where: { tokenAcesso },
       include: { clausulas: { orderBy: { ordem: "asc" } }, template: { select: { titulo: true } } },
     });
     if (!documento) return { success: false as const, error: "Documento não encontrado" };
-    if (!ctx.isAdmin && documento.criadoPorId !== ctx.userId) {
-      return { success: false as const, error: "Não autorizado" };
-    }
-
     // htmlUrl (RM-2026-94CBF6): campo adicionado por migration aditiva — busca via raw query
     let htmlUrl: string | null = null;
     try {
@@ -733,7 +733,57 @@ export async function ObterDocumentoConferencia(tokenAcesso: string) {
     htmlUrl ??= derivarHtmlUrlDoPdf(documento.pdfUrl);
 
     const { pdfUrl: urlInterna, ...documentoSeguro } = documento;
-    return { success: true as const, data: { ...documentoSeguro, pdfDisponivel: Boolean(urlInterna), htmlUrl } };
+    const variaveisSalvas = typeof documento.variaveisJson === "string"
+      ? JSON.parse(documento.variaveisJson) as Record<string, unknown>
+      : documento.variaveisJson as Record<string, unknown>;
+    const variaveisDefinicoes = documento.templateId === CONTRATO_PADRAO_ID && variaveisSalvas?.__bpmCardId
+      ? VARIAVEIS_CONTRATO_PADRAO
+      : [];
+    return { success: true as const, data: { ...documentoSeguro, variaveisDefinicoes, pdfDisponivel: Boolean(urlInterna), htmlUrl } };
+  } catch (error) {
+    return { success: false as const, error: mensagemErro(error) };
+  }
+}
+
+/** Completa os campos pendentes de um contrato padrão criado automaticamente. */
+export async function AtualizarVariaveisContratoPadrao(payload: unknown) {
+  try {
+    const { userId, role } = await getSessao();
+    const ctx = await exigirAcessoModulo(userId, role);
+    const input = z.object({
+      documentoId: z.string().cuid(),
+      valores: z.record(z.string(), z.string().max(10_000)),
+    }).strict().parse(payload);
+    const documento = await exigirOwnershipDocumento(input.documentoId, ctx);
+    if (documento.status !== "CONFERENCIA" || documento.templateId !== CONTRATO_PADRAO_ID) {
+      return { success: false as const, error: "Contrato padrão indisponível para edição de variáveis" };
+    }
+    const nomes = new Set(VARIAVEIS_CONTRATO_PADRAO.map((variavel) => variavel.nome));
+    if (Object.keys(input.valores).some((nome) => !nomes.has(nome))) {
+      return { success: false as const, error: "Variável não pertence ao contrato padrão" };
+    }
+    const fonte = await db.documentoGerado.findUnique({ where: { id: documento.id }, select: { variaveisJson: true } });
+    const bruto = fonte?.variaveisJson;
+    const anteriores = (typeof bruto === "string" ? JSON.parse(bruto) : bruto ?? {}) as Record<string, string | number | boolean | null>;
+    if (!anteriores.__bpmCardId || documento.pdfUrl) {
+      return { success: false as const, error: "Somente o rascunho automático sem PDF pode atualizar variáveis" };
+    }
+    const novos = { ...anteriores, ...input.valores };
+    const clausulas = await db.documentoClasulaGerada.findMany({
+      where: { documentoId: documento.id }, select: { id: true, conteudo: true, conteudoOriginal: true, reescritoPorIA: true },
+    });
+    const atualizacoes = clausulasAtualizaveisContrato({
+      definicoes: VARIAVEIS_CONTRATO_PADRAO, anteriores, novos, clausulas,
+    });
+    await db.$transaction([
+      db.documentoGerado.update({ where: { id: documento.id }, data: { variaveisJson: JSON.stringify(novos) } }),
+      ...atualizacoes.map((clausula) => db.documentoClasulaGerada.update({ where: { id: clausula.id }, data: { conteudo: clausula.conteudo } })),
+    ]);
+    revalidatePath(`${ROTA_BASE}/conferencia`);
+    return { success: true as const, data: {
+      variaveisJson: novos,
+      clausulas: await db.documentoClasulaGerada.findMany({ where: { documentoId: documento.id }, orderBy: { ordem: "asc" }, select: { id: true, ordem: true, titulo: true, conteudo: true, reescritoPorIA: true } }),
+    } };
   } catch (error) {
     return { success: false as const, error: mensagemErro(error) };
   }
