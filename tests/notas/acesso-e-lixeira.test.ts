@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/prisma", () => ({
+  default: { notePermission: { findMany: vi.fn().mockResolvedValue([]) } },
+}));
 import { criarFiltroAcessoNota, criarFiltroExclusaoLixeira } from "@/lib/notas/acesso";
 import { atualizarPreviewNaLista } from "@/lib/notas/preview";
 import { excluirNotasDefinitivamenteSchema } from "@/lib/validations/notas";

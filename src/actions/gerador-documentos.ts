@@ -37,6 +37,12 @@ import { renderHtmlComVariaveis } from "@/lib/gerador-documentos/html-render";
 import { renderHtmlParaPdf } from "@/lib/gerador-documentos/pdf-renderer";
 import { carregarEstiloDocxPdf } from "@/lib/gerador-documentos/docx-style";
 import {
+  CONTRATO_PADRAO_ID,
+  VARIAVEIS_CONTRATO_PADRAO,
+  VALORES_INICIAIS_CONTRATO_PADRAO,
+  carregarContratoPadrao,
+} from "@/lib/gerador-documentos/contrato-padrao";
+import {
   criarHtmlDeClausulas,
   derivarHtmlUrlDoPdf,
   substituirClausulaNoHtml,
@@ -81,7 +87,7 @@ export async function ListarTemplatesDocumentos() {
     const { userId, role } = await getSessao();
     const ctx = await exigirAcessoModulo(userId, role);
 
-    const where = ctx.isAdmin ? {} : { criadoPorId: userId };
+    const where = ctx.isAdmin ? {} : { OR: [{ criadoPorId: userId }, { id: CONTRATO_PADRAO_ID }] };
     const templates = await db.documentoTemplate.findMany({
       where,
       orderBy: { criadoEm: "desc" },
@@ -98,7 +104,17 @@ export async function ListarTemplatesDocumentos() {
       },
     });
 
-    return { success: true as const, data: templates };
+    const padrao = templates.find((template) => template.id === CONTRATO_PADRAO_ID);
+    if (padrao) {
+      padrao.categoria = "contrato";
+      padrao._count.clausulas = (await carregarContratoPadrao()).clausulas.length;
+      if (!ctx.isAdmin) {
+        padrao._count.documentos = await db.documentoGerado.count({
+          where: { templateId: CONTRATO_PADRAO_ID, criadoPorId: ctx.userId },
+        });
+      }
+    }
+    return { success: true as const, data: templates.sort((a, b) => Number(b.id === CONTRATO_PADRAO_ID) - Number(a.id === CONTRATO_PADRAO_ID)) };
   } catch (error) {
     return { success: false as const, error: mensagemErro(error), data: [] };
   }
@@ -108,7 +124,7 @@ export async function ObterTemplateDocumento(templateId: string) {
   try {
     const { userId, role } = await getSessao();
     const ctx = await exigirAcessoModulo(userId, role);
-    await exigirOwnershipTemplate(templateId, ctx);
+    await exigirOwnershipTemplate(templateId, ctx, { leitura: true });
 
     const template = await db.documentoTemplate.findUniqueOrThrow({
       where: { id: templateId },
@@ -117,7 +133,9 @@ export async function ObterTemplateDocumento(templateId: string) {
 
     return {
       success: true as const,
-      data: { ...template, variaveis: parseVariaveisJson(template.variaveisJson) },
+      data: templateId === CONTRATO_PADRAO_ID
+        ? { ...template, categoria: "contrato", variaveis: VARIAVEIS_CONTRATO_PADRAO, valoresIniciais: VALORES_INICIAIS_CONTRATO_PADRAO }
+        : { ...template, variaveis: parseVariaveisJson(template.variaveisJson) },
     };
   } catch (error) {
     return { success: false as const, error: mensagemErro(error) };
@@ -441,18 +459,22 @@ export async function GerarDocumento(payload: unknown) {
       include: { clausulas: { orderBy: { ordem: "asc" } } },
     });
     if (!template) return { success: false as const, error: "Template não encontrado" };
-    if (!ctx.isAdmin && template.criadoPorId !== ctx.userId) {
+    if (template.id !== CONTRATO_PADRAO_ID && !ctx.isAdmin && template.criadoPorId !== ctx.userId) {
       return { success: false as const, error: "Não autorizado" };
     }
     if (template.status === "ARQUIVADO") {
       return { success: false as const, error: "Este template está arquivado" };
     }
 
-    const estiloDocx = /\.docx$/i.test(template.arquivoOrigemNome ?? "")
+    const contratoPadrao = template.id === CONTRATO_PADRAO_ID ? await carregarContratoPadrao() : null;
+    const estiloDocx = contratoPadrao?.estiloDocx ?? (/\.docx$/i.test(template.arquivoOrigemNome ?? "")
       ? await carregarEstiloDocxPdf(template.arquivoOrigemUrl)
-      : undefined;
-
-    const variaveisTemplate = parseVariaveisJson(template.variaveisJson);
+      : undefined);
+    const clausulasFonte = contratoPadrao?.clausulas ?? template.clausulas;
+    const variaveisTemplate = contratoPadrao?.variaveis ?? parseVariaveisJson(template.variaveisJson);
+    if (contratoPadrao && validarVariaveisObrigatorias(variaveisTemplate, input.variaveis).length) {
+      return { success: false as const, error: "Preencha todos os campos obrigatórios do contrato padrão" };
+    }
 
     const tokenAcesso = randomUUID();
     const documento = await db.$transaction(async (tx) => {
@@ -460,7 +482,7 @@ export async function GerarDocumento(payload: unknown) {
         data: {
           templateId: template.id,
           titulo: input.titulo,
-          variaveisJson: JSON.stringify(input.variaveis),
+          variaveisJson: JSON.stringify(contratoPadrao ? { ...input.variaveis, __modeloContratoPadrao: "docx-v1" } : input.variaveis),
           tokenAcesso,
           criadoPorId: ctx.userId,
           status: "CONFERENCIA",
@@ -469,7 +491,7 @@ export async function GerarDocumento(payload: unknown) {
         },
       });
       await tx.documentoClasulaGerada.createMany({
-        data: template.clausulas.map((c) => ({
+        data: clausulasFonte.map((c) => ({
           documentoId: criado.id,
           ordem: c.ordem,
           titulo: c.titulo,
@@ -483,7 +505,7 @@ export async function GerarDocumento(payload: unknown) {
     // Gera o PDF com qualificação das partes (se cliente/empresa foram fornecidos)
     let pdfUrl: string | undefined;
     try {
-      const clausulasRenderizadas = template.clausulas.map((c) => ({
+      const clausulasRenderizadas = clausulasFonte.map((c) => ({
         titulo: c.titulo,
         conteudo: renderizarConteudo(c.conteudo, variaveisTemplate, input.variaveis),
       }));
@@ -529,8 +551,8 @@ export async function GerarDocumento(payload: unknown) {
       const bufferPdf = await gerarPdfDocumento({
         titulo: input.titulo,
         clausulas: clausulasRenderizadas,
-        partes,
-        numeroContrato: documento.id,
+        partes: contratoPadrao ? undefined : partes,
+        numeroContrato: contratoPadrao ? undefined : documento.id,
         estiloDocx,
       });
 
@@ -555,50 +577,55 @@ export async function GerarDocumento(payload: unknown) {
     try {
       // htmlUrl não está no schema Prisma (migration aditiva pendente) — busca via raw query
       let templateHtmlUrl: string | null = null;
-      try {
-        const rows = await db.$queryRaw<Array<{ htmlUrl: string | null }>>`
-          SELECT "htmlUrl" FROM "DocumentoTemplate" WHERE "id" = ${template.id}
-        `;
-        templateHtmlUrl = rows[0]?.htmlUrl ?? null;
-      } catch {
-        // coluna ainda não existe (migration não aplicada) — ignora
+      if (!contratoPadrao) {
+        try {
+          const rows = await db.$queryRaw<Array<{ htmlUrl: string | null }>>`
+            SELECT "htmlUrl" FROM "DocumentoTemplate" WHERE "id" = ${template.id}
+          `;
+          templateHtmlUrl = rows[0]?.htmlUrl ?? null;
+        } catch {
+          // coluna ainda não existe (migration não aplicada) — ignora
+        }
       }
-      if (templateHtmlUrl) {
+      let htmlOriginal: string | null = null;
+      if (contratoPadrao) {
+        htmlOriginal = criarHtmlDeClausulas(input.titulo, clausulasFonte.map((c) => ({ titulo: c.titulo, conteudo: c.conteudo })));
+      } else if (templateHtmlUrl) {
         const htmlRes = await fetch(templateHtmlUrl);
-        if (htmlRes.ok) {
-          const htmlOriginal = await htmlRes.text();
-          const htmlRenderizado = renderHtmlComVariaveis(htmlOriginal, variaveisTemplate, input.variaveis);
-          const blobTokenHtml = process.env.BLOB_READ_WRITE_TOKEN;
-          if (blobTokenHtml) {
-            const htmlBlob = await put(`gerador-documentos/documentos-html/${ctx.userId}/${documento.id}.html`, Buffer.from(htmlRenderizado, "utf-8"), {
-              access: "public",
-              addRandomSuffix: false,
-              token: blobTokenHtml,
-              contentType: "text/html",
-            });
-            htmlUrl = htmlBlob.url;
-            try {
-              await db.$executeRaw`UPDATE "DocumentoGerado" SET "htmlUrl" = ${htmlUrl} WHERE "id" = ${documento.id}`;
-            } catch {
-              // Sem a coluna opcional, o HTML continua recuperável pela URL irmã do PDF.
-            }
+        if (htmlRes.ok) htmlOriginal = await htmlRes.text();
+      }
+      if (htmlOriginal) {
+        const htmlRenderizado = renderHtmlComVariaveis(htmlOriginal, variaveisTemplate, input.variaveis);
+        const blobTokenHtml = process.env.BLOB_READ_WRITE_TOKEN;
+        if (blobTokenHtml) {
+          const htmlBlob = await put(`gerador-documentos/documentos-html/${ctx.userId}/${documento.id}.html`, Buffer.from(htmlRenderizado, "utf-8"), {
+            access: "public",
+            addRandomSuffix: false,
+            token: blobTokenHtml,
+            contentType: "text/html",
+          });
+          htmlUrl = htmlBlob.url;
+          try {
+            await db.$executeRaw`UPDATE "DocumentoGerado" SET "htmlUrl" = ${htmlUrl} WHERE "id" = ${documento.id}`;
+          } catch {
+            // Sem a coluna opcional, o HTML continua recuperável pela URL irmã do PDF.
+          }
 
-            // HTML→PDF (RM-2026-94CBF6 Fase 3): gera PDF mais fiel a partir do HTML
-            // Se o PDF baseado em cláusulas já foi gerado acima, este substitui (mais fiel).
-            // Se falhar, mantém o PDF anterior (best-effort).
-            if (!estiloDocx) {
-              try {
-                const bufferPdfHtml = await renderHtmlParaPdf(htmlRenderizado);
-                const blobPdfHtml = await put(`gerador-documentos/documentos-pdf/${ctx.userId}/${documento.id}.pdf`, bufferPdfHtml, {
-                  access: "public",
-                  addRandomSuffix: false,
-                  token: blobTokenHtml,
-                });
-                pdfUrl = blobPdfHtml.url;
-                await db.documentoGerado.update({ where: { id: documento.id }, data: { pdfUrl } });
-              } catch (pdfHtmlErr) {
-                console.warn("[GeradorDocumentos] Falha na renderização HTML→PDF (mantém PDF anterior):", pdfHtmlErr);
-              }
+          // HTML→PDF (RM-2026-94CBF6 Fase 3): gera PDF mais fiel a partir do HTML
+          // Se o PDF baseado em cláusulas já foi gerado acima, este substitui (mais fiel).
+          // Se falhar, mantém o PDF anterior (best-effort).
+          if (!estiloDocx) {
+            try {
+              const bufferPdfHtml = await renderHtmlParaPdf(htmlRenderizado);
+              const blobPdfHtml = await put(`gerador-documentos/documentos-pdf/${ctx.userId}/${documento.id}.pdf`, bufferPdfHtml, {
+                access: "public",
+                addRandomSuffix: false,
+                token: blobTokenHtml,
+              });
+              pdfUrl = blobPdfHtml.url;
+              await db.documentoGerado.update({ where: { id: documento.id }, data: { pdfUrl } });
+            } catch (pdfHtmlErr) {
+              console.warn("[GeradorDocumentos] Falha na renderização HTML→PDF (mantém PDF anterior):", pdfHtmlErr);
             }
           }
         }
@@ -804,9 +831,11 @@ export async function ReescreverClasulaComIA(payload: unknown) {
       where: { id: documento.templateId },
       select: { arquivoOrigemUrl: true, arquivoOrigemNome: true },
     });
-    const estiloDocx = /\.docx$/i.test(templateOrigem?.arquivoOrigemNome ?? "")
-      ? await carregarEstiloDocxPdf(templateOrigem?.arquivoOrigemUrl)
-      : undefined;
+    const estiloDocx = documento.templateId === CONTRATO_PADRAO_ID
+      ? (await carregarContratoPadrao()).estiloDocx
+      : /\.docx$/i.test(templateOrigem?.arquivoOrigemNome ?? "")
+        ? await carregarEstiloDocxPdf(templateOrigem?.arquivoOrigemUrl)
+        : undefined;
     const bufferPdf = estiloDocx
       ? await gerarPdfDocumento({ titulo: documento.titulo, clausulas: clausulasAtualizadas, estiloDocx })
       : await renderHtmlParaPdf(htmlAtualizado);
@@ -856,6 +885,7 @@ export async function FinalizarDocumento(documentoId: string) {
     const documento = await db.documentoGerado.findUnique({
       where: { id: documentoId },
       select: {
+        templateId: true,
         titulo: true,
         pdfUrl: true,
         variaveisJson: true,
@@ -865,11 +895,10 @@ export async function FinalizarDocumento(documentoId: string) {
     });
     if (!documento) return { success: false as const, error: "Documento não encontrado" };
 
-    const variaveisTemplate = parseVariaveisJson(documento.template.variaveisJson);
-    const valores = z
-      .record(z.string(), z.union([z.string(), z.number(), z.boolean()]).nullable())
-      .safeParse(documento.variaveisJson);
-    const faltando = validarVariaveisObrigatorias(variaveisTemplate, valores.success ? valores.data : {});
+    const valoresSalvos = z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]).nullable()).safeParse(documento.variaveisJson);
+    const usaContratoPadrao = documento.templateId === CONTRATO_PADRAO_ID && valoresSalvos.success && valoresSalvos.data.__modeloContratoPadrao === "docx-v1";
+    const variaveisTemplate = usaContratoPadrao ? VARIAVEIS_CONTRATO_PADRAO : parseVariaveisJson(documento.template.variaveisJson);
+    const faltando = validarVariaveisObrigatorias(variaveisTemplate, valoresSalvos.success ? valoresSalvos.data : {});
     if (faltando.length > 0) {
       return { success: false as const, error: `Variáveis obrigatórias ausentes: ${faltando.join(", ")}` };
     }
@@ -887,9 +916,11 @@ export async function FinalizarDocumento(documentoId: string) {
       // Compatibilidade enquanto a coluna aditiva htmlUrl não existir no ambiente.
     }
     htmlUrl ??= derivarHtmlUrlDoPdf(documento.pdfUrl);
-    const estiloDocx = /\.docx$/i.test(documento.template.arquivoOrigemNome ?? "")
-      ? await carregarEstiloDocxPdf(documento.template.arquivoOrigemUrl)
-      : undefined;
+    const estiloDocx = usaContratoPadrao
+      ? (await carregarContratoPadrao()).estiloDocx
+      : /\.docx$/i.test(documento.template.arquivoOrigemNome ?? "")
+        ? await carregarEstiloDocxPdf(documento.template.arquivoOrigemUrl)
+        : undefined;
     if (estiloDocx) {
       bufferPdf = await gerarPdfDocumento({ titulo: documento.titulo, clausulas: documento.clausulas, estiloDocx });
     } else if (htmlUrl) {

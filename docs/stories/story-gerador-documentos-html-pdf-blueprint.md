@@ -370,17 +370,35 @@ O renderer preserva a estrutura reconhecível pelo HTML do Tika, mas não reprod
 - [x] Se a fonte P052 não estiver disponível ou falhar na função publicada, repetir o PDF com fonte interna preservando a logo.
 - [x] Registrar a falha de geração/finalização e avisar quando o rascunho ficar sem PDF.
 
+### Contrato padrão compartilhado (2026-09-25)
+
+- [x] Usar `docs/CONTRATO DE PRESTAÇÃO DE SERVIÇOS.docx` como fonte do texto, cabeçalho e fonte do contrato padrão.
+- [x] Oferecer o contrato padrão a todos os usuários com acesso ao Gerador de Documentos.
+- [x] Preservar os documentos existentes e os demais templates; impedir edição e arquivamento do modelo compartilhado.
+- [x] Preencher dados do contratante, valores e data por campos editáveis na geração.
+- [x] Validar cláusulas, logo e geração de PDF em teste automatizado.
+- [x] Isolar o teste unitário de Notas do banco real para executar o gate `npm test` sem conexão externa.
+
 ### File List
 
 - `src/lib/gerador-documentos/docx-style.ts`
 - `src/lib/gerador-documentos/pdf.tsx`
+- `src/lib/gerador-documentos/contrato-padrao.ts`
+- `src/lib/gerador-documentos/contrato-padrao-id.ts`
+- `src/lib/gerador-documentos/ownership.ts`
 - `src/actions/gerador-documentos.ts`
 - `src/components/GeradorDocumentos/GerarDocumentoForm.tsx`
+- `src/components/GeradorDocumentos/GeradorDocumentosClient.tsx`
+- `src/app/PainelAlpha/GeradorDocumentos/[templateId]/page.tsx`
+- `docs/CONTRATO DE PRESTAÇÃO DE SERVIÇOS.docx`
 - `public/fonts/gerador-documentos/P052-Roman.otf`
 - `public/fonts/gerador-documentos/P052-Bold.otf`
 - `public/fonts/gerador-documentos/P052-Italic.otf`
 - `public/fonts/gerador-documentos/LICENSE-URW.txt`
 - `next.config.ts`
+- `tests/gerador-documentos/contrato-padrao.test.ts`
+- `tests/gerador-documentos/ownership.test.ts`
+- `tests/notas/acesso-e-lixeira.test.ts`
 - `tests/gerador-documentos/docx-style.test.ts`
 - `tests/gerador-documentos/pdf-fallback.test.ts`
 - `tests/gerador-documentos/reescrever-clausula.test.ts`

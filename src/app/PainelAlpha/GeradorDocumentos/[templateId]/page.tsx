@@ -4,6 +4,7 @@ import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
 import { isAdminRole } from "@/lib/roles";
 import { ObterTemplateDocumento } from "@/actions/gerador-documentos";
 import { TemplateDetalheClient } from "@/components/GeradorDocumentos/TemplateDetalheClient";
+import { CONTRATO_PADRAO_ID } from "@/lib/gerador-documentos/contrato-padrao-id";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export default async function TemplateDetalhePage({
 
   const resultado = await ObterTemplateDocumento(templateId);
   if (!resultado.success) notFound();
+  if (templateId === CONTRATO_PADRAO_ID) redirect(`/PainelAlpha/GeradorDocumentos/gerar?templateId=${templateId}`);
 
   return <TemplateDetalheClient template={resultado.data} />;
 }
