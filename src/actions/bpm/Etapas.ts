@@ -52,23 +52,24 @@ export async function CriarEtapaBpm(dados: unknown) {
     const etapa = await db.$transaction(async (tx) => {
       await exigirAcessoConfigPipeline(userId, "configurarEtapas", tx);
       const existentes = await tx.bpmEtapa.findMany({
-        where: { pipelineId },
-        select: { id: true },
+        where: { pipelineId, ativo: true },
+        select: { id: true, ehFinal: true },
       });
       const criada = await tx.bpmEtapa.create({ data: { pipelineId, nome, ordem, cor } });
       if (existentes.length > 0) {
+        const transicoes = existentes.flatMap(({ id, ehFinal }) => [
+          { pipelineId, etapaOrigemId: criada.id, etapaDestinoId: id, permitida: true, origem: "AMBOS" },
+          ...(!ehFinal ? [{ pipelineId, etapaOrigemId: id, etapaDestinoId: criada.id, permitida: true, origem: "AMBOS" }] : []),
+        ]);
         await tx.bpmTransicaoEtapa.createMany({
-          data: existentes.flatMap(({ id }) => [
-            { pipelineId, etapaOrigemId: criada.id, etapaDestinoId: id, permitida: false, origem: "AMBOS" },
-            { pipelineId, etapaOrigemId: id, etapaDestinoId: criada.id, permitida: false, origem: "AMBOS" },
-          ]),
+          data: transicoes,
         });
       }
       await registrarAuditoriaPipeline(tx, {
         pipelineId,
         adminId: userId,
         campoAlterado: "etapa_criada",
-        valorNovoJson: JSON.stringify({ nome, ordem, cor, transicoesBloqueadasCriadas: existentes.length * 2 }),
+        valorNovoJson: JSON.stringify({ nome, ordem, cor, transicoesPermitidasCriadas: existentes.length + existentes.filter((etapa) => !etapa.ehFinal).length }),
       });
       await avancarConfigVersionBpm(tx, pipelineId);
       return criada;

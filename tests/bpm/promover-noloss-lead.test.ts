@@ -29,6 +29,7 @@ import { PromoverNolossLead } from "@/actions/bpm/NolossLeads";
 
 const NOLOSS_LEAD_ID = "clw0000000000000lead";
 const ETAPA_ID = "clw0000000000000etap";
+const ETAPA_UI_ID = "draft-stage-3dc45c6e-2b99-4fd7-bb41-0adfd47ba162";
 const PIPELINE_ID = "clw0000000000000pipe";
 
 function mockTransacaoFeliz() {
@@ -92,6 +93,30 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
       cardId: "card-1",
       tipo: "CARD_CRIADO",
     });
+  });
+
+  it("promove o lead para uma etapa criada pela UI", async () => {
+    prismaMock.bpmEtapa.findFirst.mockResolvedValue({ id: ETAPA_UI_ID, visibilidades: [] });
+    prismaMock.nolossLead.findUnique.mockResolvedValue({
+      id: NOLOSS_LEAD_ID, status: "pending", nome: "Lead Teste", email: null,
+    });
+    prismaMock.nolossLead.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.cliente.create.mockResolvedValue({ id: 501 });
+    prismaMock.bpmCard.create.mockResolvedValue({ id: "card-1" });
+
+    const resultado = await PromoverNolossLead({
+      nolossLeadId: NOLOSS_LEAD_ID,
+      etapaDestinoId: ETAPA_UI_ID,
+      responsavelId: 7,
+    });
+
+    expect(resultado.success).toBe(true);
+    expect(prismaMock.bpmEtapa.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: ETAPA_UI_ID, pipelineId: PIPELINE_ID, ativo: true },
+    }));
+    expect(prismaMock.bpmCard.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ etapaId: ETAPA_UI_ID }),
+    }));
   });
 
   it("rejeita quando o lead já foi processado (status !== pending)", async () => {

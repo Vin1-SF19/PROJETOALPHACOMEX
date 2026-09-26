@@ -21,6 +21,8 @@ Pedido explícito do usuário nesta conversa: a movimentação de `Novo Lead` pa
 5. A interface e a ação de servidor apresentam a mesma decisão de permissão para mover; não mostram exigência hardcoded que o servidor já não aplica.
 6. Testes cobrem o caso `Novo Lead` → `Agendar Reunião`, outra movimentação sem configuração obrigatória, uma exigência configurada pela UI e as guardas de autorização/integridade. Gates: `npm run lint`, `npm run typecheck`, `npm test` e `npm run build`.
 7. IDs `draft-stage-<uuid>` criados pela UI são aceitos nos dois caminhos de movimentação; IDs inválidos são rejeitados com mensagem legível. A verificação de pertinência ao pipeline e de transição permitida continua no servidor.
+8. As etapas de trabalho da Revisão de Radar podem mover cards para qualquer outra etapa ativa; Fechado, Lost, Sem viabilidade, Stand By e Monitoramento são saídas sem movimento de saída. Transições legadas bloqueadas desse pipeline são removidas ou liberadas no banco após o protocolo Vault; novas etapas usam `ehFinal` configurado pela UI para definir saídas, sem mapa fixo por nome.
+9. A promoção de lead virtual NoLoss aceita as etapas atuais `draft-stage-<uuid>`, preserva autorização e verificação do destino e mostra erros de entrada legíveis.
 
 ## Checklist
 
@@ -29,12 +31,14 @@ Pedido explícito do usuário nesta conversa: a movimentação de `Novo Lead` pa
 - [x] Preservar e verificar configurações explícitas, autorização, integridade e histórico (AC 3, 4).
 - [x] Executar testes focados, lint, typecheck e suíte completa; atualizar critérios, checklist e File List (AC 6).
 - [x] Aceitar IDs de etapa criados pela UI ao mover e devolver erro legível na validação (AC 7).
+- [x] Liberar a matriz de transições da Revisão de Radar preservando as cinco saídas, após relatório Vault, backup e confirmação específica (AC 8).
+- [x] Corrigir promoção NoLoss, cobrir os casos e atualizar File List e gates (AC 9).
 
 ## Notas para implementação
 
 - Pedido atual substitui, para movimentação, exigências antigas vinculadas ao nome da etapa. Não remover a capacidade de configurar e exigir regras pela UI.
 - Consultar as stories `story-alpha-crm-formulario-unificado-por-etapa.md` e `story-alpha-crm-configuracoes-centralizadas-editor-card.md` para o formulário por etapa e sua configuração. Identificar os pontos exatos de código durante a implementação.
-- Esta story não pede alteração de schema, migration, seed, backfill ou mutação em massa.
+- Não há alteração de schema, migration ou seed. A limpeza pontual das transições persistidas da Revisão de Radar segue o protocolo Vault de backup, relatório e confirmação específica.
 
 ## Verificação de qualidade planejada
 
@@ -50,6 +54,11 @@ Pedido explícito do usuário nesta conversa: a movimentação de `Novo Lead` pa
 - `src/lib/validations/bpm.ts` — aceita IDs de etapas criadas pela UI nos schemas de movimentação.
 - `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx` — arrastar não exige próximo contato fixo.
 - `tests/bpm/movimentacao-sem-hardcode.test.ts` — prévia livre, requisitos configurados e IDs de etapa da UI.
+- `src/actions/bpm/Etapas.ts` — novas etapas recebem transições permitidas para etapas ativas, sem criar saída de etapas finais.
+- `src/actions/bpm/NolossLeads.ts` — devolve erro de validação legível na promoção.
+- `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/AdminPipelineClient.tsx` — rascunho de nova etapa segue o mesmo padrão de transições.
+- `tests/bpm/pipelines-etapas-admin.test.ts` — cobre criação de etapa com saída final protegida.
+- `tests/bpm/promover-noloss-lead.test.ts` — cobre promoção para etapa criada pela UI.
 
 ## Resultado da verificação
 
@@ -58,6 +67,9 @@ Pedido explícito do usuário nesta conversa: a movimentação de `Novo Lead` pa
 - `npm run typecheck`: passou.
 - `npm test`: 531/531 arquivos; 3925 testes passaram, 4 ignorados e 1 pendente. Uma execução anterior no sandbox falhou em 4 testes de CLI por `EPERM` ao criar subprocessos/socket; a execução fora do sandbox passou.
 - `npm run build`: compilação Webpack passou; execução interrompida durante a coleta de dados das páginas a pedido do usuário para avançar ao commit e push.
+- Nesta revisão: testes focados 44/44, `npm run typecheck` passou, `npm run lint` passou (0 erros, 1193 avisos), `npm test` passou e `npm run build` concluiu 78 páginas estáticas.
+- Vault: backup completo pré-alteração de 169.657.541 bytes, 332 tabelas e 179.616 linhas, SHA-256 `2854d3feac31f67bd5412e43cc6b8f87b6b9946834d0d401c3260fccc82ccafb`, verificado antes da execução e mantido fora do Git em `database-backups/pre-change/`.
+- Turso de produção: confirmação específica recebida; transação 8→9 aplicada com 16 passagens liberadas, 39 bloqueios sem histórico removidos, passagem histórica de Sem viabilidade desativada e Fechado marcado final. Consulta posterior confirmou 33 transições, 32 permitidas, 1 desativada com histórico e nenhuma saída permitida das cinco etapas finais.
 
 ## Validação do rascunho
 
@@ -70,3 +82,5 @@ Pedido explícito do usuário nesta conversa: a movimentação de `Novo Lead` pa
 | 2026-09-26 | 0.1 | Story criada a partir do pedido explícito do usuário | River (SM) |
 | 2026-09-26 | 0.2 | Removidos bloqueios fixos de movimentação e verificados testes, lint e typecheck | Codex |
 | 2026-09-26 | 0.3 | Corrigida validação dos IDs draft-stage e mensagem de erro de movimentação | Codex |
+| 2026-09-26 | 0.4 | Corrigida promoção NoLoss para etapas da UI e abertura padrão de transições em novas etapas, respeitando etapas finais | Codex |
+| 2026-09-26 | 0.5 | Limpeza transacional das transições legadas da Revisão de Radar após protocolo Vault e confirmação específica | Codex |

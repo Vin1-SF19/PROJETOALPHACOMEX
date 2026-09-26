@@ -191,17 +191,19 @@ describe("Etapas admin — ativar/desativar, inicial e finais", () => {
     expect(mocks.etapaUpdate).toHaveBeenCalledWith({ where: { id: ETAPA_A }, data: { ativo: false } });
   });
 
-  it("cria etapa com arestas explícitas bloqueadas nos dois sentidos", async () => {
-    mocks.etapaFindMany.mockResolvedValue([{ id: ETAPA_A }, { id: ETAPA_B }]);
+  it("cria transições livres sem abrir saída de uma etapa final", async () => {
+    mocks.etapaFindMany.mockResolvedValue([{ id: ETAPA_A, ehFinal: false }, { id: ETAPA_B, ehFinal: true }]);
     mocks.etapaCreate.mockResolvedValue({ id: "clw00000000000000etapan", pipelineId: PIPELINE_ID, nome: "Nova" });
     const result = await CriarEtapaBpm({ pipelineId: PIPELINE_ID, nome: "Nova", ordem: 2 });
     expect(result).toMatchObject({ success: true });
     expect(mocks.transicaoCreateMany).toHaveBeenCalledWith({
       data: expect.arrayContaining([
-        expect.objectContaining({ etapaOrigemId: "clw00000000000000etapan", etapaDestinoId: ETAPA_A, permitida: false }),
-        expect.objectContaining({ etapaOrigemId: ETAPA_A, etapaDestinoId: "clw00000000000000etapan", permitida: false }),
+        expect.objectContaining({ etapaOrigemId: "clw00000000000000etapan", etapaDestinoId: ETAPA_A, permitida: true }),
+        expect.objectContaining({ etapaOrigemId: ETAPA_A, etapaDestinoId: "clw00000000000000etapan", permitida: true }),
+        expect.objectContaining({ etapaOrigemId: "clw00000000000000etapan", etapaDestinoId: ETAPA_B, permitida: true }),
       ]),
     });
+    expect(mocks.transicaoCreateMany.mock.calls[0][0].data).toHaveLength(3);
   });
 
   it("reverte a alteração inteira quando a auditoria obrigatória falha", async () => {

@@ -24,7 +24,7 @@ export async function PromoverNolossLead(dados: unknown) {
     const userId = Number(session.user.id);
 
     const parsed = promoverNolossLeadSchema.safeParse(dados);
-    if (!parsed.success) return { success: false, error: parsed.error.flatten() };
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos para promover lead" };
     const { nolossLeadId, etapaDestinoId, responsavelId } = parsed.data;
 
     const pipeline = await obterPipelineRevisaoRadar();

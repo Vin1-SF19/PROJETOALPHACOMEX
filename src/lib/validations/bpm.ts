@@ -437,7 +437,7 @@ export const salvarRequisitosEMoverCardSchema = moverCardSchema.extend({
 
 export const promoverNolossLeadSchema = z.object({
   nolossLeadId: z.string().cuid(),
-  etapaDestinoId: z.string().cuid(),
+  etapaDestinoId: etapaIdCardSchema,
   responsavelId: z.number().int().positive(),
 });
 

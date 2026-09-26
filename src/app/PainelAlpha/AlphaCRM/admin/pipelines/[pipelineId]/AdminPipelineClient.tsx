@@ -330,24 +330,24 @@ export default function AdminPipelineClient({
       subStatus: [],
       formulario: null,
     };
-    const bloqueadas: TransicaoBpm[] = etapas.flatMap((etapa) => [
+    const permitidas: TransicaoBpm[] = etapas.filter((etapa) => etapa.ativo).flatMap((etapa) => [
       {
         id: `draft-${crypto.randomUUID()}`,
         etapaOrigemId: id,
         etapaDestinoId: etapa.id,
-        permitida: false,
+        permitida: true,
         origem: "AMBOS",
       },
-      {
+      ...(!etapa.ehFinal ? [{
         id: `draft-${crypto.randomUUID()}`,
         etapaOrigemId: etapa.id,
         etapaDestinoId: id,
-        permitida: false,
-        origem: "AMBOS",
-      },
+        permitida: true,
+        origem: "AMBOS" as const,
+      }] : []),
     ]);
     setEtapas((prev) => [...prev, nova]);
-    setTransicoes((prev) => [...prev, ...bloqueadas]);
+    setTransicoes((prev) => [...prev, ...permitidas]);
     setNovaEtapaNome("");
     setConflitoPublicacao(false);
     toast.success("Etapa adicionada ao rascunho; configure o fluxo e publique");
