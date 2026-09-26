@@ -23,7 +23,9 @@ export function normalizarNomeEtapa(nome: string): string {
 }
 
 export function etapaEhNovosLeads(nome: string): boolean {
-  return normalizarNomeEtapa(nome) === normalizarNomeEtapa(NOME_ETAPA_NOVOS_LEADS);
+  const nomeNormalizado = normalizarNomeEtapa(nome);
+  return nomeNormalizado === normalizarNomeEtapa(NOME_ETAPA_NOVOS_LEADS)
+    || nomeNormalizado === "novo lead";
 }
 
 export function etapaEhStandbyFollowUp(nome: string): boolean {

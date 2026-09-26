@@ -26,7 +26,7 @@ beforeEach(async () => {
   document.body.append(container);
   root = createRoot(container);
   await act(async () => root.render(createElement(NovoCardModal, {
-    pipelineId: "pipeline", etapaId: "etapa", currentUserId: 1, accent: "1,2,3",
+    pipelineId: "pipeline", etapaId: "etapa", etapaNome: "Novo Lead", currentUserId: 1, accent: "1,2,3",
     onClose: vi.fn(), onCriado: vi.fn(async () => ({ success: true as const })),
   })));
 });
@@ -51,4 +51,8 @@ it("não sobrescreve a razão social editada após iniciar a busca de CNPJ", asy
 
   expect(document.querySelector<HTMLInputElement>('input[aria-label="Razão social"]')?.value).toBe("Nome digitado");
   expect(document.querySelector<HTMLInputElement>('input[aria-label="Nome fantasia"]')?.value).toBe("");
+});
+
+it("mostra o nome configurado da etapa no cadastro", () => {
+  expect(container.textContent).toContain("Novo Lead");
 });

@@ -579,7 +579,7 @@ function KanbanColumn({
           <button
             type="button"
             onClick={onAdd}
-            aria-label="Criar card em Novos Leads"
+            aria-label={`Criar card em ${etapa.nome}`}
             className="p-1 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-colors"
           >
             <Plus size={13} aria-hidden="true" />
@@ -1137,6 +1137,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
         <NovoCardModal
           pipelineId={pipeline.id}
           etapaId={etapaNovosLeads.id}
+          etapaNome={etapaNovosLeads.nome}
           currentUserId={currentUserId}
           accent={accent}
           onClose={() => setNovoCardAberto(false)}

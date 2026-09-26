@@ -454,10 +454,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
       await notificarPipelineBpm({ pipelineId, tipo: "SLA_STATUS_ALTERADO" });
     }
     const { inicio, fim } = intervaloDiaCivilSaoPaulo(agora);
-    const etapaNovosLeads = await db.bpmEtapa.findFirst({
-      where: { pipelineId, nome: "Novos leads", ativo: true },
-      select: { id: true },
-    });
+    const etapaNovosLeads = pipelineInfo?.etapas.find((etapa) => etapaEhNovosLeads(etapa.nome));
     const cardsNovosLeads = etapaNovosLeads
       ? cards.filter((card) => card.etapaId === etapaNovosLeads.id)
       : [];

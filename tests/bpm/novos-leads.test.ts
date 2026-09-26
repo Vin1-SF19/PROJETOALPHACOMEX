@@ -6,6 +6,7 @@ import {
   calcularLigacoesPendentesNoDia,
   cicloNovosLeadsVencido,
   contarDiasUteisDecorridos,
+  etapaEhNovosLeads,
   intervaloDiaCivilSaoPaulo,
 } from "@/lib/bpm/novos-leads";
 import {
@@ -14,6 +15,12 @@ import {
 } from "@/lib/bpm/requisitos-etapa";
 
 describe("requisitos de Novos leads", () => {
+  it("reconhece a etapa inicial recriada como Novo Lead sem aceitar outras etapas", () => {
+    expect(etapaEhNovosLeads("Novo Lead")).toBe(true);
+    expect(etapaEhNovosLeads("Novos leads")).toBe(true);
+    expect(etapaEhNovosLeads("Sem viabilidade")).toBe(false);
+  });
+
   const campos = [
     { id: "campo_nome", nome: "Nome do responsável" },
     { id: "campo_cnpj", nome: "CNPJ" },
