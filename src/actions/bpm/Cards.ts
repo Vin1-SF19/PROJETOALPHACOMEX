@@ -1585,7 +1585,7 @@ export async function SalvarRequisitosEMoverCardBpm(dados: unknown) {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
     const parsed = salvarRequisitosEMoverCardSchema.safeParse(dados);
-    if (!parsed.success) return { success: false, error: parsed.error.flatten() };
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos para mover o card" };
     return await executarMovimentoCanonico(
       { ...parsed.data, origemMovimentacao: "MANUAL" },
       Number(session.user.id),
@@ -1609,7 +1609,7 @@ export async function MoverCardBpm(dados: unknown) {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
     const parsed = moverCardSchema.safeParse(dados);
-    if (!parsed.success) return { success: false, error: parsed.error.flatten() };
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos para mover o card" };
     return await executarMovimentoCanonico(
       { ...parsed.data, camposValores: {}, origemMovimentacao: "MANUAL" },
       Number(session.user.id),

@@ -20,6 +20,7 @@ Pedido explícito do usuário nesta conversa: a movimentação de `Novo Lead` pa
 4. A movimentação continua a verificar autorização do usuário, existência e pertinência do card, pipeline e etapas, e integridade dos dados e do histórico.
 5. A interface e a ação de servidor apresentam a mesma decisão de permissão para mover; não mostram exigência hardcoded que o servidor já não aplica.
 6. Testes cobrem o caso `Novo Lead` → `Agendar Reunião`, outra movimentação sem configuração obrigatória, uma exigência configurada pela UI e as guardas de autorização/integridade. Gates: `npm run lint`, `npm run typecheck`, `npm test` e `npm run build`.
+7. IDs `draft-stage-<uuid>` criados pela UI são aceitos nos dois caminhos de movimentação; IDs inválidos são rejeitados com mensagem legível. A verificação de pertinência ao pipeline e de transição permitida continua no servidor.
 
 ## Checklist
 
@@ -27,6 +28,7 @@ Pedido explícito do usuário nesta conversa: a movimentação de `Novo Lead` pa
 - [x] Remover os bloqueios hardcoded na ação de servidor e alinhar a interface (AC 1, 2, 5).
 - [x] Preservar e verificar configurações explícitas, autorização, integridade e histórico (AC 3, 4).
 - [x] Executar testes focados, lint, typecheck e suíte completa; atualizar critérios, checklist e File List (AC 6).
+- [x] Aceitar IDs de etapa criados pela UI ao mover e devolver erro legível na validação (AC 7).
 
 ## Notas para implementação
 
@@ -45,16 +47,17 @@ Pedido explícito do usuário nesta conversa: a movimentação de `Novo Lead` pa
 - `docs/stories/story-alpha-crm-movimentacao-sem-obrigatoriedades-hardcoded.md` — critérios, checklist e resultados.
 - `src/actions/bpm/Cards.ts` — prévia sem guardas por nome de etapa.
 - `src/lib/bpm/transicao-command.ts` — remove obrigatoriedades fixas de contato, reunião, transcrição e follow-up; mantém regras persistidas.
+- `src/lib/validations/bpm.ts` — aceita IDs de etapas criadas pela UI nos schemas de movimentação.
 - `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx` — arrastar não exige próximo contato fixo.
-- `tests/bpm/movimentacao-sem-hardcode.test.ts` — prévia livre e requisitos configurados.
+- `tests/bpm/movimentacao-sem-hardcode.test.ts` — prévia livre, requisitos configurados e IDs de etapa da UI.
 
 ## Resultado da verificação
 
-- Teste focado: 3/3 passaram.
+- Teste focado: 5/5 passaram.
 - `npm run lint`: 0 erros; 1193 avisos preexistentes.
 - `npm run typecheck`: passou.
-- `npm test`: 531/531 arquivos; 3923 testes passaram, 4 ignorados e 1 pendente. A primeira execução no sandbox falhou em 4 testes de CLI por `EPERM` ao criar subprocessos/socket; a execução fora do sandbox passou.
-- `npm run build`: iniciado, sem resultado confirmado devido à interrupção da execução a pedido do usuário para avançar ao commit.
+- `npm test`: 531/531 arquivos; 3925 testes passaram, 4 ignorados e 1 pendente. Uma execução anterior no sandbox falhou em 4 testes de CLI por `EPERM` ao criar subprocessos/socket; a execução fora do sandbox passou.
+- `npm run build`: compilação Webpack passou; execução interrompida durante a coleta de dados das páginas a pedido do usuário para avançar ao commit e push.
 
 ## Validação do rascunho
 
@@ -66,3 +69,4 @@ Pedido explícito do usuário nesta conversa: a movimentação de `Novo Lead` pa
 | --- | --- | --- | --- |
 | 2026-09-26 | 0.1 | Story criada a partir do pedido explícito do usuário | River (SM) |
 | 2026-09-26 | 0.2 | Removidos bloqueios fixos de movimentação e verificados testes, lint e typecheck | Codex |
+| 2026-09-26 | 0.3 | Corrigida validação dos IDs draft-stage e mensagem de erro de movimentação | Codex |

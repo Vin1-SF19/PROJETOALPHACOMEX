@@ -23,7 +23,8 @@ vi.mock("@/lib/bpm/campos-formulario-publicado", () => ({
 }));
 vi.mock("@/lib/bpm/checklists/integracao", () => ({ obterErroChecklistParaMovimento: checklistMock }));
 
-import { ObterRequisitosTransicaoBpm } from "@/actions/bpm/Cards";
+import { MoverCardBpm, ObterRequisitosTransicaoBpm } from "@/actions/bpm/Cards";
+import { moverCardSchema, salvarRequisitosEMoverCardSchema } from "@/lib/validations/bpm";
 
 const origemId = "draft-stage-314cef39-2827-4d96-bc97-15e263066088";
 const destinoId = "draft-stage-414cef39-2827-4d96-bc97-15e263066088";
@@ -72,5 +73,24 @@ describe("prévia de movimentação configurada pela UI", () => {
 
     const resultado = await ObterRequisitosTransicaoBpm("card", destinoId);
     expect(resultado).toMatchObject({ success: true, data: { podeMover: false, guardas: ["Conclua o checklist configurado."] } });
+  });
+});
+
+describe("IDs de etapas criadas pela UI", () => {
+  it("aceita destino e origem draft-stage nos dois caminhos de movimentação", () => {
+    const dados = {
+      cardId: "cmuijhi6i00000agmrwfktmht",
+      etapaOrigemEsperadaId: origemId,
+      etapaDestinoId: destinoId,
+    };
+    expect(moverCardSchema.safeParse(dados).success).toBe(true);
+    expect(salvarRequisitosEMoverCardSchema.safeParse(dados).success).toBe(true);
+  });
+
+  it("mantém erro legível para ID de etapa inválido", async () => {
+    authMock.mockResolvedValue({ user: { id: "7", role: "ADMINISTRADOR" } });
+    const resultado = await MoverCardBpm({ cardId: "cmuijhi6i00000agmrwfktmht", etapaDestinoId: "etapa-invalida" });
+    expect(resultado.success).toBe(false);
+    expect(typeof resultado.error).toBe("string");
   });
 });
