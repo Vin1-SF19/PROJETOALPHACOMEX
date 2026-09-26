@@ -108,6 +108,8 @@ export function AutomacaoCentralFormDialog({
   const acaoAtual = useMemo(() => primeiraAcao(grafoJson), [grafoJson]);
   const auditoriaAcao = acaoAtual ? obterAuditoriaAcao(acaoAtual.tipo) : null;
   const catalogoPipeline = catalogos.pipelines.find((item) => item.id === pipelineId);
+  const pipelinesDestino = useMemo(() => pipelines.filter((item) => item.ativo && item.id !== pipelineId && item.etapas.some((etapa) => etapa.ativo)), [pipelineId, pipelines]);
+  const pipelineDestino = pipelinesDestino.find((item) => item.id === acaoAtual?.parametros.pipelineId);
 
   function parametrosPadrao(tipo: TipoAcaoCentral): Record<string, unknown> {
     if (tipo === "GERAR_CONTRATO") return { templateId: templates[0]?.id ?? "", titulo: "Contrato — {{empresa.razaoSocial}}", variaveis: {} };
@@ -120,7 +122,10 @@ export function AutomacaoCentralFormDialog({
     if (tipo === "ENVIAR_EMAIL") return { para: "", assunto: "", corpo: "", cc: [] };
     if (tipo === "COMUNICACAO_EXISTENTE") return { canal: "EMAIL", mensagem: "", destinatario: "" };
     if (tipo === "HTTP" || tipo === "WEBHOOK") return { url: "https://", metodo: "POST", headers: {}, timeoutMs: 10_000 };
-    if (tipo === "CRIAR_CARD_OUTRO_PIPELINE") return { pipelineId, etapaId: pipeline?.etapas[0]?.id ?? "", vincularAoOriginal: true, somenteSeNaoExistirAtivo: false };
+    if (tipo === "CRIAR_CARD_OUTRO_PIPELINE") {
+      const destino = pipelinesDestino[0];
+      return { pipelineId: destino?.id ?? "", etapaId: destino?.etapas.find((etapa) => etapa.ativo)?.id ?? "", vincularAoOriginal: true, somenteSeNaoExistirAtivo: true };
+    }
     if (tipo === "CRIAR_TAREFAS_POR_META") return { meta: 1, interacaoTipo: "LIGACAO", tarefaTipo: "LIGACAO", titulo: "Ligação {{indice}}", prioridade: "NORMAL" };
     return {};
   }
@@ -161,6 +166,9 @@ export function AutomacaoCentralFormDialog({
       const etapaAncoraId = selecionadas[0] ?? pipeline?.etapas[0]?.id;
       if (!etapaAncoraId) return toast.error("O pipeline não possui etapa de referência");
       if (escopo === "ETAPAS" && selecionadas.length === 0) return toast.error("Selecione ao menos uma etapa");
+      if (acaoAtual?.tipo === "CRIAR_CARD_OUTRO_PIPELINE" && (!pipelineDestino || !pipelineDestino.etapas.some((etapa) => etapa.ativo && etapa.id === acaoAtual.parametros.etapaId))) {
+        return toast.error("Selecione outro pipeline e uma etapa de destino ativa");
+      }
       const payload = {
         automacaoId: automacao?.id,
         nome,
@@ -202,7 +210,7 @@ export function AutomacaoCentralFormDialog({
           <label className="text-xs text-slate-300 sm:col-span-2">Descrição<Input className="mt-1" value={descricao} onChange={(e) => setDescricao(e.target.value)} /></label>
           <label className="text-xs text-slate-300">Pipeline<Select value={pipelineId} onValueChange={(id) => { setPipelineId(id); setEtapasIds([]); }}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent>{pipelines.map((item) => <SelectItem key={item.id} value={item.id}>{item.nome}</SelectItem>)}</SelectContent></Select></label>
           <label className="text-xs text-slate-300">Escopo<Select value={escopo} onValueChange={(valor) => setEscopo(valor as typeof escopo)}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ETAPAS">Etapa(s) selecionada(s)</SelectItem><SelectItem value="GLOBAL_PIPELINE">Automação global do pipeline</SelectItem></SelectContent></Select></label>
-          {escopo === "ETAPAS" && <fieldset className="grid gap-2 rounded-xl border border-white/10 p-3 sm:col-span-2 sm:grid-cols-3"><legend className="px-1 text-xs text-slate-400">Etapas relacionadas</legend>{(pipeline?.etapas ?? []).map((etapa) => <label key={etapa.id} className="flex items-center gap-2 text-xs text-slate-200"><input type="checkbox" checked={etapasIds.includes(etapa.id)} onChange={(e) => alternarEtapa(etapa.id, e.target.checked)} />{etapa.nome}</label>)}</fieldset>}
+          {escopo === "ETAPAS" && <fieldset className="grid gap-2 rounded-xl border border-white/10 p-3 sm:col-span-2 sm:grid-cols-3"><legend className="px-1 text-xs text-slate-400">Etapas de origem do gatilho</legend>{(pipeline?.etapas ?? []).map((etapa) => <label key={etapa.id} className="flex items-center gap-2 text-xs text-slate-200"><input type="checkbox" checked={etapasIds.includes(etapa.id)} onChange={(e) => alternarEtapa(etapa.id, e.target.checked)} />{etapa.nome}</label>)}</fieldset>}
           <label className="text-xs text-slate-300">Gatilho<Select value={gatilhoTipo} onValueChange={setGatilhoTipo}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent>{GATILHOS.map((item) => <SelectItem key={item} value={item}>{item.replaceAll("_", " ")}</SelectItem>)}</SelectContent></Select></label>
           <label className="flex items-center justify-between rounded-xl border border-white/10 px-3 text-xs text-slate-300">Status <Switch checked={ativa} onCheckedChange={setAtiva} /></label>
 
@@ -265,6 +273,26 @@ export function AutomacaoCentralFormDialog({
               <div className="space-y-2 rounded-lg border border-white/[0.07] p-3"><label className="flex items-center justify-between gap-3 text-xs text-slate-300">Só mover sem próximo contato<Switch checked={acaoAtual.parametros.exigirProximoContatoVazio === true} onCheckedChange={(valor) => atualizarParametros({ exigirProximoContatoVazio: valor })} /></label></div>
             </div>}
 
+            {acaoAtual?.tipo === "CRIAR_CARD_OUTRO_PIPELINE" && <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-xs text-slate-300">Pipeline de destino
+                <Select value={pipelineDestino?.id ?? ""} onValueChange={(id) => {
+                  const destino = pipelinesDestino.find((item) => item.id === id);
+                  atualizarParametros({ pipelineId: id, etapaId: destino?.etapas.find((etapa) => etapa.ativo)?.id ?? "" });
+                }}>
+                  <SelectTrigger className="mt-1" aria-label="Pipeline de destino"><SelectValue placeholder="Selecione outro pipeline" /></SelectTrigger>
+                  <SelectContent>{pipelinesDestino.map((item) => <SelectItem key={item.id} value={item.id}>{item.nome}</SelectItem>)}</SelectContent>
+                </Select>
+              </label>
+              <label className="text-xs text-slate-300">Etapa de destino
+                <Select value={pipelineDestino?.etapas.some((etapa) => etapa.ativo && etapa.id === acaoAtual.parametros.etapaId) ? String(acaoAtual.parametros.etapaId) : ""} onValueChange={(id) => atualizarParametros({ etapaId: id })}>
+                  <SelectTrigger className="mt-1" aria-label="Etapa de destino do novo card"><SelectValue placeholder="Selecione a etapa" /></SelectTrigger>
+                  <SelectContent>{(pipelineDestino?.etapas ?? []).filter((etapa) => etapa.ativo).map((etapa) => <SelectItem key={etapa.id} value={etapa.id}>{etapa.nome}</SelectItem>)}</SelectContent>
+                </Select>
+              </label>
+              <label className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.07] p-3 text-xs text-slate-300">Vincular ao card de origem<Switch checked={acaoAtual.parametros.vincularAoOriginal !== false} onCheckedChange={(valor) => atualizarParametros({ vincularAoOriginal: valor })} /></label>
+              <label className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.07] p-3 text-xs text-slate-300">Evitar card ativo duplicado<Switch checked={acaoAtual.parametros.somenteSeNaoExistirAtivo === true} onCheckedChange={(valor) => atualizarParametros({ somenteSeNaoExistirAtivo: valor })} /></label>
+            </div>}
+
             {acaoAtual?.tipo === "ALTERAR_CAMPO" && <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-xs text-slate-300">Campo do pipeline<Select value={String(acaoAtual.parametros.campoId ?? "")} onValueChange={(valor) => atualizarParametros({ campoId: valor })}><SelectTrigger className="mt-1"><SelectValue placeholder="Selecione o campo" /></SelectTrigger><SelectContent>{(catalogoPipeline?.campos ?? []).map((campo) => <SelectItem key={campo.id} value={campo.id}>{campo.nome}</SelectItem>)}</SelectContent></Select></label>
               <label className="text-xs text-slate-300">Novo valor<Input className="mt-1" value={String(acaoAtual.parametros.valor ?? "")} onChange={(event) => atualizarParametros({ valor: event.target.value })} /></label>
@@ -294,7 +322,7 @@ export function AutomacaoCentralFormDialog({
 
             {acaoAtual && ![
               "GERAR_CONTRATO", "GERAR_FICHA", "MATERIALIZAR_CHECKLIST", "SINCRONIZAR_TRANSCRICAO_REUNIAO", "MARCAR_ALERTA_TAREFA",
-              "ADICIONAR_ANOTACAO", "CRIAR_ALERTA", "MOVER_CARD", "ALTERAR_CAMPO", "ATRIBUIR_RESPONSAVEL", "CRIAR_TAREFA", "ENVIAR_EMAIL", "HTTP", "WEBHOOK",
+              "ADICIONAR_ANOTACAO", "CRIAR_ALERTA", "MOVER_CARD", "CRIAR_CARD_OUTRO_PIPELINE", "ALTERAR_CAMPO", "ATRIBUIR_RESPONSAVEL", "CRIAR_TAREFA", "ENVIAR_EMAIL", "HTTP", "WEBHOOK",
             ].includes(acaoAtual.tipo) && <p className="rounded-lg border border-amber-400/15 bg-amber-400/[0.04] p-3 text-xs text-amber-100">A ação existe no Motor, mas possui uma configuração composta. Use o modo avançado abaixo para seus parâmetros específicos.</p>}
           </section>
 

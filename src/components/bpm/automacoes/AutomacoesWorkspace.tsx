@@ -119,7 +119,7 @@ function dataCurta(valor: string | null) {
   }).format(new Date(valor));
 }
 
-function resumoConfiguracao(automacao: AutomacaoBpmView, catalogos: CatalogosAutomacao) {
+function resumoConfiguracao(automacao: AutomacaoBpmView, catalogos: CatalogosAutomacao, pipelines: PipelineAutomacaoView[]) {
   try {
     const parametros = JSON.parse(automacao.parametrosJson) as Record<string, unknown>;
     if (automacao.acaoTipo === "DISTRIBUIR_RESPONSAVEL") {
@@ -133,6 +133,11 @@ function resumoConfiguracao(automacao: AutomacaoBpmView, catalogos: CatalogosAut
         ? String(parametros.acao.tipo).replaceAll("_", " ").toLocaleLowerCase("pt-BR")
         : "executar ação configurada";
       return `SE as condições forem atendidas e o cliente não possuir ${servico?.nome ?? "o serviço alvo"}, ENTÃO ${acao}.`;
+    }
+    if (automacao.acaoTipo === "CRIAR_CARD_OUTRO_PIPELINE") {
+      const destino = pipelines.find((item) => item.id === parametros.pipelineId);
+      const etapa = destino?.etapas.find((item) => item.id === parametros.etapaId);
+      return `Destino: ${destino?.nome ?? "pipeline indisponível"} → ${etapa?.nome ?? "etapa indisponível"}`;
     }
   } catch {
     return "Configuração inválida — revise antes de ativar.";
@@ -339,7 +344,7 @@ export function AutomacoesWorkspace({ pipelines, catalogos, templates, erro, acc
                             <p className="truncate text-sm font-semibold text-white">{automacao.nome}</p>
                             <Badge variant="outline" className="gap-1 border-cyan-400/20 text-cyan-300"><AcaoIcon tipo={automacao.acaoTipo} />{ACAO_LABEL[automacao.acaoTipo] ?? automacao.acaoTipo}</Badge>
                           </div>
-                          {resumoConfiguracao(automacao, catalogos) && <p className="mt-1 line-clamp-2 text-xs text-slate-500">{resumoConfiguracao(automacao, catalogos)}</p>}
+                          {resumoConfiguracao(automacao, catalogos, pipelines) && <p className="mt-1 line-clamp-2 text-xs text-slate-500">{resumoConfiguracao(automacao, catalogos, pipelines)}</p>}
                           {resumoVersao(automacao) && <p className="mt-1 line-clamp-2 text-[11px] text-slate-600">{resumoVersao(automacao)}</p>}
                         </div>
                         <Switch checked={automacao.ativa} onCheckedChange={(valor) => alternar(automacao, valor)} disabled={isPending} aria-label={`${automacao.ativa ? "Pausar" : "Ativar"} automação ${automacao.nome}`} />

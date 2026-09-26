@@ -28,6 +28,8 @@ Ready for Manual Acceptance — código e configuração publicados; cadeia de d
 10. Nos pipelines recriados pela UI, a entrada em Fechado da Revisão de Radar cria um card vinculado na etapa inicial ativa do Financeiro. O Radar permanece visível, atenuado e com a localização atual do destino; o vínculo evita duplicação.
 11. O arrasto solta o card na coluna sob o ponteiro, sem oscilar com a própria prévia. Destinos anteriores à etapa atual não movem o card nem exibem erro. O servidor também rejeita regressões.
 12. O painel lateral mostra apenas a etapa atual e os destinos posteriores permitidos. O movimento aparece imediatamente no board após soltar, enquanto a confirmação e a atualização dos cards acontecem em segundo plano.
+13. Nos pipelines recriados pela UI, a entrada em Concluido do Financeiro cria um card vinculado em Boas vindas do Operacional, sem duplicar um destino já vinculado.
+14. Em Configurações → Automações, o usuário pode editar essas automações de encaminhamento e escolher visualmente outra etapa de origem, o pipeline e a etapa de destino, vínculo com a origem e prevenção de duplicata, sem editar JSON.
 
 ## Escopo e decisões registradas
 
@@ -45,6 +47,8 @@ Ready for Manual Acceptance — código e configuração publicados; cadeia de d
 - [x] **Atualizar board e modal** (AC 3–5, 7): card atenuado, tag de pipeline/etapa ou localização restrita, indicação de encaminhamento pendente e controles indisponíveis.
 - [x] **Testar localmente** (AC 2–7): 3.830 testes passaram; o teste do board verifica a atualização da tag após a mudança de etapa do destino. Execução real e cadeia completa dependem da publicação protegida.
 - [x] **Publicar configuração protegida** (AC 1, 8): após Vault, backup verificado e aprovação específica, publicar e verificar execução/vínculo; gates locais concluídos.
+- [ ] **Publicar o encaminhamento Financeiro → Operacional dos pipelines recriados** (AC 13): inventariar, obter relatório Vault, verificar backup recente, receber confirmação específica e publicar uma versão ativa auditável.
+- [x] **Expor o encaminhamento no editor visual** (AC 14): configurar origem, destino, vínculo e deduplicação pelo formulário de Automações.
 
 ## Dev Notes
 
@@ -88,6 +92,8 @@ Ready for Manual Acceptance — código e configuração publicados; cadeia de d
 - [ ] Reteste visual autenticado de Boas-vindas pela conta TI após publicar a correção de visibilidade.
 - [x] Configurar e validar Radar Fechado → Financeiro inicial nos pipelines recriados após Vault, backup e confirmação específica (AC 10).
 - [x] Corrigir destino do drag, impedir regressão silenciosa e filtrar o painel lateral (AC 11, 12).
+- [ ] Publicar e verificar Financeiro Concluido → Operacional Boas vindas nos pipelines recriados após checkpoint Vault (AC 13).
+- [x] Expor configuração visual das automações de criação de card em outro pipeline (AC 14).
 - [x] Executar lint, typecheck, testes e build nesta revisão; atualizar File List e resultado.
 
 ## Dev Agent Record
@@ -109,6 +115,7 @@ Ready for Manual Acceptance — código e configuração publicados; cadeia de d
 - `src/actions/bpm/AutomacoesCentrais.ts`, `src/lib/bpm/automacoes/central-schemas.ts`, `src/lib/bpm/automacoes/schemas.ts`, `src/lib/validations/bpm.ts` — editor e motor aceitam IDs de etapas criadas pela UI.
 - `src/actions/bpm/Cards.ts` — localização exibida no Radar acompanha o destino vinculado quando este segue para outro pipeline visível.
 - `tests/bpm/board-polling-react.test.ts`, `tests/bpm/drag-drop-rollback.test.ts`, `tests/bpm/automacoes-central.test.ts`, `tests/bpm/ordem-etapas.test.ts` — regressão do arrasto, ordem e IDs de automação.
+- `src/components/bpm/automacoes/AutomacaoCentralFormDialog.tsx`, `src/components/bpm/automacoes/AutomacoesWorkspace.tsx` — editor visual de origem/destino do encaminhamento e resumo legível do destino na lista.
 
 ### Change Log
 
@@ -120,6 +127,7 @@ Ready for Manual Acceptance — código e configuração publicados; cadeia de d
 | 2026-09-25 | 0.4 | Diagnóstico do card ABIAN: destino criado, mas oculto da conta TI pelo bloqueio fixo de Boas-vindas; correção local da visibilidade; 512 arquivos e 3.832 testes, lint, typecheck e build aprovados | Codex |
 | 2026-09-26 | 0.5 | Drop estável por coluna, avanço sem regressão, atualização visual rápida e suporte a etapas da UI no motor de automações; publicação Radar → Financeiro sujeita ao Vault | Codex |
 | 2026-09-26 | 0.6 | Commit e8dc2b84 em produção; automação Radar Fechado → Financeiro Novo Contrato publicada após Vault e confirmação específica | Codex |
+| 2026-09-26 | 0.7 | Editor visual das automações entre pipelines; preparação do novo encaminhamento Financeiro → Operacional sujeita a Vault | Codex |
 
 ## QA Results
 
@@ -130,3 +138,5 @@ Na correção de visibilidade do cadastro ABIAN, lint terminou com 0 erros, type
 Na revisão de 26/09, `npm run lint` passou (0 erros, 1.192 avisos preexistentes), `npm run typecheck` passou, `npm test` passou (532 arquivos, 3.929 testes, 4 ignorados e 1 pendente) e `npm run build` compilou e gerou 78 páginas estáticas. O backup Vault dedicado da automação Radar → Financeiro foi verificado antes de solicitar confirmação; nenhum dado de produção foi movido para testar esta revisão.
 
 O deploy de `e8dc2b84` foi concluído e o domínio de produção serviu esse deployment antes da configuração. Vault verificou backup completo pré-mudança em `database-backups/pre-change/` (169.651.748 bytes, 332 tabelas, 179.598 linhas, SHA-256 `e1572a3f21695ab65dec03a3efa3d3e1f113af16098a97bfee05efa1d450fb2a`, integridade OK e zero erros de FK). Após confirmação específica do usuário, uma transação com CAS publicou a automação `c17d0860b8a679fdf3caffac8`, versão 1 ativa, gatilho de entrada em Fechado e ação de criar card vinculado em Novo Contrato do Financeiro com prevenção de duplicata; registrou auditoria e elevou Radar 9→10. Consulta posterior confirmou a definição, a auditoria e zero erros de FK. O disparo com card real permanece para aceite do usuário.
+
+Para o editor visual do encaminhamento Financeiro → Operacional, `npm run lint` passou com 0 erros e 1.192 avisos preexistentes; `npm run typecheck` passou; `npm test` passou com 532 arquivos, 3.929 testes, 4 ignorados e 1 pendente; `npm run build` passou com 78 páginas estáticas. A publicação da configuração dos pipelines recriados ainda depende do checkpoint Vault e de confirmação específica. Há um card que já estava em Concluido antes da publicação; o gatilho de entrada não o processa retroativamente.
