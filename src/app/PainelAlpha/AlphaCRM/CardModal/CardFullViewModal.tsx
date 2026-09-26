@@ -9,10 +9,6 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 import { isAdminRole } from "@/lib/roles";
-import {
-  usuarioPodeVincularPessoaBoasVindasOperacional,
-  vinculoPessoaBoasVindasOperacionalRestrito,
-} from "@/lib/bpm/boas-vindas";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { ObterPipelineBpm } from "@/actions/bpm/Pipelines";
 import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
@@ -180,10 +176,8 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
   const podeMoverEtapa = podeTrabalharNoCard;
   const podeEditar = podeTrabalharNoCard;
   const podeTrabalharTarefas = podeTrabalharNoCard;
-  const vinculoBoasVindasRestrito = Boolean(card && vinculoPessoaBoasVindasOperacionalRestrito(card.pipeline.nome, card.etapa.nome));
-  const podeGerenciarMembros = !card?.encaminhado && (vinculoBoasVindasRestrito
-    ? usuarioPodeVincularPessoaBoasVindasOperacional(currentUserRole)
-    : isAdminRole(currentUserRole) || meuVinculo?.role === "RESPONSAVEL" || meuVinculo?.role === "ADMINISTRADOR");
+  const podeGerenciarMembros = !card?.encaminhado && (isAdminRole(currentUserRole)
+    || meuVinculo?.role === "RESPONSAVEL" || meuVinculo?.role === "ADMINISTRADOR");
   const etapaAtual = card ? etapas.find((e) => e.id === card.etapa.id) ?? null : null;
 
   const transicoesDaEtapaAtual = card?.etapa.transicoesEtapaOrigem ?? [];

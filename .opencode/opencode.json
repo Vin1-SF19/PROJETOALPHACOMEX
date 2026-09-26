@@ -38,6 +38,11 @@
         "Authorization": "Bearer eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJaODZfSWJXekVmR2F2QzRPclVtTEdnIiwib3JnX2lkIjoxMDAwMTE4MjUyfQ.Vx67JE6ExrBjxPrTr0TG3VRdrwv7Z12o5_FR18WFiMxJ1KErkJa-PvYehrL5xRsloQ4aISUIJl8MS1TJC6dLAw"
       },
       "enabled": true
+    },
+    "rdstationmentor": {
+      "type": "remote",
+      "url": "https://mcp.rdstationmentor.com/crm/mcp?key=019fde0c-2b2e-7252-a217-dfdc2ac04bd5",
+      "enabled": true
     }
   }
 }

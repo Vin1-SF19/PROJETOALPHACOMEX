@@ -24,8 +24,11 @@ const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 export async function ExcluirCardBpm(cardId: string) {
   let userId: number | null = null;
   let userRole: string | null = null;
+  const startedAt = Date.now();
   try {
+    const authStartedAt = Date.now();
     const session = await auth();
+    console.info("[ExcluirCardBpm] auth", { cardId, durationMs: Date.now() - authStartedAt });
     if (!session?.user?.id) {
       return { success: false, error: "NÃO_AUTORIZADO", mensagem: "Você não tem permissão para excluir este card." };
     }
@@ -38,17 +41,22 @@ export async function ExcluirCardBpm(cardId: string) {
     }
 
     // Verificação de permissão no servidor (nunca confiar no client)
+    const permissionStartedAt = Date.now();
     await exigirAcessoBpmCard(cardId, authenticatedUserId, userRole, "excluirCard");
+    console.info("[ExcluirCardBpm] permission", { cardId, durationMs: Date.now() - permissionStartedAt });
 
     // Obter pipelineId antes do arquivamento (para notificação/revalidação)
+    const findStartedAt = Date.now();
     const cardAntes = await db.bpmCard.findUnique({
       where: { id: cardId },
       select: { pipelineId: true },
     });
+    console.info("[ExcluirCardBpm] findCard", { cardId, durationMs: Date.now() - findStartedAt });
     if (!cardAntes) return { success: false, error: "Card não encontrado" };
 
     // Soft-delete (arquivamento) — preserva eventos, auditoria e automações.
     // O card sai do board via filtro status = "ATIVO" nas queries de listagem.
+    const txStartedAt = Date.now();
     await db.$transaction(async (tx) => {
       // Revalida a permissão dentro da mesma transação para que uma mudança
       // concorrente na visibilidade da etapa não abra uma janela TOCTOU.
@@ -79,18 +87,22 @@ export async function ExcluirCardBpm(cardId: string) {
         },
       });
     });
+    console.info("[ExcluirCardBpm] transaction", { cardId, durationMs: Date.now() - txStartedAt });
 
     // Notificar em tempo real (best-effort) + revalidar cache.
     // A mutação já foi commitada; falha de transporte do Pusher não deve
     // reverter a exclusão nem reportar erro ao chamador.
+    const notifyStartedAt = Date.now();
     try {
       await notificarPipelineBpm({ pipelineId: cardAntes.pipelineId, cardId, tipo: "CARD_EXCLUIDO" });
     } catch (notifyError) {
       console.error("[ExcluirCardBpm] Falha na notificação realtime (exclusão já persistida)", notifyError);
     }
+    console.info("[ExcluirCardBpm] realtime", { cardId, durationMs: Date.now() - notifyStartedAt });
     revalidatePath(`${ROTA_BASE}/pipeline/${cardAntes.pipelineId}`);
     revalidatePath(ROTA_BASE);
 
+    console.info("[ExcluirCardBpm] completed", { cardId, totalMs: Date.now() - startedAt });
     return { success: true };
   } catch (error) {
     if (error instanceof Error && error.message === "Não autorizado") {

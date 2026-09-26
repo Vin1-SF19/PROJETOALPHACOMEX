@@ -17,6 +17,7 @@ import {
   Menu,
   X,
   AlertTriangle,
+  ExternalLink,
 } from "lucide-react";
 
 const NAV = [
@@ -27,7 +28,7 @@ const NAV = [
   { href: "/PainelAlpha/AlphaCRM/admin", label: "Configurações", icon: Settings2, exact: false, adminOnly: true },
 ];
 
-export default function CRMLayout({ children, session }: { children: React.ReactNode; session: Session | null }) {
+export default function CRMLayout({ children, session, standaloneUrl }: { children: React.ReactNode; session: Session | null; standaloneUrl?: string }) {
   const pathname = usePathname();
   const temaNome = (session?.user as { tema_interface?: string })?.tema_interface || "blue";
   const visual = getTema(temaNome);
@@ -117,6 +118,7 @@ export default function CRMLayout({ children, session }: { children: React.React
             />
           );
         })}
+        {standaloneUrl && <a href={standaloneUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-slate-300 hover:bg-white/10 hover:text-white"><ExternalLink size={16} /> Abrir CRM independente</a>}
       </nav>
     </>
   );

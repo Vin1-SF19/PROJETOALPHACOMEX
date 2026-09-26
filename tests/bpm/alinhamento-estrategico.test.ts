@@ -43,14 +43,13 @@ describe("Alinhamento Estratégico agendado", () => {
     )).toEqual({ success: true, valores: { "campo-cpf": "52998224725" } });
   });
 
-  it("conecta alerta, template e guard transacional sem um formulário paralelo", () => {
+  it("mantém alerta e template sem impor guarda antiga na transição", () => {
     const painel = readFileSync(resolve("src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx"), "utf8");
     const board = readFileSync(resolve("src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx"), "utf8");
     const cards = readFileSync(resolve("src/actions/bpm/Cards.ts"), "utf8");
     expect(painel).toContain("Chamada de alinhamento pendente");
     expect(painel).toContain("Usar template do resumo");
     expect(board).toContain("alertaAlinhamento");
-    expect(cards).toContain("obterErroCamposAlinhamentoParaSaida");
-    expect(cards).toContain("camposEtapaOrigem");
+    expect(cards).not.toContain("obterErroCamposAlinhamentoParaSaida");
   });
 });

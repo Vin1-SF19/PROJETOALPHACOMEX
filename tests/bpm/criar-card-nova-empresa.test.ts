@@ -10,7 +10,7 @@ const validarValoresCamposBpmMock = vi.hoisted(() => vi.fn());
 const notificarPipelineBpmMock = vi.hoisted(() => vi.fn());
 
 const prismaMock = vi.hoisted(() => ({
-  cliente: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn() },
+  cliente: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn() },
   bpmPipeline: { findUnique: vi.fn() },
   bpmEtapa: { findUnique: vi.fn(), findMany: vi.fn() },
   bpmCard: { create: vi.fn() },
@@ -41,10 +41,11 @@ vi.mock("@/lib/bpm/requisitos-etapa-server", () => ({
 }));
 vi.mock("@/lib/bpm/campos-dinamicos", () => ({ validarValoresCamposBpm: validarValoresCamposBpmMock }));
 
-import { BuscarEmpresasBpm, CriarCardBpm } from "@/actions/bpm/Cards";
+import { BuscarEmpresaPorCnpjBpm, BuscarEmpresasBpm, CriarCardBpm } from "@/actions/bpm/Cards";
 
 const PIPELINE_ID = "clw0000000000000pipe";
 const ETAPA_ID = "clw0000000000000etap";
+const ETAPA_ID_DRAFT = "draft-stage-314cef39-2827-4d96-bc97-15e263066088";
 
 function mockTransacaoFeliz() {
   prismaMock.$transaction.mockImplementation(async (callback) => callback({
@@ -160,6 +161,57 @@ describe("CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master)", 
 
     expect(resultado.success).toBe(true);
     expect(prismaMock.cliente.create).not.toHaveBeenCalled();
+    expect(prismaMock.bpmCard.create).toHaveBeenCalledWith({
+      data: { empresaId: 42, pipelineId: PIPELINE_ID, etapaId: ETAPA_ID, responsavelId: 7, servico: null },
+    });
+  });
+
+  it("cria card na etapa inicial com ID persistido pelo editor de pipelines", async () => {
+    prismaMock.bpmEtapa.findMany.mockResolvedValue([{ id: ETAPA_ID_DRAFT, nome: "Novo Lead", ordem: 0 }]);
+    prismaMock.cliente.findUnique.mockResolvedValue({ id: 42 });
+    prismaMock.bpmCard.create.mockResolvedValue({ id: "cmu8n150b008lihrq0tcunqj", empresaId: 42 });
+
+    const resultado = await CriarCardBpm({
+      empresaId: 42,
+      pipelineId: PIPELINE_ID,
+      etapaId: ETAPA_ID_DRAFT,
+      responsavelId: 7,
+    });
+
+    expect(resultado.success).toBe(true);
+    expect(prismaMock.bpmCard.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ etapaId: ETAPA_ID_DRAFT, empresaId: 42 }),
+    }));
+  });
+
+  it("rejeita ID de etapa que não é CUID nem draft-stage UUID", async () => {
+    const resultado = await CriarCardBpm({
+      empresaId: 42,
+      pipelineId: PIPELINE_ID,
+      etapaId: "draft-stage-invalido",
+      responsavelId: 7,
+    });
+
+    expect(resultado.success).toBe(false);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("aceita cadastro na primeira etapa Novo Lead recriada manualmente", async () => {
+    prismaMock.bpmEtapa.findMany.mockResolvedValue([
+      { id: ETAPA_ID, nome: "Novo Lead", ordem: 0 },
+      { id: "clw0000000000000semv", nome: "Sem viabilidade", ordem: 1 },
+    ]);
+    prismaMock.cliente.findUnique.mockResolvedValue({ id: 42 });
+    prismaMock.bpmCard.create.mockResolvedValue({ id: "cmu8n150b008lihrq0tcunqj", empresaId: 42 });
+
+    const resultado = await CriarCardBpm({
+      empresaId: 42,
+      pipelineId: PIPELINE_ID,
+      etapaId: ETAPA_ID,
+      responsavelId: 7,
+    });
+
+    expect(resultado.success).toBe(true);
     expect(prismaMock.bpmCard.create).toHaveBeenCalledWith({
       data: { empresaId: 42, pipelineId: PIPELINE_ID, etapaId: ETAPA_ID, responsavelId: 7, servico: null },
     });
@@ -334,5 +386,18 @@ describe("BuscarEmpresasBpm — CNPJ canônico", () => {
         cnpj: { contains: "12345678000190" },
       });
     }
+  });
+
+  it("busca vínculo exato por CNPJ sem depender de seleção por nome fantasia", async () => {
+    const empresa = { id: 42, cnpj: "12.345.678/0001-90", razaoSocial: "Empresa", nomeFantasia: null, uf: "SP", municipio: "São Paulo" };
+    prismaMock.cliente.findFirst.mockResolvedValue(empresa);
+
+    const resultado = await BuscarEmpresaPorCnpjBpm("12345678000190");
+
+    expect(resultado).toEqual({ success: true, data: empresa });
+    expect(prismaMock.cliente.findFirst).toHaveBeenCalledWith({
+      where: { cnpj: { in: ["12345678000190", "12.345.678/0001-90"] } },
+      select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true, uf: true, municipio: true },
+    });
   });
 });

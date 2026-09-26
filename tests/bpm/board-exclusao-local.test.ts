@@ -21,7 +21,8 @@ describe("PipelineBoardClient — remoção local sem Pusher", () => {
     // Banner de erro
     expect(board).toContain('role="alert"');
     // Banner de estado vazio (só quando !erro)
-    expect(board).toContain("!erro && cards.length === 0");
+    expect(board).toContain("!erro && etapasOrdenadas.length > 0 && cards.length === 0");
+    expect(board).toContain("!erro && etapasOrdenadas.length === 0");
   });
 });
 

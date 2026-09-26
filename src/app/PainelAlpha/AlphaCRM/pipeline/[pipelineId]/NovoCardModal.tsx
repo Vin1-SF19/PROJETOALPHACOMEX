@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ClipboardCheck, Loader2, X } from "lucide-react";
-import { BuscarEmpresasBpm, ListarUsuariosResponsavelBpm } from "@/actions/bpm/Cards";
+import { BuscarEmpresaPorCnpjBpm, BuscarEmpresasBpm, ListarUsuariosResponsavelBpm } from "@/actions/bpm/Cards";
 import { formatCNPJ, formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";
 
 interface EmpresaOpcao {
@@ -10,6 +10,8 @@ interface EmpresaOpcao {
   razaoSocial: string;
   nomeFantasia: string | null;
   cnpj: string | null;
+  uf?: string | null;
+  municipio?: string | null;
 }
 
 interface NovaEmpresaForm {
@@ -28,6 +30,7 @@ interface UsuarioOpcao {
 interface Props {
   pipelineId: string;
   etapaId: string;
+  etapaNome: string;
   currentUserId: number | null;
   accent: string;
   onClose: () => void;
@@ -56,6 +59,7 @@ function FieldRow({ label, htmlFor, children }: { label: string; htmlFor?: strin
 export default function NovoCardModal({
   pipelineId,
   etapaId,
+  etapaNome,
   currentUserId,
   accent,
   onClose,
@@ -63,6 +67,7 @@ export default function NovoCardModal({
 }: Props) {
   const [form, setForm] = useState<NovaEmpresaForm>(NOVA_EMPRESA_VAZIA);
   const [empresaSelecionada, setEmpresaSelecionada] = useState<EmpresaOpcao | null>(null);
+  const [vinculoAutomatico, setVinculoAutomatico] = useState(false);
   const [empresasSugestoes, setEmpresasSugestoes] = useState<EmpresaOpcao[]>([]);
   const [dropdownAberto, setDropdownAberto] = useState(false);
   const [usuarios, setUsuarios] = useState<UsuarioOpcao[]>([]);
@@ -123,13 +128,34 @@ export default function NovoCardModal({
     return () => { active = false; clearTimeout(timeout); };
   }, [form.razaoSocial, empresaSelecionada]);
 
-  // Auto-buscar CNPJ na Receita Federal quando 14 dígitos completos
+  // O cadastro interno tem prioridade; só consultamos a Receita para CNPJ novo.
   async function buscarCnpjReceita(cnpjValor: string, requestId: number) {
     const cnpjLimpo = normalizarCNPJ(cnpjValor);
     if (cnpjLimpo.length !== 14) return;
     setErroBuscaCnpj(null);
     setBuscandoCnpj(true);
     try {
+      const empresaInterna = await BuscarEmpresaPorCnpjBpm(cnpjLimpo);
+      if (requestId !== cnpjRequest.current) return;
+      if (!empresaInterna.success) {
+        setErroBuscaCnpj(empresaInterna.error ?? "Não foi possível consultar o cadastro interno");
+        return;
+      }
+      if (empresaInterna.data) {
+        const empresa = empresaInterna.data;
+        setEmpresaSelecionada(empresa);
+        setVinculoAutomatico(true);
+        setForm({
+          cnpj: normalizarCNPJ(empresa.cnpj) || cnpjLimpo,
+          razaoSocial: empresa.razaoSocial,
+          nomeFantasia: empresa.nomeFantasia || "",
+          uf: empresa.uf || "",
+          municipio: empresa.municipio || "",
+        });
+        setEmpresasSugestoes([]);
+        setDropdownAberto(false);
+        return;
+      }
       const resposta = await fetch(`/api/ReceitaFederal?cnpj=${cnpjLimpo}`);
       const dados = await resposta.json();
       if (requestId !== cnpjRequest.current) return;
@@ -157,8 +183,10 @@ export default function NovoCardModal({
   function handleCnpjChange(valor: string) {
     cancelarBuscaCnpj();
     const cnpjLimpo = normalizarCNPJ(valor);
-    setForm((anterior) => ({ ...anterior, cnpj: cnpjLimpo }));
+    setForm((anterior) => ({ ...(empresaSelecionada ? NOVA_EMPRESA_VAZIA : anterior), cnpj: cnpjLimpo }));
     setEmpresaSelecionada(null);
+    setVinculoAutomatico(false);
+    setErroBuscaCnpj(null);
     if (cnpjLimpo.length === 14) {
       void buscarCnpjReceita(cnpjLimpo, cnpjRequest.current);
     }
@@ -168,13 +196,14 @@ export default function NovoCardModal({
   function selecionarEmpresa(empresa: EmpresaOpcao) {
     cancelarBuscaCnpj();
     setEmpresaSelecionada(empresa);
+    setVinculoAutomatico(false);
     setForm((anterior) => ({
       ...anterior,
       cnpj: empresa.cnpj ? normalizarCNPJ(empresa.cnpj) : anterior.cnpj,
       razaoSocial: empresa.razaoSocial,
       nomeFantasia: empresa.nomeFantasia || "",
-      municipio: "",
-      uf: "",
+      municipio: empresa.municipio || "",
+      uf: empresa.uf || "",
     }));
     setEmpresasSugestoes([]);
     setDropdownAberto(false);
@@ -242,7 +271,7 @@ export default function NovoCardModal({
               <ClipboardCheck size={16} aria-hidden="true" className="mt-0.5 shrink-0" style={{ color: `rgb(${accent})` }} />
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Criar em</p>
-                <p className="text-sm font-semibold text-white">Novos Leads</p>
+                <p className="text-sm font-semibold text-white">{etapaNome}</p>
                 <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
                   Os detalhes da etapa são preenchidos ao abrir o card, na aba Formulário da Etapa.
                 </p>
@@ -272,6 +301,9 @@ export default function NovoCardModal({
                 )}
               </div>
               {erroBuscaCnpj && <p role="alert" className="text-[11px] text-rose-400">{erroBuscaCnpj}</p>}
+              {vinculoAutomatico && empresaSelecionada && (
+                <p role="status" className="text-[11px] text-emerald-300">Empresa encontrada pelo CNPJ e vinculada automaticamente.</p>
+              )}
 
               {/* Razão Social — autocomplete de empresas existentes */}
               <div className="relative">
@@ -280,6 +312,7 @@ export default function NovoCardModal({
                   className={inputCls}
                   placeholder="Razão social *"
                   value={form.razaoSocial}
+                  readOnly={Boolean(empresaSelecionada)}
                   onChange={(e) => {
                     cancelarBuscaCnpj();
                     setForm((anterior) => ({ ...anterior, razaoSocial: e.target.value }));
@@ -312,6 +345,7 @@ export default function NovoCardModal({
                 className={inputCls}
                 placeholder="Nome fantasia"
                 value={form.nomeFantasia}
+                readOnly={Boolean(empresaSelecionada)}
                 onChange={(e) => { cancelarBuscaCnpj(); setForm((anterior) => ({ ...anterior, nomeFantasia: e.target.value })); }}
               />
 
@@ -322,6 +356,7 @@ export default function NovoCardModal({
                   className={`${inputCls} col-span-2`}
                   placeholder="Município"
                   value={form.municipio}
+                  readOnly={Boolean(empresaSelecionada)}
                   onChange={(e) => { cancelarBuscaCnpj(); setForm((anterior) => ({ ...anterior, municipio: e.target.value })); }}
                 />
                 <input
@@ -330,6 +365,7 @@ export default function NovoCardModal({
                   placeholder="UF"
                   maxLength={2}
                   value={form.uf}
+                  readOnly={Boolean(empresaSelecionada)}
                   onChange={(e) => { cancelarBuscaCnpj(); setForm((anterior) => ({ ...anterior, uf: e.target.value.toUpperCase() })); }}
                 />
               </div>

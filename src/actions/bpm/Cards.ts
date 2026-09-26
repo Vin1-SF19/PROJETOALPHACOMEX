@@ -1,6 +1,6 @@
 "use server";
 import { randomUUID } from "node:crypto";
-import { BuscarEmpresasBpm as buscarEmpresas, ListarUsuariosResponsavelBpm as listarResponsaveis } from "./CardsConsultas";
+import { BuscarEmpresasBpm as buscarEmpresas, BuscarEmpresaPorCnpjBpm as buscarEmpresaPorCnpj, ListarUsuariosResponsavelBpm as listarResponsaveis } from "./CardsConsultas";
 import { ExcluirCardBpm as excluirCard } from "./CardsExcluir";
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
@@ -70,23 +70,6 @@ import {
   obterErroProximoContatoParaEntrada,
 } from "@/lib/bpm/em-tratativa";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
-import {
-  CONFIGURACAO_FECHADO_INVALIDA_MENSAGEM,
-  etapaEhFechado,
-} from "@/lib/bpm/status-pos-fechamento";
-import {
-  CONFIGURACAO_LOST_INVALIDA_MENSAGEM,
-  etapaEhLost,
-  resolverConfiguracaoLost,
-  validarMotivoLost,
-  type CampoConfiguracaoLost,
-  type ConfiguracaoLost,
-} from "@/lib/bpm/lost";
-import { obterErroTransicaoMonitoramento } from "@/lib/bpm/monitoramento";
-import {
-  etapaEhAlinhamentoEstrategico,
-  obterErroCamposAlinhamentoParaSaida,
-} from "@/lib/bpm/alinhamento-estrategico";
 import { executarTransicaoBpm } from "@/lib/bpm/transicao-command";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { processarCadenciasImediatasDoCardBpm } from "@/lib/bpm/cadencias/executor";
@@ -138,100 +121,6 @@ async function destinoEhEtapaCanonicaNovosLeads(
     && candidatas.length === 1
     && primeiraEtapa?.id === etapaId
     && candidatas[0].id === etapaId;
-}
-
-type ClienteConfiguracaoLost = Pick<
-  typeof db,
-  "bpmCampo" | "bpmCardCampoValor"
->;
-
-type CampoLostCarregado = CampoConfiguracaoLost & { valor: string | null };
-
-async function carregarConfiguracaoLost(params: {
-  pipelineId: string;
-  etapaLostId: string;
-  cardId?: string;
-}, client: ClienteConfiguracaoLost = db): Promise<{
-  configuracao: ConfiguracaoLost;
-  campos: CampoLostCarregado[];
-}> {
-  const camposCanonicos = await client.bpmCampo.findMany({
-      where: {
-        ativo: true,
-        etapaConfiguracoes: { some: { etapaId: params.etapaLostId, visivel: true } },
-        OR: [
-          { pipelineId: params.pipelineId },
-          { pipelinesAssociados: { some: { pipelineId: params.pipelineId } } },
-        ],
-      },
-      select: {
-        id: true,
-        pipelineId: true,
-        nome: true,
-        tipo: true,
-        opcoesJson: true,
-        etapaConfiguracoes: {
-          where: { etapaId: params.etapaLostId },
-          select: { etapaId: true, obrigatorio: true, ordem: true },
-          take: 1,
-        },
-      },
-    });
-  const camposPipeline = camposCanonicos.flatMap((campo) => {
-    const config = campo.etapaConfiguracoes[0];
-    return config ? [{
-      id: campo.id,
-      pipelineId: campo.pipelineId,
-      etapaId: config.etapaId,
-      nome: campo.nome,
-      tipo: campo.tipo,
-      opcoesJson: campo.opcoesJson,
-      obrigatorio: config.obrigatorio,
-      ordem: config.ordem,
-    }] : [];
-  });
-  const resultado = resolverConfiguracaoLost({
-    camposPipeline,
-    etapaLostId: params.etapaLostId,
-  });
-  if (!resultado.success) throw new Error("CONFIGURACAO_LOST_INVALIDA");
-
-  const ids = [
-    resultado.configuracao.motivo.id,
-    resultado.configuracao.complemento.id,
-  ];
-  const valores = params.cardId
-    ? await client.bpmCardCampoValor.findMany({
-        where: { cardId: params.cardId, campoId: { in: ids } },
-        select: { campoId: true, valor: true },
-      })
-    : [];
-  const valorPorCampo = new Map(
-    valores.map((item) => [item.campoId, item.valor]),
-  );
-  const motivo = {
-    ...resultado.configuracao.motivo,
-    obrigatorio: true,
-    valor: valorPorCampo.get(resultado.configuracao.motivo.id) ?? null,
-  };
-  const complemento = {
-    ...resultado.configuracao.complemento,
-    obrigatorio: false,
-    valor: valorPorCampo.get(resultado.configuracao.complemento.id) ?? null,
-  };
-  return {
-    configuracao: { motivo, complemento },
-    campos: [motivo, complemento],
-  };
-}
-
-function mesclarCamposPorId<T extends { id: string }>(
-  campos: readonly T[],
-  adicionais: readonly T[],
-): T[] {
-  const porId = new Map(campos.map((campo) => [campo.id, campo]));
-  for (const campo of adicionais) porId.set(campo.id, campo);
-  return [...porId.values()];
 }
 
 export async function ListarCardsPipelineBpm(pipelineId: string) {
@@ -454,10 +343,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
       await notificarPipelineBpm({ pipelineId, tipo: "SLA_STATUS_ALTERADO" });
     }
     const { inicio, fim } = intervaloDiaCivilSaoPaulo(agora);
-    const etapaNovosLeads = await db.bpmEtapa.findFirst({
-      where: { pipelineId, nome: "Novos leads", ativo: true },
-      select: { id: true },
-    });
+    const etapaNovosLeads = pipelineInfo?.etapas.find((etapa) => etapaEhNovosLeads(etapa.nome));
     const cardsNovosLeads = etapaNovosLeads
       ? cards.filter((card) => card.etapaId === etapaNovosLeads.id)
       : [];
@@ -803,7 +689,7 @@ export async function ObterCardBpm(cardId: string) {
       resolverPerfilAcessoCampo(acessoCard),
       { incluirRestritosAoPerfil: true },
     );
-    let camposEtapa = await carregarCamposAplicaveisCardEtapa(
+    const camposEtapa = await carregarCamposAplicaveisCardEtapa(
       card.id,
       card.pipelineId,
       card.etapaId,
@@ -811,15 +697,6 @@ export async function ObterCardBpm(cardId: string) {
       resolverPerfilAcessoCampo(acessoCard),
       camposConfiguradosEtapa,
     );
-    if (card.etapa.chave === BPM_STAGE_KEYS.LOST) {
-      const contextoLost = await carregarConfiguracaoLost({
-        pipelineId: card.pipelineId,
-        etapaLostId: card.etapaId,
-        cardId: card.id,
-      });
-      camposEtapa = mesclarCamposPorId(camposEtapa, contextoLost.campos);
-    }
-
     const formularioEtapa = resolverFormularioEtapa({
       formulario: card.etapa.formulario,
       camposCanonicos: camposConfiguradosEtapa,
@@ -922,9 +799,7 @@ export async function ObterCardBpm(cardId: string) {
     console.error("[ObterCardBpm]", error);
     const msg = error instanceof Error && error.message === "Não autorizado"
       ? "Não autorizado"
-      : error instanceof Error && error.message === "CONFIGURACAO_LOST_INVALIDA"
-        ? CONFIGURACAO_LOST_INVALIDA_MENSAGEM
-        : "Erro ao buscar card";
+      : "Erro ao buscar card";
     return { success: false, error: msg };
   }
 }
@@ -1022,7 +897,7 @@ export async function CriarCardBpm(dados: unknown) {
     const userId = Number(session.user.id);
 
     const parsed = criarCardSchema.safeParse(dados);
-    if (!parsed.success) return { success: false, error: parsed.error.flatten() };
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos para criar o card" };
     const { empresaId, novaEmpresa, pipelineId, etapaId, responsavelId, servico } = parsed.data;
     await exigirAcessoBpmPipeline(pipelineId, userId);
     if (!(await usuarioElegivelResponsavelBpm(pipelineId, responsavelId))) {
@@ -1211,7 +1086,7 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
       };
     }
 
-    const acessoCard = await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
+    await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
 
     const cardAnterior = await db.bpmCard.findUnique({
       where: { id: cardId },
@@ -1221,16 +1096,6 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
       },
     });
     if (!cardAnterior) return { success: false, error: "Card não encontrado" };
-    if (
-      etapaEhLost(cardAnterior.etapa.nome)
-      && camposValores !== undefined
-      && !versaoEsperadaEm
-    ) {
-      return {
-        success: false,
-        error: "A versão atual do card é obrigatória para editar o Motivo de Lost.",
-      };
-    }
     if (
       versaoEsperadaEm
       && cardAnterior.updatedAt.getTime() !== versaoEsperadaEm.getTime()
@@ -1249,32 +1114,6 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
     ) {
       return { success: false, error: "Responsável inválido para este pipeline." };
     }
-    if (etapaEhLost(cardAnterior.etapa.nome)) {
-      let camposAplicaveis = await carregarCamposAplicaveisCardEtapa(
-        cardId,
-        cardAnterior.pipelineId,
-        cardAnterior.etapaId,
-        db,
-        resolverPerfilAcessoCampo(acessoCard),
-      );
-      const contextoLost = await carregarConfiguracaoLost({
-        pipelineId: cardAnterior.pipelineId,
-        etapaLostId: cardAnterior.etapaId,
-        cardId,
-      });
-      camposAplicaveis = mesclarCamposPorId(camposAplicaveis, contextoLost.campos);
-      const validacaoCampos = validarValoresCamposBpm(
-        camposAplicaveis,
-        camposValores ?? {},
-      );
-      if (!validacaoCampos.success) return validacaoCampos;
-      const validacaoLost = validarMotivoLost({
-        configuracao: contextoLost.configuracao,
-        valores: validacaoCampos.valores,
-      });
-      if (!validacaoLost.success) return validacaoLost;
-    }
-
     const snapshotAnterior = {
       ...(campos.responsavelId !== undefined
         ? { responsavelId: cardAnterior.responsavelId }
@@ -1317,12 +1156,6 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
         throw new Error("CONFLITO_ATUALIZACAO_CARD");
       }
       if (
-        campos.statusPosFechamento !== undefined
-        && !etapaEhFechado(cardAtual.etapa.nome)
-      ) {
-        throw new Error("STATUS_POS_FECHAMENTO_FORA_DE_FECHADO");
-      }
-      if (
         campos.responsavelId !== undefined
         && !(await usuarioElegivelResponsavelBpm(
           cardAtual.pipelineId,
@@ -1335,30 +1168,14 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
 
       let valoresValidados: Record<string, string> = {};
       let valoresAnteriores: Record<string, string | null> = {};
-      if (
-        etapaEhLost(cardAtual.etapa.nome)
-        || (camposValores && Object.keys(camposValores).length > 0)
-      ) {
-        let camposAplicaveis = await carregarCamposAplicaveisCardEtapa(
+      if (camposValores && Object.keys(camposValores).length > 0) {
+        const camposAplicaveis = await carregarCamposAplicaveisCardEtapa(
           cardId,
           cardAtual.pipelineId,
           cardAtual.etapaId,
           tx,
           resolverPerfilAcessoCampo(acessoCardAtual),
         );
-        let configuracaoLostAtual: ConfiguracaoLost | null = null;
-        if (etapaEhLost(cardAtual.etapa.nome)) {
-          const contextoLostAtual = await carregarConfiguracaoLost({
-            pipelineId: cardAtual.pipelineId,
-            etapaLostId: cardAtual.etapaId,
-            cardId,
-          }, tx);
-          configuracaoLostAtual = contextoLostAtual.configuracao;
-          camposAplicaveis = mesclarCamposPorId(
-            camposAplicaveis,
-            contextoLostAtual.campos,
-          );
-        }
         const validacao = validarValoresCamposBpm(
           camposAplicaveis,
           camposValores ?? {},
@@ -1385,15 +1202,6 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
             (anexo) => anexo.id === valoresValidados[campo.id] && anexo.campoId === campo.id,
           ))) {
             throw new Error("CAMPO_INVALIDO:Arquivo não vinculado a este campo do card.");
-          }
-        }
-        if (configuracaoLostAtual) {
-          const validacaoLostAtual = validarMotivoLost({
-            configuracao: configuracaoLostAtual,
-            valores: valoresValidados,
-          });
-          if (!validacaoLostAtual.success) {
-            throw new Error(`MOTIVO_LOST_INVALIDO:${validacaoLostAtual.error}`);
           }
         }
         if (Object.keys(valoresValidados).length > 0) {
@@ -1544,10 +1352,6 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
       ? "Não autorizado"
       : error instanceof Error && error.message === "CONFLITO_ATUALIZACAO_CARD"
         ? "O card mudou enquanto era editado. Recarregue e tente novamente."
-        : error instanceof Error && error.message === "STATUS_POS_FECHAMENTO_FORA_DE_FECHADO"
-          ? "O status pós-fechamento só pode ser alterado enquanto o card estiver em Fechado."
-        : error instanceof Error && error.message === "CONFIGURACAO_LOST_INVALIDA"
-          ? CONFIGURACAO_LOST_INVALIDA_MENSAGEM
         : error instanceof Error && error.message.startsWith("CAMPO_INVALIDO:")
           ? error.message.slice("CAMPO_INVALIDO:".length)
         : error instanceof Error && error.message.startsWith("REQUISITOS_PENDENTES:")
@@ -1556,8 +1360,6 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
           ? error.message.slice("CONFIGURACAO_INVALIDA:".length)
         : error instanceof Error && error.message.startsWith("CONTRATO_INVALIDO:")
           ? error.message.slice("CONTRATO_INVALIDO:".length)
-        : error instanceof Error && error.message.startsWith("MOTIVO_LOST_INVALIDO:")
-          ? error.message.slice("MOTIVO_LOST_INVALIDO:".length)
           : error instanceof Error && error.message === "RESPONSAVEL_INVALIDO"
             ? "Responsável inválido para este pipeline."
           : "Erro ao atualizar card";
@@ -1648,16 +1450,7 @@ async function carregarCamposTransicao(params: {
   ]);
   const camposFormulario = await camposPublicadosPorEtapa([params.etapaOrigemId, params.etapaDestinoId], client);
   const camposOrigemPublicados = camposOrigemTodos.filter((campo) => camposFormulario.get(params.etapaOrigemId)?.has(campo.id));
-  let camposDestino = camposDestinoBase.filter((campo) => camposFormulario.get(params.etapaDestinoId)?.has(campo.id));
-  if (etapaEhLost(params.etapaDestinoNome)) {
-    const contextoLost = await carregarConfiguracaoLost({
-      pipelineId: params.pipelineId,
-      etapaLostId: params.etapaDestinoId,
-      cardId: params.cardId,
-    }, client);
-    camposDestino = mesclarCamposPorId(camposDestino, contextoLost.campos);
-  }
-  camposDestino = camposDestino.filter((campo) => camposFormulario.get(params.etapaDestinoId)?.has(campo.id));
+  const camposDestino = camposDestinoBase.filter((campo) => camposFormulario.get(params.etapaDestinoId)?.has(campo.id));
   const camposOrigem = camposOrigemPublicados.filter((campo) => campo.obrigatorio || campo.obrigatorioSaida);
   const origemPorId = new Map(camposOrigem.map((campo) => [campo.id, campo]));
   const destinoPorId = new Map(camposDestino.map((campo) => [campo.id, campo]));
@@ -1687,21 +1480,6 @@ async function carregarCamposTransicao(params: {
   }).sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome));
 }
 
-async function carregarCamposOrigemParaGuard(params: {
-  cardId: string;
-  pipelineId: string;
-  etapaOrigemId: string;
-  etapaOrigemNome: string;
-}, client: Parameters<typeof carregarCamposAplicaveisCardEtapa>[3] = db) {
-  if (!etapaEhAlinhamentoEstrategico(params.etapaOrigemNome)) return [];
-  return carregarCamposAplicaveisCardEtapa(
-    params.cardId,
-    params.pipelineId,
-    params.etapaOrigemId,
-    client,
-  );
-}
-
 async function carregarGuardasNativasMovimento(params: {
   cardId: string;
   etapaOrigemId?: string;
@@ -1714,16 +1492,11 @@ async function carregarGuardasNativasMovimento(params: {
   dataReuniao: Date | null;
   transcricaoReuniao: string | null;
   proximoContatoEm: Date | null;
-  camposEtapaOrigem?: readonly { nome: string; valor: string | null }[];
   capacidadesObrigatorias?: Map<string, Set<string>>;
 }, client: Pick<typeof db, "bpmChecklistFollowUp"> = db) {
   const exige = (etapaId: string | undefined, capability: string) => !params.capacidadesObrigatorias
     || Boolean(etapaId && params.capacidadesObrigatorias.get(etapaId)?.has(capability));
   const guardas = [
-    obterErroTransicaoMonitoramento({
-      etapaOrigemNome: params.etapaOrigemNome,
-      etapaDestinoNome: params.etapaDestinoNome,
-    }),
     exige(params.etapaOrigemId, BPM_CAPABILITIES.MEETING_SCHEDULER) && obterErroDataReuniaoParaMovimento({
       etapaOrigemNome: params.etapaOrigemNome,
       etapaDestinoNome: params.etapaDestinoNome,
@@ -1739,10 +1512,6 @@ async function carregarGuardasNativasMovimento(params: {
     exige(params.etapaDestinoId, BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER) && obterErroProximoContatoParaEntrada({
       etapaDestinoNome: params.etapaDestinoNome,
       proximoContatoEm: params.proximoContatoEm,
-    }),
-    obterErroCamposAlinhamentoParaSaida({
-      etapaOrigemNome: params.etapaOrigemNome,
-      campos: params.camposEtapaOrigem ?? [],
     }),
   ].filter((erro): erro is string => Boolean(erro));
 
@@ -1779,12 +1548,6 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
     const contexto = await carregarContextoMovimento(cardId, etapaDestinoId);
     if ("error" in contexto) return { success: false, error: contexto.error };
     const { card, etapaDestino } = contexto;
-    const camposEtapaOrigem = await carregarCamposOrigemParaGuard({
-      cardId,
-      pipelineId: card.pipelineId,
-      etapaOrigemId: card.etapaId,
-      etapaOrigemNome: card.etapa.nome,
-    });
     const campos = await carregarCamposTransicao({
       cardId,
       pipelineId: card.pipelineId,
@@ -1814,7 +1577,6 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
       dataReuniao: card.dataReuniao,
       transcricaoReuniao: card.transcricaoReuniao,
       proximoContatoEm: card.proximoContatoEm,
-      camposEtapaOrigem,
       capacidadesObrigatorias,
     });
     if (capacidadesObrigatorias.get(card.etapaId)?.has(BPM_CAPABILITIES.STAGE_CHECKLIST)) {
@@ -1836,9 +1598,7 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
     console.error("[ObterRequisitosTransicaoBpm]", error);
     const msg = error instanceof Error && error.message === "Não autorizado"
       ? "Não autorizado"
-      : error instanceof Error && error.message === "CONFIGURACAO_LOST_INVALIDA"
-        ? CONFIGURACAO_LOST_INVALIDA_MENSAGEM
-        : "Erro ao buscar requisitos da transição";
+      : "Erro ao buscar requisitos da transição";
     return { success: false, error: msg };
   }
 }
@@ -1920,10 +1680,6 @@ export async function SalvarRequisitosEMoverCardBpm(dados: unknown) {
       ? "Não autorizado"
       : error instanceof Error && error.message === "CONFLITO_MOVIMENTO_CARD"
         ? "O card mudou enquanto você preenchia os requisitos. Recarregue e tente novamente."
-        : error instanceof Error && error.message === "CONFIGURACAO_FECHADO_INVALIDA"
-          ? CONFIGURACAO_FECHADO_INVALIDA_MENSAGEM
-        : error instanceof Error && error.message === "CONFIGURACAO_LOST_INVALIDA"
-          ? CONFIGURACAO_LOST_INVALIDA_MENSAGEM
         : error instanceof Error && error.message.startsWith("MOVIMENTO_INVALIDO:")
           ? error.message.slice("MOVIMENTO_INVALIDO:".length)
         : "Erro ao salvar requisitos e mover card";
@@ -1948,10 +1704,6 @@ export async function MoverCardBpm(dados: unknown) {
       ? "Não autorizado"
       : error instanceof Error && error.message === "CONFLITO_MOVIMENTO_CARD"
         ? "O card mudou enquanto era movido. Recarregue e tente novamente."
-        : error instanceof Error && error.message === "CONFIGURACAO_FECHADO_INVALIDA"
-          ? CONFIGURACAO_FECHADO_INVALIDA_MENSAGEM
-        : error instanceof Error && error.message === "CONFIGURACAO_LOST_INVALIDA"
-          ? CONFIGURACAO_LOST_INVALIDA_MENSAGEM
         : error instanceof Error && error.message.startsWith("MOVIMENTO_INVALIDO:")
           ? error.message.slice("MOVIMENTO_INVALIDO:".length)
         : "Erro ao mover card";
@@ -2088,5 +1840,6 @@ export async function ListarCardsEmpresaPorPipeline(cardId: string, pipelineId: 
 
 export { isAdminRole };
 export async function BuscarEmpresasBpm(termo: string) { return buscarEmpresas(termo); }
+export async function BuscarEmpresaPorCnpjBpm(cnpj: string) { return buscarEmpresaPorCnpj(cnpj); }
 export async function ListarUsuariosResponsavelBpm(pipelineId: string) { return listarResponsaveis(pipelineId); }
 export async function ExcluirCardBpm(cardId: string) { return excluirCard(cardId); }

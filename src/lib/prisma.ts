@@ -18,7 +18,10 @@ const adapter = configuredUrl.startsWith('file:')
     })
 
 const prismaClientSingleton = () => {
-  return new PrismaClient({ adapter })
+  return new PrismaClient({
+    adapter,
+    log: process.env.NODE_ENV === 'production' ? ['warn', 'error'] : ['query', 'warn', 'error'],
+  })
 }
 
 declare global {

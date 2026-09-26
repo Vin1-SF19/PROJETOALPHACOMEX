@@ -160,6 +160,7 @@
     "gsap": "^3.15.0",
     "hostinger-api-sdk": "^0.0.17",
     "html-to-image": "1.11.13",
+    "jose": "^6.2.3",
     "jszip": "^3.10.1",
     "lucide": "^0.563.0",
     "lucide-react": "^0.563.0",

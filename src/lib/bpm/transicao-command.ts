@@ -6,7 +6,6 @@ import type { Prisma } from "@prisma/client";
 import db from "@/lib/prisma";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 import { requisitoAplicaAoMover } from "@/lib/bpm/requisitos-etapa";
-import { avaliarFormalizacaoFinanceira } from "@/lib/bpm/financeiro-formalizacao";
 import { registrarConclusaoContratoFinanceiro } from "@/lib/bpm/financeiro-assinatura-server";
 import { camposPublicadosPorEtapa, capacidadesObrigatoriasPorEtapa } from "@/lib/bpm/campos-formulario-publicado";
 import {
@@ -349,16 +348,6 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       ? (canonicos[campoId] || null)
       : value);
   }
-  if (card.pipeline.chave === BPM_PIPELINE_KEYS.FINANCEIRO) {
-    const statusAssinatura = [...camposPorId.values()].find((campo) => campo.chave === "alpha.financeiro.status.contrato.assinatura");
-    if (statusAssinatura && Object.hasOwn(formato.valores, statusAssinatura.id)
-      && formato.valores[statusAssinatura.id] !== "Assinado") {
-      const assinaturaAnterior = await tx.bpmCardHistorico.findFirst({
-        where: { cardId: card.id, acao: "CONTRATO_CONCLUIDO" }, select: { id: true },
-      });
-      if (assinaturaAnterior) erro("SIGNED_CONTRACT_REVERSAL", "Assinatura já confirmada; a reversão exige um procedimento auditado.");
-    }
-  }
   const referenciasArquivo = [...camposPorId.values()].flatMap((campo) => {
     const valor = valoresEfetivosPorId.get(campo.id)?.trim();
     return campo.tipo === "url_ou_arquivo" && valor && !valor.startsWith("https://")
@@ -438,31 +427,6 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     }
   }
 
-  if (card.pipeline.chave === BPM_PIPELINE_KEYS.FINANCEIRO
-    && destino.chave === BPM_STAGE_KEYS.CONTRATACAO_FINALIZADA) {
-    const campoPorChave = (chave: string) => [...camposPorId.values()].find((campo) => campo.chave === chave);
-    const valor = (chave: string) => {
-      const campo = campoPorChave(chave);
-      return campo ? valoresEfetivosPorId.get(campo.id) : null;
-    };
-    const campoAnexo = campoPorChave("alpha.contrato.assinado.anexo");
-    const anexoId = valor("alpha.contrato.assinado.anexo")?.trim() ?? null;
-    const anexoVinculado = campoAnexo && anexoId
-      ? await tx.bpmCardAnexo.findFirst({
-          where: { id: anexoId, cardId: card.id, campoId: campoAnexo.id },
-          select: { id: true },
-        })
-      : null;
-    const formalizacao = avaliarFormalizacaoFinanceira({
-      statusAssinatura: valor("alpha.financeiro.status.contrato.assinatura"),
-      dataAssinatura: valor("alpha.data.da.assinatura"),
-      anexoAssinadoId: anexoId,
-      anexoAssinadoVinculado: Boolean(anexoVinculado),
-      pagamentoConfirmado: valor("alpha.pagamento.confirmado"),
-    });
-    pendencias.push(...formalizacao.pendencias);
-  }
-
   const proximoContato = input.proximoContatoEm === undefined ? card.proximoContatoEm : input.proximoContatoEm;
   if (card.pipeline.chave === BPM_PIPELINE_KEYS.COMERCIAL && (
     (card.etapa.chave === BPM_STAGE_KEYS.NOVOS_LEADS && exige(card.etapaId, BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER))
@@ -495,16 +459,6 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
   if (card.etapa.chave === BPM_STAGE_KEYS.EM_TRATATIVA && exige(card.etapaId, BPM_CAPABILITIES.FOLLOW_UP_CHECKLIST)) {
     const ultimo = await tx.bpmChecklistFollowUp.findFirst({ where: { cardId: card.id }, orderBy: [{ criadoEm: "desc" }, { id: "desc" }], select: { completo: true } });
     if (!ultimo?.completo) erro("FOLLOW_UP_CHECKLIST_PENDING", "Conclua o procedimento do último follow-up antes de sair de Em Tratativa.");
-  }
-
-  if (destino.chave === BPM_STAGE_KEYS.LOST) {
-    const motivo = [...camposPorId.values()].find((campo) => campo.chave === "alpha.motivo.de.lost");
-    const complemento = [...camposPorId.values()].find((campo) => campo.chave === "alpha.motivo.lost.outro");
-    if (!motivo || vazio(valoresEfetivosPorId.get(motivo.id))) erro("LOST_REASON_REQUIRED", "Informe o Motivo de Lost.");
-    const motivoValor = valoresEfetivosPorId.get(motivo.id)?.trim().toLocaleLowerCase("pt-BR");
-    if (motivoValor === "outro" && (!complemento || vazio(valoresEfetivosPorId.get(complemento.id)))) {
-      erro("LOST_REASON_DETAIL_REQUIRED", "Descreva o Motivo de Lost - Outro.");
-    }
   }
 
   const erroRegra = await obterErroRegrasParaMovimento({
@@ -615,11 +569,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
 
       let subStatusId: string | null = card.estadoOntologico?.subStatusId ?? null;
       if (transicao.limparSubStatus) subStatusId = null;
-      if (destino.chave === BPM_STAGE_KEYS.FECHADO) {
-        const inicial = await tx.bpmSubStatus.findFirst({ where: { etapaId: destino.id, chave: "AGUARDANDO_CONTRATO", ativo: true }, select: { id: true } });
-        if (!inicial) erro("INITIAL_SUBSTATUS_MISSING", "Substatus inicial da etapa Fechado não está configurado.");
-        subStatusId = inicial.id;
-      } else if (subStatusId) {
+      if (subStatusId) {
         const valido = await tx.bpmSubStatus.findFirst({ where: { id: subStatusId, etapaId: destino.id, ativo: true }, select: { id: true } });
         if (!valido) erro("INVALID_SUBSTATUS", "O substatus atual não é válido na etapa de destino.");
       }

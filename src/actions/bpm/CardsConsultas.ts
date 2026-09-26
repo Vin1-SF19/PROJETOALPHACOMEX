@@ -1,7 +1,7 @@
 "use server";
 import db from "@/lib/prisma";
 import { auth } from "../../../auth";
-import { normalizarCNPJ } from "@/lib/format-cnpj";
+import { formatCNPJ, normalizarCNPJ } from "@/lib/format-cnpj";
 import { exigirAcessoModuloBpm, exigirAcessoBpmPipeline, usuarioElegivelResponsavelBpm } from "@/lib/bpm/ownership";
 
 /** Busca leve de empresa por razão social/nome fantasia/CNPJ para o seletor do modal de novo card. */
@@ -30,6 +30,28 @@ export async function BuscarEmpresasBpm(termo: string) {
   } catch (error) {
     console.error("[BuscarEmpresasBpm]", error);
     return { success: false, error: "Erro ao buscar empresas", data: [] };
+  }
+}
+
+/** Seleciona automaticamente uma empresa já cadastrada quando o CNPJ é completo. */
+export async function BuscarEmpresaPorCnpjBpm(cnpj: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado", data: null };
+    await exigirAcessoModuloBpm(Number(session.user.id));
+    if (cnpj.replace(/\D/g, "").length !== 14) {
+      return { success: false, error: "CNPJ inválido", data: null };
+    }
+    const cnpjNormalizado = normalizarCNPJ(cnpj);
+    const cnpjFormatado = formatCNPJ(cnpjNormalizado);
+    const empresa = await db.cliente.findFirst({
+      where: { cnpj: { in: [cnpjNormalizado, cnpjFormatado].filter((valor): valor is string => Boolean(valor)) } },
+      select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true, uf: true, municipio: true },
+    });
+    return { success: true, data: empresa };
+  } catch (error) {
+    console.error("[BuscarEmpresaPorCnpjBpm]", error);
+    return { success: false, error: "Não foi possível consultar o cadastro interno", data: null };
   }
 }
 

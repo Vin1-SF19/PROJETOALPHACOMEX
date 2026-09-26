@@ -53,7 +53,7 @@ function montarBoard() {
   document.body.append(container);
   const root = createRoot(container);
   const props: ComponentProps<typeof PipelineBoardClient> = {
-    pipeline: { id: "pipeline-1", nome: "Pipeline", etapas: [] },
+    pipeline: { id: "pipeline-1", nome: "Pipeline", etapas: [{ id: "etapa-1", nome: "Em andamento", ordem: 0 }] },
     cardsIniciais: [card],
     visual: { accent: "1,2,3" } as ComponentProps<typeof PipelineBoardClient>["visual"],
     currentUserId: 1,

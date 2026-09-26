@@ -60,9 +60,10 @@ describe("Lost — contrato canônico", () => {
     })).toMatchObject({ success: false });
   });
 
-  it("runtime Lost não consulta relações obrigatórias/ocultas legadas", () => {
+  it("runtime não exige configuração especial da etapa Lost após o reset", () => {
     const cards = ler("src/actions/bpm/Cards.ts");
-    expect(cards).toContain("etapaConfiguracoes: { some: { etapaId: params.etapaLostId");
+    expect(cards).not.toContain("carregarConfiguracaoLost");
+    expect(cards).not.toContain("validarMotivoLost");
     expect(cards).not.toContain("bpmCampoObrigatorioEtapa");
     expect(cards).not.toContain("bpmCampoOcultoEtapa");
   });

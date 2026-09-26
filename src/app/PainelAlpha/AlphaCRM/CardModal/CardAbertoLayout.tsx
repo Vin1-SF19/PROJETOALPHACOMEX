@@ -21,10 +21,6 @@ import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 import { ListarPipelinesBpm } from "@/actions/bpm/Pipelines";
 import { isAdminRole } from "@/lib/roles";
-import {
-  usuarioPodeVincularPessoaBoasVindasOperacional,
-  vinculoPessoaBoasVindasOperacionalRestrito,
-} from "@/lib/bpm/boas-vindas";
 import { formatCNPJ } from "@/lib/format-cnpj";
 import PainelHistorico from "./PainelHistorico";
 import PainelHistoricoPipeline from "./PainelHistoricoPipeline";
@@ -113,10 +109,7 @@ export function CardAbertoLayout({
   const podeMoverEtapa = podeTrabalharNoCard;
   const podeEditar = podeTrabalharNoCard;
   const podeTrabalharTarefas = podeTrabalharNoCard;
-  const vinculoBoasVindasRestrito = vinculoPessoaBoasVindasOperacionalRestrito(card.pipeline.nome, card.etapa.nome);
-  const podeGerenciarMembros = vinculoBoasVindasRestrito
-    ? usuarioPodeVincularPessoaBoasVindasOperacional(currentUserRole)
-    : isAdminRole(currentUserRole) || (podeAgirNaEtapa && (
+  const podeGerenciarMembros = isAdminRole(currentUserRole) || (podeAgirNaEtapa && (
       meuVinculo?.role === "RESPONSAVEL" || meuVinculo?.role === "ADMINISTRADOR"
     ));
   const etapaAtual = etapas.find((e) => e.id === card.etapa.id) ?? null;

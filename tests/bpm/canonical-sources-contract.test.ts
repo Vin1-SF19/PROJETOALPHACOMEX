@@ -23,8 +23,8 @@ describe("P0-1 — fontes canônicas do CRM/BPM", () => {
     expect(source).not.toContain("bpmCampoOcultoEtapa");
   });
 
-  it("Lost e Central de Pendências consultam BpmCampoEtapaConfig", () => {
-    expect(ler("src/actions/bpm/Cards.ts")).toContain("etapaConfiguracoes: { some: { etapaId: params.etapaLostId");
+  it("Central de Pendências consulta BpmCampoEtapaConfig sem guarda fixa de Lost", () => {
+    expect(ler("src/actions/bpm/Cards.ts")).not.toContain("carregarConfiguracaoLost");
     const pendencias = ler("src/lib/bpm/pendencias/motor.ts");
     expect(pendencias).toContain("client.bpmCampoEtapaConfig.findMany");
     expect(pendencias).not.toContain("obrigatorio: true },");

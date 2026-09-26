@@ -579,7 +579,7 @@ function KanbanColumn({
           <button
             type="button"
             onClick={onAdd}
-            aria-label="Criar card em Novos Leads"
+            aria-label={`Criar card em ${etapa.nome}`}
             className="p-1 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-colors"
           >
             <Plus size={13} aria-hidden="true" />
@@ -1081,7 +1081,17 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
         </div>
       )}
 
-      {!erro && cards.length === 0 && (
+      {!erro && etapasOrdenadas.length === 0 && (
+        <div
+          role="status"
+          className="mx-6 mb-3 flex items-center gap-2 px-4 py-3 rounded-xl bg-white/[0.03] border border-white/10 text-slate-400 text-sm"
+        >
+          <ClipboardList size={16} aria-hidden="true" className="shrink-0 text-slate-500" />
+          <span>Nenhuma etapa configurada neste pipeline. Configure a primeira etapa para começar.</span>
+        </div>
+      )}
+
+      {!erro && etapasOrdenadas.length > 0 && cards.length === 0 && (
         <div
           role="status"
           className="mx-6 mb-3 flex items-center gap-2 px-4 py-3 rounded-xl bg-white/[0.03] border border-white/10 text-slate-400 text-sm"
@@ -1137,6 +1147,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
         <NovoCardModal
           pipelineId={pipeline.id}
           etapaId={etapaNovosLeads.id}
+          etapaNome={etapaNovosLeads.nome}
           currentUserId={currentUserId}
           accent={accent}
           onClose={() => setNovoCardAberto(false)}

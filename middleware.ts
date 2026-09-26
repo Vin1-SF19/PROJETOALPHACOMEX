@@ -14,10 +14,12 @@ import {
 
 export async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
+  const startedAt = Date.now();
+  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
 
   const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
 
-  const token = await getToken({ 
+  const token = await getToken({
     req, 
     secret,
     raw: false,
@@ -35,29 +37,44 @@ export async function middleware(req: NextRequest) {
   const isRoleTV = token?.role === "TV";
 
   if (pathname === "/" && isLoggedIn && !retornandoDeBloqueio) {
-    return NextResponse.redirect(
+    const res = NextResponse.redirect(
       new URL(isRoleTV ? "/PainelAlpha/Metas" : "/PainelAlpha", req.nextUrl)
     );
+    res.headers.set("x-request-id", requestId);
+    console.info("[middleware] redirect", { pathname, requestId, durationMs: Date.now() - startedAt });
+    return res;
   }
 
   if (isRoleTV && pathname === "/PainelAlpha") {
-    return NextResponse.redirect(new URL("/PainelAlpha/Metas", req.nextUrl));
+    const res = NextResponse.redirect(new URL("/PainelAlpha/Metas", req.nextUrl));
+    res.headers.set("x-request-id", requestId);
+    console.info("[middleware] redirect", { pathname, requestId, durationMs: Date.now() - startedAt });
+    return res;
   }
 
   if (!isLoggedIn && pathname.startsWith("/PainelAlpha")) {
-    return NextResponse.redirect(new URL("/", req.nextUrl));
+    const res = NextResponse.redirect(new URL("/", req.nextUrl));
+    res.headers.set("x-request-id", requestId);
+    console.info("[middleware] redirect", { pathname, requestId, durationMs: Date.now() - startedAt });
+    return res;
   }
 
   const isMudarSenhaPage = pathname === "/PainelAlpha/mudar-senha";
   if (isLoggedIn && token?.senhaTemporaria === true && pathname.startsWith("/PainelAlpha") && !isMudarSenhaPage) {
-    return NextResponse.redirect(new URL("/PainelAlpha/mudar-senha", req.nextUrl));
+    const res = NextResponse.redirect(new URL("/PainelAlpha/mudar-senha", req.nextUrl));
+    res.headers.set("x-request-id", requestId);
+    console.info("[middleware] redirect", { pathname, requestId, durationMs: Date.now() - startedAt });
+    return res;
   }
 
   if (
     pathname.startsWith("/PainelAlpha/cadastro") &&
     !isAdminRole(typeof token?.role === "string" ? token.role : undefined)
   ) {
-    return NextResponse.redirect(new URL("/PainelAlpha", req.nextUrl));
+    const res = NextResponse.redirect(new URL("/PainelAlpha", req.nextUrl));
+    res.headers.set("x-request-id", requestId);
+    console.info("[middleware] redirect", { pathname, requestId, durationMs: Date.now() - startedAt });
+    return res;
   }
 
   const requestHeaders = new Headers(req.headers);
@@ -79,7 +96,10 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  return NextResponse.next({ request: { headers: requestHeaders } });
+  const res = NextResponse.next({ request: { headers: requestHeaders } });
+  res.headers.set("x-request-id", requestId);
+  console.info("[middleware] next", { pathname, requestId, durationMs: Date.now() - startedAt });
+  return res;
 }
 
 export const config = {
