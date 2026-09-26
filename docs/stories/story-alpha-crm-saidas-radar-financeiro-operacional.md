@@ -86,7 +86,7 @@ Ready for Manual Acceptance — código e configuração publicados; cadeia de d
 - [ ] Conferência visual autenticada dos dois boards pelo usuário.
 - [x] Reteste técnico somente leitura com os dados de produção: a conta TI `42` tem acesso ao pipeline, pode visualizar a etapa configurada e o card `cmuhb951900040agmeci9evnw` é retornado pela consulta do board com o código corrigido.
 - [ ] Reteste visual autenticado de Boas-vindas pela conta TI após publicar a correção de visibilidade.
-- [ ] Configurar e validar Radar Fechado → Financeiro inicial nos pipelines recriados após Vault, backup e confirmação específica (AC 10).
+- [x] Configurar e validar Radar Fechado → Financeiro inicial nos pipelines recriados após Vault, backup e confirmação específica (AC 10).
 - [x] Corrigir destino do drag, impedir regressão silenciosa e filtrar o painel lateral (AC 11, 12).
 - [x] Executar lint, typecheck, testes e build nesta revisão; atualizar File List e resultado.
 
@@ -119,6 +119,7 @@ Ready for Manual Acceptance — código e configuração publicados; cadeia de d
 | 2026-09-25 | 0.3 | Deploy d7b4b600 e publicação protegida no Turso; reprocessamento do evento concluído com sucesso | Codex |
 | 2026-09-25 | 0.4 | Diagnóstico do card ABIAN: destino criado, mas oculto da conta TI pelo bloqueio fixo de Boas-vindas; correção local da visibilidade; 512 arquivos e 3.832 testes, lint, typecheck e build aprovados | Codex |
 | 2026-09-26 | 0.5 | Drop estável por coluna, avanço sem regressão, atualização visual rápida e suporte a etapas da UI no motor de automações; publicação Radar → Financeiro sujeita ao Vault | Codex |
+| 2026-09-26 | 0.6 | Commit e8dc2b84 em produção; automação Radar Fechado → Financeiro Novo Contrato publicada após Vault e confirmação específica | Codex |
 
 ## QA Results
 
@@ -127,3 +128,5 @@ Lint e typecheck passaram; `npm test` passou com 511 arquivos, 3.830 testes apro
 Na correção de visibilidade do cadastro ABIAN, lint terminou com 0 erros, typecheck e build passaram; `npm test` passou com 512 arquivos e 3.832 testes. Com o código corrigido e leitura do banco de produção, a conta TI `42` tem acesso ao pipeline Operacional, a Boas-vindas e ao card criado. Publicação e conferência visual autenticada pendentes.
 
 Na revisão de 26/09, `npm run lint` passou (0 erros, 1.192 avisos preexistentes), `npm run typecheck` passou, `npm test` passou (532 arquivos, 3.929 testes, 4 ignorados e 1 pendente) e `npm run build` compilou e gerou 78 páginas estáticas. O backup Vault dedicado da automação Radar → Financeiro foi verificado antes de solicitar confirmação; nenhum dado de produção foi movido para testar esta revisão.
+
+O deploy de `e8dc2b84` foi concluído e o domínio de produção serviu esse deployment antes da configuração. Vault verificou backup completo pré-mudança em `database-backups/pre-change/` (169.651.748 bytes, 332 tabelas, 179.598 linhas, SHA-256 `e1572a3f21695ab65dec03a3efa3d3e1f113af16098a97bfee05efa1d450fb2a`, integridade OK e zero erros de FK). Após confirmação específica do usuário, uma transação com CAS publicou a automação `c17d0860b8a679fdf3caffac8`, versão 1 ativa, gatilho de entrada em Fechado e ação de criar card vinculado em Novo Contrato do Financeiro com prevenção de duplicata; registrou auditoria e elevou Radar 9→10. Consulta posterior confirmou a definição, a auditoria e zero erros de FK. O disparo com card real permanece para aceite do usuário.
