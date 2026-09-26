@@ -62,6 +62,11 @@ describe("BPM - tarefas por tipo", () => {
     expect(historico).toContain("separarTarefasCard(card.tarefas)");
     expect(historico).toContain("tarefas={tarefasDoCard}");
     expect(historico).toContain("podeTrabalharTarefas={podeTrabalharTarefas}");
+    expect(historico).toContain('<TabsTrigger value="checklist" className="flex-none gap-1.5">');
+    expect(historico).toContain('<TabsContent value="checklist" forceMount');
+    expect(historico).toContain("<PainelChecklistsCard");
+    expect(historico).not.toContain("formularioPossuiChecklist");
+    expect(historico).not.toContain("const checklistHabilitado");
     expect(painel).toContain("podeTrabalharTarefas: boolean");
     expect(painel).toContain("disabled={!podeTrabalharTarefas || tarefa.status === \"CONCLUIDA\"}");
     expect(painel).toContain("disabled={!podeTrabalharTarefas}");

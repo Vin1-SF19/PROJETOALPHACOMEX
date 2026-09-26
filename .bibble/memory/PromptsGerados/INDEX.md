@@ -1,6 +1,5 @@
-# Prompts Gerados — Index
+# Prompts Gerados
 
 | Arquivo | Tipo | Pedido | Data |
 |---------|------|--------|------|
-| [painel-alpha-responsividade-ui-2026-06-11.md](painel-alpha-responsividade-ui-2026-06-11.md) | Task — Implementação Frontend | Responsividade mobile, tema do usuário, remover botão colapsar sidebar, reduzir rodapé+input | 2026-06-11 |
-| [calendario-alpha-implementacao-2026-07-17.md](calendario-alpha-implementacao-2026-07-17.md) | Task — Implementação full-stack e integração Google | Implementação completa do Calendário Alpha com OAuth individual, Google Calendar API, sincronização, UX, segurança e testes | 2026-07-17 |
+| remover-hardcoded-financeiro-2026-09-26.md | Task Prompt | "Gere um prompt para eu colar na minha IA para resolver todos esses problemas, nesse prompt tem que estar tudo especificado para não ter divergências — foco absoluto remover os Hardcoded" | 2026-09-26 |

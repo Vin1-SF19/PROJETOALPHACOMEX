@@ -25,6 +25,7 @@ Como administrador do CRM, quero editar ou retirar campos e seções obrigatóri
 - [x] Inventariar banco e preparar backup/relatório Vault sem executar limpeza antes da autorização.
 - [x] Após autorização, executar limpeza restrita, verificar resultados e documentar rollback.
 - [x] Rodar lint, typecheck, testes e build.
+- [x] Corrigir a descoberta da aba Procedimento no card quando o procedimento aplicável ainda não foi materializado.
 
 ## Checklist
 
@@ -95,6 +96,7 @@ O usuário pediu retirar do catálogo de “Adicionar seção” os campos com �
 - `src/lib/bpm/tarefas-card.ts`
 - `tests/bpm/tarefas-card.test.ts`
 - `tests/bpm/tarefas-tipo.test.ts`
+- `docs/stories/story-alpha-crm-formularios-edicao-limpeza-radar.md`
 - `scripts/bpm-restaurar-formularios-radar-2026-09-24.mjs`
 
 ### Inventário e plano Vault complementar

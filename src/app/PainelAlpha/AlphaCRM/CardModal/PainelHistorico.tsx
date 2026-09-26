@@ -30,7 +30,6 @@ import { PainelTarefasPorTipo } from "./PainelTarefasPorTipo";
 import { PainelChecklistsCard } from "./PainelChecklistsCard";
 import { EditorAnotacaoCard } from "./EditorAnotacaoCard";
 import { formatarBytes, iconePorAcao } from "./PainelHistoricoShared";
-import { formularioPossuiChecklist } from "@/lib/bpm/formulario-renderer";
 import { separarTarefasCard } from "@/lib/bpm/tarefas-card";
 import { VisualizadorAnexoCard, type AnexoParaVisualizar } from "@/components/bpm/anexos/VisualizadorAnexoCard";
 
@@ -76,14 +75,11 @@ export default function PainelHistorico({
   const inputAnexoRef = useRef<HTMLInputElement>(null);
   const { tarefas: tarefasDoCard, procedimentos: tarefasDeProcedimento } = separarTarefasCard(card.tarefas);
   const procedimentosLegados = tarefasDeProcedimento.filter((tarefa) => !tarefa.cardChecklistId);
-  const checklistConfigurado = formularioPossuiChecklist(card.formularioEtapa)
-    || tarefasDeProcedimento.some((tarefa) => Boolean(tarefa.cardChecklistId));
-  const checklistHabilitado = checklistConfigurado || procedimentosLegados.length > 0;
 
   useEffect(() => {
     function abrirPendencias(event: Event) {
       const detail = (event as CustomEvent<{ cardId: string; itemId?: string | null }>).detail;
-      if (detail?.cardId !== card.id || !checklistHabilitado) return;
+      if (detail?.cardId !== card.id) return;
       setAbaEsquerda("checklist");
       window.setTimeout(() => {
         const alvo = (detail.itemId
@@ -95,7 +91,7 @@ export default function PainelHistorico({
     }
     window.addEventListener("bpm:abrir-pendencias-checklist", abrirPendencias);
     return () => window.removeEventListener("bpm:abrir-pendencias-checklist", abrirPendencias);
-  }, [card.id, checklistHabilitado]);
+  }, [card.id]);
 
   const feedHistorico: ItemTimelineCard[] = montarFeedTimelineCard(card.historico, anotacoes);
   const contextoHistorico: ContextoDescricaoHistorico = {
@@ -152,12 +148,10 @@ export default function PainelHistorico({
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300">{tarefasDoCard.length}</span>
             )}
           </TabsTrigger>
-          {checklistHabilitado && (
-            <TabsTrigger value="checklist" className="flex-none gap-1.5">
-              <ClipboardCheck size={13} />
-              Procedimento
-            </TabsTrigger>
-          )}
+          <TabsTrigger value="checklist" className="flex-none gap-1.5">
+            <ClipboardCheck size={13} />
+            Procedimento
+          </TabsTrigger>
           <TabsTrigger value="etapas" className="flex-none gap-1.5">
             <CheckCircle2 size={13} />
             Jornada
@@ -189,27 +183,25 @@ export default function PainelHistorico({
           />
         </TabsContent>
 
-        {checklistHabilitado && (
-          <TabsContent value="checklist" forceMount className="min-h-0 flex-1 overflow-y-auto data-[state=inactive]:hidden">
-            {checklistConfigurado && <PainelChecklistsCard
-              card={card}
-              accent={accent}
-              podeEditar={podeEditar}
-              realtimeRevision={realtimeRevision}
-              onAtualizado={onAtualizado}
-              ocultarVazio={procedimentosLegados.length > 0}
-            />}
-            {procedimentosLegados.length > 0 && <PainelTarefasPorTipo
-              cardId={card.id}
-              responsavelId={card.responsavel?.id ?? null}
-              tarefas={procedimentosLegados}
-              accent={accent}
-              podeTrabalharTarefas={podeTrabalharTarefas}
-              onAtualizado={onAtualizado}
-              permitirCriar={false}
-            />}
-          </TabsContent>
-        )}
+        <TabsContent value="checklist" forceMount className="min-h-0 flex-1 overflow-y-auto data-[state=inactive]:hidden">
+          <PainelChecklistsCard
+            card={card}
+            accent={accent}
+            podeEditar={podeEditar}
+            realtimeRevision={realtimeRevision}
+            onAtualizado={onAtualizado}
+            ocultarVazio={procedimentosLegados.length > 0}
+          />
+          {procedimentosLegados.length > 0 && <PainelTarefasPorTipo
+            cardId={card.id}
+            responsavelId={card.responsavel?.id ?? null}
+            tarefas={procedimentosLegados}
+            accent={accent}
+            podeTrabalharTarefas={podeTrabalharTarefas}
+            onAtualizado={onAtualizado}
+            permitirCriar={false}
+          />}
+        </TabsContent>
 
         <TabsContent value="etapas" className="min-h-0 flex-1 overflow-y-auto">
           <div className="space-y-3">
