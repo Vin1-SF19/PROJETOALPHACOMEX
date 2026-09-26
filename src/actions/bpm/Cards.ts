@@ -1,6 +1,6 @@
 "use server";
 import { randomUUID } from "node:crypto";
-import { BuscarEmpresasBpm as buscarEmpresas, ListarUsuariosResponsavelBpm as listarResponsaveis } from "./CardsConsultas";
+import { BuscarEmpresasBpm as buscarEmpresas, BuscarEmpresaPorCnpjBpm as buscarEmpresaPorCnpj, ListarUsuariosResponsavelBpm as listarResponsaveis } from "./CardsConsultas";
 import { ExcluirCardBpm as excluirCard } from "./CardsExcluir";
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
@@ -1019,7 +1019,7 @@ export async function CriarCardBpm(dados: unknown) {
     const userId = Number(session.user.id);
 
     const parsed = criarCardSchema.safeParse(dados);
-    if (!parsed.success) return { success: false, error: parsed.error.flatten() };
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos para criar o card" };
     const { empresaId, novaEmpresa, pipelineId, etapaId, responsavelId, servico } = parsed.data;
     await exigirAcessoBpmPipeline(pipelineId, userId);
     if (!(await usuarioElegivelResponsavelBpm(pipelineId, responsavelId))) {
@@ -2085,5 +2085,6 @@ export async function ListarCardsEmpresaPorPipeline(cardId: string, pipelineId: 
 
 export { isAdminRole };
 export async function BuscarEmpresasBpm(termo: string) { return buscarEmpresas(termo); }
+export async function BuscarEmpresaPorCnpjBpm(cnpj: string) { return buscarEmpresaPorCnpj(cnpj); }
 export async function ListarUsuariosResponsavelBpm(pipelineId: string) { return listarResponsaveis(pipelineId); }
 export async function ExcluirCardBpm(cardId: string) { return excluirCard(cardId); }

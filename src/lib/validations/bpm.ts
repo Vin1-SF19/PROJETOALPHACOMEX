@@ -332,11 +332,16 @@ export const novaEmpresaCardSchema = z.object({
   municipio: z.string().trim().max(120).optional(),
 });
 
+const etapaIdCardSchema = z.union([
+  z.string().cuid(),
+  z.string().regex(/^draft-stage-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i),
+]);
+
 export const criarCardSchema = z.object({
   empresaId: z.number().int().positive().optional(),
   novaEmpresa: novaEmpresaCardSchema.optional(),
   pipelineId: z.string().cuid(),
-  etapaId: z.string().cuid(),
+  etapaId: etapaIdCardSchema,
   responsavelId: z.number().int().positive(),
   // Fase 3 (RM-2026-54DC86): omitido, `servico` é derivado do nome do pipeline em CriarCardBpm.
   // RM-2026-97934A: informado explicitamente por callers que já sabem o serviço de origem
