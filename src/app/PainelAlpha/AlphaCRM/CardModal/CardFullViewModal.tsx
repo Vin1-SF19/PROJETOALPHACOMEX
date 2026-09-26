@@ -19,6 +19,7 @@ import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 
 
 import PainelRegistrar from "./PainelRegistrar";
+import { PainelNotaFiscalConcluida } from "./PainelNotaFiscalConcluida";
 
 import {
   DadosEmpresaDrawer,
@@ -300,9 +301,12 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
               >
                 <PainelRegistrar card={card} etapaAtual={etapaAtual} accent={accent}
                   podeEditar={podeEditar} realtimeRevision={realtimeRevision}
+                  currentUserRole={currentUserRole}
                    onAtualizado={handleAtualizado}
                    onEstadoFollowUpChange={atualizarEstadoFollowUp}
                    />
+                {card.pipeline.nome === "Financeiro" && card.status === "CONCLUIDO" &&
+                  <PainelNotaFiscalConcluida cardId={card.id} onAtualizado={handleAtualizado} />}
               </CardAbertoLayout>
         )}
         <AlertDialog open={camposNaoSalvos.length > 0} onOpenChange={(open) => { if (!open) setCamposNaoSalvos([]); }}>

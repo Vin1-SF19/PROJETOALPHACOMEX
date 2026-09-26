@@ -15,6 +15,7 @@ import { sincronizarTranscricaoCardBpm } from "@/lib/bpm/transcricao-reuniao-ser
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { copiarCamposCardVinculado } from "@/lib/bpm/copiar-campos-card-vinculado";
+import { carregarCamposFaltantesCardEtapa } from "@/lib/bpm/requisitos-etapa-server";
 import { montarContextoAvaliacaoDoCard } from "@/lib/bpm/regras/contexto";
 import { avaliarGrupo } from "@/lib/bpm/regras/avaliador";
 import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
@@ -290,26 +291,119 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
     if (!pipelineDestino) return { ignorada: true, motivo: "PIPELINE_DESTINO_INATIVO" };
     const etapa = await db.bpmEtapa.findFirst({ where: { id: etapaId, pipelineId, ativo: true }, select: { id: true } });
     if (!etapa) throw new Error("Pipeline/etapa de destino inválidos");
+    const handoffOperacional = card.pipeline.chave === "financeiro" && pipelineDestino.chave === "operacional";
+    if (handoffOperacional && card.status !== "CONCLUIDO") {
+      throw new Error("A contratação precisa estar concluída antes da liberação ao Operacional");
+    }
+    // A indicação pertence à negociação comercial, não ao card financeiro. O vínculo
+    // direto mantém vendedor, origem, anexos e histórico localizáveis com as permissões
+    // habituais de acesso ao card de origem.
+    const negociacao = handoffOperacional ? await db.bpmCardVinculo.findFirst({
+      where: { cardDestinoId: card.id, cardOrigem: { pipeline: { chave: "comercial" } } },
+      select: { cardOrigemId: true, cardOrigem: { select: { responsavelId: true, indicacaoOrigem: { select: { parceiroId: true } } } } },
+    }) : null;
+    const vincular = handoffOperacional || parametros.vincularAoOriginal !== false;
+    const completarHandoff = async (tx: Prisma.TransactionClient, destinoId: string) => {
+      if (!handoffOperacional) return;
+      await tx.bpmCardVinculo.upsert({
+        where: { cardOrigemId_cardDestinoId: { cardOrigemId: card.id, cardDestinoId: destinoId } },
+        create: { cardOrigemId: card.id, cardDestinoId: destinoId }, update: {},
+      });
+      // A origem financeira tem precedência; o card comercial preenche somente
+      // valores ainda ausentes no destino (o helper usa update vazio).
+      await copiarCamposCardVinculado(tx, card.id, destinoId, pipelineId, etapaId);
+      if (negociacao) {
+        await tx.bpmCardVinculo.upsert({
+          where: { cardOrigemId_cardDestinoId: { cardOrigemId: negociacao.cardOrigemId, cardDestinoId: destinoId } },
+          create: { cardOrigemId: negociacao.cardOrigemId, cardDestinoId: destinoId }, update: {},
+        });
+        await copiarCamposCardVinculado(tx, negociacao.cardOrigemId, destinoId, pipelineId, etapaId);
+      }
+      // Um valor de campo "arquivo" é o ID de BpmCardAnexo, cujo acesso é
+      // autorizado pelo card proprietário. Referências copiadas de outro card
+      // não representam um anexo do destino; os documentos seguem nos cards
+      // vinculados, sem duplicar o registro ou abrir uma URL direta.
+      const camposArquivo = await tx.bpmCampo.findMany({
+        where: { tipo: { in: ["arquivo", "url_ou_arquivo"] }, ativo: true,
+          OR: [{ pipelineId }, { pipelinesAssociados: { some: { pipelineId } } }],
+          etapaConfiguracoes: { some: { etapaId, visivel: true } } },
+        select: { id: true, tipo: true },
+      });
+      if (camposArquivo.length) {
+        const valoresArquivo = await tx.bpmCardCampoValor.findMany({
+          where: { cardId: destinoId, campoId: { in: camposArquivo.map((campo) => campo.id) } },
+          select: { campoId: true, valor: true },
+        });
+        const idsAnexo = valoresArquivo.filter((item) => item.valor && !/^https:\/\//i.test(item.valor)).map((item) => item.valor as string);
+        const anexosProprios = idsAnexo.length ? await tx.bpmCardAnexo.findMany({
+          where: { cardId: destinoId, id: { in: idsAnexo } }, select: { id: true },
+        }) : [];
+        const idsProprios = new Set(anexosProprios.map((anexo) => anexo.id));
+        const tipoPorCampo = new Map(camposArquivo.map((campo) => [campo.id, campo.tipo]));
+        const invalidos = valoresArquivo.filter((item) => item.valor && (
+          tipoPorCampo.get(item.campoId) === "arquivo" || !/^https:\/\//i.test(item.valor)
+        ) && !idsProprios.has(item.valor)).map((item) => item.campoId);
+        if (invalidos.length) await tx.bpmCardCampoValor.deleteMany({ where: { cardId: destinoId, campoId: { in: invalidos } } });
+      }
+      const pendencias = await carregarCamposFaltantesCardEtapa(destinoId, pipelineId, etapaId, tx);
+      if (pendencias.length) {
+        const excecao = await tx.bpmCardHistorico.findFirst({
+          where: { cardId: card.id, acao: "EXCECAO_LIBERACAO_OPERACIONAL" },
+          orderBy: { createdAt: "desc" }, select: { id: true, usuarioId: true, valorNovoJson: true },
+        });
+        const autorizacao = excecao ? parseObjeto(excecao.valorNovoJson) : null;
+        if (!excecao || autorizacao?.falhaExecucaoId !== execucao.id) {
+          throw new Error(`Liberação ao Operacional bloqueada. Campos obrigatórios: ${pendencias.map((campo) => campo.nome).join(", ")}`);
+        }
+        const jaRegistrada = await tx.bpmCardHistorico.findFirst({
+          where: { cardId: destinoId, acao: "LIBERACAO_OPERACIONAL_COM_EXCECAO", valorNovoJson: { contains: excecao.id } },
+          select: { id: true },
+        });
+        if (!jaRegistrada) await tx.bpmCardHistorico.create({ data: {
+          cardId: destinoId, acao: "LIBERACAO_OPERACIONAL_COM_EXCECAO", usuarioId: excecao.usuarioId,
+          valorNovoJson: JSON.stringify({ autorizacaoId: excecao.id, camposDispensados: pendencias.map((campo) => ({ id: campo.id, nome: campo.nome })),
+            autorizacao: excecao.valorNovoJson }),
+        } });
+      }
+    };
     const vinculoExistente = await db.bpmCardVinculo.findFirst({
       where: { cardOrigemId: card.id, cardDestino: { pipelineId, status: { not: "ARQUIVADO" } } },
       select: { cardDestinoId: true },
     });
-    if (vinculoExistente) return { cardId: vinculoExistente.cardDestinoId, existente: true };
-    if (parametros.somenteSeNaoExistirAtivo) {
+    if (vinculoExistente) {
+      if (handoffOperacional) await db.$transaction((tx) => completarHandoff(tx, vinculoExistente.cardDestinoId));
+      return { cardId: vinculoExistente.cardDestinoId, existente: true };
+    }
+    // No Operacional a identidade do processo é a negociação de origem. Um
+    // card ativo da mesma empresa pode corresponder a outra contratação.
+    if (parametros.somenteSeNaoExistirAtivo && !handoffOperacional) {
       const existente = await db.bpmCard.findFirst({ where: { empresaId: card.empresaId, pipelineId, status: "ATIVO" }, select: { id: true } });
       if (existente) {
-        if (parametros.vincularAoOriginal !== false) {
-          await db.bpmCardVinculo.upsert({ where: { cardOrigemId_cardDestinoId: { cardOrigemId: card.id, cardDestinoId: existente.id } },
+        await db.$transaction(async (tx) => {
+          if (vincular) await tx.bpmCardVinculo.upsert({ where: { cardOrigemId_cardDestinoId: { cardOrigemId: card.id, cardDestinoId: existente.id } },
             create: { cardOrigemId: card.id, cardDestinoId: existente.id }, update: {} });
-        }
+          await completarHandoff(tx, existente.id);
+        });
         return { cardId: existente.id, existente: true };
       }
     }
     const novo = await db.$transaction(async (tx) => {
       const criado = await tx.bpmCard.create({ data: { empresaId: card.empresaId, pipelineId, etapaId, responsavelId: Number(parametros.responsavelId ?? card.responsavelId), servico: parametros.servico ? String(parametros.servico) : card.servico, membros: { create: { userId: Number(parametros.responsavelId ?? card.responsavelId), role: "RESPONSAVEL" } } } });
-      if (parametros.vincularAoOriginal !== false) await tx.bpmCardVinculo.create({ data: { cardOrigemId: card.id, cardDestinoId: criado.id } });
+      if (vincular) await tx.bpmCardVinculo.create({ data: { cardOrigemId: card.id, cardDestinoId: criado.id } });
       if (card.pipeline.chave === "comercial" && pipelineDestino?.chave === "financeiro") {
         await copiarCamposCardVinculado(tx, card.id, criado.id, pipelineId, etapaId);
+      }
+      if (handoffOperacional) {
+        await completarHandoff(tx, criado.id);
+        await tx.bpmCardHistorico.create({ data: {
+          cardId: criado.id, acao: "CARD_CRIADO_POR_AUTOMACAO", automacaoOrigem: execucao.automacaoId,
+          valorNovoJson: JSON.stringify({
+            cardOrigemId: card.id, pipelineOrigem: card.pipeline.nome,
+            negociacaoOrigemId: negociacao?.cardOrigemId ?? null,
+            vendedorResponsavelId: negociacao?.cardOrigem.responsavelId ?? null,
+            parceiroOrigemId: negociacao?.cardOrigem.indicacaoOrigem?.parceiroId ?? null,
+          }),
+        } });
       }
       await ativarCadenciasNaEntradaBpm({
         cardId: criado.id,

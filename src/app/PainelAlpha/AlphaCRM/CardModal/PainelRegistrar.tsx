@@ -6,6 +6,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { CardOpenFormSlot } from "./CardOpenFormSlot";
 import { ConteudoScriptEtapa } from "@/app/PainelAlpha/AlphaCRM/CardModal/ConteudoScriptEtapa";
+import { PainelResumoContratacao } from "./PainelResumoContratacao";
+import { PainelExcecaoOperacional } from "./PainelExcecaoOperacional";
+import { isAdminRole } from "@/lib/roles";
 
 
 
@@ -29,12 +32,13 @@ interface Props {
   podeEditar: boolean;
   realtimeRevision: number;
   onAtualizado: () => void;
+  currentUserRole?: string | null;
   onEstadoFollowUpChange?: (
     estado: "CARREGANDO" | "ERRO" | "NAO_INICIADO" | "EM_ANDAMENTO" | "CONCLUIDO",
   ) => void;
 }
 
-export default function PainelRegistrar({ card, etapaAtual, accent, podeEditar, realtimeRevision, onAtualizado, onEstadoFollowUpChange }: Props) {
+export default function PainelRegistrar({ card, etapaAtual, accent, podeEditar, realtimeRevision, onAtualizado, currentUserRole, onEstadoFollowUpChange }: Props) {
   const [abaAtiva, setAbaAtiva] = useState("formulario-etapa");
 
   return (
@@ -56,6 +60,9 @@ export default function PainelRegistrar({ card, etapaAtual, accent, podeEditar, 
         </TabsList>
 
         <TabsContent id={`formulario-etapa-${card.id}`} value="formulario-etapa" className="m-0 mt-5 min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-5" tabIndex={-1}>
+          {card.resumoContratacao && <PainelResumoContratacao resumo={card.resumoContratacao} />}
+          {card.pipeline.chave === "financeiro" && card.resumoContratacao && !card.resumoContratacao.operacionalCardId && isAdminRole(currentUserRole)
+            && <PainelExcecaoOperacional cardId={card.id} onAtualizado={onAtualizado} />}
           <CardOpenFormSlot
             card={card}
             accent={accent}

@@ -24,10 +24,11 @@ export async function GET(
   const { anexoId } = await context.params;
   const anexo = await db.bpmCardAnexo.findUnique({
     where: { id: anexoId },
-    select: { cardId: true, url: true, nome: true, tipo: true },
+    select: { cardId: true, url: true, nome: true, tipo: true, card: { select: { pipeline: { select: { chave: true } } } } },
   });
   if (!anexo) return new Response("Anexo não encontrado", { status: 404 });
 
+  let autorizado = false;
   try {
     await exigirAcessoBpmCard(
       anexo.cardId,
@@ -35,9 +36,36 @@ export async function GET(
       session.user.role ?? null,
       "visualizar",
     );
+    autorizado = true;
   } catch {
-    return new Response("Sem permissão", { status: 403 });
+    // A entrega Financeiro → Operacional concede acesso aos documentos da
+    // contratação a quem pode visualizar o card operacional vinculado.
+    if (["financeiro", "comercial"].includes(anexo.card.pipeline.chave ?? "")) {
+      const vinculosDiretos = await db.bpmCardVinculo.findMany({
+        where: { cardOrigemId: anexo.cardId, cardDestino: { pipeline: { chave: "operacional" }, status: { not: "ARQUIVADO" } } },
+        select: { cardDestinoId: true },
+      });
+      const financeiros = anexo.card.pipeline.chave === "comercial"
+        ? await db.bpmCardVinculo.findMany({
+            where: { cardOrigemId: anexo.cardId, cardDestino: { pipeline: { chave: "financeiro" }, status: { not: "ARQUIVADO" } } },
+            select: { cardDestinoId: true },
+          }) : [];
+      const vinculosIndiretos = financeiros.length
+        ? await db.bpmCardVinculo.findMany({
+            where: { cardOrigemId: { in: financeiros.map((item) => item.cardDestinoId) },
+              cardDestino: { pipeline: { chave: "operacional" }, status: { not: "ARQUIVADO" } } },
+            select: { cardDestinoId: true },
+          }) : [];
+      for (const destinoId of new Set([...vinculosDiretos, ...vinculosIndiretos].map((item) => item.cardDestinoId))) {
+        try {
+          await exigirAcessoBpmCard(destinoId, Number(session.user.id), session.user.role ?? null, "visualizar");
+          autorizado = true;
+          break;
+        } catch { /* verificar os demais vínculos */ }
+      }
+    }
   }
+  if (!autorizado) return new Response("Sem permissão", { status: 403 });
 
   // Documento gerado pertence ao módulo autenticado de conferência; o token
   // identifica a rota, mas a própria página ainda verifica acesso e ownership.

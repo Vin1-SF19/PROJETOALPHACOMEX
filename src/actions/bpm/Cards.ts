@@ -28,6 +28,7 @@ import { executarAutomacoesCentraisDoCardAgora } from "@/lib/bpm/automacoes/orqu
 import { carregarValoresCanonicosCampos, salvarValoresGlobaisPersonalizadosCampos } from "@/lib/bpm/campos-configuraveis-server";
 import { prepararSalvamentoConfigurado } from "@/lib/bpm/validacao-salvamento-configurado";
 import { registrarConclusaoContratoFinanceiro } from "@/lib/bpm/financeiro-assinatura-server";
+import { carregarResumoContratacao } from "@/lib/bpm/resumo-contratacao-server";
 import { camposPublicadosPorEtapa, capacidadesObrigatoriasPorEtapa } from "@/lib/bpm/campos-formulario-publicado";
 import { desserializarComposicaoCardKanban, type CardKanbanComposicao } from "@/lib/bpm/card-kanban";
 import { obterStatusPosFechamentoVisivel } from "@/lib/bpm/status-pos-fechamento";
@@ -723,7 +724,7 @@ export async function ObterCardBpm(cardId: string) {
       where: { id: cardId },
       include: {
         empresa: { select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true } },
-        pipeline: { select: { id: true, nome: true } },
+        pipeline: { select: { id: true, chave: true, nome: true } },
         etapa: {
           include: {
             formulario: {
@@ -890,10 +891,22 @@ export async function ObterCardBpm(cardId: string) {
       }
     }
 
+    const origemFinanceira = card.pipeline.chave === "operacional"
+      ? await db.bpmCardVinculo.findFirst({
+          where: { cardDestinoId: card.id, cardOrigem: { pipeline: { chave: "financeiro" } } },
+          select: { cardOrigemId: true },
+          orderBy: { createdAt: "desc" },
+        })
+      : null;
+    const resumoContratacao = card.pipeline.chave === "financeiro" && card.etapa.chave === "contratacao_finalizada"
+      ? await carregarResumoContratacao(card.id)
+      : origemFinanceira ? await carregarResumoContratacao(origemFinanceira.cardOrigemId) : null;
+
     return {
       success: true,
       data: {
         ...card,
+        resumoContratacao,
         emailClienteReuniao,
         anexos: card.anexos.map((anexo) => ({ ...anexo, url: `/api/bpm/anexos/${anexo.id}` })),
         camposEtapa,

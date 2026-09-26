@@ -9,6 +9,8 @@ import { auth } from "../../auth";
 import BroadcastBanner from "@/components/BroadcastBanner";
 import { NotificacaoFlutuante } from "@/components/NotificacaoFlutuante";
 import { Heartbeat } from "@/components/Heartbeat";
+import { DebugCaptureProvider } from "@/components/debug/DebugCaptureProvider";
+import { DebugErrorOverlay } from "@/components/debug/DebugErrorOverlay";
 import { ThemeSyncer } from "@/components/ThemeSyncer";
 import { PusherGlobal } from "@/components/PusherGlobal.tsx";
 import { LoginTransitionProvider } from "@/components/login/LoginTransitionProvider";
@@ -42,6 +44,8 @@ export default async function RootLayout({
             <ThemeSyncer />
             <Toaster theme="dark" position="top-right" richColors />
             <StatusConexao />
+            <DebugCaptureProvider />
+            <DebugErrorOverlay />
 
             <ThemeProviderAlpha>
               <BroadcastBanner />

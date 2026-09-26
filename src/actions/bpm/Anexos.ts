@@ -6,6 +6,8 @@ import { registrarAnexoSchema } from "@/lib/validations/bpm";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
+import { executarAutomacoesCentraisDoCardAgora } from "@/lib/bpm/automacoes/orquestrador";
 import { criarReferenciaAnexoBpm, extrairPathnamePrivadoAnexoBpm, validarReciboUploadAnexoBpm } from "@/lib/bpm/anexos-storage";
 import { ACAO_LIMPEZA_ANEXO_PENDENTE, limparBlobAnexoPendente } from "@/lib/bpm/anexos-lifecycle";
 
@@ -89,6 +91,18 @@ export async function RegistrarAnexoBpm(dados: unknown) {
         },
         tx,
       );
+      if (campoId) {
+        const campo = await tx.bpmCampo.findUnique({ where: { id: campoId }, select: { chave: true } });
+        if (campo?.chave === "alpha.contrato.assinado.anexo") {
+          const card = await tx.bpmCard.findUnique({ where: { id: cardId }, select: { pipelineId: true } });
+          if (card) await publicarEventoBpm({
+            tipo: "CARD_ATUALIZADO", entidadeTipo: "CARD", entidadeId: cardId,
+            cardId, pipelineId: card.pipelineId, valorNovo: { anexoAssinadoId: criado.id },
+            atorTipo: "USUARIO", atorUserId: userId,
+            causationId: criado.id, idempotencyKey: `contrato-assinado-anexo:${criado.id}`,
+          }, tx);
+        }
+      }
       return { anexo: criado, criado: true };
     });
 
@@ -96,6 +110,7 @@ export async function RegistrarAnexoBpm(dados: unknown) {
       try {
         revalidatePath(`${ROTA_BASE}/pipeline`);
         await notificarPipelineBpm({ cardId, tipo: "ANEXO_ALTERADO" });
+        if (campoId) await executarAutomacoesCentraisDoCardAgora(cardId);
       } catch (notificationError) {
         console.error("[RegistrarAnexoBpm/pos-salvamento]", notificationError);
       }
