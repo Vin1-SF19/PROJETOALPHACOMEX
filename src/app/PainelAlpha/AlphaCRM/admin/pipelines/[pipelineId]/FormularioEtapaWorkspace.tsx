@@ -827,7 +827,7 @@ function FormularioEtapaWorkspaceContent({
         </div>
       </div>
 
-      <div className="min-w-0 space-y-5 rounded-[28px] border border-amber-300/10 bg-[radial-gradient(ellipse_at_top,rgba(251,191,36,0.09),rgba(8,18,32,0.96)_68%)] p-4 shadow-2xl lg:p-7">
+      <div className="min-w-0 space-y-5 rounded-[28px] border border-amber-300/15 bg-[radial-gradient(ellipse_at_top,rgba(251,191,36,0.11),rgba(8,18,32,0.97)_68%)] p-4 shadow-[0_28px_90px_rgba(2,6,23,0.35)] lg:p-7">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="flex items-center gap-2 font-bold text-white">
@@ -886,7 +886,7 @@ function FormularioEtapaWorkspaceContent({
           </p>
         )}
 
-        <div className="mx-auto w-full max-w-3xl rounded-[24px] border border-white/10 bg-slate-950/95 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.22)] sm:p-6">
+        <div className="mx-auto w-full max-w-3xl rounded-[24px] border border-white/12 bg-slate-950/95 p-4 shadow-[0_28px_80px_rgba(0,0,0,0.26)] sm:p-6">
           <div className="mb-5 rounded-xl border border-amber-300/10 bg-amber-200/[0.04] px-4 py-3">
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-200/70">Fase atual</p>
             <p className="mt-1 text-base font-semibold text-white">{etapa.nome}</p>
@@ -948,7 +948,7 @@ function FormularioEtapaWorkspaceContent({
             {secaoSelecionada && (
               <div
                 key={secaoSelecionada.id ?? secaoSelecionada.chave}
-                className="rounded-xl border border-white/10 bg-slate-950/35 p-3"
+                className="rounded-xl border border-white/12 bg-slate-950/45 p-3 shadow-[0_12px_35px_rgba(2,6,23,0.18)]"
               >
                 <div className="flex items-center gap-2">
                   <input
