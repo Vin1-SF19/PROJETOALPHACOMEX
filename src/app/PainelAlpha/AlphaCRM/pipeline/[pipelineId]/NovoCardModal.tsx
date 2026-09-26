@@ -28,6 +28,7 @@ interface UsuarioOpcao {
 interface Props {
   pipelineId: string;
   etapaId: string;
+  etapaNome: string;
   currentUserId: number | null;
   accent: string;
   onClose: () => void;
@@ -56,6 +57,7 @@ function FieldRow({ label, htmlFor, children }: { label: string; htmlFor?: strin
 export default function NovoCardModal({
   pipelineId,
   etapaId,
+  etapaNome,
   currentUserId,
   accent,
   onClose,
@@ -242,7 +244,7 @@ export default function NovoCardModal({
               <ClipboardCheck size={16} aria-hidden="true" className="mt-0.5 shrink-0" style={{ color: `rgb(${accent})` }} />
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Criar em</p>
-                <p className="text-sm font-semibold text-white">Novos Leads</p>
+                <p className="text-sm font-semibold text-white">{etapaNome}</p>
                 <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
                   Os detalhes da etapa são preenchidos ao abrir o card, na aba Formulário da Etapa.
                 </p>

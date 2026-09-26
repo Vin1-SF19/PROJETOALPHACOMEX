@@ -165,6 +165,27 @@ describe("CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master)", 
     });
   });
 
+  it("aceita cadastro na primeira etapa Novo Lead recriada manualmente", async () => {
+    prismaMock.bpmEtapa.findMany.mockResolvedValue([
+      { id: ETAPA_ID, nome: "Novo Lead", ordem: 0 },
+      { id: "clw0000000000000semv", nome: "Sem viabilidade", ordem: 1 },
+    ]);
+    prismaMock.cliente.findUnique.mockResolvedValue({ id: 42 });
+    prismaMock.bpmCard.create.mockResolvedValue({ id: "cmu8n150b008lihrq0tcunqj", empresaId: 42 });
+
+    const resultado = await CriarCardBpm({
+      empresaId: 42,
+      pipelineId: PIPELINE_ID,
+      etapaId: ETAPA_ID,
+      responsavelId: 7,
+    });
+
+    expect(resultado.success).toBe(true);
+    expect(prismaMock.bpmCard.create).toHaveBeenCalledWith({
+      data: { empresaId: 42, pipelineId: PIPELINE_ID, etapaId: ETAPA_ID, responsavelId: 7, servico: null },
+    });
+  });
+
   it("rejeita payload sem empresaId nem novaEmpresa (schema Zod)", async () => {
     const resultado = await CriarCardBpm({
       pipelineId: PIPELINE_ID,
