@@ -30,7 +30,6 @@ import { enfileirarAutomacoesMovimentoBpm } from "@/lib/bpm/automacoes/fila";
 import { sincronizarSlaMovimentoBpm } from "@/lib/bpm/sla";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { processarCadenciasImediatasDoCardBpm } from "@/lib/bpm/cadencias/executor";
-import { destinoEhPosterior } from "@/lib/bpm/ordem-etapas";
 
 export type AtorTransicaoBpm = {
   tipo: BpmTransitionRequester;
@@ -167,7 +166,6 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     }),
   ]);
   if (!destino) erro("INVALID_DESTINATION", "Etapa de destino inválida para este pipeline.");
-  if (!destinoEhPosterior(card.etapa.ordem, destino.ordem)) erro("BACKWARD_TRANSITION", "O card só pode avançar para uma etapa posterior.");
   if (!transicao) erro("TRANSITION_NOT_DEFINED", "Esta transição não está definida no pipeline.");
   if (!transicao.permitida) erro("TRANSITION_DISABLED", "Esta transição foi desativada pelo administrador.");
   if (!origemCompativel(transicao.origem, input.ator.tipo)) {

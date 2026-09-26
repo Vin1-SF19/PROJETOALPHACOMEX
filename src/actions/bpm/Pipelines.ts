@@ -164,6 +164,10 @@ export async function ObterPipelineBpm(
           where: incluirInativas ? undefined : { ativo: true },
           orderBy: { ordem: "asc" },
           include: {
+            transicoesEtapaOrigem: {
+              where: { permitida: true, origem: { in: ["MANUAL", "AMBOS"] } },
+              select: { etapaDestinoId: true },
+            },
             subStatus: { orderBy: { ordem: "asc" } },
             formulario: {
               include: {

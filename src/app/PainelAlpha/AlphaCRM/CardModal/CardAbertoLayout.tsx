@@ -22,7 +22,6 @@ import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 import { ListarPipelinesBpm } from "@/actions/bpm/Pipelines";
 import { isAdminRole } from "@/lib/roles";
 import { formatCNPJ } from "@/lib/format-cnpj";
-import { destinoEhPosterior } from "@/lib/bpm/ordem-etapas";
 import PainelHistorico from "./PainelHistorico";
 import PainelHistoricoPipeline from "./PainelHistoricoPipeline";
 import PainelProximaEtapa from "./PainelProximaEtapa";
@@ -113,12 +112,9 @@ export function CardAbertoLayout({
   const podeGerenciarMembros = isAdminRole(currentUserRole) || (podeAgirNaEtapa && (
       meuVinculo?.role === "RESPONSAVEL" || meuVinculo?.role === "ADMINISTRADOR"
     ));
-  const etapaAtual = etapas.find((e) => e.id === card.etapa.id) ?? null;
-
   const transicoesDaEtapaAtual = card.etapa.transicoesEtapaOrigem ?? [];
   const etapasParaMover = etapas.filter(
-    (e) => e.id === card.etapa.id || (destinoEhPosterior(card.etapa.ordem, e.ordem)
-      && transicoesDaEtapaAtual.some((t) => t.etapaDestinoId === e.id)),
+    (e) => e.id === card.etapa.id || transicoesDaEtapaAtual.some((t) => t.etapaDestinoId === e.id),
   );
 
   return (

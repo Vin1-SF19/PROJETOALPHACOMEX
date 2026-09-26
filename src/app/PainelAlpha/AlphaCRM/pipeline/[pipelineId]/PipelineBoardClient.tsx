@@ -45,7 +45,6 @@ import {
   restaurarSnapshotBoard,
 } from "@/lib/bpm/drag-drop-board";
 import { cn } from "@/lib/utils";
-import { destinoEhPosterior } from "@/lib/bpm/ordem-etapas";
 import { formatCNPJ } from "@/lib/format-cnpj";
 import { GradientBlobCard } from "@/components/ui/gradient-blob-card";
 import { SlaStatusBadge } from "@/components/bpm/sla/SlaStatusBadge";
@@ -70,6 +69,7 @@ interface EtapaBpm {
   id: string;
   nome: string;
   ordem: number;
+  transicoesEtapaOrigem?: { etapaDestinoId: string }[];
   automacoes?: AutomacaoBoard[];
 }
 
@@ -893,7 +893,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
     const activeCard = snapshot.cards.find((c) => c.id === active.id);
     const origem = etapasOrdenadas.find((etapa) => etapa.id === activeCard?.etapaId);
     const destino = etapasOrdenadas.find((etapa) => etapa.id === over?.id);
-    if (!activeCard || !origem || !destino || !destinoEhPosterior(origem.ordem, destino.ordem)) {
+    if (!activeCard || !origem || !destino || !origem.transicoesEtapaOrigem?.some((transicao) => transicao.etapaDestinoId === destino.id)) {
       snapshotArrastoRef.current = null;
       if (sincronizacaoRealtimePendenteRef.current) {
         sincronizacaoRealtimePendenteRef.current = false;

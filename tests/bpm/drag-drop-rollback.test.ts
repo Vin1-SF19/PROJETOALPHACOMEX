@@ -94,7 +94,7 @@ describe("CRM - rollback do drag-and-drop", () => {
     expect(board).toContain("onDragCancel={onDragCancel}");
     expect(board).toContain("function onDragCancel()");
     expect(board).toContain("snapshotArrastoRef.current = null;");
-    expect(board).toContain("!destinoEhPosterior(origem.ordem, destino.ordem)");
+    expect(board).toContain("origem.transicoesEtapaOrigem?.some((transicao) => transicao.etapaDestinoId === destino.id)");
   });
 
   it("restaura antes de sincronizar e preserva a razao devolvida pelo backend", () => {

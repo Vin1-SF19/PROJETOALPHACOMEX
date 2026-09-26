@@ -161,7 +161,7 @@ it.each(["success", "failure", "sync-failure"])("mostra pending após drop até 
     ? { success: false, error: "offline", data: [] }
     : { success: true, data: [{ ...card, etapaId: outcome === "failure" ? "etapa-1" : "etapa-2" }] } as unknown as Awaited<ReturnType<typeof ListarCardsPipelineBpm>>);
   const { container, root, props } = montarBoard();
-  props.pipeline.etapas = [{ id: "etapa-1", nome: "Origem", ordem: 0 }, { id: "etapa-2", nome: "Destino", ordem: 1 }];
+  props.pipeline.etapas = [{ id: "etapa-1", nome: "Origem", ordem: 0, transicoesEtapaOrigem: [{ etapaDestinoId: "etapa-2" }] }, { id: "etapa-2", nome: "Destino", ordem: 1 }];
   const active = { id: card.id };
   const over = { id: "etapa-2" };
   try {
@@ -185,7 +185,7 @@ it.each(["success", "failure", "sync-failure"])("mostra pending após drop até 
   }
 });
 
-it("ignora o drop em etapa anterior sem chamar o servidor nem mostrar erro", async () => {
+it("ignora o drop sem transição configurada sem chamar o servidor nem mostrar erro", async () => {
   Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
   const { container, root, props } = montarBoard();
   props.pipeline.etapas = [{ id: "etapa-1", nome: "Anterior", ordem: 0 }, { id: "etapa-2", nome: "Atual", ordem: 1 }];
@@ -198,6 +198,28 @@ it("ignora o drop em etapa anterior sem chamar o servidor nem mostrar erro", asy
     expect(MoverCardBpm).not.toHaveBeenCalled();
     expect(container.textContent).not.toContain("Não foi possível mover");
     expect(container.textContent).not.toContain("Movendo card");
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+  }
+});
+
+it("permite o drop em etapa anterior quando a transição manual foi configurada", async () => {
+  Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
+  vi.mocked(MoverCardBpm).mockResolvedValue({ success: true } as Awaited<ReturnType<typeof MoverCardBpm>>);
+  vi.mocked(ListarCardsPipelineBpm).mockResolvedValue({ success: true, data: [{ ...card, etapaId: "etapa-1" }] } as unknown as Awaited<ReturnType<typeof ListarCardsPipelineBpm>>);
+  const { container, root, props } = montarBoard();
+  props.pipeline.etapas = [
+    { id: "etapa-1", nome: "Anterior", ordem: 0 },
+    { id: "etapa-2", nome: "Atual", ordem: 1, transicoesEtapaOrigem: [{ etapaDestinoId: "etapa-1" }] },
+  ];
+  props.cardsIniciais = [{ ...card, etapaId: "etapa-2" }];
+  try {
+    await act(async () => root.render(h(PipelineBoardClient, props)));
+    const active = { id: card.id };
+    await act(async () => { drag.current!.onDragStart!({ active } as import("@dnd-kit/core").DragStartEvent); });
+    await act(async () => { await drag.current!.onDragEnd!({ active, over: { id: "etapa-1" } } as import("@dnd-kit/core").DragEndEvent); });
+    expect(MoverCardBpm).toHaveBeenCalledWith({ cardId: card.id, etapaDestinoId: "etapa-1" });
   } finally {
     await act(async () => root.unmount());
     container.remove();
