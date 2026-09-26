@@ -47,7 +47,7 @@ Ready for Manual Acceptance — código e configuração publicados; cadeia de d
 - [x] **Atualizar board e modal** (AC 3–5, 7): card atenuado, tag de pipeline/etapa ou localização restrita, indicação de encaminhamento pendente e controles indisponíveis.
 - [x] **Testar localmente** (AC 2–7): 3.830 testes passaram; o teste do board verifica a atualização da tag após a mudança de etapa do destino. Execução real e cadeia completa dependem da publicação protegida.
 - [x] **Publicar configuração protegida** (AC 1, 8): após Vault, backup verificado e aprovação específica, publicar e verificar execução/vínculo; gates locais concluídos.
-- [ ] **Publicar o encaminhamento Financeiro → Operacional dos pipelines recriados** (AC 13): inventariar, obter relatório Vault, verificar backup recente, receber confirmação específica e publicar uma versão ativa auditável.
+- [x] **Publicar o encaminhamento Financeiro → Operacional dos pipelines recriados** (AC 13): inventariar, obter relatório Vault, verificar backup recente, receber confirmação específica e publicar uma versão ativa auditável.
 - [x] **Expor o encaminhamento no editor visual** (AC 14): configurar origem, destino, vínculo e deduplicação pelo formulário de Automações.
 - [x] **Respeitar retorno autorizado pela UI** (AC 11, 12): a ordem visual não bloqueia a transição permitida; board, painel lateral e servidor usam as arestas configuradas.
 
@@ -93,7 +93,7 @@ Ready for Manual Acceptance — código e configuração publicados; cadeia de d
 - [ ] Reteste visual autenticado de Boas-vindas pela conta TI após publicar a correção de visibilidade.
 - [x] Configurar e validar Radar Fechado → Financeiro inicial nos pipelines recriados após Vault, backup e confirmação específica (AC 10).
 - [x] Corrigir destino do drag e filtrar o painel lateral pelas transições manuais configuradas (AC 11, 12).
-- [ ] Publicar e verificar Financeiro Concluido → Operacional Boas vindas nos pipelines recriados após checkpoint Vault (AC 13).
+- [x] Publicar e verificar Financeiro Concluido → Operacional Boas vindas nos pipelines recriados após checkpoint Vault (AC 13).
 - [x] Expor configuração visual das automações de criação de card em outro pipeline (AC 14).
 - [x] Executar lint, typecheck, testes e build nesta revisão; atualizar File List e resultado.
 
@@ -132,6 +132,7 @@ Ready for Manual Acceptance — código e configuração publicados; cadeia de d
 | 2026-09-26 | 0.6 | Commit e8dc2b84 em produção; automação Radar Fechado → Financeiro Novo Contrato publicada após Vault e confirmação específica | Codex |
 | 2026-09-26 | 0.7 | Editor visual das automações entre pipelines; preparação do novo encaminhamento Financeiro → Operacional sujeita a Vault | Codex |
 | 2026-09-26 | 0.8 | Correção do retorno entre etapas quando o administrador libera a transição na UI | Codex |
+| 2026-09-26 | 0.9 | Automação Financeiro Concluido → Operacional Boas vindas publicada no Turso após Vault e autorização corrigida | Codex |
 
 ## QA Results
 
@@ -146,3 +147,5 @@ O deploy de `e8dc2b84` foi concluído e o domínio de produção serviu esse dep
 Para o editor visual do encaminhamento Financeiro → Operacional, `npm run lint` passou com 0 erros e 1.192 avisos preexistentes; `npm run typecheck` passou; `npm test` passou com 532 arquivos, 3.929 testes, 4 ignorados e 1 pendente; `npm run build` passou com 78 páginas estáticas. A publicação da configuração dos pipelines recriados ainda depende do checkpoint Vault e de confirmação específica. Há um card que já estava em Concluido antes da publicação; o gatilho de entrada não o processa retroativamente.
 
 Após a correção do retorno configurado, `npm run lint` passou com 0 erros e 1.191 avisos preexistentes; `npm run typecheck` passou; os 18 testes focados do board e arrasto passaram; `npm test` passou com 531 arquivos, 3.929 testes, 4 ignorados e 1 pendente; `npm run build` compilou e gerou 78 páginas estáticas.
+
+Para a publicação protegida Financeiro → Operacional, o primeiro CAS v3→4 abortou sem escrita porque uma edição manual elevou o Financeiro a v4 e permitiu Concluido → Emissão de Nota Fiscal. Vault gerou novo backup completo pré-mudança `painelalpha_turso_pre_change_2026-09-26T17-46-54-004Z.sql` (169.690.891 bytes, 332 tabelas, 179.656 linhas, SHA-256 `c37881d48d636b238a169a3685d7fbef5bcba6607c8d7688a4bd5145c3216b39`), com restauração, integridade e FKs verificadas. Após autorização específica corrigida, a transação com CAS publicou a automação `cc1b81956f9cb47db83229463`, versão ativa `c74d5e33991f40763d96bf0ae` e auditoria `c4f3fb0876708925c4e82e9a3`, elevando Financeiro 4→5. Leitura posterior confirmou origem Concluido, destino Boas vindas, vínculo e prevenção de duplicata configurados; a transição manual permaneceu permitida. O card já em Concluido não foi retroprocessado; um disparo real futuro ainda depende de teste de uso.
