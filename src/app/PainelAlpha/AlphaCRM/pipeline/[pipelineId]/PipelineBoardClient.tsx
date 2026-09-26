@@ -1,9 +1,5 @@
 "use client";
 
-import {
-  obterErroProximoContatoParaMovimento,
-  pipelineEhRevisaoRadar,
-} from "@/lib/bpm/proximo-contato";
 import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -958,14 +954,6 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
         etapaDestinoNome,
       });
       return;
-    }
-
-    if (pipelineEhRevisaoRadar(pipeline.nome)) {
-      const erroProximoContato = obterErroProximoContatoParaMovimento(activeCard.proximoContatoEm);
-      if (erroProximoContato) {
-        await restaurarArrasto(snapshot, erroProximoContato);
-        return;
-      }
     }
 
     setCardMovendoId(activeCard.id);

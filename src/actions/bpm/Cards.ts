@@ -53,22 +53,10 @@ import {
   intervaloDiaCivilSaoPaulo,
   META_LIGACOES_NOVOS_LEADS,
 } from "@/lib/bpm/novos-leads";
-import {
-  obterErroDataReuniaoParaMovimento,
-} from "@/lib/bpm/agendar-reuniao";
-import { obterErroTranscricaoParaMovimento } from "@/lib/bpm/reuniao-agendada";
-import {
-  obterErroProximoContatoParaMovimento,
-  pipelineEhRevisaoRadar,
-} from "@/lib/bpm/proximo-contato";
+import { pipelineEhRevisaoRadar } from "@/lib/bpm/proximo-contato";
 import { buscarNolossLeadsPendentes } from "@/lib/bpm/noloss-leads";
 import { paraExibicaoTelefone } from "@/lib/validations/cs-nps";
 import { iniciarLigacaoCallix, normalizarTelefoneCallix } from "@/lib/callix/click-to-call";
-import {
-  etapaEhEmTratativa,
-  obterErroChecklistParaSaidaEmTratativa,
-  obterErroProximoContatoParaEntrada,
-} from "@/lib/bpm/em-tratativa";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 import { executarTransicaoBpm } from "@/lib/bpm/transicao-command";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
@@ -77,7 +65,7 @@ import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { obterErroChecklistParaMovimento } from "@/lib/bpm/checklists/integracao";
 import { selecionarEmailReuniaoDoCard } from "@/lib/bpm/email-reuniao";
 import { obterEmailReuniaoLegada } from "@/lib/bpm/email-reuniao-legado-server";
-import { BPM_CAPABILITIES, BPM_STAGE_KEYS } from "@/lib/bpm/ontology";
+import { BPM_CAPABILITIES } from "@/lib/bpm/ontology";
 import {
   formularioPossuiTarget,
   resolverFormularioEtapa,
@@ -1480,64 +1468,6 @@ async function carregarCamposTransicao(params: {
   }).sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome));
 }
 
-async function carregarGuardasNativasMovimento(params: {
-  cardId: string;
-  etapaOrigemId?: string;
-  etapaDestinoId?: string;
-  pipelineNome?: string;
-  etapaOrigemNome: string;
-  etapaDestinoNome: string;
-  etapaOrigemChave?: string | null;
-  etapaDestinoChave?: string | null;
-  dataReuniao: Date | null;
-  transcricaoReuniao: string | null;
-  proximoContatoEm: Date | null;
-  capacidadesObrigatorias?: Map<string, Set<string>>;
-}, client: Pick<typeof db, "bpmChecklistFollowUp"> = db) {
-  const exige = (etapaId: string | undefined, capability: string) => !params.capacidadesObrigatorias
-    || Boolean(etapaId && params.capacidadesObrigatorias.get(etapaId)?.has(capability));
-  const guardas = [
-    exige(params.etapaOrigemId, BPM_CAPABILITIES.MEETING_SCHEDULER) && obterErroDataReuniaoParaMovimento({
-      etapaOrigemNome: params.etapaOrigemNome,
-      etapaDestinoNome: params.etapaDestinoNome,
-      dataReuniao: params.dataReuniao,
-    }),
-    exige(params.etapaOrigemId, BPM_CAPABILITIES.MEETING_TRANSCRIPT) && obterErroTranscricaoParaMovimento({
-      etapaOrigemNome: params.etapaOrigemNome,
-      etapaDestinoNome: params.etapaDestinoNome,
-      etapaOrigemChave: params.etapaOrigemChave,
-      etapaDestinoChave: params.etapaDestinoChave,
-      transcricaoReuniao: params.transcricaoReuniao,
-    }),
-    exige(params.etapaDestinoId, BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER) && obterErroProximoContatoParaEntrada({
-      etapaDestinoNome: params.etapaDestinoNome,
-      proximoContatoEm: params.proximoContatoEm,
-    }),
-  ].filter((erro): erro is string => Boolean(erro));
-
-  if (pipelineEhRevisaoRadar(params.pipelineNome)
-    && (params.etapaOrigemChave === BPM_STAGE_KEYS.NOVOS_LEADS || etapaEhNovosLeads(params.etapaOrigemNome))
-    && exige(params.etapaOrigemId, BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER)) {
-    const erroProximoContato = obterErroProximoContatoParaMovimento(params.proximoContatoEm);
-    if (erroProximoContato) guardas.unshift(erroProximoContato);
-  }
-
-  if (etapaEhEmTratativa(params.etapaOrigemNome) && exige(params.etapaOrigemId, BPM_CAPABILITIES.FOLLOW_UP_CHECKLIST)) {
-    const ultimoChecklist = await client.bpmChecklistFollowUp.findFirst({
-      where: { cardId: params.cardId },
-      select: { completo: true },
-      orderBy: [{ criadoEm: "desc" }, { id: "desc" }],
-    });
-    const erroChecklist = obterErroChecklistParaSaidaEmTratativa({
-      etapaOrigemNome: params.etapaOrigemNome,
-      ultimoChecklist,
-    });
-    if (erroChecklist) guardas.push(erroChecklist);
-  }
-
-  return guardas;
-}
-
 export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId: string) {
   try {
     const session = await auth();
@@ -1565,20 +1495,7 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
         etapaAplicacaoNome: campo.etapaAplicacaoNome,
       }));
     const capacidadesObrigatorias = await capacidadesObrigatoriasPorEtapa([card.etapaId, etapaDestinoId]);
-    const guardas = await carregarGuardasNativasMovimento({
-      cardId,
-      etapaOrigemId: card.etapaId,
-      etapaDestinoId,
-      pipelineNome: card.pipeline?.nome,
-      etapaOrigemNome: card.etapa.nome,
-      etapaDestinoNome: etapaDestino.nome,
-      etapaOrigemChave: card.etapa.chave,
-      etapaDestinoChave: etapaDestino.chave,
-      dataReuniao: card.dataReuniao,
-      transcricaoReuniao: card.transcricaoReuniao,
-      proximoContatoEm: card.proximoContatoEm,
-      capacidadesObrigatorias,
-    });
+    const guardas: string[] = [];
     if (capacidadesObrigatorias.get(card.etapaId)?.has(BPM_CAPABILITIES.STAGE_CHECKLIST)) {
       const erroChecklist = await obterErroChecklistParaMovimento({ id: card.id, pipelineId: card.pipelineId, etapaId: card.etapaId });
       if (erroChecklist) guardas.push(erroChecklist);

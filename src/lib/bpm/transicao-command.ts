@@ -13,8 +13,6 @@ import {
   salvarValoresGlobaisPersonalizadosCampos,
 } from "@/lib/bpm/campos-configuraveis-server";
 import { obterErroChecklistParaMovimento } from "@/lib/bpm/checklists/integracao";
-import { obterErroProximoContatoParaMovimento } from "@/lib/bpm/proximo-contato";
-import { obterErroTranscricaoParaMovimento } from "@/lib/bpm/reuniao-agendada";
 import { obterErroRegrasParaMovimento } from "@/lib/bpm/regras/guarda-movimento";
 import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
 import { avaliarGrupo } from "@/lib/bpm/regras/avaliador";
@@ -22,7 +20,6 @@ import { montarContextoAvaliacaoDoCard } from "@/lib/bpm/regras/contexto";
 import {
   BPM_PIPELINE_KEYS,
   BPM_CAPABILITIES,
-  BPM_STAGE_KEYS,
   transitionOriginForRequester,
   type BpmTransitionRequester,
 } from "@/lib/bpm/ontology";
@@ -143,7 +140,6 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       pipeline: { select: { id: true, chave: true, nome: true } },
       etapa: { select: { id: true, chave: true, nome: true, capabilitiesJson: true } },
       estadoOntologico: { include: { subStatus: { select: { id: true, etapaId: true, chave: true } } } },
-      reunioes: { where: { chave: "principal" }, take: 1 },
       servicoContexto: true,
       campoValores: { select: { campoId: true, valor: true } },
       anexos: { select: { nome: true } },
@@ -428,37 +424,9 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
   }
 
   const proximoContato = input.proximoContatoEm === undefined ? card.proximoContatoEm : input.proximoContatoEm;
-  if (card.pipeline.chave === BPM_PIPELINE_KEYS.COMERCIAL && (
-    (card.etapa.chave === BPM_STAGE_KEYS.NOVOS_LEADS && exige(card.etapaId, BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER))
-    || ([BPM_STAGE_KEYS.EM_TRATATIVA, BPM_STAGE_KEYS.SEM_VIABILIDADE].some((chave) => chave === destino.chave)
-      && exige(destino.id, BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER))
-  )) {
-    const erroContato = obterErroProximoContatoParaMovimento(proximoContato);
-    if (erroContato) pendencias.push("Próximo contato");
-  }
   if (pendencias.length) {
     const unicas = [...new Set(pendencias)];
     erro("REQUIREMENTS_PENDING", `Campos/requisitos obrigatórios pendentes (${unicas.join(", ")}).`, unicas);
-  }
-
-  const meeting = card.reunioes[0];
-  if (card.etapa.chave === BPM_STAGE_KEYS.AGENDAR_REUNIAO && destino.chave === BPM_STAGE_KEYS.REUNIAO_AGENDADA
-    && exige(card.etapaId, BPM_CAPABILITIES.MEETING_SCHEDULER)) {
-    if (!meeting?.agendadaEm || Number.isNaN(meeting.agendadaEm.getTime())) {
-      erro("MEETING_REQUIRED", "Preencha Data e Hora da reunião antes de avançar para Reunião Agendada.");
-    }
-  }
-  const erroTranscricao = obterErroTranscricaoParaMovimento({
-    etapaOrigemNome: card.etapa.nome,
-    etapaDestinoNome: destino.nome,
-    etapaOrigemChave: card.etapa.chave,
-    etapaDestinoChave: destino.chave,
-    transcricaoReuniao: card.transcricaoReuniao,
-  });
-  if (erroTranscricao && exige(card.etapaId, BPM_CAPABILITIES.MEETING_TRANSCRIPT)) erro("TRANSCRIPT_REQUIRED", erroTranscricao);
-  if (card.etapa.chave === BPM_STAGE_KEYS.EM_TRATATIVA && exige(card.etapaId, BPM_CAPABILITIES.FOLLOW_UP_CHECKLIST)) {
-    const ultimo = await tx.bpmChecklistFollowUp.findFirst({ where: { cardId: card.id }, orderBy: [{ criadoEm: "desc" }, { id: "desc" }], select: { completo: true } });
-    if (!ultimo?.completo) erro("FOLLOW_UP_CHECKLIST_PENDING", "Conclua o procedimento do último follow-up antes de sair de Em Tratativa.");
   }
 
   const erroRegra = await obterErroRegrasParaMovimento({
