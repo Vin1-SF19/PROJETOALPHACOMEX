@@ -30,6 +30,7 @@ import { enfileirarAutomacoesMovimentoBpm } from "@/lib/bpm/automacoes/fila";
 import { sincronizarSlaMovimentoBpm } from "@/lib/bpm/sla";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { processarCadenciasImediatasDoCardBpm } from "@/lib/bpm/cadencias/executor";
+import { destinoEhPosterior } from "@/lib/bpm/ordem-etapas";
 
 export type AtorTransicaoBpm = {
   tipo: BpmTransitionRequester;
@@ -138,7 +139,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     where: { id: input.cardId },
     include: {
       pipeline: { select: { id: true, chave: true, nome: true } },
-      etapa: { select: { id: true, chave: true, nome: true, capabilitiesJson: true } },
+      etapa: { select: { id: true, chave: true, nome: true, ordem: true, capabilitiesJson: true } },
       estadoOntologico: { include: { subStatus: { select: { id: true, etapaId: true, chave: true } } } },
       servicoContexto: true,
       campoValores: { select: { campoId: true, valor: true } },
@@ -166,6 +167,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     }),
   ]);
   if (!destino) erro("INVALID_DESTINATION", "Etapa de destino inválida para este pipeline.");
+  if (!destinoEhPosterior(card.etapa.ordem, destino.ordem)) erro("BACKWARD_TRANSITION", "O card só pode avançar para uma etapa posterior.");
   if (!transicao) erro("TRANSITION_NOT_DEFINED", "Esta transição não está definida no pipeline.");
   if (!transicao.permitida) erro("TRANSITION_DISABLED", "Esta transição foi desativada pelo administrador.");
   if (!origemCompativel(transicao.origem, input.ator.tipo)) {

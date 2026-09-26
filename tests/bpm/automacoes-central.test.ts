@@ -6,7 +6,7 @@ vi.mock("@/lib/prisma", () => ({ default: {} }));
 
 import { calcularProximaRecorrencia } from "@/lib/bpm/automacoes/agenda";
 import { materializarExecucoesEventosBpm, publicarEventoBpm, sanitizarPayloadAutomacao } from "@/lib/bpm/automacoes/eventos";
-import { chamadaHttpSchema, validarGrafoAutomacao, validarParametrosAcaoCentral } from "@/lib/bpm/automacoes/central-schemas";
+import { chamadaHttpSchema, gatilhoConfigSchema, validarGrafoAutomacao, validarParametrosAcaoCentral } from "@/lib/bpm/automacoes/central-schemas";
 import { executarHttpSeguro } from "@/lib/bpm/automacoes/safe-http";
 import { idTarefaUnicaPorTipo } from "@/lib/bpm/automacoes/idempotencia-tarefa";
 
@@ -40,6 +40,16 @@ describe("Motor Central de Automações", () => {
     expect(validarParametrosAcaoCentral("CRIAR_TAREFA", { titulo: "Ligar", prioridade: "ALTA" })).toMatchObject({ titulo: "Ligar", prioridade: "ALTA" });
     expect(() => validarParametrosAcaoCentral("MOVER_CARD", { etapaId: "não-cuid" })).toThrow();
     expect(() => validarParametrosAcaoCentral("ADICIONAR_ANOTACAO", { texto: "ok", shell: "rm" })).toThrow();
+  });
+
+  it("aceita as etapas draft-stage criadas na UI no gatilho e no handoff", () => {
+    const origem = "draft-stage-2484d2bc-34dd-49b6-baf8-e53d58f07a83";
+    const destino = "draft-stage-92d707af-9b90-4f71-a9be-58ec7fbe98f8";
+    expect(gatilhoConfigSchema.parse({ escopo: "ETAPAS", etapaId: origem }).etapaId).toBe(origem);
+    expect(validarParametrosAcaoCentral("CRIAR_CARD_OUTRO_PIPELINE", {
+      pipelineId: "cmuih4i54000209gmmyqrg557", etapaId: destino,
+      vincularAoOriginal: true, somenteSeNaoExistirAtivo: true,
+    })).toMatchObject({ etapaId: destino, vincularAoOriginal: true });
   });
 
   it("remove segredos e limita estruturas no payload de eventos", () => {

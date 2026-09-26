@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
+import { etapaIdCardSchema } from "@/lib/validations/bpm";
 import { validarParametrosAutomacaoBpm, type AcaoAutomacaoBpm } from "./schemas";
 
 export const TIPOS_EVENTO_AUTOMACAO = [
@@ -23,8 +24,8 @@ export const TIPOS_ACAO_CENTRAL = [
 export const gatilhoConfigSchema = z.object({
   escopo: z.enum(["ETAPAS", "GLOBAL_PIPELINE"]).default("ETAPAS"),
   origemChave: z.string().trim().min(1).max(160).optional(),
-  etapaId: z.string().cuid().optional(),
-  etapasIds: z.array(z.string().cuid()).max(100).optional(),
+  etapaId: etapaIdCardSchema.optional(),
+  etapasIds: z.array(etapaIdCardSchema).max(100).optional(),
   campoId: z.string().cuid().optional(),
   valor: z.union([z.string().max(4_000), z.number(), z.boolean(), z.null()]).optional(),
   tipoTarefa: z.string().trim().max(80).optional(),
@@ -55,7 +56,7 @@ const alterarCampoSchema = z.object({
   somenteSeVazio: z.boolean().default(false),
 }).strict();
 const moverCardSchema = z.object({
-  etapaId: z.string().cuid(),
+  etapaId: etapaIdCardSchema,
   validarRequisitos: z.boolean().default(true),
   exigirProximoContatoVazio: z.boolean().default(false),
 }).strict();
@@ -73,14 +74,14 @@ const criarTarefaSchema = z.object({
 const criarSlaSchema = z.object({ slaConfigId: z.string().cuid() }).strict();
 const textoSchema = z.object({ texto: z.string().trim().min(1).max(8_000) }).strict();
 const criarCardSchema = z.object({
-  pipelineId: z.string().cuid(), etapaId: z.string().cuid(), responsavelId: z.number().int().positive().optional(),
+  pipelineId: z.string().cuid(), etapaId: etapaIdCardSchema, responsavelId: z.number().int().positive().optional(),
   servico: z.string().trim().max(200).optional(), vincularAoOriginal: z.boolean().default(true),
   somenteSeNaoExistirAtivo: z.boolean().default(false),
 }).strict();
 const atualizarRelacionadoSchema = z.object({
   direcao: z.enum(["ORIGEM", "DESTINO", "TODOS"]).default("TODOS"),
   campoId: z.string().cuid().optional(), valor: z.union([z.string().max(20_000), z.number(), z.boolean(), z.null()]).optional(),
-  etapaId: z.string().cuid().optional(), responsavelId: z.number().int().positive().optional(),
+  etapaId: etapaIdCardSchema.optional(), responsavelId: z.number().int().positive().optional(),
 }).strict().refine((v) => Boolean(v.campoId || v.etapaId || v.responsavelId), "Informe uma atualização");
 const responsavelSchema = z.object({ responsavelId: z.number().int().positive() }).strict();
 const comunicacaoSchema = z.object({

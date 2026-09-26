@@ -180,10 +180,6 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
     || meuVinculo?.role === "RESPONSAVEL" || meuVinculo?.role === "ADMINISTRADOR");
   const etapaAtual = card ? etapas.find((e) => e.id === card.etapa.id) ?? null : null;
 
-  const transicoesDaEtapaAtual = card?.etapa.transicoesEtapaOrigem ?? [];
-  const etapasParaMover = etapas.filter(
-    (e) => e.id === card?.etapa.id || transicoesDaEtapaAtual.some((t) => t.etapaDestinoId === e.id),
-  );
   const estadoFollowUpAtual = card ? estadoFollowUpPorCard[card.id] ?? "CARREGANDO" : "CARREGANDO";
   const deveBloquearFechamento = Boolean(
     card &&

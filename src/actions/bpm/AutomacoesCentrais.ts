@@ -13,6 +13,7 @@ import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
 import { sincronizarAgendasVersaoAutomacao } from "@/lib/bpm/automacoes/agenda";
 import { reprocessarExecucaoAutomacaoCentral } from "@/lib/bpm/automacoes/central-runtime";
 import { encerrarExecucoesEmAndamentoAutomacao, filtroExecucoesRelevantes, validarReferenciasPublicacaoAutomacao } from "@/lib/bpm/automacoes/publicacao";
+import { etapaIdCardSchema } from "@/lib/validations/bpm";
 
 const ROTA = "/PainelAlpha/AlphaCRM/admin/automacoes";
 const idSchema = z.string().cuid();
@@ -35,7 +36,7 @@ const salvarDefinicaoCentralSchema = z.object({
   nome: z.string().trim().min(2).max(120),
   descricao: z.string().trim().max(1_000).optional().nullable(),
   pipelineId: z.string().cuid(),
-  etapaAncoraId: z.string().cuid(),
+  etapaAncoraId: etapaIdCardSchema,
   ativa: z.boolean().default(true),
   gatilhoTipo: salvarVersaoAutomacaoSchema.shape.gatilhoTipo,
   gatilhoConfig: gatilhoConfigSchema,

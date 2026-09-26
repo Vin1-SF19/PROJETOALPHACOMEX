@@ -25,6 +25,9 @@ Ready for Manual Acceptance — código e configuração publicados; cadeia de d
 7. A automação, o bloqueio e a tag respeitam as permissões existentes de cada pipeline e não expõem dados de um card de destino a quem não pode vê-lo. A ausência de destino válido ou uma falha de criação mantém a origem em estado diagnosticável, sem indicar falsamente que o encaminhamento foi concluído.
 8. A correção cobre o cenário que falhou no teste do usuário, incluindo a verificação de gatilho, versão publicada, execução/erro, evento de entrada na última etapa e destino configurado. Um teste integrado demonstra a sequência Radar → Financeiro → Operacional e o estado das duas origens.
 9. O card Operacional criado aparece em Boas-vindas para uma conta com acesso ao pipeline e à etapa conforme as permissões configuradas. O nome da etapa não impõe uma restrição adicional fixa a Admin; contas administrativas globais, incluindo TI, seguem a mesma regra das demais etapas.
+10. Nos pipelines recriados pela UI, a entrada em Fechado da Revisão de Radar cria um card vinculado na etapa inicial ativa do Financeiro. O Radar permanece visível, atenuado e com a localização atual do destino; o vínculo evita duplicação.
+11. O arrasto solta o card na coluna sob o ponteiro, sem oscilar com a própria prévia. Destinos anteriores à etapa atual não movem o card nem exibem erro. O servidor também rejeita regressões.
+12. O painel lateral mostra apenas a etapa atual e os destinos posteriores permitidos. O movimento aparece imediatamente no board após soltar, enquanto a confirmação e a atualização dos cards acontecem em segundo plano.
 
 ## Escopo e decisões registradas
 
@@ -83,6 +86,9 @@ Ready for Manual Acceptance — código e configuração publicados; cadeia de d
 - [ ] Conferência visual autenticada dos dois boards pelo usuário.
 - [x] Reteste técnico somente leitura com os dados de produção: a conta TI `42` tem acesso ao pipeline, pode visualizar a etapa configurada e o card `cmuhb951900040agmeci9evnw` é retornado pela consulta do board com o código corrigido.
 - [ ] Reteste visual autenticado de Boas-vindas pela conta TI após publicar a correção de visibilidade.
+- [ ] Configurar e validar Radar Fechado → Financeiro inicial nos pipelines recriados após Vault, backup e confirmação específica (AC 10).
+- [x] Corrigir destino do drag, impedir regressão silenciosa e filtrar o painel lateral (AC 11, 12).
+- [x] Executar lint, typecheck, testes e build nesta revisão; atualizar File List e resultado.
 
 ## Dev Agent Record
 
@@ -98,6 +104,11 @@ Ready for Manual Acceptance — código e configuração publicados; cadeia de d
 - `src/actions/bpm/Dashboard.ts`, `src/actions/bpm/Empresas.ts`, `src/actions/bpm/Tarefas.ts`, `src/actions/bpm/Pendencias.ts` — remoção da restrição fixa de Boas-vindas nas consultas agregadas; perfil de empresa e tarefas agora também filtram pela visibilidade configurada da etapa.
 - `src/lib/bpm/transicao-command.ts`, `src/lib/bpm/boas-vindas.ts`, `src/lib/timeline/aggregator.ts` — permissões configuradas como fonte de autorização; nome da etapa preservado somente para alerta visual.
 - `tests/bpm/boas-vindas-acesso.test.ts`, `tests/bpm/excluir-card-action.test.ts`, `tests/bpm/pendencias-motor.test.ts`, `tests/bpm/tarefas-checklist-actions.test.ts` — expectativas de autorização e consultas atualizadas.
+- `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`, `src/lib/bpm/ordem-etapas.ts`, `src/lib/bpm/transicao-command.ts` — drop pela coluna real, atualização visual imediata e avanço estrito também no servidor.
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx`, `src/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal.tsx` — painel lateral mostra só destinos posteriores permitidos.
+- `src/actions/bpm/AutomacoesCentrais.ts`, `src/lib/bpm/automacoes/central-schemas.ts`, `src/lib/bpm/automacoes/schemas.ts`, `src/lib/validations/bpm.ts` — editor e motor aceitam IDs de etapas criadas pela UI.
+- `src/actions/bpm/Cards.ts` — localização exibida no Radar acompanha o destino vinculado quando este segue para outro pipeline visível.
+- `tests/bpm/board-polling-react.test.ts`, `tests/bpm/drag-drop-rollback.test.ts`, `tests/bpm/automacoes-central.test.ts`, `tests/bpm/ordem-etapas.test.ts` — regressão do arrasto, ordem e IDs de automação.
 
 ### Change Log
 
@@ -107,9 +118,12 @@ Ready for Manual Acceptance — código e configuração publicados; cadeia de d
 | 2026-09-25 | 0.2 | Diagnóstico real, plano Vault e implementação local de bloqueio e localização | Codex |
 | 2026-09-25 | 0.3 | Deploy d7b4b600 e publicação protegida no Turso; reprocessamento do evento concluído com sucesso | Codex |
 | 2026-09-25 | 0.4 | Diagnóstico do card ABIAN: destino criado, mas oculto da conta TI pelo bloqueio fixo de Boas-vindas; correção local da visibilidade; 512 arquivos e 3.832 testes, lint, typecheck e build aprovados | Codex |
+| 2026-09-26 | 0.5 | Drop estável por coluna, avanço sem regressão, atualização visual rápida e suporte a etapas da UI no motor de automações; publicação Radar → Financeiro sujeita ao Vault | Codex |
 
 ## QA Results
 
 Lint e typecheck passaram; `npm test` passou com 511 arquivos, 3.830 testes aprovados, 4 ignorados e 1 marcado TODO em uma cópia local do backup; build de produção passou. Vercel confirmou deploy do commit `d7b4b600cec2e0cec2f0fd9ecf4394d46adf31de`. A automação Financeiro → Operacional `cmuhb4zog0001oiihhrpkzy2g` executou o evento `cmuh93isd000f0agmn0sjbe1r` com SUCESSO e criou o card `cmuhb951900040agmeci9evnw` em Boas-vindas, vinculado ao Financeiro `cmugxle5800060agmhtfqtnjg`. Um único card ativo da empresa foi encontrado no Operacional. A automação Comercial v3 tem apenas o destino Financeiro.
 
 Na correção de visibilidade do cadastro ABIAN, lint terminou com 0 erros, typecheck e build passaram; `npm test` passou com 512 arquivos e 3.832 testes. Com o código corrigido e leitura do banco de produção, a conta TI `42` tem acesso ao pipeline Operacional, a Boas-vindas e ao card criado. Publicação e conferência visual autenticada pendentes.
+
+Na revisão de 26/09, `npm run lint` passou (0 erros, 1.192 avisos preexistentes), `npm run typecheck` passou, `npm test` passou (532 arquivos, 3.929 testes, 4 ignorados e 1 pendente) e `npm run build` compilou e gerou 78 páginas estáticas. O backup Vault dedicado da automação Radar → Financeiro foi verificado antes de solicitar confirmação; nenhum dado de produção foi movido para testar esta revisão.

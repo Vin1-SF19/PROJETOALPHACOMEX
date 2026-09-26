@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
+import { etapaIdCardSchema } from "@/lib/validations/bpm";
 
 export const GATILHOS_AUTOMACAO_BPM = [
   "ENTRAR_COLUNA",
@@ -76,7 +77,7 @@ const acaoOportunidadeSchema = z.discriminatedUnion("tipo", [
   z.object({
     tipo: z.literal("CRIAR_CARD_COMERCIAL"),
     pipelineId: z.string().cuid(),
-    etapaId: z.string().cuid(),
+    etapaId: etapaIdCardSchema,
     responsavelId: z.number().int().positive(),
   }).strict(),
   z.object({
@@ -113,7 +114,7 @@ export const parametrosOportunidadeSchema = z.object({
 
 const baseSchema = z.object({
   pipelineId: z.string().cuid(),
-  etapaId: z.string().cuid(),
+  etapaId: etapaIdCardSchema,
   nome: z.string().trim().min(2).max(120),
   descricao: z.string().trim().max(1_000).optional().nullable(),
   gatilhoTipo: z.enum(GATILHOS_AUTOMACAO_BPM),
@@ -193,7 +194,7 @@ export const atualizarAutomacaoBpmSchema = z.object({
 export const duplicarAutomacaoBpmSchema = z.object({
   automacaoId: z.string().cuid(),
   pipelineId: z.string().cuid(),
-  etapaId: z.string().cuid(),
+  etapaId: etapaIdCardSchema,
   nome: z.string().trim().min(2).max(120).optional(),
 }).strict();
 

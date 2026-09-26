@@ -332,7 +332,7 @@ export const novaEmpresaCardSchema = z.object({
   municipio: z.string().trim().max(120).optional(),
 });
 
-const etapaIdCardSchema = z.union([
+export const etapaIdCardSchema = z.union([
   z.string().cuid(),
   z.string().regex(/^draft-stage-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i),
 ]);

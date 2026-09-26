@@ -93,14 +93,14 @@ describe("CRM - rollback do drag-and-drop", () => {
   it("liga cancelamento e drop sem destino \u00e0 restaura\u00e7\u00e3o antes da reconcilia\u00e7\u00e3o", () => {
     expect(board).toContain("onDragCancel={onDragCancel}");
     expect(board).toContain("function onDragCancel()");
-    expect(board).toMatch(/if \(!over\) \{\s*await restaurarArrasto\(snapshot\);/);
-    expect(board).toContain("await restaurarArrasto(snapshot);");
+    expect(board).toContain("snapshotArrastoRef.current = null;");
+    expect(board).toContain("!destinoEhPosterior(origem.ordem, destino.ordem)");
   });
 
   it("restaura antes de sincronizar e preserva a razao devolvida pelo backend", () => {
     expect(board).toContain("setCards(restaurarSnapshotBoard(snapshot.cards));");
-    expect(board).toContain("setErro(mensagem);");
-    expect(board).toContain("preservarErro: Boolean(mensagem)");
+    expect(board).toContain("setErro(mensagemErro);");
+    expect(board).toContain("preservarErro: Boolean(mensagemErro)");
     expect(board).toContain('role="alert"');
     expect(board).toContain('aria-live="assertive"');
   });
@@ -108,9 +108,8 @@ describe("CRM - rollback do drag-and-drop", () => {
   it("protege rollback de respostas antigas, reconcilia sucesso e nao atualiza a rota no caminho DnD", () => {
     expect(board).toContain("const generation = ++generationBoardRef.current;");
     expect(board).toContain("generation !== generationBoardRef.current");
-    expect(board).toContain("resolverMovimentoOtimistaBoard({");
-    expect(board).toContain("reconciliar: () => recarregarCards({ generation: snapshot.generation })");
-    expect(board).toContain('setErro("Movimento salvo, mas nao foi possivel sincronizar o board agora.");');
+    expect(board).toContain("movimentoPendenteRef.current = false;");
+    expect(board).toContain("void recarregarCards({ generation: snapshot.generation, preservarErro: Boolean(mensagemErro) });");
 
     const inicioDnD = board.indexOf("function onDragStart");
     const fimDnD = board.indexOf("const activeCard = cards.find", inicioDnD);
@@ -119,6 +118,6 @@ describe("CRM - rollback do drag-and-drop", () => {
 
   it("mantem colunas vazias como destinos de drop", () => {
     expect(board).toContain("useDroppable({ id: etapa.id })");
-    expect(board).toContain("ref={setDroppableRef}");
+    expect(board).toContain("ref={vincularColuna}");
   });
 });

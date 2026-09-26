@@ -7,14 +7,14 @@ import { useRouter } from "next/navigation";
 import {
   DndContext,
   DragEndEvent,
-  DragOverEvent,
   DragStartEvent,
   PointerSensor,
   useSensor,
   useSensors,
   DragOverlay,
-  closestCorners,
+  pointerWithin,
   useDroppable,
+  type CollisionDetection,
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -42,10 +42,10 @@ import {
   criarSnapshotBoard,
   moverCardOtimistaNoBoard,
   podeIniciarArrastoBoard,
-  resolverMovimentoOtimistaBoard,
   restaurarSnapshotBoard,
 } from "@/lib/bpm/drag-drop-board";
 import { cn } from "@/lib/utils";
+import { destinoEhPosterior } from "@/lib/bpm/ordem-etapas";
 import { formatCNPJ } from "@/lib/format-cnpj";
 import { GradientBlobCard } from "@/components/ui/gradient-blob-card";
 import { SlaStatusBadge } from "@/components/bpm/sla/SlaStatusBadge";
@@ -551,12 +551,11 @@ export function KanbanCard({
 }
 
 function KanbanColumn({
-  etapa, cor, cards, accent, arrastoDesabilitado, cardMovendoId, onAdd, onAbrirCard, onAgendarReuniao,
+  etapa, cor, cards, accent, arrastoDesabilitado, cardMovendoId, isOver, onAdd, onAbrirCard, onAgendarReuniao,
 }: {
-  etapa: EtapaBpm; cor: string; cards: CardBpm[]; accent: string; arrastoDesabilitado: boolean; cardMovendoId: string | null; onAdd?: () => void; onAbrirCard: (cardId: string) => void; onAgendarReuniao: (cardId: string) => void;
+  etapa: EtapaBpm; cor: string; cards: CardBpm[]; accent: string; arrastoDesabilitado: boolean; cardMovendoId: string | null; isOver: boolean; onAdd?: () => void; onAbrirCard: (cardId: string) => void; onAgendarReuniao: (cardId: string) => void;
 }) {
   const novosLeads = etapaEhNovosLeads(etapa.nome);
-  const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id: etapa.id });
   return (
     <div className="alpha-pipeline-column-shell flex flex-col h-full min-h-0 w-full md:w-[220px] lg:w-[240px] xl:w-[260px] max-w-full">
       <div className="alpha-pipeline-column-header flex items-center justify-between mb-2 px-1 py-1">
@@ -600,7 +599,6 @@ function KanbanColumn({
       )}
       <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <div
-          ref={setDroppableRef}
           className={cn("alpha-pipeline-column flex-1 min-h-0 overflow-y-auto rounded-2xl p-2 space-y-2 border border-dashed border-white/5", isOver && "is-over")}
           style={{
             background: isOver ? `rgba(${cor},0.1)` : `rgba(${cor},0.03)`,
@@ -633,10 +631,15 @@ function LazyPipelineColumn({
   etapa: EtapaBpm; cor: string; cards: CardBpm[]; accent: string; arrastoDesabilitado: boolean; cardMovendoId: string | null; onAdd?: () => void; onAbrirCard: (cardId: string) => void; onAgendarReuniao: (cardId: string) => void; atualizandoManual: boolean;
 }) {
   const [ref, inView] = useLazyColumn(200);
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id: etapa.id });
+  const vincularColuna = useCallback((node: HTMLDivElement | null) => {
+    ref.current = node;
+    setDroppableRef(node);
+  }, [ref, setDroppableRef]);
   const showSkeleton = atualizandoManual || !inView;
 
   return (
-    <div ref={ref} className="h-full">
+    <div ref={vincularColuna} className="h-full w-[220px] shrink-0 lg:w-[240px] xl:w-[260px]">
       {showSkeleton ? (
         <SkeletonColumn cardCount={cards.length || 4} />
       ) : (
@@ -648,6 +651,7 @@ function LazyPipelineColumn({
             accent={accent}
             cardMovendoId={cardMovendoId}
             arrastoDesabilitado={arrastoDesabilitado}
+            isOver={isOver}
             onAdd={onAdd}
             onAbrirCard={onAbrirCard}
             onAgendarReuniao={onAgendarReuniao}
@@ -708,7 +712,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
   const movimentoPendenteRef = useRef(false);
   const atualizacaoManualRef = useRef(false);
 
-  const etapasOrdenadas = [...pipeline.etapas].sort((a, b) => a.ordem - b.ordem);
+  const etapasOrdenadas = useMemo(() => [...pipeline.etapas].sort((a, b) => a.ordem - b.ordem), [pipeline.etapas]);
   // A entrada de um lead é única: só a primeira coluna pode ser Novos Leads.
   // Se a configuração do pipeline estiver inconsistente, falhamos fechados e não
   // oferecemos criação em nenhuma outra etapa.
@@ -718,6 +722,12 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
     : undefined;
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const idsColunas = useMemo(() => new Set(etapasOrdenadas.map((etapa) => etapa.id)), [etapasOrdenadas]);
+  const detectarColuna = useCallback<CollisionDetection>((args) => pointerWithin({
+    ...args,
+    droppableContainers: args.droppableContainers.filter((container) =>
+      idsColunas.has(String(container.id))),
+  }), [idsColunas]);
 
   const responsaveisDisponiveis = useMemo(() => {
     const mapa = new Map<number, string>();
@@ -876,131 +886,66 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
     setErro(null);
   }
 
-  function onDragOver({ active, over }: DragOverEvent) {
-    if (movimentoPendenteRef.current || !snapshotArrastoRef.current) return;
-    if (!over) return;
-    const activeCard = cards.find((c) => c.id === active.id);
-    if (!activeCard) return;
-
-    const overEtapa = etapasOrdenadas.find((e) => e.id === over.id)?.id;
-    const overCard = cards.find((c) => c.id === over.id);
-    const targetEtapaId = overEtapa || overCard?.etapaId;
-
-    if (targetEtapaId && targetEtapaId !== activeCard.etapaId) {
-      setCards((prev) => moverCardOtimistaNoBoard(prev, activeCard.id, targetEtapaId));
-    }
-  }
-
-  async function restaurarArrasto(snapshot: SnapshotArrasto, mensagem?: string) {
-    if (snapshotArrastoRef.current !== snapshot) return;
-    const generationRollback = ++generationBoardRef.current;
-    setCards(restaurarSnapshotBoard(snapshot.cards));
-    if (mensagem) setErro(mensagem);
-
-    // A c\u00f3pia local \u00e9 a fonte imediata de verdade. A recarga \u00e9 somente uma
-    // reconcilia\u00e7\u00e3o em segundo plano e n\u00e3o pode apagar o motivo do bloqueio.
-    try {
-      await recarregarCards({ generation: generationRollback, preservarErro: Boolean(mensagem) });
-    } finally {
-      if (snapshotArrastoRef.current !== snapshot) return;
-      snapshotArrastoRef.current = null;
-      movimentoPendenteRef.current = false;
-      setMovimentoPendente(false);
-      setCardMovendoId(null);
-
-      if (sincronizacaoRealtimePendenteRef.current) {
-        sincronizacaoRealtimePendenteRef.current = false;
-        void recarregarCards({ generation: generationBoardRef.current, preservarErro: Boolean(mensagem) });
-      }
-    }
-  }
-
   async function onDragEnd({ active, over }: DragEndEvent) {
     setActiveId(null);
     const snapshot = snapshotArrastoRef.current;
     if (!snapshot) return;
-    movimentoPendenteRef.current = true;
-    setMovimentoPendente(true);
-
-    if (!over) {
-      await restaurarArrasto(snapshot);
-      return;
-    }
-
     const activeCard = snapshot.cards.find((c) => c.id === active.id);
-    if (!activeCard) {
-      await restaurarArrasto(snapshot);
-      return;
-    }
-
-    const overEtapa = etapasOrdenadas.find((e) => e.id === over.id)?.id;
-    const overCard = cards.find((c) => c.id === over.id);
-    const etapaDestinoId = overEtapa || overCard?.etapaId;
-
-    if (!etapaDestinoId || etapaDestinoId === activeCard.etapaId) {
-      await restaurarArrasto(snapshot);
+    const origem = etapasOrdenadas.find((etapa) => etapa.id === activeCard?.etapaId);
+    const destino = etapasOrdenadas.find((etapa) => etapa.id === over?.id);
+    if (!activeCard || !origem || !destino || !destinoEhPosterior(origem.ordem, destino.ordem)) {
+      snapshotArrastoRef.current = null;
+      if (sincronizacaoRealtimePendenteRef.current) {
+        sincronizacaoRealtimePendenteRef.current = false;
+        void recarregarCards({ generation: snapshot.generation });
+      }
       return;
     }
 
     if (activeCard.origem === "noloss" && activeCard.nolossLeadId) {
-      // Lead virtual: nunca move sozinho — reverte visualmente e abre o modal
-      // de "quem assume esse lead?" antes de qualquer efeito real no banco.
-      const etapaDestinoNome = etapasOrdenadas.find((etapa) => etapa.id === etapaDestinoId)?.nome ?? "";
-      await restaurarArrasto(snapshot);
+      snapshotArrastoRef.current = null;
       setPromocaoLeadPendente({
         nolossLeadId: activeCard.nolossLeadId,
         nomeLead: activeCard.empresa.nomeFantasia || activeCard.empresa.razaoSocial,
-        etapaDestinoId,
-        etapaDestinoNome,
+        etapaDestinoId: destino.id,
+        etapaDestinoNome: destino.nome,
       });
       return;
     }
 
+    movimentoPendenteRef.current = true;
+    setMovimentoPendente(true);
     setCardMovendoId(activeCard.id);
-    let motivoRejeicao = "Nao foi possivel mover o card";
+    setCards((prev) => moverCardOtimistaNoBoard(prev, activeCard.id, destino.id));
+    let mensagemErro: string | null = null;
     try {
-      const resultado = await resolverMovimentoOtimistaBoard({
-        mover: async () => {
-          try {
-            const res = await MoverCardBpm({ cardId: activeCard.id, etapaDestinoId });
-            if (!res.success) {
-              motivoRejeicao = typeof res.error === "string" ? res.error : motivoRejeicao;
-              return false;
-            }
-            return true;
-          } catch {
-            return false;
-          }
-        },
-        reconciliar: () => recarregarCards({ generation: snapshot.generation }),
-        restaurar: () => restaurarArrasto(snapshot, motivoRejeicao),
-      });
-
-      if (snapshotArrastoRef.current !== snapshot) return;
-      if (resultado === "SINCRONIZACAO_PENDENTE") {
-        setErro("Movimento salvo, mas nao foi possivel sincronizar o board agora.");
-      }
+      const resultado = await MoverCardBpm({ cardId: activeCard.id, etapaDestinoId: destino.id });
+      if (!resultado.success) mensagemErro = typeof resultado.error === "string" ? resultado.error : "Não foi possível mover o card";
+    } catch {
+      mensagemErro = "Não foi possível mover o card";
     } finally {
       if (snapshotArrastoRef.current !== snapshot) return;
+      if (mensagemErro) {
+        setCards(restaurarSnapshotBoard(snapshot.cards));
+        setErro(mensagemErro);
+      }
       snapshotArrastoRef.current = null;
       movimentoPendenteRef.current = false;
       setMovimentoPendente(false);
       setCardMovendoId(null);
-
-      if (sincronizacaoRealtimePendenteRef.current) {
-        sincronizacaoRealtimePendenteRef.current = false;
-        void recarregarCards({ generation: generationBoardRef.current });
-      }
+      sincronizacaoRealtimePendenteRef.current = false;
+      // A resposta do servidor libera o arrasto; a leitura atualiza badges e
+      // encaminhamentos sem manter o usuário preso ao spinner.
+      void recarregarCards({ generation: snapshot.generation, preservarErro: Boolean(mensagemErro) });
     }
   }
 
   function onDragCancel() {
     setActiveId(null);
-    const snapshot = snapshotArrastoRef.current;
-    if (snapshot) {
-      movimentoPendenteRef.current = true;
-      setMovimentoPendente(true);
-      void restaurarArrasto(snapshot);
+    snapshotArrastoRef.current = null;
+    if (sincronizacaoRealtimePendenteRef.current) {
+      sincronizacaoRealtimePendenteRef.current = false;
+      void recarregarCards({ generation: generationBoardRef.current });
     }
   }
 
@@ -1091,9 +1036,8 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
 
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCorners}
+        collisionDetection={detectarColuna}
         onDragStart={onDragStart}
-        onDragOver={onDragOver}
         onDragEnd={onDragEnd}
         onDragCancel={onDragCancel}
       >

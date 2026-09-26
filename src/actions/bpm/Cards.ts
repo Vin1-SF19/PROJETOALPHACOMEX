@@ -262,7 +262,19 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
     });
 
     const idsDestinos = [...new Set(cards.flatMap((card) => card.vinculosOrigem.map((vinculo) => vinculo.cardDestino.id)))];
-    const destinosVisiveis = new Set((await Promise.all(idsDestinos.map(async (id) => {
+    const vinculosPosteriores = idsDestinos.length ? await db.bpmCardVinculo.findMany({
+      where: { cardOrigemId: { in: idsDestinos }, cardDestino: { pipeline: { ativo: true }, status: { not: "ARQUIVADO" } } },
+      select: { cardOrigemId: true, cardDestino: { select: { id: true, pipelineId: true,
+        pipeline: { select: { nome: true } }, etapa: { select: { nome: true } },
+      } } },
+      orderBy: { createdAt: "desc" },
+    }) : [];
+    const destinoPosteriorPorOrigem = new Map<string, (typeof vinculosPosteriores)[number]["cardDestino"]>();
+    for (const vinculo of vinculosPosteriores) {
+      if (!destinoPosteriorPorOrigem.has(vinculo.cardOrigemId)) destinoPosteriorPorOrigem.set(vinculo.cardOrigemId, vinculo.cardDestino);
+    }
+    const idsParaAutorizar = [...new Set([...idsDestinos, ...vinculosPosteriores.map((vinculo) => vinculo.cardDestino.id)])];
+    const destinosVisiveis = new Set((await Promise.all(idsParaAutorizar.map(async (id) => {
       try {
         await exigirAcessoBpmCard(id, userId, session.user.role ?? null, "visualizar");
         return id;
@@ -464,9 +476,12 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
       const composicaoCardKanban = composicaoPorEtapa.get(card.etapaId);
       const etapaFinal = Boolean(pipelineInfo?.etapas.find((etapa) => etapa.id === card.etapaId)?.ehFinal);
       const encaminhamentos = etapaFinal
-        ? vinculosOrigem.map(({ cardDestino }) => destinosVisiveis.has(cardDestino.id)
-          ? { pipeline: cardDestino.pipeline.nome, etapa: cardDestino.etapa.nome }
-          : { pipeline: null, etapa: null })
+        ? vinculosOrigem.map(({ cardDestino }) => {
+          if (!destinosVisiveis.has(cardDestino.id)) return { pipeline: null, etapa: null };
+          const posterior = destinoPosteriorPorOrigem.get(cardDestino.id);
+          const atual = posterior && destinosVisiveis.has(posterior.id) ? posterior : cardDestino;
+          return { pipeline: atual.pipeline.nome, etapa: atual.etapa.nome };
+        })
         : [];
       const encaminhamentoPendente = etapaFinal && etapasComSaida.has(card.etapaId)
         && card.status === "CONCLUIDO" && encaminhamentos.length === 0;

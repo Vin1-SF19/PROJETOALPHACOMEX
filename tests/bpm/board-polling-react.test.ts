@@ -167,7 +167,6 @@ it.each(["success", "failure", "sync-failure"])("mostra pending após drop até 
   try {
     await act(async () => root.render(h(PipelineBoardClient, props)));
     await act(async () => { drag.current!.onDragStart!({ active } as import("@dnd-kit/core").DragStartEvent); });
-    await act(async () => { drag.current!.onDragOver!({ active, over } as import("@dnd-kit/core").DragOverEvent); });
     let finished: unknown;
     await act(async () => { finished = drag.current!.onDragEnd!({ active, over } as import("@dnd-kit/core").DragEndEvent); });
     expect(container.textContent).toContain("Movendo card…");
@@ -179,7 +178,26 @@ it.each(["success", "failure", "sync-failure"])("mostra pending após drop até 
     });
     expect(container.textContent).not.toContain("Movendo card…");
     expect(container.querySelector('[aria-busy="true"]')).toBeNull();
-    if (outcome === "sync-failure") expect(container.textContent).toContain("Movimento salvo");
+    if (outcome === "sync-failure") expect(container.textContent).not.toContain("Movimento salvo");
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+  }
+});
+
+it("ignora o drop em etapa anterior sem chamar o servidor nem mostrar erro", async () => {
+  Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
+  const { container, root, props } = montarBoard();
+  props.pipeline.etapas = [{ id: "etapa-1", nome: "Anterior", ordem: 0 }, { id: "etapa-2", nome: "Atual", ordem: 1 }];
+  props.cardsIniciais = [{ ...card, etapaId: "etapa-2" }];
+  try {
+    await act(async () => root.render(h(PipelineBoardClient, props)));
+    const active = { id: card.id };
+    await act(async () => { drag.current!.onDragStart!({ active } as import("@dnd-kit/core").DragStartEvent); });
+    await act(async () => { await drag.current!.onDragEnd!({ active, over: { id: "etapa-1" } } as import("@dnd-kit/core").DragEndEvent); });
+    expect(MoverCardBpm).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain("Não foi possível mover");
+    expect(container.textContent).not.toContain("Movendo card");
   } finally {
     await act(async () => root.unmount());
     container.remove();
