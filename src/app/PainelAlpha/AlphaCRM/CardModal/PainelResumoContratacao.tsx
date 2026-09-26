@@ -9,6 +9,11 @@ export function PainelResumoContratacao({ resumo }: { resumo: Resumo }) {
   return (
     <section aria-label="Dados da contratação" className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
       <h3 className="mb-3 text-sm font-semibold text-slate-100">Dados da contratação</h3>
+      {!resumo.operacionalCardId && resumo.pendenciasOperacionais && (
+        <p role="alert" className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-100">
+          {resumo.pendenciasOperacionais}
+        </p>
+      )}
       <dl className="grid gap-x-5 gap-y-3 sm:grid-cols-2">
         {resumo.campos.map(({ nome, valor }) => (
           <div key={nome} className="min-w-0">

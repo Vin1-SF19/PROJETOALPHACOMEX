@@ -22,6 +22,7 @@ vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/PainelRegistrar", async () => {
   }) };
 });
 vi.mock("@/actions/bpm/Anexos", () => ({ RegistrarAnexoBpm: vi.fn() }));
+vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/PainelNotaFiscalConcluida", () => ({ PainelNotaFiscalConcluida: () => null }));
 
 let root: Root;
 let container: HTMLDivElement;

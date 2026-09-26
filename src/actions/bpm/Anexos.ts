@@ -42,9 +42,12 @@ export async function RegistrarAnexoBpm(dados: unknown) {
 
     const resultado = await db.$transaction(async (tx) => {
       const acesso = await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "enviarArquivo", tx);
+      let campoContratoAssinado = false;
+      let pipelineIdCard: string | null = null;
       if (campoId) {
         const card = await tx.bpmCard.findUnique({ where: { id: cardId }, select: { pipelineId: true, etapaId: true } });
         if (!card) throw new Error("CAMPO_ARQUIVO_INVALIDO");
+        pipelineIdCard = card.pipelineId;
         const perfil = acesso.isAdminGlobal || acesso.role === "ADMINISTRADOR"
           ? "ADMIN" : acesso.role === "RESPONSAVEL" ? "RESPONSAVEL" : "MEMBRO";
         const campos = await carregarCamposAplicaveisCardEtapa(cardId, card.pipelineId, card.etapaId, tx, perfil);
@@ -52,6 +55,7 @@ export async function RegistrarAnexoBpm(dados: unknown) {
         if (!campo || !validarValoresCamposBpm([campo], { [campoId]: "" }).success) {
           throw new Error("CAMPO_ARQUIVO_INVALIDO");
         }
+        campoContratoAssinado = campo.chave === "alpha.contrato.assinado.anexo";
       }
       const referencia = criarReferenciaAnexoBpm(recibo.pathname);
       // O mesmo recibo assinado sempre descreve o mesmo pathname. Em caso de
@@ -91,26 +95,22 @@ export async function RegistrarAnexoBpm(dados: unknown) {
         },
         tx,
       );
-      if (campoId) {
-        const campo = await tx.bpmCampo.findUnique({ where: { id: campoId }, select: { chave: true } });
-        if (campo?.chave === "alpha.contrato.assinado.anexo") {
-          const card = await tx.bpmCard.findUnique({ where: { id: cardId }, select: { pipelineId: true } });
-          if (card) await publicarEventoBpm({
-            tipo: "CARD_ATUALIZADO", entidadeTipo: "CARD", entidadeId: cardId,
-            cardId, pipelineId: card.pipelineId, valorNovo: { anexoAssinadoId: criado.id },
-            atorTipo: "USUARIO", atorUserId: userId,
-            causationId: criado.id, idempotencyKey: `contrato-assinado-anexo:${criado.id}`,
-          }, tx);
-        }
+      if (campoContratoAssinado && pipelineIdCard) {
+        await publicarEventoBpm({
+          tipo: "CARD_ATUALIZADO", entidadeTipo: "CARD", entidadeId: cardId,
+          cardId, pipelineId: pipelineIdCard, valorNovo: { anexoAssinadoId: criado.id },
+          atorTipo: "USUARIO", atorUserId: userId,
+          causationId: criado.id, idempotencyKey: `contrato-assinado-anexo:${criado.id}`,
+        }, tx);
       }
-      return { anexo: criado, criado: true };
+      return { anexo: criado, criado: true, campoContratoAssinado };
     });
 
     if (resultado.criado) {
       try {
         revalidatePath(`${ROTA_BASE}/pipeline`);
         await notificarPipelineBpm({ cardId, tipo: "ANEXO_ALTERADO" });
-        if (campoId) await executarAutomacoesCentraisDoCardAgora(cardId);
+        if (resultado.campoContratoAssinado) await executarAutomacoesCentraisDoCardAgora(cardId);
       } catch (notificationError) {
         console.error("[RegistrarAnexoBpm/pos-salvamento]", notificationError);
       }

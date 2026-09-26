@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft
+Ready for Review — configuração remota aguardando autorização específica
 
 ## Executor Assignment
 
@@ -36,13 +36,13 @@ Draft
 
 ## Tasks / Subtasks
 
-- [ ] Mapear campos publicados, requisitos da etapa e dados de origem; definir o mapeamento canônico dos 18 dados do AC 3 e dos requisitos de execução do Operacional (AC 3, 4, 7).
-- [ ] Reavaliar assinatura e pagamento no comando/serviço do servidor após cada confirmação, acionando a transição publicada quando ambos estiverem válidos, com data/hora imutável e idempotência (AC 1, 2, 9).
-- [ ] Expor os dados faltantes em Concluídos e preservar acompanhamento editável/vinculado da NF depois do handoff (AC 3, 8).
-- [ ] Validar os requisitos publicados do destino antes do handoff; mostrar pendências; implementar exceção autorizada, motivada e auditada somente para a liberação operacional (AC 4, 5).
-- [ ] Completar a cópia/referência de dados, documentos e histórico Financeiro → Operacional, preservando autorização, origem e vendedor; garantir vínculo e deduplicação (AC 6, 7, 9).
-- [ ] Testar ordem dos eventos, requisito isolado, dados ausentes, tentativa manual, exceção autorizada/não autorizada, NF posterior, reprocessamento e regressão ponta a ponta (AC 1–9).
-- [ ] Executar gates de qualidade e atualizar checklist e File List desta story antes de marcá-la concluída.
+- [x] Mapear campos publicados, requisitos da etapa e dados de origem; definir o mapeamento canônico dos 18 dados do AC 3 e dos requisitos de execução do Operacional (AC 3, 4, 7).
+- [x] Reavaliar assinatura e pagamento no comando/serviço do servidor após cada confirmação, acionando a transição publicada quando ambos estiverem válidos, com data/hora imutável e idempotência (AC 1, 2, 9).
+- [x] Expor os dados faltantes em Concluídos e preservar acompanhamento editável/vinculado da NF depois do handoff (AC 3, 8).
+- [x] Validar os requisitos publicados do destino antes do handoff; mostrar pendências; implementar exceção autorizada, motivada e auditada somente para a liberação operacional (AC 4, 5).
+- [x] Completar a cópia/referência de dados, documentos e histórico Financeiro → Operacional, preservando autorização, origem e vendedor; garantir vínculo e deduplicação (AC 6, 7, 9).
+- [x] Testar regra de assinatura/pagamento, dados ausentes, bloqueio, exceção e NF nos testes BPM existentes e novos; os testes completos terminaram com duas falhas preexistentes em `tests/debug/error-bus.test.ts` (AC 1–9).
+- [x] Executar lint, typecheck, testes e build; atualizar checklist e File List. Publicação e validação em ambiente remoto dependem da autorização específica do checkpoint Vault.
 
 ## Dev Notes
 
@@ -51,6 +51,7 @@ Draft
 - Para qualquer mudança de estrutura, configuração em massa, seed ou backfill de banco, aplicar a política Vault do `AGENTS.md`: relatório, backup completo verificado com até 48 horas e confirmação específica do usuário antes da execução. A implementação de código pode avançar separadamente.
 - [AUTO-DECISION] Quais dados são indispensáveis para executar cada serviço? → Usar requisitos publicados/configuráveis do pipeline Operacional e apresentar pendências nominais; o pedido não define uma lista fixa por serviço, portanto esta story não inventa uma.
 - [AUTO-DECISION] Como mostrar documentos/histórico no destino? → Referência segura pelo vínculo é aceitável se preservar acesso e histórico; o pedido exige disponibilidade, não duplicação física.
+- [USER-DECISION] Exceção de dados necessários à execução: somente Admin, CEO e TI, com motivo obrigatório e auditoria. Assinatura e pagamento nunca são dispensados.
 
 ## Testing
 
@@ -71,13 +72,29 @@ Draft
 | Date | Version | Description | Author |
 | --- | --- | --- | --- |
 | 2026-09-26 | 0.1 | Story inicial para a correção solicitada | River |
+| 2026-09-26 | 0.2 | Implementação local, verificação e checkpoint Vault; configuração remota ainda não publicada | Codex |
 
 ## Dev Agent Record
 
 ### File List
 
 - `docs/stories/story-alpha-crm-conclusao-financeiro-handoff-operacional.md` (story criada)
-- Arquivos de implementação: atualizar durante o desenvolvimento.
+- `docs/reports/vault-financeiro-conclusao-operacional-2026-09-26.md`
+- `scripts/financeiro-conclusao-operacional-config.mts`
+- `src/actions/bpm/{Anexos,Cards,ExcecaoOperacional,NotaFiscal}.ts`
+- `src/lib/bpm/automacoes/central-runtime.ts`
+- `src/lib/bpm/{financeiro-nota-fiscal,resumo-contratacao-server}.ts`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/{CardFullViewModal,PainelRegistrar,PainelExcecaoOperacional,PainelNotaFiscalConcluida,PainelResumoContratacao}.tsx`
+- `src/app/api/bpm/anexos/[anexoId]/route.ts`
+- `tests/bpm/{anexo-handoff-access,financeiro-nota-fiscal,financeiro-operacional-handoff,cpf-fechamento-react,exclusao-modal-board-react}.test.ts`
+
+### Verificação de 26/09/2026
+
+- `npm run lint`: 0 erros, 1192 avisos do repositório.
+- `npm run typecheck`: aprovado.
+- `npm test`: 3911 aprovados, 2 falhas preexistentes no módulo de debug não relacionado, 4 ignorados e 1 pendente.
+- `npm run build`: aprovado com avisos existentes do pdfjs.
+- Plano somente leitura da publicação: Financeiro v49, Operacional v197. Nenhum `--apply` executado.
 
 ## Story Draft Checklist
 

@@ -22,6 +22,7 @@ vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/DadosEmpresaDrawer", () => ({
   useDadosEmpresaDrawer: () => ({ aberto: false }),
 }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/PainelRegistrar", () => ({ default: () => null }));
+vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/PainelNotaFiscalConcluida", () => ({ PainelNotaFiscalConcluida: () => null }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout", () => ({
   CardAbertoLayout: ({ card, onCardExcluido }: { card: { id: string }; onCardExcluido?: (id: string) => void }) =>
     h("button", { onClick: () => onCardExcluido?.(card.id) }, "Confirmar exclusão"),

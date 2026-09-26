@@ -152,7 +152,8 @@ try {
         await tx.bpmCampoEtapaConfig.upsert({ where: { campoId_etapaId: { campoId: id, etapaId } },
           create: { campoId: id, etapaId, visivel: true, editavel: false, somenteLeitura: true,
             obrigatorio: etapaId === boasVindasId && camposObrigatoriosOperacional.includes(chave), ordem: 100 + i, grupo: "Dados da contratação" },
-          update: etapaId === boasVindasId && camposObrigatoriosOperacional.includes(chave) ? { visivel: true, obrigatorio: true } : { visivel: true } });
+          update: { visivel: true, editavel: false, somenteLeitura: true,
+            obrigatorio: etapaId === boasVindasId && camposObrigatoriosOperacional.includes(chave) } });
         await tx.bpmFormularioComponente.upsert({ where: { secaoId_chave: { secaoId, chave: `field:${id}` } },
           create: { secaoId, chave: `field:${id}`, tipo: "CAMPO", campoId: id, ordem: 100 + i }, update: {} });
       }

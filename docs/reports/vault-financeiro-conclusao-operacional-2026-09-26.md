@@ -15,6 +15,7 @@ Publicar `scripts/financeiro-conclusao-operacional-config.mts --apply` após apr
 1. 🟡 Atualiza duas `BpmTransicaoEtapa` existentes (Formalização → Concluídos e Pagamento → Concluídos) para `permitida=true`, `origem=AUTOMACAO`, `lifecycleDestino=CONCLUIDO`.
 2. 🟡 Cria uma `BpmAutomacao` ativa e uma `BpmAutomacaoVersao` ativa, disparada por atualização de card quando assinatura = Assinado e pagamento = Sim, para mover o card a Concluídos.
 3. 🟡 Insere ou atualiza vínculos e configurações de campos para os formulários Concluídos e Boas-vindas, incluindo seis campos obrigatórios na entrada operacional; insere componentes de formulário quando ausentes e incrementa versões dos dois formulários.
+   Os campos transportados ficam somente para leitura no formulário operacional; contrato, NF e histórico são consultados pela projeção vinculada atualizada a partir da origem.
 4. 🟡 Incrementa `configVersion` de ambos os pipelines. Não há `DROP`, `DELETE`, backfill de cards nem migration.
 
 O comando de publicação previsto, **ainda não autorizado nem executado**, é:

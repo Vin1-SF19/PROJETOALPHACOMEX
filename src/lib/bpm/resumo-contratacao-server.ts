@@ -63,11 +63,17 @@ export async function carregarResumoContratacao(financeiroCardId: string) {
     where: { chave: "alpha.contrato.assinado.anexo", ativo: true }, select: { id: true },
   }).then((campo) => campo ? persistidos.get(campo.id) : null);
   const contratoAssinado = Boolean(anexoContratoId && card.anexos.some((anexo) => anexo.id === anexoContratoId));
+  const falhaLiberacao = await db.bpmAutomacaoExecucao.findFirst({
+    where: { cardId: card.id, automacao: { chave: "financeiro.handoff.contrato.concluido.operacional" }, status: "FALHA" },
+    orderBy: { iniciadoEm: "desc" }, select: { mensagemErro: true },
+  });
 
   return {
     financeiroCardId: card.id,
     operacionalCardId: card.vinculosOrigem[0]?.cardDestinoId ?? null,
     negociacaoId: comercial?.id ?? null,
+    pendenciasOperacionais: falhaLiberacao?.mensagemErro?.includes("Campos obrigatórios:")
+      ? falhaLiberacao.mensagemErro : null,
     campos: [
       { nome: "CNPJ", valor: card.empresa.cnpj ?? null },
       { nome: "Razão Social", valor: card.empresa.razaoSocial ?? null },
