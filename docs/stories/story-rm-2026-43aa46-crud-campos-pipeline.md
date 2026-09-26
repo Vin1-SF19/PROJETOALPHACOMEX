@@ -1,5 +1,37 @@
 # Story RM-2026-43AA46 — CRUD completo de campos por coluna (Pipeline)
 
+## Correção — texto curto em etapa publicada pelo editor (2026-09-26)
+
+Relato: ao criar um campo de texto curto numa seção para o nome do responsável, o cadastro retorna um toast de entrada inválida.
+
+Critérios de aceite desta correção:
+
+- [x] Criar e atualizar campos aceita os IDs `draft-stage-<uuid>` que o editor persiste ao publicar novas etapas, além dos CUIDs existentes.
+- [x] Obrigatoriedade por etapa continua sendo preservada e validada.
+- [x] IDs inválidos e etapas inexistentes continuam sendo rejeitados.
+- [x] Executar os gates e registrar seus resultados reais.
+
+Diagnóstico: `ConfiguracaoPipeline.ts` persiste o ID da nova etapa sem conversão; `campoEtapaConfigSchema` aceita somente CUID, embora `etapaIdCardSchema` já reconheça ambos os formatos. A correção reutiliza essa validação nas configurações dos campos. Sem migração ou alteração de dados.
+
+Validação desta correção:
+
+- Pipeline informado pelo usuário: Revisão do Radar. Etapa específica e smoke autenticado não confirmados; a incompatibilidade foi reproduzida pela validação dos formatos de ID e coberta por testes.
+- Vitest focado: **2 arquivos, 33 testes aprovados** (`crud-campos-bpm` e `campos-configuraveis-actions`). Executado em drive temporário criado por `cmd pushd`, com binding Windows do Rolldown 1.0.1 instalado somente no TEMP e indicado via `NODE_PATH`, sem mudar manifest/lockfile do projeto.
+- `git diff --check` do escopo: sem erros.
+- `npm run lint`, `npm run typecheck` e `npm test`: tentados. Os wrappers npm deste ambiente Windows não encontram os executáveis da instalação compartilhada; `typecheck` também utiliza atribuição de variável no formato POSIX.
+- Executáveis Node chamados diretamente como alternativa: lint do escopo inicialmente terminou sem diagnósticos; lint global e typecheck não concluíram após vários minutos na pasta de rede e foram encerrados. Esses gates globais **não estão aprovados**.
+- Suíte geral com cobertura: iniciou, apresentou falhas em Google Calendar, Chatbot, gerador de PDF e falhas de carregamento em suites de integração; encerrada sem relatório completo. Não foi executada comparação de baseline para atribuir a origem dessas falhas.
+- Build Next: tentou baixar/carregar SWC Windows e encontrou `Access is denied` ao carregar o binário pela pasta de rede; execução encerrada, sem build aprovado.
+- CodeRabbit: indisponível, pois o WSL exigido pelo fluxo não está instalado.
+- Estado: correção implementada e testes focados aprovados; validação global e smoke autenticado pendentes. Commit local solicitado pelo usuário em 2026-09-26. Sem push, publicação, migração ou mutação de dados.
+
+File list desta correção:
+
+- `src/lib/validations/bpm.ts`
+- `tests/bpm/crud-campos-bpm.test.ts`
+- `tests/bpm/campos-configuraveis-actions.test.ts`
+- `docs/stories/story-rm-2026-43aa46-crud-campos-pipeline.md`
+
 **Título do objetivo:** COnfigurações de Pipelines do CRM
 **Objetivo:** `adicionar, editar, excluir, escolher o tipo (texto, select, checkbox, etc), se é obrigatório ou não` — por coluna/etapa do Pipeline.
 **Projeto:** Painel Alpha (PainelAlpha/AlphaCRM)

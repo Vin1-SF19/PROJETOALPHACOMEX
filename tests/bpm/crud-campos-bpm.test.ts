@@ -7,6 +7,32 @@ const CUID2 = "cfakecuidqrstuvwxyz12345";
 const PIPE = "cpipelinefakeabcdefghij12";
 
 describe("schema de campos BPM (CRUD completo)", () => {
+  it("aceita texto curto obrigatório em etapa publicada com identidade do editor", () => {
+    const etapaConfiguracoes = [{
+      etapaId: "draft-stage-12345678-1234-1234-1234-123456789abc",
+      obrigatorio: true,
+    }];
+    const criado = criarCampoSchema.safeParse({
+      pipelineId: PIPE, nome: "Nome do responsável", tipo: "texto",
+      opcoes: [], etapaConfiguracoes,
+    });
+    expect(criado.success).toBe(true);
+    if (criado.success) expect(criado.data.etapaConfiguracoes?.[0]).toMatchObject({
+      ...etapaConfiguracoes[0], visivel: true, editavel: true,
+    });
+    expect(atualizarCampoSchema.safeParse({ campoId: CUID, etapaConfiguracoes }).success).toBe(true);
+  });
+
+  it.each(["x", "draft-stage-invalido", "", "12345678-1234-1234-1234-123456789abc"])(
+    "rejeita identidade inválida de etapa: %s", (etapaId) => {
+      const etapaConfiguracoes = [{ etapaId, obrigatorio: true }];
+      expect(criarCampoSchema.safeParse({
+        pipelineId: PIPE, nome: "Nome do responsável", tipo: "texto", etapaConfiguracoes,
+      }).success).toBe(false);
+      expect(atualizarCampoSchema.safeParse({ campoId: CUID, etapaConfiguracoes }).success).toBe(false);
+    },
+  );
+
   it("permite atualizar comportamento por etapa apenas pela configuração canônica", () => {
     const r = atualizarCampoSchema.safeParse({
       campoId: CUID,

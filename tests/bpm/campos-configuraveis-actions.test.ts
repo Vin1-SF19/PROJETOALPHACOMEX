@@ -210,6 +210,41 @@ describe("ações de gestão configurável de campos", () => {
     expect(mocks.campoPipelineCreateMany).not.toHaveBeenCalled();
   });
 
+  it("cria texto curto obrigatório em etapa publicada pelo editor", async () => {
+    const etapaId = "draft-stage-12345678-1234-1234-1234-123456789abc";
+    mocks.etapaFindMany.mockResolvedValue([{ id: etapaId, pipelineId: PIPELINE_ID }]);
+    const resultado = await CriarCampoBpm({
+      pipelineId: PIPELINE_ID, nome: "Nome do responsável", tipo: "texto", opcoes: [],
+      etapaConfiguracoes: [{ etapaId, obrigatorio: true }],
+    });
+    expect(resultado.success).toBe(true);
+    expect(mocks.campoEtapaConfigCreateMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ etapaId, obrigatorio: true, visivel: true, editavel: true })],
+    });
+  });
+
+  it("rejeita etapa com identidade do editor que ainda não existe", async () => {
+    mocks.etapaFindMany.mockResolvedValue([]);
+    const resultado = await CriarCampoBpm({
+      pipelineId: PIPELINE_ID, nome: "Nome do responsável", tipo: "texto",
+      etapaConfiguracoes: [{ etapaId: "draft-stage-12345678-1234-1234-1234-123456789abc", obrigatorio: true }],
+    });
+    expect(resultado).toMatchObject({ success: false, error: expect.stringContaining("não existe") });
+    expect(mocks.campoCreate).not.toHaveBeenCalled();
+  });
+
+  it("rejeita texto obrigatório somente leitura em etapa com identidade do editor", async () => {
+    const resultado = await CriarCampoBpm({
+      pipelineId: PIPELINE_ID, nome: "Nome do responsável", tipo: "texto",
+      etapaConfiguracoes: [{
+        etapaId: "draft-stage-12345678-1234-1234-1234-123456789abc",
+        obrigatorio: true, editavel: false, somenteLeitura: true,
+      }],
+    });
+    expect(resultado).toMatchObject({ success: false, error: expect.stringContaining("visível e editável") });
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
   it("preserva o agregado completo em dois saves consecutivos sem reload", async () => {
     const agregado = {
       id: CAMPO_DESTINO_ID,

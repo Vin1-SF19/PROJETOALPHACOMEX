@@ -202,8 +202,14 @@ const campoOpcaoSchema = z.union([
   }),
 ]);
 
+// O editor publica novas etapas preservando o ID draft-stage-<uuid>.
+export const etapaIdCardSchema = z.union([
+  z.string().cuid(),
+  z.string().regex(/^draft-stage-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i),
+]);
+
 const campoEtapaConfigSchema = z.object({
-  etapaId: z.string().cuid(),
+  etapaId: etapaIdCardSchema,
   visivel: z.boolean().default(true),
   editavel: z.boolean().default(true),
   somenteLeitura: z.boolean().default(false),
@@ -331,11 +337,6 @@ export const novaEmpresaCardSchema = z.object({
   uf: z.string().trim().length(2).optional(),
   municipio: z.string().trim().max(120).optional(),
 });
-
-export const etapaIdCardSchema = z.union([
-  z.string().cuid(),
-  z.string().regex(/^draft-stage-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i),
-]);
 
 export const criarCardSchema = z.object({
   empresaId: z.number().int().positive().optional(),
