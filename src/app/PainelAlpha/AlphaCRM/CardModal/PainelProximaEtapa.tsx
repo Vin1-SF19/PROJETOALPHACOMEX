@@ -10,6 +10,7 @@ import { CampoBpmInput } from "@/app/PainelAlpha/AlphaCRM/CampoBpmInput";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCardSave } from "./CardSaveContext";
 import { BPM_CAPABILITIES, BPM_STAGE_KEYS } from "@/lib/bpm/ontology";
+import { transcricaoRealRegistrada } from "@/lib/bpm/reuniao-agendada";
 import { formularioExigeCapacidade } from "@/lib/bpm/formulario-renderer";
 import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
 import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
@@ -41,7 +42,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
     primeiroItemId: string | null;
   } | null>(null);
   const aguardandoTranscricao = card.etapa.chave === BPM_STAGE_KEYS.REUNIAO_AGENDADA
-    && !card.transcricaoReuniao?.trim()
+    && !transcricaoRealRegistrada(card.transcricaoReuniao)
     && formularioExigeCapacidade(card.formularioEtapa, BPM_CAPABILITIES.MEETING_TRANSCRIPT);
 
   const carregarPendencias = useCallback(async () => {

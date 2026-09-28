@@ -119,7 +119,7 @@ export async function ativarCadenciasNaEntradaBpm(
   for (const cadencia of cadencias) {
     // A cadência editável desta etapa é executada pelo job de oito dias úteis.
     // O motor genérico conta dias corridos e produziria tarefas duplicadas.
-    if (destino.pipeline?.nome === "Revisão de Radar" && destino.nome === "Agendar Reunião"
+    if (destino.pipeline?.nome === "Revisão de Radar" && ["Agendar Reunião", "Reunião Agendada"].includes(destino.nome)
       && cadencia.etapas?.some((etapa) => etapa.etapaId === destino.id)) continue;
     const primeiroPasso = cadencia.passos[0];
     if (!primeiroPasso) continue;

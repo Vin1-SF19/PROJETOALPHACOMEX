@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { obterErroTranscricaoParaMovimento } from "@/lib/bpm/reuniao-agendada";
+import { destinoPermitidoReuniaoAgendada, inicioTentativasAposReuniao, obterErroTranscricaoParaMovimento } from "@/lib/bpm/reuniao-agendada";
 import {
   consolidarTranscricao,
   extrairCodigoMeet,
@@ -8,6 +8,18 @@ import {
 } from "@/lib/bpm/transcricao-reuniao";
 
 describe("Reunião Agendada", () => {
+  it("aceita somente as três saídas da etapa", () => {
+    expect(["Em tratativas", "Sem viabilidade", "Stand By"].every(destinoPermitidoReuniaoAgendada)).toBe(true);
+    expect(["Novo Lead", "Agendar Reunião", "Fechado", "Lost", "Monitoramento"].some(destinoPermitidoReuniaoAgendada)).toBe(false);
+  });
+
+  it("inicia as ligações após a reunião, sem criar tentativa antes dela", () => {
+    const inicio = inicioTentativasAposReuniao(
+      new Date("2026-08-10T10:00:00.000Z"),
+      new Date("2026-08-10T18:00:00.000Z"),
+    );
+    expect(inicio.toISOString()).toBe("2026-08-11T03:00:00.000Z");
+  });
   it("extrai somente meeting code de URL oficial válida", () => {
     expect(extrairCodigoMeet("https://meet.google.com/abc-mnop-xyz?authuser=0")).toBe("abc-mnop-xyz");
     expect(extrairCodigoMeet("https://evil.example/abc-mnop-xyz")).toBeNull();
@@ -36,6 +48,16 @@ describe("Reunião Agendada", () => {
       etapaOrigemNome: "Reunião Agendada",
       etapaDestinoNome: "Em tratativa",
       transcricaoReuniao: "  ",
+    })).toContain("ainda não foi recebida");
+    expect(obterErroTranscricaoParaMovimento({
+      etapaOrigemNome: "Reunião Agendada",
+      etapaDestinoNome: "Em tratativas",
+      transcricaoReuniao: "  ",
+    })).toContain("ainda não foi recebida");
+    expect(obterErroTranscricaoParaMovimento({
+      etapaOrigemNome: "Reunião Agendada",
+      etapaDestinoNome: "Em tratativas",
+      transcricaoReuniao: "Resumo parcial do evento (Google Calendar):\nDescrição do convite",
     })).toContain("ainda não foi recebida");
     expect(obterErroTranscricaoParaMovimento({
       etapaOrigemNome: "Reunião Agendada",

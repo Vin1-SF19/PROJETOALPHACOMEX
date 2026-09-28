@@ -2,18 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Video, CalendarClock, FileText, RefreshCw, CircleCheck } from "lucide-react";
+import { Video, CalendarClock, FileText, RefreshCw, CircleCheck, Download } from "lucide-react";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { AgendarReuniaoGoogleMeetBpm, ListarConvidadosReuniaoGoogleMeetBpm, ReagendarReuniaoBpm } from "@/actions/bpm/GoogleMeet";
 import {
   SalvarResumoReuniaoBpm,
   SincronizarTranscricaoReuniaoBpm,
+  ObterArtefatosMeetBpm,
 } from "@/actions/bpm/TranscricaoMeet";
 import { useCardSave } from "./CardSaveContext";
 import { BpmDateTimeField } from "./BpmDateTimeField";
 import { fmtDateTime, formatarDataHoraLocalBpm, parseDataHoraLocalBpm } from "@/lib/format-date";
 import { criarRastreadorRascunho } from "@/lib/bpm/rascunho-versionado";
 import { emailClienteReuniaoSchema, emailsConvidadosReuniaoSchema } from "@/lib/bpm/email-reuniao";
+import { transcricaoRealRegistrada } from "@/lib/bpm/reuniao-agendada";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 
@@ -22,11 +24,12 @@ interface Props {
   accent: string;
   podeEditar: boolean;
   onAtualizado: () => void;
-  /** No estágio Reunião Agendada, mantém apenas o acompanhamento/transcrição. */
+  /** Na etapa Reunião Agendada, exibe reagendamento e transcrição. */
   mostrarFormulario?: boolean;
+  permitirReagendar?: boolean;
 }
 
-export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarFormulario = true }: Props) {
+export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarFormulario = true, permitirReagendar = false }: Props) {
   const { registerSave, scheduleSave, getVersion, confirmVersion, getDraft, setDraft } = useCardSave();
   const [dataHora, setDataHora] = useState(() => formatarDataHoraLocalBpm(card.dataReuniao));
   const [erroDataHora, setErroDataHora] = useState<string | null>(null);
@@ -40,6 +43,12 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
   const [sincronizando, setSincronizando] = useState(false);
   const [erroTranscricao, setErroTranscricao] = useState<string | null>(null);
   const [motivoPendente, setMotivoPendente] = useState<string | null>(null);
+  const [resumosMeet, setResumosMeet] = useState<Array<{ nome: string; url: string }>>([]);
+  const [gravacoesMeet, setGravacoesMeet] = useState<Array<{ nome: string; url: string }>>([]);
+  const [buscandoResumos, setBuscandoResumos] = useState(false);
+  const [gerandoFicha, setGerandoFicha] = useState(false);
+  const [erroResumos, setErroResumos] = useState<string | null>(null);
+  const [agora, setAgora] = useState(() => Date.now());
   const [conflitoDataHora, setConflitoDataHora] = useState(false);
   const [conflitoResumo, setConflitoResumo] = useState(false);
   const cardIdRef = useRef(card.id);
@@ -52,7 +61,14 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
   const resumoRascunhoRef = useRef(criarRastreadorRascunho(resumo));
 
   const jaAgendada = Boolean(card.googleEventId);
-  const transcricaoRecebida = Boolean(card.transcricaoReuniao?.trim());
+  const transcricaoRecebida = transcricaoRealRegistrada(card.transcricaoReuniao);
+  const reuniaoJaOcorreu = Boolean(card.dataReuniao && new Date(card.dataReuniao).getTime() <= agora);
+  const reagendamentoBloqueado = jaAgendada && (transcricaoRecebida || reuniaoJaOcorreu);
+
+  useEffect(() => {
+    const timer = setInterval(() => setAgora(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const novaDataHora = formatarDataHoraLocalBpm(card.dataReuniao);
@@ -71,6 +87,9 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
       setDataHora(novaDataHora);
       setEmailCliente(novoEmailCliente);
       setEmailsAdicionados([]);
+      setResumosMeet([]);
+      setGravacoesMeet([]);
+      setErroResumos(null);
       setErroEmailCliente(null);
       setResumo(novoResumo);
       setConflitoDataHora(false);
@@ -120,6 +139,20 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
     }).catch(() => { /* Falha de leitura não impede reagendar com o e-mail principal. */ });
     return () => { ativo = false; };
   }, [card.id, card.googleEventId, card.emailClienteReuniao]);
+
+  useEffect(() => {
+    if (mostrarFormulario || !card.googleEventId || !card.dataReuniao || new Date(card.dataReuniao).getTime() > Date.now()) return;
+    let ativo = true;
+    void ObterArtefatosMeetBpm({ cardId: card.id }).then((resultado) => {
+      if (!ativo) return;
+      if (resultado.success) {
+        setResumosMeet(resultado.data.resumos);
+        setGravacoesMeet(resultado.data.gravacoes);
+      }
+      else setErroResumos(resultado.error);
+    });
+    return () => { ativo = false; };
+  }, [card.id, card.googleEventId, card.dataReuniao, mostrarFormulario]);
 
   function adicionarEmailDigitado() {
     const resultado = emailClienteReuniaoSchema.safeParse(emailCliente);
@@ -211,6 +244,33 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
     onAtualizado();
   }
 
+  async function handleBuscarResumos() {
+    setBuscandoResumos(true);
+    setErroResumos(null);
+    const resultado = await ObterArtefatosMeetBpm({ cardId: card.id });
+    setBuscandoResumos(false);
+    if (resultado.success) {
+      setResumosMeet(resultado.data.resumos);
+      setGravacoesMeet(resultado.data.gravacoes);
+    }
+    else setErroResumos(resultado.error);
+  }
+
+  async function handleGerarFicha() {
+    setGerandoFicha(true);
+    const { GerarFichaViabilidadeBpm } = await import("@/actions/bpm/FichaViabilidade");
+    const resultado = await GerarFichaViabilidadeBpm({ cardId: card.id });
+    setGerandoFicha(false);
+    if (!resultado.success) { toast.error(resultado.error); return; }
+    const bytes = Uint8Array.from(atob(resultado.data.base64), (caractere) => caractere.charCodeAt(0));
+    const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = resultado.data.nome;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
+
   async function persistirResumo(): Promise<boolean> {
     const snapshot = resumoRascunhoRef.current.capturar();
     return registerSave(async () => {
@@ -232,7 +292,7 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
         resumoSujoRef.current = false;
         setConflitoResumo(false);
       }
-      toast.success("Resumo da reunião salvo");
+      toast.success("Transcrição da reunião salva");
       onAtualizado();
       return true;
     }, card.id, draftKey, undefined, false);
@@ -254,7 +314,7 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
         </p>
       )}
 
-      {mostrarFormulario && (
+      {(mostrarFormulario || (permitirReagendar && jaAgendada)) && (
         <>
           <BpmDateTimeField
             id={`reuniao-data-hora-${card.id}`}
@@ -267,7 +327,7 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
               setErroDataHora(null);
             }}
             required
-            disabled={!podeEditar || salvando || (jaAgendada && transcricaoRecebida)}
+            disabled={!podeEditar || salvando || reagendamentoBloqueado}
             error={erroDataHora}
           />
 
@@ -281,7 +341,7 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
                   <span key={email} className="inline-flex items-center gap-1 rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-2 py-1 text-[11px] text-cyan-100">
                     {index === 0 && <span className="font-semibold">Principal:</span>}
                     {email}
-                    <button type="button" aria-label={`Remover ${email}`} disabled={!podeEditar || salvando || (jaAgendada && transcricaoRecebida)} onClick={() => {
+                    <button type="button" aria-label={`Remover ${email}`} disabled={!podeEditar || salvando || reagendamentoBloqueado} onClick={() => {
                       emailClienteSujoRef.current = true;
                       setEmailsAdicionados((atuais) => atuais.filter((item) => item !== email));
                     }} className="rounded px-1 hover:bg-white/10 disabled:opacity-50">×</button>
@@ -309,7 +369,7 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
                 }
               }}
               required={emailsAdicionados.length === 0}
-              disabled={!podeEditar || salvando || (jaAgendada && transcricaoRecebida)}
+              disabled={!podeEditar || salvando || reagendamentoBloqueado}
               aria-invalid={Boolean(erroEmailCliente)}
               aria-describedby={erroEmailCliente ? `reuniao-email-cliente-erro-${card.id}` : undefined}
               placeholder="Digite o e-mail e pressione Enter"
@@ -332,9 +392,9 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
           <button
             type="button"
             onClick={() => void handleAgendar()}
-            disabled={!podeEditar || salvando || (jaAgendada && transcricaoRecebida)}
-            title={jaAgendada && transcricaoRecebida
-              ? "A reunião concluída não pode ser reutilizada após a chegada da transcrição."
+            disabled={!podeEditar || salvando || reagendamentoBloqueado}
+            title={reagendamentoBloqueado
+              ? "O horário da reunião já passou ou há transcrição. Preserve o evento para receber a evidência."
               : undefined}
             className="w-full flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition-all disabled:opacity-60"
             style={{ background: `rgba(${accent},0.18)`, color: `rgb(${accent})`, border: `1px solid rgba(${accent},0.35)` }}
@@ -342,7 +402,7 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
             {salvando ? <RefreshCw size={13} className="animate-spin" /> : <Video size={13} />}
             {salvando
               ? "Salvando..."
-              : jaAgendada && transcricaoRecebida
+              : reagendamentoBloqueado
                 ? "Reunião concluída"
                 : jaAgendada
                   ? "Reagendar"
@@ -370,8 +430,27 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
 
       {!mostrarFormulario && jaAgendada && (
         <div className="rounded-2xl border border-white/[0.07] bg-black/10 p-3 space-y-2">
+          <button type="button" onClick={() => void handleGerarFicha()} disabled={gerandoFicha}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-200 disabled:opacity-50">
+            <Download size={13} /> {gerandoFicha ? "Gerando ficha…" : "Gerar ficha de viabilidade"}
+          </button>
+          <div className="space-y-2">
+            <button type="button" onClick={() => void handleBuscarResumos()} disabled={buscandoResumos}
+              className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-200 disabled:opacity-50">
+              {buscandoResumos ? "Buscando artefatos…" : "Buscar resumos e gravações do Google Meet"}
+            </button>
+            {erroResumos && <p role="alert" className="text-xs text-rose-300">{erroResumos}</p>}
+            {resumosMeet.length > 0 ? resumosMeet.map((item) => (
+              <a key={item.url} href={item.url} target="_blank" rel="noreferrer"
+                className="block text-xs text-cyan-300 underline">{item.nome} no Google Docs</a>
+            )) : !buscandoResumos && !erroResumos && <p className="text-xs text-slate-500">Os resumos aparecem aqui quando o Meet gerar notas com o Gemini.</p>}
+            {gravacoesMeet.map((item) => (
+              <a key={item.url} href={item.url} target="_blank" rel="noreferrer"
+                className="block text-xs text-cyan-300 underline">{item.nome} no Google Drive</a>
+            ))}
+          </div>
           <div className="flex items-center gap-2 text-[11px] font-semibold">
-            {card.transcricaoReuniao?.trim() ? (
+            {transcricaoRecebida ? (
               <>
                 <CircleCheck size={14} className="text-emerald-400" />
                 <span className="text-emerald-300">Transcrição recebida</span>
@@ -388,12 +467,12 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
 
           <div className="space-y-1.5">
               <label htmlFor={`resumo-reuniao-${card.id}`} className="text-[10px] font-medium text-slate-400">
-                Resumo da reunião
+                Transcrição da reunião
               </label>
               <textarea
                 id={`resumo-reuniao-${card.id}`}
                 value={resumo}
-                placeholder="Registre aqui o resumo da reunião ou busque a transcrição do Meet abaixo."
+                placeholder="Cole a transcrição da reunião ou busque o texto gerado pelo Google Meet abaixo."
                 onChange={(event) => {
                   resumoSujoRef.current = true;
                   resumoRascunhoRef.current.alterar(event.target.value);
@@ -403,13 +482,13 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
                 }}
                 onBlur={() => void persistirResumo()}
                 disabled={!podeEditar}
-                aria-label="Resumo da reunião"
+                aria-label="Transcrição da reunião"
                 className="min-h-32 w-full resize-y rounded-xl border border-white/10 bg-black/20 p-3 text-[11px] leading-relaxed text-slate-300 outline-none transition-colors focus:border-white/20 disabled:cursor-not-allowed disabled:opacity-60"
               />
               <p className="text-[10px] text-slate-500" role="status" aria-live="polite">
                 {salvandoResumo ? "Salvando resumo…" : resumo.trim()
-                  ? "A transcrição do Meet pode ser ajustada antes de avançar."
-                  : "O Google pode levar alguns minutos após a reunião. Você também pode registrar o resumo aqui."}
+                  ? "A transcrição está registrada e pode ser revisada antes de avançar."
+                  : "O Google pode levar alguns minutos após a reunião. Você também pode colar a transcrição aqui."}
               </p>
               {conflitoResumo && (
                 <p className="rounded-xl border border-sky-500/25 bg-sky-500/[0.07] p-3 text-xs text-sky-200" role="status">

@@ -16,7 +16,6 @@ import {
   AUTOMACAO_ORIGEM_LIGACOES_NOVOS_LEADS,
   AUTOMACAO_ORIGEM_NOVOS_LEADS,
   calcularLigacoesPendentesNoDia,
-  cicloNovosLeadsVencido,
   cicloDeTentativasNovosLeadsConcluido,
   datasUteisCicloNovosLeads,
   oitoTentativasDiariasRegistradas,
@@ -36,6 +35,7 @@ import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automa
 import {
   AUTOMACAO_ORIGEM_REUNIAO_AGENDADA,
   NOME_ETAPA_REUNIAO_AGENDADA,
+  inicioTentativasAposReuniao,
 } from "@/lib/bpm/reuniao-agendada";
 import {
   ACAO_MONITORAMENTO_EXECUTADO,
@@ -90,6 +90,7 @@ export type ResumoAutomacaoFollowUpBpm = {
   porEtapa: ResumoEtapaFollowUp[];
   ligacoesNovosLeads: ResumoLigacoesNovosLeads;
   ligacoesAgendarReuniao: ResumoLigacoesNovosLeads;
+  ligacoesReuniaoAgendada: ResumoLigacoesNovosLeads;
   standby: ResumoStandbyFollowUp;
   monitoramento: ResumoMonitoramento;
   avisos: string[];
@@ -388,13 +389,15 @@ async function executarAutomacaoLigacoesNovosLeadsBpm(params: {
 async function executarAutomacaoLigacoesAgendarBpm(params: {
   pipelineId: string;
   etapaId: string;
-  cards: Array<{ id: string; etapaId: string; responsavelId: number | null; createdAt: Date; updatedAt: Date }>;
+  cards: Array<{ id: string; etapaId: string; responsavelId: number | null; createdAt: Date; updatedAt: Date; dataReuniao?: Date | null }>;
   historicosPorCard: Map<string, Array<{ createdAt: Date; valorNovoJson: string | null }>>;
   cadencia: { id: string; passos: Array<{ id: string; ordem: number; intervaloDias: number; tipoTarefa: string; titulo: string; descricao: string | null; prioridade: string }> };
+  acaoPlanejamento: string;
+  iniciarAposReuniao?: boolean;
   agora: Date;
   resumo: ResumoLigacoesNovosLeads;
 }) {
-  const { pipelineId, etapaId, cards, historicosPorCard, cadencia, agora, resumo } = params;
+  const { pipelineId, etapaId, cards, historicosPorCard, cadencia, acaoPlanejamento, iniciarAposReuniao = false, agora, resumo } = params;
   const candidatos = cards.filter((card) => card.etapaId === etapaId);
   resumo.examinados = candidatos.length;
   if (!candidatos.length || !ehDiaUtilNovosLeads(agora)) {
@@ -404,12 +407,18 @@ async function executarAutomacaoLigacoesAgendarBpm(params: {
   const { inicio, fim } = intervaloDiaCivilSaoPaulo(agora);
   const [interacoes, planejamentos] = await Promise.all([
     db.bpmInteracaoCard.findMany({ where: { cardId: { in: candidatos.map((card) => card.id) }, tipo: "LIGACAO", createdAt: { gte: inicio, lt: fim } }, select: { cardId: true } }),
-    db.bpmCardHistorico.findMany({ where: { cardId: { in: candidatos.map((card) => card.id) }, acao: "AGENDAR_REUNIAO_LIGACAO_PLANEJADA", createdAt: { gte: inicio, lt: fim } }, select: { cardId: true } }),
+    db.bpmCardHistorico.findMany({ where: { cardId: { in: candidatos.map((card) => card.id) }, acao: acaoPlanejamento, createdAt: { gte: inicio, lt: fim } }, select: { cardId: true } }),
   ]);
   const ligacoesHoje = new Set(interacoes.map((item) => item.cardId));
   const jaPlanejados = new Set(planejamentos.map((item) => item.cardId));
   for (const card of candidatos) {
-    const entrada = resolverInicioCicloNaEtapa(etapaId, card.createdAt, historicosPorCard.get(card.id) ?? []);
+    const entradaEtapa = resolverInicioCicloNaEtapa(etapaId, card.createdAt, historicosPorCard.get(card.id) ?? []);
+    if (iniciarAposReuniao && (!card.dataReuniao || card.dataReuniao > agora)) {
+      resumo.ignorados++;
+      continue;
+    }
+    const entrada = iniciarAposReuniao && card.dataReuniao
+      ? inicioTentativasAposReuniao(entradaEtapa, card.dataReuniao) : entradaEtapa;
     const passo = agendaLigacoesAgendar(entrada, cadencia.passos).find((item) => item.dataCivil === formatarDataCivil(agora));
     if (!passo || ligacoesHoje.has(card.id) || jaPlanejados.has(card.id)) {
       resumo.ignorados++;
@@ -433,7 +442,7 @@ async function executarAutomacaoLigacoesAgendarBpm(params: {
           tipo: "LIGACAO", prioridade: passo.prioridade, status: "PENDENTE",
         }, select: { id: true } });
         await tx.bpmCardHistorico.create({ data: {
-          cardId: card.id, acao: "AGENDAR_REUNIAO_LIGACAO_PLANEJADA", automacaoOrigem: cadencia.id,
+          cardId: card.id, acao: acaoPlanejamento, automacaoOrigem: cadencia.id,
           valorNovoJson: JSON.stringify({ cadenciaId: cadencia.id, passoId: passo.id, tarefaId: tarefa.id, dataCivil: passo.dataCivil }),
         } });
         return true;
@@ -461,6 +470,7 @@ export async function executarAutomacaoFollowUpBpm(
     porEtapa: [],
     ligacoesNovosLeads: criarResumoLigacoesNovosLeads(),
     ligacoesAgendarReuniao: criarResumoLigacoesNovosLeads(),
+    ligacoesReuniaoAgendada: criarResumoLigacoesNovosLeads(),
     standby: criarResumoStandby(),
     monitoramento: criarResumoMonitoramento(),
     avisos: [],
@@ -545,12 +555,19 @@ export async function executarAutomacaoFollowUpBpm(
       status: "ATIVO",
       proximoContatoEm: null,
     },
-    select: { id: true, etapaId: true, responsavelId: true, createdAt: true, updatedAt: true },
+    select: { id: true, etapaId: true, responsavelId: true, createdAt: true, updatedAt: true, dataReuniao: true },
   });
 
   const etapaAgendar = configuracoes.find((item) => item.nome === NOME_ETAPA_AGENDAR_REUNIAO);
   const cadenciaAgendar = etapaAgendar ? await db.bpmCadencia.findFirst({
     where: { pipelineId: pipeline.id, ativa: true, excluidoEm: null, etapas: { some: { etapaId: etapaAgendar.id } } },
+    select: { id: true, passos: { where: { ativo: true }, orderBy: { ordem: "asc" }, select: {
+      id: true, ordem: true, intervaloDias: true, tipoTarefa: true, titulo: true, descricao: true, prioridade: true,
+    } } },
+  }) : null;
+  const etapaReuniaoAgendada = configuracoes.find((item) => item.nome === NOME_ETAPA_REUNIAO_AGENDADA);
+  const cadenciaReuniaoAgendada = etapaReuniaoAgendada ? await db.bpmCadencia.findFirst({
+    where: { pipelineId: pipeline.id, ativa: true, excluidoEm: null, etapas: { some: { etapaId: etapaReuniaoAgendada.id } } },
     select: { id: true, passos: { where: { ativo: true }, orderBy: { ordem: "asc" }, select: {
       id: true, ordem: true, intervaloDias: true, tipoTarefa: true, titulo: true, descricao: true, prioridade: true,
     } } },
@@ -574,7 +591,7 @@ export async function executarAutomacaoFollowUpBpm(
   }
 
   const cardsComLigacoes = cards.filter((card) => configuracoes.some((configuracao) =>
-    [NOME_ETAPA_NOVOS_LEADS, NOME_ETAPA_AGENDAR_REUNIAO].includes(configuracao.nome) && configuracao.id === card.etapaId));
+    [NOME_ETAPA_NOVOS_LEADS, NOME_ETAPA_AGENDAR_REUNIAO, NOME_ETAPA_REUNIAO_AGENDADA].includes(configuracao.nome) && configuracao.id === card.etapaId));
   const interacoesDoCiclo = cardsComLigacoes.length > 0
     ? await db.bpmInteracaoCard.findMany({
         where: {
@@ -601,19 +618,23 @@ export async function executarAutomacaoFollowUpBpm(
     resumoEtapa.examinados = cardsEtapa.length;
 
     const elegiveis = cardsEtapa.filter((card) => {
-      const inicioCiclo = configuracao.nome === NOME_ETAPA_NOVOS_LEADS
+      const entradaEtapa = configuracao.nome === NOME_ETAPA_NOVOS_LEADS
         ? card.createdAt
         : resolverInicioCicloNaEtapa(
             configuracao.id,
             card.createdAt,
             historicosPorCard.get(card.id) ?? [],
           );
+      const aposReuniao = configuracao.nome === NOME_ETAPA_REUNIAO_AGENDADA;
+      if (aposReuniao && (!card.dataReuniao || card.dataReuniao > agora)) return false;
+      const inicioCiclo = aposReuniao && card.dataReuniao
+        ? inicioTentativasAposReuniao(entradaEtapa, card.dataReuniao) : entradaEtapa;
       return configuracao.nome === NOME_ETAPA_NOVOS_LEADS
         ? cicloDeTentativasNovosLeadsConcluido(inicioCiclo, agora)
           && oitoTentativasDiariasRegistradas(inicioCiclo, interacoesPorCard.get(card.id) ?? [])
         : configuracao.nome === NOME_ETAPA_AGENDAR_REUNIAO
           ? Boolean(cadenciaAgendar && agendaAgendarConcluida(inicioCiclo, cadenciaAgendar.passos, interacoesPorCard.get(card.id) ?? [], agora))
-        : cicloNovosLeadsVencido(inicioCiclo, agora);
+        : Boolean(cadenciaReuniaoAgendada && agendaAgendarConcluida(inicioCiclo, cadenciaReuniaoAgendada.passos, interacoesPorCard.get(card.id) ?? [], agora));
     });
     resumoEtapa.elegiveis = elegiveis.length;
     resumoEtapa.ignorados = cardsEtapa.length - elegiveis.length;
@@ -676,6 +697,19 @@ export async function executarAutomacaoFollowUpBpm(
               } } },
             });
             const entrada = resolverInicioCicloNaEtapa(configuracao.id, card.createdAt, historicosPorCard.get(card.id) ?? []);
+            if (!atual || !agendaAgendarConcluida(entrada, atual.passos, interacoesPorCard.get(card.id) ?? [], agora)) return false;
+          }
+          if (configuracao.nome === NOME_ETAPA_REUNIAO_AGENDADA) {
+            if (!cadenciaReuniaoAgendada) return false;
+            const atual = await tx.bpmCadencia.findFirst({
+              where: { id: cadenciaReuniaoAgendada.id, ativa: true, excluidoEm: null, etapas: { some: { etapaId: configuracao.id } } },
+              select: { passos: { where: { ativo: true }, orderBy: { ordem: "asc" }, select: {
+                id: true, ordem: true, intervaloDias: true, tipoTarefa: true, titulo: true, descricao: true, prioridade: true,
+              } } },
+            });
+            const entradaEtapa = resolverInicioCicloNaEtapa(configuracao.id, card.createdAt, historicosPorCard.get(card.id) ?? []);
+            if (!card.dataReuniao || card.dataReuniao > agora) return false;
+            const entrada = inicioTentativasAposReuniao(entradaEtapa, card.dataReuniao);
             if (!atual || !agendaAgendarConcluida(entrada, atual.passos, interacoesPorCard.get(card.id) ?? [], agora)) return false;
           }
           const atualizacao = await tx.bpmCard.updateMany({
@@ -744,6 +778,15 @@ export async function executarAutomacaoFollowUpBpm(
     await executarAutomacaoLigacoesAgendarBpm({
       pipelineId: pipeline.id, etapaId: etapaAgendar.id, cards, historicosPorCard,
       cadencia: cadenciaAgendar, agora, resumo: resumo.ligacoesAgendarReuniao,
+      acaoPlanejamento: "AGENDAR_REUNIAO_LIGACAO_PLANEJADA",
+    });
+  }
+  if (etapaReuniaoAgendada && cadenciaReuniaoAgendada) {
+    await executarAutomacaoLigacoesAgendarBpm({
+      pipelineId: pipeline.id, etapaId: etapaReuniaoAgendada.id, cards, historicosPorCard,
+      cadencia: cadenciaReuniaoAgendada, agora, resumo: resumo.ligacoesReuniaoAgendada,
+      acaoPlanejamento: "REUNIAO_AGENDADA_LIGACAO_PLANEJADA",
+      iniciarAposReuniao: true,
     });
   }
 

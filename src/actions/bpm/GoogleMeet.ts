@@ -26,6 +26,7 @@ import { GoogleCalendarError } from "@/lib/google-calendar/errors";
 import { cancelarCriacaoSemVinculo, registrarCompensacaoGooglePendente, reverterReagendamentoSemPersistencia, type EventoCriadoSemVinculo, type ReagendamentoPendente } from "@/lib/bpm/google-meet-compensacao";
 import { destinoEhReuniaoAgendada, etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
 import { extrairCodigoMeet } from "@/lib/bpm/transcricao-reuniao";
+import { etapaEhReuniaoAgendada } from "@/lib/bpm/reuniao-agendada";
 import { dataHoraObrigatoriaBpmSchema } from "@/lib/validations/bpm";
 import {
   combinarParticipantesReuniao,
@@ -35,7 +36,8 @@ import {
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 const DURACAO_PADRAO_MINUTOS = 60; // decisão confirmada com o usuário (plano-novos-leads-bpm.md, Bloco 2)
-const ERRO_ETAPA_REUNIAO = "O Google Meet só pode ser agendado ou reagendado na etapa Agendar Reunião.";
+const ERRO_ETAPA_REUNIAO = "O Google Meet só pode ser agendado na etapa Agendar Reunião.";
+const ERRO_ETAPA_REAGENDAMENTO = "O Google Meet só pode ser reagendado em Agendar Reunião ou Reunião Agendada.";
 
 /** Recupera convidados do evento sem duplicar sua lista no banco do CRM. */
 export async function ListarConvidadosReuniaoGoogleMeetBpm(cardId: string) {
@@ -101,6 +103,16 @@ async function compensarReagendamentoComRegistro(pendente: ReagendamentoPendente
 
 function cardEstaNaEtapaDeReuniao(card: { etapa: { nome: string } } | null): boolean {
   return Boolean(card && etapaEhAgendarReuniao(card.etapa.nome));
+}
+
+function cardEstaNaEtapaDeReagendamento(card: { etapa: { nome: string } } | null): boolean {
+  return Boolean(card && (etapaEhAgendarReuniao(card.etapa.nome) || etapaEhReuniaoAgendada(card.etapa.nome)));
+}
+
+const ERRO_REUNIAO_ENCERRADA = "O horário desta reunião já passou. Preserve o evento para receber a transcrição; para uma nova reunião, crie outro agendamento.";
+
+function reuniaoJaOcorreu(data: Date | null | undefined): boolean {
+  return Boolean(data && data.getTime() <= Date.now());
 }
 
 function mesmoEspacoMeet(linkDoCard: string, linkDoGoogle: string | null): boolean {
@@ -529,9 +541,12 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
       },
     });
     if (!card) return { success: false, error: "Card não encontrado" };
-    if (!cardEstaNaEtapaDeReuniao(card)) return { success: false, error: ERRO_ETAPA_REUNIAO };
+    if (!cardEstaNaEtapaDeReagendamento(card)) return { success: false, error: ERRO_ETAPA_REAGENDAMENTO };
     if (!card.googleEventId || !card.googleCalendarId || !card.googleMeetLink) {
       return { success: false, error: "Este card ainda não tem reunião agendada — use Agendar pelo Google Meet primeiro." };
+    }
+    if (reuniaoJaOcorreu(card.dataReuniao)) {
+      return { success: false, error: ERRO_REUNIAO_ENCERRADA };
     }
     if (card.transcricaoReuniao?.trim()) {
       return {
@@ -552,11 +567,12 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
         googleEventId: true,
         googleCalendarId: true,
         googleMeetLink: true,
+        dataReuniao: true,
         transcricaoReuniao: true,
       },
     });
-    if (!cardAntesDeReagendar || !cardEstaNaEtapaDeReuniao(cardAntesDeReagendar)) {
-      return { success: false, error: ERRO_ETAPA_REUNIAO };
+    if (!cardAntesDeReagendar || !cardEstaNaEtapaDeReagendamento(cardAntesDeReagendar)) {
+      return { success: false, error: ERRO_ETAPA_REAGENDAMENTO };
     }
     if (
       cardAntesDeReagendar.googleEventId !== card.googleEventId
@@ -570,6 +586,9 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
         success: false,
         error: "Esta reunião já possui transcrição recebida e não pode ser reutilizada em outra data. Avance o card para preservar o vínculo da evidência.",
       };
+    }
+    if (reuniaoJaOcorreu(cardAntesDeReagendar.dataReuniao)) {
+      return { success: false, error: ERRO_REUNIAO_ENCERRADA };
     }
     await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
     const resultado = await reagendarEventoVinculado({
@@ -601,17 +620,21 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
           googleEventId: true,
           googleCalendarId: true,
           googleMeetLink: true,
+          dataReuniao: true,
           transcricaoReuniao: true,
         },
       });
-      if (!cardAntesDePersistir || !cardEstaNaEtapaDeReuniao(cardAntesDePersistir)) {
-        return { success: false as const, error: ERRO_ETAPA_REUNIAO };
+      if (!cardAntesDePersistir || !cardEstaNaEtapaDeReagendamento(cardAntesDePersistir)) {
+        return { success: false as const, error: ERRO_ETAPA_REAGENDAMENTO };
       }
       if (cardAntesDePersistir.transcricaoReuniao?.trim()) {
         return {
           success: false as const,
           error: "Esta reunião já possui transcrição recebida e não pode ser reutilizada em outra data. Avance o card para preservar o vínculo da evidência.",
         };
+      }
+      if (reuniaoJaOcorreu(cardAntesDePersistir.dataReuniao)) {
+        return { success: false as const, error: ERRO_REUNIAO_ENCERRADA };
       }
       const atualizado = await tx.bpmCard.updateMany({
         where: {

@@ -204,3 +204,53 @@ export async function carregarArtefatoTranscricaoMeet(
     throw classificarErro(erro);
   }
 }
+
+/** Retorna apenas links de notas Gemini da conferência, sem ampliar o escopo OAuth. */
+export async function listarResumosMeet(
+  emailUsuario: string,
+  conferenceRecordName: string,
+): Promise<Array<{ nome: string; url: string }>> {
+  const meet = criarClienteMeet(emailUsuario);
+  try {
+    const notas = await paginarGoogleMeet(async (pageToken) => {
+      const resposta = await meet.conferenceRecords.smartNotes.list({
+        parent: conferenceRecordName,
+        pageSize: 100,
+        pageToken,
+      }, { timeout: TIMEOUT_CHAMADA_MEET_MS });
+      return { itens: resposta.data.smartNotes ?? [], nextPageToken: resposta.data.nextPageToken };
+    }, { maxItens: 100 });
+    return notas.flatMap((nota, indice) => {
+      if (nota.state !== "FILE_GENERATED" || !nota.docsDestination?.document) return [];
+      const documento = nota.docsDestination.document;
+      if (!/^[A-Za-z0-9_-]{10,}$/.test(documento)) return [];
+      return [{ nome: `Resumo ${indice + 1}`, url: `https://docs.google.com/document/d/${documento}/view` }];
+    });
+  } catch (erro) {
+    throw classificarErro(erro);
+  }
+}
+
+export async function listarGravacoesMeet(
+  emailUsuario: string,
+  conferenceRecordName: string,
+): Promise<Array<{ nome: string; url: string }>> {
+  const meet = criarClienteMeet(emailUsuario);
+  try {
+    const gravacoes = await paginarGoogleMeet(async (pageToken) => {
+      const resposta = await meet.conferenceRecords.recordings.list({
+        parent: conferenceRecordName,
+        pageSize: 100,
+        pageToken,
+      }, { timeout: TIMEOUT_CHAMADA_MEET_MS });
+      return { itens: resposta.data.recordings ?? [], nextPageToken: resposta.data.nextPageToken };
+    }, { maxItens: 100 });
+    return gravacoes.flatMap((item, indice) => {
+      const url = item.driveDestination?.exportUri;
+      if (item.state !== "FILE_GENERATED" || !url?.startsWith("https://drive.google.com/")) return [];
+      return [{ nome: `Gravação ${indice + 1}`, url }];
+    });
+  } catch (erro) {
+    throw classificarErro(erro);
+  }
+}

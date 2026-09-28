@@ -46,13 +46,14 @@ describe("CRM - formulário unificado por etapa", () => {
     expect(slotFormulario).toContain("<PainelReuniao");
     expect(modal).not.toContain("<PainelReuniao");
     expect(modal).not.toContain("destinoEhReuniaoAgendada");
-    expect(reuniao).toContain("{mostrarFormulario && (");
+    expect(reuniao).toContain("{(mostrarFormulario || (permitirReagendar && jaAgendada)) && (");
   });
 
-  it("mostra acompanhamento e resumo em Reunião Agendada sem reabrir o agendamento", () => {
+  it("mostra transcrição e permite reagendamento em Reunião Agendada", () => {
     expect(slotFormulario).toContain('case "meeting-transcript"');
     expect(slotFormulario).toContain("mostrarFormulario={false}");
-    expect(reuniao).toContain('aria-label="Resumo da reunião"');
+    expect(slotFormulario).toContain("permitirReagendar");
+    expect(reuniao).toContain('aria-label="Transcrição da reunião"');
   });
 
   it("delega a exclusividade visual à composição publicada", () => {

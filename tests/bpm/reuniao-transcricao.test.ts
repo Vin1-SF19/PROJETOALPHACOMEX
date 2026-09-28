@@ -16,7 +16,7 @@ describe("RM-2026-CB55AA — transcrição da reunião no card", () => {
   });
 
   it("exibe resumo editável e registra o autosave no fluxo do card", () => {
-    expect(painel).toContain('aria-label="Resumo da reunião"');
+    expect(painel).toContain('aria-label="Transcrição da reunião"');
     expect(painel).toContain("onBlur={() => void persistirResumo()}");
     expect(painel).toContain("return registerSave(async () =>");
   });

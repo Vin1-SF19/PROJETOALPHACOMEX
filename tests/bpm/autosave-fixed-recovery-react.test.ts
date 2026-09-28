@@ -97,11 +97,11 @@ it.each<[Kind, string]>([["contact", "2026-09-23T14:00"], ["summary", "Resumo ed
   expect(host.textContent).not.toContain("mudou enquanto");
 });
 
-it("permite registrar resumo quando a transcrição da reunião começa vazia", async () => {
+it("permite registrar transcrição manual quando a reunião começa sem texto", async () => {
   backend.fail = false;
   backend.resumo = "";
   await act(async () => root.render(h(CardSaveProvider, { children: h(Harness, { kind: "summary", show: true, initialSummary: "" }) })));
-  const resumo = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="Resumo da reunião"]');
+  const resumo = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="Transcrição da reunião"]');
   expect(resumo).toBeTruthy();
   expect(resumo?.value).toBe("");
   await edit("Resumo registrado após a reunião");

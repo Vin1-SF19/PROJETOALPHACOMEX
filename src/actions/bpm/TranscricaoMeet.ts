@@ -7,13 +7,13 @@ import { auth } from "../../../auth";
 import db from "@/lib/prisma";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
-import { sincronizarTranscricaoCardBpm } from "@/lib/bpm/transcricao-reuniao-server";
+import { obterLinksArtefatosMeetCardBpm, sincronizarTranscricaoCardBpm } from "@/lib/bpm/transcricao-reuniao-server";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 const schema = z.object({ cardId: z.string().min(1) });
 const salvarResumoSchema = z.object({
   cardId: z.string().min(1),
-  resumo: z.string().trim().min(1, "O resumo não pode ficar vazio").max(200_000),
+  resumo: z.string().trim().min(1, "A transcrição não pode ficar vazia").max(200_000),
   versaoEsperadaEm: z.coerce.date(),
 });
 
@@ -53,7 +53,7 @@ export async function SalvarResumoReuniaoBpm(dados: unknown) {
       await tx.bpmCardHistorico.create({
         data: {
           cardId,
-          acao: "RESUMO_REUNIAO_EDITADO",
+          acao: "TRANSCRICAO_REUNIAO_EDITADA",
           usuarioId: userId,
           valorAnteriorJson: JSON.stringify({ caracteres: card.transcricaoReuniao?.length ?? 0 }),
           valorNovoJson: JSON.stringify({ caracteres: resumo.length }),
@@ -76,7 +76,7 @@ export async function SalvarResumoReuniaoBpm(dados: unknown) {
         ? "Não autorizado"
         : error === "CONFLITO_ATUALIZACAO_CARD"
           ? "O card mudou enquanto era editado. Recarregue e tente novamente."
-          : "Não foi possível salvar o resumo da reunião",
+          : "Não foi possível salvar a transcrição da reunião",
     };
   }
 }
@@ -118,5 +118,19 @@ export async function SincronizarTranscricaoReuniaoBpm(dados: unknown) {
       ? "Não autorizado"
       : "Não foi possível sincronizar a transcrição";
     return { success: false as const, error: mensagem };
+  }
+}
+
+export async function ObterArtefatosMeetBpm(dados: unknown) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false as const, error: "Não autorizado" };
+  const parsed = schema.safeParse(dados);
+  if (!parsed.success) return { success: false as const, error: "Card inválido" };
+  try {
+    await exigirAcessoBpmCard(parsed.data.cardId, Number(session.user.id), session.user.role ?? null, "visualizar");
+    return { success: true as const, data: await obterLinksArtefatosMeetCardBpm(parsed.data.cardId) };
+  } catch (erro) {
+    return { success: false as const, error: erro instanceof Error && erro.message === "Não autorizado"
+      ? "Não autorizado" : "Não foi possível consultar os artefatos do Google Meet" };
   }
 }

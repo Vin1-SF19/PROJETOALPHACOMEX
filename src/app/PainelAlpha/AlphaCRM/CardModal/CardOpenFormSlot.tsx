@@ -63,7 +63,7 @@ export function CardOpenFormSlot({
             case "meeting-scheduler":
               return <PainelReuniao card={card} accent={accent} podeEditar={podeEditar} onAtualizado={onAtualizado} />;
             case "meeting-transcript":
-              return <PainelReuniao card={card} accent={accent} podeEditar={podeEditar} mostrarFormulario={false} onAtualizado={onAtualizado} />;
+              return <PainelReuniao card={card} accent={accent} podeEditar={podeEditar} mostrarFormulario={false} permitirReagendar onAtualizado={onAtualizado} />;
             case "follow-up-scheduler":
               return <PainelProximoContato card={card} onAtualizado={onAtualizado} podeEditar={podeEditar} realtimeRevision={realtimeRevision} />;
             case "follow-up-checklist":

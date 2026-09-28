@@ -9,6 +9,7 @@ const tarefaCreateMock = vi.hoisted(() => vi.fn());
 const transactionMock = vi.hoisted(() => vi.fn());
 const notificarMock = vi.hoisted(() => vi.fn());
 const cadenciaFindFirstMock = vi.hoisted(() => vi.fn());
+const interacaoFindManyMock = vi.hoisted(() => vi.fn());
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/bpm/cadencias/ativacao-automatica", () => ({ ativarCadenciasNaEntradaBpm: vi.fn().mockResolvedValue({ alteradas: 0 }) }));
@@ -17,6 +18,7 @@ vi.mock("@/lib/prisma", () => ({
     bpmPipeline: { findFirst: pipelineFindFirstMock },
     bpmCard: { findMany: cardFindManyMock },
     bpmCadencia: { findFirst: cadenciaFindFirstMock },
+    bpmInteracaoCard: { findMany: interacaoFindManyMock },
     bpmTarefa: { create: tarefaCreateMock },
     bpmCardHistorico: { findMany: historicoFindManyMock },
     bpmCardCampoValor: { findMany: vi.fn().mockResolvedValue([]) },
@@ -35,6 +37,7 @@ describe("automação de oito dias de Reunião Agendada", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     cadenciaFindFirstMock.mockResolvedValue(null);
+    interacaoFindManyMock.mockResolvedValue([]);
     pipelineFindFirstMock.mockResolvedValue({
       id: "pipeline-1",
       etapas: [
@@ -49,6 +52,7 @@ describe("automação de oito dias de Reunião Agendada", () => {
       id: "card-1",
       etapaId: "reuniao",
       createdAt: new Date("2026-07-01T12:00:00.000Z"),
+      dataReuniao: new Date("2026-08-10T10:00:00.000Z"),
       }])
       .mockResolvedValueOnce([]);
     historicoFindManyMock.mockResolvedValue([{
@@ -68,7 +72,24 @@ describe("automação de oito dias de Reunião Agendada", () => {
   });
 
   it("move uma única vez para Standby no oitavo dia útil e registra a origem da etapa", async () => {
-    const resumo = await executarAutomacaoFollowUpBpm(new Date("2026-08-20T12:00:00.000Z"));
+    const passos = Array.from({ length: 8 }, (_, ordem) => ({
+      id: `passo-${ordem}`, ordem, intervaloDias: ordem === 0 ? 0 : 1,
+      tipoTarefa: "LIGACAO", titulo: `Ligação ${ordem + 1}`, descricao: null, prioridade: "NORMAL",
+    }));
+    cadenciaFindFirstMock.mockReset()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: "cadencia-reuniao", passos });
+    interacaoFindManyMock.mockResolvedValue([
+      "2026-08-11", "2026-08-12", "2026-08-13", "2026-08-14",
+      "2026-08-17", "2026-08-18", "2026-08-19", "2026-08-20",
+    ].map((data) => ({ cardId: "card-1", createdAt: new Date(`${data}T12:00:00.000Z`) })));
+    transactionMock.mockImplementation(async (callback) => callback({
+      bpmCard: { updateMany: updateManyMock },
+      bpmCadencia: { findFirst: vi.fn().mockResolvedValue({ passos }) },
+      bpmTarefa: { create: tarefaCreateMock },
+      bpmCardHistorico: { create: historicoCreateMock },
+    }));
+    const resumo = await executarAutomacaoFollowUpBpm(new Date("2026-08-21T12:00:00.000Z"));
 
     expect(resumo).toMatchObject({ examinados: 1, elegiveis: 1, movidos: 1, falhos: 0 });
     expect(updateManyMock).toHaveBeenCalledWith({
@@ -95,6 +116,25 @@ describe("automação de oito dias de Reunião Agendada", () => {
       cardId: "card-1",
       tipo: "CARD_MOVIDO",
     });
+  });
+
+  it("não inicia tentativas nem Standby antes da data da reunião", async () => {
+    cardFindManyMock.mockReset()
+      .mockResolvedValueOnce([{
+        id: "card-futuro", etapaId: "reuniao", responsavelId: 42,
+        createdAt: new Date("2026-08-10T10:00:00.000Z"),
+        updatedAt: new Date("2026-08-10T10:00:00.000Z"),
+        dataReuniao: new Date("2026-08-25T10:00:00.000Z"),
+      }])
+      .mockResolvedValueOnce([]);
+    cadenciaFindFirstMock.mockReset().mockResolvedValueOnce(null).mockResolvedValueOnce({
+      id: "cadencia-reuniao",
+      passos: [{ id: "p1", ordem: 0, intervaloDias: 0, tipoTarefa: "LIGACAO", titulo: "Ligação", descricao: null, prioridade: "NORMAL" }],
+    });
+    const resumo = await executarAutomacaoFollowUpBpm(new Date("2026-08-20T12:00:00.000Z"));
+    expect(resumo.porEtapa.find((item) => item.etapa === "Reunião Agendada")?.elegiveis).toBe(0);
+    expect(resumo.ligacoesReuniaoAgendada.tarefasCriadas).toBe(0);
+    expect(updateManyMock).not.toHaveBeenCalled();
   });
 
   it("gera uma tarefa semanal em Standby somente após sete dias, com CAS e histórico", async () => {

@@ -26,6 +26,7 @@ import {
 import { exigirAcessoBpmCard, usuarioElegivelResponsavelBpm } from "@/lib/bpm/ownership";
 import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
 import { etapaEhAgendarReuniao, destinoEhReuniaoAgendada, obterErroDataReuniaoParaMovimento } from "@/lib/bpm/agendar-reuniao";
+import { destinoPermitidoReuniaoAgendada, etapaEhReuniaoAgendada, obterErroTranscricaoParaMovimento } from "@/lib/bpm/reuniao-agendada";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { enfileirarAutomacoesMovimentoBpm } from "@/lib/bpm/automacoes/fila";
@@ -449,6 +450,17 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       && destino.nome !== "Stand By") {
       erro("STAGE_EXIT_BLOCKED", "Agendar Reunião só pode avançar para Reunião Agendada ou Stand By.");
     }
+  }
+  if (card.pipeline.nome === "Revisão de Radar" && etapaEhReuniaoAgendada(card.etapa.nome)) {
+    if (!destinoPermitidoReuniaoAgendada(destino.nome)) {
+      erro("STAGE_EXIT_BLOCKED", "Reunião Agendada só pode avançar para Em tratativas, Stand By ou Sem viabilidade.");
+    }
+    const erroTranscricao = obterErroTranscricaoParaMovimento({
+      etapaOrigemNome: card.etapa.nome,
+      etapaDestinoNome: destino.nome,
+      transcricaoReuniao: card.transcricaoReuniao,
+    });
+    if (erroTranscricao) erro("MEETING_TRANSCRIPT_REQUIRED", erroTranscricao);
   }
   if (pendencias.length) {
     const unicas = [...new Set(pendencias)];

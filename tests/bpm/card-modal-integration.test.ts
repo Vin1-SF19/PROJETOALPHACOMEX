@@ -75,7 +75,7 @@ describe("CRM - wiring do modal por etapa", () => {
     expect(slotFormulario).toContain("<PainelReuniao");
     expect(modal).not.toContain("<PainelReuniao");
     expect(modal).not.toContain("destinoEhReuniaoAgendada");
-    expect(painelReuniao).toContain("{mostrarFormulario && (");
+    expect(painelReuniao).toContain("{(mostrarFormulario || (permitirReagendar && jaAgendada)) && (");
     expect(painelReuniao).toContain("Agendar pelo Google Meet");
     expect(painelReuniao).toContain("Abrir link da reunião");
   });

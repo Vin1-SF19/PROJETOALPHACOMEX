@@ -6,9 +6,10 @@ import {
   carregarArtefatoTranscricaoMeet,
   GoogleMeetIntegracaoError,
   listarRegistrosConferenciaMeet,
+  listarResumosMeet,
+  listarGravacoesMeet,
 } from "@/lib/google-meet/client";
 import { obterUsuarioGoogleAtivoPorCalendario } from "@/lib/google-calendar/usuario-google";
-import { obterEvento as obterEventoGoogle } from "@/lib/google-calendar/client";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import {
   consolidarTranscricao,
@@ -20,7 +21,6 @@ import { NOME_ETAPA_STANDBY } from "@/lib/bpm/novos-leads";
 
 const MAX_CARACTERES_TRANSCRICAO = 1_000_000;
 const PRAZO_MEET_MS = 18_000;
-const PRAZO_TOTAL_INTEGRACOES_MS = 25_000;
 const sincronizacoesEmAndamento = new Map<string, Promise<ResultadoSincronizacaoTranscricao>>();
 
 export type ResultadoSincronizacaoTranscricao =
@@ -60,36 +60,6 @@ export async function executarComPrazoGoogleMeet<T>(
   }
 }
 
-function textoPlanoDeHtml(valor: string): string {
-  return valor
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/p>/gi, "\n")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .replace(/[ \t]{2,}/g, " ")
-    .trim();
-}
-
-async function obterResumoParcialDoEvento(params: {
-  emailUsuario: string;
-  googleCalendarId: string;
-  googleEventId: string;
-  limiteMs: number;
-}): Promise<string | null> {
-  const evento = await executarComPrazoGoogleMeet(() => obterEventoGoogle({
-    emailUsuario: params.emailUsuario,
-    calendarId: params.googleCalendarId,
-    googleEventId: params.googleEventId,
-  }), params.limiteMs);
-  const descricao = evento.descricao ? textoPlanoDeHtml(evento.descricao) : "";
-  return descricao ? `Resumo parcial do evento (Google Calendar):\n${descricao}` : null;
-}
-
 async function resolverEmailOrganizador(params: {
   googleEventId: string;
   googleCalendarId: string;
@@ -117,6 +87,33 @@ async function resolverEmailOrganizador(params: {
     );
   }
   return usuarioGoogle.emailUsuario;
+}
+
+export async function obterLinksArtefatosMeetCardBpm(cardId: string): Promise<{
+  resumos: Array<{ nome: string; url: string }>;
+  gravacoes: Array<{ nome: string; url: string }>;
+}> {
+  const vazio = { resumos: [], gravacoes: [] };
+  const card = await db.bpmCard.findUnique({
+    where: { id: cardId },
+    select: { dataReuniao: true, googleEventId: true, googleCalendarId: true, googleMeetLink: true },
+  });
+  if (!card?.dataReuniao || !card.googleEventId || !card.googleCalendarId || !card.googleMeetLink) return vazio;
+  const codigo = extrairCodigoMeet(card.googleMeetLink);
+  if (!codigo) return vazio;
+  const emailOrganizador = await resolverEmailOrganizador({
+    googleEventId: card.googleEventId,
+    googleCalendarId: card.googleCalendarId,
+    googleMeetLink: card.googleMeetLink,
+  });
+  const registros = await listarRegistrosConferenciaMeet(emailOrganizador, codigo);
+  const registro = selecionarRegistroConferencia(registros, card.dataReuniao);
+  if (!registro) return vazio;
+  const [resumos, gravacoes] = await Promise.all([
+    listarResumosMeet(emailOrganizador, registro.name),
+    listarGravacoesMeet(emailOrganizador, registro.name),
+  ]);
+  return { resumos, gravacoes };
 }
 
 async function executarSincronizacaoTranscricaoCardBpm(
@@ -162,13 +159,11 @@ async function executarSincronizacaoTranscricaoCardBpm(
       googleCalendarId: card.googleCalendarId,
       googleMeetLink: card.googleMeetLink,
     });
-    const inicioIntegracoes = Date.now();
-    const prazoMeetEm = inicioIntegracoes + PRAZO_MEET_MS;
-    const prazoTotalEm = inicioIntegracoes + PRAZO_TOTAL_INTEGRACOES_MS;
+    const prazoMeetEm = Date.now() + PRAZO_MEET_MS;
     let transcricao: string | null = null;
     let conferencia: string | null = null;
     let quantidadeEntradas = 0;
-    let fonte: "google_meet" | "google_calendar_fallback" = "google_meet";
+    const fonte = "google_meet";
 
     try {
       const registros = await executarComPrazoGoogleMeet(
@@ -199,21 +194,9 @@ async function executarSincronizacaoTranscricaoCardBpm(
         };
       }
     } catch (erroMeet) {
-      const falhaMeet = erroMeet instanceof GoogleMeetIntegracaoError
+      throw erroMeet instanceof GoogleMeetIntegracaoError
         ? erroMeet
         : new GoogleMeetIntegracaoError("Não foi possível consultar a transcrição no Google Meet.", true);
-      try {
-        transcricao = await obterResumoParcialDoEvento({
-          emailUsuario: emailOrganizador,
-          googleCalendarId: card.googleCalendarId,
-          googleEventId: card.googleEventId,
-          limiteMs: Math.max(1, prazoTotalEm - Date.now()),
-        });
-      } catch {
-        throw falhaMeet;
-      }
-      if (!transcricao) throw falhaMeet;
-      fonte = "google_calendar_fallback";
     }
 
     if (!transcricao) {

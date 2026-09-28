@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.hoisted(() => vi.fn());
 const acessoMock = vi.hoisted(() => vi.fn());
@@ -62,11 +62,13 @@ import { GoogleCalendarError } from "@/lib/google-calendar/errors";
 const CARD_ID = "clw0000000000000card";
 const DATA = new Date("2026-08-20T13:00:00.000Z");
 const EMAIL = "cliente@exemplo.com";
-const ERRO_ETAPA = "O Google Meet só pode ser agendado ou reagendado na etapa Agendar Reunião.";
+const ERRO_ETAPA = "O Google Meet só pode ser agendado na etapa Agendar Reunião.";
 
 describe("Google Meet: guard de etapa no backend", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-08-01T12:00:00.000Z"));
     authMock.mockResolvedValue({ user: { id: "7", role: "COMERCIAL" } });
     acessoMock.mockResolvedValue(undefined);
     prismaMock.googleCalendarEventoCache.upsert.mockResolvedValue({});
@@ -83,6 +85,7 @@ describe("Google Meet: guard de etapa no backend", () => {
       empresa: { nomeFantasia: "Empresa", razaoSocial: "Empresa LTDA" },
     });
   });
+  afterEach(() => vi.useRealTimers());
 
   it("recusa chamadas diretas de agendamento fora de Agendar Reunião antes do Calendar", async () => {
     await expect(AgendarReuniaoGoogleMeetBpm({ cardId: CARD_ID, dataHora: DATA, emailCliente: EMAIL })).resolves.toEqual({
@@ -93,13 +96,41 @@ describe("Google Meet: guard de etapa no backend", () => {
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
-  it("recusa chamadas diretas de reagendamento fora de Agendar Reunião antes do Calendar", async () => {
+  it("recusa chamadas diretas de reagendamento fora das duas etapas de reunião antes do Calendar", async () => {
+    prismaMock.bpmCard.findUnique.mockResolvedValueOnce({
+      id: CARD_ID,
+      etapaId: "etapa-fechado",
+      etapa: { nome: "Fechado" },
+      googleEventId: "evento-1",
+      googleCalendarId: "primary",
+      googleMeetLink: "https://meet.google.com/abc-defg-hij",
+      dataReuniao: DATA,
+      transcricaoReuniao: null,
+    });
     await expect(ReagendarReuniaoBpm({ cardId: CARD_ID, dataHora: DATA, emailCliente: EMAIL })).resolves.toEqual({
       success: false,
-      error: ERRO_ETAPA,
+      error: "O Google Meet só pode ser reagendado em Agendar Reunião ou Reunião Agendada.",
     });
     expect(atualizarEventoMock).not.toHaveBeenCalled();
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("preserva o vínculo do Meet depois do horário da reunião enquanto a transcrição é processada", async () => {
+    prismaMock.bpmCard.findUnique.mockResolvedValueOnce({
+      id: CARD_ID,
+      etapaId: "reuniao",
+      etapa: { nome: "Reunião Agendada" },
+      googleEventId: "evento-1",
+      googleCalendarId: "primary",
+      googleMeetLink: "https://meet.google.com/abc-defg-hij",
+      dataReuniao: new Date("2026-01-10T13:00:00.000Z"),
+      transcricaoReuniao: null,
+    });
+    await expect(ReagendarReuniaoBpm({ cardId: CARD_ID, dataHora: DATA, emailCliente: EMAIL })).resolves.toMatchObject({
+      success: false,
+      error: expect.stringContaining("Preserve o evento"),
+    });
+    expect(atualizarEventoMock).not.toHaveBeenCalled();
   });
 
   it("rejeita data fora do contrato antes de ownership, Calendar e persistência", async () => {
@@ -334,6 +365,8 @@ describe("RM-2026-D64AF1: recuperação segura do vínculo", () => {
   const reagendar = () => ReagendarReuniaoBpm({ cardId: CARD_ID, dataHora: DATA, emailCliente: EMAIL });
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-08-01T12:00:00.000Z"));
     authMock.mockResolvedValue({ user: { id: "7", role: "COMERCIAL" } });
     prismaMock.bpmCard.findUnique.mockResolvedValue(card);
     prismaMock.googleCalendarEventoCache.findMany.mockResolvedValue([]);
@@ -346,6 +379,7 @@ describe("RM-2026-D64AF1: recuperação segura do vínculo", () => {
       findUnique: vi.fn().mockResolvedValue(card), updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     }, bpmCardReuniao: { upsert: vi.fn() } }));
   });
+  afterEach(() => vi.useRealTimers());
   it("usa a agenda do solicitante e confirma o mesmo Meet no Google sem depender do cache", async () => {
     expect(await reagendar()).toEqual({ success: true });
     expect(prismaMock.googleCalendarSelecionado.findFirst).toHaveBeenCalledWith({
