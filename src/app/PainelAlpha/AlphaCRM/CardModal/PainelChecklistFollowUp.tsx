@@ -30,6 +30,10 @@ function valorTexto(resposta: Resposta | undefined): string {
   return typeof resposta === "string" ? resposta : "";
 }
 
+function respostaLegivel(resposta: Resposta | undefined): string {
+  return typeof resposta === "boolean" ? resposta ? "Sim" : "Não" : resposta ?? "";
+}
+
 export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstadoChange, podeEditar, realtimeRevision }: PainelChecklistFollowUpProps) {
   const [estado, setEstado] = useState<EstadoFollowUp | null>(null);
   const [respostas, setRespostas] = useState<Record<string, Resposta>>({});
@@ -42,7 +46,7 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
   const revisaoRef = useRef(0);
   const draftSujoRef = useRef(false);
   const revisaoAnteriorRef = useRef(realtimeRevision);
-  const { registerSave, scheduleSave, getDraft, setDraft, confirmVersion, subscribeConfirmation } = useCardSave();
+  const { registerSave, scheduleSave, getDraft, setDraft, confirmVersion, subscribeConfirmation, setPendingFields } = useCardSave();
   const draftKey = `${cardId}:followup`;
   useEffect(() => subscribeConfirmation(cardId, (_card, key) => {
     if (key !== draftKey || getDraft(draftKey)) return;
@@ -94,6 +98,11 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
     if (value === undefined) delete next[id]; else next[id] = value;
     respostasRef.current = next;
     setDraft(draftKey, Object.fromEntries(Object.entries(next).map(([id, value]) => [id, JSON.stringify(value)])));
+    setPendingFields(draftKey, (estado?.checklist?.perguntas ?? []).flatMap((pergunta) => {
+      const before = estado?.checklist?.respostas?.[pergunta.id];
+      const after = next[pergunta.id];
+      return before === after ? [] : [{ label: pergunta.pergunta, before: respostaLegivel(before), after: respostaLegivel(after) }];
+    }));
     setRespostas(next);
     scheduleSave(`${cardId}:followup:${id}`, () => void persistir(false), delay);
   }
@@ -124,6 +133,7 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
         respostasRef.current = resultado.data.checklist?.respostas ?? {};
         setRespostas(respostasRef.current);
         draftSujoRef.current = false;
+        setPendingFields(draftKey, []);
       }
       setConflitoRealtime(false);
       onEstadoChange(resultado.data.estado);

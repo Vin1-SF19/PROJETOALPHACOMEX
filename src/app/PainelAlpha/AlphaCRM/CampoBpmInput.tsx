@@ -35,7 +35,7 @@ interface CampoBpmInputProps {
   cardId?: string;
   errorToastOptions?: Pick<ExternalToast, "duration" | "closeButton">;
   arquivoAtual?: { id: string; nome: string; url: string; tipo?: string | null } | null;
-  registerFileSave?: (save: () => Promise<boolean>) => Promise<boolean>;
+  registerFileSave?: (save: () => Promise<boolean>, fileName: string) => Promise<boolean>;
   onFileConfirmed?: (arquivo: { id: string; nome: string; url: string }) => void;
 }
 
@@ -236,7 +236,7 @@ export function CampoBpmInput({
                 return false;
               }
             };
-            if (registerFileSave) await registerFileSave(enviar); else await enviar();
+            if (registerFileSave) await registerFileSave(enviar, file.name); else await enviar();
             inputArquivo.value = "";
             setEnviandoArquivo(false);
           }}

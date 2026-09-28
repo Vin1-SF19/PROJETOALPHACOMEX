@@ -110,7 +110,11 @@ export function PainelCamposEtapaAtual({
       valorComparavel(campo.tipo, valoresRef.current[campo.id]) !== valorComparavel(campo.tipo, snapshotAtivoRef.current.valores[campo.id]));
     camposAtuaisSujosRef.current = pendentes.length > 0;
     setDraft(idInstancia, pendentes.length ? { ...valoresRef.current } : undefined);
-    setPendingFields(`${card.id}:${idInstancia}`, pendentes.map((campo) => campoLabels[campo.id] ?? campo.nome));
+    setPendingFields(`${card.id}:${idInstancia}`, pendentes.map((campo) => ({
+      label: campoLabels[campo.id] ?? campo.nome,
+      before: snapshotAtivoRef.current.valores[campo.id] ?? "",
+      after: valoresRef.current[campo.id] ?? "",
+    })));
   }
   function alterarCampo(id: string, valor: string) {
     const campo = camposEtapaBase.find((item) => item.id === id);
@@ -432,7 +436,19 @@ export function PainelCamposEtapaAtual({
                     ? card.anexos.find((anexo) => anexo.id === valoresCamposAtuais[campo.id]) ?? null
                     : null}
                   errorToastOptions={erroFormulario}
-                  registerFileSave={(save) => registerSave(save, card.id, `${card.id}:arquivo:${campo.id}`, erroFormulario)}
+                  registerFileSave={(save, fileName) => {
+                    const key = `${card.id}:arquivo:${campo.id}`;
+                    setPendingFields(key, [{
+                      label: campoLabels[campo.id] ?? campo.nome,
+                      before: card.anexos.find((anexo) => anexo.id === valoresRef.current[campo.id])?.nome ?? "",
+                      after: fileName,
+                    }]);
+                    return registerSave(async () => {
+                      const sucesso = await save();
+                      if (sucesso) setPendingFields(key, []);
+                      return sucesso;
+                    }, card.id, key, erroFormulario);
+                  }}
                   onFileConfirmed={(arquivo) => {
                     const antes = { ...valoresRef.current };
                     const proximos = { ...valoresRef.current, [campo.id]: arquivo.id };

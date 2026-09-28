@@ -36,13 +36,14 @@ A Fase 2 formalizou o blueprint como Ready. O encerramento local da Fase 11 cons
 ## Critérios de aceitação
 
 - [x] Ao editar qualquer campo do card e sair, o campo é persistido sem perda.
-- [x] Nenhum modal 'Sair sem salvar' / 'Descartar alterações' é exibido ao fechar o card, incluindo o diálogo atual “Campos não salvos”.
+- [x] O fechamento com salvamento confirmado não exibe confirmação de descarte. **Refinamento de 28/09/2026:** se o salvamento falhar, o diálogo mostra cada alteração (valor anterior e valor editado) e oferece tentar salvar, continuar editando ou sair sem salvar. Este refinamento substitui a proibição anterior de modal em caso de falha.
 - [x] O autosave funciona para texto, textarea, número, moeda, select, multiselect, booleano (select Sim/Não; checkbox dinâmico não existe), data, arquivo e campos dinâmicos por etapa.
 - [x] Testes automatizados cobrem o autosave e a saída sem modal.
 - [ ] `npm run lint`, `npm run typecheck` e `npm test` passam.
 - [x] Digitação agenda persistência em 500 ms por card/campo; seleções, booleanos, datas e arquivos disparam imediatamente; blur antecipa sem duplicação, incluindo edição por template e data sem editar a hora.
 - [x] Fechar captura e enfileira imediatamente as revisões pendentes; a confirmação de rede permanece assíncrona. Reabertura e navegação interna do CRM preservam pendências e erros recuperáveis, com estados “Salvando…”, “Salvo” e “Erro”.
 - [x] Valores inválidos não são considerados salvos; falha de rede e conflito externo não causam perda silenciosa. Movimento de etapa depende do sucesso real do flush e a guarda de follow-up permanece respeitada.
+- [ ] Em falha de salvamento, o diálogo de saída exibe valores alterados de forma legível, repete a tentativa de persistência ao escolher salvar e só descarta rascunhos ao escolher explicitamente sair sem salvar.
 - [x] Respostas antigas, reversões durante requests e edições entre seções não sobrescrevem rascunhos recentes; upload mantém vínculo e download acessível ao usuário autorizado.
 
 ## Checklist por fase
@@ -668,3 +669,33 @@ AUTO_ADJUSTMENT_ACCEPTANCE: corrigir o fixture respeitando o contrato tipado, ex
 ### QA Results
 
 Testes direcionados passaram, incluindo repetição do cenário de recuperação do upload. Gates finais: `npm run lint` PASS (0 erros; 1.192 avisos preexistentes), `npm run typecheck` PASS, `npm test` PASS (525 arquivos; 3.889 testes aprovados, 4 ignorados, 1 todo), `npm run build` PASS e `git diff --check` PASS. Não houve alteração de estrutura nem mutação de dados do banco. A validação autenticada com card real permanece pendente.
+
+## Refinamento do diálogo de falha — 2026-09-28
+
+**Pedido:** ao falhar o salvamento na saída do card, mostrar o que mudou e oferecer salvar ou não salvar. O fluxo normal continua fechando após confirmação do autosave.
+
+### Checklist
+
+- [x] O diálogo mostra nome do campo e valores anterior e editado para campos dinâmicos, transcrição, próximo contato, status, respostas do follow-up e arquivo selecionado.
+- [x] “Salvar alterações” repete saves falhos; só sai após confirmação. Nova falha mantém o diálogo e o rascunho.
+- [x] “Continuar editando” preserva o rascunho; “Sair sem salvar” limpa pendências apenas do card atual.
+- [x] Fechar pelo X, Escape, clique externo e abrir outro card usam a mesma decisão.
+- [x] Gates finais e QA do refinamento registrados.
+
+### File List
+
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelReuniao.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximoContato.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelStatusPosFechamento.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelChecklistFollowUp.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CampoBpmInput.tsx`
+- `tests/bpm/cpf-fechamento-react.test.ts`
+- `tests/bpm/arquivo-persistencia-react.test.ts`
+- `docs/stories/story-rm-2026-b88712-autosave-card-crm.md`
+
+### QA Results do refinamento
+
+QA: **APPROVED**. Foram revisados os caminhos de fechamento, retry, descarte, upload e isolamento entre cards. Testes direcionados: 54 aprovados. Gates finais: `npm run lint` PASS (0 erros; 1.191 avisos preexistentes), `npm run typecheck` PASS, `npm test` PASS (538 arquivos; 3.980 testes aprovados, 4 ignorados, 1 todo), `npm run build` PASS e `git diff --check` PASS. Sem alteração de estrutura ou dados do banco. A interação com um card real em ambiente autenticado não foi executada nesta alteração local.

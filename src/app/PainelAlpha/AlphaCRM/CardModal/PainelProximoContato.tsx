@@ -19,7 +19,7 @@ interface PainelProximoContatoProps {
 }
 
 export function PainelProximoContato({ card, onAtualizado, podeEditar, realtimeRevision }: PainelProximoContatoProps) {
-  const { registerSave, scheduleSave, getDraft, setDraft, getVersion, confirmVersion } = useCardSave();
+  const { registerSave, scheduleSave, getDraft, setDraft, getVersion, confirmVersion, setPendingFields } = useCardSave();
   const draftKey = `${card.id}:proximoContato`;
   const [valor, setValor] = useState(() => getDraft(draftKey)?.valor ?? formatarDataHoraLocalBpm(card.proximoContatoEm));
   const [salvando, setSalvando] = useState(false);
@@ -74,6 +74,9 @@ export function PainelProximoContato({ card, onAtualizado, podeEditar, realtimeR
       if (resultado.data) confirmVersion(card.id, new Date(resultado.data.updatedAt).toISOString());
       valorPersistidoRef.current = snapshot.valor;
       if (getDraft(draftKey)?.valor === snapshot.valor) setDraft(draftKey);
+      const rascunhoAtual = getDraft(draftKey)?.valor;
+      setPendingFields(draftKey, rascunhoAtual !== undefined && rascunhoAtual !== snapshot.valor
+        ? [{ label: "Próximo contato", before: snapshot.valor, after: rascunhoAtual }] : []);
       if (rascunhoRef.current.corresponde(snapshot)) {
         sujoRef.current = false;
         setConflitoRealtime(false);
@@ -111,6 +114,8 @@ export function PainelProximoContato({ card, onAtualizado, podeEditar, realtimeR
             rascunhoRef.current.alterar(novoValor);
             setValor(novoValor);
             setDraft(draftKey, { valor: novoValor });
+            setPendingFields(draftKey, novoValor !== valorPersistidoRef.current
+              ? [{ label: "Próximo contato", before: valorPersistidoRef.current, after: novoValor }] : []);
             setErro(null);
             scheduleSave(`${card.id}:proximoContato`, () => void persistir(novoValor || null), 0);
           }}

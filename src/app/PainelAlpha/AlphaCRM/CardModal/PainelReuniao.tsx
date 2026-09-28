@@ -30,7 +30,7 @@ interface Props {
 }
 
 export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarFormulario = true, permitirReagendar = false }: Props) {
-  const { registerSave, scheduleSave, getVersion, confirmVersion, getDraft, setDraft } = useCardSave();
+  const { registerSave, scheduleSave, getVersion, confirmVersion, getDraft, setDraft, setPendingFields } = useCardSave();
   const [dataHora, setDataHora] = useState(() => formatarDataHoraLocalBpm(card.dataReuniao));
   const [erroDataHora, setErroDataHora] = useState<string | null>(null);
   const [emailCliente, setEmailCliente] = useState(card.emailClienteReuniao ?? "");
@@ -288,6 +288,9 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
       if (resultado.data) confirmVersion(card.id, new Date(resultado.data.updatedAt).toISOString());
       resumoPersistidoRef.current = snapshot.valor;
       if (getDraft(draftKey)?.valor === snapshot.valor) setDraft(draftKey);
+      const rascunhoAtual = getDraft(draftKey)?.valor;
+      setPendingFields(draftKey, rascunhoAtual !== undefined && rascunhoAtual !== snapshot.valor
+        ? [{ label: "Transcrição da reunião", before: snapshot.valor, after: rascunhoAtual }] : []);
       if (resumoRascunhoRef.current.corresponde(snapshot)) {
         resumoSujoRef.current = false;
         setConflitoResumo(false);
@@ -478,6 +481,8 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
                   resumoRascunhoRef.current.alterar(event.target.value);
                   setResumo(event.target.value);
                   setDraft(draftKey, { valor: event.target.value });
+                  setPendingFields(draftKey, event.target.value !== resumoPersistidoRef.current
+                    ? [{ label: "Transcrição da reunião", before: resumoPersistidoRef.current, after: event.target.value }] : []);
                   scheduleSave(`${card.id}:resumo`, () => void persistirResumo());
                 }}
                 onBlur={() => void persistirResumo()}

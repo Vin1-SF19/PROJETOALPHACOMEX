@@ -6,6 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, type ReactNo
 
 type ConfirmedCard = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type ConfirmationListener = (card: ConfirmedCard, key?: string) => void;
+export type PendingCardChange = { label: string; before?: string; after?: string };
 
 interface CardSaveContextValue {
   subscribeConfirmation: (cardId: string, listener: ConfirmationListener) => () => void;
@@ -15,8 +16,12 @@ interface CardSaveContextValue {
   confirmVersion: (cardId: string, version: string) => void;
   getDraft: (key: string) => Record<string, string> | undefined;
   setDraft: (key: string, value?: Record<string, string>) => void;
-  setPendingFields: (instance: string, fields: string[]) => void;
+  setPendingFields: (instance: string, fields: Array<string | PendingCardChange>) => void;
   getPendingFields: (cardId?: string) => string[];
+  getPendingChanges: (cardId?: string) => PendingCardChange[];
+  getFailedSaveKeys: (cardId: string) => string[];
+  retryFailedSaves: (cardId: string) => Promise<boolean>;
+  discardPending: (cardId: string) => void;
   /** Enfileira um save para preservar a ordem e a versão-base do card. */
   registerSave: (save: () => Promise<boolean>, cardId?: string, recoveryKey?: string, errorOptions?: Pick<ExternalToast, "duration" | "closeButton">, refreshAfterSave?: boolean) => Promise<boolean>;
   /** Aguarda todos os saves e informa se a persistência foi concluída. */
@@ -68,20 +73,21 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
     scheduled.current.set(key, { timer, save });
   }, []);
   useEffect(() => () => flushScheduled(), [flushScheduled]);
-  const pendingRef = useRef(new Map<string, string[]>());
-  const setPendingFields = useCallback((instance: string, fields: string[]) => {
-    if (fields.length) pendingRef.current.set(instance, fields);
+  const pendingRef = useRef(new Map<string, PendingCardChange[]>());
+  const setPendingFields = useCallback((instance: string, fields: Array<string | PendingCardChange>) => {
+    if (fields.length) pendingRef.current.set(instance, fields.map((field) => typeof field === "string" ? { label: field } : field));
     else pendingRef.current.delete(instance);
   }, []);
-  const getPendingFields = useCallback((cardId?: string) => [...new Set([...pendingRef.current]
+  const getPendingChanges = useCallback((cardId?: string) => [...pendingRef.current]
     .filter(([key]) => !cardId || key.startsWith(`${cardId}:`))
-    .flatMap(([, fields]) => fields))], []);
+    .flatMap(([, fields]) => fields), []);
+  const getPendingFields = useCallback((cardId?: string) => [...new Set(getPendingChanges(cardId).map((field) => field.label))], [getPendingChanges]);
   const savePromiseRef = useRef(new Map<string, Promise<boolean>>());
 
-  const recovery = useRef(new Map<string, () => Promise<boolean>>());
+  const recovery = useRef(new Map<string, { save: () => Promise<boolean>; errorOptions?: Pick<ExternalToast, "duration" | "closeButton">; refreshAfterSave: boolean }>());
   const failures = useRef(new Map<string, string | undefined>());
   const registerSave = useCallback(function enqueue(save: () => Promise<boolean>, cardId?: string, recoveryKey?: string, errorOptions?: Pick<ExternalToast, "duration" | "closeButton">, refreshAfterSave = true): Promise<boolean> {
-    if (recoveryKey) recovery.current.set(recoveryKey, save);
+    if (recoveryKey) recovery.current.set(recoveryKey, { save, errorOptions, refreshAfterSave });
     const scope = cardId ?? "";
     const anteriores = savePromiseRef.current.get(scope) ?? Promise.resolve(true);
     const tentativa = anteriores.then(async () => {
@@ -101,7 +107,7 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
       }
       return success;
     }).catch(() => false).then((success) => {
-      if (recoveryKey && recovery.current.get(recoveryKey) === save) {
+      if (recoveryKey && recovery.current.get(recoveryKey)?.save === save) {
         if (success) {
           recovery.current.delete(recoveryKey);
           failures.current.delete(recoveryKey);
@@ -115,7 +121,7 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
               flushScheduled(cardId ? `${cardId}:` : "");
               const latest = recovery.current.get(recoveryKey);
               // O flush pode ter enfileirado uma revisão mais recente.
-              if (latest && latest === previous) void enqueue(latest, cardId, recoveryKey, errorOptions, refreshAfterSave);
+              if (latest && latest === previous) void enqueue(latest.save, cardId, recoveryKey, latest.errorOptions, latest.refreshAfterSave);
             } },
           });
         }
@@ -146,8 +152,37 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
     }
   }, [getPendingFields, flushScheduled]);
 
+  const getFailedSaveKeys = useCallback((cardId: string) => [...failures.current]
+    .filter(([, id]) => id === cardId).map(([key]) => key), []);
+
+  const retryFailedSaves = useCallback(async (cardId: string) => {
+    flushScheduled(`${cardId}:`);
+    if (await flushSaves(cardId)) return true;
+    const falhas = [...failures.current].filter(([, id]) => id === cardId);
+    if (falhas.length === 0) return false;
+    const tentativas = await Promise.all(falhas.map(([key]) => {
+      const recovered = recovery.current.get(key);
+      return recovered ? registerSave(recovered.save, cardId, key, recovered.errorOptions, recovered.refreshAfterSave) : Promise.resolve(false);
+    }));
+    return tentativas.every(Boolean) && await flushSaves(cardId);
+  }, [flushScheduled, flushSaves, registerSave]);
+
+  const discardPending = useCallback((cardId: string) => {
+    for (const [key, job] of scheduled.current) {
+      if (!key.startsWith(`${cardId}:`)) continue;
+      clearTimeout(job.timer);
+      scheduled.current.delete(key);
+    }
+    for (const key of drafts.current.keys()) {
+      if (key.startsWith(`${cardId}:`) || key.startsWith(`${cardId}-`)) drafts.current.delete(key);
+    }
+    for (const key of pendingRef.current.keys()) if (key.startsWith(`${cardId}:`)) pendingRef.current.delete(key);
+    for (const [key, id] of failures.current) if (id === cardId) failures.current.delete(key);
+    for (const key of recovery.current.keys()) if (key.startsWith(`${cardId}:`)) recovery.current.delete(key);
+  }, []);
+
   return (
-    <CardSaveContext.Provider value={{ subscribeConfirmation, scheduleSave, flushScheduled, getVersion, confirmVersion, getDraft, setDraft, registerSave, flushSaves, setPendingFields, getPendingFields }}>
+    <CardSaveContext.Provider value={{ subscribeConfirmation, scheduleSave, flushScheduled, getVersion, confirmVersion, getDraft, setDraft, registerSave, flushSaves, setPendingFields, getPendingFields, getPendingChanges, getFailedSaveKeys, retryFailedSaves, discardPending }}>
       {children}
     </CardSaveContext.Provider>
   );

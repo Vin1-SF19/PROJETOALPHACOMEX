@@ -32,7 +32,7 @@ export function PainelStatusPosFechamento({
   accent,
   onAtualizado,
 }: PainelStatusPosFechamentoProps) {
-  const { registerSave, getVersion, confirmVersion, getDraft, setDraft } = useCardSave();
+  const { registerSave, getVersion, confirmVersion, getDraft, setDraft, setPendingFields } = useCardSave();
   const draftKey = `${cardId}:status`;
   const recovered = getDraft(draftKey)?.valor;
   const statusReconhecido = statusPosFechamentoEhValido(statusPersistido)
@@ -123,6 +123,9 @@ export function PainelStatusPosFechamento({
         versaoAnterior: versaoBaseAtual,
       };
       if (getDraft(draftKey)?.valor === status) setDraft(draftKey);
+      const rascunhoAtual = getDraft(draftKey)?.valor;
+      setPendingFields(draftKey, rascunhoAtual !== undefined && rascunhoAtual !== status
+        ? [{ label: "Status pós-fechamento", before: status, after: rascunhoAtual }] : []);
       rascunhoSujoRef.current = false;
       setBase(status);
       setConflitoRealtime(false);
@@ -187,6 +190,8 @@ export function PainelStatusPosFechamento({
             if (!statusPosFechamentoEhValido(event.target.value)) return;
             rascunhoSujoRef.current = event.target.value !== base;
             setDraft(draftKey, { valor: event.target.value });
+            setPendingFields(draftKey, event.target.value !== base
+              ? [{ label: "Status pós-fechamento", before: base ?? "", after: event.target.value }] : []);
             setRascunho(event.target.value);
             void salvar(event.target.value);
           }}
