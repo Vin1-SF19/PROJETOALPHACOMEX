@@ -1,6 +1,6 @@
 # Vault — configuração de Reunião Agendada no pipeline Revisão de Radar
 
-Data: 2026-09-28. Estado: **prévia validada, publicação bloqueada aguardando autorização explícita específica**.
+Data: 2026-09-28. Estado: **publicação autorizada, aplicada e verificada**.
 
 ## Ambiente e banco
 
@@ -9,6 +9,8 @@ Turso remoto de produção `banco-alpha-alphacomex.aws-us-east-1.turso.io`, pipe
 ## Backup
 
 Backup completo em `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-28T13-13-20-383Z.sql`, com manifesto associado. Criado às 13:18 UTC de 28/09/2026, 170.445.077 bytes, SHA-256 `5d5417b27e3ae403a78104765e3a4939343d373def84c7d4ee99655491ea20c2`, 332 tabelas e 180.760 linhas. `scripts/verify-turso-backup.mjs` restaurou e verificou integridade e FKs (zero violações). A idade deve ser conferida novamente antes da publicação.
+
+Restauração, integridade, hash e contagens revalidados às 16:22 UTC de 28/09/2026. A prévia remota ainda mostrou `configVersion=14`, sem formulário nem cadência na etapa. Uma reunião real já agendada alcançou a etapa por retry posterior da automação; o diagnóstico confirmou `SQLITE_BUSY` na primeira tentativa. Esse movimento de card não publicou a configuração dos campos.
 
 ## Plano exato de publicação
 
@@ -35,3 +37,9 @@ O script cria snapshot privado da configuração imediatamente antes da transaç
 2. Reexecutar prévia read-only e verificar versão 14, três saídas existentes, formulário/cadência ainda ausentes.
 3. Revalidar backup e idade abaixo de 48 horas.
 4. Após aplicar, conferir campos, componentes, transições, cadência, auditoria e FKs; homologar card autenticado e integração Google.
+
+## Execução e verificação de 28/09/2026
+
+O usuário autorizou explicitamente nesta conversa a publicação descrita neste relatório, com auditoria de Vinicius (TI). O script foi executado contra o Turso de produção com `--expected-config-version=14`, `--admin-id=8` e o backup acima; gerou snapshot privado em `database-backups/pre-change/` e concluiu em transação única. A versão do pipeline passou a **15**.
+
+A leitura posterior confirmou **13 campos da Análise de Viabilidade**, todos ativos e opcionais inicialmente, mais o campo de resumo; formulário ativo com três seções e 16 componentes; apenas **Em tratativas**, **Stand By** e **Sem viabilidade** como saídas permitidas; cadência ativa com oito passos de ligação; auditoria `adminId=8`; `PRAGMA foreign_key_check` com zero violações. O card afetado pelo incidente do Meet já está em Reunião Agendada. Homologação autenticada da UI e reunião real do Google continuam verificações operacionais externas.

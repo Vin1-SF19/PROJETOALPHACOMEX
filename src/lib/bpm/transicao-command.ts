@@ -33,6 +33,7 @@ import { enfileirarAutomacoesMovimentoBpm } from "@/lib/bpm/automacoes/fila";
 import { sincronizarSlaMovimentoBpm } from "@/lib/bpm/sla";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { processarCadenciasImediatasDoCardBpm } from "@/lib/bpm/cadencias/executor";
+import { erroSqliteBusy, repetirTransacaoOcupada } from "@/lib/bpm/sqlite-busy-retry";
 
 export type AtorTransicaoBpm = {
   tipo: BpmTransitionRequester;
@@ -105,6 +106,9 @@ function mensagemErroDesconhecido(errorValue: unknown): ResultadoTransicaoBpm {
     return { success: false, code: errorValue.code, error: errorValue.message, pendencias: errorValue.pendencias };
   }
   console.error("[TransitionCommand]", errorValue);
+  if (erroSqliteBusy(errorValue)) {
+    return { success: false, code: "DATABASE_BUSY", error: "O banco estava ocupado e não concluiu o movimento. Tente novamente." };
+  }
   return { success: false, code: "TRANSITION_FAILED", error: "Não foi possível concluir a transição." };
 }
 
@@ -529,7 +533,7 @@ export async function avaliarTransicaoBpm(input: ComandoTransicaoBpm): Promise<R
 export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<ResultadoTransicaoBpm> {
   const correlationId = input.correlationId ?? randomUUID();
   try {
-    const result = await db.$transaction(async (tx) => {
+    const result = await repetirTransacaoOcupada(() => db.$transaction(async (tx) => {
       const prepared = await prepararTransicao(input, tx);
       if (prepared.idempotente) {
         return {
@@ -700,7 +704,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
         idempotente: false,
         pipelineId: card.pipelineId,
       };
-    }, { maxWait: 10_000, timeout: 60_000 });
+    }, { maxWait: 10_000, timeout: 60_000 }));
 
     if (!result.idempotente) {
       try {

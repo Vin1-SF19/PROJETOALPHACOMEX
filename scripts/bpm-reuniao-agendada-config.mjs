@@ -5,6 +5,7 @@ import path from "node:path";
 
 config({ path: ".env.local", quiet: true });
 const { default: db } = await import("../src/lib/prisma.ts");
+const { repetirTransacaoOcupada } = await import("../src/lib/bpm/sqlite-busy-retry.ts");
 
 const campos = [
   ["mes_protocolar", "Mês para protocolar", "data", []],
@@ -82,7 +83,7 @@ execFileSync(process.execPath, ["scripts/verify-turso-backup.mjs", dumpPath, man
 const snapshotPath = path.resolve(`${backupBase}.reuniao-agendada-config.${Date.now()}.json`);
 await writeFile(snapshotPath, JSON.stringify({ plan, atuais, etapa }, null, 2), { flag: "wx", mode: 0o600 });
 
-await db.$transaction(async (tx) => {
+await repetirTransacaoOcupada(() => db.$transaction(async (tx) => {
   const vigente = await tx.bpmPipeline.findUnique({ where: { id: pipeline.id }, select: { configVersion: true } });
   if (vigente?.configVersion !== expectedVersion) throw new Error("Configuração alterada durante publicação");
   const camposPorSlug = new Map();
@@ -144,6 +145,6 @@ await db.$transaction(async (tx) => {
     valorAnteriorJson: JSON.stringify({ etapa, campos: atuais[0].map((campo) => ({ id: campo.id, chave: campo.chave })), formulario: atuais[1], transicoes: atuais[2].map((item) => ({ id: item.id, permitida: item.permitida })), cadencias: atuais[3].map((item) => item.id) }),
     valorNovoJson: JSON.stringify(plan),
   } });
-});
+}, { maxWait: 20_000, timeout: 120_000 }));
 console.log(JSON.stringify({ mode: "APPLIED", pipelineId: pipeline.id, etapaId: etapa.id, snapshotPath }));
 await db.$disconnect();

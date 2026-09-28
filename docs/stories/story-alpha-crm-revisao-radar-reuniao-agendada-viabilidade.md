@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress — publicação Turso aguardando gate Vault
+Ready for Review — configuração Turso publicada; homologação Google Workspace pendente
 
 ## Executor Assignment
 
@@ -71,13 +71,13 @@ Todos os campos abaixo devem constar em **Configurações → Campos e Formulár
 ## Tasks / Subtasks
 
 - [x] 1. Auditar configuração ativa, transições, valores canônicos, editor, formulário, ficha, captura de transcrição e cadência existentes (AC 1–15).
-- [ ] 2. Implementar/ajustar seção de Análise de Viabilidade com os treze campos, tipos e catálogos, salvamento e reabertura (AC 3–6): script e UI genérica preparados; aguarda publicação e homologação.
-- [ ] 3. Configurar UI administrativa de campos/formulário, transcrição e obrigações aplicáveis sem duplicar valores; preparar prévia da configuração (AC 2, 4–6, 14): prévia pronta; publicação pendente.
-- [x] 4. Aplicar guard de avanço no backend e limitar saídas no board/servidor/configuração; preservar contingência Standby (AC 2, 7): guard no servidor pronto; transições do banco pendentes.
+- [x] 2. Implementar/ajustar seção de Análise de Viabilidade com os treze campos, tipos e catálogos, salvamento e reabertura (AC 3–6): formulário publicado; homologação autenticada da UI ainda recomendada.
+- [x] 3. Configurar UI administrativa de campos/formulário, transcrição e obrigações aplicáveis sem duplicar valores; preparar prévia da configuração (AC 2, 4–6, 14): configuração publicada na versão 15.
+- [x] 4. Aplicar guard de avanço no backend e limitar saídas no board/servidor/configuração; preservar contingência Standby (AC 2, 7): guard e três transições do banco publicados.
 - [x] 5. Integrar Gerar ficha, reagendamento, transcrição e resumo de reuniões ao card, respeitando a evidência existente (AC 1, 8–10).
-- [x] 6. Auditar/ajustar cadência configurável e job único para esta etapa, Próximo Contato e Standby idempotente (AC 11–12): runtime pronto; definição da cadência pendente no banco.
+- [x] 6. Auditar/ajustar cadência configurável e job único para esta etapa, Próximo Contato e Standby idempotente (AC 11–12): runtime e definição de oito passos publicados.
 - [ ] 7. Produzir e validar guia operacional Google Workspace/Cloud com teste real e diagnóstico de permissões/licença (AC 13): guia pronto; teste real requer configuração externa.
-- [ ] 8. Se houver escrita protegida no Turso, executar Vault, obter confirmação específica e publicar com auditoria/rollback; homologar UI autenticada (AC 14).
+- [x] 8. Se houver escrita protegida no Turso, executar Vault, obter confirmação específica e publicar com auditoria/rollback; configuração conferida por leitura e FKs. Homologação UI autenticada ainda recomendada.
 - [x] 9. Executar testes e gates, preencher File List e checklist, documentar evidências e pendências externas (AC 15).
 
 ## Dev Notes
@@ -115,9 +115,9 @@ Testes BPM em `tests/bpm/` e integração Google com mocks para situações pend
 ## Checklist de conclusão
 
 - [ ] AC 1–15 verificados com evidência no Dev Agent Record.
-- [ ] Configuração Turso publicada apenas após gate Vault e confirmação específica.
+- [x] Configuração Turso publicada apenas após gate Vault e confirmação específica.
 - [ ] Guia Google Workspace/Cloud validado contra integração e homologação real.
-- [x] `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` executados: lint 0 erros (1191 avisos preexistentes), typecheck PASS, 537 arquivos/3967 testes PASS, build PASS.
+- [x] `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` executados: lint 0 erros (1191 avisos preexistentes), typecheck PASS, 538 arquivos/3969 testes PASS, build PASS.
 - [x] QA sem issue CRITICAL pendente; CodeRabbit externo não executado.
 - [x] File List e Change Log atualizados.
 
@@ -139,6 +139,8 @@ Testes BPM em `tests/bpm/` e integração Google com mocks para situações pend
 | --- | --- | --- | --- |
 | 2026-09-28 | 0.1 | Story complementar para Reunião Agendada, Análise de Viabilidade, ficha, saídas, cadência e guia Google. | River (`@sm`) |
 | 2026-09-28 | 0.2 | Código, guia, prévia Vault, testes e QA concluídos; publicação Turso e teste real Google aguardam. | Codex (`@dev`) |
+| 2026-09-28 | 0.3 | Diagnóstico de movimento pendente após Meet: Turso retornou `SQLITE_BUSY`; transição ganhou retry transacional e erro técnico. Card afetado avançou na terceira tentativa da automação. | Codex (`@dev`) |
+| 2026-09-28 | 0.4 | Publicação Turso autorizada e aplicada; versão 15, formulário, campos, cadência, transições e auditoria verificados. | Codex (`@dev`) |
 
 ## Dev Agent Record
 
@@ -148,11 +150,14 @@ GPT-6 Codex.
 
 ### Completion Notes
 
-Implementado guard de saídas/transcrição, remoção do fallback Calendar que criava falsa transcrição, reagendamento em Reunião Agendada, links de smart notes/gravações, ficha PDF, cadência editável com início após reunião, e guia Workspace. Script de publicação e prévia read-only prontos. Configuração Turso ainda não aplicada por gate Vault; sem reunião real de homologação.
+Implementado guard de saídas/transcrição, remoção do fallback Calendar que criava falsa transcrição, reagendamento em Reunião Agendada, links de smart notes/gravações, ficha PDF, cadência editável com início após reunião, e guia Workspace. Configuração Turso publicada após autorização e verificada; sem reunião real de homologação do Google.
+
+Diagnóstico operacional de 28/09: um Meet foi salvo, mas o movimento automático encontrou `SQLITE_BUSY` na transação remota. A validação read-only passou e a mesma transição concluiu numa cópia local do banco. O card avançou depois pelo retry do motor central, com status `SUCESSO` e sem duplicidade. A transição agora faz uma tentativa inicial e até três novas tentativas em disputa de escrita, devolvendo `DATABASE_BUSY` se esgotá-las. Após autorização específica, a configuração foi publicada no Turso, versão 15, e verificada com 14 campos de etapa, 16 componentes, três saídas, oito passos de cadência e zero violações de FK.
 
 ### File List
 
 - `src/lib/bpm/transicao-command.ts`, `src/lib/bpm/reuniao-agendada.ts` — guard de saídas e transcrição.
+- `src/lib/bpm/sqlite-busy-retry.ts` — retry seguro da transação de movimento contra disputa de escrita do Turso.
 - `src/lib/bpm/transcricao-reuniao-server.ts`, `src/lib/google-meet/client.ts`, `src/actions/bpm/TranscricaoMeet.ts` — transcrição real e links de resumos/gravações.
 - `src/actions/bpm/GoogleMeet.ts`, `src/app/PainelAlpha/AlphaCRM/CardModal/PainelReuniao.tsx`, `src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa.tsx`, `src/app/PainelAlpha/AlphaCRM/CardModal/CardOpenFormSlot.tsx` — reagendamento, transcrição e ficha no card.
 - `src/lib/bpm/ficha-viabilidade-server.ts`, `src/actions/bpm/FichaViabilidade.ts` — PDF de viabilidade.
@@ -160,10 +165,13 @@ Implementado guard de saídas/transcrição, remoção do fallback Calendar que 
 - `scripts/bpm-reuniao-agendada-config.mjs` — publicação transacional com prévia e guard Vault.
 - `docs/google-meet-transcricoes-alpha-crm.md`, `docs/reports/vault-revisao-radar-reuniao-agendada-2026-09-28.md` — guia e relatório de banco.
 - `tests/bpm/ficha-viabilidade.test.ts`, `tests/bpm/reuniao-agendada.test.ts`, `tests/bpm/transcricao-reuniao-server.test.ts`, `tests/bpm/automacao-reuniao-agendada.test.ts`, `tests/bpm/google-meet-etapa-guard.test.ts`, `tests/bpm/formulario-etapa.test.ts`, `tests/bpm/card-modal-integration.test.ts`, `tests/bpm/reuniao-transcricao.test.ts`, `tests/bpm/autosave-fixed-recovery-react.test.ts` — testes de regressão e novos cenários.
+- `tests/bpm/sqlite-busy-retry.test.ts` — retry de lock e rejeição imediata de falha de negócio.
 
 ## QA Results
 
-PASS para código em revisão read-only de @qa: guard e saídas, rejeição do fallback legado, bloqueio de reagendamento depois da reunião, ficha PDF, links Meet e cadência configurável. Testes dirigidos 5 arquivos/39 testes e `git diff --check` passaram. Publicação Turso e homologação Google são gates operacionais pendentes.
+PASS para código em revisão read-only de @qa: guard e saídas, rejeição do fallback legado, bloqueio de reagendamento depois da reunião, ficha PDF, links Meet e cadência configurável. Testes dirigidos 5 arquivos/39 testes e `git diff --check` passaram. Publicação Turso verificada; homologação Google continua pendente.
+
+Patch de retry `SQLITE_BUSY` revisado novamente por @qa: PASS. A transação inteira é repetida, com efeitos pós-commit fora do retry e chave de idempotência preservada; 2 testes dirigidos e `git diff --check` passaram.
 
 ## Story Draft Validation
 
