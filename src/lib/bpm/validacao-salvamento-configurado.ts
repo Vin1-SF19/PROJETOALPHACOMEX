@@ -8,6 +8,8 @@ import { carregarValoresCanonicosCampos } from "@/lib/bpm/campos-configuraveis-s
 import { avaliarGrupo } from "@/lib/bpm/regras/avaliador";
 import { montarContextoAvaliacaoDoCard } from "@/lib/bpm/regras/contexto";
 import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
+import { FINANCIAL_FIELD_KEYS as K } from "@/lib/bpm/pipeline-financeiro";
+import { calcularNovoContrato, pendenciasValidacaoNovoContrato } from "@/lib/bpm/novo-contrato-financeiro";
 
 type Card = Parameters<typeof montarContextoAvaliacaoDoCard>[0];
 
@@ -35,6 +37,7 @@ export async function prepararSalvamentoConfigurado(params: {
   valoresSubmetidos: Record<string, string>;
   client: Prisma.TransactionClient;
   agora?: Date;
+  atorId?: number;
 }): Promise<Record<string, string>> {
   const { card, client } = params;
   const agora = params.agora ?? new Date();
@@ -48,9 +51,45 @@ export async function prepararSalvamentoConfigurado(params: {
     include: { campo: { select: { id: true, nome: true, chave: true, tipo: true, opcoesJson: true } } },
   });
   const statusAssinatura = configs.find((config) => config.campo.chave === "alpha.financeiro.status.contrato.assinatura");
+  const camposFinanceiros = new Map(configs.filter((config) => config.campo.chave).map((config) => [config.campo.chave, config.campoId]));
+  let valoresSubmetidos = params.valoresSubmetidos;
+  if (camposFinanceiros.has(K.VALOR_BRUTO)) {
+    const atuais = await client.bpmCardCampoValor.findMany({
+      where: { cardId: card.id, campoId: { in: [...camposFinanceiros.values()] } },
+      select: { campoId: true, valor: true },
+    });
+    const porId = { ...Object.fromEntries(atuais.map((item) => [item.campoId, item.valor])), ...params.valoresSubmetidos };
+    const valores = Object.fromEntries([...camposFinanceiros].map(([chave, id]) => [chave, porId[id] ?? ""]));
+    const invalidos = pendenciasValidacaoNovoContrato(valores);
+    if (invalidos.length) throw new Error(`CAMPO_INVALIDO:${invalidos.join(", ")}`);
+    const calculo = calcularNovoContrato(valores);
+    const alterouEntrada = [K.VALOR_BRUTO, K.REGIME_CLIENTE, K.REGIME_PRESTADOR, K.IRRF_APLICAVEL,
+      K.ALIQUOTA_IRRF, K.CSRF_APLICAVEL, K.ALIQUOTA_CSRF, K.VENCIMENTO, K.DADOS_PAGAMENTO]
+      .some((chave) => {
+        const id = camposFinanceiros.get(chave);
+        return id && Object.hasOwn(params.valoresSubmetidos, id) && params.valoresSubmetidos[id] !== (atuais.find((item) => item.campoId === id)?.valor ?? "");
+      });
+    if (alterouEntrada) {
+      const resultado = { ...valoresSubmetidos };
+      for (const [chave, valor] of Object.entries(calculo.resultados)) {
+        const id = camposFinanceiros.get(chave);
+        if (id) resultado[id] = valor ?? "";
+      }
+      for (const [indicador, aliquota] of [[K.IRRF_APLICAVEL, K.ALIQUOTA_IRRF], [K.CSRF_APLICAVEL, K.ALIQUOTA_CSRF]]) {
+        const id = camposFinanceiros.get(aliquota);
+        if (id && valores[indicador] === "Não") resultado[id] = "";
+      }
+      const memoriaId = camposFinanceiros.get(K.MEMORIA_CALCULO);
+      if (memoriaId && resultado[memoriaId]) {
+        const memoria = JSON.parse(resultado[memoriaId]);
+        resultado[memoriaId] = JSON.stringify({ ...memoria, calculadoEm: agora.toISOString(), confirmadoPorId: params.atorId ?? null });
+      }
+      valoresSubmetidos = resultado;
+    }
+  }
   const possuiAutomacao = configs.some((config) => config.condicaoObrigatoriedadeJson
     && (config.valorPadrao === "{{agora.data}}" || config.valorPadrao === "{{agora.instante}}"));
-  if (!possuiAutomacao && !statusAssinatura) return params.valoresSubmetidos;
+  if (!possuiAutomacao && !statusAssinatura) return valoresSubmetidos;
 
   const publicadosPipeline = await camposPublicadosPorEtapa(etapas.map((etapa) => etapa.id), client);
   const idsPublicados = new Set([...publicadosPipeline.values()].flatMap((ids) => [...ids]));
@@ -66,9 +105,9 @@ export async function prepararSalvamentoConfigurado(params: {
     ...Object.fromEntries(campos.map((campo) => [campo.id, null])),
     ...contexto.camposDinamicos,
     ...canonicos,
-    ...params.valoresSubmetidos,
+    ...valoresSubmetidos,
   };
-  const valores = { ...params.valoresSubmetidos };
+  const valores = { ...valoresSubmetidos };
 
   for (const config of configs) {
     if (!config.condicaoObrigatoriedadeJson || !config.valorPadrao) continue;
@@ -82,7 +121,7 @@ export async function prepararSalvamentoConfigurado(params: {
   }
 
   const valoresContexto = contexto.camposDinamicos ?? {};
-  if (statusAssinatura && Object.hasOwn(params.valoresSubmetidos, statusAssinatura.campoId)
+  if (statusAssinatura && Object.hasOwn(valoresSubmetidos, statusAssinatura.campoId)
     && valoresContexto[statusAssinatura.campoId] !== "Assinado") {
     const assinaturaAnterior = await client.bpmCardHistorico.findFirst({
       where: { cardId: card.id, acao: "CONTRATO_CONCLUIDO" }, select: { id: true },

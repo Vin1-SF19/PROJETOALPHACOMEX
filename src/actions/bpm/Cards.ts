@@ -675,6 +675,23 @@ export async function ObterCardBpm(cardId: string) {
 
     if (!card) return { success: false, error: "Card não encontrado" };
 
+    const historicosConferenciaFinanceiro = card.pipeline.chave === "financeiro"
+      && card.etapa.chave === "solicitacao_contrato"
+      ? await db.bpmCardHistorico.findMany({
+          where: { cardId: card.id, acao: { in: ["CARD_ATUALIZADO", "CARD_TESTE_PREENCHIDO"] } },
+          select: { valorNovoJson: true },
+        }) : [];
+    const camposCorrigidosFinanceiro = new Set<string>();
+    for (const registro of historicosConferenciaFinanceiro) {
+      if (!registro.valorNovoJson) continue;
+      try {
+        const payload: unknown = JSON.parse(registro.valorNovoJson);
+        if (payload && typeof payload === "object" && "camposAlterados" in payload && Array.isArray(payload.camposAlterados)) {
+          for (const id of payload.camposAlterados) if (typeof id === "string") camposCorrigidosFinanceiro.add(id);
+        }
+      } catch { /* histórico anterior sem JSON estruturado */ }
+    }
+
     const movimentosParaDataPerda = etapaEhLost(card.etapa.nome)
       ? await db.bpmCardHistorico.findMany({
           where: { cardId: card.id, acao: "CARD_MOVIDO" },
@@ -816,6 +833,7 @@ export async function ObterCardBpm(cardId: string) {
         emailClienteReuniao,
         anexos: card.anexos.map((anexo) => ({ ...anexo, url: `/api/bpm/anexos/${anexo.id}` })),
         camposEtapa,
+        camposCorrigidosFinanceiro: [...camposCorrigidosFinanceiro],
         formularioEtapa,
         encaminhado: acessoCard.bloqueadoPorEncaminhamento === true,
         permissaoEtapa: {
@@ -1318,6 +1336,7 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
             card: cardAtual,
             valoresSubmetidos: valoresValidados,
             client: tx,
+            atorId: userId,
           });
           const ids = Object.keys(valoresValidados);
           const [camposDefinidos, valoresPersistidos] = await Promise.all([

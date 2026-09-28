@@ -283,6 +283,12 @@ export function PainelCamposEtapaAtual({
     if (!sucesso && revisaoEdicao.current === revisaoEnviada) setEstadoSave("erro");
   }
   const campoCnpj = camposAtuaisVisiveis.find((campo) => campo.chave === FINANCIAL_FIELD_KEYS.CNPJ);
+  const camposCorrigidosFinanceiro = new Set(card.camposCorrigidosFinanceiro ?? []);
+  const chavesCalculadasFinanceiro = new Set<string>([
+    FINANCIAL_FIELD_KEYS.VALOR_IRRF, FINANCIAL_FIELD_KEYS.VALOR_CSRF,
+    FINANCIAL_FIELD_KEYS.TOTAL_RETENCOES, FINANCIAL_FIELD_KEYS.VALOR_LIQUIDO,
+    FINANCIAL_FIELD_KEYS.MEMORIA_CALCULO, FINANCIAL_FIELD_KEYS.STATUS_FINANCEIRO,
+  ]);
   const campoAssinatura = camposAtuaisVisiveis.find((campo) => campo.chave === CHAVES_CAMPOS.STATUS_ASSINATURA);
   const campoDataAssinatura = camposAtuaisVisiveis.find((campo) => campo.chave === CHAVES_CAMPOS.DATA_ASSINATURA);
   const campoContratoAssinado = camposAtuaisVisiveis.find((campo) => campo.chave === CHAVES_CAMPOS.ANEXO_ASSINADO);
@@ -401,12 +407,20 @@ export function PainelCamposEtapaAtual({
             const complementoPendente = campo.id === configuracaoLostUi.campoComplementoId && complementoLostPendente;
             const somenteLeitura = campo.somenteLeitura === true || campo.editavel === false;
             const fonteAutomatica = campo.escopo === "GLOBAL" && Boolean(campo.fonteEntidade);
+            const origemFinanceiro = card.pipeline?.chave === "financeiro" && card.etapa.chave === "solicitacao_contrato"
+              ? chavesCalculadasFinanceiro.has(campo.chave ?? "") ? "Calculado automaticamente"
+                : campo.mapeamentoModo === "COPIAR"
+                  ? camposCorrigidosFinanceiro.has(campo.id) ? "Corrigido no Financeiro"
+                    : (valoresCamposAtuais[campo.id] ?? "").trim() ? "Copiado do Comercial" : "Aguardando dado do Comercial"
+                  : null
+              : null;
             const descricaoId = complementoPendente ? `campo-bpm-${campo.id}-erro` : undefined;
             return (
               <div key={campo.id} className="space-y-1.5">
                 <label htmlFor={`campo-bpm-${campo.id}`} className="text-[11px] font-medium text-slate-400">
                   {campoLabels[campo.id] ?? campo.nome}{campo.obrigatorio ? " *" : ""}{campo.obrigatorioEntrada ? " · exigido na entrada" : ""}{campo.obrigatorioSaida ? " · exigido na saída" : ""}{fonteAutomatica ? " · automático" : ""}
                 </label>
+                {origemFinanceiro && <p className="text-[10px] text-sky-300/80">{origemFinanceiro}</p>}
                 {campo.chave === BPM_FIELD_KEYS.MEETING_SUMMARY && (
                   <button
                     type="button"

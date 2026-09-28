@@ -40,6 +40,9 @@ import { sincronizarSlaMovimentoBpm } from "@/lib/bpm/sla";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { processarCadenciasImediatasDoCardBpm } from "@/lib/bpm/cadencias/executor";
 import { erroSqliteBusy, repetirTransacaoOcupada } from "@/lib/bpm/sqlite-busy-retry";
+import { FINANCIAL_FIELD_KEYS as FIN } from "@/lib/bpm/pipeline-financeiro";
+import { calcularNovoContrato, pendenciasValidacaoNovoContrato } from "@/lib/bpm/novo-contrato-financeiro";
+import { prepararSalvamentoConfigurado } from "@/lib/bpm/validacao-salvamento-configurado";
 
 export type AtorTransicaoBpm = {
   tipo: BpmTransitionRequester;
@@ -342,6 +345,10 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
   }));
   const formato = validarValoresCamposBpm(formataveis, valoresSubmetidos);
   if (!formato.success) erro("FORMAT_INVALID", formato.error);
+  if (Object.keys(formato.valores).length && card.pipeline.chave === "financeiro" && card.etapa.chave === "solicitacao_contrato") {
+    formato.valores = await prepararSalvamentoConfigurado({ card, valoresSubmetidos: formato.valores, client: tx,
+      atorId: input.ator.userId });
+  }
 
   const idsValores = [...camposPorId.keys()];
   const [persistidos, canonicos] = await Promise.all([
@@ -463,6 +470,33 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
         obrigatorio = obrigatorio || avaliarGrupo(validada.data, contextoRegra);
       }
       if (obrigatorio && vazio(valoresEfetivosPorId.get(campo.id))) pendencias.push(campo.nome);
+    }
+  }
+  if (card.pipeline.chave === "financeiro" && card.etapa.chave === "solicitacao_contrato"
+    && destino.chave === "elaboracao_contrato") {
+    const valoresNovoContrato = Object.fromEntries([...camposPorId.values()]
+      .filter((campo) => campo.chave)
+      .map((campo) => [campo.chave, valoresEfetivosPorId.get(campo.id) ?? ""]));
+    pendencias.push(...pendenciasValidacaoNovoContrato(valoresNovoContrato));
+    for (const campo of [...camposPorId.values()].filter((item) => item.etapaConfiguracoes.some((config) => config.etapaId === card.etapaId && config.visivel))) {
+      const valor = valoresEfetivosPorId.get(campo.id)?.trim();
+      if (!valor) continue;
+      const validacao = validarValoresCamposBpm([{
+        id: campo.id, nome: campo.nome, tipo: campo.tipo,
+        opcoesJson: campo.opcoes.length ? JSON.stringify(campo.opcoes.map((opcao) => opcao.rotulo)) : campo.opcoesJson,
+        editavel: true, somenteLeitura: false,
+      }], { [campo.id]: valor });
+      if (!validacao.success) pendencias.push(campo.nome);
+    }
+    for (const [indicador, aliquota, nome] of [
+      [FIN.IRRF_APLICAVEL, FIN.ALIQUOTA_IRRF, "Alíquota IRRF"],
+      [FIN.CSRF_APLICAVEL, FIN.ALIQUOTA_CSRF, "Alíquota CSRF"],
+    ]) {
+      if (valoresNovoContrato[indicador] === "Sim" && !valoresNovoContrato[aliquota]?.trim()) pendencias.push(nome);
+    }
+    if (valoresNovoContrato[FIN.IRRF_APLICAVEL]?.trim() && valoresNovoContrato[FIN.CSRF_APLICAVEL]?.trim()) {
+      pendencias.push(...calcularNovoContrato(valoresNovoContrato).pendencias.filter((item) =>
+        item.startsWith("Alíquota ") || item === "Total de retenções superior ao valor bruto"));
     }
   }
   if (card.pipeline.nome === "Revisão de Radar" && destino.nome === "Fechado") {
