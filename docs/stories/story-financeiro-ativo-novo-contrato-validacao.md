@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress — implementação local e prévia de publicação prontas; aplicação no Turso e preenchimento dos dois cards dependem das confirmações específicas do procedimento Vault.
+Done — código e configuração publicados; os dois cards de teste foram preenchidos após autorização específica e conferidos no Turso. O fluxo de criação/transição foi exercitado no ensaio local e nos testes automatizados, sem movimentar um card real em produção.
 
 ## Executor Assignment
 
@@ -48,9 +48,9 @@ Esta story não reativa o pipeline Financeiro antigo, sua etapa `Solicitação d
 - [x] Integrar consulta de CNPJ com preenchimento assistido e fallback manual, sem inferência tributária não confiável (AC 5). A action e a UI existentes passam a usar o campo publicado.
 - [x] Implementar cálculo auditável com indicadores e alíquotas informados pelo Financeiro, sem presumir regra fiscal; resultados protegidos contra edição manual divergente (AC 6, 7, 10).
 - [x] Preparar registro dos dados de pagamento e guarda do status `Aguardando pagamento`; dados ficam no card para conferência e envio manual (AC 8). Publicação pendente.
-- [ ] Testar entrada idempotente, cópia/snapshot, validações, condicionais, cálculo, recálculo, status, publicação e mensagens de pendência; rodar lint, typecheck, test e build (AC 1–10). Gates locais passaram; integração publicada pendente.
-- [ ] Executar Vault e obter confirmação específica antes de qualquer publicação de configuração protegida em produção; registrar versão, backup, diff, verificação posterior e rollback na story. Atualizar checklist e File List (AC 10).
-- [ ] Inventariar os dois cards Financeiro de teste, preparar valores fictícios por campo e realizar o preenchimento somente após a implementação/publicação e o checkpoint Vault específico para esse backfill; conferir sem efeitos de cobrança ou envio (AC 11).
+- [x] Testar entrada idempotente, cópia/snapshot, validações, condicionais, cálculo, recálculo, status, publicação e mensagens de pendência; rodar lint, typecheck, test e build (AC 1–10). Gates e ensaio local passaram; a configuração publicada foi conferida por leitura direta.
+- [x] Executar Vault e obter confirmação específica antes de qualquer publicação de configuração protegida em produção; registrar versão, backup, diff, verificação posterior e rollback na story. Atualizar checklist e File List (AC 10).
+- [x] Inventariar os dois cards Financeiro de teste, preparar valores fictícios por campo e realizar o preenchimento somente após a implementação/publicação e o checkpoint Vault específico para esse backfill; conferir sem efeitos de cobrança ou envio (AC 11).
 
 ## Decisões e dependências
 
@@ -70,11 +70,20 @@ Esta story não reativa o pipeline Financeiro antigo, sua etapa `Solicitação d
 - O campo existente de valor negociado mantém ID e valores, passando a usar a chave estável de valor bruto; a forma de pagamento também mantém ID/valores. `Origem do cliente` é uma seleção nova (`Direto`, `Parceiro`, `Outro`) para tornar configurável a condição de parceiro, preservando o antigo `Canal de origem` livre no Comercial.
 - A lista de regimes inclui todos os cinco valores não nulos observados em `Cliente.regimeTributario` mais `Outro`; nenhuma categoria foi inferida de CNPJ para calcular imposto.
 - Os cards de teste são `cmuini24h000a09gmadd2zmu0` (Concluído) e `cmulnujrr00060agmrmuf4t8i` (Novo Contrato). O backfill cria somente valores de campos vazios no card, preserva valor negociado/forma já presentes e não altera `Cliente`; o card concluído não recebe status `Aguardando pagamento`.
-- Backup dedicado pré-mudança: `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-28T20-24-36-883Z.sql` e manifesto adjacente; 179.547.070 bytes, 332 tabelas, 189.528 linhas, SHA-256 `acc0198adcf291f793fed733e7e645a67564d149048f0c4f316fa5b18d9a0995`; restauração de verificação passou. Nenhuma escrita executada.
+- Backup dedicado pré-mudança: `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-28T20-24-36-883Z.sql` e manifesto adjacente; 179.547.070 bytes, 332 tabelas, 189.528 linhas, SHA-256 `acc0198adcf291f793fed733e7e645a67564d149048f0c4f316fa5b18d9a0995`; restauração de verificação passou. A publicação foi autorizada depois dessa prévia.
 - Ensaio de integração em cópia local restaurada desse backup passou: configuração transacional chegou a Financeiro v8 e Comercial v22, com 31 campos financeiros, 16 fontes comerciais e 18 mapeamentos. O backfill local preencheu 27 e 26 campos vazios, preservou os dois valores anteriores do segundo card, criou histórico de proveniência em ambos e deixou o card Concluído sem status pendente. A cópia temporária foi removida.
-- Gates locais: lint sem erros (avisos preexistentes), typecheck, 551 arquivos/4.044 testes e build passaram. A publicação e teste integrado dependem da autorização Vault.
+- Gates locais: lint sem erros (avisos preexistentes), typecheck, 551 arquivos/4.044 testes e build passaram. O checkout limpo do DevOps repetiu os gates antes do push.
 - QA: `APPROVED` para o patch local após correções de transição e proveniência; produção permanece pendente do Vault.
 - **Contexto acumulado:** `accumulated-context.md` e `.aiox/gotchas.json` não estão presentes nesta worktree. `[AUTO-DECISION]` A coerência entre stories foi conferida com os artefatos existentes, sem presumir conteúdo ausente.
+
+## Publicação e conferência (28/09/2026)
+
+- O usuário autorizou separadamente o envio do commit `cdaf1b9a9f68036963a28d2713f5fbad74e14d0c`, a configuração de Novo Contrato no Turso e, após nova prévia, o preenchimento dos dois cards de teste. O DevOps publicou o commit em `origin/main`; Vercel concluiu o deploy e `/api/health/version` informou esse SHA.
+- `npx tsx scripts/configurar-novo-contrato-financeiro.mts --apply`, com administrador 1, versões esperadas Financeiro 7/Revisão de Radar 21, token de aprovação e backup dedicado, concluiu em uma transação. Leitura posterior confirmou Financeiro v8, Revisão de Radar v22, 31 campos financeiros ativos, 16 fontes comerciais novas e 18 mapeamentos. Não houve DDL ou exclusão de dados.
+- Antes do backfill foi criado outro backup completo em `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-28T20-57-55-720Z.sql`, com manifesto adjacente; 179.796.656 bytes, 332 tabelas, 190.135 linhas e SHA-256 `64726fc018b9e39cd325b031ef31f80fa5373792b0cd9db9ec54b541ebe02cf8`. A restauração de verificação passou. Dumps e manifestos permanecem fora do Git.
+- A prévia final confirmou 27 campos vazios no card `cmuini24h000a09gmadd2zmu0` e 26 no `cmulnujrr00060agmrmuf4t8i`, preservando os 2 valores existentes no segundo. Após a autorização específica, `npx tsx scripts/preencher-cards-teste-novo-contrato.mts --apply` gravou esses valores e um evento `CARD_TESTE_PREENCHIDO` por card.
+- Leitura posterior: o card Concluído permaneceu em `contratacao_finalizada`, tem 27 valores, bruto/líquido `1000.00`, retenções `0.00` e nenhum status de pagamento pendente. O card Novo Contrato permaneceu em `solicitacao_contrato`, tem 28 valores, preservou bruto `21999.99` e forma de pagamento, líquido `21999.99`, retenções `0.00`, status `Aguardando pagamento`; ambos têm dados de pagamento marcados como fictícios e um histórico com as quantidades exatas de campos alterados. Nenhuma cobrança ou envio externo foi acionado.
+- Rollback preferencial: reversão dirigida dos campos e configurações identificados nos históricos e auditorias. A restauração integral de um dump sobrescreveria alterações posteriores de outros usuários e fica reservada a incidente com plano específico. Risco residual: dados de teste são visíveis a usuários com acesso a esses cards; não foi criado card real nem exercitada uma transição real em produção.
 
 ## Testes de aceite
 
@@ -98,7 +107,7 @@ Esta story não reativa o pipeline Financeiro antigo, sua etapa `Solicitação d
 
 ### File List
 
-- `docs/stories/story-financeiro-ativo-novo-contrato-validacao.md` — story e checklist. A implementação deve acrescentar todos os arquivos alterados.
+- `docs/stories/story-financeiro-ativo-novo-contrato-validacao.md` — story, checklist, publicação e conferência.
 - `scripts/configurar-novo-contrato-financeiro.mts` — prévia e publicação transacional protegida pelo Vault.
 - `scripts/preencher-cards-teste-novo-contrato.mts` — prévia e backfill restrito aos dois cards de teste.
 - `src/lib/bpm/pipeline-financeiro.ts` — identidades estáveis dos campos.
@@ -116,6 +125,7 @@ Esta story não reativa o pipeline Financeiro antigo, sua etapa `Solicitação d
 | --- | --- | --- | --- |
 | 2026-09-28 | 0.1 | Draft para o Financeiro ativo recriado e pedido de conferência/cálculo | River (@sm) |
 | 2026-09-28 | 0.2 | Inventário, implementação local, backup e prévia protegida; publicação pendente | Codex |
+| 2026-09-28 | 0.3 | Publicação autorizada, verificação no Turso e preenchimento conferido dos dois cards de teste | Codex |
 
 ## Validação do draft
 
