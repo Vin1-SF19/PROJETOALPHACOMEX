@@ -20,11 +20,13 @@ import { montarContextoAvaliacaoDoCard } from "@/lib/bpm/regras/contexto";
 import {
   BPM_PIPELINE_KEYS,
   BPM_CAPABILITIES,
+  BPM_FIELD_KEYS,
   transitionOriginForRequester,
   type BpmTransitionRequester,
 } from "@/lib/bpm/ontology";
 import { exigirAcessoBpmCard, usuarioElegivelResponsavelBpm } from "@/lib/bpm/ownership";
 import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
+import { etapaEhLost } from "@/lib/bpm/lost";
 import { sincronizarProximoContatoAgenda } from "@/lib/bpm/proximo-contato-agenda";
 import { destinoPermitidoEmTratativa, etapaEhEmTratativa, obterErroChecklistParaSaidaEmTratativa } from "@/lib/bpm/em-tratativa";
 import { obterErroProximoContatoParaMovimento } from "@/lib/bpm/proximo-contato";
@@ -390,6 +392,24 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
   };
   const pendencias: string[] = [];
   for (const requisito of requisitosAplicaveis) {
+  if (card.pipeline.nome === "Revisão de Radar" && etapaEhLost(destino.nome)) {
+    const motivos = camposRequisito.filter((campo) =>
+      campo.chave === BPM_FIELD_KEYS.LOST_REASON
+      && campo.tipo === "selecao"
+      && camposFormulario.get(destino.id)?.has(campo.id)
+      && campo.etapaConfiguracoes.some((config) =>
+        config.etapaId === destino.id && config.visivel && config.obrigatorioEntrada,
+      ),
+    );
+    if (motivos.length !== 1 || motivos[0].opcoes.length === 0) {
+      erro("INVALID_FIELD_CONFIG", "Configure o Motivo do Lost como seleção obrigatória na entrada em Campos e formulários.");
+    }
+    const motivo = motivos[0];
+    const valor = valoresEfetivosPorId.get(motivo.id)?.trim() ?? "";
+    if (!valor || !motivo.opcoes.some((opcao) => opcao.rotulo === valor)) {
+      pendencias.push(motivo.nome);
+    }
+  }
     if (requisito.condicaoJson) {
       let condicao: unknown;
       try { condicao = JSON.parse(requisito.condicaoJson); } catch { erro("INVALID_REQUIREMENT", `Requisito inválido: ${requisito.chave}.`); }

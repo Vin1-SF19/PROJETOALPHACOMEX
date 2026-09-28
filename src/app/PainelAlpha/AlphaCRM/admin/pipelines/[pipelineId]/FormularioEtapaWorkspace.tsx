@@ -82,6 +82,7 @@ type EtapaFormulario = {
 };
 
 type CampoAplicavel = CampoFormulario & {
+  opcoes?: Array<{ id?: string; chave: string; rotulo: string; ordem: number; ativo: boolean }>;
   ativo?: boolean;
   editavel?: boolean;
   somenteLeitura?: boolean;
@@ -239,6 +240,7 @@ function FormularioEtapaWorkspaceContent({
   const [blocoSelecionado, setBlocoSelecionado] = useState<{ secaoChave: string; chave: string } | null>(null);
   const deepLinkAplicado = useRef(false);
   const [nomeEdicao, setNomeEdicao] = useState("");
+  const [opcoesEdicao, setOpcoesEdicao] = useState("");
   const [salvandoCampo, setSalvandoCampo] = useState(false);
   const [habilitandoCampo, setHabilitandoCampo] = useState(false);
   const [usoCampos, setUsoCampos] = useState<Record<string, UsoCampo> | null>(null);
@@ -265,6 +267,7 @@ function FormularioEtapaWorkspaceContent({
       if (campoDaUrl) {
         setCampoSelecionadoId(campoDaUrl.id);
         setNomeEdicao(campoDaUrl.nome);
+        setOpcoesEdicao(campoDaUrl.opcoes?.filter((opcao) => opcao.ativo).map((opcao) => opcao.rotulo).join("\n") ?? "");
       }
     }, 0);
     return () => window.clearTimeout(timer);
@@ -364,6 +367,7 @@ function FormularioEtapaWorkspaceContent({
     setBlocoSelecionado(null);
     setCampoSelecionadoId(campo.id);
     setNomeEdicao(campo.nome);
+    setOpcoesEdicao(campo.opcoes?.filter((opcao) => opcao.ativo).map((opcao) => opcao.rotulo).join("\n") ?? "");
   }
 
   function atualizarObrigatoriedadeBloco(obrigatorioSaida: boolean) {
@@ -380,7 +384,7 @@ function FormularioEtapaWorkspaceContent({
     setSujo(true);
   }
 
-  async function atualizarCampo(patch: { nome?: string; etapaConfiguracoes?: NonNullable<CampoAplicavel["etapaConfiguracoes"]> }) {
+  async function atualizarCampo(patch: { nome?: string; opcoes?: Array<string | NonNullable<CampoAplicavel["opcoes"]>[number]>; etapaConfiguracoes?: NonNullable<CampoAplicavel["etapaConfiguracoes"]> }) {
     if (!campoSelecionado || bloqueado) return;
     setSalvandoCampo(true);
     try {
@@ -397,6 +401,7 @@ function FormularioEtapaWorkspaceContent({
       setCamposLocais((atuais) => [...atuais.filter((item) => item.id !== atualizado.id), atualizado]);
       setSecoes((atuais) => atuais.map((secao) => ({ ...secao, componentes: secao.componentes.map((item) => item.campoId === atualizado.id ? { ...item, campo: atualizado } : item) })));
       setNomeEdicao(atualizado.nome);
+      if (patch.opcoes) setOpcoesEdicao(atualizado.opcoes?.filter((opcao) => opcao.ativo).map((opcao) => opcao.rotulo).join("\n") ?? "");
       if (patch.etapaConfiguracoes && !patch.etapaConfiguracoes.find((item) => item.etapaId === etapaId)?.visivel) {
         setObrigacoesDraft((atuais) => ({ ...atuais, [atualizado.id]: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false } }));
       }
@@ -404,6 +409,28 @@ function FormularioEtapaWorkspaceContent({
       onPublished?.();
     } catch { toast.error("Não foi possível atualizar o campo. Tente novamente."); }
     finally { setSalvandoCampo(false); }
+  }
+
+  function salvarOpcoesCampo() {
+    if (!campoSelecionado) return;
+    const rotulos = opcoesEdicao.split("\n").map((rotulo) => rotulo.trim()).filter(Boolean);
+    if (!rotulos.length) { toast.error("Informe ao menos uma opção ativa"); return; }
+    if (new Set(rotulos.map((rotulo) => rotulo.toLocaleLowerCase())).size !== rotulos.length) {
+      toast.error("Cada opção precisa ter um nome diferente");
+      return;
+    }
+    const existentes = campoSelecionado.opcoes ?? [];
+    const utilizadas = new Set<string>();
+    const opcoes = rotulos.map((rotulo, ordem) => {
+      const existente = existentes.find((opcao) => opcao.rotulo === rotulo && !utilizadas.has(opcao.chave));
+      if (!existente) return rotulo;
+      utilizadas.add(existente.chave);
+      return { id: existente.id, chave: existente.chave, rotulo, ordem, ativo: true };
+    });
+    // A API rejeita a retirada de opções já usadas em cards. As inativas permanecem no catálogo.
+    const inativas = existentes.filter((opcao) => !opcao.ativo && !utilizadas.has(opcao.chave));
+    if (opcoes.length + inativas.length > 50) { toast.error("O campo aceita até 50 opções"); return; }
+    void atualizarCampo({ opcoes: [...opcoes, ...inativas] });
   }
 
   function atualizarRegra(chave: "visivel" | "editavel" | "obrigatorio" | "obrigatorioEntrada" | "obrigatorioSaida", valor: boolean) {
@@ -1098,6 +1125,13 @@ function FormularioEtapaWorkspaceContent({
               <input value={nomeEdicao} onChange={(event) => setNomeEdicao(event.target.value)} maxLength={120} disabled={bloqueado} className="mt-1 min-h-10 w-full rounded-lg border border-white/10 bg-slate-900 px-3 text-sm text-white disabled:opacity-50" />
             </label>
             <button type="button" disabled={bloqueado || !nomeEdicao.trim() || nomeEdicao.trim() === campoSelecionado.nome} onClick={() => void atualizarCampo({ nome: nomeEdicao.trim() })} className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-cyan-400/30 text-xs font-semibold text-cyan-200 hover:bg-cyan-400/10 disabled:opacity-40">{salvandoCampo ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Atualizar nome em todos os usos</button>
+            {["selecao", "multiselecao"].includes(campoSelecionado.tipo) && <div className="border-t border-white/10 pt-3">
+              <label className="block text-xs font-semibold text-slate-300">Opções do campo
+                <textarea value={opcoesEdicao} onChange={(event) => setOpcoesEdicao(event.target.value)} rows={Math.min(8, Math.max(4, opcoesEdicao.split("\n").length))} disabled={bloqueado} placeholder="Uma opção por linha" className="mt-1 min-h-24 w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white placeholder:text-slate-500 disabled:opacity-50" />
+              </label>
+              <p className="mt-1 text-[11px] text-slate-500">Uma opção por linha. Opções usadas em cards não podem ser removidas. A alteração vale em todas as etapas vinculadas.</p>
+              <button type="button" disabled={bloqueado || opcoesEdicao.split("\n").map((rotulo) => rotulo.trim()).filter(Boolean).join("\n") === (campoSelecionado.opcoes ?? []).filter((opcao) => opcao.ativo).map((opcao) => opcao.rotulo).join("\n")} onClick={salvarOpcoesCampo} className="mt-2 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-cyan-400/30 text-xs font-semibold text-cyan-200 hover:bg-cyan-400/10 disabled:opacity-40">{salvandoCampo ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Atualizar opções em todos os usos</button>
+            </div>}
             <div className="border-t border-white/10 pt-3">
               <h4 className="flex items-center gap-2 text-xs font-semibold text-white"><ShieldCheck size={15} className="text-cyan-300" /> Regras desta etapa</h4>
               <p className="mt-1 text-[11px] text-slate-500">As obrigações entram em vigor ao publicar a composição.</p>

@@ -14,6 +14,7 @@ import { transcricaoRealRegistrada } from "@/lib/bpm/reuniao-agendada";
 import { formularioExigeCapacidade } from "@/lib/bpm/formulario-renderer";
 import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
 import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
+import { etapaEhLost } from "@/lib/bpm/lost";
 import { AtribuirLeadAgendarModal } from "./AtribuirLeadAgendarModal";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { ObterDisponibilidadeEtapasCardBpm, type DisponibilidadeEtapaCard } from "@/actions/bpm/DisponibilidadeEtapasCard";
@@ -183,6 +184,10 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
       }
       const dados = await buscarRequisitos(etapaDestinoId);
       if (!dados || dados.faltantes.length || dados.guardas.length) return;
+      if (card.pipeline?.nome === "Revisão de Radar" && etapaEhLost(dados.etapaDestino.nome)) {
+        setRequisitos(dados);
+        return;
+      }
       if (card.pipeline?.nome === "Revisão de Radar" && etapaEhNovosLeads(card.etapa.nome)
         && etapaEhAgendarReuniao(dados.etapaDestino.nome)) {
         setAtribuicaoPendente({ etapaDestinoId });
@@ -197,8 +202,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
 
   async function salvarRequisitosEMover() {
     if (!requisitos || movendoEtapa) return;
-    const faltantes = requisitos.faltantes.filter((campo) => !valoresRequisitos[campo.id]?.trim());
-    if (faltantes.length || requisitos.guardas.length) return;
+    if (faltantesNoRascunho.length || requisitos.guardas.length) return;
     setMovendoEtapa(true);
     try {
       const savesConcluidos = await flushSaves(card.id);
@@ -227,8 +231,18 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
     const campo = requisitos.campos.find((item) => item.id === pendente.id);
     return campo ? [{ ...campo, contexto: pendente.contexto, etapaAplicacaoNome: pendente.etapaAplicacaoNome }] : [];
   }) ?? [];
+  const requisitosLost = card.pipeline?.nome === "Revisão de Radar"
+    && etapaEhLost(requisitos?.etapaDestino.nome);
+  const camposObrigatoriosLost = requisitosLost
+    ? requisitos?.campos.filter((campo) => campo.obrigatorio && campo.contexto !== "ORIGEM" && !camposPendentes.some((pendente) => pendente.id === campo.id)) ?? []
+    : [];
+  const camposOpcionaisLost = requisitosLost
+    ? requisitos?.campos.filter((campo) => !campo.obrigatorio && campo.contexto !== "ORIGEM" && campo.editavel && !campo.somenteLeitura) ?? []
+    : [];
   const camposSemEdicao = camposPendentes.filter((campo) => !campo.editavel || campo.somenteLeitura);
-  const faltantesNoRascunho = requisitos?.faltantes.filter((campo) => !valoresRequisitos[campo.id]?.trim()) ?? [];
+  const faltantesNoRascunho = requisitosLost
+    ? requisitos?.campos.filter((campo) => campo.obrigatorio && !valoresRequisitos[campo.id]?.trim()) ?? []
+    : requisitos?.faltantes.filter((campo) => !valoresRequisitos[campo.id]?.trim()) ?? [];
   const camposIndisponiveis = requisitos?.faltantes.filter((pendente) => !requisitos.campos.some((campo) => campo.id === pendente.id)) ?? [];
 
   return (
@@ -254,7 +268,9 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
         <DialogContent className="max-h-[85vh] overflow-y-auto border-white/10 bg-slate-950 text-white sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Antes de mover para {requisitos?.etapaDestino.nome}</DialogTitle>
-            <DialogDescription className="text-slate-400">Preencha os campos exigidos pela configuração desta transição.</DialogDescription>
+            <DialogDescription className="text-slate-400">{requisitosLost
+              ? "Informe o motivo da perda. Os demais campos da etapa podem ser preenchidos para dar contexto."
+              : "Preencha os campos exigidos pela configuração desta transição."}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             {requisitos?.guardas.map((guarda) => <p key={guarda} role="alert" className="rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-xs text-amber-100">{guarda}</p>)}
@@ -267,6 +283,14 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
               <span className="font-semibold">{campo.nome} <span className="text-amber-300">*</span></span>
               <span className="block text-[11px] text-slate-500">{campo.etapaAplicacaoNome} · {campo.contexto === "ORIGEM" ? "exigido na saída" : "exigido na entrada"}</span>
               <CampoBpmInput campo={campo} value={valoresRequisitos[campo.id] ?? ""} onChange={(valor) => setValoresRequisitos((atuais) => ({ ...atuais, [campo.id]: valor }))} className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white" disabled={movendoEtapa} readOnly={!campo.editavel || campo.somenteLeitura} cardId={card.id} />
+            </label>)}
+            {camposObrigatoriosLost.map((campo) => <label key={campo.id} className="block space-y-1.5 text-xs text-slate-300">
+              <span className="font-semibold">{campo.nome} <span className="text-amber-300">*</span></span>
+              <CampoBpmInput campo={campo} value={valoresRequisitos[campo.id] ?? ""} onChange={(valor) => setValoresRequisitos((atuais) => ({ ...atuais, [campo.id]: valor }))} className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white" disabled={movendoEtapa} readOnly={!campo.editavel || campo.somenteLeitura} cardId={card.id} />
+            </label>)}
+            {camposOpcionaisLost.map((campo) => <label key={campo.id} className="block space-y-1.5 text-xs text-slate-300">
+              <span className="font-semibold">{campo.nome} <span className="font-normal text-slate-500">(opcional)</span></span>
+              <CampoBpmInput campo={campo} value={valoresRequisitos[campo.id] ?? ""} onChange={(valor) => setValoresRequisitos((atuais) => ({ ...atuais, [campo.id]: valor }))} className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white" disabled={movendoEtapa} cardId={card.id} />
             </label>)}
             {camposSemEdicao.length > 0 && <div role="alert" className="rounded-xl border border-amber-400/25 bg-amber-400/10 p-3 text-xs text-amber-100">
               <p>{camposSemEdicao.map((campo) => campo.nome).join(", ")} {camposSemEdicao.length === 1 ? "está configurado como obrigatório e somente leitura" : "estão configurados como obrigatórios e somente leitura"}. Peça a um administrador para ajustar a regra em Campos e formulários.</p>
@@ -338,8 +362,10 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
                     : <ArrowRight size={14} className="shrink-0 opacity-70" aria-hidden="true" />}
             </button>
           );
+          const podeInformarMotivo = card.pipeline?.nome === "Revisão de Radar" && etapaEhLost(etapa.nome);
           return bloqueada ? (
-            <TooltipPrimitive.Root key={etapa.id}>
+            <div key={etapa.id} className="space-y-1.5">
+            <TooltipPrimitive.Root>
               <TooltipPrimitive.Trigger asChild>
                 <span tabIndex={0} className="block rounded-xl opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-amber-300/70" aria-label={`${etapa.nome}: avanço bloqueado. ${pendencias.join("; ")}`}>
                   {botao}
@@ -355,6 +381,15 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
                 </TooltipPrimitive.Content>
               </TooltipPrimitive.Portal>
             </TooltipPrimitive.Root>
+            {podeInformarMotivo && <button
+              type="button"
+              onClick={() => void buscarRequisitos(etapa.id, true)}
+              disabled={movendoEtapa}
+              className="min-h-9 w-full rounded-lg border border-amber-300/25 bg-amber-300/10 px-3 text-left text-xs font-semibold text-amber-100 transition hover:bg-amber-300/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 disabled:opacity-50"
+            >
+              Preencher dados de Lost
+            </button>}
+            </div>
           ) : <div key={etapa.id}>{botao}</div>;
         })}
       </TooltipPrimitive.Provider>
