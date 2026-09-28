@@ -1,21 +1,21 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
+import Link, { useLinkStatus } from 'next/link';
 import {
-  Activity as ActivityLucide,
   AlertTriangle,
   ListChecks,
-  CheckCircle2,
   Clock,
   ArrowRight,
   Building2,
   Settings,
+  Loader2,
   type LucideIcon,
 } from 'lucide-react';
 import type { TemaAlpha } from '@/lib/temas';
 import { fmtDateTime } from '@/lib/format-date';
 import { ObterDashboardBpm } from '@/actions/bpm/Dashboard';
+import { isAdminRole } from '@/lib/roles';
 import CardFullViewModal from './CardModal/CardFullViewModal';
 import {
   GlowIcon,
@@ -38,70 +38,58 @@ interface Props {
   currentUserRole: string | null;
 }
 
-/* ── KPI card (apenas visual; dados vêm de `dashboard`) ────────── */
-function KpiCard({
-  icon,
-  label,
-  value,
-  accent,
-  tone,
-  delay,
-}: {
+function NavigationCardContent({ icon: Icon, title, description, accent }: {
   icon: LucideIcon;
-  label: string;
-  value: number;
-  accent: string; // rgb
-  tone?: 'danger' | 'ok' | 'warn';
-  delay?: number;
+  title: string;
+  description: string;
+  accent: string;
 }) {
-  const accentRgb =
-    tone === 'danger'
-      ? '251, 113, 133'
-      : tone === 'ok'
-        ? '52, 211, 153'
-        : tone === 'warn'
-          ? '245, 158, 11'
-          : accent;
+  const { pending } = useLinkStatus();
 
   return (
-    <TiltSpotCard
-      maxTilt={1.4}
-      className="p-4 sm:p-5 min-h-[96px]"
-      style={{ animationDelay: `${delay ?? 0}ms` }}
+    <span
+      className="flex flex-1 flex-col items-start"
+      aria-busy={pending}
+      onClickCapture={(event) => { if (pending) event.preventDefault(); }}
     >
-      <div className="flex items-start justify-between">
-        <GlowIcon icon={icon} accent={accentRgb} chip={46} size={22} />
-        <span
-          className="hidden sm:block h-15 w-[3px] rounded-full"
-          aria-hidden
-          style={{
-            height: 46,
-            background: `linear-gradient(180deg, rgba(${accentRgb},0.4), rgba(${accentRgb},0.05))`,
-          }}
-        />
-      </div>
-      <div className="mt-3 flex items-end justify-between gap-3">
-        <p
-          className="text-3xl sm:text-[34px] leading-none font-black tabular-nums text-white"
-          style={{ textShadow: `0 0 18px rgba(${accentRgb},0.16)` }}
-        >
-          {value === 0 ? '—' : value}
-        </p>
-        {value > 0 && (
-          <span
-            className="mb-1.5 h-2 w-2 rounded-full crm-pulse-dot"
-            style={{
-              background: `rgb(${accentRgb})`,
-              boxShadow: `0 0 12px rgba(${accentRgb},0.7)`,
-            }}
-            aria-hidden
-          />
-        )}
-      </div>
-      <p className="mt-1.5 text-[11px] font-medium tracking-wide uppercase text-[hsl(215,16%,46%)]">
-        {label}
-      </p>
+      <GlowIcon icon={Icon} accent={accent} chip={48} size={22} />
+      <span className="mt-6 block text-lg font-bold text-white">{title}</span>
+      <span className="mt-2 block text-sm leading-relaxed text-slate-400">{description}</span>
+      <span className="mt-auto flex w-full items-center justify-end pt-5 text-slate-300" aria-hidden="true">
+        {pending ? <Loader2 size={18} className="animate-spin motion-reduce:animate-none" /> : <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />}
+      </span>
+    </span>
+  );
+}
+
+function NavigationCard({ href, icon, title, description, accent }: {
+  href: string;
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  accent: string;
+}) {
+  return (
+    <TiltSpotCard maxTilt={1.4} className="group min-h-52 cursor-pointer p-0 focus-within:ring-2 focus-within:ring-cyan-300/60">
+      <Link href={href} className="flex min-h-52 flex-col rounded-2xl p-5 focus-visible:outline-none sm:p-6">
+        <NavigationCardContent icon={icon} title={title} description={description} accent={accent} />
+      </Link>
     </TiltSpotCard>
+  );
+}
+
+function PendingPipelineNavigation() {
+  const { pending } = useLinkStatus();
+  if (!pending) return null;
+  return (
+    <span
+      role="status"
+      aria-label="Abrindo pipeline"
+      className="absolute inset-0 z-20 grid cursor-progress place-items-center rounded-2xl bg-slate-950/80"
+      onClickCapture={(event) => { event.preventDefault(); event.stopPropagation(); }}
+    >
+      <Loader2 size={22} className="animate-spin text-cyan-300 motion-reduce:animate-none" />
+    </span>
   );
 }
 
@@ -126,7 +114,7 @@ export default function DashboardClient({
     });
   }, [dashboard, agora]);
 
-  const isAdmin = currentUserRole === 'admin';
+  const isAdmin = isAdminRole(currentUserRole);
 
   if (erro || !dashboard) {
     return (
@@ -140,9 +128,6 @@ export default function DashboardClient({
 
   const {
     pipelines,
-    totalAtivos,
-    concluidasSemana,
-    tarefasAtrasadasCount,
     historicoRecente,
   } = dashboard;
 
@@ -164,130 +149,25 @@ export default function DashboardClient({
               className="text-2xl sm:text-[32px] font-black tracking-[0.01em] text-white"
               style={{ textShadow: '0 0 24px rgba(120,200,255,0.14)' }}
             >
-              Dashboard
+              Alpha CRM
             </h1>
             <p className="mt-1.5 text-[13px] sm:text-sm text-[hsl(214,20%,52%)]">
-              Controle seus processos em tempo real.
+              Centralize seus processos e acompanhe suas operações em tempo real.
             </p>
           </div>
-          <span
-            className="relative flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-semibold"
-            style={{
-              borderColor: 'rgba(0,230,195,0.22)',
-              background: 'rgba(0,230,195,0.06)',
-              color: 'rgb(0,230,195)',
-            }}
-          >
-            <span
-              className="h-1.5 w-1.5 rounded-full crm-pulse-dot"
-              style={{ background: 'rgb(0,230,195)', boxShadow: '0 0 10px rgb(0,230,195)' }}
-              aria-hidden
-            />
-            Ao vivo
-          </span>
         </div>
       </header>
 
-      {/* ── KPI cards ── */}
-      <section aria-label="Indicadores" className="crm-enter grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5" style={{ animationDelay: "60ms" }}>
-        <KpiCard
-          icon={ActivityLucide}
-          label="Cards ativos"
-          value={totalAtivos}
-          accent={accent}
-          delay={0}
-        />
-        <KpiCard
-          icon={AlertTriangle}
-          label="Tarefas atrasadas"
-          value={tarefasAtrasadasCount}
-          accent={accent}
-          tone={tarefasAtrasadasCount > 0 ? 'danger' : undefined}
-          delay={60}
-        />
-        <KpiCard
-          icon={ListChecks}
-          label="Tarefas pendentes"
-          value={tarefasOrdenadas.length}
-          accent={accent}
-          tone={tarefasOrdenadas.length > 0 ? 'warn' : undefined}
-          delay={120}
-        />
-        <KpiCard
-          icon={CheckCircle2}
-          label="Concluídos (7 dias)"
-          value={concluidasSemana}
-          accent={accent}
-          tone="ok"
-          delay={180}
-        />
-      </section>
-
-      {/* ── Atalhos rápidos ── */}
-      <section aria-label="Atalhos rápidos" className="crm-enter grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5" style={{ animationDelay: "90ms" }}>
-        <TiltSpotCard maxTilt={1.4} className="group p-4" aria-label="Tarefas">
-          <Link href="/PainelAlpha/AlphaCRM/tarefas" className="flex h-full items-center gap-3">
-            <span
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
-              style={{
-                background: 'linear-gradient(155deg, rgba(251,113,133,0.22), rgba(251,113,133,0.05) 65%)',
-                border: '1px solid rgba(251,113,133,0.26)',
-              }}
-            >
-              <ListChecks size={18} style={{ color: 'rgb(251,113,133)', filter: 'drop-shadow(0 0 6px rgba(251,113,133,0.55))' }} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-bold text-white">Tarefas</span>
-              <span className="block truncate text-xs text-[hsl(215,16%,46%)]">Acompanhe todas as tarefas do time</span>
-            </span>
-            <ArrowRight size={14} className="shrink-0 text-[hsl(215,16%,46%)] transition-all duration-200 group-hover:text-[hsl(0,90%,70%)] group-hover:translate-x-0.5" />
-          </Link>
-        </TiltSpotCard>
-
-        <TiltSpotCard maxTilt={1.4} className="group p-4" aria-label="Pendências">
-          <Link href="/PainelAlpha/AlphaCRM/pendencias" className="flex h-full items-center gap-3">
-            <span
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
-              style={{
-                background: 'linear-gradient(155deg, rgba(245,158,11,0.22), rgba(245,158,11,0.05) 65%)',
-                border: '1px solid rgba(245,158,11,0.26)',
-              }}
-            >
-              <AlertTriangle size={18} style={{ color: 'rgb(245,158,11)', filter: 'drop-shadow(0 0 6px rgba(245,158,11,0.55))' }} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-bold text-white">Pendências</span>
-              <span className="block truncate text-xs text-[hsl(215,16%,46%)]">Veja o que precisa de atenção</span>
-            </span>
-            <ArrowRight size={14} className="shrink-0 text-[hsl(215,16%,46%)] transition-all duration-200 group-hover:text-[hsl(38,92%,55%)] group-hover:translate-x-0.5" />
-          </Link>
-        </TiltSpotCard>
-
-        {isAdmin && (
-          <TiltSpotCard maxTilt={1.4} className="group p-4" aria-label="Configurações">
-            <Link href="/PainelAlpha/AlphaCRM/admin" className="flex h-full items-center gap-3">
-              <span
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
-                style={{
-                  background: 'linear-gradient(155deg, rgba(59,130,246,0.22), rgba(59,130,246,0.05) 65%)',
-                  border: '1px solid rgba(59,130,246,0.26)',
-                }}
-              >
-                <Settings size={18} style={{ color: 'rgb(59,130,246)', filter: 'drop-shadow(0 0 6px rgba(59,130,246,0.55))' }} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-bold text-white">Configurações</span>
-                <span className="block truncate text-xs text-[hsl(215,16%,46%)]">Gerencie pipelines e integrações</span>
-              </span>
-              <ArrowRight size={14} className="shrink-0 text-[hsl(215,16%,46%)] transition-all duration-200 group-hover:text-[hsl(217,91%,60%)] group-hover:translate-x-0.5" />
-            </Link>
-          </TiltSpotCard>
-        )}
+      <section aria-label="Acessos do CRM" className="crm-enter grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3" style={{ animationDelay: '60ms' }}>
+        <NavigationCard href="/PainelAlpha/AlphaCRM/tarefas" icon={ListChecks} title="Tarefas" description="Visualize e acompanhe as tarefas do time." accent="251, 113, 133" />
+        <NavigationCard href="/PainelAlpha/AlphaCRM/pendencias" icon={AlertTriangle} title="Pendências" description="Veja o que precisa da sua atenção." accent="245, 158, 11" />
+        {isAdmin && <NavigationCard href="/PainelAlpha/AlphaCRM/admin" icon={Settings} title="Configurações" description="Gerencie pipelines e integrações." accent="52, 133, 255" />}
       </section>
 
       {/* ── Pipelines ── */}
       <section aria-label="Pipelines" className="crm-enter" style={{ animationDelay: "120ms" }}>
         <SectionHeader title="Pipelines" />
+        <p className="mt-2 text-sm text-slate-400">Acesse seus pipelines e gerencie seus cards por área de negócio.</p>
         <div className="mt-3">
           {pipelines.length === 0 ? (
             <GlassCard className="p-6">
@@ -307,8 +187,9 @@ export default function DashboardClient({
                   >
                     <Link
                       href={`/PainelAlpha/AlphaCRM/pipeline/${pipeline.id}`}
-                      className="flex flex-col h-full"
+                      className="relative flex h-full flex-col rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
                     >
+                      <PendingPipelineNavigation />
                       <div className="flex items-start justify-between">
                         <PipelineGlyph identity={ident} className="crm-float" />
                         <span
