@@ -40,6 +40,7 @@ import {
 import {
   ACAO_MONITORAMENTO_EXECUTADO,
   AUTOMACAO_ORIGEM_MONITORAMENTO,
+  CHAVE_AUTOMACAO_REVISAO_MONITORAMENTO,
   calcularProximaRevisaoMonitoramento,
   monitoramentoEstaVencido,
   NOME_ETAPA_MONITORAMENTO,
@@ -137,6 +138,13 @@ async function executarAutomacaoMonitoramentoBpm(params: {
     avisos.push("Etapa Monitoramento não encontrada.");
     return;
   }
+  // A definição central é a única autoridade após a migração. Pausar essa
+  // automação na UI também deve pausar a revisão, sem religar o job legado.
+  const automacaoCentral = await db.bpmAutomacao.findFirst({
+    where: { pipelineId: pipeline.id, chave: CHAVE_AUTOMACAO_REVISAO_MONITORAMENTO },
+    select: { id: true },
+  });
+  if (automacaoCentral) return;
 
   const cardsMonitoramento = await db.bpmCard.findMany({
     where: {

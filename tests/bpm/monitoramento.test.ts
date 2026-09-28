@@ -4,9 +4,16 @@ import {
   etapaEhMonitoramento,
   monitoramentoEstaVencido,
   obterErroTransicaoMonitoramento,
+  validarAtivacaoCondicaoMonitoramento,
 } from "@/lib/bpm/monitoramento";
 
 describe("BPM - regra de Monitoramento", () => {
+  it("não permite ativar retorno sem critério e preserva outras automações", () => {
+    expect(() => validarAtivacaoCondicaoMonitoramento("monitoramento_condicao_retorno", null)).toThrow("condição de interesse válida");
+    expect(() => validarAtivacaoCondicaoMonitoramento("monitoramento_condicao_retorno", "{\"operador\":\"E\"}")).toThrow();
+    expect(() => validarAtivacaoCondicaoMonitoramento("monitoramento_condicao_retorno", JSON.stringify({ operador: "AND", condicoes: [{ tipo: "condicao", campo: { fonte: "card", campo: "status" }, operador: "preenchido" }] }))).not.toThrow();
+    expect(() => validarAtivacaoCondicaoMonitoramento("monitoramento_revisao_interna", null)).not.toThrow();
+  });
   it("reconhece a etapa independentemente de caixa e acentuação", () => {
     expect(etapaEhMonitoramento("Monitoramento")).toBe(true);
     expect(etapaEhMonitoramento(" monitoramento ")).toBe(true);
@@ -48,8 +55,22 @@ describe("BPM - regra de Monitoramento", () => {
       etapaDestinoNome: "Monitoramento",
     })).toBeNull();
     expect(obterErroTransicaoMonitoramento({
+      etapaOrigemNome: "Em tratativas",
+      etapaDestinoNome: "Monitoramento",
+    })).toBeNull();
+    expect(obterErroTransicaoMonitoramento({
       etapaOrigemNome: "Monitoramento",
       etapaDestinoNome: "Lost",
     })).toBeNull();
+    expect(obterErroTransicaoMonitoramento({
+      etapaOrigemNome: "Monitoramento",
+      etapaDestinoNome: "Agendar Reunião",
+      atorTipo: "AUTOMACAO",
+    })).toBeNull();
+    expect(obterErroTransicaoMonitoramento({
+      etapaOrigemNome: "Monitoramento",
+      etapaDestinoNome: "Agendar Reunião",
+      atorTipo: "MANUAL",
+    })).not.toBeNull();
   });
 });

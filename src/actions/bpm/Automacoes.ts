@@ -26,6 +26,7 @@ import {
 import type { GrupoCondicao } from "@/lib/bpm/regras/types";
 import { publicarVersaoCentralDaDefinicaoSimples } from "@/lib/bpm/automacoes/centralizacao";
 import { encerrarExecucoesEmAndamentoAutomacao, filtroExecucoesRelevantes, validarReferenciasPublicacaoAutomacao } from "@/lib/bpm/automacoes/publicacao";
+import { validarAtivacaoCondicaoMonitoramento } from "@/lib/bpm/monitoramento";
 
 const ROTA_AUTOMACOES = "/PainelAlpha/AlphaCRM/admin/automacoes";
 const idSchema = z.string().cuid();
@@ -522,6 +523,7 @@ export async function AlternarAutomacaoBpm(automacaoId: string, ativa: boolean) 
     const atual = await db.bpmAutomacao.findUnique({ where: { id } });
     if (!atual) throw new Error("Automação não encontrada");
     const versaoAtiva = await db.bpmAutomacaoVersao.findFirst({ where: { automacaoId: id, status: "ATIVA" }, orderBy: { versao: "desc" } });
+    if (ativa) validarAtivacaoCondicaoMonitoramento(atual.chave, versaoAtiva?.condicaoJson);
     // Religar exige referências válidas (ex.: cópia duplicada para outro pipeline).
     if (ativa && versaoAtiva) {
       await validarReferenciasPublicacaoAutomacao(atual, versaoAtiva.gatilhoTipo, versaoAtiva.gatilhoConfigJson, versaoAtiva.grafoJson);

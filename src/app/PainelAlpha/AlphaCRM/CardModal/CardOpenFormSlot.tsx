@@ -7,6 +7,7 @@ import { PainelProximoContato } from "./PainelProximoContato";
 import { PainelReuniao } from "./PainelReuniao";
 import { PainelStatusPosFechamento } from "./PainelStatusPosFechamento";
 import { PainelStandbyFollowUp } from "./PainelStandbyFollowUp";
+import { PainelMonitoramento } from "./PainelMonitoramento";
 import { FormularioEtapaRenderer } from "./FormularioEtapaRenderer";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
@@ -70,6 +71,8 @@ export function CardOpenFormSlot({
               return <PainelChecklistFollowUp cardId={card.id} accent={accent} onAtualizado={onAtualizado} onEstadoChange={onEstadoFollowUpChange} podeEditar={podeEditar} realtimeRevision={realtimeRevision} />;
             case "standby-follow-up":
               return <PainelStandbyFollowUp cardId={card.id} accent={accent} podeEditar={podeEditar} realtimeRevision={realtimeRevision} onAtualizado={onAtualizado} />;
+            case "monitoring-status":
+              return <PainelMonitoramento cardId={card.id} realtimeRevision={realtimeRevision} />;
             case "commercial-post-closing":
               return <PainelStatusPosFechamento cardId={card.id} statusPersistido={card.statusPosFechamento} versaoPersistidaEm={card.updatedAt} podeEditar={podeEditar} realtimeRevision={realtimeRevision} accent={accent} onAtualizado={onAtualizado} />;
             default:

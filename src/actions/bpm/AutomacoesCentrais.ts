@@ -14,6 +14,7 @@ import { sincronizarAgendasVersaoAutomacao } from "@/lib/bpm/automacoes/agenda";
 import { reprocessarExecucaoAutomacaoCentral } from "@/lib/bpm/automacoes/central-runtime";
 import { encerrarExecucoesEmAndamentoAutomacao, filtroExecucoesRelevantes, validarReferenciasPublicacaoAutomacao } from "@/lib/bpm/automacoes/publicacao";
 import { etapaIdCardSchema } from "@/lib/validations/bpm";
+import { validarAtivacaoCondicaoMonitoramento } from "@/lib/bpm/monitoramento";
 
 const ROTA = "/PainelAlpha/AlphaCRM/admin/automacoes";
 const idSchema = z.string().cuid();
@@ -71,6 +72,7 @@ export async function SalvarDefinicaoAutomacaoCentralBpm(payload: unknown) {
         ? await tx.bpmAutomacao.findUnique({ where: { id: dados.automacaoId } })
         : null;
       if (dados.automacaoId && !atual) throw new Error("Automação não encontrada");
+      if (dados.ativa) validarAtivacaoCondicaoMonitoramento(atual?.chave, dados.condicao);
       const automacao = atual
         ? await tx.bpmAutomacao.update({
             where: { id: atual.id },
@@ -162,6 +164,7 @@ export async function AtivarVersaoAutomacaoCentralBpm(versaoId: string) {
     const userId = await exigirAdmin(); const id = idSchema.parse(versaoId);
     const versao = await db.bpmAutomacaoVersao.findUnique({ where: { id }, include: { automacao: true } });
     if (!versao) throw new Error("Versão não encontrada");
+    validarAtivacaoCondicaoMonitoramento(versao.automacao.chave, versao.condicaoJson);
     await validarReferenciasPublicacaoAutomacao(versao.automacao, versao.gatilhoTipo, versao.gatilhoConfigJson, versao.grafoJson);
     if (versao.condicaoJson) grupoCondicaoSchema.parse(JSON.parse(versao.condicaoJson));
     await db.$transaction(async (tx) => {

@@ -72,6 +72,15 @@ export const BPM_FORM_COMPONENT_REGISTRY = {
     multiple: false,
     configSchema: presentationConfigSchema,
   },
+  [BPM_CAPABILITIES.MONITORING_STATUS]: {
+    tipo: "CAPABILITY",
+    target: BPM_CAPABILITIES.MONITORING_STATUS,
+    label: "Próxima verificação",
+    description: "Mostra a próxima revisão calculada pela automação de Monitoramento. A data não exige preenchimento manual.",
+    rendererId: "monitoring-status",
+    multiple: false,
+    configSchema: presentationConfigSchema,
+  },
   [BPM_CAPABILITIES.COMMERCIAL_POST_CLOSING]: {
     tipo: "CAPABILITY",
     target: BPM_CAPABILITIES.COMMERCIAL_POST_CLOSING,

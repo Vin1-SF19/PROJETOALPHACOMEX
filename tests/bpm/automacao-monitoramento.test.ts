@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const pipelineFindFirstMock = vi.hoisted(() => vi.fn());
+const automacaoFindFirstMock = vi.hoisted(() => vi.fn());
 const cardFindManyMock = vi.hoisted(() => vi.fn());
 const historicoFindManyMock = vi.hoisted(() => vi.fn());
 const updateManyMock = vi.hoisted(() => vi.fn());
@@ -13,6 +14,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({
   default: {
     bpmPipeline: { findFirst: pipelineFindFirstMock },
+    bpmAutomacao: { findFirst: automacaoFindFirstMock },
     bpmCard: { findMany: cardFindManyMock },
     bpmTarefa: { create: tarefaCreateMock },
     bpmCardHistorico: { findMany: historicoFindManyMock },
@@ -30,6 +32,7 @@ import { executarAutomacaoFollowUpBpm } from "@/lib/bpm/automacao-novos-leads";
 describe("automação mensal de Monitoramento", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    automacaoFindFirstMock.mockResolvedValue(null);
     pipelineFindFirstMock.mockResolvedValue({
       id: "pipeline-1",
       etapas: [
@@ -157,5 +160,16 @@ describe("automação mensal de Monitoramento", () => {
 
     expect(resumo.avisos).toContain("Etapa Stand By não encontrada.");
     expect(resumo.monitoramento).toMatchObject({ examinados: 1, tarefasCriadas: 1 });
+  });
+
+  it("não executa o job legado quando existe definição central, mesmo pausada", async () => {
+    automacaoFindFirstMock.mockResolvedValue({ id: "automacao-central-inativa" });
+    const resumo = await executarAutomacaoFollowUpBpm(new Date("2026-08-31T12:00:00.000Z"));
+    expect(resumo.monitoramento).toMatchObject({ examinados: 0, tarefasCriadas: 0 });
+    expect(tarefaCreateMock).not.toHaveBeenCalled();
+    expect(automacaoFindFirstMock).toHaveBeenCalledWith({
+      where: { pipelineId: "pipeline-1", chave: "monitoramento_revisao_interna" },
+      select: { id: true },
+    });
   });
 });
