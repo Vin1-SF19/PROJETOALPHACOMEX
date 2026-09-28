@@ -8,6 +8,7 @@ const historicoCreateMock = vi.hoisted(() => vi.fn());
 const tarefaCreateMock = vi.hoisted(() => vi.fn());
 const transactionMock = vi.hoisted(() => vi.fn());
 const notificarMock = vi.hoisted(() => vi.fn());
+const cadenciaFindFirstMock = vi.hoisted(() => vi.fn());
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/bpm/cadencias/ativacao-automatica", () => ({ ativarCadenciasNaEntradaBpm: vi.fn().mockResolvedValue({ alteradas: 0 }) }));
@@ -15,6 +16,7 @@ vi.mock("@/lib/prisma", () => ({
   default: {
     bpmPipeline: { findFirst: pipelineFindFirstMock },
     bpmCard: { findMany: cardFindManyMock },
+    bpmCadencia: { findFirst: cadenciaFindFirstMock },
     bpmTarefa: { create: tarefaCreateMock },
     bpmCardHistorico: { findMany: historicoFindManyMock },
     bpmCardCampoValor: { findMany: vi.fn().mockResolvedValue([]) },
@@ -32,6 +34,7 @@ import { executarAutomacaoFollowUpBpm } from "@/lib/bpm/automacao-novos-leads";
 describe("automação de oito dias de Reunião Agendada", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    cadenciaFindFirstMock.mockResolvedValue(null);
     pipelineFindFirstMock.mockResolvedValue({
       id: "pipeline-1",
       etapas: [

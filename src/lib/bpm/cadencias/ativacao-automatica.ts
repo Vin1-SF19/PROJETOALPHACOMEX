@@ -65,7 +65,7 @@ export async function ativarCadenciasNaEntradaBpm(
   const [destino, card] = await Promise.all([
     tx.bpmEtapa.findFirst({
       where: { id: input.etapaDestinoId, pipelineId: input.pipelineDestinoId, ativo: true },
-      select: { id: true },
+      select: { id: true, nome: true, pipeline: { select: { nome: true } } },
     }),
     tx.bpmCard.findFirst({
       where: {
@@ -98,6 +98,7 @@ export async function ativarCadenciasNaEntradaBpm(
     select: {
       id: true,
       nome: true,
+      etapas: { select: { etapaId: true } },
       passos: {
         where: { ativo: true },
         orderBy: { ordem: "asc" },
@@ -116,6 +117,10 @@ export async function ativarCadenciasNaEntradaBpm(
   const agora = input.agora ?? new Date();
 
   for (const cadencia of cadencias) {
+    // A cadência editável desta etapa é executada pelo job de oito dias úteis.
+    // O motor genérico conta dias corridos e produziria tarefas duplicadas.
+    if (destino.pipeline?.nome === "Revisão de Radar" && destino.nome === "Agendar Reunião"
+      && cadencia.etapas?.some((etapa) => etapa.etapaId === destino.id)) continue;
     const primeiroPasso = cadencia.passos[0];
     if (!primeiroPasso) continue;
     const existente = existentePorCadencia.get(cadencia.id);

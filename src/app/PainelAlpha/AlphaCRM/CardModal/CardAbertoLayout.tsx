@@ -327,6 +327,7 @@ export function CardAbertoLayout({
           <PainelProximaEtapa
             card={card}
             etapas={etapasParaMover}
+            currentUserId={currentUserId}
             podeMoverEtapa={podeMoverEtapa}
             accent={accent}
             onMovido={() => { onAtualizado(); }}

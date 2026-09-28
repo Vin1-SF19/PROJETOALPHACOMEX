@@ -892,6 +892,17 @@ function FormularioEtapaWorkspaceContent({
             <p className="mt-1 text-base font-semibold text-white">{etapa.nome}</p>
           </div>
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-cyan-400/15 bg-cyan-400/5 px-3 py-2 text-xs text-slate-300"><span><span className="font-semibold text-cyan-200">{secoes.length} seções</span> · {secoes.reduce((total, secao) => total + secao.componentes.length, 0)} componentes nesta etapa</span><button type="button" onClick={() => setMostrarPreview((atual) => !atual)} className="inline-flex min-h-9 items-center gap-2 rounded-lg px-2 text-cyan-200 hover:bg-cyan-400/10"><Eye size={14} /> {mostrarPreview ? "Ocultar prévia" : "Ver prévia"}</button></div>
+        {pipelineNome === "Revisão de Radar" && etapa.nome === "Agendar Reunião" && (
+          <section aria-label="Campos do sistema de Agendar Reunião" className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-slate-300">
+            <p className="font-semibold text-white">Campos do sistema desta etapa</p>
+            <p className="mt-1 text-slate-400">Os valores usam o card existente e são configurados pelos blocos do formulário abaixo.</p>
+            <ul className="mt-2 space-y-1">
+              <li>Data da reunião — {componentesEmUso.has("MEETING_SCHEDULER") ? "no formulário" : "adicione Agendamento de reunião"}</li>
+              <li>Hora da reunião — {componentesEmUso.has("MEETING_SCHEDULER") ? "no formulário" : "adicione Agendamento de reunião"}</li>
+              <li>Próximo Contato — {componentesEmUso.has("FOLLOW_UP_SCHEDULER") ? "no formulário" : "adicione Próximo contato"}</li>
+            </ul>
+          </section>
+        )}
         <ListaCamposFormulario
           secoes={secaoSelecionada ? [secaoSelecionada] : []}
           bloqueado={bloqueado}

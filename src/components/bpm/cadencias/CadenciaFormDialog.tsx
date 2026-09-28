@@ -55,6 +55,8 @@ export function CadenciaFormDialog({ cadencia, pipelines, onClose, onSaved, onCr
   const pipelineId = useWatch({ control, name: "pipelineId" });
   const etapaIds = useWatch({ control, name: "etapaIds" }) ?? [];
   const etapasDisponiveis = pipelines.find((pipeline) => pipeline.id === pipelineId)?.etapas ?? [];
+  const cadenciaAgendarRadar = pipelines.find((pipeline) => pipeline.id === pipelineId)?.nome === "Revisão de Radar"
+    && etapasDisponiveis.some((etapa) => etapaIds.includes(etapa.id) && etapa.nome === "Agendar Reunião");
 
   const salvarMetadados = handleSubmit((dados) => {
     startTransition(async () => {
@@ -207,10 +209,11 @@ export function CadenciaFormDialog({ cadencia, pipelines, onClose, onSaved, onCr
           {cadencia && (
             <div className="space-y-2 rounded-xl border border-white/10 p-3">
               <span className="text-xs font-semibold text-slate-300">Passos ({passos.length})</span>
+              {cadenciaAgendarRadar && <p className="text-[11px] text-cyan-200">Nesta etapa, o intervalo é contado em dias úteis desde o passo anterior, excluindo feriados nacionais. Sem Próximo Contato, as ligações configuradas controlam o envio para Stand By.</p>}
               {passos.map((passo) => (
                 <div key={passo.id} className="flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-2.5 py-1.5 text-xs">
                   <GripVertical size={13} className="shrink-0 text-slate-600" />
-                  <span className="shrink-0 rounded bg-white/5 px-1.5 py-0.5 font-mono text-[10px]">Dia {passo.intervaloDias}</span>
+                  <span className="shrink-0 rounded bg-white/5 px-1.5 py-0.5 font-mono text-[10px]">+{passo.intervaloDias} {cadenciaAgendarRadar ? "dia(s) úteis" : "dia(s)"}</span>
                   <span className="min-w-0 flex-1 truncate text-slate-300">{passo.titulo}</span>
                   <span className="shrink-0 text-[10px] text-slate-500">{TIPO_LABEL[passo.tipoTarefa] ?? passo.tipoTarefa}</span>
                   <Switch checked={passo.ativo} onCheckedChange={(v) => alternarPassoAtivo(passo.id, v)} />
@@ -221,7 +224,7 @@ export function CadenciaFormDialog({ cadencia, pipelines, onClose, onSaved, onCr
               ))}
               <div className="grid grid-cols-[1fr_80px_120px_auto] items-center gap-1.5">
                 <Input className="h-8 text-xs" placeholder="Título do passo" value={novoPassoTitulo} onChange={(e) => setNovoPassoTitulo(e.target.value)} />
-                <Input className="h-8 text-xs" type="number" placeholder="Dia" value={novoPassoIntervalo} onChange={(e) => setNovoPassoIntervalo(e.target.value)} />
+                <Input className="h-8 text-xs" type="number" aria-label={cadenciaAgendarRadar ? "Intervalo em dias úteis" : "Intervalo em dias"} placeholder="Intervalo" value={novoPassoIntervalo} onChange={(e) => setNovoPassoIntervalo(e.target.value)} />
                 <Select value={novoPassoTipo} onValueChange={setNovoPassoTipo}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>

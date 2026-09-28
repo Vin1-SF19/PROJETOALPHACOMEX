@@ -32,6 +32,7 @@ import type { TemaAlpha } from "@/lib/temas";
 import NovoCardModal from "./NovoCardModal";
 import AtribuirResponsavelPromocaoModal from "./AtribuirResponsavelPromocaoModal";
 import CardFullViewModal from "../../CardModal/CardFullViewModal";
+import { AtribuirLeadAgendarModal } from "../../CardModal/AtribuirLeadAgendarModal";
 import NolossLeadModal from "./NolossLeadModal";
 import { GrupoAvataresMembrosCard, type MembroCard } from "../../CardModal/SeletorMembrosCard";
 import { obterStatusPosFechamentoVisivel } from "@/lib/bpm/status-pos-fechamento";
@@ -764,6 +765,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
   const [erro, setErro] = useState<string | null>(null);
   const [novoCardAberto, setNovoCardAberto] = useState(false);
   const [promocaoLeadPendente, setPromocaoLeadPendente] = useState<PromocaoLeadPendente | null>(null);
+  const [atribuicaoAgendarPendente, setAtribuicaoAgendarPendente] = useState<{ cardId: string; etapaDestinoId: string } | null>(null);
   const [cardMovendoId, setCardMovendoId] = useState<string | null>(null);
   const [movimentoPendente, setMovimentoPendente] = useState(false);
   const [atualizandoManual, setAtualizandoManual] = useState(false);
@@ -979,6 +981,12 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
       return;
     }
 
+    if (pipeline.nome === "Revisão de Radar" && etapaEhNovosLeads(origem.nome) && etapaEhAgendarReuniao(destino.nome)) {
+      snapshotArrastoRef.current = null;
+      setAtribuicaoAgendarPendente({ cardId: activeCard.id, etapaDestinoId: destino.id });
+      return;
+    }
+
     movimentoPendenteRef.current = true;
     setMovimentoPendente(true);
     setCardMovendoId(activeCard.id);
@@ -1162,6 +1170,22 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
           }}
         />
       )}
+
+      <AtribuirLeadAgendarModal
+        pipelineId={pipeline.id}
+        currentUserId={currentUserId}
+        open={Boolean(atribuicaoAgendarPendente)}
+        onClose={() => setAtribuicaoAgendarPendente(null)}
+        onConfirmar={async (responsavelId) => {
+          if (!atribuicaoAgendarPendente) return { success: false, error: "Movimento não encontrado." };
+          const resultado = await MoverCardBpm({ ...atribuicaoAgendarPendente, responsavelId });
+          if (!resultado.success) return { success: false, error: typeof resultado.error === "string" ? resultado.error : "Não foi possível mover o lead." };
+          setAtribuicaoAgendarPendente(null);
+          await recarregarCards();
+          router.refresh();
+          return { success: true };
+        }}
+      />
 
       {cardSelecionadoId && (
         <CardFullViewModal

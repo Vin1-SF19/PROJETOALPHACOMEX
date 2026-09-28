@@ -30,6 +30,7 @@ import {
   TOTAL_DIAS_UTEIS_CICLO_NOVOS_LEADS,
 } from "@/lib/bpm/novos-leads";
 import { formatarDataCivil } from "@/components/CalendarioAlpha/lib/datas";
+import { agendaAgendarConcluida, agendaLigacoesAgendar } from "@/lib/bpm/cadencias/agendar-reuniao";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import {
@@ -88,6 +89,7 @@ export type ResumoAutomacaoFollowUpBpm = {
   falhos: number;
   porEtapa: ResumoEtapaFollowUp[];
   ligacoesNovosLeads: ResumoLigacoesNovosLeads;
+  ligacoesAgendarReuniao: ResumoLigacoesNovosLeads;
   standby: ResumoStandbyFollowUp;
   monitoramento: ResumoMonitoramento;
   avisos: string[];
@@ -383,6 +385,69 @@ async function executarAutomacaoLigacoesNovosLeadsBpm(params: {
   }
 }
 
+async function executarAutomacaoLigacoesAgendarBpm(params: {
+  pipelineId: string;
+  etapaId: string;
+  cards: Array<{ id: string; etapaId: string; responsavelId: number | null; createdAt: Date; updatedAt: Date }>;
+  historicosPorCard: Map<string, Array<{ createdAt: Date; valorNovoJson: string | null }>>;
+  cadencia: { id: string; passos: Array<{ id: string; ordem: number; intervaloDias: number; tipoTarefa: string; titulo: string; descricao: string | null; prioridade: string }> };
+  agora: Date;
+  resumo: ResumoLigacoesNovosLeads;
+}) {
+  const { pipelineId, etapaId, cards, historicosPorCard, cadencia, agora, resumo } = params;
+  const candidatos = cards.filter((card) => card.etapaId === etapaId);
+  resumo.examinados = candidatos.length;
+  if (!candidatos.length || !ehDiaUtilNovosLeads(agora)) {
+    resumo.ignorados = candidatos.length;
+    return;
+  }
+  const { inicio, fim } = intervaloDiaCivilSaoPaulo(agora);
+  const [interacoes, planejamentos] = await Promise.all([
+    db.bpmInteracaoCard.findMany({ where: { cardId: { in: candidatos.map((card) => card.id) }, tipo: "LIGACAO", createdAt: { gte: inicio, lt: fim } }, select: { cardId: true } }),
+    db.bpmCardHistorico.findMany({ where: { cardId: { in: candidatos.map((card) => card.id) }, acao: "AGENDAR_REUNIAO_LIGACAO_PLANEJADA", createdAt: { gte: inicio, lt: fim } }, select: { cardId: true } }),
+  ]);
+  const ligacoesHoje = new Set(interacoes.map((item) => item.cardId));
+  const jaPlanejados = new Set(planejamentos.map((item) => item.cardId));
+  for (const card of candidatos) {
+    const entrada = resolverInicioCicloNaEtapa(etapaId, card.createdAt, historicosPorCard.get(card.id) ?? []);
+    const passo = agendaLigacoesAgendar(entrada, cadencia.passos).find((item) => item.dataCivil === formatarDataCivil(agora));
+    if (!passo || ligacoesHoje.has(card.id) || jaPlanejados.has(card.id)) {
+      resumo.ignorados++;
+      continue;
+    }
+    try {
+      const criado = await db.$transaction(async (tx) => {
+        const vigente = await tx.bpmCadencia.findFirst({
+          where: { id: cadencia.id, ativa: true, excluidoEm: null, etapas: { some: { etapaId } }, passos: { some: { id: passo.id, ativo: true } } },
+          select: { id: true },
+        });
+        if (!vigente) return false;
+        const atualizado = await tx.bpmCard.updateMany({
+          where: { id: card.id, pipelineId, etapaId, status: "ATIVO", proximoContatoEm: null, updatedAt: card.updatedAt },
+          data: { updatedAt: agora },
+        });
+        if (atualizado.count !== 1) return false;
+        const tarefa = await tx.bpmTarefa.create({ data: {
+          cardId: card.id, titulo: passo.titulo, descricao: passo.descricao,
+          responsavelId: card.responsavelId, prazo: agora, alertaEm: agora,
+          tipo: "LIGACAO", prioridade: passo.prioridade, status: "PENDENTE",
+        }, select: { id: true } });
+        await tx.bpmCardHistorico.create({ data: {
+          cardId: card.id, acao: "AGENDAR_REUNIAO_LIGACAO_PLANEJADA", automacaoOrigem: cadencia.id,
+          valorNovoJson: JSON.stringify({ cadenciaId: cadencia.id, passoId: passo.id, tarefaId: tarefa.id, dataCivil: passo.dataCivil }),
+        } });
+        return true;
+      });
+      if (!criado) { resumo.ignorados++; continue; }
+      resumo.tarefasCriadas++;
+      await notificarPipelineBpm({ pipelineId, cardId: card.id, tipo: "TAREFA_ALTERADA" });
+    } catch (error) {
+      resumo.falhos++;
+      console.error("[AutomacaoLigacoesAgendarBpm]", { cardId: card.id, error });
+    }
+  }
+}
+
 export async function executarAutomacaoFollowUpBpm(
   agora = new Date(),
 ): Promise<ResumoAutomacaoFollowUpBpm> {
@@ -395,6 +460,7 @@ export async function executarAutomacaoFollowUpBpm(
     falhos: 0,
     porEtapa: [],
     ligacoesNovosLeads: criarResumoLigacoesNovosLeads(),
+    ligacoesAgendarReuniao: criarResumoLigacoesNovosLeads(),
     standby: criarResumoStandby(),
     monitoramento: criarResumoMonitoramento(),
     avisos: [],
@@ -411,6 +477,7 @@ export async function executarAutomacaoFollowUpBpm(
               NOME_ETAPA_NOVOS_LEADS,
               "Novos leads",
               NOME_ETAPA_AGENDAR_REUNIAO,
+              "Agendar Reunião",
               NOME_ETAPA_REUNIAO_AGENDADA,
               NOME_ETAPA_STANDBY,
               "Standby - Follow Up",
@@ -461,7 +528,9 @@ export async function executarAutomacaoFollowUpBpm(
   ].flatMap((configuracao) => {
     const etapa = pipeline.etapas.find((item) => configuracao.nome === NOME_ETAPA_NOVOS_LEADS
       ? etapaEhNovosLeads(item.nome)
-      : item.nome === configuracao.nome);
+      : configuracao.nome === NOME_ETAPA_AGENDAR_REUNIAO
+        ? item.nome.toLocaleLowerCase("pt-BR") === NOME_ETAPA_AGENDAR_REUNIAO.toLocaleLowerCase("pt-BR")
+        : item.nome === configuracao.nome);
     if (!etapa) {
       resumo.avisos.push(`Etapa ${configuracao.nome} não encontrada.`);
       return [];
@@ -478,6 +547,14 @@ export async function executarAutomacaoFollowUpBpm(
     },
     select: { id: true, etapaId: true, responsavelId: true, createdAt: true, updatedAt: true },
   });
+
+  const etapaAgendar = configuracoes.find((item) => item.nome === NOME_ETAPA_AGENDAR_REUNIAO);
+  const cadenciaAgendar = etapaAgendar ? await db.bpmCadencia.findFirst({
+    where: { pipelineId: pipeline.id, ativa: true, excluidoEm: null, etapas: { some: { etapaId: etapaAgendar.id } } },
+    select: { id: true, passos: { where: { ativo: true }, orderBy: { ordem: "asc" }, select: {
+      id: true, ordem: true, intervaloDias: true, tipoTarefa: true, titulo: true, descricao: true, prioridade: true,
+    } } },
+  }) : null;
 
   const historicos = cards.length > 0
     ? await db.bpmCardHistorico.findMany({
@@ -496,12 +573,12 @@ export async function executarAutomacaoFollowUpBpm(
     historicosPorCard.set(historico.cardId, lista);
   }
 
-  const cardsNovosLeads = cards.filter((card) => configuracoes.some((configuracao) =>
-    configuracao.nome === NOME_ETAPA_NOVOS_LEADS && configuracao.id === card.etapaId));
-  const interacoesDoCiclo = cardsNovosLeads.length > 0
+  const cardsComLigacoes = cards.filter((card) => configuracoes.some((configuracao) =>
+    [NOME_ETAPA_NOVOS_LEADS, NOME_ETAPA_AGENDAR_REUNIAO].includes(configuracao.nome) && configuracao.id === card.etapaId));
+  const interacoesDoCiclo = cardsComLigacoes.length > 0
     ? await db.bpmInteracaoCard.findMany({
         where: {
-          cardId: { in: cardsNovosLeads.map((card) => card.id) },
+          cardId: { in: cardsComLigacoes.map((card) => card.id) },
           tipo: "LIGACAO",
           createdAt: { lt: intervaloDiaCivilSaoPaulo(agora).inicio },
         },
@@ -509,7 +586,7 @@ export async function executarAutomacaoFollowUpBpm(
       })
     : [];
   const interacoesPorCard = new Map<string, Date[]>();
-  const criacaoPorCard = new Map(cardsNovosLeads.map((card) => [card.id, card.createdAt]));
+  const criacaoPorCard = new Map(cardsComLigacoes.map((card) => [card.id, card.createdAt]));
   for (const interacao of interacoesDoCiclo) {
     if (interacao.createdAt < (criacaoPorCard.get(interacao.cardId) ?? agora)) continue;
     const datas = interacoesPorCard.get(interacao.cardId) ?? [];
@@ -534,6 +611,8 @@ export async function executarAutomacaoFollowUpBpm(
       return configuracao.nome === NOME_ETAPA_NOVOS_LEADS
         ? cicloDeTentativasNovosLeadsConcluido(inicioCiclo, agora)
           && oitoTentativasDiariasRegistradas(inicioCiclo, interacoesPorCard.get(card.id) ?? [])
+        : configuracao.nome === NOME_ETAPA_AGENDAR_REUNIAO
+          ? Boolean(cadenciaAgendar && agendaAgendarConcluida(inicioCiclo, cadenciaAgendar.passos, interacoesPorCard.get(card.id) ?? [], agora))
         : cicloNovosLeadsVencido(inicioCiclo, agora);
     });
     resumoEtapa.elegiveis = elegiveis.length;
@@ -588,6 +667,17 @@ export async function executarAutomacaoFollowUpBpm(
         }
 
         const movido = await db.$transaction(async (tx) => {
+          if (configuracao.nome === NOME_ETAPA_AGENDAR_REUNIAO) {
+            if (!cadenciaAgendar) return false;
+            const atual = await tx.bpmCadencia.findFirst({
+              where: { id: cadenciaAgendar.id, ativa: true, excluidoEm: null, etapas: { some: { etapaId: configuracao.id } } },
+              select: { passos: { where: { ativo: true }, orderBy: { ordem: "asc" }, select: {
+                id: true, ordem: true, intervaloDias: true, tipoTarefa: true, titulo: true, descricao: true, prioridade: true,
+              } } },
+            });
+            const entrada = resolverInicioCicloNaEtapa(configuracao.id, card.createdAt, historicosPorCard.get(card.id) ?? []);
+            if (!atual || !agendaAgendarConcluida(entrada, atual.passos, interacoesPorCard.get(card.id) ?? [], agora)) return false;
+          }
           const atualizacao = await tx.bpmCard.updateMany({
             where: {
               id: card.id,
@@ -650,6 +740,12 @@ export async function executarAutomacaoFollowUpBpm(
     agora,
     resumo: resumo.ligacoesNovosLeads,
   });
+  if (etapaAgendar && cadenciaAgendar) {
+    await executarAutomacaoLigacoesAgendarBpm({
+      pipelineId: pipeline.id, etapaId: etapaAgendar.id, cards, historicosPorCard,
+      cadencia: cadenciaAgendar, agora, resumo: resumo.ligacoesAgendarReuniao,
+    });
+  }
 
   for (const etapa of resumo.porEtapa) {
     resumo.examinados += etapa.examinados;

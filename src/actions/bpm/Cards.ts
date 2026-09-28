@@ -12,6 +12,7 @@ import {
   salvarRequisitosEMoverCardSchema,
 } from "@/lib/validations/bpm";
 import { cnpjEhValido, formatCNPJ, normalizarCNPJ } from "@/lib/format-cnpj";
+import { obterErroDataReuniaoParaMovimento } from "@/lib/bpm/agendar-reuniao";
 import {
   exigirAcessoBpmCard,
   exigirAcessoBpmPipeline,
@@ -1427,6 +1428,7 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
 type DadosMovimentoComRequisitos = {
   cardId: string;
   etapaDestinoId: string;
+  responsavelId?: number;
   camposValores: Record<string, string>;
   proximoContatoEm?: Date | null;
   origemMovimentacao?: "MANUAL" | "AUTOMACAO";
@@ -1565,6 +1567,14 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
       }));
     const capacidadesObrigatorias = await capacidadesObrigatoriasPorEtapa([card.etapaId, etapaDestinoId]);
     const guardas: string[] = [];
+    if (card.pipeline.nome === "Revisão de Radar") {
+      const erroDataHora = obterErroDataReuniaoParaMovimento({
+        etapaOrigemNome: card.etapa.nome,
+        etapaDestinoNome: etapaDestino.nome,
+        dataReuniao: card.dataReuniao,
+      });
+      if (erroDataHora) guardas.push(erroDataHora);
+    }
     if (capacidadesObrigatorias.get(card.etapaId)?.has(BPM_CAPABILITIES.STAGE_CHECKLIST)) {
       const erroChecklist = await obterErroChecklistParaMovimento({ id: card.id, pipelineId: card.pipelineId, etapaId: card.etapaId });
       if (erroChecklist) guardas.push(erroChecklist);
@@ -1621,6 +1631,7 @@ async function executarMovimentoCanonico(
     ator: { tipo: "MANUAL", userId, userRole },
     camposValores: dados.camposValores,
     proximoContatoEm: dados.proximoContatoEm,
+    responsavelId: dados.responsavelId,
   });
   if (!resultado.success) return { success: false, error: resultado.error };
 

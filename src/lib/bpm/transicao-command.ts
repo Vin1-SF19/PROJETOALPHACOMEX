@@ -23,7 +23,9 @@ import {
   transitionOriginForRequester,
   type BpmTransitionRequester,
 } from "@/lib/bpm/ontology";
-import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
+import { exigirAcessoBpmCard, usuarioElegivelResponsavelBpm } from "@/lib/bpm/ownership";
+import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
+import { etapaEhAgendarReuniao, destinoEhReuniaoAgendada, obterErroDataReuniaoParaMovimento } from "@/lib/bpm/agendar-reuniao";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { enfileirarAutomacoesMovimentoBpm } from "@/lib/bpm/automacoes/fila";
@@ -50,6 +52,7 @@ export type ComandoTransicaoBpm = {
   ator: AtorTransicaoBpm;
   camposValores?: Record<string, string>;
   proximoContatoEm?: Date | null;
+  responsavelId?: number;
 };
 
 export type ResultadoTransicaoBpm =
@@ -173,6 +176,16 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
   }
 
   const perfilCampo = await validarAutorizacao(input, card, destino, tx);
+  const atribuirAoEntrarEmAgendar = input.ator.tipo === "MANUAL"
+    && card.pipeline.nome === "Revisão de Radar"
+    && etapaEhNovosLeads(card.etapa.nome)
+    && etapaEhAgendarReuniao(destino.nome);
+  if (atribuirAoEntrarEmAgendar) {
+    if (!input.responsavelId) erro("ASSIGNMENT_REQUIRED", "Escolha se o lead ficará com você ou com outro responsável.");
+    if (!(await usuarioElegivelResponsavelBpm(card.pipelineId, input.responsavelId, tx))) {
+      erro("ASSIGNEE_INVALID", "O responsável selecionado não pode receber leads deste pipeline.");
+    }
+  }
   const valoresSubmetidos = input.camposValores ?? {};
   const campoIdsSubmetidos = Object.keys(valoresSubmetidos);
   const componentes = campoIdsSubmetidos.length
@@ -424,6 +437,19 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
   }
 
   const proximoContato = input.proximoContatoEm === undefined ? card.proximoContatoEm : input.proximoContatoEm;
+  if (card.pipeline.nome === "Revisão de Radar" && input.ator.tipo === "MANUAL") {
+    const erroReuniao = obterErroDataReuniaoParaMovimento({
+      etapaOrigemNome: card.etapa.nome,
+      etapaDestinoNome: destino.nome,
+      dataReuniao: card.dataReuniao,
+    });
+    if (erroReuniao) erro("MEETING_DATE_REQUIRED", erroReuniao);
+    if (etapaEhAgendarReuniao(card.etapa.nome)
+      && !destinoEhReuniaoAgendada(destino.nome)
+      && destino.nome !== "Stand By") {
+      erro("STAGE_EXIT_BLOCKED", "Agendar Reunião só pode avançar para Reunião Agendada ou Stand By.");
+    }
+  }
   if (pendencias.length) {
     const unicas = [...new Set(pendencias)];
     erro("REQUIREMENTS_PENDING", `Campos/requisitos obrigatórios pendentes (${unicas.join(", ")}).`, unicas);
@@ -450,6 +476,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     transicao,
     valoresValidados: formato.valores,
     proximoContato,
+    responsavelId: atribuirAoEntrarEmAgendar ? input.responsavelId : undefined,
   };
 }
 
@@ -551,9 +578,17 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
           versao: { increment: 1 },
           updatedAt: agora,
           ...(input.proximoContatoEm !== undefined ? { proximoContatoEm: input.proximoContatoEm } : {}),
+          ...(prepared.responsavelId ? { responsavelId: prepared.responsavelId } : {}),
         },
       });
       if (movimento.count !== 1) erro("CONCURRENT_TRANSITION", "Outra operação moveu este card. Recarregue e tente novamente.");
+      if (prepared.responsavelId) {
+        await tx.bpmCardMembro.upsert({
+          where: { cardId_userId: { cardId: card.id, userId: prepared.responsavelId } },
+          create: { cardId: card.id, userId: prepared.responsavelId, role: "RESPONSAVEL" },
+          update: { role: "RESPONSAVEL" },
+        });
+      }
 
       await tx.bpmCardEstado.upsert({
         where: { cardId: card.id },
@@ -579,7 +614,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
           usuarioId: input.ator.tipo === "MANUAL" ? input.ator.userId : null,
           automacaoOrigem: input.ator.automacaoId,
           valorAnteriorJson: JSON.stringify({ etapaId: card.etapaId, lifecycle: card.status, outcome: card.estadoOntologico?.outcome ?? null, versao: card.versao }),
-          valorNovoJson: JSON.stringify({ etapaId: destino.id, lifecycle, outcome, subStatusId, versao: card.versao + 1, camposPreenchidos: Object.keys(prepared.valoresValidados) }),
+          valorNovoJson: JSON.stringify({ etapaId: destino.id, lifecycle, outcome, subStatusId, versao: card.versao + 1, responsavelId: prepared.responsavelId ?? card.responsavelId, camposPreenchidos: Object.keys(prepared.valoresValidados) }),
         },
       });
       const evento = await publicarEventoBpm({

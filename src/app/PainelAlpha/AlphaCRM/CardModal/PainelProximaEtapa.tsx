@@ -11,6 +11,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useCardSave } from "./CardSaveContext";
 import { BPM_CAPABILITIES, BPM_STAGE_KEYS } from "@/lib/bpm/ontology";
 import { formularioExigeCapacidade } from "@/lib/bpm/formulario-renderer";
+import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
+import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
+import { AtribuirLeadAgendarModal } from "./AtribuirLeadAgendarModal";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type EtapaOpcao = { id: string; chave?: string | null; nome: string; ordem: number; script: string | null };
@@ -19,16 +22,18 @@ type RequisitosTransicao = NonNullable<Awaited<ReturnType<typeof ObterRequisitos
 interface Props {
   card: CardDetalhe;
   etapas: EtapaOpcao[];
+  currentUserId?: number | null;
   podeMoverEtapa: boolean;
   accent: string;
   onMovido: () => void;
 }
 
-export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accent, onMovido }: Props) {
+export default function PainelProximaEtapa({ card, etapas, currentUserId = null, podeMoverEtapa, accent, onMovido }: Props) {
   const router = useRouter();
   const { flushSaves } = useCardSave();
   const [movendoEtapa, setMovendoEtapa] = useState(false);
   const [requisitos, setRequisitos] = useState<RequisitosTransicao | null>(null);
+  const [atribuicaoPendente, setAtribuicaoPendente] = useState<{ etapaDestinoId: string; camposValores?: Record<string, string> } | null>(null);
   const [valoresRequisitos, setValoresRequisitos] = useState<Record<string, string>>({});
   const [pendenciasChecklist, setPendenciasChecklist] = useState<{
     quantidade: number;
@@ -136,6 +141,11 @@ export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accen
       }
       const dados = await buscarRequisitos(etapaDestinoId);
       if (!dados || dados.faltantes.length || dados.guardas.length) return;
+      if (card.pipeline?.nome === "Revisão de Radar" && etapaEhNovosLeads(card.etapa.nome)
+        && etapaEhAgendarReuniao(dados.etapaDestino.nome)) {
+        setAtribuicaoPendente({ etapaDestinoId });
+        return;
+      }
       confirmarMovimento(await MoverCardBpm({ cardId: card.id, etapaDestinoId }));
     } finally {
       setMovendoEtapa(false);
@@ -156,6 +166,12 @@ export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accen
       const camposValores = Object.fromEntries(requisitos.campos
         .filter((campo) => campo.editavel && !campo.somenteLeitura && (valoresRequisitos[campo.id] ?? "") !== (campo.valor ?? ""))
         .map((campo) => [campo.id, valoresRequisitos[campo.id] ?? ""]));
+      if (card.pipeline?.nome === "Revisão de Radar" && etapaEhNovosLeads(card.etapa.nome)
+        && etapaEhAgendarReuniao(requisitos.etapaDestino.nome)) {
+        setAtribuicaoPendente({ etapaDestinoId: requisitos.etapaDestino.id, camposValores });
+        setRequisitos(null);
+        return;
+      }
       confirmarMovimento(await SalvarRequisitosEMoverCardBpm({
         cardId: card.id, etapaDestinoId: requisitos.etapaDestino.id, camposValores,
       }));
@@ -174,6 +190,23 @@ export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accen
 
   return (
     <div className="rounded-2xl border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent overflow-y-auto p-3 space-y-1.5">
+      <AtribuirLeadAgendarModal
+        pipelineId={card.pipelineId}
+        currentUserId={currentUserId}
+        open={Boolean(atribuicaoPendente)}
+        onClose={() => setAtribuicaoPendente(null)}
+        onConfirmar={async (responsavelId) => {
+          if (!atribuicaoPendente) return { success: false, error: "Movimento não encontrado." };
+          const dados = { cardId: card.id, etapaDestinoId: atribuicaoPendente.etapaDestinoId, responsavelId };
+          const resultado = atribuicaoPendente.camposValores
+            ? await SalvarRequisitosEMoverCardBpm({ ...dados, camposValores: atribuicaoPendente.camposValores })
+            : await MoverCardBpm(dados);
+          if (!resultado.success) return { success: false, error: typeof resultado.error === "string" ? resultado.error : "Não foi possível mover o lead." };
+          setAtribuicaoPendente(null);
+          confirmarMovimento(resultado);
+          return { success: true };
+        }}
+      />
       <Dialog open={Boolean(requisitos)} onOpenChange={(aberto) => { if (!aberto && !movendoEtapa) setRequisitos(null); }}>
         <DialogContent className="max-h-[85vh] overflow-y-auto border-white/10 bg-slate-950 text-white sm:max-w-xl">
           <DialogHeader>
