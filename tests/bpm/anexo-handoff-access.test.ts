@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), acesso: vi.fn(), anexo: vi.fn(), vinculos: vi.fn(), get: vi.fn() }));
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), acesso: vi.fn(), acessoPipeline: vi.fn(), anexo: vi.fn(), vinculos: vi.fn(), get: vi.fn() }));
 vi.mock("../../auth", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/prisma", () => ({ default: {
   bpmCardAnexo: { findUnique: mocks.anexo }, bpmCardVinculo: { findMany: mocks.vinculos },
 } }));
-vi.mock("@/lib/bpm/ownership", () => ({ exigirAcessoBpmCard: mocks.acesso }));
+vi.mock("@/lib/bpm/ownership", () => ({ exigirAcessoBpmCard: mocks.acesso, checarAcessoBpmPipeline: mocks.acessoPipeline }));
 vi.mock("@/lib/bpm/anexos-storage", () => ({
   extrairPathnamePrivadoAnexoBpm: () => "contratos/assinado.pdf",
   extrairUrlLegadaAnexoBpm: () => null,
@@ -24,6 +24,7 @@ describe("acesso a documento da contratação pelo card Operacional", () => {
     mocks.anexo.mockResolvedValue({ cardId: "financeiro", url: "privado", nome: "Contrato assinado.pdf",
       tipo: "application/pdf", card: { pipeline: { chave: "financeiro" } } });
     mocks.vinculos.mockResolvedValue([{ cardDestinoId: "operacional" }]);
+    mocks.acessoPipeline.mockResolvedValue(true);
     mocks.acesso.mockImplementation(async (cardId: string) => {
       if (cardId !== "operacional") throw new Error("Sem acesso ao card de origem");
     });
@@ -61,5 +62,13 @@ describe("acesso a documento da contratação pelo card Operacional", () => {
       tipo: "application/pdf", card: { pipeline: { chave: "interno" } } });
     expect((await GET(requisicao, contexto)).status).toBe(403);
     expect(mocks.vinculos).not.toHaveBeenCalled();
+  });
+
+  it("nega anexo de card arquivado sem acesso ao pipeline, antes de consultar o Blob", async () => {
+    mocks.anexo.mockResolvedValueOnce({ cardId: "arquivado", url: "privado", nome: "Contrato.pdf",
+      tipo: "application/pdf", card: { status: "ARQUIVADO", pipelineId: "radar", pipeline: { chave: "comercial" } } });
+    mocks.acessoPipeline.mockResolvedValueOnce(false);
+    expect((await GET(requisicao, contexto)).status).toBe(403);
+    expect(mocks.get).not.toHaveBeenCalled();
   });
 });

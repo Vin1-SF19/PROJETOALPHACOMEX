@@ -56,7 +56,7 @@ describe("arquivamento: action e guard reais", () => {
   mocks.db.setorPermissao.findMany.mockResolvedValue([]);
   mocks.db.usuarioPermissaoOverride.findMany.mockResolvedValue([]);
   mocks.db.bpmCardMembro.findUnique.mockResolvedValue({ role: "RESPONSAVEL" });
-  mocks.db.bpmCard.findUnique.mockResolvedValue({ status: "ATIVO", pipelineId: "pipeline", etapa: { nome: "Em tratativa", visibilidades: [] } });
+  mocks.db.bpmCard.findUnique.mockResolvedValue({ status: "ATIVO", pipelineId: "pipeline", etapaId: "etapa", pipeline: { nome: "Revisão de Radar" }, etapa: { nome: "Em tratativa", visibilidades: [] } });
   mocks.db.$transaction.mockImplementation((fn: (tx: typeof mocks.db) => Promise<unknown>) => fn(mocks.db));
  });
  it("exige sessão antes de consultar o banco", async () => {
@@ -80,7 +80,7 @@ describe("arquivamento: action e guard reais", () => {
   mocks.db.bpmCardMembro.findUnique.mockResolvedValue({ role });
   expect(await ExcluirCardBpm("card")).toEqual({ success: true });
   expect(mocks.db.bpmCard.update).toHaveBeenCalledWith({ where: { id: "card" }, data: { status: "ARQUIVADO" } });
-  expect(mocks.db.bpmCardHistorico.create).toHaveBeenCalledWith({ data: { cardId: "card", acao: "CARD_ARQUIVADO", usuarioId: 1, valorAnteriorJson: '{"status":"ATIVO"}', valorNovoJson: '{"status":"ARQUIVADO"}' } });
+  expect(mocks.db.bpmCardHistorico.create).toHaveBeenCalledWith({ data: { cardId: "card", acao: "CARD_ARQUIVADO", usuarioId: 1, valorAnteriorJson: '{"status":"ATIVO","pipelineId":"pipeline","pipelineNome":"Revisão de Radar","etapaId":"etapa","etapaNome":"Em tratativa"}', valorNovoJson: '{"status":"ARQUIVADO"}' } });
   expect(mocks.notify).toHaveBeenCalledWith({ pipelineId: "pipeline", cardId: "card", tipo: "CARD_EXCLUIDO" });
  });
  it("revalida vínculo dentro da transação", async () => {
@@ -162,7 +162,7 @@ describe("arquivamento com SQLite descartável", () => {
    mocks.db.setorPermissao.findMany.mockResolvedValue([]);
    mocks.db.usuarioPermissaoOverride.findMany.mockResolvedValue([]);
    mocks.db.bpmCardMembro.findUnique.mockResolvedValue({ role: "RESPONSAVEL" });
-   mocks.db.bpmCard.findUnique.mockResolvedValue({ status: "ATIVO", pipelineId: "pipeline", etapa: { nome: "Em tratativa", visibilidades: [] } });
+   mocks.db.bpmCard.findUnique.mockResolvedValue({ status: "ATIVO", pipelineId: "pipeline", etapaId: "etapa", pipeline: { nome: "Revisão de Radar" }, etapa: { nome: "Em tratativa", visibilidades: [] } });
    mocks.db.$transaction.mockImplementation(async (fn: (tx: typeof mocks.db) => Promise<unknown>) => {
     const tx = await sqlite.transaction("write");
     mocks.db.bpmCard.update.mockImplementation(async ({ data }: { data: { status: string } }) => {

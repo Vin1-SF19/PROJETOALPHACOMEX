@@ -9,6 +9,7 @@ import {
   ArrowRight,
   Building2,
   Settings,
+  Archive,
   Loader2,
   type LucideIcon,
 } from 'lucide-react';
@@ -158,9 +159,10 @@ export default function DashboardClient({
         </div>
       </header>
 
-      <section aria-label="Acessos do CRM" className="crm-enter grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3" style={{ animationDelay: '60ms' }}>
+      <section aria-label="Acessos do CRM" className="crm-enter grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4" style={{ animationDelay: '60ms' }}>
         <NavigationCard href="/PainelAlpha/AlphaCRM/tarefas" icon={ListChecks} title="Tarefas" description="Visualize e acompanhe as tarefas do time." accent="251, 113, 133" />
         <NavigationCard href="/PainelAlpha/AlphaCRM/pendencias" icon={AlertTriangle} title="Pendências" description="Veja o que precisa da sua atenção." accent="245, 158, 11" />
+        <NavigationCard href="/PainelAlpha/AlphaCRM/arquivados" icon={Archive} title="Cards arquivados" description="Consulte os cards preservados e sua etapa anterior." accent="148, 163, 184" />
         {isAdmin && <NavigationCard href="/PainelAlpha/AlphaCRM/admin" icon={Settings} title="Configurações" description="Gerencie pipelines e integrações." accent="52, 133, 255" />}
       </section>
 
@@ -209,8 +211,8 @@ export default function DashboardClient({
                       </h3>
                       <p className="mt-1 text-xs text-[hsl(215,16%,46%)]">
                         {pipeline._count.cards === 0
-                          ? 'Nenhum card ativo'
-                          : `${pipeline._count.cards} card${pipeline._count.cards > 1 ? 's' : ''} ativo${pipeline._count.cards > 1 ? 's' : ''}`}
+                          ? 'Nenhum card no quadro'
+                          : `${pipeline._count.cards} card${pipeline._count.cards > 1 ? 's' : ''} no quadro`}
                       </p>
 
                       <div className="mt-5 flex items-center justify-between">

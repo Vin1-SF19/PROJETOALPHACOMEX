@@ -2,7 +2,7 @@ import { get } from "@vercel/blob";
 
 import { auth } from "../../../../../../auth";
 import db from "@/lib/prisma";
-import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
+import { checarAcessoBpmPipeline, exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import {
   extrairPathnamePrivadoAnexoBpm,
   extrairUrlLegadaAnexoBpm,
@@ -24,9 +24,14 @@ export async function GET(
   const { anexoId } = await context.params;
   const anexo = await db.bpmCardAnexo.findUnique({
     where: { id: anexoId },
-    select: { cardId: true, url: true, nome: true, tipo: true, card: { select: { pipeline: { select: { chave: true } } } } },
+    select: { cardId: true, url: true, nome: true, tipo: true, card: { select: { status: true, pipelineId: true, pipeline: { select: { chave: true } } } } },
   });
   if (!anexo) return new Response("Anexo não encontrado", { status: 404 });
+
+  if (anexo.card.status === "ARQUIVADO"
+    && !(await checarAcessoBpmPipeline(anexo.card.pipelineId, Number(session.user.id)))) {
+    return new Response("Sem permissão", { status: 403 });
+  }
 
   let autorizado = false;
   try {

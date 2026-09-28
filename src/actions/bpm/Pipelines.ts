@@ -10,6 +10,7 @@ import {
 } from "@/lib/validations/bpm";
 import {
   checarAcessoBpmPipeline,
+  checarAcessoConfigPipeline,
   exigirAcessoBpmPipeline,
   exigirAcessoConfigPipeline,
   exigirAcessoModuloBpm,
@@ -17,6 +18,7 @@ import {
 } from "@/lib/bpm/ownership";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import { avancarConfigVersionBpm } from "@/lib/bpm/config-version";
+import { contarCardsVisiveisNoQuadro } from "@/lib/bpm/cards-no-quadro";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -90,6 +92,10 @@ export async function ListarPipelinesBpm(incluirInativos = false) {
       return { success: false, error: "Não autorizado", data: [] };
     const userId = Number(session.user.id);
     await exigirAcessoModuloBpm(userId);
+    const [admin, usuario] = await Promise.all([
+      checarAcessoConfigPipeline(userId, "visualizarPipeline"),
+      db.usuarios.findUnique({ where: { id: userId }, select: { role: true } }),
+    ]);
 
     const pipelines = await db.bpmPipeline.findMany({
       where: incluirInativos ? undefined : { ativo: true },
@@ -99,7 +105,7 @@ export async function ListarPipelinesBpm(incluirInativos = false) {
         ativo: true,
         ordem: true,
         setores: { select: { setor: { select: { id: true, nome: true } } } },
-        _count: { select: { cards: true, etapas: true } },
+        _count: { select: { etapas: true } },
       },
       orderBy: { nome: "asc" },
     });
@@ -107,9 +113,15 @@ export async function ListarPipelinesBpm(incluirInativos = false) {
     const acessos = await Promise.all(
       pipelines.map((pipeline) => checarAcessoBpmPipeline(pipeline.id, userId)),
     );
+    const permitidos = pipelines.filter((_, index) => acessos[index]);
+    const contagens = await Promise.all(permitidos.map((pipeline) =>
+      contarCardsVisiveisNoQuadro(pipeline.id, userId, usuario?.role ?? null, admin)));
     return {
       success: true,
-      data: pipelines.filter((_, index) => acessos[index]),
+      data: permitidos.map((pipeline, index) => ({
+        ...pipeline,
+        _count: { ...pipeline._count, cards: contagens[index] },
+      })),
     };
   } catch (error) {
     console.error("[ListarPipelinesBpm]", error);

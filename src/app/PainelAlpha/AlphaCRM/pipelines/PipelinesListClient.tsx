@@ -69,7 +69,7 @@ export default function PipelinesListClient({ pipelines, erro, accent }: Props) 
                 </div>
                 <h3 className="font-bold text-white mb-1">{pipeline.nome}</h3>
                 <p className="text-xs text-slate-400">
-                  {pipeline._count.cards} card(s)
+                  {pipeline._count.cards} card(s) no quadro
                 </p>
               </Link>
             </CrmPipelineBorder>

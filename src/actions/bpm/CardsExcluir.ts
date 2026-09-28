@@ -69,7 +69,8 @@ export async function ExcluirCardBpm(cardId: string) {
       );
       const cardAtual = await tx.bpmCard.findUnique({
         where: { id: cardId },
-        select: { status: true },
+        select: { status: true, pipelineId: true, etapaId: true,
+          pipeline: { select: { nome: true } }, etapa: { select: { nome: true } } },
       });
       if (!cardAtual) throw new Error("Card não encontrado");
       if (cardAtual.status === "ARQUIVADO") return;
@@ -82,7 +83,13 @@ export async function ExcluirCardBpm(cardId: string) {
           cardId,
           acao: "CARD_ARQUIVADO",
           usuarioId: authenticatedUserId,
-          valorAnteriorJson: JSON.stringify({ status: cardAtual.status }),
+          valorAnteriorJson: JSON.stringify({
+            status: cardAtual.status,
+            pipelineId: cardAtual.pipelineId,
+            pipelineNome: cardAtual.pipeline.nome,
+            etapaId: cardAtual.etapaId,
+            etapaNome: cardAtual.etapa.nome,
+          }),
           valorNovoJson: JSON.stringify({ status: "ARQUIVADO" }),
         },
       });

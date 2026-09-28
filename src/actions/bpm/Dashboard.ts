@@ -7,6 +7,7 @@ import {
   exigirAcessoModuloBpm,
 } from "@/lib/bpm/ownership";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
+import { contarCardsVisiveisNoQuadro } from "@/lib/bpm/cards-no-quadro";
 
 /**
  * Agregação central do módulo BPM (Fase 3): métricas por pipeline, tarefas
@@ -150,12 +151,12 @@ export async function ObterDashboardBpm() {
     const totalAtivos = contagemVisivel
       .filter((c) => c.status === "ATIVO")
       .reduce((acc, c) => acc + c._count._all, 0);
-    const pipelinesComContagemVisivel = pipelinesVisiveis.map((pipeline) => ({
+    const contagensQuadro = await Promise.all(pipelinesVisiveis.map((pipeline) =>
+      contarCardsVisiveisNoQuadro(pipeline.id, userId, usuarioAtual?.role ?? null, admin)));
+    const pipelinesComContagemVisivel = pipelinesVisiveis.map((pipeline, index) => ({
       ...pipeline,
       _count: {
-        cards: contagemVisivel
-          .filter((item) => item.pipelineId === pipeline.id)
-          .reduce((total, item) => total + item._count._all, 0),
+        cards: contagensQuadro[index],
       },
     }));
 

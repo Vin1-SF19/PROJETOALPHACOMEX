@@ -257,7 +257,7 @@ export default function AdminPipelinesListClient({ pipelines: pipelinesIniciais,
                 <p className="text-xs text-slate-500 truncate">
                   {pipeline.setores.map((s) => s.setor.nome).join(", ") || "Sem setor vinculado"}
                   {" · "}
-                  {pipeline._count.cards} card(s) · {pipeline._count.etapas} etapa(s)
+                  {pipeline._count.cards} card(s) no quadro · {pipeline._count.etapas} etapa(s)
                 </p>
               </div>
             </Link>

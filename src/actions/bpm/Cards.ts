@@ -60,6 +60,7 @@ import { sincronizarProximoContatoAgenda } from "@/lib/bpm/proximo-contato-agend
 import { etapaEhEmTratativa, etapaEhSemViabilidade, obterErroProximoContatoParaEntrada } from "@/lib/bpm/em-tratativa";
 import { obterErroProximoContatoParaMovimento } from "@/lib/bpm/proximo-contato";
 import { buscarNolossLeadsPendentes } from "@/lib/bpm/noloss-leads";
+import { cardApareceNoQuadro, etapasComSaidaDoQuadro } from "@/lib/bpm/cards-no-quadro";
 import { paraExibicaoTelefone } from "@/lib/validations/cs-nps";
 import { iniciarLigacaoCallix, normalizarTelefoneCallix } from "@/lib/callix/click-to-call";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
@@ -158,13 +159,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
         resolverVisibilidadeEtapa(usuarioAtual?.role, etapa.visibilidades),
       ]),
     );
-    const etapasComSaida = new Set((pipelineInfo?.etapas ?? []).filter((etapa) => etapa.automacoes?.some((automacao) =>
-      automacao.versoes.some((versao) => {
-        try {
-          const grafo = JSON.parse(versao.grafoJson) as { nos?: { acaoTipo?: string }[] };
-          return grafo.nos?.some((no) => no.acaoTipo === "CRIAR_CARD_OUTRO_PIPELINE") ?? false;
-        } catch { return false; }
-      }))).map((etapa) => etapa.id));
+    const etapasComSaida = etapasComSaidaDoQuadro(pipelineInfo?.etapas ?? []);
     const etapasVisiveis = [...visibilidadePorEtapa.entries()]
       .filter(([, permissao]) => permissao.podeVer)
       .map(([etapaId]) => etapaId);
@@ -472,9 +467,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
       return { nativos, campos, camposLabel };
     }
 
-    const cardsReais = cards.filter((card) => card.status === "ATIVO"
-      || (pipelineInfo?.etapas.find((etapa) => etapa.id === card.etapaId)?.ehFinal
-        && (card.vinculosOrigem.length > 0 || etapasComSaida.has(card.etapaId))))
+    const cardsReais = cards.filter((card) => cardApareceNoQuadro(card, pipelineInfo?.etapas ?? [], etapasComSaida))
       .map((card) => {
       const { vinculosOrigem, ...cardSemVinculos } = card;
       const ehNovoLead = card.etapaId === etapaNovosLeads?.id;
