@@ -22,7 +22,7 @@ export class ErroConsultaRadar extends Error {
 
 const campo = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 
-export async function consultarRadar(cnpj: string): Promise<DadosRadar> {
+export async function consultarRadar(cnpj: string, timeoutMs = 90_000): Promise<DadosRadar> {
   const digits = cnpj.replace(/\D/g, "");
   if (!/^(\d{8}|\d{14})$/.test(digits)) {
     throw new ErroConsultaRadar(400, "INVALID_CNPJ", "CNPJ inválido");
@@ -37,7 +37,7 @@ export async function consultarRadar(cnpj: string): Promise<DadosRadar> {
   try {
     response = await fetch(`https://consulta-radar.alpha-comex.com/consultar/${raiz}`, {
       headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(90_000),
+      signal: AbortSignal.timeout(timeoutMs),
       cache: "no-store",
     });
   } catch {

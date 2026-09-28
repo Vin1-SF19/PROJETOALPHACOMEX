@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ClipboardCheck, Loader2, X } from "lucide-react";
 import { BuscarEmpresaPorCnpjBpm, BuscarEmpresasBpm, ListarUsuariosResponsavelBpm } from "@/actions/bpm/Cards";
+import { ConsultarDadosCnpjNovoLeadBpm } from "@/actions/bpm/CardsConsultas";
 import { cnpjEhValido, formatCNPJ, formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";
 
 interface EmpresaOpcao {
@@ -82,6 +83,7 @@ export default function NovoCardModal({
   const [buscandoCnpj, setBuscandoCnpj] = useState(false);
   const [erroBuscaCnpj, setErroBuscaCnpj] = useState<string | null>(null);
   const cnpjRequest = useRef(0);
+  const consultaPendente = useRef<{ cnpj: string; promise: Promise<void> } | null>(null);
 
   function cancelarBuscaCnpj() {
     cnpjRequest.current += 1;
@@ -133,8 +135,8 @@ export default function NovoCardModal({
     return () => { active = false; clearTimeout(timeout); };
   }, [form.razaoSocial, empresaSelecionada]);
 
-  // O cadastro interno tem prioridade; só consultamos a Receita para CNPJ novo.
-  async function buscarCnpjReceita(cnpjValor: string, requestId: number) {
+  // O cadastro interno tem prioridade; as fontes completas ficam no backend.
+  async function buscarCnpjCompleto(cnpjValor: string, requestId: number) {
     const cnpjLimpo = normalizarCNPJ(cnpjValor);
     if (!cnpjEhValido(cnpjLimpo)) return;
     setErroBuscaCnpj(null);
@@ -159,23 +161,26 @@ export default function NovoCardModal({
         });
         setEmpresasSugestoes([]);
         setDropdownAberto(false);
-        return;
       }
-      const resposta = await fetch(`/api/ReceitaFederal?cnpj=${cnpjLimpo}`);
-      const dados = await resposta.json();
+      const consulta = await ConsultarDadosCnpjNovoLeadBpm(pipelineId, cnpjLimpo);
       if (requestId !== cnpjRequest.current) return;
-      if (!resposta.ok || dados.error) {
-        setErroBuscaCnpj(dados.error || "Não foi possível buscar os dados do CNPJ");
+      if (!consulta.success) {
+        setErroBuscaCnpj(consulta.error || "Não foi possível buscar os dados do CNPJ");
         return;
       }
-      setForm((anterior) => ({
-        ...anterior,
-        razaoSocial: dados.razaoSocial || anterior.razaoSocial,
-        nomeFantasia: dados.nomeFantasia || anterior.nomeFantasia,
-        uf: dados.uf || anterior.uf,
-        municipio: dados.municipio || anterior.municipio,
-      }));
-      setEmpresaSelecionada(null);
+      const cadastro = consulta.data.cadastro;
+      if (!empresaInterna.data && cadastro) {
+        setForm((anterior) => ({
+          ...anterior,
+          razaoSocial: cadastro.razaoSocial || anterior.razaoSocial,
+          nomeFantasia: cadastro.nomeFantasia || anterior.nomeFantasia,
+          uf: cadastro.uf || anterior.uf,
+          municipio: cadastro.municipio || anterior.municipio,
+        }));
+      }
+      if (consulta.data.falhas.length) {
+        setErroBuscaCnpj(`Consulta parcial: ${consulta.data.falhas.join(", ")} indisponível. Dados anteriores preservados.`);
+      }
     } catch {
       if (requestId === cnpjRequest.current)
         setErroBuscaCnpj("Erro ao buscar CNPJ. Tente novamente.");
@@ -193,7 +198,10 @@ export default function NovoCardModal({
     setVinculoAutomatico(false);
     setErroBuscaCnpj(null);
     if (cnpjEhValido(cnpjLimpo)) {
-      void buscarCnpjReceita(cnpjLimpo, cnpjRequest.current);
+      const promise = buscarCnpjCompleto(cnpjLimpo, cnpjRequest.current);
+      consultaPendente.current = { cnpj: cnpjLimpo, promise };
+    } else {
+      consultaPendente.current = null;
     }
   }
 
@@ -239,6 +247,8 @@ export default function NovoCardModal({
 
     setSalvando(true);
     try {
+      const pendente = consultaPendente.current;
+      if (pendente?.cnpj === normalizarCNPJ(cnpj)) await pendente.promise;
       const resultado = await onCriado({
         ...(empresaSelecionada
           ? { empresaId: empresaSelecionada.id }
@@ -294,7 +304,7 @@ export default function NovoCardModal({
 
           <FieldRow label="Empresa *" htmlFor="novo-card-empresa">
             <div className="space-y-2 rounded-xl border border-white/10 bg-slate-800/60 p-3">
-              {/* CNPJ — auto-busca na Receita Federal ao completar 14 dígitos */}
+              {/* CNPJ — consulta as fontes no servidor ao completar 14 dígitos */}
               <div className="flex gap-2">
                 <input
                   id="novo-card-empresa"
@@ -417,7 +427,7 @@ export default function NovoCardModal({
 
         <div className="flex gap-2 p-5 border-t border-white/5">
           <button type="button" onClick={onClose} disabled={salvando} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm text-slate-400 hover:text-white disabled:opacity-50">Cancelar</button>
-          <button type="button" onClick={handleSalvar} disabled={salvando} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50" style={{ background: `rgba(${accent},0.85)` }}>
+          <button type="button" onClick={handleSalvar} disabled={salvando || buscandoCnpj} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50" style={{ background: `rgba(${accent},0.85)` }}>
             {salvando ? "Salvando..." : "Criar Card"}
           </button>
         </div>

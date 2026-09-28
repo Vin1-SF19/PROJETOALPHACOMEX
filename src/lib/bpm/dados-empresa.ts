@@ -157,14 +157,26 @@ export interface DadosEmpresaConsolidado {
   };
   radar: {
     situacao: string | null;
+    modalidade: string | null;
     submodalidade: string | null;
+    dataSituacao: string | null;
+    baseLegal: string | null;
+    tipoDesabilitacao: string | null;
+    operacoesAutorizadas: string | null;
     qualificacao: string | null;
     perse: string | null;
     anexoPerse: string | null;
     dividaTributaria: number | null;
     consultadoEm: string | null;
   };
+  analiseFiscal: {
+    faturamento: string | null;
+    quadroFuncionarios: string | null;
+    programasEspeciais: string | null;
+    site: string | null;
+  };
   fonteCartaoCnpj: "Pré-Análise" | "CS&NPS";
+  fontesPendentes: string[];
   atualizadoEm: string | null;
 }
 
@@ -238,6 +250,11 @@ function uniqueStrings(values: Array<string | null | undefined>): string[] {
   });
 }
 
+function textoOuLista(value: unknown): string | null {
+  if (Array.isArray(value)) return uniqueStrings(value.map((item) => stringValue(item))).join(" • ") || null;
+  return stringValue(value);
+}
+
 function envelopeDados(value: unknown): JsonRecord {
   const envelope = asRecord(value);
   return Object.keys(asRecord(envelope.dados)).length > 0 ? asRecord(envelope.dados) : envelope;
@@ -286,6 +303,7 @@ export function normalizarDadosEmpresaBpm(fontes: DadosEmpresaFontes): DadosEmpr
   const radarEnvelope = asRecord(bruto.radar);
   const radar = envelopeDados(bruto.radar);
   const extra = asRecord(bruto.extra);
+  const consultaCrm = asRecord(bruto.consultaCrm);
   const cliente = fontes.empresaPrincipal;
   const radarFiscal = fontes.radarFiscal;
 
@@ -455,14 +473,26 @@ export function normalizarDadosEmpresaBpm(fontes: DadosEmpresaFontes): DadosEmpr
     },
     radar: {
       situacao: stringValue(radar.situacao, radar.status),
+      modalidade: stringValue(radar.modalidade),
       submodalidade: stringValue(radar.submodalidade, fontes.preAnalise?.submodalidade),
+      dataSituacao: stringValue(radar.dataSituacao),
+      baseLegal: stringValue(radar.baseLegal),
+      tipoDesabilitacao: stringValue(radar.tipoDesabilitacao),
+      operacoesAutorizadas: stringValue(radar.operacoesAutorizadas),
       qualificacao: stringValue(regimeApi.qualificacao, fontes.preAnalise?.qualificacao, radarFiscal?.qualificacao),
       perse: stringValue(regimeApi.perse, radarFiscal?.perse),
       anexoPerse: stringValue(regimeApi.perse_anexo, radarFiscal?.perse_anexo),
       dividaTributaria: numberValue(regimeApi.divida_tributaria, radarFiscal?.divida_tributaria),
       consultadoEm: stringValue(radarEnvelope.consultadoEm, radarFiscal?.data_consulta),
     },
+    analiseFiscal: {
+      faturamento: stringValue(regimeApi.faturamento),
+      quadroFuncionarios: stringValue(regimeApi.quadro_funcionarios),
+      programasEspeciais: textoOuLista(regimeApi.programas_especiais),
+      site: stringValue(regimeApi.site),
+    },
     fonteCartaoCnpj: Object.keys(rfb).length > 0 ? "Pré-Análise" : "CS&NPS",
+    fontesPendentes: asArray(consultaCrm.falhas).filter((item): item is string => typeof item === "string"),
     atualizadoEm: dataIso(fontes.preAnalise?.updatedAt),
   };
 }

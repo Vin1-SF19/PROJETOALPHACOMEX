@@ -75,6 +75,10 @@ function criarFontes(): DadosEmpresaFontes {
         empresaqui: {
           dados: {
             regimeEA: "LUCRO REAL",
+            faturamento: "Acima de 16M",
+            quadro_funcionarios: "35",
+            programas_especiais: ["Drawback", "Recof"],
+            site: "empresa.com.br",
             regimeReceita: "REGIME NORMAL",
             qualificacao: "PREMIUM",
             perse: "SIM",
@@ -84,9 +88,12 @@ function criarFontes(): DadosEmpresaFontes {
           },
         },
         radar: {
-          dados: { situacao: "HABILITADO", submodalidade: "LIMITADO" },
+          dados: { situacao: "HABILITADO", modalidade: "LIMITADO", submodalidade: "LIMITADO",
+            dataSituacao: "2026-08-06", baseLegal: "Ato legal", tipoDesabilitacao: "",
+            operacoesAutorizadas: "Importação" },
           consultadoEm: "2026-08-06T10:00:00.000Z",
         },
+        consultaCrm: { falhas: ["Receita Federal"] },
       },
     },
     radarFiscal: null,
@@ -122,12 +129,19 @@ describe("normalizarDadosEmpresaBpm", () => {
     expect(dados.regimeTributario.atual).toBe("LUCRO REAL");
     expect(dados.radar).toMatchObject({
       situacao: "HABILITADO",
+      modalidade: "LIMITADO",
       submodalidade: "LIMITADO",
+      baseLegal: "Ato legal",
+      operacoesAutorizadas: "Importação",
       qualificacao: "PREMIUM",
       perse: "SIM",
       anexoPerse: "ANEXO 1",
       dividaTributaria: 1250.5,
     });
+    expect(dados.analiseFiscal).toMatchObject({
+      faturamento: "Acima de 16M", quadroFuncionarios: "35", programasEspeciais: "Drawback • Recof",
+    });
+    expect(dados.fontesPendentes).toEqual(["Receita Federal"]);
   });
 
   it("usa CS&NPS e Radar Fiscal como fallback sem inventar campos", () => {
@@ -161,6 +175,7 @@ const prismaMock = vi.hoisted(() => ({
   socios: { findMany: vi.fn() },
   consultaPreAnalise: { findUnique: vi.fn() },
   radar_fiscal: { findFirst: vi.fn() },
+  pessoaClienteVinculo: { findMany: vi.fn() },
   bpmCardHistorico: { findMany: vi.fn() },
 }));
 
@@ -192,5 +207,36 @@ describe("ObterDadosEmpresaCardBpm", () => {
     expect(exigirAcessoMock).toHaveBeenCalledWith("card-1", 42, "User", "visualizar");
     expect(resultado).toEqual({ success: false, error: "Não autorizado", data: null });
     expect(prismaMock.bpmCard.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("lê a consulta salva por CNPJ no card de empresa recém-criada", async () => {
+    authMock.mockResolvedValue({ user: { id: "42", role: "User" } });
+    exigirAcessoMock.mockResolvedValue(undefined);
+    prismaMock.bpmCard.findUnique.mockResolvedValue({
+      empresa: { id: 9, status: "Lead", cnpj: "11.222.333/0001-81", razaoSocial: "Empresa Nova",
+        nomeFantasia: null, dataConstituicao: null, uf: "SP", municipio: "São Paulo",
+        regimeTributario: null, servicos: [] },
+      responsavel: { nome: "Responsável" }, membros: [],
+    });
+    prismaMock.pessoaClienteVinculo.findMany.mockResolvedValue([]);
+    prismaMock.consultaPreAnalise.findUnique.mockResolvedValue({
+      regimeEA: "LUCRO REAL", qualificacao: null, submodalidade: "ILIMITADA", capitalSocial: 10000,
+      nomeResponsavel: null, telefoneContato: null, observacoes: null, updatedAt: new Date(),
+      dadosBrutos: { rfb: { dados: { razaoSocial: "EMPRESA NOVA", situacao: "ATIVA" } },
+        empresaqui: { dados: { regimeEA: "LUCRO REAL", faturamento: "5000000" } },
+        radar: { dados: { situacao: "HABILITADA", modalidade: "ILIMITADA" } } },
+    });
+    prismaMock.radar_fiscal.findFirst.mockResolvedValue(null);
+
+    const resultado = await ObterDadosEmpresaCardBpm("card-novo");
+
+    expect(prismaMock.consultaPreAnalise.findUnique).toHaveBeenCalledWith(expect.objectContaining({
+      where: { cnpj: "11222333000181" },
+    }));
+    expect(resultado).toMatchObject({ success: true, data: {
+      empresa: { razaoSocial: "EMPRESA NOVA" },
+      radar: { situacao: "HABILITADA", modalidade: "ILIMITADA" },
+      analiseFiscal: { faturamento: "5000000" },
+    } });
   });
 });

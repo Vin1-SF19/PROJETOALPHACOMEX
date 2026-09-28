@@ -1,8 +1,31 @@
 "use server";
 import db from "@/lib/prisma";
 import { auth } from "../../../auth";
-import { formatCNPJ, normalizarCNPJ } from "@/lib/format-cnpj";
+import { cnpjEhValido, formatCNPJ, normalizarCNPJ } from "@/lib/format-cnpj";
 import { exigirAcessoModuloBpm, exigirAcessoBpmPipeline, usuarioElegivelResponsavelBpm } from "@/lib/bpm/ownership";
+import { pipelineEhRevisaoRadar } from "@/lib/bpm/proximo-contato";
+import { consultarEGuardarCnpjLead } from "@/lib/bpm/consulta-cnpj-lead";
+
+/** Enriquece o CNPJ no cadastro de Novo Lead; não altera o layout do modal. */
+export async function ConsultarDadosCnpjNovoLeadBpm(pipelineId: string, cnpj: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false as const, error: "Não autorizado" };
+    const cnpjLimpo = normalizarCNPJ(cnpj);
+    if (!cnpjEhValido(cnpjLimpo)) return { success: false as const, error: "CNPJ inválido" };
+    await exigirAcessoBpmPipeline(pipelineId, Number(session.user.id));
+    const pipeline = await db.bpmPipeline.findUnique({
+      where: { id: pipelineId }, select: { ativo: true, nome: true },
+    });
+    if (!pipeline?.ativo || !pipelineEhRevisaoRadar(pipeline.nome)) {
+      return { success: false as const, error: "Pipeline de cadastro inválido" };
+    }
+    return { success: true as const, data: await consultarEGuardarCnpjLead(cnpjLimpo) };
+  } catch (error) {
+    console.error("[ConsultarDadosCnpjNovoLeadBpm]", error instanceof Error ? error.name : "unknown");
+    return { success: false as const, error: "Não foi possível consultar os dados da empresa" };
+  }
+}
 
 /** Busca leve de empresa por razão social/nome fantasia/CNPJ para o seletor do modal de novo card. */
 export async function BuscarEmpresasBpm(termo: string) {

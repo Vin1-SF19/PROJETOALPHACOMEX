@@ -77,6 +77,11 @@ export function DadosEmpresaConteudo({ dados, accent }: DadosEmpresaConteudoProp
 
   return (
     <div className="grid w-full grid-cols-1 gap-3 p-3">
+      {dados.fontesPendentes.length > 0 && (
+        <p role="status" className="rounded-2xl border border-amber-400/20 bg-amber-400/5 px-4 py-3 text-xs text-amber-200">
+          Consulta parcial: {dados.fontesPendentes.join(", ")} indisponível. Dados anteriores preservados.
+        </p>
+      )}
       <section className="relative overflow-hidden rounded-3xl border border-white/[0.07] bg-white/[0.03] p-5">
         <div className="absolute inset-y-0 left-0 w-1" style={{ background: `rgb(${accent})` }} />
         <div className="grid gap-4">
@@ -211,10 +216,24 @@ export function DadosEmpresaConteudo({ dados, accent }: DadosEmpresaConteudoProp
         )}
       </Secao>
 
+      <Secao titulo="Análise fiscal" descricao="Dados adicionais encontrados na consulta tributária" icon={BarChart3}>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Campo rotulo="Faturamento informado" valor={dados.analiseFiscal.faturamento} />
+          <Campo rotulo="Quadro de funcionários" valor={dados.analiseFiscal.quadroFuncionarios} />
+          <Campo rotulo="Programas especiais" valor={dados.analiseFiscal.programasEspeciais} />
+          <Campo rotulo="Site" valor={dados.analiseFiscal.site} />
+        </div>
+      </Secao>
+
       <Secao titulo="Dados do RADAR" descricao="Habilitação e qualificação fiscal" icon={ShieldCheck}>
         <div className="grid gap-3 sm:grid-cols-2">
           <Campo rotulo="Situação" valor={dados.radar.situacao || "Não consultado"} />
+          <Campo rotulo="Modalidade" valor={dados.radar.modalidade} />
           <Campo rotulo="Submodalidade" valor={dados.radar.submodalidade || "Não consultado"} />
+          <Campo rotulo="Data da situação" valor={dados.radar.dataSituacao} />
+          <Campo rotulo="Base legal" valor={dados.radar.baseLegal} />
+          <Campo rotulo="Tipo de desabilitação" valor={dados.radar.tipoDesabilitacao} />
+          <Campo rotulo="Operações autorizadas" valor={dados.radar.operacoesAutorizadas} />
           <Campo rotulo="Qualificação" valor={dados.radar.qualificacao} />
           <Campo rotulo="PERSE / Anexo" valor={[dados.radar.perse, dados.radar.anexoPerse].filter(Boolean).join(" • ") || null} />
           <Campo rotulo="Dívida tributária" valor={formatarMoeda(dados.radar.dividaTributaria)} />
