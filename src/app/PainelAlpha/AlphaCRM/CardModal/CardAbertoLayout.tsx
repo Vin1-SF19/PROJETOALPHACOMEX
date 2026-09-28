@@ -329,6 +329,7 @@ export function CardAbertoLayout({
             etapas={etapasParaMover}
             currentUserId={currentUserId}
             podeMoverEtapa={podeMoverEtapa}
+            realtimeRevision={realtimeRevision}
             accent={accent}
             onMovido={() => { onAtualizado(); }}
           />

@@ -138,7 +138,8 @@ describe("CRM - formulário unificado por etapa", () => {
     expect(proximaEtapa).toContain("await flushSaves(card.id)");
     expect(proximaEtapa).toContain("MoverCardBpm({ cardId: card.id, etapaDestinoId })");
     expect(proximaEtapa).not.toContain("Salvar e avançar");
-    expect(proximaEtapa).toContain("px-3 py-2 rounded-xl text-xs");
+    expect(proximaEtapa).toContain("rounded-xl border border-white/[0.06]");
+    expect(proximaEtapa).toContain("px-3 py-2 text-left text-xs");
     expect(proximaEtapa).not.toContain("px-4 py-3.5 rounded-2xl text-sm");
   });
 });

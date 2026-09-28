@@ -4,11 +4,12 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
-  preflight: vi.fn(), move: vi.fn(), saveAndMove: vi.fn(),
+  preflight: vi.fn(), move: vi.fn(), saveAndMove: vi.fn(), disponibilidade: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock("@/actions/bpm/Checklists", () => ({ ObterResumoChecklistCardBpm: vi.fn(async () => ({ success: false })) }));
+vi.mock("@/actions/bpm/DisponibilidadeEtapasCard", () => ({ ObterDisponibilidadeEtapasCardBpm: api.disponibilidade }));
 vi.mock("@/actions/bpm/Cards", () => ({
   ObterCardBpm: vi.fn(), MoverCardBpm: api.move,
   ObterRequisitosTransicaoBpm: api.preflight,
@@ -50,6 +51,9 @@ describe("requisitos configurados antes da mudança de etapa", () => {
     root = createRoot(host);
     api.move.mockResolvedValue({ success: true });
     api.saveAndMove.mockResolvedValue({ success: true });
+    api.disponibilidade.mockImplementation(async (_cardId: string, ids: string[]) => ({
+      success: true, data: ids.map((etapaId) => ({ etapaId, pendencias: [], oculta: false })),
+    }));
   });
   afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
 
@@ -76,6 +80,40 @@ describe("requisitos configurados antes da mudança de etapa", () => {
     expect(salvar?.disabled).toBe(false);
     await act(async () => salvar!.click());
     expect(api.saveAndMove).toHaveBeenCalledWith({ cardId: "card-1", etapaDestinoId: "destino", camposValores: { radar: "Limitado", vendedor: "Maria" } });
+  });
+
+  it("bloqueia destino pendente e expõe a lista por foco de teclado", async () => {
+    api.disponibilidade.mockResolvedValue({ success: true, data: [{
+      etapaId: "destino", oculta: false,
+      pendencias: ["Preencha Radar pretendido", "Conclua o checklist"],
+    }] });
+    await act(async () => root.render(h(PainelProximaEtapa, { card, etapas, podeMoverEtapa: true, accent: "1,2,3", onMovido: vi.fn() })));
+    const botao = [...host.querySelectorAll("button")].find((item) => item.textContent?.includes("Reunião Agendada"));
+    expect(botao?.disabled).toBe(true);
+    const gatilho = botao?.parentElement;
+    expect(gatilho?.tabIndex).toBe(0);
+    expect(gatilho?.getAttribute("aria-label")).toContain("Preencha Radar pretendido; Conclua o checklist");
+    await act(async () => { gatilho?.focus(); });
+    expect(document.body.textContent).toContain("Para desbloquear Reunião Agendada");
+    expect(document.body.textContent).toContain("Conclua o checklist");
+    await act(async () => { botao?.click(); });
+    expect(api.move).not.toHaveBeenCalled();
+  });
+
+  it("omite destino inacessível e reavalia bloqueio após atualização do card", async () => {
+    api.disponibilidade.mockResolvedValueOnce({ success: true, data: [{ etapaId: "destino", oculta: true, pendencias: [] }] })
+      .mockResolvedValueOnce({ success: true, data: [{ etapaId: "destino", oculta: false, pendencias: ["Preencha Radar"] }] })
+      .mockResolvedValueOnce({ success: true, data: [{ etapaId: "destino", oculta: false, pendencias: [] }] });
+    const render = (updatedAt: string) => h(PainelProximaEtapa, {
+      card: { ...card, updatedAt: new Date(updatedAt) } as React.ComponentProps<typeof PainelProximaEtapa>["card"],
+      etapas, podeMoverEtapa: true, accent: "1,2,3", onMovido: vi.fn(),
+    });
+    await act(async () => root.render(render("2026-09-28T10:00:00Z")));
+    expect([...host.querySelectorAll("button")].some((item) => item.textContent?.includes("Reunião Agendada"))).toBe(false);
+    await act(async () => root.render(render("2026-09-28T10:01:00Z")));
+    expect([...host.querySelectorAll("button")].find((item) => item.textContent?.includes("Reunião Agendada"))?.disabled).toBe(true);
+    await act(async () => root.render(render("2026-09-28T10:02:00Z")));
+    expect([...host.querySelectorAll("button")].find((item) => item.textContent?.includes("Reunião Agendada"))?.disabled).toBe(false);
   });
 
   it("explica obrigação somente leitura e impede envio sem valor", async () => {

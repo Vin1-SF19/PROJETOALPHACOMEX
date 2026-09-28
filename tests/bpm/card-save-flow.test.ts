@@ -48,9 +48,9 @@ describe("CRM - persistência antes da movimentação", () => {
     const movimento = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa.tsx");
 
     expect(movimento).toContain("const [movendoEtapa, setMovendoEtapa] = useState(false)");
-    expect(movimento).toContain("if (etapaDestinoId === card.etapa.id || movendoEtapa) return");
-    expect(movimento).toContain("disabled={movendoEtapa || !podeMoverEtapa");
-    expect(movimento).toContain('aria-busy={movendoEtapa}');
+    expect(movimento).toContain("if (etapaDestinoId === card.etapa.id || movendoEtapa || !podeMoverEtapa");
+    expect(movimento).toContain("disabled={bloqueada || movendoEtapa}");
+    expect(movimento).toContain('aria-busy={!estado || movendoEtapa}');
     expect(movimento).toContain('className="shrink-0 animate-spin"');
   });
 

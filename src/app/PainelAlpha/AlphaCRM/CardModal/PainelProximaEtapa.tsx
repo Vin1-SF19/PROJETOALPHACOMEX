@@ -3,7 +3,7 @@
 import { toast } from "sonner";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ArrowRight, Check, Loader2, Settings2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, Loader2, Settings2 } from "lucide-react";
 import { ObterCardBpm, MoverCardBpm, ObterRequisitosTransicaoBpm, SalvarRequisitosEMoverCardBpm, type CardFilhoCriado } from "@/actions/bpm/Cards";
 import { ObterResumoChecklistCardBpm } from "@/actions/bpm/Checklists";
 import { CampoBpmInput } from "@/app/PainelAlpha/AlphaCRM/CampoBpmInput";
@@ -15,6 +15,8 @@ import { formularioExigeCapacidade } from "@/lib/bpm/formulario-renderer";
 import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
 import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
 import { AtribuirLeadAgendarModal } from "./AtribuirLeadAgendarModal";
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+import { ObterDisponibilidadeEtapasCardBpm, type DisponibilidadeEtapaCard } from "@/actions/bpm/DisponibilidadeEtapasCard";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type EtapaOpcao = { id: string; chave?: string | null; nome: string; ordem: number; script: string | null };
@@ -25,17 +27,23 @@ interface Props {
   etapas: EtapaOpcao[];
   currentUserId?: number | null;
   podeMoverEtapa: boolean;
+  realtimeRevision?: number;
   accent: string;
   onMovido: () => void;
 }
 
-export default function PainelProximaEtapa({ card, etapas, currentUserId = null, podeMoverEtapa, accent, onMovido }: Props) {
+export default function PainelProximaEtapa({ card, etapas, currentUserId = null, podeMoverEtapa, realtimeRevision = 0, accent, onMovido }: Props) {
   const router = useRouter();
   const { flushSaves } = useCardSave();
   const [movendoEtapa, setMovendoEtapa] = useState(false);
   const [requisitos, setRequisitos] = useState<RequisitosTransicao | null>(null);
   const [atribuicaoPendente, setAtribuicaoPendente] = useState<{ etapaDestinoId: string; camposValores?: Record<string, string> } | null>(null);
   const [valoresRequisitos, setValoresRequisitos] = useState<Record<string, string>>({});
+  const [consultaDisponibilidade, setConsultaDisponibilidade] = useState<{
+    chave: string;
+    data: Record<string, DisponibilidadeEtapaCard>;
+  } | null>(null);
+  const [revisaoDisponibilidade, setRevisaoDisponibilidade] = useState(0);
   const [pendenciasChecklist, setPendenciasChecklist] = useState<{
     quantidade: number;
     templates: string[];
@@ -44,6 +52,35 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
   const aguardandoTranscricao = card.etapa.chave === BPM_STAGE_KEYS.REUNIAO_AGENDADA
     && !transcricaoRealRegistrada(card.transcricaoReuniao)
     && formularioExigeCapacidade(card.formularioEtapa, BPM_CAPABILITIES.MEETING_TRANSCRIPT);
+  const destinos = etapas.filter((etapa) => etapa.id !== card.etapa.id);
+  const destinosIds = destinos.map((etapa) => etapa.id).join("|");
+  const chaveDisponibilidade = `${card.id}:${card.etapa.id}:${card.updatedAt}:${destinosIds}:${realtimeRevision}:${revisaoDisponibilidade}`;
+  const disponibilidade = consultaDisponibilidade?.chave === chaveDisponibilidade ? consultaDisponibilidade.data : null;
+
+  useEffect(() => {
+    let ativo = true;
+    const ids = destinosIds ? destinosIds.split("|") : [];
+    if (!ids.length) return;
+    void ObterDisponibilidadeEtapasCardBpm(card.id, ids).then((resposta) => {
+      if (!ativo) return;
+      if (!resposta.success) {
+        setConsultaDisponibilidade({ chave: chaveDisponibilidade, data: Object.fromEntries(ids.map((id) => [id, {
+          etapaId: id, oculta: false, pendencias: [resposta.error],
+        }])) });
+        return;
+      }
+      const recebidos = new Map(resposta.data.map((item) => [item.etapaId, item]));
+      setConsultaDisponibilidade({ chave: chaveDisponibilidade, data: Object.fromEntries(ids.map((id) => [id, recebidos.get(id) ?? {
+        etapaId: id, oculta: true, pendencias: [],
+      }])) });
+    }).catch(() => {
+      if (!ativo) return;
+      setConsultaDisponibilidade({ chave: chaveDisponibilidade, data: Object.fromEntries(ids.map((id) => [id, {
+        etapaId: id, oculta: false, pendencias: ["Não foi possível verificar os requisitos desta etapa."],
+      }])) });
+    });
+    return () => { ativo = false; };
+  }, [card.id, destinosIds, chaveDisponibilidade]);
 
   const carregarPendencias = useCallback(async () => {
     const resposta = await ObterResumoChecklistCardBpm({ cardId: card.id });
@@ -70,6 +107,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
         templates: detail.templates,
         primeiroItemId: detail.primeiroItemId,
       } : null);
+      setRevisaoDisponibilidade((atual) => atual + 1);
     }
     window.addEventListener("bpm:checklist-resumo", atualizarResumo);
     return () => {
@@ -131,7 +169,10 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
   }
 
   async function handleMover(etapaDestinoId: string) {
-    if (etapaDestinoId === card.etapa.id || movendoEtapa) return;
+    if (etapaDestinoId === card.etapa.id || movendoEtapa || !podeMoverEtapa
+      || !disponibilidade?.[etapaDestinoId]
+      || disponibilidade[etapaDestinoId].oculta
+      || disponibilidade[etapaDestinoId].pendencias.length) return;
     setMovendoEtapa(true);
     try {
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
@@ -150,6 +191,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
       confirmarMovimento(await MoverCardBpm({ cardId: card.id, etapaDestinoId }));
     } finally {
       setMovendoEtapa(false);
+      setRevisaoDisponibilidade((atual) => atual + 1);
     }
   }
 
@@ -265,39 +307,57 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
         </div>
       )}
       
-      {etapas.map((etapa) => {
-        const ativa = etapa.id === card.etapa.id;
-        return (
-          <button
-            key={etapa.id}
-            onClick={() => handleMover(etapa.id)}
-            disabled={movendoEtapa || !podeMoverEtapa}
-            aria-busy={movendoEtapa}
-            className="w-full flex items-center justify-between gap-2 text-left px-3 py-2 rounded-xl text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 not-disabled:hover:bg-white/[0.07]"
-            style={
-              ativa
-                ? {
-                    background: `linear-gradient(135deg, rgb(${accent}), rgba(${accent},0.75))`,
-                    color: "#0f172a",
-                    boxShadow: `0 10px 30px -8px rgba(${accent},0.65), inset 0 1px 0 rgba(255,255,255,0.3)`,
-                  }
-                : {
-                    background: "rgba(255,255,255,0.03)",
-                    color: "#cbd5e1",
-                    border: "1px solid rgba(255,255,255,0.06)",
-                    boxShadow: "0 4px 12px -4px rgba(0,0,0,0.3)",
-                  }
-            }
-          >
-            <span className="whitespace-nowrap">{etapa.nome}</span>
-            {movendoEtapa && !ativa
-              ? <Loader2 size={14} className="shrink-0 animate-spin" aria-hidden="true" />
-              : ativa
-                ? <Check size={15} className="shrink-0" />
-                : <ArrowRight size={14} className="shrink-0 opacity-50" />}
-          </button>
-        );
-      })}
+      <div className="px-1 pb-1 text-[11px] text-slate-400">
+        Etapa atual: <span className="font-semibold" style={{ color: `rgb(${accent})` }}>{card.etapa.nome}</span>
+      </div>
+      {podeMoverEtapa && destinos.length === 0 && (
+        <p className="px-1 py-2 text-xs text-slate-500">Nenhuma próxima etapa configurada.</p>
+      )}
+      {podeMoverEtapa && !disponibilidade && destinos.length > 0 && (
+        <div role="status" aria-label="Verificando etapas disponíveis" className="space-y-1.5">
+          {destinos.map((etapa) => <div key={etapa.id} className="h-9 animate-pulse rounded-xl bg-white/[0.05] motion-reduce:animate-none" />)}
+        </div>
+      )}
+      <TooltipPrimitive.Provider delayDuration={200}>
+        {podeMoverEtapa && disponibilidade && destinos.filter((etapa) => !disponibilidade[etapa.id]?.oculta).map((etapa) => {
+          const estado = disponibilidade?.[etapa.id];
+          const pendencias = estado?.pendencias ?? ["Verificando requisitos desta etapa..."];
+          const bloqueada = !estado || pendencias.length > 0;
+          const botao = (
+            <button
+              type="button"
+              onClick={() => void handleMover(etapa.id)}
+              disabled={bloqueada || movendoEtapa}
+              aria-busy={!estado || movendoEtapa}
+              className="flex w-full items-center justify-between gap-2 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-left text-xs font-semibold text-slate-200 shadow-sm transition-colors enabled:cursor-pointer enabled:hover:bg-white/[0.07] disabled:cursor-not-allowed"
+            >
+              <span>{etapa.nome}</span>
+              {!estado ? <Loader2 size={14} className="shrink-0 animate-spin" aria-hidden="true" />
+                : movendoEtapa && !bloqueada ? <Loader2 size={14} className="shrink-0 animate-spin" aria-hidden="true" />
+                  : bloqueada ? <AlertTriangle size={14} className="shrink-0 text-amber-300" aria-hidden="true" />
+                    : <ArrowRight size={14} className="shrink-0 opacity-70" aria-hidden="true" />}
+            </button>
+          );
+          return bloqueada ? (
+            <TooltipPrimitive.Root key={etapa.id}>
+              <TooltipPrimitive.Trigger asChild>
+                <span tabIndex={0} className="block rounded-xl opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-amber-300/70" aria-label={`${etapa.nome}: avanço bloqueado. ${pendencias.join("; ")}`}>
+                  {botao}
+                </span>
+              </TooltipPrimitive.Trigger>
+              <TooltipPrimitive.Portal>
+                <TooltipPrimitive.Content side="left" sideOffset={8} collisionPadding={12} className="z-[120] max-w-xs rounded-xl border border-amber-300/25 bg-slate-950 px-3 py-2 text-xs text-slate-100 shadow-xl">
+                  <p className="mb-1.5 font-semibold text-amber-200">Para desbloquear {etapa.nome}:</p>
+                  <ul className="list-disc space-y-1 pl-4">
+                    {pendencias.map((pendencia) => <li key={pendencia}>{pendencia}</li>)}
+                  </ul>
+                  <TooltipPrimitive.Arrow className="fill-slate-950" />
+                </TooltipPrimitive.Content>
+              </TooltipPrimitive.Portal>
+            </TooltipPrimitive.Root>
+          ) : <div key={etapa.id}>{botao}</div>;
+        })}
+      </TooltipPrimitive.Provider>
 
       {!podeMoverEtapa && (
         <p className="text-[11px] text-slate-500 mt-3 px-1">
