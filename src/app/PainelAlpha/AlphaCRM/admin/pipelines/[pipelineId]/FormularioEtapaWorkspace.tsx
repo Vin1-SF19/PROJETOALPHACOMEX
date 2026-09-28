@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ListaCamposFormulario } from "./ListaCamposFormulario";
+import { PerguntasFollowUpEditor } from "./PerguntasFollowUpEditor";
+import { etapaEhEmTratativa } from "@/lib/bpm/em-tratativa";
 import { moverItemFormulario } from "@/lib/bpm/ordem-formulario";
 
 import { PipelineEditorStateBoundary, usePipelineEditorState } from "./PipelineEditorStateProvider";
@@ -904,6 +906,16 @@ function FormularioEtapaWorkspaceContent({
             </ul>
           </section>
         )}
+        {pipelineNome === "Revisão de Radar" && etapaEhEmTratativa(etapa.nome) && <>
+          <section aria-label="Campos do sistema de Em tratativas" className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-slate-300">
+            <p className="font-semibold text-white">Campos do sistema desta etapa</p>
+            <ul className="mt-2 space-y-1">
+              <li>Próximo Contato — {componentesEmUso.has("FOLLOW_UP_SCHEDULER") ? "no formulário" : "adicione Próximo contato"}</li>
+              <li>Anotações do último follow-up — {componentesEmUso.has("FOLLOW_UP_CHECKLIST") ? "no formulário" : "adicione Último follow-up"}</li>
+            </ul>
+          </section>
+          <PerguntasFollowUpEditor pipelineId={pipelineId} />
+        </>}
         <ListaCamposFormulario
           secoes={secaoSelecionada ? [secaoSelecionada] : []}
           bloqueado={bloqueado}
@@ -927,6 +939,11 @@ function FormularioEtapaWorkspaceContent({
           onRotulo={(_, indice, rotulo) => alterarSecao(indiceSecaoSelecionada, { componentes: secaoSelecionada.componentes.map((item, i) => i === indice ? aplicarRotulo(item, rotulo) : item) })}
           onRemover={(_, indice) => {
             const componente = secaoSelecionada.componentes[indice];
+            if (pipelineNome === "Revisão de Radar" && etapaEhEmTratativa(etapa.nome)
+              && ["FOLLOW_UP_SCHEDULER", "FOLLOW_UP_CHECKLIST"].includes(componente?.capability ?? "")) {
+              toast.error("Este bloco é obrigatório na etapa Em tratativas.");
+              return;
+            }
             if (componente?.capability) {
               setBlocoParaRemover({ secaoChave: secaoSelecionada.chave, capability: componente.capability, label: obterDefinicaoComponenteFormulario(componente.capability)?.label ?? componente.chave });
               return;
@@ -999,6 +1016,11 @@ function FormularioEtapaWorkspaceContent({
                     type="button"
                     aria-label="Remover seção"
                     onClick={() => {
+                      if (pipelineNome === "Revisão de Radar" && etapaEhEmTratativa(etapa.nome)
+                        && secaoSelecionada.componentes.some((item) => ["FOLLOW_UP_SCHEDULER", "FOLLOW_UP_CHECKLIST"].includes(item.capability ?? ""))) {
+                        toast.error("Mova os blocos obrigatórios para outra seção antes de remover esta seção.");
+                        return;
+                      }
                       const campoIds = secaoSelecionada.componentes.flatMap((componente) => componente.campoId ? [componente.campoId] : []);
                       if (campoIds.length) setObrigacoesDraft((atuais) => ({ ...atuais, ...Object.fromEntries(campoIds.map((campoId) => [campoId, { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false }])) }));
                       setSecoes((atuais) =>
@@ -1041,7 +1063,10 @@ function FormularioEtapaWorkspaceContent({
           {componenteSelecionado?.capability && <div className="mt-4 space-y-3 text-xs text-slate-300">
             <p className="font-semibold text-white">{obterDefinicaoComponenteFormulario(componenteSelecionado.capability)?.label ?? componenteSelecionado.chave}</p>
             <p>Este bloco pertence ao formulário de <strong>{etapa.nome}</strong>. A regra passa a valer após publicar a composição.</p>
-            {["MEETING_SCHEDULER", "MEETING_TRANSCRIPT", "FOLLOW_UP_SCHEDULER", "FOLLOW_UP_CHECKLIST", "STAGE_CHECKLIST"].includes(componenteSelecionado.capability) && <label className="flex items-start gap-2.5 rounded-lg border border-white/10 bg-slate-900/40 p-2.5">
+            {pipelineNome === "Revisão de Radar" && etapaEhEmTratativa(etapa.nome)
+              && ["FOLLOW_UP_SCHEDULER", "FOLLOW_UP_CHECKLIST"].includes(componenteSelecionado.capability)
+              ? <p className="rounded-lg border border-cyan-400/20 bg-cyan-400/5 p-2.5 text-[11px] text-cyan-100">Este bloco e sua validação são obrigatórios nesta etapa. Você pode configurar as perguntas adicionais do follow-up acima.</p>
+              : ["MEETING_SCHEDULER", "MEETING_TRANSCRIPT", "FOLLOW_UP_SCHEDULER", "FOLLOW_UP_CHECKLIST", "STAGE_CHECKLIST"].includes(componenteSelecionado.capability) && <label className="flex items-start gap-2.5 rounded-lg border border-white/10 bg-slate-900/40 p-2.5">
               <input type="checkbox" checked={configComponente(componenteSelecionado).obrigatorioSaida !== false} disabled={bloqueado} onChange={(event) => atualizarObrigatoriedadeBloco(event.target.checked)} className="mt-0.5 accent-cyan-400" />
               <span><span className="font-semibold">Exigir na transição</span><span className="mt-0.5 block text-[11px] text-slate-500">Quando ativo, este requisito bloqueia a mudança de etapa até ser atendido. Retirar o bloco do formulário também remove a obrigação.</span></span>
             </label>}

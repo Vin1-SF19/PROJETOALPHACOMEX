@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   ID_PERGUNTA_ANOTACOES_ULTIMO_FOLLOW_UP,
+  destinoPermitidoEmTratativa,
+  etapaEhEmTratativa,
   etapaExigeProximoContato,
   montarSnapshotPerguntasFollowUp,
   obterErroChecklistParaSaidaEmTratativa,
@@ -26,6 +28,11 @@ describe("etapaExigeProximoContato", () => {
     expect(etapaExigeProximoContato(" sem   viabilidade ")).toBe(true);
     expect(etapaExigeProximoContato("SÉM VIABILIDADE")).toBe(true);
     expect(etapaExigeProximoContato("Fechado")).toBe(false);
+    expect(etapaExigeProximoContato("Em tratativas")).toBe(true);
+    expect(etapaEhEmTratativa("Em tratativas")).toBe(true);
+    expect(destinoPermitidoEmTratativa("Fechado")).toBe(true);
+    expect(destinoPermitidoEmTratativa("Novo Lead")).toBe(false);
+    expect(destinoPermitidoEmTratativa("Standby - Follow Up")).toBe(false);
   });
 });
 

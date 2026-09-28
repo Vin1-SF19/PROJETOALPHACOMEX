@@ -200,6 +200,26 @@ describe("contrato e salvamento diferencial do formulário de etapa", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
+  it("impede desativar ou ocultar os controles obrigatórios de Em tratativas via action", async () => {
+    mocks.stageFindFirst.mockResolvedValue({
+      id: STAGE_ID, nome: "Em tratativas", pipeline: { nome: "Revisão de Radar" },
+      capabilitiesJson: JSON.stringify(["FOLLOW_UP_SCHEDULER", "FOLLOW_UP_CHECKLIST"]),
+      formulario: persistedForm(),
+    });
+    const base = input();
+    for (const alteracao of [
+      { ...base, ativo: false },
+      { ...base, secoes: [{ ...base.secoes[0], componentes: base.secoes[0].componentes.filter((item) => item.capability !== "FOLLOW_UP_SCHEDULER") }] },
+      { ...base, secoes: [{ ...base.secoes[0], componentes: base.secoes[0].componentes.filter((item) => item.capability !== "FOLLOW_UP_CHECKLIST") }] },
+    ]) {
+      await expect(SalvarFormularioEtapaBpm(alteracao)).resolves.toMatchObject({
+        success: false,
+        error: expect.stringContaining("FORMULARIO_EM_TRATATIVAS_OBRIGATORIO"),
+      });
+    }
+    expect(mocks.formUpdateMany).not.toHaveBeenCalled();
+  });
+
   it("preserva CHECKLIST e CAPABILITY válidos no schema", () => {
     const parsed = salvarFormularioEtapaSchema.parse(input());
     expect(parsed.secoes[0].componentes[1].capability).toBe("STAGE_CHECKLIST");

@@ -63,7 +63,7 @@ export async function carregarIntervaloAgendaAlpha(input: {
   const correlationId = criarCorrelationIdAgendaAlpha();
 
   try {
-    const [calendarios, tarefasCache] = await Promise.all([
+    const [calendarios, tarefasCache, contatosCrm] = await Promise.all([
       db.googleCalendarSelecionado.findMany({
         where: {
           conexao: { userId: acesso.userId, status: "ATIVA" },
@@ -143,6 +143,17 @@ export async function carregarIntervaloAgendaAlpha(input: {
           },
         },
       }),
+      db.bpmTarefa.findMany({
+        where: {
+          responsavelId: acesso.userId,
+          tipo: "CRM_PROXIMO_CONTATO",
+          status: "PENDENTE",
+          prazo: { gte: inicio, lt: fim },
+          card: { status: "ATIVO", etapa: { nome: { in: ["Em tratativa", "Em Tratativa", "Em tratativas", "Em Tratativas"] } } },
+        },
+        select: { id: true, titulo: true, prazo: true, card: { select: { pipelineId: true } } },
+        take: 500,
+      }),
     ]);
 
     const eventos: EventoExibicao[] = calendarios.flatMap((calendario) =>
@@ -171,6 +182,25 @@ export async function carregarIntervaloAgendaAlpha(input: {
         ),
       })),
     );
+    eventos.push(...contatosCrm.flatMap((tarefa): EventoExibicao[] => tarefa.prazo ? [{
+      id: tarefa.id,
+      googleEventId: tarefa.id,
+      status: "confirmed",
+      titulo: tarefa.titulo,
+      inicioEm: tarefa.prazo.toISOString(),
+      fimEm: new Date(tarefa.prazo.getTime() + 30 * 60_000).toISOString(),
+      diaInteiro: false,
+      etag: "",
+      linkMeet: null,
+      eventType: "default",
+      tipo: "evento",
+      calendarioId: "crm-proximo-contato",
+      calendarioGoogleId: "",
+      calendarioNome: "CRM · Próximo contato",
+      calendarioCorHex: "#06b6d4",
+      calendarioGravavel: false,
+      bpmPipelineId: tarefa.card.pipelineId,
+    }] : []));
 
     const tarefas: TarefaAgendaExibicao[] = tarefasCache.map((tarefa) => {
       const gravavel = tarefa.taskList.conexao.userId === acesso.userId;

@@ -56,6 +56,9 @@ import {
   META_LIGACOES_NOVOS_LEADS,
 } from "@/lib/bpm/novos-leads";
 import { pipelineEhRevisaoRadar } from "@/lib/bpm/proximo-contato";
+import { sincronizarProximoContatoAgenda } from "@/lib/bpm/proximo-contato-agenda";
+import { etapaEhEmTratativa } from "@/lib/bpm/em-tratativa";
+import { obterErroProximoContatoParaMovimento } from "@/lib/bpm/proximo-contato";
 import { buscarNolossLeadsPendentes } from "@/lib/bpm/noloss-leads";
 import { paraExibicaoTelefone } from "@/lib/validations/cs-nps";
 import { iniciarLigacaoCallix, normalizarTelefoneCallix } from "@/lib/callix/click-to-call";
@@ -1200,7 +1203,7 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
       );
       const cardAtual = await tx.bpmCard.findUnique({
         where: { id: cardId },
-        include: { etapa: { select: { nome: true } }, pipeline: { select: { chave: true } } },
+        include: { etapa: { select: { nome: true } }, pipeline: { select: { chave: true, nome: true } }, empresa: { select: { razaoSocial: true } } },
       });
       if (
         !cardAtual
@@ -1223,6 +1226,14 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
         ))
       ) {
         throw new Error("RESPONSAVEL_INVALIDO");
+      }
+      if (cardAtual.pipeline.nome === "Revisão de Radar"
+        && etapaEhEmTratativa(cardAtual.etapa.nome)
+        && campos.proximoContatoEm !== undefined) {
+        const erroContato = campos.proximoContatoEm
+          ? obterErroProximoContatoParaMovimento(campos.proximoContatoEm)
+          : null;
+        if (erroContato) throw new Error(`PROXIMO_CONTATO_INVALIDO:${erroContato}`);
       }
 
       let valoresValidados: Record<string, string> = {};
@@ -1306,6 +1317,15 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
           create: { cardId, proximoContatoEm: campos.proximoContatoEm },
           update: { proximoContatoEm: campos.proximoContatoEm },
         });
+      }
+      if (cardAtual.pipeline.nome === "Revisão de Radar"
+        && (campos.proximoContatoEm !== undefined || campos.responsavelId !== undefined || campos.status !== undefined)) {
+        await sincronizarProximoContatoAgenda({
+          cardId, etapaNome: cardAtual.etapa.nome, status: campos.status ?? cardAtual.status,
+          proximoContatoEm: campos.proximoContatoEm === undefined ? cardAtual.proximoContatoEm : campos.proximoContatoEm,
+          responsavelId: campos.responsavelId ?? cardAtual.responsavelId,
+          empresaNome: cardAtual.empresa.razaoSocial,
+        }, tx);
       }
 
       if (camposValores) {
@@ -1419,6 +1439,8 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
           ? error.message.slice("CONFIGURACAO_INVALIDA:".length)
         : error instanceof Error && error.message.startsWith("CONTRATO_INVALIDO:")
           ? error.message.slice("CONTRATO_INVALIDO:".length)
+        : error instanceof Error && error.message.startsWith("PROXIMO_CONTATO_INVALIDO:")
+          ? error.message.slice("PROXIMO_CONTATO_INVALIDO:".length)
           : error instanceof Error && error.message === "RESPONSAVEL_INVALIDO"
             ? "Responsável inválido para este pipeline."
           : "Erro ao atualizar card";

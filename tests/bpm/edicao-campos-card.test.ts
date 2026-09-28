@@ -84,6 +84,7 @@ function cardNaEtapaAtual(updatedAt = UPDATED_AT) {
     statusPosFechamento: null,
     proximoContatoEm: null,
     etapa: { nome: "Novos Leads" },
+    pipeline: { nome: "Outro pipeline", chave: null },
   };
 }
 

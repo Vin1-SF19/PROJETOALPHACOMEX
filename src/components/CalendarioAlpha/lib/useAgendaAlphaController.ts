@@ -428,6 +428,10 @@ export function useAgendaAlphaController({
   }
 
   async function editarEvento(evento: EventoExibicao) {
+    if (evento.bpmPipelineId) {
+      router.push(`/PainelAlpha/AlphaCRM/pipeline/${evento.bpmPipelineId}`);
+      return;
+    }
     if (evento.sincronizacaoPendente) {
       toast.info("Este item ainda está sendo salvo no Google.");
       return;

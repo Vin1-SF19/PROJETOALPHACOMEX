@@ -25,6 +25,9 @@ import {
 } from "@/lib/bpm/ontology";
 import { exigirAcessoBpmCard, usuarioElegivelResponsavelBpm } from "@/lib/bpm/ownership";
 import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
+import { sincronizarProximoContatoAgenda } from "@/lib/bpm/proximo-contato-agenda";
+import { destinoPermitidoEmTratativa, etapaEhEmTratativa, obterErroChecklistParaSaidaEmTratativa } from "@/lib/bpm/em-tratativa";
+import { obterErroProximoContatoParaMovimento } from "@/lib/bpm/proximo-contato";
 import { etapaEhAgendarReuniao, destinoEhReuniaoAgendada, obterErroDataReuniaoParaMovimento } from "@/lib/bpm/agendar-reuniao";
 import { destinoPermitidoReuniaoAgendada, etapaEhReuniaoAgendada, obterErroTranscricaoParaMovimento } from "@/lib/bpm/reuniao-agendada";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
@@ -147,6 +150,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     include: {
       pipeline: { select: { id: true, chave: true, nome: true } },
       etapa: { select: { id: true, chave: true, nome: true, ordem: true, capabilitiesJson: true } },
+      empresa: { select: { razaoSocial: true } },
       estadoOntologico: { include: { subStatus: { select: { id: true, etapaId: true, chave: true } } } },
       servicoContexto: true,
       campoValores: { select: { campoId: true, valor: true } },
@@ -442,6 +446,24 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
   }
 
   const proximoContato = input.proximoContatoEm === undefined ? card.proximoContatoEm : input.proximoContatoEm;
+  if (card.pipeline.nome === "Revisão de Radar" && input.ator.tipo === "MANUAL"
+    && etapaEhEmTratativa(destino.nome)) {
+    const erroContato = obterErroProximoContatoParaMovimento(proximoContato);
+    if (erroContato) erro("NEXT_CONTACT_REQUIRED", erroContato);
+  }
+  if (card.pipeline.nome === "Revisão de Radar" && etapaEhEmTratativa(card.etapa.nome)) {
+    if (!destinoPermitidoEmTratativa(destino.nome)) {
+      erro("STAGE_EXIT_BLOCKED", "Em tratativas só pode avançar para Fechado, Lost, Stand By, Monitoramento ou Sem viabilidade.");
+    }
+    const ultimoChecklist = await tx.bpmChecklistFollowUp.findFirst({
+      where: { cardId: card.id }, orderBy: [{ criadoEm: "desc" }, { id: "desc" }],
+      select: { completo: true },
+    });
+    const erroFollowUp = obterErroChecklistParaSaidaEmTratativa({
+      etapaOrigemNome: card.etapa.nome, ultimoChecklist,
+    });
+    if (erroFollowUp) erro("FOLLOW_UP_INCOMPLETE", erroFollowUp);
+  }
   if (card.pipeline.nome === "Revisão de Radar" && input.ator.tipo === "MANUAL") {
     const erroReuniao = obterErroDataReuniaoParaMovimento({
       etapaOrigemNome: card.etapa.nome,
@@ -598,6 +620,14 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
         },
       });
       if (movimento.count !== 1) erro("CONCURRENT_TRANSITION", "Outra operação moveu este card. Recarregue e tente novamente.");
+      if (card.pipeline.nome === "Revisão de Radar") {
+        await sincronizarProximoContatoAgenda({
+          cardId: card.id, etapaNome: destino.nome, status: lifecycle,
+          proximoContatoEm: input.proximoContatoEm === undefined ? card.proximoContatoEm : input.proximoContatoEm,
+          responsavelId: prepared.responsavelId ?? card.responsavelId,
+          empresaNome: card.empresa.razaoSocial,
+        }, tx);
+      }
       if (prepared.responsavelId) {
         await tx.bpmCardMembro.upsert({
           where: { cardId_userId: { cardId: card.id, userId: prepared.responsavelId } },

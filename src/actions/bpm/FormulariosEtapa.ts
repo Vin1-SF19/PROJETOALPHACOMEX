@@ -70,6 +70,7 @@ export async function SalvarFormularioEtapaBpm(input: unknown) {
         select: {
           id: true,
           nome: true,
+          pipeline: { select: { nome: true } },
           capabilitiesJson: true,
           formulario: {
             include: {
@@ -102,6 +103,12 @@ export async function SalvarFormularioEtapaBpm(input: unknown) {
       }
 
       const componentes = componentesDoFormulario(parsed.data);
+      if (etapa.pipeline?.nome === "Revisão de Radar" && ["Em tratativa", "Em tratativas"].includes(etapa.nome)) {
+        const capabilities = new Set(componentes.map((componente) => componente.capability));
+        if (!ativo || !capabilities.has("FOLLOW_UP_SCHEDULER") || !capabilities.has("FOLLOW_UP_CHECKLIST")) {
+          falhar("FORMULARIO_EM_TRATATIVAS_OBRIGATORIO", "Em tratativas exige formulário ativo com Próximo Contato e Último follow-up.");
+        }
+      }
       const capabilityInvalida = listarCapabilitiesInvalidasParaEtapa(
         componentes,
         etapa.capabilitiesJson,
@@ -465,7 +472,7 @@ export async function SalvarFormularioEtapaBpm(input: unknown) {
   } catch (error) {
     const mensagem =
       error instanceof Error &&
-      /^(ETAPA_FORA_PIPELINE|CAMPO_FORA_FORMULARIO_ETAPA|CAPABILITY_FORA_ETAPA|CONFLITO_VERSAO_FORMULARIO|SECAO_FORA_FORMULARIO|COMPONENTE_FORA_FORMULARIO|IDENTIDADE_SECAO_INCOMPATIVEL|IDENTIDADE_COMPONENTE_INCOMPATIVEL|CHAVE_SECAO_EM_USO|RECONCILIACAO_SECAO_FALHOU|OBRIGACAO_FORA_FORMULARIO|OBRIGACAO_CAMPO_INACESSIVEL|OBRIGACAO_CONFIG_AUSENTE):/.test(
+      /^(ETAPA_FORA_PIPELINE|FORMULARIO_EM_TRATATIVAS_OBRIGATORIO|CAMPO_FORA_FORMULARIO_ETAPA|CAPABILITY_FORA_ETAPA|CONFLITO_VERSAO_FORMULARIO|SECAO_FORA_FORMULARIO|COMPONENTE_FORA_FORMULARIO|IDENTIDADE_SECAO_INCOMPATIVEL|IDENTIDADE_COMPONENTE_INCOMPATIVEL|CHAVE_SECAO_EM_USO|RECONCILIACAO_SECAO_FALHOU|OBRIGACAO_FORA_FORMULARIO|OBRIGACAO_CAMPO_INACESSIVEL|OBRIGACAO_CONFIG_AUSENTE):/.test(
         error.message,
       )
         ? error.message

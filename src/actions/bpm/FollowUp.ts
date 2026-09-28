@@ -14,6 +14,7 @@ import {
   validarRespostasFollowUp,
   type RespostasFollowUp,
 } from "@/lib/bpm/em-tratativa";
+import { obterErroProximoContatoParaMovimento } from "@/lib/bpm/proximo-contato";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -97,6 +98,8 @@ export async function SalvarChecklistFollowUpBpm(dados: unknown) {
           pipelineId: true,
           etapaId: true,
           updatedAt: true,
+          proximoContatoEm: true,
+          pipeline: { select: { nome: true } },
           etapa: { select: { nome: true } },
         },
       });
@@ -105,6 +108,10 @@ export async function SalvarChecklistFollowUpBpm(dados: unknown) {
         throw new Error(
           "FOLLOW_UP_NEGOCIO:O procedimento de follow-up só pode ser operado em Em Tratativa.",
         );
+      }
+      if (concluir && card.pipeline.nome === "Revisão de Radar") {
+        const erroContato = obterErroProximoContatoParaMovimento(card.proximoContatoEm);
+        if (erroContato) throw new Error(`FOLLOW_UP_NEGOCIO:${erroContato}`);
       }
 
       const proximaVersao = new Date(Math.max(Date.now(), card.updatedAt.getTime() + 1));
@@ -192,6 +199,15 @@ export async function SalvarChecklistFollowUpBpm(dados: unknown) {
           },
         });
         if (!atualizado) throw new Error("FOLLOW_UP_CONFLITO");
+        if (completo) {
+          await tx.bpmInteracaoCard.create({
+            data: {
+              cardId, tipo: "FOLLOW_UP",
+              observacoes: String(validacao.respostas["anotacoes-ultimo-follow-up"] ?? ""),
+              registradoPorId: userId,
+            },
+          });
+        }
         await tx.bpmCardHistorico.create({
           data: {
             cardId,
@@ -203,16 +219,15 @@ export async function SalvarChecklistFollowUpBpm(dados: unknown) {
         return { checklist: atualizado, pendencias: validacao.pendencias, pipelineId: card.pipelineId, cardUpdatedAt: proximaVersao };
       }
 
-      await tx.bpmInteracaoCard.create({
-        data: {
-          cardId,
-          tipo: "FOLLOW_UP",
-          observacoes: typeof validacao.respostas["anotacoes-ultimo-follow-up"] === "string"
-            ? validacao.respostas["anotacoes-ultimo-follow-up"]
-            : undefined,
-          registradoPorId: userId,
-        },
-      });
+      if (completo) {
+        await tx.bpmInteracaoCard.create({
+          data: {
+            cardId, tipo: "FOLLOW_UP",
+            observacoes: String(validacao.respostas["anotacoes-ultimo-follow-up"] ?? ""),
+            registradoPorId: userId,
+          },
+        });
+      }
       const criado = await tx.bpmChecklistFollowUp.create({
         data: {
           cardId,

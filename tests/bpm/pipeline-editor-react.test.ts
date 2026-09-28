@@ -7,6 +7,7 @@ import { FormularioEtapaWorkspace, type FormularioEtapaAdmin } from "@/app/Paine
 
 vi.mock("@/actions/bpm/Campos", () => ({ CriarCampoBpm: vi.fn(), AtualizarCampoBpm: vi.fn(), ExcluirCampoBpm: vi.fn(), ObterUsoCamposBpm: vi.fn() }));
 vi.mock("@/actions/bpm/FormulariosEtapa", () => ({ SalvarFormularioEtapaBpm: vi.fn() }));
+vi.mock("@/actions/bpm/PerguntasFollowUp", () => ({ ListarPerguntasFollowUpBpm: vi.fn(), SalvarPerguntaFollowUpBpm: vi.fn(), ExcluirPerguntaFollowUpBpm: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/FormularioEtapaRenderer", () => ({ FormularioEtapaRenderer: () => null }));
 import { CriarCampoBpm, ExcluirCampoBpm, ObterUsoCamposBpm } from "@/actions/bpm/Campos";

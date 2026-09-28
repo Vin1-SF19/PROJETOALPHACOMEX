@@ -8,8 +8,15 @@ export const ID_PERGUNTA_ANOTACOES_ULTIMO_FOLLOW_UP =
 
 const ETAPAS_EXIGEM_PROXIMO_CONTATO = [
   NOME_ETAPA_EM_TRATATIVA,
+  "Em Tratativas",
   "Sem Viabilidade",
 ].map(normalizarNomeEtapa);
+
+const DESTINOS_EM_TRATATIVA = ["Fechado", "Lost", "Stand By", "Monitoramento", "Sem viabilidade"].map(normalizarNomeEtapa);
+
+export function destinoPermitidoEmTratativa(nome: string): boolean {
+  return DESTINOS_EM_TRATATIVA.includes(normalizarNomeEtapa(nome));
+}
 
 export type TipoPerguntaFollowUp = "texto" | "selecao" | "booleano";
 
@@ -223,7 +230,8 @@ export function obterEstadoFollowUp(
 }
 
 export function etapaEhEmTratativa(nome: string): boolean {
-  return normalizarNomeEtapa(nome) === normalizarNomeEtapa(NOME_ETAPA_EM_TRATATIVA);
+  return ["Em Tratativa", "Em Tratativas"].some((etapa) =>
+    normalizarNomeEtapa(nome) === normalizarNomeEtapa(etapa));
 }
 
 export function etapaExigeProximoContato(nome: string): boolean {

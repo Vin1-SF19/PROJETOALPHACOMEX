@@ -125,6 +125,7 @@ export interface EventoExibicao {
   eventType: string;
   tipo: "evento" | "tarefa";
   tarefaCacheId?: string;
+  bpmPipelineId?: string;
   tarefaNotas?: string | null;
   calendarioId: string;
   calendarioGoogleId: string;

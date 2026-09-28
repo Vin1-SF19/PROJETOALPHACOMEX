@@ -16,8 +16,8 @@ export async function GET(request: Request) {
 
   jobEmAndamento = true;
   try {
-    if (await alertasTarefasForamMigrados()) return NextResponse.json({ success: true, data: { ignorado: true, motivo: "MIGRADO_PARA_MOTOR_CENTRAL" } });
-    return NextResponse.json({ success: true, data: await executarAlertasTarefasBpm() });
+    const somenteProximoContatoCrm = await alertasTarefasForamMigrados();
+    return NextResponse.json({ success: true, data: await executarAlertasTarefasBpm(new Date(), somenteProximoContatoCrm) });
   } catch (error) {
     console.error("[AlertasTarefasRoute] Falha no lote", error);
     return NextResponse.json({ success: false, error: "Falha ao processar alertas de tarefas." }, { status: 500 });

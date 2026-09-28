@@ -8,6 +8,8 @@ import { criarRastreadorRascunho } from "@/lib/bpm/rascunho-versionado";
 import { formatarDataHoraLocalBpm, parseDataHoraLocalBpm } from "@/lib/format-date";
 import { BpmDateTimeField } from "@/app/PainelAlpha/AlphaCRM/CardModal/BpmDateTimeField";
 import { useCardSave } from "@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext";
+import { etapaEhEmTratativa } from "@/lib/bpm/em-tratativa";
+import { obterErroProximoContatoParaMovimento } from "@/lib/bpm/proximo-contato";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 
@@ -55,6 +57,10 @@ export function PainelProximoContato({ card, onAtualizado, podeEditar, realtimeR
     if (proximoContatoEm && !dataPersistida) {
       setErro("Escolha uma data e uma hora válidas.");
       return;
+    }
+    if (card.pipeline?.nome === "Revisão de Radar" && etapaEhEmTratativa(card.etapa?.nome ?? "")) {
+      const erroContato = dataPersistida ? obterErroProximoContatoParaMovimento(dataPersistida) : null;
+      if (erroContato) { setErro(erroContato); return; }
     }
     const valorPersistido = formatarDataHoraLocalBpm(card.proximoContatoEm);
     if (!sujoRef.current && (proximoContatoEm ?? "") === valorPersistido) return;

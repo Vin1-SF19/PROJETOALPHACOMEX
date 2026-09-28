@@ -4,6 +4,7 @@ const acessoMock = vi.hoisted(() => vi.fn());
 const prismaMock = vi.hoisted(() => ({
   googleCalendarSelecionado: { findMany: vi.fn() },
   googleCalendarTaskCache: { findMany: vi.fn() },
+  bpmTarefa: { findMany: vi.fn() },
 }));
 const metricaMock = vi.hoisted(() => vi.fn());
 
@@ -63,6 +64,7 @@ describe("Agenda Alpha snapshot consolidado", () => {
         },
       },
     ]);
+    prismaMock.bpmTarefa.findMany.mockResolvedValue([]);
   });
 
   it("autoriza uma vez e retorna eventos e tarefas em consultas consolidadas", async () => {
@@ -148,6 +150,22 @@ describe("Agenda Alpha snapshot consolidado", () => {
         ],
       },
     });
+  });
+
+  it("mostra Próximo Contato do CRM somente na agenda do responsável", async () => {
+    prismaMock.bpmTarefa.findMany.mockResolvedValue([{
+      id: "crm-proximo-contato:card-1", titulo: "Próximo contato — Empresa Teste",
+      prazo: new Date("2026-09-09T15:00:00Z"), card: { pipelineId: "radar" },
+    }]);
+    const resultado = await carregarIntervaloAgendaAlpha({
+      inicioISO: "2026-09-01T00:00:00.000Z", fimISO: "2026-10-01T00:00:00.000Z",
+    });
+    expect(resultado).toMatchObject({ success: true, data: { eventos: expect.arrayContaining([
+      expect.objectContaining({ id: "crm-proximo-contato:card-1", calendarioNome: "CRM · Próximo contato", bpmPipelineId: "radar", calendarioGravavel: false }),
+    ]) } });
+    expect(prismaMock.bpmTarefa.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ responsavelId: 7, tipo: "CRM_PROXIMO_CONTATO", status: "PENDENTE" }),
+    }));
   });
 
   it("rejeita intervalos maiores que a janela anual antes de consultar o banco", async () => {
