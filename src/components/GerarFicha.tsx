@@ -101,6 +101,15 @@ export type FichaAlphaDados = {
     horaSituacao?: string; nomeResponsavel?: string; telefone?: string;
     email?: string; mesProtocolo?: string; observacoes?: string;
   };
+  viabilidade?: FichaAlphaViabilidade;
+};
+
+export type FichaAlphaViabilidade = {
+  radarPretendido?: string; faturamento5Anos?: string; armazenamento?: string;
+  faturasTitularidade?: string; atuacaoEmpresa?: string; tributosSemestre?: string;
+  valorAcordado?: string; formaPagamento?: string; exportador?: string;
+  complexidade?: string; historicoTentativas?: string; embasamento?: string;
+  resumoReuniao?: string; transcricaoRegistrada?: boolean;
 };
 
 export const FichaAlphaPDF = ({ dados, userLogado, logoPath }: { dados: FichaAlphaDados, userLogado: string, logoPath?: string }) => {
@@ -109,7 +118,11 @@ export const FichaAlphaPDF = ({ dados, userLogado, logoPath }: { dados: FichaAlp
   const eq = dados?.empresaqui?.dados || dados?.empresaqui || {};
 
   const origemLead = dados.extra?.origemLead || "";
+  const origemNormalizada = origemLead.toLowerCase();
   const origemDetalhe = dados.extra?.origemLeadDetalhe || "";
+  const origemConhecida = ["instagram", "google", "callix", "parceiro", "indicacao", "outros"].includes(origemNormalizada);
+  const radarPretendido = dados.viabilidade?.radarPretendido?.toLowerCase() ?? "";
+  const embasamento = dados.viabilidade?.embasamento?.toLowerCase() ?? "";
 
   const radarExibicao = String(radar?.submodalidade || " ").toUpperCase();
   const situacaoRadar = String(radar?.situacao || " ").toUpperCase();
@@ -183,12 +196,13 @@ export const FichaAlphaPDF = ({ dados, userLogado, logoPath }: { dados: FichaAlp
                 <View style={styles.optionRow}>
                   <View style={styles.circleFilled} />
                   <Text style={styles.optionText}>
-                    {origemLead === "instagram" && "INSTAGRAM"}
-                    {origemLead === "google" && "GOOGLE"}
-                    {origemLead === "callix" && "CALLIX"}
-                    {origemLead === "parceiro" && (origemDetalhe ? `PARCEIRO: ${origemDetalhe}` : "PARCEIRO")}
-                    {origemLead === "indicacao" && (origemDetalhe ? `INDICAÇÃO: ${origemDetalhe}` : "INDICAÇÃO")}
-                    {origemLead === "outros" && (origemDetalhe ? `OUTROS: ${origemDetalhe}` : "OUTROS")}
+                    {origemNormalizada === "instagram" && "INSTAGRAM"}
+                    {origemNormalizada === "google" && "GOOGLE"}
+                    {origemNormalizada === "callix" && "CALLIX"}
+                    {origemNormalizada === "parceiro" && (origemDetalhe ? `PARCEIRO: ${origemDetalhe}` : "PARCEIRO")}
+                    {origemNormalizada === "indicacao" && (origemDetalhe ? `INDICAÇÃO: ${origemDetalhe}` : "INDICAÇÃO")}
+                    {origemNormalizada === "outros" && (origemDetalhe ? `OUTROS: ${origemDetalhe}` : "OUTROS")}
+                    {!origemConhecida && origemLead.toUpperCase()}
                   </Text>
                 </View>
               ) : (
@@ -246,10 +260,11 @@ export const FichaAlphaPDF = ({ dados, userLogado, logoPath }: { dados: FichaAlp
             <View style={[styles.cell, { flex: 1 }]}>
               <Text style={styles.label}>RADAR PRETENDIDO</Text>
               <View style={styles.optionRow}>
-                <View style={styles.optionRow}><View style={styles.circle} /><Text style={styles.optionText}>Habilitação (50K)</Text></View>
-                <View style={styles.optionRow}><View style={styles.circle} /><Text style={styles.optionText}>150K</Text></View>
-                <View style={styles.optionRow}><View style={styles.circle} /><Text style={styles.optionText}>ILIMITADO</Text></View>
+                <View style={styles.optionRow}><View style={radarPretendido.includes("50k") && !radarPretendido.includes("150k") ? styles.circleFilled : styles.circle} /><Text style={styles.optionText}>Habilitação (50K)</Text></View>
+                <View style={styles.optionRow}><View style={radarPretendido.includes("150k") ? styles.circleFilled : styles.circle} /><Text style={styles.optionText}>150K</Text></View>
+                <View style={styles.optionRow}><View style={radarPretendido.includes("ilimitad") ? styles.circleFilled : styles.circle} /><Text style={styles.optionText}>ILIMITADO</Text></View>
               </View>
+              {dados.viabilidade?.radarPretendido && <Text style={styles.optionText}>{dados.viabilidade.radarPretendido}</Text>}
             </View>
           </View>
 
@@ -297,9 +312,14 @@ export const FichaAlphaPDF = ({ dados, userLogado, logoPath }: { dados: FichaAlp
           <View style={[styles.table, { flex: 1 }]}>
             <Text style={[styles.cell, styles.titleCell, styles.label]}>CAPACIDADE OPERACIONAL</Text>
             <View style={styles.cell}>
-              <Text style={styles.optionText}>SEDE: (   ) ALUGADO (  ) PRÓPRIO</Text>
-              <Text style={styles.optionText}>FATURAS: (   ) NET (   ) ENERGIA</Text>
-              <Text style={styles.optionText}>ARMAZÉM: (   ) SEDE (   ) OUTRO</Text>
+              {dados.viabilidade ? <>
+                <Text style={styles.optionText}>ARMAZENAMENTO: {dados.viabilidade.armazenamento || "________________"}</Text>
+                <Text style={styles.optionText}>FATURAS: {dados.viabilidade.faturasTitularidade || "________________"}</Text>
+              </> : <>
+                <Text style={styles.optionText}>SEDE: (   ) ALUGADO (  ) PRÓPRIO</Text>
+                <Text style={styles.optionText}>FATURAS: (   ) NET (   ) ENERGIA</Text>
+                <Text style={styles.optionText}>ARMAZÉM: (   ) SEDE (   ) OUTRO</Text>
+              </>}
             </View>
           </View>
           <View style={[styles.table, { flex: 1 }]}>
@@ -327,7 +347,7 @@ export const FichaAlphaPDF = ({ dados, userLogado, logoPath }: { dados: FichaAlp
 
         <View style={styles.finGrid}>
           <View style={styles.finBox}>
-            <View style={styles.finHeader}><View style={styles.circle} /><Text style={styles.finTitle}>DISPONIBILIDADE FINANCEIRA</Text></View>
+            <View style={styles.finHeader}><View style={embasamento.includes("disponibilidade financeira") ? styles.circleFilled : styles.circle} /><Text style={styles.finTitle}>DISPONIBILIDADE FINANCEIRA</Text></View>
             <View style={styles.finContent}>
               <Text>• Lucro Real, Presumido ou Simples</Text>
               <Text>• Qualquer tempo de empresa</Text>
@@ -337,7 +357,7 @@ export const FichaAlphaPDF = ({ dados, userLogado, logoPath }: { dados: FichaAlp
             <View style={styles.finFooter}><Text style={styles.finFooterCell}>(   ) USD 150K</Text><Text style={[styles.finFooterCell, { borderRightWidth: 0 }]}>(   )ILIMITADO</Text></View>
           </View>
           <View style={styles.finBox}>
-            <View style={styles.finHeader}><View style={styles.circle} /><Text style={styles.finTitle}>INÍCIO OU RETOMADA</Text></View>
+            <View style={styles.finHeader}><View style={embasamento.includes("início ou retomada") ? styles.circleFilled : styles.circle} /><Text style={styles.finTitle}>INÍCIO OU RETOMADA</Text></View>
             <View style={styles.finContent}>
               <Text>• Lucro Real OU Presumido</Text>
               <Text>• Iniciado/retomado atividades a menos de 5 anos</Text>
@@ -350,7 +370,7 @@ export const FichaAlphaPDF = ({ dados, userLogado, logoPath }: { dados: FichaAlp
 
         <View style={styles.finGrid}>
           <View style={styles.finBox}>
-            <View style={styles.finHeader}><View style={styles.circle} /><Text style={styles.finTitle}>RECEITA BRUTA (CPRB)</Text></View>
+            <View style={styles.finHeader}><View style={embasamento.includes("cprb") ? styles.circleFilled : styles.circle} /><Text style={styles.finTitle}>RECEITA BRUTA (CPRB)</Text></View>
             <View style={styles.finContent}>
               <Text>• Optante por CPRB (Lucro Real ou Presumido)</Text>
               <Text>• Qualquer tempo de Empresa</Text>
@@ -361,7 +381,7 @@ export const FichaAlphaPDF = ({ dados, userLogado, logoPath }: { dados: FichaAlp
             <View style={styles.finFooter}><Text style={styles.finFooterCell}>(   ) USD 150K</Text><Text style={[styles.finFooterCell, { borderRightWidth: 0 }]}>(   ) ILIMITADO</Text></View>
           </View>
           <View style={styles.finBox}>
-            <View style={styles.finHeader}><View style={styles.circle} /><Text style={styles.finTitle}>RECEITA BRUTA (DAS)</Text></View>
+            <View style={styles.finHeader}><View style={embasamento.includes("das") ? styles.circleFilled : styles.circle} /><Text style={styles.finTitle}>RECEITA BRUTA (DAS)</Text></View>
             <View style={styles.finContent}>
               <Text>• Simples Nacional</Text>
               <Text>• Qualquer tempo de Empresa</Text>
@@ -388,6 +408,33 @@ export const FichaAlphaPDF = ({ dados, userLogado, logoPath }: { dados: FichaAlp
           <Text>ETAPA DO FUNIL (CRM): (   ) Leads Frios  (   ) Stand-by  (   ) Em tratativa  (   ) Hot leads</Text>
         </View>
       </Page>
+      {dados.viabilidade && (
+        <Page size="A4" style={styles.page}>
+          <Text style={[styles.label, { marginBottom: 14 }]}>ANÁLISE DE VIABILIDADE — REVISÃO DE RADAR</Text>
+          {([
+            ["Radar pretendido", dados.viabilidade.radarPretendido],
+            ["Faturamento nos últimos 5 anos", dados.viabilidade.faturamento5Anos],
+            ["Armazenamento", dados.viabilidade.armazenamento],
+            ["Faturas sob titularidade da empresa", dados.viabilidade.faturasTitularidade],
+            ["Atuação da empresa", dados.viabilidade.atuacaoEmpresa],
+            ["Tributos pagos no último semestre", dados.viabilidade.tributosSemestre],
+            ["Valor acordado no contrato", dados.viabilidade.valorAcordado],
+            ["Forma de pagamento", dados.viabilidade.formaPagamento],
+            ["Exportador", dados.viabilidade.exportador],
+            ["Nível de complexidade da revisão", dados.viabilidade.complexidade],
+            ["Histórico de tentativas anteriores", dados.viabilidade.historicoTentativas],
+            ["Embasamento do processo", dados.viabilidade.embasamento],
+            ["Transcrição da reunião", dados.viabilidade.transcricaoRegistrada ? "Registrada no card" : "Pendente"],
+          ] as const).map(([rotulo, valor]) => (
+            <View key={rotulo} style={[styles.row, { borderBottomWidth: 1, borderColor: '#ddd', paddingVertical: 6 }]}>
+              <Text style={[styles.optionText, { width: '42%' }]}>{rotulo}</Text>
+              <Text style={[styles.optionText, { width: '58%' }]}>{valor || 'Não informado'}</Text>
+            </View>
+          ))}
+          <Text style={[styles.label, { marginTop: 20, marginBottom: 8 }]}>RESUMO DA REUNIÃO</Text>
+          <Text style={{ fontSize: 9, lineHeight: 1.4 }}>{dados.viabilidade.resumoReuniao || 'Não informado'}</Text>
+        </Page>
+      )}
     </Document>
   );
 };
