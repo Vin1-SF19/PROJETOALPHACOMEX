@@ -60,3 +60,25 @@ export async function capacidadesObrigatoriasPorEtapa(
   }
   return porEtapa;
 }
+
+/** Exigência nativa na entrada, publicada no bloco do formulário da etapa. */
+export async function capacidadeObrigatoriaEntrada(
+  etapaId: string,
+  capability: string,
+  client: ClienteFormulario = db,
+): Promise<boolean> {
+  const componente = await client.bpmFormularioComponente.findFirst({
+    where: {
+      tipo: "CAPABILITY", capability,
+      secao: { formulario: { ativo: true, etapaId } },
+    },
+    select: { configJson: true },
+  });
+  if (!componente?.configJson) return false;
+  try {
+    const config = JSON.parse(componente.configJson) as { obrigatorioEntrada?: unknown };
+    return config.obrigatorioEntrada === true;
+  } catch {
+    return false;
+  }
+}

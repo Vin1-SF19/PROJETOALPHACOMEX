@@ -15,6 +15,8 @@ import { formularioExigeCapacidade } from "@/lib/bpm/formulario-renderer";
 import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
 import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
 import { etapaEhLost } from "@/lib/bpm/lost";
+import { BpmDateTimeField } from "./BpmDateTimeField";
+import { formatarDataHoraLocalBpm, parseDataHoraLocalBpm } from "@/lib/format-date";
 import { AtribuirLeadAgendarModal } from "./AtribuirLeadAgendarModal";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { ObterDisponibilidadeEtapasCardBpm, type DisponibilidadeEtapaCard } from "@/actions/bpm/DisponibilidadeEtapasCard";
@@ -40,6 +42,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
   const [requisitos, setRequisitos] = useState<RequisitosTransicao | null>(null);
   const [atribuicaoPendente, setAtribuicaoPendente] = useState<{ etapaDestinoId: string; camposValores?: Record<string, string> } | null>(null);
   const [valoresRequisitos, setValoresRequisitos] = useState<Record<string, string>>({});
+  const [proximoContatoRascunho, setProximoContatoRascunho] = useState("");
   const [consultaDisponibilidade, setConsultaDisponibilidade] = useState<{
     chave: string;
     data: Record<string, DisponibilidadeEtapaCard>;
@@ -166,6 +169,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
     if (mostrarMesmoSemPendencias || resposta.data.faltantes.length || resposta.data.guardas.length) setRequisitos(resposta.data);
     else setRequisitos(null);
     setValoresRequisitos(Object.fromEntries(resposta.data.campos.map((campo) => [campo.id, campo.valor ?? ""])));
+    setProximoContatoRascunho(formatarDataHoraLocalBpm(resposta.data.proximoContatoEm));
     return resposta.data;
   }
 
@@ -202,7 +206,9 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
 
   async function salvarRequisitosEMover() {
     if (!requisitos || movendoEtapa) return;
-    if (faltantesNoRascunho.length || requisitos.guardas.length) return;
+    const dataProximoContato = parseDataHoraLocalBpm(proximoContatoRascunho);
+    if (faltantesNoRascunho.length || guardasSemProximoContato.length
+      || (requisitos.proximoContatoObrigatorio && !dataProximoContato)) return;
     setMovendoEtapa(true);
     try {
       const savesConcluidos = await flushSaves(card.id);
@@ -221,6 +227,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
       }
       confirmarMovimento(await SalvarRequisitosEMoverCardBpm({
         cardId: card.id, etapaDestinoId: requisitos.etapaDestino.id, camposValores,
+        ...(requisitos.proximoContatoObrigatorio ? { proximoContatoEm: dataProximoContato?.toISOString() } : {}),
       }));
     } finally {
       setMovendoEtapa(false);
@@ -244,6 +251,9 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
     ? requisitos?.campos.filter((campo) => campo.obrigatorio && !valoresRequisitos[campo.id]?.trim()) ?? []
     : requisitos?.faltantes.filter((campo) => !valoresRequisitos[campo.id]?.trim()) ?? [];
   const camposIndisponiveis = requisitos?.faltantes.filter((pendente) => !requisitos.campos.some((campo) => campo.id === pendente.id)) ?? [];
+  const guardasSemProximoContato = requisitos?.guardas.filter((guarda) =>
+    !(requisitos.proximoContatoObrigatorio && guarda.includes('campo "Próximo Contato"'))) ?? [];
+  const proximoContatoInvalido = Boolean(requisitos?.proximoContatoObrigatorio && !parseDataHoraLocalBpm(proximoContatoRascunho));
 
   return (
     <div className="rounded-2xl border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent overflow-y-auto p-3 space-y-1.5">
@@ -273,7 +283,12 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
               : "Preencha os campos exigidos pela configuração desta transição."}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {requisitos?.guardas.map((guarda) => <p key={guarda} role="alert" className="rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-xs text-amber-100">{guarda}</p>)}
+            {guardasSemProximoContato.map((guarda) => <p key={guarda} role="alert" className="rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-xs text-amber-100">{guarda}</p>)}
+            {requisitos?.proximoContatoObrigatorio && (
+              <BpmDateTimeField id={`proximo-contato-movimento-${card.id}`} label="Próximo Contato" required
+                value={proximoContatoRascunho} onChange={setProximoContatoRascunho}
+                disabled={movendoEtapa} error={proximoContatoInvalido ? "Informe data e hora válidas para entrar nesta etapa." : null} />
+            )}
             {aguardandoTranscricao && requisitos?.guardas.some((guarda) => guarda.includes("transcrição")) && (
               <button type="button" onClick={irParaTranscricao} className="min-h-11 rounded-lg border border-amber-300/30 px-3 text-xs font-bold text-amber-100 hover:bg-amber-300/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300">
                 Ir para a transcrição da reunião
@@ -301,7 +316,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
           <DialogFooter>
             <button type="button" onClick={() => setRequisitos(null)} disabled={movendoEtapa} className="min-h-10 rounded-lg border border-white/15 px-4 text-xs font-semibold text-slate-300">Cancelar</button>
             <button type="button" onClick={() => void buscarRequisitos(requisitos!.etapaDestino.id, true)} disabled={movendoEtapa} className="min-h-10 rounded-lg border border-white/15 px-4 text-xs font-semibold text-slate-200">Recarregar requisitos</button>
-            <button type="button" onClick={() => void salvarRequisitosEMover()} disabled={movendoEtapa || faltantesNoRascunho.length > 0 || Boolean(requisitos?.guardas.length)} className="min-h-10 rounded-lg bg-cyan-500 px-4 text-xs font-bold text-slate-950 disabled:opacity-50">{movendoEtapa ? "Movendo…" : "Salvar e mover"}</button>
+            <button type="button" onClick={() => void salvarRequisitosEMover()} disabled={movendoEtapa || faltantesNoRascunho.length > 0 || guardasSemProximoContato.length > 0 || proximoContatoInvalido} className="min-h-10 rounded-lg bg-cyan-500 px-4 text-xs font-bold text-slate-950 disabled:opacity-50">{movendoEtapa ? "Movendo…" : "Salvar e mover"}</button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -363,6 +378,9 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
             </button>
           );
           const podeInformarMotivo = card.pipeline?.nome === "Revisão de Radar" && etapaEhLost(etapa.nome);
+          const podeInformarProximoContato = card.pipeline?.nome === "Revisão de Radar"
+            && etapa.nome.toLocaleLowerCase("pt-BR") === "sem viabilidade"
+            && pendencias.some((pendencia) => pendencia.includes("Próximo Contato"));
           return bloqueada ? (
             <div key={etapa.id} className="space-y-1.5">
             <TooltipPrimitive.Root>
@@ -389,6 +407,12 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
             >
               Preencher dados de Lost
             </button>}
+            {podeInformarProximoContato && <button
+              type="button"
+              onClick={() => void buscarRequisitos(etapa.id, true)}
+              disabled={movendoEtapa}
+              className="min-h-9 w-full rounded-lg border border-amber-300/25 bg-amber-300/10 px-3 text-left text-xs font-semibold text-amber-100 transition hover:bg-amber-300/15 disabled:opacity-50"
+            >Informar Próximo Contato</button>}
             </div>
           ) : <div key={etapa.id}>{botao}</div>;
         })}

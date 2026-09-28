@@ -31,7 +31,7 @@ import { carregarValoresCanonicosCampos, salvarValoresGlobaisPersonalizadosCampo
 import { prepararSalvamentoConfigurado } from "@/lib/bpm/validacao-salvamento-configurado";
 import { registrarConclusaoContratoFinanceiro } from "@/lib/bpm/financeiro-assinatura-server";
 import { carregarResumoContratacao } from "@/lib/bpm/resumo-contratacao-server";
-import { camposPublicadosPorEtapa, capacidadesObrigatoriasPorEtapa } from "@/lib/bpm/campos-formulario-publicado";
+import { camposPublicadosPorEtapa, capacidadesObrigatoriasPorEtapa, capacidadeObrigatoriaEntrada } from "@/lib/bpm/campos-formulario-publicado";
 import { desserializarComposicaoCardKanban, type CardKanbanComposicao } from "@/lib/bpm/card-kanban";
 import { etapaEhFechado, obterStatusPosFechamentoVisivel } from "@/lib/bpm/status-pos-fechamento";
 import { projetarResumosKanbanOperacionais } from "@/lib/bpm/card-kanban-projecao";
@@ -57,7 +57,7 @@ import {
 } from "@/lib/bpm/novos-leads";
 import { pipelineEhRevisaoRadar } from "@/lib/bpm/proximo-contato";
 import { sincronizarProximoContatoAgenda } from "@/lib/bpm/proximo-contato-agenda";
-import { etapaEhEmTratativa } from "@/lib/bpm/em-tratativa";
+import { etapaEhEmTratativa, etapaEhSemViabilidade, obterErroProximoContatoParaEntrada } from "@/lib/bpm/em-tratativa";
 import { obterErroProximoContatoParaMovimento } from "@/lib/bpm/proximo-contato";
 import { buscarNolossLeadsPendentes } from "@/lib/bpm/noloss-leads";
 import { paraExibicaoTelefone } from "@/lib/validations/cs-nps";
@@ -1676,6 +1676,14 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
       }));
     const capacidadesObrigatorias = await capacidadesObrigatoriasPorEtapa([card.etapaId, etapaDestinoId]);
     const guardas: string[] = [];
+    const proximoContatoObrigatorio = card.pipeline.nome === "Revisão de Radar" && etapaEhSemViabilidade(etapaDestino.nome)
+      && await capacidadeObrigatoriaEntrada(etapaDestinoId, BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER);
+    if (proximoContatoObrigatorio) {
+      const erroContato = obterErroProximoContatoParaEntrada({
+        etapaDestinoNome: etapaDestino.nome, proximoContatoEm: card.proximoContatoEm,
+      });
+      if (erroContato) guardas.push(erroContato);
+    }
     if (card.pipeline.nome === "Revisão de Radar" && etapaEhLost(etapaDestino.nome)) {
       const motivos = campos.filter((campo) => campo.chave === BPM_FIELD_KEYS.LOST_REASON
         && campo.contexto !== "ORIGEM" && campo.tipo === "selecao" && campo.obrigatorio);
@@ -1701,6 +1709,7 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
         faltantes,
         guardas,
         proximoContatoEm: card.proximoContatoEm,
+        proximoContatoObrigatorio,
         podeMover: faltantes.length === 0 && guardas.length === 0,
       },
     };

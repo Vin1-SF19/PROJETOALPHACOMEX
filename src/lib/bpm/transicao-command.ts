@@ -7,7 +7,7 @@ import db from "@/lib/prisma";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 import { requisitoAplicaAoMover } from "@/lib/bpm/requisitos-etapa";
 import { registrarConclusaoContratoFinanceiro } from "@/lib/bpm/financeiro-assinatura-server";
-import { camposPublicadosPorEtapa, capacidadesObrigatoriasPorEtapa } from "@/lib/bpm/campos-formulario-publicado";
+import { camposPublicadosPorEtapa, capacidadesObrigatoriasPorEtapa, capacidadeObrigatoriaEntrada } from "@/lib/bpm/campos-formulario-publicado";
 import {
   carregarValoresCanonicosCampos,
   salvarValoresGlobaisPersonalizadosCampos,
@@ -28,7 +28,7 @@ import { exigirAcessoBpmCard, usuarioElegivelResponsavelBpm } from "@/lib/bpm/ow
 import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
 import { etapaEhLost } from "@/lib/bpm/lost";
 import { sincronizarProximoContatoAgenda } from "@/lib/bpm/proximo-contato-agenda";
-import { destinoPermitidoEmTratativa, etapaEhEmTratativa, obterErroChecklistParaSaidaEmTratativa } from "@/lib/bpm/em-tratativa";
+import { destinoPermitidoEmTratativa, etapaEhEmTratativa, etapaEhSemViabilidade, obterErroChecklistParaSaidaEmTratativa, obterErroProximoContatoParaEntrada } from "@/lib/bpm/em-tratativa";
 import { obterErroProximoContatoParaMovimento } from "@/lib/bpm/proximo-contato";
 import { etapaEhAgendarReuniao, destinoEhReuniaoAgendada, obterErroDataReuniaoParaMovimento } from "@/lib/bpm/agendar-reuniao";
 import { destinoPermitidoReuniaoAgendada, etapaEhReuniaoAgendada, obterErroTranscricaoParaMovimento } from "@/lib/bpm/reuniao-agendada";
@@ -481,6 +481,11 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
   }
 
   const proximoContato = input.proximoContatoEm === undefined ? card.proximoContatoEm : input.proximoContatoEm;
+  if (card.pipeline.nome === "Revisão de Radar" && etapaEhSemViabilidade(destino.nome)
+    && await capacidadeObrigatoriaEntrada(destino.id, BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER, tx)) {
+    const erroContato = obterErroProximoContatoParaEntrada({ etapaDestinoNome: destino.nome, proximoContatoEm: proximoContato });
+    if (erroContato) erro("NEXT_CONTACT_REQUIRED", erroContato);
+  }
   if (card.pipeline.nome === "Revisão de Radar" && input.ator.tipo === "MANUAL"
     && etapaEhEmTratativa(destino.nome)) {
     const erroContato = obterErroProximoContatoParaMovimento(proximoContato);

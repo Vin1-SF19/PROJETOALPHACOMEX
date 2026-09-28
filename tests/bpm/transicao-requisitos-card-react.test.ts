@@ -21,6 +21,11 @@ vi.mock("@/app/PainelAlpha/AlphaCRM/CampoBpmInput", async () => {
   return { CampoBpmInput: ({ campo, value, onChange, readOnly }: { campo: { id: string }; value: string; onChange: (value: string) => void; readOnly: boolean }) =>
     ReactModule.createElement("button", { type: "button", "data-field-id": campo.id, disabled: readOnly, onClick: () => onChange(campo.id === "radar" ? "Limitado" : "Maria") }, value || "Preencher") };
 });
+vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/BpmDateTimeField", async () => {
+  const ReactModule = await import("react");
+  return { BpmDateTimeField: ({ onChange, value }: { onChange: (value: string) => void; value: string }) =>
+    ReactModule.createElement("button", { type: "button", "data-proximo-contato": "true", onClick: () => onChange("2026-10-01T09:00") }, value || "Informar data") };
+});
 vi.mock("@/components/ui/dialog", async () => {
   const ReactModule = await import("react");
   const wrapper = ({ children }: { children: React.ReactNode }) => ReactModule.createElement("div", null, children);
@@ -98,6 +103,33 @@ describe("requisitos configurados antes da mudança de etapa", () => {
     expect(document.body.textContent).toContain("Conclua o checklist");
     await act(async () => { botao?.click(); });
     expect(api.move).not.toHaveBeenCalled();
+  });
+
+  it("abre Sem viabilidade pendente e envia Próximo Contato junto com o movimento", async () => {
+    api.disponibilidade.mockResolvedValue({ success: true, data: [{
+      etapaId: "sem-viabilidade", oculta: false, pendencias: ['O campo "Próximo Contato" precisa estar preenchido.'],
+    }] });
+    api.preflight.mockResolvedValue({ success: true, data: {
+      etapaDestino: { id: "sem-viabilidade", nome: "Sem viabilidade" },
+      campos: [], faltantes: [],
+      guardas: ['Não é possível avançar para "Sem viabilidade": o campo "Próximo Contato" precisa estar preenchido.'],
+      proximoContatoEm: null, proximoContatoObrigatorio: true,
+    } });
+    const radarCard = { ...card, pipeline: { nome: "Revisão de Radar" }, etapa: { ...card.etapa, nome: "Em tratativas" } } as typeof card;
+    const semViabilidade = [{ id: "sem-viabilidade", chave: null, nome: "Sem viabilidade", ordem: 3, script: null }];
+    await act(async () => root.render(h(PainelProximaEtapa, { card: radarCard, etapas: semViabilidade, podeMoverEtapa: true, accent: "1,2,3", onMovido: vi.fn() })));
+    const informar = [...host.querySelectorAll("button")].find((item) => item.textContent?.includes("Informar Próximo Contato"));
+    expect(informar).toBeTruthy();
+    await act(async () => informar!.click());
+    const salvar = [...host.querySelectorAll<HTMLButtonElement>("button")].find((item) => item.textContent?.includes("Salvar e mover"));
+    expect(salvar?.disabled).toBe(true);
+    await act(async () => host.querySelector<HTMLButtonElement>('[data-proximo-contato="true"]')!.click());
+    expect(salvar?.disabled).toBe(false);
+    await act(async () => salvar!.click());
+    expect(api.saveAndMove).toHaveBeenCalledWith(expect.objectContaining({
+      cardId: "card-1", etapaDestinoId: "sem-viabilidade", camposValores: {},
+      proximoContatoEm: expect.stringMatching(/^2026-10-01T/),
+    }));
   });
 
   it("omite destino inacessível e reavalia bloqueio após atualização do card", async () => {

@@ -234,6 +234,10 @@ export function etapaEhEmTratativa(nome: string): boolean {
     normalizarNomeEtapa(nome) === normalizarNomeEtapa(etapa));
 }
 
+export function etapaEhSemViabilidade(nome: string): boolean {
+  return normalizarNomeEtapa(nome) === normalizarNomeEtapa("Sem viabilidade");
+}
+
 export function etapaExigeProximoContato(nome: string): boolean {
   if (!nome) return false;
   const nomeNormalizado = normalizarNomeEtapa(nome)

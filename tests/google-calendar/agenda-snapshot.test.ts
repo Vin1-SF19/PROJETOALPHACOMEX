@@ -164,7 +164,12 @@ describe("Agenda Alpha snapshot consolidado", () => {
       expect.objectContaining({ id: "crm-proximo-contato:card-1", calendarioNome: "CRM · Próximo contato", bpmPipelineId: "radar", calendarioGravavel: false }),
     ]) } });
     expect(prismaMock.bpmTarefa.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ responsavelId: 7, tipo: "CRM_PROXIMO_CONTATO", status: "PENDENTE" }),
+      where: expect.objectContaining({
+        responsavelId: 7, tipo: "CRM_PROXIMO_CONTATO", status: "PENDENTE",
+        card: { OR: expect.arrayContaining([
+          expect.objectContaining({ status: { in: ["ATIVO", "CONCLUIDO"] }, etapa: { nome: { in: ["Sem viabilidade", "Sem Viabilidade"] } } }),
+        ]) },
+      }),
     }));
   });
 

@@ -149,7 +149,10 @@ export async function carregarIntervaloAgendaAlpha(input: {
           tipo: "CRM_PROXIMO_CONTATO",
           status: "PENDENTE",
           prazo: { gte: inicio, lt: fim },
-          card: { status: "ATIVO", etapa: { nome: { in: ["Em tratativa", "Em Tratativa", "Em tratativas", "Em Tratativas"] } } },
+          card: { OR: [
+            { status: "ATIVO", etapa: { nome: { in: ["Em tratativa", "Em Tratativa", "Em tratativas", "Em Tratativas"] } } },
+            { status: { in: ["ATIVO", "CONCLUIDO"] }, etapa: { nome: { in: ["Sem viabilidade", "Sem Viabilidade"] } } },
+          ] },
         },
         select: { id: true, titulo: true, prazo: true, card: { select: { pipelineId: true } } },
         take: 500,

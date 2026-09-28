@@ -4,11 +4,11 @@ vi.mock("server-only", () => ({}));
 import { idTarefaProximoContato, sincronizarProximoContatoAgenda } from "@/lib/bpm/proximo-contato-agenda";
 
 function clienteTarefas() {
-  let registro: { prazo: Date; responsavelId: number; status: string } | null = null;
+  let registro: { prazo: Date; responsavelId: number; status: string; descricao: string } | null = null;
   const findUnique = vi.fn(async () => registro);
-  const upsert = vi.fn(async ({ create, update }: { create: { prazo: Date; responsavelId: number; status: string }; update: { prazo: Date; responsavelId: number; status: string } }) => {
-    registro = { prazo: create.prazo, responsavelId: create.responsavelId, status: create.status };
-    if (upsert.mock.calls.length > 1) registro = { prazo: update.prazo, responsavelId: update.responsavelId, status: update.status };
+  const upsert = vi.fn(async ({ create, update }: { create: { prazo: Date; responsavelId: number; status: string; descricao: string }; update: { prazo: Date; responsavelId: number; status: string; descricao: string } }) => {
+    registro = { prazo: create.prazo, responsavelId: create.responsavelId, status: create.status, descricao: create.descricao };
+    if (upsert.mock.calls.length > 1) registro = { prazo: update.prazo, responsavelId: update.responsavelId, status: update.status, descricao: update.descricao };
   });
   const updateMany = vi.fn(async () => { if (registro) registro.status = "CONCLUIDA"; return { count: 1 }; });
   return { bpmTarefa: { findUnique, upsert, updateMany } };

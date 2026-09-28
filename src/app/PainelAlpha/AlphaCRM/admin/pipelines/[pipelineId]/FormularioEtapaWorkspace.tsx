@@ -23,7 +23,7 @@ import {
 import { toast } from "sonner";
 import { ListaCamposFormulario } from "./ListaCamposFormulario";
 import { PerguntasFollowUpEditor } from "./PerguntasFollowUpEditor";
-import { etapaEhEmTratativa } from "@/lib/bpm/em-tratativa";
+import { etapaEhEmTratativa, etapaEhSemViabilidade } from "@/lib/bpm/em-tratativa";
 import { moverItemFormulario } from "@/lib/bpm/ordem-formulario";
 
 import { PipelineEditorStateBoundary, usePipelineEditorState } from "./PipelineEditorStateProvider";
@@ -378,6 +378,20 @@ function FormularioEtapaWorkspaceContent({
         if (item.chave !== blocoSelecionado.chave) return item;
         const config = configComponente(item);
         config.obrigatorioSaida = obrigatorioSaida;
+        return { ...item, configJson: JSON.stringify(config) };
+      }),
+    }));
+    setSujo(true);
+  }
+
+  function atualizarObrigatoriedadeEntradaBloco(obrigatorioEntrada: boolean) {
+    if (!blocoSelecionado || !componenteSelecionado) return;
+    setSecoes((atuais) => atuais.map((secao) => secao.chave !== blocoSelecionado.secaoChave ? secao : {
+      ...secao,
+      componentes: secao.componentes.map((item) => {
+        if (item.chave !== blocoSelecionado.chave) return item;
+        const config = configComponente(item);
+        config.obrigatorioEntrada = obrigatorioEntrada;
         return { ...item, configJson: JSON.stringify(config) };
       }),
     }));
@@ -943,6 +957,12 @@ function FormularioEtapaWorkspaceContent({
           </section>
           <PerguntasFollowUpEditor pipelineId={pipelineId} />
         </>}
+        {pipelineNome === "Revisão de Radar" && etapaEhSemViabilidade(etapa.nome) && (
+          <section aria-label="Campos do sistema de Sem viabilidade" className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-slate-300">
+            <p className="font-semibold text-white">Campos do sistema desta etapa</p>
+            <p className="mt-2">Próximo Contato — {componentesEmUso.has("FOLLOW_UP_SCHEDULER") ? "no formulário" : "adicione Próximo contato"}</p>
+          </section>
+        )}
         <ListaCamposFormulario
           secoes={secaoSelecionada ? [secaoSelecionada] : []}
           bloqueado={bloqueado}
@@ -1093,10 +1113,19 @@ function FormularioEtapaWorkspaceContent({
             {pipelineNome === "Revisão de Radar" && etapaEhEmTratativa(etapa.nome)
               && ["FOLLOW_UP_SCHEDULER", "FOLLOW_UP_CHECKLIST"].includes(componenteSelecionado.capability)
               ? <p className="rounded-lg border border-cyan-400/20 bg-cyan-400/5 p-2.5 text-[11px] text-cyan-100">Este bloco e sua validação são obrigatórios nesta etapa. Você pode configurar as perguntas adicionais do follow-up acima.</p>
-              : ["MEETING_SCHEDULER", "MEETING_TRANSCRIPT", "FOLLOW_UP_SCHEDULER", "FOLLOW_UP_CHECKLIST", "STAGE_CHECKLIST"].includes(componenteSelecionado.capability) && <label className="flex items-start gap-2.5 rounded-lg border border-white/10 bg-slate-900/40 p-2.5">
+              : ["MEETING_SCHEDULER", "MEETING_TRANSCRIPT", "FOLLOW_UP_SCHEDULER", "FOLLOW_UP_CHECKLIST", "STAGE_CHECKLIST"].includes(componenteSelecionado.capability)
+                && !(pipelineNome === "Revisão de Radar" && etapaEhSemViabilidade(etapa.nome) && componenteSelecionado.capability === "FOLLOW_UP_SCHEDULER")
+                && <label className="flex items-start gap-2.5 rounded-lg border border-white/10 bg-slate-900/40 p-2.5">
               <input type="checkbox" checked={configComponente(componenteSelecionado).obrigatorioSaida !== false} disabled={bloqueado} onChange={(event) => atualizarObrigatoriedadeBloco(event.target.checked)} className="mt-0.5 accent-cyan-400" />
               <span><span className="font-semibold">Exigir na transição</span><span className="mt-0.5 block text-[11px] text-slate-500">Quando ativo, este requisito bloqueia a mudança de etapa até ser atendido. Retirar o bloco do formulário também remove a obrigação.</span></span>
             </label>}
+            {pipelineNome === "Revisão de Radar" && etapaEhSemViabilidade(etapa.nome)
+              && componenteSelecionado.capability === "FOLLOW_UP_SCHEDULER" && (
+                <label className="flex items-start gap-2.5 rounded-lg border border-white/10 bg-slate-900/40 p-2.5">
+                  <input type="checkbox" checked={configComponente(componenteSelecionado).obrigatorioEntrada === true} disabled={bloqueado} onChange={(event) => atualizarObrigatoriedadeEntradaBloco(event.target.checked)} className="mt-0.5 accent-cyan-400" />
+                  <span><span className="font-semibold">Exigir para entrar</span><span className="mt-0.5 block text-[11px] text-slate-500">Bloqueia a entrada em Sem viabilidade sem Próximo Contato.</span></span>
+                </label>
+              )}
           </div>}
           {!campoSelecionado && !componenteSelecionado ? <p className="mt-3 text-xs leading-5 text-slate-400">Selecione um campo ou bloco na composição para configurar suas regras.</p> : campoSelecionado && <div className="mt-4 space-y-4">
             {indiceSecaoCampoSelecionado >= 0 && secoes.length > 1 && <label className="block text-xs font-semibold text-slate-300">Mover campo para seção
