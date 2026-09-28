@@ -13,6 +13,7 @@ interface OpcoesGoogleCalendarError {
   retryable?: boolean;
   retryAfterMs?: number;
   status?: number;
+  reason?: string;
   cause?: unknown;
 }
 
@@ -22,6 +23,7 @@ export class GoogleCalendarError extends Error {
   readonly retryable: boolean;
   readonly retryAfterMs?: number;
   readonly status?: number;
+  readonly reason?: string;
 
   constructor(message: string, opcoes: OpcoesGoogleCalendarError) {
     super(message);
@@ -30,6 +32,7 @@ export class GoogleCalendarError extends Error {
     this.retryable = opcoes.retryable ?? false;
     this.retryAfterMs = opcoes.retryAfterMs;
     this.status = opcoes.status;
+    this.reason = opcoes.reason;
     if (opcoes.cause !== undefined) {
       (this as { cause?: unknown }).cause = opcoes.cause;
     }
@@ -67,6 +70,7 @@ export function classificarErroGoogle(erroOriginal: unknown): GoogleCalendarErro
   const erro = (erroOriginal ?? {}) as FormaErroGoogleApi;
   const status = erro.response?.status ?? erro.code;
   const motivo = extrairMotivo(erro);
+  const reason = motivo && /^[A-Za-z][A-Za-z0-9_]{0,80}$/.test(motivo) ? motivo : undefined;
   const retryAfterMs = extrairRetryAfterMs(erro.response?.headers);
 
   if (status === 401) {
@@ -90,6 +94,7 @@ export function classificarErroGoogle(erroOriginal: unknown): GoogleCalendarErro
       kind: "forbidden",
       retryable: false,
       status,
+      reason,
       cause: erroOriginal,
     });
   }
@@ -137,6 +142,7 @@ export function classificarErroGoogle(erroOriginal: unknown): GoogleCalendarErro
       kind: "invalid_request",
       retryable: false,
       status,
+      reason,
       cause: erroOriginal,
     });
   }

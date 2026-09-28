@@ -19,7 +19,11 @@ vi.mock("@/actions/bpm/Cards", () => ({
     return { success: true };
   }),
 }));
-vi.mock("@/actions/bpm/GoogleMeet", () => ({ AgendarReuniaoGoogleMeetBpm: vi.fn(), ReagendarReuniaoBpm: vi.fn() }));
+vi.mock("@/actions/bpm/GoogleMeet", () => ({
+  AgendarReuniaoGoogleMeetBpm: vi.fn(),
+  ReagendarReuniaoBpm: vi.fn(),
+  ListarConvidadosReuniaoGoogleMeetBpm: vi.fn().mockResolvedValue({ success: true, data: [] }),
+}));
 vi.mock("@/actions/bpm/TranscricaoMeet", () => ({
   SincronizarTranscricaoReuniaoBpm: vi.fn(),
   SalvarResumoReuniaoBpm: vi.fn(async ({ resumo }: { resumo: string }) => {

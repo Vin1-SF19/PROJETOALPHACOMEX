@@ -491,6 +491,12 @@ export async function criarEventoNoCalendario(input: CriarEventoInput): Promise<
         googleEventId: eventoCriado.googleEventId,
         ...dadosCacheDeEvento(eventoCriado),
       },
+    }).catch((error) => {
+      // O evento já existe no Google; o card pode confirmar o Meet pela API.
+      console.error("[AgendaAlpha] Evento criado, mas o cache local falhou", {
+        correlationId,
+        tipo: error instanceof Error ? error.name : "Erro desconhecido",
+      });
     });
 
     registrarMetricaPerformanceAgendaAlpha({
@@ -502,13 +508,28 @@ export async function criarEventoNoCalendario(input: CriarEventoInput): Promise<
     });
     revalidatePath("/PainelAlpha/CalendarioAlpha");
     return { success: true, data: { googleEventId: eventoCriado.googleEventId } };
-  } catch {
+  } catch (error) {
     registrarMetricaPerformanceAgendaAlpha({
       correlationId,
       operation: "criar_evento",
       outcome: "error",
       latencyMs: Date.now() - iniciadoEm,
     });
+    if (error instanceof GoogleCalendarError) {
+      console.error("[AgendaAlpha] Google recusou a criação do evento", {
+        correlationId, kind: error.kind, status: error.status, reason: error.reason,
+      });
+      if (error.kind === "forbidden") {
+        if (error.reason === "forbiddenForNonOrganizer") {
+          return { success: false, error: "O Google recusou criar o evento porque a agenda selecionada não pertence ao organizador (403: forbiddenForNonOrganizer). Selecione a agenda principal da sua conta." };
+        }
+        return { success: false, error: `O Google negou acesso para criar este evento (403${error.reason ? `: ${error.reason}` : ""}). Verifique as permissões da conta e da agenda; se a falha ocorrer só com convidados externos, peça ao administrador para revisar as regras do Workspace.` };
+      }
+      if (error.kind === "invalid_request") {
+        return { success: false, error: `O Google recusou os dados do convite (400${error.reason ? `: ${error.reason}` : ""}). Confira os e-mails dos convidados e a agenda selecionada.` };
+      }
+      return { success: false, error: error.message };
+    }
     return { success: false, error: "Não foi possível criar o evento no Google Agenda." };
   }
 }

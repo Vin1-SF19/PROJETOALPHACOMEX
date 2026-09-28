@@ -26,6 +26,11 @@ describe("classificação de erros da Google Calendar API", () => {
     expect(erro.retryable).toBe(false);
   });
 
+  it("guarda somente o código seguro da razão do Google", () => {
+    expect(classificarErroGoogle(erroFalso(403, { reason: "forbiddenForNonOrganizer" })).reason).toBe("forbiddenForNonOrganizer");
+    expect(classificarErroGoogle(erroFalso(400, { reason: "email@privado.com" })).reason).toBeUndefined();
+  });
+
   it("403 com reason de quota vira rate_limited retryable", () => {
     const erro = classificarErroGoogle(erroFalso(403, { reason: "rateLimitExceeded" }));
     expect(erro.kind).toBe("rate_limited");

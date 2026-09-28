@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   combinarParticipantesReuniao,
   emailClienteReuniaoSchema,
+  emailsConvidadosReuniaoSchema,
   selecionarEmailClienteReuniao,
   selecionarEmailReuniaoDoCard,
   selecionarEmailConvidadoUnico,
@@ -18,6 +19,14 @@ describe("e-mail do cliente na reunião", () => {
     expect(emailClienteReuniaoSchema.parse("  CLIENTE@EXEMPLO.COM ")).toBe("cliente@exemplo.com");
     expect(emailClienteReuniaoSchema.safeParse("").success).toBe(false);
     expect(emailClienteReuniaoSchema.safeParse("cliente@exemplo").success).toBe(false);
+  });
+
+  it("aceita convidados externos e elimina duplicatas sem trocar o principal", () => {
+    expect(emailsConvidadosReuniaoSchema.parse([
+      " CLIENTE@EXEMPLO.COM ", "Pessoa@GMAIL.COM", "pessoa@gmail.com", "contato@hotmail.com",
+    ])).toEqual(["cliente@exemplo.com", "pessoa@gmail.com", "contato@hotmail.com"]);
+    expect(emailsConvidadosReuniaoSchema.safeParse([]).success).toBe(false);
+    expect(emailsConvidadosReuniaoSchema.safeParse(["cliente@exemplo.com", "inválido"]).success).toBe(false);
   });
 
   it("prefere o único contato principal ativo com e-mail válido", () => {
@@ -51,9 +60,11 @@ describe("e-mail do cliente na reunião", () => {
       { email: "convidado@exemplo.com" },
       { email: "CLIENTE@EXEMPLO.COM" },
       { email: "invalido" },
-    ], " cliente@exemplo.com ")).toEqual([
+    ], " cliente@exemplo.com ", ["PESSOA@GMAIL.COM", "contato@hotmail.com"])).toEqual([
       "convidado@exemplo.com",
       "cliente@exemplo.com",
+      "pessoa@gmail.com",
+      "contato@hotmail.com",
     ]);
   });
 

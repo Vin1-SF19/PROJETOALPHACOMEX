@@ -46,7 +46,7 @@ vi.mock("@/lib/google-calendar/errors", () => ({
   },
 }));
 
-import { AgendarReuniaoGoogleMeetBpm, ReagendarReuniaoBpm } from "@/actions/bpm/GoogleMeet";
+import { AgendarReuniaoGoogleMeetBpm, ListarConvidadosReuniaoGoogleMeetBpm, ReagendarReuniaoBpm } from "@/actions/bpm/GoogleMeet";
 import { GoogleCalendarError } from "@/lib/google-calendar/errors";
 
 const CARD_ID = "clw0000000000000card";
@@ -124,6 +124,15 @@ describe("Google Meet: guard de etapa no backend", () => {
     expect(atualizarEventoMock).not.toHaveBeenCalled();
   });
 
+  it("rejeita convidado adicional inválido antes de chamar o Google", async () => {
+    const dados = { cardId: CARD_ID, dataHora: DATA, emailCliente: EMAIL, emailsAdicionais: ["pessoa@gmail.com", "invalido"] };
+    expect((await AgendarReuniaoGoogleMeetBpm(dados)).success).toBe(false);
+    expect((await ReagendarReuniaoBpm(dados)).success).toBe(false);
+    expect(acessoMock).not.toHaveBeenCalled();
+    expect(criarEventoMock).not.toHaveBeenCalled();
+    expect(atualizarEventoMock).not.toHaveBeenCalled();
+  });
+
   it("exige sessão antes de validar ou consultar o card", async () => {
     authMock.mockResolvedValueOnce(null);
     await expect(AgendarReuniaoGoogleMeetBpm({ cardId: CARD_ID, dataHora: DATA, emailCliente: EMAIL })).resolves.toEqual({
@@ -132,6 +141,22 @@ describe("Google Meet: guard de etapa no backend", () => {
     });
     expect(acessoMock).not.toHaveBeenCalled();
     expect(prismaMock.bpmCard.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("recupera convidados externos ao reabrir uma reunião autorizada", async () => {
+    prismaMock.bpmCard.findUnique.mockResolvedValue({ googleEventId: "evento-1", googleCalendarId: "primary" });
+    prismaMock.googleCalendarSelecionado.findFirst.mockResolvedValue({ id: "calendario-local" });
+    obterUsuarioPorCalendarioMock.mockResolvedValue({ ok: true, userId: 7, emailUsuario: "organizador@exemplo.com" });
+    obterEventoMock.mockResolvedValue({ googleEventId: "evento-1", status: "confirmed", participantes: [
+      { email: "organizador@exemplo.com", organizador: true },
+      { email: "Pessoa@GMAIL.COM", organizador: false },
+      { email: "pessoa@gmail.com", organizador: false },
+      { email: "contato@hotmail.com", organizador: false },
+    ] });
+    await expect(ListarConvidadosReuniaoGoogleMeetBpm(CARD_ID)).resolves.toEqual({
+      success: true, data: ["pessoa@gmail.com", "contato@hotmail.com"],
+    });
+    expect(acessoMock).toHaveBeenCalledWith(CARD_ID, 7, "COMERCIAL", "visualizar");
   });
 
   it("normaliza e envia o cliente como participante ao agendar", async () => {
@@ -168,10 +193,11 @@ describe("Google Meet: guard de etapa no backend", () => {
       cardId: CARD_ID,
       dataHora: DATA,
       emailCliente: " CLIENTE@EXEMPLO.COM ",
+      emailsAdicionais: ["PESSOA@GMAIL.COM", "contato@hotmail.com", "pessoa@gmail.com"],
     })).resolves.toEqual({ success: true, data: { googleEventId: "evento-1" } });
 
     expect(criarEventoMock).toHaveBeenCalledWith(expect.objectContaining({
-      participantes: [EMAIL],
+      participantes: [EMAIL, "pessoa@gmail.com", "contato@hotmail.com"],
     }));
     expect(tx.bpmCardReuniao.upsert).toHaveBeenCalledWith(expect.objectContaining({
       where: { cardId_chave: { cardId: CARD_ID, chave: "principal" } },
@@ -229,11 +255,12 @@ describe("Google Meet: guard de etapa no backend", () => {
       cardId: CARD_ID,
       dataHora: DATA,
       emailCliente: " cliente@exemplo.com ",
+      emailsAdicionais: ["PESSOA@GMAIL.COM", "contato@hotmail.com"],
     })).resolves.toEqual({ success: true });
 
     expect(atualizarEventoMock).toHaveBeenCalledWith(expect.objectContaining({
       evento: expect.objectContaining({
-        participantes: ["convidado@exemplo.com", EMAIL],
+        participantes: ["convidado@exemplo.com", EMAIL, "pessoa@gmail.com", "contato@hotmail.com"],
       }),
     }));
     expect(tx.bpmCardReuniao.upsert).toHaveBeenCalledWith(expect.objectContaining({

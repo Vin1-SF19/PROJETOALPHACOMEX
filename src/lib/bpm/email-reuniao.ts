@@ -8,6 +8,11 @@ export const emailClienteReuniaoSchema = z
   .max(320, "O e-mail deve ter no máximo 320 caracteres")
   .transform((email) => email.toLowerCase());
 
+export const emailsConvidadosReuniaoSchema = z.array(emailClienteReuniaoSchema)
+  .min(1, "Adicione pelo menos um e-mail para a reunião")
+  .max(50, "Adicione no máximo 50 convidados")
+  .transform((emails) => Array.from(new Set(emails)));
+
 interface VinculoEmailReuniao {
   ativo: boolean;
   principal: boolean;
@@ -66,8 +71,9 @@ export function selecionarEmailConvidadoUnico(
 export function combinarParticipantesReuniao(
   existentes: Array<{ email: string }>,
   emailCliente: string,
+  adicionais: string[] = [],
 ): string[] {
-  const candidatos = [...existentes.map(({ email }) => email), emailCliente];
+  const candidatos = [...existentes.map(({ email }) => email), emailCliente, ...adicionais];
   return Array.from(new Set(candidatos.flatMap((email) => {
     const resultado = emailClienteReuniaoSchema.safeParse(email);
     return resultado.success ? [resultado.data] : [];

@@ -27,11 +27,54 @@ import { dataHoraObrigatoriaBpmSchema } from "@/lib/validations/bpm";
 import {
   combinarParticipantesReuniao,
   emailClienteReuniaoSchema,
+  emailsConvidadosReuniaoSchema,
 } from "@/lib/bpm/email-reuniao";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 const DURACAO_PADRAO_MINUTOS = 60; // decisão confirmada com o usuário (plano-novos-leads-bpm.md, Bloco 2)
 const ERRO_ETAPA_REUNIAO = "O Google Meet só pode ser agendado ou reagendado na etapa Agendar Reunião.";
+
+/** Recupera convidados do evento sem duplicar sua lista no banco do CRM. */
+export async function ListarConvidadosReuniaoGoogleMeetBpm(cardId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false as const, error: "Não autorizado" };
+    const userId = Number(session.user.id);
+    if (!cardId.trim()) return { success: false as const, error: "Card inválido" };
+    await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "visualizar");
+    const card = await db.bpmCard.findUnique({
+      where: { id: cardId }, select: { googleEventId: true, googleCalendarId: true },
+    });
+    if (!card?.googleEventId || !card.googleCalendarId) return { success: true as const, data: [] as string[] };
+    const calendario = await db.googleCalendarSelecionado.findFirst({
+      where: { conexao: { userId }, googleCalendarId: card.googleCalendarId }, select: { id: true },
+    });
+    if (!calendario) return { success: false as const, error: "Agenda da reunião indisponível para esta conta." };
+    const usuarioGoogle = await obterUsuarioGoogleAtivoPorCalendario(calendario.id);
+    if (!usuarioGoogle.ok || usuarioGoogle.userId !== userId) {
+      return { success: false as const, error: "Agenda Alpha não está ativa para esta conta." };
+    }
+    const evento = await obterEventoGoogle({
+      emailUsuario: usuarioGoogle.emailUsuario,
+      calendarId: card.googleCalendarId,
+      googleEventId: card.googleEventId,
+    });
+    if (evento.googleEventId !== card.googleEventId || evento.status === "cancelled") {
+      return { success: false as const, error: "Evento da reunião indisponível na Agenda Google." };
+    }
+    return { success: true as const, data: Array.from(new Set(evento.participantes
+      .filter((participante) => !participante.organizador)
+      .flatMap((participante) => {
+        const email = emailClienteReuniaoSchema.safeParse(participante.email);
+        return email.success ? [email.data] : [];
+      }))) };
+  } catch (error) {
+    console.error("[ListarConvidadosReuniaoGoogleMeetBpm]", error instanceof GoogleCalendarError
+      ? { kind: error.kind, status: error.status, reason: error.reason }
+      : { tipo: error instanceof Error ? error.name : "Erro desconhecido" });
+    return { success: false as const, error: "Não foi possível consultar os convidados desta reunião." };
+  }
+}
 
 async function compensarCriacaoComRegistro(evento: EventoCriadoSemVinculo) {
   try {
@@ -119,6 +162,7 @@ async function reagendarEventoVinculado(params: {
   inicio: Date;
   fim: Date;
   emailCliente: string;
+  emailsAdicionais: string[];
 }) {
   // O ID "primary" pode existir em várias contas. A agenda usada deve ser
   // sempre a de quem solicitou o reagendamento, sem depender do cache local.
@@ -168,7 +212,7 @@ async function reagendarEventoVinculado(params: {
       fim: params.fim,
       diaInteiro: false,
       timezone: vinculo.timezone || "America/Sao_Paulo",
-      participantes: combinarParticipantesReuniao(eventoAtual.participantes, params.emailCliente),
+      participantes: combinarParticipantesReuniao(eventoAtual.participantes, params.emailCliente, params.emailsAdicionais),
     },
   });
   const compensacao: ReagendamentoPendente = {
@@ -203,6 +247,7 @@ const agendarSchema = z.object({
   cardId: z.string().min(1),
   dataHora: dataHoraObrigatoriaBpmSchema("Data e hora da reunião são obrigatórias"),
   emailCliente: emailClienteReuniaoSchema,
+  emailsAdicionais: z.array(emailClienteReuniaoSchema).max(49).default([]),
 });
 
 /**
@@ -247,7 +292,8 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
 
     const parsed = agendarSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
-    const { cardId, dataHora, emailCliente } = parsed.data;
+    const { cardId, dataHora, emailCliente, emailsAdicionais } = parsed.data;
+    const convidados = emailsConvidadosReuniaoSchema.parse([emailCliente, ...emailsAdicionais]);
 
     await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
 
@@ -301,7 +347,7 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
       diaInteiro: false,
       inicio,
       fim,
-      participantes: [emailCliente],
+      participantes: convidados,
       criarMeet: true,
       eventType: "default",
       visibilidade: "default",
@@ -418,6 +464,7 @@ const reagendarSchema = z.object({
   cardId: z.string().min(1),
   dataHora: dataHoraObrigatoriaBpmSchema("Data e hora da reunião são obrigatórias"),
   emailCliente: emailClienteReuniaoSchema,
+  emailsAdicionais: z.array(emailClienteReuniaoSchema).max(49).default([]),
 });
 
 export async function ReagendarReuniaoBpm(dados: unknown) {
@@ -429,7 +476,7 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
 
     const parsed = reagendarSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
-    const { cardId, dataHora, emailCliente } = parsed.data;
+    const { cardId, dataHora, emailCliente, emailsAdicionais } = parsed.data;
 
     await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
 
@@ -500,6 +547,7 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
       inicio,
       fim,
       emailCliente,
+      emailsAdicionais,
     });
 
     if (!resultado.success) {
@@ -595,9 +643,13 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
   } catch (error) {
     if (compensacao) await compensarReagendamentoComRegistro(compensacao);
     console.error("[ReagendarReuniaoBpm]", error instanceof GoogleCalendarError
-      ? { kind: error.kind, status: error.status, message: error.message }
+      ? { kind: error.kind, status: error.status, reason: error.reason, message: error.message }
       : { message: error instanceof Error ? error.message : "Erro desconhecido" });
-    const msg = error instanceof Error && error.message === "Não autorizado" ? "Não autorizado" : "Erro ao reagendar reunião";
+    const msg = error instanceof GoogleCalendarError
+      ? error.kind === "forbidden"
+        ? "O Google recusou atualizar os convidados. Confira a permissão da conta organizadora para convidar pessoas externas."
+        : error.message
+      : error instanceof Error && error.message === "Não autorizado" ? "Não autorizado" : "Erro ao reagendar reunião";
     return { success: false, error: msg };
   }
 }
