@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ClipboardCheck, Loader2, X } from "lucide-react";
 import { BuscarEmpresaPorCnpjBpm, BuscarEmpresasBpm, ListarUsuariosResponsavelBpm } from "@/actions/bpm/Cards";
-import { formatCNPJ, formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";
+import { cnpjEhValido, formatCNPJ, formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";
 
 interface EmpresaOpcao {
   id: number;
@@ -33,6 +33,7 @@ interface Props {
   etapaNome: string;
   currentUserId: number | null;
   accent: string;
+  radarOpcoes: string[];
   onClose: () => void;
   onCriado: (dados: unknown) => Promise<{ success: true } | { success: false; error: string }>;
 }
@@ -62,6 +63,7 @@ export default function NovoCardModal({
   etapaNome,
   currentUserId,
   accent,
+  radarOpcoes,
   onClose,
   onCriado,
 }: Props) {
@@ -72,6 +74,9 @@ export default function NovoCardModal({
   const [dropdownAberto, setDropdownAberto] = useState(false);
   const [usuarios, setUsuarios] = useState<UsuarioOpcao[]>([]);
   const [responsavelId, setResponsavelId] = useState<number | null>(currentUserId);
+  const [radarPretendido, setRadarPretendido] = useState("");
+  const [canalOrigem, setCanalOrigem] = useState("");
+  const [qualificacao, setQualificacao] = useState<"Qualificado" | "Sem qualificação" | "">("");
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [buscandoCnpj, setBuscandoCnpj] = useState(false);
@@ -131,7 +136,7 @@ export default function NovoCardModal({
   // O cadastro interno tem prioridade; só consultamos a Receita para CNPJ novo.
   async function buscarCnpjReceita(cnpjValor: string, requestId: number) {
     const cnpjLimpo = normalizarCNPJ(cnpjValor);
-    if (cnpjLimpo.length !== 14) return;
+    if (!cnpjEhValido(cnpjLimpo)) return;
     setErroBuscaCnpj(null);
     setBuscandoCnpj(true);
     try {
@@ -187,7 +192,7 @@ export default function NovoCardModal({
     setEmpresaSelecionada(null);
     setVinculoAutomatico(false);
     setErroBuscaCnpj(null);
-    if (cnpjLimpo.length === 14) {
+    if (cnpjEhValido(cnpjLimpo)) {
       void buscarCnpjReceita(cnpjLimpo, cnpjRequest.current);
     }
   }
@@ -212,11 +217,16 @@ export default function NovoCardModal({
   async function handleSalvar() {
     setErro(null);
 
+    const cnpj = empresaSelecionada?.cnpj ?? form.cnpj;
+    if (!cnpjEhValido(cnpj)) {
+      setErro("Informe um CNPJ válido com dígitos verificadores corretos.");
+      return;
+    }
+    if (!radarPretendido || !radarOpcoes.includes(radarPretendido)) {
+      setErro("Selecione uma opção válida em Radar pretendido.");
+      return;
+    }
     if (!empresaSelecionada) {
-      if (normalizarCNPJ(form.cnpj).length !== 14) {
-        setErro("Informe um CNPJ válido (14 dígitos).");
-        return;
-      }
       if (!form.razaoSocial.trim()) {
         setErro("Informe a razão social da empresa.");
         return;
@@ -244,6 +254,9 @@ export default function NovoCardModal({
         pipelineId,
         etapaId,
         responsavelId,
+        radarPretendido,
+        canalOrigem: canalOrigem.trim() || undefined,
+        qualificacao: qualificacao || undefined,
       });
       if (!resultado.success) setErro(resultado.error);
     } catch {
@@ -372,10 +385,30 @@ export default function NovoCardModal({
             </div>
           </FieldRow>
 
-          <FieldRow label="Responsável *" htmlFor="novo-card-responsavel">
+          <FieldRow label="Nome do responsável *" htmlFor="novo-card-responsavel">
             <select id="novo-card-responsavel" className={inputCls} value={responsavelId ?? ""} onChange={(e) => setResponsavelId(e.target.value ? Number(e.target.value) : null)}>
               <option value="">Selecione...</option>
               {usuarios.map((usuario) => <option key={usuario.id} value={usuario.id}>{usuario.nome}</option>)}
+            </select>
+          </FieldRow>
+
+          <FieldRow label="Radar pretendido *" htmlFor="novo-card-radar">
+            <select id="novo-card-radar" className={inputCls} value={radarPretendido} onChange={(e) => setRadarPretendido(e.target.value)} disabled={radarOpcoes.length === 0} required>
+              <option value="">Selecione...</option>
+              {radarOpcoes.map((opcao) => <option key={opcao} value={opcao}>{opcao}</option>)}
+            </select>
+            {radarOpcoes.length === 0 && <p role="status" className="text-[11px] text-amber-300">Configure as opções de Radar pretendido no editor do pipeline para cadastrar leads.</p>}
+          </FieldRow>
+
+          <FieldRow label="Canal de origem" htmlFor="novo-card-canal">
+            <input id="novo-card-canal" className={inputCls} value={canalOrigem} onChange={(e) => setCanalOrigem(e.target.value)} maxLength={120} placeholder="Informe o canal, se conhecido" />
+          </FieldRow>
+
+          <FieldRow label="Qualificação" htmlFor="novo-card-qualificacao">
+            <select id="novo-card-qualificacao" className={inputCls} value={qualificacao} onChange={(e) => setQualificacao(e.target.value as typeof qualificacao)}>
+              <option value="">Selecione...</option>
+              <option value="Qualificado">Qualificado</option>
+              <option value="Sem qualificação">Sem qualificação</option>
             </select>
           </FieldRow>
 

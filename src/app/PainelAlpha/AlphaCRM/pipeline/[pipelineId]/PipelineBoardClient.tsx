@@ -77,7 +77,29 @@ interface PipelineBpm {
   id: string;
   nome: string;
   etapas: EtapaBpm[];
+  campos?: {
+    nome: string;
+    tipo: string;
+    ativo: boolean;
+    opcoesJson: string | null;
+    opcoes: { rotulo: string; ativo: boolean }[];
+  }[];
   automacoesGlobais?: AutomacaoBoard[];
+}
+
+function opcoesRadarPretendido(pipeline: PipelineBpm): string[] {
+  const campo = pipeline.campos?.find((item) => item.ativo && item.nome.trim().toLocaleLowerCase("pt-BR") === "radar pretendido");
+  if (!campo) return [];
+  const opcoesAtivas = campo.opcoes.filter((opcao) => opcao.ativo && opcao.rotulo.trim()).map((opcao) => opcao.rotulo.trim());
+  if (campo.opcoes.length > 0 || !campo.opcoesJson) return opcoesAtivas;
+  try {
+    const opcoes: unknown = JSON.parse(campo.opcoesJson);
+    return Array.isArray(opcoes) && opcoes.every((opcao) => typeof opcao === "string" && opcao.trim())
+      ? opcoes.map((opcao: string) => opcao.trim())
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 export interface CardBpm {
@@ -89,6 +111,9 @@ export interface CardBpm {
   nolossLeadId: string | null;
   nolossEmail?: string | null;
   nolossTelefone?: string | null;
+  nolossUtmSource?: string | null;
+  nolossUtmMedium?: string | null;
+  veioNoloss?: boolean;
   createdAt: Date | string;
   primeiraVisualizacaoEm?: Date | string | null;
   proximoContatoEm?: Date | string | null;
@@ -214,9 +239,12 @@ export function KanbanCard({
   // Uma composição antiga/configurada na etapa seguinte não pode promover o
   // botão para Reunião Agendada, onde ficam apenas acompanhamento/transcrição.
   const agendarReuniao = etapaEhAgendarReuniao(etapaNome);
-  const naoAcessado = !card.primeiraVisualizacaoEm;
+  const naoAcessado = !ehLeadVirtual && !card.primeiraVisualizacaoEm;
   const alertaBoasVindas = !ehLeadVirtual && etapaEhBoasVindas(etapaNome) && naoAcessado;
   const canalOrigem = card.campoValores?.find((campo) => campo.campo.nome === "Canal de origem")?.valor;
+  const canalNoloss = card.nolossUtmSource?.trim() || card.nolossUtmMedium?.trim() || "NoLoss";
+  const qualificacao = card.campoValores?.find((campo) => campo.campo.nome === "Qualificação")?.valor?.trim();
+  const semCnpjNoloss = novosLeads && (ehLeadVirtual || card.veioNoloss) && !card.empresa.cnpj;
   const radarPretendido = card.campoValores?.find((campo) => campo.campo.nome === "Radar pretendido")?.valor;
   const resumoAlinhamento = card.campoValores?.find((campo) => campoEhResumoAlinhamento(campo.campo.nome))?.valor;
   const alertaAlinhamento = etapaEhAlinhamentoEstrategico(etapaNome) && !resumoAlinhamento?.trim();
@@ -252,7 +280,7 @@ export function KanbanCard({
         "relative select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
         encaminhado ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
         card.sla?.status === "ATRASADO" && "rounded-2xl ring-2 ring-rose-500/55 shadow-lg shadow-rose-950/40",
-        (alertaBoasVindas || alertaAlinhamento) && "animate-pulse",
+        (alertaBoasVindas || alertaAlinhamento || semCnpjNoloss) && "animate-pulse motion-reduce:animate-none",
         ehLeadVirtual
           ? "border-dashed border-sky-400/40 hover:border-sky-400/60"
           : alertaBoasVindas || alertaAlinhamento
@@ -277,6 +305,8 @@ export function KanbanCard({
         surfaceClassName={cn(
           statusConfig?.cardClassName,
           card.sla?.status === "ATRASADO" && "border-rose-500/60 bg-rose-950/20",
+          novosLeads && naoAcessado && "border-cyan-300/60 bg-cyan-950/20 ring-1 ring-cyan-300/30",
+          semCnpjNoloss && "border-amber-300/60 ring-2 ring-amber-300/50",
         )}
       >
         <div className="relative space-y-2.5">
@@ -361,7 +391,7 @@ export function KanbanCard({
               <div className="flex items-center gap-1.5 text-sm font-semibold leading-tight text-white">
                 {naoAcessado && (
                   <span
-                    className={cn("h-1.5 w-1.5 shrink-0 rounded-full animate-pulse", alertaBoasVindas ? "bg-red-400" : "bg-cyan-400")}
+                    className={cn("h-1.5 w-1.5 shrink-0 rounded-full animate-pulse motion-reduce:animate-none", alertaBoasVindas ? "bg-red-400" : "bg-cyan-400")}
                     title="Nunca acessado"
                   />
                 )}
@@ -401,6 +431,41 @@ export function KanbanCard({
           >
             <AlertTriangle size={13} aria-hidden="true" className="shrink-0 text-red-300" />
             <span>{alertaBoasVindas ? "Nunca acessado — requer atenção" : "Chamada de alinhamento pendente"}</span>
+          </div>
+        )}
+
+        {novosLeads && (naoAcessado || semCnpjNoloss) && (
+          <div className="flex flex-wrap gap-1.5" role="status">
+            {naoAcessado && (
+              <span className="rounded-lg border border-cyan-300/40 bg-cyan-400/15 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-cyan-100">
+                Nunca acessado
+              </span>
+            )}
+            {semCnpjNoloss && (
+              <span className="rounded-lg border border-amber-300/40 bg-amber-400/15 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-amber-100">
+                {ehLeadVirtual ? "CNPJ pendente · informe ao assumir" : "CNPJ pendente · abra para preencher"}
+              </span>
+            )}
+          </div>
+        )}
+
+        {novosLeads && (
+          <div className="flex flex-wrap gap-1.5" aria-label="Origem e qualificação do lead">
+            {(ehLeadVirtual || canalOrigem) && (
+              <span className="rounded-lg border border-sky-300/40 bg-sky-400/15 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-sky-100" title="Canal de origem">
+                Origem: {ehLeadVirtual ? canalNoloss : canalOrigem}
+              </span>
+            )}
+            {qualificacao && (
+              <span className={cn(
+                "rounded-lg border px-2 py-1 text-[9px] font-extrabold uppercase tracking-wide",
+                qualificacao.toLocaleLowerCase("pt-BR") === "qualificado"
+                  ? "border-emerald-300/50 bg-emerald-400/20 text-emerald-100"
+                  : "border-amber-300/50 bg-amber-400/20 text-amber-100",
+              )} title="Qualificação">
+                {qualificacao}
+              </span>
+            )}
           </div>
         )}
 
@@ -720,6 +785,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
   const etapaNovosLeads = primeiraEtapa && etapaEhNovosLeads(primeiraEtapa.nome)
     ? primeiraEtapa
     : undefined;
+  const radarOpcoes = useMemo(() => opcoesRadarPretendido(pipeline), [pipeline]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const idsColunas = useMemo(() => new Set(etapasOrdenadas.map((etapa) => etapa.id)), [etapasOrdenadas]);
@@ -1080,6 +1146,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
           pipelineId={pipeline.id}
           etapaId={etapaNovosLeads.id}
           etapaNome={etapaNovosLeads.nome}
+          radarOpcoes={radarOpcoes}
           currentUserId={currentUserId}
           accent={accent}
           onClose={() => setNovoCardAberto(false)}
@@ -1121,10 +1188,13 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
             nome: nolossLeadAberto.empresa.razaoSocial,
             email: nolossLeadAberto.nolossEmail ?? null,
             telefone: nolossLeadAberto.nolossTelefone ?? null,
+            utmSource: nolossLeadAberto.nolossUtmSource ?? null,
+            utmMedium: nolossLeadAberto.nolossUtmMedium ?? null,
             receivedAt: nolossLeadAberto.createdAt,
           }}
           pipelineId={pipeline.id}
           accent={accent}
+          radarOpcoes={radarOpcoes}
           currentUserId={currentUserId}
           onClose={() => setNolossLeadAberto(null)}
           onPromovido={async () => {
@@ -1132,11 +1202,14 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
             await recarregarCards();
             router.refresh();
           }}
-          onConfirmarPromocao={async (responsavelId) => {
+          onConfirmarPromocao={async (responsavelId, cnpj, radarPretendido, qualificacao) => {
             const res = await PromoverNolossLead({
               nolossLeadId: nolossLeadAberto.nolossLeadId ?? nolossLeadAberto.id,
               etapaDestinoId: nolossLeadAberto.etapaId,
               responsavelId,
+              cnpj,
+              radarPretendido,
+              qualificacao,
             });
             if (res.success) return { success: true as const };
             return { success: false as const, error: typeof res.error === "string" ? res.error : "Erro ao promover lead" };
@@ -1151,12 +1224,14 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
           etapaDestinoNome={promocaoLeadPendente.etapaDestinoNome}
           currentUserId={currentUserId}
           accent={accent}
+          radarOpcoes={radarOpcoes}
           onCancelar={() => setPromocaoLeadPendente(null)}
-          onConfirmar={async (responsavelId) => {
+          onConfirmar={async (responsavelId, radarPretendido) => {
             const res = await PromoverNolossLead({
               nolossLeadId: promocaoLeadPendente.nolossLeadId,
               etapaDestinoId: promocaoLeadPendente.etapaDestinoId,
               responsavelId,
+              radarPretendido,
             });
             if (res.success) {
               setPromocaoLeadPendente(null);

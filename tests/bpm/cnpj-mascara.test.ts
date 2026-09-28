@@ -202,7 +202,7 @@ describe("Integração — wiring dos consumidores visuais", () => {
       "src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/NovoCardModal.tsx",
     );
     expect(source).toContain(
-      'import { formatCNPJ, formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";',
+      'import { cnpjEhValido, formatCNPJ, formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";',
     );
     expect(source).not.toContain("function formatarCnpjInput");
     expect(source).toContain("formatarCNPJProgressivo(form.cnpj)");

@@ -5,8 +5,13 @@ import {
   calcularDiaCicloNovosLeads,
   calcularLigacoesPendentesNoDia,
   cicloNovosLeadsVencido,
+  cicloDeTentativasNovosLeadsConcluido,
   contarDiasUteisDecorridos,
+  datasUteisCicloNovosLeads,
+  oitoTentativasDiariasRegistradas,
+  ehDiaUtilNovosLeads,
   etapaEhNovosLeads,
+  etapaEhStandbyFollowUp,
   intervaloDiaCivilSaoPaulo,
 } from "@/lib/bpm/novos-leads";
 import {
@@ -19,6 +24,7 @@ describe("requisitos de Novos leads", () => {
     expect(etapaEhNovosLeads("Novo Lead")).toBe(true);
     expect(etapaEhNovosLeads("Novos leads")).toBe(true);
     expect(etapaEhNovosLeads("Sem viabilidade")).toBe(false);
+    expect(etapaEhStandbyFollowUp("Stand By")).toBe(true);
   });
 
   const campos = [
@@ -107,11 +113,32 @@ describe("cadência de oito dias úteis", () => {
 });
 
 describe("meta operacional de ligações", () => {
-  it("planeja somente as ligações faltantes sem ultrapassar a meta diária", () => {
-    expect(calcularLigacoesPendentesNoDia(0)).toBe(5);
-    expect(calcularLigacoesPendentesNoDia(3)).toBe(2);
-    expect(calcularLigacoesPendentesNoDia(5)).toBe(0);
-    expect(calcularLigacoesPendentesNoDia(8)).toBe(0);
+  it("planeja no máximo uma ligação por dia", () => {
+    expect(calcularLigacoesPendentesNoDia(0)).toBe(1);
+    expect(calcularLigacoesPendentesNoDia(1)).toBe(0);
+    expect(calcularLigacoesPendentesNoDia(3)).toBe(0);
+  });
+
+  it("exige registro em oito datas úteis distintas e ciclo concluído", () => {
+    const inicio = new Date("2026-08-03T13:00:00.000Z");
+    const datas = datasUteisCicloNovosLeads(inicio);
+    expect(datas).toEqual([
+      "2026-08-03", "2026-08-04", "2026-08-05", "2026-08-06",
+      "2026-08-07", "2026-08-10", "2026-08-11", "2026-08-12",
+    ]);
+    const ligacoes = datas.map((data) => new Date(`${data}T15:00:00.000Z`));
+    expect(oitoTentativasDiariasRegistradas(inicio, ligacoes)).toBe(true);
+    expect(oitoTentativasDiariasRegistradas(inicio, [...ligacoes.slice(0, 7), ligacoes[0]])).toBe(false);
+    expect(cicloDeTentativasNovosLeadsConcluido(inicio, new Date("2026-08-12T20:00:00.000Z"))).toBe(false);
+    expect(cicloDeTentativasNovosLeadsConcluido(inicio, new Date("2026-08-13T03:00:00.000Z"))).toBe(true);
+  });
+
+  it("exclui feriado nacional e fim de semana da cadência", () => {
+    const inicio = new Date("2026-09-04T15:00:00.000Z");
+    expect(ehDiaUtilNovosLeads(new Date("2026-09-07T15:00:00.000Z"))).toBe(false);
+    expect(datasUteisCicloNovosLeads(inicio).slice(0, 3)).toEqual([
+      "2026-09-04", "2026-09-08", "2026-09-09",
+    ]);
   });
 });
 

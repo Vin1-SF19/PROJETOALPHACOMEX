@@ -155,7 +155,7 @@ describe("automação mensal de Monitoramento", () => {
 
     const resumo = await executarAutomacaoFollowUpBpm(new Date("2026-08-31T12:00:00.000Z"));
 
-    expect(resumo.avisos).toContain("Etapa Standby - Follow Up não encontrada.");
+    expect(resumo.avisos).toContain("Etapa Stand By não encontrada.");
     expect(resumo.monitoramento).toMatchObject({ examinados: 1, tarefasCriadas: 1 });
   });
 });

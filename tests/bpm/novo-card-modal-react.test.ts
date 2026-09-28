@@ -33,6 +33,7 @@ beforeEach(async () => {
   root = createRoot(container);
   await act(async () => root.render(createElement(NovoCardModal, {
     pipelineId: "pipeline", etapaId: "etapa", etapaNome: "Novo Lead", currentUserId: 1, accent: "1,2,3",
+    radarOpcoes: ["Revisão de Radar Ilimitado"],
     onClose: vi.fn(), onCriado,
   })));
 });
@@ -47,7 +48,7 @@ it("não sobrescreve a razão social editada após iniciar a busca de CNPJ", asy
   let responder!: (value: Response) => void;
   globalThis.fetch = vi.fn(() => new Promise<Response>((resolve) => { responder = resolve; })) as typeof fetch;
 
-  await act(async () => editar("CNPJ", "12345678000195"));
+  await act(async () => editar("CNPJ", "11222333000181"));
   expect(globalThis.fetch).toHaveBeenCalledOnce();
   await act(async () => editar("Razão social", "Nome digitado"));
   await act(async () => responder({
@@ -68,17 +69,23 @@ it("vincula empresa existente automaticamente pelo CNPJ, sem consulta externa", 
   globalThis.fetch = fetchMock as typeof fetch;
   buscarPorCnpj.mockResolvedValueOnce({
     success: true,
-    data: { id: 42, cnpj: "12.345.678/0001-90", razaoSocial: "Empresa Cadastrada", nomeFantasia: "Fantasia", uf: "SP", municipio: "São Paulo" },
+    data: { id: 42, cnpj: "11.222.333/0001-81", razaoSocial: "Empresa Cadastrada", nomeFantasia: "Fantasia", uf: "SP", municipio: "São Paulo" },
   });
 
-  await act(async () => editar("CNPJ", "12345678000190"));
+  await act(async () => editar("CNPJ", "11222333000181"));
 
-  expect(buscarPorCnpj).toHaveBeenCalledWith("12345678000190");
+  expect(buscarPorCnpj).toHaveBeenCalledWith("11222333000181");
   expect(container.textContent).toContain("Empresa encontrada pelo CNPJ e vinculada automaticamente.");
   expect(document.querySelector<HTMLInputElement>('input[aria-label="Razão social"]')?.value).toBe("Empresa Cadastrada");
   expect(document.querySelector<HTMLInputElement>('input[aria-label="Nome fantasia"]')?.value).toBe("Fantasia");
   expect(document.querySelector<HTMLInputElement>('input[aria-label="Município"]')?.value).toBe("São Paulo");
   expect(fetchMock).not.toHaveBeenCalled();
+
+  await act(async () => {
+    const select = document.querySelector<HTMLSelectElement>("#novo-card-radar")!;
+    select.value = "Revisão de Radar Ilimitado";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
 
   await act(async () => {
     [...container.querySelectorAll("button")].find((button) => button.textContent === "Criar Card")?.click();
@@ -90,9 +97,9 @@ it("ignora resposta antiga quando o CNPJ muda durante a consulta", async () => {
   let responder!: (value: unknown) => void;
   buscarPorCnpj.mockImplementationOnce(() => new Promise((resolve) => { responder = resolve; }));
 
-  await act(async () => editar("CNPJ", "12345678000190"));
+  await act(async () => editar("CNPJ", "11222333000181"));
   await act(async () => editar("CNPJ", "123"));
-  await act(async () => responder({ success: true, data: { id: 42, cnpj: "12345678000190", razaoSocial: "Empresa antiga", nomeFantasia: null, uf: null, municipio: null } }));
+  await act(async () => responder({ success: true, data: { id: 42, cnpj: "11222333000181", razaoSocial: "Empresa antiga", nomeFantasia: null, uf: null, municipio: null } }));
 
   expect(container.textContent).not.toContain("Empresa encontrada pelo CNPJ");
   expect(document.querySelector<HTMLInputElement>('input[aria-label="Razão social"]')?.value).toBe("");

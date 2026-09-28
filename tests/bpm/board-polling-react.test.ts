@@ -87,6 +87,29 @@ it("remove card arquivado em outra sessão após 30 segundos sem Pusher", async 
   }
 });
 
+it("destaca CNPJ pendente em card real promovido do NoLoss na coluna Novos Leads", async () => {
+  Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
+  const { container, root, props } = montarBoard();
+  props.pipeline.etapas = [{ id: "etapa-1", nome: "Novos leads", ordem: 0 }];
+  props.cardsIniciais = [
+    { ...card, veioNoloss: true, primeiraVisualizacaoEm: new Date("2026-09-28T12:00:00Z") },
+    { ...card, id: "outro-card", empresa: { ...card.empresa, razaoSocial: "Outro lead" },
+      primeiraVisualizacaoEm: new Date("2026-09-28T12:00:00Z") },
+  ];
+  try {
+    await act(async () => root.render(h(PipelineBoardClient, props)));
+    const leadNoloss = container.querySelector<HTMLElement>('[aria-label="Empresa"]');
+    const outroLead = container.querySelector<HTMLElement>('[aria-label="Outro lead"]');
+    expect(leadNoloss?.className).toContain("animate-pulse");
+    expect(leadNoloss?.className).toContain("motion-reduce:animate-none");
+    expect(leadNoloss?.textContent).toContain("CNPJ pendente · abra para preencher");
+    expect(outroLead?.textContent).not.toContain("CNPJ pendente");
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+  }
+});
+
 it("para o polling ao desmontar o board", async () => {
   Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
   vi.useFakeTimers();

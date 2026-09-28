@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { STATUS_POS_FECHAMENTO_CODIGOS } from "@/lib/bpm/status-pos-fechamento";
 import { BPM_TAREFA_TIPOS } from "@/lib/bpm/tarefas-tipo";
-import { normalizarCNPJ } from "@/lib/format-cnpj";
+import { cnpjEhValido, normalizarCNPJ } from "@/lib/format-cnpj";
 
 export const BPM_CARD_STATUS = ["ATIVO", "CONCLUIDO", "CANCELADO"] as const;
 
@@ -344,6 +344,9 @@ export const criarCardSchema = z.object({
   pipelineId: z.string().cuid(),
   etapaId: etapaIdCardSchema,
   responsavelId: z.number().int().positive(),
+  radarPretendido: z.string().trim().min(1).max(120).optional(),
+  canalOrigem: z.string().trim().max(120).optional(),
+  qualificacao: z.enum(["Qualificado", "Sem qualificação"]).optional(),
   // Fase 3 (RM-2026-54DC86): omitido, `servico` é derivado do nome do pipeline em CriarCardBpm.
   // RM-2026-97934A: informado explicitamente por callers que já sabem o serviço de origem
   // (ex: Indicacao.servicoIndicado) — quando ausente, mantém o fallback do nome do pipeline.
@@ -440,6 +443,11 @@ export const promoverNolossLeadSchema = z.object({
   nolossLeadId: z.string().cuid(),
   etapaDestinoId: etapaIdCardSchema,
   responsavelId: z.number().int().positive(),
+  radarPretendido: z.string().trim().min(1).max(120).optional(),
+  qualificacao: z.enum(["Qualificado", "Sem qualificação"]).optional(),
+  cnpj: z.string().trim().optional()
+    .refine((valor) => !valor || (valor.replace(/\D/g, "").length === 14 && cnpjEhValido(valor)), "CNPJ inválido")
+    .transform((valor) => valor ? normalizarCNPJ(valor) : undefined),
 });
 
 export const criarVinculoCardSchema = z.object({

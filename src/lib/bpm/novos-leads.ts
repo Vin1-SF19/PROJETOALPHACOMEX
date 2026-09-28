@@ -4,14 +4,15 @@ import {
   inicioDoDia,
   parsearDataCivil,
 } from "@/components/CalendarioAlpha/lib/datas";
+import { feriadosNacionais } from "@/lib/commissions/holidays-seed";
 
-export const NOME_ETAPA_NOVOS_LEADS = "Novos leads";
-export const NOME_ETAPA_STANDBY = "Standby - Follow Up";
-export const META_LIGACOES_NOVOS_LEADS = 5;
+export const NOME_ETAPA_NOVOS_LEADS = "Novo Lead";
+export const NOME_ETAPA_STANDBY = "Stand By";
+export const META_LIGACOES_NOVOS_LEADS = 1;
 export const TOTAL_DIAS_UTEIS_CICLO_NOVOS_LEADS = 8;
 export const INTERVALO_DIAS_STANDBY_FOLLOW_UP = 7;
 export const AUTOMACAO_ORIGEM_NOVOS_LEADS = "novos_leads_8_dias_uteis";
-export const AUTOMACAO_ORIGEM_LIGACOES_NOVOS_LEADS = "novos_leads_5_ligacoes_diarias";
+export const AUTOMACAO_ORIGEM_LIGACOES_NOVOS_LEADS = "novos_leads_1_ligacao_diaria";
 export const ACAO_LIGACOES_NOVOS_LEADS_PLANEJADAS = "NOVOS_LEADS_LIGACOES_PLANEJADAS";
 export const CRIAR_CARD_DESTINO_INVALIDO_MENSAGEM =
   "Novos cards só podem ser criados na etapa Novos Leads.";
@@ -25,11 +26,12 @@ export function normalizarNomeEtapa(nome: string): string {
 export function etapaEhNovosLeads(nome: string): boolean {
   const nomeNormalizado = normalizarNomeEtapa(nome);
   return nomeNormalizado === normalizarNomeEtapa(NOME_ETAPA_NOVOS_LEADS)
-    || nomeNormalizado === "novo lead";
+    || nomeNormalizado === "novos leads";
 }
 
 export function etapaEhStandbyFollowUp(nome: string): boolean {
-  return normalizarNomeEtapa(nome) === normalizarNomeEtapa(NOME_ETAPA_STANDBY);
+  return normalizarNomeEtapa(nome) === normalizarNomeEtapa(NOME_ETAPA_STANDBY)
+    || normalizarNomeEtapa(nome) === "standby - follow up";
 }
 
 export function intervaloDiaCivilSaoPaulo(agora = new Date()): {
@@ -40,11 +42,44 @@ export function intervaloDiaCivilSaoPaulo(agora = new Date()): {
   return { inicio, fim: adicionarDias(inicio, 1) };
 }
 
-function ehDiaUtil(data: Date): boolean {
+const feriadosPorAno = new Map<number, Set<string>>();
+
+export function ehDiaUtilNovosLeads(data: Date): boolean {
   const dataCivil = formatarDataCivil(data);
   const pseudoUtc = new Date(`${dataCivil}T00:00:00.000Z`);
   const diaDaSemana = pseudoUtc.getUTCDay();
-  return diaDaSemana >= 1 && diaDaSemana <= 5;
+  if (diaDaSemana < 1 || diaDaSemana > 5) return false;
+  const ano = pseudoUtc.getUTCFullYear();
+  let feriados = feriadosPorAno.get(ano);
+  if (!feriados) {
+    feriados = new Set(feriadosNacionais(ano).map((feriado) => feriado.data));
+    feriadosPorAno.set(ano, feriados);
+  }
+  return !feriados.has(dataCivil);
+}
+
+/** As oito datas úteis disponíveis para as tentativas, incluindo a criação se útil. */
+export function datasUteisCicloNovosLeads(inicio: Date): string[] {
+  const primeiroDia = parsearDataCivil(formatarDataCivil(inicio));
+  if (!primeiroDia) return [];
+  const datas: string[] = [];
+  for (let cursor = primeiroDia; datas.length < TOTAL_DIAS_UTEIS_CICLO_NOVOS_LEADS; cursor = adicionarDias(cursor, 1)) {
+    if (ehDiaUtilNovosLeads(cursor)) datas.push(formatarDataCivil(cursor));
+  }
+  return datas;
+}
+
+/** O ciclo termina na virada civil depois da oitava data útil. */
+export function cicloDeTentativasNovosLeadsConcluido(inicio: Date, agora = new Date()): boolean {
+  const datas = datasUteisCicloNovosLeads(inicio);
+  return datas.length === TOTAL_DIAS_UTEIS_CICLO_NOVOS_LEADS
+    && formatarDataCivil(agora) > datas[datas.length - 1];
+}
+
+export function oitoTentativasDiariasRegistradas(inicio: Date, interacoes: Date[]): boolean {
+  const datas = new Set(datasUteisCicloNovosLeads(inicio));
+  const registradas = new Set(interacoes.map(formatarDataCivil).filter((data) => datas.has(data)));
+  return registradas.size === TOTAL_DIAS_UTEIS_CICLO_NOVOS_LEADS;
 }
 
 /**
@@ -62,7 +97,7 @@ export function contarDiasUteisDecorridos(inicio: Date, fim = new Date()): numbe
     cursor <= fimCivil;
     cursor = adicionarDias(cursor, 1)
   ) {
-    if (ehDiaUtil(cursor)) total += 1;
+    if (ehDiaUtilNovosLeads(cursor)) total += 1;
   }
   return total;
 }

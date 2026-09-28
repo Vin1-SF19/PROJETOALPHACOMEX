@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.hoisted(() => vi.fn());
 const exigirAcessoBpmPipelineMock = vi.hoisted(() => vi.fn());
+const exigirAcessoBpmCardMock = vi.hoisted(() => vi.fn());
 const usuarioElegivelResponsavelBpmMock = vi.hoisted(() => vi.fn());
 const notificarPipelineBpmMock = vi.hoisted(() => vi.fn());
 
@@ -10,8 +11,11 @@ const prismaMock = vi.hoisted(() => ({
   bpmEtapa: { findFirst: vi.fn() },
   usuarios: { findUnique: vi.fn() },
   nolossLead: { findUnique: vi.fn(), updateMany: vi.fn(), update: vi.fn() },
-  cliente: { create: vi.fn() },
-  bpmCard: { create: vi.fn() },
+  cliente: { create: vi.fn(), findUnique: vi.fn(), updateMany: vi.fn() },
+  bpmCard: { create: vi.fn(), findUnique: vi.fn() },
+  bpmCardHistorico: { create: vi.fn() },
+  bpmCampo: { findMany: vi.fn() },
+  bpmCardCampoValor: { create: vi.fn() },
   $transaction: vi.fn(),
 }));
 
@@ -20,12 +24,14 @@ vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/bpm/cadencias/ativacao-automatica", () => ({ ativarCadenciasNaEntradaBpm: vi.fn().mockResolvedValue({ alteradas: 0 }) }));
 vi.mock("@/lib/bpm/realtime-server", () => ({ notificarPipelineBpm: notificarPipelineBpmMock }));
+vi.mock("@/lib/bpm/requisitos-etapa-server", () => ({ verificarTransicaoPermitidaBpm: vi.fn().mockResolvedValue({ permitida: true }) }));
 vi.mock("@/lib/bpm/ownership", () => ({
+  exigirAcessoBpmCard: exigirAcessoBpmCardMock,
   exigirAcessoBpmPipeline: exigirAcessoBpmPipelineMock,
   usuarioElegivelResponsavelBpm: usuarioElegivelResponsavelBpmMock,
 }));
 
-import { PromoverNolossLead } from "@/actions/bpm/NolossLeads";
+import { PreencherCnpjCardNoloss, PromoverNolossLead } from "@/actions/bpm/NolossLeads";
 
 const NOLOSS_LEAD_ID = "clw0000000000000lead";
 const ETAPA_ID = "clw0000000000000etap";
@@ -41,9 +47,15 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
     vi.clearAllMocks();
     authMock.mockResolvedValue({ user: { id: "7" } });
     exigirAcessoBpmPipelineMock.mockResolvedValue(undefined);
+    exigirAcessoBpmCardMock.mockResolvedValue(undefined);
     usuarioElegivelResponsavelBpmMock.mockResolvedValue(true);
     prismaMock.bpmPipeline.findFirst.mockResolvedValue({ id: PIPELINE_ID });
-    prismaMock.bpmEtapa.findFirst.mockResolvedValue({ id: ETAPA_ID, visibilidades: [] });
+    prismaMock.bpmEtapa.findFirst.mockResolvedValue({ id: ETAPA_ID, nome: "Novo Lead", visibilidades: [] });
+    prismaMock.bpmCampo.findMany.mockResolvedValue([
+      { id: "radar", nome: "Radar pretendido", tipo: "selecao", opcoesJson: null, opcoes: [{ rotulo: "Revisão de Radar Ilimitado" }] },
+      { id: "canal", nome: "Canal de origem", tipo: "texto", opcoesJson: null, opcoes: [] },
+      { id: "qualificacao", nome: "Qualificação", tipo: "selecao", opcoesJson: null, opcoes: [] },
+    ]);
     prismaMock.usuarios.findUnique.mockResolvedValue({ role: "COMERCIAL" });
     mockTransacaoFeliz();
   });
@@ -63,6 +75,7 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
       nolossLeadId: NOLOSS_LEAD_ID,
       etapaDestinoId: ETAPA_ID,
       responsavelId: 7,
+      radarPretendido: "Revisão de Radar Ilimitado",
     });
 
     expect(resultado).toEqual({ success: true, data: { cardId: "card-1" } });
@@ -96,7 +109,7 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
   });
 
   it("promove o lead para uma etapa criada pela UI", async () => {
-    prismaMock.bpmEtapa.findFirst.mockResolvedValue({ id: ETAPA_UI_ID, visibilidades: [] });
+    prismaMock.bpmEtapa.findFirst.mockResolvedValue({ id: ETAPA_UI_ID, nome: "Agendar Reunião", visibilidades: [] });
     prismaMock.nolossLead.findUnique.mockResolvedValue({
       id: NOLOSS_LEAD_ID, status: "pending", nome: "Lead Teste", email: null,
     });
@@ -108,6 +121,7 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
       nolossLeadId: NOLOSS_LEAD_ID,
       etapaDestinoId: ETAPA_UI_ID,
       responsavelId: 7,
+      radarPretendido: "Revisão de Radar Ilimitado",
     });
 
     expect(resultado.success).toBe(true);
@@ -131,6 +145,7 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
       nolossLeadId: NOLOSS_LEAD_ID,
       etapaDestinoId: ETAPA_ID,
       responsavelId: 7,
+      radarPretendido: "Revisão de Radar Ilimitado",
     });
 
     expect(resultado).toEqual({ success: false, error: "Lead não encontrado ou já processado" });
@@ -145,6 +160,7 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
       nolossLeadId: NOLOSS_LEAD_ID,
       etapaDestinoId: ETAPA_ID,
       responsavelId: 7,
+      radarPretendido: "Revisão de Radar Ilimitado",
     });
 
     expect(resultado).toEqual({ success: false, error: "Lead não encontrado ou já processado" });
@@ -165,6 +181,7 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
       nolossLeadId: NOLOSS_LEAD_ID,
       etapaDestinoId: ETAPA_ID,
       responsavelId: 7,
+      radarPretendido: "Revisão de Radar Ilimitado",
     });
 
     expect(resultado).toEqual({ success: false, error: "Lead não encontrado ou já processado" });
@@ -179,6 +196,7 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
       nolossLeadId: NOLOSS_LEAD_ID,
       etapaDestinoId: ETAPA_ID,
       responsavelId: 7,
+      radarPretendido: "Revisão de Radar Ilimitado",
     });
 
     expect(resultado).toEqual({ success: false, error: "Pipeline Revisão de Radar não encontrado" });
@@ -192,6 +210,7 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
       nolossLeadId: NOLOSS_LEAD_ID,
       etapaDestinoId: ETAPA_ID,
       responsavelId: 7,
+      radarPretendido: "Revisão de Radar Ilimitado",
     });
 
     expect(resultado).toEqual({ success: false, error: "Etapa de destino inválida" });
@@ -201,6 +220,7 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
   it("rejeita promoção quando o perfil não pode agir na etapa de destino", async () => {
     prismaMock.bpmEtapa.findFirst.mockResolvedValue({
       id: ETAPA_ID,
+      nome: "Novo Lead",
       visibilidades: [{ perfil: "COMERCIAL", podeVer: true, podeAgir: false }],
     });
 
@@ -208,6 +228,7 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
       nolossLeadId: NOLOSS_LEAD_ID,
       etapaDestinoId: ETAPA_ID,
       responsavelId: 7,
+      radarPretendido: "Revisão de Radar Ilimitado",
     });
 
     expect(resultado).toEqual({
@@ -224,6 +245,7 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
       nolossLeadId: NOLOSS_LEAD_ID,
       etapaDestinoId: ETAPA_ID,
       responsavelId: 999,
+      radarPretendido: "Revisão de Radar Ilimitado",
     });
 
     expect(resultado).toEqual({ success: false, error: "Responsável inválido para este pipeline." });
@@ -237,6 +259,7 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
       nolossLeadId: NOLOSS_LEAD_ID,
       etapaDestinoId: ETAPA_ID,
       responsavelId: 7,
+      radarPretendido: "Revisão de Radar Ilimitado",
     });
 
     expect(resultado).toEqual({ success: false, error: "Não autorizado" });
@@ -248,6 +271,7 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
       nolossLeadId: "invalido",
       etapaDestinoId: ETAPA_ID,
       responsavelId: 7,
+      radarPretendido: "Revisão de Radar Ilimitado",
     });
 
     expect(resultado.success).toBe(false);
@@ -269,6 +293,7 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
       nolossLeadId: NOLOSS_LEAD_ID,
       etapaDestinoId: ETAPA_ID,
       responsavelId: 7,
+      radarPretendido: "Revisão de Radar Ilimitado",
     });
 
     expect(prismaMock.cliente.create).toHaveBeenCalledWith({
@@ -292,11 +317,58 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
       nolossLeadId: NOLOSS_LEAD_ID,
       etapaDestinoId: ETAPA_ID,
       responsavelId: 7,
+      radarPretendido: "Revisão de Radar Ilimitado",
     });
 
     expect(prismaMock.cliente.create).toHaveBeenCalledWith({
       data: { razaoSocial: "so-email@teste.com", cnpj: null, status: "ATIVO" },
       select: { id: true },
     });
+  });
+});
+
+describe("PreencherCnpjCardNoloss", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authMock.mockResolvedValue({ user: { id: "7", role: "COMERCIAL" } });
+    exigirAcessoBpmCardMock.mockResolvedValue(undefined);
+    mockTransacaoFeliz();
+    prismaMock.bpmCard.findUnique.mockResolvedValue({
+      empresaId: 501,
+      pipelineId: PIPELINE_ID,
+      empresa: { cnpj: null },
+      pipeline: { nome: "Revisão de Radar" },
+      nolossLeadOrigem: [{ id: NOLOSS_LEAD_ID }],
+    });
+    prismaMock.cliente.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.bpmCardHistorico.create.mockResolvedValue({});
+  });
+
+  it("recusa CNPJ inválido antes de consultar o card", async () => {
+    expect(await PreencherCnpjCardNoloss("card-1", "11.111.111/1111-11"))
+      .toEqual({ success: false, error: "Informe um CNPJ válido." });
+    expect(prismaMock.bpmCard.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("recusa card que não tem origem NoLoss", async () => {
+    prismaMock.bpmCard.findUnique.mockResolvedValueOnce({
+      empresaId: 501, pipelineId: PIPELINE_ID, empresa: { cnpj: null },
+      pipeline: { nome: "Revisão de Radar" }, nolossLeadOrigem: [],
+    });
+    expect(await PreencherCnpjCardNoloss("card-1", "11.222.333/0001-81"))
+      .toEqual({ success: false, error: "Card de origem NoLoss não encontrado." });
+    expect(prismaMock.cliente.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("salva CNPJ opcional de card NoLoss e registra histórico sem expor o número", async () => {
+    expect(await PreencherCnpjCardNoloss("card-1", "11.222.333/0001-81"))
+      .toEqual({ success: true });
+    expect(prismaMock.cliente.updateMany).toHaveBeenCalledWith({
+      where: { id: 501, cnpj: null }, data: { cnpj: "11222333000181" },
+    });
+    expect(prismaMock.bpmCardHistorico.create).toHaveBeenCalledWith({ data: {
+      cardId: "card-1", acao: "CNPJ_PREENCHIDO_NOLOSS", usuarioId: 7,
+      valorNovoJson: "{\"preenchido\":true}",
+    } });
   });
 });

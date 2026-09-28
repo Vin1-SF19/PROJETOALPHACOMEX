@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, XIcon } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 
@@ -31,6 +31,7 @@ import { formularioPossuiTarget } from "@/lib/bpm/formulario-renderer";
 import { BPM_CAPABILITIES } from "@/lib/bpm/ontology";
 import { CardAbertoLayout } from "./CardAbertoLayout";
 import { useCardSave } from "./CardSaveContext";
+const PreencherCnpjNoloss = lazy(() => import("./PreencherCnpjNoloss").then((modulo) => ({ default: modulo.PreencherCnpjNoloss })));
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type EtapaOpcao = { id: string; chave?: string | null; nome: string; ordem: number; script: string | null };
@@ -289,6 +290,9 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
                 }}
                 onInteracaoCriada={(nova) => setInteracoes((prev) => [nova, ...prev])}
               >
+                {card.pipeline.nome === "Revisão de Radar" && card.nolossLeadOrigem.length > 0
+                  && !card.empresa.cnpj && podeEditar
+                  && <Suspense fallback={null}><PreencherCnpjNoloss cardId={card.id} onAtualizado={handleAtualizado} /></Suspense>}
                 <PainelRegistrar card={card} etapaAtual={etapaAtual} accent={accent}
                   podeEditar={podeEditar} realtimeRevision={realtimeRevision}
                   currentUserRole={currentUserRole}

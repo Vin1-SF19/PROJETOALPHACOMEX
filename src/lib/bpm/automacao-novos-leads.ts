@@ -15,16 +15,21 @@ import {
   ACAO_LIGACOES_NOVOS_LEADS_PLANEJADAS,
   AUTOMACAO_ORIGEM_LIGACOES_NOVOS_LEADS,
   AUTOMACAO_ORIGEM_NOVOS_LEADS,
-  calcularDiaCicloNovosLeads,
   calcularLigacoesPendentesNoDia,
   cicloNovosLeadsVencido,
+  cicloDeTentativasNovosLeadsConcluido,
+  datasUteisCicloNovosLeads,
+  oitoTentativasDiariasRegistradas,
+  ehDiaUtilNovosLeads,
+  etapaEhNovosLeads,
+  etapaEhStandbyFollowUp,
   followUpStandbyEstaVencido,
   intervaloDiaCivilSaoPaulo,
-  META_LIGACOES_NOVOS_LEADS,
   NOME_ETAPA_NOVOS_LEADS,
   NOME_ETAPA_STANDBY,
   TOTAL_DIAS_UTEIS_CICLO_NOVOS_LEADS,
 } from "@/lib/bpm/novos-leads";
+import { formatarDataCivil } from "@/components/CalendarioAlpha/lib/datas";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import {
@@ -245,7 +250,7 @@ async function executarAutomacaoMonitoramentoBpm(params: {
 }
 
 /**
- * Planeja as ligações restantes do dia para Novos Leads. Uma ligação só é
+ * Planeja uma ligação por dia útil para Novo Lead. Uma ligação só é
  * considerada realizada quando existe uma interação LIGACAO; a automação cria
  * tarefas operacionais, jamais uma ligação ou mensagem externa por conta própria.
  */
@@ -270,6 +275,10 @@ async function executarAutomacaoLigacoesNovosLeadsBpm(params: {
   resumo.examinados = cards.length;
   if (cards.length === 0) return;
 
+  if (!ehDiaUtilNovosLeads(agora)) {
+    resumo.ignorados = cards.length;
+    return;
+  }
   const [interacoes, execucoesHoje] = await Promise.all([
     db.bpmInteracaoCard.findMany({
       where: {
@@ -295,7 +304,8 @@ async function executarAutomacaoLigacoesNovosLeadsBpm(params: {
   const cardsJaPlanejados = new Set(execucoesHoje.map((execucao) => execucao.cardId));
 
   for (const card of cards) {
-    if (cicloNovosLeadsVencido(card.createdAt, agora) || cardsJaPlanejados.has(card.id)) {
+    if (!datasUteisCicloNovosLeads(card.createdAt).includes(formatarDataCivil(agora))
+      || cardsJaPlanejados.has(card.id)) {
       resumo.ignorados += 1;
       continue;
     }
@@ -308,7 +318,7 @@ async function executarAutomacaoLigacoesNovosLeadsBpm(params: {
       continue;
     }
 
-    const diaCiclo = calcularDiaCicloNovosLeads(card.createdAt, agora);
+    const diaCiclo = datasUteisCicloNovosLeads(card.createdAt).indexOf(formatarDataCivil(agora)) + 1;
     try {
       const resultado = await db.$transaction(async (tx) => {
         const atualizacao = await tx.bpmCard.updateMany({
@@ -324,11 +334,10 @@ async function executarAutomacaoLigacoesNovosLeadsBpm(params: {
         });
         if (atualizacao.count !== 1) return null;
 
-        const tarefas = await Promise.all(
-          Array.from({ length: restantes }, (_, indice) => tx.bpmTarefa.create({
+        const tarefa = await tx.bpmTarefa.create({
             data: {
               cardId: card.id,
-              titulo: `Ligação ${realizadas + indice + 1} de ${META_LIGACOES_NOVOS_LEADS} — Novos Leads`,
+              titulo: `Ligação do dia ${diaCiclo} de ${TOTAL_DIAS_UTEIS_CICLO_NOVOS_LEADS} — Novo Lead`,
               descricao: `Tentativa operacional do dia ${diaCiclo} do ciclo de ${TOTAL_DIAS_UTEIS_CICLO_NOVOS_LEADS} dias úteis. Registre o resultado como interação de ligação no card.`,
               responsavelId: card.responsavelId,
               prazo: agora,
@@ -338,8 +347,7 @@ async function executarAutomacaoLigacoesNovosLeadsBpm(params: {
               status: "PENDENTE",
             },
             select: { id: true },
-          })),
-        );
+          });
         await tx.bpmCardHistorico.create({
           data: {
             cardId: card.id,
@@ -348,12 +356,12 @@ async function executarAutomacaoLigacoesNovosLeadsBpm(params: {
             valorNovoJson: JSON.stringify({
               diaCiclo,
               ligacoesRegistradas: realizadas,
-              tarefasCriadas: tarefas.map((tarefa) => tarefa.id),
+              tarefasCriadas: [tarefa.id],
               dataCivilInicio: inicio.toISOString(),
             }),
           },
         });
-        return tarefas.length;
+        return 1;
       });
       if (resultado === null) {
         resumo.ignorados += 1;
@@ -401,9 +409,11 @@ export async function executarAutomacaoFollowUpBpm(
           nome: {
             in: [
               NOME_ETAPA_NOVOS_LEADS,
+              "Novos leads",
               NOME_ETAPA_AGENDAR_REUNIAO,
               NOME_ETAPA_REUNIAO_AGENDADA,
               NOME_ETAPA_STANDBY,
+              "Standby - Follow Up",
               NOME_ETAPA_MONITORAMENTO,
             ],
           },
@@ -420,9 +430,9 @@ export async function executarAutomacaoFollowUpBpm(
   }
   resumo.pipelineId = pipeline.id;
 
-  const destino = pipeline.etapas.find((etapa) => etapa.nome === NOME_ETAPA_STANDBY);
+  const destino = pipeline.etapas.find((etapa) => etapaEhStandbyFollowUp(etapa.nome));
   if (!destino) {
-    resumo.avisos.push("Etapa Standby - Follow Up não encontrada.");
+    resumo.avisos.push(`Etapa ${NOME_ETAPA_STANDBY} não encontrada.`);
     await executarAutomacaoMonitoramentoBpm({
       pipeline,
       agora,
@@ -449,7 +459,9 @@ export async function executarAutomacaoFollowUpBpm(
       validarRequisitos: false,
     },
   ].flatMap((configuracao) => {
-    const etapa = pipeline.etapas.find((item) => item.nome === configuracao.nome);
+    const etapa = pipeline.etapas.find((item) => configuracao.nome === NOME_ETAPA_NOVOS_LEADS
+      ? etapaEhNovosLeads(item.nome)
+      : item.nome === configuracao.nome);
     if (!etapa) {
       resumo.avisos.push(`Etapa ${configuracao.nome} não encontrada.`);
       return [];
@@ -484,6 +496,27 @@ export async function executarAutomacaoFollowUpBpm(
     historicosPorCard.set(historico.cardId, lista);
   }
 
+  const cardsNovosLeads = cards.filter((card) => configuracoes.some((configuracao) =>
+    configuracao.nome === NOME_ETAPA_NOVOS_LEADS && configuracao.id === card.etapaId));
+  const interacoesDoCiclo = cardsNovosLeads.length > 0
+    ? await db.bpmInteracaoCard.findMany({
+        where: {
+          cardId: { in: cardsNovosLeads.map((card) => card.id) },
+          tipo: "LIGACAO",
+          createdAt: { lt: intervaloDiaCivilSaoPaulo(agora).inicio },
+        },
+        select: { cardId: true, createdAt: true },
+      })
+    : [];
+  const interacoesPorCard = new Map<string, Date[]>();
+  const criacaoPorCard = new Map(cardsNovosLeads.map((card) => [card.id, card.createdAt]));
+  for (const interacao of interacoesDoCiclo) {
+    if (interacao.createdAt < (criacaoPorCard.get(interacao.cardId) ?? agora)) continue;
+    const datas = interacoesPorCard.get(interacao.cardId) ?? [];
+    datas.push(interacao.createdAt);
+    interacoesPorCard.set(interacao.cardId, datas);
+  }
+
   for (const configuracao of configuracoes) {
     const resumoEtapa = criarResumoEtapa(configuracao.nome);
     resumo.porEtapa.push(resumoEtapa);
@@ -498,7 +531,10 @@ export async function executarAutomacaoFollowUpBpm(
             card.createdAt,
             historicosPorCard.get(card.id) ?? [],
           );
-      return cicloNovosLeadsVencido(inicioCiclo, agora);
+      return configuracao.nome === NOME_ETAPA_NOVOS_LEADS
+        ? cicloDeTentativasNovosLeadsConcluido(inicioCiclo, agora)
+          && oitoTentativasDiariasRegistradas(inicioCiclo, interacoesPorCard.get(card.id) ?? [])
+        : cicloNovosLeadsVencido(inicioCiclo, agora);
     });
     resumoEtapa.elegiveis = elegiveis.length;
     resumoEtapa.ignorados = cardsEtapa.length - elegiveis.length;
@@ -512,7 +548,7 @@ export async function executarAutomacaoFollowUpBpm(
       if (!transicaoPermitida.permitida) {
         resumoEtapa.ignorados += elegiveis.length;
         resumo.avisos.push(
-          `Cards de ${configuracao.nome} não movidos para Standby - Follow Up: ${transicaoPermitida.motivo ?? "transição não permitida."}`,
+          `Cards de ${configuracao.nome} não movidos para ${NOME_ETAPA_STANDBY}: ${transicaoPermitida.motivo ?? "transição não permitida."}`,
         );
         continue;
       }

@@ -11,7 +11,7 @@ import {
   moverCardSchema,
   salvarRequisitosEMoverCardSchema,
 } from "@/lib/validations/bpm";
-import { formatCNPJ, normalizarCNPJ } from "@/lib/format-cnpj";
+import { cnpjEhValido, formatCNPJ, normalizarCNPJ } from "@/lib/format-cnpj";
 import {
   exigirAcessoBpmCard,
   exigirAcessoBpmPipeline,
@@ -218,6 +218,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
         dataReuniao: true,
         googleMeetLink: true,
         statusPosFechamento: true,
+        nolossLeadOrigem: { select: { id: true }, take: 1 },
         vinculosOrigem: {
           where: { cardDestino: { pipeline: { ativo: true }, status: { not: "ARQUIVADO" } } },
           select: { cardDestino: { select: { id: true, pipelineId: true,
@@ -250,7 +251,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
           where: {
             campo: {
               OR: [
-                { nome: { in: ["Canal de origem", "Resumo da reunião", "Radar pretendido"] } },
+                { nome: { in: ["Canal de origem", "Resumo da reunião", "Radar pretendido", "Qualificação"] } },
                 ...(campoIdsConfigurados.length ? [{ id: { in: campoIdsConfigurados } }] : []),
               ],
             },
@@ -490,6 +491,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
         sla,
         origem: "real" as const,
         nolossLeadId: null as string | null,
+        veioNoloss: card.nolossLeadOrigem.length > 0,
         ligacoesHoje: ehNovoLead ? (ligacoesPorCard.get(card.id) ?? 0) : 0,
         metaLigacoesDia: META_LIGACOES_NOVOS_LEADS,
         diasUteisDecorridos: ehNovoLead
@@ -565,6 +567,9 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
           nolossLeadId: lead.id,
           nolossEmail: lead.email,
           nolossTelefone: lead.telefone,
+          nolossUtmSource: lead.utmSource,
+          nolossUtmMedium: lead.utmMedium,
+          nolossUtmCampaign: lead.utmCampaign,
           ligacoesHoje: 0,
           metaLigacoesDia: META_LIGACOES_NOVOS_LEADS,
           diasUteisDecorridos: 0,
@@ -657,6 +662,7 @@ export async function ObterCardBpm(cardId: string) {
           select: { emailCliente: true, googleEventId: true },
           take: 1,
         },
+        nolossLeadOrigem: { select: { id: true }, take: 1 },
         historico: {
           orderBy: { createdAt: "desc" },
           take: 50,
@@ -901,7 +907,7 @@ export async function CriarCardBpm(dados: unknown) {
 
     const parsed = criarCardSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos para criar o card" };
-    const { empresaId, novaEmpresa, pipelineId, etapaId, responsavelId, servico } = parsed.data;
+    const { empresaId, novaEmpresa, pipelineId, etapaId, responsavelId, servico, radarPretendido, canalOrigem, qualificacao } = parsed.data;
     await exigirAcessoBpmPipeline(pipelineId, userId);
     if (!(await usuarioElegivelResponsavelBpm(pipelineId, responsavelId))) {
       return { success: false, error: "Responsável inválido para este pipeline." };
@@ -922,8 +928,12 @@ export async function CriarCardBpm(dados: unknown) {
         return { success: false, error: "Já existe uma empresa cadastrada com este CNPJ — busque e selecione-a." };
       }
     } else {
-      const empresaExiste = await db.cliente.findUnique({ where: { id: empresaId }, select: { id: true } });
+      const empresaExiste = await db.cliente.findUnique({ where: { id: empresaId }, select: { id: true, cnpj: true } });
       if (!empresaExiste) return { success: false, error: "Empresa não encontrada" };
+      if ((await db.bpmPipeline.findUnique({ where: { id: pipelineId }, select: { nome: true } }))?.nome === "Revisão de Radar"
+        && !cnpjEhValido(empresaExiste.cnpj)) {
+        return { success: false, error: "A empresa selecionada precisa de um CNPJ válido para o cadastro manual." };
+      }
     }
 
     const card = await db.$transaction(async (tx) => {
@@ -955,6 +965,31 @@ export async function CriarCardBpm(dados: unknown) {
       }
       if (!empresaIdResolvido) throw new Error("CRIACAO_CARD_INVALIDA");
 
+      const pipelineAtual = await tx.bpmPipeline.findUnique({ where: { id: pipelineId }, select: { nome: true } });
+      if (pipelineAtual?.nome === "Revisão de Radar" && novaEmpresa && !cnpjEhValido(novaEmpresa.cnpj)) {
+        throw new Error("CNPJ_NOVO_LEAD_INVALIDO");
+      }
+      const camposNovoLead = pipelineAtual?.nome === "Revisão de Radar"
+        ? await tx.bpmCampo.findMany({
+            where: {
+              pipelineId,
+              ativo: true,
+              nome: { in: ["Radar pretendido", "Canal de origem", "Qualificação"] },
+              etapaConfiguracoes: { some: { etapaId, visivel: true } },
+            },
+            select: { id: true, nome: true, tipo: true, opcoesJson: true, opcoes: { where: { ativo: true }, select: { rotulo: true } } },
+          })
+        : [];
+      const campoRadar = camposNovoLead.find((campo) => campo.nome === "Radar pretendido");
+      if (pipelineAtual?.nome === "Revisão de Radar") {
+        if (!campoRadar || campoRadar.tipo !== "selecao") throw new Error("RADAR_CAMPO_NAO_CONFIGURADO");
+        const opcoesLegadas = (() => { try { return JSON.parse(campoRadar.opcoesJson ?? "[]"); } catch { return []; } })();
+        const opcoes = campoRadar.opcoes.length > 0
+          ? campoRadar.opcoes.map((opcao) => opcao.rotulo)
+          : Array.isArray(opcoesLegadas) ? opcoesLegadas.filter((opcao): opcao is string => typeof opcao === "string") : [];
+        if (!radarPretendido || !opcoes.includes(radarPretendido)) throw new Error("RADAR_OPCAO_INVALIDA");
+      }
+
       const empresaAtual = await tx.cliente.findUnique({
         where: { id: empresaIdResolvido },
         select: { id: true },
@@ -973,6 +1008,17 @@ export async function CriarCardBpm(dados: unknown) {
           servico: servico ?? (await tx.bpmPipeline.findUnique({ where: { id: pipelineId }, select: { nome: true } }))?.nome ?? null,
         },
       });
+
+      for (const [nome, valor] of [
+        ["Radar pretendido", radarPretendido],
+        ["Canal de origem", canalOrigem],
+        ["Qualificação", qualificacao],
+      ] as const) {
+        if (!valor) continue;
+        const campo = camposNovoLead.find((item) => item.nome === nome);
+        if (!campo) throw new Error("NOVO_LEAD_CAMPO_NAO_CONFIGURADO");
+        await tx.bpmCardCampoValor.create({ data: { cardId: novoCard.id, campoId: campo.id, valor } });
+      }
 
       // D-041: responsável principal também é registrado como membro RESPONSAVEL.
       await tx.bpmCardMembro.create({
@@ -1047,6 +1093,14 @@ export async function CriarCardBpm(dados: unknown) {
       ? "Não autorizado"
       : error instanceof Error && error.message === "CNPJ_JA_CADASTRADO"
         ? "Já existe uma empresa cadastrada com este CNPJ — busque e selecione-a."
+        : error instanceof Error && error.message === "CNPJ_NOVO_LEAD_INVALIDO"
+          ? "Informe um CNPJ válido com dígitos verificadores corretos."
+        : error instanceof Error && error.message === "RADAR_CAMPO_NAO_CONFIGURADO"
+          ? "Configure o campo Radar pretendido como seleção no Novo Lead antes de cadastrar."
+        : error instanceof Error && error.message === "RADAR_OPCAO_INVALIDA"
+          ? "Selecione uma opção válida de Radar pretendido."
+        : error instanceof Error && error.message === "NOVO_LEAD_CAMPO_NAO_CONFIGURADO"
+          ? "Configure Canal de origem e Qualificação no Novo Lead antes de usá-los."
         : error instanceof Error && error.message === "CRIACAO_CARD_INVALIDA"
           ? "Os dados de criação mudaram ou não são mais válidos. Recarregue e tente novamente."
         : error instanceof Error && error.message === "CRIACAO_CARD_CONTEXTO_ALTERADO"

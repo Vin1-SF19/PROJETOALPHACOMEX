@@ -15,7 +15,9 @@ interface Props {
   etapaDestinoNome: string;
   currentUserId: number | null;
   accent: string;
-  onConfirmar: (responsavelId: number) => Promise<{ success: boolean; error?: string }>;
+  radarOpcoes: string[];
+  radarPretendidoInicial?: string;
+  onConfirmar: (responsavelId: number, radarPretendido: string) => Promise<{ success: boolean; error?: string }>;
   onCancelar: () => void;
 }
 
@@ -27,11 +29,14 @@ export default function AtribuirResponsavelPromocaoModal({
   etapaDestinoNome,
   currentUserId,
   accent,
+  radarOpcoes,
+  radarPretendidoInicial = "",
   onConfirmar,
   onCancelar,
 }: Props) {
   const [usuarios, setUsuarios] = useState<UsuarioOpcao[]>([]);
   const [responsavelId, setResponsavelId] = useState<number | null>(currentUserId);
+  const [radarPretendido, setRadarPretendido] = useState(radarPretendidoInicial);
   const [erro, setErro] = useState<string | null>(null);
   const [confirmando, setConfirmando] = useState(false);
 
@@ -60,9 +65,13 @@ export default function AtribuirResponsavelPromocaoModal({
       setErro("Selecione um responsável.");
       return;
     }
+    if (!radarPretendido || !radarOpcoes.includes(radarPretendido)) {
+      setErro("Selecione um Radar pretendido válido.");
+      return;
+    }
     setConfirmando(true);
     try {
-      const resultado = await onConfirmar(responsavelId);
+      const resultado = await onConfirmar(responsavelId, radarPretendido);
       if (!resultado.success) setErro(resultado.error ?? "Não foi possível promover o lead.");
     } catch {
       setErro("Não foi possível promover o lead. Tente novamente.");
@@ -103,6 +112,14 @@ export default function AtribuirResponsavelPromocaoModal({
               <option value="">Selecione...</option>
               {usuarios.map((usuario) => <option key={usuario.id} value={usuario.id}>{usuario.nome}</option>)}
             </select>
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="promover-lead-radar" className="text-[11px] text-slate-400 font-medium">Radar pretendido *</label>
+            <select id="promover-lead-radar" className={inputCls} value={radarPretendido} onChange={(event) => setRadarPretendido(event.target.value)} disabled={radarOpcoes.length === 0} required>
+              <option value="">Selecione...</option>
+              {radarOpcoes.map((opcao) => <option key={opcao} value={opcao}>{opcao}</option>)}
+            </select>
+            {radarOpcoes.length === 0 && <p role="status" className="text-[11px] text-amber-300">Configure as opções de Radar pretendido no editor do pipeline para assumir leads.</p>}
           </div>
         </div>
 
