@@ -10,8 +10,10 @@ import {
   Clock,
   ArrowRight,
   Building2,
+  Settings,
   type LucideIcon,
 } from 'lucide-react';
+import { VALORES } from "@/lib/bpm/financeiro-config.client";
 import type { TemaAlpha } from '@/lib/temas';
 import { fmtDateTime } from '@/lib/format-date';
 import { ObterDashboardBpm } from '@/actions/bpm/Dashboard';
@@ -125,6 +127,8 @@ export default function DashboardClient({
     });
   }, [dashboard, agora]);
 
+  const isAdmin = currentUserRole === 'admin';
+
   if (erro || !dashboard) {
     return (
       <div className="p-8">
@@ -218,6 +222,68 @@ export default function DashboardClient({
           tone="ok"
           delay={180}
         />
+      </section>
+
+      {/* ── Atalhos rápidos ── */}
+      <section aria-label="Atalhos rápidos" className="crm-enter grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5" style={{ animationDelay: "90ms" }}>
+        <TiltSpotCard maxTilt={1.4} className="group p-4" aria-label="Tarefas">
+          <Link href="/PainelAlpha/AlphaCRM/tarefas" className="flex h-full items-center gap-3">
+            <span
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
+              style={{
+                background: 'linear-gradient(155deg, rgba(251,113,133,0.22), rgba(251,113,133,0.05) 65%)',
+                border: '1px solid rgba(251,113,133,0.26)',
+              }}
+            >
+              <ListChecks size={18} style={{ color: 'rgb(251,113,133)', filter: 'drop-shadow(0 0 6px rgba(251,113,133,0.55))' }} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-bold text-white">Tarefas</span>
+              <span className="block truncate text-xs text-[hsl(215,16%,46%)]">Acompanhe todas as tarefas do time</span>
+            </span>
+            <ArrowRight size={14} className="shrink-0 text-[hsl(215,16%,46%)] transition-all duration-200 group-hover:text-[hsl(0,90%,70%)] group-hover:translate-x-0.5" />
+          </Link>
+        </TiltSpotCard>
+
+        <TiltSpotCard maxTilt={1.4} className="group p-4" aria-label="Pendências">
+          <Link href="/PainelAlpha/AlphaCRM/pendencias" className="flex h-full items-center gap-3">
+            <span
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
+              style={{
+                background: 'linear-gradient(155deg, rgba(245,158,11,0.22), rgba(245,158,11,0.05) 65%)',
+                border: '1px solid rgba(245,158,11,0.26)',
+              }}
+            >
+              <AlertTriangle size={18} style={{ color: 'rgb(245,158,11)', filter: 'drop-shadow(0 0 6px rgba(245,158,11,0.55))' }} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-bold text-white">Pendências</span>
+              <span className="block truncate text-xs text-[hsl(215,16%,46%)]">Veja o que precisa de atenção</span>
+            </span>
+            <ArrowRight size={14} className="shrink-0 text-[hsl(215,16%,46%)] transition-all duration-200 group-hover:text-[hsl(38,92%,55%)] group-hover:translate-x-0.5" />
+          </Link>
+        </TiltSpotCard>
+
+        {isAdmin && (
+          <TiltSpotCard maxTilt={1.4} className="group p-4" aria-label="Configurações">
+            <Link href="/PainelAlpha/AlphaCRM/admin" className="flex h-full items-center gap-3">
+              <span
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
+                style={{
+                  background: 'linear-gradient(155deg, rgba(59,130,246,0.22), rgba(59,130,246,0.05) 65%)',
+                  border: '1px solid rgba(59,130,246,0.26)',
+                }}
+              >
+                <Settings size={18} style={{ color: 'rgb(59,130,246)', filter: 'drop-shadow(0 0 6px rgba(59,130,246,0.55))' }} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-bold text-white">Configurações</span>
+                <span className="block truncate text-xs text-[hsl(215,16%,46%)]">Gerencie pipelines e integrações</span>
+              </span>
+              <ArrowRight size={14} className="shrink-0 text-[hsl(215,16%,46%)] transition-all duration-200 group-hover:text-[hsl(217,91%,60%)] group-hover:translate-x-0.5" />
+            </Link>
+          </TiltSpotCard>
+        )}
       </section>
 
       {/* ── Pipelines ── */}
@@ -336,7 +402,7 @@ export default function DashboardClient({
                           {atrasada ? (
                             <StatusBadge label="Atrasada" tone="danger" className="shrink-0" />
                           ) : t.prazo ? (
-                            <StatusBadge label="Pendente" tone="info" className="shrink-0" />
+                            <StatusBadge label={VALORES.PENDENTE} tone="info" className="shrink-0" />
                           ) : null}
                         </div>
                         <div className="mt-1 flex items-center gap-2 text-[11px] text-[hsl(215,16%,46%)]">

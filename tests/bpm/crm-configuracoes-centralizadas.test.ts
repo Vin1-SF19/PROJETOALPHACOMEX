@@ -9,6 +9,7 @@ describe("CRM - configurações centralizadas e card editável", () => {
       "src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/AdminPipelineClient.tsx",
     );
     const layout = ler("src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx");
+    const dashboard = ler("src/app/PainelAlpha/AlphaCRM/DashboardClient.tsx");
 
     for (const label of [
       "Automações",
@@ -20,11 +21,13 @@ describe("CRM - configurações centralizadas e card editável", () => {
     }
     expect(tabs).toContain('<TabsTrigger value="checklists">');
     expect(tabs).toContain('<TabsContent value="checklists">');
-    expect(layout).toContain('label: "Configurações"');
+    expect(layout).not.toContain('label: "Configurações"');
     expect(layout).not.toContain('label: "Automações"');
     expect(layout).not.toContain('label: "Checklists"');
     expect(layout).not.toContain('label: "Base de Conhecimento"');
     expect(layout).not.toContain('label: "Cadências"');
+    expect(dashboard).toContain('href="/PainelAlpha/AlphaCRM/admin"');
+    expect(dashboard).toContain("Configurações");
   });
 
   it("preserva a URL antiga de automações por redirecionamento", () => {

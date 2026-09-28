@@ -18,12 +18,15 @@ describe("autoajuste de entrega do Checklist Builder", () => {
       "src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/page.tsx",
     );
     const menu = ler("src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx");
+    const dashboard = ler("src/app/PainelAlpha/AlphaCRM/DashboardClient.tsx");
 
     expect(tabs).toContain('<TabsTrigger value="checklists">');
     expect(tabs).toContain('<TabsContent value="checklists">');
     expect(pagina).toContain("<ChecklistsWorkspace");
     expect(menu).not.toContain('label: "Checklists"');
-    expect(menu).toContain('label: "Configurações"');
+    expect(menu).not.toContain('label: "Configurações"');
+    expect(dashboard).toContain('href="/PainelAlpha/AlphaCRM/admin"');
+    expect(dashboard).toContain("Configurações");
   });
 
   it("protege o workspace por sessão e papel administrativo", () => {
