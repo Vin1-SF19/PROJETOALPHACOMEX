@@ -10,6 +10,10 @@ export function PainelResumoContratacao({ resumo }: { resumo: Resumo }) {
   return (
     <section aria-label="Dados da contratação" className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
       <h3 className="mb-3 text-sm font-semibold text-slate-100">Dados da contratação</h3>
+      <p className="mb-3 text-xs text-slate-300">Financeiro · {resumo.etapaFinanceira}</p>
+      <p className="mb-3 text-xs text-slate-300">
+        Contrato assinado no BlobCRM: {resumo.contratoAssinadoArquivadoNoCrm ? "Arquivado" : "Pendente"}
+      </p>
       {!resumo.operacionalCardId && resumo.pendenciasOperacionais && (
         <p role="alert" className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-100">
           {resumo.pendenciasOperacionais}

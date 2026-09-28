@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Prisma } from "@prisma/client";
 import { avaliarFormalizacaoFinanceira } from "@/lib/bpm/financeiro-formalizacao";
+import { extrairPathnamePrivadoAnexoBpm } from "@/lib/bpm/anexos-storage";
 import {
   PIPELINE_CHAVE,
   CHAVES_CAMPOS,
@@ -39,14 +40,14 @@ export async function registrarConclusaoContratoFinanceiro(
   const anexo = anexoId && ids.get(CHAVES_CAMPOS.ANEXO_ASSINADO)
     ? await tx.bpmCardAnexo.findFirst({
         where: { id: anexoId, cardId, campoId: ids.get(CHAVES_CAMPOS.ANEXO_ASSINADO) },
-        select: { id: true },
+        select: { id: true, url: true },
       })
     : null;
   const avaliacao = avaliarFormalizacaoFinanceira({
     statusAssinatura: valor(CHAVES_CAMPOS.STATUS_ASSINATURA),
     dataAssinatura: valor(CHAVES_CAMPOS.DATA_ASSINATURA),
     anexoAssinadoId: anexoId,
-    anexoAssinadoVinculado: Boolean(anexo),
+    anexoAssinadoVinculado: Boolean(anexo?.url && extrairPathnamePrivadoAnexoBpm(anexo.url)),
     pagamentoConfirmado: valor(CHAVES_CAMPOS.PAGAMENTO_CONFIRMADO),
   });
   if (avaliacao.contrato !== VALORES.CONCLUIDO) return;

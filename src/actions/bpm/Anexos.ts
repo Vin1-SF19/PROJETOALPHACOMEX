@@ -183,6 +183,22 @@ export async function ExcluirAnexoBpm(anexoId: string) {
 
     const pendenteId = await db.$transaction(async (tx) => {
       await exigirAcessoBpmCard(anexo.cardId, userId, session.user.role ?? null, "excluirArquivo", tx);
+      if (anexo.campoId) {
+        const [campo, card, valor] = await Promise.all([
+          tx.bpmCampo.findUnique({ where: { id: anexo.campoId }, select: { chave: true } }),
+          tx.bpmCard.findUnique({ where: { id: anexo.cardId }, select: { statusPosFechamento: true } }),
+          tx.bpmCardCampoValor.findUnique({ where: { cardId_campoId: { cardId: anexo.cardId, campoId: anexo.campoId } }, select: { valor: true } }),
+        ]);
+        if (campo?.chave === "alpha.radar.fechado.contrato_assinado"
+          && card?.statusPosFechamento === "CONTRATO_ASSINADO"
+          && valor?.valor === anexoId) throw new Error("CONTRATO_ASSINADO_EM_USO");
+        if (campo?.chave === "alpha.contrato.assinado.anexo" && valor?.valor === anexoId) {
+          const conclusao = await tx.bpmCardHistorico.findFirst({
+            where: { cardId: anexo.cardId, acao: "CONTRATO_CONCLUIDO" }, select: { id: true },
+          });
+          if (conclusao) throw new Error("CONTRATO_ASSINADO_EM_USO");
+        }
+      }
       await tx.bpmCardAnexo.delete({ where: { id: anexoId } });
       await registrarHistoricoCard(
         {
@@ -220,7 +236,10 @@ export async function ExcluirAnexoBpm(anexoId: string) {
     return { success: true };
   } catch (error) {
     console.error("[ExcluirAnexoBpm]", error);
-    const msg = error instanceof Error && error.message === "Não autorizado" ? "Não autorizado" : "Erro ao excluir anexo";
+    const msg = error instanceof Error && error.message === "Não autorizado" ? "Não autorizado"
+      : error instanceof Error && error.message === "CONTRATO_ASSINADO_EM_USO"
+        ? "Este arquivo comprova o contrato assinado. Altere o status ou substitua o arquivo antes de excluí-lo."
+        : "Erro ao excluir anexo";
     return { success: false, error: msg };
   }
 }

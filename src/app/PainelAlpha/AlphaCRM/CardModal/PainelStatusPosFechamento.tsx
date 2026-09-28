@@ -215,6 +215,17 @@ export function PainelStatusPosFechamento({
         </div>
       </div>
 
+      {rascunho === "CONTRATO_A_ENVIAR" && (
+        <p className="rounded-lg border border-blue-400/20 bg-blue-400/5 px-3 py-2 text-[11px] text-blue-100">
+          Inclua a minuta no campo Contrato para envio, na seção Contratação.
+        </p>
+      )}
+      {rascunho === "CONTRATO_ASSINADO" && (
+        <p className="rounded-lg border border-emerald-400/20 bg-emerald-400/5 px-3 py-2 text-[11px] text-emerald-100">
+          Anexe e salve a versão assinada no campo Contrato assinado antes de selecionar este status. O arquivo fica no armazenamento privado do CRM.
+        </p>
+      )}
+
       {salvando && <p className="flex items-center gap-2 text-[11px] text-slate-500"><Loader2 size={13} className="animate-spin" /> Salvando status...</p>}
     </section>
   );

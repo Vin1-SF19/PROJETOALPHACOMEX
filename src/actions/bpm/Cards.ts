@@ -33,7 +33,7 @@ import { registrarConclusaoContratoFinanceiro } from "@/lib/bpm/financeiro-assin
 import { carregarResumoContratacao } from "@/lib/bpm/resumo-contratacao-server";
 import { camposPublicadosPorEtapa, capacidadesObrigatoriasPorEtapa } from "@/lib/bpm/campos-formulario-publicado";
 import { desserializarComposicaoCardKanban, type CardKanbanComposicao } from "@/lib/bpm/card-kanban";
-import { obterStatusPosFechamentoVisivel } from "@/lib/bpm/status-pos-fechamento";
+import { etapaEhFechado, obterStatusPosFechamentoVisivel } from "@/lib/bpm/status-pos-fechamento";
 import { projetarResumosKanbanOperacionais } from "@/lib/bpm/card-kanban-projecao";
 import type { CardKanbanValores } from "@/components/bpm/kanban/CardKanbanRenderer";
 
@@ -800,14 +800,25 @@ export async function ObterCardBpm(cardId: string) {
           orderBy: { createdAt: "desc" },
         })
       : null;
+    const destinoFinanceiro = card.pipeline.nome === "Revisão de Radar" && etapaEhFechado(card.etapa.nome)
+      ? await db.bpmCardVinculo.findFirst({
+          where: { cardOrigemId: card.id, cardDestino: { pipeline: { chave: PIPELINE_CHAVE } } },
+          select: { cardDestinoId: true },
+          orderBy: { createdAt: "desc" },
+        })
+      : null;
+    const financeiroVisivel = destinoFinanceiro && await podeVerVinculado(destinoFinanceiro.cardDestinoId)
+      ? destinoFinanceiro.cardDestinoId : null;
     const resumoContratacao = card.pipeline.chave === PIPELINE_CHAVE && card.etapa.chave === ETAPAS.CONTRATACAO_FINALIZADA
       ? await carregarResumoContratacao(card.id)
-      : origemFinanceira ? await carregarResumoContratacao(origemFinanceira.cardOrigemId) : null;
+      : origemFinanceira ? await carregarResumoContratacao(origemFinanceira.cardOrigemId)
+        : financeiroVisivel ? await carregarResumoContratacao(financeiroVisivel) : null;
 
     return {
       success: true,
       data: {
         ...card,
+        dataPerdaEm,
         resumoContratacao,
         emailClienteReuniao,
         anexos: card.anexos.map((anexo) => ({ ...anexo, url: `/api/bpm/anexos/${anexo.id}` })),
@@ -818,7 +829,6 @@ export async function ObterCardBpm(cardId: string) {
           podeVer: true,
           podeAgir: acessoCard.podeAgirEtapa,
         },
-        dataPerdaEm,
       },
     };
   } catch (error) {
@@ -1229,6 +1239,30 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
       ) {
         throw new Error("CONFLITO_ATUALIZACAO_CARD");
       }
+      if (campos.statusPosFechamento !== undefined
+        && (cardAtual.pipeline.nome !== "Revisão de Radar" || !etapaEhFechado(cardAtual.etapa.nome))) {
+        throw new Error("STATUS_FECHADO_INVALIDO");
+      }
+      if (campos.statusPosFechamento === "CONTRATO_ASSINADO") {
+        const campoAssinado = await tx.bpmCampo.findFirst({
+          where: {
+            chave: "alpha.radar.fechado.contrato_assinado",
+            pipelineId: cardAtual.pipelineId,
+            tipo: "arquivo",
+            ativo: true,
+          },
+          select: { id: true },
+        });
+        if (!campoAssinado) throw new Error("CONTRATO_ASSINADO_SEM_ARQUIVO");
+        const valorAssinado = await tx.bpmCardCampoValor.findUnique({
+          where: { cardId_campoId: { cardId, campoId: campoAssinado.id } },
+          select: { valor: true },
+        });
+        if (!valorAssinado?.valor || !await tx.bpmCardAnexo.findFirst({
+          where: { id: valorAssinado.valor, cardId, campoId: campoAssinado.id, url: { startsWith: "bpm-blob:bpm/" } },
+          select: { id: true },
+        })) throw new Error("CONTRATO_ASSINADO_SEM_ARQUIVO");
+      }
       if (
         campos.responsavelId !== undefined
         && !(await usuarioElegivelResponsavelBpm(
@@ -1308,6 +1342,33 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
         }
       }
 
+      if (cardAtual.pipeline.nome === "Revisão de Radar" && etapaEhLost(cardAtual.etapa.nome)) {
+        const publicados = await camposPublicadosPorEtapa([cardAtual.etapaId], tx);
+        const motivos = await tx.bpmCampo.findMany({
+          where: { pipelineId: cardAtual.pipelineId, chave: BPM_FIELD_KEYS.LOST_REASON, ativo: true },
+          select: {
+            id: true, nome: true, tipo: true,
+            opcoes: { where: { ativo: true }, select: { rotulo: true } },
+            etapaConfiguracoes: { where: { etapaId: cardAtual.etapaId }, select: { visivel: true, obrigatorio: true, obrigatorioEntrada: true } },
+          },
+        });
+        const motivo = motivos[0];
+        const configuracao = motivo?.etapaConfiguracoes[0];
+        if (motivos.length !== 1 || motivo.tipo !== "selecao" || !configuracao?.visivel
+          || !configuracao.obrigatorioEntrada || !publicados.get(cardAtual.etapaId)?.has(motivo.id)
+          || !motivo.opcoes.length) {
+          throw new Error("CONFIGURACAO_LOST_INVALIDA:Configure o Motivo do Lost em Campos e formulários.");
+        }
+        const persistido = await tx.bpmCardCampoValor.findUnique({
+          where: { cardId_campoId: { cardId, campoId: motivo.id } },
+          select: { valor: true },
+        });
+        const valorMotivo = (valoresValidados[motivo.id] ?? persistido?.valor ?? "").trim();
+        if (!motivo.opcoes.some((opcao) => opcao.rotulo === valorMotivo)) {
+          throw new Error("MOTIVO_LOST_OBRIGATORIO:Informe um Motivo do Lost válido.");
+        }
+      }
+
       const proximaVersao = new Date(Math.max(Date.now(), cardAtual.updatedAt.getTime() + 1));
       const atualizacao = await tx.bpmCard.updateMany({
         where: {
@@ -1342,33 +1403,6 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
 
       if (camposValores) {
         const idsGlobais = await salvarValoresGlobaisPersonalizadosCampos(cardId, valoresValidados, tx);
-      if (cardAtual.pipeline.nome === "Revisão de Radar" && etapaEhLost(cardAtual.etapa.nome)) {
-        const publicados = await camposPublicadosPorEtapa([cardAtual.etapaId], tx);
-        const motivos = await tx.bpmCampo.findMany({
-          where: { pipelineId: cardAtual.pipelineId, chave: BPM_FIELD_KEYS.LOST_REASON, ativo: true },
-          select: {
-            id: true, nome: true, tipo: true,
-            opcoes: { where: { ativo: true }, select: { rotulo: true } },
-            etapaConfiguracoes: { where: { etapaId: cardAtual.etapaId }, select: { visivel: true, obrigatorio: true, obrigatorioEntrada: true } },
-          },
-        });
-        const motivo = motivos[0];
-        const configuracao = motivo?.etapaConfiguracoes[0];
-        if (motivos.length !== 1 || motivo.tipo !== "selecao" || !configuracao?.visivel
-          || !configuracao.obrigatorioEntrada || !publicados.get(cardAtual.etapaId)?.has(motivo.id)
-          || !motivo.opcoes.length) {
-          throw new Error("CONFIGURACAO_LOST_INVALIDA:Configure o Motivo do Lost em Campos e formulários.");
-        }
-        const persistido = await tx.bpmCardCampoValor.findUnique({
-          where: { cardId_campoId: { cardId, campoId: motivo.id } },
-          select: { valor: true },
-        });
-        const valorMotivo = (valoresValidados[motivo.id] ?? persistido?.valor ?? "").trim();
-        if (!motivo.opcoes.some((opcao) => opcao.rotulo === valorMotivo)) {
-          throw new Error("MOTIVO_LOST_OBRIGATORIO:Informe um Motivo do Lost válido.");
-        }
-      }
-
         const snapshots = typeof carregarSnapshotsCopiaCamposCard === "function"
           ? await carregarSnapshotsCopiaCamposCard(cardId, cardAtual.pipelineId, cardAtual.etapaId, tx)
           : {};
@@ -1476,10 +1510,18 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
           ? error.message.slice("REQUISITOS_PENDENTES:".length)
         : error instanceof Error && error.message.startsWith("CONFIGURACAO_INVALIDA:")
           ? error.message.slice("CONFIGURACAO_INVALIDA:".length)
+        : error instanceof Error && error.message.startsWith("CONFIGURACAO_LOST_INVALIDA:")
+          ? error.message.slice("CONFIGURACAO_LOST_INVALIDA:".length)
+        : error instanceof Error && error.message.startsWith("MOTIVO_LOST_OBRIGATORIO:")
+          ? error.message.slice("MOTIVO_LOST_OBRIGATORIO:".length)
         : error instanceof Error && error.message.startsWith("CONTRATO_INVALIDO:")
           ? error.message.slice("CONTRATO_INVALIDO:".length)
         : error instanceof Error && error.message.startsWith("PROXIMO_CONTATO_INVALIDO:")
           ? error.message.slice("PROXIMO_CONTATO_INVALIDO:".length)
+        : error instanceof Error && error.message === "STATUS_FECHADO_INVALIDO"
+          ? "O status da contratação só pode ser alterado em Fechado."
+        : error instanceof Error && error.message === "CONTRATO_ASSINADO_SEM_ARQUIVO"
+          ? "Anexe e salve o arquivo no campo Contrato assinado antes de marcar esse status."
           : error instanceof Error && error.message === "RESPONSAVEL_INVALIDO"
             ? "Responsável inválido para este pipeline."
           : "Erro ao atualizar card";
@@ -1510,10 +1552,6 @@ async function carregarContextoMovimento(
     client.bpmCard.findUnique({
       where: { id: cardId },
       include: {
-        : error instanceof Error && error.message.startsWith("CONFIGURACAO_LOST_INVALIDA:")
-          ? error.message.slice("CONFIGURACAO_LOST_INVALIDA:".length)
-        : error instanceof Error && error.message.startsWith("MOTIVO_LOST_OBRIGATORIO:")
-          ? error.message.slice("MOTIVO_LOST_OBRIGATORIO:".length)
         etapa: { select: { nome: true, chave: true } },
         pipeline: { select: { nome: true } },
       },
@@ -1638,6 +1676,11 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
       }));
     const capacidadesObrigatorias = await capacidadesObrigatoriasPorEtapa([card.etapaId, etapaDestinoId]);
     const guardas: string[] = [];
+    if (card.pipeline.nome === "Revisão de Radar" && etapaEhLost(etapaDestino.nome)) {
+      const motivos = campos.filter((campo) => campo.chave === BPM_FIELD_KEYS.LOST_REASON
+        && campo.contexto !== "ORIGEM" && campo.tipo === "selecao" && campo.obrigatorio);
+      if (motivos.length !== 1) guardas.push("Configure o Motivo do Lost como seleção obrigatória na entrada em Campos e formulários.");
+    }
     if (card.pipeline.nome === "Revisão de Radar") {
       const erroDataHora = obterErroDataReuniaoParaMovimento({
         etapaOrigemNome: card.etapa.nome,
@@ -1676,11 +1719,6 @@ async function executarMovimentoCanonico(
     versaoEsperada?: number;
     idempotencyKey?: string;
   },
-    if (card.pipeline.nome === "Revisão de Radar" && etapaEhLost(etapaDestino.nome)) {
-      const motivos = campos.filter((campo) => campo.chave === BPM_FIELD_KEYS.LOST_REASON
-        && campo.contexto !== "ORIGEM" && campo.tipo === "selecao" && campo.obrigatorio);
-      if (motivos.length !== 1) guardas.push("Configure o Motivo do Lost como seleção obrigatória na entrada em Campos e formulários.");
-    }
   userId: number,
   userRole: string | null,
 ) {

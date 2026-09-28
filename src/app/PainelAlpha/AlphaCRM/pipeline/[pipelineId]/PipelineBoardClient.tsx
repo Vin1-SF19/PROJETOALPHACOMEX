@@ -36,6 +36,7 @@ import { AtribuirLeadAgendarModal } from "../../CardModal/AtribuirLeadAgendarMod
 import NolossLeadModal from "./NolossLeadModal";
 import { GrupoAvataresMembrosCard, type MembroCard } from "../../CardModal/SeletorMembrosCard";
 import { obterStatusPosFechamentoVisivel } from "@/lib/bpm/status-pos-fechamento";
+import { processoOperacionalDeferido } from "@/lib/bpm/resultado-operacional";
 import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
 import { etapaEhBoasVindas } from "@/lib/bpm/boas-vindas";
 import { campoEhResumoAlinhamento, etapaEhAlinhamentoEstrategico } from "@/lib/bpm/alinhamento-estrategico";
@@ -250,6 +251,7 @@ export function KanbanCard({
   const resumoAlinhamento = card.campoValores?.find((campo) => campoEhResumoAlinhamento(campo.campo.nome))?.valor;
   const alertaAlinhamento = etapaEhAlinhamentoEstrategico(etapaNome) && !resumoAlinhamento?.trim();
   const statusConfig = obterStatusPosFechamentoVisivel({ etapaNome, status: card.statusPosFechamento });
+  const deferidoOperacional = processoOperacionalDeferido(etapaNome, card.encaminhamentos);
   const razaoSocial = card.empresa.razaoSocial;
   const nomeFantasia = card.empresa.nomeFantasia;
   const cnpjFormatado = formatCNPJ(card.empresa.cnpj);
@@ -276,7 +278,8 @@ export function KanbanCard({
       onClick={() => onAbrir(card.id)}
       aria-label={ehLeadVirtual ? `${nomeEmpresa}. Lead do site, ainda sem card` : encaminhado
         ? `${nomeEmpresa}. ${card.encaminhamentoPendente ? "Encaminhamento pendente" : "Card encaminhado"}, somente leitura.`
-        : statusConfig ? `${nomeEmpresa}. Status pós-fechamento: ${statusConfig.label}` : nomeEmpresa}
+        : statusConfig ? `${nomeEmpresa}. Status pós-fechamento: ${statusConfig.label}${deferidoOperacional ? ". Processo deferido no Operacional" : ""}`
+          : deferidoOperacional ? `${nomeEmpresa}. Processo deferido no Operacional` : nomeEmpresa}
       className={cn(
         "relative select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
         encaminhado ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
@@ -324,6 +327,11 @@ export function KanbanCard({
                 : "Encaminhado · localização restrita"}
             </div>
           ))}
+          {deferidoOperacional && (
+            <div role="status" className="rounded-lg border border-emerald-300/35 bg-emerald-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-100">
+              DEFERIDO · Operacional
+            </div>
+          )}
           {!ehLeadVirtual && card.sla && (
             <div className="flex justify-end">
               <SlaStatusBadge sla={card.sla} />

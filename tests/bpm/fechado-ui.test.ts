@@ -33,8 +33,8 @@ describe("CRM Fechado - representacao no board", () => {
     expect(board).toContain("isDragging ? 0.4 : encaminhado ? 0.58 : 1");
     expect(board).toContain("border-cyan-400/50 hover:border-cyan-400/70");
     expect(board).toContain('title="Nunca acessado"');
-    expect(board).toContain("`${nomeEmpresa}. Status pós-fechamento: ${statusConfig.label}`");
-    expect(board).toContain(": nomeEmpresa}");
+    expect(board).toContain("Status pós-fechamento: ${statusConfig.label}");
+    expect(board).toContain("Processo deferido no Operacional");
     expect(board.indexOf("{...attributes}")).toBeLessThan(board.indexOf("aria-label={ehLeadVirtual"));
     expect(board.indexOf("{...listeners}")).toBeLessThan(board.indexOf("aria-label={ehLeadVirtual"));
     expect(board).toContain("statusConfig.label");

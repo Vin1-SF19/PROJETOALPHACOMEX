@@ -57,6 +57,21 @@ function execucao() {
   };
 }
 
+function execucaoRadar() {
+  const atual = execucao();
+  return {
+    ...atual,
+    card: {
+      ...atual.card,
+      id: comercial,
+      pipelineId: "revisao-radar",
+      pipeline: { nome: "Revisão de Radar", chave: null },
+      etapa: { nome: "Fechado" },
+      status: "ATIVO",
+    },
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.db.$transaction.mockImplementation(async (callback: (tx: typeof mocks.db) => Promise<unknown>) => callback(mocks.db));
@@ -144,5 +159,32 @@ describe("handoff Financeiro → Operacional", () => {
     expect(await processarFilaAutomacoesCentraisBpm()).toMatchObject({ executados: 1 });
     expect(mocks.db.bpmCard.findFirst).not.toHaveBeenCalled();
     expect(mocks.db.bpmCard.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("handoff Revisão de Radar → Financeiro", () => {
+  beforeEach(() => {
+    mocks.db.bpmAutomacaoExecucao.findUnique.mockResolvedValue(execucaoRadar());
+    mocks.db.bpmPipeline.findFirst.mockResolvedValue({ chave: "financeiro" });
+    mocks.db.bpmCardVinculo.findFirst.mockResolvedValue(null);
+  });
+
+  it("copia campos da negociação para o novo card financeiro", async () => {
+    expect(await processarFilaAutomacoesCentraisBpm()).toMatchObject({ executados: 1 });
+    expect(mocks.copiar).toHaveBeenCalledWith(mocks.db, comercial, operacional, pipelineId, etapaId);
+  });
+
+  it("reconcilia os campos quando já existe vínculo e não duplica o card", async () => {
+    mocks.db.bpmCardVinculo.findFirst.mockResolvedValue({ cardDestinoId: operacional });
+    expect(await processarFilaAutomacoesCentraisBpm()).toMatchObject({ executados: 1 });
+    expect(mocks.db.bpmCard.create).not.toHaveBeenCalled();
+    expect(mocks.copiar).toHaveBeenCalledWith(mocks.db, comercial, operacional, pipelineId, etapaId);
+  });
+
+  it("não associa contrato de outra negociação da mesma empresa", async () => {
+    mocks.db.bpmCard.findFirst.mockResolvedValue({ id: "outro-contrato" });
+    expect(await processarFilaAutomacoesCentraisBpm()).toMatchObject({ executados: 1 });
+    expect(mocks.db.bpmCard.create).toHaveBeenCalledTimes(1);
+    expect(mocks.copiar).toHaveBeenCalledWith(mocks.db, comercial, operacional, pipelineId, etapaId);
   });
 });

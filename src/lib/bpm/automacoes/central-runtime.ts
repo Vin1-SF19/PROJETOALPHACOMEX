@@ -295,6 +295,8 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
     const etapa = await db.bpmEtapa.findFirst({ where: { id: etapaId, pipelineId, ativo: true }, select: { id: true } });
     if (!etapa) throw new Error("Pipeline/etapa de destino inválidos");
     const handoffOperacional = card.pipeline.chave === "financeiro" && pipelineDestino.chave === "operacional";
+    const handoffFinanceiro = pipelineDestino.chave === "financeiro"
+      && (card.pipeline.chave === "comercial" || card.pipeline.nome === "Revisão de Radar");
     if (handoffOperacional && card.status !== "CONCLUIDO") {
       throw new Error("A contratação precisa estar concluída antes da liberação ao Operacional");
     }
@@ -375,13 +377,14 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
     });
     if (vinculoExistente) {
       if (handoffOperacional) await db.$transaction((tx) => completarHandoff(tx, vinculoExistente.cardDestinoId));
+      if (handoffFinanceiro) await db.$transaction((tx) => copiarCamposCardVinculado(tx, card.id, vinculoExistente.cardDestinoId, pipelineId, etapaId));
       return { cardId: vinculoExistente.cardDestinoId, existente: true };
     }
     // No Operacional a identidade do processo é a negociação de origem. Um
     // card ativo da mesma empresa pode corresponder a outra contratação.
     if (parametros.somenteSeNaoExistirAtivo && !handoffOperacional) {
       const existente = await db.bpmCard.findFirst({ where: { empresaId: card.empresaId, pipelineId, status: "ATIVO" }, select: { id: true } });
-      if (existente) {
+      if (existente && !handoffFinanceiro) {
         await db.$transaction(async (tx) => {
           if (vincular) await tx.bpmCardVinculo.upsert({ where: { cardOrigemId_cardDestinoId: { cardOrigemId: card.id, cardDestinoId: existente.id } },
             create: { cardOrigemId: card.id, cardDestinoId: existente.id }, update: {} });
@@ -393,7 +396,7 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
     const novo = await db.$transaction(async (tx) => {
       const criado = await tx.bpmCard.create({ data: { empresaId: card.empresaId, pipelineId, etapaId, responsavelId: Number(parametros.responsavelId ?? card.responsavelId), servico: parametros.servico ? String(parametros.servico) : card.servico, membros: { create: { userId: Number(parametros.responsavelId ?? card.responsavelId), role: "RESPONSAVEL" } } } });
       if (vincular) await tx.bpmCardVinculo.create({ data: { cardOrigemId: card.id, cardDestinoId: criado.id } });
-      if (card.pipeline.chave === "comercial" && pipelineDestino?.chave === "financeiro") {
+      if (handoffFinanceiro) {
         await copiarCamposCardVinculado(tx, card.id, criado.id, pipelineId, etapaId);
       }
       if (handoffOperacional) {

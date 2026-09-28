@@ -32,6 +32,7 @@ import { destinoPermitidoEmTratativa, etapaEhEmTratativa, obterErroChecklistPara
 import { obterErroProximoContatoParaMovimento } from "@/lib/bpm/proximo-contato";
 import { etapaEhAgendarReuniao, destinoEhReuniaoAgendada, obterErroDataReuniaoParaMovimento } from "@/lib/bpm/agendar-reuniao";
 import { destinoPermitidoReuniaoAgendada, etapaEhReuniaoAgendada, obterErroTranscricaoParaMovimento } from "@/lib/bpm/reuniao-agendada";
+import { statusInicialAoEntrarFechado } from "@/lib/bpm/status-pos-fechamento";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { enfileirarAutomacoesMovimentoBpm } from "@/lib/bpm/automacoes/fila";
@@ -391,7 +392,6 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     ...Object.fromEntries(valoresEfetivosPorId),
   };
   const pendencias: string[] = [];
-  for (const requisito of requisitosAplicaveis) {
   if (card.pipeline.nome === "Revisão de Radar" && etapaEhLost(destino.nome)) {
     const motivos = camposRequisito.filter((campo) =>
       campo.chave === BPM_FIELD_KEYS.LOST_REASON
@@ -410,6 +410,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       pendencias.push(motivo.nome);
     }
   }
+  for (const requisito of requisitosAplicaveis) {
     if (requisito.condicaoJson) {
       let condicao: unknown;
       try { condicao = JSON.parse(requisito.condicaoJson); } catch { erro("INVALID_REQUIREMENT", `Requisito inválido: ${requisito.chave}.`); }
@@ -462,6 +463,20 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
         obrigatorio = obrigatorio || avaliarGrupo(validada.data, contextoRegra);
       }
       if (obrigatorio && vazio(valoresEfetivosPorId.get(campo.id))) pendencias.push(campo.nome);
+    }
+  }
+  if (card.pipeline.nome === "Revisão de Radar" && destino.nome === "Fechado") {
+    for (const chave of ["alpha.radar.viabilidade.valor_acordado", "alpha.radar.viabilidade.forma_pagamento"]) {
+      const campo = camposRequisito.find((item) => item.chave === chave
+        && item.etapaConfiguracoes.some((config) => config.etapaId === destino.id && config.visivel && config.obrigatorioEntrada));
+      if (!campo) continue;
+      const valor = valoresEfetivosPorId.get(campo.id)?.trim();
+      if (!valor) continue;
+      const validacao = validarValoresCamposBpm([{
+        id: campo.id, nome: campo.nome, tipo: campo.tipo,
+        opcoesJson: campo.opcoes.length ? JSON.stringify(campo.opcoes.map((opcao) => opcao.rotulo)) : campo.opcoesJson,
+      }], { [campo.id]: valor });
+      if (!validacao.success) pendencias.push(campo.nome);
     }
   }
 
@@ -597,6 +612,11 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
       const lifecycle = transicao.lifecycleDestino ?? card.status;
       const concluidoEm = lifecycle === "CONCLUIDO" ? (card.concluidoEm ?? agora) : null;
       const outcome = lifecycle === "ATIVO" ? null : (transicao.outcomeDestino ?? card.estadoOntologico?.outcome ?? null);
+      const statusPosFechamentoInicial = statusInicialAoEntrarFechado({
+        pipelineNome: card.pipeline.nome,
+        etapaDestinoNome: destino.nome,
+        statusAtual: card.statusPosFechamento,
+      });
 
       const valores = prepared.valoresValidados;
       const idsGlobais = await salvarValoresGlobaisPersonalizadosCampos(card.id, valores, tx);
@@ -635,6 +655,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
           concluidoEm,
           versao: { increment: 1 },
           updatedAt: agora,
+          ...(statusPosFechamentoInicial ? { statusPosFechamento: statusPosFechamentoInicial } : {}),
           ...(input.proximoContatoEm !== undefined ? { proximoContatoEm: input.proximoContatoEm } : {}),
           ...(prepared.responsavelId ? { responsavelId: prepared.responsavelId } : {}),
         },
@@ -680,7 +701,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
           usuarioId: input.ator.tipo === "MANUAL" ? input.ator.userId : null,
           automacaoOrigem: input.ator.automacaoId,
           valorAnteriorJson: JSON.stringify({ etapaId: card.etapaId, lifecycle: card.status, outcome: card.estadoOntologico?.outcome ?? null, versao: card.versao }),
-          valorNovoJson: JSON.stringify({ etapaId: destino.id, lifecycle, outcome, subStatusId, versao: card.versao + 1, responsavelId: prepared.responsavelId ?? card.responsavelId, camposPreenchidos: Object.keys(prepared.valoresValidados) }),
+          valorNovoJson: JSON.stringify({ etapaId: destino.id, lifecycle, outcome, subStatusId, statusPosFechamento: statusPosFechamentoInicial ?? card.statusPosFechamento, versao: card.versao + 1, responsavelId: prepared.responsavelId ?? card.responsavelId, camposPreenchidos: Object.keys(prepared.valoresValidados) }),
         },
       });
       const evento = await publicarEventoBpm({

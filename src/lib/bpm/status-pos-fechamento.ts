@@ -122,7 +122,7 @@ export function configuracaoEntradaFechadoEhValida(
   return valor.length === 1
     && forma.length === 1
     && valor[0].obrigatorio
-    && normalizarNomeEtapa(valor[0].tipo) === "numero"
+    && ["numero", "moeda"].includes(normalizarNomeEtapa(valor[0].tipo))
     && forma[0].obrigatorio
     && normalizarNomeEtapa(forma[0].tipo) === "selecao"
     && catalogoSelecaoEhValido(forma[0].opcoesJson);
@@ -130,6 +130,15 @@ export function configuracaoEntradaFechadoEhValida(
 
 export function etapaEhFechado(nome: string | null | undefined): boolean {
   return typeof nome === "string" && normalizarNomeEtapa(nome) === "fechado";
+}
+
+export function statusInicialAoEntrarFechado(params: {
+  pipelineNome: string;
+  etapaDestinoNome: string;
+  statusAtual: string | null;
+}): StatusPosFechamento | undefined {
+  return params.pipelineNome === "Revisão de Radar" && etapaEhFechado(params.etapaDestinoNome)
+    && !params.statusAtual ? STATUS_POS_FECHAMENTO_INICIAL : undefined;
 }
 
 export function obterStatusPosFechamentoVisivel(params: {

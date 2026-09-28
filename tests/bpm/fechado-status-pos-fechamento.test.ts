@@ -9,6 +9,7 @@ import {
   STATUS_POS_FECHAMENTO_CONFIG,
   STATUS_POS_FECHAMENTO_INICIAL,
   STATUS_POS_FECHAMENTO_OPCOES,
+  statusInicialAoEntrarFechado,
   statusPosFechamentoEhValido,
 } from "@/lib/bpm/status-pos-fechamento";
 
@@ -49,6 +50,15 @@ describe("contrato do status pós-fechamento", () => {
     expect(etapaEhFechado("  FECHADO ")).toBe(true);
     expect(etapaEhFechado("Em tratativa")).toBe(false);
     expect(etapaEhFechado(null)).toBe(false);
+  });
+
+  it("inicia contratação em Aguardando contrato e preserva status de reentrada", () => {
+    expect(statusInicialAoEntrarFechado({ pipelineNome: "Revisão de Radar", etapaDestinoNome: "Fechado", statusAtual: null }))
+      .toBe("AGUARDANDO_CONTRATO");
+    expect(statusInicialAoEntrarFechado({ pipelineNome: "Revisão de Radar", etapaDestinoNome: "Fechado", statusAtual: "CONTRATO_ENVIADO" }))
+      .toBeUndefined();
+    expect(statusInicialAoEntrarFechado({ pipelineNome: "Financeiro", etapaDestinoNome: "Fechado", statusAtual: null }))
+      .toBeUndefined();
   });
 
   it("rejeita valores desconhecidos e só torna status visível em Fechado", () => {
