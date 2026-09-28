@@ -57,7 +57,8 @@ export async function sincronizarAgendasVersaoAutomacao(versaoId: string) {
   const config = gatilhoConfigSchema.parse(parseObjeto(versao.gatilhoConfigJson));
   if (versao.gatilhoTipo !== "RECORRENCIA_ATINGIDA" || !config.recorrencia) return { criadas: 0 };
   const etapasIds = [...new Set([...(config.etapasIds ?? []), ...(config.etapaId ? [config.etapaId] : [])])];
-  const cards = await db.bpmCard.findMany({ where: { pipelineId: versao.automacao.pipelineId, status: "ATIVO", ...(config.escopo === "GLOBAL_PIPELINE" ? {} : { etapaId: { in: etapasIds.length ? etapasIds : [versao.automacao.etapaId] } }) }, select: { id: true, etapaId: true, createdAt: true } });
+  const interrompivel = versao.automacao.chave === "standby_follow_up_semanal" || versao.grafoJson.includes('"interromperSeCampoPreenchido":"standbyFollowUpInterrompidoEm"');
+  const cards = await db.bpmCard.findMany({ where: { pipelineId: versao.automacao.pipelineId, status: "ATIVO", ...(interrompivel ? { standbyFollowUpInterrompidoEm: null } : {}), ...(config.escopo === "GLOBAL_PIPELINE" ? {} : { etapaId: { in: etapasIds.length ? etapasIds : [versao.automacao.etapaId] } }) }, select: { id: true, etapaId: true, createdAt: true } });
   const historicos = config.recorrencia.ancora === "ENTRADA_ETAPA" && cards.length
     ? await db.bpmCardHistorico.findMany({ where: { cardId: { in: cards.map((card) => card.id) }, acao: { in: ["CARD_MOVIDO", "CARD_MOVIDO_POR_AUTOMACAO", "MOVIDO_AUTOMACAO"] } }, select: { cardId: true, createdAt: true, valorNovoJson: true }, orderBy: { createdAt: "desc" } })
     : [];
@@ -110,6 +111,14 @@ export async function materializarAgendasAutomacoesBpm(limite = 100) {
       await db.bpmAutomacaoAgenda.update({ where: { id: agenda.id }, data: { ativo: false, ultimaMaterializacaoEm: agora } }); materializadas++; continue;
     }
     if (!agenda.cardId || agenda.automacaoVersao.status !== "ATIVA" || !agenda.automacaoVersao.automacao.ativa) { await db.bpmAutomacaoAgenda.update({ where: { id: agenda.id }, data: { ativo: false } }); continue; }
+    const cardAtual = await db.bpmCard.findUnique({ where: { id: agenda.cardId }, select: { status: true, etapaId: true, standbyFollowUpInterrompidoEm: true } });
+    const configAtual = gatilhoConfigSchema.parse(parseObjeto(agenda.automacaoVersao.gatilhoConfigJson));
+    const etapasAtuais = [...new Set([...(configAtual.etapasIds ?? []), ...(configAtual.etapaId ? [configAtual.etapaId] : [])])];
+    const interrompivel = agenda.automacaoVersao.automacao.chave === "standby_follow_up_semanal" || agenda.automacaoVersao.grafoJson.includes('"interromperSeCampoPreenchido":"standbyFollowUpInterrompidoEm"');
+    if (!cardAtual || cardAtual.status !== "ATIVO" || (configAtual.escopo !== "GLOBAL_PIPELINE" && !etapasAtuais.includes(cardAtual.etapaId)) || (interrompivel && cardAtual.standbyFollowUpInterrompidoEm)) {
+      await db.bpmAutomacaoAgenda.update({ where: { id: agenda.id }, data: { ativo: false } });
+      continue;
+    }
     const ciclo = agenda.proximaExecucaoEm.toISOString();
     await publicarEventoBpm({ tipo: agenda.tipo === "RECORRENTE" ? "RECORRENCIA_ATINGIDA" : "TEMPO_NA_ETAPA_ATINGIDO", entidadeTipo: "SISTEMA", entidadeId: agenda.id, cardId: agenda.cardId, pipelineId: agenda.automacaoVersao.automacao.pipelineId, valorNovo: { agendaId: agenda.id, ciclo }, atorTipo: "SISTEMA", correlationId: `agenda:${agenda.id}:${ciclo}`, idempotencyKey: `agenda:${agenda.id}:${ciclo}` });
     const recorrencia = agenda.tipo === "RECORRENTE" ? gatilhoConfigSchema.shape.recorrencia.unwrap().parse(parseObjeto(agenda.recorrenciaJson)) : null;

@@ -5,11 +5,12 @@ const db = vi.hoisted(() => ({
   bpmAutomacaoLease: { create: vi.fn(), deleteMany: vi.fn(), updateMany: vi.fn() },
   bpmAutomacaoPassoExecucao: { upsert: vi.fn(), update: vi.fn() },
   bpmCardHistorico: { create: vi.fn(), findMany: vi.fn() },
-  bpmAutomacaoAgenda: { findMany: vi.fn(), update: vi.fn() },
-  bpmAutomacaoVersao: { findMany: vi.fn() },
-  bpmTarefa: { findMany: vi.fn() },
-  bpmCard: { findMany: vi.fn() },
+  bpmAutomacaoAgenda: { findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn(), upsert: vi.fn() },
+  bpmAutomacaoVersao: { findMany: vi.fn(), findUnique: vi.fn() },
+  bpmTarefa: { findMany: vi.fn(), create: vi.fn() },
+  bpmCard: { findMany: vi.fn(), findUnique: vi.fn(), updateMany: vi.fn() },
   bpmEventoDominio: { findMany: vi.fn(), create: vi.fn() },
+  $transaction: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -23,7 +24,7 @@ vi.mock("@/lib/bpm/cadencias/ativacao-automatica", () => ({ ativarCadenciasNaEnt
 vi.mock("@/lib/bpm/automacoes/executor", () => ({ executarAcaoLegadaNoMotorCentral: vi.fn() }));
 
 import { processarFilaAutomacoesCentraisBpm } from "@/lib/bpm/automacoes/central-runtime";
-import { materializarAgendasAutomacoesBpm, materializarGatilhosTemporaisBpm } from "@/lib/bpm/automacoes/agenda";
+import { materializarAgendasAutomacoesBpm, materializarGatilhosTemporaisBpm, sincronizarAgendasVersaoAutomacao } from "@/lib/bpm/automacoes/agenda";
 import { materializarExecucoesEventosBpm } from "@/lib/bpm/automacoes/eventos";
 
 const CARD = "cm1card0000000000000000001";
@@ -68,9 +69,94 @@ beforeEach(() => {
   db.bpmTarefa.findMany.mockResolvedValue([]);
   db.bpmEventoDominio.findMany.mockResolvedValue([]);
   db.bpmEventoDominio.create.mockImplementation(async ({ data }) => ({ id: "evento-novo", ...data }));
+  db.$transaction.mockImplementation(async (callback) => callback(db));
 });
 
 describe("correções do Motor Central", () => {
+  it("sincronização NoLoss exclui cards com opt-out e desativa agendas antigas", async () => {
+    db.bpmAutomacaoVersao.findUnique.mockResolvedValue({
+      id: "versao-standby", status: "ATIVA", gatilhoTipo: "RECORRENCIA_ATINGIDA", timezone: "America/Sao_Paulo",
+      gatilhoConfigJson: JSON.stringify({ escopo: "ETAPAS", etapaId: ETAPA, etapasIds: [ETAPA], recorrencia: { tipo: "INTERVALO_DIAS", intervaloDias: 7, ancora: "ENTRADA_ETAPA" } }),
+      grafoJson: "{}", automacao: { ativa: true, chave: "standby_follow_up_semanal", pipelineId: PIPELINE, etapaId: ETAPA },
+    });
+    db.bpmCard.findMany.mockResolvedValue([]);
+    db.bpmAutomacaoAgenda.updateMany.mockResolvedValue({ count: 1 });
+
+    expect(await sincronizarAgendasVersaoAutomacao("versao-standby")).toEqual({ criadas: 0 });
+    expect(db.bpmCard.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ standbyFollowUpInterrompidoEm: null }) }));
+    expect(db.bpmAutomacaoAgenda.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { ativo: false } }));
+    expect(db.bpmAutomacaoAgenda.upsert).not.toHaveBeenCalled();
+  });
+
+  it("nova versão configurada com outro intervalo ancora o ciclo na reentrada atual", async () => {
+    const reentrada = new Date("2026-09-10T12:00:00.000Z");
+    db.bpmAutomacaoVersao.findUnique.mockResolvedValue({
+      id: "versao-standby-2", status: "ATIVA", gatilhoTipo: "RECORRENCIA_ATINGIDA", timezone: "America/Sao_Paulo",
+      gatilhoConfigJson: JSON.stringify({ escopo: "ETAPAS", etapaId: ETAPA, etapasIds: [ETAPA], recorrencia: { tipo: "INTERVALO_DIAS", intervaloDias: 3, ancora: "ENTRADA_ETAPA" } }),
+      grafoJson: "{}", automacao: { ativa: true, chave: "standby_follow_up_semanal", pipelineId: PIPELINE, etapaId: ETAPA },
+    });
+    db.bpmCard.findMany.mockResolvedValue([{ id: CARD, etapaId: ETAPA, createdAt: new Date("2026-08-01T12:00:00.000Z") }]);
+    db.bpmCardHistorico.findMany.mockResolvedValue([{ cardId: CARD, createdAt: reentrada, valorNovoJson: JSON.stringify({ etapaId: ETAPA }) }]);
+    db.bpmAutomacaoAgenda.upsert.mockResolvedValue({});
+    db.bpmAutomacaoAgenda.updateMany.mockResolvedValue({ count: 0 });
+
+    expect(await sincronizarAgendasVersaoAutomacao("versao-standby-2")).toEqual({ criadas: 1 });
+    expect(db.bpmAutomacaoAgenda.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({ proximaExecucaoEm: new Date("2026-09-13T12:00:00.000Z"), chaveAgendamento: expect.stringContaining(String(reentrada.getTime())) }),
+    }));
+  });
+
+  it("materialização NoLoss desativa agenda de card interrompido sem publicar evento", async () => {
+    db.bpmAutomacaoAgenda.findMany.mockResolvedValue([{
+      id: "agenda-standby", cardId: CARD, tipo: "RECORRENTE", proximaExecucaoEm: new Date("2026-09-01T00:00:00Z"),
+      automacaoVersao: { id: "versao-standby", status: "ATIVA", gatilhoConfigJson: JSON.stringify({ escopo: "ETAPAS", etapaId: ETAPA, etapasIds: [ETAPA], recorrencia: { tipo: "INTERVALO_DIAS", intervaloDias: 7, ancora: "ENTRADA_ETAPA" } }), grafoJson: "{}", automacao: { ativa: true, chave: "standby_follow_up_semanal", pipelineId: PIPELINE } },
+    }]);
+    db.bpmCard.findUnique.mockResolvedValue({ status: "ATIVO", etapaId: ETAPA, standbyFollowUpInterrompidoEm: new Date() });
+    db.bpmAutomacaoAgenda.update.mockResolvedValue({});
+
+    expect(await materializarAgendasAutomacoesBpm()).toEqual({ encontradas: 1, materializadas: 0 });
+    expect(db.bpmAutomacaoAgenda.update).toHaveBeenCalledWith({ where: { id: "agenda-standby" }, data: { ativo: false } });
+    expect(db.bpmEventoDominio.create).not.toHaveBeenCalled();
+  });
+
+  it("motor NoLoss cria tarefa e histórico somente após revalidar elegibilidade na transação", async () => {
+    const grafo = JSON.stringify({ inicioId: "tarefa", nos: [
+      { id: "tarefa", tipo: "ACAO", acaoTipo: "CRIAR_TAREFA", parametros: { titulo: "Realizar follow-up", tipo: "LIGACAO", prioridade: "NORMAL", interromperSeCampoPreenchido: "standbyFollowUpInterrompidoEm", registrarExecucaoEmCampo: "standbyFollowUpUltimoEm" }, proximoId: "fim" },
+      { id: "fim", tipo: "FIM" },
+    ] });
+    db.bpmAutomacaoExecucao.findUnique.mockResolvedValue(execucao({
+      id: "cm1exec000000000000000001",
+      automacao: { ativa: true, chave: "standby_follow_up_semanal", nome: "NoLoss", criadoPorId: 1, etapaId: ETAPA },
+      automacaoVersao: { status: "ATIVA", grafoJson: grafo, condicaoJson: null, timezone: "America/Sao_Paulo" },
+      card: { ...execucao().card, responsavelId: 7, standbyFollowUpInterrompidoEm: null },
+    }));
+    db.bpmCard.updateMany.mockResolvedValue({ count: 1 });
+    db.bpmTarefa.create.mockResolvedValue({ id: "tarefa-noloss", tipo: "LIGACAO", titulo: "Realizar follow-up" });
+
+    const resultado = await processarFilaAutomacoesCentraisBpm();
+    expect(db.bpmCard.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ standbyFollowUpInterrompidoEm: null, etapaId: ETAPA }) }));
+    expect(db.bpmTarefa.create).toHaveBeenCalledTimes(1);
+    expect(db.bpmCardHistorico.create).toHaveBeenCalledWith({ data: expect.objectContaining({ acao: "STANDBY_FOLLOW_UP_TAREFA_CRIADA", valorNovoJson: expect.stringContaining("tarefa-noloss") }) });
+    expect(resultado).toMatchObject({ executados: 1, falhos: 0 });
+  });
+
+  it("motor NoLoss não cria tarefa se o opt-out vencer a corrida transacional", async () => {
+    const grafo = JSON.stringify({ inicioId: "tarefa", nos: [
+      { id: "tarefa", tipo: "ACAO", acaoTipo: "CRIAR_TAREFA", parametros: { titulo: "Realizar follow-up", tipo: "LIGACAO", prioridade: "NORMAL", interromperSeCampoPreenchido: "standbyFollowUpInterrompidoEm", registrarExecucaoEmCampo: "standbyFollowUpUltimoEm" }, proximoId: "fim" },
+      { id: "fim", tipo: "FIM" },
+    ] });
+    db.bpmAutomacaoExecucao.findUnique.mockResolvedValue(execucao({
+      id: "cm1exec000000000000000001",
+      automacao: { ativa: true, chave: "standby_follow_up_semanal", nome: "NoLoss", criadoPorId: 1, etapaId: ETAPA },
+      automacaoVersao: { status: "ATIVA", grafoJson: grafo, condicaoJson: null, timezone: "America/Sao_Paulo" },
+      card: { ...execucao().card, responsavelId: 7, standbyFollowUpInterrompidoEm: null },
+    }));
+    db.bpmCard.updateMany.mockResolvedValue({ count: 0 });
+
+    expect(await processarFilaAutomacoesCentraisBpm()).toMatchObject({ falhos: 0 });
+    expect(db.bpmTarefa.create).not.toHaveBeenCalled();
+  });
+
   it("retentativa após condição já avaliada executa o ramo escolhido, não encerra como sucesso vazio", async () => {
     db.bpmAutomacaoExecucao.findUnique.mockResolvedValue(execucao({
       passos: [

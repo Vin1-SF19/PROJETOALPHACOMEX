@@ -270,7 +270,8 @@ export async function ConcluirTarefaBpm(dados: unknown) {
         }, tx);
         return { alterou: reconciliacao.acao !== "IGNORADA", cardId: atual.cardId };
       }
-      if (atual.status === "CONCLUIDA") return { alterou: false, cardId: atual.cardId };
+      if (atual.status === "CANCELADA") throw new Error("Tarefa cancelada não pode ser concluída");
+      if (atual.status !== "PENDENTE") return { alterou: false, cardId: atual.cardId };
       await tx.bpmTarefa.update({
         where: { id: tarefaId },
         data: { status: "CONCLUIDA", concluidaEm: new Date() },
@@ -308,6 +309,7 @@ export async function ConcluirTarefaBpm(dados: unknown) {
     const msg = error instanceof Error && [
       "Não autorizado",
       "Tarefa não encontrada",
+      "Tarefa cancelada não pode ser concluída",
       MENSAGEM_TAREFA_CHECKLIST_PENDENTE,
     ].includes(error.message) ? error.message : "Erro ao concluir tarefa";
     return { success: false, error: msg };

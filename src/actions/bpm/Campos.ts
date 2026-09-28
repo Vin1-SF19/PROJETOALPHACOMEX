@@ -422,6 +422,13 @@ export async function AtualizarCampoBpm(dados: unknown) {
     const fonteFinal = escopoFinal === "GLOBAL" ? entidadeFinal : null;
     const ativoFinal = entrada.ativo ?? anterior.ativo;
     const opcoesFinais = novasOpcoes ?? anterior.opcoes;
+    if (anterior.chave === "alpha.radar.standby.status_follow_up") {
+      const ativas = new Set(opcoesFinais.filter((opcao) => opcao.ativo).map((opcao) => opcao.chave));
+      if (tipoFinal !== "selecao" || !ativas.has("ativo") || !ativas.has("interrompido")
+        || entrada.somenteLeitura === false || entrada.editavel === true) {
+        return { success: false, error: "O status NoLoss precisa manter as opções Ativo/Interrompido e permanecer somente leitura; os rótulos podem ser editados." };
+      }
+    }
     validarCatalogoSelecao({
       tipo: tipoFinal,
       opcoes: opcoesFinais,

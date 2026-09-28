@@ -143,10 +143,11 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
         const config = obterConfigTipoTarefa(tarefa.tipo);
         const alertaAtivo = tarefa.status === "PENDENTE" && Boolean(tarefa.alertaDisparadoEm);
         const prioridadeCor = tarefa.prioridade === "ALTA" ? "bg-red-500/15 text-red-300" : tarefa.prioridade === "MEDIA" ? "bg-amber-500/15 text-amber-300" : "bg-slate-500/15 text-slate-300";
-        const statusCor = tarefa.status === "CONCLUIDA" ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-500/15 text-slate-300";
+        const encerrada = tarefa.status === "CONCLUIDA" || tarefa.status === "CANCELADA";
+        const statusCor = tarefa.status === "CONCLUIDA" ? "bg-emerald-500/15 text-emerald-300" : tarefa.status === "CANCELADA" ? "bg-rose-500/15 text-rose-300" : "bg-slate-500/15 text-slate-300";
         const prazoData = tarefa.prazo ? new Date(tarefa.prazo) : null;
         const prazoValido = prazoData !== null && !Number.isNaN(prazoData.getTime());
-        const prazoVencido = tarefa.status !== "CONCLUIDA" && prazoValido && prazoData < new Date();
+        const prazoVencido = tarefa.status === "PENDENTE" && prazoValido && prazoData < new Date();
         const gerenciadaPorChecklist = Boolean(tarefa.cardChecklistId);
         return (
           <div key={tarefa.id} className={`rounded-xl border px-3 py-2.5 ${alertaAtivo ? "border-amber-400/35 bg-amber-400/[0.07]" : "border-white/5 bg-white/[0.03]"}`}>
@@ -157,19 +158,19 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
                   return;
                 }
                 void ConcluirTarefaBpm({ tarefaId: tarefa.id }).then((res) => res.success ? onAtualizado() : toast.error(typeof res.error === "string" ? res.error : "Erro ao concluir tarefa"));
-              }} disabled={!podeTrabalharTarefas || tarefa.status === "CONCLUIDA"} className="mt-0.5 text-slate-500 disabled:cursor-not-allowed" aria-label={tarefa.status === "CONCLUIDA" ? "Tarefa concluída" : gerenciadaPorChecklist ? "Abrir procedimento para concluir" : "Concluir tarefa"}>
+              }} disabled={!podeTrabalharTarefas || encerrada} className="mt-0.5 text-slate-500 disabled:cursor-not-allowed" aria-label={tarefa.status === "CANCELADA" ? "Tarefa cancelada" : tarefa.status === "CONCLUIDA" ? "Tarefa concluída" : gerenciadaPorChecklist ? "Abrir procedimento para concluir" : "Concluir tarefa"}>
                 <CheckCircle2 size={16} className={tarefa.status === "CONCLUIDA" ? "text-emerald-400" : ""} />
               </button>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300"><IconeTipo tipo={tarefa.tipo} size={11} />{config.label}</span>
                   {tarefa.prioridade && <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${prioridadeCor}`}>{tarefa.prioridade}</span>}
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusCor}`}>{tarefa.status === "CONCLUIDA" ? "Concluída" : VALORES.PENDENTE}</span>
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusCor}`}>{tarefa.status === "CANCELADA" ? "Cancelada" : tarefa.status === "CONCLUIDA" ? "Concluída" : VALORES.PENDENTE}</span>
                   {alertaAtivo && <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300"><Bell size={11} /> Alerta ativo</span>}
                 </div>
-                <p className={`mt-1.5 text-sm font-semibold ${tarefa.status === "CONCLUIDA" ? "text-slate-500 line-through" : "text-white"}`}>{tarefa.titulo || "Tarefa sem título"}</p>
+                <p className={`mt-1.5 text-sm font-semibold ${encerrada ? "text-slate-500 line-through" : "text-white"}`}>{tarefa.titulo || "Tarefa sem título"}</p>
                 {tarefa.descricao && (
-                  <p className={`mt-1 text-xs leading-relaxed ${tarefa.status === "CONCLUIDA" ? "text-slate-600" : "text-slate-400"} line-clamp-3 whitespace-pre-line`}>{tarefa.descricao}</p>
+                  <p className={`mt-1 text-xs leading-relaxed ${encerrada ? "text-slate-600" : "text-slate-400"} line-clamp-3 whitespace-pre-line`}>{tarefa.descricao}</p>
                 )}
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
                   {prazoValido && <span className={`inline-flex items-center gap-1 ${prazoVencido ? "text-red-400" : ""}`}><Calendar size={11} aria-label="Prazo" /> {fmtDateTime(tarefa.prazo)}</span>}

@@ -9,6 +9,11 @@ const revalidatePathMock = vi.hoisted(() => vi.fn());
 const prismaMock = vi.hoisted(() => ({
   bpmCard: { findUnique: vi.fn(), updateMany: vi.fn() },
   bpmCardHistorico: { create: vi.fn(), findMany: vi.fn() },
+  bpmCampo: { findMany: vi.fn(), findUnique: vi.fn() },
+  bpmCardCampoValor: { upsert: vi.fn() },
+  bpmAutomacaoAgenda: { updateMany: vi.fn(), findFirst: vi.fn() },
+  bpmAutomacao: { findUnique: vi.fn() },
+  bpmTarefa: { findMany: vi.fn(), updateMany: vi.fn() },
   $transaction: vi.fn(),
 }));
 
@@ -18,7 +23,7 @@ vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
 vi.mock("@/lib/bpm/ownership", () => ({ exigirAcessoBpmCard: acessoMock }));
 vi.mock("@/lib/bpm/realtime-server", () => ({ notificarPipelineBpm: notificarMock }));
 
-import { InterromperStandbyFollowUpBpm } from "@/actions/bpm/StandbyFollowUp";
+import { InterromperStandbyFollowUpBpm, ObterEstadoStandbyFollowUpBpm } from "@/actions/bpm/StandbyFollowUp";
 import {
   calcularProximoFollowUpStandby,
   followUpStandbyEstaVencido,
@@ -50,6 +55,15 @@ describe("Standby - Follow Up", () => {
     prismaMock.bpmCard.findUnique.mockResolvedValue(cardStandby());
     prismaMock.bpmCard.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.bpmCardHistorico.create.mockResolvedValue({});
+    prismaMock.bpmCampo.findMany.mockResolvedValue([
+      { id: "status", chave: "alpha.radar.standby.status_follow_up", opcoes: [{ chave: "interrompido", rotulo: "Interrompido" }] },
+      { id: "motivo", chave: "alpha.radar.standby.motivo_interrupcao", opcoes: [] },
+    ]);
+    prismaMock.bpmCardCampoValor.upsert.mockResolvedValue({});
+    prismaMock.bpmAutomacaoAgenda.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.bpmCardHistorico.findMany.mockResolvedValue([{ valorNovoJson: JSON.stringify({ tarefaId: "tarefa-1" }) }]);
+    prismaMock.bpmTarefa.findMany.mockResolvedValue([{ id: "tarefa-1", titulo: "Realizar follow-up semanal" }]);
+    prismaMock.bpmTarefa.updateMany.mockResolvedValue({ count: 1 });
     notificarMock.mockResolvedValue(undefined);
     instalarTransaction();
   });
@@ -74,6 +88,23 @@ describe("Standby - Follow Up", () => {
       ultimoFollowUpEm: ultimoDaPassagemAnterior,
       agora: new Date("2026-08-16T23:59:59.999Z"),
     })).toBe(false);
+  });
+
+  it("estado publicado usa a entrada atual quando o último follow-up é da passagem anterior", async () => {
+    const reentrada = new Date("2026-09-10T12:00:00.000Z");
+    prismaMock.bpmCard.findUnique.mockResolvedValueOnce({
+      ...cardStandby(), id: CARD_ID, createdAt: new Date("2026-08-01T12:00:00.000Z"),
+      standbyFollowUpUltimoEm: new Date("2026-08-08T12:00:00.000Z"),
+    });
+    prismaMock.bpmCardHistorico.findMany.mockResolvedValueOnce([{ createdAt: reentrada, valorNovoJson: JSON.stringify({ etapaId: "clw0000000000000stan" }) }]);
+    prismaMock.bpmAutomacao.findUnique.mockResolvedValue({ ativa: true, versoes: [{ id: "versao-1", timezone: "America/Sao_Paulo", gatilhoConfigJson: JSON.stringify({ escopo: "ETAPAS", etapaId: "clw0000000000000stan", recorrencia: { tipo: "INTERVALO_DIAS", intervaloDias: 7, ancora: "ENTRADA_ETAPA" } }) }] });
+    prismaMock.bpmAutomacaoAgenda.findFirst.mockResolvedValue(null);
+    prismaMock.bpmCampo.findUnique.mockImplementation(async ({ where }: { where: { chave: string } }) => where.chave.endsWith("status_follow_up")
+      ? { opcoes: [{ chave: "ativo", rotulo: "Em acompanhamento" }, { chave: "interrompido", rotulo: "Contato encerrado" }] }
+      : { nome: "Motivo da interrupção" });
+
+    const resultado = await ObterEstadoStandbyFollowUpBpm(CARD_ID);
+    expect(resultado).toMatchObject({ success: true, data: { ativo: true, intervaloDias: 7, rotuloAtivo: "Em acompanhamento", rotuloInterrompido: "Contato encerrado", proximoFollowUpEm: new Date("2026-09-17T12:00:00.000Z") } });
   });
 
   it("exige autenticação e permissão de edição antes de registrar o opt-out", async () => {
@@ -107,6 +138,14 @@ describe("Standby - Follow Up", () => {
         usuarioId: 7,
       }),
     });
+    expect(prismaMock.bpmAutomacaoAgenda.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { ativo: false } }));
+    expect(prismaMock.bpmTarefa.findMany).toHaveBeenCalledWith({ where: { id: { in: ["tarefa-1"] }, cardId: CARD_ID, status: "PENDENTE" }, select: { id: true, titulo: true } });
+    expect(prismaMock.bpmTarefa.updateMany).toHaveBeenCalledWith({ where: { id: "tarefa-1", cardId: CARD_ID, status: "PENDENTE" }, data: { status: "CANCELADA" } });
+    expect(prismaMock.bpmCardHistorico.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+      acao: "STANDBY_FOLLOW_UP_TAREFA_CANCELADA",
+      valorNovoJson: expect.stringContaining('"tarefaId":"tarefa-1"'),
+    }) });
+    expect(prismaMock.bpmCardCampoValor.upsert).toHaveBeenCalledTimes(2);
     expect(notificarMock).toHaveBeenCalledAfter(prismaMock.bpmCardHistorico.create);
     expect(revalidatePathMock).toHaveBeenCalledWith("/PainelAlpha/AlphaCRM/card/clw0000000000000card");
   });
@@ -115,7 +154,7 @@ describe("Standby - Follow Up", () => {
     prismaMock.bpmCard.findUnique.mockResolvedValueOnce({ ...cardStandby(), etapa: { nome: "Em Tratativa" } });
     expect(await InterromperStandbyFollowUpBpm({ cardId: CARD_ID, motivo: "Pediu bloqueio" })).toEqual({
       success: false,
-      error: "O follow-up semanal só pode ser interrompido em Standby - Follow Up.",
+      error: "O follow-up só pode ser interrompido em Stand By.",
     });
 
     prismaMock.bpmCard.findUnique.mockResolvedValueOnce({ ...cardStandby(), standbyFollowUpInterrompidoEm: new Date() });

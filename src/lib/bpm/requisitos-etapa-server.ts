@@ -312,6 +312,14 @@ export async function carregarCamposAplicaveisCardEtapa(
   const valorPorCampo = new Map(
     valores.map((valor) => [valor.campoId, valor.valor]),
   );
+  const possuiStatusStandby = campos.some((campo) => campo.chave === "alpha.radar.standby.status_follow_up");
+  const estadoStandby = possuiStatusStandby
+    ? await client.bpmCard.findUnique({ where: { id: cardId }, select: { standbyFollowUpInterrompidoEm: true } })
+    : null;
+  const campoStatusStandby = campos.find((campo) => campo.chave === "alpha.radar.standby.status_follow_up");
+  const opcoesStatusStandby = campoStatusStandby
+    ? await client.bpmCampo.findUnique({ where: { id: campoStatusStandby.id }, select: { opcoes: { where: { ativo: true }, select: { chave: true, rotulo: true } } } })
+    : null;
   const fontesCanonicas = [
     ...campos.map((campo) => ({
       id: campo.id,
@@ -396,7 +404,9 @@ export async function carregarCamposAplicaveisCardEtapa(
         ? valorPersistido
         : (valoresCanonicos[campo.id] || null))
       : (resolvidos.efetivos[campo.id] || valorPersistido || campo.valorPadrao || null);
-    const valor = precisaDadosMestres && campo.escopo === "CARD" && !mapeamento && !valorPersistido
+    const valor = campo.chave === "alpha.radar.standby.status_follow_up"
+      ? (opcoesStatusStandby?.opcoes.find((opcao) => opcao.chave === (estadoStandby?.standbyFollowUpInterrompidoEm ? "interrompido" : "ativo"))?.rotulo ?? (estadoStandby?.standbyFollowUpInterrompidoEm ? "Interrompido" : "Ativo"))
+      : precisaDadosMestres && campo.escopo === "CARD" && !mapeamento && !valorPersistido
       ? resolverValorEfetivoCampoBpm({ nomeCampo: campo.nome, valorPersistido: valorNovoContrato, dadosMestres })
       : valorNovoContrato;
     return {

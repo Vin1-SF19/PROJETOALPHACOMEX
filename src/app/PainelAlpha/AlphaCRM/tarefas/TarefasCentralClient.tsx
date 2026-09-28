@@ -100,9 +100,10 @@ export default function TarefasCentralClient({ tarefas, visual, currentUserId, c
               className="w-full flex items-center justify-between gap-3 bg-slate-900/60 border border-white/5 rounded-xl px-4 py-3 text-left hover:border-white/15 transition-colors"
             >
               <div className="min-w-0 flex-1">
-                <p className={`text-sm ${t.status === "CONCLUIDA" ? "line-through text-slate-500" : "text-white"}`}>
+                <p className={`text-sm ${t.status === "CONCLUIDA" || t.status === "CANCELADA" ? "line-through text-slate-500" : "text-white"}`}>
                   {t.titulo}
                 </p>
+                {t.status === "CANCELADA" && <span className="mt-1 inline-flex rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-300">Cancelada</span>}
                 {t.cardChecklistId && (
                   <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-300">
                     <ClipboardCheck size={11} aria-hidden="true" /> Procedimento

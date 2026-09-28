@@ -201,7 +201,8 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
   }
   if (tipo === "CRIAR_TAREFA") {
     const interromperSeCampo = parametros.interromperSeCampoPreenchido;
-    if (interromperSeCampo === "standbyFollowUpInterrompidoEm" && card.standbyFollowUpInterrompidoEm) return { ignorada: true, motivo: "FOLLOW_UP_INTERROMPIDO" };
+    const followUpNoLoss = execucao.automacao.chave === "standby_follow_up_semanal" || interromperSeCampo === "standbyFollowUpInterrompidoEm";
+    if (followUpNoLoss && card.standbyFollowUpInterrompidoEm) return { ignorada: true, motivo: "FOLLOW_UP_INTERROMPIDO" };
     if (interromperSeCampo === "proximoContatoEm" && card.proximoContatoEm) return { ignorada: true, motivo: "PROXIMO_CONTATO_PREENCHIDO" };
     const responsavelId = Number(parametros.responsavelId ?? card.responsavelId);
     const temPrazo = parametros.prazoMinutos !== undefined;
@@ -209,6 +210,13 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
     const alertaMinutos = parametros.alertaMinutos === undefined ? null : Number(parametros.alertaMinutos);
     const agora = new Date();
     const tarefa = await db.$transaction(async (tx) => {
+      if (followUpNoLoss) {
+        const elegivel = await tx.bpmCard.updateMany({
+          where: { id: card.id, etapaId: execucao.automacao.etapaId, status: "ATIVO", standbyFollowUpInterrompidoEm: null },
+          data: { standbyFollowUpUltimoEm: agora },
+        });
+        if (elegivel.count !== 1) return { ignorada: true as const, motivo: "FOLLOW_UP_INTERROMPIDO_OU_FORA_DA_ETAPA" };
+      }
       if (parametros.naoDuplicarTipo || parametros.naoDuplicarPendenteTipo) {
         const existente = await tx.bpmTarefa.findFirst({ where: {
           cardId: card.id, tipo: String(parametros.tipo),
@@ -216,7 +224,7 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
         }, select: { id: true } });
         if (existente) return { id: existente.id, existente: true };
       }
-      if (parametros.registrarExecucaoEmCampo === "standbyFollowUpUltimoEm") {
+      if (parametros.registrarExecucaoEmCampo === "standbyFollowUpUltimoEm" && !followUpNoLoss) {
         await tx.bpmCard.update({ where: { id: card.id }, data: { standbyFollowUpUltimoEm: agora } });
       }
       const criada = await tx.bpmTarefa.create({ data: {
@@ -226,9 +234,16 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
         alertaEm: alertaMinutos === null ? null : new Date(agora.getTime() + alertaMinutos * 60_000),
         tipo: String(parametros.tipo), prioridade: String(parametros.prioridade),
       } });
+      if (followUpNoLoss) {
+        await tx.bpmCardHistorico.create({ data: {
+          cardId: card.id, acao: "STANDBY_FOLLOW_UP_TAREFA_CRIADA", automacaoOrigem: execucao.automacaoId,
+          valorNovoJson: JSON.stringify({ tarefaId: criada.id, execucaoId: execucao.id, criadaEm: agora.toISOString() }),
+        } });
+      }
       await publicarEventoDaAcao(execucao, "TAREFA_CRIADA", "TAREFA", criada.id, undefined, { tarefaId: criada.id, tipo: criada.tipo, titulo: criada.titulo }, tx);
       return criada;
     });
+    if ("ignorada" in tarefa) return tarefa;
     if ("existente" in tarefa) return { tarefaId: tarefa.id, existente: true };
     await notificarPipelineBpm({ pipelineId: card.pipelineId, cardId: card.id, tipo: "TAREFA_ALTERADA" });
     return { tarefaId: tarefa.id };
