@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress — configuração Turso publicada; envio do código e homologação pendentes
+Ready for Review — configuração Turso publicada e QA de código aprovado; deploy e homologação real pendentes
 
 ## Executor Assignment
 
@@ -105,6 +105,7 @@ Testes de domínio/actions em `tests/bpm/` e integração da Agenda Alpha nos te
 | 2026-09-28 | 0.1 | Pedido Em tratativas, controles configuráveis, follow-up e tarefa na Agenda Alpha. | River (`@sm`) |
 | 2026-09-28 | 0.2 | Código, prévia da configuração, testes focados e revisão QA; publicação protegida pendente. | Codex (`@dev`) |
 | 2026-09-28 | 0.3 | Configuração publicada no Turso com autorização específica e verificação pós-escrita. | Codex (`@dev`) |
+| 2026-09-28 | 0.4 | Story pronta para revisão após QA do código; deploy e homologação real registrados como pendências. | Codex (`@dev`) |
 
 ## Story Draft Validation
 
