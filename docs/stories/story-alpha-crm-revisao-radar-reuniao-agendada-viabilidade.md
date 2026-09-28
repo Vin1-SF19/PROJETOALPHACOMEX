@@ -54,6 +54,7 @@ Todos os campos abaixo devem constar em **Configurações → Campos e Formulár
 8. A ação **Gerar ficha** está disponível nesta etapa e produz a **mesma Ficha Alpha em PDF usada pelo botão Gerar Ficha da Pré-Análise** (`FichaAlphaPDF`), preenchida automaticamente com valores persistidos do card e da empresa. Ela inclui os dados aplicáveis da Análise de Viabilidade, mantém lacunas sem dado em branco e não mistura consultas de outra empresa nem inventa conteúdo. Os dados já salvos da Pré-Análise para o mesmo CNPJ podem complementar o card.
 9. É possível reagendar a reunião nesta etapa conforme a regra de integridade da transcrição já documentada: preservar evento/Meet e evidência existente; se a transcrição recebida tornar o reagendamento inseguro, a UI e o backend explicam a recusa e oferecem orientação operacional, sem limpar a transcrição.
 10. A integração Google Meet captura/permite registrar a transcrição e traz resumo das reuniões. Estados pendente, recebida e erro são distinguíveis. Falha de licença, permissão ou ausência de transcrição no Google não gera transcrição fictícia e não libera o avanço comercial.
+    Quando o mesmo link Meet produz várias sessões, inclusive após reagendamento, a busca reúne transcrições e artefatos apenas das sessões encerradas próximas umas das outras e compatíveis com a data atual do card. Sessões curtas sem conteúdo não impedem a busca; reuniões separadas por horas não são atribuídas ao card.
 11. Sem **Próximo Contato**, card ativo em Reunião Agendada participa da cadência de **até oito dias úteis**, com uma ligação registrada por dia útil conforme configuração; com Próximo Contato a cadência e envio automático a Standby pausam. Tentativa não registrada não é presumida como realizada. Configuração de cadência deve aparecer na UI e edições/desativação/exclusão são respeitadas pelo job existente.
 12. Ao esgotar a cadência ativa e as tentativas exigidas sem resposta/Próximo Contato, a automação envia o card para **Standby** uma só vez, com histórico e atualização do board. Retry e concorrência não duplicam movimento. Não cria segundo cron.
 13. Entregar guia **passo a passo completo** para habilitar transcrição no Google Workspace/Cloud, incluindo licença elegível, gravação/transcrição habilitada na reunião, Meet REST API, conta de serviço e Domain-Wide Delegation, scope necessário, usuário impersonado/permissões, variáveis de ambiente, implantação, teste com reunião real, verificação de estados, solução de problemas e limites de disponibilidade. Segredos e dados de clientes não entram no guia/logs.
@@ -76,6 +77,7 @@ Todos os campos abaixo devem constar em **Configurações → Campos e Formulár
 - [x] 4. Aplicar guard de avanço no backend e limitar saídas no board/servidor/configuração; preservar contingência Standby (AC 2, 7): guard e três transições do banco publicados.
 - [x] 5. Integrar Gerar ficha, reagendamento, transcrição e resumo de reuniões ao card, respeitando a evidência existente (AC 1, 8–10).
 - [x] 5a. Substituir o PDF próprio da ficha do CRM pelo mesmo template da Pré-Análise, com preenchimento dos dados persistidos do card (refinamento solicitado após publicação).
+- [x] 5b. Corrigir busca de transcrição e resumos quando o mesmo link Meet contém sessões curtas sem artefatos e uma sessão principal após reagendamento; validar com o card ZAMP S.A.
 - [x] 6. Auditar/ajustar cadência configurável e job único para esta etapa, Próximo Contato e Standby idempotente (AC 11–12): runtime e definição de oito passos publicados.
 - [ ] 7. Produzir e validar guia operacional Google Workspace/Cloud com teste real e diagnóstico de permissões/licença (AC 13): guia pronto; teste real requer configuração externa.
 - [x] 8. Se houver escrita protegida no Turso, executar Vault, obter confirmação específica e publicar com auditoria/rollback; configuração conferida por leitura e FKs. Homologação UI autenticada ainda recomendada.
@@ -118,7 +120,7 @@ Testes BPM em `tests/bpm/` e integração Google com mocks para situações pend
 - [ ] AC 1–15 verificados com evidência no Dev Agent Record.
 - [x] Configuração Turso publicada apenas após gate Vault e confirmação específica.
 - [ ] Guia Google Workspace/Cloud validado contra integração e homologação real.
-- [x] `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` executados: lint 0 erros (1191 avisos preexistentes), typecheck PASS, 538 arquivos/3970 testes PASS, build PASS.
+- [x] `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` executados: lint 0 erros (1192 avisos), typecheck PASS, 538 arquivos/3975 testes PASS, build PASS.
 - [x] QA sem issue CRITICAL pendente; CodeRabbit externo não executado.
 - [x] File List e Change Log atualizados.
 
@@ -143,6 +145,7 @@ Testes BPM em `tests/bpm/` e integração Google com mocks para situações pend
 | 2026-09-28 | 0.3 | Diagnóstico de movimento pendente após Meet: Turso retornou `SQLITE_BUSY`; transição ganhou retry transacional e erro técnico. Card afetado avançou na terceira tentativa da automação. | Codex (`@dev`) |
 | 2026-09-28 | 0.4 | Publicação Turso autorizada e aplicada; versão 15, formulário, campos, cadência, transições e auditoria verificados. | Codex (`@dev`) |
 | 2026-09-28 | 0.5 | Botão de ficha do CRM reutiliza o PDF da Pré-Análise, com preenchimento a partir do card e complemento por CNPJ idêntico. | Codex (`@dev`) |
+| 2026-09-28 | 0.6 | Busca de transcrição percorre sessões compatíveis do mesmo Meet; sessão curta sem conteúdo não bloqueia a sessão principal. ZAMP S.A. sincronizada e verificada. | Codex (`@dev`) |
 
 ## Dev Agent Record
 
@@ -156,17 +159,20 @@ Implementado guard de saídas/transcrição, remoção do fallback Calendar que 
 
 Diagnóstico operacional de 28/09: um Meet foi salvo, mas o movimento automático encontrou `SQLITE_BUSY` na transação remota. A validação read-only passou e a mesma transição concluiu numa cópia local do banco. O card avançou depois pelo retry do motor central, com status `SUCESSO` e sem duplicidade. A transição agora faz uma tentativa inicial e até três novas tentativas em disputa de escrita, devolvendo `DATABASE_BUSY` se esgotá-las. Após autorização específica, a configuração foi publicada no Turso, versão 15, e verificada com 14 campos de etapa, 16 componentes, três saídas, oito passos de cadência e zero violações de FK.
 
+Diagnóstico ZAMP S.A. em 28/09: o link Meet gerou três sessões encerradas; duas de poucos segundos sem transcrição e a sessão principal com duas entradas. A seleção anterior usava somente a sessão cronologicamente mais próxima. A nova busca reúne entradas das sessões do mesmo grupo temporal, sem atribuir reuniões distantes que reutilizem o link. Sincronização operacional do card executada pela rotina normal do aplicativo; status `RECEBIDA` e 149 caracteres persistidos, sem exibir o conteúdo no relatório.
+
 ### File List
 
 - `src/lib/bpm/transicao-command.ts`, `src/lib/bpm/reuniao-agendada.ts` — guard de saídas e transcrição.
 - `src/lib/bpm/sqlite-busy-retry.ts` — retry seguro da transação de movimento contra disputa de escrita do Turso.
 - `src/lib/bpm/transcricao-reuniao-server.ts`, `src/lib/google-meet/client.ts`, `src/actions/bpm/TranscricaoMeet.ts` — transcrição real e links de resumos/gravações.
+- `src/lib/bpm/transcricao-reuniao.ts` — seleção ordenada das sessões encerradas compatíveis com o card.
 - `src/actions/bpm/GoogleMeet.ts`, `src/app/PainelAlpha/AlphaCRM/CardModal/PainelReuniao.tsx`, `src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa.tsx`, `src/app/PainelAlpha/AlphaCRM/CardModal/CardOpenFormSlot.tsx` — reagendamento, transcrição e ficha no card.
 - `src/lib/bpm/ficha-viabilidade-server.ts`, `src/lib/bpm/ficha-viabilidade-dados.ts`, `src/components/GerarFicha.tsx`, `src/actions/bpm/FichaViabilidade.ts` — ficha compartilhada com Pré-Análise, mapeamento seguro dos dados do card e geração do PDF.
 - `src/lib/bpm/automacao-novos-leads.ts`, `src/lib/bpm/cadencias/ativacao-automatica.ts` — cadência após reunião.
 - `scripts/bpm-reuniao-agendada-config.mjs` — publicação transacional com prévia e guard Vault.
 - `docs/google-meet-transcricoes-alpha-crm.md`, `docs/reports/vault-revisao-radar-reuniao-agendada-2026-09-28.md` — guia e relatório de banco.
-- `tests/bpm/ficha-viabilidade.test.ts`, `tests/bpm/reuniao-agendada.test.ts`, `tests/bpm/transcricao-reuniao-server.test.ts`, `tests/bpm/automacao-reuniao-agendada.test.ts`, `tests/bpm/google-meet-etapa-guard.test.ts`, `tests/bpm/formulario-etapa.test.ts`, `tests/bpm/card-modal-integration.test.ts`, `tests/bpm/reuniao-transcricao.test.ts`, `tests/bpm/autosave-fixed-recovery-react.test.ts` — testes de regressão e novos cenários.
+- `tests/bpm/ficha-viabilidade.test.ts`, `tests/bpm/reuniao-agendada.test.ts`, `tests/bpm/transcricao-reuniao-server.test.ts`, `tests/bpm/automacao-reuniao-agendada.test.ts`, `tests/bpm/google-meet-etapa-guard.test.ts`, `tests/bpm/formulario-etapa.test.ts`, `tests/bpm/card-modal-integration.test.ts`, `tests/bpm/reuniao-transcricao.test.ts`, `tests/bpm/autosave-fixed-recovery-react.test.ts` — testes de regressão, incluindo sessões múltiplas após reagendamento e isolamento de outra reunião.
 - `tests/bpm/sqlite-busy-retry.test.ts` — retry de lock e rejeição imediata de falha de negócio.
 
 ## QA Results
@@ -176,6 +182,8 @@ PASS para código em revisão read-only de @qa: guard e saídas, rejeição do f
 Patch de retry `SQLITE_BUSY` revisado novamente por @qa: PASS. A transação inteira é repetida, com efeitos pós-commit fora do retry e chave de idempotência preservada; 2 testes dirigidos e `git diff --check` passaram.
 
 Refinamento da ficha compartilhada revisado por @qa: PASS. O CRM reutiliza `FichaAlphaPDF`, complementa apenas pela Pré-Análise de CNPJ idêntico, preserva autorização e exibe os campos da Análise de Viabilidade em segunda página. Uma regressão de capitalização do canal de origem foi corrigida antes do veredito. Teste dirigido 3/3, typecheck e `git diff --check` passaram.
+
+Correção ZAMP/reagendamento revisada por @qa: PASS. A busca agrega transcrições e links apenas de sessões conectadas temporalmente à sessão mais próxima da data do card; sessões distantes no mesmo código Meet não são importadas. Testes dirigidos 23/23, typecheck e `git diff --check` passaram. Limite residual: reuniões distintas com o mesmo código e intervalo de até 15 minutos podem ser indistinguíveis pela API; não ocorreu no caso verificado.
 
 ## Story Draft Validation
 

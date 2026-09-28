@@ -5,6 +5,7 @@ import {
   consolidarTranscricao,
   extrairCodigoMeet,
   selecionarRegistroConferencia,
+  selecionarRegistrosConferenciaCompativeis,
 } from "@/lib/bpm/transcricao-reuniao";
 
 describe("Reunião Agendada", () => {
@@ -33,6 +34,16 @@ describe("Reunião Agendada", () => {
       { name: "conferenceRecords/ativa", startTime: "2026-08-12T14:00:00Z", endTime: null },
     ], new Date("2026-08-12T14:00:00Z"));
     expect(escolhida?.name).toBe("conferenceRecords/correta");
+  });
+
+  it("ordena sessões compatíveis da data reagendada e exclui sessões de dias anteriores", () => {
+    const registros = selecionarRegistrosConferenciaCompativeis([
+      { name: "antiga", startTime: "2026-08-10T14:00:00Z", endTime: "2026-08-10T15:00:00Z" },
+      { name: "principal", startTime: "2026-08-12T14:01:15Z", endTime: "2026-08-12T15:00:00Z" },
+      { name: "curta", startTime: "2026-08-12T14:01:00Z", endTime: "2026-08-12T14:01:03Z" },
+      { name: "outra", startTime: "2026-08-12T18:00:00Z", endTime: "2026-08-12T18:30:00Z" },
+    ], new Date("2026-08-12T14:00:00Z"));
+    expect(registros.map((registro) => registro.name)).toEqual(["curta", "principal"]);
   });
 
   it("consolida entradas em ordem com participante e horário", () => {

@@ -13,6 +13,7 @@ export type EntradaTranscricaoMeet = {
 
 const CODIGO_MEET = /^[a-z]+-[a-z]+-[a-z]+$/;
 const JANELA_COMPATIBILIDADE_MS = 24 * 60 * 60 * 1000;
+const INTERVALO_MAXIMO_ENTRE_SESSOES_MS = 15 * 60 * 1000;
 
 export function extrairCodigoMeet(link: string | null | undefined): string | null {
   if (!link) return null;
@@ -30,24 +31,47 @@ export function selecionarRegistroConferencia(
   registros: RegistroConferenciaMeet[],
   dataReuniao: Date | null,
 ): RegistroConferenciaMeet | null {
+  return selecionarRegistrosConferenciaCompativeis(registros, dataReuniao)[0] ?? null;
+}
+
+export function selecionarRegistrosConferenciaCompativeis(
+  registros: RegistroConferenciaMeet[],
+  dataReuniao: Date | null,
+): RegistroConferenciaMeet[] {
   const encerrados = registros.filter((registro) => {
-    return Boolean(registro.name && registro.endTime && Number.isFinite(Date.parse(registro.startTime)));
+    return Boolean(registro.name && registro.endTime
+      && Number.isFinite(Date.parse(registro.startTime))
+      && Number.isFinite(Date.parse(registro.endTime))
+      && Date.parse(registro.endTime) >= Date.parse(registro.startTime));
   });
-  if (encerrados.length === 0) return null;
+  if (encerrados.length === 0) return [];
 
   if (!dataReuniao) {
-    return encerrados.sort((a, b) => Date.parse(b.startTime) - Date.parse(a.startTime))[0] ?? null;
+    return encerrados.sort((a, b) => Date.parse(b.startTime) - Date.parse(a.startTime)).slice(0, 1);
   }
 
   const alvo = dataReuniao.getTime();
-  const porProximidade = encerrados.sort((a, b) => {
-    return Math.abs(Date.parse(a.startTime) - alvo) - Math.abs(Date.parse(b.startTime) - alvo);
-  });
-  const escolhido = porProximidade[0];
-  if (!escolhido || Math.abs(Date.parse(escolhido.startTime) - alvo) > JANELA_COMPATIBILIDADE_MS) {
-    return null;
+  const proximos = encerrados.filter((registro) => Math.abs(Date.parse(registro.startTime) - alvo) <= JANELA_COMPATIBILIDADE_MS);
+  const maisProximo = [...proximos].sort((a, b) => Math.abs(Date.parse(a.startTime) - alvo) - Math.abs(Date.parse(b.startTime) - alvo))[0];
+  if (!maisProximo) return [];
+
+  // Um código Meet pode ser reutilizado em outras reuniões. Só percorremos
+  // as sessões conectadas por intervalos curtos à sessão mais próxima do card.
+  const cronologicos = proximos.sort((a, b) => Date.parse(a.startTime) - Date.parse(b.startTime));
+  let grupo: RegistroConferenciaMeet[] = [];
+  let fimGrupo = 0;
+  for (const registro of cronologicos) {
+    const inicio = Date.parse(registro.startTime);
+    if (grupo.length && inicio - fimGrupo > INTERVALO_MAXIMO_ENTRE_SESSOES_MS) {
+      if (grupo.includes(maisProximo)) break;
+      grupo = [];
+    }
+    grupo.push(registro);
+    fimGrupo = Math.max(fimGrupo, Date.parse(registro.endTime!));
   }
-  return escolhido;
+  return grupo.includes(maisProximo)
+    ? grupo.sort((a, b) => Math.abs(Date.parse(a.startTime) - alvo) - Math.abs(Date.parse(b.startTime) - alvo))
+    : [];
 }
 
 export function consolidarTranscricao(

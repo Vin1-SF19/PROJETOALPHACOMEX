@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const listarRegistrosMock = vi.hoisted(() => vi.fn());
 const carregarArtefatoMock = vi.hoisted(() => vi.fn());
+const listarResumosMock = vi.hoisted(() => vi.fn());
+const listarGravacoesMock = vi.hoisted(() => vi.fn());
 const obterUsuarioGoogleMock = vi.hoisted(() => vi.fn());
 const notificarPipelineMock = vi.hoisted(() => vi.fn());
 const cardFindUniqueMock = vi.hoisted(() => vi.fn());
@@ -19,6 +21,8 @@ vi.mock("@/lib/google-meet/client", () => ({
   },
   listarRegistrosConferenciaMeet: listarRegistrosMock,
   carregarArtefatoTranscricaoMeet: carregarArtefatoMock,
+  listarResumosMeet: listarResumosMock,
+  listarGravacoesMeet: listarGravacoesMock,
 }));
 vi.mock("@/lib/google-calendar/usuario-google", () => ({
   obterUsuarioGoogleAtivoPorCalendario: obterUsuarioGoogleMock,
@@ -36,6 +40,7 @@ vi.mock("@/lib/prisma", () => ({
 
 import {
   executarComPrazoGoogleMeet,
+  obterLinksArtefatosMeetCardBpm,
   sincronizarTranscricaoCardBpm,
 } from "@/lib/bpm/transcricao-reuniao-server";
 
@@ -73,6 +78,8 @@ describe("sincronizarTranscricaoCardBpm", () => {
       }],
       participantes: new Map([["participants/1", "Ana"]]),
     });
+    listarResumosMock.mockResolvedValue([]);
+    listarGravacoesMock.mockResolvedValue([]);
     updateManyMock.mockResolvedValue({ count: 1 });
     historicoCreateMock.mockResolvedValue({});
     transactionMock.mockImplementation(async (callback) => callback({
@@ -106,6 +113,91 @@ describe("sincronizarTranscricaoCardBpm", () => {
       cardId: "card-1",
       tipo: "REUNIAO_ALTERADA",
     });
+  });
+
+  it("ignora sessões curtas sem transcrição do mesmo Meet e importa a sessão da reunião reagendada", async () => {
+    cardFindUniqueMock.mockResolvedValue({ ...cardBase, dataReuniao: new Date("2026-08-12T14:00:00.000Z") });
+    listarRegistrosMock.mockResolvedValue([
+      { name: "conferenceRecords/antiga", startTime: "2026-08-10T14:00:00.000Z", endTime: "2026-08-10T14:30:00.000Z" },
+      { name: "conferenceRecords/curta", startTime: "2026-08-12T14:01:00.000Z", endTime: "2026-08-12T14:01:03.000Z" },
+      { name: "conferenceRecords/reagendada", startTime: "2026-08-12T14:01:15.000Z", endTime: "2026-08-12T14:30:00.000Z" },
+      { name: "conferenceRecords/outra-reuniao", startTime: "2026-08-12T18:00:00.000Z", endTime: "2026-08-12T18:30:00.000Z" },
+    ]);
+    carregarArtefatoMock.mockImplementation(async (_email, name) => name === "conferenceRecords/curta"
+      ? { transcriptsEncontrados: 0, entradas: [], participantes: new Map() }
+      : { transcriptsEncontrados: 1, entradas: [{ name: "entrada", participant: null, text: "Reunião reagendada", startTime: "2026-08-12T14:02:00.000Z" }], participantes: new Map() });
+
+    const resultado = await sincronizarTranscricaoCardBpm("card-1", "manual");
+
+    expect(resultado).toMatchObject({ status: "RECEBIDA", atualizada: true });
+    expect(carregarArtefatoMock.mock.calls.map(([, name]) => name)).toEqual([
+      "conferenceRecords/curta", "conferenceRecords/reagendada",
+    ]);
+    expect(updateManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: { transcricaoReuniao: "[14:02:00] Participante: Reunião reagendada" },
+    }));
+  });
+
+  it("busca links de resumo na sessão que gerou artefatos", async () => {
+    listarRegistrosMock.mockResolvedValue([
+      { name: "conferenceRecords/curta", startTime: "2026-08-12T12:01:00.000Z", endTime: "2026-08-12T12:01:03.000Z" },
+      { name: "conferenceRecords/principal", startTime: "2026-08-12T12:01:15.000Z", endTime: "2026-08-12T12:30:00.000Z" },
+    ]);
+    listarResumosMock.mockImplementation(async (_email, name) => name === "conferenceRecords/principal"
+      ? [{ nome: "Resumo 1", url: "https://docs.google.com/document/d/exemplo/view" }] : []);
+    listarGravacoesMock.mockImplementation(async (_email, name) => name === "conferenceRecords/curta"
+      ? [{ nome: "Gravação 1", url: "https://drive.google.com/file/d/exemplo/view" }] : []);
+
+    const resultado = await obterLinksArtefatosMeetCardBpm("card-1");
+
+    expect(resultado.resumos).toHaveLength(1);
+    expect(resultado.gravacoes).toHaveLength(1);
+    expect(listarResumosMock.mock.calls.map(([, name]) => name)).toEqual([
+      "conferenceRecords/curta", "conferenceRecords/principal",
+    ]);
+  });
+
+  it("reúne entradas de sessões próximas sem importar a transcrição de outra reunião", async () => {
+    listarRegistrosMock.mockResolvedValue([
+      { name: "conferenceRecords/curta", startTime: "2026-08-12T12:01:00.000Z", endTime: "2026-08-12T12:01:03.000Z" },
+      { name: "conferenceRecords/principal", startTime: "2026-08-12T12:01:15.000Z", endTime: "2026-08-12T12:30:00.000Z" },
+      { name: "conferenceRecords/outra", startTime: "2026-08-12T18:00:00.000Z", endTime: "2026-08-12T18:30:00.000Z" },
+    ]);
+    carregarArtefatoMock.mockImplementation(async (_email, name) => ({
+      transcriptsEncontrados: 1,
+      entradas: [{
+        name: `${name}/entry`, participant: null,
+        text: name === "conferenceRecords/curta" ? "Início" : name === "conferenceRecords/principal" ? "Conteúdo principal" : "Outra empresa",
+        startTime: name === "conferenceRecords/curta" ? "2026-08-12T12:01:02.000Z" : "2026-08-12T12:05:00.000Z",
+      }],
+      participantes: new Map(),
+    }));
+
+    const resultado = await sincronizarTranscricaoCardBpm("card-1", "manual");
+
+    expect(resultado.status).toBe("RECEBIDA");
+    expect(carregarArtefatoMock.mock.calls.map(([, name]) => name)).toEqual([
+      "conferenceRecords/curta", "conferenceRecords/principal",
+    ]);
+    expect(updateManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: { transcricaoReuniao: "[12:01:02] Participante: Início\n[12:05:00] Participante: Conteúdo principal" },
+    }));
+  });
+
+  it("mantém pendente quando só outra reunião distante tem transcrição no mesmo link", async () => {
+    listarRegistrosMock.mockResolvedValue([
+      { name: "conferenceRecords/proxima", startTime: "2026-08-12T12:01:00.000Z", endTime: "2026-08-12T12:01:03.000Z" },
+      { name: "conferenceRecords/outra", startTime: "2026-08-12T18:00:00.000Z", endTime: "2026-08-12T18:30:00.000Z" },
+    ]);
+    carregarArtefatoMock.mockImplementation(async (_email, name) => name === "conferenceRecords/proxima"
+      ? { transcriptsEncontrados: 0, entradas: [], participantes: new Map() }
+      : { transcriptsEncontrados: 1, entradas: [{ name: "outra/entry", participant: null, text: "Outra reunião", startTime: "2026-08-12T18:02:00.000Z" }], participantes: new Map() });
+
+    const resultado = await sincronizarTranscricaoCardBpm("card-1", "manual");
+
+    expect(resultado.status).toBe("PENDENTE");
+    expect(carregarArtefatoMock.mock.calls.map(([, name]) => name)).toEqual(["conferenceRecords/proxima"]);
+    expect(updateManyMock).not.toHaveBeenCalled();
   });
 
   it("não duplica histórico nem realtime quando o conteúdo já está persistido", async () => {

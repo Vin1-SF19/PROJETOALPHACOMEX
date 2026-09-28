@@ -14,7 +14,7 @@ import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import {
   consolidarTranscricao,
   extrairCodigoMeet,
-  selecionarRegistroConferencia,
+  selecionarRegistrosConferenciaCompativeis,
 } from "@/lib/bpm/transcricao-reuniao";
 import { NOME_ETAPA_REUNIAO_AGENDADA } from "@/lib/bpm/reuniao-agendada";
 import { NOME_ETAPA_STANDBY } from "@/lib/bpm/novos-leads";
@@ -107,13 +107,20 @@ export async function obterLinksArtefatosMeetCardBpm(cardId: string): Promise<{
     googleMeetLink: card.googleMeetLink,
   });
   const registros = await listarRegistrosConferenciaMeet(emailOrganizador, codigo);
-  const registro = selecionarRegistroConferencia(registros, card.dataReuniao);
-  if (!registro) return vazio;
-  const [resumos, gravacoes] = await Promise.all([
-    listarResumosMeet(emailOrganizador, registro.name),
-    listarGravacoesMeet(emailOrganizador, registro.name),
-  ]);
-  return { resumos, gravacoes };
+  const resumosEncontrados: Array<{ nome: string; url: string }> = [];
+  const gravacoesEncontradas: Array<{ nome: string; url: string }> = [];
+  for (const registro of selecionarRegistrosConferenciaCompativeis(registros, card.dataReuniao)) {
+    const [resumos, gravacoes] = await Promise.all([
+      listarResumosMeet(emailOrganizador, registro.name),
+      listarGravacoesMeet(emailOrganizador, registro.name),
+    ]);
+    resumosEncontrados.push(...resumos);
+    gravacoesEncontradas.push(...gravacoes);
+  }
+  return {
+    resumos: resumosEncontrados.filter((item, indice, lista) => lista.findIndex((outro) => outro.url === item.url) === indice),
+    gravacoes: gravacoesEncontradas.filter((item, indice, lista) => lista.findIndex((outro) => outro.url === item.url) === indice),
+  };
 }
 
 async function executarSincronizacaoTranscricaoCardBpm(
@@ -161,7 +168,7 @@ async function executarSincronizacaoTranscricaoCardBpm(
     });
     const prazoMeetEm = Date.now() + PRAZO_MEET_MS;
     let transcricao: string | null = null;
-    let conferencia: string | null = null;
+    const conferencias: string[] = [];
     let quantidadeEntradas = 0;
     const fonte = "google_meet";
 
@@ -170,25 +177,33 @@ async function executarSincronizacaoTranscricaoCardBpm(
         () => listarRegistrosConferenciaMeet(emailOrganizador, meetingCode),
         Math.max(1, prazoMeetEm - Date.now()),
       );
-      const registro = selecionarRegistroConferencia(registros, card.dataReuniao);
-      if (!registro) {
+      const candidatos = selecionarRegistrosConferenciaCompativeis(registros, card.dataReuniao);
+      if (candidatos.length === 0) {
         return {
           status: "PENDENTE",
           motivo: "A conferência encerrada ainda não está disponível no Google Meet.",
         };
       }
-
-      const artefato = await executarComPrazoGoogleMeet(
-        () => carregarArtefatoTranscricaoMeet(emailOrganizador, registro.name),
-        Math.max(1, prazoMeetEm - Date.now()),
-      );
-      conferencia = registro.name;
-      quantidadeEntradas = artefato.entradas.length;
-      transcricao = consolidarTranscricao(artefato.entradas, artefato.participantes);
+      let transcricoesEmProcessamento = false;
+      const entradas = new Map<string, Awaited<ReturnType<typeof carregarArtefatoTranscricaoMeet>>["entradas"][number]>();
+      const participantes = new Map<string, string>();
+      for (const registro of candidatos) {
+        const artefato = await executarComPrazoGoogleMeet(
+          () => carregarArtefatoTranscricaoMeet(emailOrganizador, registro.name),
+          Math.max(1, prazoMeetEm - Date.now()),
+        );
+        transcricoesEmProcessamento ||= artefato.transcriptsEncontrados > 0;
+        if (artefato.entradas.length === 0) continue;
+        conferencias.push(registro.name);
+        for (const entrada of artefato.entradas) entradas.set(entrada.name, entrada);
+        for (const [id, nome] of artefato.participantes) participantes.set(id, nome);
+      }
+      quantidadeEntradas = entradas.size;
+      transcricao = consolidarTranscricao([...entradas.values()], participantes);
       if (!transcricao) {
         return {
           status: "PENDENTE",
-          motivo: artefato.transcriptsEncontrados > 0
+          motivo: transcricoesEmProcessamento
             ? "A transcrição ainda está sendo processada pelo Google Meet."
             : "A reunião foi encontrada, mas ainda não possui transcrição gerada.",
         };
@@ -247,7 +262,8 @@ async function executarSincronizacaoTranscricaoCardBpm(
           valorNovoJson: JSON.stringify({
             origem,
             fonte,
-            conferenceRecord: conferencia,
+            conferenceRecord: conferencias[0] ?? null,
+            conferenceRecords: conferencias,
             entradas: quantidadeEntradas,
             caracteres: transcricao.length,
           }),
