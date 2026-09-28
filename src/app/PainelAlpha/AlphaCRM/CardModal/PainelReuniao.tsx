@@ -181,6 +181,10 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
         setConflitoDataHora(false);
       }
       toast.success(jaAgendada ? "Reunião reagendada" : "Reunião agendada no Google Meet");
+      if (!jaAgendada && "data" in res && res.data && typeof res.data === "object"
+        && "avancoConcluido" in res.data && !res.data.avancoConcluido) {
+        toast.info("Reunião criada; a mudança para Reunião Agendada está pendente.");
+      }
       onAtualizado();
     } else {
       toast.error(typeof res.error === "string" ? res.error : "Não foi possível salvar a reunião");

@@ -85,6 +85,7 @@ const GATILHO_LABEL: Record<string, string> = {
   TAREFA_CRIADA: "Tarefa criada",
   PROCESSO_DEFERIDO: "Processo deferido",
   CARD_ATUALIZADO: "Card atualizado",
+  REUNIAO_AGENDADA: "Reunião agendada",
   CAMPO_ALTERADO: "Campo alterado",
   CAMPO_VALOR_ASSUMIDO: "Valor de campo assumido",
   TAREFA_CONCLUIDA: "Tarefa concluída",

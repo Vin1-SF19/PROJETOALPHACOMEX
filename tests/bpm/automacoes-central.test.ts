@@ -134,6 +134,39 @@ describe("Motor Central de Automações", () => {
     }) });
   });
 
+  it("materializa o agendamento confirmado somente para a etapa configurada", async () => {
+    const origem = "draft-stage-3dc45c6e-2b99-4fd7-bb41-0adfd47ba162";
+    const create = vi.fn().mockResolvedValue({ id: "exec-meet" });
+    const client = {
+      bpmAutomacaoVersao: { findMany: vi.fn().mockResolvedValue([{
+        id: "versao-meet", automacaoId: "automacao-meet", gatilhoTipo: "REUNIAO_AGENDADA",
+        gatilhoConfigJson: JSON.stringify({ escopo: "ETAPAS", etapaId: origem, etapasIds: [origem] }),
+        automacao: { etapaId: origem, pipelineId: "pipeline-radar" },
+      }]) },
+      bpmEventoDominio: { findMany: vi.fn().mockResolvedValue([{
+        id: "evento-meet", tipo: "REUNIAO_AGENDADA", cardId: "card-1",
+        correlationId: "corr-meet", causationId: null, profundidade: 0,
+        valorAnteriorJson: null, valorNovoJson: JSON.stringify({ etapaId: origem }),
+        card: { etapaId: origem },
+      }]) },
+      bpmAutomacaoExecucao: { findFirst: vi.fn().mockResolvedValue(null), create },
+    };
+    expect(await materializarExecucoesEventosBpm(10, client as never)).toMatchObject({ criadas: 1 });
+    expect(create).toHaveBeenCalledWith({ data: expect.objectContaining({
+      automacaoVersaoId: "versao-meet", eventoId: "evento-meet", cardId: "card-1",
+    }) });
+    client.bpmEventoDominio.findMany.mockResolvedValueOnce([{
+      id: "evento-outra-etapa", tipo: "REUNIAO_AGENDADA", cardId: "card-2",
+      correlationId: "corr-meet-2", causationId: null, profundidade: 0,
+      valorAnteriorJson: null, valorNovoJson: JSON.stringify({ etapaId: "outra-etapa" }),
+      card: { etapaId: "outra-etapa" },
+    }]);
+    expect(await materializarExecucoesEventosBpm(10, client as never)).toMatchObject({ criadas: 0 });
+    expect(create).toHaveBeenLastCalledWith({ data: expect.objectContaining({
+      status: "IGNORADA", resultadoJson: expect.stringContaining("CONFIGURACAO_GATILHO_NAO_CORRESPONDE"),
+    }) });
+  });
+
   it("bloqueia HTTP sem TLS antes de qualquer chamada externa", async () => {
     await expect(executarHttpSeguro({
       url: "http://127.0.0.1/admin",

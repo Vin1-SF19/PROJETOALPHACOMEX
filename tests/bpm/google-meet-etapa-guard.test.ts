@@ -6,6 +6,9 @@ const criarEventoMock = vi.hoisted(() => vi.fn());
 const atualizarEventoMock = vi.hoisted(() => vi.fn());
 const obterEventoMock = vi.hoisted(() => vi.fn());
 const obterUsuarioPorCalendarioMock = vi.hoisted(() => vi.fn());
+const publicarEventoMock = vi.hoisted(() => vi.fn());
+const executarAutomacoesMock = vi.hoisted(() => vi.fn());
+const compensarCriacaoMock = vi.hoisted(() => vi.fn());
 const prismaMock = vi.hoisted(() => ({
   bpmCard: { findUnique: vi.fn(), updateMany: vi.fn() },
   usuarios: { findUnique: vi.fn() },
@@ -24,6 +27,13 @@ vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
 vi.mock("@/lib/bpm/ownership", () => ({ exigirAcessoBpmCard: acessoMock }));
 vi.mock("@/lib/bpm/historico-server", () => ({ registrarHistoricoCard: vi.fn() }));
 vi.mock("@/lib/bpm/realtime-server", () => ({ notificarPipelineBpm: vi.fn() }));
+vi.mock("@/lib/bpm/automacoes/eventos", () => ({ publicarEventoBpm: publicarEventoMock }));
+vi.mock("@/lib/bpm/automacoes/orquestrador", () => ({ executarAutomacoesCentraisDoCardAgora: executarAutomacoesMock }));
+vi.mock("@/lib/bpm/google-meet-compensacao", () => ({
+  cancelarCriacaoSemVinculo: compensarCriacaoMock,
+  registrarCompensacaoGooglePendente: vi.fn(),
+  reverterReagendamentoSemPersistencia: vi.fn(),
+}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/actions/google-calendar-eventos", () => ({ criarEventoNoCalendario: criarEventoMock }));
 vi.mock("@/lib/google-calendar/client", () => ({
@@ -162,6 +172,7 @@ describe("Google Meet: guard de etapa no backend", () => {
   it("normaliza e envia o cliente como participante ao agendar", async () => {
     const card = {
       id: CARD_ID,
+      pipelineId: "pipeline-radar",
       etapaId: "etapa-agendar",
       updatedAt: new Date("2026-08-13T00:00:00.000Z"),
       etapa: { nome: "Agendar Reunião" },
@@ -170,7 +181,8 @@ describe("Google Meet: guard de etapa no backend", () => {
     };
     prismaMock.bpmCard.findUnique
       .mockResolvedValueOnce(card)
-      .mockResolvedValueOnce(card);
+      .mockResolvedValueOnce(card)
+      .mockResolvedValueOnce({ etapa: { nome: "Reunião Agendada" } });
     prismaMock.usuarios.findUnique.mockResolvedValue({ email: "organizador@exemplo.com" });
     prismaMock.googleCalendarSelecionado.findMany.mockResolvedValue([{
       id: "calendario-local",
@@ -194,7 +206,7 @@ describe("Google Meet: guard de etapa no backend", () => {
       dataHora: DATA,
       emailCliente: " CLIENTE@EXEMPLO.COM ",
       emailsAdicionais: ["PESSOA@GMAIL.COM", "contato@hotmail.com", "pessoa@gmail.com"],
-    })).resolves.toEqual({ success: true, data: { googleEventId: "evento-1" } });
+    })).resolves.toEqual({ success: true, data: { googleEventId: "evento-1", avancoConcluido: true } });
 
     expect(criarEventoMock).toHaveBeenCalledWith(expect.objectContaining({
       participantes: [EMAIL, "pessoa@gmail.com", "contato@hotmail.com"],
@@ -203,6 +215,46 @@ describe("Google Meet: guard de etapa no backend", () => {
       where: { cardId_chave: { cardId: CARD_ID, chave: "principal" } },
       update: expect.objectContaining({ agendadaEm: DATA, googleEventId: "evento-1", emailCliente: EMAIL }),
     }));
+    expect(publicarEventoMock).toHaveBeenCalledWith(expect.objectContaining({
+      tipo: "REUNIAO_AGENDADA",
+      cardId: CARD_ID,
+      pipelineId: "pipeline-radar",
+      idempotencyKey: `reuniao-agendada:${CARD_ID}:evento-1`,
+      valorNovo: expect.objectContaining({ etapaId: "etapa-agendar" }),
+    }), tx);
+    expect(executarAutomacoesMock).toHaveBeenCalledWith(CARD_ID);
+  });
+
+  it("preserva o Meet e informa avanço pendente se o motor falhar após o commit", async () => {
+    const card = {
+      id: CARD_ID,
+      pipelineId: "pipeline-radar",
+      etapaId: "etapa-agendar",
+      updatedAt: new Date("2026-08-13T00:00:00.000Z"),
+      etapa: { nome: "Agendar Reunião" },
+      googleEventId: null,
+      empresa: { nomeFantasia: "Empresa", razaoSocial: "Empresa LTDA" },
+    };
+    prismaMock.bpmCard.findUnique
+      .mockResolvedValueOnce(card)
+      .mockResolvedValueOnce(card);
+    prismaMock.usuarios.findUnique.mockResolvedValue({ email: "organizador@exemplo.com" });
+    prismaMock.googleCalendarSelecionado.findMany.mockResolvedValue([{
+      id: "calendario-local", googleCalendarId: "primary", nome: "Principal", timezone: "America/Sao_Paulo",
+    }]);
+    criarEventoMock.mockResolvedValue({ success: true, data: { googleEventId: "evento-1" } });
+    prismaMock.googleCalendarEventoCache.findUnique.mockResolvedValue({ linkMeet: "https://meet.google.com/abc-defg-hij" });
+    prismaMock.$transaction.mockImplementation(async (callback) => callback({
+      bpmCard: { findUnique: vi.fn().mockResolvedValue(card), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      bpmCardReuniao: { upsert: vi.fn() },
+    }));
+    executarAutomacoesMock.mockRejectedValueOnce(new Error("fila indisponível"));
+
+    await expect(AgendarReuniaoGoogleMeetBpm({
+      cardId: CARD_ID, dataHora: DATA, emailCliente: EMAIL,
+    })).resolves.toEqual({ success: true, data: { googleEventId: "evento-1", avancoConcluido: false } });
+    expect(publicarEventoMock).toHaveBeenCalledOnce();
+    expect(compensarCriacaoMock).not.toHaveBeenCalled();
   });
 
   it("preserva convidados e inclui o cliente sem duplicar ao reagendar", async () => {

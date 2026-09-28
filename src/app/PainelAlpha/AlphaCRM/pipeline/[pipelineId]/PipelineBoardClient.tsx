@@ -657,7 +657,10 @@ function KanbanColumn({
             {etapa.automacoes!.map((automacao) => (
               <div key={automacao.id} className="rounded-md bg-slate-950/50 px-2 py-1 text-[10px]" title={automacao.descricao ?? undefined}>
                 <p className="truncate font-semibold text-slate-200">{automacao.nome}</p>
-                <p className="truncate text-slate-500">{automacao.ativa ? "Ativa" : "Inativa"} · {automacao.gatilhoTipo.replaceAll("_", " ").toLocaleLowerCase("pt-BR")}</p>
+                <p className="truncate text-slate-500">
+                  {automacao.ativa ? "Ativa" : "Inativa"} · {automacao.gatilhoTipo.replaceAll("_", " ").toLocaleLowerCase("pt-BR")}
+                  {automacao.acoes.length > 0 ? ` · ${automacao.acoes.map((acao) => acao.replaceAll("_", " ").toLocaleLowerCase("pt-BR")).join(", ")}` : ""}
+                </p>
               </div>
             ))}
           </div>

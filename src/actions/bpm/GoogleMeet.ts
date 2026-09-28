@@ -3,12 +3,15 @@ import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import {
   criarEventoNoCalendario,
 } from "@/actions/google-calendar-eventos";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
+import { executarAutomacoesCentraisDoCardAgora } from "@/lib/bpm/automacoes/orquestrador";
 import {
   atualizarEventoParcial as atualizarEventoParcialGoogle,
   cancelarEvento as cancelarEventoGoogle,
@@ -21,7 +24,7 @@ import {
 import { dadosCacheDeEvento } from "@/lib/google-calendar/cache-eventos";
 import { GoogleCalendarError } from "@/lib/google-calendar/errors";
 import { cancelarCriacaoSemVinculo, registrarCompensacaoGooglePendente, reverterReagendamentoSemPersistencia, type EventoCriadoSemVinculo, type ReagendamentoPendente } from "@/lib/bpm/google-meet-compensacao";
-import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
+import { destinoEhReuniaoAgendada, etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
 import { extrairCodigoMeet } from "@/lib/bpm/transcricao-reuniao";
 import { dataHoraObrigatoriaBpmSchema } from "@/lib/validations/bpm";
 import {
@@ -301,6 +304,7 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
       where: { id: cardId },
       select: {
         id: true,
+        pipelineId: true,
         etapaId: true,
         updatedAt: true,
         googleEventId: true,
@@ -439,6 +443,18 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
         },
         tx,
       );
+      await publicarEventoBpm({
+        tipo: "REUNIAO_AGENDADA",
+        entidadeTipo: "CARD",
+        entidadeId: cardId,
+        cardId,
+        pipelineId: card.pipelineId,
+        valorNovo: { etapaId: cardAntesDeCriarEvento.etapaId, dataReuniao: inicio.toISOString() },
+        atorTipo: "USUARIO",
+        atorUserId: userId,
+        correlationId: randomUUID(),
+        idempotencyKey: `reuniao-agendada:${cardId}:${resultado.data.googleEventId}`,
+      }, tx);
       return { success: true as const };
     });
     if (!persistencia.success) {
@@ -447,9 +463,27 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
     }
     eventoCriado = null;
 
-    revalidatePath(`${ROTA_BASE}/pipeline`);
-    await notificarPipelineBpm({ cardId, tipo: "REUNIAO_ALTERADA" });
-    return { success: true, data: { googleEventId: resultado.data.googleEventId } };
+    let avancoConcluido = false;
+    try {
+      await executarAutomacoesCentraisDoCardAgora(cardId);
+      const etapaAtual = await db.bpmCard.findUnique({
+        where: { id: cardId }, select: { etapa: { select: { nome: true } } },
+      });
+      avancoConcluido = Boolean(etapaAtual && destinoEhReuniaoAgendada(etapaAtual.etapa.nome));
+    } catch (error) {
+      console.error("[AgendarReuniaoGoogleMeetBpm] Automação pendente", {
+        tipo: error instanceof Error ? error.name : "Erro desconhecido",
+      });
+    }
+    try {
+      revalidatePath(`${ROTA_BASE}/pipeline`);
+      await notificarPipelineBpm({ cardId, tipo: "REUNIAO_ALTERADA" });
+    } catch (error) {
+      console.error("[AgendarReuniaoGoogleMeetBpm] Notificação pendente", {
+        tipo: error instanceof Error ? error.name : "Erro desconhecido",
+      });
+    }
+    return { success: true, data: { googleEventId: resultado.data.googleEventId, avancoConcluido } };
   } catch (error) {
     if (eventoCriado) await compensarCriacaoComRegistro(eventoCriado);
     console.error("[AgendarReuniaoGoogleMeetBpm]", error instanceof GoogleCalendarError

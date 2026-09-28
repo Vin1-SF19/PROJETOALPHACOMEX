@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import { PainelReuniao } from "@/app/PainelAlpha/AlphaCRM/CardModal/PainelReuniao";
 import { AgendarReuniaoGoogleMeetBpm, ListarConvidadosReuniaoGoogleMeetBpm } from "@/actions/bpm/GoogleMeet";
+import { toast } from "sonner";
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() } }));
 vi.mock("@/actions/bpm/Cards", () => ({ ObterCardBpm: vi.fn() }));
@@ -36,6 +37,9 @@ afterEach(async () => {
 
 it("Enter adiciona convidados externos, limpa o input e envia todos ao agendar", async () => {
   Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
+  vi.mocked(AgendarReuniaoGoogleMeetBpm).mockResolvedValueOnce({
+    success: true, data: { googleEventId: "evento-1", avancoConcluido: false },
+  });
   const host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
@@ -69,6 +73,7 @@ it("Enter adiciona convidados externos, limpa o input e envia todos ao agendar",
     emailCliente: "cliente@exemplo.com",
     emailsAdicionais: ["pessoa@gmail.com", "contato@hotmail.com"],
   }));
+  expect(toast.info).toHaveBeenCalledWith("Reunião criada; a mudança para Reunião Agendada está pendente.");
 });
 
 it("reabre o card com o principal salvo e convidados do evento Google", async () => {

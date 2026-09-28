@@ -171,6 +171,9 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
     const anterior = card.etapaId;
     if (parametros.exigirProximoContatoVazio && card.proximoContatoEm) return { ignorada: true, motivo: "PROXIMO_CONTATO_PREENCHIDO" };
     if (anterior === etapaId) return { etapaAnteriorId: anterior, etapaId };
+    if (execucao.gatilhoTipo === "REUNIAO_AGENDADA" && anterior !== execucao.automacao.etapaId) {
+      return { ignorada: true, motivo: "CARD_JA_SAIU_DA_ETAPA_DO_AGENDAMENTO" };
+    }
     const movimento = await executarTransicaoBpm({
       cardId: card.id,
       etapaOrigemEsperadaId: anterior,
