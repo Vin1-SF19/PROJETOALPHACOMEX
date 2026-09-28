@@ -2,73 +2,21 @@ import { NextResponse } from "next/server";
 import db from "@/lib/prisma";
 import { getReceitaData } from "@/lib/cnpj/receita-federal";
 import { parseDateBR } from "@/lib/cnpj/parse-date-br";
+import { consultarRadar, ErroConsultaRadar } from "@/lib/radar/consulta";
+import { validarCnpj } from "@/lib/gerador-documentos/cnpj";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-// Consulta RADAR direto na InfoSimples (sem HTTP interno)
-async function getRadarData(cnpj: string) {
-  const token = process.env.API_TOKEN;
-  const urlRadar = process.env.URL_RADAR;
-
-  if (!token || !urlRadar) {
-    throw new Error("API RADAR não configurada (API_TOKEN ou URL_RADAR ausente)");
-  }
-
-  const params = new URLSearchParams();
-  params.append("cnpj", cnpj);
-  params.append("token", token);
-  params.append("timeout", "300");
-
-  const resp = await fetch(urlRadar, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: params.toString(),
-    signal: AbortSignal.timeout(30000),
-  });
-
-  if (!resp.ok) throw new Error(`RADAR HTTP ${resp.status}`);
-
-  const json = await resp.json();
-  const raw = json?.data;
-  const dados = Array.isArray(raw) ? raw[0] : raw || null;
-
-  return {
-    contribuinte:
-      dados?.contribuinte ||
-      dados?.nome_contribuinte ||
-      dados?.razao_social ||
-      dados?.nome ||
-      "",
-    situacao:
-      dados?.situacao ||
-      dados?.situacao_habilitacao ||
-      dados?.descricao_situacao ||
-      dados?.status ||
-      "NÃO HABILITADA",
-    dataSituacao:
-      dados?.data_situacao ||
-      dados?.situacao_data ||
-      dados?.data_evento ||
-      dados?.data ||
-      "",
-    submodalidade:
-      dados?.submodalidade ||
-      dados?.submodalidade_texto ||
-      dados?.modalidade ||
-      "NÃO HABILITADO",
-  };
-}
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const cnpjRaw = searchParams.get("cnpj") || "";
-    const cnpj = cnpjRaw.replace(/\D/g, "").padStart(14, "0").substring(0, 14);
+    const cnpj = cnpjRaw.replace(/\D/g, "");
     const forcar = searchParams.get("forcar") === "true";
     const somenteBanco = searchParams.get("somenteBanco") === "true";
 
-    if (!cnpj || cnpj === "00000000000000") {
+    if (!validarCnpj(cnpj)) {
       return NextResponse.json({ error: "CNPJ inválido" }, { status: 400 });
     }
 
@@ -100,7 +48,7 @@ export async function GET(req: Request) {
     // Consultas externas em paralelo (chamadas diretas, sem HTTP interno)
     const [receitaResult, radarResult] = await Promise.allSettled([
       getReceitaData(cnpj),
-      getRadarData(cnpj),
+      consultarRadar(cnpj),
     ]);
 
     // Receita Federal é obrigatória
@@ -170,26 +118,22 @@ export async function GET(req: Request) {
 
     const receita = receitaResult.value;
 
-    // RADAR é opcional — se falhar de verdade (timeout, HTTP não-200, config ausente),
-    // marca como ERRO NA CONSULTA (elegível para reconsulta) em vez de fingir "NÃO HABILITADA".
-    // Se a chamada teve sucesso mas voltou sem dados, isso é uma resposta de negócio
-    // válida e fiel à API — não mexer nesse caminho.
+    // Apenas 404 confirma ausência de habilitação; as demais falhas permanecem erro.
     let radar = {
       situacao: "NÃO HABILITADA",
       submodalidade: "N/A",
       contribuinte: "",
       dataSituacao: "",
+      raw: "",
     };
     if (radarResult.status === "fulfilled") {
       radar = radarResult.value;
+    } else if (radarResult.reason instanceof ErroConsultaRadar && radarResult.reason.status === 404) {
+      // Resposta de negócio do provedor.
     } else {
-      console.error("RADAR falhou:", radarResult.reason?.message);
-      radar = {
-        situacao: "ERRO NA CONSULTA",
-        submodalidade: "",
-        contribuinte: "",
-        dataSituacao: "",
-      };
+      const code = radarResult.reason instanceof ErroConsultaRadar ? radarResult.reason.code : "UPSTREAM_UNAVAILABLE";
+      console.error("RADAR falhou:", code);
+      return NextResponse.json({ error: "Consulta Radar indisponível; dados anteriores preservados", code }, { status: 502 });
     }
 
     const payload = {
@@ -198,7 +142,7 @@ export async function GET(req: Request) {
       nome_fantasia: String(receita.nomeFantasia || "").toUpperCase(),
       situacao_radar: String(radar.situacao).toUpperCase(),
       submodalidade: String(radar.submodalidade),
-      data_situacao: parseDateBR(radar.dataSituacao || receita.situacao),
+      data_situacao: parseDateBR(radar.dataSituacao),
       municipio: String(receita.municipio || "").toUpperCase(),
       uf: String(receita.uf || "").toUpperCase(),
       regime_tributario: String(receita.regimeTributario || ""),

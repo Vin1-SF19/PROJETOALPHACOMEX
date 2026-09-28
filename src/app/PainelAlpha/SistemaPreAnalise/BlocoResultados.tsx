@@ -28,7 +28,7 @@ type DadosEmpresaquiExibicao = {
     historico_regime?: HistoricoExibicao[]; historicoRegime?: HistoricoExibicao[];
     consultaStatus?: string; regimeEA?: string;
 };
-type DadosRadarExibicao = { submodalidade?: string; situacao?: string; dataSituacao?: string };
+type DadosRadarExibicao = { submodalidade?: string; situacao?: string; dataSituacao?: string; error?: string; code?: string };
 type EtapaExibicao = {
     status?: string;
     dados?: Record<string, unknown> | null;
@@ -338,7 +338,7 @@ export default function BlocoResultados({ dados, visual, userName, onRetry }: Pr
                                     <div className="space-y-6">
                                         {etapas.radar.status === "error" ? (
                                             <div className="py-6 px-4 rounded-2xl bg-red-500/5 border border-red-500/20 text-center">
-                                                <p className="text-red-400 text-[10px] font-black uppercase tracking-widest">Falha na consulta. Tente novamente.</p>
+                                                <p className="text-red-400 text-[10px] font-black uppercase tracking-widest">{dadosExibicaoRadar?.error || "Falha na consulta. Tente novamente."}</p>
                                             </div>
                                         ) : (
                                             <div className={loadingRadar ? "opacity-40 animate-pulse pointer-events-none" : ""}>

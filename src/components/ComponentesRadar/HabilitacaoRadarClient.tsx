@@ -93,7 +93,6 @@ export function HabilitacaoRadarClient() {
   const [statusLote, setStatusLote] = useState("");
   const cancelarProcessamento = useRef<boolean>(false);
   const pausarRef = useRef<boolean>(false);
-  const [infosimples, setInfosimples] = useState<{ saldo?: number; consumo?: number } | null>(null);
   const [isOffline, setIsOffline] = useState(false);
   const [empresaSelecionada, setEmpresaSelecionada] = useState<EmpresaRadar | null>(null);
   const [showModalReconsulta, setShowModalReconsulta] = useState(false);
@@ -123,18 +122,6 @@ export function HabilitacaoRadarClient() {
     };
   }, []);
 
-  useEffect(() => {
-    const buscar = async () => {
-      try {
-        const res = await fetch("/api/InfoSimples");
-        setInfosimples(await res.json());
-      } catch {}
-    };
-    buscar();
-    const id = setInterval(buscar, 30000);
-    return () => clearInterval(id);
-  }, []);
-
   // ── Derived data ────────────────────────────────────────────────────────────
   const empresasExibidas = useMemo(() => {
     let r = [...empresas];
@@ -157,7 +144,7 @@ export function HabilitacaoRadarClient() {
         const s = (e.situacao || "").toUpperCase().trim();
         if (filtroSituacao === "SEM STATUS")
           return !e.razaoSocial || s === "" || s === "PENDENTE RADAR";
-        return s === filtroSituacao.toUpperCase();
+        return filtroSituacao === "DEFERIDA" ? ["DEFERIDA", "HABILITADA"].includes(s) : s === filtroSituacao.toUpperCase();
       });
     }
 
@@ -327,7 +314,10 @@ export function HabilitacaoRadarClient() {
       }
 
       const resApi = await fetch(`/api/ConsultaCompleta?cnpj=${limpo}`, { cache: "no-store" });
-      if (!resApi.ok) throw new Error("Falha na API");
+      if (!resApi.ok) {
+        const erro = await resApi.json().catch(() => ({}));
+        throw new Error(erro.error || "Falha na consulta Radar");
+      }
       const empresa = await resApi.json();
 
       const novo: EmpresaRadar = {
@@ -356,7 +346,8 @@ export function HabilitacaoRadarClient() {
         );
       }
       return novo;
-    } catch {
+    } catch (error) {
+      if (!cnpjOpcional) toast.error(error instanceof Error ? error.message : "Falha na consulta Radar");
       return null;
     } finally {
       if (!cnpjOpcional) setLoading(false);
@@ -431,6 +422,7 @@ export function HabilitacaoRadarClient() {
     setTotalLote(alvo.length);
     setProcessadas(0);
     cancelarProcessamento.current = false;
+    let bloqueadoCaptcha = false;
 
     for (let i = 0; i < alvo.length; i++) {
       if (isOffline) {
@@ -445,14 +437,28 @@ export function HabilitacaoRadarClient() {
       let ok = false;
       let t = 0;
 
-      while (!ok && t < 10) {
-        setStatusLote(`${i + 1}/${alvo.length} (T.${t + 1}/10): ${c}`);
+      while (!ok && t < 3) {
+        setStatusLote(`${i + 1}/${alvo.length} (T.${t + 1}/3): ${c}`);
         try {
           const res = await fetch(
             `/api/ConsultaCompleta?cnpj=${c}&forcar=true&t=${Date.now()}`,
             { cache: "no-store" }
           );
-          if (!res.ok) throw new Error();
+          if (!res.ok) {
+            const erro = await res.json().catch(() => ({}));
+            if (erro.code === "BLOCKED_BY_CAPTCHA") {
+              setStatusLote("Consulta bloqueada por captcha. Retome em alguns minutos.");
+              bloqueadoCaptcha = true;
+              cancelarProcessamento.current = true;
+              break;
+            }
+            if (["UPSTREAM_UNAUTHORIZED", "NOT_CONFIGURED", "UPSTREAM_BAD_REQUEST", "INVALID_RESPONSE"].includes(erro.code)) {
+              setStatusLote(`Consulta interrompida: ${erro.error || "falha na API Radar"}`);
+              cancelarProcessamento.current = true;
+              break;
+            }
+            throw new Error();
+          }
           const api = await res.json();
           if (api.salvo !== false) {
             setEmpresas((prev) =>
@@ -462,17 +468,24 @@ export function HabilitacaoRadarClient() {
           } else throw new Error();
         } catch {
           t++;
-          if (t < 10) await new Promise((r) => setTimeout(r, 25000));
+          if (t < 3) await new Promise((r) => setTimeout(r, 25000));
         }
       }
       setProcessadas(i + 1);
+      if (cancelarProcessamento.current) break;
       await new Promise((r) => setTimeout(r, 5000));
     }
 
     setProcessando(false);
     setLoading(false);
-    setStatusLote("Processamento finalizado!");
-    toast.success("Reconsulta concluída!");
+    if (bloqueadoCaptcha) {
+      toast.error("Radar bloqueado por captcha. Tente novamente em alguns minutos.");
+    } else if (cancelarProcessamento.current) {
+      toast.error("Reconsulta interrompida.");
+    } else {
+      setStatusLote("Processamento finalizado!");
+      toast.success("Reconsulta concluída!");
+    }
   };
 
   const esperarResumido = async () => {
@@ -571,6 +584,15 @@ export function HabilitacaoRadarClient() {
 
         try {
           const r = await fetch(`/api/ConsultaCompleta?cnpj=${item.cnpj}`);
+          if (!r.ok) {
+            const erro = await r.json().catch(() => ({}));
+            if (erro.code === "BLOCKED_BY_CAPTCHA") {
+              cancelarProcessamento.current = true;
+              setStatusLote("Consulta bloqueada por captcha. Retome em alguns minutos.");
+              break;
+            }
+            continue;
+          }
           if (r.ok) {
             const d = await r.json();
             setEmpresas((prev) =>
@@ -581,7 +603,7 @@ export function HabilitacaoRadarClient() {
       }
 
       if (cancelarProcessamento.current) {
-        toast.error("Consulta interrompida.", { id: tid });
+        toast.error("Consulta interrompida. Se houve captcha, tente novamente em alguns minutos.", { id: tid });
       } else {
         toast.success(`Importação concluída! ${novos.length} consultados na Receita.`, { id: tid });
       }
@@ -760,58 +782,7 @@ export function HabilitacaoRadarClient() {
           </div>
         </div>
 
-        {/* InfoSimples strip */}
         <div className="flex flex-wrap items-center gap-3">
-          <div
-            className="flex items-center gap-3 px-4 h-11 bg-black/30 backdrop-blur-sm rounded-xl border transition-all"
-            style={{
-              borderColor:
-                (infosimples?.saldo ?? 0) < 100
-                  ? "rgba(239,68,68,0.4)"
-                  : "rgba(255,255,255,0.06)",
-            }}
-          >
-            <div className="flex flex-col">
-              <span className="text-[8px] uppercase font-black text-slate-500 tracking-widest">
-                Saldo InfoSimples
-              </span>
-              <span
-                className="text-sm font-mono font-black"
-                style={{ color: (infosimples?.saldo ?? 0) < 100 ? "#f87171" : "#34d399" }}
-              >
-                {isOffline ? (
-                  <span className="flex items-center gap-1 text-[9px] text-slate-500">
-                    <Loader2 size={10} className="animate-spin" /> OFFLINE
-                  </span>
-                ) : (
-                  `R$ ${Number(infosimples?.saldo || 0).toFixed(2)}`
-                )}
-              </span>
-            </div>
-            {infosimples?.consumo !== undefined && (
-              <>
-                <div className="h-6 w-px bg-white/5" />
-                <div className="flex flex-col hidden sm:flex">
-                  <span className="text-[7px] uppercase font-bold text-slate-600">Consumo mensal</span>
-                  <span
-                    className="text-[10px] font-black italic"
-                    style={{ color: `rgb(${visual.accent})` }}
-                  >
-                    R$ {Number(infosimples.consumo).toFixed(0)}
-                  </span>
-                </div>
-              </>
-            )}
-            <span
-              className="h-2 w-2 rounded-full ml-1"
-              style={{
-                background:
-                  (infosimples?.saldo ?? 0) < 100 ? "#ef4444" : "#10b981",
-                animation: (infosimples?.saldo ?? 0) < 100 ? "ping 1s linear infinite" : "none",
-              }}
-            />
-          </div>
-
           <a
             href="https://portalunico.siscomex.gov.br/cint/#/habilitacao-situacao?perfil=publico"
             target="_blank"
