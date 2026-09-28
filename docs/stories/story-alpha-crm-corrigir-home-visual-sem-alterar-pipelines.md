@@ -16,12 +16,14 @@ Como usuário autorizado do Alpha CRM, quero uma Home clara com acesso aos módu
 4. O layout compartilhado do CRM mantém o comportamento esperado sem sidebar interna: fundo, largura, espaçamento, navegação e abertura das páginas filhas funcionam na Home e nas demais rotas do CRM, inclusive em telas estreitas.
 5. Navegações e consultas com espera perceptível apresentam feedback de carregamento real enquanto a operação está pendente, encerrando o feedback ao concluir ou falhar. Não se exibe estado permanente de “Ao vivo” sem relação com uma operação ou conexão verificável.
 6. A correção preserva as verificações de acesso existentes para pipelines e páginas administrativas. Usuários sem permissão não obtêm links ou conteúdo restritos pela nova Home ou pelo layout.
+7. As páginas internas do CRM exibem **Voltar** no canto superior esquerdo. Páginas internas de Configurações retornam à lista de Configurações; as demais retornam à Home, inclusive quando abertas diretamente. A Home não exibe um botão que aponte para si mesma.
 
 ## Tarefas / subtarefas
 
 - [x] Conferir o estado anterior e atual da Home, do layout compartilhado e do board para localizar as regressões relatadas (AC 1–4).
 - [x] Corrigir título, cards de navegação e estados de carregamento da Home (AC 1, 2, 5, 6).
 - [x] Ajustar somente o comportamento necessário do layout compartilhado sem sidebar e conferir as rotas filhas no código (AC 3, 4, 6).
+- [x] Adicionar retorno visível às páginas internas e verificar os destinos por rota (AC 7).
 - [ ] Conferir visualmente e por testes os perfis com e sem acesso administrativo, a Home responsiva e pelo menos um pipeline autorizado (AC 2–6).
 - [x] Rodar `npm run lint`, `npm run typecheck` e `npm test`; registrar os resultados. Atualizar checklist e File List antes de concluir.
 
@@ -44,21 +46,26 @@ Como usuário autorizado do Alpha CRM, quero uma Home clara com acesso aos módu
 - [ ] Critérios de aceite validados em navegador autenticado (Home e pipeline).
 - [x] `npm run lint` passou (0 erros; warnings preexistentes).
 - [x] `npm run typecheck` passou.
-- [x] `npm test` passou (538 arquivos; 3975 testes passaram, 4 ignorados, 1 pendente).
+- [x] `npm test` passou (539 arquivos; 3983 testes passaram, 4 ignorados, 1 pendente).
 - [x] `npm run build` passou.
 - [x] File List atualizada com os arquivos realmente alterados.
 
 **Validação:** o commit `3b44c1a1` só alterou `CRMLayoutClient.tsx` e `DashboardClient.tsx` no produto. A regressão no board vinha do `max-w-7xl` e do padding impostos pelo layout compartilhado. O board e suas regras não foram editados nesta correção. A renderização em navegador autenticado permanece para revisão visual; o build e os testes automatizados passaram.
 
+**Retorno interno:** `crm-back-destination.test.ts` passou (3 testes). O botão usa links para pais conhecidos da navegação, permitindo voltar mesmo em acesso direto à rota.
+
 ## File List
 
 - `docs/stories/story-alpha-crm-corrigir-home-visual-sem-alterar-pipelines.md` — criação da story.
 - `src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx` — restaura o contêiner visual do CRM sem sidebar e sem restringir o board.
+- `src/app/PainelAlpha/AlphaCRM/crm-back-destination.ts` — define o destino de retorno para páginas internas.
 - `src/app/PainelAlpha/AlphaCRM/DashboardClient.tsx` — substitui indicadores por cards de navegação, preserva os pipelines e corrige a visibilidade administrativa.
 - `src/app/PainelAlpha/AlphaCRM/page.tsx` — adiciona skeleton durante o carregamento real do dashboard.
+- `tests/bpm/crm-back-destination.test.ts` — cobre retorno da Home, páginas e configurações.
 
 ## Change Log
 
 | Data | Versão | Descrição | Autor |
 | --- | --- | --- | --- |
 | 2026-09-28 | 0.1 | Story de correção visual da Home e proteção dos pipelines | River (@sm) |
+| 2026-09-28 | 0.2 | Botão Voltar nas páginas internas do CRM | Codex |
