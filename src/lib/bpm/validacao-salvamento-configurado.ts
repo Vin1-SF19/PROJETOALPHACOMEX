@@ -10,6 +10,17 @@ import { montarContextoAvaliacaoDoCard } from "@/lib/bpm/regras/contexto";
 import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
 import { FINANCIAL_FIELD_KEYS as K } from "@/lib/bpm/pipeline-financeiro";
 import { calcularNovoContrato, pendenciasValidacaoNovoContrato } from "@/lib/bpm/novo-contrato-financeiro";
+import { CHAVES_CAMPOS } from "@/lib/bpm/financeiro-config.client";
+import { cnpjEhValido } from "@/lib/format-cnpj";
+
+const DADOS_PARA_ELABORAR = [
+  [K.CNPJ, "CNPJ"], [K.RAZAO_SOCIAL, "Razão Social"], [K.RUA, "Rua"],
+  [K.NUMERO, "Número"], [K.BAIRRO, "Bairro"], [K.CEP, "CEP"],
+  [K.MUNICIPIO, "Município"], [K.ESTADO, "Estado"], [K.EMAIL, "E-mail"],
+  [K.REGIME_CLIENTE, "Regime tributário do cliente"], [K.SERVICO, "Serviço contratado"],
+  [K.VALOR_BRUTO, "Valor bruto do contrato"], [K.FORMA_PAGAMENTO, "Forma de pagamento"],
+  [K.CONDICAO, "Condição negociada"],
+] as const;
 
 type Card = Parameters<typeof montarContextoAvaliacaoDoCard>[0];
 
@@ -89,7 +100,8 @@ export async function prepararSalvamentoConfigurado(params: {
   }
   const possuiAutomacao = configs.some((config) => config.condicaoObrigatoriedadeJson
     && (config.valorPadrao === "{{agora.data}}" || config.valorPadrao === "{{agora.instante}}"));
-  if (!possuiAutomacao && !statusAssinatura) return valoresSubmetidos;
+  const possuiContratoElaborado = configs.some((config) => config.campo.chave === CHAVES_CAMPOS.CONTRATO_ELABORADO);
+  if (!possuiAutomacao && !statusAssinatura && !possuiContratoElaborado) return valoresSubmetidos;
 
   const publicadosPipeline = await camposPublicadosPorEtapa(etapas.map((etapa) => etapa.id), client);
   const idsPublicados = new Set([...publicadosPipeline.values()].flatMap((ids) => [...ids]));
@@ -97,9 +109,18 @@ export async function prepararSalvamentoConfigurado(params: {
     where: { id: { in: [...idsPublicados] }, ativo: true,
       OR: [{ pipelineId: card.pipelineId }, { pipelinesAssociados: { some: { pipelineId: card.pipelineId } } }],
     },
-    select: { id: true, nome: true, chave: true, escopo: true, fonteEntidade: true, fonteAtributo: true, entidadeGlobal: true },
+    select: { id: true, nome: true, chave: true, tipo: true, opcoesJson: true, escopo: true, fonteEntidade: true, fonteAtributo: true, entidadeGlobal: true },
   });
   const contexto = await montarContextoAvaliacaoDoCard(card, client);
+  // Datas de eventos já registrados são imutáveis mesmo que um cliente envie
+  // manualmente outro valor num salvamento posterior.
+  for (const chave of [CHAVES_CAMPOS.DATA_ELABORACAO, CHAVES_CAMPOS.DATA_ENVIO]) {
+    const id = campos.find((campo) => campo.chave === chave)?.id;
+    const persistido = id ? String(contexto.camposDinamicos?.[id] ?? "").trim() : "";
+    if (id && persistido && Object.hasOwn(valoresSubmetidos, id)) {
+      valoresSubmetidos = { ...valoresSubmetidos, [id]: persistido };
+    }
+  }
   const canonicos = await carregarValoresCanonicosCampos(card.id, campos, client);
   contexto.camposDinamicos = {
     ...Object.fromEntries(campos.map((campo) => [campo.id, null])),
@@ -108,6 +129,57 @@ export async function prepararSalvamentoConfigurado(params: {
     ...valoresSubmetidos,
   };
   const valores = { ...valoresSubmetidos };
+
+  // As identidades estáveis ligam a validação aos campos publicados, inclusive
+  // os conferidos na etapa anterior. Os rótulos vêm do cadastro atual.
+  const porChave = new Map(campos.filter((campo) => campo.chave).map((campo) => [campo.chave, campo]));
+  const campoElaborado = configs.find((config) => config.campo.chave === CHAVES_CAMPOS.CONTRATO_ELABORADO);
+  if (campoElaborado) {
+    const valorDe = (chave: string) => {
+      const id = porChave.get(chave)?.id;
+      return id ? String(contexto.camposDinamicos?.[id] ?? "").trim() : "";
+    };
+    const campoEnviado = porChave.get(CHAVES_CAMPOS.CONTRATO_ENVIADO);
+    const elaborado = valorDe(CHAVES_CAMPOS.CONTRATO_ELABORADO) === "Sim";
+    const enviado = valorDe(CHAVES_CAMPOS.CONTRATO_ENVIADO) === "Sim";
+    const pendencias: string[] = [];
+    if (enviado && !elaborado) pendencias.push(campoElaborado.campo.nome);
+    if (elaborado) {
+      for (const [chave, rotulo] of DADOS_PARA_ELABORAR) {
+        const campo = porChave.get(chave);
+        const valor = valorDe(chave);
+        if (!valor) { pendencias.push(campo?.nome ?? rotulo); continue; }
+        if (campo && !validarValoresCamposBpm([{ ...campo, tipo: campo.tipo, opcoesJson: campo.opcoesJson }], { [campo.id]: valor }).success) {
+          pendencias.push(campo.nome);
+        }
+      }
+      const valorBruto = valorDe(K.VALOR_BRUTO).replace(",", ".");
+      if (valorBruto && (!/^\d+(?:\.\d{1,2})?$/.test(valorBruto) || Number(valorBruto) <= 0)) {
+        pendencias.push(porChave.get(K.VALOR_BRUTO)?.nome ?? "Valor bruto do contrato");
+      }
+      const porChaveValores = Object.fromEntries(DADOS_PARA_ELABORAR.map(([chave]) => [chave, valorDe(chave)]));
+      if (valorDe(K.CNPJ) && !cnpjEhValido(valorDe(K.CNPJ))) pendencias.push(porChave.get(K.CNPJ)?.nome ?? "CNPJ");
+      for (const motivo of pendenciasValidacaoNovoContrato(porChaveValores)) {
+        const chave = motivo.startsWith("CEP") ? K.CEP : motivo.startsWith("Estado") ? K.ESTADO : K.VALOR_BRUTO;
+        pendencias.push(porChave.get(chave)?.nome ?? motivo);
+      }
+      if (valorDe(K.EMAIL) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valorDe(K.EMAIL))) pendencias.push(porChave.get(K.EMAIL)?.nome ?? "E-mail");
+    }
+    if (enviado) {
+      const link = porChave.get(CHAVES_CAMPOS.LINK_CONTRATO);
+      const referencia = valorDe(CHAVES_CAMPOS.LINK_CONTRATO);
+      if (!referencia || (link && !validarValoresCamposBpm([{ ...link, tipo: link.tipo, opcoesJson: link.opcoesJson }], { [link.id]: referencia }).success)) {
+        pendencias.push(link?.nome ?? "Link/arquivo do contrato");
+      } else if (link && !/^https:\/\//i.test(referencia)) {
+        const anexo = await client.bpmCardAnexo.findFirst({
+          where: { id: referencia, cardId: card.id, campoId: link.id }, select: { id: true },
+        });
+        if (!anexo) pendencias.push(link.nome);
+      }
+      if (!campoEnviado) pendencias.push("Contrato enviado para assinatura");
+    }
+    if (pendencias.length) throw new Error(`REQUISITOS_PENDENTES:${[...new Set(pendencias)].join(", ")}`);
+  }
 
   for (const config of configs) {
     if (!config.condicaoObrigatoriedadeJson || !config.valorPadrao) continue;
@@ -118,6 +190,24 @@ export async function prepararSalvamentoConfigurado(params: {
     if (!validacao.success) throw new Error(`CAMPO_INVALIDO:${validacao.error}`);
     valores[config.campoId] = validacao.valores[config.campoId];
     contexto.camposDinamicos[config.campoId] = valores[config.campoId];
+  }
+
+  if (campoElaborado) {
+    const pendenciasDatas: string[] = [];
+    for (const [indicador, chaveData, rotulo] of [
+      [CHAVES_CAMPOS.CONTRATO_ELABORADO, CHAVES_CAMPOS.DATA_ELABORACAO, "Data de elaboração"],
+      [CHAVES_CAMPOS.CONTRATO_ENVIADO, CHAVES_CAMPOS.DATA_ENVIO, "Data do envio"],
+    ]) {
+      const idIndicador = porChave.get(indicador)?.id;
+      const campoData = porChave.get(chaveData);
+      if (idIndicador && String(contexto.camposDinamicos?.[idIndicador] ?? "").trim() === "Sim") {
+        const valor = campoData ? String(contexto.camposDinamicos?.[campoData.id] ?? "").trim() : "";
+        if (!valor || (campoData && !validarValoresCamposBpm([campoData], { [campoData.id]: valor }).success)) {
+          pendenciasDatas.push(campoData?.nome ?? rotulo);
+        }
+      }
+    }
+    if (pendenciasDatas.length) throw new Error(`REQUISITOS_PENDENTES:${pendenciasDatas.join(", ")}`);
   }
 
   const valoresContexto = contexto.camposDinamicos ?? {};

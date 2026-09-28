@@ -345,9 +345,21 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
   }));
   const formato = validarValoresCamposBpm(formataveis, valoresSubmetidos);
   if (!formato.success) erro("FORMAT_INVALID", formato.error);
-  if (Object.keys(formato.valores).length && card.pipeline.chave === "financeiro" && card.etapa.chave === "solicitacao_contrato") {
-    formato.valores = await prepararSalvamentoConfigurado({ card, valoresSubmetidos: formato.valores, client: tx,
-      atorId: input.ator.userId });
+  if (card.pipeline.chave === "financeiro"
+    && (card.etapa.chave === "solicitacao_contrato" || card.etapa.chave === "elaboracao_contrato")) {
+    try {
+      formato.valores = await prepararSalvamentoConfigurado({ card, valoresSubmetidos: formato.valores, client: tx,
+        atorId: input.ator.userId });
+    } catch (falha) {
+      if (falha instanceof Error && falha.message.startsWith("REQUISITOS_PENDENTES:")) {
+        const pendencias = falha.message.slice("REQUISITOS_PENDENTES:".length).split(", ").filter(Boolean);
+        erro("REQUIREMENTS_PENDING", `Preencha os campos pendentes: ${pendencias.join(", ")}.`, pendencias);
+      }
+      if (falha instanceof Error && falha.message.startsWith("CAMPO_INVALIDO:")) {
+        erro("FORMAT_INVALID", falha.message.slice("CAMPO_INVALIDO:".length));
+      }
+      throw falha;
+    }
   }
 
   const idsValores = [...camposPorId.keys()];

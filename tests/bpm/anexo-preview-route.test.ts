@@ -16,11 +16,12 @@ vi.mock("@/lib/bpm/ownership", () => ({ exigirAcessoBpmCard: mocks.acesso }));
 vi.mock("@vercel/blob", () => ({ get: mocks.get }));
 
 import { GET } from "@/app/api/bpm/anexos/[anexoId]/preview/route";
+import { CONTRATO_PADRAO_ID } from "@/lib/gerador-documentos/contrato-padrao-id";
 
 const token = "12345678-1234-1234-1234-123456789abc";
 const anexo = { cardId: "card-1", tipo: "application/x-painel-alpha-documento", url: `/PainelAlpha/GeradorDocumentos/conferencia/${token}` };
 const documento = {
-  titulo: "Contrato Alpha", status: "CONFERENCIA", pdfUrl: null,
+  titulo: "Contrato Alpha", status: "CONFERENCIA", pdfUrl: null, templateId: CONTRATO_PADRAO_ID,
   variaveisJson: JSON.stringify({ __bpmCardId: "card-1" }),
   clausulas: [{ id: "clausula-1", ordem: 1, titulo: "Objeto", conteudo: "Prestação de serviços" }],
 };
@@ -48,7 +49,9 @@ describe("prévia autenticada do contrato no card", () => {
   it("mostra as cláusulas para quem pode visualizar o card, mesmo sem PDF", async () => {
     const resposta = await GET(new Request("http://localhost/api/bpm/anexos/anexo-1/preview"), contexto);
     expect(resposta.status).toBe(200);
-    expect(await resposta.json()).toMatchObject({ titulo: "Contrato Alpha", pdfDisponivel: false, clausulas: [{ titulo: "Objeto" }] });
+    expect(await resposta.json()).toMatchObject({ titulo: "Contrato Alpha", pdfDisponivel: false,
+      pendencias: expect.arrayContaining(["Valor total por extenso", "Data de assinatura"]),
+      clausulas: [{ titulo: "Objeto" }] });
     expect(mocks.acesso).toHaveBeenCalledWith("card-1", 7, "Financeiro", "visualizar");
     expect(mocks.documento).toHaveBeenCalledWith(expect.objectContaining({ where: { tokenAcesso: token } }));
   });

@@ -117,11 +117,15 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
   const variaveis = placeholdersDoCard(card);
   const texto = (valor: unknown) => renderizarPlaceholdersAutomacaoBpm(String(valor), variaveis);
   if (["ENVIAR_EMAIL", "GERAR_CONTRATO", "GERAR_FICHA", "MATERIALIZAR_CHECKLIST", "DISTRIBUIR_RESPONSAVEL", "IDENTIFICAR_OPORTUNIDADE"].includes(tipo)) {
-    return executarAcaoLegadaNoMotorCentral({
+    const resultado = await executarAcaoLegadaNoMotorCentral({
       execucaoId: execucao.id, automacaoId: execucao.automacaoId, automacaoNome: execucao.automacao.nome,
       criadoPorId: execucao.automacao.criadoPorId, cardId: card.id, gatilhoTipo: execucao.gatilhoTipo,
       automacaoEtapaId: execucao.automacao.etapaId, acaoTipo: tipo as AcaoAutomacaoBpm, parametros,
     });
+    if (tipo === "GERAR_CONTRATO") {
+      await notificarPipelineBpm({ pipelineId: card.pipelineId, cardId: card.id, tipo: "CARD_ATUALIZADO" });
+    }
+    return resultado;
   }
   if (tipo === "ALTERAR_CAMPO") {
     const campoId = String(parametros.campoId);

@@ -145,7 +145,9 @@ async function resolverVariaveisContrato(
     Object.entries(parametros.variaveis).map(([chave, valor]) => [
       chave,
       typeof valor === "string"
-        ? renderizarPlaceholdersAutomacaoBpm(valor, placeholders)
+        ? (chave === "contratante_endereco"
+          ? renderizarPlaceholdersAutomacaoBpm(valor, placeholders).replace(/,\s*,/g, ",")
+          : renderizarPlaceholdersAutomacaoBpm(valor, placeholders))
         : valor,
     ]),
   );
@@ -169,6 +171,15 @@ async function gerarContrato(
   }) : null;
   if (parametros.empresaContratadaId && !contratada) throw new Error("Contratada configurada não encontrada ou arquivada");
   if (padrao && !contratada) throw new Error("Contrato padrão exige contratada configurada");
+  if (parametros.campoIdContrato) {
+    const campoContrato = await db.bpmCampo.findFirst({
+      where: { id: parametros.campoIdContrato, ativo: true, tipo: { in: ["url_ou_arquivo", "arquivo"] },
+        OR: [{ pipelineId: contexto.card.pipelineId }, { pipelinesAssociados: { some: { pipelineId: contexto.card.pipelineId } } }],
+      },
+      select: { id: true },
+    });
+    if (!campoContrato) throw new Error("Campo do contrato inválido para o pipeline");
+  }
   const clausulas = padrao?.clausulas.map((clausula, indice) => ({
     ...clausula,
     conteudo: indice === 0 && contratada ? qualificarContratadaContratoPadrao(clausula.conteudo, contratada) : clausula.conteudo,
@@ -191,16 +202,30 @@ async function gerarContrato(
   );
   const anexosExistentes = await db.bpmCardAnexo.findMany({
     where: { cardId: contexto.card.id, tipo: "application/x-painel-alpha-documento" },
-    select: { url: true },
+    select: { id: true, url: true, campoId: true },
     orderBy: { createdAt: "asc" },
   });
   for (const anexo of anexosExistentes) {
     const token = anexo.url.split("/").at(-1);
     const existente = token ? await db.documentoGerado.findUnique({ where: { tokenAcesso: token }, select: { id: true, templateId: true, pdfUrl: true } }) : null;
-    if (existente?.templateId === template.id) return {
-      tipo: "CONTRATO", documentoId: existente.id, pdfUrl: existente.pdfUrl,
-      urlConferencia: anexo.url, existente: true,
-    };
+    if (existente?.templateId === template.id) {
+      if (parametros.campoIdContrato && (!anexo.campoId || anexo.campoId === parametros.campoIdContrato)) {
+        await db.$transaction(async (tx) => {
+          if (!anexo.campoId) await tx.bpmCardAnexo.update({ where: { id: anexo.id }, data: { campoId: parametros.campoIdContrato } });
+          const valor = await tx.bpmCardCampoValor.findUnique({
+            where: { cardId_campoId: { cardId: contexto.card.id, campoId: parametros.campoIdContrato! } },
+            select: { valor: true },
+          });
+          if (!valor?.valor?.trim()) await tx.bpmCardCampoValor.upsert({
+            where: { cardId_campoId: { cardId: contexto.card.id, campoId: parametros.campoIdContrato! } },
+            create: { cardId: contexto.card.id, campoId: parametros.campoIdContrato!, valor: anexo.id },
+            update: { valor: anexo.id },
+          });
+        });
+      }
+      return { tipo: "CONTRATO", documentoId: existente.id, pdfUrl: existente.pdfUrl,
+        urlConferencia: anexo.url, existente: true };
+    }
   }
   const tokenAcesso = randomUUID();
   const documento = await db.$transaction(async (tx) => {
@@ -225,13 +250,25 @@ async function gerarContrato(
         conteudoOriginal: clausula.conteudo,
       })),
     });
-    await tx.bpmCardAnexo.create({ data: {
+    const anexo = await tx.bpmCardAnexo.create({ data: {
       cardId: contexto.card.id,
       url: `/PainelAlpha/GeradorDocumentos/conferencia/${tokenAcesso}`,
       nome: titulo,
       tipo: "application/x-painel-alpha-documento",
       enviadoPorId: criadoPorId,
+      campoId: parametros.campoIdContrato,
     } });
+    if (parametros.campoIdContrato) {
+      const valor = await tx.bpmCardCampoValor.findUnique({
+        where: { cardId_campoId: { cardId: contexto.card.id, campoId: parametros.campoIdContrato } },
+        select: { valor: true },
+      });
+      if (!valor?.valor?.trim()) await tx.bpmCardCampoValor.upsert({
+        where: { cardId_campoId: { cardId: contexto.card.id, campoId: parametros.campoIdContrato } },
+        create: { cardId: contexto.card.id, campoId: parametros.campoIdContrato, valor: anexo.id },
+        update: { valor: anexo.id },
+      });
+    }
     return criado;
   });
 

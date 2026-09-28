@@ -1495,6 +1495,15 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
       return { updatedAt: proximaVersao, camposValores: valoresValidados };
     }, { maxWait: 10_000, timeout: 60_000 });
 
+    if (cardAnterior.pipeline.chave === PIPELINE_CHAVE
+      && Object.keys(confirmacao.camposValores).length > 0) {
+      try {
+        await executarAutomacoesCentraisDoCardAgora(cardId);
+      } catch (error) {
+        // O evento já está no outbox; o worker retoma a execução se o flush falhar.
+        console.error("[AtualizarCardBpm/pos-salvamento/automacoes]", error);
+      }
+    }
     try {
       revalidatePath(`${ROTA_BASE}/pipeline/${cardAnterior.pipelineId}`);
     } catch (notificationError) {

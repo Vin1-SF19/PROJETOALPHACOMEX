@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 export type AnexoParaVisualizar = { id: string; nome: string; tipo: string | null };
 
 type Clausula = { id: string; ordem: number; titulo: string; conteudo: string };
-type ContratoPreview = { titulo: string; status: string; pdfDisponivel: boolean; clausulas: Clausula[] };
+type ContratoPreview = { titulo: string; status: string; pdfDisponivel: boolean; pendencias?: string[]; clausulas: Clausula[] };
 
 export function VisualizadorAnexoCard({ anexo, onClose }: {
   anexo: AnexoParaVisualizar | null;
@@ -72,6 +72,14 @@ export function VisualizadorAnexoCard({ anexo, onClose }: {
                   </button>
                 )}
               </div>
+              {Boolean(contrato.pendencias?.length) && (
+                <div role="note" className="shrink-0 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                  <p className="font-semibold">Pendências do rascunho para conferência:</p>
+                  <ul className="mt-1 list-inside list-disc">
+                    {contrato.pendencias!.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                </div>
+              )}
               {verPdf && contrato.pdfDisponivel ? (
                 <iframe src={`${previewUrl}?formato=pdf`} title={`PDF: ${contrato.titulo}`} className="min-h-0 flex-1 rounded-md bg-white" />
               ) : (

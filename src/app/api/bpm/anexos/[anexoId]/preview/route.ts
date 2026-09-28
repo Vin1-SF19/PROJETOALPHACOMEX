@@ -3,6 +3,8 @@ import { get } from "@vercel/blob";
 import { auth } from "../../../../../../../auth";
 import db from "@/lib/prisma";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
+import { CONTRATO_PADRAO_ID, VARIAVEIS_CONTRATO_PADRAO } from "@/lib/gerador-documentos/contrato-padrao";
+import { validarVariaveisObrigatorias } from "@/lib/gerador-documentos/render";
 
 export const dynamic = "force-dynamic";
 
@@ -33,22 +35,29 @@ export async function GET(request: Request, context: { params: Promise<{ anexoId
   const documento = await db.documentoGerado.findUnique({
     where: { tokenAcesso: token },
     select: {
-      titulo: true, status: true, pdfUrl: true, variaveisJson: true,
+      titulo: true, status: true, pdfUrl: true, variaveisJson: true, templateId: true,
       clausulas: { orderBy: { ordem: "asc" }, select: { id: true, ordem: true, titulo: true, conteudo: true } },
     },
   });
   if (!documento) return new Response("Contrato não encontrado", { status: 404 });
+  let variaveis: Record<string, unknown>;
   try {
-    const variaveis: unknown = typeof documento.variaveisJson === "string"
+    const dados: unknown = typeof documento.variaveisJson === "string"
       ? JSON.parse(documento.variaveisJson)
       : documento.variaveisJson;
-    if (!variaveis || typeof variaveis !== "object" || Array.isArray(variaveis)
-      || (variaveis as Record<string, unknown>).__bpmCardId !== anexo.cardId) {
+    if (!dados || typeof dados !== "object" || Array.isArray(dados)
+      || (dados as Record<string, unknown>).__bpmCardId !== anexo.cardId) {
       return new Response("Contrato não encontrado", { status: 404 });
     }
+    variaveis = dados as Record<string, unknown>;
   } catch {
     return new Response("Contrato não encontrado", { status: 404 });
   }
+
+  const pendencias = documento.templateId === CONTRATO_PADRAO_ID && documento.status === "CONFERENCIA"
+    ? validarVariaveisObrigatorias(VARIAVEIS_CONTRATO_PADRAO, variaveis as Record<string, string | number | boolean | null | undefined>)
+      .map((nome) => VARIAVEIS_CONTRATO_PADRAO.find((item) => item.nome === nome)?.label ?? nome)
+    : [];
 
   if (new URL(request.url).searchParams.get("formato") === "pdf") {
     if (!documento.pdfUrl) return new Response("PDF ainda não disponível", { status: 404 });
@@ -74,6 +83,7 @@ export async function GET(request: Request, context: { params: Promise<{ anexoId
     titulo: documento.titulo,
     status: documento.status,
     pdfDisponivel: Boolean(documento.pdfUrl),
+    pendencias,
     clausulas: documento.clausulas,
   }, { headers: { "Cache-Control": "private, no-store, max-age=0" } });
 }

@@ -35,6 +35,7 @@ export const parametrosContratoSchema = z.object({
   templateId: z.string().cuid(),
   titulo: z.string().trim().min(1).max(200),
   empresaContratadaId: z.string().cuid().optional(),
+  campoIdContrato: z.string().cuid().optional(),
   permitirPendencias: z.boolean().default(false),
   variaveis: z.record(
     z.string().min(1).max(60),

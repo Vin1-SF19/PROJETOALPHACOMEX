@@ -38,7 +38,10 @@ vi.mock("@/lib/bpm/lost", () => ({ CONFIGURACAO_LOST_INVALIDA_MENSAGEM: vi.fn(),
 vi.mock("@/lib/bpm/monitoramento", () => ({ obterErroTransicaoMonitoramento: vi.fn() }));
 vi.mock("@/lib/bpm/regras/guarda-movimento", () => ({ obterErroRegrasParaMovimento: vi.fn() }));
 vi.mock("@/lib/bpm/alinhamento-estrategico", () => ({ etapaEhAlinhamentoEstrategico: vi.fn(), obterErroCamposAlinhamentoParaSaida: vi.fn() }));
-vi.mock("@/lib/bpm/pipeline-financeiro", () => ({ campoFinanceiroSomenteLeitura: vi.fn(), etapaFinanceiraValida: vi.fn(), validateFinancialTransition: vi.fn() }));
+vi.mock("@/lib/bpm/pipeline-financeiro", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/bpm/pipeline-financeiro")>(),
+  campoFinanceiroSomenteLeitura: vi.fn(), etapaFinanceiraValida: vi.fn(), validateFinancialTransition: vi.fn(),
+}));
 vi.mock("@/lib/bpm/transicao-command", () => ({ executarTransicaoBpm: vi.fn() }));
 vi.mock("@/lib/bpm/cadencias/ativacao-automatica", () => ({ ativarCadenciasNaEntradaBpm: vi.fn() }));
 vi.mock("@/lib/bpm/checklists/integracao", () => ({ obterErroChecklistParaMovimento: vi.fn() }));
