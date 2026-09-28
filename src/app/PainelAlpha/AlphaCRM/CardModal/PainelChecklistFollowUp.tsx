@@ -5,6 +5,7 @@ import { CheckCircle2, ClipboardList, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { ObterUltimoFollowUpBpm, SalvarChecklistFollowUpBpm } from "@/actions/bpm/FollowUp";
 import { useCardSave } from "@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext";
+import { VALORES } from "@/lib/bpm/financeiro-config.client";
 
 type RespostaObterFollowUp = NonNullable<Awaited<ReturnType<typeof ObterUltimoFollowUpBpm>>["data"]>;
 type Checklist = NonNullable<RespostaObterFollowUp["checklist"]>;
@@ -213,7 +214,7 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
                 <select id={`follow-up-${pergunta.id}`} disabled={!podeEditar} className={inputClassName} value={typeof respostas[pergunta.id] === "boolean" ? String(respostas[pergunta.id]) : ""} onChange={(evento) => {
                   alterarResposta(pergunta.id, evento.target.value ? evento.target.value === "true" : undefined, 0);
                 }} onBlur={() => void persistir(false)}>
-                  <option value="">Selecione...</option><option value="true">Sim</option><option value="false">Não</option>
+                  <option value="">Selecione...</option><option value="true">{VALORES.SIM}</option><option value="false">{VALORES.NAO}</option>
                 </select>
               ) : (
                 <textarea id={`follow-up-${pergunta.id}`} disabled={!podeEditar} className={`${inputClassName} min-h-24 resize-y`} value={valorTexto(respostas[pergunta.id])} onChange={(evento) => {

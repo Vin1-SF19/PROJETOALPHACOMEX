@@ -8,6 +8,7 @@ import { CriarTarefaBpm, ConcluirTarefaBpm } from "@/actions/bpm/Tarefas";
 import { fmtDateTime, parseDataHoraLocalBpm } from "@/lib/format-date";
 import { BPM_TAREFA_TIPOS, obterConfigTipoTarefa, type BpmTarefaTipo } from "@/lib/bpm/tarefas-tipo";
 import { BpmDateTimeField } from "./BpmDateTimeField";
+import { VALORES } from "@/lib/bpm/financeiro-config.client";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type Tarefa = CardDetalhe["tarefas"][number];
@@ -163,7 +164,7 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300"><IconeTipo tipo={tarefa.tipo} size={11} />{config.label}</span>
                   {tarefa.prioridade && <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${prioridadeCor}`}>{tarefa.prioridade}</span>}
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusCor}`}>{tarefa.status === "CONCLUIDA" ? "Concluída" : "Pendente"}</span>
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusCor}`}>{tarefa.status === "CONCLUIDA" ? "Concluída" : VALORES.PENDENTE}</span>
                   {alertaAtivo && <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300"><Bell size={11} /> Alerta ativo</span>}
                 </div>
                 <p className={`mt-1.5 text-sm font-semibold ${tarefa.status === "CONCLUIDA" ? "text-slate-500 line-through" : "text-white"}`}>{tarefa.titulo || "Tarefa sem título"}</p>

@@ -9,6 +9,7 @@ import { ConteudoScriptEtapa } from "@/app/PainelAlpha/AlphaCRM/CardModal/Conteu
 import { PainelResumoContratacao } from "./PainelResumoContratacao";
 import { PainelExcecaoOperacional } from "./PainelExcecaoOperacional";
 import { isAdminRole } from "@/lib/roles";
+import { PIPELINE_CHAVE } from "@/lib/bpm/financeiro-config.client";
 
 
 
@@ -61,7 +62,7 @@ export default function PainelRegistrar({ card, etapaAtual, accent, podeEditar, 
 
         <TabsContent id={`formulario-etapa-${card.id}`} value="formulario-etapa" className="m-0 mt-5 min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-5" tabIndex={-1}>
           {card.resumoContratacao && <PainelResumoContratacao resumo={card.resumoContratacao} />}
-          {card.pipeline.chave === "financeiro" && card.resumoContratacao && !card.resumoContratacao.operacionalCardId && isAdminRole(currentUserRole)
+          {card.pipeline.chave === PIPELINE_CHAVE && card.resumoContratacao && !card.resumoContratacao.operacionalCardId && isAdminRole(currentUserRole)
             && <PainelExcecaoOperacional cardId={card.id} onAtualizado={onAtualizado} />}
           <CardOpenFormSlot
             card={card}

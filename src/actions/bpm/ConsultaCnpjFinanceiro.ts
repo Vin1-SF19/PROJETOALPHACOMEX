@@ -5,6 +5,7 @@ import db from "@/lib/prisma";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import { getReceitaData } from "@/lib/cnpj/receita-federal";
 import { cnpjEhValido } from "@/lib/format-cnpj";
+import { PIPELINE_CHAVE, ETAPAS } from "@/lib/bpm/financeiro-config";
 
 export async function ConsultarCnpjNovoContrato(cardId: string, cnpjInformado?: string) {
   try {
@@ -19,7 +20,7 @@ export async function ConsultarCnpjNovoContrato(cardId: string, cnpjInformado?: 
         empresa: { select: { cnpj: true } },
       },
     });
-    if (!card || card.pipeline.chave !== "financeiro" || card.etapa.chave !== "solicitacao_contrato") {
+    if (!card || card.pipeline.chave !== PIPELINE_CHAVE || card.etapa.chave !== ETAPAS.SOLICITACAO_CONTRATO) {
       return { success: false as const, error: "Card fora da etapa Novo contrato" };
     }
     const cnpj = cnpjInformado?.trim() || card.empresa.cnpj || "";

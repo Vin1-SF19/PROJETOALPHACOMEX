@@ -37,6 +37,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { resolverFormularioEtapa } from "@/lib/bpm/formulario-renderer";
+import { VALORES } from "@/lib/bpm/financeiro-config.client";
 import {
   obterDefinicaoComponenteFormulario,
   listarInventarioComponentesFormulario,
@@ -110,7 +111,7 @@ const TIPOS_CAMPO = [
   ["percentual", "Percentual"],
   ["data", "Data"],
   ["data_hora", "Data e hora"],
-  ["booleano", "Sim ou não"],
+  ["booleano", `${VALORES.SIM} ou ${VALORES.NAO}`],
   ["selecao", "Seleção única"],
   ["multiselecao", "Seleção múltipla"],
   ["cnpj", "CNPJ"],
@@ -1093,7 +1094,7 @@ function FormularioEtapaWorkspaceContent({
               <div className="mt-3 grid gap-2 rounded-lg border border-white/10 bg-slate-900/40 p-2.5 text-xs text-slate-300">
                 <label>Exigir quando outro campo for igual a
                   <select value={lerCondicaoIgualSimples(condicoesDraft[campoSelecionado.id] ?? "")?.campoId ?? ""} disabled={bloqueado || !estaNoRascunho}
-                    onChange={(event) => { const atual = lerCondicaoIgualSimples(condicoesDraft[campoSelecionado.id] ?? ""); setCondicoesDraft((rascunho) => ({ ...rascunho, [campoSelecionado.id]: condicaoIgualJson(event.target.value, atual?.valor || "Sim") })); setSujo(true); }}
+                    onChange={(event) => { const atual = lerCondicaoIgualSimples(condicoesDraft[campoSelecionado.id] ?? ""); setCondicoesDraft((rascunho) => ({ ...rascunho, [campoSelecionado.id]: condicaoIgualJson(event.target.value, atual?.valor || VALORES.SIM) })); setSujo(true); }}
                     className="mt-1 w-full rounded-lg border border-white/10 bg-slate-900 p-2 text-white">
                     <option value="">Sem condição simples</option>
                     {camposLocais.filter((campo) => campo.id !== campoSelecionado.id && campo.ativo !== false).map((campo) => <option key={campo.id} value={campo.id}>{campo.nome}</option>)}
@@ -1102,13 +1103,13 @@ function FormularioEtapaWorkspaceContent({
                 <label>Valor que ativa a obrigação
                   <input value={lerCondicaoIgualSimples(condicoesDraft[campoSelecionado.id] ?? "")?.valor ?? ""} disabled={bloqueado || !estaNoRascunho || !lerCondicaoIgualSimples(condicoesDraft[campoSelecionado.id] ?? "")?.campoId}
                     onChange={(event) => { const atual = lerCondicaoIgualSimples(condicoesDraft[campoSelecionado.id] ?? ""); setCondicoesDraft((rascunho) => ({ ...rascunho, [campoSelecionado.id]: condicaoIgualJson(atual?.campoId ?? "", event.target.value) })); setSujo(true); }}
-                    placeholder="Sim" className="mt-1 w-full rounded-lg border border-white/10 bg-slate-900 p-2 text-white" />
+                    placeholder={VALORES.SIM} className="mt-1 w-full rounded-lg border border-white/10 bg-slate-900 p-2 text-white" />
                 </label>
               </div>
               <label className="mt-3 block text-xs text-slate-300">Condição avançada (JSON)
                 <textarea value={condicoesDraft[campoSelecionado.id] ?? ""} disabled={bloqueado || !estaNoRascunho}
                   onChange={(event) => { setCondicoesDraft((atuais) => ({ ...atuais, [campoSelecionado.id]: event.target.value })); setSujo(true); }}
-                  placeholder='{"operador":"AND","condicoes":[{"tipo":"condicao","campo":{"fonte":"campo_dinamico","campo":"ID_DO_CAMPO"},"operador":"igual","valor":"Sim"}]}'
+                  placeholder={'{"operador":"AND","condicoes":[{"tipo":"condicao","campo":{"fonte":"campo_dinamico","campo":"ID_DO_CAMPO"},"operador":"igual","valor":"Sim"}]}'}
                   className="mt-1 min-h-24 w-full rounded-lg border border-white/10 bg-slate-900 p-2 font-mono text-xs text-white disabled:opacity-50" />
                 <span className="mt-1 block text-[11px] text-slate-500">Use o ID de outro campo publicado na condição. Deixe vazio para não exigir condicionalmente.</span>
               </label>

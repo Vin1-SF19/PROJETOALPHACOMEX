@@ -5,6 +5,7 @@ import { CheckCircle2, ChevronDown, ClipboardList } from "lucide-react";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { fmtDateTime } from "@/lib/format-date";
 import { etapaResumoInicialId, etapasAnterioresParaResumo, type EtapaResumoPipeline } from "@/lib/bpm/resumo-etapas";
+import { VALORES } from "@/lib/bpm/financeiro-config.client";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 
@@ -26,8 +27,8 @@ function obterEtapaDoHistorico(valorJson: string | null): string | null {
 }
 
 function formatarValorResumo(valor: string): string {
-  if (valor === "true") return "Sim";
-  if (valor === "false") return "Não";
+  if (valor === "true") return VALORES.SIM;
+  if (valor === "false") return VALORES.NAO;
   return valor;
 }
 

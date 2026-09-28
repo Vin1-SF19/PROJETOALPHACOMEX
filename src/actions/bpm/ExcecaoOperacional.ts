@@ -7,9 +7,10 @@ import { isAdminRole } from "@/lib/roles";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import { executarAutomacoesCentraisDoCardAgora } from "@/lib/bpm/automacoes/orquestrador";
 import { revalidatePath } from "next/cache";
+import { PIPELINE_CHAVE, CHAVE_AUTOMACAO_HANDOFF, ETAPAS } from "@/lib/bpm/financeiro-config";
 
 const entradaSchema = z.object({ cardId: z.string().min(1), motivo: z.string().trim().min(20).max(1000) }).strict();
-const CHAVE_AUTOMACAO = "financeiro.handoff.contrato.concluido.operacional";
+const CHAVE_AUTOMACAO = CHAVE_AUTOMACAO_HANDOFF;
 
 /** Exceção por contratação, restrita à liberação operacional; não altera os requisitos financeiros. */
 export async function AutorizarExcecaoLiberacaoOperacionalBpm(entrada: unknown) {
@@ -23,7 +24,7 @@ export async function AutorizarExcecaoLiberacaoOperacionalBpm(entrada: unknown) 
     await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "visualizar");
     await db.$transaction(async (tx) => {
       const card = await tx.bpmCard.findFirst({
-        where: { id: cardId, status: "CONCLUIDO", etapa: { chave: "contratacao_finalizada" }, pipeline: { chave: "financeiro" } },
+        where: { id: cardId, status: "CONCLUIDO", etapa: { chave: ETAPAS.CONTRATACAO_FINALIZADA }, pipeline: { chave: PIPELINE_CHAVE } },
         select: { id: true, pipelineId: true },
       });
       if (!card) throw new Error("A contratação financeira precisa estar concluída.");

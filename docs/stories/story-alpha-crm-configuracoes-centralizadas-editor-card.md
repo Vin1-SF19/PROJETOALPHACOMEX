@@ -55,6 +55,7 @@ O pedido aprovado é simplificar essa experiência sem alterar schema ou dados: 
 - [x] Centralizar rotas administrativas e limpar a sidebar (AC6–AC7).
 - [x] Adicionar/ajustar testes e executar quality gates (AC9).
 - [x] Restaurar o layout visual original do preview na aba Card, mantendo a edição funcional e a prévia ao vivo (AC2–AC4).
+- [x] Corrigir a regressão de build no dashboard após a mudança de navegação do commit `3b44c1a`: manter o rótulo “Pendente” sem importar um módulo financeiro não versionado.
 
 ## Dev Notes
 
@@ -105,12 +106,14 @@ O pedido aprovado é simplificar essa experiência sem alterar schema ou dados: 
 - Nenhuma migration, seed, backfill ou mutation em massa foi criada ou executada.
 - Correção visual final: o Card do Kanban preserva novamente o preview original em três colunas, mas a configuração central agora edita o rascunho e atualiza o card de exemplo ao vivo. A troca de etapa protege alterações não salvas e as ações assíncronas sempre liberam o estado de carregamento.
 - Validação da correção final: 65/65 testes focados verdes e ESLint do escopo verde. A suíte global repetiu o baseline de 2.782 testes verdes, 1 todo e 28 falhas externas em 14 arquivos; typecheck e lint globais também repetiram apenas falhas preexistentes fora do escopo.
+- Regressão do commit `3b44c1a` reproduzida em checkout isolado: o build falhava ao importar `financeiro-config.client`, ausente do commit. Após restaurar o rótulo literal do dashboard, `npm run build`, `npm run typecheck`, `npm run lint` (0 erros, 1.192 avisos) e `npm test` (538 arquivos, 3.970 testes aprovados, 4 ignorados e 1 todo) passaram.
 
 ### File List
 
 - [x] `docs/stories/story-alpha-crm-configuracoes-centralizadas-editor-card.md`
 - [x] `plan/self-critique-crm-kanban-card-preview-editor.json`
 - [x] `src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx`
+- [x] `src/app/PainelAlpha/AlphaCRM/DashboardClient.tsx` — correção de build do commit `3b44c1a`.
 - [x] `src/app/PainelAlpha/AlphaCRM/CardModal/CardOpenFormSlot.tsx`
 - [x] `src/app/PainelAlpha/AlphaCRM/CardModal/FormularioEtapaRenderer.tsx`
 - [x] `src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx`
@@ -141,3 +144,4 @@ O pedido aprovado é simplificar essa experiência sem alterar schema ou dados: 
 - 2026-09-10: implementação concluída e movida para Review, sem alterações de banco.
 - 2026-09-10: navegação corrigida para usar as abas internas existentes e Card do Kanban convertido de preview bloqueado para editor direto.
 - 2026-09-10: Card do Kanban corrigido novamente para preservar o layout original do preview, agora conectado ao editor e à prévia ao vivo.
+- 2026-09-28: corrigida a dependência não versionada introduzida no dashboard pelo commit `3b44c1a`.

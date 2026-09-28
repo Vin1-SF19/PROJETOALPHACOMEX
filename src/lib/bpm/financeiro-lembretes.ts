@@ -3,18 +3,19 @@ import "server-only";
 import db from "@/lib/prisma";
 import { intervaloDiaCivilSaoPaulo } from "@/lib/bpm/novos-leads";
 import { avaliarFormalizacaoFinanceira } from "@/lib/bpm/financeiro-formalizacao";
+import { PIPELINE_CHAVE, CHAVES_CAMPOS } from "@/lib/bpm/financeiro-config";
 
 const CHAVES = [
-  "alpha.financeiro.status.contrato.assinatura",
-  "alpha.data.da.assinatura",
-  "alpha.contrato.assinado.anexo",
-  "alpha.pagamento.confirmado",
-  "alpha.financeiro.prazo.assinatura",
+  CHAVES_CAMPOS.STATUS_ASSINATURA,
+  CHAVES_CAMPOS.DATA_ASSINATURA,
+  CHAVES_CAMPOS.ANEXO_ASSINADO,
+  CHAVES_CAMPOS.PAGAMENTO_CONFIRMADO,
+  CHAVES_CAMPOS.PRAZO_ASSINATURA,
 ];
 
 /** Lembrete diário para cards com prazo individual e assinatura ainda pendente. */
 export async function processarLembretesAssinaturaFinanceiro(agora = new Date()) {
-  const pipeline = await db.bpmPipeline.findUnique({ where: { chave: "financeiro" }, select: { id: true } });
+  const pipeline = await db.bpmPipeline.findUnique({ where: { chave: PIPELINE_CHAVE }, select: { id: true } });
   if (!pipeline) return { examinados: 0, criados: 0 };
   const campos = await db.bpmCampo.findMany({
     where: { pipelineId: pipeline.id, chave: { in: CHAVES }, ativo: true }, select: { id: true, chave: true },

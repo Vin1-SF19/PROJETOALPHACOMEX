@@ -7,6 +7,7 @@ import { campoBpmEhCnpj } from "@/lib/bpm/campos-dinamicos";
 import { formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";
 import { RegistrarAnexoBpm } from "@/actions/bpm/Anexos";
 import { VisualizadorAnexoCard, type AnexoParaVisualizar } from "@/components/bpm/anexos/VisualizadorAnexoCard";
+import { VALORES } from "@/lib/bpm/financeiro-config.client";
 
 export interface CampoBpmEditavel {
   id: string;
@@ -91,7 +92,7 @@ export function CampoBpmInput({
   const [anexoSelecionado, setAnexoSelecionado] = useState<AnexoParaVisualizar | null>(null);
   const bloqueado = disabled || readOnly;
   const opcoes = campo.tipo === "booleano"
-    ? ["Sim", "Não"]
+    ? [VALORES.SIM, VALORES.NAO]
     : lerOpcoes(campo.opcoesJson);
 
   if ((campo.tipo === "selecao" || campo.tipo === "multiselecao") && campo.fonteEntidade) {

@@ -8,6 +8,7 @@ import { AtualizarCardBpm, ObterCardBpm } from "@/actions/bpm/Cards";
 import { ConsultarCnpjNovoContrato } from "@/actions/bpm/ConsultaCnpjFinanceiro";
 import { CampoBpmInput } from "@/app/PainelAlpha/AlphaCRM/CampoBpmInput";
 import { MOTIVO_LOST_OUTRO_OBRIGATORIO_MENSAGEM } from "@/lib/bpm/lost";
+import { CHAVES_CAMPOS, VALORES } from "@/lib/bpm/financeiro-config.client";
 import {
   montarPayloadCamposDestino,
   prepararCamposMotivoLostUiCanonico,
@@ -278,9 +279,9 @@ export function PainelCamposEtapaAtual({
     if (!sucesso && revisaoEdicao.current === revisaoEnviada) setEstadoSave("erro");
   }
   const campoCnpj = camposAtuaisVisiveis.find((campo) => campo.chave === FINANCIAL_FIELD_KEYS.CNPJ);
-  const campoAssinatura = camposAtuaisVisiveis.find((campo) => campo.chave === "alpha.financeiro.status.contrato.assinatura");
-  const campoDataAssinatura = camposAtuaisVisiveis.find((campo) => campo.chave === "alpha.data.da.assinatura");
-  const campoContratoAssinado = camposAtuaisVisiveis.find((campo) => campo.chave === "alpha.contrato.assinado.anexo");
+  const campoAssinatura = camposAtuaisVisiveis.find((campo) => campo.chave === CHAVES_CAMPOS.STATUS_ASSINATURA);
+  const campoDataAssinatura = camposAtuaisVisiveis.find((campo) => campo.chave === CHAVES_CAMPOS.DATA_ASSINATURA);
+  const campoContratoAssinado = camposAtuaisVisiveis.find((campo) => campo.chave === CHAVES_CAMPOS.ANEXO_ASSINADO);
   const anexoAssinadoId = campoContratoAssinado ? valoresConfirmados[campoContratoAssinado.id] : null;
   const requisitoContrato = campoAssinatura && avaliarFormalizacaoFinanceira({
     statusAssinatura: valoresConfirmados[campoAssinatura.id],
@@ -366,10 +367,10 @@ export function PainelCamposEtapaAtual({
         </div>
       )}
       {requisitoContrato && (
-        <div role="status" className={requisitoContrato === "Concluído"
+        <div role="status" className={requisitoContrato === VALORES.CONCLUIDO
           ? "rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs font-semibold text-emerald-200"
           : "rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-semibold text-amber-200"}>
-          {requisitoContrato === "Concluído" ? "CONTRATO CONCLUÍDO" : "Contrato pendente de assinatura válida"}
+          {requisitoContrato === VALORES.CONCLUIDO ? "CONTRATO CONCLUÍDO" : "Contrato pendente de assinatura válida"}
         </div>
       )}
       {camposAtuaisVisiveis.length === 0 ? (

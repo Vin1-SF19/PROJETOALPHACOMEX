@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Users,
 } from "lucide-react";
+import { VALORES } from "@/lib/bpm/financeiro-config.client";
 import type { LucideIcon } from "lucide-react";
 
 import type { DadosEmpresaConsolidado } from "@/lib/bpm/dados-empresa";
@@ -65,7 +66,7 @@ function formatarMoeda(valor: number | null): string {
 }
 
 function SimNao({ valor }: { valor: boolean | null }) {
-  return <>{valor === null ? "Não informado" : valor ? "Sim" : "Não"}</>;
+  return <>{valor === null ? "Não informado" : valor ? VALORES.SIM : VALORES.NAO}</>;
 }
 
 export function DadosEmpresaConteudo({ dados, accent }: DadosEmpresaConteudoProps) {

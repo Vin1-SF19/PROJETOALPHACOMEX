@@ -13,7 +13,6 @@ import {
   Settings,
   type LucideIcon,
 } from 'lucide-react';
-import { VALORES } from "@/lib/bpm/financeiro-config.client";
 import type { TemaAlpha } from '@/lib/temas';
 import { fmtDateTime } from '@/lib/format-date';
 import { ObterDashboardBpm } from '@/actions/bpm/Dashboard';
@@ -402,7 +401,7 @@ export default function DashboardClient({
                           {atrasada ? (
                             <StatusBadge label="Atrasada" tone="danger" className="shrink-0" />
                           ) : t.prazo ? (
-                            <StatusBadge label={VALORES.PENDENTE} tone="info" className="shrink-0" />
+                            <StatusBadge label="Pendente" tone="info" className="shrink-0" />
                           ) : null}
                         </div>
                         <div className="mt-1 flex items-center gap-2 text-[11px] text-[hsl(215,16%,46%)]">

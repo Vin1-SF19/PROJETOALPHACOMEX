@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ObterNotaFiscalFinanceiroBpm, SalvarNotaFiscalFinanceiroBpm } from "@/actions/bpm/NotaFiscal";
+import { VALORES } from "@/lib/bpm/financeiro-config.client";
 
 type Nota = { emitida: "Sim" | "Não" | ""; dataEmissao: string; numero: string; link: string };
 
@@ -48,7 +49,7 @@ export function PainelNotaFiscalConcluida({ cardId, onAtualizado }: { cardId: st
     <div className="grid gap-3 sm:grid-cols-2">
       <label className="space-y-1 text-xs text-slate-300">NF emitida
         <select disabled={!podeEditar} className="w-full rounded-md border border-white/15 bg-slate-900 p-2 text-white" value={nota.emitida} onChange={(e) => setNota({ ...nota, emitida: e.target.value as Nota["emitida"] })}>
-          <option value="">Não informado</option><option value="Sim">Sim</option><option value="Não">Não</option>
+          <option value="">Não informado</option><option value={VALORES.SIM}>{VALORES.SIM}</option><option value={VALORES.NAO}>{VALORES.NAO}</option>
         </select>
       </label>
       <label className="space-y-1 text-xs text-slate-300">Data de emissão

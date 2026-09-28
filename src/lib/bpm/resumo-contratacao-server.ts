@@ -2,31 +2,32 @@ import "server-only";
 
 import db from "@/lib/prisma";
 import { carregarValoresCanonicosCampos } from "@/lib/bpm/campos-configuraveis-server";
+import { PIPELINE_CHAVE, CHAVES_CAMPOS } from "@/lib/bpm/financeiro-config";
 
 const CAMPOS = [
-  ["Contato", "alpha.contato.responsavel.representante"],
-  ["E-mail", "alpha.e.mail"],
-  ["Serviço contratado", "alpha.servico.contratado"],
-  ["Data da assinatura", "alpha.data.da.assinatura"],
-  ["Valor contratado", "alpha.valor.acordado.no.contrato"],
-  ["Valor líquido", "alpha.financeiro.valor.liquido.pagamento"],
-  ["Forma de pagamento", "alpha.forma.de.pagamento"],
-  ["Pagamento realizado", "alpha.pagamento.confirmado"],
-  ["Data do pagamento", "alpha.data.do.pagamento"],
-  ["NF emitida", "alpha.nf.emitida"],
-  ["Data de emissão da NF", "alpha.data.de.emissao"],
-  ["Número da NF", "alpha.numero.da.nf"],
-  ["Link da NF", "alpha.arquivo.link.da.nf"],
-  ["Vendedor responsável", "alpha.vendedor.a"],
-  ["Parceiro", "alpha.parceiro.responsavel"],
-  ["Origem", "alpha.canal.origem.do.cliente"],
-  ["Observações comerciais", "alpha.observacoes.comerciais"],
+  ["Contato", CHAVES_CAMPOS.CONTATO_RESPONSAVEL],
+  ["E-mail", CHAVES_CAMPOS.EMAIL],
+  ["Serviço contratado", CHAVES_CAMPOS.SERVICO_CONTRATADO],
+  ["Data da assinatura", CHAVES_CAMPOS.DATA_ASSINATURA],
+  ["Valor contratado", CHAVES_CAMPOS.VALOR_CONTRATADO],
+  ["Valor líquido", CHAVES_CAMPOS.VALOR_LIQUIDO],
+  ["Forma de pagamento", CHAVES_CAMPOS.FORMA_PAGAMENTO],
+  ["Pagamento realizado", CHAVES_CAMPOS.PAGAMENTO_CONFIRMADO],
+  ["Data do pagamento", CHAVES_CAMPOS.DATA_PAGAMENTO],
+  ["NF emitida", CHAVES_CAMPOS.NF_EMITIDA],
+  ["Data de emissão da NF", CHAVES_CAMPOS.DATA_EMISSAO_NF],
+  ["Número da NF", CHAVES_CAMPOS.NUMERO_NF],
+  ["Link da NF", CHAVES_CAMPOS.LINK_NF],
+  ["Vendedor responsável", CHAVES_CAMPOS.VENDEDOR_RESPONSAVEL],
+  ["Parceiro", CHAVES_CAMPOS.PARCEIRO_RESPONSAVEL],
+  ["Origem", CHAVES_CAMPOS.ORIGEM_CLIENTE],
+  ["Observações comerciais", CHAVES_CAMPOS.OBSERVACOES_COMERCIAIS],
 ] as const;
 
 /** Projeção de leitura pelo vínculo explícito; os documentos seguem na origem. */
 export async function carregarResumoContratacao(financeiroCardId: string) {
   const card = await db.bpmCard.findFirst({
-    where: { id: financeiroCardId, pipeline: { chave: "financeiro" } },
+    where: { id: financeiroCardId, pipeline: { chave: PIPELINE_CHAVE } },
     select: {
       id: true, empresa: { select: { cnpj: true, razaoSocial: true } }, concluidoEm: true,
       campoValores: { select: { campoId: true, valor: true } },

@@ -1,6 +1,7 @@
 "use client";
 
 import type { ObterCardBpm } from "@/actions/bpm/Cards";
+import { VALORES } from "@/lib/bpm/financeiro-config.client";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type Resumo = NonNullable<CardDetalhe["resumoContratacao"]>;
@@ -23,7 +24,7 @@ export function PainelResumoContratacao({ resumo }: { resumo: Resumo }) {
                 ? <a href={valor} target="_blank" rel="noopener noreferrer" className="underline">Abrir nota fiscal</a>
                 : nome === "Link da NF" && resumo.documentos.some((documento) => documento.id === valor)
                   ? <a href={`/api/bpm/anexos/${valor}`} target="_blank" rel="noopener noreferrer" className="underline">Abrir nota fiscal</a>
-                  : valor || "Pendente"}
+                  : valor || VALORES.PENDENTE}
             </dd>
           </div>
         ))}

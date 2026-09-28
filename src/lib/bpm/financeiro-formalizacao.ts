@@ -1,13 +1,15 @@
-/** Estado dos dois requisitos independentes da contratação financeira. */
-export type EstadoRequisitoFinanceiro = "Pendente" | "Concluído";
+import {
+  VALORES,
+  REQUISITOS_CONTRATO,
+  REQUISITOS_PAGAMENTO,
+  type EntradaRequisitosFinanceiro,
+  type ResultadoRequisitosFinanceiro,
+} from "@/lib/bpm/financeiro-config";
 
-export type EntradaFormalizacaoFinanceira = {
-  statusAssinatura: string | null | undefined;
-  dataAssinatura: string | null | undefined;
-  anexoAssinadoId: string | null | undefined;
-  anexoAssinadoVinculado: boolean;
-  pagamentoConfirmado: string | null | undefined;
-};
+/** Estado dos dois requisitos independentes da contratação financeira. */
+export type EstadoRequisitoFinanceiro = typeof VALORES.PENDENTE | typeof VALORES.CONCLUIDO;
+
+export type EntradaFormalizacaoFinanceira = EntradaRequisitosFinanceiro;
 
 function dataCivilValida(valor: string | null | undefined): boolean {
   if (!valor || !/^\d{4}-\d{2}-\d{2}$/.test(valor)) return false;
@@ -15,23 +17,23 @@ function dataCivilValida(valor: string | null | undefined): boolean {
   return !Number.isNaN(data.getTime()) && data.toISOString().slice(0, 10) === valor;
 }
 
-export function avaliarFormalizacaoFinanceira(entrada: EntradaFormalizacaoFinanceira) {
-  const assinaturaConfirmada = entrada.statusAssinatura === "Assinado";
+export function avaliarFormalizacaoFinanceira(entrada: EntradaFormalizacaoFinanceira): ResultadoRequisitosFinanceiro {
+  const assinaturaConfirmada = entrada.statusAssinatura === VALORES.ASSINADO;
   const dataConfirmada = dataCivilValida(entrada.dataAssinatura);
   const documentoConfirmado = Boolean(entrada.anexoAssinadoId?.trim() && entrada.anexoAssinadoVinculado);
   const contrato: EstadoRequisitoFinanceiro = assinaturaConfirmada && dataConfirmada && documentoConfirmado
-    ? "Concluído" : "Pendente";
-  const pagamento: EstadoRequisitoFinanceiro = entrada.pagamentoConfirmado === "Sim"
-    ? "Concluído" : "Pendente";
+    ? VALORES.CONCLUIDO : VALORES.PENDENTE;
+  const pagamento: EstadoRequisitoFinanceiro = entrada.pagamentoConfirmado === VALORES.SIM
+    ? VALORES.CONCLUIDO : VALORES.PENDENTE;
   const pendencias: string[] = [];
-  if (!assinaturaConfirmada) pendencias.push("Status da assinatura");
-  if (!dataConfirmada) pendencias.push("Data da assinatura");
-  if (!documentoConfirmado) pendencias.push("Contrato assinado/anexo");
-  if (pagamento === "Pendente") pendencias.push("Pagamento confirmado");
+  if (!assinaturaConfirmada) pendencias.push(REQUISITOS_CONTRATO[0].rotulo);
+  if (!dataConfirmada) pendencias.push(REQUISITOS_CONTRATO[1].rotulo);
+  if (!documentoConfirmado) pendencias.push(REQUISITOS_CONTRATO[2].rotulo);
+  if (pagamento === VALORES.PENDENTE) pendencias.push(REQUISITOS_PAGAMENTO[0].rotulo);
   return {
     contrato,
     pagamento,
-    contratacaoConcluida: contrato === "Concluído" && pagamento === "Concluído",
+    contratacaoConcluida: contrato === VALORES.CONCLUIDO && pagamento === VALORES.CONCLUIDO,
     pendencias,
   };
 }

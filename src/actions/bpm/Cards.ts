@@ -5,6 +5,7 @@ import { ExcluirCardBpm as excluirCard } from "./CardsExcluir";
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
+import { PIPELINE_CHAVE, ETAPAS } from "@/lib/bpm/financeiro-config";
 import {
   criarCardSchema,
   atualizarCardSchema,
@@ -780,12 +781,12 @@ export async function ObterCardBpm(cardId: string) {
 
     const origemFinanceira = card.pipeline.chave === "operacional"
       ? await db.bpmCardVinculo.findFirst({
-          where: { cardDestinoId: card.id, cardOrigem: { pipeline: { chave: "financeiro" } } },
+          where: { cardDestinoId: card.id, cardOrigem: { pipeline: { chave: PIPELINE_CHAVE } } },
           select: { cardOrigemId: true },
           orderBy: { createdAt: "desc" },
         })
       : null;
-    const resumoContratacao = card.pipeline.chave === "financeiro" && card.etapa.chave === "contratacao_finalizada"
+    const resumoContratacao = card.pipeline.chave === PIPELINE_CHAVE && card.etapa.chave === ETAPAS.CONTRATACAO_FINALIZADA
       ? await carregarResumoContratacao(card.id)
       : origemFinanceira ? await carregarResumoContratacao(origemFinanceira.cardOrigemId) : null;
 
@@ -1330,7 +1331,7 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
         }
       }
 
-      if (cardAtual.pipeline?.chave === "financeiro" && Object.keys(valoresValidados).length > 0) {
+      if (cardAtual.pipeline?.chave === PIPELINE_CHAVE && Object.keys(valoresValidados).length > 0) {
         await registrarConclusaoContratoFinanceiro(tx, cardId, cardAtual.pipelineId, userId);
       }
 
