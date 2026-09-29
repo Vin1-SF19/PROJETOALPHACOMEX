@@ -7,6 +7,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, type ReactNo
 type ConfirmedCard = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type ConfirmationListener = (card: ConfirmedCard, key?: string) => void;
 export type PendingCardChange = { label: string; before?: string; after?: string };
+type SaveErrorOptions = Pick<ExternalToast, "duration" | "closeButton"> & { failureMessage?: () => string };
 
 interface CardSaveContextValue {
   subscribeConfirmation: (cardId: string, listener: ConfirmationListener) => () => void;
@@ -20,10 +21,11 @@ interface CardSaveContextValue {
   getPendingFields: (cardId?: string) => string[];
   getPendingChanges: (cardId?: string) => PendingCardChange[];
   getFailedSaveKeys: (cardId: string) => string[];
+  clearFailedSave: (key: string) => void;
   retryFailedSaves: (cardId: string) => Promise<boolean>;
   discardPending: (cardId: string) => void;
   /** Enfileira um save para preservar a ordem e a versão-base do card. */
-  registerSave: (save: () => Promise<boolean>, cardId?: string, recoveryKey?: string, errorOptions?: Pick<ExternalToast, "duration" | "closeButton">, refreshAfterSave?: boolean) => Promise<boolean>;
+  registerSave: (save: () => Promise<boolean>, cardId?: string, recoveryKey?: string, errorOptions?: SaveErrorOptions, refreshAfterSave?: boolean) => Promise<boolean>;
   /** Aguarda todos os saves e informa se a persistência foi concluída. */
   flushSaves: (cardId?: string) => Promise<boolean>;
 }
@@ -84,9 +86,9 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
   const getPendingFields = useCallback((cardId?: string) => [...new Set(getPendingChanges(cardId).map((field) => field.label))], [getPendingChanges]);
   const savePromiseRef = useRef(new Map<string, Promise<boolean>>());
 
-  const recovery = useRef(new Map<string, { save: () => Promise<boolean>; errorOptions?: Pick<ExternalToast, "duration" | "closeButton">; refreshAfterSave: boolean }>());
+  const recovery = useRef(new Map<string, { save: () => Promise<boolean>; errorOptions?: SaveErrorOptions; refreshAfterSave: boolean }>());
   const failures = useRef(new Map<string, string | undefined>());
-  const registerSave = useCallback(function enqueue(save: () => Promise<boolean>, cardId?: string, recoveryKey?: string, errorOptions?: Pick<ExternalToast, "duration" | "closeButton">, refreshAfterSave = true): Promise<boolean> {
+  const registerSave = useCallback(function enqueue(save: () => Promise<boolean>, cardId?: string, recoveryKey?: string, errorOptions?: SaveErrorOptions, refreshAfterSave = true): Promise<boolean> {
     if (recoveryKey) recovery.current.set(recoveryKey, { save, errorOptions, refreshAfterSave });
     const scope = cardId ?? "";
     const anteriores = savePromiseRef.current.get(scope) ?? Promise.resolve(true);
@@ -111,11 +113,13 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
         if (success) {
           recovery.current.delete(recoveryKey);
           failures.current.delete(recoveryKey);
+          if (cardId && ![...failures.current.values()].includes(cardId)) toast.dismiss?.(`card-save:${cardId}`);
         } else {
           failures.current.set(recoveryKey, cardId);
-          toast.error("Erro ao salvar. A alteração foi preservada nesta sessão.", {
-            ...errorOptions,
+          toast.error(errorOptions?.failureMessage?.() ?? "Erro ao salvar. A alteração foi preservada nesta sessão.", {
             duration: Infinity,
+            closeButton: errorOptions?.closeButton,
+            id: cardId ? `card-save:${cardId}` : `card-save:${recoveryKey}`,
             action: { label: "Tentar novamente", onClick: () => {
               const previous = recovery.current.get(recoveryKey);
               flushScheduled(cardId ? `${cardId}:` : "");
@@ -154,6 +158,12 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
 
   const getFailedSaveKeys = useCallback((cardId: string) => [...failures.current]
     .filter(([, id]) => id === cardId).map(([key]) => key), []);
+  const clearFailedSave = useCallback((key: string) => {
+    const cardId = failures.current.get(key);
+    failures.current.delete(key);
+    recovery.current.delete(key);
+    if (cardId && ![...failures.current.values()].includes(cardId)) toast.dismiss?.(`card-save:${cardId}`);
+  }, []);
 
   const retryFailedSaves = useCallback(async (cardId: string) => {
     flushScheduled(`${cardId}:`);
@@ -179,10 +189,11 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
     for (const key of pendingRef.current.keys()) if (key.startsWith(`${cardId}:`)) pendingRef.current.delete(key);
     for (const [key, id] of failures.current) if (id === cardId) failures.current.delete(key);
     for (const key of recovery.current.keys()) if (key.startsWith(`${cardId}:`)) recovery.current.delete(key);
+    toast.dismiss?.(`card-save:${cardId}`);
   }, []);
 
   return (
-    <CardSaveContext.Provider value={{ subscribeConfirmation, scheduleSave, flushScheduled, getVersion, confirmVersion, getDraft, setDraft, registerSave, flushSaves, setPendingFields, getPendingFields, getPendingChanges, getFailedSaveKeys, retryFailedSaves, discardPending }}>
+    <CardSaveContext.Provider value={{ subscribeConfirmation, scheduleSave, flushScheduled, getVersion, confirmVersion, getDraft, setDraft, registerSave, flushSaves, setPendingFields, getPendingFields, getPendingChanges, getFailedSaveKeys, clearFailedSave, retryFailedSaves, discardPending }}>
       {children}
     </CardSaveContext.Provider>
   );

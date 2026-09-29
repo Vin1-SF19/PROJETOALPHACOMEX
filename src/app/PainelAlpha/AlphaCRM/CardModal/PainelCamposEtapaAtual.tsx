@@ -51,7 +51,7 @@ export function PainelCamposEtapaAtual({
   realtimeRevision,
   onAtualizado,
 }: Props) {
-  const { registerSave, setPendingFields, scheduleSave, flushScheduled, getVersion, confirmVersion, getDraft, setDraft, subscribeConfirmation } = useCardSave();
+  const { registerSave, setPendingFields, scheduleSave, flushScheduled, getVersion, confirmVersion, getDraft, setDraft, subscribeConfirmation, getFailedSaveKeys, clearFailedSave } = useCardSave();
   const idInstancia = `${card.id}-${instanceKey}`;
   const ordemCampos = new Map(campoIds.map((id, indice) => [id, indice]));
   const camposDoComponente = card.camposEtapa
@@ -186,6 +186,9 @@ export function PainelCamposEtapaAtual({
   }, [snapshotCamposEtapa, versaoRemotaCampos, realtimeRevision, getDraft, idInstancia]);
   function usarDadosAtualizadosCampos() {
     if (!snapshotRemotoPendente || !camposRemotosPendentes) return;
+    const chavesDestaSecao = new Set(camposEtapaBase.map((campo) => `${card.id}:campo:${campo.id}`));
+    chavesDestaSecao.add(`${card.id}:campo:${instanceKey}`);
+    for (const key of getFailedSaveKeys(card.id)) if (chavesDestaSecao.has(key)) clearFailedSave(key);
     valoresRef.current = snapshotRemotoPendente.valores;
     rastreadores.current.clear();
     setPendingFields(`${card.id}:${idInstancia}`, []);
@@ -213,6 +216,7 @@ export function PainelCamposEtapaAtual({
     }
     const revisaoEnviada = revisaoEdicao.current;
     const revisoes = new Map(configuracaoAtual.camposVisiveis.map((campo) => [campo.id, rastreadores.current.get(campo.id)?.capturar()]));
+    let erroDaTentativa = "Não foi possível salvar os campos da etapa.";
     setSavesCamposPendentes((total) => total + 1);
     const promise = registerSave(async () => {
       // Compare após os saves anteriores: uma reversão pode coincidir com a base
@@ -232,13 +236,57 @@ export function PainelCamposEtapaAtual({
         return true;
       }
       const valoresAntesDaRequisicao = { ...valoresRef.current };
-      const resultado = await AtualizarCardBpm({
-        cardId: card.id,
-        camposValores,
-        versaoEsperadaEm: getVersion(card.id, versaoBaseCamposRef.current),
+      const baseAntesDaRequisicao = { ...snapshotAtivoRef.current.valores };
+      const atualizar = (versao: string) => AtualizarCardBpm({
+        cardId: card.id, camposValores, versaoEsperadaEm: versao,
       });
+      let resultado;
+      let camposRemotos: Record<string, string> = {};
+      try {
+        resultado = await atualizar(getVersion(card.id, versaoBaseCamposRef.current));
+        if (!resultado.success && resultado.error === "O card mudou enquanto era editado. Recarregue e tente novamente.") {
+          const remoto = await ObterCardBpm(card.id);
+          if (remoto.success && remoto.data && remoto.data.etapa.id === card.etapa.id) {
+            const porId = new Map(remoto.data.camposEtapa.map((campo) => [campo.id, campo]));
+            const semConflitoNoCampo = Object.keys(camposValores).every((id) => {
+              const campoRemoto = porId.get(id);
+              const campoLocal = configuracaoAtual.camposVisiveis.find((campo) => campo.id === id);
+              return campoRemoto && campoLocal
+                && valorComparavel(campoLocal.tipo, campoRemoto.valor ?? "")
+                  === valorComparavel(campoLocal.tipo, snapshotAtivoRef.current.valores[id]);
+            });
+            if (semConflitoNoCampo) {
+              const versaoRemota = new Date(remoto.data.updatedAt).toISOString();
+              camposRemotos = Object.fromEntries(remoto.data.camposEtapa
+                .filter((campo) => Object.hasOwn(snapshotAtivoRef.current.valores, campo.id))
+                .map((campo) => [campo.id, campo.valor ?? ""]));
+              confirmVersion(card.id, versaoRemota);
+              versaoBaseCamposRef.current = versaoRemota;
+              resultado = await atualizar(versaoRemota);
+            } else {
+              setSnapshotRemotoPendente({
+                valores: Object.fromEntries(remoto.data.camposEtapa
+                  .filter((campo) => Object.hasOwn(snapshotAtivoRef.current.valores, campo.id))
+                  .map((campo) => [campo.id, campo.valor ?? ""])),
+                versao: new Date(remoto.data.updatedAt).toISOString(),
+              });
+              setCamposRemotosPendentes(remoto.data.camposEtapa
+                .filter((campo) => Object.hasOwn(snapshotAtivoRef.current.valores, campo.id)));
+              setConflitoCamposAtuais(true);
+              erroDaTentativa = "Este campo foi alterado em outra sessão. Revise o valor antes de salvar.";
+            }
+          }
+        }
+      } catch {
+        erroDaTentativa = "Falha de conexão ao salvar. A alteração continua no rascunho.";
+        return false;
+      }
       if (!resultado.success) {
-        toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível salvar os campos da etapa", erroFormulario);
+        if (erroDaTentativa === "Não foi possível salvar os campos da etapa.") {
+          erroDaTentativa = typeof resultado.error === "string" ? resultado.error
+            : resultado.error.formErrors[0] ?? Object.values(resultado.error.fieldErrors).flat()[0]
+              ?? erroDaTentativa;
+        }
         return false;
       }
       // A action confirma a gravação na própria transação. O fallback mantém
@@ -254,14 +302,19 @@ export function PainelCamposEtapaAtual({
       const confirmados = confirmacao?.camposValores ?? Object.fromEntries(cardAtualizado!.data!.camposEtapa
         .filter((campo) => Object.hasOwn(camposValores, campo.id))
         .map((campo) => [campo.id, campo.valor ?? ""]));
+      Object.assign(confirmados, Object.fromEntries(Object.entries(camposRemotos)
+        .filter(([id]) => !Object.hasOwn(confirmados, id))));
       const antesDaConfirmacao = valoresRef.current;
       for (const [id, valor] of Object.entries(confirmados)) {
         const revisao = revisoes.get(id);
-        const semEdicaoLocal = !revisao && !rastreadores.current.has(id)
-          && valoresRef.current[id] === valoresAntesDaRequisicao[id];
-        if ((revisao && rastreadores.current.get(id)?.corresponde(revisao)) || semEdicaoLocal) {
+        const tipo = camposEtapaBase.find((campo) => campo.id === id)?.tipo ?? "texto";
+        const semEdicaoLocal = valoresRef.current[id] === valoresAntesDaRequisicao[id]
+          && valorComparavel(tipo, valoresAntesDaRequisicao[id]) === valorComparavel(tipo, baseAntesDaRequisicao[id]);
+        const salvoNestaRequisicao = Object.hasOwn(camposValores, id)
+          && revisao && rastreadores.current.get(id)?.corresponde(revisao);
+        if (salvoNestaRequisicao || semEdicaoLocal) {
           valoresRef.current = { ...valoresRef.current, [id]: valor };
-          if (revisao) rastreadores.current.get(id)?.sincronizar(valor);
+          if (salvoNestaRequisicao) rastreadores.current.get(id)?.sincronizar(valor);
         }
       }
       setValoresCamposAtuais(valoresRef.current);
@@ -279,7 +332,8 @@ export function PainelCamposEtapaAtual({
       setConflitoCamposAtuais(false);
       onAtualizado();
       return true;
-    }, card.id, `${card.id}:campo:${campoId ?? instanceKey}`, erroFormulario, false).finally(() => {
+    }, card.id, `${card.id}:campo:${campoId ?? instanceKey}`,
+      { ...erroFormulario, failureMessage: () => erroDaTentativa }, false).finally(() => {
       setSavesCamposPendentes((total) => total - 1);
     });
     const sucesso = await promise;
@@ -444,7 +498,14 @@ export function PainelCamposEtapaAtual({
                   onChange={(valor) => {
                     alterarCampo(campo.id, valor);
                   }}
-                  onBlur={() => { scheduleSave(`${card.id}:${campo.id}`, () => void salvarCamposAtuais(campo.id), 0); }}
+                  onBlur={() => {
+                    const key = `${card.id}:campo:${campo.id}`;
+                    if (getFailedSaveKeys(card.id).includes(key)) {
+                      scheduleSave(`${card.id}:${campo.id}`, () => void salvarCamposAtuais(campo.id), 0);
+                    } else {
+                      flushScheduled(`${card.id}:${campo.id}`);
+                    }
+                  }}
                   className={inputCls}
                   disabled={!podeEditar}
                   readOnly={somenteLeitura}

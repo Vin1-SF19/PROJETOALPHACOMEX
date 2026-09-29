@@ -95,6 +95,7 @@ Lista final consolidada dos arquivos atribuídos a este RM nas fases anteriores;
 - `.bibble/memory/journal.md`
 - `.bibble/memory/known-errors.md`
 - `docs/stories/story-rm-2026-b88712-autosave-card-crm.md`
+
 - `src/actions/bpm/Anexos.ts`
 - `src/actions/bpm/Campos.ts`
 - `src/actions/bpm/Cards.ts`
@@ -721,4 +722,29 @@ File List desta correção:
 - `src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx`
 - `tests/bpm/requisitos-etapa-server.test.ts`
 - `tests/bpm/autosave-tipos-imediatos-react.test.ts`
+- `docs/stories/story-rm-2026-b88712-autosave-card-crm.md`
+
+## Correção — erros repetidos por edição de campo (2026-09-29)
+
+Relato: ao editar campos em Confirmação de Pagamento, o card exibe repetidamente “Erro ao salvar. A alteração foi preservada nesta sessão.” O autosave precisa preservar o rascunho, informar a causa concreta uma vez e recuperar conflitos de versão que não alteraram o campo editado.
+
+Critérios de aceite desta correção:
+
+- [x] Uma falha de gravação produz uma única notificação por card com o motivo retornado pelo servidor.
+- [x] Conflito de versão causado por alteração em outro campo é conciliado e a edição é salva sem perder mudanças externas.
+- [x] Conflito no mesmo campo continua protegido contra sobrescrita automática.
+- [x] Testes e gates são executados, com File List atualizado.
+
+Diagnóstico: a fila exibida pelo `CardSaveProvider` mostrava uma notificação genérica adicional para cada falha. O blur enfileirava outra gravação mesmo quando a revisão já estava em voo. Em conflito de versão, a action rejeitava o autosave sem distinguir se o campo editado realmente mudou no servidor. Uma avaliação somente leitura do card real em Confirmação de Pagamento confirmou que os campos de pagamento aceitam salvamento parcial nas regras configuradas; o motivo exato da falha autenticada anterior não estava disponível no toast genérico. A correção mantém um aviso por card com o erro retornado, concilia conflitos seguros uma vez e conserva conflitos reais para revisão.
+
+Validação: testes direcionados de conflito, rascunho concorrente, blur e recuperação aprovados; `npm run lint` aprovado (0 erros, 1.191 avisos), `npm run typecheck` aprovado, `npm test` aprovado (558 arquivos, 4.099 testes aprovados, 4 ignorados, 1 todo), `npm run build` aprovado e `git diff --check` aprovado. Nenhuma mutação de banco foi executada; não houve smoke autenticado no card real.
+
+File List desta correção:
+
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx`
+- `tests/bpm/autosave-recovery-react.test.ts`
+- `tests/bpm/autosave-tipos-imediatos-react.test.ts`
+- `tests/bpm/formulario-etapa.test.ts`
+- `tests/bpm/lost-ui.test.ts`
 - `docs/stories/story-rm-2026-b88712-autosave-card-crm.md`

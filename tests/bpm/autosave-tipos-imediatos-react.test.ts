@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { CardSaveProvider, useCardSave } from "@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext";
 import { PainelCamposEtapaAtual } from "@/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual";
 import { AtualizarCardBpm, ObterCardBpm } from "@/actions/bpm/Cards";
+import { toast } from "sonner";
 
 vi.mock("@/actions/bpm/Cards", () => ({ AtualizarCardBpm: vi.fn(), ObterCardBpm: vi.fn() }));
 vi.mock("@/actions/bpm/ConsultaCnpjFinanceiro", () => ({ ConsultarCnpjNovoContrato: vi.fn() }));
@@ -109,6 +110,104 @@ it("booleano (Sim/Não) dispara a action imediatamente na mudança, sem blur", a
     cardId: "card",
     camposValores: { ativo: "Sim" },
   }));
+});
+
+it("reconcilia conflito de versão quando outro campo mudou no servidor", async () => {
+  const card = makeCard([
+    { id: "status", nome: "Status", tipo: "selecao", opcoesJson: '["A","B","C"]' },
+    { id: "nota", nome: "Nota", tipo: "texto" },
+  ]);
+  const remoto = makeCard([
+    { id: "status", nome: "Status", tipo: "selecao", opcoesJson: '["A","B","C"]' },
+    { id: "nota", nome: "Nota", tipo: "texto" },
+  ]);
+  remoto.camposEtapa[1].valor = "Atualizada em outra seção";
+  vi.mocked(ObterCardBpm).mockResolvedValue({
+    success: true, data: { ...remoto, updatedAt: new Date("2026-09-22T10:02:00Z") },
+  } as Awaited<ReturnType<typeof ObterCardBpm>>);
+  vi.mocked(AtualizarCardBpm)
+    .mockResolvedValueOnce({ success: false, error: "O card mudou enquanto era editado. Recarregue e tente novamente." })
+    .mockResolvedValueOnce({ success: true, data: { updatedAt: new Date("2026-09-22T10:03:00Z"), camposValores: { status: "B" } } });
+  await render(card, ["status", "nota"]);
+
+  const select = container.querySelector<HTMLSelectElement>("#campo-bpm-status")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(select, "B");
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+
+  expect(AtualizarCardBpm).toHaveBeenCalledTimes(2);
+  expect(AtualizarCardBpm).toHaveBeenLastCalledWith(expect.objectContaining({
+    camposValores: { status: "B" }, versaoEsperadaEm: "2026-09-22T10:02:00.000Z",
+  }));
+  expect(await saves.flushSaves("card")).toBe(true);
+  expect(saves.getPendingChanges("card")).toEqual([]);
+  expect(container.querySelector<HTMLInputElement>("#campo-bpm-nota")?.value).toBe("Atualizada em outra seção");
+});
+
+it("preserva rascunho local de outro campo durante a conciliação de versão", async () => {
+  const card = makeCard([
+    { id: "status", nome: "Status", tipo: "selecao", opcoesJson: '["A","B","C"]' },
+    { id: "nota", nome: "Nota", tipo: "texto" },
+  ]);
+  const remoto = makeCard([
+    { id: "status", nome: "Status", tipo: "selecao", opcoesJson: '["A","B","C"]' },
+    { id: "nota", nome: "Nota", tipo: "texto" },
+  ]);
+  remoto.camposEtapa[1].valor = "Outra sessão";
+  vi.mocked(ObterCardBpm).mockResolvedValue({
+    success: true, data: { ...remoto, updatedAt: new Date("2026-09-22T10:02:00Z") },
+  } as Awaited<ReturnType<typeof ObterCardBpm>>);
+  let responderConflito!: (resultado: Awaited<ReturnType<typeof AtualizarCardBpm>>) => void;
+  vi.mocked(AtualizarCardBpm)
+    .mockImplementationOnce(() => new Promise((resolve) => { responderConflito = resolve; }))
+    .mockResolvedValueOnce({ success: true, data: { updatedAt: new Date("2026-09-22T10:03:00Z"), camposValores: { status: "B" } } });
+  await render(card, ["status", "nota"]);
+  const select = container.querySelector<HTMLSelectElement>("#campo-bpm-status")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(select, "B");
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  const input = container.querySelector<HTMLInputElement>("#campo-bpm-nota")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "Meu rascunho");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => {
+    responderConflito({ success: false, error: "O card mudou enquanto era editado. Recarregue e tente novamente." });
+    await Promise.resolve();
+  });
+
+  expect(input.value).toBe("Meu rascunho");
+  expect(saves.getPendingFields("card")).toContain("Nota");
+});
+
+it("não sobrescreve campo alterado em outra sessão nem repete erro no blur", async () => {
+  const card = makeCard([{ id: "status", nome: "Status", tipo: "selecao", opcoesJson: '["A","B","C"]' }]);
+  const remoto = makeCard([{ id: "status", nome: "Status", tipo: "selecao", opcoesJson: '["A","B","C"]' }]);
+  remoto.camposEtapa[0].valor = "C";
+  vi.mocked(ObterCardBpm).mockResolvedValue({
+    success: true, data: { ...remoto, updatedAt: new Date("2026-09-22T10:02:00Z") },
+  } as Awaited<ReturnType<typeof ObterCardBpm>>);
+  vi.mocked(AtualizarCardBpm).mockResolvedValue({
+    success: false, error: "O card mudou enquanto era editado. Recarregue e tente novamente.",
+  });
+  await render(card, ["status"]);
+
+  const select = container.querySelector<HTMLSelectElement>("#campo-bpm-status")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(select, "B");
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await act(async () => select.dispatchEvent(new FocusEvent("focusout", { bubbles: true })));
+
+  expect(AtualizarCardBpm).toHaveBeenCalledOnce();
+  expect(toast.error).toHaveBeenCalledOnce();
+  expect(toast.error).toHaveBeenCalledWith(
+    "Este campo foi alterado em outra sessão. Revise o valor antes de salvar.",
+    expect.objectContaining({ id: "card-save:card" }),
+  );
+  expect(saves.getPendingFields("card")).toContain("Status");
 });
 
 it("data dispara a action imediatamente na mudança, sem blur", async () => {

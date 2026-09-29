@@ -10,7 +10,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/actions/bpm/Checklists", () => ({ ObterResumoChecklistCardBpm: vi.fn(async () => ({ success: false })) }));
 vi.mock("@/actions/bpm/DisponibilidadeEtapasCard", () => ({ ObterDisponibilidadeEtapasCardBpm: vi.fn(async (_cardId: string, ids: string[]) => ({ success: true, data: ids.map((etapaId) => ({ etapaId, pendencias: [], oculta: false })) })) }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CampoBpmInput", () => ({ CampoBpmInput: () => null }));
-vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), dismiss: vi.fn() } }));
 vi.mock("@/actions/bpm/Cards", () => ({ MoverCardBpm: vi.fn(async () => ({ success: true })), ObterRequisitosTransicaoBpm: vi.fn(async () => ({ success: true, data: { etapaDestino: { id: "destino", nome: "Avançar" }, campos: [], faltantes: [], guardas: [] } })), SalvarRequisitosEMoverCardBpm: vi.fn(async () => ({ success: true })), ObterCardBpm: vi.fn(async () => ({ success: true, data: { updatedAt: "2026-09-22T12:00:00Z" } })) }));
 let root: Root;
 let host: HTMLDivElement;
@@ -75,6 +75,25 @@ it("mantém disponível a recuperação de falha real mesmo com opções de toas
     "Erro ao salvar. A alteração foi preservada nesta sessão.",
     expect.objectContaining({ duration: Infinity, closeButton: true, action: expect.objectContaining({ label: "Tentar novamente" }) }),
   );
+});
+
+it("mostra o motivo real no mesmo aviso por card e limpa falha descartada", async () => {
+  await context.registerSave(async () => false, "card", "card:campo:a", {
+    failureMessage: () => "O card mudou enquanto era editado.",
+  });
+  await context.registerSave(async () => false, "card", "card:campo:b", {
+    failureMessage: () => "O card mudou enquanto era editado.",
+  });
+  expect(vi.mocked(toast.error).mock.calls.map(([, options]) => options?.id)).toEqual([
+    "card-save:card", "card-save:card",
+  ]);
+  expect(vi.mocked(toast.error).mock.calls[0][0]).toBe("O card mudou enquanto era editado.");
+  expect(await context.flushSaves("card")).toBe(false);
+  context.clearFailedSave("card:campo:a");
+  expect(context.getFailedSaveKeys("card")).toEqual(["card:campo:b"]);
+  context.clearFailedSave("card:campo:b");
+  expect(await context.flushSaves("card")).toBe(true);
+  expect(toast.dismiss).toHaveBeenCalledWith("card-save:card");
 });
 
 it("retry antecipa debounce novo sem reenviar a revisão antiga", async () => {
