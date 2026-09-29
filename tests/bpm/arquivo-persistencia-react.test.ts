@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import React, { act, createElement as h } from "react";
 import { createRoot } from "react-dom/client";
-import { expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
+import { upload } from "@vercel/blob/client";
 import { CampoBpmInput } from "@/app/PainelAlpha/AlphaCRM/CampoBpmInput";
 import { PainelCamposEtapaAtual } from "@/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual";
 import { CardSaveProvider, useCardSave } from "@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext";
@@ -10,9 +11,15 @@ import { ObterCardBpm } from "@/actions/bpm/Cards";
 import JSZip from "jszip";
 
 vi.mock("@/actions/bpm/Anexos", () => ({ RegistrarAnexoBpm: vi.fn() }));
+vi.mock("@vercel/blob/client", () => ({ upload: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock("@/actions/bpm/Cards", () => ({ AtualizarCardBpm: vi.fn(), ObterCardBpm: vi.fn() }));
 vi.mock("@/actions/bpm/ConsultaCnpjFinanceiro", () => ({ ConsultarCnpjNovoContrato: vi.fn() }));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(upload).mockResolvedValue({ pathname: "bpm/card-1/550e8400-e29b-41d4-a716-446655440000-contrato.pdf" } as Awaited<ReturnType<typeof upload>>);
+});
 
 it("enfileira upload e registro antes do await e abre o arquivo confirmado no modal", async () => {
   Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
@@ -106,10 +113,10 @@ it("limpa a pendência do anexo depois de falha e retry pelo diálogo", async ()
     expect(fetch).not.toHaveBeenCalled();
     await act(async () => root.render(h(CardSaveProvider, null, h(Probe))));
     await act(async () => root.render(h(CardSaveProvider, null, h(Probe), painel())));
-    expect(container.textContent).toContain("Arquivo pronto para salvar: documento.pdf");
+    expect(container.querySelector('[role="group"][aria-label="Arquivo selecionado para Documento"]')?.textContent).toContain("documento.pdf");
     await act(async () => { [...container.querySelectorAll("button")].find((botao) => botao.textContent?.includes("Salvar alterações"))!.click(); });
     expect(context.getFailedSaveKeys("card-upload")).toEqual(["card-upload:arquivo:anexo"]);
-    expect(container.textContent).toContain("Arquivo pronto para salvar: documento.pdf");
+    expect(container.querySelector('[role="group"][aria-label="Arquivo selecionado para Documento"]')?.textContent).toContain("documento.pdf");
     await act(async () => { [...container.querySelectorAll("button")].find((botao) => botao.textContent?.includes("Salvar alterações"))!.click(); });
     expect(context.getPendingChanges("card-upload")).toEqual([]);
     expect(context.getFailedSaveKeys("card-upload")).toEqual([]);
@@ -138,9 +145,11 @@ it("recusa arquivo acima do limite na seleção sem criar pendência ou enviar r
     expect(input.accept).toContain(".jpeg");
     expect(input.accept).toContain(".docx");
     expect(input.accept).toContain(".pdf");
-    Object.defineProperty(input, "files", { configurable: true, value: [new File([new ArrayBuffer(4 * 1024 * 1024 + 1)], "grande.pdf", { type: "application/pdf" })] });
+    const arquivoGrande = new File(["%PDF-1.7"], "grande.pdf", { type: "application/pdf" });
+    Object.defineProperty(arquivoGrande, "size", { value: 90 * 1024 * 1024 + 1 });
+    Object.defineProperty(input, "files", { configurable: true, value: [arquivoGrande] });
     await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain("4 MiB");
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("90 MiB");
     expect(registerFileSave).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
   } finally {
@@ -182,13 +191,13 @@ it("encerra estado de envio após erro HTTP e permite tentar novamente com o arq
   }
 });
 
-it("interrompe upload travado após 60 segundos e libera nova tentativa", async () => {
+it("interrompe upload travado após 10 minutos e libera nova tentativa", async () => {
   vi.clearAllMocks();
   Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
-  const fetchMock = vi.fn((_url: string, options: RequestInit) => new Promise<Response>((_resolve, reject) => {
-    options.signal?.addEventListener("abort", () => reject(new DOMException("Abortado", "AbortError")));
+  vi.mocked(upload).mockImplementation((_pathname, _file, options) => new Promise((_resolve, reject) => {
+    options?.abortSignal?.addEventListener("abort", () => reject(new DOMException("Abortado", "AbortError")));
   }));
-  vi.stubGlobal("fetch", fetchMock);
+  vi.stubGlobal("fetch", vi.fn());
   let salvarArquivo: (() => Promise<boolean>) | undefined;
   const registerFileSave = vi.fn(async (save: () => Promise<boolean>) => { salvarArquivo = save; return true; });
   const container = document.createElement("div"); document.body.append(container);
@@ -204,13 +213,14 @@ it("interrompe upload travado após 60 segundos e libera nova tentativa", async 
     vi.useFakeTimers();
     await act(async () => {
       const resultado = salvarArquivo?.();
-      await vi.advanceTimersByTimeAsync(60_000);
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
       expect(await resultado).toBe(false);
     });
-    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(upload).toHaveBeenCalledOnce();
+    expect(fetch).not.toHaveBeenCalled();
     expect(input.disabled).toBe(false);
     expect(container.textContent).not.toContain("Enviando arquivo");
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain("60 segundos");
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("10 minutos");
   } finally {
     vi.useRealTimers();
     await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals();

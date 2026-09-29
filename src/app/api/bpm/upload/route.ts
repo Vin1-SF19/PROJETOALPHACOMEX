@@ -38,6 +38,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Arquivo ou card inválido" }, { status: 400 });
   }
   const { file, cardId } = parsed.data;
+  // Compatibilidade da rota multipart antiga: a Vercel limita o body da
+  // Function a 4,5 MiB. Arquivos maiores usam /api/bpm/upload/direct.
+  if (file.size > 4 * 1024 * 1024) {
+    return NextResponse.json({ success: false, error: "Use o envio direto para anexos acima de 4 MiB." }, { status: 413 });
+  }
 
   try {
     await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "enviarArquivo");

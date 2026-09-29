@@ -62,8 +62,8 @@ it("retorna erro útil e não registra histórico quando o provedor falha", asyn
 });
 it("rejeita arquivo acima do limite do proxy antes de chamar o storage", async () => {
   const response = await POST(request(new File([new ArrayBuffer(4 * 1024 * 1024 + 1)], "grande.pdf", { type: "application/pdf" })));
-  expect(response.status).toBe(400);
-  expect(await response.json()).toMatchObject({ success: false, error: expect.stringContaining("4 MiB") });
+  expect(response.status).toBe(413);
+  expect(await response.json()).toMatchObject({ success: false, error: expect.stringContaining("envio direto") });
   expect(mocks.put).not.toHaveBeenCalled();
 });
 it("limpa o Blob se o registro de histórico falhar", async () => {
@@ -91,6 +91,15 @@ it("aceita DOCX com estrutura Office válida", async () => {
   })));
   expect(response.status).toBe(200);
   expect(mocks.put).toHaveBeenCalledOnce();
+});
+it("recusa DOCX com nomes no diretório central e cabeçalho local adulterado", async () => {
+  const zip = new JSZip();
+  zip.file("[Content_Types].xml", "<Types/>");
+  zip.file("word/document.xml", "<document/>");
+  const bytes = await zip.generateAsync({ type: "uint8array" });
+  bytes[0] = 0;
+  expect(await conteudoUploadCompativel(bytes.buffer as ArrayBuffer,
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document")).toBe(false);
 });
 it.each([
   ["PDF sem MIME", "", "contrato.pdf", "%PDF-1.7", "application/pdf"],
