@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — código e prévia validados; publicação da configuração v11 pendente de autorização específica.
+Ready for Review — código e configuração v11 validados; publicação da aplicação pendente.
 
 ## Objetivo
 
@@ -51,10 +51,10 @@ Na coluna **Envio do Checklist Atualizado** do pipeline Operacional, anexar ao c
 - [x] Inventariar etapa ativa, formulário publicado, upload/anexos BPM e histórico; registrar diagnóstico somente leitura.
 - [x] Desenhar a regra de data civil para reunião e envio com o fuso usado pelo processo, sem presumir horário de corte.
 - [x] Reutilizar o upload BPM de `.xlsx`/`.xls`, vincular a planilha ao card, criar tarefa e disponibilizar o link do arquivo no card com data/hora.
-- [ ] Expor o novo campo da etapa em Campos e Formulários: script v10→v11 e prévia prontos; aplicação aguarda Vault.
+- [x] Expor o novo campo da etapa em Campos e Formulários: configuração v10→v11 aplicada e verificada.
 - [x] Exibir no card a planilha anexada, o link e a tarefa; manter controle automático de enviados/pendentes para a fase futura do checklist nativo.
 - [x] Cobrir aceite por testes de domínio, action e UI; executar `npm run lint`, `npm run typecheck`, `npm test` e `npm run build`.
-- [ ] Aplicar a configuração somente após relatório Vault, backup completo verificado e autorização específica, conforme AGENTS.md. Backup e prévia já validados.
+- [x] Aplicar a configuração após relatório Vault, backup completo verificado e autorização específica, conforme AGENTS.md.
 - [x] Atualizar esta checklist, a File List e as evidências antes da publicação.
 
 ## File List inicial
@@ -80,7 +80,7 @@ Na coluna **Envio do Checklist Atualizado** do pipeline Operacional, anexar ao c
 - `prisma migrate diff --script`: migration vazia; sem alteração de schema.
 - Backup Vault dedicado: `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-29T19-16-01-554Z.sql`, gerado pelo snapshot da réplica Turso. Manifesto adjacente; 183.062.358 bytes, 332 tabelas, 195.086 linhas, SHA-256 `f412e1698f3ff43407b7dd38bc1b0a4ce10afc210d24b897b852b06039b7100f`. Verificação por `scripts/verify-turso-backup.mjs`: hash, tamanho, integridade, chaves estrangeiras e restauração isolada aprovados. O método alternativo por transação longa falhou por timeout antes de gerar dump; não foi utilizado.
 - Gates: lint 0 erros (1.191 avisos preexistentes), typecheck e build aprovados; `npm test` com 562 arquivos e 4.129 testes aprovados, 4 ignorados e 1 pendente; testes focados da planilha e anexo aprovados.
-- A configuração v11 não foi aplicada; o código permanece preparado localmente até autorização específica.
+- Configuração v11 aplicada em 2026-09-29 após confirmação explícita do usuário para esta alteração, com o backup dedicado verificado antes da transação. `scripts/verificar-checklist-operacional.mts`: `verificado: true`, pipeline v11, campo em 11 etapas, formulário da coluna v3 e obrigatoriedade na saída. Código no commit local `ddd52fb0`; não houve push ou deploy nesta etapa.
 
 ## Validação do draft
 

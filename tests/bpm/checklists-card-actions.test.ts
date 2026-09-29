@@ -108,7 +108,7 @@ describe("Checklists.ts — operações robustas no card", () => {
       },
       bpmCardMembro: { findUnique: mocks.membroFindUnique },
       bpmCardChecklist: { update: mocks.checklistUpdate },
-      bpmChecklistTemplate: { findUnique: mocks.templateFindUnique, create: mocks.templateCreate },
+      bpmChecklistTemplate: { upsert: mocks.templateUpsert },
     }));
   });
 

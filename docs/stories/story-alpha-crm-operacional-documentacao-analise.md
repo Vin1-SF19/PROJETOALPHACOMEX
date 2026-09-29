@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — código validado; publicação do componente aguarda autorização específica e o cadastro documental ocorrerá pela UI.
+Ready for Review — código e configuração v12 validados; publicação da aplicação pendente e cadastro documental ocorrerá pela UI.
 
 ## Story
 
@@ -46,7 +46,7 @@ Ready for Review — código validado; publicação do componente aguarda autori
 
 - [x] Inventariar a coluna, os campos configurados, o histórico do card, os alertas existentes e o módulo nativo de checklist (AC 1–6).
 - [x] Mapear contrato entre card, opções adicionais e checklist de procedimentos CRM/BPM, sem presumir template ou documentos específicos (AC 1, 2, 6).
-- [ ] Publicar o componente de checkboxes em Campos e Formulários; prévia e código prontos, pendente de autorização específica e template documental (AC 1, 2).
+- [x] Publicar o componente de checkboxes em Campos e Formulários, com autorização específica e backup verificado (AC 1, 2).
 - [x] Confirmar que os dados operacionais herdados continuam no formulário da etapa e que anotações usam o histórico existente (AC 3).
 - [x] Preparar monitoramento diário e cadência semanal com IDs por card/ciclo; ajustar após resposta às perguntas de produto (AC 4, 5).
 - [x] Usar o checklist de procedimentos CRM/BPM configurado e permitir documentos exclusivos do card, inclusive o primeiro documento sem template (AC 6).
@@ -82,7 +82,7 @@ Ready for Review — código validado; publicação do componente aguarda autori
 - `src/lib/bpm/documentacao-analise.ts`, `src/lib/bpm/documentacao-analise-monitor.ts` — constantes, ciclo semanal e monitor.
 - `src/actions/bpm/Checklists.ts`, `src/app/PainelAlpha/AlphaCRM/CardModal/PainelChecklistsCard.tsx` — criação de procedimento exclusivo sem template, checkboxes dos documentos e adição de item fora do template.
 - `src/app/api/bpm/jobs/automacoes/route.ts`, `scripts/bpm-documentacao-monitor.mts`, `package.json` — job e comando CLI.
-- `scripts/configurar-documentacao-analise-operacional.mts` — prévia e publicação controlada do componente em Campos e Formulários.
+- `scripts/configurar-documentacao-analise-operacional.mts`, `scripts/verificar-documentacao-analise-operacional.mts` — prévia, publicação controlada e verificação do componente em Campos e Formulários.
 - `tests/bpm/documentacao-analise.test.ts`, `tests/bpm/documentacao-analise-monitor.test.ts`, `tests/bpm/checklists-card-actions.test.ts` — cadência semanal, paginação/idempotência e primeiro documento sem template.
 
 ## Evidência de preparação
@@ -91,7 +91,9 @@ Ready for Review — código validado; publicação do componente aguarda autori
 - `[USER-DECISION]` O usuário cadastrará os documentos na UI. A prévia adiciona `STAGE_CHECKLIST` com rótulo **Documentos pendentes** e `obrigatorioSaida: false`, passando v10→v11 ou v11→v12 se a publicação pendente da etapa anterior ocorrer primeiro; nenhum card é alterado pela configuração.
 - O CLI `npm run bpm:documentacao` retornou zero ações antes da publicação do componente, como esperado.
 - Typecheck aprovado; lint sem erros (1.191 avisos preexistentes); 564 arquivos e 4.133 testes aprovados, 4 ignorados e 1 pendente; build aprovado. QA aprovou; após a revisão foi incluído teste de paginação e reexecução idempotente do monitor.
-- Backup Vault dedicado para publicação v10→v11: `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-29T20-27-38-322Z.sql`, manifesto adjacente, 179.078.126 bytes, 332 tabelas, 189.299 linhas, SHA-256 `87750797028be51ad6545a7ac7c82bc591ae393fadf065e8e42fa8b66176107d`. `scripts/verify-turso-backup.mjs` aprovou hash, integridade e restauração isolada. A publicação não foi executada.
+- Backup da preparação inicial em v10: `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-29T20-27-38-322Z.sql`, manifesto adjacente, 179.078.126 bytes, 332 tabelas, 189.299 linhas, SHA-256 `87750797028be51ad6545a7ac7c82bc591ae393fadf065e8e42fa8b66176107d`. A verificação passou; esse backup não será usado na v12 porque antecede a publicação da etapa Envio.
+- Após a publicação da configuração Excel da etapa anterior, o Operacional está na v11. Novo backup Vault para a publicação v11→v12: `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-29T20-59-35-446Z.sql`, manifesto adjacente, 179.258.336 bytes, 332 tabelas, 189.419 linhas, SHA-256 `aa2b2b103d8d7fb11c903e26d832d21e11f5e7f19b4020d0ece4d3f878c29495`. Verificação de hash, integridade e restauração isolada aprovada. `prisma migrate diff --script` vazio. Prévia v11→v12 validada; gravação v12 ainda pendente de confirmação específica.
+- Configuração v12 aplicada em 2026-09-29 após confirmação específica do usuário, com backup anterior revalidado imediatamente antes da gravação. `scripts/verificar-documentacao-analise-operacional.mts`: `verificado: true`, pipeline v12, formulário da coluna v4 e componente `STAGE_CHECKLIST`. Nenhum template ou card existente foi alterado pela publicação. Código permanece em commit local `f5e71779`; push e deploy pendentes.
 
 ## Change Log
 
