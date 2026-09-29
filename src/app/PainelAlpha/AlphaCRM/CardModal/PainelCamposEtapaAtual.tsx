@@ -2,7 +2,7 @@
 import { criarRastreadorRascunho } from "@/lib/bpm/rascunho-versionado";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Check, ClipboardPaste, Loader2, SlidersHorizontal } from "lucide-react";
+import { AlertTriangle, Check, ClipboardPaste, Loader2, Save, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { AtualizarCardBpm, ObterCardBpm } from "@/actions/bpm/Cards";
 import { ConsultarCnpjNovoContrato } from "@/actions/bpm/ConsultaCnpjFinanceiro";
@@ -51,7 +51,7 @@ export function PainelCamposEtapaAtual({
   realtimeRevision,
   onAtualizado,
 }: Props) {
-  const { registerSave, setPendingFields, scheduleSave, flushScheduled, getVersion, confirmVersion, getDraft, setDraft, subscribeConfirmation, getFailedSaveKeys, clearFailedSave } = useCardSave();
+  const { registerSave, registerManualSave, getPendingUpload, setPendingUpload, setPendingFields, getVersion, confirmVersion, getDraft, setDraft, subscribeConfirmation, getFailedSaveKeys, clearFailedSave } = useCardSave();
   const idInstancia = `${card.id}-${instanceKey}`;
   const ordemCampos = new Map(campoIds.map((id, indice) => [id, indice]));
   const camposDoComponente = card.camposEtapa
@@ -76,6 +76,15 @@ export function PainelCamposEtapaAtual({
   const [conflitoCamposAtuais, setConflitoCamposAtuais] = useState(false);
   const camposAtuaisSujosRef = useRef(false);
   const [savesCamposPendentes, setSavesCamposPendentes] = useState(0);
+  const [progressoSave, setProgressoSave] = useState<{ concluido: number; total: number } | null>(null);
+  const salvandoManualRef = useRef(false);
+  const [arquivosIniciais] = useState(() => new Map(camposDoComponente.flatMap((campo) => {
+    const upload = getPendingUpload(`${card.id}:arquivo:${campo.id}`);
+    return upload ? [[campo.id, upload] as const] : [];
+  })));
+  const arquivosPendentesRef = useRef(arquivosIniciais);
+  const [arquivosPendentes, setArquivosPendentes] = useState<Record<string, string>>(() =>
+    Object.fromEntries([...arquivosIniciais].map(([id, upload]) => [id, upload.nome])));
 
   const [estadoSave, setEstadoSave] = useState<"pendente" | "salvo" | "erro" | "invalido" | null>(null);
   const [buscandoCnpj, setBuscandoCnpj] = useState(false);
@@ -127,12 +136,14 @@ export function PainelCamposEtapaAtual({
       rastreadores.current.set(id, rastreador);
     }
     rastreador.alterar(valor);
+    if (arquivosPendentesRef.current.delete(id)) {
+      setPendingUpload(`${card.id}:arquivo:${id}`);
+      setArquivosPendentes((atual) => { const proximo = { ...atual }; delete proximo[id]; return proximo; });
+      setPendingFields(`${card.id}:arquivo:${id}`, []);
+    }
     valoresRef.current = { ...valoresRef.current, [id]: valor };
     atualizarPendencias();
     setValoresCamposAtuais(valoresRef.current);
-    const tipo = camposEtapaBase.find((campo) => campo.id === id)?.tipo;
-    scheduleSave(`${card.id}:${id}`, () => void salvarCamposAtuais(id),
-      ["selecao", "multiselecao", "booleano", "data", "data_hora", "arquivo"].includes(tipo ?? "") ? 0 : 500);
   }
   const configuracaoLostUi = prepararCamposMotivoLostUiCanonico(
     card.etapa.chave,
@@ -140,6 +151,9 @@ export function PainelCamposEtapaAtual({
     valoresCamposAtuais,
   );
   const camposAtuaisVisiveis = configuracaoLostUi.camposVisiveis;
+  const totalCamposAlterados = camposAtuaisVisiveis.filter((campo) => Object.hasOwn(arquivosPendentes, campo.id)
+    || (!campo.somenteLeitura && campo.editavel !== false
+    && valorComparavel(campo.tipo, valoresCamposAtuais[campo.id]) !== valorComparavel(campo.tipo, valoresConfirmados[campo.id]))).length;
   const complementoLostPendente = Boolean(
     configuracaoLostUi.exigeComplemento
     && configuracaoLostUi.campoComplementoId
@@ -204,15 +218,15 @@ export function PainelCamposEtapaAtual({
     camposAtuaisSujosRef.current = false;
     setConflitoCamposAtuais(false);
   }
-  useEffect(() => () => flushScheduled(`${card.id}:`), [card.id, flushScheduled]);
-  async function salvarCamposAtuais(campoId?: string) {
-    if (!podeEditar || conflitoCamposAtuais) return;
+  async function salvarCamposAtuais(campoId: string): Promise<boolean> {
+    if (!podeEditar || conflitoCamposAtuais) return false;
     const valoresAtuais = getDraft(idInstancia) ?? valoresRef.current;
     const configuracaoAtual = prepararCamposMotivoLostUiCanonico(card.etapa.chave, camposEtapaBase, valoresAtuais);
     if (configuracaoAtual.exigeComplemento && configuracaoAtual.campoComplementoId
       && !valoresAtuais[configuracaoAtual.campoComplementoId]?.trim()) {
       toast.error(MOTIVO_LOST_OUTRO_OBRIGATORIO_MENSAGEM, erroFormulario);
-      return;
+      setEstadoSave("invalido");
+      return false;
     }
     const revisaoEnviada = revisaoEdicao.current;
     const revisoes = new Map(configuracaoAtual.camposVisiveis.map((campo) => [campo.id, rastreadores.current.get(campo.id)?.capturar()]));
@@ -233,7 +247,7 @@ export function PainelCamposEtapaAtual({
       }
       if (!Object.keys(camposValores).length) {
         if (possuiValorInvalido && revisaoEdicao.current === revisaoEnviada) setEstadoSave("invalido");
-        return true;
+        return !possuiValorInvalido;
       }
       const valoresAntesDaRequisicao = { ...valoresRef.current };
       const baseAntesDaRequisicao = { ...snapshotAtivoRef.current.valores };
@@ -338,7 +352,48 @@ export function PainelCamposEtapaAtual({
     });
     const sucesso = await promise;
     if (!sucesso && revisaoEdicao.current === revisaoEnviada) setEstadoSave("erro");
+    return sucesso;
   }
+  function idsPendentes() {
+    const atuais = getDraft(idInstancia) ?? valoresRef.current;
+    return prepararCamposMotivoLostUiCanonico(card.etapa.chave, camposEtapaBase, atuais).camposVisiveis
+      .filter((campo) => !campo.somenteLeitura && campo.editavel !== false
+        && !arquivosPendentesRef.current.has(campo.id)
+        && valorComparavel(campo.tipo, atuais[campo.id]) !== valorComparavel(campo.tipo, snapshotAtivoRef.current.valores[campo.id]))
+      .map((campo) => campo.id);
+  }
+  async function salvarAlteracoes(): Promise<boolean> {
+    if (salvandoManualRef.current) return false;
+    const ids = [...new Set([...arquivosPendentesRef.current.keys(), ...idsPendentes()])];
+    if (!ids.length) return true;
+    salvandoManualRef.current = true;
+    setProgressoSave({ concluido: 0, total: ids.length });
+    try {
+      for (let indice = 0; indice < ids.length; indice += 1) {
+        const arquivo = arquivosPendentesRef.current.get(ids[indice]);
+        if (arquivo) {
+          const key = `${card.id}:arquivo:${ids[indice]}`;
+          const sucesso = await registerSave(async () => {
+            const confirmado = await arquivo.save();
+            if (confirmado) setPendingFields(key, []);
+            return confirmado;
+          }, card.id, key, erroFormulario);
+          if (!sucesso) { setEstadoSave("erro"); return false; }
+          arquivosPendentesRef.current.delete(ids[indice]);
+          setPendingUpload(key);
+          setArquivosPendentes((atual) => { const proximo = { ...atual }; delete proximo[ids[indice]]; return proximo; });
+        } else if (!await salvarCamposAtuais(ids[indice])) return false;
+        setProgressoSave({ concluido: indice + 1, total: ids.length });
+      }
+      return idsPendentes().length === 0 && arquivosPendentesRef.current.size === 0;
+    } finally {
+      salvandoManualRef.current = false;
+      setProgressoSave(null);
+    }
+  }
+  const salvarManualRef = useRef(salvarAlteracoes);
+  useEffect(() => { salvarManualRef.current = salvarAlteracoes; });
+  useEffect(() => registerManualSave(card.id, idInstancia, () => salvarManualRef.current()), [card.id, idInstancia, registerManualSave]);
   const campoCnpj = camposAtuaisVisiveis.find((campo) => campo.chave === FINANCIAL_FIELD_KEYS.CNPJ);
   const camposCorrigidosFinanceiro = new Set(card.camposCorrigidosFinanceiro ?? []);
   const chavesCalculadasFinanceiro = new Set<string>([
@@ -394,7 +449,6 @@ export function PainelCamposEtapaAtual({
     setValoresCamposAtuais(proximos);
     setEstadoSave("pendente");
     atualizarPendencias();
-    scheduleSave(`${card.id}:consulta-cnpj`, () => void salvarCamposAtuais(), 0);
   }
   const consultarCnpjRef = useRef(consultarCnpjNovoContrato);
   useEffect(() => { consultarCnpjRef.current = consultarCnpjNovoContrato; });
@@ -498,16 +552,8 @@ export function PainelCamposEtapaAtual({
                   onChange={(valor) => {
                     alterarCampo(campo.id, valor);
                   }}
-                  onBlur={() => {
-                    const key = `${card.id}:campo:${campo.id}`;
-                    if (getFailedSaveKeys(card.id).includes(key)) {
-                      scheduleSave(`${card.id}:${campo.id}`, () => void salvarCamposAtuais(campo.id), 0);
-                    } else {
-                      flushScheduled(`${card.id}:${campo.id}`);
-                    }
-                  }}
                   className={inputCls}
-                  disabled={!podeEditar}
+                  disabled={!podeEditar || progressoSave !== null}
                   readOnly={somenteLeitura}
                   cardId={card.id}
                   arquivoAtual={campo.tipo === "arquivo" || campo.tipo === "url_ou_arquivo"
@@ -516,16 +562,16 @@ export function PainelCamposEtapaAtual({
                   errorToastOptions={erroFormulario}
                   registerFileSave={(save, fileName) => {
                     const key = `${card.id}:arquivo:${campo.id}`;
+                    arquivosPendentesRef.current.set(campo.id, { save, nome: fileName });
+                    setPendingUpload(key, { save, nome: fileName });
+                    setArquivosPendentes((atual) => ({ ...atual, [campo.id]: fileName }));
                     setPendingFields(key, [{
                       label: campoLabels[campo.id] ?? campo.nome,
                       before: card.anexos.find((anexo) => anexo.id === valoresRef.current[campo.id])?.nome ?? "",
                       after: fileName,
                     }]);
-                    return registerSave(async () => {
-                      const sucesso = await save();
-                      if (sucesso) setPendingFields(key, []);
-                      return sucesso;
-                    }, card.id, key, erroFormulario);
+                    setEstadoSave("pendente");
+                    return Promise.resolve(true);
                   }}
                   onFileConfirmed={(arquivo) => {
                     const antes = { ...valoresRef.current };
@@ -542,6 +588,7 @@ export function PainelCamposEtapaAtual({
                     onAtualizado();
                   }}
                 />
+                {arquivosPendentes[campo.id] && <p className="text-[11px] text-amber-200">Arquivo pronto para salvar: {arquivosPendentes[campo.id]}</p>}
                 {complementoPendente && (
                   <p id={descricaoId} role="alert" className="text-[11px] text-amber-300">
                     {MOTIVO_LOST_OUTRO_OBRIGATORIO_MENSAGEM}
@@ -551,11 +598,20 @@ export function PainelCamposEtapaAtual({
             );
               })}
             </fieldset>
+          {podeEditar && (
+            <button type="button" onClick={() => void salvarAlteracoes()}
+              disabled={totalCamposAlterados === 0 || progressoSave !== null || conflitoCamposAtuais}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-2 text-xs font-bold text-slate-950 shadow-lg shadow-sky-500/15 transition hover:bg-sky-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 disabled:cursor-not-allowed disabled:opacity-50">
+              {progressoSave ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Save size={15} aria-hidden="true" />}
+              {progressoSave ? `Salvando ${Math.min(progressoSave.concluido + 1, progressoSave.total)}/${progressoSave.total}`
+                : `Salvar alterações${totalCamposAlterados ? ` (${totalCamposAlterados})` : ""}`}
+            </button>
+          )}
           <p role="status" aria-live="polite" className="flex items-center gap-2 text-[11px] text-slate-400">
             {savesCamposPendentes > 0 ? <><Loader2 size={13} className="animate-spin" aria-hidden="true" /> Salvando alterações...</>
               : estadoSave === "salvo" && !conflitoCamposAtuais ? <><Check size={13} aria-hidden="true" /> Salvo</>
               : estadoSave === "erro" ? <><AlertTriangle size={13} aria-hidden="true" /> Erro ao salvar. Sua alteração foi preservada.</>
-              : estadoSave === "invalido" ? <><AlertTriangle size={13} aria-hidden="true" /> Revise o campo indicado. Os demais valores válidos foram salvos.</>
+              : estadoSave === "invalido" ? <><AlertTriangle size={13} aria-hidden="true" /> Revise o campo indicado. As alterações não salvas foram preservadas.</>
               : estadoSave === "pendente" ? "Alterações pendentes" : null}
           </p>
           {!podeEditar && <p className="text-[11px] text-slate-500">Somente o responsável ou um administrador pode editar estes campos.</p>}

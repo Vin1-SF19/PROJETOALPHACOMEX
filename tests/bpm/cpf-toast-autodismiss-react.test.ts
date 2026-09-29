@@ -34,6 +34,9 @@ it("Sonner dispensa erros em 5s ou manualmente sem apagar CPF pendente nem um er
     });
     await act(async () => { container.querySelector("input")!.dispatchEvent(new FocusEvent("focusout", { bubbles: true })); });
     await tick(10);
+    expect(errors()).toHaveLength(0);
+    await act(async () => { [...container.querySelectorAll("button")].find((botao) => botao.textContent?.includes("Salvar alterações"))!.click(); });
+    await tick(10);
     expect(errors().length).toBeGreaterThan(0);
     const close = container.querySelector<HTMLButtonElement>('[data-close-button="true"]')!;
     expect(close).not.toBeNull();

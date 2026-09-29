@@ -748,3 +748,33 @@ File List desta correção:
 - `tests/bpm/formulario-etapa.test.ts`
 - `tests/bpm/lost-ui.test.ts`
 - `docs/stories/story-rm-2026-b88712-autosave-card-crm.md`
+
+## Mudança de produto — salvamento manual do formulário da etapa (2026-09-29)
+
+Pedido do usuário: substituir o autosave do formulário editável do card por um botão. O botão deve gravar apenas os campos alterados, um por vez, e mostrar `Salvando 1/N`, `2/N` etc., onde N é a quantidade alterada, não a quantidade total de campos. Esta mudança substitui os critérios anteriores de debounce, gravação no blur e gravação automática dos campos da etapa. Outras ações operacionais do card preservam seus fluxos próprios.
+
+### Critérios de aceitação
+
+- [x] Digitar, selecionar e sair do campo não dispara gravação do formulário da etapa.
+- [x] Botão de salvar mostra a quantidade de campos alterados e fica inativo sem alterações.
+- [x] Ao clicar, cada campo alterado é enviado em sequência, com progresso visível e versão atualizada entre envios.
+- [x] O primeiro erro interrompe a sequência; alterações restantes ficam no rascunho para nova tentativa.
+- [x] Seleção de arquivo fica pendente e entra na mesma sequência após o clique.
+- [x] O diálogo de saída consegue salvar os campos pendentes pelo mesmo fluxo manual.
+- [ ] Smoke autenticado em card real, incluindo reload e navegação entre abas com arquivo selecionado.
+- [x] Gates finais `lint`, `typecheck`, `test` e `build` aprovados.
+
+### File List
+
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx`
+- `tests/bpm/salvamento-manual-campos-react.test.ts`
+- `tests/bpm/arquivo-persistencia-react.test.ts`
+- `tests/bpm/cpf-toast-autodismiss-react.test.ts`
+- `tests/bpm/formulario-etapa.test.ts`
+- `tests/bpm/card-modal-integration.test.ts`
+- Testes antigos de autosave do formulário removidos: `tests/bpm/autosave-tipos-imediatos-react.test.ts`, `tests/bpm/cpf-pendencias-react.test.ts`, `tests/bpm/cpf-fechamento-react.test.ts`.
+
+### Validação
+
+`npm run lint` passou com 0 erros e 1.191 avisos existentes; `npm run typecheck` passou; `npm test` passou com 556 arquivos e 4.055 testes aprovados, 4 ignorados e 1 pendente; `npm run build` passou. A verificação de whitespace dos arquivos desta mudança passou. Nenhuma alteração de banco foi executada. O teste autenticado em card real continua pendente.

@@ -93,14 +93,20 @@ it("limpa a pendência do anexo depois de falha e retry pelo diálogo", async ()
   const container = document.createElement("div"); document.body.append(container);
   const root = createRoot(container);
   try {
+    const painel = () => h(PainelCamposEtapaAtual, { card: card as unknown as React.ComponentProps<typeof PainelCamposEtapaAtual>["card"],
+      campoIds: ["anexo"], instanceKey: "upload", accent: "1,2,3", podeEditar: true, realtimeRevision: 0, onAtualizado: vi.fn() });
     await act(async () => root.render(h(CardSaveProvider, null,
       h(Probe),
-      h(PainelCamposEtapaAtual, { card: card as unknown as React.ComponentProps<typeof PainelCamposEtapaAtual>["card"],
-        campoIds: ["anexo"], instanceKey: "upload", accent: "1,2,3", podeEditar: true, realtimeRevision: 0, onAtualizado: vi.fn() }))));
+      painel())));
     const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
     Object.defineProperty(input, "files", { configurable: true, value: [new File(["pdf"], "documento.pdf")] });
     await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
     expect(context.getPendingChanges("card-upload")).toEqual([{ label: "Documento", before: "", after: "documento.pdf" }]);
+    expect(fetch).not.toHaveBeenCalled();
+    await act(async () => root.render(h(CardSaveProvider, null, h(Probe))));
+    await act(async () => root.render(h(CardSaveProvider, null, h(Probe), painel())));
+    expect(container.textContent).toContain("Arquivo pronto para salvar: documento.pdf");
+    await act(async () => { [...container.querySelectorAll("button")].find((botao) => botao.textContent?.includes("Salvar alterações"))!.click(); });
     expect(context.getFailedSaveKeys("card-upload")).toEqual(["card-upload:arquivo:anexo"]);
     expect(await context.flushSaves("card-upload")).toBe(false);
     await act(async () => { expect(await context.retryFailedSaves("card-upload")).toBe(true); });

@@ -123,10 +123,10 @@ describe("CRM - formulário unificado por etapa", () => {
     expect(formulario).not.toContain("agendaLink");
   });
 
-  it("persiste os formulários locais automaticamente ao sair do campo", () => {
-    expect(campos).toContain("onBlur={() => {");
-    expect(campos).toContain("flushScheduled(`${card.id}:${campo.id}`)");
-    expect(campos).not.toContain("Salvar campos da etapa");
+  it("salva o formulário somente pelo botão de alterações", () => {
+    expect(campos).toContain("Salvar alterações");
+    expect(campos).toContain("await salvarCamposAtuais(ids[indice])");
+    expect(campos).not.toContain("scheduleSave(`${card.id}:${id}`");
     expect(proximoContato).toContain("onCommit={(novoValor) => void persistir(novoValor || null)}");
     expect(proximoContato).not.toContain(">Salvar<");
     expect(statusPosFechamento).toContain("void salvar(event.target.value)");

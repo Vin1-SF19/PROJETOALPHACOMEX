@@ -81,7 +81,7 @@ describe("CRM - wiring do modal por etapa", () => {
   });
 
   it("aplica readonly aos controles operacionais", () => {
-    expect(camposEtapa).toContain("disabled={!podeEditar}");
+    expect(camposEtapa).toContain("disabled={!podeEditar || progressoSave !== null}");
     expect(camposEtapa).toContain("disabled={!podeEditar");
     expect(proximoContato).toContain("disabled={!podeEditar");
     expect(checklist).toContain("disabled={!podeEditar");

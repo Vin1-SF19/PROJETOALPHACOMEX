@@ -8,6 +8,7 @@ type ConfirmedCard = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"
 type ConfirmationListener = (card: ConfirmedCard, key?: string) => void;
 export type PendingCardChange = { label: string; before?: string; after?: string };
 type SaveErrorOptions = Pick<ExternalToast, "duration" | "closeButton"> & { failureMessage?: () => string };
+type PendingUpload = { save: () => Promise<boolean>; nome: string };
 
 interface CardSaveContextValue {
   subscribeConfirmation: (cardId: string, listener: ConfirmationListener) => () => void;
@@ -23,6 +24,9 @@ interface CardSaveContextValue {
   getFailedSaveKeys: (cardId: string) => string[];
   clearFailedSave: (key: string) => void;
   retryFailedSaves: (cardId: string) => Promise<boolean>;
+  registerManualSave: (cardId: string, instance: string, save: () => Promise<boolean>) => () => void;
+  getPendingUpload: (key: string) => PendingUpload | undefined;
+  setPendingUpload: (key: string, upload?: PendingUpload) => void;
   discardPending: (cardId: string) => void;
   /** Enfileira um save para preservar a ordem e a versão-base do card. */
   registerSave: (save: () => Promise<boolean>, cardId?: string, recoveryKey?: string, errorOptions?: SaveErrorOptions, refreshAfterSave?: boolean) => Promise<boolean>;
@@ -85,6 +89,23 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
     .flatMap(([, fields]) => fields), []);
   const getPendingFields = useCallback((cardId?: string) => [...new Set(getPendingChanges(cardId).map((field) => field.label))], [getPendingChanges]);
   const savePromiseRef = useRef(new Map<string, Promise<boolean>>());
+  const manualSaves = useRef(new Map<string, Map<string, () => Promise<boolean>>>());
+  const pendingUploads = useRef(new Map<string, PendingUpload>());
+  const getPendingUpload = useCallback((key: string) => pendingUploads.current.get(key), []);
+  const setPendingUpload = useCallback((key: string, upload?: PendingUpload) => {
+    if (upload) pendingUploads.current.set(key, upload);
+    else pendingUploads.current.delete(key);
+  }, []);
+  const registerManualSave = useCallback((cardId: string, instance: string, save: () => Promise<boolean>) => {
+    const handlers = manualSaves.current.get(cardId) ?? new Map<string, () => Promise<boolean>>();
+    handlers.set(instance, save);
+    manualSaves.current.set(cardId, handlers);
+    return () => {
+      if (handlers.get(instance) === save && !drafts.current.has(instance)
+        && ![...pendingRef.current.keys()].some((key) => key.startsWith(`${cardId}:arquivo:`))) handlers.delete(instance);
+      if (!handlers.size) manualSaves.current.delete(cardId);
+    };
+  }, []);
 
   const recovery = useRef(new Map<string, { save: () => Promise<boolean>; errorOptions?: SaveErrorOptions; refreshAfterSave: boolean }>());
   const failures = useRef(new Map<string, string | undefined>());
@@ -167,6 +188,8 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
 
   const retryFailedSaves = useCallback(async (cardId: string) => {
     flushScheduled(`${cardId}:`);
+    const handlers = [...(manualSaves.current.get(cardId)?.values() ?? [])];
+    for (const save of handlers) if (!await save()) return false;
     if (await flushSaves(cardId)) return true;
     const falhas = [...failures.current].filter(([, id]) => id === cardId);
     if (falhas.length === 0) return false;
@@ -189,11 +212,13 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
     for (const key of pendingRef.current.keys()) if (key.startsWith(`${cardId}:`)) pendingRef.current.delete(key);
     for (const [key, id] of failures.current) if (id === cardId) failures.current.delete(key);
     for (const key of recovery.current.keys()) if (key.startsWith(`${cardId}:`)) recovery.current.delete(key);
+    for (const key of pendingUploads.current.keys()) if (key.startsWith(`${cardId}:`)) pendingUploads.current.delete(key);
+    manualSaves.current.delete(cardId);
     toast.dismiss?.(`card-save:${cardId}`);
   }, []);
 
   return (
-    <CardSaveContext.Provider value={{ subscribeConfirmation, scheduleSave, flushScheduled, getVersion, confirmVersion, getDraft, setDraft, registerSave, flushSaves, setPendingFields, getPendingFields, getPendingChanges, getFailedSaveKeys, clearFailedSave, retryFailedSaves, discardPending }}>
+    <CardSaveContext.Provider value={{ subscribeConfirmation, scheduleSave, flushScheduled, getVersion, confirmVersion, getDraft, setDraft, registerSave, registerManualSave, getPendingUpload, setPendingUpload, flushSaves, setPendingFields, getPendingFields, getPendingChanges, getFailedSaveKeys, clearFailedSave, retryFailedSaves, discardPending }}>
       {children}
     </CardSaveContext.Provider>
   );
