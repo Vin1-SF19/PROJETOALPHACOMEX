@@ -14,6 +14,7 @@ import { pendenciasNotaFiscal, type DadosNotaFiscal } from "@/lib/bpm/financeiro
 import { verificarLinkNotaFiscalAcessivel } from "@/lib/bpm/nota-fiscal-link";
 import { CHAVES_CAMPOS } from "@/lib/bpm/financeiro-config.client";
 import { extrairPathnamePrivadoAnexoBpm } from "@/lib/bpm/anexos-storage";
+import { etapaEhBoasVindas, pendenciasSaidaBoasVindasOperacional, PIPELINE_OPERACIONAL_ATIVO_ID } from "@/lib/bpm/boas-vindas";
 import { camposPublicadosPorEtapa, capacidadesObrigatoriasPorEtapa, capacidadeObrigatoriaEntrada } from "@/lib/bpm/campos-formulario-publicado";
 import {
   carregarValoresCanonicosCampos,
@@ -419,6 +420,13 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     ...Object.fromEntries(valoresEfetivosPorId),
   };
   const pendencias: string[] = [];
+  if (card.pipelineId === PIPELINE_OPERACIONAL_ATIVO_ID && etapaEhBoasVindas(card.etapa.nome)) {
+    const analista = await tx.usuarios.findUnique({ where: { id: card.responsavelId },
+      select: { role: true, cargo: true, status: true } });
+    pendencias.push(...pendenciasSaidaBoasVindasOperacional({ ...card,
+      responsavelRole: analista?.status === "ATIVO" ? analista.role : null,
+      responsavelCargo: analista?.status === "ATIVO" ? analista.cargo : null }));
+  }
   if (card.pipeline.chave === BPM_PIPELINE_KEYS.FINANCEIRO && destino.chave === "contratacao_finalizada") {
     const idCampo = (chave: string) => [...camposPorId.values()].find((campo) => campo.chave === chave)?.id;
     const valorCampo = (chave: string) => valoresEfetivosPorId.get(idCampo(chave) ?? "") ?? null;

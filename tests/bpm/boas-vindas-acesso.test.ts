@@ -33,7 +33,8 @@ describe("Boas-vindas — permissões configuradas", () => {
     expect(pipelineEhOperacional(" operacional ")).toBe(true);
     expect(vinculoPessoaBoasVindasOperacionalRestrito("Operacional", "BOAS-VINDAS")).toBe(true);
     expect(usuarioPodeVincularPessoaBoasVindasOperacional("Admin")).toBe(true);
-    expect(usuarioPodeVincularPessoaBoasVindasOperacional("DIRETOR")).toBe(true);
+    expect(usuarioPodeVincularPessoaBoasVindasOperacional("OPERACIONAL", 10)).toBe(true);
+    expect(usuarioPodeVincularPessoaBoasVindasOperacional("DIRETOR")).toBe(false);
     expect(usuarioPodeVincularPessoaBoasVindasOperacional("TI")).toBe(false);
     expect(usuarioPodeVincularPessoaBoasVindasOperacional("COMERCIAL")).toBe(false);
     expect(vinculoPessoaBoasVindasOperacionalRestrito("Comercial", "Boas-vindas")).toBe(false);
@@ -64,6 +65,6 @@ describe("Boas-vindas — permissões configuradas", () => {
     expect(readFileSync(resolve("src/lib/bpm/transicao-command.ts"), "utf8")).not.toContain("checarAcessoDiretoriaBpm");
     const board = readFileSync(resolve("src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx"), "utf8");
     expect(board).toContain("alertaBoasVindas");
-    expect(board).toContain("Nunca acessado — requer atenção");
+    expect(board).toContain("Boas-vindas pendentes — requer atenção");
   });
 });

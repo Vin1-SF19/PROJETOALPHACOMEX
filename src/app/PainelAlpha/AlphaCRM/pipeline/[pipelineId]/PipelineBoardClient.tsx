@@ -242,7 +242,7 @@ export function KanbanCard({
   // botão para Reunião Agendada, onde ficam apenas acompanhamento/transcrição.
   const agendarReuniao = etapaEhAgendarReuniao(etapaNome);
   const naoAcessado = !ehLeadVirtual && !card.primeiraVisualizacaoEm;
-  const alertaBoasVindas = !ehLeadVirtual && etapaEhBoasVindas(etapaNome) && naoAcessado;
+  const alertaBoasVindas = !ehLeadVirtual && etapaEhBoasVindas(etapaNome);
   const canalOrigem = card.campoValores?.find((campo) => campo.campo.nome === "Canal de origem")?.valor;
   const canalNoloss = card.nolossUtmSource?.trim() || card.nolossUtmMedium?.trim() || "NoLoss";
   const qualificacao = card.campoValores?.find((campo) => campo.campo.nome === "Qualificação")?.valor?.trim();
@@ -439,7 +439,7 @@ export function KanbanCard({
             className="flex items-center gap-1.5 rounded-xl border border-red-400/35 bg-red-500/15 px-2.5 py-2 text-[10px] font-extrabold uppercase tracking-wide text-red-100"
           >
             <AlertTriangle size={13} aria-hidden="true" className="shrink-0 text-red-300" />
-            <span>{alertaBoasVindas ? "Nunca acessado — requer atenção" : "Chamada de alinhamento pendente"}</span>
+            <span>{alertaBoasVindas ? "Boas-vindas pendentes — requer atenção" : "Chamada de alinhamento pendente"}</span>
           </div>
         )}
 

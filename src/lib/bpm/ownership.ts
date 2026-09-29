@@ -5,6 +5,7 @@ import {
   acaoBpmExigeSomenteVisualizacao,
   resolverVisibilidadeEtapa,
 } from "@/lib/bpm/visibilidade-etapa";
+import { etapaEhBoasVindas, PIPELINE_OPERACIONAL_ATIVO_ID, podeAgirBoasVindasOperacional } from "@/lib/bpm/boas-vindas";
 
 const PERMISSAO_CRM = "crm";
 
@@ -366,6 +367,7 @@ export async function checarAcessoBpmCard(
     client.bpmCard.findUnique({
       where: { id: cardId },
       select: {
+        pipelineId: true,
         status: true,
         etapa: {
           select: {
@@ -389,6 +391,12 @@ export async function checarAcessoBpmCard(
   const bloqueadoPorEncaminhamento = card.etapa.ehFinal
     && (card.status === "CONCLUIDO" || Boolean(card.vinculosOrigem?.length));
   const apenasVisualizacao = acaoBpmExigeSomenteVisualizacao(acao);
+  if (!apenasVisualizacao && card.pipelineId === PIPELINE_OPERACIONAL_ATIVO_ID
+    && etapaEhBoasVindas(card.etapa.nome)
+    && !podeAgirBoasVindasOperacional(userId, acessoModulo.usuario.role)) {
+    return { autorizado: false, isAdminGlobal: false, role: null,
+      perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false };
+  }
   if (isAdminRole(acessoModulo.usuario.role)) {
     return { autorizado: apenasVisualizacao || !bloqueadoPorEncaminhamento, isAdminGlobal: true,
       role: "ADMINISTRADOR", perfilGlobal: acessoModulo.usuario.role,

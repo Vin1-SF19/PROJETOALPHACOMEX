@@ -41,6 +41,7 @@ export async function carregarValoresCanonicosCampos(
       tipoProcesso: true,
       status: true,
       concluidoEm: true,
+      dataReuniao: true,
       responsavelId: true,
       createdAt: true,
       empresa: {
@@ -52,6 +53,7 @@ export async function carregarValoresCanonicosCampos(
           uf: true,
           municipio: true,
           regimeTributario: true,
+          dataConstituicao: true,
           status: true,
           pessoas: {
             where: { ativo: true },

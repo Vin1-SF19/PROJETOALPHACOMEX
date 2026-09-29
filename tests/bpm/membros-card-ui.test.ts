@@ -33,7 +33,7 @@ describe("CRM - pessoas vinculadas ao card na interface", () => {
 
   it("monta o seletor no cabeçalho do card aberto com edição condicionada à permissão", () => {
     expect(modal).toContain('import { SeletorMembrosCard } from "./SeletorMembrosCard"');
-    expect(modal).toContain("const podeGerenciarMembros = isAdminRole(currentUserRole)");
+    expect(modal).toContain("const podeGerenciarMembros = permitidoBoasVindas && (isAdminRole(currentUserRole)");
     expect(modal).not.toContain("vinculoBoasVindasRestrito");
     expect(modal).toContain("<SeletorMembrosCard");
     expect(modal).toContain("podeGerenciar={podeGerenciarMembros}");

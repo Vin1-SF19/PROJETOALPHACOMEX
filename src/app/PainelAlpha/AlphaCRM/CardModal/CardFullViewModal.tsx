@@ -9,6 +9,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 import { isAdminRole } from "@/lib/roles";
+import { etapaEhBoasVindas, PIPELINE_OPERACIONAL_ATIVO_ID, podeAgirBoasVindasOperacional } from "@/lib/bpm/boas-vindas";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { ObterPipelineBpm } from "@/actions/bpm/Pipelines";
 import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
@@ -30,6 +31,7 @@ import { type EstadoFollowUpModal } from "@/lib/bpm/card-modal-ui";
 import { formularioPossuiTarget } from "@/lib/bpm/formulario-renderer";
 import { BPM_CAPABILITIES } from "@/lib/bpm/ontology";
 import { CardAbertoLayout } from "./CardAbertoLayout";
+import { PainelBoasVindasOperacional } from "./PainelBoasVindasOperacional";
 import { useCardSave, type PendingCardChange } from "./CardSaveContext";
 const PreencherCnpjNoloss = lazy(() => import("./PreencherCnpjNoloss").then((modulo) => ({ default: modulo.PreencherCnpjNoloss })));
 
@@ -184,12 +186,16 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
 
   const meuVinculo = card?.membros.find((m) => m.userId === currentUserId);
   const podeAgirNaEtapa = card?.permissaoEtapa?.podeAgir ?? true;
-  const podeTrabalharNoCard = !card?.encaminhado && (isAdminRole(currentUserRole)
+  const restritoBoasVindas = card?.pipelineId === PIPELINE_OPERACIONAL_ATIVO_ID
+    && etapaEhBoasVindas(card.etapa.nome);
+  const permitidoBoasVindas = !restritoBoasVindas
+    || (currentUserId !== null && podeAgirBoasVindasOperacional(currentUserId, currentUserRole));
+  const podeTrabalharNoCard = permitidoBoasVindas && !card?.encaminhado && (isAdminRole(currentUserRole)
     || (Boolean(meuVinculo) && podeAgirNaEtapa));
   const podeMoverEtapa = podeTrabalharNoCard;
   const podeEditar = podeTrabalharNoCard;
   const podeTrabalharTarefas = podeTrabalharNoCard;
-  const podeGerenciarMembros = !card?.encaminhado && (isAdminRole(currentUserRole)
+  const podeGerenciarMembros = permitidoBoasVindas && !card?.encaminhado && (isAdminRole(currentUserRole)
     || meuVinculo?.role === "RESPONSAVEL" || meuVinculo?.role === "ADMINISTRADOR");
   const etapaAtual = card ? etapas.find((e) => e.id === card.etapa.id) ?? null : null;
 
@@ -308,6 +314,13 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
                 {card.pipeline.nome === "Revisão de Radar" && card.nolossLeadOrigem.length > 0
                   && !card.empresa.cnpj && podeEditar
                   && <Suspense fallback={null}><PreencherCnpjNoloss cardId={card.id} onAtualizado={handleAtualizado} /></Suspense>}
+                {restritoBoasVindas &&
+                  <PainelBoasVindasOperacional cardId={card.id}
+                    emailInicial={card.emailClienteReuniao ?? null}
+                    dataReuniao={card.dataReuniao ?? null}
+                    googleMeetLink={card.googleMeetLink ?? null}
+                    responsavelNome={card.responsavel.nome}
+                    podeEditar={podeEditar} onAtualizado={handleAtualizado} />}
                 <PainelRegistrar card={card} etapaAtual={etapaAtual} accent={accent}
                   podeEditar={podeEditar} realtimeRevision={realtimeRevision}
                   currentUserRole={currentUserRole}

@@ -88,10 +88,10 @@ describe("CRM - wiring do modal por etapa", () => {
   });
 
   it("permite operação completa ao participante vinculado e restringe somente a gestão de membros", () => {
-    expect(layout).toContain("const podeTrabalharNoCard = isAdminRole(currentUserRole)");
+    expect(layout).toContain("const podeTrabalharNoCard = permitidoBoasVindas && (isAdminRole(currentUserRole)");
     expect(layout).toContain("const podeMoverEtapa = podeTrabalharNoCard");
     expect(layout).toContain("const podeEditar = podeTrabalharNoCard");
-    expect(layout).toContain("const podeGerenciarMembros = isAdminRole(currentUserRole)");
+    expect(layout).toContain("const podeGerenciarMembros = permitidoBoasVindas && (isAdminRole(currentUserRole)");
     expect(layout).not.toContain("vinculoBoasVindasRestrito");
     expect(historico).toContain("const podeExcluirAnexo = isAdminRole(currentUserRole) || Boolean(meuVinculo)");
   });

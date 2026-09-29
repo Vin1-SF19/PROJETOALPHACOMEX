@@ -1,13 +1,13 @@
 import { normalizarCNPJ } from "@/lib/format-cnpj";
 
 export const ATRIBUTOS_FONTE_CAMPO = {
-  CLIENTE: ["id", "cnpj", "razaoSocial", "nomeFantasia", "uf", "municipio", "regimeTributario", "status"],
+  CLIENTE: ["id", "cnpj", "razaoSocial", "nomeFantasia", "uf", "municipio", "regimeTributario", "dataConstituicao", "status"],
   CONTATO: ["id", "nome", "cpf", "celular", "email", "telefoneExtra", "vinculo", "cargo"],
   PARCEIRO: ["id", "documento", "nome", "nomeFantasia", "email", "telefone", "segmento", "ativo"],
   CONTRATO: ["id", "valorContrato", "formaPagamento", "servico", "status", "contratoUrl"],
   SERVICO: ["id", "nome"],
   PROCESSO: ["id", "status", "dataInicio", "dataProtocolo", "dataExito", "tentativas"],
-  CARD: ["id", "servico", "tipoProcesso", "status", "responsavelId", "createdAt", "concluidoEm"],
+  CARD: ["id", "servico", "tipoProcesso", "status", "responsavelId", "createdAt", "concluidoEm", "dataReuniao"],
 } as const;
 
 export type EntidadeFonteCampo = keyof typeof ATRIBUTOS_FONTE_CAMPO;

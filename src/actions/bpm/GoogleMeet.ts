@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
-import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
+import { exigirAcessoBpmCard, usuarioElegivelResponsavelBpm } from "@/lib/bpm/ownership";
+import { DIRETOR_OPERACIONAL_VITOR_ID, PIPELINE_OPERACIONAL_ATIVO_ID, etapaEhBoasVindas, podeAgirBoasVindasOperacional } from "@/lib/bpm/boas-vindas";
 import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import {
   criarEventoNoCalendario,
@@ -78,6 +79,184 @@ export async function ListarConvidadosReuniaoGoogleMeetBpm(cardId: string) {
       ? { kind: error.kind, status: error.status, reason: error.reason }
       : { tipo: error instanceof Error ? error.name : "Erro desconhecido" });
     return { success: false as const, error: "Não foi possível consultar os convidados desta reunião." };
+  }
+}
+
+const iniciarBoasVindasSchema = z.object({
+  cardId: z.string().min(1),
+  dataHora: dataHoraObrigatoriaBpmSchema("Data e hora da reunião são obrigatórias"),
+  emailCliente: emailClienteReuniaoSchema,
+  analistaId: z.number().int().positive(),
+});
+
+export async function ListarAnalistasBoasVindasBpm(cardId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || !cardId.trim()) return { success: false as const, error: "Não autorizado" };
+    const userId = Number(session.user.id);
+    if (!podeAgirBoasVindasOperacional(userId, session.user.role)) {
+      return { success: false as const, error: "Não autorizado" };
+    }
+    await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
+    const card = await db.bpmCard.findUnique({ where: { id: cardId }, select: {
+      pipelineId: true, etapa: { select: { nome: true } },
+    } });
+    if (!card || card.pipelineId !== PIPELINE_OPERACIONAL_ATIVO_ID || !etapaEhBoasVindas(card.etapa.nome)) {
+      return { success: false as const, error: "Card fora de Boas-vindas." };
+    }
+    const usuarios = await db.usuarios.findMany({ where: {
+      role: "OPERACIONAL", status: "ATIVO", cargo: { contains: "Analista" },
+      id: { not: DIRETOR_OPERACIONAL_VITOR_ID },
+    }, select: { id: true, nome: true, email: true }, orderBy: { nome: "asc" } });
+    const elegiveis = await Promise.all(usuarios.map(async (usuario) => ({
+      usuario, elegivel: await usuarioElegivelResponsavelBpm(PIPELINE_OPERACIONAL_ATIVO_ID, usuario.id),
+    })));
+    return { success: true as const, data: elegiveis.filter((item) => item.elegivel)
+      .map(({ usuario }) => ({ id: usuario.id, nome: usuario.nome, email: usuario.email })) };
+  } catch {
+    return { success: false as const, error: "Não foi possível listar as analistas." };
+  }
+}
+
+/** A direção escolhe a analista e o horário; o servidor cria o Meet antes de confirmar a atribuição. */
+export async function IniciarBoasVindasOperacionalBpm(dados: unknown) {
+  let eventoCriado: EventoCriadoSemVinculo | null = null;
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false as const, error: "Não autorizado" };
+    const userId = Number(session.user.id);
+    const parsed = iniciarBoasVindasSchema.safeParse(dados);
+    if (!parsed.success) return { success: false as const, error: parsed.error.flatten() };
+    const { cardId, analistaId, dataHora, emailCliente } = parsed.data;
+    if (dataHora.getTime() <= Date.now()) return { success: false as const, error: "Escolha um horário futuro para a reunião." };
+    if (analistaId === DIRETOR_OPERACIONAL_VITOR_ID) {
+      return { success: false as const, error: "Escolha uma analista diferente do Diretor Operacional." };
+    }
+    if (!podeAgirBoasVindasOperacional(userId, session.user.role)) {
+      return { success: false as const, error: "Somente Admin ou Vitor podem iniciar Boas-vindas." };
+    }
+    await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
+    const [card, analista] = await Promise.all([
+      db.bpmCard.findUnique({ where: { id: cardId }, select: {
+        pipelineId: true, etapaId: true, updatedAt: true, googleEventId: true, responsavelId: true,
+        etapa: { select: { nome: true } },
+        empresa: { select: { razaoSocial: true, nomeFantasia: true } },
+      } }),
+      db.usuarios.findUnique({ where: { id: analistaId }, select: {
+        id: true, nome: true, email: true, role: true, cargo: true, status: true,
+      } }),
+    ]);
+    if (!card || card.pipelineId !== PIPELINE_OPERACIONAL_ATIVO_ID || !etapaEhBoasVindas(card.etapa.nome)) {
+      return { success: false as const, error: "O card não está em Boas-vindas do Operacional." };
+    }
+    if (card.googleEventId) return { success: false as const, error: "A primeira reunião já está agendada." };
+    if (!analista || analista.status !== "ATIVO" || analista.role.toUpperCase() !== "OPERACIONAL"
+      || !/analista/i.test(analista.cargo ?? "")
+      || !await usuarioElegivelResponsavelBpm(card.pipelineId, analistaId)) {
+      return { success: false as const, error: "A analista selecionada não está apta para este processo." };
+    }
+    const emailAnalista = emailClienteReuniaoSchema.safeParse(analista.email);
+    if (!emailAnalista.success) return { success: false as const, error: "A analista não possui e-mail válido." };
+    const convidados = emailsConvidadosReuniaoSchema.parse([emailCliente, emailAnalista.data]);
+    const calendarioResolvido = await resolverCalendarioPrincipal(userId);
+    if (!calendarioResolvido.ok) return { success: false as const, error: calendarioResolvido.erro };
+    const { calendario } = calendarioResolvido;
+    const cardAtual = await db.bpmCard.findUnique({ where: { id: cardId }, select: {
+      etapaId: true, updatedAt: true, googleEventId: true,
+    } });
+    if (!cardAtual || cardAtual.etapaId !== card.etapaId || cardAtual.googleEventId
+      || cardAtual.updatedAt.getTime() !== card.updatedAt.getTime()) {
+      return { success: false as const, error: "O card mudou. Recarregue antes de agendar." };
+    }
+    const resultado = await criarEventoNoCalendario({
+      calendarId: calendario.googleCalendarId,
+      titulo: `Primeira reunião operacional — ${card.empresa.nomeFantasia || card.empresa.razaoSocial}`,
+      timezone: calendario.timezone || "America/Sao_Paulo", diaInteiro: false,
+      inicio: dataHora, fim: new Date(dataHora.getTime() + DURACAO_PADRAO_MINUTOS * 60_000),
+      participantes: convidados, criarMeet: true, eventType: "default",
+      visibilidade: "default", transparencia: "opaque", lembretesMinutos: [],
+    });
+    if (!resultado.success) return { success: false as const, error: resultado.error };
+    eventoCriado = { cardId, userId, calendarioId: calendario.id,
+      googleCalendarId: calendario.googleCalendarId, googleEventId: resultado.data.googleEventId };
+    const eventoCache = await db.googleCalendarEventoCache.findUnique({
+      where: { calendarioId_googleEventId: { calendarioId: calendario.id,
+        googleEventId: resultado.data.googleEventId } }, select: { linkMeet: true },
+    });
+    const googleMeetLink = eventoCache?.linkMeet ?? await confirmarLinkMeetCriado({
+      userId, calendarioId: calendario.id, googleCalendarId: calendario.googleCalendarId,
+      googleEventId: resultado.data.googleEventId,
+    });
+    if (!googleMeetLink) {
+      await compensarCriacaoComRegistro(eventoCriado);
+      eventoCriado = null;
+      return { success: false as const, error: "O Google não confirmou o link do Meet. Tente novamente." };
+    }
+    const persistencia = await db.$transaction(async (tx) => {
+      await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard", tx);
+      const atualizado = await tx.bpmCard.updateMany({ where: {
+        id: cardId, pipelineId: PIPELINE_OPERACIONAL_ATIVO_ID, etapaId: card.etapaId,
+        updatedAt: card.updatedAt, googleEventId: null,
+      }, data: {
+        responsavelId: analistaId, dataReuniao: dataHora,
+        googleEventId: resultado.data.googleEventId,
+        googleCalendarId: calendario.googleCalendarId, googleMeetLink,
+        versao: { increment: 1 },
+      } });
+      if (atualizado.count !== 1) return false;
+      await tx.bpmCardMembro.upsert({
+        where: { cardId_userId: { cardId, userId: analistaId } },
+        create: { cardId, userId: analistaId, role: "RESPONSAVEL" },
+        update: { role: "RESPONSAVEL" },
+      });
+      await tx.bpmCardMembro.upsert({
+        where: { cardId_userId: { cardId, userId: DIRETOR_OPERACIONAL_VITOR_ID } },
+        create: { cardId, userId: DIRETOR_OPERACIONAL_VITOR_ID, role: "ADMINISTRADOR" },
+        update: { role: "ADMINISTRADOR" },
+      });
+      if (card.responsavelId !== analistaId && card.responsavelId !== DIRETOR_OPERACIONAL_VITOR_ID) {
+        await tx.bpmCardMembro.deleteMany({ where: { cardId, userId: card.responsavelId } });
+      }
+      await tx.bpmCardReuniao.upsert({ where: { cardId_chave: { cardId, chave: "principal" } },
+        create: { cardId, chave: "principal", status: "AGENDADA", agendadaEm: dataHora,
+          googleEventId: resultado.data.googleEventId, googleCalendarId: calendario.googleCalendarId,
+          googleMeetLink, emailCliente },
+        update: { status: "AGENDADA", agendadaEm: dataHora,
+          googleEventId: resultado.data.googleEventId, googleCalendarId: calendario.googleCalendarId,
+          googleMeetLink, emailCliente },
+      });
+      await registrarHistoricoCard({ cardId, acao: "BOAS_VINDAS_INICIADAS", usuarioId: userId,
+        valorNovoJson: JSON.stringify({ analistaId, dataReuniao: dataHora.toISOString(),
+          googleEventId: resultado.data.googleEventId }) }, tx);
+      await publicarEventoBpm({ tipo: "REUNIAO_AGENDADA", entidadeTipo: "CARD", entidadeId: cardId,
+        cardId, pipelineId: PIPELINE_OPERACIONAL_ATIVO_ID,
+        valorNovo: { etapaId: card.etapaId, dataReuniao: dataHora.toISOString(), analistaId },
+        atorTipo: "USUARIO", atorUserId: userId, correlationId: randomUUID(),
+        idempotencyKey: `boas-vindas-reuniao:${cardId}:${resultado.data.googleEventId}` }, tx);
+      return true;
+    });
+    if (!persistencia) {
+      await compensarCriacaoComRegistro(eventoCriado);
+      eventoCriado = null;
+      return { success: false as const, error: "O card mudou enquanto a reunião era agendada. Recarregue e tente novamente." };
+    }
+    eventoCriado = null;
+    try {
+      revalidatePath(`${ROTA_BASE}/pipeline`);
+      await notificarPipelineBpm({ pipelineId: PIPELINE_OPERACIONAL_ATIVO_ID, cardId, tipo: "REUNIAO_ALTERADA" });
+    } catch (notificacaoErro) {
+      console.error("[IniciarBoasVindasOperacionalBpm] Notificação pendente", {
+        tipo: notificacaoErro instanceof Error ? notificacaoErro.name : "Erro desconhecido",
+      });
+    }
+    return { success: true as const, data: { googleEventId: resultado.data.googleEventId } };
+  } catch (error) {
+    if (eventoCriado) await compensarCriacaoComRegistro(eventoCriado);
+    console.error("[IniciarBoasVindasOperacionalBpm]", error instanceof GoogleCalendarError
+      ? { kind: error.kind, status: error.status, reason: error.reason }
+      : { tipo: error instanceof Error ? error.name : "Erro desconhecido" });
+    return { success: false as const, error: error instanceof Error && error.message === "Não autorizado"
+      ? "Não autorizado" : "Não foi possível iniciar Boas-vindas." };
   }
 }
 

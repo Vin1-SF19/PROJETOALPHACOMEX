@@ -21,6 +21,7 @@ import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 import { ListarPipelinesBpm } from "@/actions/bpm/Pipelines";
 import { isAdminRole } from "@/lib/roles";
+import { etapaEhBoasVindas, PIPELINE_OPERACIONAL_ATIVO_ID, podeAgirBoasVindasOperacional } from "@/lib/bpm/boas-vindas";
 import { formatCNPJ } from "@/lib/format-cnpj";
 import PainelHistorico from "./PainelHistorico";
 import PainelHistoricoPipeline from "./PainelHistoricoPipeline";
@@ -104,14 +105,18 @@ export function CardAbertoLayout({
 
   const meuVinculo = card.membros.find((m) => m.userId === currentUserId);
   const podeAgirNaEtapa = card.permissaoEtapa?.podeAgir ?? true;
-  const podeTrabalharNoCard = isAdminRole(currentUserRole)
-    || (Boolean(meuVinculo) && podeAgirNaEtapa);
+  const restritoBoasVindas = card.pipelineId === PIPELINE_OPERACIONAL_ATIVO_ID
+    && etapaEhBoasVindas(card.etapa.nome);
+  const permitidoBoasVindas = !restritoBoasVindas
+    || (currentUserId !== null && podeAgirBoasVindasOperacional(currentUserId, currentUserRole));
+  const podeTrabalharNoCard = permitidoBoasVindas && (isAdminRole(currentUserRole)
+    || (Boolean(meuVinculo) && podeAgirNaEtapa));
   const podeMoverEtapa = podeTrabalharNoCard;
   const podeEditar = podeTrabalharNoCard;
   const podeTrabalharTarefas = podeTrabalharNoCard;
-  const podeGerenciarMembros = isAdminRole(currentUserRole) || (podeAgirNaEtapa && (
+  const podeGerenciarMembros = permitidoBoasVindas && (isAdminRole(currentUserRole) || (podeAgirNaEtapa && (
       meuVinculo?.role === "RESPONSAVEL" || meuVinculo?.role === "ADMINISTRADOR"
-    ));
+    )));
   const transicoesDaEtapaAtual = card.etapa.transicoesEtapaOrigem ?? [];
   const etapasParaMover = etapas.filter(
     (e) => e.id === card.etapa.id || transicoesDaEtapaAtual.some((t) => t.etapaDestinoId === e.id),
