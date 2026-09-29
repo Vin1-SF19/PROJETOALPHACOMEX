@@ -404,20 +404,31 @@ export function PainelCamposEtapaAtual({
         CHAVES_CAMPOS.FORMA_PAGAMENTO_UTILIZADA,
         CHAVES_CAMPOS.PAGAMENTO_NO_EXITO,
       ]);
-      const idsPagamento = new Set(camposEtapaBase
-        .filter((campo) => chavesPagamento.has(campo.chave ?? ""))
-        .map((campo) => campo.id));
-      const idsAgrupados = ids.filter((id) => idsPagamento.has(id) && !arquivosPendentesRef.current.has(id));
-      // O comprovante e demais entradas são confirmados antes do indicador;
-      // todos os dados interdependentes do pagamento entram na mesma transação.
+      const chavesNotaFiscal = new Set<string>([
+        CHAVES_CAMPOS.NF_EMITIDA,
+        CHAVES_CAMPOS.NUMERO_NF,
+        CHAVES_CAMPOS.DATA_EMISSAO_NF,
+        CHAVES_CAMPOS.VALOR_NF,
+        CHAVES_CAMPOS.LINK_NF,
+      ]);
+      const grupoPendente = (chaves: Set<string>) => {
+        const idsDoGrupo = new Set(camposEtapaBase
+          .filter((campo) => chaves.has(campo.chave ?? ""))
+          .map((campo) => campo.id));
+        return ids.filter((id) => idsDoGrupo.has(id) && !arquivosPendentesRef.current.has(id));
+      };
+      const grupos = [grupoPendente(chavesPagamento), grupoPendente(chavesNotaFiscal)].filter((grupo) => grupo.length);
+      const idsAgrupados = new Set(grupos.flat());
+      // Anexos e campos independentes são salvos antes dos grupos que o servidor valida juntos.
       const idsOrdenados = [
-        ...ids.filter((id) => !idsAgrupados.includes(id)),
-        ...idsAgrupados,
+        ...ids.filter((id) => !idsAgrupados.has(id)),
+        ...grupos.flat(),
       ];
       let concluidos = 0;
       for (let indice = 0; indice < idsOrdenados.length; indice += 1) {
         const id = idsOrdenados[indice];
-        if (idsAgrupados.includes(id) && id !== idsAgrupados[0]) continue;
+        const grupo = grupos.find((item) => item.includes(id));
+        if (grupo && id !== grupo[0]) continue;
         const arquivo = arquivosPendentesRef.current.get(id);
         if (arquivo) {
           const key = `${card.id}:arquivo:${id}`;
@@ -440,8 +451,8 @@ export function PainelCamposEtapaAtual({
           mensagensErroArquivoRef.current.delete(id);
           setPendingUpload(key);
           setArquivosPendentes((atual) => { const proximo = { ...atual }; delete proximo[id]; return proximo; });
-        } else if (!await salvarCamposAtuais(idsAgrupados.includes(id) ? idsAgrupados : [id])) return false;
-        concluidos += idsAgrupados.includes(id) ? idsAgrupados.length : 1;
+        } else if (!await salvarCamposAtuais(grupo ?? [id])) return false;
+        concluidos += grupo?.length ?? 1;
         setProgressoSave({ concluido: concluidos, total: ids.length });
       }
       return idsPendentes().length === 0 && arquivosPendentesRef.current.size === 0;

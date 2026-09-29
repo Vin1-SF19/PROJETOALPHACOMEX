@@ -103,3 +103,20 @@ Checklist `story-draft-checklist.md`: objetivo/contexto **PASS**; orientação t
 ## QA Results
 
 Testes locais: `npm run lint` passou com zero erros (1.191 warnings preexistentes); `npm run typecheck` passou após o build; `npm test` passou (558 arquivos, 4.094 testes aprovados, 4 ignorados e 1 todo); `npm run build` passou com avisos conhecidos de `pdfjs-polyfill`; testes focados da NF passaram (3 arquivos, 9 testes); `git diff --check` passou. Prévia v16→v17 passou em modo somente leitura; o backup dedicado foi restaurado e verificado em SQLite isolado. A transação autorizada publicou a v17; leitura independente conferiu cinco campos, formulário v3, cinco requisitos e quatro automações v2. QA funcional autenticado em card real permanece pendente porque a etapa tinha zero cards, e esta verificação não criou ou moveu card de produção.
+
+## Correção do salvamento manual da NF — 29/09/2026
+
+Relato em card real na etapa Emissão de Nota Fiscal: Número da NF e Valor da NF permaneceram no rascunho com erro. A leitura do card mostrou apenas o arquivo/link persistido; indicador, número, data e valor ainda estavam vazios. O formulário enviava cada campo isolado, mas a validação da NF exige todos os dados quando o indicador é `Sim`. O arquivo, quando pendente, deve ser salvo antes; indicador, número, data, valor e link editáveis seguem juntos numa atualização atômica.
+
+- [x] Agrupar os campos interdependentes da NF no botão de salvar, preservando salvamento sequencial de campos independentes e upload anterior ao grupo.
+- [x] Cobrir a atualização agrupada da NF em teste do formulário.
+- [x] Confirmar lint, typecheck, suíte completa e build desta correção.
+- [ ] Repetir salvamento autenticado e reload do card real para confirmar persistência e encerramento da tarefa.
+
+Validação local: lint sem erros (1.191 avisos preexistentes), typecheck e build aprovados; suíte completa com 561 arquivos e 4.123 testes aprovados, 4 ignorados e 1 pendente. O teste focado do formulário da NF passou.
+
+**File List desta correção:**
+
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx`
+- `tests/bpm/salvamento-manual-campos-react.test.ts`
+- `docs/stories/story-financeiro-ativo-emissao-nota-fiscal.md`

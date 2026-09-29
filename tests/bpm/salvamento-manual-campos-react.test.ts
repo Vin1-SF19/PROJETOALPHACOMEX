@@ -164,6 +164,45 @@ it("envia os cinco campos dependentes em um único salvamento e aguarda confirma
   expect(container.querySelector("#campo-bpm-status_contratacao")?.tagName).toBe("OUTPUT");
 });
 
+it("envia indicador, número, data e valor da NF juntos para validação no servidor", async () => {
+  const camposNota = [
+    { id: "nf_emitida", chave: "alpha.nf.emitida", nome: "NF emitida", tipo: "selecao", opcoesJson: JSON.stringify(["Sim", "Não"]) },
+    { id: "numero_nf", chave: "alpha.numero.da.nf", nome: "Número da NF", tipo: "texto", opcoesJson: null },
+    { id: "data_nf", chave: "alpha.data.de.emissao", nome: "Data de emissão", tipo: "data", opcoesJson: null },
+    { id: "valor_nf", chave: "alpha.valor.da.nf", nome: "Valor da NF", tipo: "moeda", opcoesJson: null },
+  ].map((campo) => ({ ...campo, valor: "", editavel: true, obrigatorio: false,
+    pipelineId: "financeiro", etapaId: "etapa", ordem: 0 }));
+  const cardNota = { id: "card-nota", updatedAt: "2026-09-29T10:00:00Z",
+    pipelineId: "cmuih4i54000209gmmyqrg557", etapa: { id: "etapa", nome: "Emissão de Nota Fiscal", chave: "emissao_nota_fiscal" },
+    camposEtapa: camposNota,
+  } as unknown as React.ComponentProps<typeof PainelCamposEtapaAtual>["card"];
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  vi.mocked(ObterCardBpm).mockResolvedValue({ success: true, data: cardNota } as Awaited<ReturnType<typeof ObterCardBpm>>);
+  await act(async () => root.render(h(CardSaveProvider, null, h(Probe), h(PainelCamposEtapaAtual, {
+    card: cardNota, campoIds: camposNota.map((campo) => campo.id), instanceKey: "nota",
+    accent: "1,2,3", podeEditar: true, realtimeRevision: 0, onAtualizado: vi.fn(),
+  }))));
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5)); });
+  await selecionar("nf_emitida", "Sim");
+  await editar("numero_nf", "NF-123");
+  await editar("data_nf", "2026-09-29");
+  await editar("valor_nf", "21999.99");
+  vi.mocked(AtualizarCardBpm).mockResolvedValue({ success: true, data: {
+    updatedAt: new Date("2026-09-29T10:01:00Z"), camposValores: {
+      nf_emitida: "Sim", numero_nf: "NF-123", data_nf: "2026-09-29", valor_nf: "21999.99",
+    },
+  } });
+  await act(async () => { botaoSalvar().click(); });
+  expect(AtualizarCardBpm).toHaveBeenCalledTimes(1);
+  expect(AtualizarCardBpm).toHaveBeenCalledWith(expect.objectContaining({
+    cardId: "card-nota", camposValores: {
+      nf_emitida: "Sim", numero_nf: "NF-123", data_nf: "2026-09-29", valor_nf: "21999.99",
+    },
+  }));
+  expect(context.getPendingFields("card-nota")).toEqual([]);
+});
+
 it("em falha de validação do pagamento mantém os cinco valores e mostra a pendência real", async () => {
   await montarPagamento();
   vi.mocked(AtualizarCardBpm).mockResolvedValue({ success: false, error: "Valor esperado divergente do valor líquido calculado" });
