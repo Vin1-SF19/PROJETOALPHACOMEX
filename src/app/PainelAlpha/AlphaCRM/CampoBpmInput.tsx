@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast, type ExternalToast } from "sonner";
 import { cn } from "@/lib/utils";
 import { campoBpmEhCnpj } from "@/lib/bpm/campos-dinamicos";
@@ -8,6 +8,18 @@ import { formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";
 import { RegistrarAnexoBpm } from "@/actions/bpm/Anexos";
 import { VisualizadorAnexoCard, type AnexoParaVisualizar } from "@/components/bpm/anexos/VisualizadorAnexoCard";
 import { VALORES } from "@/lib/bpm/financeiro-config.client";
+import { validarUploadAnexo } from "@/lib/validations/bpm";
+
+const TIPOS_ANEXO_ACEITOS = ".pdf,.png,.jpg,.jpeg,.webp,.docx,.xlsx,.xls,.csv";
+const TEMPO_LIMITE_UPLOAD_MS = 60_000;
+const TEMPO_LIMITE_REGISTRO_MS = 30_000;
+const PRAZO_REUTILIZACAO_RECIBO_MS = 9 * 60_000;
+
+function erroDaResposta(resposta: unknown, fallback: string): string {
+  if (resposta && typeof resposta === "object" && "error" in resposta
+    && typeof resposta.error === "string" && resposta.error.trim()) return resposta.error;
+  return fallback;
+}
 
 export interface CampoBpmEditavel {
   id: string;
@@ -35,7 +47,7 @@ interface CampoBpmInputProps {
   cardId?: string;
   errorToastOptions?: Pick<ExternalToast, "duration" | "closeButton">;
   arquivoAtual?: { id: string; nome: string; url: string; tipo?: string | null } | null;
-  registerFileSave?: (save: () => Promise<boolean>, fileName: string) => Promise<boolean>;
+  registerFileSave?: (save: () => Promise<boolean>, fileName: string, getFailureMessage?: () => string) => Promise<boolean>;
   onFileConfirmed?: (arquivo: { id: string; nome: string; url: string }) => void;
 }
 
@@ -89,6 +101,8 @@ export function CampoBpmInput({
   onFileConfirmed,
 }: CampoBpmInputProps) {
   const [enviandoArquivo, setEnviandoArquivo] = useState(false);
+  const [erroArquivo, setErroArquivo] = useState<string | null>(null);
+  const envioEmAndamentoRef = useRef(false);
   const [anexoSelecionado, setAnexoSelecionado] = useState<AnexoParaVisualizar | null>(null);
   const bloqueado = disabled || readOnly;
   const opcoes = campo.tipo === "booleano"
@@ -205,42 +219,104 @@ export function CampoBpmInput({
           id={campo.tipo === "arquivo" ? `campo-bpm-${campo.id}` : undefined}
           className={className}
           type="file"
+          accept={TIPOS_ANEXO_ACEITOS}
           disabled={bloqueado || enviandoArquivo || !cardId}
-          aria-invalid={invalid || undefined}
-          aria-describedby={describedBy}
+          aria-invalid={invalid || Boolean(erroArquivo) || undefined}
+          aria-describedby={[describedBy, erroArquivo ? `campo-bpm-${campo.id}-upload-erro` : undefined].filter(Boolean).join(" ") || undefined}
           onChange={async (event) => {
             const inputArquivo = event.currentTarget;
             const file = event.target.files?.[0];
             if (!file || !cardId) return;
-            setEnviandoArquivo(true);
-            const resultadoEnvio: {
-              confirmado: { id: string; nome: string; url: string } | null;
-            } = { confirmado: null };
+            inputArquivo.value = "";
+            setErroArquivo(null);
+            const erroValidacao = validarUploadAnexo({ size: file.size, type: file.type, name: file.name });
+            if (erroValidacao) {
+              setErroArquivo(erroValidacao);
+              return;
+            }
+            let mensagemFalha = "Não foi possível enviar o arquivo. Tente novamente.";
+            // O recibo representa um blob já enviado. Reutilizá-lo evita um
+            // segundo POST quando só o registro do anexo falhou.
+            let reciboSelecionado: string | null = null;
+            let reciboRecebidoEm = 0;
             const enviar = async () => {
+              if (envioEmAndamentoRef.current) return false;
+              envioEmAndamentoRef.current = true;
+              setEnviandoArquivo(true);
+              setErroArquivo(null);
+              const controle = new AbortController();
+              let limiteUpload: ReturnType<typeof setTimeout> | undefined;
               try {
-              const formData = new FormData();
-              formData.append("file", file);
-              formData.append("cardId", cardId);
-              const resposta = await fetch("/api/bpm/upload", { method: "POST", body: formData });
-              const upload = await resposta.json();
-              if (!resposta.ok || !upload.success) throw new Error(upload.error ?? "Falha no upload");
-              const registro = await RegistrarAnexoBpm({ cardId, campoId: campo.id, recibo: upload.file.recibo });
-              if (!registro.success || !registro.data) throw new Error(typeof registro.error === "string" ? registro.error : "Falha ao registrar arquivo");
-              resultadoEnvio.confirmado = { id: registro.data.id, nome: registro.data.nome, url: registro.data.url };
-              if (onFileConfirmed) onFileConfirmed(resultadoEnvio.confirmado);
-              else onChange(resultadoEnvio.confirmado.id);
-              toast.success("Arquivo vinculado ao campo");
-              return true;
+                // O servidor expira o recibo em 10 minutos. Renovamos antes
+                // disso para não prender o usuário num retry impossível.
+                if (reciboSelecionado && Date.now() - reciboRecebidoEm >= PRAZO_REUTILIZACAO_RECIBO_MS) {
+                  reciboSelecionado = null;
+                }
+                if (!reciboSelecionado) {
+                  const formData = new FormData();
+                  formData.append("file", file);
+                  formData.append("cardId", cardId);
+                  limiteUpload = setTimeout(() => controle.abort(), TEMPO_LIMITE_UPLOAD_MS);
+                  const resposta = await fetch("/api/bpm/upload", { method: "POST", body: formData, signal: controle.signal });
+                  const upload: unknown = await resposta.json().catch(() => null);
+                  if (!resposta.ok) throw new Error(erroDaResposta(upload, `Falha no envio do arquivo (HTTP ${resposta.status}).`));
+                  if (!upload || typeof upload !== "object" || !("success" in upload) || upload.success !== true
+                    || !("file" in upload) || !upload.file || typeof upload.file !== "object"
+                    || !("recibo" in upload.file) || typeof upload.file.recibo !== "string" || !upload.file.recibo.trim()) {
+                    throw new Error(erroDaResposta(upload, "O servidor não confirmou o envio do arquivo."));
+                  }
+                  reciboSelecionado = upload.file.recibo;
+                  reciboRecebidoEm = Date.now();
+                  clearTimeout(limiteUpload);
+                }
+                let cancelarLimiteRegistro: ReturnType<typeof setTimeout> | undefined;
+                let registro: Awaited<ReturnType<typeof RegistrarAnexoBpm>>;
+                try {
+                  registro = await Promise.race([
+                    RegistrarAnexoBpm({ cardId, campoId: campo.id, recibo: reciboSelecionado }),
+                    new Promise<never>((_, reject) => {
+                      cancelarLimiteRegistro = setTimeout(() => reject(new Error("O registro do anexo demorou demais. Tente salvar novamente.")), TEMPO_LIMITE_REGISTRO_MS);
+                    }),
+                  ]);
+                } finally {
+                  clearTimeout(cancelarLimiteRegistro);
+                }
+                if (!registro.success || !registro.data) {
+                  const erroRegistro = typeof registro.error === "string" ? registro.error : "Falha ao registrar arquivo";
+                  if (erroRegistro.includes("Comprovante de upload inválido ou expirado")) {
+                    reciboSelecionado = null;
+                    throw new Error("O comprovante do envio expirou. Clique em Salvar novamente para reenviar o arquivo.");
+                  }
+                  throw new Error(erroRegistro);
+                }
+                const confirmado = { id: registro.data.id, nome: registro.data.nome, url: registro.data.url };
+                if (onFileConfirmed) onFileConfirmed(confirmado);
+                else onChange(confirmado.id);
+                toast.success("Arquivo vinculado ao campo");
+                return true;
               } catch (error) {
-                toast.error(error instanceof Error ? error.message : "Não foi possível enviar o arquivo", errorToastOptions);
+                mensagemFalha = controle.signal.aborted
+                  ? "O envio demorou mais de 60 segundos. Tente salvar novamente."
+                  : error instanceof Error ? error.message : "Não foi possível enviar o arquivo. Tente novamente.";
+                setErroArquivo(mensagemFalha);
+                if (!registerFileSave) toast.error(mensagemFalha, errorToastOptions);
                 return false;
+              } finally {
+                clearTimeout(limiteUpload);
+                envioEmAndamentoRef.current = false;
+                setEnviandoArquivo(false);
               }
             };
-            if (registerFileSave) await registerFileSave(enviar, file.name); else await enviar();
-            inputArquivo.value = "";
-            setEnviandoArquivo(false);
+            try {
+              if (registerFileSave) await registerFileSave(enviar, file.name, () => mensagemFalha);
+              else await enviar();
+            } catch (error) {
+              setErroArquivo(error instanceof Error ? error.message : "Não foi possível preparar o arquivo para salvar.");
+            }
           }}
         />
+        {enviandoArquivo && <p role="status" className="text-[11px] text-sky-200">Enviando arquivo...</p>}
+        {erroArquivo && <p id={`campo-bpm-${campo.id}-upload-erro`} role="alert" className="text-[11px] text-rose-300">{erroArquivo}</p>}
         {value.startsWith("https://") ? (
           <a href={value} target="_blank" rel="noopener noreferrer" className="block truncate text-[11px] text-emerald-300 hover:underline">
             Abrir link do contrato

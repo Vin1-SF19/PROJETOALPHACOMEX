@@ -5,8 +5,8 @@ import { del, put } from "@vercel/blob";
 import db from "@/lib/prisma";
 import { auth } from "../../../../../auth";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
-import { validarUploadAnexo } from "@/lib/validations/bpm";
-import { criarReciboUploadAnexoBpm, criarReferenciaAnexoBpm, recibosAnexoBpmConfigurados } from "@/lib/bpm/anexos-storage";
+import { obterTipoUploadAnexo, validarUploadAnexo } from "@/lib/validations/bpm";
+import { criarReciboUploadAnexoBpm, criarReferenciaAnexoBpm, obterTokenBlobPrivadoAnexoBpm, recibosAnexoBpmConfigurados } from "@/lib/bpm/anexos-storage";
 import { ACAO_UPLOAD_ANEXO_SEM_REGISTRO } from "@/lib/bpm/anexos-lifecycle";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +19,11 @@ export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ success: false, error: "Não autorizado" }, { status: 401 });
+  }
+  const tokenPrivado = obterTokenBlobPrivadoAnexoBpm();
+  if (!tokenPrivado) {
+    console.error("[POST /api/bpm/upload] BLOBCRM_READ_WRITE_TOKEN ausente");
+    return NextResponse.json({ success: false, error: "Armazenamento privado de anexos indisponível. Avise o administrador." }, { status: 503 });
   }
   const userId = Number(session.user.id);
 
@@ -40,9 +45,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Não autorizado" }, { status: 403 });
   }
 
-  const erroValidacao = validarUploadAnexo({ size: file.size, type: file.type });
+  const erroValidacao = validarUploadAnexo({ size: file.size, type: file.type, name: file.name });
   if (erroValidacao) {
     return NextResponse.json({ success: false, error: erroValidacao }, { status: 400 });
+  }
+  const tipoEfetivo = obterTipoUploadAnexo({ name: file.name, type: file.type });
+  if (!tipoEfetivo) {
+    return NextResponse.json({ success: false, error: "Tipo de arquivo não permitido" }, { status: 400 });
   }
 
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -50,16 +59,22 @@ export async function POST(request: NextRequest) {
   const uploadPath = `bpm/${cardId}/${uniqueName}`;
 
   const arrayBuffer = await file.arrayBuffer();
-  if (!await conteudoUploadCompativel(arrayBuffer, file.type)) {
+  if (!await conteudoUploadCompativel(arrayBuffer, tipoEfetivo)) {
     return NextResponse.json({ success: false, error: "Conteúdo incompatível com o tipo do arquivo" }, { status: 400 });
   }
 
+  let blob: Awaited<ReturnType<typeof put>>;
   try {
-    const blob = await put(uploadPath, new Blob([arrayBuffer], { type: file.type }), {
+    blob = await put(uploadPath, new Blob([arrayBuffer], { type: tipoEfetivo }), {
       access: "private",
-      token: process.env.CRM_READ_WRITE_TOKEN,
+      token: tokenPrivado,
     });
+  } catch (error) {
+    console.error("[POST /api/bpm/upload] Falha no Blob privado", { error: error instanceof Error ? error.name : "unknown" });
+    return NextResponse.json({ success: false, error: "Falha no armazenamento do anexo. Tente novamente." }, { status: 502 });
+  }
 
+  try {
     try {
       await db.bpmCardHistorico.create({ data: {
         cardId,
@@ -68,8 +83,11 @@ export async function POST(request: NextRequest) {
         valorAnteriorJson: criarReferenciaAnexoBpm(blob.pathname),
       } });
     } catch (error) {
-      await del(blob.pathname, { token: process.env.CRM_READ_WRITE_TOKEN }).catch((cleanupError) =>
-        console.error("[POST /api/bpm/upload] Blob sem registro de limpeza", { pathname: blob.pathname, cleanupError }));
+      await del(blob.pathname, { token: tokenPrivado }).catch((cleanupError) =>
+        console.error("[POST /api/bpm/upload] Blob sem registro de limpeza", {
+          pathname: blob.pathname,
+          error: cleanupError instanceof Error ? cleanupError.name : "unknown",
+        }));
       throw error;
     }
 
@@ -77,7 +95,7 @@ export async function POST(request: NextRequest) {
       cardId,
       pathname: blob.pathname,
       nome: file.name,
-      tipo: file.type || "application/octet-stream",
+      tipo: tipoEfetivo,
       tamanho: file.size,
     });
 
@@ -85,13 +103,13 @@ export async function POST(request: NextRequest) {
       success: true,
       file: {
         originalName: file.name,
-        mimeType: file.type || "application/octet-stream",
+        mimeType: tipoEfetivo,
         size: file.size,
         recibo,
       },
     });
   } catch (error) {
-    console.error("[POST /api/bpm/upload]", error);
-    return NextResponse.json({ success: false, error: "Erro ao enviar arquivo" }, { status: 500 });
+    console.error("[POST /api/bpm/upload] Falha ao registrar anexo", { error: error instanceof Error ? error.name : "unknown" });
+    return NextResponse.json({ success: false, error: "Não foi possível registrar o anexo. Tente novamente." }, { status: 500 });
   }
 }

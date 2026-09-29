@@ -83,6 +83,7 @@ export function PainelCamposEtapaAtual({
     return upload ? [[campo.id, upload] as const] : [];
   })));
   const arquivosPendentesRef = useRef(arquivosIniciais);
+  const mensagensErroArquivoRef = useRef(new Map<string, () => string>());
   const [arquivosPendentes, setArquivosPendentes] = useState<Record<string, string>>(() =>
     Object.fromEntries([...arquivosIniciais].map(([id, upload]) => [id, upload.nome])));
 
@@ -137,6 +138,7 @@ export function PainelCamposEtapaAtual({
     }
     rastreador.alterar(valor);
     if (arquivosPendentesRef.current.delete(id)) {
+      mensagensErroArquivoRef.current.delete(id);
       setPendingUpload(`${card.id}:arquivo:${id}`);
       setArquivosPendentes((atual) => { const proximo = { ...atual }; delete proximo[id]; return proximo; });
       setPendingFields(`${card.id}:arquivo:${id}`, []);
@@ -377,9 +379,14 @@ export function PainelCamposEtapaAtual({
             const confirmado = await arquivo.save();
             if (confirmado) setPendingFields(key, []);
             return confirmado;
-          }, card.id, key, erroFormulario);
+          }, card.id, key, {
+            ...erroFormulario,
+            failureMessage: () => mensagensErroArquivoRef.current.get(ids[indice])?.()
+              ?? "Não foi possível salvar o anexo. Tente novamente.",
+          });
           if (!sucesso) { setEstadoSave("erro"); return false; }
           arquivosPendentesRef.current.delete(ids[indice]);
+          mensagensErroArquivoRef.current.delete(ids[indice]);
           setPendingUpload(key);
           setArquivosPendentes((atual) => { const proximo = { ...atual }; delete proximo[ids[indice]]; return proximo; });
         } else if (!await salvarCamposAtuais(ids[indice])) return false;
@@ -560,9 +567,10 @@ export function PainelCamposEtapaAtual({
                     ? card.anexos.find((anexo) => anexo.id === valoresCamposAtuais[campo.id]) ?? null
                     : null}
                   errorToastOptions={erroFormulario}
-                  registerFileSave={(save, fileName) => {
+                  registerFileSave={(save, fileName, getFailureMessage) => {
                     const key = `${card.id}:arquivo:${campo.id}`;
                     arquivosPendentesRef.current.set(campo.id, { save, nome: fileName });
+                    if (getFailureMessage) mensagensErroArquivoRef.current.set(campo.id, getFailureMessage);
                     setPendingUpload(key, { save, nome: fileName });
                     setArquivosPendentes((atual) => ({ ...atual, [campo.id]: fileName }));
                     setPendingFields(key, [{

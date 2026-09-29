@@ -82,6 +82,31 @@ describe("RegistrarAnexoBpm: idempotência concorrente", () => {
     expect(notificarMock).not.toHaveBeenCalled();
     expect(revalidatePathMock).not.toHaveBeenCalled();
   });
+
+  it("recupera P2002 no mesmo campo de arquivo sem recriar anexo ou sobrescrever valor", async () => {
+    camposMock.mockResolvedValue([{ id: CAMPO_ID, nome: "Contrato", tipo: "arquivo", editavel: true }]);
+    prismaMock.bpmCardAnexo.create.mockRejectedValue({ code: "P2002" });
+    prismaMock.bpmCardAnexo.findUnique.mockResolvedValue({ id: "anexo-vencedor", cardId: CARD_ID,
+      campoId: CAMPO_ID, url: "bpm-blob:bpm/recibo-concorrente.pdf" });
+
+    const resultado = await RegistrarAnexoBpm({ cardId: CARD_ID, campoId: CAMPO_ID, recibo: RECIBO });
+    expect(resultado).toMatchObject({ success: true, data: { id: "anexo-vencedor", url: "/api/bpm/anexos/anexo-vencedor" } });
+    expect(prismaMock.bpmCardAnexo.create).toHaveBeenCalledOnce();
+    expect(prismaMock.bpmCardCampoValor.upsert).not.toHaveBeenCalled();
+    expect(historicoMock).not.toHaveBeenCalled();
+  });
+
+  it("recusa P2002 quando o recibo vencedor pertence a outro campo", async () => {
+    camposMock.mockResolvedValue([{ id: CAMPO_ID, nome: "Contrato", tipo: "arquivo", editavel: true }]);
+    prismaMock.bpmCardAnexo.create.mockRejectedValue({ code: "P2002" });
+    prismaMock.bpmCardAnexo.findUnique.mockResolvedValue({ id: "anexo-de-outro-campo", cardId: CARD_ID,
+      campoId: "clw000000000000outro", url: "bpm-blob:bpm/recibo-concorrente.pdf" });
+
+    const resultado = await RegistrarAnexoBpm({ cardId: CARD_ID, campoId: CAMPO_ID, recibo: RECIBO });
+    expect(resultado).toEqual({ success: false, error: "Campo de arquivo inválido para este card" });
+    expect(prismaMock.bpmCardCampoValor.upsert).not.toHaveBeenCalled();
+    expect(historicoMock).not.toHaveBeenCalled();
+  });
 });
 
 const CAMPO_ID = "clw000000000000campo";

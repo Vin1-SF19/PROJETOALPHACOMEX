@@ -124,7 +124,7 @@ export async function RegistrarAnexoBpm(dados: unknown) {
     // requisições concorrentes podem chegar ao create juntas. A restrição
     // composta resolve a corrida; a perdedora devolve o mesmo anexo de modo
     // idempotente, sem criar outro histórico ou emitir outro evento realtime.
-    if (erroDeUnicidadeAnexo(error) && !registrarAnexoSchema.safeParse(dados).data?.campoId) {
+    if (erroDeUnicidadeAnexo(error)) {
       try {
         const session = await auth();
         if (!session?.user?.id) return { success: false, error: "Não autorizado" };
@@ -136,7 +136,7 @@ export async function RegistrarAnexoBpm(dados: unknown) {
           return { success: false, error: "Comprovante de upload inválido ou expirado" };
         }
 
-        const { cardId } = parsed.data;
+        const { cardId, campoId } = parsed.data;
         await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "enviarArquivo");
         const anexo = await db.bpmCardAnexo.findUnique({
           where: {
@@ -146,6 +146,9 @@ export async function RegistrarAnexoBpm(dados: unknown) {
             },
           },
         });
+        if (anexo && (anexo.campoId ?? null) !== (campoId ?? null)) {
+          return { success: false, error: "Campo de arquivo inválido para este card" };
+        }
         if (anexo) {
           return {
             success: true,

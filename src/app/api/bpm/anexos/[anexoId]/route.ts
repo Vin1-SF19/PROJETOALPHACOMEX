@@ -6,6 +6,7 @@ import { checarAcessoBpmPipeline, exigirAcessoBpmCard } from "@/lib/bpm/ownershi
 import {
   extrairPathnamePrivadoAnexoBpm,
   extrairUrlLegadaAnexoBpm,
+  obterTokenBlobPrivadoAnexoBpm,
 } from "@/lib/bpm/anexos-storage";
 
 export const dynamic = "force-dynamic";
@@ -84,11 +85,16 @@ export async function GET(
   if (!pathnamePrivado && !urlLegada) {
     return new Response("Anexo com referência inválida", { status: 422 });
   }
+  const tokenPrivado = pathnamePrivado ? obterTokenBlobPrivadoAnexoBpm() : null;
+  if (pathnamePrivado && !tokenPrivado) {
+    console.error("[GET /api/bpm/anexos] BLOBCRM_READ_WRITE_TOKEN ausente");
+    return new Response("Armazenamento privado de anexos indisponível", { status: 503 });
+  }
 
   try {
     const blob = await get(pathnamePrivado ?? urlLegada!, {
       access: pathnamePrivado ? "private" : "public",
-      token: process.env.CRM_READ_WRITE_TOKEN,
+      token: pathnamePrivado ? tokenPrivado! : process.env.CRM_READ_WRITE_TOKEN,
       useCache: false,
     });
     if (!blob || blob.statusCode !== 200 || !blob.stream) {

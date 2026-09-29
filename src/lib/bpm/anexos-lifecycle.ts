@@ -2,7 +2,7 @@ import "server-only";
 
 import { del } from "@vercel/blob";
 import db from "@/lib/prisma";
-import { extrairPathnamePrivadoAnexoBpm } from "@/lib/bpm/anexos-storage";
+import { extrairPathnamePrivadoAnexoBpm, obterTokenBlobPrivadoAnexoBpm } from "@/lib/bpm/anexos-storage";
 
 export const ACAO_LIMPEZA_ANEXO_PENDENTE = "ANEXO_BLOB_LIMPEZA_PENDENTE";
 export const ACAO_LIMPEZA_ANEXO_CONCLUIDA = "ANEXO_BLOB_LIMPEZA_CONCLUIDA";
@@ -23,7 +23,11 @@ export async function limparBlobAnexoPendente(pendenteId: string): Promise<boole
   const aindaReferenciado = await db.bpmCardAnexo.findFirst({
     where: { url: pendente.valorAnteriorJson! }, select: { id: true },
   });
-  if (!aindaReferenciado) await del(pathname, { token: process.env.CRM_READ_WRITE_TOKEN });
+  if (!aindaReferenciado) {
+    const tokenPrivado = obterTokenBlobPrivadoAnexoBpm();
+    if (!tokenPrivado) throw new Error("BLOBCRM_READ_WRITE_TOKEN ausente para limpar anexo privado");
+    await del(pathname, { token: tokenPrivado });
+  }
   await db.bpmCardHistorico.updateMany({
     where: { id: pendente.id, acao: pendente.acao },
     data: { acao: ACAO_LIMPEZA_ANEXO_CONCLUIDA },

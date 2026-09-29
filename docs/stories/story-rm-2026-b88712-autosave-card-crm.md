@@ -778,3 +778,46 @@ Pedido do usuário: substituir o autosave do formulário editável do card por u
 ### Validação
 
 `npm run lint` passou com 0 erros e 1.191 avisos existentes; `npm run typecheck` passou; `npm test` passou com 556 arquivos e 4.055 testes aprovados, 4 ignorados e 1 pendente; `npm run build` passou. A verificação de whitespace dos arquivos desta mudança passou. Nenhuma alteração de banco foi executada. O teste autenticado em card real continua pendente.
+
+## Correção — upload do anexo no salvamento manual (2026-09-29)
+
+Relato: ao salvar `Contrato assinado/anexo`, o navegador recebeu `POST /api/bpm/upload` com HTTP 500 e o PDF ficou carregando. O usuário pediu PNG, JPG/JPEG, DOCX, PDF e demais formatos de anexo já suportados.
+
+Diagnóstico confirmado pelo log da requisição em produção: `Vercel Blob: Cannot use private access on a public store. The store must be configured with private access.` A rota fazia `put(..., { access: "private", token: CRM_READ_WRITE_TOKEN })`. O store `CRM-BPM` ligado a esse token é público; o store privado `CRM-STORAGE` usa `BLOBCRM_READ_WRITE_TOKEN`. O seletor de arquivo não tinha prazo máximo nem `finally` para limpar o estado de envio. A lista de MIME do servidor já incluía PNG/JPEG/DOCX/PDF. O upload via Function anunciava 100 MB, mas a hospedagem aceita corpo total de até 4,5 MB; o limite deste fluxo foi alinhado a 4 MiB para devolver erro claro antes da requisição. Para arquivos maiores será necessário um fluxo separado de upload direto ao Blob com autenticação, conferência do conteúdo e recibo seguro.
+
+### Critérios de aceitação
+
+- [x] Upload, leitura e limpeza de anexos privados usam o token do store privado; URLs públicas legadas preservam a leitura com o token antigo.
+- [x] Ausência do token e falha do Blob produzem respostas distintas, sem expor segredos.
+- [x] PDF, PNG, JPG/JPEG e DOCX aceitos continuam sujeitos a verificação de conteúdo no servidor.
+- [x] Arquivo acima de 4 MiB recebe mensagem antes do envio e no servidor.
+- [x] Erro ou timeout encerra o indicador de carregamento, preserva a pendência e permite nova tentativa pelo botão.
+- [x] Após resposta de upload confirmada, falha no registro reutiliza o recibo na nova tentativa sem repetir o envio do Blob.
+- [x] Recibo expirado é renovado na tentativa seguinte; concorrência no registro do mesmo campo recupera o anexo existente.
+- [x] MIME ausente ou genérico usa a extensão permitida somente com verificação da assinatura/estrutura do arquivo.
+- [x] Testes focados do fluxo e das falhas passam.
+- [x] Gates globais e revisão de integração/segurança concluídos.
+- [ ] Smoke autenticado com anexo real e confirmação de download após recarregar.
+
+### File List
+
+- `src/app/api/bpm/upload/route.ts`
+- `src/actions/bpm/Anexos.ts`
+- `src/app/api/bpm/anexos/[anexoId]/route.ts`
+- `src/app/api/contratos/[contratoId]/assinado-financeiro/route.ts`
+- `src/lib/bpm/anexos-storage.ts`
+- `src/lib/bpm/anexos-lifecycle.ts`
+- `src/lib/validations/bpm.ts`
+- `src/app/PainelAlpha/AlphaCRM/CampoBpmInput.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx`
+- `tests/bpm/upload-validacao.test.ts`
+- `tests/bpm/arquivo-persistencia-react.test.ts`
+- `tests/bpm/anexos-storage.test.ts`
+- `tests/bpm/anexos-lifecycle.test.ts`
+- `tests/bpm/anexo-handoff-access.test.ts`
+- `tests/bpm/anexos-idempotencia.test.ts`
+- `src/app/PainelAlpha/AlphaCRM/README.md`
+
+### Validação
+
+Scout mapeou o fluxo; Echo corrigiu armazenamento, limite e idempotência; Nova corrigiu interação e validade do recibo; Sage aprovou 47 testes focados dos casos adicionais; Probe confirmou o caminho até visualização/download; Anubis não encontrou falha crítica no diff; Lens detectou a corrida do registro e a validade do recibo, ambas corrigidas, e aprovou a revisão final. Forge reexecutou os gates após todas as correções: `lint` 0 erros/1.191 avisos, `typecheck` aprovado, `npm test` 558 arquivos/4.091 aprovados (4 ignorados, 1 pendente), `build` aprovado e `git diff --check` aprovado. Não houve mutação de banco nem upload real nesta validação.

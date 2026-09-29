@@ -6889,3 +6889,12 @@ Publicação: commit 598efced na branch fix/crm-motor-automacoes-backend, merge 
 - **Vault:** autorização explícita do usuário. Backup fresco em `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-24T20-14-49-598Z.sql`: verificado, 331 tabelas, 158.777 linhas, sha256 `4ca8f34c…`. ADD COLUMN aplicado no Turso de produção via `scripts/apply-turso-migration.mjs`. `meta_equipe` continua com 5 linhas antes e depois, coluna `INTEGER NOT NULL DEFAULT 0`. O Turso não tem `_prisma_migrations`: as migrations são manuais.
 - Rollback: `ALTER TABLE "meta_equipe" DROP COLUMN "metaAlphaMensal";` + reverter o código.
 - Gates: `npm run typecheck` exit 0 (`npx tsc` direto dá OOM, catalogado em known-errors), eslint sem erros, build exit 0, `tests/metas` 72/72. Nada commitado nem publicado.
+
+## 2026-09-29 — Bibble Squad — upload de anexo no formulário manual do CRM
+
+**Agentes:** Scout → Echo/Nova → Sage → Forge/Probe/Anubis → Lens.
+
+- Log de produção confirmou `Vercel Blob: Cannot use private access on a public store` em `POST /api/bpm/upload`. O código usava `CRM_READ_WRITE_TOKEN` do store público `CRM-BPM` ao enviar com `access: "private"`. Upload, leitura privada e limpeza passaram a usar `BLOBCRM_READ_WRITE_TOKEN` do store privado `CRM-STORAGE`; leitura pública legada preserva o token antigo.
+- A seleção do arquivo preserva o rascunho para o botão manual, valida extensão/MIME e conteúdo permitido, mostra erro específico e sempre encerra o indicador após erro ou timeout. Retry reutiliza recibo válido; recibo expirado é renovado. `RegistrarAnexoBpm` recupera corrida `P2002` quando o anexo existente pertence ao mesmo campo.
+- O upload via Function agora limita o arquivo a 4 MiB com mensagem clara, abaixo do limite de corpo total de 4,5 MB da Vercel. Arquivos maiores exigem fluxo futuro de upload direto ao Blob com autorização e recibo seguro.
+- Gates finais: lint 0 erros/1.191 avisos, typecheck, 558 arquivos/4.091 testes aprovados, build e diff check. Nenhuma mudança de schema/migration ou upload real de produção nesta validação.

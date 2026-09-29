@@ -5,18 +5,22 @@ import {
   criarReferenciaAnexoBpm,
   extrairPathnamePrivadoAnexoBpm,
   extrairUrlLegadaAnexoBpm,
+  obterTokenBlobPrivadoAnexoBpm,
   recibosAnexoBpmConfigurados,
   validarReciboUploadAnexoBpm,
 } from "@/lib/bpm/anexos-storage";
 
 const segredoAnterior = process.env.CRM_ANEXO_RECEIPT_SECRET;
 const tokenBlobAnterior = process.env.CRM_READ_WRITE_TOKEN;
+const tokenPrivadoAnterior = process.env.BLOBCRM_READ_WRITE_TOKEN;
 
 afterEach(() => {
   if (segredoAnterior === undefined) delete process.env.CRM_ANEXO_RECEIPT_SECRET;
   else process.env.CRM_ANEXO_RECEIPT_SECRET = segredoAnterior;
   if (tokenBlobAnterior === undefined) delete process.env.CRM_READ_WRITE_TOKEN;
   else process.env.CRM_READ_WRITE_TOKEN = tokenBlobAnterior;
+  if (tokenPrivadoAnterior === undefined) delete process.env.BLOBCRM_READ_WRITE_TOKEN;
+  else process.env.BLOBCRM_READ_WRITE_TOKEN = tokenPrivadoAnterior;
 });
 
 describe("recibo de upload privado do BPM", () => {
@@ -57,5 +61,13 @@ describe("recibo de upload privado do BPM", () => {
       tipo: "application/pdf",
       tamanho: 42,
     })).toThrow("Armazenamento de anexos não configurado");
+  });
+
+  it("só usa o token da store privada, sem fallback para a store pública", () => {
+    process.env.CRM_READ_WRITE_TOKEN = "token-publico";
+    delete process.env.BLOBCRM_READ_WRITE_TOKEN;
+    expect(obterTokenBlobPrivadoAnexoBpm()).toBeNull();
+    process.env.BLOBCRM_READ_WRITE_TOKEN = "  token-privado  ";
+    expect(obterTokenBlobPrivadoAnexoBpm()).toBe("token-privado");
   });
 });

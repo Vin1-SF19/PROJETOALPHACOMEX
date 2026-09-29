@@ -538,7 +538,9 @@ export const criarTarefaPresetSchema = z.object({
   ).min(1),
 });
 
-const BPM_ANEXO_MAX_BYTES = 100 * 1024 * 1024;
+// O multipart passa pela Vercel Function (limite total de 4,5 MB).
+// A margem abaixo cobre os demais campos e cabeçalhos do formulário.
+const BPM_ANEXO_MAX_BYTES = 4 * 1024 * 1024;
 const BPM_ANEXO_ALLOWED_MIME = [
   "application/pdf",
   "image/png",
@@ -550,15 +552,39 @@ const BPM_ANEXO_ALLOWED_MIME = [
   "text/csv",
 ] as const;
 
+const BPM_ANEXO_MIME_POR_EXTENSAO: Record<string, (typeof BPM_ANEXO_ALLOWED_MIME)[number]> = {
+  pdf: "application/pdf",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  xls: "application/vnd.ms-excel",
+  csv: "text/csv",
+};
+
+/** Só infere MIME pela extensão se o navegador omitiu o tipo ou enviou octet-stream. */
+export function obterTipoUploadAnexo(file: { name: string; type: string }): string | null {
+  const extensao = /\.([a-z0-9]+)$/i.exec(file.name)?.[1]?.toLowerCase();
+  const tipoEsperado = extensao ? BPM_ANEXO_MIME_POR_EXTENSAO[extensao] : undefined;
+  if (!tipoEsperado) return null;
+  const tipoDeclarado = file.type.trim().toLowerCase();
+  return !tipoDeclarado || tipoDeclarado === "application/octet-stream" || tipoDeclarado === tipoEsperado
+    ? tipoEsperado
+    : null;
+}
+
 export const registrarAnexoSchema = z.object({
   cardId: z.string().cuid(),
   campoId: z.string().cuid().optional(),
   recibo: z.string().trim().min(20).max(4_096),
 });
 
-export function validarUploadAnexo(file: { size: number; type: string }): string | null {
-  if (file.size > BPM_ANEXO_MAX_BYTES) return "Arquivo excede o tamanho máximo permitido (100MB)";
-  if (!BPM_ANEXO_ALLOWED_MIME.includes(file.type as (typeof BPM_ANEXO_ALLOWED_MIME)[number])) {
+export function validarUploadAnexo(file: { size: number; type: string; name?: string }): string | null {
+  if (file.size > BPM_ANEXO_MAX_BYTES) return "Arquivo excede 4 MiB. Reduza o arquivo para enviar o anexo.";
+  const tipo = file.name === undefined ? file.type : obterTipoUploadAnexo({ name: file.name, type: file.type });
+  if (!tipo || !BPM_ANEXO_ALLOWED_MIME.includes(tipo as (typeof BPM_ANEXO_ALLOWED_MIME)[number])) {
     return "Tipo de arquivo não permitido";
   }
   return null;

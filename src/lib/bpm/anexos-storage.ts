@@ -7,6 +7,11 @@ const PREFIXO_REFERENCIA_PRIVADA = "bpm-blob:";
 const PREFIXO_PATHNAME = "bpm/";
 const DURACAO_RECIBO_MS = 10 * 60 * 1000;
 
+/** Anexos novos pertencem ao store privado CRM-STORAGE. Nunca usar o token do store público aqui. */
+export function obterTokenBlobPrivadoAnexoBpm(): string | null {
+  return process.env.BLOBCRM_READ_WRITE_TOKEN?.trim() || null;
+}
+
 export type ReciboUploadAnexoBpm = {
   cardId: string;
   pathname: string;

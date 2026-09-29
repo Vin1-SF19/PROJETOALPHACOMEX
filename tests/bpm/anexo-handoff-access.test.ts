@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), acesso: vi.fn(), acessoPipeline: vi.fn(), anexo: vi.fn(), vinculos: vi.fn(), get: vi.fn() }));
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), acesso: vi.fn(), acessoPipeline: vi.fn(), anexo: vi.fn(), vinculos: vi.fn(), get: vi.fn(), token: vi.fn() }));
 vi.mock("../../auth", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/prisma", () => ({ default: {
   bpmCardAnexo: { findUnique: mocks.anexo }, bpmCardVinculo: { findMany: mocks.vinculos },
@@ -9,6 +9,7 @@ vi.mock("@/lib/bpm/ownership", () => ({ exigirAcessoBpmCard: mocks.acesso, checa
 vi.mock("@/lib/bpm/anexos-storage", () => ({
   extrairPathnamePrivadoAnexoBpm: () => "contratos/assinado.pdf",
   extrairUrlLegadaAnexoBpm: () => null,
+  obterTokenBlobPrivadoAnexoBpm: mocks.token,
 }));
 vi.mock("@vercel/blob", () => ({ get: mocks.get }));
 
@@ -30,6 +31,7 @@ describe("acesso a documento da contratação pelo card Operacional", () => {
     });
     mocks.get.mockResolvedValue({ statusCode: 200, blob: { contentType: "application/pdf" },
       stream: new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array([37, 80, 68, 70])); controller.close(); } }) });
+    mocks.token.mockReturnValue("token-privado-teste");
   });
 
   it("entrega via proxy quando o usuário pode ver o destino explicitamente vinculado", async () => {
@@ -37,6 +39,7 @@ describe("acesso a documento da contratação pelo card Operacional", () => {
     expect(resposta.status).toBe(200);
     expect(mocks.acesso).toHaveBeenCalledWith("operacional", 7, "Operacional", "visualizar");
     expect(mocks.vinculos).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ cardOrigemId: "financeiro" }) }));
+    expect(mocks.get).toHaveBeenCalledWith("contratos/assinado.pdf", expect.objectContaining({ access: "private", token: "token-privado-teste" }));
   });
 
   it("nega se o vínculo não existe ou o destino não é visível", async () => {
@@ -69,6 +72,13 @@ describe("acesso a documento da contratação pelo card Operacional", () => {
       tipo: "application/pdf", card: { status: "ARQUIVADO", pipelineId: "radar", pipeline: { chave: "comercial" } } });
     mocks.acessoPipeline.mockResolvedValueOnce(false);
     expect((await GET(requisicao, contexto)).status).toBe(403);
+    expect(mocks.get).not.toHaveBeenCalled();
+  });
+
+  it("retorna indisponibilidade quando a store privada não está configurada", async () => {
+    mocks.token.mockReturnValueOnce(null);
+    const resposta = await GET(requisicao, contexto);
+    expect(resposta.status).toBe(503);
     expect(mocks.get).not.toHaveBeenCalled();
   });
 });

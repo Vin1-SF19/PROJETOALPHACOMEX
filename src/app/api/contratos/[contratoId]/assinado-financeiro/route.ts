@@ -5,7 +5,7 @@ import { auth } from "../../../../../../auth";
 import db from "@/lib/prisma";
 import { isAdminRole } from "@/lib/roles";
 import { buscarAnexosAssinadosFinanceiroPorContrato } from "@/lib/bpm/financeiro-metas";
-import { extrairPathnamePrivadoAnexoBpm, extrairUrlLegadaAnexoBpm } from "@/lib/bpm/anexos-storage";
+import { extrairPathnamePrivadoAnexoBpm, extrairUrlLegadaAnexoBpm, obterTokenBlobPrivadoAnexoBpm } from "@/lib/bpm/anexos-storage";
 
 export const dynamic = "force-dynamic";
 
@@ -36,10 +36,15 @@ export async function GET(
   const pathnamePrivado = extrairPathnamePrivadoAnexoBpm(anexo.url);
   const urlLegada = pathnamePrivado ? null : extrairUrlLegadaAnexoBpm(anexo.url);
   if (!pathnamePrivado && !urlLegada) return new Response("Arquivo inválido", { status: 422 });
+  const tokenPrivado = pathnamePrivado ? obterTokenBlobPrivadoAnexoBpm() : null;
+  if (pathnamePrivado && !tokenPrivado) {
+    console.error("[GET /api/contratos/assinado-financeiro] BLOBCRM_READ_WRITE_TOKEN ausente");
+    return new Response("Armazenamento privado de anexos indisponível", { status: 503 });
+  }
   try {
     const blob = await get(pathnamePrivado ?? urlLegada!, {
       access: pathnamePrivado ? "private" : "public",
-      token: process.env.CRM_READ_WRITE_TOKEN,
+      token: pathnamePrivado ? tokenPrivado! : process.env.CRM_READ_WRITE_TOKEN,
       useCache: false,
     });
     if (!blob || blob.statusCode !== 200 || !blob.stream) return new Response("Arquivo não encontrado", { status: 404 });

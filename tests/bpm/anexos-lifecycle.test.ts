@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   del: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn(), findMany: vi.fn(),
@@ -10,8 +10,14 @@ vi.mock("@/lib/prisma", () => ({ default: {
 } }));
 
 import { limparBlobAnexoPendente, reconciliarBlobsAnexosBpm } from "@/lib/bpm/anexos-lifecycle";
+const tokenAnterior = process.env.BLOBCRM_READ_WRITE_TOKEN;
+afterEach(() => {
+  if (tokenAnterior === undefined) delete process.env.BLOBCRM_READ_WRITE_TOKEN;
+  else process.env.BLOBCRM_READ_WRITE_TOKEN = tokenAnterior;
+});
 
 beforeEach(() => {
+  process.env.BLOBCRM_READ_WRITE_TOKEN = "token-privado-teste";
   vi.clearAllMocks();
   mocks.findUnique.mockResolvedValue({ id: "h1", cardId: "c1", acao: "ANEXO_BLOB_LIMPEZA_PENDENTE", valorAnteriorJson: "bpm-blob:bpm/c1/arquivo.pdf", createdAt: new Date(0) });
   mocks.findFirst.mockResolvedValue(null);
@@ -22,6 +28,7 @@ beforeEach(() => {
 it("apaga Blob após commit e conclui pendência", async () => {
   expect(await limparBlobAnexoPendente("h1")).toBe(true);
   expect(mocks.del).toHaveBeenCalledWith("bpm/c1/arquivo.pdf", expect.any(Object));
+  expect(mocks.del).toHaveBeenCalledWith("bpm/c1/arquivo.pdf", { token: "token-privado-teste" });
   expect(mocks.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { acao: "ANEXO_BLOB_LIMPEZA_CONCLUIDA" } }));
 });
 
