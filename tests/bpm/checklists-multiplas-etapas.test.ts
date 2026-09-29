@@ -47,6 +47,13 @@ describe("RM-2026-457A31 — escopo multietapa", () => {
     expect(criarTemplateChecklistSchema.safeParse({ nome: "Checklist", pipelineId: cuid2, etapaIds: Array.from({ length: 101 }, (_, index) => `${cuid1}${index}`), itens: [] }).success).toBe(false);
   });
 
+  it("aceita etapas publicadas pelo editor com ID draft-stage e rejeita ID arbitrário", () => {
+    const etapaPublicada = "draft-stage-10cb9f48-1e00-4814-8ccd-6e076a82a8d1";
+    expect(criarTemplateChecklistSchema.safeParse({ nome: "Checklist", pipelineId: cuid2, etapaIds: [etapaPublicada], itens: [] }).success).toBe(true);
+    expect(criarTemplateChecklistSchema.safeParse({ nome: "Checklist", pipelineId: cuid2, etapaId: etapaPublicada, itens: [] }).success).toBe(true);
+    expect(criarTemplateChecklistSchema.safeParse({ nome: "Checklist", pipelineId: cuid2, etapaIds: ["draft-stage-invalida"], itens: [] }).success).toBe(false);
+  });
+
   it("preserva o legado com associações vazias e prioriza associações preenchidas", () => {
     const legado = { pipelineId: "pipe-1", etapaId: "etapa-2", etapaIds: [], cardId: null };
     expect(templateChecklistCompativel(legado, card)).toBe(false);
@@ -190,6 +197,21 @@ describe("RM-2026-457A31 — Server Actions", () => {
         etapaId: etapaA,
         etapas: { create: [{ etapaId: etapaA }, { etapaId: etapaB }] },
       }),
+    }));
+  });
+
+  it("cria template em etapa draft-stage publicada pelo editor", async () => {
+    const etapaPublicada = "draft-stage-10cb9f48-1e00-4814-8ccd-6e076a82a8d1";
+    prismaMock.bpmEtapa.findMany.mockResolvedValue([{ id: etapaPublicada, pipelineId, ordem: 0 }]);
+    prismaMock.bpmChecklistTemplate.create.mockResolvedValue({ id: templateId });
+
+    const resposta = await CriarTemplateChecklistBpm({
+      nome: "Procedimento", pipelineId, etapaIds: [etapaPublicada], itens: [],
+    });
+
+    expect(resposta).toEqual({ success: true, data: { id: templateId } });
+    expect(prismaMock.bpmChecklistTemplate.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ etapaId: etapaPublicada, etapas: { create: [{ etapaId: etapaPublicada }] } }),
     }));
   });
 

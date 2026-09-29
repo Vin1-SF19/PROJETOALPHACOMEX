@@ -145,3 +145,24 @@ Revisão somente leitura de configuração e fluxo futuro; nenhum card ou banco 
 ## Validação do draft
 
 Checklist `story-draft-checklist.md`: objetivo/contexto **PASS**; orientação técnica **PASS** para início do inventário, com IDs reais de campos/modelos a confirmar; referências **PASS**; autossuficiência **PASS**; testes **PASS**; CodeRabbit **PASS**. **Resultado: READY para inventário e implementação local.** Publicação no Turso depende de checkpoint Vault específico.
+
+## Correção — salvamento do card em Elaboração (2026-09-29)
+
+Relato: ao editar informações no card de Elaboração de Contrato, o diálogo “Ainda não foi possível salvar” persiste. O usuário pediu verificação também do contrato comum aos demais pipelines.
+
+Critérios de aceite desta correção:
+
+- [x] A validação de valores anteriores ao marcar `Contrato elaborado = Sim` usa as opções ativas do catálogo de campos, como já faz o formulário do card; `opcoesJson` permanece fallback legado.
+- [x] Uma opção fora do catálogo ativo continua inválida e os demais requisitos de elaboração permanecem aplicados.
+- [x] O card da etapa atual deixa de acusar “Forma de pagamento” quando seu valor persistido ainda está no catálogo ativo.
+- [x] Testes de regressão, lint, typecheck, suíte completa e build executados; File List e resultados registrados.
+
+Diagnóstico somente leitura: o card atual tem os dados exigidos. Sua Forma de pagamento é uma opção ativa em `BpmCampoOpcao`, mas `BpmCampo.opcoesJson` está nulo. A leitura do formulário resolve a relação de opções; `prepararSalvamentoConfigurado` validava apenas a coluna legada e rejeitava a marcação de elaboração com `REQUISITOS_PENDENTES:Forma de pagamento`. Nenhum dado foi alterado no diagnóstico.
+
+Verificação: o novo teste reproduziu a falha antes da correção. Após a alteração, 55/55 testes direcionados passaram; a mesma validação sobre o card atual, em modo somente leitura, retornou aceita. `npm run lint` exit 0 (0 erros, 1.191 avisos), `npm run typecheck` exit 0, `npm test` exit 0 (556 arquivos, 4.085 testes aprovados, 4 ignorados, 1 todo) e `npm run build` exit 0.
+
+File List desta correção:
+
+- `src/lib/bpm/validacao-salvamento-configurado.ts` — normalização do catálogo ativo antes da validação.
+- `tests/bpm/validacao-salvamento-configurado.test.ts` — regressão da seleção persistida com catálogo relacional.
+- `docs/stories/story-financeiro-ativo-elaboracao-contrato.md` — diagnóstico, checklist, resultados e File List.

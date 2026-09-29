@@ -1271,3 +1271,25 @@ DELIVERY_READY: Alpha CRM → Configurações → Checklists → `/PainelAlpha/A
 RESULT: PASS — encerramento local conforme isolamento administrativo; pendências globais/remotas não bloqueantes.
 
 Validação documental: `git diff --check` nos dois documentos alterados aprovado (exit 0).
+
+## Correção — criação de template com etapas publicadas pelo editor (2026-09-29)
+
+Relato: em Configurações → Procedimentos, salvar um novo template vinculado a uma etapa retornava “Dados inválidos. A seleção atual foi preservada para você revisar e tentar novamente.”
+
+Critérios de aceite desta correção:
+
+- [x] Criar e editar templates aceita IDs `draft-stage-<uuid>` das etapas publicadas pelo editor e preserva o suporte a CUID.
+- [x] IDs de etapa malformados continuam rejeitados; a action mantém a verificação da etapa ativa e da pertinência ao pipeline.
+- [x] A criação com etapa `draft-stage-<uuid>` chega à persistência com o vínculo correto.
+- [x] Testes direcionados, lint, typecheck e suíte completa executados.
+- [x] Build concluído com sucesso.
+
+Diagnóstico: inventário somente leitura mostrou 28 etapas atuais com ID `draft-stage-<uuid>`. O schema do template aceitava somente CUID em `etapaIds` e no campo singular legado `etapaId`, gerando o erro Zod antes de qualquer escrita. O editor de pipelines já persiste esse formato e `etapaIdCardSchema` já o valida. O schema do procedimento agora reutiliza esse contrato. Nenhuma migration ou mutação de dados foi feita.
+
+Validação: 34/34 testes direcionados aprovados; `npm run lint` exit 0 (0 erros, 1.191 avisos); `npm run typecheck` exit 0; `npm test` exit 0 (556 arquivos, 4.083 testes aprovados, 4 ignorados, 1 todo); `npm run build` exit 0.
+
+File List desta correção:
+
+- `src/lib/bpm/checklists/schemas.ts` — aceita os formatos de ID das etapas publicados pelo CRM.
+- `tests/bpm/checklists-multiplas-etapas.test.ts` — cobre validação e criação com etapa `draft-stage-<uuid>`.
+- `docs/stories/story-rm-2026-457a31-checklist-varias-etapas.md` — diagnóstico, checklist, gates e File List.

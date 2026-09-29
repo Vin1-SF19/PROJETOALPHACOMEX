@@ -44,6 +44,15 @@ function valorAutomatico(valorPadrao: string, agora: Date): string | null {
   return null;
 }
 
+function campoComCatalogoAtivo<T extends { opcoesJson: string | null; opcoes?: { rotulo: string }[] }>(campo: T) {
+  return {
+    ...campo,
+    opcoesJson: campo.opcoes?.length
+      ? JSON.stringify(campo.opcoes.map((opcao) => opcao.rotulo))
+      : campo.opcoesJson,
+  };
+}
+
 /** Aplica padrões temporais ao autosave; requisitos da etapa são avaliados ao avançar. */
 export async function prepararSalvamentoConfigurado(params: {
   card: Card;
@@ -61,7 +70,7 @@ export async function prepararSalvamentoConfigurado(params: {
   const publicados = publicadosPorEtapa.get(card.etapaId) ?? new Set<string>();
   const configs = await client.bpmCampoEtapaConfig.findMany({
     where: { etapaId: card.etapaId, visivel: true, campoId: { in: [...publicados] }, campo: { ativo: true } },
-    include: { campo: { select: { id: true, nome: true, chave: true, tipo: true, opcoesJson: true } } },
+    include: { campo: { select: { id: true, nome: true, chave: true, tipo: true, opcoesJson: true, opcoes: { where: { ativo: true }, orderBy: { ordem: "asc" }, select: { rotulo: true } } } } },
   });
   const statusAssinatura = configs.find((config) => config.campo.chave === "alpha.financeiro.status.contrato.assinatura");
   const camposFinanceiros = new Map(configs.filter((config) => config.campo.chave).map((config) => [config.campo.chave, config.campoId]));
@@ -113,7 +122,7 @@ export async function prepararSalvamentoConfigurado(params: {
     where: { id: { in: [...idsPublicados] }, ativo: true,
       OR: [{ pipelineId: card.pipelineId }, { pipelinesAssociados: { some: { pipelineId: card.pipelineId } } }],
     },
-    select: { id: true, nome: true, chave: true, tipo: true, opcoesJson: true, escopo: true, fonteEntidade: true, fonteAtributo: true, entidadeGlobal: true },
+    select: { id: true, nome: true, chave: true, tipo: true, opcoesJson: true, opcoes: { where: { ativo: true }, orderBy: { ordem: "asc" }, select: { rotulo: true } }, escopo: true, fonteEntidade: true, fonteAtributo: true, entidadeGlobal: true },
   });
   const contexto = await montarContextoAvaliacaoDoCard(card, client);
   const valoresPersistidos = { ...contexto.camposDinamicos };
@@ -162,7 +171,7 @@ export async function prepararSalvamentoConfigurado(params: {
         const campo = porChave.get(chave);
         const valor = valorDe(chave);
         if (!valor) { pendencias.push(campo?.nome ?? rotulo); continue; }
-        if (campo && !validarValoresCamposBpm([{ ...campo, tipo: campo.tipo, opcoesJson: campo.opcoesJson }], { [campo.id]: valor }).success) {
+        if (campo && !validarValoresCamposBpm([campoComCatalogoAtivo(campo)], { [campo.id]: valor }).success) {
           pendencias.push(campo.nome);
         }
       }
@@ -181,7 +190,7 @@ export async function prepararSalvamentoConfigurado(params: {
     if (enviado) {
       const link = porChave.get(CHAVES_CAMPOS.LINK_CONTRATO);
       const referencia = valorDe(CHAVES_CAMPOS.LINK_CONTRATO);
-      if (!referencia || (link && !validarValoresCamposBpm([{ ...link, tipo: link.tipo, opcoesJson: link.opcoesJson }], { [link.id]: referencia }).success)) {
+      if (!referencia || (link && !validarValoresCamposBpm([campoComCatalogoAtivo(link)], { [link.id]: referencia }).success)) {
         pendencias.push(link?.nome ?? "Link/arquivo do contrato");
       } else if (link && !/^https:\/\//i.test(referencia)) {
         const anexo = await client.bpmCardAnexo.findFirst({
@@ -199,7 +208,7 @@ export async function prepararSalvamentoConfigurado(params: {
     const automatico = valorAutomatico(config.valorPadrao, agora);
     if (automatico === null || String(contexto.camposDinamicos[config.campoId] ?? "").trim()) continue;
     if (!avaliarGrupo(condicaoValida(config.condicaoObrigatoriedadeJson, config.campo.nome), contexto)) continue;
-    const validacao = validarValoresCamposBpm([config.campo], { [config.campoId]: automatico });
+    const validacao = validarValoresCamposBpm([campoComCatalogoAtivo(config.campo)], { [config.campoId]: automatico });
     if (!validacao.success) throw new Error(`CAMPO_INVALIDO:${validacao.error}`);
     valores[config.campoId] = validacao.valores[config.campoId];
     contexto.camposDinamicos[config.campoId] = valores[config.campoId];
@@ -215,7 +224,7 @@ export async function prepararSalvamentoConfigurado(params: {
       const campoData = porChave.get(chaveData);
       if (idIndicador && String(contexto.camposDinamicos?.[idIndicador] ?? "").trim() === "Sim") {
         const valor = campoData ? String(contexto.camposDinamicos?.[campoData.id] ?? "").trim() : "";
-        if (!valor || (campoData && !validarValoresCamposBpm([campoData], { [campoData.id]: valor }).success)) {
+        if (!valor || (campoData && !validarValoresCamposBpm([campoComCatalogoAtivo(campoData)], { [campoData.id]: valor }).success)) {
           pendenciasDatas.push(campoData?.nome ?? rotulo);
         }
       }
@@ -287,7 +296,7 @@ export async function prepararSalvamentoConfigurado(params: {
     if (statusAtual === "Assinado" || statusContratoAtual === "Assinado" || statusContratoAtual === "CONTRATO CONCLUÍDO") {
       if (statusAtual !== "Assinado") pendencias.push(statusAssinatura.campo.nome);
       const data = campoData ? String(valoresContexto[campoData.id] ?? "").trim() : "";
-      if (!campoData || !data || !validarValoresCamposBpm([campoData], { [campoData.id]: data }).success) {
+      if (!campoData || !data || !validarValoresCamposBpm([campoComCatalogoAtivo(campoData)], { [campoData.id]: data }).success) {
         pendencias.push(campoData?.nome ?? "Data da assinatura");
       }
       const anexoId = campoAnexo ? String(valoresContexto[campoAnexo.id] ?? "").trim() : "";

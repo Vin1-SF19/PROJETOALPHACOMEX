@@ -111,6 +111,40 @@ describe("Elaboração de Contrato ativa", () => {
     vi.mocked(carregarValoresCanonicosCampos).mockResolvedValue({});
   });
 
+  it("aceita forma de pagamento persistida no catálogo relacional ativo", async () => {
+    vi.mocked(montarContextoAvaliacaoDoCard).mockResolvedValue({ card: {}, camposDinamicos: valoresValidos() });
+    const client = clienteNovoContrato();
+    const campos = await client.bpmCampo.findMany();
+    client.bpmCampo.findMany.mockResolvedValue(campos.map((campo: { chave: string }) => campo.chave === K.FORMA_PAGAMENTO
+      ? { ...campo, tipo: "selecao", opcoesJson: null, opcoes: [{ rotulo: "Pix" }] }
+      : campo));
+
+    const resultado = await prepararSalvamentoConfigurado({
+      card: card as never,
+      valoresSubmetidos: { [id(C.CONTRATO_ELABORADO)]: "Sim" },
+      client: client as never,
+      agora: new Date("2026-09-29T12:00:00.000Z"),
+    });
+
+    expect(resultado[id(C.CONTRATO_ELABORADO)]).toBe("Sim");
+    expect(resultado[id(C.DATA_ELABORACAO)]).toBe("2026-09-29");
+  });
+
+  it("continua rejeitando opção removida do catálogo ativo", async () => {
+    vi.mocked(montarContextoAvaliacaoDoCard).mockResolvedValue({ card: {}, camposDinamicos: valoresValidos() });
+    const client = clienteNovoContrato();
+    const campos = await client.bpmCampo.findMany();
+    client.bpmCampo.findMany.mockResolvedValue(campos.map((campo: { chave: string }) => campo.chave === K.FORMA_PAGAMENTO
+      ? { ...campo, tipo: "selecao", opcoesJson: null, opcoes: [{ rotulo: "Cartão" }] }
+      : campo));
+
+    await expect(prepararSalvamentoConfigurado({
+      card: card as never,
+      valoresSubmetidos: { [id(C.CONTRATO_ELABORADO)]: "Sim" },
+      client: client as never,
+    })).rejects.toThrow("REQUISITOS_PENDENTES:Forma de pagamento");
+  });
+
   it("lista dados ausentes e inválidos pelo rótulo publicado antes de elaborar", async () => {
     vi.mocked(montarContextoAvaliacaoDoCard).mockResolvedValue({ card: {}, camposDinamicos: { ...valoresValidos(), [id(K.CNPJ)]: "00000000000000", [id(K.CEP)]: "123", [id(K.VALOR_BRUTO)]: "0", [id(K.EMAIL)]: "ruim", [id(K.SERVICO)]: "" } });
     await expect(prepararSalvamentoConfigurado({ card: card as never, valoresSubmetidos: { [id(C.CONTRATO_ELABORADO)]: "Sim" }, client: clienteNovoContrato() as never }))

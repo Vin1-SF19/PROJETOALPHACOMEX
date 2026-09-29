@@ -1,8 +1,9 @@
 import { z } from "zod";
+import { etapaIdCardSchema } from "@/lib/validations/bpm";
 
 const idSchema = z.string().cuid();
 const textoOpcional = (maximo: number) => z.string().trim().max(maximo).nullable().optional();
-const etapaIdsSchema = z.array(idSchema).max(100).refine(
+const etapaIdsSchema = z.array(etapaIdCardSchema).max(100).refine(
   (ids) => new Set(ids).size === ids.length,
   "Etapas duplicadas",
 );
@@ -21,7 +22,7 @@ const dadosTemplateSchema = z.object({
   pipelineId: idSchema.nullable().optional(),
   etapaIds: etapaIdsSchema.optional(),
   // Compatibilidade temporária com clientes ainda no contrato singular.
-  etapaId: idSchema.nullable().optional(),
+  etapaId: etapaIdCardSchema.nullable().optional(),
   cardId: idSchema.nullable().optional(),
 });
 
