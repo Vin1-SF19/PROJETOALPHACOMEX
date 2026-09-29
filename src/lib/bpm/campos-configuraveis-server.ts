@@ -126,8 +126,7 @@ export async function carregarValoresCanonicosCampos(
     CONTRATO: contrato,
     SERVICO: servico ?? (card.servico ? { id: null, nome: card.servico } : null),
     PROCESSO: processo,
-    USUARIO: card.responsavel,
-    CARD: card,
+    CARD: { ...card, responsavelNome: card.responsavel?.nome, responsavelCpf: card.responsavel?.cpf },
   };
 
   return Object.fromEntries(globais.map((campo) => {

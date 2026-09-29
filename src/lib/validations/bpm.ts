@@ -31,7 +31,7 @@ export const BPM_CAMPO_TIPO = [
 ] as const;
 
 export const BPM_CAMPO_ESCOPO = ["CARD", "GLOBAL"] as const;
-export const BPM_CAMPO_FONTE_ENTIDADE = ["CLIENTE", "CONTATO", "PARCEIRO", "CONTRATO", "SERVICO", "PROCESSO", "USUARIO", "CARD"] as const;
+export const BPM_CAMPO_FONTE_ENTIDADE = ["CLIENTE", "CONTATO", "PARCEIRO", "CONTRATO", "SERVICO", "PROCESSO", "CARD"] as const;
 export const BPM_CAMPO_MAPEAMENTO_MODO = ["COPIAR", "SINCRONIZAR", "REFERENCIAR"] as const;
 export const BPM_CAMPO_PERFIL = ["ADMIN", "RESPONSAVEL", "MEMBRO"] as const;
 

@@ -36,9 +36,9 @@ try {
     obrigatoriosSaida: campos.filter((campo) => campo.etapaConfiguracoes[0]?.obrigatorioSaida
       && campo.etapaConfiguracoes[0]?.visivel).length,
     nomeCanonico: nome?.tipo === "texto" && nome.escopo === "GLOBAL"
-      && nome.fonteEntidade === "USUARIO" && nome.fonteAtributo === "nome",
+      && nome.fonteEntidade === "CARD" && nome.fonteAtributo === "responsavelNome",
     cpfCanonico: cpf?.tipo === "cpf" && cpf.escopo === "GLOBAL"
-      && cpf.fonteEntidade === "USUARIO" && cpf.fonteAtributo === "cpf",
+      && cpf.fonteEntidade === "CARD" && cpf.fonteAtributo === "responsavelCpf",
     linkUrl: link?.tipo === "url" && link.escopo === "CARD",
     etapasComDados: posteriores.length, transportados,
   };

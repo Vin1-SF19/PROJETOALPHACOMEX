@@ -5004,7 +5004,7 @@ model BpmCampo {
   ativo          Boolean @default(true)
   escopo         String  @default("CARD") // "CARD" | "GLOBAL"
   valorPadrao    String?
-  fonteEntidade  String? // allowlist: CLIENTE|CONTATO|PARCEIRO|CONTRATO|SERVICO|PROCESSO|CARD
+  fonteEntidade  String? // allowlist: CLIENTE|CONTATO|PARCEIRO|CONTRATO|SERVICO|PROCESSO|CARD; CARD pode projetar dados do responsável
   fonteAtributo  String? // validado contra allowlist fixa no servidor
   entidadeGlobal String? // CLIENTE para valor global personalizado sem atributo canônico
   visivel        Boolean @default(true)

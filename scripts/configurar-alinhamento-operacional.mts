@@ -79,11 +79,11 @@ try {
       if (reservado.count !== 1) throw new Error("Versão do Operacional mudou durante a publicação.");
       const nome = await tx.bpmCampo.create({ data: { pipelineId: OPERACIONAL, chave: NOME,
         nome: "Nome do responsável pelo processo", tipo: "texto", escopo: "GLOBAL",
-        fonteEntidade: "USUARIO", fonteAtributo: "nome", visivel: true,
+        fonteEntidade: "CARD", fonteAtributo: "responsavelNome", visivel: true,
         editavel: false, somenteLeitura: true, ativo: true, ordem: 500 } });
       const cpf = await tx.bpmCampo.create({ data: { pipelineId: OPERACIONAL, chave: CPF,
         nome: "CPF do responsável pelo processo", tipo: "cpf", escopo: "GLOBAL",
-        fonteEntidade: "USUARIO", fonteAtributo: "cpf", visivel: true,
+        fonteEntidade: "CARD", fonteAtributo: "responsavelCpf", visivel: true,
         editavel: false, somenteLeitura: true, ativo: true, ordem: 501 } });
       const link = await tx.bpmCampo.create({ data: { pipelineId: OPERACIONAL, chave: LINK,
         nome: "Link do resumo da reunião", tipo: "url", escopo: "CARD",

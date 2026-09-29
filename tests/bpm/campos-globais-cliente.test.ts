@@ -17,8 +17,8 @@ describe("campos globais personalizados por cliente", () => {
       }) },
     };
     const valores = await carregarValoresCanonicosCampos("card-operacional", [
-      { id: "nome", escopo: "GLOBAL", fonteEntidade: "USUARIO", fonteAtributo: "nome" },
-      { id: "cpf", escopo: "GLOBAL", fonteEntidade: "USUARIO", fonteAtributo: "cpf" },
+      { id: "nome", escopo: "GLOBAL", fonteEntidade: "CARD", fonteAtributo: "responsavelNome" },
+      { id: "cpf", escopo: "GLOBAL", fonteEntidade: "CARD", fonteAtributo: "responsavelCpf" },
     ], client as never);
     expect(valores).toEqual({ nome: "Analista", cpf: "52998224725" });
   });

@@ -8,8 +8,8 @@ const PIPE = "cpipelinefakeabcdefghij12";
 
 describe("schema de campos BPM (CRUD completo)", () => {
   it("permite configurar CPF canônico da usuária responsável", () => {
-    expect(atualizarCampoSchema.safeParse({ campoId: CUID, fonteEntidade: "USUARIO",
-      fonteAtributo: "cpf", escopo: "GLOBAL", editavel: false, somenteLeitura: true }).success).toBe(true);
+    expect(atualizarCampoSchema.safeParse({ campoId: CUID, fonteEntidade: "CARD",
+      fonteAtributo: "responsavelCpf", escopo: "GLOBAL", editavel: false, somenteLeitura: true }).success).toBe(true);
   });
   it("aceita texto curto obrigatório em etapa publicada com identidade do editor", () => {
     const etapaConfiguracoes = [{

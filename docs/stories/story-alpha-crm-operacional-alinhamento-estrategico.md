@@ -20,7 +20,7 @@ Reaberta em 29/09/2026 — atualização do pipeline Operacional ativo
 - [x] Exibir artefatos do Meet na etapa e alerta de link pendente.
 - [x] Criar lembrete de 30 minutos para a analista no agendamento de Boas-vindas e no Google Agenda.
 - [x] Cobrir CPF vinculado, URL do resumo, reminder e UI com testes; rodar lint, typecheck, test e build.
-- [ ] Antes de aplicar configuração no Turso: relatório Vault, backup completo validado em até 48 horas e autorização específica para esta operação.
+- [x] Antes de aplicar configuração no Turso: relatório Vault, backup completo validado em até 48 horas e autorização específica para esta operação.
 
 ## Objetivo
 
@@ -74,6 +74,7 @@ Tornar a etapa **Alinhamento Estratégico agendado** operacional: lembrar visual
 - `scripts/diagnosticar-alinhamento-operacional.mts`
 - `scripts/configurar-alinhamento-operacional.mts`
 - `scripts/verificar-alinhamento-operacional.mts`
+- `prisma/schema.prisma` (comentário da allowlist já existente; nenhuma migration)
 - `src/lib/bpm/alinhamento-estrategico.ts`
 - `src/lib/bpm/campos-configuraveis.ts`
 - `src/lib/bpm/campos-configuraveis-server.ts`
@@ -103,7 +104,7 @@ Tornar a etapa **Alinhamento Estratégico agendado** operacional: lembrar visual
 - `npm run build`: aprovado no commit isolado `05ade97c`.
 - Backup Vault dedicado: `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-29T17-20-36-026Z.sql`, concluído às 17:25:13 UTC; 182.704.706 bytes, 332 tabelas, 194.611 linhas. Manifesto adjacente com SHA-256 `74571a777e90ee17be7b048fc20741396c931530fbba6e80bd2679dd4ec3ed8e`. Restauração isolada aprovada por `scripts/verify-turso-backup.mjs`: hash, tamanho, integridade, chaves estrangeiras, tabelas e linhas.
 - `prisma migrate diff --script`: migration vazia; não há alteração de schema.
-- Publicação no Turso aguarda autorização específica. Até lá, o código permanece preparado localmente.
+- Publicação concluída em 29/09/2026 após autorização: pipeline Operacional v10 e formulário de Alinhamento v2. A verificação read-only confirmou 3 campos novos, 4 requisitos de saída e dados exibidos em 12 etapas. A primeira tentativa foi revertida por constraint `fonteEntidade`; o valor canônico passou a ser projetado via fonte `CARD`, aceita pela constraint existente, sem alterar o schema.
 
 ## Validação
 
