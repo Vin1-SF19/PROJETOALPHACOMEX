@@ -137,15 +137,17 @@ Relato em card real: ao editar `Pagamento confirmado = Sim`, data, valor recebid
 - [x] Campos interdependentes de confirmação são enviados juntos numa atualização atômica, com comprovante enviado antes quando exigido; os demais campos mantêm salvamento sequencial.
 - [x] O progresso do botão conta alterações realmente confirmadas e a falha preserva o rascunho com pendência nominal.
 - [x] Após uma falha, editar o formulário invalida o retry antigo; uma resposta tardia não apaga a recuperação da tentativa mais recente.
+- [x] Falha tardia de um envio anterior não oferece retry com valores desatualizados quando o usuário editou durante a requisição.
 - [x] Os status calculados aparecem como informação de leitura com explicação, sem controle de edição manual.
 - [x] Testes de confirmação agrupada, falha, progresso, status de leitura e gates lint/typecheck/test/build passam.
 - [ ] Smoke autenticado em card real confirma persistência após reload e atualização dos status.
 
-Validação local desta correção: lint sem erros (1.191 avisos preexistentes), typecheck e build aprovados; suíte completa com 561 arquivos e 4.121 testes aprovados, 4 ignorados e 1 pendente. O smoke autenticado depende de um card real na etapa e segue aberto.
+Validação local desta correção: lint sem erros (1.191 avisos preexistentes), typecheck e build aprovados; suíte completa com 561 arquivos e 4.122 testes aprovados, 4 ignorados e 1 pendente. O smoke autenticado depende de um card real na etapa e segue aberto.
 
 **File List desta correção:**
 
 - `src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext.tsx`
 - `tests/bpm/salvamento-manual-campos-react.test.ts`
 - `tests/bpm/validacao-salvamento-configurado.test.ts`
 - `tests/bpm/formulario-etapa.test.ts`

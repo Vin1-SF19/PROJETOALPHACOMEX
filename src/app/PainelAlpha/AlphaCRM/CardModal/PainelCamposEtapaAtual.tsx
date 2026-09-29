@@ -368,7 +368,8 @@ export function PainelCamposEtapaAtual({
       onAtualizado();
       return true;
     }, card.id, chaveSaveCampos,
-      { ...erroFormulario, failureMessage: () => erroDaTentativa }, false).finally(() => {
+      { ...erroFormulario, failureMessage: () => erroDaTentativa,
+        isCurrent: () => revisaoEdicao.current === revisaoEnviada }, false).finally(() => {
       setSavesCamposPendentes((total) => total - 1);
     });
     const sucesso = await promise;

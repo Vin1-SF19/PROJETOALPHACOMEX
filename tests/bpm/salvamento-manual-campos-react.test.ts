@@ -206,6 +206,31 @@ it("descarta retry antigo após editar o lote financeiro que falhou", async () =
   expect(botaoSalvar().hasAttribute("disabled")).toBe(true);
 });
 
+it("ignora retry de uma falha que chegou depois de nova edição", async () => {
+  await montarPagamento();
+  let falhar!: (value: Awaited<ReturnType<typeof AtualizarCardBpm>>) => void;
+  vi.mocked(AtualizarCardBpm)
+    .mockImplementationOnce(() => new Promise((resolve) => { falhar = resolve; }))
+    .mockResolvedValueOnce({ success: true, data: { updatedAt: new Date("2026-09-29T10:01:00Z"), camposValores: {
+      pagamento_confirmado: "Sim", data_pagamento: "2026-09-29T18:00:00.000Z",
+      valor_recebido: "23000", forma_utilizada: "Cartão de crédito", pagamento_exito: "Sim",
+    } } });
+  await preencherPagamento();
+  await act(async () => { botaoSalvar().click(); await Promise.resolve(); });
+  await editar("valor_recebido", "23000");
+  await act(async () => { falhar({ success: false, error: "Falha antiga" }); await Promise.resolve(); });
+
+  expect(context.getFailedSaveKeys("card-pagamento")).toEqual([]);
+  expect(toast.error).not.toHaveBeenCalled();
+  expect(botaoSalvar().textContent).toContain("Salvar alterações (5)");
+  await act(async () => { botaoSalvar().click(); });
+  expect(AtualizarCardBpm).toHaveBeenCalledTimes(2);
+  expect(AtualizarCardBpm).toHaveBeenNthCalledWith(2, expect.objectContaining({
+    camposValores: expect.objectContaining({ valor_recebido: "23000" }),
+  }));
+  expect(context.getPendingFields("card-pagamento")).toEqual([]);
+});
+
 it("falha tardia do lote A não apaga a recuperação mais recente do lote B", async () => {
   await montarPagamento();
   let falharA!: (value: Awaited<ReturnType<typeof AtualizarCardBpm>>) => void;

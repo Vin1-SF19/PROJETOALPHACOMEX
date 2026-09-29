@@ -7,7 +7,10 @@ import { createContext, useCallback, useContext, useEffect, useRef, type ReactNo
 type ConfirmedCard = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type ConfirmationListener = (card: ConfirmedCard, key?: string) => void;
 export type PendingCardChange = { label: string; before?: string; after?: string };
-type SaveErrorOptions = Pick<ExternalToast, "duration" | "closeButton"> & { failureMessage?: () => string };
+type SaveErrorOptions = Pick<ExternalToast, "duration" | "closeButton"> & {
+  failureMessage?: () => string;
+  isCurrent?: () => boolean;
+};
 type PendingUpload = { save: () => Promise<boolean>; nome: string };
 
 interface CardSaveContextValue {
@@ -131,6 +134,11 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
       return success;
     }).catch(() => false).then((success) => {
       if (recoveryKey && recovery.current.get(recoveryKey)?.save === save) {
+        if (errorOptions?.isCurrent?.() === false) {
+          recovery.current.delete(recoveryKey);
+          failures.current.delete(recoveryKey);
+          return success;
+        }
         if (success) {
           recovery.current.delete(recoveryKey);
           failures.current.delete(recoveryKey);
