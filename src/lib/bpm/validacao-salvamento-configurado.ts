@@ -11,6 +11,7 @@ import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
 import { FINANCIAL_FIELD_KEYS as K } from "@/lib/bpm/pipeline-financeiro";
 import { calcularNovoContrato, pendenciasValidacaoNovoContrato } from "@/lib/bpm/novo-contrato-financeiro";
 import { CHAVES_CAMPOS } from "@/lib/bpm/financeiro-config.client";
+import { avaliarPagamentoFinanceiro } from "@/lib/bpm/financeiro-pagamento-validacao";
 import { extrairPathnamePrivadoAnexoBpm } from "@/lib/bpm/anexos-storage";
 import { cnpjEhValido } from "@/lib/format-cnpj";
 
@@ -102,7 +103,9 @@ export async function prepararSalvamentoConfigurado(params: {
   const possuiAutomacao = configs.some((config) => config.condicaoObrigatoriedadeJson
     && (config.valorPadrao === "{{agora.data}}" || config.valorPadrao === "{{agora.instante}}"));
   const possuiContratoElaborado = configs.some((config) => config.campo.chave === CHAVES_CAMPOS.CONTRATO_ELABORADO);
-  if (!possuiAutomacao && !statusAssinatura && !possuiContratoElaborado) return valoresSubmetidos;
+  const possuiPagamento = card.pipelineId === "cmuih4i54000209gmmyqrg557"
+    && configs.some((config) => config.campo.chave === CHAVES_CAMPOS.PAGAMENTO_CONFIRMADO);
+  if (!possuiAutomacao && !statusAssinatura && !possuiContratoElaborado && !possuiPagamento) return valoresSubmetidos;
 
   const publicadosPipeline = await camposPublicadosPorEtapa(etapas.map((etapa) => etapa.id), client);
   const idsPublicados = new Set([...publicadosPipeline.values()].flatMap((ids) => [...ids]));
@@ -121,6 +124,14 @@ export async function prepararSalvamentoConfigurado(params: {
     const persistido = id ? String(contexto.camposDinamicos?.[id] ?? "").trim() : "";
     if (id && persistido && Object.hasOwn(valoresSubmetidos, id)) {
       valoresSubmetidos = { ...valoresSubmetidos, [id]: persistido };
+    }
+  }
+  if (possuiPagamento) {
+    const idData = campos.find((campo) => campo.chave === CHAVES_CAMPOS.DATA_PAGAMENTO)?.id;
+    const dataAnterior = idData ? String(valoresPersistidos[idData] ?? "").trim() : "";
+    if (idData && dataAnterior
+      && Object.hasOwn(valoresSubmetidos, idData) && String(valoresSubmetidos[idData] ?? "").trim() !== dataAnterior) {
+      throw new Error("REQUISITOS_PENDENTES:Data do pagamento já registrada; correção exige procedimento auditado.");
     }
   }
   const canonicos = await carregarValoresCanonicosCampos(card.id, campos, client);
@@ -213,6 +224,54 @@ export async function prepararSalvamentoConfigurado(params: {
   }
 
   const valoresContexto = contexto.camposDinamicos ?? {};
+  if (possuiPagamento) {
+    const campoDe = (chave: string) => porChave.get(chave);
+    const valorDe = (chave: string) => {
+      const id = campoDe(chave)?.id;
+      return id ? String(valoresContexto[id] ?? "").trim() : "";
+    };
+    const esperado = campoDe(CHAVES_CAMPOS.VALOR_ESPERADO);
+    const liquido = valorDe(CHAVES_CAMPOS.VALOR_LIQUIDO);
+    const bruto = valorDe(CHAVES_CAMPOS.VALOR_CONTRATADO);
+    const retencoes = valorDe(CHAVES_CAMPOS.TOTAL_RETENCOES);
+    const origem = liquido || ((!retencoes || Number(retencoes.replace(",", ".")) === 0) ? bruto : "");
+    if (esperado && origem) {
+      valores[esperado.id] = origem;
+      valoresContexto[esperado.id] = origem;
+    }
+    const confirmado = valorDe(CHAVES_CAMPOS.PAGAMENTO_CONFIRMADO) === "Sim";
+    const campoComprovante = campoDe(CHAVES_CAMPOS.COMPROVANTE);
+    const requisitosComprovante = campoComprovante ? await client.bpmRequisito.findMany({
+      where: { pipelineId: card.pipelineId, campoId: campoComprovante.id,
+        alvoTipo: "CAMPO", fase: "DURING_STAGE", ativo: true },
+      select: { condicaoJson: true },
+    }) : [];
+    const comprovanteExigido = requisitosComprovante.some((requisito) => !requisito.condicaoJson
+      || avaliarGrupo(condicaoValida(requisito.condicaoJson, campoComprovante?.nome ?? "Comprovante"), contexto));
+    const comprovanteId = valorDe(CHAVES_CAMPOS.COMPROVANTE);
+    const anexo = comprovanteId && campoComprovante ? await client.bpmCardAnexo.findFirst({
+      where: { id: comprovanteId, cardId: card.id, campoId: campoComprovante.id }, select: { url: true },
+    }) : null;
+    const avaliacao = avaliarPagamentoFinanceiro({
+      confirmado: valorDe(CHAVES_CAMPOS.PAGAMENTO_CONFIRMADO),
+      data: valorDe(CHAVES_CAMPOS.DATA_PAGAMENTO),
+      esperado: valorDe(CHAVES_CAMPOS.VALOR_ESPERADO),
+      recebido: valorDe(CHAVES_CAMPOS.VALOR_RECEBIDO),
+      forma: valorDe(CHAVES_CAMPOS.FORMA_PAGAMENTO_UTILIZADA),
+      comprovanteExigido: Boolean(comprovanteExigido),
+      comprovanteValido: Boolean(anexo?.url && extrairPathnamePrivadoAnexoBpm(anexo.url)),
+      liquido, bruto, retencoes,
+    });
+    if (confirmado) {
+      const bloqueios = avaliacao.pendencias.filter((item) => !item.startsWith("Divergência financeira:"));
+      if (bloqueios.length) throw new Error(`REQUISITOS_PENDENTES:${bloqueios.join(", ")}`);
+    }
+    const statusConcluido = valorDe(CHAVES_CAMPOS.STATUS_FINANCEIRO) === "PAGAMENTO CONCLUÍDO"
+      || valorDe(CHAVES_CAMPOS.STATUS_CONTRATACAO) === "Contratação concluída";
+    if (statusConcluido && !avaliacao.concluido) {
+      throw new Error(`REQUISITOS_PENDENTES:${avaliacao.pendencias.join(", ")}`);
+    }
+  }
   if (statusAssinatura) {
     const statusAtual = String(valoresContexto[statusAssinatura.campoId] ?? "").trim();
     const campoData = porChave.get(CHAVES_CAMPOS.DATA_ASSINATURA);

@@ -8,6 +8,7 @@ import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 import { requisitoAplicaAoMover } from "@/lib/bpm/requisitos-etapa";
 import { registrarConclusaoContratoFinanceiro } from "@/lib/bpm/financeiro-assinatura-server";
 import { avaliarFormalizacaoFinanceira } from "@/lib/bpm/financeiro-formalizacao";
+import { avaliarPagamentoFinanceiro } from "@/lib/bpm/financeiro-pagamento-validacao";
 import { CHAVES_CAMPOS } from "@/lib/bpm/financeiro-config.client";
 import { extrairPathnamePrivadoAnexoBpm } from "@/lib/bpm/anexos-storage";
 import { camposPublicadosPorEtapa, capacidadesObrigatoriasPorEtapa, capacidadeObrigatoriaEntrada } from "@/lib/bpm/campos-formulario-publicado";
@@ -431,6 +432,35 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       pagamentoConfirmado: valorCampo(CHAVES_CAMPOS.PAGAMENTO_CONFIRMADO),
     });
     if (!avaliacao.contratacaoConcluida) pendencias.push(...avaliacao.pendencias);
+    if (card.pipelineId === "cmuih4i54000209gmmyqrg557" && !idCampo(CHAVES_CAMPOS.VALOR_ESPERADO)) {
+      pendencias.push("Valor esperado indisponível na configuração ativa");
+    }
+    if (card.pipelineId === "cmuih4i54000209gmmyqrg557" && idCampo(CHAVES_CAMPOS.VALOR_ESPERADO)) {
+      const comprovanteId = valorCampo(CHAVES_CAMPOS.COMPROVANTE);
+      const comprovanteCampoId = idCampo(CHAVES_CAMPOS.COMPROVANTE);
+      const comprovante = comprovanteId && comprovanteCampoId ? await tx.bpmCardAnexo.findFirst({
+        where: { id: comprovanteId, cardId: card.id, campoId: comprovanteCampoId }, select: { url: true },
+      }) : null;
+      const regrasComprovante = comprovanteCampoId ? await tx.bpmRequisito.findMany({
+        where: { pipelineId: card.pipelineId, campoId: comprovanteCampoId,
+          alvoTipo: "CAMPO", fase: "DURING_STAGE", ativo: true }, select: { condicaoJson: true },
+      }) : [];
+      const comprovanteExigido = regrasComprovante.some((regra) => !regra.condicaoJson
+        || avaliarGrupo(grupoCondicaoSchema.parse(JSON.parse(regra.condicaoJson)), contextoRegra));
+      const pagamento = avaliarPagamentoFinanceiro({
+        confirmado: valorCampo(CHAVES_CAMPOS.PAGAMENTO_CONFIRMADO),
+        data: valorCampo(CHAVES_CAMPOS.DATA_PAGAMENTO),
+        esperado: valorCampo(CHAVES_CAMPOS.VALOR_ESPERADO),
+        recebido: valorCampo(CHAVES_CAMPOS.VALOR_RECEBIDO),
+        forma: valorCampo(CHAVES_CAMPOS.FORMA_PAGAMENTO_UTILIZADA),
+        comprovanteExigido: Boolean(comprovanteExigido),
+        comprovanteValido: Boolean(comprovante?.url && extrairPathnamePrivadoAnexoBpm(comprovante.url)),
+        liquido: valorCampo(CHAVES_CAMPOS.VALOR_LIQUIDO),
+        bruto: valorCampo(CHAVES_CAMPOS.VALOR_CONTRATADO),
+        retencoes: valorCampo(CHAVES_CAMPOS.TOTAL_RETENCOES),
+      });
+      if (!pagamento.concluido) pendencias.push(...pagamento.pendencias);
+    }
   }
   if (card.pipeline.nome === "Revisão de Radar" && etapaEhLost(destino.nome)) {
     const motivos = camposRequisito.filter((campo) =>

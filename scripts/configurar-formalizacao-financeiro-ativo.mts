@@ -1,8 +1,8 @@
 /** Prévia por padrão. Publicação Turso exige checkpoint Vault desta etapa. */
-import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 import { config } from "dotenv";
+import { verificarBackupTurso } from "./lib/verificar-backup-turso.mjs";
 
 config({ path: ".env.local", quiet: true });
 const { default: db } = await import("../src/lib/prisma");
@@ -75,7 +75,7 @@ try {
       || b.size < 1_000_000 || b.size !== m.sizeBytes || createHash("sha256").update(readFileSync(backup)).digest("hex") !== m.sha256) {
       throw new Error("Backup dedicado, íntegro e recente obrigatório.");
     }
-    execFileSync("node", ["scripts/verify-turso-backup.mjs", backup, manifest], { stdio: "pipe" });
+    await verificarBackupTurso(backup, manifest);
     const admin = await db.usuarios.findUnique({ where: { id: 1 }, select: { role: true, status: true } });
     if (admin?.role !== "Admin" || admin.status !== "ATIVO") throw new Error("Administrador inválido.");
     await db.$transaction(async (tx) => {

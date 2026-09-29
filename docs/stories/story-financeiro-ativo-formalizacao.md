@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — implementação e ensaio local concluídos; publicação pendente. A Elaboração ativa ainda não foi publicada no Turso, portanto esta configuração depende dela.
+Ready for Review — configuração publicada no Turso em 29/09/2026 (Financeiro v9→v10). Conferência autenticada da UI e fluxo com card real ainda pendentes.
 
 ## Executor Assignment
 
@@ -43,18 +43,18 @@ Todos os quatro campos devem aparecer em **Configurações → Campos e Formulá
 - [x] Implementar validação condicional no servidor e no formulário, anexos privados vinculados ao card/campo e data automática na primeira confirmação (AC 2–4).
 - [x] Ligar avaliação independente de Contrato e Pagamento: campos de assinatura continuam acessíveis nas etapas Pagamento/Nota Fiscal, e a conclusão exige ambos os requisitos (AC 5).
 - [x] Conferir a integração existente de Metas por `contratoComercialId`; anexo só é exposto com vínculo e autorização. NAS segue opcional/futuro (AC 6).
-- [x] Publicar no plano três automações ativas, incluindo recorrência diária configurável pela UI e prazo individual do card; a execução central evita duplicação no mesmo dia e para de criar tarefas após `Assinado` (AC 7, 8). Aplicação no Turso pendente.
+- [x] Publicar três automações ativas, incluindo recorrência diária configurável pela UI e prazo individual do card; a execução central evita duplicação no mesmo dia e para de criar tarefas após `Assinado` (AC 7, 8).
 - [x] Exercitar testes direcionados de data, anexo inválido, estados contraditórios, requisitos independentes, encerramento de tarefas e deduplicação diária; lint e typecheck passaram. Suíte completa: 554 arquivos, 4.068 testes aprovados, 4 skipped e 1 todo (AC 1–8).
-- [ ] Antes de alterar configuração ou dados protegidos no Turso: acionar Vault, apresentar plano/impacto/risco/alternativa/rollback, criar e verificar backup completo de até 48 horas em `database-backups/pre-change/`, obter autorização específica e conferir publicação por leitura (AC 8).
+- [x] Antes de alterar configuração no Turso: acionar Vault, apresentar plano/impacto/risco/alternativa/rollback, criar e verificar backup completo de até 48 horas em `database-backups/pre-change/`, obter autorização específica e conferir publicação por leitura (AC 8).
 - [ ] Atualizar checklist, File List, evidências de testes, publicação e smoke autenticado antes de marcar a story Done.
 
 ### Evidências locais (29/09/2026)
 
 - Script `scripts/configurar-formalizacao-financeiro-ativo.mts` prepara v9→v10 após Elaboração: 5 campos novos (os quatro solicitados usam o status de assinatura compartilhado; Prazo da assinatura e Pagamento confirmado sustentam o fluxo paralelo), 3 formulários, 6 requisitos e 3 automações com versões `ATIVA`. A UI administrativa pode editar a definição dos campos, opções, regras e automações; `Status do contrato` permanece somente leitura para o usuário do card porque é calculado da assinatura.
-- Ensaio em cópia local do backup Turso de 28/09: Elaboração v8→v9 e Formalização v9→v10; leitura final confirmou 3 formulários, 6 requisitos, 3 automações e 3 versões ativas. Cópia e scripts temporários removidos; nenhuma escrita em produção.
+- Ensaio em cópia local do backup Turso de 28/09: Elaboração v8→v9 e Formalização v9→v10; leitura final confirmou 3 formulários, 6 requisitos, 3 automações e 3 versões ativas. Cópia e scripts temporários removidos.
 - Validação no servidor rejeita assinatura sem arquivo privado do próprio card/campo, preenche data se vazia, impede edição após a confirmação auditada e verifica assinatura mais pagamento antes da etapa final. `registrarConclusaoContratoFinanceiro` existente preserva o primeiro evento e registra a situação do pagamento.
 - `npm run lint`: 0 erros, 1.191 avisos existentes. `npm run typecheck` e `npm run build`: passaram, executados em sequência para evitar disputa de arquivos `.next`. Três arquivos direcionados: 27 testes aprovados. `npm test`: 554 arquivos, 4.068 testes aprovados, 4 skipped e 1 todo. As duas falhas transitórias da edição paralela do construtor de formulários foram corrigidas pelo respectivo responsável antes desta execução final.
-- Publicação exige novo backup Vault completo e autorização específica. O backup de Elaboração não autoriza esta nova configuração; o script valida motivo, integridade e idade do backup antes do apply. O rollback preferencial desativa as novas automações/requisitos e remove os formulários depois de preservar quaisquer valores escritos; restauração integral é último recurso.
+- Publicação autorizada especificamente após backup completo `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-29T12-48-41-978Z.sql`: 177.087.618 bytes, 332 tabelas, 190.772 linhas, SHA-256 `05277f1e7b2a0043907eb49261833444e1fe6fca39e0ec4ed360bc3c4eb80211`; restauração, integridade e chaves verificadas. A transação passou v9→v10 sem alterar valores dos cards. Leitura posterior confirmou formulário de 5 componentes em Formalização, formulários de 6 componentes em Pagamento e Nota Fiscal, 6 requisitos novos e 3 automações com uma versão ativa cada. Rollback preferencial desativa novas automações/requisitos e retira formulários após preservar valores posteriores; restauração integral é último recurso.
 
 ## Dev Notes
 
@@ -130,3 +130,7 @@ As duas correções foram inspecionadas: a confirmação da assinatura conclui t
 ### Gate final local — PASS
 
 Em workspace estabilizado, `npm run lint` terminou com zero erros, `npm run typecheck` e `npm run build` passaram, e `npm test` aprovou 4.068 testes em 554 arquivos (4 ignorados, 1 todo). Os critérios de aceite implementados no código e no ensaio local estão cobertos sem achados bloqueantes. A publicação no Turso e o smoke autenticado são verificações posteriores e continuam pendentes; esta decisão não os substitui. **Recomendação: pronto para revisão da publicação autorizada.**
+
+### Conferência da publicação — 29/09/2026
+
+Após autorização específica e backup restaurado/verificado, a transação v9→v10 foi aplicada. Leitura do Turso confirmou formulário de Formalização com cinco componentes, dois requisitos próprios, quatro requisitos na etapa final e três automações de Formalização com versões ativas. O smoke na UI autenticada permanece pendente.

@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — implementação e ensaio local concluídos; publicação no Turso depende do checkpoint Vault e de autorização específica. Nenhum card de produção foi alterado.
+Ready for Review — configuração publicada no Turso em 29/09/2026 (Financeiro v8→v9). Conferência autenticada da UI e fluxo com card real ainda pendentes; nenhum valor de card foi alterado pelo script.
 
 ## Executor Assignment
 
@@ -43,12 +43,13 @@ O formulário, as regras condicionais, os gatilhos e as ações devem ser config
 ## Tarefas / subtarefas
 
 - [x] Inventariar em leitura o Financeiro ativo v8, a etapa sem formulário nem cards, campos compartilhados, catálogo de automações e modelo RADAR ativo no Gerador (AC 1, 7–9).
-- [x] Preparar publicação dos cinco campos, status de assinatura somente leitura e formulário com condicionais; nenhum valor/card existente é modificado pelo script (AC 1–4). Aplicação em produção pendente.
+- [x] Publicar os cinco campos, status de assinatura somente leitura e formulário com condicionais; nenhum valor/card existente foi modificado pelo script (AC 1–4).
 - [x] Conectar validação no salvamento e na transição, com lista de pendências, datas automáticas idempotentes e referência de anexo vinculada ao card/campo (AC 2–5, 9).
-- [x] Preparar 18 automações com versões ativas de datas, status/tarefa, alertas e Gerador de Documentos; ensaio em cópia local confirmou a publicação e o vínculo seguro do documento foi revisado (AC 5–8). Aplicação em produção pendente.
+- [x] Publicar 18 automações com versões ativas de datas, status/tarefa, alertas e Gerador de Documentos; ensaio em cópia local confirmou a publicação e o vínculo seguro do documento foi revisado (AC 5–8).
 - [x] Testar validação de dados, envio, datas, vínculo de documento e visualização de pendências do rascunho. Alteração posterior no card Financeiro usa gatilhos de campo do motor central (AC 2–8).
-- [x] Rodar lint, typecheck, suíte completa e build; criar backup Vault dedicado e ensaiar a transação em cópia restaurada (AC 1–9). Autorização e publicação em produção pendentes.
-- [ ] Aplicar configuração após autorização específica, conferir campos/requisitos/automações ativos na UI/banco, atualizar este registro e realizar smoke autenticado sem alterar card real.
+- [x] Rodar lint, typecheck, suíte completa e build; criar backup Vault dedicado e ensaiar a transação em cópia restaurada (AC 1–9).
+- [x] Aplicar configuração após autorização específica e conferir por leitura no banco: v9, formulário com 6 componentes, 17 requisitos e 18 automações com uma versão ativa cada.
+- [ ] Conferir os campos e automações na UI autenticada e realizar smoke com card real sem alterar valores de produção.
 
 ## Dev Notes
 
@@ -105,12 +106,32 @@ O formulário, as regras condicionais, os gatilhos e as ações devem ser config
 - Gates: lint sem erros (1.191 avisos existentes), typecheck, 553 arquivos/4.060 testes e build passaram. QA aprovou o patch local, com ressalva do alerta redundante quando dados e elaboração são salvos na mesma atualização.
 - Comando de produção previsto: `npx tsx scripts/configurar-elaboracao-contrato-financeiro-ativo.mts --apply --approval=AUTORIZO_ELABORACAO_FINANCEIRO_ATIVO --expect-financeiro=8 --admin-id=1 --backup=<dump verificado> --manifest=<manifesto>`; nenhuma escrita antes de confirmação específica. Rollback preferencial: desativar as 18 automações/requisitos e retirar a composição nova depois de avaliar possíveis respostas de cards; restauração integral do dump é último recurso porque sobrescreveria escritas posteriores.
 
+## Reavaliação de produção (29/09/2026)
+
+- Prévia em leitura confirmou Financeiro ativo v8, formulário e automações da etapa ainda ausentes e modelo padrão RADAR ativo. O gatilho `ENTRAR_COLUNA` e a ação `GERAR_CONTRATO` já existem no código, mas não têm versão publicada para esta etapa; por isso a chegada do card não criou documento.
+- Havia um card ativo já em Elaboração, com serviço `Revisão de Radar — TESTE`, sem documento da empresa. A proteção antiga do script recusava publicar se houvesse card na etapa; a publicação da configuração não altera valores do card, e essa proteção foi removida localmente.
+- Durante a verificação, outra operação publicou o Financeiro v9 e moveu o card de teste de volta para `Novo Contrato`. A leitura atual confirmou 6 campos, 17 requisitos, 18 automações e 18 versões ativas em Elaboração. A automação `financeiro.elaboracao.ativa.gerador.radar` está ativa com gatilho `ENTRAR_COLUNA`, condição `Serviço contratado` contém `Radar` e ação `GERAR_CONTRATO`; não havia execução registrada porque não ocorreu nova entrada após a ativação. Nenhum card ativo permanece na etapa, portanto não há conciliação retroativa a executar.
+- Backup novo criado em `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-29T12-40-09-340Z.sql`, com manifesto adjacente: 180.134.142 bytes, 332 tabelas, 190.693 linhas, SHA-256 `723f999dfc7d3458f0cbca60a78e0a8acf40efea9ab42c004cc835313b6544fa`. A restauração de prova passou por `integrity_check`, `foreign_key_check` e conferência das contagens. Não versionar os arquivos de backup.
+- `prisma migrate diff --from-schema-datamodel prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --script` retornou migração vazia. A prévia CLI foi somente em leitura. `npm run lint` passou com 0 erros/1.191 avisos existentes; 30 testes focados e a suíte completa (554 arquivos/4.068 testes) passaram. O typecheck global encontrou erros apenas nos arquivos ainda em edição da tarefa paralela de Pagamento, nenhum no script de Elaboração.
+- O evento de entrada usa a configuração agora publicada para os próximos cards RADAR. Smoke end-to-end com nova entrada e documento gerado ainda não ocorreu nesta verificação. Serviços diferentes de RADAR não têm modelo/condição definidos nesta automação; decisão de escopo solicitada ao usuário.
+
 ## Change Log
 
 | Data | Versão | Descrição | Autor |
 | --- | --- | --- | --- |
 | 2026-09-28 | 0.1 | Draft da etapa ativa com campos, validações, Gerador de Documentos e automações publicadas | River (@sm) |
 | 2026-09-28 | 0.2 | Implementação local, ensaio transacional, backup Vault e gates; publicação pendente | Codex |
+
+## QA Results — reavaliação de 29/09/2026
+
+**Veredito: NEEDS_WORK** para a story completa. A leitura de produção confirma Financeiro v9, formulário com 6 campos, 17 requisitos e 18 automações com versões ativas. A automação RADAR tem gatilho `ENTRAR_COLUNA` e ação `GERAR_CONTRATO`. O código da transição publica `CARD_MOVIDO` junto com o movimento, e o motor seleciona a versão ativa apenas para eventos posteriores à ativação cujo destino é Elaboração. As 0 execuções atuais são compatíveis com a ausência de nova entrada após a publicação; o card de teste voltou a Novo Contrato e não requer conciliação.
+
+- **Aceite pendente:** ainda não houve smoke end-to-end com nova entrada RADAR, execução concluída e documento vinculado ao card. Confirmar também acesso autenticado e visualização do documento no Gerador. Sem isso, o AC 7 não está verificado em produção.
+- **Escopo:** a condição publicada cobre apenas `Serviço contratado` contendo `Radar`. Outros serviços não geram contrato automaticamente com esta automação; explicitar a limitação e definir modelos se o requisito abranger todos os serviços.
+- **Gate técnico:** 30 testes focados e suíte completa (554 arquivos, 4.068 testes) passaram; lint sem erros, com 1.191 avisos existentes. O typecheck global falhou em arquivos da tarefa paralela de Pagamento. Reexecutar com a árvore estável antes de aprovar a story completa.
+- **Risco operacional:** a fila assíncrona pode executar um evento de entrada depois que o card sair da etapa. O motor reavalia a condição RADAR e ignora card arquivado, mas não exige permanência na etapa; observar no smoke se esse comportamento é aceitável para o contrato.
+
+Revisão somente leitura de configuração e fluxo futuro; nenhum card ou banco foi alterado por QA. Recomendo novo gate após o smoke, a decisão de escopo e o typecheck limpo.
 
 ## Validação do draft
 

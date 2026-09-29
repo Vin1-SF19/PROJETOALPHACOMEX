@@ -1,0 +1,52 @@
+schema: 1
+story: financeiro-ativo-confirmacao-pagamento
+story_title: Financeiro ativo — Confirmação de Pagamento
+gate: CONCERNS
+status_reason: Implementação e ensaio local aprovados; critérios de publicação e smoke autenticado ainda pendentes no Financeiro ativo.
+reviewer: Quinn (Test Architect)
+updated: '2026-09-29'
+top_issues:
+  - severity: medium
+    category: completeness
+    description: Configuração v11 ainda não publicada nem verificada no Turso de produção.
+    suggested_owner: devops
+  - severity: medium
+    category: testing
+    description: Falta teste de integração com persistência, concorrência, edição administrativa e cron real.
+    suggested_owner: dev
+waiver:
+  active: false
+evidence:
+  tests_reviewed: 11
+  risks_identified: 2
+  trace:
+    ac_covered_locally: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    ac_pending_production: [1, 5, 7, 8, 9, 10]
+  quality_gates:
+    lint: pass
+    typecheck: pass
+    tests: '556 files; 4079 passed; 4 skipped; 1 todo'
+    build: pass
+    rehearsal: 'v10→v11; 7 fields; 6 requirements; 9 active automation versions'
+nfr_validation:
+  security:
+    status: PASS
+    notes: Validação de anexo privado vinculado ao card e campo; guarda de exclusão após confirmação.
+  performance:
+    status: CONCERNS
+    notes: Consultas de validação e automação ainda sem medição sob carga real.
+  reliability:
+    status: CONCERNS
+    notes: Sem teste de concorrência e execução real do cron; tarefa NF usa identidade determinística.
+  maintainability:
+    status: PASS
+    notes: Campos, requisitos e versões de automação expostos na configuração administrativa.
+recommendations:
+  immediate:
+    - action: Publicar com checkpoint Vault e confirmar versão 11, campos, requisitos e automações na UI.
+      refs: [scripts/configurar-pagamento-financeiro-ativo.mts]
+    - action: Executar smoke autenticado dos caminhos de confirmação, divergência e cobrança.
+      refs: [docs/stories/story-financeiro-ativo-confirmacao-pagamento.md]
+  future:
+    - action: Adicionar testes com persistência para concorrência, cron e edição da regra de comprovante.
+      refs: [tests/bpm/financeiro-pagamento-fluxo.test.ts]

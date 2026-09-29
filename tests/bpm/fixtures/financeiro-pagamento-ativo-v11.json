@@ -1,0 +1,716 @@
+{
+  "entrada": {
+    "grafo": {
+      "inicioId": "liquido",
+      "nos": [
+        {
+          "id": "liquido",
+          "tipo": "CONDICAO",
+          "condicao": {
+            "operador": "AND",
+            "condicoes": [
+              {
+                "tipo": "condicao",
+                "campo": {
+                  "fonte": "campo_dinamico",
+                  "campo": "alpha.financeiro.valor.liquido.pagamento"
+                },
+                "operador": "preenchido"
+              }
+            ]
+          },
+          "entaoId": "copiar_liquido",
+          "senaoId": "bruto"
+        },
+        {
+          "id": "copiar_liquido",
+          "tipo": "ACAO",
+          "acaoTipo": "ALTERAR_CAMPO",
+          "parametros": {
+            "campoId": "alpha.valor.esperado",
+            "valor": "{{campo.alpha.financeiro.valor.liquido.pagamento}}"
+          },
+          "proximoId": "fim"
+        },
+        {
+          "id": "bruto",
+          "tipo": "CONDICAO",
+          "condicao": {
+            "operador": "AND",
+            "condicoes": [
+              {
+                "tipo": "condicao",
+                "campo": {
+                  "fonte": "campo_dinamico",
+                  "campo": "alpha.financeiro.valor.bruto.contrato"
+                },
+                "operador": "preenchido"
+              },
+              {
+                "operador": "OR",
+                "condicoes": [
+                  {
+                    "tipo": "condicao",
+                    "campo": {
+                      "fonte": "campo_dinamico",
+                      "campo": "alpha.total.retencoes"
+                    },
+                    "operador": "vazio"
+                  },
+                  {
+                    "tipo": "condicao",
+                    "campo": {
+                      "fonte": "campo_dinamico",
+                      "campo": "alpha.total.retencoes"
+                    },
+                    "operador": "igual",
+                    "valor": 0,
+                    "tipoEsperado": "numero"
+                  }
+                ]
+              }
+            ]
+          },
+          "entaoId": "copiar_bruto",
+          "senaoId": "fim"
+        },
+        {
+          "id": "copiar_bruto",
+          "tipo": "ACAO",
+          "acaoTipo": "ALTERAR_CAMPO",
+          "parametros": {
+            "campoId": "alpha.valor.esperado",
+            "valor": "{{campo.alpha.financeiro.valor.bruto.contrato}}"
+          },
+          "proximoId": "fim"
+        },
+        {
+          "id": "fim",
+          "tipo": "FIM"
+        }
+      ]
+    },
+    "condicao": null
+  },
+  "edicao": {
+    "grafo": {
+      "inicioId": "pago",
+      "nos": [
+        {
+          "id": "pago",
+          "tipo": "CONDICAO",
+          "condicao": {
+            "operador": "AND",
+            "condicoes": [
+              {
+                "tipo": "condicao",
+                "campo": {
+                  "fonte": "campo_dinamico",
+                  "campo": "alpha.pagamento.confirmado"
+                },
+                "operador": "preenchido"
+              },
+              {
+                "tipo": "condicao",
+                "campo": {
+                  "fonte": "campo_dinamico",
+                  "campo": "alpha.pagamento.confirmado"
+                },
+                "operador": "igual",
+                "valor": "Sim"
+              }
+            ]
+          },
+          "entaoId": "validado",
+          "senaoId": "vencido"
+        },
+        {
+          "id": "validado",
+          "tipo": "CONDICAO",
+          "condicao": {
+            "operador": "AND",
+            "condicoes": [
+              {
+                "operador": "AND",
+                "condicoes": [
+                  {
+                    "tipo": "condicao",
+                    "campo": {
+                      "fonte": "campo_dinamico",
+                      "campo": "alpha.valor.esperado"
+                    },
+                    "operador": "preenchido"
+                  },
+                  {
+                    "tipo": "condicao",
+                    "campo": {
+                      "fonte": "campo_dinamico",
+                      "campo": "alpha.valor.recebido"
+                    },
+                    "operador": "preenchido"
+                  },
+                  {
+                    "tipo": "condicao",
+                    "campo": {
+                      "fonte": "campo_dinamico",
+                      "campo": "alpha.valor.recebido"
+                    },
+                    "operador": "igual",
+                    "valorCampo": {
+                      "fonte": "campo_dinamico",
+                      "campo": "alpha.valor.esperado"
+                    },
+                    "tipoEsperado": "numero"
+                  }
+                ]
+              },
+              {
+                "operador": "OR",
+                "condicoes": [
+                  {
+                    "operador": "AND",
+                    "condicoes": [
+                      {
+                        "tipo": "condicao",
+                        "campo": {
+                          "fonte": "campo_dinamico",
+                          "campo": "alpha.financeiro.valor.liquido.pagamento"
+                        },
+                        "operador": "preenchido"
+                      },
+                      {
+                        "tipo": "condicao",
+                        "campo": {
+                          "fonte": "campo_dinamico",
+                          "campo": "alpha.valor.esperado"
+                        },
+                        "operador": "igual",
+                        "valorCampo": {
+                          "fonte": "campo_dinamico",
+                          "campo": "alpha.financeiro.valor.liquido.pagamento"
+                        },
+                        "tipoEsperado": "numero"
+                      }
+                    ]
+                  },
+                  {
+                    "operador": "AND",
+                    "condicoes": [
+                      {
+                        "tipo": "condicao",
+                        "campo": {
+                          "fonte": "campo_dinamico",
+                          "campo": "alpha.financeiro.valor.liquido.pagamento"
+                        },
+                        "operador": "vazio"
+                      },
+                      {
+                        "tipo": "condicao",
+                        "campo": {
+                          "fonte": "campo_dinamico",
+                          "campo": "alpha.financeiro.valor.bruto.contrato"
+                        },
+                        "operador": "preenchido"
+                      },
+                      {
+                        "operador": "OR",
+                        "condicoes": [
+                          {
+                            "tipo": "condicao",
+                            "campo": {
+                              "fonte": "campo_dinamico",
+                              "campo": "alpha.total.retencoes"
+                            },
+                            "operador": "vazio"
+                          },
+                          {
+                            "tipo": "condicao",
+                            "campo": {
+                              "fonte": "campo_dinamico",
+                              "campo": "alpha.total.retencoes"
+                            },
+                            "operador": "igual",
+                            "valor": 0,
+                            "tipoEsperado": "numero"
+                          }
+                        ]
+                      },
+                      {
+                        "tipo": "condicao",
+                        "campo": {
+                          "fonte": "campo_dinamico",
+                          "campo": "alpha.valor.esperado"
+                        },
+                        "operador": "igual",
+                        "valorCampo": {
+                          "fonte": "campo_dinamico",
+                          "campo": "alpha.financeiro.valor.bruto.contrato"
+                        },
+                        "tipoEsperado": "numero"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tipo": "condicao",
+                "campo": {
+                  "fonte": "campo_dinamico",
+                  "campo": "alpha.data.do.pagamento"
+                },
+                "operador": "preenchido"
+              },
+              {
+                "tipo": "condicao",
+                "campo": {
+                  "fonte": "campo_dinamico",
+                  "campo": "alpha.financeiro.forma.pagamento.utilizada"
+                },
+                "operador": "preenchido"
+              },
+              {
+                "tipo": "condicao",
+                "campo": {
+                  "fonte": "campo_dinamico",
+                  "campo": "alpha.valor.esperado"
+                },
+                "operador": "maiorOuIgual",
+                "valor": 0,
+                "tipoEsperado": "numero"
+              },
+              {
+                "tipo": "condicao",
+                "campo": {
+                  "fonte": "campo_dinamico",
+                  "campo": "alpha.valor.recebido"
+                },
+                "operador": "maiorOuIgual",
+                "valor": 0,
+                "tipoEsperado": "numero"
+              }
+            ]
+          },
+          "entaoId": "pago_status",
+          "senaoId": "comparar"
+        },
+        {
+          "id": "comparar",
+          "tipo": "CONDICAO",
+          "condicao": {
+            "operador": "AND",
+            "condicoes": [
+              {
+                "tipo": "condicao",
+                "campo": {
+                  "fonte": "campo_dinamico",
+                  "campo": "alpha.valor.esperado"
+                },
+                "operador": "preenchido"
+              },
+              {
+                "tipo": "condicao",
+                "campo": {
+                  "fonte": "campo_dinamico",
+                  "campo": "alpha.valor.recebido"
+                },
+                "operador": "preenchido"
+              },
+              {
+                "tipo": "condicao",
+                "campo": {
+                  "fonte": "campo_dinamico",
+                  "campo": "alpha.valor.recebido"
+                },
+                "operador": "diferente",
+                "valorCampo": {
+                  "fonte": "campo_dinamico",
+                  "campo": "alpha.valor.esperado"
+                },
+                "tipoEsperado": "numero"
+              }
+            ]
+          },
+          "entaoId": "divergente",
+          "senaoId": "aguardando"
+        },
+        {
+          "id": "pago_status",
+          "tipo": "ACAO",
+          "acaoTipo": "ALTERAR_CAMPO",
+          "parametros": {
+            "campoId": "alpha.status.financeiro",
+            "valor": "PAGAMENTO CONCLUÍDO"
+          },
+          "proximoId": "tarefa_nf"
+        },
+        {
+          "id": "assinatura_pago",
+          "tipo": "CONDICAO",
+          "condicao": {
+            "operador": "AND",
+            "condicoes": [
+              {
+                "tipo": "condicao",
+                "campo": {
+                  "fonte": "campo_dinamico",
+                  "campo": "alpha.financeiro.status.contrato.assinatura"
+                },
+                "operador": "preenchido"
+              },
+              {
+                "tipo": "condicao",
+                "campo": {
+                  "fonte": "campo_dinamico",
+                  "campo": "alpha.financeiro.status.contrato.assinatura"
+                },
+                "operador": "igual",
+                "valor": "Assinado"
+              },
+              {
+                "tipo": "condicao",
+                "campo": {
+                  "fonte": "campo_dinamico",
+                  "campo": "alpha.data.da.assinatura"
+                },
+                "operador": "preenchido"
+              },
+              {
+                "tipo": "condicao",
+                "campo": {
+                  "fonte": "campo_dinamico",
+                  "campo": "alpha.contrato.assinado.anexo"
+                },
+                "operador": "preenchido"
+              }
+            ]
+          },
+          "entaoId": "ambos",
+          "senaoId": "aguarda_assinatura"
+        },
+        {
+          "id": "ambos",
+          "tipo": "ACAO",
+          "acaoTipo": "ALTERAR_CAMPO",
+          "parametros": {
+            "campoId": "alpha.financeiro.status.contratacao",
+            "valor": "Contratação concluída"
+          },
+          "proximoId": "fim"
+        },
+        {
+          "id": "aguarda_assinatura",
+          "tipo": "ACAO",
+          "acaoTipo": "ALTERAR_CAMPO",
+          "parametros": {
+            "campoId": "alpha.financeiro.status.contratacao",
+            "valor": "Aguardando assinatura"
+          },
+          "proximoId": "fim"
+        },
+        {
+          "id": "tarefa_nf",
+          "tipo": "ACAO",
+          "acaoTipo": "CRIAR_TAREFA",
+          "parametros": {
+            "titulo": "Emitir Nota Fiscal – {{empresa.razaoSocial}}",
+            "tipo": "EMISSAO_NF",
+            "prioridade": "ALTA",
+            "naoDuplicarTipo": true
+          },
+          "proximoId": "assinatura_pago"
+        },
+        {
+          "id": "divergente",
+          "tipo": "ACAO",
+          "acaoTipo": "ALTERAR_CAMPO",
+          "parametros": {
+            "campoId": "alpha.status.financeiro",
+            "valor": "Divergência financeira"
+          },
+          "proximoId": "pendente_assinatura"
+        },
+        {
+          "id": "vencido",
+          "tipo": "CONDICAO",
+          "condicao": {
+            "operador": "AND",
+            "condicoes": [
+              {
+                "tipo": "condicao",
+                "campo": {
+                  "fonte": "campo_dinamico",
+                  "campo": "alpha.status.financeiro"
+                },
+                "operador": "preenchido"
+              },
+              {
+                "tipo": "condicao",
+                "campo": {
+                  "fonte": "campo_dinamico",
+                  "campo": "alpha.status.financeiro"
+                },
+                "operador": "igual",
+                "valor": "Pagamento vencido"
+              }
+            ]
+          },
+          "entaoId": "pendente_assinatura",
+          "senaoId": "aguardando"
+        },
+        {
+          "id": "aguardando",
+          "tipo": "ACAO",
+          "acaoTipo": "ALTERAR_CAMPO",
+          "parametros": {
+            "campoId": "alpha.status.financeiro",
+            "valor": "Aguardando pagamento"
+          },
+          "proximoId": "pendente_assinatura"
+        },
+        {
+          "id": "pendente_assinatura",
+          "tipo": "CONDICAO",
+          "condicao": {
+            "operador": "AND",
+            "condicoes": [
+              {
+                "tipo": "condicao",
+                "campo": {
+                  "fonte": "campo_dinamico",
+                  "campo": "alpha.financeiro.status.contrato.assinatura"
+                },
+                "operador": "preenchido"
+              },
+              {
+                "tipo": "condicao",
+                "campo": {
+                  "fonte": "campo_dinamico",
+                  "campo": "alpha.financeiro.status.contrato.assinatura"
+                },
+                "operador": "igual",
+                "valor": "Assinado"
+              },
+              {
+                "tipo": "condicao",
+                "campo": {
+                  "fonte": "campo_dinamico",
+                  "campo": "alpha.data.da.assinatura"
+                },
+                "operador": "preenchido"
+              },
+              {
+                "tipo": "condicao",
+                "campo": {
+                  "fonte": "campo_dinamico",
+                  "campo": "alpha.contrato.assinado.anexo"
+                },
+                "operador": "preenchido"
+              }
+            ]
+          },
+          "entaoId": "aguarda_pagamento",
+          "senaoId": "aguarda_ambos"
+        },
+        {
+          "id": "aguarda_pagamento",
+          "tipo": "ACAO",
+          "acaoTipo": "ALTERAR_CAMPO",
+          "parametros": {
+            "campoId": "alpha.financeiro.status.contratacao",
+            "valor": "Aguardando pagamento"
+          },
+          "proximoId": "fim"
+        },
+        {
+          "id": "aguarda_ambos",
+          "tipo": "ACAO",
+          "acaoTipo": "ALTERAR_CAMPO",
+          "parametros": {
+            "campoId": "alpha.financeiro.status.contratacao",
+            "valor": "Aguardando assinatura e pagamento"
+          },
+          "proximoId": "fim"
+        },
+        {
+          "id": "fim",
+          "tipo": "FIM"
+        }
+      ]
+    },
+    "condicao": null
+  },
+  "cobranca": {
+    "grafo": {
+      "inicioId": "marcar",
+      "nos": [
+        {
+          "id": "marcar",
+          "tipo": "ACAO",
+          "acaoTipo": "ALTERAR_CAMPO",
+          "parametros": {
+            "campoId": "alpha.status.financeiro",
+            "valor": "Pagamento vencido"
+          },
+          "proximoId": "tarefa"
+        },
+        {
+          "id": "tarefa",
+          "tipo": "ACAO",
+          "acaoTipo": "CRIAR_TAREFA",
+          "parametros": {
+            "titulo": "Cobrar pagamento vencido – {{empresa.razaoSocial}}",
+            "tipo": "COBRANCA_FINANCEIRA",
+            "prioridade": "ALTA",
+            "naoDuplicarPendenteTipo": true
+          },
+          "proximoId": "alerta"
+        },
+        {
+          "id": "alerta",
+          "tipo": "ACAO",
+          "acaoTipo": "CRIAR_ALERTA",
+          "parametros": {
+            "texto": "Pagamento vencido: conferir vencimento e cobrar conforme a política interna."
+          },
+          "proximoId": "fim"
+        },
+        {
+          "id": "fim",
+          "tipo": "FIM"
+        }
+      ]
+    },
+    "condicao": {
+      "operador": "AND",
+      "condicoes": [
+        {
+          "operador": "OR",
+          "condicoes": [
+            {
+              "tipo": "condicao",
+              "campo": {
+                "fonte": "campo_dinamico",
+                "campo": "alpha.pagamento.confirmado"
+              },
+              "operador": "vazio"
+            },
+            {
+              "tipo": "condicao",
+              "campo": {
+                "fonte": "campo_dinamico",
+                "campo": "alpha.pagamento.confirmado"
+              },
+              "operador": "igual",
+              "valor": "Não"
+            }
+          ]
+        },
+        {
+          "tipo": "condicao",
+          "campo": {
+            "fonte": "campo_dinamico",
+            "campo": "alpha.vencimento"
+          },
+          "operador": "preenchido"
+        },
+        {
+          "tipo": "condicao",
+          "campo": {
+            "fonte": "campo_dinamico",
+            "campo": "alpha.vencimento"
+          },
+          "operador": "menorOuIgual",
+          "valorCampo": {
+            "fonte": "agora",
+            "campo": "data"
+          },
+          "tipoEsperado": "data"
+        },
+        {
+          "operador": "OR",
+          "condicoes": [
+            {
+              "operador": "AND",
+              "condicoes": [
+                {
+                  "tipo": "condicao",
+                  "campo": {
+                    "fonte": "campo_dinamico",
+                    "campo": "alpha.pagamento.no.exito"
+                  },
+                  "operador": "preenchido"
+                },
+                {
+                  "tipo": "condicao",
+                  "campo": {
+                    "fonte": "campo_dinamico",
+                    "campo": "alpha.pagamento.no.exito"
+                  },
+                  "operador": "igual",
+                  "valor": "Não"
+                }
+              ]
+            },
+            {
+              "operador": "AND",
+              "condicoes": [
+                {
+                  "operador": "AND",
+                  "condicoes": [
+                    {
+                      "tipo": "condicao",
+                      "campo": {
+                        "fonte": "campo_dinamico",
+                        "campo": "alpha.pagamento.no.exito"
+                      },
+                      "operador": "preenchido"
+                    },
+                    {
+                      "tipo": "condicao",
+                      "campo": {
+                        "fonte": "campo_dinamico",
+                        "campo": "alpha.pagamento.no.exito"
+                      },
+                      "operador": "igual",
+                      "valor": "Sim"
+                    }
+                  ]
+                },
+                {
+                  "tipo": "condicao",
+                  "campo": {
+                    "fonte": "contratacao",
+                    "campo": "dataExito"
+                  },
+                  "operador": "preenchido"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "operador": "OR",
+          "condicoes": [
+            {
+              "tipo": "condicao",
+              "campo": {
+                "fonte": "campo_dinamico",
+                "campo": "alpha.status.financeiro"
+              },
+              "operador": "vazio"
+            },
+            {
+              "tipo": "condicao",
+              "campo": {
+                "fonte": "campo_dinamico",
+                "campo": "alpha.status.financeiro"
+              },
+              "operador": "diferente",
+              "valor": "Pagamento vencido"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -186,7 +186,7 @@ export async function ExcluirAnexoBpm(anexoId: string) {
       if (anexo.campoId) {
         const [campo, card, valor] = await Promise.all([
           tx.bpmCampo.findUnique({ where: { id: anexo.campoId }, select: { chave: true } }),
-          tx.bpmCard.findUnique({ where: { id: anexo.cardId }, select: { statusPosFechamento: true } }),
+          tx.bpmCard.findUnique({ where: { id: anexo.cardId }, select: { pipelineId: true, statusPosFechamento: true } }),
           tx.bpmCardCampoValor.findUnique({ where: { cardId_campoId: { cardId: anexo.cardId, campoId: anexo.campoId } }, select: { valor: true } }),
         ]);
         if (campo?.chave === "alpha.radar.fechado.contrato_assinado"
@@ -197,6 +197,17 @@ export async function ExcluirAnexoBpm(anexoId: string) {
             where: { cardId: anexo.cardId, acao: "CONTRATO_CONCLUIDO" }, select: { id: true },
           });
           if (conclusao) throw new Error("CONTRATO_ASSINADO_EM_USO");
+        }
+        if (card?.pipelineId === "cmuih4i54000209gmmyqrg557"
+          && campo?.chave === "alpha.comprovante" && valor?.valor === anexoId) {
+          const confirmado = await tx.bpmCampo.findFirst({
+            where: { pipelineId: card.pipelineId, chave: "alpha.pagamento.confirmado", ativo: true },
+            select: { id: true },
+          });
+          const resposta = confirmado ? await tx.bpmCardCampoValor.findUnique({
+            where: { cardId_campoId: { cardId: anexo.cardId, campoId: confirmado.id } }, select: { valor: true },
+          }) : null;
+          if (resposta?.valor === "Sim") throw new Error("COMPROVANTE_PAGAMENTO_EM_USO");
         }
       }
       await tx.bpmCardAnexo.delete({ where: { id: anexoId } });
@@ -239,6 +250,8 @@ export async function ExcluirAnexoBpm(anexoId: string) {
     const msg = error instanceof Error && error.message === "Não autorizado" ? "Não autorizado"
       : error instanceof Error && error.message === "CONTRATO_ASSINADO_EM_USO"
         ? "Este arquivo comprova o contrato assinado. Altere o status ou substitua o arquivo antes de excluí-lo."
+        : error instanceof Error && error.message === "COMPROVANTE_PAGAMENTO_EM_USO"
+          ? "Este comprovante está vinculado a um pagamento confirmado. Faça a correção por um procedimento auditado."
         : "Erro ao excluir anexo";
     return { success: false, error: msg };
   }

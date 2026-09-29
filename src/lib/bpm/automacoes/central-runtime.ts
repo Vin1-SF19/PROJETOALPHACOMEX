@@ -17,6 +17,10 @@ import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automa
 import { copiarCamposCardVinculado } from "@/lib/bpm/copiar-campos-card-vinculado";
 import { carregarCamposFaltantesCardEtapa } from "@/lib/bpm/requisitos-etapa-server";
 import { montarContextoAvaliacaoDoCard } from "@/lib/bpm/regras/contexto";
+import { avaliarPagamentoFinanceiro } from "@/lib/bpm/financeiro-pagamento-validacao";
+import { avaliarFormalizacaoFinanceira } from "@/lib/bpm/financeiro-formalizacao";
+import { CHAVES_CAMPOS } from "@/lib/bpm/financeiro-config.client";
+import { extrairPathnamePrivadoAnexoBpm } from "@/lib/bpm/anexos-storage";
 import { avaliarGrupo } from "@/lib/bpm/regras/avaliador";
 import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
 import type { ContextoAvaliacao } from "@/lib/bpm/regras/types";
@@ -96,6 +100,62 @@ function placeholdersDoCard(card: ExecucaoCentral["card"]): Record<string, strin
   };
 }
 
+async function exigirPagamentoValidado(card: ExecucaoCentral["card"], tx: Prisma.TransactionClient,
+  exigirContrato = false) {
+  if (card.pipelineId !== "cmuih4i54000209gmmyqrg557") return;
+  const chaves = [CHAVES_CAMPOS.PAGAMENTO_CONFIRMADO, CHAVES_CAMPOS.DATA_PAGAMENTO,
+    CHAVES_CAMPOS.VALOR_ESPERADO, CHAVES_CAMPOS.VALOR_RECEBIDO, CHAVES_CAMPOS.FORMA_PAGAMENTO_UTILIZADA,
+    CHAVES_CAMPOS.COMPROVANTE, CHAVES_CAMPOS.VALOR_LIQUIDO, CHAVES_CAMPOS.VALOR_CONTRATADO,
+    CHAVES_CAMPOS.TOTAL_RETENCOES, CHAVES_CAMPOS.STATUS_ASSINATURA, CHAVES_CAMPOS.DATA_ASSINATURA,
+    CHAVES_CAMPOS.ANEXO_ASSINADO];
+  const campos = await tx.bpmCampo.findMany({ where: { pipelineId: card.pipelineId, chave: { in: chaves }, ativo: true },
+    select: { id: true, chave: true } });
+  const ids = new Map(campos.map((campo) => [campo.chave, campo.id]));
+  if (!ids.has(CHAVES_CAMPOS.VALOR_ESPERADO)) throw new Error("Campo Valor esperado indisponível na configuração ativa");
+  const valores = await tx.bpmCardCampoValor.findMany({ where: { cardId: card.id, campoId: { in: [...ids.values()] } },
+    select: { campoId: true, valor: true } });
+  const porId = new Map(valores.map((item) => [item.campoId, item.valor]));
+  const valor = (chave: string) => porId.get(ids.get(chave) ?? "") ?? null;
+  const comprovanteCampoId = ids.get(CHAVES_CAMPOS.COMPROVANTE);
+  const comprovanteId = valor(CHAVES_CAMPOS.COMPROVANTE);
+  const comprovante = comprovanteId && comprovanteCampoId ? await tx.bpmCardAnexo.findFirst({
+    where: { id: comprovanteId, cardId: card.id, campoId: comprovanteCampoId }, select: { url: true },
+  }) : null;
+  const regras = comprovanteCampoId ? await tx.bpmRequisito.findMany({
+    where: { pipelineId: card.pipelineId, campoId: comprovanteCampoId, ativo: true,
+      alvoTipo: "CAMPO", fase: "DURING_STAGE" }, select: { condicaoJson: true },
+  }) : [];
+  const contexto = regras.some((regra) => regra.condicaoJson)
+    ? await montarContextoAvaliacaoDoCard(card, tx) : null;
+  const comprovanteExigido = regras.some((regra) => !regra.condicaoJson || (contexto
+    && avaliarGrupo(grupoCondicaoSchema.parse(JSON.parse(regra.condicaoJson)), contexto)));
+  const avaliacao = avaliarPagamentoFinanceiro({
+    confirmado: valor(CHAVES_CAMPOS.PAGAMENTO_CONFIRMADO), data: valor(CHAVES_CAMPOS.DATA_PAGAMENTO),
+    esperado: valor(CHAVES_CAMPOS.VALOR_ESPERADO), recebido: valor(CHAVES_CAMPOS.VALOR_RECEBIDO),
+    forma: valor(CHAVES_CAMPOS.FORMA_PAGAMENTO_UTILIZADA),
+    comprovanteExigido: Boolean(comprovanteExigido),
+    comprovanteValido: Boolean(comprovante?.url && extrairPathnamePrivadoAnexoBpm(comprovante.url)),
+    liquido: valor(CHAVES_CAMPOS.VALOR_LIQUIDO), bruto: valor(CHAVES_CAMPOS.VALOR_CONTRATADO),
+    retencoes: valor(CHAVES_CAMPOS.TOTAL_RETENCOES),
+  });
+  if (!avaliacao.concluido) throw new Error(`Pagamento não validado: ${avaliacao.pendencias.join(", ")}`);
+  if (exigirContrato) {
+    const anexoCampoId = ids.get(CHAVES_CAMPOS.ANEXO_ASSINADO);
+    const anexoId = valor(CHAVES_CAMPOS.ANEXO_ASSINADO);
+    const anexo = anexoId && anexoCampoId ? await tx.bpmCardAnexo.findFirst({
+      where: { id: anexoId, cardId: card.id, campoId: anexoCampoId }, select: { url: true },
+    }) : null;
+    const contrato = avaliarFormalizacaoFinanceira({
+      statusAssinatura: valor(CHAVES_CAMPOS.STATUS_ASSINATURA),
+      dataAssinatura: valor(CHAVES_CAMPOS.DATA_ASSINATURA),
+      anexoAssinadoId: anexoId,
+      anexoAssinadoVinculado: Boolean(anexo?.url && extrairPathnamePrivadoAnexoBpm(anexo.url)),
+      pagamentoConfirmado: valor(CHAVES_CAMPOS.PAGAMENTO_CONFIRMADO),
+    });
+    if (!contrato.contratacaoConcluida) throw new Error(`Contratação não concluída: ${contrato.pendencias.join(", ")}`);
+  }
+}
+
 function proximoNo(no: NoAutomacao): string | null {
   return no.tipo === "ACAO" ? no.proximoId ?? null : no.tipo === "ESPERA" ? no.proximoId : null;
 }
@@ -134,7 +194,7 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
         { pipelineId: card.pipelineId },
         { pipelinesAssociados: { some: { pipelineId: card.pipelineId } } },
       ] },
-      select: { id: true, nome: true, tipo: true, opcoesJson: true },
+      select: { id: true, chave: true, nome: true, tipo: true, opcoesJson: true },
     });
     if (!campo) throw new Error("Campo ativo não pertence ao pipeline do card");
     let brutoValor = parametros.valor === null ? "" : texto(parametros.valor);
@@ -155,6 +215,10 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
     if (!validacao.success) throw new Error(validacao.error);
     const valor = validacao.valores[campoId] || null;
     const resultado = await db.$transaction(async (tx) => {
+      if ((campo.chave === CHAVES_CAMPOS.STATUS_FINANCEIRO && valor === "PAGAMENTO CONCLUÍDO")
+        || (campo.chave === CHAVES_CAMPOS.STATUS_CONTRATACAO && valor === "Contratação concluída")) {
+        await exigirPagamentoValidado(card, tx, valor === "Contratação concluída");
+      }
       const anterior = await tx.bpmCardCampoValor.findUnique({ where: { cardId_campoId: { cardId: card.id, campoId } } });
       if (parametros.somenteSeVazio === true && anterior?.valor?.trim()) {
         return { campoId, valor: anterior.valor, ignorada: true, motivo: "CAMPO_JA_PREENCHIDO" };
@@ -216,6 +280,7 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
     const idUnicoDia = parametros.naoDuplicarDiaTipo
       ? idTarefaDiariaPorTipo(card.id, String(parametros.tipo), agora) : null;
     const tarefa = await db.$transaction(async (tx) => {
+      if (String(parametros.tipo) === "EMISSAO_NF") await exigirPagamentoValidado(card, tx);
       let prazoDoCampo: Date | null = null;
       if (parametros.prazoCampoId) {
         const campoPrazo = await tx.bpmCampo.findFirst({
