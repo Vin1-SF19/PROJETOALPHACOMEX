@@ -1,5 +1,16 @@
 # ARCHITECTURE — Mapa de Arquitetura do Projeto
 
+## BPM — anexo privado de até 90 MiB (2026-09-29)
+
+`POST /api/bpm/upload/direct` autoriza o navegador a enviar diretamente ao
+store privado `BLOBCRM_READ_WRITE_TOKEN` por token curto do Vercel Blob. Antes de
+emitir o token, verifica sessão/permissão de card. O callback assinado do Blob
+registra o caminho pendente em `BpmCardHistorico` com card e usuário para
+reconciliação de órfãos.
+`POST /api/bpm/upload/finalize` recebe somente metadados, exige o mesmo usuário,
+confere metadados e conteúdo no store privado e emite recibo HMAC para
+`RegistrarAnexoBpm`. A rota multipart antiga permanece limitada a 4 MiB.
+
 ## Restaurar operação — checkpoint de mutação em massa para cutover de automações (RM-2026-EB7B58, Fase 3, 2026-09-21)
 
 **Veredito:** `WAITING_APPROVAL` (checkpoint produzido, aguardando aprovação humana explícita e específica fora desta sessão, além de backup específico ainda não gerado). Nenhuma mutação foi executada. Não houve alteração de schema/migration nesta fase.

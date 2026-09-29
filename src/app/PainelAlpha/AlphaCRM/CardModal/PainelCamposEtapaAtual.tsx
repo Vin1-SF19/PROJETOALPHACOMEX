@@ -567,6 +567,21 @@ export function PainelCamposEtapaAtual({
                     ? card.anexos.find((anexo) => anexo.id === valoresCamposAtuais[campo.id]) ?? null
                     : null}
                   errorToastOptions={erroFormulario}
+                  pendingFileName={arquivosPendentes[campo.id] ?? null}
+                  onFileRemoved={() => {
+                    const key = `${card.id}:arquivo:${campo.id}`;
+                    arquivosPendentesRef.current.delete(campo.id);
+                    mensagensErroArquivoRef.current.delete(campo.id);
+                    setPendingUpload(key);
+                    setPendingFields(key, []);
+                    clearFailedSave(key);
+                    setArquivosPendentes((atual) => {
+                      const proximo = { ...atual };
+                      delete proximo[campo.id];
+                      return proximo;
+                    });
+                    setEstadoSave(idsPendentes().length ? "pendente" : null);
+                  }}
                   registerFileSave={(save, fileName, getFailureMessage) => {
                     const key = `${card.id}:arquivo:${campo.id}`;
                     arquivosPendentesRef.current.set(campo.id, { save, nome: fileName });
@@ -596,7 +611,6 @@ export function PainelCamposEtapaAtual({
                     onAtualizado();
                   }}
                 />
-                {arquivosPendentes[campo.id] && <p className="text-[11px] text-amber-200">Arquivo pronto para salvar: {arquivosPendentes[campo.id]}</p>}
                 {complementoPendente && (
                   <p id={descricaoId} role="alert" className="text-[11px] text-amber-300">
                     {MOTIVO_LOST_OUTRO_OBRIGATORIO_MENSAGEM}

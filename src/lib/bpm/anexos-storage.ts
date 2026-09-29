@@ -44,6 +44,14 @@ export function pathnameAnexoBpmValido(pathname: string): boolean {
     && !pathname.includes("#");
 }
 
+/** Upload direto só aceita o caminho opaco emitido para o card. */
+export function pathnameUploadDiretoAnexoBpmValido(pathname: string, cardId: string): boolean {
+  if (!pathnameAnexoBpmValido(pathname)) return false;
+  const prefixo = `bpm/${cardId}/`;
+  return pathname.startsWith(prefixo)
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}-[a-zA-Z0-9._-]{1,255}$/i.test(pathname.slice(prefixo.length));
+}
+
 export function criarReferenciaAnexoBpm(pathname: string): string {
   if (!pathnameAnexoBpmValido(pathname)) throw new Error("Referência de anexo inválida");
   return `${PREFIXO_REFERENCIA_PRIVADA}${pathname}`;
