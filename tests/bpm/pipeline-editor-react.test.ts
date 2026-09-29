@@ -37,12 +37,23 @@ async function render() {
   await act(async () => root.render(h(PipelineEditorStateProvider, { key: pipeline, children: h(Editor, { key: version }) })));
 }
 async function click(label: string) {
-  const button = [...document.querySelectorAll("button")].find((item) => item.textContent?.includes(label));
+  let button = [...document.querySelectorAll("button")].find((item) => item.textContent?.includes(label));
+  if (!button && (label === "Existing" || label === "Criar campo")) {
+    await openCatalog();
+    button = [...document.querySelectorAll("button")].find((item) => item.textContent?.includes(label));
+  }
   expect(button, label).toBeTruthy();
   await act(async () => button!.click());
 }
+async function openCatalog() {
+  if (document.querySelector('[data-slot="sheet-content"]')) return;
+  const button = [...container.querySelectorAll("button")].find((item) => item.textContent?.trim() === "Adicionar campo");
+  expect(button).toBeTruthy();
+  await act(async () => button!.click());
+}
 async function addExisting() {
-  const button = container.querySelector<HTMLButtonElement>('[aria-label="Adicionar Existing à seção"]');
+  await openCatalog();
+  const button = document.querySelector<HTMLButtonElement>('[aria-label="Adicionar Existing à seção"]');
   expect(button).toBeTruthy();
   await act(async () => button!.click());
 }
@@ -58,6 +69,27 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
 
 describe("workspace React com remontagem versionada", () => {
+  it("mostra a etapa, o resumo e abre o catálogo somente ao adicionar campo", async () => {
+    expect(container.textContent).toContain("Configuração do formulário");
+    expect(container.textContent).toContain("1 seção");
+    expect(document.querySelector('[data-slot="sheet-content"]')).toBeNull();
+    await click("Adicionar campo");
+    expect(document.querySelector('[data-slot="sheet-content"]')?.textContent).toContain("Campos existentes");
+    expect(document.querySelector('[data-slot="sheet-content"]')?.textContent).toContain("Para informações breves");
+    await click("Criar campo");
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Criar campo para second");
+  });
+
+  it("oferece estado vazio com a ação existente de adicionar seção", async () => {
+    currentStages[1].formulario.secoes = [];
+    pipeline = "pipeline-vazio";
+    await render(); await click("Fields"); await click("second");
+    expect(container.textContent).toContain("Seu formulário está vazio");
+    await click("Adicionar seção");
+    expect(container.textContent).not.toContain("Seu formulário está vazio");
+    expect(container.querySelector('input[aria-label="Título da seção 1"]')).toBeTruthy();
+  });
+
   it("permite definir obrigação de avanço no primeiro rascunho do campo", async () => {
     await addExisting();
     await click("Existing");
@@ -108,7 +140,8 @@ describe("workspace React com remontagem versionada", () => {
     expect(container.textContent).not.toContain("Adicionar componente compatível");
     expect(container.querySelector('[aria-label^="Adicionar componente à seção"]')).toBeNull();
     expect(container.querySelector('[aria-label^="Adicionar campo à seção"]')).toBeNull();
-    expect(container.querySelector('[aria-label="Adicionar Existing à seção"]')).toBeTruthy();
+    await openCatalog();
+    expect(document.querySelector('[aria-label="Adicionar Existing à seção"]')).toBeTruthy();
     await click("Criar campo");
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Criar campo para second");
   });
@@ -120,7 +153,8 @@ describe("workspace React com remontagem versionada", () => {
     await render(); await click("Fields"); await click("second");
     expect(title()).toBe("Section second");
     expect(container.querySelector('input[aria-label="Título da seção 2"]')).toBeNull();
-    const seletor = container.querySelector<HTMLSelectElement>('[aria-label="Selecionar seção do formulário"]')!;
+    await openCatalog();
+    const seletor = document.querySelector<HTMLSelectElement>('[aria-label="Selecionar seção do formulário"]')!;
     await act(async () => { seletor.value = "other"; seletor.dispatchEvent(new Event("change", { bubbles: true })); });
     expect(container.querySelector<HTMLInputElement>('input[aria-label="Título da seção 2"]')?.value).toBe("Outra seção");
     expect(title()).toBeUndefined();
@@ -162,7 +196,8 @@ describe("workspace React com remontagem versionada", () => {
       confirmarDescarteDados: true,
       usoConfirmado: { valoresCard: 0, valoresGlobais: 0, anexos: 0, formularios: 0, etapas: 0 },
     });
-    expect(container.querySelector('[aria-label="Adicionar Existing à seção"]')).toBeNull();
+    await openCatalog();
+    expect(document.querySelector('[aria-label="Adicionar Existing à seção"]')).toBeNull();
     expect(toast.success).toHaveBeenCalledWith("Campo “Existing” excluído");
   });
 
@@ -186,7 +221,8 @@ describe("workspace React com remontagem versionada", () => {
     await click("Cancelar");
     expect(ExcluirCampoBpm).not.toHaveBeenCalled();
     expect(document.querySelector('[role="dialog"]')).toBeNull();
-    expect(container.querySelector('[aria-label="Adicionar Existing à seção"]')).toBeTruthy();
+    await openCatalog();
+    expect(document.querySelector('[aria-label="Adicionar Existing à seção"]')).toBeTruthy();
   });
 
   it("impede confirmação repetida enquanto a exclusão está pendente", async () => {
@@ -213,7 +249,8 @@ describe("workspace React com remontagem versionada", () => {
     await click("Existing");
     await click("Preparar exclusão definitiva");
     await click("Excluir definitivamente");
-    expect(container.querySelector('[aria-label="Adicionar Existing à seção"]')).toBeTruthy();
+    await openCatalog();
+    expect(document.querySelector('[aria-label="Adicionar Existing à seção"]')).toBeTruthy();
     expect(document.querySelector('[role="dialog"]')).toBeTruthy();
     expect(toast.error).toHaveBeenCalledWith("O uso do campo mudou. Atualize a análise e confirme novamente");
   });

@@ -27,6 +27,8 @@ describe("workspace integral de configuração", () => {
     expect(ui).toContain("Descartar alterações");
     expect(ui).toContain("Publicar rascunho principal");
     expect(ui).toContain("Rascunho principal: etapas e fluxo");
+    expect(ui).toContain("fixed bottom-4 right-4");
+    expect(ui).toContain("{alteracoesPendentes > 0 && (");
   });
 
   it("não confunde editores independentes com publicação parcial do rascunho principal", () => {

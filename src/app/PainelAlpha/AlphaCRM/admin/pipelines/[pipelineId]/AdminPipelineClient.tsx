@@ -7,7 +7,6 @@ import {
   Bot,
   BookOpen,
   CalendarClock,
-  Check,
   CircleDot,
   Clock3,
   ClipboardCheck,
@@ -441,40 +440,26 @@ export default function AdminPipelineClient({
   }
 
   return (
-    <div className="min-w-0 space-y-5 p-4 sm:p-6 xl:p-8">
-      <header className="-mx-4 flex flex-wrap items-center justify-between gap-4 border-b border-white/10 bg-slate-950/90 px-4 py-4 backdrop-blur-xl sm:-mx-6 sm:px-6 xl:-mx-8 xl:px-8">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Pipeline Comercial
-          </p>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <h1 className="truncate text-xl font-black text-white">
-              {pipeline.nome}
-            </h1>
-            <span
-              className={`rounded-full px-2 py-1 text-[10px] font-bold ${pipeline.ativo === false ? "bg-slate-700 text-slate-300" : "bg-emerald-400/10 text-emerald-200"}`}
-            >
-              {pipeline.ativo === false ? "Inativo" : "Ativo"}
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-slate-500">
-            Rascunho principal: etapas e fluxo
-          </p>
-          <p className="mt-1 font-mono text-[10px] text-slate-600">
-            Versão de configuração {baseVersion}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+    <div className={`min-w-0 space-y-4 p-4 sm:p-6 xl:p-8 ${alteracoesPendentes ? "pb-32 sm:pb-24" : ""}`}>
+      <div className="flex min-w-0 items-center gap-2 text-xs text-slate-400" aria-label={`Configuração do pipeline ${pipeline.nome}`}>
+        <span className="truncate font-semibold text-slate-200">{pipeline.nome}</span>
+        <span aria-hidden="true" className="text-slate-600">·</span>
+        <span>{pipeline.ativo === false ? "Inativo" : "Ativo"}</span>
+        <span aria-hidden="true" className="text-slate-600">·</span>
+        <span className="font-mono text-[11px]">v{baseVersion}</span>
+        <span className="hidden text-slate-500 lg:inline">Rascunho principal: etapas e fluxo</span>
+      </div>
+
+      {alteracoesPendentes > 0 && (
+        <div className="fixed bottom-4 right-4 z-40 flex max-w-[calc(100vw-2rem)] flex-wrap items-center justify-end gap-2 rounded-2xl border border-cyan-300/20 bg-slate-950/95 p-2.5 shadow-[0_20px_60px_rgba(0,0,0,.5)] backdrop-blur-xl sm:bottom-6 sm:right-6" aria-label="Ações do rascunho principal">
           <span
             role="status"
-            className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-semibold ${erro || conflitoPublicacao ? "border-rose-400/30 bg-rose-400/10 text-rose-200" : operacao ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-200" : alteracoesPendentes ? "border-amber-400/30 bg-amber-400/10 text-amber-200" : "border-emerald-400/20 bg-emerald-400/[0.07] text-emerald-200"}`}
+            className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-semibold ${erro || conflitoPublicacao ? "border-rose-400/30 bg-rose-400/10 text-rose-200" : operacao ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-200" : "border-amber-400/30 bg-amber-400/10 text-amber-200"}`}
           >
             {operacao ? (
               <Loader2 size={14} className="animate-spin" />
-            ) : alteracoesPendentes ? (
-              <CircleDot size={14} />
             ) : (
-              <Check size={14} />
+              <CircleDot size={14} />
             )}
             {conflitoPublicacao
               ? "Conflito — recarregue"
@@ -482,9 +467,7 @@ export default function AdminPipelineClient({
                 ? "Erro ao publicar"
                 : operacao
                   ? "Publicando…"
-                  : alteracoesPendentes
-                    ? `${alteracoesPendentes} alteração(ões) no rascunho principal`
-                    : "Publicado"}
+                  : `${alteracoesPendentes} alteração(ões) no rascunho principal`}
           </span>
           <button
             type="button"
@@ -504,7 +487,7 @@ export default function AdminPipelineClient({
             <Save size={14} /> Publicar rascunho principal
           </button>
         </div>
-      </header>
+      )}
 
       {erro && (
         <div

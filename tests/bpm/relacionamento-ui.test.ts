@@ -41,13 +41,15 @@ it("mantém relacionamento na composição/publicação e remove apenas da cria�
       onFormularioAtualizado: () => {},
     }),
   })));
-  const adicionar = container.querySelector<HTMLButtonElement>('[aria-label="Adicionar Parceiro à seção"]')!;
+  await click("Adicionar campo");
+  const adicionar = document.querySelector<HTMLButtonElement>('[aria-label="Adicionar Parceiro à seção"]')!;
   expect(adicionar).toBeTruthy();
   await act(async () => adicionar.click());
   expect(container.querySelector('input[aria-label="Rótulo de Parceiro"]')).toBeTruthy();
   vi.mocked(SalvarFormularioEtapaBpm).mockResolvedValue({ success: true, data: formulario } as Awaited<ReturnType<typeof SalvarFormularioEtapaBpm>>);
   await click("Publicar composição");
   expect(JSON.stringify(vi.mocked(SalvarFormularioEtapaBpm).mock.calls)).toContain('"rel"');
+  await click("Adicionar campo");
   await click("Criar campo");
   const tipo = document.querySelector<HTMLSelectElement>('[role="dialog"] select')!;
   expect([...tipo.options].map((option) => option.value)).toEqual([

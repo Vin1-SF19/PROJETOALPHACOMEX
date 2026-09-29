@@ -38,6 +38,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { resolverFormularioEtapa } from "@/lib/bpm/formulario-renderer";
 import { VALORES } from "@/lib/bpm/financeiro-config.client";
 import {
@@ -125,6 +126,26 @@ const TIPOS_CAMPO = [
   ["url", "Link/URL"],
   ["arquivo", "Arquivo"],
 ] as const;
+
+const DESCRICOES_CAMPO: Record<(typeof TIPOS_CAMPO)[number][0], string> = {
+  texto: "Para informações breves",
+  texto_longo: "Para observações e detalhes",
+  numero: "Para quantidades numéricas",
+  moeda: "Para valores monetários",
+  percentual: "Para taxas e percentuais",
+  data: "Para uma data do calendário",
+  data_hora: "Para data e horário",
+  booleano: "Para respostas de sim ou não",
+  selecao: "Para escolher uma opção",
+  multiselecao: "Para escolher várias opções",
+  cnpj: "Para cadastro empresarial",
+  cpf: "Para identificação pessoal",
+  email: "Para endereço de e-mail",
+  lista_email: "Para vários e-mails",
+  telefone: "Para números de contato",
+  url: "Para endereços de sites",
+  arquivo: "Para anexar documentos",
+};
 
 function mensagemErroCampo(error: unknown): string {
   if (typeof error === "string") return error;
@@ -250,6 +271,8 @@ function FormularioEtapaWorkspaceContent({
   const indiceSecaoSelecionada = Math.max(0, secoes.findIndex((secao) => secao.chave === secaoSelecionadaChave));
   const secaoSelecionada = secoes[indiceSecaoSelecionada];
   const [mostrarPreview, setMostrarPreview] = useState(true);
+  const [catalogoAberto, setCatalogoAberto] = useState(false);
+  const [catalogoTipo, setCatalogoTipo] = useState<"campos" | "blocos">("campos");
   const publicandoRef = useRef(false);
   const bloqueado = publicationBlocked || salvando || criandoCampo || excluindoCampo || salvandoCampo || habilitandoCampo;
 
@@ -775,22 +798,25 @@ function FormularioEtapaWorkspaceContent({
 
   return (
     <section
-      className="grid gap-4 xl:grid-cols-[248px_minmax(0,1fr)]"
+      className="grid min-w-0 gap-4 xl:grid-cols-[210px_minmax(0,1fr)_300px] 2xl:grid-cols-[230px_minmax(0,1fr)_340px]"
       aria-labelledby="formulario-etapa-title"
     >
-      <header className="relative flex flex-wrap items-center justify-between gap-5 overflow-hidden rounded-[28px] border border-cyan-300/20 bg-[radial-gradient(circle_at_12%_0%,rgba(34,211,238,.18),transparent_36%),linear-gradient(120deg,#102238,#0b1324_65%,#1a2135)] px-6 py-6 shadow-[0_24px_70px_rgba(0,0,0,.2)] xl:col-span-2">
+      <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-900/65 px-4 py-3 xl:col-span-3">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300">Configurações · Campos e formulários</p>
-          <h2 id="formulario-etapa-title" className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">Construa cada etapa do seu card</h2>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-300">Escolha uma etapa, combine campos e blocos operacionais e confira a prévia antes de publicar.</p>
+          <h2 id="formulario-etapa-title" className="text-lg font-semibold tracking-tight text-white">Configuração do formulário</h2>
+          <p className="mt-0.5 text-xs text-slate-400">Configure os campos e informações que aparecem em <strong className="text-slate-200">{etapa.nome}</strong>.</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+            <span className={`rounded-full border px-2 py-0.5 font-semibold ${ativo ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-200" : "border-slate-500/30 bg-slate-500/10 text-slate-300"}`}>● Formulário {ativo ? "ativo" : "inativo"}</span>
+            {sujo && <span role="status" className="rounded-full border border-amber-400/25 bg-amber-400/10 px-2 py-0.5 font-semibold text-amber-200">● Alterações não publicadas</span>}
+          </div>
         </div>
-        <label className="min-w-56 text-xs font-semibold text-slate-300">Fase atual
-          <select aria-label="Selecionar etapa do formulário" value={etapaId} onChange={(event) => selecionar(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-cyan-400/20 bg-slate-900 px-3 text-sm font-semibold text-cyan-100 focus-visible:outline-2 focus-visible:outline-cyan-400">
+        <label className="min-w-48 text-xs font-semibold text-slate-300">Etapa selecionada
+          <select aria-label="Selecionar etapa do formulário" value={etapaId} onChange={(event) => selecionar(event.target.value)} className="mt-1 min-h-10 w-full rounded-xl border border-cyan-400/20 bg-slate-950 px-3 text-sm font-semibold text-cyan-100 focus-visible:outline-2 focus-visible:outline-cyan-400">
             {etapas.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
           </select>
         </label>
       </header>
-      <div className="space-y-4 rounded-[24px] border border-white/10 bg-slate-950/85 p-3 shadow-[0_16px_45px_rgba(0,0,0,.12)] xl:self-start">
+      <nav className="space-y-4 rounded-2xl border border-white/10 bg-slate-950/80 p-3 xl:sticky xl:top-4 xl:self-start" aria-label="Etapas do pipeline">
         {pipelineNome && <div className="px-2"><p className="text-xs font-semibold text-cyan-200">Pipeline: {pipelineNome}</p><Link href="/PainelAlpha/AlphaCRM/admin" onClick={(event) => { if (sujo) { event.preventDefault(); toast.error("Publique ou descarte as alterações antes de trocar de pipeline."); } }} className="mt-2 inline-flex min-h-9 items-center text-xs font-semibold text-slate-300 underline underline-offset-4 hover:text-white">Trocar pipeline</Link></div>}
         <h3
           className="px-2 pb-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-500"
@@ -803,23 +829,35 @@ function FormularioEtapaWorkspaceContent({
               key={item.id}
               type="button"
               onClick={() => selecionar(item.id)}
-              className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left text-sm transition-colors ${item.id === etapaId ? "border-cyan-300/35 bg-cyan-400/15 text-cyan-50 shadow-[inset_3px_0_0_#67e8f9]" : "border-transparent text-slate-400 hover:border-white/10 hover:bg-white/5 hover:text-white"}`}
+              aria-current={item.id === etapaId ? "step" : undefined}
+              className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-cyan-300 ${item.id === etapaId ? "border-cyan-300/40 bg-cyan-400/15 text-cyan-50 shadow-[inset_3px_0_0_#67e8f9]" : "border-white/[0.06] bg-slate-900/30 text-slate-400 hover:border-white/15 hover:bg-white/5 hover:text-white"}`}
             >
-              <span className="flex min-w-0 items-center gap-2">
-                  {(
-                  <i
+              <i
                     className="size-2.5 shrink-0 rounded-full"
                     style={{ background: item.cor ?? "#64748b" }}
-                  />
-                )}
-                <span className="truncate">{item.nome}</span>
-              </span>
-              <span className="text-[10px]">
-                {item.formulario?.secoes.length ?? 0} seções
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">{item.nome}</span>
+                <span className="mt-0.5 block text-[10px] text-slate-500">
+                  {item.id === etapaId ? secoes.length : item.formulario?.secoes.length ?? 0} {(item.id === etapaId ? secoes.length : item.formulario?.secoes.length ?? 0) === 1 ? "seção" : "seções"}
+                </span>
               </span>
             </button>
           ))}
         </div>
+      </nav>
+      <Sheet open={catalogoAberto} onOpenChange={setCatalogoAberto}>
+        <SheetContent side="right" className="w-full overflow-y-auto border-white/10 bg-slate-950 p-4 text-white sm:max-w-md">
+          <SheetHeader className="px-0">
+            <SheetTitle className="text-white">Adicionar {catalogoTipo === "campos" ? "campo" : "bloco operacional"}</SheetTitle>
+            <SheetDescription className="text-slate-400">Escolha uma opção para a seção selecionada. As ações de criação e reuso permanecem as mesmas.</SheetDescription>
+          </SheetHeader>
+          <div className="mt-4 flex gap-2 border-b border-white/10 pb-3">
+            <button type="button" onClick={() => setCatalogoTipo("campos")} className={`min-h-9 flex-1 rounded-lg px-3 text-xs font-semibold ${catalogoTipo === "campos" ? "bg-cyan-400/15 text-cyan-100" : "text-slate-400 hover:bg-white/5"}`}>Campos</button>
+            <button type="button" onClick={() => setCatalogoTipo("blocos")} className={`min-h-9 flex-1 rounded-lg px-3 text-xs font-semibold ${catalogoTipo === "blocos" ? "bg-amber-400/15 text-amber-100" : "text-slate-400 hover:bg-white/5"}`}>Blocos operacionais</button>
+          </div>
+          <div className="mt-4 space-y-4">
+        {catalogoTipo === "blocos" && (
         <div className="border-t border-white/10 pt-4">
           <div className="flex items-center justify-between gap-2">
             <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-200"><CalendarClock size={15} className="text-amber-300" /> Blocos operacionais</h4>
@@ -835,17 +873,19 @@ function FormularioEtapaWorkspaceContent({
                     <p className="text-xs font-semibold text-white">{bloco.label}</p>
                     <p className="mt-1 text-[11px] leading-4 text-slate-400">{bloco.description}</p>
                   </div>
-                  <button type="button" disabled={bloqueado || !secoes.length || !bloco.disponivel || emUso} onClick={() => adicionarBloco(bloco.target)} aria-label={`Adicionar ${bloco.label} à seção`} className={`inline-flex size-9 shrink-0 items-center justify-center rounded-lg border transition-colors focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:cursor-not-allowed ${emUso ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-200" : "border-amber-300/20 bg-amber-300/10 text-amber-200 hover:bg-amber-300/20 disabled:opacity-40"}`}>{emUso ? <Check size={16} /> : <Plus size={16} />}</button>
+                  <button type="button" disabled={bloqueado || !secoes.length || !bloco.disponivel || emUso} onClick={() => { adicionarBloco(bloco.target); setCatalogoAberto(false); }} aria-label={`Adicionar ${bloco.label} à seção`} className={`inline-flex size-9 shrink-0 items-center justify-center rounded-lg border transition-colors focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:cursor-not-allowed ${emUso ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-200" : "border-amber-300/20 bg-amber-300/10 text-amber-200 hover:bg-amber-300/20 disabled:opacity-40"}`}>{emUso ? <Check size={16} /> : <Plus size={16} />}</button>
                 </div>
                 <p className={`mt-2 text-[10px] font-medium ${emUso ? "text-emerald-300" : bloco.disponivel ? "text-amber-200/80" : "text-slate-500"}`}>{emUso ? "Já incluído nesta etapa" : bloco.disponivel ? "Pronto para adicionar" : "Este bloco não está habilitado nesta etapa"}</p>
               </div>;
             })}
           </div>
         </div>
+        )}
+        {catalogoTipo === "campos" && (
         <div className="border-t border-white/10 pt-4">
           <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300"><Layers3 size={15} /> Criar campo</h4>
           <p className="mt-1 text-xs text-slate-500">Clique em um tipo para criar um campo na seção selecionada.</p>
-          <div className="mt-3 grid max-h-72 gap-1.5 overflow-y-auto pr-1">{TIPOS_CAMPO.map(([tipo, rotulo]) => <button key={tipo} type="button" disabled={bloqueado || !secoes.length} onClick={() => { abrirNovoCampo(indiceSecaoSelecionada); setTipoNovoCampo(tipo); }} className="flex min-h-10 items-center gap-2 rounded-lg border border-cyan-400/10 bg-cyan-400/5 px-3 text-left text-xs text-slate-200 hover:border-cyan-400/40 hover:bg-cyan-400/10 focus-visible:outline-2 focus-visible:outline-cyan-400 disabled:opacity-40"><FileText size={14} className="shrink-0 text-cyan-300" />{rotulo}</button>)}</div>
+          <div className="mt-3 grid max-h-80 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">{TIPOS_CAMPO.map(([tipo, rotulo]) => <button key={tipo} type="button" disabled={bloqueado || !secoes.length} onClick={() => { setCatalogoAberto(false); abrirNovoCampo(indiceSecaoSelecionada); setTipoNovoCampo(tipo); }} className="flex min-h-16 items-start gap-2 rounded-xl border border-cyan-400/10 bg-cyan-400/5 px-3 py-2.5 text-left text-xs text-slate-200 transition-colors hover:border-cyan-400/40 hover:bg-cyan-400/10 focus-visible:outline-2 focus-visible:outline-cyan-400 disabled:opacity-40"><FileText size={15} className="mt-0.5 shrink-0 text-cyan-300" /><span><span className="block font-semibold text-white">{rotulo}</span><span className="mt-1 block text-[11px] leading-4 text-slate-400">{DESCRICOES_CAMPO[tipo]}</span></span></button>)}</div>
           <h4 className="mt-5 border-t border-white/10 pt-4 text-xs font-bold uppercase tracking-wider text-slate-300">Campos existentes</h4>
           <p className="mt-1 text-xs text-slate-500">Reutilize sem perder valores ou anexos.</p>
           <label className="mt-3 flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-slate-900 px-3 text-slate-400">
@@ -859,19 +899,22 @@ function FormularioEtapaWorkspaceContent({
             </select>
           </label>
           <div className="mt-3 max-h-[45vh] space-y-1.5 overflow-y-auto pr-1">
-            {camposFiltrados.map((campo) => <div key={campo.id} className="flex min-h-11 items-center gap-1 rounded-xl border border-white/10 bg-slate-900/70 p-1 text-xs text-slate-200"><button type="button" onClick={() => selecionarCampo(campo)} className="min-w-0 flex-1 rounded-lg px-2 py-1 text-left hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-cyan-400"><span className="block truncate">{campo.nome}</span><span className="block text-[10px] text-slate-500">{TIPOS_CAMPO.find(([tipo]) => tipo === campo.tipo)?.[1] ?? campo.tipo}{campo.etapaConfiguracoes?.some((item) => item.etapaId === etapaId && item.visivel) ? "" : " · fora desta etapa"}</span></button><button type="button" disabled={bloqueado || !secoes.length} onClick={() => void adicionarCampoDaBiblioteca(indiceSecaoSelecionada, campo)} aria-label={`Adicionar ${campo.nome} à seção`} className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg text-cyan-200 hover:bg-cyan-400/10 disabled:opacity-40"><Plus size={15} aria-hidden="true" /></button></div>)}
+            {camposFiltrados.map((campo) => <div key={campo.id} className="flex min-h-11 items-center gap-1 rounded-xl border border-white/10 bg-slate-900/70 p-1 text-xs text-slate-200"><button type="button" onClick={() => { selecionarCampo(campo); setCatalogoAberto(false); }} className="min-w-0 flex-1 rounded-lg px-2 py-1 text-left hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-cyan-400"><span className="block truncate">{campo.nome}</span><span className="block text-[10px] text-slate-500">{TIPOS_CAMPO.find(([tipo]) => tipo === campo.tipo)?.[1] ?? campo.tipo}{campo.etapaConfiguracoes?.some((item) => item.etapaId === etapaId && item.visivel) ? "" : " · fora desta etapa"}</span></button><button type="button" disabled={bloqueado || !secoes.length} onClick={() => { void adicionarCampoDaBiblioteca(indiceSecaoSelecionada, campo); setCatalogoAberto(false); }} aria-label={`Adicionar ${campo.nome} à seção`} className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg text-cyan-200 hover:bg-cyan-400/10 disabled:opacity-40"><Plus size={15} aria-hidden="true" /></button></div>)}
             {!camposFiltrados.length && <p className="py-3 text-xs text-slate-500">Nenhum campo disponível para esta busca.</p>}
           </div>
-          <button type="button" disabled={bloqueado || !secoes.length} onClick={() => abrirNovoCampo(indiceSecaoSelecionada)} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-cyan-400/30 text-xs font-semibold text-cyan-200 hover:bg-cyan-400/10 disabled:opacity-40"><Plus size={15} /> Criar campo</button>
+          <button type="button" disabled={bloqueado || !secoes.length} onClick={() => { setCatalogoAberto(false); abrirNovoCampo(indiceSecaoSelecionada); }} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-cyan-400/30 text-xs font-semibold text-cyan-200 hover:bg-cyan-400/10 disabled:opacity-40"><Plus size={15} /> Criar campo</button>
         </div>
+        )}
         <div className="border-t border-white/10 pt-4">
           <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">Card fechado do Kanban</h4>
           <p className="mt-1 text-[11px] leading-4 text-slate-500">A composição compacta tem um editor dedicado.</p>
           <a href={`/PainelAlpha/AlphaCRM/admin/pipelines/${pipelineId}?tab=card`} onClick={(event) => { if (sujo) { event.preventDefault(); toast.error("Publique ou descarte as alterações antes de abrir o card do Kanban."); } }} className="mt-2 inline-flex min-h-9 items-center text-xs font-semibold text-cyan-200 underline underline-offset-4 hover:text-white">Abrir editor do Kanban</a>
         </div>
-      </div>
+          </div>
+        </SheetContent>
+      </Sheet>
 
-      <div className="min-w-0 space-y-5 rounded-[28px] border border-amber-300/15 bg-[radial-gradient(ellipse_at_top,rgba(251,191,36,0.11),rgba(8,18,32,0.97)_68%)] p-4 shadow-[0_28px_90px_rgba(2,6,23,0.35)] lg:p-7">
+      <div className="min-w-0 space-y-5 rounded-2xl border border-white/10 bg-slate-950/65 p-4 shadow-[0_16px_40px_rgba(2,6,23,0.18)] lg:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="flex items-center gap-2 font-bold text-white">
@@ -886,7 +929,7 @@ function FormularioEtapaWorkspaceContent({
                 : "Monte as seções que aparecem no card desta etapa e defina o que precisa ser preenchido."}
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <label className="flex items-center gap-2 text-xs text-slate-300">
               <input
                 type="checkbox"
@@ -930,12 +973,33 @@ function FormularioEtapaWorkspaceContent({
           </p>
         )}
 
-        <div className="mx-auto w-full max-w-3xl rounded-[24px] border border-white/12 bg-slate-950/95 p-4 shadow-[0_28px_80px_rgba(0,0,0,0.26)] sm:p-6">
-          <div className="mb-5 rounded-xl border border-amber-300/10 bg-amber-200/[0.04] px-4 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-200/70">Fase atual</p>
-            <p className="mt-1 text-base font-semibold text-white">{etapa.nome}</p>
+        <div className="space-y-5 rounded-2xl border border-white/10 bg-slate-900/45 p-3 sm:p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4 text-xs text-slate-300">
+            <span><span className="font-semibold text-cyan-200">{secoes.length} {secoes.length === 1 ? "seção" : "seções"}</span> · {secoes.reduce((total, secao) => total + secao.componentes.length, 0)} componentes</span>
+            <div className="inline-flex rounded-xl border border-white/10 bg-slate-950/70 p-1" aria-label="Modo de visualização do formulário">
+              <button type="button" onClick={() => setMostrarPreview(false)} aria-pressed={!mostrarPreview} className={`min-h-8 rounded-lg px-3 font-semibold transition-colors ${!mostrarPreview ? "bg-cyan-400/20 text-cyan-100" : "text-slate-400 hover:text-white"}`}>Editar</button>
+              <button type="button" onClick={() => setMostrarPreview(true)} aria-pressed={mostrarPreview} className={`min-h-8 rounded-lg px-3 font-semibold transition-colors ${mostrarPreview ? "bg-cyan-400/20 text-cyan-100" : "text-slate-400 hover:text-white"}`}><Eye size={13} className="mr-1 inline" /> Visualizar</button>
+            </div>
           </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-cyan-400/15 bg-cyan-400/5 px-3 py-2 text-xs text-slate-300"><span><span className="font-semibold text-cyan-200">{secoes.length} seções</span> · {secoes.reduce((total, secao) => total + secao.componentes.length, 0)} componentes nesta etapa</span><button type="button" onClick={() => setMostrarPreview((atual) => !atual)} className="inline-flex min-h-9 items-center gap-2 rounded-lg px-2 text-cyan-200 hover:bg-cyan-400/10"><Eye size={14} /> {mostrarPreview ? "Ocultar prévia" : "Ver prévia"}</button></div>
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-[0.14em] text-slate-300">Seções do formulário</h4>
+            <p className="mt-1 text-xs text-slate-500">Selecione uma seção para organizar seus campos e blocos.</p>
+          </div>
+          {secoes.length > 0 && <div className="grid gap-2">
+            {secoes.map((secao, indice) => <div key={secao.chave} className={`rounded-xl border p-3 transition-colors ${secao.chave === secaoSelecionada?.chave ? "border-cyan-300/40 bg-cyan-400/[0.08] ring-1 ring-cyan-300/10" : "border-white/10 bg-slate-950/60 hover:border-white/20"}`}>
+              <button type="button" onClick={() => { setSecaoSelecionadaChave(secao.chave); setCampoSelecionadoId(null); setBlocoSelecionado(null); }} aria-current={secao.chave === secaoSelecionada?.chave ? "true" : undefined} className="flex min-h-9 w-full items-center justify-between gap-2 text-left focus-visible:outline-2 focus-visible:outline-cyan-300">
+                <span className="min-w-0 truncate text-sm font-semibold text-white">{indice + 1}. {secao.titulo || `Seção ${indice + 1}`}</span>
+                <span className="shrink-0 text-[11px] text-slate-400">{secao.componentes.length} componentes</span>
+              </button>
+              {secao.componentes.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5 border-t border-white/10 pt-2">
+                {secao.componentes.map((componente) => <span key={componente.clientId ?? componente.chave} className={`rounded-md border px-2 py-1 text-[11px] ${componente.campoId ? "border-cyan-300/15 bg-cyan-400/[0.05] text-cyan-100/80" : "border-amber-300/20 bg-amber-300/[0.06] text-amber-100/80"}`}>{campoPorId.get(componente.campoId ?? "")?.nome ?? obterDefinicaoComponenteFormulario(componente.capability)?.label ?? componente.chave}</span>)}
+              </div>}
+            </div>)}
+          </div>}
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button type="button" disabled={bloqueado || !secoes.length} onClick={() => { setCatalogoTipo("campos"); setCatalogoAberto(true); }} className="flex min-h-14 items-center gap-3 rounded-xl border border-cyan-300/20 bg-cyan-400/[0.05] px-3 text-left text-xs font-semibold text-cyan-100 transition-colors hover:border-cyan-300/45 hover:bg-cyan-400/10 focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:opacity-40"><span className="rounded-lg bg-cyan-400/10 p-2"><Plus size={16} /></span> Adicionar campo</button>
+            <button type="button" disabled={bloqueado || !secoes.length} onClick={() => { setCatalogoTipo("blocos"); setCatalogoAberto(true); }} className="flex min-h-14 items-center gap-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.05] px-3 text-left text-xs font-semibold text-amber-100 transition-colors hover:border-amber-300/45 hover:bg-amber-300/10 focus-visible:outline-2 focus-visible:outline-amber-300 disabled:opacity-40"><span className="rounded-lg bg-amber-300/10 p-2"><Plus size={16} /></span> Adicionar bloco operacional</button>
+          </div>
         {pipelineNome === "Revisão de Radar" && etapa.nome === "Agendar Reunião" && (
           <section aria-label="Campos do sistema de Agendar Reunião" className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-slate-300">
             <p className="font-semibold text-white">Campos do sistema desta etapa</p>
@@ -963,61 +1027,15 @@ function FormularioEtapaWorkspaceContent({
             <p className="mt-2">Próximo Contato — {componentesEmUso.has("FOLLOW_UP_SCHEDULER") ? "no formulário" : "adicione Próximo contato"}</p>
           </section>
         )}
-        <ListaCamposFormulario
-          secoes={secaoSelecionada ? [secaoSelecionada] : []}
-          bloqueado={bloqueado}
-          metadados={(componente) => {
-            const campo = campoPorId.get(componente.campoId ?? "") ?? componente.campo;
-            return {
-              nome: campo?.nome ?? obterDefinicaoComponenteFormulario(componente.capability)?.label ?? componente.chave,
-              tipo: campo ? TIPOS_CAMPO.find(([tipo]) => tipo === campo.tipo)?.[1] ?? campo.tipo : componente.tipo === "CHECKLIST" ? "Checklist" : "Componente especializado",
-              obrigatorio: campoPorId.get(componente.campoId ?? "")?.etapaConfiguracoes?.find((config) => config.etapaId === etapaId)?.obrigatorio ?? false,
-              rotulo: rotuloPersonalizado(componente),
-            };
-          }}
-          onMover={(origem, destino) => {
-            if (bloqueado) return false;
-            const resultado = moverItemFormulario(secoes, origem, destino);
-            if (resultado.erro) { toast.error(resultado.erro); return false; }
-            setSecoes((atuais) => moverItemFormulario(atuais, origem, destino).secoes);
-            setSujo(true);
-            return true;
-          }}
-          onRotulo={(_, indice, rotulo) => alterarSecao(indiceSecaoSelecionada, { componentes: secaoSelecionada.componentes.map((item, i) => i === indice ? aplicarRotulo(item, rotulo) : item) })}
-          onRemover={(_, indice) => {
-            const componente = secaoSelecionada.componentes[indice];
-            if (pipelineNome === "Revisão de Radar" && etapaEhEmTratativa(etapa.nome)
-              && ["FOLLOW_UP_SCHEDULER", "FOLLOW_UP_CHECKLIST"].includes(componente?.capability ?? "")) {
-              toast.error("Este bloco é obrigatório na etapa Em tratativas.");
-              return;
-            }
-            if (componente?.capability) {
-              setBlocoParaRemover({ secaoChave: secaoSelecionada.chave, capability: componente.capability, label: obterDefinicaoComponenteFormulario(componente.capability)?.label ?? componente.chave });
-              return;
-            }
-            const campoId = componente?.campoId;
-            const uso = campoId ? usoCampos?.[campoId] : null;
-            if (campoId && uso && uso.valoresCard + uso.valoresGlobais + uso.anexos > 0) toast.success("Ao publicar, o campo sairá do formulário; valores e anexos existentes serão preservados.");
-            if (campoId) setObrigacoesDraft((atuais) => ({ ...atuais, [campoId]: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false } }));
-            alterarSecao(indiceSecaoSelecionada, { componentes: secaoSelecionada.componentes.filter((_, i) => i !== indice) });
-          }}
-          onSelecionar={(componente) => {
-            const campo = camposLocais.find((item) => item.id === componente.campoId);
-            if (campo) selecionarCampo(campo);
-            else if (componente.capability && secaoSelecionada) {
-              setCampoSelecionadoId(null);
-              setBlocoSelecionado({ secaoChave: secaoSelecionada.chave, chave: componente.chave });
-            }
-          }}
-        />
         <div className="border-t border-white/10 pt-4">
-          <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white"><Settings2 size={16} className="text-cyan-300" /> Seções do card</h4>
+          <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white"><Settings2 size={16} className="text-cyan-300" /> Editar seção selecionada</h4>
           <fieldset disabled={bloqueado} className="mt-3 space-y-3">
         {secoes.length === 0 ? (
-          <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/25 bg-cyan-400/[0.025] px-6 py-10 text-center">
+          <div className="flex min-h-56 flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/25 bg-cyan-400/[0.025] px-6 py-8 text-center">
             <div className="mb-4 flex size-16 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-200"><Layers3 size={28} /></div>
-            <p className="max-w-sm text-base font-semibold text-white">Comece a criar o formulário desta fase</p>
-            <p className="mt-2 max-w-sm text-xs leading-5 text-slate-400">Adicione uma seção e escolha os campos no catálogo ao lado. As regras passam a valer ao publicar.</p>
+            <p className="max-w-sm text-base font-semibold text-white">Seu formulário está vazio</p>
+            <p className="mt-2 max-w-sm text-xs leading-5 text-slate-400">Adicione uma seção para começar a configurar esta etapa. As regras passam a valer ao publicar.</p>
+            <button type="button" onClick={adicionarSecao} className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-xl bg-cyan-400 px-4 text-xs font-bold text-slate-950 hover:bg-cyan-300"><Plus size={15} /> Adicionar seção</button>
           </div>
         ) : (
           <div className="space-y-3">
@@ -1033,7 +1051,7 @@ function FormularioEtapaWorkspaceContent({
                     onChange={(event) =>
                       alterarSecao(indiceSecaoSelecionada, { titulo: event.target.value })
                     }
-                    className="min-w-0 flex-1 rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm font-semibold text-white"
+                    className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-3 py-2 text-sm font-semibold text-white outline-none transition-colors hover:border-white/10 hover:bg-slate-900 focus:border-cyan-300/40 focus:bg-slate-900"
                   />
                   <button
                     type="button"
@@ -1081,6 +1099,55 @@ function FormularioEtapaWorkspaceContent({
                     <Trash2 size={15} />
                   </button>
                 </div>
+        <ListaCamposFormulario
+          secoes={secaoSelecionada ? [secaoSelecionada] : []}
+          bloqueado={bloqueado}
+          selectedCampoId={campoSelecionadoId}
+          selectedBlockKey={blocoSelecionado?.chave ?? null}
+          metadados={(componente) => {
+            const campo = campoPorId.get(componente.campoId ?? "") ?? componente.campo;
+            return {
+              nome: campo?.nome ?? obterDefinicaoComponenteFormulario(componente.capability)?.label ?? componente.chave,
+              tipo: campo ? TIPOS_CAMPO.find(([tipo]) => tipo === campo.tipo)?.[1] ?? campo.tipo : componente.tipo === "CHECKLIST" ? "Checklist" : "Componente especializado",
+              obrigatorio: campoPorId.get(componente.campoId ?? "")?.etapaConfiguracoes?.find((config) => config.etapaId === etapaId)?.obrigatorio ?? false,
+              rotulo: rotuloPersonalizado(componente),
+            };
+          }}
+          onMover={(origem, destino) => {
+            if (bloqueado) return false;
+            const resultado = moverItemFormulario(secoes, origem, destino);
+            if (resultado.erro) { toast.error(resultado.erro); return false; }
+            setSecoes((atuais) => moverItemFormulario(atuais, origem, destino).secoes);
+            setSujo(true);
+            return true;
+          }}
+          onRotulo={(_, indice, rotulo) => alterarSecao(indiceSecaoSelecionada, { componentes: secaoSelecionada.componentes.map((item, i) => i === indice ? aplicarRotulo(item, rotulo) : item) })}
+          onRemover={(_, indice) => {
+            const componente = secaoSelecionada.componentes[indice];
+            if (pipelineNome === "Revisão de Radar" && etapaEhEmTratativa(etapa.nome)
+              && ["FOLLOW_UP_SCHEDULER", "FOLLOW_UP_CHECKLIST"].includes(componente?.capability ?? "")) {
+              toast.error("Este bloco é obrigatório na etapa Em tratativas.");
+              return;
+            }
+            if (componente?.capability) {
+              setBlocoParaRemover({ secaoChave: secaoSelecionada.chave, capability: componente.capability, label: obterDefinicaoComponenteFormulario(componente.capability)?.label ?? componente.chave });
+              return;
+            }
+            const campoId = componente?.campoId;
+            const uso = campoId ? usoCampos?.[campoId] : null;
+            if (campoId && uso && uso.valoresCard + uso.valoresGlobais + uso.anexos > 0) toast.success("Ao publicar, o campo sairá do formulário; valores e anexos existentes serão preservados.");
+            if (campoId) setObrigacoesDraft((atuais) => ({ ...atuais, [campoId]: { obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false } }));
+            alterarSecao(indiceSecaoSelecionada, { componentes: secaoSelecionada.componentes.filter((_, i) => i !== indice) });
+          }}
+          onSelecionar={(componente) => {
+            const campo = camposLocais.find((item) => item.id === componente.campoId);
+            if (campo) selecionarCampo(campo);
+            else if (componente.capability && secaoSelecionada) {
+              setCampoSelecionadoId(null);
+              setBlocoSelecionado({ secaoChave: secaoSelecionada.chave, chave: componente.chave });
+            }
+          }}
+        />
                 <div className="mt-3 space-y-2 border-l border-white/10 pl-4">
                   {secaoSelecionada.componentes.some((componente) => {
                     if (!componente.campoId) return false;
@@ -1092,21 +1159,21 @@ function FormularioEtapaWorkspaceContent({
             )}
           </div>
         )}
-        <button
+        {secoes.length > 0 && <button
           type="button"
           onClick={adicionarSecao}
           className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 px-3 text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white"
         >
           <Plus size={14} /> Adicionar seção
-        </button>
+        </button>}
           </fieldset>
         </div>
         </div>
       </div>
 
-      <aside className="min-w-0 space-y-4 xl:col-start-2 2xl:grid 2xl:grid-cols-2 2xl:items-start 2xl:gap-4 2xl:space-y-0" aria-label="Propriedades e prévia">
+      <aside className="min-w-0 space-y-4 xl:col-start-3 xl:row-start-2 xl:self-start" aria-label="Propriedades e prévia">
         <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-          <h3 className="flex items-center gap-2 text-sm font-bold text-white"><Pencil size={16} className="text-cyan-300" /> Propriedades do componente</h3>
+          <h3 className="flex items-center gap-2 text-sm font-bold text-white"><Pencil size={16} className="text-cyan-300" /> Propriedades</h3>
           {componenteSelecionado?.capability && <div className="mt-4 space-y-3 text-xs text-slate-300">
             <p className="font-semibold text-white">{obterDefinicaoComponenteFormulario(componenteSelecionado.capability)?.label ?? componenteSelecionado.chave}</p>
             <p>Este bloco pertence ao formulário de <strong>{etapa.nome}</strong>. A regra passa a valer após publicar a composição.</p>
@@ -1127,7 +1194,14 @@ function FormularioEtapaWorkspaceContent({
                 </label>
               )}
           </div>}
-          {!campoSelecionado && !componenteSelecionado ? <p className="mt-3 text-xs leading-5 text-slate-400">Selecione um campo ou bloco na composição para configurar suas regras.</p> : campoSelecionado && <div className="mt-4 space-y-4">
+          {!campoSelecionado && !componenteSelecionado && (secaoSelecionada ? <div className="mt-4 space-y-3 text-xs text-slate-300">
+            <p className="font-semibold uppercase tracking-wider text-cyan-200">Seção selecionada</p>
+            <label className="block font-semibold text-slate-300">Título da seção
+              <input value={secaoSelecionada.titulo} disabled={bloqueado} onChange={(event) => alterarSecao(indiceSecaoSelecionada, { titulo: event.target.value })} className="mt-1 min-h-10 w-full rounded-lg border border-white/10 bg-slate-900 px-3 text-sm text-white focus-visible:outline-2 focus-visible:outline-cyan-300" />
+            </label>
+            <p className="text-slate-500">{secaoSelecionada.componentes.length} componentes. Selecione um campo ou bloco para ver as demais propriedades.</p>
+          </div> : <p className="mt-3 text-xs leading-5 text-slate-400">Adicione uma seção e selecione um campo ou bloco para configurar suas propriedades.</p>)}
+          {campoSelecionado && <div className="mt-4 space-y-4">
             {indiceSecaoCampoSelecionado >= 0 && secoes.length > 1 && <label className="block text-xs font-semibold text-slate-300">Mover campo para seção
               <select value={secoes[indiceSecaoCampoSelecionado].chave} disabled={bloqueado} onChange={(event) => {
                 const destino = event.target.value;
@@ -1214,10 +1288,10 @@ function FormularioEtapaWorkspaceContent({
         </div>
       {mostrarPreview && (
         <section className="rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top,rgba(34,211,238,.08),transparent_55%)] p-4 xl:p-6">
-          <div className="mx-auto w-full max-w-xl rounded-2xl border border-white/10 bg-slate-950 p-4 shadow-2xl">
+          <div className="w-full rounded-2xl border border-white/10 bg-slate-950 p-4 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs text-slate-500">Preview do card</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-cyan-200">Prévia do card</p>
                 <h3 className="mt-1 font-bold text-white">
                   Empresa de exemplo
                 </h3>
