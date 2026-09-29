@@ -53,6 +53,8 @@ export function PainelCamposEtapaAtual({
 }: Props) {
   const { registerSave, registerManualSave, getPendingUpload, setPendingUpload, setPendingFields, getVersion, confirmVersion, getDraft, setDraft, subscribeConfirmation, getFailedSaveKeys, clearFailedSave } = useCardSave();
   const idInstancia = `${card.id}-${instanceKey}`;
+  const prefixoChaveSaveCampos = `${card.id}:campo:`;
+  const chaveSaveCampos = `${card.id}:campo:${idInstancia}`;
   const ordemCampos = new Map(campoIds.map((id, indice) => [id, indice]));
   const camposDoComponente = card.camposEtapa
     .filter((campo) => ordemCampos.has(campo.id))
@@ -94,6 +96,18 @@ export function PainelCamposEtapaAtual({
   const revisaoEdicao = useRef(0);
   const valoresRef = useRef(valoresCamposAtuais);
   const rastreadores = useRef(new Map<string, ReturnType<typeof criarRastreadorRascunho>>());
+  function limparFalhasCamposDaSecao() {
+    const idsDaSecao = new Set(camposEtapaBase.map((campo) => campo.id));
+    for (const key of getFailedSaveKeys(card.id)) {
+      if (key === chaveSaveCampos || key === `${prefixoChaveSaveCampos}${instanceKey}`) {
+        clearFailedSave(key);
+        continue;
+      }
+      if (!key.startsWith(prefixoChaveSaveCampos)) continue;
+      const idsAntigos = key.slice(prefixoChaveSaveCampos.length).split(",");
+      if (idsAntigos.length && idsAntigos.every((id) => idsDaSecao.has(id))) clearFailedSave(key);
+    }
+  }
   useEffect(() => subscribeConfirmation(card.id, (confirmed, key) => {
     if (!key?.startsWith(`${card.id}:arquivo:`)) return;
     const campoId = key.slice(`${card.id}:arquivo:`.length);
@@ -131,6 +145,9 @@ export function PainelCamposEtapaAtual({
     const campo = camposEtapaBase.find((item) => item.id === id);
     if (campo?.tipo === "cpf" && valorComparavel("cpf", valor) === valorComparavel("cpf", valoresRef.current[id])) return;
     revisaoEdicao.current += 1;
+    // O retry da tentativa anterior capturou um rascunho antigo. Depois de
+    // editar, somente o botão Salvar pode enviar a versão atual do formulário.
+    limparFalhasCamposDaSecao();
     setEstadoSave("pendente");
     setMensagemErroSave(null);
     let rastreador = rastreadores.current.get(id);
@@ -204,9 +221,7 @@ export function PainelCamposEtapaAtual({
   }, [snapshotCamposEtapa, versaoRemotaCampos, realtimeRevision, getDraft, idInstancia]);
   function usarDadosAtualizadosCampos() {
     if (!snapshotRemotoPendente || !camposRemotosPendentes) return;
-    const chavesDestaSecao = new Set(camposEtapaBase.map((campo) => `${card.id}:campo:${campo.id}`));
-    chavesDestaSecao.add(`${card.id}:campo:${instanceKey}`);
-    for (const key of getFailedSaveKeys(card.id)) if (chavesDestaSecao.has(key)) clearFailedSave(key);
+    limparFalhasCamposDaSecao();
     valoresRef.current = snapshotRemotoPendente.valores;
     rastreadores.current.clear();
     setPendingFields(`${card.id}:${idInstancia}`, []);
@@ -352,14 +367,16 @@ export function PainelCamposEtapaAtual({
       setMensagemErroSave(null);
       onAtualizado();
       return true;
-    }, card.id, `${card.id}:campo:${campoIds.join(",") || instanceKey}`,
+    }, card.id, chaveSaveCampos,
       { ...erroFormulario, failureMessage: () => erroDaTentativa }, false).finally(() => {
       setSavesCamposPendentes((total) => total - 1);
     });
     const sucesso = await promise;
-    if (!sucesso && revisaoEdicao.current === revisaoEnviada) {
-      setEstadoSave("erro");
-      setMensagemErroSave(erroDaTentativa);
+    if (!sucesso) {
+      if (revisaoEdicao.current === revisaoEnviada) {
+        setEstadoSave("erro");
+        setMensagemErroSave(erroDaTentativa);
+      }
     }
     return sucesso;
   }
@@ -375,6 +392,7 @@ export function PainelCamposEtapaAtual({
     if (salvandoManualRef.current) return false;
     const ids = [...new Set([...arquivosPendentesRef.current.keys(), ...idsPendentes()])];
     if (!ids.length) return true;
+    limparFalhasCamposDaSecao();
     salvandoManualRef.current = true;
     setProgressoSave({ concluido: 0, total: ids.length });
     try {

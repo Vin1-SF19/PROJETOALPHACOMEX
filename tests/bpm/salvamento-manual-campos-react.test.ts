@@ -175,3 +175,67 @@ it("em falha de validação do pagamento mantém os cinco valores e mostra a pen
   expect(container.querySelector<HTMLInputElement>("#campo-bpm-valor_recebido")?.value).toBe("22000");
   expect(botaoSalvar().textContent).toContain("Salvar alterações (5)");
 });
+
+it("descarta retry antigo após editar o lote financeiro que falhou", async () => {
+  await montarPagamento();
+  vi.mocked(AtualizarCardBpm)
+    .mockResolvedValueOnce({ success: false, error: "Valor recebido diferente do esperado" })
+    .mockResolvedValueOnce({ success: true, data: { updatedAt: new Date("2026-09-29T10:01:00Z"), camposValores: {
+      pagamento_confirmado: "Sim", data_pagamento: "2026-09-29T18:00:00.000Z",
+      valor_recebido: "23000", forma_utilizada: "Cartão de crédito",
+    } } });
+  await preencherPagamento();
+  await act(async () => { botaoSalvar().click(); });
+  expect(context.getFailedSaveKeys("card-pagamento")).toHaveLength(1);
+
+  await editar("valor_recebido", "23000");
+  await selecionar("pagamento_exito", "");
+  expect(context.getPendingFields("card-pagamento")).toHaveLength(4);
+  expect(context.getFailedSaveKeys("card-pagamento")).toEqual([]);
+  await act(async () => { expect(await context.retryFailedSaves("card-pagamento")).toBe(true); });
+
+  expect(AtualizarCardBpm).toHaveBeenCalledTimes(2);
+  expect(AtualizarCardBpm).toHaveBeenNthCalledWith(2, expect.objectContaining({
+    cardId: "card-pagamento", camposValores: {
+      pagamento_confirmado: "Sim", data_pagamento: "2026-09-29T18:00:00.000Z",
+      valor_recebido: "23000", forma_utilizada: "Cartão de crédito",
+    },
+  }));
+  expect(context.getFailedSaveKeys("card-pagamento")).toEqual([]);
+  expect(context.getPendingFields("card-pagamento")).toEqual([]);
+  expect(botaoSalvar().hasAttribute("disabled")).toBe(true);
+});
+
+it("falha tardia do lote A não apaga a recuperação mais recente do lote B", async () => {
+  await montarPagamento();
+  let falharA!: (value: Awaited<ReturnType<typeof AtualizarCardBpm>>) => void;
+  vi.mocked(AtualizarCardBpm).mockImplementationOnce(() => new Promise((resolve) => { falharA = resolve; }));
+  await preencherPagamento();
+  await act(async () => { botaoSalvar().click(); await Promise.resolve(); });
+  const recoveryKey = context.getFailedSaveKeys("card-pagamento")[0]
+    ?? "card-pagamento:campo:card-pagamento-pagamento";
+  // Outra edição registra uma nova tentativa para o mesmo formulário enquanto A aguarda a API.
+  const executarB = vi.fn(async () => false);
+  let tentativaB!: Promise<boolean>;
+  await act(async () => {
+    context.clearFailedSave(recoveryKey);
+    tentativaB = context.registerSave(executarB, "card-pagamento", recoveryKey,
+      { failureMessage: () => "Falha do lote B" }, false);
+    falharA({ success: false, error: "Falha do lote A" });
+    await tentativaB;
+  });
+
+  expect(executarB).toHaveBeenCalledTimes(1);
+  expect(context.getFailedSaveKeys("card-pagamento")).toEqual([recoveryKey]);
+  expect(toast.error).toHaveBeenLastCalledWith("Falha do lote B", expect.any(Object));
+
+  const ultimoToast = vi.mocked(toast.error).mock.lastCall?.[1];
+  expect(ultimoToast).toEqual(expect.objectContaining({ action: expect.objectContaining({ label: "Tentar novamente" }) }));
+  await act(async () => {
+    (ultimoToast as unknown as { action: { onClick: () => void } }).action.onClick();
+    await context.flushSaves("card-pagamento");
+  });
+  expect(executarB).toHaveBeenCalledTimes(2);
+  expect(AtualizarCardBpm).toHaveBeenCalledTimes(1);
+  expect(context.getFailedSaveKeys("card-pagamento")).toEqual([recoveryKey]);
+});
