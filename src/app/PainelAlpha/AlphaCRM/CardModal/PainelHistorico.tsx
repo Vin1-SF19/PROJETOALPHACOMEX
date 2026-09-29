@@ -36,6 +36,16 @@ import { VisualizadorAnexoCard, type AnexoParaVisualizar } from "@/components/bp
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
 
+function linkNotaFiscalNoHistorico(item: ItemTimelineCard, anexos: CardDetalhe["anexos"]): string | null {
+  if (!item.acao || !["NOTA_FISCAL_EMITIDA", "NOTA_FISCAL_ATUALIZADA"].includes(item.acao)) return null;
+  try {
+    const link = (JSON.parse(item.valorNovo ?? "{}") as { link?: unknown }).link;
+    if (typeof link !== "string") return null;
+    if (link.startsWith("https://") && new URL(link).protocol === "https:") return link;
+    return anexos.some((anexo) => anexo.id === link) ? `/api/bpm/anexos/${link}` : null;
+  } catch { return null; }
+}
+
 interface Props {
   card: CardDetalhe;
   accent: string;
@@ -273,6 +283,9 @@ export default function PainelHistorico({
                         contexto: contextoHistorico,
                       })}
                     </span>
+                    {linkNotaFiscalNoHistorico(item, card.anexos) && <>
+                      {" · "}<a href={linkNotaFiscalNoHistorico(item, card.anexos)!} target="_blank" rel="noopener noreferrer" className="text-sky-300 underline">Abrir NF</a>
+                    </>}
                     {" — "}
                     {item.autor}
                     {" · "}

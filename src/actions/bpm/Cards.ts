@@ -30,6 +30,7 @@ import { executarAutomacoesCentraisDoCardAgora } from "@/lib/bpm/automacoes/orqu
 import { carregarValoresCanonicosCampos, salvarValoresGlobaisPersonalizadosCampos } from "@/lib/bpm/campos-configuraveis-server";
 import { prepararSalvamentoConfigurado } from "@/lib/bpm/validacao-salvamento-configurado";
 import { registrarConclusaoContratoFinanceiro } from "@/lib/bpm/financeiro-assinatura-server";
+import { sincronizarNotaFiscalCard } from "@/lib/bpm/financeiro-nota-fiscal-server";
 import { carregarResumoContratacao } from "@/lib/bpm/resumo-contratacao-server";
 import { camposPublicadosPorEtapa, capacidadesObrigatoriasPorEtapa, capacidadeObrigatoriaEntrada } from "@/lib/bpm/campos-formulario-publicado";
 import { desserializarComposicaoCardKanban, type CardKanbanComposicao } from "@/lib/bpm/card-kanban";
@@ -1438,6 +1439,7 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
 
       if (cardAtual.pipeline?.chave === PIPELINE_CHAVE && Object.keys(valoresValidados).length > 0) {
         await registrarConclusaoContratoFinanceiro(tx, cardId, cardAtual.pipelineId, userId);
+        await sincronizarNotaFiscalCard({ tx, cardId, pipelineId: cardAtual.pipelineId, usuarioId: userId });
       }
 
       const historicoAtualizacao = await tx.bpmCardHistorico.create({

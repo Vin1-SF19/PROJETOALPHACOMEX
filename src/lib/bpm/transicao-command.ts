@@ -7,6 +7,7 @@ import db from "@/lib/prisma";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 import { requisitoAplicaAoMover, validarValorRequisitoCampo } from "@/lib/bpm/requisitos-etapa";
 import { registrarConclusaoContratoFinanceiro } from "@/lib/bpm/financeiro-assinatura-server";
+import { sincronizarNotaFiscalCard } from "@/lib/bpm/financeiro-nota-fiscal-server";
 import { avaliarFormalizacaoFinanceira } from "@/lib/bpm/financeiro-formalizacao";
 import { avaliarPagamentoFinanceiro } from "@/lib/bpm/financeiro-pagamento-validacao";
 import { CHAVES_CAMPOS } from "@/lib/bpm/financeiro-config.client";
@@ -729,6 +730,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
       }
       if (card.pipeline.chave === BPM_PIPELINE_KEYS.FINANCEIRO && Object.keys(valores).length > 0) {
         await registrarConclusaoContratoFinanceiro(tx, card.id, card.pipelineId, input.ator.userId ?? null);
+        await sincronizarNotaFiscalCard({ tx, cardId: card.id, pipelineId: card.pipelineId, usuarioId: input.ator.userId ?? null });
       }
 
       if (input.proximoContatoEm !== undefined) {

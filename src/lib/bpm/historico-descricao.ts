@@ -366,6 +366,10 @@ function descreverCatalogado(
     case "SUBSTATUS_ALTERADO": return `Substatus alterado para ${nome("nome", "novo status")}`;
     case "TAREFA_ALERTA_DISPARADO": return "Alerta de tarefa disparado";
     case "TAREFA_CONCLUIDA": return `Tarefa concluída${texto(novo, "titulo") ? `: ${nome("titulo", "tarefa")}` : ""}`;
+    case "NOTA_FISCAL_EMITIDA": return `Nota fiscal ${nome("numero", "emitida")} registrada no card`;
+    case "NOTA_FISCAL_ATUALIZADA": return `Nota fiscal ${nome("numero", "atualizada")} atualizada no card`;
+    case "NOTA_FISCAL_PENDENTE": return "Nota fiscal voltou ao estado pendente";
+    case "TAREFA_NF_REABERTA": return "Tarefa de emissão de NF reaberta";
     case "TAREFA_CRIADA": {
       const tipo = tipoTarefa(texto(novo, "tipo"));
       const prazo = dataFormatada(novo, "prazo");

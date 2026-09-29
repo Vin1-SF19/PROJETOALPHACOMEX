@@ -16,6 +16,7 @@ import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { copiarCamposCardVinculado } from "@/lib/bpm/copiar-campos-card-vinculado";
 import { carregarCamposFaltantesCardEtapa } from "@/lib/bpm/requisitos-etapa-server";
+import { sincronizarNotaFiscalCard } from "@/lib/bpm/financeiro-nota-fiscal-server";
 import { montarContextoAvaliacaoDoCard } from "@/lib/bpm/regras/contexto";
 import { avaliarPagamentoFinanceiro } from "@/lib/bpm/financeiro-pagamento-validacao";
 import { avaliarFormalizacaoFinanceira } from "@/lib/bpm/financeiro-formalizacao";
@@ -334,6 +335,9 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
         } });
       }
       await publicarEventoDaAcao(execucao, "TAREFA_CRIADA", "TAREFA", criada.id, undefined, { tarefaId: criada.id, tipo: criada.tipo, titulo: criada.titulo }, tx);
+      if (criada.tipo === "EMISSAO_NF" && card.pipelineId === "cmuih4i54000209gmmyqrg557") {
+        await sincronizarNotaFiscalCard({ tx, cardId: card.id, pipelineId: card.pipelineId });
+      }
       return criada;
     }).catch(async (error) => {
       if (idUnicoDia && typeof error === "object" && error !== null && "code" in error && error.code === "P2002") {

@@ -17,6 +17,7 @@ import { tipoTarefaEhValido } from "@/lib/bpm/tarefas-tipo";
 import { enfileirarAutomacoesCriacaoTarefaBpm } from "@/lib/bpm/automacoes/fila";
 import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { criarSlaInstancia } from "@/lib/bpm/sla";
+import { exigirNotaFiscalParaConcluirTarefa } from "@/lib/bpm/financeiro-nota-fiscal-server";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import {
   MENSAGEM_TAREFA_CHECKLIST_PENDENTE,
@@ -272,6 +273,13 @@ export async function ConcluirTarefaBpm(dados: unknown) {
       }
       if (atual.status === "CANCELADA") throw new Error("Tarefa cancelada não pode ser concluída");
       if (atual.status !== "PENDENTE") return { alterou: false, cardId: atual.cardId };
+      if (atual.tipo === "EMISSAO_NF") {
+        const card = await tx.bpmCard.findUnique({ where: { id: atual.cardId }, select: { pipelineId: true } });
+        if (!card) throw new Error("Card não encontrado");
+        if (card.pipelineId === "cmuih4i54000209gmmyqrg557") {
+          await exigirNotaFiscalParaConcluirTarefa(atual.cardId, card.pipelineId, tx);
+        }
+      }
       await tx.bpmTarefa.update({
         where: { id: tarefaId },
         data: { status: "CONCLUIDA", concluidaEm: new Date() },
@@ -310,6 +318,7 @@ export async function ConcluirTarefaBpm(dados: unknown) {
       "Não autorizado",
       "Tarefa não encontrada",
       "Tarefa cancelada não pode ser concluída",
+      "Registre uma NF válida antes de concluir a tarefa de emissão.",
       MENSAGEM_TAREFA_CHECKLIST_PENDENTE,
     ].includes(error.message) ? error.message : "Erro ao concluir tarefa";
     return { success: false, error: msg };

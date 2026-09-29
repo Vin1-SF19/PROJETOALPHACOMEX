@@ -209,6 +209,24 @@ export async function ExcluirAnexoBpm(anexoId: string) {
           }) : null;
           if (resposta?.valor === "Sim") throw new Error("COMPROVANTE_PAGAMENTO_EM_USO");
         }
+        if (card?.pipelineId === "cmuih4i54000209gmmyqrg557"
+          && campo?.chave === "alpha.arquivo.link.da.nf" && valor?.valor === anexoId) {
+          const campoEmitida = await tx.bpmCampo.findFirst({
+            where: { pipelineId: card.pipelineId, chave: "alpha.nf.emitida", ativo: true }, select: { id: true },
+          });
+          const emitida = campoEmitida ? await tx.bpmCardCampoValor.findUnique({
+            where: { cardId_campoId: { cardId: anexo.cardId, campoId: campoEmitida.id } }, select: { valor: true },
+          }) : null;
+          if (emitida?.valor === "Sim") throw new Error("NOTA_FISCAL_EM_USO");
+        }
+        if (card?.pipelineId === "cmuih4i54000209gmmyqrg557"
+          && campo?.chave === "alpha.arquivo.link.da.nf") {
+          const historicoNF = await tx.bpmCardHistorico.findFirst({ where: {
+            cardId: anexo.cardId, acao: { in: ["NOTA_FISCAL_EMITIDA", "NOTA_FISCAL_ATUALIZADA"] },
+            valorNovoJson: { contains: anexoId },
+          }, select: { id: true } });
+          if (historicoNF) throw new Error("NOTA_FISCAL_EM_USO");
+        }
       }
       await tx.bpmCardAnexo.delete({ where: { id: anexoId } });
       await registrarHistoricoCard(
@@ -252,6 +270,8 @@ export async function ExcluirAnexoBpm(anexoId: string) {
         ? "Este arquivo comprova o contrato assinado. Altere o status ou substitua o arquivo antes de excluí-lo."
         : error instanceof Error && error.message === "COMPROVANTE_PAGAMENTO_EM_USO"
           ? "Este comprovante está vinculado a um pagamento confirmado. Faça a correção por um procedimento auditado."
+        : error instanceof Error && error.message === "NOTA_FISCAL_EM_USO"
+          ? "Este arquivo está vinculado a uma NF emitida. Corrija a NF antes de excluir o arquivo."
         : "Erro ao excluir anexo";
     return { success: false, error: msg };
   }

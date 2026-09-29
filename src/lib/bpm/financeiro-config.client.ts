@@ -33,6 +33,7 @@ export const CHAVES_CAMPOS = {
   NF_EMITIDA: "alpha.nf.emitida",
   DATA_EMISSAO_NF: "alpha.data.de.emissao",
   NUMERO_NF: "alpha.numero.da.nf",
+  VALOR_NF: "alpha.valor.da.nf",
   LINK_NF: "alpha.arquivo.link.da.nf",
   VENDEDOR: "alpha.vendedor.a",
   VENDEDOR_RESPONSAVEL: "alpha.vendedor.a",

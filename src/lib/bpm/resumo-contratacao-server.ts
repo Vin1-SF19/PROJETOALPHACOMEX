@@ -19,6 +19,7 @@ const CAMPOS = [
   ["NF emitida", CHAVES_CAMPOS.NF_EMITIDA],
   ["Data de emissão da NF", CHAVES_CAMPOS.DATA_EMISSAO_NF],
   ["Número da NF", CHAVES_CAMPOS.NUMERO_NF],
+  ["Valor da NF", CHAVES_CAMPOS.VALOR_NF],
   ["Link da NF", CHAVES_CAMPOS.LINK_NF],
   ["Vendedor responsável", CHAVES_CAMPOS.VENDEDOR_RESPONSAVEL],
   ["Parceiro", CHAVES_CAMPOS.PARCEIRO_RESPONSAVEL],

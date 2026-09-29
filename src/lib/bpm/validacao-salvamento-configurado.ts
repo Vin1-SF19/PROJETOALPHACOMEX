@@ -12,6 +12,8 @@ import { FINANCIAL_FIELD_KEYS as K } from "@/lib/bpm/pipeline-financeiro";
 import { calcularNovoContrato, pendenciasValidacaoNovoContrato } from "@/lib/bpm/novo-contrato-financeiro";
 import { CHAVES_CAMPOS } from "@/lib/bpm/financeiro-config.client";
 import { avaliarPagamentoFinanceiro } from "@/lib/bpm/financeiro-pagamento-validacao";
+import { pendenciasNotaFiscal, type DadosNotaFiscal } from "@/lib/bpm/financeiro-nota-fiscal";
+import { verificarLinkNotaFiscalAcessivel } from "@/lib/bpm/nota-fiscal-link";
 import { extrairPathnamePrivadoAnexoBpm } from "@/lib/bpm/anexos-storage";
 import { cnpjEhValido } from "@/lib/format-cnpj";
 
@@ -114,7 +116,9 @@ export async function prepararSalvamentoConfigurado(params: {
   const possuiContratoElaborado = configs.some((config) => config.campo.chave === CHAVES_CAMPOS.CONTRATO_ELABORADO);
   const possuiPagamento = card.pipelineId === "cmuih4i54000209gmmyqrg557"
     && configs.some((config) => config.campo.chave === CHAVES_CAMPOS.PAGAMENTO_CONFIRMADO);
-  if (!possuiAutomacao && !statusAssinatura && !possuiContratoElaborado && !possuiPagamento) return valoresSubmetidos;
+  const possuiNotaFiscal = card.pipelineId === "cmuih4i54000209gmmyqrg557"
+    && configs.some((config) => config.campo.chave === CHAVES_CAMPOS.NF_EMITIDA);
+  if (!possuiAutomacao && !statusAssinatura && !possuiContratoElaborado && !possuiPagamento && !possuiNotaFiscal) return valoresSubmetidos;
 
   const publicadosPipeline = await camposPublicadosPorEtapa(etapas.map((etapa) => etapa.id), client);
   const idsPublicados = new Set([...publicadosPipeline.values()].flatMap((ids) => [...ids]));
@@ -315,6 +319,32 @@ export async function prepararSalvamentoConfigurado(params: {
       if (camposProtegidos.some((id) => Object.hasOwn(valoresSubmetidos, id)
         && String(valoresContexto[id] ?? "") !== String(valoresPersistidos[id] ?? ""))) {
         throw new Error("REQUISITOS_PENDENTES:Assinatura já confirmada; alterações exigem um procedimento auditado.");
+      }
+    }
+  }
+  if (possuiNotaFiscal) {
+    const valorDe = (chave: string) => {
+      const id = porChave.get(chave)?.id;
+      return id ? String(contexto.camposDinamicos?.[id] ?? "").trim() : "";
+    };
+    const dados: DadosNotaFiscal = {
+      emitida: valorDe(CHAVES_CAMPOS.NF_EMITIDA) as DadosNotaFiscal["emitida"],
+      numero: valorDe(CHAVES_CAMPOS.NUMERO_NF), dataEmissao: valorDe(CHAVES_CAMPOS.DATA_EMISSAO_NF),
+      valor: valorDe(CHAVES_CAMPOS.VALOR_NF), link: valorDe(CHAVES_CAMPOS.LINK_NF),
+    };
+    const campoLink = porChave.get(CHAVES_CAMPOS.LINK_NF);
+    const anexo = dados.link && campoLink ? await client.bpmCardAnexo.findFirst({
+      where: { id: dados.link, cardId: card.id, campoId: campoLink.id }, select: { url: true },
+    }) : null;
+    const pendencias = pendenciasNotaFiscal(dados, Boolean(anexo?.url && extrairPathnamePrivadoAnexoBpm(anexo.url)));
+    if (pendencias.length) throw new Error(`REQUISITOS_PENDENTES:${pendencias.join(", ")}`);
+    const idEmitida = porChave.get(CHAVES_CAMPOS.NF_EMITIDA)?.id;
+    if (dados.emitida === "Sim" && dados.link.startsWith("https://") && campoLink
+      && (String(valoresPersistidos[idEmitida ?? ""] ?? "") !== "Sim"
+        || String(valoresPersistidos[campoLink.id] ?? "") !== dados.link)) {
+      try { await verificarLinkNotaFiscalAcessivel(dados.link); }
+      catch (error) {
+        throw new Error(`REQUISITOS_PENDENTES:Arquivo/link da NF (${error instanceof Error ? error.message : "inacessível"})`);
       }
     }
   }
