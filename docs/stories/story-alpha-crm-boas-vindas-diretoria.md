@@ -1,6 +1,6 @@
 # Story — Operacional: Boas-vindas com alerta e acesso da diretoria
 
-**Status:** Implementação local validada; publicação da configuração pendente de autorização Vault
+**Status:** Implementação e configuração publicadas em 29/09/2026
 **Data:** 2026-08-14
 
 ## Objetivo
@@ -27,7 +27,7 @@ O pedido atual amplia a story para o pipeline Operacional ativo, etapa inicial B
 - [x] Definir com o usuário a regra de data/hora da primeira reunião e a identidade da diretoria nesta coluna; registrar a decisão antes da automação. Horário escolhido na atribuição; acesso para Admin e usuário Operacional Vitor, sujeito à confirmação read-only do ID.
 - [x] Implementar e testar a leitura dos dados em todas as etapas, a configuração na UI, a atribuição restrita e o agendamento conforme decisão.
 - [x] Rodar `npm run lint`, `npm run typecheck`, `npm test` e `npm run build`; atualizar File List e evidências.
-- [ ] Antes de qualquer publicação no Turso: relatório Vault, backup completo verificado com até 48 horas e autorização específica para esta retomada. Nenhuma autorização anterior cobre a operação.
+- [x] Antes da publicação no Turso: relatório Vault, backup completo verificado com até 48 horas e autorização específica para esta retomada. Autorização recebida no pedido “Então faça isso”; nenhuma autorização anterior foi usada.
 
 ### Integração e decisões pendentes
 
@@ -69,6 +69,7 @@ O pedido atual amplia a story para o pipeline Operacional ativo, etapa inicial B
 - `docs/stories/story-alpha-crm-boas-vindas-diretoria.md`
 - `scripts/diagnosticar-boas-vindas-operacional.mts`
 - `scripts/configurar-boas-vindas-operacional.mts`
+- `scripts/verificar-boas-vindas-operacional.mts`
 - `src/lib/bpm/boas-vindas.ts`
 - `src/lib/bpm/ownership.ts`
 - `src/lib/bpm/campos-configuraveis.ts`
@@ -94,9 +95,11 @@ O pedido atual amplia a story para o pipeline Operacional ativo, etapa inicial B
 - `npm run typecheck`: aprovado.
 - `npm test`: 558 arquivos aprovados; 4.061 testes aprovados, 4 ignorados, 1 pendente.
 - `npm run build`: aprovado.
-- Backup Vault dedicado: `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-29T16-44-59-857Z.sql`, gerado em 29/09/2026 às 16:44:59 UTC, 182.429.762 bytes, 332 tabelas, 194.023 linhas. Manifesto `.manifest.json` adjacente, SHA-256 `870e1402fd35d9a633a07cb7da0f2425d8773977d846e7dc8a4188c8e2e3560f`. Restauração isolada aprovada por `scripts/verify-turso-backup.mjs`: hash, tamanho, tabelas, linhas, integridade e chaves estrangeiras.
+- Backup Vault dedicado: `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-29T16-44-59-857Z.sql`, finalizado em 29/09/2026 às 16:48:42 UTC, 182.429.762 bytes, 332 tabelas, 194.023 linhas. Manifesto `.manifest.json` adjacente, SHA-256 `870e1402fd35d9a633a07cb7da0f2425d8773977d846e7dc8a4188c8e2e3560f`. Restauração isolada aprovada por `scripts/verify-turso-backup.mjs`: hash, tamanho, tabelas, linhas, integridade e chaves estrangeiras.
 - `prisma migrate diff --script`: migration vazia; não há mudança estrutural.
-- A publicação da configuração no Turso permanece bloqueada pelo protocolo Vault até aprovação específica do usuário.
+- Primeira tentativa de publicação expirou dentro da transação; leitura independente confirmou rollback completo em v8. O script foi otimizado para inserções em lotes e a publicação autorizada foi repetida com o mesmo backup.
+- Verificação read-only após publicação: Operacional v9, 13 etapas com formulário, Boas v2 com 37 componentes, 8 campos novos, 17 campos editáveis e obrigatórios na saída, handoff Financeiro v2 ativo com responsável inicial ID 10. Nenhum card preexistente foi alterado.
+- O domínio de produção retornou `deployedCommitSha=ae0db0bbb8a285b21a1c59c586490ee9b317abfc` em `/api/health/version`, correspondente ao código funcional enviado pelo usuário.
 
 ## Verificação
 

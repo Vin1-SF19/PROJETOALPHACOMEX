@@ -153,6 +153,21 @@ try {
       await tx.bpmCampoMapeamento.create({ data: { campoOrigemId: fonteRadar.id,
         campoDestinoId: ids.get("fonte")!, modo: "COPIAR", ativo: true } });
       const nomes: NomeCampo[] = [...CAMPOS_ANALISE, ...CAMPOS_PROCESSO];
+      const idsCampos = nomes.map((nome) => ids.get(nome)!);
+      const associacoes = await tx.bpmCampoPipeline.findMany({ where: {
+        pipelineId: OPERACIONAL, campoId: { in: idsCampos } }, select: { campoId: true } });
+      const configuracoes = await tx.bpmCampoEtapaConfig.findMany({ where: {
+        etapaId: { in: pipeline.etapas.map((etapa) => etapa.id) }, campoId: { in: idsCampos } },
+      select: { campoId: true, etapaId: true } });
+      const associados = new Set(associacoes.map((item) => item.campoId));
+      const faltantesPipeline = idsCampos.filter((id) => !associados.has(id));
+      if (faltantesPipeline.length) await tx.bpmCampoPipeline.createMany({ data: faltantesPipeline.map((campoId) => ({
+        campoId, pipelineId: OPERACIONAL,
+      })) });
+      const configurados = new Set(configuracoes.map((item) => `${item.etapaId}:${item.campoId}`));
+      await tx.bpmCampoEtapaConfig.updateMany({ where: { etapaId: BOAS,
+        campoId: { in: CAMPOS_ANALISE.map((nome) => ids.get(nome)!) } },
+      data: { obrigatorioSaida: true, visivel: true, editavel: true, somenteLeitura: false } });
       for (const etapa of pipeline.etapas) {
         const formulario = etapa.formulario ?? await tx.bpmEtapaFormulario.create({ data: {
           etapaId: etapa.id, versao: 1, ativo: true,
@@ -163,23 +178,24 @@ try {
         } });
         const existentesNoFormulario = new Set(etapa.formulario?.secoes.flatMap((item) =>
           item.componentes.map((componente) => componente.campoId)) ?? []);
-        for (const [ordem, nomeCampo] of nomes.entries()) {
+        const faltantesConfig = nomes.flatMap((nomeCampo, ordem) => {
           const campoId = ids.get(nomeCampo)!;
-          await tx.bpmCampoPipeline.upsert({ where: { campoId_pipelineId: { campoId, pipelineId: OPERACIONAL } },
-            create: { campoId, pipelineId: OPERACIONAL }, update: {} });
-          await tx.bpmCampoEtapaConfig.upsert({ where: { campoId_etapaId: { campoId, etapaId: etapa.id } },
-            create: { campoId, etapaId: etapa.id, visivel: true,
-              editavel: nomeCampo !== "analista" && nomeCampo !== "primeiraReuniao",
-              somenteLeitura: nomeCampo === "analista" || nomeCampo === "primeiraReuniao",
-              obrigatorioSaida: etapa.id === BOAS && CAMPOS_ANALISE.includes(nomeCampo as typeof CAMPOS_ANALISE[number]),
-              ordem: 100 + ordem, grupo: "Dados da negociação e início do atendimento" },
-            update: etapa.id === BOAS && CAMPOS_ANALISE.includes(nomeCampo as typeof CAMPOS_ANALISE[number])
-              ? { obrigatorioSaida: true, visivel: true, editavel: true, somenteLeitura: false } : {},
-          });
-          if (!existentesNoFormulario.has(campoId)) await tx.bpmFormularioComponente.create({ data: {
+          return configurados.has(`${etapa.id}:${campoId}`) ? [] : [{
+            campoId, etapaId: etapa.id, visivel: true,
+            editavel: nomeCampo !== "analista" && nomeCampo !== "primeiraReuniao",
+            somenteLeitura: nomeCampo === "analista" || nomeCampo === "primeiraReuniao",
+            obrigatorioSaida: etapa.id === BOAS && CAMPOS_ANALISE.includes(nomeCampo as typeof CAMPOS_ANALISE[number]),
+            ordem: 100 + ordem, grupo: "Dados da negociação e início do atendimento",
+          }];
+        });
+        if (faltantesConfig.length) await tx.bpmCampoEtapaConfig.createMany({ data: faltantesConfig });
+        const faltantesFormulario = nomes.flatMap((nomeCampo, ordem) => {
+          const campoId = ids.get(nomeCampo)!;
+          return existentesNoFormulario.has(campoId) ? [] : [{
             secaoId: secao.id, chave: `campo:${campoId}`, tipo: "CAMPO", campoId, ordem,
-          } });
-        }
+          }];
+        });
+        if (faltantesFormulario.length) await tx.bpmFormularioComponente.createMany({ data: faltantesFormulario });
         if (etapa.id === BOAS) await tx.bpmEtapaFormulario.update({ where: { id: formulario.id },
           data: { versao: { increment: 1 } } });
       }
