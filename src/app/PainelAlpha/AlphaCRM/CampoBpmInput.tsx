@@ -11,6 +11,7 @@ import { RegistrarAnexoBpm } from "@/actions/bpm/Anexos";
 import { VisualizadorAnexoCard, type AnexoParaVisualizar } from "@/components/bpm/anexos/VisualizadorAnexoCard";
 import { VALORES } from "@/lib/bpm/financeiro-config.client";
 import { nomeSeguroUploadAnexo, obterTipoUploadAnexo, validarUploadAnexo } from "@/lib/validations/bpm";
+import { CAMPO_CHECKLIST_EXCEL, planilhaChecklistValida } from "@/lib/bpm/checklist-envio-operacional";
 
 const TIPOS_ANEXO_ACEITOS = ".pdf,.png,.jpg,.jpeg,.webp,.docx,.xlsx,.xls,.csv";
 const TEMPO_LIMITE_UPLOAD_MS = 10 * 60_000;
@@ -25,6 +26,7 @@ function erroDaResposta(resposta: unknown, fallback: string): string {
 
 export interface CampoBpmEditavel {
   id: string;
+  chave?: string | null;
   nome: string;
   tipo: string;
   obrigatorio: boolean;
@@ -230,7 +232,7 @@ export function CampoBpmInput({
           id={campo.tipo === "arquivo" ? `campo-bpm-${campo.id}` : undefined}
           className={nomeArquivoPendente ? "sr-only" : className}
           type="file"
-          accept={TIPOS_ANEXO_ACEITOS}
+          accept={campo.chave === CAMPO_CHECKLIST_EXCEL ? ".xlsx,.xls" : TIPOS_ANEXO_ACEITOS}
           disabled={bloqueado || enviandoArquivo || !cardId}
           tabIndex={nomeArquivoPendente ? -1 : undefined}
           aria-hidden={nomeArquivoPendente ? true : undefined}
@@ -245,6 +247,11 @@ export function CampoBpmInput({
             const erroValidacao = validarUploadAnexo({ size: file.size, type: file.type, name: file.name });
             if (erroValidacao) {
               setErroArquivo(erroValidacao);
+              return;
+            }
+            if (campo.chave === CAMPO_CHECKLIST_EXCEL && !planilhaChecklistValida(
+              file.name, obterTipoUploadAnexo({ name: file.name, type: file.type }))) {
+              setErroArquivo("O checklist atualizado deve ser uma planilha Excel .xlsx ou .xls.");
               return;
             }
             // Quando o pai fornece pendingFileName, ele mantém o File na fila.

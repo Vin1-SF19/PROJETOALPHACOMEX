@@ -18,6 +18,7 @@ import { enfileirarAutomacoesCriacaoTarefaBpm } from "@/lib/bpm/automacoes/fila"
 import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { criarSlaInstancia } from "@/lib/bpm/sla";
 import { exigirNotaFiscalParaConcluirTarefa } from "@/lib/bpm/financeiro-nota-fiscal-server";
+import { CAMPO_CHECKLIST_EXCEL, PIPELINE_OPERACIONAL_CHECKLIST_ID, TITULO_TAREFA_CHECKLIST } from "@/lib/bpm/checklist-envio-operacional";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import {
   MENSAGEM_TAREFA_CHECKLIST_PENDENTE,
@@ -278,6 +279,17 @@ export async function ConcluirTarefaBpm(dados: unknown) {
         if (!card) throw new Error("Card não encontrado");
         if (card.pipelineId === "cmuih4i54000209gmmyqrg557") {
           await exigirNotaFiscalParaConcluirTarefa(atual.cardId, card.pipelineId, tx);
+        }
+      }
+      if (atual.titulo.startsWith(TITULO_TAREFA_CHECKLIST)) {
+        const card = await tx.bpmCard.findUnique({ where: { id: atual.cardId }, select: { pipelineId: true } });
+        if (card?.pipelineId === PIPELINE_OPERACIONAL_CHECKLIST_ID) {
+          const campo = await tx.bpmCampo.findUnique({ where: { chave: CAMPO_CHECKLIST_EXCEL }, select: { id: true } });
+          const valor = campo ? await tx.bpmCardCampoValor.findUnique({ where: {
+            cardId_campoId: { cardId: atual.cardId, campoId: campo.id } }, select: { valor: true } }) : null;
+          const anexo = valor?.valor && campo ? await tx.bpmCardAnexo.findFirst({ where: {
+            id: valor.valor, cardId: atual.cardId, campoId: campo.id }, select: { id: true } }) : null;
+          if (!anexo) throw new Error("Anexe a planilha Excel do checklist antes de concluir esta tarefa.");
         }
       }
       await tx.bpmTarefa.update({

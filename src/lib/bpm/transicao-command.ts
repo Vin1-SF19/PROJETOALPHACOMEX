@@ -52,6 +52,10 @@ import { erroSqliteBusy, repetirTransacaoOcupada } from "@/lib/bpm/sqlite-busy-r
 import { FINANCIAL_FIELD_KEYS as FIN } from "@/lib/bpm/pipeline-financeiro";
 import { calcularNovoContrato, pendenciasValidacaoNovoContrato } from "@/lib/bpm/novo-contrato-financeiro";
 import { prepararSalvamentoConfigurado } from "@/lib/bpm/validacao-salvamento-configurado";
+import {
+  CAMPO_CHECKLIST_EXCEL, ETAPA_ENVIO_CHECKLIST_ID, PIPELINE_OPERACIONAL_CHECKLIST_ID,
+  TITULO_TAREFA_CHECKLIST, prazoEnvioChecklist,
+} from "@/lib/bpm/checklist-envio-operacional";
 
 export type AtorTransicaoBpm = {
   tipo: BpmTransitionRequester;
@@ -806,6 +810,22 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
         },
       });
       if (movimento.count !== 1) erro("CONCURRENT_TRANSITION", "Outra operação moveu este card. Recarregue e tente novamente.");
+      if (card.pipelineId === PIPELINE_OPERACIONAL_CHECKLIST_ID && destino.id === ETAPA_ENVIO_CHECKLIST_ID) {
+        const campoChecklist = await tx.bpmCampo.findFirst({ where: { pipelineId: card.pipelineId,
+          chave: CAMPO_CHECKLIST_EXCEL, ativo: true,
+          etapaConfiguracoes: { some: { etapaId: destino.id, visivel: true } } }, select: { id: true } });
+        if (campoChecklist) {
+          const titulo = `${TITULO_TAREFA_CHECKLIST} – ${card.empresa.razaoSocial}`;
+          const prazo = prazoEnvioChecklist(card.dataReuniao);
+          const existente = await tx.bpmTarefa.findFirst({ where: { cardId: card.id, titulo }, select: { id: true, status: true } });
+          if (!existente) await tx.bpmTarefa.create({ data: { cardId: card.id, titulo,
+            descricao: "Anexe a planilha Excel do checklist atualizado ao card no mesmo dia da reunião de alinhamento.",
+            responsavelId: prepared.responsavelId ?? card.responsavelId,
+            prazo, alertaEm: prazo, tipo: "TAREFA", prioridade: "ALTA" } });
+          else if (existente.status === "PENDENTE") await tx.bpmTarefa.update({ where: { id: existente.id },
+            data: { prazo, alertaEm: prazo, responsavelId: prepared.responsavelId ?? card.responsavelId } });
+        }
+      }
       if (card.pipeline.nome === "Revisão de Radar") {
         await sincronizarProximoContatoAgenda({
           cardId: card.id, etapaNome: destino.nome, status: lifecycle,

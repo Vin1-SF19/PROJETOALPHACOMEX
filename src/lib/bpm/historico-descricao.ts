@@ -42,6 +42,8 @@ export const ACOES_HISTORICO_CATALOGADAS = [
   "CHECKLIST_ITEM_ATUALIZADO",
   "CHECKLIST_ITEM_EXCLUSIVO_ADICIONADO",
   "CHECKLIST_MATERIALIZADO",
+  "CHECKLIST_ATUALIZADO_DISPONIBILIZADO",
+  "CHECKLIST_ATUALIZADO_REMOVIDO",
   "CHECKLIST_STATUS_ALTERADO",
   "COMUNICACAO_PENDENTE",
   "CONTRATO_ENVIADO_ASSINATURA",
@@ -307,6 +309,8 @@ function descreverCatalogado(
     }
     case "CHECKLIST_ITEM_EXCLUSIVO_ADICIONADO": return `Item de procedimento adicionado: ${nome("nome", "novo item")}`;
     case "CHECKLIST_MATERIALIZADO": return `Procedimento ${nome("templateNome", "configurado")} aplicado ao card`;
+    case "CHECKLIST_ATUALIZADO_DISPONIBILIZADO": return `Checklist atualizado disponível: ${nome("nome", "planilha Excel")}`;
+    case "CHECKLIST_ATUALIZADO_REMOVIDO": return "Checklist atualizado removido do card";
     case "CHECKLIST_STATUS_ALTERADO": {
       const status = rotuloStatus(texto(novo, "status"));
       return status ? `Item de procedimento marcado como ${status}` : "Status do procedimento atualizado";

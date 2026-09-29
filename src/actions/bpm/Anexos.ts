@@ -14,6 +14,10 @@ import { ACAO_LIMPEZA_ANEXO_PENDENTE, limparBlobAnexoPendente } from "@/lib/bpm/
 
 import { carregarCamposAplicaveisCardEtapa } from "@/lib/bpm/requisitos-etapa-server";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
+import {
+  CAMPO_CHECKLIST_EXCEL, PIPELINE_OPERACIONAL_CHECKLIST_ID, TITULO_TAREFA_CHECKLIST,
+  checklistNoDiaDaReuniao, planilhaChecklistValida,
+} from "@/lib/bpm/checklist-envio-operacional";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -44,9 +48,11 @@ export async function RegistrarAnexoBpm(dados: unknown) {
     const resultado = await db.$transaction(async (tx) => {
       const acesso = await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "enviarArquivo", tx);
       let campoContratoAssinado = false;
+      let campoChecklistExcel = false;
+      let dataReuniaoChecklist: Date | null = null;
       let pipelineIdCard: string | null = null;
       if (campoId) {
-        const card = await tx.bpmCard.findUnique({ where: { id: cardId }, select: { pipelineId: true, etapaId: true } });
+        const card = await tx.bpmCard.findUnique({ where: { id: cardId }, select: { pipelineId: true, etapaId: true, dataReuniao: true } });
         if (!card) throw new Error("CAMPO_ARQUIVO_INVALIDO");
         pipelineIdCard = card.pipelineId;
         const perfil = acesso.isAdminGlobal || acesso.role === "ADMINISTRADOR"
@@ -57,6 +63,9 @@ export async function RegistrarAnexoBpm(dados: unknown) {
           throw new Error("CAMPO_ARQUIVO_INVALIDO");
         }
         campoContratoAssinado = campo.chave === "alpha.contrato.assinado.anexo";
+        campoChecklistExcel = card.pipelineId === PIPELINE_OPERACIONAL_CHECKLIST_ID && campo.chave === CAMPO_CHECKLIST_EXCEL;
+        if (campoChecklistExcel && !planilhaChecklistValida(nome, tipo)) throw new Error("CHECKLIST_EXCEL_INVALIDO");
+        if (campoChecklistExcel) dataReuniaoChecklist = card.dataReuniao;
       }
       const referencia = criarReferenciaAnexoBpm(recibo.pathname);
       // O mesmo recibo assinado sempre descreve o mesmo pathname. Em caso de
@@ -96,6 +105,16 @@ export async function RegistrarAnexoBpm(dados: unknown) {
         },
         tx,
       );
+      if (campoChecklistExcel) {
+        const tarefa = await tx.bpmTarefa.findFirst({ where: { cardId,
+          titulo: { startsWith: TITULO_TAREFA_CHECKLIST }, status: "PENDENTE" }, select: { id: true } });
+        if (tarefa) await tx.bpmTarefa.update({ where: { id: tarefa.id },
+          data: { status: "CONCLUIDA", concluidaEm: criado.createdAt } });
+        await registrarHistoricoCard({ cardId, acao: "CHECKLIST_ATUALIZADO_DISPONIBILIZADO", usuarioId: userId,
+          valorNovoJson: JSON.stringify({ anexoId: criado.id, nome,
+            dataReuniao: dataReuniaoChecklist?.toISOString() ?? null,
+            noDiaDaReuniao: checklistNoDiaDaReuniao(dataReuniaoChecklist, criado.createdAt) }) }, tx);
+      }
       if (campoContratoAssinado && pipelineIdCard) {
         await publicarEventoBpm({
           tipo: "CARD_ATUALIZADO", entidadeTipo: "CARD", entidadeId: cardId,
@@ -168,6 +187,8 @@ export async function RegistrarAnexoBpm(dados: unknown) {
     console.error("[RegistrarAnexoBpm]", error);
     const msg = error instanceof Error && error.message === "Não autorizado"
       ? "Não autorizado"
+      : error instanceof Error && error.message === "CHECKLIST_EXCEL_INVALIDO"
+        ? "O checklist atualizado deve ser uma planilha Excel .xlsx ou .xls."
       : error instanceof Error && error.message === "CAMPO_ARQUIVO_INVALIDO"
         ? "Campo de arquivo inválido para este card"
         : "Erro ao registrar anexo";
@@ -231,6 +252,17 @@ export async function ExcluirAnexoBpm(anexoId: string) {
             valorNovoJson: { contains: anexoId },
           }, select: { id: true } });
           if (historicoNF) throw new Error("NOTA_FISCAL_EM_USO");
+        }
+        if (card?.pipelineId === PIPELINE_OPERACIONAL_CHECKLIST_ID
+          && campo?.chave === CAMPO_CHECKLIST_EXCEL && valor?.valor === anexoId) {
+          await tx.bpmCardCampoValor.update({ where: { cardId_campoId: { cardId: anexo.cardId, campoId: anexo.campoId } },
+            data: { valor: "" } });
+          const tarefa = await tx.bpmTarefa.findFirst({ where: { cardId: anexo.cardId,
+            titulo: { startsWith: TITULO_TAREFA_CHECKLIST }, status: "CONCLUIDA" }, select: { id: true } });
+          if (tarefa) await tx.bpmTarefa.update({ where: { id: tarefa.id },
+            data: { status: "PENDENTE", concluidaEm: null } });
+          await registrarHistoricoCard({ cardId: anexo.cardId, acao: "CHECKLIST_ATUALIZADO_REMOVIDO",
+            usuarioId: userId, valorAnteriorJson: JSON.stringify({ anexoId }) }, tx);
         }
       }
       await tx.bpmCardAnexo.delete({ where: { id: anexoId } });

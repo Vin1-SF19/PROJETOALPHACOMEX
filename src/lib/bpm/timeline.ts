@@ -55,6 +55,8 @@ const LABELS_EVENTO_TIMELINE: Record<string, string> = {
   REUNIAO_REAGENDADA: "Reunião reagendada",
   RESUMO_REUNIAO_EDITADO: "Resumo da reunião editado",
   CHECKLIST_MATERIALIZADO: "Procedimento aplicado ao card",
+  CHECKLIST_ATUALIZADO_DISPONIBILIZADO: "Checklist atualizado disponível",
+  CHECKLIST_ATUALIZADO_REMOVIDO: "Checklist atualizado removido",
   CHECKLIST_STATUS_ALTERADO: "Item de procedimento atualizado",
   CHECKLIST_ITEM_ATUALIZADO: "Item de procedimento atualizado",
   CHECKLIST_ITEM_EXCLUSIVO_ADICIONADO: "Item de procedimento adicionado",

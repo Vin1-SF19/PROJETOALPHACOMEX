@@ -33,6 +33,8 @@ import { BPM_CAPABILITIES, BPM_FIELD_KEYS } from "@/lib/bpm/ontology";
 import { CardAbertoLayout } from "./CardAbertoLayout";
 import { PainelBoasVindasOperacional } from "./PainelBoasVindasOperacional";
 import { PainelAlinhamentoEstrategico } from "./PainelAlinhamentoEstrategico";
+import { PainelEnvioChecklistOperacional } from "./PainelEnvioChecklistOperacional";
+import { CAMPO_CHECKLIST_EXCEL, ETAPA_ENVIO_CHECKLIST_ID, TITULO_TAREFA_CHECKLIST } from "@/lib/bpm/checklist-envio-operacional";
 import { etapaEhAlinhamentoEstrategico } from "@/lib/bpm/alinhamento-estrategico";
 import { useCardSave, type PendingCardChange } from "./CardSaveContext";
 const PreencherCnpjNoloss = lazy(() => import("./PreencherCnpjNoloss").then((modulo) => ({ default: modulo.PreencherCnpjNoloss })));
@@ -329,6 +331,13 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
                     responsavelNome={card.responsavel.nome}
                     linkResumo={card.campoValores.find((valor) =>
                       valor.campo.chave === BPM_FIELD_KEYS.STRATEGIC_ALIGNMENT_SUMMARY_LINK)?.valor ?? null} />}
+                {card.pipelineId === PIPELINE_OPERACIONAL_ATIVO_ID && card.etapa.id === ETAPA_ENVIO_CHECKLIST_ID && (() => {
+                  const valor = card.campoValores.find((item) => item.campo.chave === CAMPO_CHECKLIST_EXCEL);
+                  const anexo = card.anexos.find((item) => item.id === valor?.valor) ?? null;
+                  const tarefa = card.tarefas.find((item) => item.titulo.startsWith(TITULO_TAREFA_CHECKLIST)) ?? null;
+                  return <PainelEnvioChecklistOperacional dataReuniao={card.dataReuniao ?? null}
+                    anexo={anexo} tarefa={tarefa} />;
+                })()}
                 <PainelRegistrar card={card} etapaAtual={etapaAtual} accent={accent}
                   podeEditar={podeEditar} realtimeRevision={realtimeRevision}
                   currentUserRole={currentUserRole}
