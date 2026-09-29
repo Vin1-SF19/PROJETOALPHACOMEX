@@ -1,3 +1,5 @@
+import "./gerador-documentos.css";
+
 export default function GeradorDocumentosLayout({ children }: { children: React.ReactNode }) {
-  return <div className="relative min-h-screen">{children}</div>;
+  return <div className="gd-shell relative min-h-screen">{children}</div>;
 }

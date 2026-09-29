@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Loader2, Upload, FileText, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { CriarTemplateViaUpload } from "@/actions/gerador-documentos";
 
@@ -93,9 +93,10 @@ export function NovoTemplateDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="gd-dialog max-w-lg border-[#2a3a4d] bg-[#0d1726] text-[#f5f7fa] shadow-2xl">
         <DialogHeader>
-          <DialogTitle>Novo template de documento</DialogTitle>
+          <p className="gd-kicker">Biblioteca de modelos</p><DialogTitle className="text-xl">Novo template de documento</DialogTitle>
+          <DialogDescription>Envie um arquivo para identificar as variáveis e cláusulas do template.</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4 py-2">
@@ -109,8 +110,8 @@ export function NovoTemplateDialog({
           />
 
           {isPending ? (
-            <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-neutral-300 py-12 text-center dark:border-neutral-700">
-              <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+            <div className="gd-upload flex flex-col items-center gap-3 rounded-xl border border-dashed py-12 text-center" role="status">
+              <Loader2 className="h-8 w-8 animate-spin text-[#73bfd2]" />
               <div>
                 <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
                   Analisando documento e identificando variáveis...
@@ -119,10 +120,10 @@ export function NovoTemplateDialog({
               </div>
             </div>
           ) : arquivo ? (
-            <div className="flex items-center gap-3 rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
-              <FileText className="h-8 w-8 shrink-0 text-emerald-500" />
+            <div className="gd-subpanel flex items-center gap-3 rounded-xl p-4">
+              <FileText className="h-8 w-8 shrink-0 text-[#73bfd2]" />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{arquivo.name}</p>
+                <p className="truncate text-sm font-medium text-[#f5f7fa]">{arquivo.name}</p>
                 <p className="text-xs text-neutral-400">{(arquivo.size / 1024).toFixed(0)} KB</p>
               </div>
               <Button variant="ghost" size="icon" onClick={() => setArquivo(null)} aria-label="Remover arquivo">
@@ -144,8 +145,8 @@ export function NovoTemplateDialog({
               onDragLeave={() => setIsDragging(false)}
               onDrop={handleDrop}
               className={cn(
-                "flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed border-neutral-300 py-12 text-center transition-colors dark:border-neutral-700",
-                isDragging && "border-emerald-500 bg-emerald-500/5",
+                "gd-upload flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed py-12 text-center transition-colors",
+                isDragging && "border-[#de4152] bg-[#de4152]/10",
               )}
             >
               <Upload className="h-8 w-8 text-neutral-400" />

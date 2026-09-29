@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, Sparkles, FileCheck, Download, Loader2, FileWarning } from "lucide-react";
+import { CheckCircle2, Sparkles, FileCheck, Download, Loader2, FileWarning, FileText } from "lucide-react";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,6 +58,7 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
     Object.fromEntries(documento.clausulas.map((clausula) => [clausula.id, clausula.conteudo])),
   );
   const [clasulaEmEdicao, setClasulaEmEdicao] = useState<string | null>(null);
+  const [acaoPendente, setAcaoPendente] = useState<"clausula" | "ia" | "finalizar" | "variaveis" | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const somenteLeitura = status === "FINALIZADO" || status === "ARQUIVADO";
@@ -66,19 +68,24 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
 
   function handleSalvarTexto(clasulaId: string, conteudo: string) {
     if (conteudo === conteudosSalvos[clasulaId] || isPending) return;
+    setAcaoPendente("clausula");
     startTransition(async () => {
-      const resultado = await EditarClasulaGerada({ documentoId: documento.id, clasulaId, conteudo });
-      if (!resultado.success) {
-        toast.error(resultado.error);
-        return;
+      try {
+        const resultado = await EditarClasulaGerada({ documentoId: documento.id, clasulaId, conteudo });
+        if (!resultado.success) {
+          toast.error(resultado.error);
+          return;
+        }
+        setConteudosSalvos((prev) => ({ ...prev, [clasulaId]: conteudo }));
+        setPdfDisponivel(resultado.pdfDisponivel);
+        if (resultado.atualizado) {
+          setPdfStatus("loading");
+          setPdfRevision((revision) => revision + 1);
+        }
+        toast.success("Documento e PDF atualizados");
+      } finally {
+        setAcaoPendente(null);
       }
-      setConteudosSalvos((prev) => ({ ...prev, [clasulaId]: conteudo }));
-      setPdfDisponivel(resultado.pdfDisponivel);
-      if (resultado.atualizado) {
-        setPdfStatus("loading");
-        setPdfRevision((revision) => revision + 1);
-      }
-      toast.success("Documento e PDF atualizados");
     });
   }
 
@@ -91,37 +98,47 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
       toast.error("Salve as alterações antes de reescrever com IA");
       return;
     }
+    setAcaoPendente("ia");
     startTransition(async () => {
-      const resultado = await ReescreverClasulaComIA({ documentoId: documento.id, clasulaId, instrucao });
-      if (!resultado.success) {
-        toast.error(resultado.error);
-        return;
+      try {
+        const resultado = await ReescreverClasulaComIA({ documentoId: documento.id, clasulaId, instrucao });
+        if (!resultado.success) {
+          toast.error(resultado.error);
+          return;
+        }
+        setClausulas((prev) =>
+          prev.map((c) => (c.id === clasulaId ? { ...c, conteudo: resultado.conteudo, reescritoPorIA: true } : c)),
+        );
+        setConteudosSalvos((prev) => ({ ...prev, [clasulaId]: resultado.conteudo }));
+        setPdfDisponivel(resultado.pdfDisponivel);
+        setPdfStatus("loading");
+        setPdfRevision((revision) => revision + 1);
+        toast.success("Cláusula reescrita pela IA");
+        setClasulaEmEdicao(null);
+      } finally {
+        setAcaoPendente(null);
       }
-      setClausulas((prev) =>
-        prev.map((c) => (c.id === clasulaId ? { ...c, conteudo: resultado.conteudo, reescritoPorIA: true } : c)),
-      );
-      setConteudosSalvos((prev) => ({ ...prev, [clasulaId]: resultado.conteudo }));
-      setPdfDisponivel(resultado.pdfDisponivel);
-      setPdfStatus("loading");
-      setPdfRevision((revision) => revision + 1);
-      toast.success("Cláusula reescrita pela IA");
-      setClasulaEmEdicao(null);
     });
   }
 
   function handleFinalizar() {
     if (temAlteracoesPendentes || isPending) return;
+    setAcaoPendente("finalizar");
     startTransition(async () => {
-      const resultado = await FinalizarDocumento(documento.id);
-      if (!resultado.success) {
-        toast.error(resultado.error);
-        return;
+      try {
+        const resultado = await FinalizarDocumento(documento.id);
+        if (!resultado.success) {
+          toast.error(resultado.error);
+          return;
+        }
+        setStatus("FINALIZADO");
+        setPdfDisponivel(true);
+        setPdfStatus("loading");
+        setPdfRevision((revision) => revision + 1);
+        toast.success("Documento finalizado");
+      } finally {
+        setAcaoPendente(null);
       }
-      setStatus("FINALIZADO");
-      setPdfDisponivel(true);
-      setPdfStatus("loading");
-      setPdfRevision((revision) => revision + 1);
-      toast.success("Documento finalizado");
     });
   }
 
@@ -130,31 +147,37 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
       toast.error("Salve as cláusulas antes de atualizar os dados do contrato");
       return;
     }
+    setAcaoPendente("variaveis");
     startTransition(async () => {
-      const resultado = await AtualizarVariaveisContratoPadrao({ documentoId: documento.id, valores: variaveis });
-      if (!resultado.success) {
-        toast.error(resultado.error);
-        return;
+      try {
+        const resultado = await AtualizarVariaveisContratoPadrao({ documentoId: documento.id, valores: variaveis });
+        if (!resultado.success) {
+          toast.error(resultado.error);
+          return;
+        }
+        setClausulas(resultado.data.clausulas);
+        setConteudosSalvos(Object.fromEntries(resultado.data.clausulas.map((clausula) => [clausula.id, clausula.conteudo])));
+        setVariaveisSalvas({ ...variaveis });
+        setPdfDisponivel(resultado.data.pdfDisponivel);
+        setPdfStatus("loading");
+        setPdfRevision((revision) => revision + 1);
+        toast.success("Dados do contrato e PDF atualizados");
+      } finally {
+        setAcaoPendente(null);
       }
-      setClausulas(resultado.data.clausulas);
-      setConteudosSalvos(Object.fromEntries(resultado.data.clausulas.map((clausula) => [clausula.id, clausula.conteudo])));
-      setVariaveisSalvas({ ...variaveis });
-      setPdfDisponivel(resultado.data.pdfDisponivel);
-      setPdfStatus("loading");
-      setPdfRevision((revision) => revision + 1);
-      toast.success("Dados do contrato e PDF atualizados");
     });
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 md:px-8">
-      <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <main className="gd-main gd-inner mx-auto max-w-6xl px-4 py-8 md:px-8">
+      <nav aria-label="Caminho" className="gd-breadcrumb mb-6"><Link href="/PainelAlpha/GeradorDocumentos">Gerador de Documentos</Link><span>/</span><span>Documentos gerados</span><span>/</span><span aria-current="page">{documento.titulo}</span></nav>
+      <div className="gd-page-heading mb-7 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">{documento.titulo}</h1>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">{documento.template.titulo}</p>
+          <p className="gd-kicker">Conferência do documento</p><h1 className="gd-title">{documento.titulo}</h1>
+          <p className="gd-muted mt-2 text-sm">{documento.template.titulo}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant={status === "FINALIZADO" ? "default" : "secondary"}>{STATUS_LABEL[status] ?? status}</Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge className="gd-status" data-status={status}>{STATUS_LABEL[status] ?? status}</Badge>
           {pdfDisponivel && !temAlteracoesPendentes && !isPending && (
             <a href={`/PainelAlpha/GeradorDocumentos/${documento.id}/download`} target="_blank" rel="noopener noreferrer">
               <Button variant="secondary">
@@ -171,27 +194,27 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
           )}
           {!somenteLeitura && (
             <Button onClick={handleFinalizar} disabled={isPending || temAlteracoesPendentes}>
-              <CheckCircle2 className="mr-1.5 h-4 w-4" />
-              Finalizar
+              {acaoPendente === "finalizar" ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-4 w-4" />}
+              {acaoPendente === "finalizar" ? "Finalizando..." : "Finalizar"}
             </Button>
           )}
         </div>
       </div>
 
       {somenteLeitura && (
-        <div className="mb-6 flex items-center gap-2 rounded-lg bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600 dark:text-emerald-400">
+        <div className="gd-notice gd-notice-success mb-6 flex items-center gap-2 px-4 py-3 text-sm">
           <FileCheck className="h-4 w-4 shrink-0" />
           Este documento já foi finalizado e não pode mais ser editado.
         </div>
       )}
 
       {!somenteLeitura && definicoes.length > 0 && (
-        <Card className="mb-6 space-y-4 p-5">
+        <Card className="gd-panel mb-6 space-y-4 p-5 md:p-6">
           <div>
-            <h2 className="font-medium text-neutral-900 dark:text-neutral-100">Dados do contrato para conferência</h2>
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">Confira os dados importados do Financeiro e preencha os pendentes antes de finalizar.</p>
+            <p className="gd-kicker">Informações importadas</p><h2 className="gd-section-title">Dados do contrato para conferência</h2>
+            <p className="gd-muted text-sm">Confira os dados importados do Financeiro e preencha os pendentes antes de finalizar.</p>
           </div>
-          <div className="rounded-md border border-neutral-200 p-3 text-sm dark:border-neutral-800">
+          <div className="gd-subpanel rounded-md p-4 text-sm">
             <p><strong>Serviço:</strong> {String(valoresIniciais.__bpmServico ?? "Não informado")}</p>
             <p><strong>Forma de pagamento:</strong> {String(valoresIniciais.__bpmFormaPagamento ?? "Não informada")}</p>
             <p><strong>Condição negociada:</strong> {String(valoresIniciais.__bpmCondicaoNegociada ?? "Não informada")}</p>
@@ -207,16 +230,16 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
                 disabled={isPending} />
             </label>)}
           </div>
-          <Button type="button" onClick={handleSalvarVariaveis} disabled={isPending || !temVariaveisPendentes || temClausulasPendentes}>Atualizar dados do contrato</Button>
+          <Button type="button" onClick={handleSalvarVariaveis} disabled={isPending || !temVariaveisPendentes || temClausulasPendentes}>{acaoPendente === "variaveis" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{acaoPendente === "variaveis" ? "Atualizando..." : "Atualizar dados do contrato"}</Button>
         </Card>
       )}
 
       {pdfDisponivel ? (
-        <Card className="mb-6 flex flex-col gap-3 p-5">
-          <h2 className="font-medium text-neutral-900 dark:text-neutral-100">Documento em PDF</h2>
-          <div className="relative min-h-[32rem] overflow-hidden rounded-md border border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-950">
+        <Card className="gd-panel mb-6 flex flex-col gap-3 p-5 md:p-6">
+          <div className="flex items-center gap-2"><FileText className="h-4 w-4 text-[#73bfd2]" /><h2 className="gd-section-title">Documento em PDF</h2></div>
+          <div className="gd-pdf-frame relative min-h-[32rem] overflow-hidden rounded-md">
             {(temAlteracoesPendentes || isPending) && (
-              <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/90 px-6 text-center text-sm text-neutral-700 dark:bg-neutral-950/90 dark:text-neutral-200" role="status">
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0b1424]/95 px-6 text-center text-sm text-slate-200" role="status">
                 {isPending ? "Atualizando documento e PDF…" : "Alterações pendentes. Salve os campos ou saia da cláusula para atualizar o PDF."}
               </div>
             )}
@@ -243,7 +266,7 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
           </div>
         </Card>
       ) : (
-        <div className="mb-6 flex items-center gap-2 rounded-lg bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300" role="alert">
+        <div className="gd-notice gd-notice-warning mb-6 flex items-center gap-2 px-4 py-3 text-sm" role="alert">
           <FileWarning className="h-4 w-4 shrink-0" aria-hidden="true" />
           {definicoes.length > 0
             ? "Confira e salve os dados do contrato para atualizar o PDF."
@@ -251,16 +274,17 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
         </div>
       )}
 
+      <div className="mb-4"><p className="gd-kicker">Conteúdo</p><h2 className="gd-section-title">Cláusulas do documento</h2></div>
       <div className="flex flex-col gap-4">
         {clausulas
           .slice()
           .sort((a, b) => a.ordem - b.ordem)
           .map((clasula) => (
-            <Card key={clasula.id} className="flex flex-col gap-3 p-5">
+            <Card key={clasula.id} className="gd-clause-card flex flex-col gap-3 p-5 md:p-6">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="font-medium text-neutral-900 dark:text-neutral-100">{clasula.titulo}</h3>
                 {clasula.reescritoPorIA && (
-                  <Badge variant="secondary" className="gap-1">
+                  <Badge variant="secondary" className="gd-ai gap-1">
                     <Sparkles className="h-3 w-3" />
                     Reescrito por IA
                   </Badge>
@@ -268,7 +292,7 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
               </div>
 
               <textarea
-                className="min-h-28 w-full rounded-md border border-neutral-200 bg-transparent p-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-neutral-800"
+                className="gd-textarea min-h-28 w-full rounded-md p-3 text-sm outline-none"
                 value={clasula.conteudo}
                 disabled={somenteLeitura || isPending}
                 onChange={(e) => handleAtualizarLocal(clasula.id, e.target.value)}
@@ -293,12 +317,12 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
                   onAbrir={() => setClasulaEmEdicao(clasula.id)}
                   onFechar={() => setClasulaEmEdicao(null)}
                   onReescrever={(instrucao) => handleReescrever(clasula.id, instrucao)}
-                  carregando={isPending && clasulaEmEdicao === clasula.id}
+                  carregando={acaoPendente === "ia" && clasulaEmEdicao === clasula.id}
                 />
               )}
             </Card>
           ))}
       </div>
-    </div>
+    </main>
   );
 }

@@ -7,7 +7,7 @@ import { Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { CriarEmpresaContratada, ConsultarCnpjParaQualificacao } from "@/actions/empresas-contratadas";
 
 export interface EmpresaContratadaResumo {
@@ -162,9 +162,10 @@ export function ModalNovaEmpresaContratada({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="gd-dialog max-h-[90vh] overflow-y-auto border-[#2a3a4d] bg-[#0d1726] text-[#f5f7fa] shadow-2xl sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Nova empresa contratada</DialogTitle>
+          <p className="gd-kicker">Qualificação</p><DialogTitle className="text-xl">Nova empresa contratada</DialogTitle>
+          <DialogDescription>Preencha os dados da empresa ou consulte o CNPJ para começar.</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4 py-2">
@@ -223,7 +224,7 @@ export function ModalNovaEmpresaContratada({
             </div>
           </div>
 
-          <section className="flex flex-col gap-3 rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
+          <section className="gd-subpanel flex flex-col gap-3 rounded-lg p-4">
             <h4 className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Representante legal</h4>
             <p className="text-xs text-neutral-400">
               A Receita Federal não retorna o representante legal formal — preencha manualmente.

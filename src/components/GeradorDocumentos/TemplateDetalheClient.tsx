@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, GripVertical, Trash2, Plus } from "lucide-react";
+import { ArrowLeft, FileText, Trash2, Plus, Braces, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -59,6 +59,7 @@ export function TemplateDetalheClient({ template }: { template: TemplateDetalhe 
   const [clausulas, setClausulas] = useState(template.clausulas);
   const [variaveis, setVariaveis] = useState(template.variaveis);
   const [novaVariavel, setNovaVariavel] = useState<VariavelTemplate | null>(null);
+  const [salvandoClausulas, setSalvandoClausulas] = useState<Set<string>>(() => new Set());
   const [isPending, startTransition] = useTransition();
   const [isPendingVariaveis, startTransitionVariaveis] = useTransition();
 
@@ -120,18 +121,27 @@ export function TemplateDetalheClient({ template }: { template: TemplateDetalhe 
 
   function handleSalvarClasula(clasulaId: string) {
     const clasula = clausulas.find((c) => c.id === clasulaId);
-    if (!clasula) return;
+    if (!clasula || salvandoClausulas.has(clasulaId)) return;
+    setSalvandoClausulas((atual) => new Set(atual).add(clasulaId));
     startTransition(async () => {
-      const resultado = await AtualizarClasulaTemplate({
-        clasulaId,
-        titulo: clasula.titulo,
-        conteudo: clasula.conteudo,
-      });
-      if (!resultado.success) {
-        toast.error(resultado.error);
-        return;
+      try {
+        const resultado = await AtualizarClasulaTemplate({
+          clasulaId,
+          titulo: clasula.titulo,
+          conteudo: clasula.conteudo,
+        });
+        if (!resultado.success) {
+          toast.error(resultado.error);
+          return;
+        }
+        toast.success("Cláusula salva");
+      } finally {
+        setSalvandoClausulas((atual) => {
+          const proximas = new Set(atual);
+          proximas.delete(clasulaId);
+          return proximas;
+        });
       }
-      toast.success("Cláusula salva");
     });
   }
 
@@ -148,27 +158,38 @@ export function TemplateDetalheClient({ template }: { template: TemplateDetalhe 
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 md:px-8">
-      <Link href="/PainelAlpha/GeradorDocumentos" className="mb-4 inline-flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100">
+    <main className="gd-main gd-inner mx-auto max-w-6xl px-4 py-8 md:px-8">
+      <nav aria-label="Caminho" className="gd-breadcrumb mb-6">
+        <Link href="/PainelAlpha/GeradorDocumentos">Gerador de Documentos</Link><span>/</span><span>Templates</span><span>/</span><span aria-current="page">{template.titulo}</span>
+      </nav>
+      <Link href="/PainelAlpha/GeradorDocumentos" className="gd-back mb-5 inline-flex items-center gap-1.5 text-sm">
         <ArrowLeft className="h-4 w-4" />
         Voltar
       </Link>
 
-      <div className="mb-6 flex items-center justify-between gap-3">
+      <div className="gd-page-heading mb-7 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">{template.titulo}</h1>
-          {template.descricao && <p className="text-sm text-neutral-500 dark:text-neutral-400">{template.descricao}</p>}
+          <p className="gd-kicker">Editor de template</p>
+          <h1 className="gd-title">{template.titulo}</h1>
+          {template.descricao && <p className="gd-muted mt-2 text-sm">{template.descricao}</p>}
         </div>
         {template.status === "ATIVO" && (
           <Link href={`/PainelAlpha/GeradorDocumentos/gerar?templateId=${template.id}`}>
-            <Button>Gerar documento</Button>
+            <Button><FileText className="mr-2 h-4 w-4" />Gerar documento</Button>
           </Link>
         )}
       </div>
+      <div className="gd-editor-layout">
+        <aside className="gd-panel gd-editor-nav p-4" aria-label="Seções do template">
+          <p className="gd-kicker mb-4">Neste template</p>
+          <a href="#variaveis-template" className="gd-editor-nav-link"><Braces className="h-4 w-4" /> Variáveis <span>{variaveis.length}</span></a>
+          <a href="#clausulas-template" className="gd-editor-nav-link"><FileText className="h-4 w-4" /> Cláusulas <span>{clausulas.length}</span></a>
+        </aside>
+        <div className="min-w-0">
 
-      <section className="mb-6 flex flex-col gap-3">
+      <section id="variaveis-template" className="gd-panel mb-6 flex flex-col gap-4 p-5 md:p-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Variáveis ({variaveis.length})</h2>
+          <div><p className="gd-kicker">Conteúdo dinâmico</p><h2 className="gd-section-title">Variáveis <span className="gd-muted">({variaveis.length})</span></h2></div>
           {!novaVariavel && (
             <Button
               variant="ghost"
@@ -183,13 +204,13 @@ export function TemplateDetalheClient({ template }: { template: TemplateDetalhe 
         </div>
 
         {variaveis.length === 0 && !novaVariavel && (
-          <p className="text-xs text-neutral-400">Nenhuma variável ainda.</p>
+          <p className="gd-empty-inline">Nenhuma variável ainda. Adicione uma para preencher dados ao gerar um documento.</p>
         )}
 
         {variaveis.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {variaveis.map((variavel) => (
-              <Badge key={variavel.nome} variant="secondary" className="flex items-center gap-1.5 pr-1">
+              <Badge key={variavel.nome} variant="secondary" className="gd-variable-chip flex items-center gap-1.5 pr-1">
                 {`{{${variavel.nome}}}`} — {variavel.label}
                 <button
                   type="button"
@@ -206,7 +227,7 @@ export function TemplateDetalheClient({ template }: { template: TemplateDetalhe 
         )}
 
         {novaVariavel && (
-          <div className="grid grid-cols-1 gap-2 rounded-lg border border-neutral-200 p-3 sm:grid-cols-[1fr_1fr_140px_auto_auto] sm:items-center dark:border-neutral-800">
+          <div className="gd-subpanel grid grid-cols-1 gap-3 p-4 sm:grid-cols-[1fr_1fr_140px_auto_auto] sm:items-center">
             <Input
               placeholder="nome_variavel"
               value={novaVariavel.nome}
@@ -224,7 +245,7 @@ export function TemplateDetalheClient({ template }: { template: TemplateDetalhe 
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="gd-popover">
                 {TIPOS_VARIAVEL_OPCOES.map((opcao) => (
                   <SelectItem key={opcao.value} value={opcao.value}>
                     {opcao.label}
@@ -244,7 +265,7 @@ export function TemplateDetalheClient({ template }: { template: TemplateDetalhe 
             </div>
             <div className="flex items-center gap-1">
               <Button size="sm" onClick={handleAdicionarVariavel} disabled={isPendingVariaveis}>
-                Salvar
+                {isPendingVariaveis && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}{isPendingVariaveis ? "Salvando..." : "Salvar"}
               </Button>
               <Button variant="ghost" size="icon" onClick={() => setNovaVariavel(null)} aria-label="Cancelar">
                 <Trash2 className="h-4 w-4" />
@@ -254,22 +275,24 @@ export function TemplateDetalheClient({ template }: { template: TemplateDetalhe 
         )}
       </section>
 
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Cláusulas ({clausulas.length})</h2>
+      <div id="clausulas-template" className="mb-4 flex items-center justify-between gap-3 scroll-mt-6">
+        <div><p className="gd-kicker">Estrutura do documento</p><h2 className="gd-section-title">Cláusulas <span className="gd-muted">({clausulas.length})</span></h2></div>
         <Button variant="ghost" size="sm" onClick={handleAdicionar} disabled={isPending}>
-          <Plus className="mr-1 h-3.5 w-3.5" />
-          Adicionar cláusula
+          {isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Plus className="mr-1 h-3.5 w-3.5" />}
+          {isPending ? "Aguarde..." : "Adicionar cláusula"}
         </Button>
       </div>
 
       <div className="flex flex-col gap-3">
+        {clausulas.length === 0 && <div className="gd-panel gd-empty-inline p-8 text-center">Nenhuma cláusula ainda. Adicione a primeira cláusula para montar este template.</div>}
         {clausulas.map((clasula) => (
-          <Card key={clasula.id} className="flex flex-col gap-2 p-4">
+          <Card key={clasula.id} className="gd-clause-card flex flex-col gap-3 p-5">
             <div className="flex items-center gap-2">
-              <GripVertical className="h-4 w-4 shrink-0 text-neutral-300" />
+              <span className="gd-clause-index">{String(clasula.ordem + 1).padStart(2, "0")}</span>
               <input
-                className="flex-1 border-none bg-transparent text-sm font-medium outline-none"
+                className="gd-clause-title min-w-0 flex-1 border-none bg-transparent text-sm font-medium outline-none"
                 value={clasula.titulo}
+                disabled={salvandoClausulas.has(clasula.id)}
                 onChange={(e) => handleAtualizarCampo(clasula.id, "titulo", e.target.value)}
                 onBlur={() => handleSalvarClasula(clasula.id)}
               />
@@ -278,14 +301,18 @@ export function TemplateDetalheClient({ template }: { template: TemplateDetalhe 
               </Button>
             </div>
             <textarea
-              className="min-h-24 w-full rounded-md border border-neutral-200 bg-transparent p-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-neutral-800"
+              className="gd-textarea min-h-28 w-full rounded-md p-3 text-sm outline-none"
               value={clasula.conteudo}
+              disabled={salvandoClausulas.has(clasula.id)}
               onChange={(e) => handleAtualizarCampo(clasula.id, "conteudo", e.target.value)}
               onBlur={() => handleSalvarClasula(clasula.id)}
             />
+            {salvandoClausulas.has(clasula.id) && <p className="gd-muted flex items-center gap-2 text-xs" role="status"><Loader2 className="h-3 w-3 animate-spin" />Salvando cláusula...</p>}
           </Card>
         ))}
       </div>
-    </div>
+        </div>
+      </div>
+    </main>
   );
 }

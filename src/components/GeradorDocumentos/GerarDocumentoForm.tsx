@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Search } from "lucide-react";
+import { ArrowLeft, Plus, Search, FileText, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,6 +63,7 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
   const [buscandoClientes, setBuscandoClientes] = useState(false);
 
   const [empresasContratadas, setEmpresasContratadas] = useState<EmpresaContratadaResumo[]>([]);
+  const [carregandoEmpresas, setCarregandoEmpresas] = useState(!contratoPadrao);
   const [empresaContratadaId, setEmpresaContratadaId] = useState<string | null>(null);
   const [modalEmpresaOpen, setModalEmpresaOpen] = useState(false);
 
@@ -70,7 +71,7 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
     if (contratoPadrao) return;
     ListarEmpresasContratadas().then((res) => {
       if (res.success) setEmpresasContratadas(res.data);
-    });
+    }).finally(() => setCarregandoEmpresas(false));
   }, [contratoPadrao]);
 
   useEffect(() => {
@@ -182,23 +183,24 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8 md:px-8">
+    <main className="gd-main gd-inner mx-auto max-w-4xl px-4 py-8 md:px-8">
+      <nav aria-label="Caminho" className="gd-breadcrumb mb-6"><span>Gerador de Documentos</span><span>/</span><span>Templates</span><span>/</span><span aria-current="page">Gerar documento</span></nav>
       <Button
         type="button"
         variant="ghost"
         size="sm"
         onClick={handleVoltar}
         aria-label="Voltar para a tela anterior"
-        className="mb-4 flex h-auto items-center gap-1.5 px-0 text-sm font-normal text-neutral-500 hover:bg-transparent hover:text-neutral-900 dark:hover:text-neutral-100"
+        className="gd-back mb-5 flex h-auto items-center gap-1.5 px-0 text-sm font-normal hover:bg-transparent"
       >
         <ArrowLeft className="h-4 w-4" />
         Voltar
       </Button>
 
-      <h1 className="mb-1 text-xl font-semibold text-neutral-900 dark:text-neutral-100">Gerar documento</h1>
-      <p className="mb-6 text-sm text-neutral-500 dark:text-neutral-400">A partir do template &ldquo;{template.titulo}&rdquo;</p>
+      <div className="gd-page-heading mb-7"><p className="gd-kicker">Nova geração</p><h1 className="gd-title">Gerar documento</h1><p className="gd-muted mt-2 text-sm">A partir do template &ldquo;{template.titulo}&rdquo;</p></div>
 
-      <div className="flex flex-col gap-4">
+      <div className="gd-panel flex flex-col gap-5 p-5 md:p-7">
+        <div className="flex items-center gap-3"><span className="gd-icon"><FileText className="h-5 w-5" /></span><div><h2 className="gd-section-title">Dados do documento</h2><p className="gd-muted text-sm">Confira as informações antes de gerar.</p></div></div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="titulo-documento">Título do documento</Label>
           <Input id="titulo-documento" value={titulo} onChange={(e) => setTitulo(e.target.value)} />
@@ -207,7 +209,7 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
         <section className="flex flex-col gap-1.5">
           <Label htmlFor="busca-contratante">Contratante (cliente)</Label>
           {clienteSelecionado ? (
-            <div className="flex items-center justify-between rounded-md border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800">
+            <div className="gd-subpanel flex items-center justify-between px-3 py-2 text-sm">
               <div className="min-w-0">
                 <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">{clienteSelecionado.razaoSocial}</p>
                 {clienteSelecionado.nomeFantasia && (
@@ -229,9 +231,9 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
                 onChange={(e) => setBuscaCliente(e.target.value)}
               />
               {(clientesEncontrados.length > 0 || buscandoClientes || (buscaCliente.trim().length >= 2 && !buscandoClientes)) && (
-                <div className="absolute z-10 mt-1 w-full rounded-md border border-neutral-200 bg-white shadow-lg dark:border-neutral-800 dark:bg-neutral-900" aria-live="polite">
+                <div className="gd-popover absolute z-10 mt-1 w-full rounded-md shadow-lg" aria-live="polite">
                   {buscandoClientes ? (
-                    <p className="px-3 py-2 text-xs text-neutral-400">Buscando...</p>
+                    <p className="flex items-center gap-2 px-3 py-2 text-xs text-neutral-400"><Loader2 className="h-3.5 w-3.5 animate-spin" />Buscando...</p>
                   ) : clientesEncontrados.length === 0 ? (
                     <p className="px-3 py-2 text-xs text-neutral-400">Nenhum cliente encontrado</p>
                   ) : (
@@ -240,7 +242,7 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
                         key={cliente.id}
                         type="button"
                         onClick={() => selecionarCliente(cliente)}
-                        className="block w-full px-3 py-2 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                        className="gd-search-result block w-full px-3 py-2 text-left text-sm"
                       >
                         <span className="font-medium text-neutral-900 dark:text-neutral-100">{cliente.razaoSocial}</span>
                         {cliente.nomeFantasia && <span className="ml-1.5 text-xs text-neutral-400">{cliente.nomeFantasia}</span>}
@@ -261,8 +263,10 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
               <SelectTrigger id="select-contratada" className="flex-1">
                 <SelectValue placeholder="Selecione a empresa contratada" />
               </SelectTrigger>
-              <SelectContent>
-                {empresasContratadas.length === 0 ? (
+              <SelectContent className="gd-popover">
+                {carregandoEmpresas ? (
+                  <div className="flex items-center gap-2 px-3 py-2 text-sm text-[#a6dce9]" role="status"><Loader2 className="h-4 w-4 animate-spin" />Carregando empresas...</div>
+                ) : empresasContratadas.length === 0 ? (
                   <div className="px-3 py-2 text-sm text-neutral-400">Nenhuma empresa cadastrada</div>
                 ) : (
                   empresasContratadas.map((empresa) => (
@@ -287,7 +291,7 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
               .filter(Boolean)
               .join(", ");
             return (
-              <div className="mt-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm dark:border-neutral-800 dark:bg-neutral-900" aria-live="polite">
+              <div className="gd-subpanel mt-2 p-4 text-sm" aria-live="polite">
                 <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
                   Qualificação da empresa contratada
                 </h4>
@@ -324,6 +328,7 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
           })()}
         </section>}
 
+        {template.variaveis.length > 0 && <div className="border-t border-white/10 pt-5"><p className="gd-kicker">Personalização</p><h2 className="gd-section-title">Variáveis do template</h2></div>}
         {template.variaveis.map((variavel) => (
           <div key={variavel.nome} className="flex flex-col gap-1.5">
             <Label htmlFor={`var-${variavel.nome}`}>
@@ -350,12 +355,12 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
           </div>
         ))}
 
-        <Button onClick={handleGerar} disabled={isPending} className="mt-2">
-          {isPending ? "Gerando..." : "Gerar documento"}
+        <Button onClick={handleGerar} disabled={isPending} className="mt-2 self-start">
+          {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{isPending ? "Gerando..." : "Gerar documento"}
         </Button>
       </div>
 
       {!contratoPadrao && <ModalNovaEmpresaContratada open={modalEmpresaOpen} onOpenChange={setModalEmpresaOpen} onCriada={handleEmpresaCriada} />}
-    </div>
+    </main>
   );
 }
