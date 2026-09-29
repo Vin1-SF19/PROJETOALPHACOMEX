@@ -5,7 +5,9 @@ import { AlertTriangle, CheckCircle2, ChevronDown, Circle, ListChecks, Loader2, 
 import { toast } from "sonner";
 
 import {
+  AdicionarItemExclusivoChecklistCardBpm,
   AtualizarItemChecklistCardBpm,
+  CriarChecklistDocumentalAvulsoBpm,
   ListarChecklistsCardBpm,
 } from "@/actions/bpm/Checklists";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
@@ -14,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ETAPA_DOCUMENTACAO_ANALISE_ID, PIPELINE_DOCUMENTACAO_OPERACIONAL_ID } from "@/lib/bpm/documentacao-analise";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type Checklist = Awaited<ReturnType<typeof ListarChecklistsCardBpm>>["data"][number];
@@ -46,6 +49,7 @@ export function PainelChecklistsCard({ card, accent, podeEditar, realtimeRevisio
   const [salvando, setSalvando] = useState<string | null>(null);
   const [observacoes, setObservacoes] = useState<Record<string, string>>({});
   const [conflitoRealtime, setConflitoRealtime] = useState(false);
+  const [novoDocumento, setNovoDocumento] = useState<Record<string, string>>({});
   const sujosRef = useRef(new Set<string>());
   const revisaoInicialRef = useRef(realtimeRevision);
 
@@ -83,6 +87,7 @@ export function PainelChecklistsCard({ card, accent, podeEditar, realtimeRevisio
     card.membros.forEach((membro) => mapa.set(membro.usuario.id, membro.usuario.nome));
     return [...mapa].map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
   }, [card.membros, card.responsavel]);
+  const documentacaoEmAnalise = card.pipelineId === PIPELINE_DOCUMENTACAO_OPERACIONAL_ID && card.etapaId === ETAPA_DOCUMENTACAO_ANALISE_ID;
 
   async function atualizarItem(itemId: string, alteracao: { status?: "PENDENTE" | "CONCLUIDO"; observacao?: string | null; responsavelId?: number | null }) {
     if (!podeEditar) return;
@@ -100,16 +105,54 @@ export function PainelChecklistsCard({ card, accent, podeEditar, realtimeRevisio
     onAtualizado();
   }
 
+  async function adicionarDocumento(cardChecklistId: string) {
+    const nome = novoDocumento[cardChecklistId]?.trim();
+    if (!podeEditar || !nome) return;
+    setSalvando(cardChecklistId);
+    const resposta = await AdicionarItemExclusivoChecklistCardBpm({ cardChecklistId, nome, obrigatorio: true });
+    setSalvando(null);
+    if (!resposta.success) { toast.error(resposta.error); return; }
+    setNovoDocumento((atual) => ({ ...atual, [cardChecklistId]: "" }));
+    toast.success("Documento adicionado ao procedimento deste card.");
+    await carregar();
+    onAtualizado();
+  }
+
+  async function criarPrimeiroDocumento() {
+    const nome = novoDocumento.avulso?.trim();
+    if (!podeEditar || !nome) return;
+    setSalvando("avulso");
+    const resposta = await CriarChecklistDocumentalAvulsoBpm({ cardId: card.id, nome });
+    setSalvando(null);
+    if (!resposta.success) { toast.error(resposta.error); return; }
+    setNovoDocumento((atual) => ({ ...atual, avulso: "" }));
+    toast.success("Documento adicionado ao card.");
+    await carregar();
+    onAtualizado();
+  }
+
   return <section id="checklist-pendencias" tabIndex={-1} className="space-y-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 outline-none focus-visible:ring-2 focus-visible:ring-white/30" aria-labelledby={`checklists-card-titulo-${card.id}`}>
-    <div className="flex items-start justify-between gap-3"><div className="flex items-start gap-2.5"><div className="flex size-8 shrink-0 items-center justify-center rounded-lg" style={{ background: `rgba(${accent},0.15)` }}><ListChecks size={15} aria-hidden="true" style={{ color: `rgb(${accent})` }} /></div><h3 id={`checklists-card-titulo-${card.id}`} className="self-center text-xs font-bold uppercase tracking-wide text-white">Procedimentos</h3></div>{!carregando && checklists.length > 0 && <Badge variant={totais.obrigatorios ? "destructive" : "secondary"}>{totais.obrigatorios ? `${totais.obrigatorios} pendentes` : "Em dia"}</Badge>}</div>
+    <div className="flex items-start justify-between gap-3"><div className="flex items-start gap-2.5"><div className="flex size-8 shrink-0 items-center justify-center rounded-lg" style={{ background: `rgba(${accent},0.15)` }}><ListChecks size={15} aria-hidden="true" style={{ color: `rgb(${accent})` }} /></div><h3 id={`checklists-card-titulo-${card.id}`} className="self-center text-xs font-bold uppercase tracking-wide text-white">{documentacaoEmAnalise ? "Documentos pendentes" : "Procedimentos"}</h3></div>{!carregando && checklists.length > 0 && <Badge variant={totais.obrigatorios ? "destructive" : "secondary"}>{totais.obrigatorios ? `${totais.obrigatorios} pendentes` : "Em dia"}</Badge>}</div>
     {carregando && <div aria-live="polite" className="space-y-2"><span className="sr-only">Carregando procedimentos</span><Skeleton className="h-3 w-full" /><Skeleton className="h-20 w-full" /></div>}
     {erro && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-200"><span><AlertTriangle size={14} className="mr-1 inline" />{erro}</span><Button size="sm" variant="ghost" onClick={() => void carregar()}><RefreshCw size={13} className="mr-1" />Tentar novamente</Button></div>}
     {conflitoRealtime && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-500/30 bg-sky-500/10 p-3 text-xs text-sky-100"><span>O procedimento mudou em tempo real. Seu rascunho foi preservado.</span><Button size="sm" variant="ghost" onClick={() => void carregar()}>Usar dados atualizados</Button></div>}
-    {!carregando && !erro && checklists.length === 0 && !ocultarVazio && <p className="rounded-xl border border-dashed border-white/10 p-5 text-center text-xs text-slate-500">Nenhum procedimento se aplica a este card.</p>}
+    {!carregando && !erro && checklists.length === 0 && !ocultarVazio && <p className="rounded-xl border border-dashed border-white/10 p-5 text-center text-xs text-slate-500">{documentacaoEmAnalise ? "Nenhum checklist de documentos está configurado para este card. Cadastre um template em Configurações → Checklists." : "Nenhum procedimento se aplica a este card."}</p>}
+    {!carregando && !erro && checklists.length === 0 && documentacaoEmAnalise && podeEditar &&
+      <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); void criarPrimeiroDocumento(); }}>
+        <Input aria-label="Adicionar primeiro documento fora do template" placeholder="Adicionar documento necessário" maxLength={200}
+          value={novoDocumento.avulso ?? ""} onChange={(event) => setNovoDocumento((atual) => ({ ...atual, avulso: event.target.value }))} />
+        <Button type="submit" size="sm" disabled={!novoDocumento.avulso?.trim() || salvando === "avulso"}>Adicionar</Button>
+      </form>}
     {!carregando && checklists.length > 0 && <div className="space-y-3">
       {checklists.map((checklist) => { const concluidos = checklist.itens.filter((item) => item.status === "CONCLUIDO").length; const percentual = checklist.itens.length ? Math.round((concluidos / checklist.itens.length) * 100) : 0; const nomesResponsaveis = [...new Set(checklist.itens.flatMap((item) => item.responsavel?.nome ? [item.responsavel.nome] : []))]; const resumoResponsaveis = nomesResponsaveis.length === 0 ? "Sem responsável" : nomesResponsaveis.length === 1 ? `Responsável: ${nomesResponsaveis[0]}` : `Responsáveis: ${nomesResponsaveis.length} pessoas`; return <details key={checklist.id} open className="group rounded-xl border border-white/[0.07] bg-black/10"><summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 p-3"><div className="min-w-0"><span className="block truncate text-sm font-semibold text-slate-100">{checklist.templateNome}</span><span className="block text-[11px] text-slate-500">{concluidos}/{checklist.itens.length} concluídos</span><span className="block truncate text-[11px] text-slate-400">{resumoResponsaveis}</span></div><ChevronDown size={15} className="shrink-0 text-slate-500 transition-transform group-open:rotate-180 motion-reduce:transition-none" /></summary><div className="space-y-2 border-t border-white/[0.06] p-3"><div role="progressbar" aria-label={`Progresso de ${checklist.templateNome}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentual} className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full" style={{ width: `${percentual}%`, backgroundColor: `rgb(${accent})` }} /></div>
         {checklist.itens.length === 0 && <p className="py-2 text-center text-xs text-slate-500">Este procedimento não tem itens.</p>}
         {checklist.itens.map((item) => <div id={`checklist-item-${item.id}`} tabIndex={-1} key={item.id} aria-busy={salvando === item.id} className="space-y-2 rounded-xl border border-white/[0.06] p-3 outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"><div className="flex items-start gap-3"><Checkbox aria-label={`${item.status === "CONCLUIDO" ? "Reabrir" : "Concluir"} ${item.nome}`} checked={item.status === "CONCLUIDO"} disabled={!podeEditar || salvando === item.id} onCheckedChange={(valor) => void atualizarItem(item.id, { status: valor === true ? "CONCLUIDO" : "PENDENTE" })} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><span className={`text-sm ${item.status === "CONCLUIDO" ? "text-slate-500 line-through" : "text-slate-100"}`}>{item.nome}</span>{item.obrigatorio && <Badge variant="outline" className="text-[10px]"><AlertTriangle size={10} className="mr-1" />Obrigatório</Badge>}<Badge variant="secondary" className="text-[10px]">{item.exclusivoCard ? "Exclusivo deste card" : "Do template"}</Badge></div>{item.descricao && <p className="mt-1 text-xs text-slate-500">{item.descricao}</p>}</div>{salvando === item.id ? <Loader2 size={15} className="animate-spin text-slate-400" /> : item.status === "CONCLUIDO" ? <CheckCircle2 size={15} className="text-emerald-400" /> : <Circle size={15} className="text-slate-600" />}</div><div className="grid gap-2 sm:grid-cols-2"><Input aria-label={`Observação de ${item.nome}`} disabled={!podeEditar || salvando === item.id} value={observacoes[item.id] ?? ""} placeholder="Observação" onChange={(event) => { setObservacoes((atual) => ({ ...atual, [item.id]: event.target.value })); sujosRef.current.add(item.id); }} onBlur={() => sujosRef.current.has(item.id) && void atualizarItem(item.id, { observacao: observacoes[item.id]?.trim() || null })} /><select aria-label={`Responsável por ${item.nome}`} disabled={!podeEditar || salvando === item.id} value={item.responsavelId ?? ""} onChange={(event) => void atualizarItem(item.id, { responsavelId: event.target.value ? Number(event.target.value) : null })} className="min-h-10 rounded-lg border border-white/10 bg-slate-900 px-3 text-xs text-white disabled:opacity-50"><option value="">Sem responsável</option>{responsaveis.map((pessoa) => <option key={pessoa.id} value={pessoa.id}>{pessoa.nome}</option>)}</select></div></div>)}
+        {podeEditar && documentacaoEmAnalise &&
+          <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); void adicionarDocumento(checklist.id); }}>
+            <Input aria-label="Adicionar documento fora do template" placeholder="Adicionar documento necessário" maxLength={200}
+              value={novoDocumento[checklist.id] ?? ""} onChange={(event) => setNovoDocumento((atual) => ({ ...atual, [checklist.id]: event.target.value }))} />
+            <Button type="submit" size="sm" disabled={!novoDocumento[checklist.id]?.trim() || salvando === checklist.id}>Adicionar</Button>
+          </form>}
       </div></details>; })}
     </div>}
     {!podeEditar && checklists.length > 0 && <p className="text-[11px] text-slate-500">Você possui acesso somente para leitura neste card.</p>}

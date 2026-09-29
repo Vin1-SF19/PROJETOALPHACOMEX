@@ -21,6 +21,7 @@
     "bpm:novos-leads:run": "node scripts/bpm-novos-leads-job.mjs",
     "bpm:regras": "node --import tsx scripts/bpm-regras-cli.mjs",
     "bpm:cadencias": "node --import tsx scripts/bpm-cadencias-cli.mjs",
+    "bpm:documentacao": "node --conditions=react-server --import tsx scripts/bpm-documentacao-monitor.mts",
     "bpm:automacoes": "tsx --conditions=react-server scripts/bpm-automacoes.ts",
     "bpm:automacoes:migrar-hardcoded": "tsx --conditions=react-server scripts/migrar-automacoes-hardcoded.ts",
     "bpm:checklists:reconciliar": "tsx --conditions=react-server scripts/reconciliar-tarefas-checklists.ts",

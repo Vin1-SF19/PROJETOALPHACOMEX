@@ -28,6 +28,7 @@ import {
 } from "@/lib/bpm/checklists/service";
 import { carregarResumoChecklistAplicavelCard } from "@/lib/bpm/checklists/integracao";
 import { reconciliarTarefaChecklist } from "@/lib/bpm/checklists/reconciliacao-tarefa";
+import { ETAPA_DOCUMENTACAO_ANALISE_ID, PIPELINE_DOCUMENTACAO_OPERACIONAL_ID } from "@/lib/bpm/documentacao-analise";
 
 const ROTA_ADMIN = "/PainelAlpha/AlphaCRM/admin/checklists";
 const ROTA_CRM = "/PainelAlpha/AlphaCRM";
@@ -503,6 +504,52 @@ export async function ObterResumoChecklistCardBpm(payload: unknown) {
       success: true as const,
       data: await carregarResumoChecklistAplicavelCard(card),
     };
+  } catch (error) {
+    return { success: false as const, error: erroPublico(error) };
+  }
+}
+
+/** Primeiro documento fora de um template: cria um procedimento exclusivo do card. */
+export async function CriarChecklistDocumentalAvulsoBpm(payload: unknown) {
+  try {
+    const dados = z.object({ cardId: z.string().min(1), nome: z.string().trim().min(1).max(200) }).parse(payload);
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Não autorizado");
+    const userId = Number(session.user.id);
+    const role = session.user.role ?? null;
+    await exigirAcessoBpmCard(dados.cardId, userId, role, "editarCard");
+    const card = await db.bpmCard.findUnique({ where: { id: dados.cardId }, select: {
+      id: true, pipelineId: true, etapaId: true, responsavelId: true } });
+    if (!card || card.pipelineId !== PIPELINE_DOCUMENTACAO_OPERACIONAL_ID
+      || card.etapaId !== ETAPA_DOCUMENTACAO_ANALISE_ID) throw new Error("Etapa inválida para o pipeline");
+    const templateId = `documentacao-avulsa:${card.id}`;
+    const item = await db.$transaction(async (tx) => {
+      await exigirAcessoBpmCard(card.id, userId, role, "editarCard", tx);
+      const cardAtual = await tx.bpmCard.findUnique({ where: { id: card.id }, select: { pipelineId: true, etapaId: true } });
+      if (cardAtual?.pipelineId !== PIPELINE_DOCUMENTACAO_OPERACIONAL_ID
+        || cardAtual.etapaId !== ETAPA_DOCUMENTACAO_ANALISE_ID) throw new Error("Etapa inválida para o pipeline");
+      const template = await tx.bpmChecklistTemplate.upsert({ where: { id: templateId }, update: {}, create: {
+        id: templateId, nome: "Documentos adicionais da análise", pipelineId: card.pipelineId,
+        etapaId: card.etapaId, cardId: card.id, criadoPorId: userId,
+      }, select: { id: true } });
+      const checklist = await tx.bpmCardChecklist.upsert({ where: { cardId_templateId: {
+        cardId: card.id, templateId: template.id } }, update: {}, create: {
+        cardId: card.id, templateId: template.id, templateNome: "Documentos adicionais da análise",
+      }, select: { id: true } });
+      const ultimo = await tx.bpmCardChecklistItem.findFirst({ where: { cardChecklistId: checklist.id },
+        orderBy: [{ ordem: "desc" }, { id: "desc" }], select: { ordem: true } });
+      const criado = await tx.bpmCardChecklistItem.create({ data: { cardChecklistId: checklist.id,
+        nome: dados.nome, obrigatorio: true, ordem: (ultimo?.ordem ?? -1) + 1,
+        exclusivoCard: true, responsavelId: card.responsavelId }, select: { id: true, nome: true } });
+      await tx.bpmCardChecklist.update({ where: { id: checklist.id }, data: { status: "PENDENTE", concluidoEm: null } });
+      await registrarHistoricoCard({ cardId: card.id, acao: "CHECKLIST_ITEM_EXCLUSIVO_ADICIONADO", usuarioId: userId,
+        valorNovoJson: JSON.stringify({ checklistId: checklist.id, itemId: criado.id, nome: criado.nome }) }, tx);
+      await reconciliarTarefaChecklist({ checklistId: checklist.id, usuarioId: userId }, tx);
+      return criado;
+    });
+    revalidatePath(ROTA_CRM);
+    await notificarPipelineBpm({ pipelineId: card.pipelineId, cardId: card.id, tipo: "TAREFA_ALTERADA" });
+    return { success: true as const, data: item };
   } catch (error) {
     return { success: false as const, error: erroPublico(error) };
   }

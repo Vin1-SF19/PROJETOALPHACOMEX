@@ -16,6 +16,9 @@ const mocks = vi.hoisted(() => ({
   revalidate: vi.fn(),
   transaction: vi.fn(),
   reconciliar: vi.fn(),
+  cardFindUnique: vi.fn(),
+  templateUpsert: vi.fn(),
+  checklistUpsert: vi.fn(),
 }));
 
 vi.mock("../../auth", () => ({ auth: mocks.auth }));
@@ -33,6 +36,7 @@ vi.mock("@/lib/prisma", () => ({
   default: {
     bpmCardChecklistItem: { findUnique: mocks.itemFindUnique },
     bpmCardChecklist: { findUnique: mocks.checklistFindUnique },
+    bpmCard: { findUnique: mocks.cardFindUnique },
     $transaction: mocks.transaction,
   },
 }));
@@ -40,6 +44,7 @@ vi.mock("@/lib/prisma", () => ({
 import {
   AdicionarItemExclusivoChecklistCardBpm,
   AtualizarItemChecklistCardBpm,
+  CriarChecklistDocumentalAvulsoBpm,
 } from "@/actions/bpm/Checklists";
 
 const ITEM_ID = "cm12345678901234567890123";
@@ -103,6 +108,7 @@ describe("Checklists.ts — operações robustas no card", () => {
       },
       bpmCardMembro: { findUnique: mocks.membroFindUnique },
       bpmCardChecklist: { update: mocks.checklistUpdate },
+      bpmChecklistTemplate: { findUnique: mocks.templateFindUnique, create: mocks.templateCreate },
     }));
   });
 
@@ -228,6 +234,30 @@ describe("Checklists.ts — operações robustas no card", () => {
     }));
     expect(mocks.reconciliar).toHaveBeenCalledTimes(1);
     expect(mocks.realtime).toHaveBeenCalledTimes(1);
+  });
+
+  it("cria o primeiro documento da análise sem template prévio, com histórico e tarefa", async () => {
+    mocks.cardFindUnique.mockResolvedValue({ id: "card-1", pipelineId: "cmuih4tnh000409gm5z34jvss",
+      etapaId: "draft-stage-86098ead-66b3-4032-a920-04832b71dc0c", responsavelId: 7 });
+    mocks.templateUpsert.mockResolvedValue({ id: "documentacao-avulsa:card-1" });
+    mocks.checklistUpsert.mockResolvedValue({ id: "checklist-avulso" });
+    mocks.itemFindFirst.mockResolvedValue(null);
+    mocks.transaction.mockImplementation(async (operacao) => operacao({
+      bpmCard: { findUnique: mocks.cardFindUnique },
+      bpmChecklistTemplate: { upsert: mocks.templateUpsert },
+      bpmCardChecklist: { upsert: mocks.checklistUpsert, update: mocks.checklistUpdate },
+      bpmCardChecklistItem: { findFirst: mocks.itemFindFirst, create: mocks.itemCreate },
+    }));
+
+    const resposta = await CriarChecklistDocumentalAvulsoBpm({ cardId: "card-1", nome: "Contrato social" });
+
+    expect(resposta.success).toBe(true);
+    expect(mocks.templateUpsert).toHaveBeenCalledTimes(1);
+    expect(mocks.itemCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      nome: "Contrato social", exclusivoCard: true, responsavelId: 7,
+    }) }));
+    expect(mocks.historico).toHaveBeenCalledTimes(1);
+    expect(mocks.reconciliar).toHaveBeenCalledWith(expect.objectContaining({ checklistId: "checklist-avulso" }), expect.anything());
   });
 
   it("detecta escrita concorrente e não emite histórico ou realtime", async () => {
