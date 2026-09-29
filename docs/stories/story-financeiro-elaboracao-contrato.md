@@ -169,3 +169,22 @@ Ready for Review — código da integração RADAR publicado e configuração da
 ## Validação do draft
 
 Checklist `story-draft-checklist.md`: objetivo/contexto **PASS**; orientação técnica **PARTIAL** (fluxo de acompanhamento, integração aplicável e representação de data/hora precisam de inventário antes da implementação); referências **PASS**; autossuficiência **PASS**; testes **PASS**; CodeRabbit **PASS**. **Resultado: READY para investigação e implementação local.** Publicação/mutação de configuração protegida depende do checkpoint Vault.
+
+## Correção — opção relacional na transição (2026-09-29)
+
+O card real em Elaboração de Contrato tem `Forma de pagamento` preenchida com opção ativa. O requisito `DURING_STAGE` usa a mesma identidade canônica, mas a validação da transição entrega `opcoesJson: null` ao validador, ignorando as opções relacionais. O campo é reportado como pendente mesmo após salvo.
+
+Critérios desta correção:
+
+- [x] O avanço aceita uma opção ativa do catálogo relacional mesmo quando `opcoesJson` é nulo.
+- [x] O avanço continua rejeitando opções fora do catálogo ativo.
+- [x] Testes e gates passam; File List registra somente os arquivos desta correção.
+
+Validação: teste regressivo falhou antes da implementação e passou depois; `npm run lint` aprovado (0 erros, 1.191 avisos), `npm run typecheck` aprovado, `npm test` aprovado (558 arquivos, 4.095 testes aprovados, 4 ignorados, 1 todo), `npm run build` aprovado. A configuração e o valor do card real foram conferidos em leitura; não houve movimento do card, mutação de banco ou smoke autenticado.
+
+File List desta correção:
+
+- `src/lib/bpm/transicao-command.ts`
+- `src/lib/bpm/requisitos-etapa.ts`
+- `tests/bpm/requisitos-transicao-obrigatoriedade.test.ts`
+- `docs/stories/story-financeiro-elaboracao-contrato.md`

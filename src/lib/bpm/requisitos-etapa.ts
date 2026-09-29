@@ -1,3 +1,5 @@
+import { validarValoresCamposBpm, type CampoDinamicoBpm } from "@/lib/bpm/campos-dinamicos";
+
 export type CampoObrigatorioBpm = {
   id: string;
   nome: string;
@@ -21,6 +23,25 @@ export function requisitoAplicaAoMover(
   if (requisito.transicaoId && requisito.transicaoId !== transicaoId) return false;
   if (requisito.fase === "ENTER_STAGE") return !requisito.etapaId || requisito.etapaId === etapaDestinoId;
   return !requisito.etapaId || requisito.etapaId === etapaOrigemId;
+}
+
+/** Usa o catálogo ativo publicado ao validar um valor já salvo na transição. */
+export function validarValorRequisitoCampo(
+  campo: CampoDinamicoBpm & { opcoes: readonly { rotulo: string }[] },
+  valor: string,
+): boolean {
+  return validarValoresCamposBpm([{
+    id: campo.id,
+    nome: campo.nome,
+    tipo: campo.tipo,
+    opcoesJson: campo.opcoes.length
+      ? JSON.stringify(campo.opcoes.map((opcao) => opcao.rotulo))
+      : campo.opcoesJson,
+    escopo: campo.escopo,
+    fonteEntidade: campo.fonteEntidade,
+    editavel: true,
+    somenteLeitura: false,
+  }], { [campo.id]: valor }).success;
 }
 
 type ObrigacaoCampoTransicao = {

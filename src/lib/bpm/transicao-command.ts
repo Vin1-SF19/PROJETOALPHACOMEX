@@ -5,7 +5,7 @@ import type { Prisma } from "@prisma/client";
 
 import db from "@/lib/prisma";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
-import { requisitoAplicaAoMover } from "@/lib/bpm/requisitos-etapa";
+import { requisitoAplicaAoMover, validarValorRequisitoCampo } from "@/lib/bpm/requisitos-etapa";
 import { registrarConclusaoContratoFinanceiro } from "@/lib/bpm/financeiro-assinatura-server";
 import { avaliarFormalizacaoFinanceira } from "@/lib/bpm/financeiro-formalizacao";
 import { avaliarPagamentoFinanceiro } from "@/lib/bpm/financeiro-pagamento-validacao";
@@ -494,10 +494,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
         pendencias.push(requisito.campo?.nome ?? requisito.alvoChave ?? requisito.mensagem);
       } else {
         const campo = camposPorId.get(requisito.campoId);
-        if (campo && !validarValoresCamposBpm([{
-          id: campo.id, nome: campo.nome, tipo: campo.tipo, opcoesJson: campo.opcoesJson,
-          escopo: campo.escopo, fonteEntidade: campo.fonteEntidade, editavel: true, somenteLeitura: false,
-        }], { [campo.id]: valor ?? "" }).success) {
+        if (campo && !validarValorRequisitoCampo(campo, valor ?? "")) {
           pendencias.push(requisito.campo?.nome ?? campo.nome);
         }
       }
