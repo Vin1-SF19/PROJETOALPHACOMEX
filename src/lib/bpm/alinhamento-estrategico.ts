@@ -4,6 +4,7 @@ export const NOME_ETAPA_ALINHAMENTO_ESTRATEGICO = "Alinhamento Estratégico agen
 export const NOME_CAMPO_RESPONSAVEL_PROCESSO = "Responsável pelo processo";
 export const NOME_CAMPO_CPF_RESPONSAVEL = "CPF do responsável";
 export const NOME_CAMPO_RESUMO_REUNIAO = "Resumo da reunião";
+export const NOME_CAMPO_LINK_RESUMO_REUNIAO = "Link do resumo da reunião";
 export const ERRO_ALINHAMENTO_RESUMO_OBRIGATORIO =
   "Cole o resumo da reunião antes de avançar para a próxima etapa.";
 export const TEMPLATE_RESUMO_ALINHAMENTO = `Participantes:\n\nObjetivo do alinhamento:\n\nPontos discutidos:\n\nDecisões tomadas:\n\nPróximos passos:`;
@@ -20,6 +21,10 @@ export function etapaEhAlinhamentoEstrategico(nome: string): boolean {
 
 export function campoEhResumoAlinhamento(nome: string): boolean {
   return normalizarNomeEtapa(nome) === normalizarNomeEtapa(NOME_CAMPO_RESUMO_REUNIAO);
+}
+
+export function linkResumoAlinhamentoValido(valor: string): boolean {
+  try { return new URL(valor).protocol === "https:"; } catch { return false; }
 }
 
 export function cpfEhValido(valor: string): boolean {

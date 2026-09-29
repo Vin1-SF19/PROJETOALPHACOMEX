@@ -256,11 +256,12 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
             campo: {
               OR: [
                 { nome: { in: ["Canal de origem", "Resumo da reunião", "Radar pretendido", "Qualificação"] } },
+                { chave: BPM_FIELD_KEYS.STRATEGIC_ALIGNMENT_SUMMARY_LINK },
                 ...(campoIdsConfigurados.length ? [{ id: { in: campoIdsConfigurados } }] : []),
               ],
             },
           },
-          select: { valor: true, campo: { select: { id: true, nome: true } } },
+          select: { valor: true, campo: { select: { id: true, nome: true, chave: true } } },
         },
       },
       orderBy: { createdAt: "desc" },

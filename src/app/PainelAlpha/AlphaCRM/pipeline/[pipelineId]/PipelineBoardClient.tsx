@@ -39,7 +39,8 @@ import { obterStatusPosFechamentoVisivel } from "@/lib/bpm/status-pos-fechamento
 import { processoOperacionalDeferido } from "@/lib/bpm/resultado-operacional";
 import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
 import { etapaEhBoasVindas } from "@/lib/bpm/boas-vindas";
-import { campoEhResumoAlinhamento, etapaEhAlinhamentoEstrategico } from "@/lib/bpm/alinhamento-estrategico";
+import { etapaEhAlinhamentoEstrategico } from "@/lib/bpm/alinhamento-estrategico";
+import { BPM_FIELD_KEYS } from "@/lib/bpm/ontology";
 import {
   criarSnapshotBoard,
   moverCardOtimistaNoBoard,
@@ -127,7 +128,7 @@ export interface CardBpm {
   membros: MembroCard[];
   _count: { tarefas: number; anexos: number };
   tarefas: { titulo: string; prazo: Date | string | null; tipo: string }[];
-  campoValores?: { valor: string | null; campo: { nome: string } }[];
+  campoValores?: { valor: string | null; campo: { nome: string; chave?: string | null } }[];
   cardViewComposicao?: CardKanbanComposicao;
   cardViewValores?: CardKanbanValores;
   ligacoesHoje?: number;
@@ -248,7 +249,8 @@ export function KanbanCard({
   const qualificacao = card.campoValores?.find((campo) => campo.campo.nome === "Qualificação")?.valor?.trim();
   const semCnpjNoloss = novosLeads && (ehLeadVirtual || card.veioNoloss) && !card.empresa.cnpj;
   const radarPretendido = card.campoValores?.find((campo) => campo.campo.nome === "Radar pretendido")?.valor;
-  const resumoAlinhamento = card.campoValores?.find((campo) => campoEhResumoAlinhamento(campo.campo.nome))?.valor;
+  const resumoAlinhamento = card.campoValores?.find((campo) =>
+    campo.campo.chave === BPM_FIELD_KEYS.STRATEGIC_ALIGNMENT_SUMMARY_LINK)?.valor;
   const alertaAlinhamento = etapaEhAlinhamentoEstrategico(etapaNome) && !resumoAlinhamento?.trim();
   const statusConfig = obterStatusPosFechamentoVisivel({ etapaNome, status: card.statusPosFechamento });
   const deferidoOperacional = processoOperacionalDeferido(etapaNome, card.encaminhamentos);
@@ -439,7 +441,7 @@ export function KanbanCard({
             className="flex items-center gap-1.5 rounded-xl border border-red-400/35 bg-red-500/15 px-2.5 py-2 text-[10px] font-extrabold uppercase tracking-wide text-red-100"
           >
             <AlertTriangle size={13} aria-hidden="true" className="shrink-0 text-red-300" />
-            <span>{alertaBoasVindas ? "Boas-vindas pendentes — requer atenção" : "Chamada de alinhamento pendente"}</span>
+            <span>{alertaBoasVindas ? "Boas-vindas pendentes — requer atenção" : "Link do resumo da reunião pendente"}</span>
           </div>
         )}
 

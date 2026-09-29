@@ -7,6 +7,10 @@ const CUID2 = "cfakecuidqrstuvwxyz12345";
 const PIPE = "cpipelinefakeabcdefghij12";
 
 describe("schema de campos BPM (CRUD completo)", () => {
+  it("permite configurar CPF canônico da usuária responsável", () => {
+    expect(atualizarCampoSchema.safeParse({ campoId: CUID, fonteEntidade: "USUARIO",
+      fonteAtributo: "cpf", escopo: "GLOBAL", editavel: false, somenteLeitura: true }).success).toBe(true);
+  });
   it("aceita texto curto obrigatório em etapa publicada com identidade do editor", () => {
     const etapaConfiguracoes = [{
       etapaId: "draft-stage-12345678-1234-1234-1234-123456789abc",
