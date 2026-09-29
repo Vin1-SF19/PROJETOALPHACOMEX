@@ -173,3 +173,83 @@ describe("Elaboração de Contrato ativa", () => {
     expect(salvo[id(C.DATA_ENVIO)]).toBe("2026-09-28T12:34:56.000Z");
   });
 });
+
+const formalizacaoIds = {
+  status: "cmt36ivq0002fkw0ax7jkz33c",
+  contrato: "cmt36ivq0002gkw0ax7jkz33c",
+  data: "cmt36ivq0002hkw0ax7jkz33c",
+  anexo: "cmt36ivq0002ikw0ax7jkz33c",
+};
+const quandoAssinado = JSON.stringify({ operador: "AND", condicoes: [{
+  tipo: "condicao", campo: { fonte: "campo_dinamico", campo: formalizacaoIds.status }, operador: "igual", valor: "Assinado",
+}] });
+
+function clienteFormalizacao() {
+  const definicoes = [
+    [C.STATUS_ASSINATURA, formalizacaoIds.status, "Status da assinatura", "selecao", JSON.stringify(["Aguardando assinatura", "Assinado"])],
+    [C.STATUS_CONTRATO, formalizacaoIds.contrato, "Status do contrato", "selecao", JSON.stringify(["Pendente", "CONTRATO CONCLUÍDO"])],
+    [C.DATA_ASSINATURA, formalizacaoIds.data, "Data da assinatura", "data", null],
+    [C.ANEXO_ASSINADO, formalizacaoIds.anexo, "Contrato assinado/anexo", "arquivo", null],
+  ] as const;
+  return {
+    bpmEtapa: { findMany: vi.fn().mockResolvedValue([{ id: etapaId }]) },
+    bpmCampoEtapaConfig: { findMany: vi.fn().mockResolvedValue(definicoes.map(([chave, id, nome, tipo, opcoesJson]) => ({
+      campoId: id, valorPadrao: chave === C.DATA_ASSINATURA ? "{{agora.data}}" : null,
+      condicaoObrigatoriedadeJson: chave === C.DATA_ASSINATURA || chave === C.ANEXO_ASSINADO ? quandoAssinado : null,
+      campo: { id, chave, nome, tipo, opcoesJson },
+    }))) },
+    bpmCampo: { findMany: vi.fn().mockResolvedValue(definicoes.map(([chave, id, nome, tipo, opcoesJson]) => ({
+      id, chave, nome, tipo, opcoesJson, escopo: "CARD", fonteEntidade: null, fonteAtributo: null, entidadeGlobal: null,
+    }))) },
+    bpmCardAnexo: { findFirst: vi.fn().mockResolvedValue(null) },
+    bpmCardHistorico: { findFirst: vi.fn().mockResolvedValue(null) },
+  };
+}
+
+describe("Formalização ativa", () => {
+  beforeEach(() => {
+    vi.mocked(camposPublicadosPorEtapa).mockResolvedValue(new Map([[etapaId, new Set(Object.values(formalizacaoIds))]]));
+    vi.mocked(carregarValoresCanonicosCampos).mockResolvedValue({});
+    vi.mocked(montarContextoAvaliacaoDoCard).mockResolvedValue({ card: {}, camposDinamicos: {} });
+  });
+
+  it("não confirma assinatura sem anexo próprio e preenche data ao confirmar", async () => {
+    const client = clienteFormalizacao();
+    const anexoId = "cmt36ivq0002jkw0ax7jkz33c";
+    const valoresSubmetidos = { [formalizacaoIds.status]: "Assinado", [formalizacaoIds.anexo]: anexoId };
+    await expect(prepararSalvamentoConfigurado({ card: card as never, valoresSubmetidos, client: client as never,
+      agora: new Date("2026-09-29T12:00:00.000Z") }))
+      .rejects.toThrow("REQUISITOS_PENDENTES:Contrato assinado/anexo");
+    expect(client.bpmCardAnexo.findFirst).toHaveBeenCalledWith({
+      where: { id: anexoId, cardId: card.id, campoId: formalizacaoIds.anexo }, select: { url: true },
+    });
+    client.bpmCardAnexo.findFirst.mockResolvedValue({ url: "bpm-blob:bpm/contratos/assinado.pdf" });
+    vi.mocked(montarContextoAvaliacaoDoCard).mockResolvedValue({ card: {}, camposDinamicos: {} });
+    const salvo = await prepararSalvamentoConfigurado({ card: card as never, valoresSubmetidos, client: client as never,
+      agora: new Date("2026-09-29T12:00:00.000Z") });
+    expect(salvo[formalizacaoIds.data]).toBe("2026-09-29");
+  });
+
+  it("não aceita status de contrato concluído sem assinatura e protege confirmação anterior", async () => {
+    const client = clienteFormalizacao();
+    await expect(prepararSalvamentoConfigurado({ card: card as never,
+      valoresSubmetidos: { [formalizacaoIds.contrato]: "CONTRATO CONCLUÍDO" }, client: client as never }))
+      .rejects.toThrow(/Status da assinatura.*Data da assinatura.*Contrato assinado\/anexo/);
+    vi.mocked(montarContextoAvaliacaoDoCard).mockResolvedValue({ card: {}, camposDinamicos: {
+      [formalizacaoIds.status]: "Assinado", [formalizacaoIds.data]: "2026-09-29",
+      [formalizacaoIds.anexo]: "cmt36ivq0002jkw0ax7jkz33c",
+    } });
+    client.bpmCardAnexo.findFirst.mockResolvedValue({ url: "bpm-blob:bpm/contratos/assinado.pdf" });
+    client.bpmCardHistorico.findFirst.mockResolvedValue({ id: "historico" });
+    await expect(prepararSalvamentoConfigurado({ card: card as never,
+      valoresSubmetidos: { [formalizacaoIds.status]: "Aguardando assinatura" }, client: client as never }))
+      .rejects.toThrow("Assinatura já confirmada");
+    vi.mocked(montarContextoAvaliacaoDoCard).mockResolvedValue({ card: {}, camposDinamicos: {
+      [formalizacaoIds.status]: "Assinado", [formalizacaoIds.data]: "2026-09-29",
+      [formalizacaoIds.anexo]: "cmt36ivq0002jkw0ax7jkz33c",
+    } });
+    await expect(prepararSalvamentoConfigurado({ card: card as never,
+      valoresSubmetidos: { [formalizacaoIds.contrato]: "Pendente" }, client: client as never }))
+      .rejects.toThrow("REQUISITOS_PENDENTES:Status do contrato");
+  });
+});

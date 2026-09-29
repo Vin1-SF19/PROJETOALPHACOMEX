@@ -7,6 +7,9 @@ import db from "@/lib/prisma";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 import { requisitoAplicaAoMover } from "@/lib/bpm/requisitos-etapa";
 import { registrarConclusaoContratoFinanceiro } from "@/lib/bpm/financeiro-assinatura-server";
+import { avaliarFormalizacaoFinanceira } from "@/lib/bpm/financeiro-formalizacao";
+import { CHAVES_CAMPOS } from "@/lib/bpm/financeiro-config.client";
+import { extrairPathnamePrivadoAnexoBpm } from "@/lib/bpm/anexos-storage";
 import { camposPublicadosPorEtapa, capacidadesObrigatoriasPorEtapa, capacidadeObrigatoriaEntrada } from "@/lib/bpm/campos-formulario-publicado";
 import {
   carregarValoresCanonicosCampos,
@@ -346,7 +349,8 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
   const formato = validarValoresCamposBpm(formataveis, valoresSubmetidos);
   if (!formato.success) erro("FORMAT_INVALID", formato.error);
   if (card.pipeline.chave === "financeiro"
-    && (card.etapa.chave === "solicitacao_contrato" || card.etapa.chave === "elaboracao_contrato")) {
+    && ["solicitacao_contrato", "elaboracao_contrato", "formalizacao_contratacao",
+      "confirmacao_pagamento", "emissao_nota_fiscal"].includes(card.etapa.chave ?? "")) {
     try {
       formato.valores = await prepararSalvamentoConfigurado({ card, valoresSubmetidos: formato.valores, client: tx,
         atorId: input.ator.userId });
@@ -411,6 +415,23 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     ...Object.fromEntries(valoresEfetivosPorId),
   };
   const pendencias: string[] = [];
+  if (card.pipeline.chave === BPM_PIPELINE_KEYS.FINANCEIRO && destino.chave === "contratacao_finalizada") {
+    const idCampo = (chave: string) => [...camposPorId.values()].find((campo) => campo.chave === chave)?.id;
+    const valorCampo = (chave: string) => valoresEfetivosPorId.get(idCampo(chave) ?? "") ?? null;
+    const anexoId = valorCampo(CHAVES_CAMPOS.ANEXO_ASSINADO);
+    const campoAnexoId = idCampo(CHAVES_CAMPOS.ANEXO_ASSINADO);
+    const anexo = anexoId && campoAnexoId ? await tx.bpmCardAnexo.findFirst({
+      where: { id: anexoId, cardId: card.id, campoId: campoAnexoId }, select: { url: true },
+    }) : null;
+    const avaliacao = avaliarFormalizacaoFinanceira({
+      statusAssinatura: valorCampo(CHAVES_CAMPOS.STATUS_ASSINATURA),
+      dataAssinatura: valorCampo(CHAVES_CAMPOS.DATA_ASSINATURA),
+      anexoAssinadoId: anexoId,
+      anexoAssinadoVinculado: Boolean(anexo?.url && extrairPathnamePrivadoAnexoBpm(anexo.url)),
+      pagamentoConfirmado: valorCampo(CHAVES_CAMPOS.PAGAMENTO_CONFIRMADO),
+    });
+    if (!avaliacao.contratacaoConcluida) pendencias.push(...avaliacao.pendencias);
+  }
   if (card.pipeline.nome === "Revisão de Radar" && etapaEhLost(destino.nome)) {
     const motivos = camposRequisito.filter((campo) =>
       campo.chave === BPM_FIELD_KEYS.LOST_REASON

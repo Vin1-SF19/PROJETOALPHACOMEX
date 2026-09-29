@@ -8,7 +8,7 @@ import { calcularProximaRecorrencia } from "@/lib/bpm/automacoes/agenda";
 import { materializarExecucoesEventosBpm, publicarEventoBpm, sanitizarPayloadAutomacao } from "@/lib/bpm/automacoes/eventos";
 import { chamadaHttpSchema, gatilhoConfigSchema, validarGrafoAutomacao, validarParametrosAcaoCentral } from "@/lib/bpm/automacoes/central-schemas";
 import { executarHttpSeguro } from "@/lib/bpm/automacoes/safe-http";
-import { idTarefaUnicaPorTipo } from "@/lib/bpm/automacoes/idempotencia-tarefa";
+import { idTarefaDiariaPorTipo, idTarefaUnicaPorTipo } from "@/lib/bpm/automacoes/idempotencia-tarefa";
 
 const FIM = { id: "fim", tipo: "FIM" as const };
 
@@ -38,6 +38,11 @@ describe("Motor Central de Automações", () => {
 
   it("valida parâmetros estritos por catálogo de ação", () => {
     expect(validarParametrosAcaoCentral("CRIAR_TAREFA", { titulo: "Ligar", prioridade: "ALTA" })).toMatchObject({ titulo: "Ligar", prioridade: "ALTA" });
+    expect(validarParametrosAcaoCentral("CRIAR_TAREFA", {
+      titulo: "Acompanhar assinatura", tipo: "ASSINATURA_CONTRATO", prazoCampoId: "cmt36ivq0002hkw0ax7jkz33c",
+      naoDuplicarDiaTipo: true,
+    })).toMatchObject({ prazoCampoId: "cmt36ivq0002hkw0ax7jkz33c", naoDuplicarDiaTipo: true });
+    expect(() => validarParametrosAcaoCentral("CRIAR_TAREFA", { titulo: "Acompanhar assinatura", prazoCampoId: "outra-etapa" })).toThrow();
     expect(() => validarParametrosAcaoCentral("MOVER_CARD", { etapaId: "não-cuid" })).toThrow();
     expect(() => validarParametrosAcaoCentral("ADICIONAR_ANOTACAO", { texto: "ok", shell: "rm" })).toThrow();
   });
@@ -84,6 +89,15 @@ describe("Motor Central de Automações", () => {
     expect(primeiro).not.toBe(idTarefaUnicaPorTipo("card-b", "EMISSAO_NF"));
     expect(primeiro).not.toBe(idTarefaUnicaPorTipo("card-a", "COBRANCA_FINANCEIRA"));
     expect(primeiro).toMatch(/^c[a-f0-9]{24}$/);
+  });
+
+  it("usa a mesma chave única em reexecuções do dia local e outra no dia seguinte", () => {
+    const tarde = idTarefaDiariaPorTipo("card-a", "ASSINATURA_CONTRATO", new Date("2026-09-29T15:00:00Z"));
+    const noite = idTarefaDiariaPorTipo("card-a", "ASSINATURA_CONTRATO", new Date("2026-09-30T01:00:00Z"));
+    const proximoDia = idTarefaDiariaPorTipo("card-a", "ASSINATURA_CONTRATO", new Date("2026-09-30T04:00:00Z"));
+    expect(tarde).toBe(noite);
+    expect(proximoDia).not.toBe(tarde);
+    expect(idTarefaDiariaPorTipo("card-b", "ASSINATURA_CONTRATO", new Date("2026-09-29T15:00:00Z"))).not.toBe(tarde);
   });
 
   it("deduplica a publicação de evento pela chave de idempotência", async () => {

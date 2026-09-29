@@ -11,6 +11,7 @@ import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
 import { FINANCIAL_FIELD_KEYS as K } from "@/lib/bpm/pipeline-financeiro";
 import { calcularNovoContrato, pendenciasValidacaoNovoContrato } from "@/lib/bpm/novo-contrato-financeiro";
 import { CHAVES_CAMPOS } from "@/lib/bpm/financeiro-config.client";
+import { extrairPathnamePrivadoAnexoBpm } from "@/lib/bpm/anexos-storage";
 import { cnpjEhValido } from "@/lib/format-cnpj";
 
 const DADOS_PARA_ELABORAR = [
@@ -112,6 +113,7 @@ export async function prepararSalvamentoConfigurado(params: {
     select: { id: true, nome: true, chave: true, tipo: true, opcoesJson: true, escopo: true, fonteEntidade: true, fonteAtributo: true, entidadeGlobal: true },
   });
   const contexto = await montarContextoAvaliacaoDoCard(card, client);
+  const valoresPersistidos = { ...contexto.camposDinamicos };
   // Datas de eventos já registrados são imutáveis mesmo que um cliente envie
   // manualmente outro valor num salvamento posterior.
   for (const chave of [CHAVES_CAMPOS.DATA_ELABORACAO, CHAVES_CAMPOS.DATA_ENVIO]) {
@@ -211,13 +213,41 @@ export async function prepararSalvamentoConfigurado(params: {
   }
 
   const valoresContexto = contexto.camposDinamicos ?? {};
-  if (statusAssinatura && Object.hasOwn(valoresSubmetidos, statusAssinatura.campoId)
-    && valoresContexto[statusAssinatura.campoId] !== "Assinado") {
+  if (statusAssinatura) {
+    const statusAtual = String(valoresContexto[statusAssinatura.campoId] ?? "").trim();
+    const campoData = porChave.get(CHAVES_CAMPOS.DATA_ASSINATURA);
+    const campoAnexo = porChave.get(CHAVES_CAMPOS.ANEXO_ASSINADO);
+    const campoContrato = porChave.get(CHAVES_CAMPOS.STATUS_CONTRATO);
+    const pendencias: string[] = [];
+    let anexoValido = false;
+    const statusContratoAtual = campoContrato ? String(valoresContexto[campoContrato.id] ?? "") : "";
+    if (statusAtual === "Assinado" && campoContrato && Object.hasOwn(valoresSubmetidos, campoContrato.id)
+      && statusContratoAtual !== "Assinado" && statusContratoAtual !== "CONTRATO CONCLUÍDO") {
+      pendencias.push(campoContrato.nome);
+    }
+    if (statusAtual === "Assinado" || statusContratoAtual === "Assinado" || statusContratoAtual === "CONTRATO CONCLUÍDO") {
+      if (statusAtual !== "Assinado") pendencias.push(statusAssinatura.campo.nome);
+      const data = campoData ? String(valoresContexto[campoData.id] ?? "").trim() : "";
+      if (!campoData || !data || !validarValoresCamposBpm([campoData], { [campoData.id]: data }).success) {
+        pendencias.push(campoData?.nome ?? "Data da assinatura");
+      }
+      const anexoId = campoAnexo ? String(valoresContexto[campoAnexo.id] ?? "").trim() : "";
+      const anexo = anexoId && campoAnexo ? await client.bpmCardAnexo.findFirst({
+        where: { id: anexoId, cardId: card.id, campoId: campoAnexo.id }, select: { url: true },
+      }) : null;
+      anexoValido = Boolean(anexo?.url && extrairPathnamePrivadoAnexoBpm(anexo.url));
+      if (!anexoValido) pendencias.push(campoAnexo?.nome ?? "Contrato assinado/anexo");
+    }
+    if (pendencias.length) throw new Error(`REQUISITOS_PENDENTES:${[...new Set(pendencias)].join(", ")}`);
     const assinaturaAnterior = await client.bpmCardHistorico.findFirst({
       where: { cardId: card.id, acao: "CONTRATO_CONCLUIDO" }, select: { id: true },
     });
     if (assinaturaAnterior) {
-      throw new Error("REQUISITOS_PENDENTES:Assinatura já confirmada; a reversão exige um procedimento auditado.");
+      const camposProtegidos = [statusAssinatura.campoId, campoData?.id, campoAnexo?.id, campoContrato?.id].filter((id): id is string => Boolean(id));
+      if (camposProtegidos.some((id) => Object.hasOwn(valoresSubmetidos, id)
+        && String(valoresContexto[id] ?? "") !== String(valoresPersistidos[id] ?? ""))) {
+        throw new Error("REQUISITOS_PENDENTES:Assinatura já confirmada; alterações exigem um procedimento auditado.");
+      }
     }
   }
   return valores;

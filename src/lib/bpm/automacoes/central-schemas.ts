@@ -65,10 +65,12 @@ const alterarSubstatusSchema = z.object({ subStatusId: z.string().cuid() }).stri
 const criarTarefaSchema = z.object({
   titulo: z.string().trim().min(1).max(200), descricao: z.string().max(4_000).optional(),
   responsavelId: z.number().int().positive().optional(), prazoMinutos: z.number().int().min(0).max(525_600).optional(),
+  prazoCampoId: z.string().cuid().optional(),
   tipo: z.string().trim().min(1).max(80).default("TAREFA"), prioridade: z.enum(["BAIXA", "NORMAL", "ALTA"]).default("NORMAL"),
   alertaMinutos: z.number().int().min(0).max(525_600).optional(),
   naoDuplicarPendenteTipo: z.boolean().default(false),
   naoDuplicarTipo: z.boolean().default(false),
+  naoDuplicarDiaTipo: z.boolean().default(false),
   interromperSeCampoPreenchido: z.enum(["standbyFollowUpInterrompidoEm", "proximoContatoEm"]).optional(),
   registrarExecucaoEmCampo: z.enum(["standbyFollowUpUltimoEm"]).optional(),
 }).strict();

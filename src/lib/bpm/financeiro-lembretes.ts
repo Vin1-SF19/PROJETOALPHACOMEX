@@ -17,6 +17,10 @@ const CHAVES = [
 export async function processarLembretesAssinaturaFinanceiro(agora = new Date()) {
   const pipeline = await db.bpmPipeline.findUnique({ where: { chave: PIPELINE_CHAVE }, select: { id: true } });
   if (!pipeline) return { examinados: 0, criados: 0 };
+  const lembreteConfigurado = await db.bpmAutomacao.findFirst({ where: {
+    pipelineId: pipeline.id, chave: "financeiro.formalizacao.ativa.lembrete",
+  }, select: { id: true } });
+  if (lembreteConfigurado) return { examinados: 0, criados: 0 };
   const campos = await db.bpmCampo.findMany({
     where: { pipelineId: pipeline.id, chave: { in: CHAVES }, ativo: true }, select: { id: true, chave: true },
   });

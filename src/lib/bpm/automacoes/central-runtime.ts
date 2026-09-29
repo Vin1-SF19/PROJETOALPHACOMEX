@@ -9,7 +9,7 @@ import { calcularPrazoFinal } from "@/lib/bpm/sla";
 import { executarTransicaoBpm } from "@/lib/bpm/transicao-command";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 import { carregarValoresCanonicosCampos } from "@/lib/bpm/campos-configuraveis-server";
-import { idTarefaUnicaPorTipo } from "@/lib/bpm/automacoes/idempotencia-tarefa";
+import { idTarefaDiariaPorTipo, idTarefaUnicaPorTipo } from "@/lib/bpm/automacoes/idempotencia-tarefa";
 import { calcularDiaCicloNovosLeads, contarDiasUteisDecorridos, intervaloDiaCivilSaoPaulo } from "@/lib/bpm/novos-leads";
 import { sincronizarTranscricaoCardBpm } from "@/lib/bpm/transcricao-reuniao-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
@@ -213,7 +213,23 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
     const prazoMinutos = Number(parametros.prazoMinutos ?? 0);
     const alertaMinutos = parametros.alertaMinutos === undefined ? null : Number(parametros.alertaMinutos);
     const agora = new Date();
+    const idUnicoDia = parametros.naoDuplicarDiaTipo
+      ? idTarefaDiariaPorTipo(card.id, String(parametros.tipo), agora) : null;
     const tarefa = await db.$transaction(async (tx) => {
+      let prazoDoCampo: Date | null = null;
+      if (parametros.prazoCampoId) {
+        const campoPrazo = await tx.bpmCampo.findFirst({
+          where: { id: String(parametros.prazoCampoId), pipelineId: card.pipelineId, ativo: true,
+            tipo: { in: ["data", "data_hora"] } }, select: { id: true },
+        });
+        if (!campoPrazo) throw new Error("Campo do prazo da tarefa inválido");
+        const valorPrazo = await tx.bpmCardCampoValor.findUnique({
+          where: { cardId_campoId: { cardId: card.id, campoId: campoPrazo.id } }, select: { valor: true },
+        });
+        if (!valorPrazo?.valor) return { ignorada: true as const, motivo: "PRAZO_NAO_DEFINIDO" };
+        prazoDoCampo = new Date(valorPrazo.valor);
+        if (Number.isNaN(prazoDoCampo.getTime())) throw new Error("Prazo da tarefa inválido");
+      }
       if (followUpNoLoss) {
         const elegivel = await tx.bpmCard.updateMany({
           where: { id: card.id, etapaId: execucao.automacao.etapaId, status: "ATIVO", standbyFollowUpInterrompidoEm: null },
@@ -228,13 +244,21 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
         }, select: { id: true } });
         if (existente) return { id: existente.id, existente: true };
       }
+      if (parametros.naoDuplicarDiaTipo) {
+        const { inicio, fim } = intervaloDiaCivilSaoPaulo(agora);
+        const existenteHoje = await tx.bpmTarefa.findFirst({ where: {
+          cardId: card.id, tipo: String(parametros.tipo), createdAt: { gte: inicio, lt: fim },
+        }, select: { id: true } });
+        if (existenteHoje) return { id: existenteHoje.id, existente: true };
+      }
       if (parametros.registrarExecucaoEmCampo === "standbyFollowUpUltimoEm" && !followUpNoLoss) {
         await tx.bpmCard.update({ where: { id: card.id }, data: { standbyFollowUpUltimoEm: agora } });
       }
       const criada = await tx.bpmTarefa.create({ data: {
-        ...(parametros.naoDuplicarTipo ? { id: idTarefaUnicaPorTipo(card.id, String(parametros.tipo)) } : {}),
+        ...(parametros.naoDuplicarTipo ? { id: idTarefaUnicaPorTipo(card.id, String(parametros.tipo)) }
+          : idUnicoDia ? { id: idUnicoDia } : {}),
         cardId: card.id, titulo: texto(parametros.titulo), descricao: parametros.descricao ? texto(parametros.descricao) : null,
-        responsavelId, prazo: temPrazo ? new Date(agora.getTime() + prazoMinutos * 60_000) : null,
+        responsavelId, prazo: prazoDoCampo ?? (temPrazo ? new Date(agora.getTime() + prazoMinutos * 60_000) : null),
         alertaEm: alertaMinutos === null ? null : new Date(agora.getTime() + alertaMinutos * 60_000),
         tipo: String(parametros.tipo), prioridade: String(parametros.prioridade),
       } });
@@ -246,6 +270,12 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
       }
       await publicarEventoDaAcao(execucao, "TAREFA_CRIADA", "TAREFA", criada.id, undefined, { tarefaId: criada.id, tipo: criada.tipo, titulo: criada.titulo }, tx);
       return criada;
+    }).catch(async (error) => {
+      if (idUnicoDia && typeof error === "object" && error !== null && "code" in error && error.code === "P2002") {
+        const existente = await db.bpmTarefa.findUnique({ where: { id: idUnicoDia }, select: { id: true } });
+        if (existente) return { ...existente, existente: true };
+      }
+      throw error;
     });
     if ("ignorada" in tarefa) return tarefa;
     if ("existente" in tarefa) return { tarefaId: tarefa.id, existente: true };
