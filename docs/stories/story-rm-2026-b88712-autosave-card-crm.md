@@ -699,3 +699,26 @@ Testes direcionados passaram, incluindo repetição do cenário de recuperação
 ### QA Results do refinamento
 
 QA: **APPROVED**. Foram revisados os caminhos de fechamento, retry, descarte, upload e isolamento entre cards. Testes direcionados: 54 aprovados. Gates finais: `npm run lint` PASS (0 erros; 1.191 avisos preexistentes), `npm run typecheck` PASS, `npm test` PASS (538 arquivos; 3.980 testes aprovados, 4 ignorados, 1 todo), `npm run build` PASS e `git diff --check` PASS. Sem alteração de estrutura ou dados do banco. A interação com um card real em ambiente autenticado não foi executada nesta alteração local.
+
+## Correção — placeholder temporal preso no rascunho (2026-09-29)
+
+Relato: após salvar o card em Elaboração de Contrato, o diálogo de saída mostra `Data do envio`, com valor anterior persistido e alteração `{{agora.instante}}`, e não permite concluir o salvamento.
+
+Critérios de aceite desta correção:
+
+- [x] A leitura do card não apresenta expressões `{{agora.data}}` e `{{agora.instante}}` como valores de campo; valores padrão literais continuam disponíveis.
+- [x] Se uma gravação preencher automaticamente outro campo, o autosave incorpora o valor confirmado sem criar alteração pendente falsa.
+- [x] Uma edição humana feita enquanto a gravação está em andamento não é sobrescrita pela confirmação automática.
+- [x] O fechamento do card conclui após todas as gravações confirmadas; testes, gates e File List são atualizados.
+
+Diagnóstico: `carregarCamposAplicaveisCardEtapa` usava `valorPadrao` como valor exibido mesmo quando era uma expressão a ser avaliada no servidor. Ao confirmar uma gravação, `PainelCamposEtapaAtual` sincronizava apenas os IDs que tinham rastreador de edição local. A data gerada no servidor não tinha rastreador; a base passava a conter o instante real, mas o rascunho permanecia com `{{agora.instante}}`. Um teste de componente reproduziu `flushSaves(card) === false` depois de uma resposta de sucesso da action.
+
+Validação: 28 testes direcionados aprovados (2 arquivos), inclusive fechamento sem alteração pendente falsa e preservação de edição concorrente. Gates finais: `npm run lint` aprovado (0 erros, 1.191 avisos), `npm run typecheck` aprovado, `npm test` aprovado (556 arquivos, 4.089 testes aprovados, 4 ignorados, 1 todo), `npm run build` aprovado e `git diff --check` aprovado. Nenhuma alteração de banco foi executada. A interação manual em um card autenticado não foi executada nesta correção local.
+
+File List desta correção:
+
+- `src/lib/bpm/requisitos-etapa-server.ts`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx`
+- `tests/bpm/requisitos-etapa-server.test.ts`
+- `tests/bpm/autosave-tipos-imediatos-react.test.ts`
+- `docs/stories/story-rm-2026-b88712-autosave-card-crm.md`

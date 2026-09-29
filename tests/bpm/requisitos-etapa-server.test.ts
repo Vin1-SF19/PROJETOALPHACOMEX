@@ -35,6 +35,27 @@ function configEtapa(etapaId: string, patch: Record<string, unknown> = {}) {
 }
 
 describe("campos aplicáveis por etapa", () => {
+  it("não expõe expressões temporais como valores do formulário", async () => {
+    const client = criarCliente({});
+    const camposBase = [
+      { id: "data", nome: "Data", tipo: "data", valorPadrao: "{{agora.data}}" },
+      { id: "instante", nome: "Instante", tipo: "data_hora", valorPadrao: "{{agora.instante}}" },
+      { id: "texto", nome: "Texto", tipo: "texto", valorPadrao: "Pendente" },
+    ].map((campo) => ({
+      ...campo, chave: campo.id, pipelineId: "pipeline-1", etapaId: "etapa-1", opcoesJson: null,
+      obrigatorio: false, obrigatorioEntrada: false, obrigatorioSaida: false, ordem: 0,
+      ativo: true, escopo: "CARD", fonteEntidade: null, fonteAtributo: null, entidadeGlobal: null,
+      visivel: true, editavel: true, somenteLeitura: false, configVersao: 1,
+      condicaoVisibilidadeJson: null, condicaoObrigatoriedadeJson: null,
+    }));
+
+    const campos = await carregarCamposAplicaveisCardEtapa(
+      "card-1", "pipeline-1", "etapa-1", client as never, undefined, camposBase,
+    );
+
+    expect(campos.map((campo) => campo.valor)).toEqual([null, null, "Pendente"]);
+  });
+
   it("não preenche campo financeiro pelo rótulo quando não há fonte configurada", async () => {
     const buscarCard = vi.fn().mockResolvedValue(null);
     const client = criarCliente({

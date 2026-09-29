@@ -128,6 +128,67 @@ it("data dispara a action imediatamente na mudança, sem blur", async () => {
   }));
 });
 
+it("reconcilia data preenchida automaticamente ao salvar outro campo", async () => {
+  const instante = "2026-09-29T14:09:49.575Z";
+  vi.mocked(AtualizarCardBpm).mockResolvedValue({
+    success: true,
+    data: { updatedAt: new Date("2026-09-29T14:10:00.000Z"), camposValores: { enviado: "Sim", dataEnvio: instante } },
+  });
+  const card = makeCard([
+    { id: "enviado", nome: "Contrato enviado", tipo: "booleano" },
+    { id: "dataEnvio", nome: "Data do envio", tipo: "data_hora" },
+  ]);
+  card.camposEtapa[1].valor = "{{agora.instante}}";
+  await render(card, ["enviado", "dataEnvio"]);
+
+  const select = container.querySelector<HTMLSelectElement>("#campo-bpm-enviado")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(select, "Sim");
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+
+  expect(await saves.flushSaves("card")).toBe(true);
+  expect(saves.getPendingChanges("card")).toEqual([]);
+  expect(container.querySelector<HTMLInputElement>("#campo-bpm-dataEnvio")?.value).not.toBe("");
+});
+
+it("mantém edição humana feita na data enquanto a confirmação automática estava em voo", async () => {
+  let confirmarPrimeiro!: (resultado: Awaited<ReturnType<typeof AtualizarCardBpm>>) => void;
+  let confirmarSegundo!: (resultado: Awaited<ReturnType<typeof AtualizarCardBpm>>) => void;
+  vi.mocked(AtualizarCardBpm)
+    .mockImplementationOnce(() => new Promise((resolve) => { confirmarPrimeiro = resolve; }))
+    .mockImplementationOnce(() => new Promise((resolve) => { confirmarSegundo = resolve; }));
+  const card = makeCard([
+    { id: "enviado", nome: "Contrato enviado", tipo: "booleano" },
+    { id: "dataEnvio", nome: "Data do envio", tipo: "data_hora" },
+  ]);
+  card.camposEtapa[1].valor = "";
+  await render(card, ["enviado", "dataEnvio"]);
+
+  const select = container.querySelector<HTMLSelectElement>("#campo-bpm-enviado")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(select, "Sim");
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  const input = container.querySelector<HTMLInputElement>("#campo-bpm-dataEnvio")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "2026-09-30T10:00");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => {
+    confirmarPrimeiro({ success: true, data: { updatedAt: new Date("2026-09-29T14:10:00.000Z"), camposValores: { enviado: "Sim", dataEnvio: "2026-09-29T14:09:49.575Z" } } });
+    await Promise.resolve();
+  });
+
+  expect(input.value).toBe("2026-09-30T10:00");
+  expect(saves.getPendingFields("card")).toContain("Data do envio");
+  await act(async () => {
+    confirmarSegundo({ success: true, data: { updatedAt: new Date("2026-09-29T14:11:00.000Z"), camposValores: { dataEnvio: "2026-09-30T10:00:00.000Z" } } });
+    expect(await saves.flushSaves("card")).toBe(true);
+  });
+  expect(saves.getPendingChanges("card")).toEqual([]);
+});
+
 it("duas edições rápidas no mesmo campo de select persistem a última", async () => {
   const card = makeCard([{ id: "status", nome: "Status", tipo: "selecao", opcoesJson: '["A","B","C"]' }]);
   await render(card, ["status"]);

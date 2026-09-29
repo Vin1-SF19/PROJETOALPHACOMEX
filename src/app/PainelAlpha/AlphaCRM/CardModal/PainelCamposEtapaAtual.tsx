@@ -231,6 +231,7 @@ export function PainelCamposEtapaAtual({
         if (possuiValorInvalido && revisaoEdicao.current === revisaoEnviada) setEstadoSave("invalido");
         return true;
       }
+      const valoresAntesDaRequisicao = { ...valoresRef.current };
       const resultado = await AtualizarCardBpm({
         cardId: card.id,
         camposValores,
@@ -256,9 +257,11 @@ export function PainelCamposEtapaAtual({
       const antesDaConfirmacao = valoresRef.current;
       for (const [id, valor] of Object.entries(confirmados)) {
         const revisao = revisoes.get(id);
-        if (revisao && rastreadores.current.get(id)?.corresponde(revisao)) {
+        const semEdicaoLocal = !revisao && !rastreadores.current.has(id)
+          && valoresRef.current[id] === valoresAntesDaRequisicao[id];
+        if ((revisao && rastreadores.current.get(id)?.corresponde(revisao)) || semEdicaoLocal) {
           valoresRef.current = { ...valoresRef.current, [id]: valor };
-          rastreadores.current.get(id)?.sincronizar(valor);
+          if (revisao) rastreadores.current.get(id)?.sincronizar(valor);
         }
       }
       setValoresCamposAtuais(valoresRef.current);

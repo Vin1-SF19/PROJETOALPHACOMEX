@@ -399,11 +399,14 @@ export async function carregarCamposAplicaveisCardEtapa(
   return campos.map((campo) => {
     const valorPersistido = valorPorCampo.get(campo.id) ?? null;
     const mapeamento = mapeamentos.find((item) => item.campoDestinoId === campo.id);
+    const valorPadraoExibivel = campo.valorPadrao === "{{agora.data}}" || campo.valorPadrao === "{{agora.instante}}"
+      ? null
+      : campo.valorPadrao;
     const valorNovoContrato = campo.escopo === "GLOBAL"
       ? (campo.fonteEntidade && !campo.somenteLeitura && campo.editavel !== false && !mapeamento && valorPersistido?.trim()
         ? valorPersistido
         : (valoresCanonicos[campo.id] || null))
-      : (resolvidos.efetivos[campo.id] || valorPersistido || campo.valorPadrao || null);
+      : (resolvidos.efetivos[campo.id] || valorPersistido || valorPadraoExibivel || null);
     const valor = campo.chave === "alpha.radar.standby.status_follow_up"
       ? (opcoesStatusStandby?.opcoes.find((opcao) => opcao.chave === (estadoStandby?.standbyFollowUpInterrompidoEm ? "interrompido" : "ativo"))?.rotulo ?? (estadoStandby?.standbyFollowUpInterrompidoEm ? "Interrompido" : "Ativo"))
       : precisaDadosMestres && campo.escopo === "CARD" && !mapeamento && !valorPersistido
