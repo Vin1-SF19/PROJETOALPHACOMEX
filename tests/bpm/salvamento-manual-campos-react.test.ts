@@ -94,3 +94,84 @@ it("o comando de salvar do diálogo de saída usa o mesmo fluxo manual", async (
   expect(AtualizarCardBpm).toHaveBeenCalledOnce();
   expect(context.getPendingFields("card")).toEqual([]);
 });
+
+const camposPagamento = [
+  { id: "pagamento_confirmado", nome: "Pagamento confirmado", chave: "alpha.pagamento.confirmado", tipo: "selecao", opcoesJson: JSON.stringify(["Sim", "Não"]) },
+  { id: "data_pagamento", nome: "Data do pagamento", chave: "alpha.data.do.pagamento", tipo: "data_hora", opcoesJson: null },
+  { id: "valor_recebido", nome: "Valor recebido", chave: "alpha.valor.recebido", tipo: "moeda", opcoesJson: null },
+  { id: "forma_utilizada", nome: "Forma de pagamento utilizada", chave: "alpha.financeiro.forma.pagamento.utilizada", tipo: "selecao", opcoesJson: JSON.stringify(["Pix", "Cartão de crédito"]) },
+  { id: "pagamento_exito", nome: "Pagamento no êxito", chave: "alpha.pagamento.no.exito", tipo: "selecao", opcoesJson: JSON.stringify(["Sim", "Não"]) },
+  { id: "status_financeiro", nome: "Status financeiro", chave: "alpha.status.financeiro", tipo: "selecao", opcoesJson: JSON.stringify(["Aguardando pagamento", "PAGAMENTO CONCLUÍDO"]), editavel: false, somenteLeitura: true },
+  { id: "status_contratacao", nome: "Status da contratação", chave: "alpha.financeiro.status.contratacao", tipo: "selecao", opcoesJson: JSON.stringify(["Aguardando pagamento", "Contratação concluída"]), editavel: false, somenteLeitura: true },
+].map((campo) => ({ valor: "", editavel: true, obrigatorio: false, pipelineId: "financeiro", etapaId: "etapa", ordem: 0, ...campo }));
+const cardPagamento = { id: "card-pagamento", updatedAt: "2026-09-29T10:00:00Z",
+  pipelineId: "cmuih4i54000209gmmyqrg557", pipeline: { chave: null }, etapa: { id: "etapa", nome: "Confirmação de Pagamento", chave: "confirmacao_pagamento" },
+  camposEtapa: camposPagamento,
+} as unknown as React.ComponentProps<typeof PainelCamposEtapaAtual>["card"];
+
+async function montarPagamento() {
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  vi.mocked(ObterCardBpm).mockResolvedValue({ success: true, data: cardPagamento } as Awaited<ReturnType<typeof ObterCardBpm>>);
+  await act(async () => root.render(h(CardSaveProvider, null, h(Probe), h(PainelCamposEtapaAtual, {
+    card: cardPagamento, campoIds: camposPagamento.map((campo) => campo.id), instanceKey: "pagamento",
+    accent: "1,2,3", podeEditar: true, realtimeRevision: 0, onAtualizado: vi.fn(),
+  }))));
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5)); });
+}
+
+async function selecionar(id: string, valor: string) {
+  await act(async () => {
+    const input = container.querySelector<HTMLSelectElement>(`#campo-bpm-${id}`)!;
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(input, valor);
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+}
+
+async function preencherPagamento() {
+  await selecionar("pagamento_confirmado", "Sim");
+  await editar("data_pagamento", "2026-09-29T18:00");
+  await editar("valor_recebido", "22000");
+  await selecionar("forma_utilizada", "Cartão de crédito");
+  await selecionar("pagamento_exito", "Sim");
+}
+
+it("envia os cinco campos dependentes em um único salvamento e aguarda confirmação para concluir", async () => {
+  await montarPagamento();
+  let confirmar!: (value: Awaited<ReturnType<typeof AtualizarCardBpm>>) => void;
+  vi.mocked(AtualizarCardBpm).mockImplementationOnce(() => new Promise((resolve) => { confirmar = resolve; }));
+  await preencherPagamento();
+  expect(botaoSalvar().textContent).toContain("Salvar alterações (5)");
+  await act(async () => { botaoSalvar().click(); await Promise.resolve(); });
+  expect(AtualizarCardBpm).toHaveBeenCalledTimes(1);
+  expect(AtualizarCardBpm).toHaveBeenCalledWith(expect.objectContaining({
+    cardId: "card-pagamento", camposValores: {
+      pagamento_confirmado: "Sim", data_pagamento: "2026-09-29T18:00:00.000Z",
+      valor_recebido: "22000", forma_utilizada: "Cartão de crédito", pagamento_exito: "Sim",
+    },
+  }));
+  expect(botaoSalvar().textContent).toContain("Salvando 1/5");
+  expect(context.getPendingFields("card-pagamento")).toHaveLength(5);
+  await act(async () => { confirmar({ success: true, data: {
+    updatedAt: new Date("2026-09-29T10:01:00Z"), camposValores: {
+      pagamento_confirmado: "Sim", data_pagamento: "2026-09-29T18:00:00.000Z",
+      valor_recebido: "22000", forma_utilizada: "Cartão de crédito", pagamento_exito: "Sim",
+    },
+  } }); await Promise.resolve(); });
+  expect(context.getPendingFields("card-pagamento")).toEqual([]);
+  expect(botaoSalvar().hasAttribute("disabled")).toBe(true);
+  expect(container.querySelector("#campo-bpm-status_financeiro")?.tagName).toBe("OUTPUT");
+  expect(container.querySelector("#campo-bpm-status_contratacao")?.tagName).toBe("OUTPUT");
+});
+
+it("em falha de validação do pagamento mantém os cinco valores e mostra a pendência real", async () => {
+  await montarPagamento();
+  vi.mocked(AtualizarCardBpm).mockResolvedValue({ success: false, error: "Valor esperado divergente do valor líquido calculado" });
+  await preencherPagamento();
+  await act(async () => { botaoSalvar().click(); });
+  expect(AtualizarCardBpm).toHaveBeenCalledTimes(1);
+  expect(context.getPendingFields("card-pagamento")).toHaveLength(5);
+  expect(container.textContent).toContain("Valor esperado divergente do valor líquido calculado");
+  expect(container.querySelector<HTMLInputElement>("#campo-bpm-valor_recebido")?.value).toBe("22000");
+  expect(botaoSalvar().textContent).toContain("Salvar alterações (5)");
+});

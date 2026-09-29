@@ -129,3 +129,24 @@ Gates desta retomada: `npm run lint` passou com zero erros e 1.191 avisos; `npm 
 ### Publicação autorizada — 2026-09-29
 
 Após a confirmação explícita do usuário, a prévia v11→v12 e a restauração do backup foram repetidas e passaram. A publicação transacional concluiu. Leitura posterior confirmou Financeiro v12, formulários de Formalização/Pagamento/Nota Fiscal v2, sete campos solicitados ativos e publicados no formulário de Pagamento, seis requisitos ativos e nove automações com versão `ATIVA`. Os grafos publicados contêm quatro estados, tarefa de NF idempotente, cobrança após êxito e preferência pelo líquido. O smoke autenticado com card real segue pendente porque não havia cards em Pagamento ou Nota Fiscal; nenhum card de produção foi criado ou movido nesta validação.
+
+### Correção — salvamento manual na confirmação (2026-09-29)
+
+Relato em card real: ao editar `Pagamento confirmado = Sim`, data, valor recebido, forma e pagamento no êxito, o botão interrompe o salvamento no primeiro campo. Causa: o formulário envia cada campo isolado, enquanto `prepararSalvamentoConfigurado` valida todos os requisitos da confirmação na mesma transação. Os status da contratação e financeiro são calculados por automação na configuração v12 e aparecem como selects desabilitados, sem indicação do motivo.
+
+- [x] Campos interdependentes de confirmação são enviados juntos numa atualização atômica, com comprovante enviado antes quando exigido; os demais campos mantêm salvamento sequencial.
+- [x] O progresso do botão conta alterações realmente confirmadas e a falha preserva o rascunho com pendência nominal.
+- [x] Os status calculados aparecem como informação de leitura com explicação, sem controle de edição manual.
+- [x] Testes de confirmação agrupada, falha, progresso, status de leitura e gates lint/typecheck/test/build passam.
+- [ ] Smoke autenticado em card real confirma persistência após reload e atualização dos status.
+
+Validação local desta correção: lint sem erros (1.191 avisos preexistentes), typecheck e build aprovados; suíte completa com 561 arquivos e 4.119 testes aprovados, 4 ignorados e 1 pendente. O smoke autenticado depende de um card real na etapa e segue aberto.
+
+**File List desta correção:**
+
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx`
+- `tests/bpm/salvamento-manual-campos-react.test.ts`
+- `tests/bpm/validacao-salvamento-configurado.test.ts`
+- `tests/bpm/formulario-etapa.test.ts`
+- `tests/bpm/formulario-etapa.test.ts`
+- `docs/stories/story-financeiro-ativo-confirmacao-pagamento.md`

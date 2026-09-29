@@ -88,6 +88,7 @@ export function PainelCamposEtapaAtual({
     Object.fromEntries([...arquivosIniciais].map(([id, upload]) => [id, upload.nome])));
 
   const [estadoSave, setEstadoSave] = useState<"pendente" | "salvo" | "erro" | "invalido" | null>(null);
+  const [mensagemErroSave, setMensagemErroSave] = useState<string | null>(null);
   const [buscandoCnpj, setBuscandoCnpj] = useState(false);
   const cnpjConsultadoRef = useRef("");
   const revisaoEdicao = useRef(0);
@@ -131,6 +132,7 @@ export function PainelCamposEtapaAtual({
     if (campo?.tipo === "cpf" && valorComparavel("cpf", valor) === valorComparavel("cpf", valoresRef.current[id])) return;
     revisaoEdicao.current += 1;
     setEstadoSave("pendente");
+    setMensagemErroSave(null);
     let rastreador = rastreadores.current.get(id);
     if (!rastreador) {
       rastreador = criarRastreadorRascunho(valoresRef.current[id] ?? "");
@@ -220,7 +222,7 @@ export function PainelCamposEtapaAtual({
     camposAtuaisSujosRef.current = false;
     setConflitoCamposAtuais(false);
   }
-  async function salvarCamposAtuais(campoId: string): Promise<boolean> {
+  async function salvarCamposAtuais(campoIds: string[]): Promise<boolean> {
     if (!podeEditar || conflitoCamposAtuais) return false;
     const valoresAtuais = getDraft(idInstancia) ?? valoresRef.current;
     const configuracaoAtual = prepararCamposMotivoLostUiCanonico(card.etapa.chave, camposEtapaBase, valoresAtuais);
@@ -232,25 +234,26 @@ export function PainelCamposEtapaAtual({
     }
     const revisaoEnviada = revisaoEdicao.current;
     const revisoes = new Map(configuracaoAtual.camposVisiveis.map((campo) => [campo.id, rastreadores.current.get(campo.id)?.capturar()]));
+    const idsPermitidos = new Set(campoIds);
     let erroDaTentativa = "Não foi possível salvar os campos da etapa.";
     setSavesCamposPendentes((total) => total + 1);
     const promise = registerSave(async () => {
       // Compare após os saves anteriores: uma reversão pode coincidir com a base
       // antiga no blur, mas precisar de persistência quando chegar sua vez.
       const camposValores: Record<string, string> = {};
-      let possuiValorInvalido = false;
       for (const campo of configuracaoAtual.camposVisiveis) {
-        if (campoId && campo.id !== campoId && !configuracaoAtual.exigeComplemento) continue;
+        if (!idsPermitidos.has(campo.id) && !configuracaoAtual.exigeComplemento) continue;
         if (campo.somenteLeitura || campo.editavel === false
           || valorComparavel(campo.tipo, valoresAtuais[campo.id]) === valorComparavel(campo.tipo, snapshotAtivoRef.current.valores[campo.id])) continue;
         const validacao = validarValoresCamposBpm([campo], montarPayloadCamposDestino([campo], valoresAtuais));
-        if (!validacao.success) { possuiValorInvalido = true; toast.error(validacao.error, erroFormulario); continue; }
+        if (!validacao.success) {
+          erroDaTentativa = validacao.error;
+          if (revisaoEdicao.current === revisaoEnviada) setEstadoSave("invalido");
+          return false;
+        }
         Object.assign(camposValores, validacao.valores);
       }
-      if (!Object.keys(camposValores).length) {
-        if (possuiValorInvalido && revisaoEdicao.current === revisaoEnviada) setEstadoSave("invalido");
-        return !possuiValorInvalido;
-      }
+      if (!Object.keys(camposValores).length) return true;
       const valoresAntesDaRequisicao = { ...valoresRef.current };
       const baseAntesDaRequisicao = { ...snapshotAtivoRef.current.valores };
       const atualizar = (versao: string) => AtualizarCardBpm({
@@ -343,17 +346,21 @@ export function PainelCamposEtapaAtual({
       setVersaoBaseCampos(novaVersao);
       atualizarPendencias(antesDaConfirmacao);
       if (revisaoEdicao.current === revisaoEnviada) {
-        setEstadoSave(possuiValorInvalido ? "invalido" : getDraft(idInstancia) ? "pendente" : "salvo");
+        setEstadoSave(getDraft(idInstancia) ? "pendente" : "salvo");
       }
       setConflitoCamposAtuais(false);
+      setMensagemErroSave(null);
       onAtualizado();
       return true;
-    }, card.id, `${card.id}:campo:${campoId ?? instanceKey}`,
+    }, card.id, `${card.id}:campo:${campoIds.join(",") || instanceKey}`,
       { ...erroFormulario, failureMessage: () => erroDaTentativa }, false).finally(() => {
       setSavesCamposPendentes((total) => total - 1);
     });
     const sucesso = await promise;
-    if (!sucesso && revisaoEdicao.current === revisaoEnviada) setEstadoSave("erro");
+    if (!sucesso && revisaoEdicao.current === revisaoEnviada) {
+      setEstadoSave("erro");
+      setMensagemErroSave(erroDaTentativa);
+    }
     return sucesso;
   }
   function idsPendentes() {
@@ -371,26 +378,52 @@ export function PainelCamposEtapaAtual({
     salvandoManualRef.current = true;
     setProgressoSave({ concluido: 0, total: ids.length });
     try {
-      for (let indice = 0; indice < ids.length; indice += 1) {
-        const arquivo = arquivosPendentesRef.current.get(ids[indice]);
+      const chavesPagamento = new Set<string>([
+        CHAVES_CAMPOS.PAGAMENTO_CONFIRMADO,
+        CHAVES_CAMPOS.DATA_PAGAMENTO,
+        CHAVES_CAMPOS.VALOR_RECEBIDO,
+        CHAVES_CAMPOS.FORMA_PAGAMENTO_UTILIZADA,
+        CHAVES_CAMPOS.PAGAMENTO_NO_EXITO,
+      ]);
+      const idsPagamento = new Set(camposEtapaBase
+        .filter((campo) => chavesPagamento.has(campo.chave ?? ""))
+        .map((campo) => campo.id));
+      const idsAgrupados = ids.filter((id) => idsPagamento.has(id) && !arquivosPendentesRef.current.has(id));
+      // O comprovante e demais entradas são confirmados antes do indicador;
+      // todos os dados interdependentes do pagamento entram na mesma transação.
+      const idsOrdenados = [
+        ...ids.filter((id) => !idsAgrupados.includes(id)),
+        ...idsAgrupados,
+      ];
+      let concluidos = 0;
+      for (let indice = 0; indice < idsOrdenados.length; indice += 1) {
+        const id = idsOrdenados[indice];
+        if (idsAgrupados.includes(id) && id !== idsAgrupados[0]) continue;
+        const arquivo = arquivosPendentesRef.current.get(id);
         if (arquivo) {
-          const key = `${card.id}:arquivo:${ids[indice]}`;
+          const key = `${card.id}:arquivo:${id}`;
           const sucesso = await registerSave(async () => {
             const confirmado = await arquivo.save();
             if (confirmado) setPendingFields(key, []);
             return confirmado;
           }, card.id, key, {
             ...erroFormulario,
-            failureMessage: () => mensagensErroArquivoRef.current.get(ids[indice])?.()
+            failureMessage: () => mensagensErroArquivoRef.current.get(id)?.()
               ?? "Não foi possível salvar o anexo. Tente novamente.",
           });
-          if (!sucesso) { setEstadoSave("erro"); return false; }
-          arquivosPendentesRef.current.delete(ids[indice]);
-          mensagensErroArquivoRef.current.delete(ids[indice]);
+          if (!sucesso) {
+            setEstadoSave("erro");
+            setMensagemErroSave(mensagensErroArquivoRef.current.get(id)?.()
+              ?? "Não foi possível salvar o anexo. Tente novamente.");
+            return false;
+          }
+          arquivosPendentesRef.current.delete(id);
+          mensagensErroArquivoRef.current.delete(id);
           setPendingUpload(key);
-          setArquivosPendentes((atual) => { const proximo = { ...atual }; delete proximo[ids[indice]]; return proximo; });
-        } else if (!await salvarCamposAtuais(ids[indice])) return false;
-        setProgressoSave({ concluido: indice + 1, total: ids.length });
+          setArquivosPendentes((atual) => { const proximo = { ...atual }; delete proximo[id]; return proximo; });
+        } else if (!await salvarCamposAtuais(idsAgrupados.includes(id) ? idsAgrupados : [id])) return false;
+        concluidos += idsAgrupados.includes(id) ? idsAgrupados.length : 1;
+        setProgressoSave({ concluido: concluidos, total: ids.length });
       }
       return idsPendentes().length === 0 && arquivosPendentesRef.current.size === 0;
     } finally {
@@ -524,6 +557,9 @@ export function PainelCamposEtapaAtual({
               {camposAtuaisVisiveis.map((campo) => {
             const complementoPendente = campo.id === configuracaoLostUi.campoComplementoId && complementoLostPendente;
             const somenteLeitura = campo.somenteLeitura === true || campo.editavel === false;
+            const estadoCalculado = somenteLeitura
+              && (card.pipelineId === "cmuih4i54000209gmmyqrg557" || card.pipeline?.chave === "financeiro")
+              && (campo.chave === CHAVES_CAMPOS.STATUS_FINANCEIRO || campo.chave === CHAVES_CAMPOS.STATUS_CONTRATACAO);
             const fonteAutomatica = campo.escopo === "GLOBAL" && Boolean(campo.fonteEntidade);
             const origemFinanceiro = card.pipeline?.chave === "financeiro" && card.etapa.chave === "solicitacao_contrato"
               ? chavesCalculadasFinanceiro.has(campo.chave ?? "") ? "Calculado automaticamente"
@@ -551,7 +587,15 @@ export function PainelCamposEtapaAtual({
                     <ClipboardPaste size={12} aria-hidden="true" /> Usar template do resumo
                   </button>
                 )}
-                <CampoBpmInput
+                {estadoCalculado ? (
+                  <>
+                    <output id={`campo-bpm-${campo.id}`} aria-label={campoLabels[campo.id] ?? campo.nome}
+                      className="block w-full rounded-xl border border-sky-400/20 bg-sky-400/[0.06] px-3 py-2 text-sm font-medium text-sky-100">
+                      {valoresCamposAtuais[campo.id]?.trim() || "Aguardando atualização"}
+                    </output>
+                    <p className="text-[10px] text-sky-300/75">Estado calculado automaticamente após salvar os dados de contrato e pagamento.</p>
+                  </>
+                ) : <CampoBpmInput
                   campo={campo}
                   value={valoresCamposAtuais[campo.id] ?? ""}
                   invalid={complementoPendente}
@@ -610,7 +654,7 @@ export function PainelCamposEtapaAtual({
                     atualizarPendencias(antes);
                     onAtualizado();
                   }}
-                />
+                />}
                 {complementoPendente && (
                   <p id={descricaoId} role="alert" className="text-[11px] text-amber-300">
                     {MOTIVO_LOST_OUTRO_OBRIGATORIO_MENSAGEM}
@@ -632,7 +676,7 @@ export function PainelCamposEtapaAtual({
           <p role="status" aria-live="polite" className="flex items-center gap-2 text-[11px] text-slate-400">
             {savesCamposPendentes > 0 ? <><Loader2 size={13} className="animate-spin" aria-hidden="true" /> Salvando alterações...</>
               : estadoSave === "salvo" && !conflitoCamposAtuais ? <><Check size={13} aria-hidden="true" /> Salvo</>
-              : estadoSave === "erro" ? <><AlertTriangle size={13} aria-hidden="true" /> Erro ao salvar. Sua alteração foi preservada.</>
+              : estadoSave === "erro" ? <><AlertTriangle size={13} aria-hidden="true" /> {mensagemErroSave ?? "Erro ao salvar."} Sua alteração foi preservada.</>
               : estadoSave === "invalido" ? <><AlertTriangle size={13} aria-hidden="true" /> Revise o campo indicado. As alterações não salvas foram preservadas.</>
               : estadoSave === "pendente" ? "Alterações pendentes" : null}
           </p>

@@ -287,3 +287,102 @@ describe("Formalização ativa", () => {
       .rejects.toThrow("REQUISITOS_PENDENTES:Status do contrato");
   });
 });
+
+const pipelineFinanceiroAtivo = "cmuih4i54000209gmmyqrg557";
+const idsPagamento = new Map<string, string>([
+  C.PAGAMENTO_CONFIRMADO, C.DATA_PAGAMENTO, C.VALOR_ESPERADO, C.VALOR_RECEBIDO,
+  C.FORMA_PAGAMENTO_UTILIZADA, C.COMPROVANTE, C.PAGAMENTO_NO_EXITO,
+  C.VALOR_LIQUIDO, C.VALOR_CONTRATADO, C.TOTAL_RETENCOES, C.STATUS_FINANCEIRO,
+  C.STATUS_CONTRATACAO,
+].map((chave, indice) => [chave, `cmt36ivq${String(indice + 100).padStart(4, "0")}kw0ax7jkz33c`]));
+const idPagamento = (chave: string) => idsPagamento.get(chave)!;
+
+function clientePagamento(requisitos: Array<{ condicaoJson: string | null }> = []) {
+  const definicoes = [
+    [C.PAGAMENTO_CONFIRMADO, "Pagamento confirmado", "selecao", ["Sim", "Não"]],
+    [C.DATA_PAGAMENTO, "Data do pagamento", "data_hora", null],
+    [C.VALOR_ESPERADO, "Valor esperado", "moeda", null],
+    [C.VALOR_RECEBIDO, "Valor recebido", "moeda", null],
+    [C.FORMA_PAGAMENTO_UTILIZADA, "Forma de pagamento utilizada", "selecao", ["Pix", "Cartão de crédito"]],
+    [C.COMPROVANTE, "Comprovante", "arquivo", null],
+    [C.PAGAMENTO_NO_EXITO, "Pagamento no êxito", "selecao", ["Sim", "Não"]],
+    [C.VALOR_LIQUIDO, "Valor líquido", "moeda", null],
+    [C.VALOR_CONTRATADO, "Valor contratado", "moeda", null],
+    [C.TOTAL_RETENCOES, "Retenções", "moeda", null],
+    [C.STATUS_FINANCEIRO, "Status financeiro", "selecao", ["Aguardando pagamento", "PAGAMENTO CONCLUÍDO"]],
+    [C.STATUS_CONTRATACAO, "Status da contratação", "selecao", ["Aguardando pagamento", "Contratação concluída"]],
+  ] as const;
+  const campo = ([chave, nome, tipo, opcoes]: (typeof definicoes)[number]) => ({
+    id: idPagamento(chave), chave, nome, tipo, opcoesJson: opcoes ? JSON.stringify(opcoes) : null,
+    opcoes: opcoes?.map((rotulo) => ({ rotulo })) ?? [], escopo: "CARD", fonteEntidade: null,
+    fonteAtributo: null, entidadeGlobal: null,
+  });
+  return {
+    bpmEtapa: { findMany: vi.fn().mockResolvedValue([{ id: etapaId }]) },
+    bpmCampoEtapaConfig: { findMany: vi.fn().mockResolvedValue(definicoes.slice(0, 7).map((definicao) => ({
+      campoId: idPagamento(definicao[0]), campo: campo(definicao), visivel: true,
+      valorPadrao: definicao[0] === C.DATA_PAGAMENTO ? "{{agora.instante}}" : null,
+      condicaoObrigatoriedadeJson: definicao[0] === C.DATA_PAGAMENTO ? JSON.stringify({
+        operador: "AND", condicoes: [{ tipo: "condicao", campo: { fonte: "campo_dinamico", campo: idPagamento(C.PAGAMENTO_CONFIRMADO) }, operador: "igual", valor: "Sim" }],
+      }) : null,
+    }))) },
+    bpmCampo: { findMany: vi.fn().mockResolvedValue(definicoes.map(campo)) },
+    bpmRequisito: { findMany: vi.fn().mockResolvedValue(requisitos) },
+    bpmCardAnexo: { findFirst: vi.fn().mockResolvedValue(null) },
+  };
+}
+
+describe("Confirmação de Pagamento ativa", () => {
+  const cardPagamento = { id: "card-pagamento", pipelineId: pipelineFinanceiroAtivo, etapaId };
+  const agora = new Date("2026-09-29T18:00:00.000Z");
+  const valoresBase = {
+    [idPagamento(C.VALOR_LIQUIDO)]: "22000.00",
+    [idPagamento(C.VALOR_CONTRATADO)]: "23000.00",
+    [idPagamento(C.TOTAL_RETENCOES)]: "1000.00",
+  };
+  const pagamentoCompleto = {
+    [idPagamento(C.PAGAMENTO_CONFIRMADO)]: "Sim",
+    [idPagamento(C.DATA_PAGAMENTO)]: agora.toISOString(),
+    [idPagamento(C.VALOR_RECEBIDO)]: "22000",
+    [idPagamento(C.FORMA_PAGAMENTO_UTILIZADA)]: "Cartão de crédito",
+    [idPagamento(C.PAGAMENTO_NO_EXITO)]: "Sim",
+  };
+
+  beforeEach(() => {
+    vi.mocked(camposPublicadosPorEtapa).mockResolvedValue(new Map([[etapaId, new Set(idsPagamento.values())]]));
+    vi.mocked(carregarValoresCanonicosCampos).mockResolvedValue({});
+    vi.mocked(montarContextoAvaliacaoDoCard).mockResolvedValue({ card: {}, camposDinamicos: { ...valoresBase } });
+  });
+
+  it("reproduz a falha ao salvar primeiro só Pagamento confirmado", async () => {
+    await expect(prepararSalvamentoConfigurado({ card: cardPagamento as never,
+      valoresSubmetidos: { [idPagamento(C.PAGAMENTO_CONFIRMADO)]: "Sim" },
+      client: clientePagamento() as never, agora }))
+      .rejects.toThrow("REQUISITOS_PENDENTES:Valor recebido, Forma de pagamento utilizada");
+  });
+
+  it("aceita os cinco campos interdependentes juntos e deriva o valor esperado do líquido", async () => {
+    const resultado = await prepararSalvamentoConfigurado({ card: cardPagamento as never,
+      valoresSubmetidos: pagamentoCompleto, client: clientePagamento() as never, agora });
+    expect(resultado).toMatchObject({ ...pagamentoCompleto, [idPagamento(C.VALOR_ESPERADO)]: "22000.00" });
+    expect(resultado[idPagamento(C.STATUS_FINANCEIRO)]).toBeUndefined();
+    expect(resultado[idPagamento(C.STATUS_CONTRATACAO)]).toBeUndefined();
+  });
+
+  it("preserva a exigência de comprovante próprio quando o processo exige prova manual", async () => {
+    const client = clientePagamento([{ condicaoJson: null }]);
+    const comprovanteId = "cmt36ivq0200kw0ax7jkz33c";
+    await expect(prepararSalvamentoConfigurado({ card: cardPagamento as never,
+      valoresSubmetidos: { ...pagamentoCompleto, [idPagamento(C.COMPROVANTE)]: comprovanteId },
+      client: client as never, agora }))
+      .rejects.toThrow("REQUISITOS_PENDENTES:Comprovante");
+    expect(client.bpmCardAnexo.findFirst).toHaveBeenCalledWith({
+      where: { id: comprovanteId, cardId: cardPagamento.id, campoId: idPagamento(C.COMPROVANTE) },
+      select: { url: true },
+    });
+    client.bpmCardAnexo.findFirst.mockResolvedValue({ url: "bpm-blob:bpm/comprovantes/pagamento.pdf" });
+    await expect(prepararSalvamentoConfigurado({ card: cardPagamento as never,
+      valoresSubmetidos: { ...pagamentoCompleto, [idPagamento(C.COMPROVANTE)]: comprovanteId },
+      client: client as never, agora })).resolves.toMatchObject(pagamentoCompleto);
+  });
+});

@@ -125,7 +125,8 @@ describe("CRM - formulário unificado por etapa", () => {
 
   it("salva o formulário somente pelo botão de alterações", () => {
     expect(campos).toContain("Salvar alterações");
-    expect(campos).toContain("await salvarCamposAtuais(ids[indice])");
+    expect(campos).toContain("async function salvarAlteracoes()");
+    expect(campos).toContain("registerManualSave(card.id, idInstancia");
     expect(campos).not.toContain("scheduleSave(`${card.id}:${id}`");
     expect(proximoContato).toContain("onCommit={(novoValor) => void persistir(novoValor || null)}");
     expect(proximoContato).not.toContain(">Salvar<");
