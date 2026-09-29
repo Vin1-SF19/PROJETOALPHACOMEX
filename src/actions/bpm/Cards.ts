@@ -6,6 +6,7 @@ import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
 import { PIPELINE_CHAVE, ETAPAS } from "@/lib/bpm/financeiro-config";
+import { ehPipelineOperacional } from "@/lib/bpm/financeiro-config.client";
 import {
   criarCardSchema,
   atualizarCardSchema,
@@ -804,7 +805,7 @@ export async function ObterCardBpm(cardId: string) {
       }
     }
 
-    const origemFinanceira = card.pipeline.chave === "operacional"
+    const origemFinanceira = ehPipelineOperacional({ id: card.pipelineId, chave: card.pipeline.chave })
       ? await db.bpmCardVinculo.findFirst({
           where: { cardDestinoId: card.id, cardOrigem: { pipeline: { chave: PIPELINE_CHAVE } } },
           select: { cardOrigemId: true },

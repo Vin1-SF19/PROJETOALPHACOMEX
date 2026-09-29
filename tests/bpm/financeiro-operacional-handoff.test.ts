@@ -80,7 +80,8 @@ beforeEach(() => {
   mocks.db.bpmAutomacaoExecucao.findUnique.mockResolvedValue(execucao());
   mocks.db.bpmAutomacaoLease.create.mockResolvedValue({});
   mocks.db.bpmAutomacaoPassoExecucao.upsert.mockResolvedValue({ id: "passo" });
-  mocks.db.bpmPipeline.findFirst.mockResolvedValue({ chave: "operacional" });
+  // O pipeline Operacional ativo possui chave técnica nula no banco publicado.
+  mocks.db.bpmPipeline.findFirst.mockResolvedValue({ id: "cmuih4tnh000409gm5z34jvss", chave: null });
   mocks.db.bpmEtapa.findFirst.mockResolvedValue({ id: etapaId });
   mocks.db.bpmCardVinculo.findFirst.mockImplementation(async ({ where }) => where.cardDestinoId
     ? { cardOrigemId: comercial, cardOrigem: { responsavelId: 29, indicacaoOrigem: { parceiroId: 31 } } }
@@ -101,6 +102,11 @@ describe("handoff Financeiro → Operacional", () => {
     expect(await processarFilaAutomacoesCentraisBpm()).toMatchObject({ executados: 1 });
     expect(mocks.copiar).toHaveBeenNthCalledWith(1, mocks.db, origem, operacional, pipelineId, etapaId);
     expect(mocks.copiar).toHaveBeenNthCalledWith(2, mocks.db, comercial, operacional, pipelineId, etapaId);
+    expect(mocks.db.bpmCardVinculo.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ cardDestinoId: origem, cardOrigem: {
+        pipeline: { OR: [{ chave: "comercial" }, { nome: "Revisão de Radar" }] },
+      } }),
+    }));
     expect(mocks.db.bpmCardVinculo.upsert).toHaveBeenCalledWith(expect.objectContaining({
       where: { cardOrigemId_cardDestinoId: { cardOrigemId: comercial, cardDestinoId: operacional } },
     }));

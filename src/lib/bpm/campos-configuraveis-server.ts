@@ -40,6 +40,7 @@ export async function carregarValoresCanonicosCampos(
       servico: true,
       tipoProcesso: true,
       status: true,
+      concluidoEm: true,
       responsavelId: true,
       createdAt: true,
       empresa: {

@@ -2,7 +2,8 @@ import "server-only";
 
 import db from "@/lib/prisma";
 import { carregarValoresCanonicosCampos } from "@/lib/bpm/campos-configuraveis-server";
-import { PIPELINE_CHAVE, CHAVES_CAMPOS, VALORES } from "@/lib/bpm/financeiro-config";
+import { PIPELINE_CHAVE, CHAVES_CAMPOS, VALORES, CHAVE_AUTOMACAO_HANDOFF } from "@/lib/bpm/financeiro-config";
+import { PIPELINE_OPERACIONAL_ID } from "@/lib/bpm/financeiro-config.client";
 import { extrairPathnamePrivadoAnexoBpm } from "@/lib/bpm/anexos-storage";
 import { avaliarFormalizacaoFinanceira } from "@/lib/bpm/financeiro-formalizacao";
 
@@ -36,7 +37,9 @@ export async function carregarResumoContratacao(financeiroCardId: string) {
       campoValores: { select: { campoId: true, valor: true } },
       anexos: { select: { id: true, nome: true, url: true, createdAt: true }, orderBy: { createdAt: "desc" } },
       historico: { select: { id: true, acao: true, createdAt: true }, orderBy: { createdAt: "desc" }, take: 50 },
-      vinculosOrigem: { where: { cardDestino: { pipeline: { chave: "operacional" }, status: { not: "ARQUIVADO" } } },
+      vinculosOrigem: { where: { cardDestino: { OR: [
+        { pipelineId: PIPELINE_OPERACIONAL_ID }, { pipeline: { chave: "operacional" } },
+      ], status: { not: "ARQUIVADO" } } },
         select: { cardDestinoId: true }, take: 1 },
       vinculosDestino: { where: { cardOrigem: { pipeline: { OR: [{ chave: "comercial" }, { nome: "Revisão de Radar" }] } } }, select: {
         cardOrigem: { select: {
@@ -74,7 +77,7 @@ export async function carregarResumoContratacao(financeiroCardId: string) {
     pagamentoConfirmado: valor(CHAVES_CAMPOS.PAGAMENTO_CONFIRMADO),
   }).contrato === VALORES.CONCLUIDO;
   const falhaLiberacao = await db.bpmAutomacaoExecucao.findFirst({
-    where: { cardId: card.id, automacao: { chave: "financeiro.handoff.contrato.concluido.operacional" }, status: "FALHA" },
+    where: { cardId: card.id, automacao: { chave: CHAVE_AUTOMACAO_HANDOFF }, status: "FALHA" },
     orderBy: { iniciadoEm: "desc" }, select: { mensagemErro: true },
   });
 

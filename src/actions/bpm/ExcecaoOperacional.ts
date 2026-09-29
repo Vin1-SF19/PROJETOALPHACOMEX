@@ -8,6 +8,7 @@ import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import { executarAutomacoesCentraisDoCardAgora } from "@/lib/bpm/automacoes/orquestrador";
 import { revalidatePath } from "next/cache";
 import { PIPELINE_CHAVE, CHAVE_AUTOMACAO_HANDOFF, ETAPAS } from "@/lib/bpm/financeiro-config";
+import { PIPELINE_OPERACIONAL_ID } from "@/lib/bpm/financeiro-config.client";
 
 const entradaSchema = z.object({ cardId: z.string().min(1), motivo: z.string().trim().min(20).max(1000) }).strict();
 const CHAVE_AUTOMACAO = CHAVE_AUTOMACAO_HANDOFF;
@@ -29,7 +30,9 @@ export async function AutorizarExcecaoLiberacaoOperacionalBpm(entrada: unknown) 
       });
       if (!card) throw new Error("A contratação financeira precisa estar concluída.");
       const vinculo = await tx.bpmCardVinculo.findFirst({
-        where: { cardOrigemId: cardId, cardDestino: { pipeline: { chave: "operacional" }, status: { not: "ARQUIVADO" } } },
+        where: { cardOrigemId: cardId, cardDestino: { OR: [
+          { pipelineId: PIPELINE_OPERACIONAL_ID }, { pipeline: { chave: "operacional" } },
+        ], status: { not: "ARQUIVADO" } } },
         select: { id: true },
       });
       if (vinculo) throw new Error("A contratação já foi liberada ao Operacional.");
@@ -58,7 +61,9 @@ export async function AutorizarExcecaoLiberacaoOperacionalBpm(entrada: unknown) 
     });
     await executarAutomacoesCentraisDoCardAgora(cardId);
     const destino = await db.bpmCardVinculo.findFirst({
-      where: { cardOrigemId: cardId, cardDestino: { pipeline: { chave: "operacional" }, status: { not: "ARQUIVADO" } } },
+      where: { cardOrigemId: cardId, cardDestino: { OR: [
+        { pipelineId: PIPELINE_OPERACIONAL_ID }, { pipeline: { chave: "operacional" } },
+      ], status: { not: "ARQUIVADO" } } },
       select: { cardDestinoId: true },
     });
     revalidatePath("/PainelAlpha/AlphaCRM");

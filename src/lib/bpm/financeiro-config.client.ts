@@ -1,5 +1,11 @@
 export const PIPELINE_CHAVE = "financeiro";
 export const PIPELINE_NOME = "Financeiro";
+/** Pipeline Operacional ativo legado: o registro publicado ainda não possui chave técnica. */
+export const PIPELINE_OPERACIONAL_ID = "cmuih4tnh000409gm5z34jvss";
+
+export function ehPipelineOperacional(pipeline: { id: string; chave: string | null }): boolean {
+  return pipeline.id === PIPELINE_OPERACIONAL_ID || pipeline.chave === "operacional";
+}
 
 export const ETAPAS = {
   SOLICITACAO_CONTRATO: "solicitacao_contrato",
@@ -72,7 +78,7 @@ export const VALORES = {
 
 export type ValorFinanceiro = (typeof VALORES)[keyof typeof VALORES];
 
-export const CHAVE_AUTOMACAO_HANDOFF = "financeiro.handoff.contrato.concluido.operacional";
+export const CHAVE_AUTOMACAO_HANDOFF = "financeiro_concluido_criar_card_operacional";
 
 export const ACAO_HISTORICO_CONTRATO = "CONTRATO_CONCLUIDO";
 export const ACAO_HISTORICO_EXCECAO = "EXCECAO_LIBERACAO_OPERACIONAL";

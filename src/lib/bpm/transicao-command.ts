@@ -10,6 +10,8 @@ import { registrarConclusaoContratoFinanceiro } from "@/lib/bpm/financeiro-assin
 import { sincronizarNotaFiscalCard } from "@/lib/bpm/financeiro-nota-fiscal-server";
 import { avaliarFormalizacaoFinanceira } from "@/lib/bpm/financeiro-formalizacao";
 import { avaliarPagamentoFinanceiro } from "@/lib/bpm/financeiro-pagamento-validacao";
+import { pendenciasNotaFiscal, type DadosNotaFiscal } from "@/lib/bpm/financeiro-nota-fiscal";
+import { verificarLinkNotaFiscalAcessivel } from "@/lib/bpm/nota-fiscal-link";
 import { CHAVES_CAMPOS } from "@/lib/bpm/financeiro-config.client";
 import { extrairPathnamePrivadoAnexoBpm } from "@/lib/bpm/anexos-storage";
 import { camposPublicadosPorEtapa, capacidadesObrigatoriasPorEtapa, capacidadeObrigatoriaEntrada } from "@/lib/bpm/campos-formulario-publicado";
@@ -461,6 +463,29 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
         retencoes: valorCampo(CHAVES_CAMPOS.TOTAL_RETENCOES),
       });
       if (!pagamento.concluido) pendencias.push(...pagamento.pendencias);
+    }
+    if (card.pipelineId === "cmuih4i54000209gmmyqrg557") {
+      const dadosNF: DadosNotaFiscal = {
+        emitida: (valorCampo(CHAVES_CAMPOS.NF_EMITIDA) ?? "") as DadosNotaFiscal["emitida"],
+        numero: valorCampo(CHAVES_CAMPOS.NUMERO_NF) ?? "",
+        dataEmissao: valorCampo(CHAVES_CAMPOS.DATA_EMISSAO_NF) ?? "",
+        valor: valorCampo(CHAVES_CAMPOS.VALOR_NF) ?? "",
+        link: valorCampo(CHAVES_CAMPOS.LINK_NF) ?? "",
+      };
+      const campoLinkId = idCampo(CHAVES_CAMPOS.LINK_NF);
+      const anexoNF = dadosNF.link && campoLinkId ? await tx.bpmCardAnexo.findFirst({
+        where: { id: dadosNF.link, cardId: card.id, campoId: campoLinkId }, select: { url: true },
+      }) : null;
+      if (dadosNF.emitida !== "Sim") pendencias.push("NF emitida");
+      else {
+        const pendenciasNF = pendenciasNotaFiscal(dadosNF,
+          Boolean(anexoNF?.url && extrairPathnamePrivadoAnexoBpm(anexoNF.url)));
+        pendencias.push(...pendenciasNF);
+        if (!pendenciasNF.length && /^https:\/\//i.test(dadosNF.link)) {
+          try { await verificarLinkNotaFiscalAcessivel(dadosNF.link); }
+          catch { pendencias.push("Arquivo/link da NF inacessível"); }
+        }
+      }
     }
   }
   if (card.pipeline.nome === "Revisão de Radar" && etapaEhLost(destino.nome)) {

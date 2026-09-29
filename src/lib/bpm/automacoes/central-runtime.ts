@@ -21,6 +21,7 @@ import { montarContextoAvaliacaoDoCard } from "@/lib/bpm/regras/contexto";
 import { avaliarPagamentoFinanceiro } from "@/lib/bpm/financeiro-pagamento-validacao";
 import { avaliarFormalizacaoFinanceira } from "@/lib/bpm/financeiro-formalizacao";
 import { CHAVES_CAMPOS } from "@/lib/bpm/financeiro-config.client";
+import { ehPipelineOperacional } from "@/lib/bpm/financeiro-config.client";
 import { extrairPathnamePrivadoAnexoBpm } from "@/lib/bpm/anexos-storage";
 import { avaliarGrupo } from "@/lib/bpm/regras/avaliador";
 import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
@@ -408,11 +409,11 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
   }
   if (tipo === "CRIAR_CARD_OUTRO_PIPELINE") {
     const pipelineId = String(parametros.pipelineId); const etapaId = String(parametros.etapaId);
-    const pipelineDestino = await db.bpmPipeline.findFirst({ where: { id: pipelineId, ativo: true }, select: { chave: true } });
+    const pipelineDestino = await db.bpmPipeline.findFirst({ where: { id: pipelineId, ativo: true }, select: { id: true, chave: true } });
     if (!pipelineDestino) return { ignorada: true, motivo: "PIPELINE_DESTINO_INATIVO" };
     const etapa = await db.bpmEtapa.findFirst({ where: { id: etapaId, pipelineId, ativo: true }, select: { id: true } });
     if (!etapa) throw new Error("Pipeline/etapa de destino inválidos");
-    const handoffOperacional = card.pipeline.chave === "financeiro" && pipelineDestino.chave === "operacional";
+    const handoffOperacional = card.pipeline.chave === "financeiro" && ehPipelineOperacional(pipelineDestino);
     const handoffFinanceiro = pipelineDestino.chave === "financeiro"
       && (card.pipeline.chave === "comercial" || card.pipeline.nome === "Revisão de Radar");
     if (handoffOperacional && card.status !== "CONCLUIDO") {
@@ -422,7 +423,9 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
     // direto mantém vendedor, origem, anexos e histórico localizáveis com as permissões
     // habituais de acesso ao card de origem.
     const negociacao = handoffOperacional ? await db.bpmCardVinculo.findFirst({
-      where: { cardDestinoId: card.id, cardOrigem: { pipeline: { chave: "comercial" } } },
+      where: { cardDestinoId: card.id, cardOrigem: { pipeline: { OR: [
+        { chave: "comercial" }, { nome: "Revisão de Radar" },
+      ] } } },
       select: { cardOrigemId: true, cardOrigem: { select: { responsavelId: true, indicacaoOrigem: { select: { parceiroId: true } } } } },
     }) : null;
     const vincular = handoffOperacional || parametros.vincularAoOriginal !== false;

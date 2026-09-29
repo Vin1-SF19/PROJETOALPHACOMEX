@@ -11,6 +11,7 @@ import {
 describe("gestão configurável de campos", () => {
   it("usa allowlist fechada para fontes canônicas", () => {
     expect(fonteCampoPermitida("CLIENTE", "cnpj")).toBe(true);
+    expect(fonteCampoPermitida("CARD", "concluidoEm")).toBe(true);
     expect(fonteCampoPermitida("CLIENTE", "senhaHash")).toBe(false);
     expect(fonteCampoPermitida("TabelaInjetada", "id")).toBe(false);
   });
