@@ -2,7 +2,7 @@
 
 ## Status
 
-Reaberta para o Financeiro ativo — inventário, ajustes e publicação da etapa `Concluídos` pendentes. A implementação e a verificação de 26/09/2026 permanecem registradas abaixo como evidência histórica, não como prova da configuração atual.
+Configuração da etapa `Concluídos` publicada no Financeiro ativo; deploy do código da aplicação e homologação com card real pendentes. A implementação e a verificação de 26/09/2026 permanecem registradas abaixo como evidência histórica, não como prova da configuração atual.
 
 ## Executor Assignment
 
@@ -50,9 +50,9 @@ Esta retomada amplia os critérios existentes; não apaga os resultados de 26/09
 - [x] Construir matriz dos 18 dados: origem canônica, identificador, representação na etapa, obrigatoriedade configurada, destino operacional e referência segura a documento/histórico; identificar lacunas sem criar campos redundantes (AC 3–4, 7–8, 10).
 - [x] Verificar nos pontos de entrada manuais e automáticos assinatura, pagamento e NF efetivamente validados, os demais dados obrigatórios completos, ambas as ordens de assinatura/pagamento, data/hora gerada atomicamente e imutável, transição idempotente e bloqueio de bypass; conservar a exceção operacional autorizada apenas para dados de execução (AC 1–2, 4–5, 8, 12–13). Verificação local; publicação remota pendente.
 - [x] Auditar e, se necessário, corrigir a automação já publicada de handoff para um único processo operacional, com vínculo à negociação/cliente/card de origem, mapeamento completo, permissões de documentos e histórico, vendedor e parceiro/origem; registrar falha e permitir reprocessamento seguro (AC 4, 6–7, 9, 11). Correção local do reconhecimento do pipeline sem chave; publicação remota pendente.
-- [ ] Publicar os dados, condições e formulário de `Concluídos` em **Configurações → Campos e Formulários**, exigindo NF válida na entrada e mantendo seu acompanhamento próprio/consulta após a conclusão (AC 3, 8, 10, 12).
+- [x] Publicar os dados, condições e formulário de `Concluídos` em **Configurações → Campos e Formulários**, exigindo NF válida na entrada e mantendo seu acompanhamento próprio/consulta após a conclusão (AC 3, 8, 10, 12). Registros publicados e lidos de volta; regra de NF no servidor depende do deploy do código.
 - [x] Exercitar testes existentes de assinatura→pagamento e pagamento→assinatura, NF pendente/inválida e válida, bypass, ausência de dados operacionais, exceção permitida/negada, reprocessamento, documentos privados e correção posterior da NF; executar `npm run lint`, `npm run typecheck`, `npm test` e `npm run build` (AC 1–13). Smoke integrado do novo formulário remoto pendente da publicação.
-- [ ] **Checkpoint Vault antes de qualquer mutação no banco:** relatar ambiente/banco, comandos, impacto, riscos, alternativa não destrutiva e rollback; criar ou comprovar backup completo em `database-backups/pre-change/`, com até 48 horas e restauração/verificação; obter autorização explícita específica para a publicação desta retomada. A autorização dada para NF v16→v17 não cobre a etapa `Concluídos`. Conferir a versão e os registros publicados por leitura posterior (AC 3–4, 6–11).
+- [x] **Checkpoint Vault antes de qualquer mutação no banco:** relatar ambiente/banco, comandos, impacto, riscos, alternativa não destrutiva e rollback; criar ou comprovar backup completo em `database-backups/pre-change/`, com até 48 horas e restauração/verificação; obter autorização explícita específica para a publicação desta retomada. O usuário respondeu “publique” à pergunta específica; Financeiro v18/Operacional v8 e registros foram confirmados por leitura posterior (AC 3–4, 6–11).
 - [x] Atualizar checklist, File List e evidências reais da retomada; não marcar AC como concluído com base apenas nos resultados de 26/09.
 
 ### Cenários adicionais de aceite
@@ -75,7 +75,7 @@ Esta retomada amplia os critérios existentes; não apaga os resultados de 26/09
 - Os dados solicitados correspondem a 23 componentes no formulário de Concluído: cadastro (CNPJ, Razão Social, Contato, E-mail), serviço, assinatura (estado, data, anexo), valores (contratado, líquido), pagamento (forma, confirmação, data), NF (estado, número, data, valor, arquivo/link), responsabilidade (vendedor, parceiro, origem), observações e data/hora de conclusão. Os 20 campos reutilizados mantêm suas chaves canônicas; apenas Contato, Observações e a data/hora derivada exigem novas definições. Parceiro é opcional; data/hora nasce na transição; os outros 21 componentes são obrigatórios na entrada, além da validação semântica de assinatura, pagamento e NF.
 - O formulário de Boas vindas usa 20 desses campos; IDs de anexos do Financeiro ficam apenas no card de origem e são consultáveis pelo vínculo, sem copiar um ID de arquivo privado para outro card. O handoff conserva referência à negociação original, vendedor e parceiro, verifica faltas na etapa operacional e é idempotente por vínculo.
 - Existe um card legado na etapa Concluído com status ativo e requisitos ausentes, já vinculado ao Operacional. A publicação proposta não altera esse registro; ele está sinalizado para revisão humana separada. A regra nova impede novas entradas incompletas, sem reescrever silenciosamente o histórico.
-- A publicação preparada é Financeiro v17→v18 e Operacional v7→v8, com três definições, formulários, três arestas e uma automação nova. A prévia é somente leitura; a operação remota depende do checkpoint Vault em `docs/reports/vault-financeiro-ativo-concluidos-2026-09-29.md`.
+- A configuração foi publicada de Financeiro v17→v18 e Operacional v7→v8, com três definições, formulários, três arestas e uma automação nova. O checkpoint e a verificação posterior constam de `docs/reports/vault-financeiro-ativo-concluidos-2026-09-29.md`. O deploy do código da aplicação ainda é necessário para a regra de NF e o runtime de handoff valerem em produção.
 
 ## Tasks / Subtasks
 
@@ -119,6 +119,7 @@ Esta retomada amplia os critérios existentes; não apaga os resultados de 26/09
 | 2026-09-29 | 0.3 | Reabertura para `Concluídos` do Financeiro ativo, UI configurável e auditoria do handoff existente | River |
 | 2026-09-29 | 0.4 | Entrada em `Concluídos` exige dados completos; data/hora atômica; regra de NF pendente de decisão | River |
 | 2026-09-29 | 0.5 | Decisão do usuário: NF emitida e válida passa a ser requisito de entrada em `Concluídos` | River |
+| 2026-09-29 | 0.6 | Configuração remota v18/v8 publicada após Vault e autorização; leitura posterior aprovada, deploy do código pendente | Codex |
 
 ## Dev Agent Record
 
@@ -148,6 +149,7 @@ Esta retomada amplia os critérios existentes; não apaga os resultados de 26/09
 - Prévia de `scripts/configurar-concluidos-financeiro-ativo.mts` aprovada contra Financeiro v17 e Operacional v7. Nenhum `--apply` executado; configuração remota e smoke de UI ainda pendentes.
 - `npm run lint`: zero erros, 1191 avisos existentes. `npm run typecheck`: aprovado. `npm test`: 558 arquivos, 4099 testes aprovados, 4 ignorados e 1 pendente. `npm run build`: aprovado.
 - Backup Turso dedicado em `database-backups/pre-change/`, criado em 29/09/2026 15:11:58 UTC, SHA-256 `46488faa460fd815ba2857473ac7c6c0ff209768999056ddd24edb33b22943ce`; restauração isolada verificada, integridade e chaves estrangeiras aprovadas. Expira em 01/10/2026 15:11:58 UTC.
+- Publicação remota autorizada em 29/09/2026: Financeiro v18, Operacional v8; formulário Concluído com 23 componentes, NF v4 e Boas vindas com 20. Leitura independente passou após corrigir o verificador para ignorar uma configuração anterior fora dos 20 componentes publicados. Card legado preservado. Código no commit local `8973f8e6`, sem push/deploy nesta operação.
 
 ## Story Draft Checklist
 

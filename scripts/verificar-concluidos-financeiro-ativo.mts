@@ -45,6 +45,8 @@ try {
     configsFinal: configs.filter((item) => item.etapaId === ETAPA_FINAL).length,
     obrigatoriosFinal: configs.filter((item) => item.etapaId === ETAPA_FINAL && item.obrigatorioEntrada).length,
     configsOperacional: configs.filter((item) => item.etapaId === BOAS_VINDAS).length,
+    configsCamposFormularioOperacional: configs.filter((item) => item.etapaId === BOAS_VINDAS
+      && componentes(BOAS_VINDAS).some((componente) => componente.campoId === item.campoId && item.visivel)).length,
     automacaoConclusao: { ativa: auto?.ativa, versao: auto?.versoes[0]?.versao,
       destino: acoesAuto?.nos.find((no) => no.acaoTipo === "MOVER_CARD")?.parametros?.etapaId },
     handoff: { ativa: handoff?.ativa, versao: handoff?.versoes[0]?.versao,
@@ -57,7 +59,8 @@ try {
   if (resultado.financeiro !== 18 || resultado.operacional !== 8 || resultado.formFinal !== 1
     || resultado.componentesFinal !== 23 || resultado.formNF !== 4 || resultado.formBoasVindas !== 1
     || resultado.componentesBoasVindas !== 20 || campos.length !== 3 || campos.some((campo) => !campo.ativo)
-    || resultado.configsFinal !== 23 || resultado.obrigatoriosFinal !== 21 || resultado.configsOperacional !== 20
+    || resultado.configsFinal !== 23 || resultado.obrigatoriosFinal !== 21
+    || resultado.configsCamposFormularioOperacional !== 20
     || resultado.automacaoConclusao.ativa !== true || resultado.automacaoConclusao.destino !== ETAPA_FINAL
     || resultado.handoff.ativa !== true || resultado.handoff.destino?.pipelineId !== OPERACIONAL
     || resultado.handoff.destino?.etapaId !== BOAS_VINDAS || resultado.arestas.length !== 3

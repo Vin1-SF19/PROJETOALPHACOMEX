@@ -1,6 +1,6 @@
 # Vault Report — Etapa Concluído e entrega ao Operacional
 
-**Estado: BLOQUEADO para publicação; aguarda autorização explícita específica.**
+**Estado: configuração publicada no Turso em 29/09/2026, mediante autorização específica do usuário. Deploy do código da aplicação pendente.**
 
 ## Ambiente e inventário
 
@@ -42,4 +42,11 @@ Classificação Vault: `INSERT` de campos, associações, formulários, componen
 
 ## Autorização necessária
 
-A autorização anterior para NF v16→v17 não cobre esta operação. Antes do `--apply`, o usuário precisa autorizar especificamente **a publicação da etapa Concluído e do handoff no Turso remoto, Financeiro v17→v18 e Operacional v7→v8, conforme este relatório**. A correção do card legado e do vínculo Operacional não está incluída nesse consentimento.
+A autorização anterior para NF v16→v17 não cobria esta operação. Após receber o relatório e a pergunta específica sobre Financeiro v17→v18 e Operacional v7→v8, o usuário respondeu **“publique”** em 29/09/2026. O consentimento não incluiu correção do card legado ou do vínculo Operacional.
+
+## Execução e verificação posterior
+
+- Às 16:00 UTC, a prévia somente leitura repetiu as pré-condições Financeiro v17, Operacional v7, Concluído sem formulário, handoff existente v1 e um card legado. O dump dedicado foi restaurado novamente em SQLite isolado: hash, tamanho, 332 tabelas, 193.581 linhas, integridade e chaves estrangeiras aprovados. O backup tinha menos de uma hora.
+- O comando `--apply` documentado acima concluiu com `sucesso=true` e `COMMIT`. Publicou Financeiro v18, Operacional v8, os três campos, formulário Concluído v1 com 23 componentes e 21 obrigatoriedades de entrada, formulário NF v4, formulário Boas vindas v1 com 20 componentes, as três arestas `AMBOS/CONCLUIDO` e a nova automação de conclusão. A automação de handoff existente permaneceu ativa v1 e apontando ao pipeline e etapa Operacional reais.
+- `scripts/verificar-concluidos-financeiro-ativo.mts` fez leitura independente e confirmou esses registros. A primeira versão do verificador pressupunha 20 configurações totais em Boas vindas; havia uma configuração anterior adicional, totalizando 21. A verificação foi corrigida para exigir que os 20 componentes publicados possuam configurações visíveis, e passou. Nenhum ajuste remoto adicional foi necessário.
+- O card legado incompleto permanece sem alteração. O código da aplicação está no commit local `8973f8e6`, ainda não enviado nem implantado em produção; até seu deploy, a regra de NF obrigatória e a correção do reconhecimento do pipeline Operacional no runtime não podem ser consideradas ativas no servidor publicado. Homologação com card real também permanece pendente.
