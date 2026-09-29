@@ -11,6 +11,7 @@ const { validarGrafoAutomacao, gatilhoConfigSchema } = await import("../src/lib/
 const { grupoCondicaoSchema } = await import("../src/lib/bpm/regras/schemas");
 
 const PIPELINE = "cmuih4i54000209gmmyqrg557";
+const VERSAO_ATUAL = 11;
 const PREFIXO = "financeiro.pagamento.ativo.";
 const arg = (key: string) => process.argv.slice(2).find((item) => item.startsWith(`--${key}=`))?.slice(key.length + 3);
 const aplicar = process.argv.includes("--apply");
@@ -56,7 +57,7 @@ try {
   const porChave = new Map(campos.filter((campo) => campo.pipelineId === PIPELINE).map((campo) => [campo.chave, campo]));
   const tem = (chave: string) => porChave.get(chave)?.id;
   const formOk = (etapa: typeof pagamento) => Boolean(etapa?.formulario && etapa.formulario.secoes.some((secao) => secao.chave === "assinatura"));
-  if (pipeline?.chave !== "financeiro" || !pipeline.ativo || pipeline.configVersion !== 10
+  if (pipeline?.chave !== "financeiro" || !pipeline.ativo || pipeline.configVersion !== VERSAO_ATUAL
     || !formOk(formalizacao) || !formOk(pagamento) || !formOk(nf) || !final
     || formalizacao?.formulario?.secoes.some((secao) => secao.chave === "estado_contratacao")
     || [pagamento, nf].some((etapa) => etapa?.formulario?.secoes.some((secao) => secao.chave === "pagamento"))
@@ -71,7 +72,7 @@ try {
   }
   const opcoesStatus = JSON.parse(porChave.get(K.STATUS_FINANCEIRO)!.opcoesJson ?? "null");
   if (JSON.stringify(opcoesStatus) !== JSON.stringify(["Aguardando pagamento"])) throw new Error("Status financeiro anterior foi editado; replaneje.");
-  const plano = { pipelineId: PIPELINE, versaoAtual: 10, versaoNova: 11,
+  const plano = { pipelineId: PIPELINE, versaoAtual: VERSAO_ATUAL, versaoNova: VERSAO_ATUAL + 1,
     etapaId: pagamento!.id, cardsPagamento: pagamento!._count.cards, cardsNF: nf!._count.cards,
     novosCampos: chavesNovas, formularioFormalizacao: "v1→v2", formularioPagamento: "v1→v2", formularioNF: "v1→v2",
     formaUtilizada: formaOpcoes, statusFinanceiro: financeiroOpcoes, statusContratacao: contratacaoOpcoes,
@@ -82,7 +83,7 @@ try {
   else {
     if (!process.env.TURSO_DATABASE_URL?.startsWith("libsql://")
       || arg("approval") !== "AUTORIZO_PAGAMENTO_FINANCEIRO_ATIVO"
-      || Number(arg("expect-financeiro")) !== 10 || Number(arg("admin-id")) !== 1) {
+      || Number(arg("expect-financeiro")) !== VERSAO_ATUAL || Number(arg("admin-id")) !== 1) {
       throw new Error("Autorização específica do pagamento, ambiente, administrador ou versão inválidos.");
     }
     const backup = arg("backup"), manifest = arg("manifest");
@@ -98,7 +99,7 @@ try {
     const admin = await db.usuarios.findUnique({ where: { id: 1 }, select: { role: true, status: true } });
     if (admin?.role !== "Admin" || admin.status !== "ATIVO") throw new Error("Administrador inválido.");
     await db.$transaction(async (tx) => {
-      const versao = await tx.bpmPipeline.updateMany({ where: { id: PIPELINE, configVersion: 10 }, data: { configVersion: { increment: 1 } } });
+      const versao = await tx.bpmPipeline.updateMany({ where: { id: PIPELINE, configVersion: VERSAO_ATUAL }, data: { configVersion: { increment: 1 } } });
       if (versao.count !== 1) throw new Error("Configuração mudou durante a publicação.");
       if (await tx.bpmCard.count({ where: { etapaId: { in: [pagamento!.id, nf!.id] } } }) !== plano.cardsPagamento + plano.cardsNF)
         throw new Error("Cards mudaram entre prévia e publicação.");

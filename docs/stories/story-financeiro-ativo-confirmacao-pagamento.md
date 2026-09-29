@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — implementação local e ensaio concluídos; publicação no Turso e smoke autenticado pendentes.
+Ready for Review — configuração v12 publicada e conferida no Turso; smoke autenticado com card real pendente.
 
 ## Executor Assignment
 
@@ -44,12 +44,12 @@ Os campos, opções, condições, obrigatoriedades e composição do formulário
 ## Tarefas / checklist
 
 - [x] Inventariar somente leitura a etapa ativa, formulários, campos, opções, versões, requisitos, automações e cards; comparar identidades com Novo Contrato e Formalização sem reutilizar versões/IDs históricos (AC 1–3).
-- [x] Preparar os sete campos e o formulário em **Campos e Formulários**, preservando o `Pagamento confirmado` compartilhado e a origem do valor líquido (AC 1–3). Publicação pendente.
+- [x] Preparar e publicar os sete campos e o formulário em **Campos e Formulários**, preservando o `Pagamento confirmado` compartilhado e a origem do valor líquido (AC 1–3).
 - [x] Implementar validações no salvamento e na transição: data automática, valor monetário não negativo, forma utilizada, comprovante privado condicional e divergência; listar pendências ao usuário (AC 2–5, 10).
 - [x] Implementar os quatro estados Contrato/Pagamento, o evento único de confirmação e a tarefa de NF idempotente; assegurar ambas as ordens dos eventos (AC 6, 8, 10).
-- [x] Preparar política de vencimento/cobrança com exclusão de pagamento no êxito antes do evento vinculante; publicação pendente (AC 7, 9).
+- [x] Preparar e publicar política de vencimento/cobrança com exclusão de pagamento no êxito antes do evento vinculante (AC 7, 9).
 - [ ] Completar testes de integração com persistência, concorrência, regra administrativa alterada e execução real do cron; testes unitários e ensaio de configuração cobrem valor, quatro estados e êxito (AC 1–10).
-- [ ] Antes de qualquer alteração de configuração/dados no Turso: acionar Vault, descrever ambiente, comandos, impacto, riscos, alternativa e rollback; verificar backup completo de até 48 horas em `database-backups/pre-change/`; obter autorização específica e conferir publicação por leitura (AC 1–10).
+- [x] Antes de qualquer alteração de configuração/dados no Turso: acionar Vault, descrever ambiente, comandos, impacto, riscos, alternativa e rollback; verificar backup completo de até 48 horas em `database-backups/pre-change/`; obter autorização específica e conferir publicação por leitura (AC 1–10). Evidência em `docs/reports/vault-financeiro-ativo-pagamento-2026-09-29.md`.
 - [ ] Executar lint, typecheck, testes, build e smoke autenticado; os quatro gates locais passaram em 2026-09-29, smoke depende da publicação.
 
 ## Dev Notes
@@ -82,7 +82,8 @@ Os campos, opções, condições, obrigatoriedades e composição do formulário
 ### File List
 
 - `docs/stories/story-financeiro-ativo-confirmacao-pagamento.md` — escopo, checklist e evidências.
-- `scripts/configurar-pagamento-financeiro-ativo.mts` — prévia e publicação transacional v10→v11.
+- `scripts/configurar-pagamento-financeiro-ativo.mts` — prévia e publicação transacional v11→v12 após mudança concorrente da versão.
+- `docs/reports/vault-financeiro-ativo-pagamento-2026-09-29.md` — plano, riscos, backup e rollback para autorização específica.
 - `scripts/lib/verificar-backup-turso.mjs` — verificação de backup por restauração.
 - `scripts/turso-backup-prisma.mts` — backup completo alternativo por Prisma HTTP.
 - `src/lib/bpm/financeiro-pagamento-validacao.ts` — comparação monetária e pendências.
@@ -118,3 +119,13 @@ Revisão preliminar: CONCERNS pela falta de testes de integração com persistê
 - Limites: os testes de fluxo avaliam um snapshot do grafo ensaiado e a função pura; não exercitam persistência concorrente, execução real do cron nem edição administrativa seguida de reprocessamento. Falta publicar com Vault, ler de volta a configuração no Turso e fazer smoke autenticado. A data preenchida antes da confirmação fica imutável, exigindo procedimento auditado para corrigir erro prévio.
 
 **Recomendação:** concluir o checkpoint Vault e a publicação autorizada, verificar a versão 11 e as automações na UI, executar smoke autenticado e então reavaliar a story para `Done`.
+
+### Retomada do checkpoint — 2026-09-29
+
+Leitura do Turso confirmou que o Financeiro ativo avançou de v10 para v11 sem os campos/requisitos/automações desta story. A prévia foi atualizada para v11→v12 e passou; zero cards nas etapas Pagamento e Nota Fiscal. O backup dedicado foi restaurado e verificado conforme `docs/reports/vault-financeiro-ativo-pagamento-2026-09-29.md`. A publicação segue bloqueada até confirmação específica; nenhuma configuração foi alterada nesta retomada.
+
+Gates desta retomada: `npm run lint` passou com zero erros e 1.191 avisos; `npm run typecheck` passou; `npm test` passou com 556 arquivos e 4.085 testes (4 ignorados, 1 todo); `npm run build` passou. O smoke autenticado continua pendente da publicação.
+
+### Publicação autorizada — 2026-09-29
+
+Após a confirmação explícita do usuário, a prévia v11→v12 e a restauração do backup foram repetidas e passaram. A publicação transacional concluiu. Leitura posterior confirmou Financeiro v12, formulários de Formalização/Pagamento/Nota Fiscal v2, sete campos solicitados ativos e publicados no formulário de Pagamento, seis requisitos ativos e nove automações com versão `ATIVA`. Os grafos publicados contêm quatro estados, tarefa de NF idempotente, cobrança após êxito e preferência pelo líquido. O smoke autenticado com card real segue pendente porque não havia cards em Pagamento ou Nota Fiscal; nenhum card de produção foi criado ou movido nesta validação.
