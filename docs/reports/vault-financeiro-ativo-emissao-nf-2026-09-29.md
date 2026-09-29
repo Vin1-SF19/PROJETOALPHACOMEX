@@ -1,6 +1,6 @@
 # Vault Report — Emissão da Nota Fiscal do Financeiro ativo
 
-**Estado: BLOQUEADO para publicação; aguarda autorização explícita específica.**
+**Estado: APROVADO e publicado após autorização explícita específica.**
 
 ## Ambiente e operação
 
@@ -36,6 +36,12 @@ O script confere versão, formulários e automações antes de escrever, reserva
 - Motivo: `emissao-nf-financeiro-ativo-v17`; criado em `2026-09-29T14:41:18.822Z`; 141.437.089 bytes; SHA-256 `ebd99d4750ca703cc134555ea8fe2533519d0e833d2d1d9dc9a3963dbc8717fc`.
 - A primeira rotina de réplica não concluiu a exportação e a tentativa Prisma sofreu rollback da transação de leitura pelo Turso. O dump final foi criado a partir de uma cópia SQLite consistente da réplica sincronizada com `configVersion=16` e `integrity_check=ok`. `node scripts/verify-turso-backup.mjs` restaurou esse dump em SQLite isolado e validou `integrity_check=ok`, zero violações de chave estrangeira, 332 tabelas e 193.429 linhas; hash e tamanho conferidos. Válido no máximo até 2026-10-01 14:41:18 UTC. Se expirar, falhar ou a versão mudar, gerar novo backup e rever o plano antes de publicar.
 
-## Confirmação necessária
+## Confirmação recebida
 
-A autorização anterior para confirmação de pagamento v11→v12 não cobre a publicação da NF v16→v17. Antes de executar `--apply`, é necessária uma resposta explícita do usuário que identifique **a publicação da configuração da etapa Emissão da Nota Fiscal no Turso remoto do Financeiro ativo, versão 16→17, conforme este relatório**. Até lá, a prévia e o código permanecem locais.
+A autorização anterior para confirmação de pagamento v11→v12 não cobria a publicação da NF v16→v17. O usuário respondeu “sim” ao pedido explícito de publicação da etapa Emissão da Nota Fiscal no Turso remoto, Financeiro v16→v17, conforme este relatório. Antes do `--apply`, a prévia confirmou a v16 e zero cards na etapa, e o backup foi restaurado e verificado novamente.
+
+## Resultado da publicação
+
+- `scripts/configurar-emissao-nf-financeiro-ativo.mts --apply` confirmou a transação com `sucesso=true`; Financeiro v16→v17, formulário NF v2→v3, cinco campos, cinco requisitos e quatro novas versões de automação.
+- Leitura independente com `scripts/verificar-emissao-nf-financeiro-ativo.mts` confirmou v17, formulário v3, seção NF com cinco componentes, cinco campos ativos/visíveis/editáveis em Configurações → Campos e Formulários, quatro obrigatoriedades condicionais, valor padrão da data de emissão, cinco requisitos ativos e as quatro automações v2 com título `Emitir NF – {{empresa.razaoSocial}}`.
+- Havia zero cards na etapa. Não foi criado ou movido card de produção para smoke autenticado; o comportamento em card real permanece para acompanhamento operacional.

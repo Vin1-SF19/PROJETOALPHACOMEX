@@ -2,7 +2,7 @@
 
 ## Status
 
-Implementação local concluída; publicação no banco pendente de autorização explícita específica do checkpoint Vault.
+Publicada no Financeiro ativo v17; smoke autenticado com card apropriado pendente.
 
 ## Executor Assignment
 
@@ -39,14 +39,14 @@ Implementação local concluída; publicação no banco pendente de autorizaçã
 ## Tarefas / checklist
 
 - [x] Inventariar a configuração publicada da etapa e os campos de NF existentes, incluindo formulários, regras, automações e tarefas; verificar versão e identidades atuais antes de propor publicação (AC 1, 4).
-- [x] Preparar script transacional dos cinco campos e da obrigatoriedade condicional em **Campos e Formulários**, além de novas versões das quatro automações de pagamento, preservando o tipo/idempotência da tarefa (AC 1–4). Publicação pendente.
+- [x] Publicar por script transacional os cinco campos e a obrigatoriedade condicional em **Campos e Formulários**, além de novas versões das quatro automações de pagamento, preservando o tipo/idempotência da tarefa (AC 1–4).
 - [x] Validar os dados de NF no servidor ao salvar e ao avançar, incluindo data real, valor monetário `> 0`, referência do próprio card e acesso autorizado (AC 2, 3, 9).
 - [x] Conectar o ciclo da tarefa existente ao estado da NF; fechar após confirmação válida e reabrir se a emissão for revertida (AC 4–6).
 - [x] Registrar referência, vínculo cliente/card e evento no histórico; preservar histórico e idempotência em salvamentos repetidos (AC 6, 7).
 - [x] Conferir independência entre NF, assinatura e pagamento e proteção da conclusão da contratação (AC 8, 9).
 - [x] Cobrir a validação e a reconciliação com testes automatizados; executar `npm run lint`, `npm run typecheck`, `npm test` e `npm run build` (AC 1–9). Smoke autenticado com card apropriado pendente de publicação.
-- [ ] Antes de alterar configuração, dados ou estrutura no banco: acionar Vault; apresentar ambiente, comandos, impacto, riscos, alternativa não destrutiva e rollback; verificar backup completo de até 48 horas em `database-backups/pre-change/`; obter autorização explícita específica para esta publicação; ler e conferir a configuração após publicar. A autorização dada para Pagamento v11→v12 não cobre esta mudança (AC 1–9).
-- [x] Atualizar checklist, File List e evidências dos testes locais. Versão publicada e smoke permanecem pendentes.
+- [x] Antes de alterar configuração, dados ou estrutura no banco: acionar Vault; apresentar ambiente, comandos, impacto, riscos, alternativa não destrutiva e rollback; verificar backup completo de até 48 horas em `database-backups/pre-change/`; obter autorização explícita específica para esta publicação; ler e conferir a configuração após publicar. A autorização dada para Pagamento v11→v12 não cobria esta mudança (AC 1–9).
+- [x] Atualizar checklist, File List e evidências dos testes locais e da versão publicada. Smoke autenticado permanece pendente por ausência de card na etapa.
 
 ## Dev Notes
 
@@ -82,6 +82,7 @@ Implementação local concluída; publicação no banco pendente de autorizaçã
 - `docs/stories/story-financeiro-ativo-emissao-nota-fiscal.md` — story, checklist e evidências.
 - `docs/reports/vault-financeiro-ativo-emissao-nf-2026-09-29.md` — relatório Vault e plano de publicação.
 - `scripts/configurar-emissao-nf-financeiro-ativo.mts` — prévia e publicação guardada por versão, backup e consentimento.
+- `scripts/verificar-emissao-nf-financeiro-ativo.mts` — leitura independente da configuração publicada.
 - `src/lib/bpm/financeiro-config.client.ts`, `src/lib/bpm/financeiro-nota-fiscal.ts`, `src/lib/bpm/financeiro-nota-fiscal-server.ts`, `src/lib/bpm/nota-fiscal-link.ts`, `src/lib/bpm/validacao-salvamento-configurado.ts` — chaves, validação, acessibilidade do link, histórico e reconciliação da tarefa.
 - `src/actions/bpm/Cards.ts`, `src/lib/bpm/transicao-command.ts`, `src/lib/bpm/automacoes/central-runtime.ts`, `src/actions/bpm/NotaFiscal.ts`, `src/actions/bpm/Tarefas.ts`, `src/actions/bpm/Anexos.ts` — integração de salvamento, automação, tarefa e anexo.
 - `src/app/PainelAlpha/AlphaCRM/CardModal/PainelNotaFiscalConcluida.tsx`, `src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx`, `src/lib/bpm/timeline.ts`, `src/lib/bpm/historico-descricao.ts`, `src/lib/bpm/resumo-contratacao-server.ts` — leitura/edição e histórico da NF.
@@ -93,6 +94,7 @@ Implementação local concluída; publicação no banco pendente de autorizaçã
 | --- | --- | --- | --- |
 | 2026-09-29 | 0.1 | Draft da emissão da NF no Financeiro ativo | River (@sm) |
 | 2026-09-29 | 0.2 | Implementação local, prévia da configuração, testes e checkpoint Vault pendente de autorização | Codex (@dev) |
+| 2026-09-29 | 0.3 | Publicação autorizada v16→v17 e leitura independente da configuração | Codex (@dev) |
 
 ## Validação do draft
 
@@ -100,4 +102,4 @@ Checklist `story-draft-checklist.md`: objetivo/contexto **PASS**; orientação t
 
 ## QA Results
 
-Testes locais: `npm run lint` passou com zero erros (1.191 warnings preexistentes); `npm run typecheck` passou após o build; `npm test` passou (558 arquivos, 4.094 testes aprovados, 4 ignorados e 1 todo); `npm run build` passou com avisos conhecidos de `pdfjs-polyfill`; testes focados da NF passaram (3 arquivos, 9 testes); `git diff --check` passou. Prévia da configuração passou em modo somente leitura. O backup dedicado foi restaurado e verificado em SQLite isolado, conforme relatório Vault. QA funcional autenticado e leitura da configuração v13 dependem da publicação autorizada.
+Testes locais: `npm run lint` passou com zero erros (1.191 warnings preexistentes); `npm run typecheck` passou após o build; `npm test` passou (558 arquivos, 4.094 testes aprovados, 4 ignorados e 1 todo); `npm run build` passou com avisos conhecidos de `pdfjs-polyfill`; testes focados da NF passaram (3 arquivos, 9 testes); `git diff --check` passou. Prévia v16→v17 passou em modo somente leitura; o backup dedicado foi restaurado e verificado em SQLite isolado. A transação autorizada publicou a v17; leitura independente conferiu cinco campos, formulário v3, cinco requisitos e quatro automações v2. QA funcional autenticado em card real permanece pendente porque a etapa tinha zero cards, e esta verificação não criou ou moveu card de produção.
