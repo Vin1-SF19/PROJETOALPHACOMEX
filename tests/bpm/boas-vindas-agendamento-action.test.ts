@@ -11,6 +11,7 @@ const tx = vi.hoisted(() => ({
   bpmCard: { updateMany: vi.fn() },
   bpmCardMembro: { upsert: vi.fn(), deleteMany: vi.fn() },
   bpmCardReuniao: { upsert: vi.fn() },
+  bpmTarefa: { create: vi.fn() },
 }));
 const prismaMock = vi.hoisted(() => ({
   bpmCard: { findUnique: vi.fn() },
@@ -88,12 +89,17 @@ describe("início de Boas-vindas com Google Meet", () => {
     expect(resultado).toMatchObject({ success: true });
     expect(criarEventoMock).toHaveBeenCalledWith(expect.objectContaining({
       participantes: ["cliente@example.com", "analista@example.com"], criarMeet: true,
+      lembretesMinutos: [30],
     }));
     expect(tx.bpmCard.updateMany).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ responsavelId: 23, googleEventId: "evento-1" }),
     }));
     expect(tx.bpmCardMembro.upsert).toHaveBeenCalledWith(expect.objectContaining({
       create: { cardId: CARD, userId: 23, role: "RESPONSAVEL" },
+    }));
+    expect(tx.bpmTarefa.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ cardId: CARD, responsavelId: 23,
+        prazo: new Date(DATA), alertaEm: new Date("2026-10-02T12:30:00.000Z") }),
     }));
     expect(historicoMock).toHaveBeenCalledOnce();
     expect(eventoMock).toHaveBeenCalledOnce();

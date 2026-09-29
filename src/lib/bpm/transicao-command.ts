@@ -15,6 +15,7 @@ import { verificarLinkNotaFiscalAcessivel } from "@/lib/bpm/nota-fiscal-link";
 import { CHAVES_CAMPOS } from "@/lib/bpm/financeiro-config.client";
 import { extrairPathnamePrivadoAnexoBpm } from "@/lib/bpm/anexos-storage";
 import { etapaEhBoasVindas, pendenciasSaidaBoasVindasOperacional, PIPELINE_OPERACIONAL_ATIVO_ID } from "@/lib/bpm/boas-vindas";
+import { etapaEhAlinhamentoEstrategico, linkResumoAlinhamentoValido } from "@/lib/bpm/alinhamento-estrategico";
 import { camposPublicadosPorEtapa, capacidadesObrigatoriasPorEtapa, capacidadeObrigatoriaEntrada } from "@/lib/bpm/campos-formulario-publicado";
 import {
   carregarValoresCanonicosCampos,
@@ -563,7 +564,17 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
         if (!validada.success) erro("INVALID_FIELD_CONFIG", `Configuração inválida do campo ${campo.nome}.`);
         obrigatorio = obrigatorio || avaliarGrupo(validada.data, contextoRegra);
       }
-      if (obrigatorio && vazio(valoresEfetivosPorId.get(campo.id))) pendencias.push(campo.nome);
+      const valorEfetivo = valoresEfetivosPorId.get(campo.id);
+      if (obrigatorio && vazio(valorEfetivo)) pendencias.push(campo.nome);
+      else if (obrigatorio && valorEfetivo && card.pipelineId === PIPELINE_OPERACIONAL_ATIVO_ID
+        && etapaEhAlinhamentoEstrategico(card.etapa.nome)
+        && (campo.chave === BPM_FIELD_KEYS.STRATEGIC_ALIGNMENT_RESPONSIBLE_CPF
+          || campo.chave === BPM_FIELD_KEYS.STRATEGIC_ALIGNMENT_SUMMARY_LINK)
+        && (campo.chave === BPM_FIELD_KEYS.STRATEGIC_ALIGNMENT_SUMMARY_LINK
+          ? !linkResumoAlinhamentoValido(valorEfetivo)
+          : !validarValorRequisitoCampo(campo, valorEfetivo))) {
+        pendencias.push(campo.nome);
+      }
     }
   }
   if (card.pipeline.chave === "financeiro" && card.etapa.chave === "solicitacao_contrato"

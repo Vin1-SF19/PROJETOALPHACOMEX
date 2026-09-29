@@ -41,6 +41,8 @@ export const BPM_FIELD_KEYS = {
   LOST_REASON: "alpha.motivo.de.lost",
   LOST_REASON_OTHER: "alpha.motivo.lost.outro",
   MEETING_SUMMARY: "alpha.resumo.da.reuniao",
+  STRATEGIC_ALIGNMENT_SUMMARY_LINK: "alpha.operacional.alinhamento.link.resumo",
+  STRATEGIC_ALIGNMENT_RESPONSIBLE_CPF: "alpha.operacional.analista.cpf",
 } as const;
 
 export type BpmLifecycleStatus = "ATIVO" | "CONCLUIDO" | "CANCELADO" | "ARQUIVADO";

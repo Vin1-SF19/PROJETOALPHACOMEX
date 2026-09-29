@@ -43,6 +43,7 @@ export async function carregarValoresCanonicosCampos(
       concluidoEm: true,
       dataReuniao: true,
       responsavelId: true,
+      responsavel: { select: { id: true, nome: true, cpf: true } },
       createdAt: true,
       empresa: {
         select: {
@@ -125,6 +126,7 @@ export async function carregarValoresCanonicosCampos(
     CONTRATO: contrato,
     SERVICO: servico ?? (card.servico ? { id: null, nome: card.servico } : null),
     PROCESSO: processo,
+    USUARIO: card.responsavel,
     CARD: card,
   };
 

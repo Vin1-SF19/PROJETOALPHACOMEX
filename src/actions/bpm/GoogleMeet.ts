@@ -174,7 +174,7 @@ export async function IniciarBoasVindasOperacionalBpm(dados: unknown) {
       timezone: calendario.timezone || "America/Sao_Paulo", diaInteiro: false,
       inicio: dataHora, fim: new Date(dataHora.getTime() + DURACAO_PADRAO_MINUTOS * 60_000),
       participantes: convidados, criarMeet: true, eventType: "default",
-      visibilidade: "default", transparencia: "opaque", lembretesMinutos: [],
+      visibilidade: "default", transparencia: "opaque", lembretesMinutos: [30],
     });
     if (!resultado.success) return { success: false as const, error: resultado.error };
     eventoCriado = { cardId, userId, calendarioId: calendario.id,
@@ -214,6 +214,13 @@ export async function IniciarBoasVindasOperacionalBpm(dados: unknown) {
         create: { cardId, userId: DIRETOR_OPERACIONAL_VITOR_ID, role: "ADMINISTRADOR" },
         update: { role: "ADMINISTRADOR" },
       });
+      await tx.bpmTarefa.create({ data: {
+        cardId, titulo: "Chamada de alinhamento estratégico",
+        descricao: "Primeira reunião operacional com o cliente.",
+        responsavelId: analistaId, prazo: dataHora,
+        alertaEm: new Date(dataHora.getTime() - 30 * 60_000),
+        tipo: "LEMBRETE_REUNIAO", prioridade: "ALTA",
+      } });
       if (card.responsavelId !== analistaId && card.responsavelId !== DIRETOR_OPERACIONAL_VITOR_ID) {
         await tx.bpmCardMembro.deleteMany({ where: { cardId, userId: card.responsavelId } });
       }

@@ -5,6 +5,7 @@ import {
   cpfEhValido,
   ERRO_ALINHAMENTO_RESUMO_OBRIGATORIO,
   etapaEhAlinhamentoEstrategico,
+  linkResumoAlinhamentoValido,
   obterErroCamposAlinhamentoParaSaida,
   TEMPLATE_RESUMO_ALINHAMENTO,
 } from "@/lib/bpm/alinhamento-estrategico";
@@ -41,6 +42,12 @@ describe("Alinhamento Estratégico agendado", () => {
       [{ id: "campo-cpf", nome: "CPF do responsável", tipo: "cpf", opcoesJson: null }],
       { "campo-cpf": "529.982.247-25" },
     )).toEqual({ success: true, valores: { "campo-cpf": "52998224725" } });
+  });
+
+  it("aceita somente links HTTPS para o resumo obrigatório", () => {
+    expect(linkResumoAlinhamentoValido("https://docs.google.com/document/d/resumo")).toBe(true);
+    expect(linkResumoAlinhamentoValido("javascript:alert(1)")).toBe(false);
+    expect(linkResumoAlinhamentoValido("http://docs.google.com/document/d/resumo")).toBe(false);
   });
 
   it("mantém alerta e template sem impor guarda antiga na transição", () => {

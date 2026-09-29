@@ -7,6 +7,7 @@ export const ATRIBUTOS_FONTE_CAMPO = {
   CONTRATO: ["id", "valorContrato", "formaPagamento", "servico", "status", "contratoUrl"],
   SERVICO: ["id", "nome"],
   PROCESSO: ["id", "status", "dataInicio", "dataProtocolo", "dataExito", "tentativas"],
+  USUARIO: ["id", "nome", "cpf"],
   CARD: ["id", "servico", "tipoProcesso", "status", "responsavelId", "createdAt", "concluidoEm", "dataReuniao"],
 } as const;
 

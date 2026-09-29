@@ -29,9 +29,11 @@ import {
 import { toast } from "sonner";
 import { type EstadoFollowUpModal } from "@/lib/bpm/card-modal-ui";
 import { formularioPossuiTarget } from "@/lib/bpm/formulario-renderer";
-import { BPM_CAPABILITIES } from "@/lib/bpm/ontology";
+import { BPM_CAPABILITIES, BPM_FIELD_KEYS } from "@/lib/bpm/ontology";
 import { CardAbertoLayout } from "./CardAbertoLayout";
 import { PainelBoasVindasOperacional } from "./PainelBoasVindasOperacional";
+import { PainelAlinhamentoEstrategico } from "./PainelAlinhamentoEstrategico";
+import { etapaEhAlinhamentoEstrategico } from "@/lib/bpm/alinhamento-estrategico";
 import { useCardSave, type PendingCardChange } from "./CardSaveContext";
 const PreencherCnpjNoloss = lazy(() => import("./PreencherCnpjNoloss").then((modulo) => ({ default: modulo.PreencherCnpjNoloss })));
 
@@ -321,6 +323,12 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
                     googleMeetLink={card.googleMeetLink ?? null}
                     responsavelNome={card.responsavel.nome}
                     podeEditar={podeEditar} onAtualizado={handleAtualizado} />}
+                {card.pipelineId === PIPELINE_OPERACIONAL_ATIVO_ID && etapaEhAlinhamentoEstrategico(card.etapa.nome) &&
+                  <PainelAlinhamentoEstrategico cardId={card.id} dataReuniao={card.dataReuniao ?? null}
+                    googleEventId={card.googleEventId ?? null}
+                    responsavelNome={card.responsavel.nome}
+                    linkResumo={card.campoValores.find((valor) =>
+                      valor.campo.chave === BPM_FIELD_KEYS.STRATEGIC_ALIGNMENT_SUMMARY_LINK)?.valor ?? null} />}
                 <PainelRegistrar card={card} etapaAtual={etapaAtual} accent={accent}
                   podeEditar={podeEditar} realtimeRevision={realtimeRevision}
                   currentUserRole={currentUserRole}
