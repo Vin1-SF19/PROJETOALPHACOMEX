@@ -22,7 +22,7 @@ export function VisualizadorAnexoCard({ anexo, onClose }: {
   const contrato = resultado && resultado.id === anexoId ? resultado.contrato : null;
   const erro = resultado && resultado.id === anexoId ? resultado.erro : null;
   const carregando = Boolean(gerado && anexoId && resultado?.id !== anexoId);
-  const verPdf = Boolean(visualizacao && visualizacao.id === anexoId && visualizacao.pdf);
+  const verPdf = Boolean(contrato?.pdfDisponivel && (visualizacao?.id === anexoId ? visualizacao?.pdf : true));
 
   useEffect(() => {
     if (!anexoId || !gerado) return;
@@ -71,6 +71,9 @@ export function VisualizadorAnexoCard({ anexo, onClose }: {
                     {verPdf ? "Ver texto" : "Ver PDF"}
                   </button>
                 )}
+                <a href={arquivoUrl} target="_blank" rel="noopener noreferrer" className="rounded-md border border-white/15 px-2.5 py-1 text-sky-200 hover:bg-white/10">
+                  Abrir no Gerador de Documentos
+                </a>
               </div>
               {Boolean(contrato.pendencias?.length) && (
                 <div role="note" className="shrink-0 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">

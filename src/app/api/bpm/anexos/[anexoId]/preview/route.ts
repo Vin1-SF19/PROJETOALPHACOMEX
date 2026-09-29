@@ -3,7 +3,8 @@ import { get } from "@vercel/blob";
 import { auth } from "../../../../../../../auth";
 import db from "@/lib/prisma";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
-import { CONTRATO_PADRAO_ID, VARIAVEIS_CONTRATO_PADRAO } from "@/lib/gerador-documentos/contrato-padrao";
+import { carregarContratoPadrao, CONTRATO_PADRAO_ID, VARIAVEIS_CONTRATO_PADRAO } from "@/lib/gerador-documentos/contrato-padrao";
+import { gerarPdfDocumento } from "@/lib/gerador-documentos/pdf";
 import { validarVariaveisObrigatorias } from "@/lib/gerador-documentos/render";
 
 export const dynamic = "force-dynamic";
@@ -58,10 +59,26 @@ export async function GET(request: Request, context: { params: Promise<{ anexoId
     ? validarVariaveisObrigatorias(VARIAVEIS_CONTRATO_PADRAO, variaveis as Record<string, string | number | boolean | null | undefined>)
       .map((nome) => VARIAVEIS_CONTRATO_PADRAO.find((item) => item.nome === nome)?.label ?? nome)
     : [];
+  const pdfDoModeloDisponivel = documento.templateId === CONTRATO_PADRAO_ID && documento.clausulas.length > 0;
 
   if (new URL(request.url).searchParams.get("formato") === "pdf") {
-    if (!documento.pdfUrl) return new Response("PDF ainda não disponível", { status: 404 });
+    if (!documento.pdfUrl && !pdfDoModeloDisponivel) return new Response("PDF ainda não disponível", { status: 404 });
     try {
+      if (!documento.pdfUrl) {
+        // Rascunhos criados antes do preenchimento completo não têm PDF salvo.
+        // Renderiza as cláusulas já geradas com o mesmo estilo DOCX do Gerador,
+        // sem persistir nem confundir a prévia com um contrato finalizado.
+        const { estiloDocx } = await carregarContratoPadrao();
+        const pdf = await gerarPdfDocumento({ titulo: documento.titulo, clausulas: documento.clausulas, estiloDocx });
+        return new Response(new Uint8Array(pdf), {
+          headers: {
+            "Content-Type": "application/pdf",
+            "Content-Disposition": "inline; filename=contrato-rascunho.pdf",
+            "Cache-Control": "private, no-store, max-age=0",
+            "X-Content-Type-Options": "nosniff",
+          },
+        });
+      }
       const arquivo = await get(documento.pdfUrl, { access: "public", useCache: false });
       if (!arquivo || arquivo.statusCode !== 200 || !arquivo.stream) {
         return new Response("PDF não encontrado", { status: 404 });
@@ -82,7 +99,7 @@ export async function GET(request: Request, context: { params: Promise<{ anexoId
   return Response.json({
     titulo: documento.titulo,
     status: documento.status,
-    pdfDisponivel: Boolean(documento.pdfUrl),
+    pdfDisponivel: Boolean(documento.pdfUrl) || pdfDoModeloDisponivel,
     pendencias,
     clausulas: documento.clausulas,
   }, { headers: { "Cache-Control": "private, no-store, max-age=0" } });

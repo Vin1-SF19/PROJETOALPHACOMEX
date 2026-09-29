@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   anexo: vi.fn(),
   documento: vi.fn(),
   get: vi.fn(),
+  carregarContratoPadrao: vi.fn(),
+  gerarPdfDocumento: vi.fn(),
 }));
 vi.mock("../../auth", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/prisma", () => ({ default: {
@@ -14,6 +16,11 @@ vi.mock("@/lib/prisma", () => ({ default: {
 } }));
 vi.mock("@/lib/bpm/ownership", () => ({ exigirAcessoBpmCard: mocks.acesso }));
 vi.mock("@vercel/blob", () => ({ get: mocks.get }));
+vi.mock("@/lib/gerador-documentos/contrato-padrao", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/gerador-documentos/contrato-padrao")>(),
+  carregarContratoPadrao: mocks.carregarContratoPadrao,
+}));
+vi.mock("@/lib/gerador-documentos/pdf", () => ({ gerarPdfDocumento: mocks.gerarPdfDocumento }));
 
 import { GET } from "@/app/api/bpm/anexos/[anexoId]/preview/route";
 import { CONTRATO_PADRAO_ID } from "@/lib/gerador-documentos/contrato-padrao-id";
@@ -34,6 +41,8 @@ describe("prévia autenticada do contrato no card", () => {
     mocks.anexo.mockResolvedValue(anexo);
     mocks.documento.mockResolvedValue(documento);
     mocks.acesso.mockResolvedValue(undefined);
+    mocks.carregarContratoPadrao.mockResolvedValue({ estiloDocx: { fonteCorpo: "Palatino" } });
+    mocks.gerarPdfDocumento.mockResolvedValue(Buffer.from("%PDF-teste"));
   });
 
   it("exige sessão e acesso ao card antes de ler o contrato", async () => {
@@ -46,10 +55,10 @@ describe("prévia autenticada do contrato no card", () => {
     expect(mocks.documento).not.toHaveBeenCalled();
   });
 
-  it("mostra as cláusulas para quem pode visualizar o card, mesmo sem PDF", async () => {
+  it("mostra as cláusulas e oferece prévia do modelo mesmo sem PDF salvo", async () => {
     const resposta = await GET(new Request("http://localhost/api/bpm/anexos/anexo-1/preview"), contexto);
     expect(resposta.status).toBe(200);
-    expect(await resposta.json()).toMatchObject({ titulo: "Contrato Alpha", pdfDisponivel: false,
+    expect(await resposta.json()).toMatchObject({ titulo: "Contrato Alpha", pdfDisponivel: true,
       pendencias: expect.arrayContaining(["Valor total por extenso", "Data de assinatura"]),
       clausulas: [{ titulo: "Objeto" }] });
     expect(mocks.acesso).toHaveBeenCalledWith("card-1", 7, "Financeiro", "visualizar");
@@ -69,5 +78,16 @@ describe("prévia autenticada do contrato no card", () => {
     expect(resposta.headers.get("Content-Type")).toBe("application/pdf");
     expect(resposta.headers.get("Content-Disposition")).toContain("inline");
     expect(mocks.get).toHaveBeenCalledWith("https://blob.example/contrato.pdf", expect.objectContaining({ access: "public" }));
+  });
+
+  it("renderiza o contrato padrão existente com o estilo do Gerador quando falta PDF salvo", async () => {
+    const resposta = await GET(new Request("http://localhost/api/bpm/anexos/anexo-1/preview?formato=pdf"), contexto);
+    expect(resposta.status).toBe(200);
+    expect(resposta.headers.get("Content-Type")).toBe("application/pdf");
+    expect(resposta.headers.get("Content-Disposition")).toContain("contrato-rascunho.pdf");
+    expect(mocks.gerarPdfDocumento).toHaveBeenCalledWith({
+      titulo: "Contrato Alpha", clausulas: documento.clausulas, estiloDocx: { fonteCorpo: "Palatino" },
+    });
+    expect(mocks.get).not.toHaveBeenCalled();
   });
 });

@@ -29,3 +29,28 @@ it("mostra no modal as cláusulas do contrato gerado mesmo sem PDF", async () =>
   container.remove();
   vi.unstubAllGlobals();
 });
+
+it("abre o contrato padrão em PDF e oferece acesso ao Gerador", async () => {
+  Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+    titulo: "CONTRATO DE PRESTAÇÃO DE SERVIÇOS", status: "CONFERENCIA", pdfDisponivel: true,
+    clausulas: [{ id: "c1", ordem: 1, titulo: "Objeto", conteudo: "Prestação de serviços" }],
+  }), { status: 200, headers: { "Content-Type": "application/json" } })));
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  await act(async () => root.render(h(VisualizadorAnexoCard, {
+    anexo: { id: "anexo-2", nome: "CONTRATO DE PRESTAÇÃO DE SERVIÇOS", tipo: "application/x-painel-alpha-documento" },
+    onClose: vi.fn(),
+  })));
+  await act(async () => { await Promise.resolve(); });
+
+  expect(document.querySelector('[role="dialog"] iframe')?.getAttribute("src"))
+    .toBe("/api/bpm/anexos/anexo-2/preview?formato=pdf");
+  expect(document.querySelector('[role="dialog"] a[href="/api/bpm/anexos/anexo-2"]')?.textContent)
+    .toContain("Abrir no Gerador de Documentos");
+
+  await act(async () => root.unmount());
+  container.remove();
+  vi.unstubAllGlobals();
+});

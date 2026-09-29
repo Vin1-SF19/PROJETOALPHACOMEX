@@ -50,6 +50,7 @@ O formulário, as regras condicionais, os gatilhos e as ações devem ser config
 - [x] Rodar lint, typecheck, suíte completa e build; criar backup Vault dedicado e ensaiar a transação em cópia restaurada (AC 1–9).
 - [x] Aplicar configuração após autorização específica e conferir por leitura no banco: v9, formulário com 6 componentes, 17 requisitos e 18 automações com uma versão ativa cada.
 - [ ] Conferir os campos e automações na UI autenticada e realizar smoke com card real sem alterar valores de produção.
+- [x] Corrigir a prévia do contrato padrão no card: exibir PDF com estilo do DOCX mesmo quando o rascunho ainda não tem PDF salvo; manter acesso ao Gerador para completar os dados.
 
 ## Dev Notes
 
@@ -91,10 +92,11 @@ O formulário, as regras condicionais, os gatilhos e as ações devem ser config
 - `src/lib/bpm/automacoes/schemas.ts` — campo de destino opcional na ação Gerar contrato.
 - `src/lib/bpm/automacoes/executor.ts` — vincula anexo gerado ao campo do contrato sem sobrescrever valor existente.
 - `src/lib/bpm/automacoes/central-runtime.ts` — notifica a atualização do card após gerar contrato.
-- `src/app/api/bpm/anexos/[anexoId]/preview/route.ts` — informa pendências do modelo padrão no rascunho.
-- `src/components/bpm/anexos/VisualizadorAnexoCard.tsx` — mostra pendências do rascunho.
+- `src/app/api/bpm/anexos/[anexoId]/preview/route.ts` — informa pendências e renderiza prévia PDF com estilo do modelo padrão sem alterar o documento.
+- `src/components/bpm/anexos/VisualizadorAnexoCard.tsx` — abre o PDF do modelo e oferece acesso ao Gerador.
 - `tests/bpm/validacao-salvamento-configurado.test.ts` — cenários de validação e datas.
-- `tests/bpm/anexo-preview-route.test.ts` — prévia autenticada com pendências.
+- `tests/bpm/anexo-preview-route.test.ts` — prévia autenticada, pendências e PDF do modelo.
+- `tests/bpm/visualizador-anexo-card.test.ts` — visualização no card e acesso ao Gerador.
 - `tests/bpm/excluir-card-action.test.ts` — preserva constantes reais no mock do Financeiro.
 
 ## Evidências locais e plano Vault (28/09/2026)
@@ -121,6 +123,13 @@ O formulário, as regras condicionais, os gatilhos e as ações devem ser config
 | --- | --- | --- | --- |
 | 2026-09-28 | 0.1 | Draft da etapa ativa com campos, validações, Gerador de Documentos e automações publicadas | River (@sm) |
 | 2026-09-28 | 0.2 | Implementação local, ensaio transacional, backup Vault e gates; publicação pendente | Codex |
+| 2026-09-29 | 0.3 | Prévia do contrato RADAR com o estilo do Gerador, inclusive em rascunho com dados pendentes | Codex |
+
+## Correção da prévia do contrato (29/09/2026)
+
+- Leitura do card atual em Elaboração: 1 anexo gerado, vinculado ao template padrão `cmthgdqel00000akvfblyma6y`; o documento possui 10 cláusulas e ainda não possui PDF salvo porque aguarda variáveis obrigatórias. A prévia anterior abria em texto simples.
+- A rota autenticada de prévia agora renderiza essas cláusulas com o estilo extraído do mesmo DOCX usado pelo Gerador. O PDF do rascunho é servido sob demanda, sem gravar ou finalizar o documento. O modal abre essa visualização por padrão e permite abrir a conferência no Gerador para completar os dados.
+- O contrato padrão local foi renderizado com 10 cláusulas em um PDF válido de 99.335 bytes. Testes de rota e modal cobrem a prévia e o vínculo com o Gerador. `npm run lint` passou sem erros (1.191 avisos existentes), `npm run typecheck`, `npm test` e `npm run build` passaram; `git diff --check` não apontou problemas. A verificação visual autenticada em produção depende da publicação do código.
 
 ## QA Results — reavaliação de 29/09/2026
 
