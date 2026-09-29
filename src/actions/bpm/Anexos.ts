@@ -1,4 +1,5 @@
 "use server";
+import { randomUUID } from "node:crypto";
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
@@ -100,6 +101,7 @@ export async function RegistrarAnexoBpm(dados: unknown) {
           tipo: "CARD_ATUALIZADO", entidadeTipo: "CARD", entidadeId: cardId,
           cardId, pipelineId: pipelineIdCard, valorNovo: { anexoAssinadoId: criado.id },
           atorTipo: "USUARIO", atorUserId: userId,
+          correlationId: randomUUID(),
           causationId: criado.id, idempotencyKey: `contrato-assinado-anexo:${criado.id}`,
         }, tx);
       }

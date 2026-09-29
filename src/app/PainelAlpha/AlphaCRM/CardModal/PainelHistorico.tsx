@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { upload } from "@vercel/blob/client";
 import { toast } from "sonner";
 import {
   Loader2,
@@ -32,6 +33,7 @@ import { EditorAnotacaoCard } from "./EditorAnotacaoCard";
 import { formatarBytes, iconePorAcao } from "./PainelHistoricoShared";
 import { separarTarefasCard } from "@/lib/bpm/tarefas-card";
 import { VisualizadorAnexoCard, type AnexoParaVisualizar } from "@/components/bpm/anexos/VisualizadorAnexoCard";
+import { nomeSeguroUploadAnexo, obterTipoUploadAnexo, validarUploadAnexo } from "@/lib/validations/bpm";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
@@ -79,6 +81,7 @@ export default function PainelHistorico({
   onAbrirCard,
 }: Props) {
   const [enviandoAnexo, setEnviandoAnexo] = useState(false);
+  const [progressoAnexo, setProgressoAnexo] = useState(0);
   const [arrastandoAnexo, setArrastandoAnexo] = useState(false);
   const [abaEsquerda, setAbaEsquerda] = useState("etapas");
   const [anexoSelecionado, setAnexoSelecionado] = useState<AnexoParaVisualizar | null>(null);
@@ -116,29 +119,53 @@ export default function PainelHistorico({
   const meuVinculo = card.membros.find((m) => m.userId === currentUserId);
   const podeExcluirAnexo = isAdminRole(currentUserRole) || Boolean(meuVinculo);
   async function enviarAnexo(file: File) {
+    const erroValidacao = validarUploadAnexo({ size: file.size, type: file.type, name: file.name });
+    if (erroValidacao) { toast.error(erroValidacao); return; }
+    const tipo = obterTipoUploadAnexo({ name: file.name, type: file.type });
+    if (!tipo) { toast.error("Tipo de arquivo não permitido"); return; }
     setEnviandoAnexo(true);
+    setProgressoAnexo(0);
+    const controle = new AbortController();
+    const limite = setTimeout(() => controle.abort(), 10 * 60_000);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("cardId", card.id);
-      const resp = await fetch("/api/bpm/upload", { method: "POST", body: formData });
-      const data = await resp.json();
-      if (!resp.ok || !data.success) { toast.error(data.error ?? "Erro ao enviar arquivo"); return; }
+      const pathname = `bpm/${card.id}/${crypto.randomUUID()}-${nomeSeguroUploadAnexo(file.name)}`;
+      const blob = await upload(pathname, file, {
+        access: "private", handleUploadUrl: "/api/bpm/upload/direct",
+        clientPayload: JSON.stringify({ cardId: card.id }), contentType: tipo,
+        multipart: true, abortSignal: controle.signal,
+        onUploadProgress: ({ percentage }) => setProgressoAnexo(Math.round(percentage)),
+      });
+      const resp = await fetch("/api/bpm/upload/finalize", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardId: card.id, pathname: blob.pathname, originalName: file.name, mimeType: file.type, size: file.size }),
+        signal: controle.signal,
+      });
+      const data: unknown = await resp.json().catch(() => null);
+      if (!resp.ok || !data || typeof data !== "object" || !("success" in data) || data.success !== true
+        || !("file" in data) || !data.file || typeof data.file !== "object"
+        || !("recibo" in data.file) || typeof data.file.recibo !== "string") {
+        const erro = data && typeof data === "object" && "error" in data && typeof data.error === "string" ? data.error : "Erro ao enviar arquivo";
+        toast.error(erro);
+        return;
+      }
       const registro = await RegistrarAnexoBpm({
         cardId: card.id, recibo: data.file.recibo,
       });
       if (registro.success) { toast.success("Anexo enviado"); onAtualizado(); }
       else toast.error(typeof registro.error === "string" ? registro.error : "Erro ao registrar anexo");
-    } catch {
-      toast.error("Erro ao enviar arquivo");
+    } catch (error) {
+      toast.error(controle.signal.aborted ? "O envio demorou mais de 10 minutos. Tente novamente." : error instanceof Error ? error.message : "Erro ao enviar arquivo");
     } finally {
+      clearTimeout(limite);
       setEnviandoAnexo(false);
+      setProgressoAnexo(0);
     }
   }
 
-  function handleFiles(files: FileList | null) {
+  async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
-    Array.from(files).forEach((file) => enviarAnexo(file));
+    for (const file of Array.from(files)) await enviarAnexo(file);
+    if (inputAnexoRef.current) inputAnexoRef.current.value = "";
   }
 
   async function handleExcluirAnexo(anexoId: string) {
@@ -242,14 +269,14 @@ export default function PainelHistorico({
           <div
             onDragOver={(e) => { e.preventDefault(); setArrastandoAnexo(true); }}
             onDragLeave={() => setArrastandoAnexo(false)}
-            onDrop={(e) => { e.preventDefault(); setArrastandoAnexo(false); handleFiles(e.dataTransfer.files); }}
+            onDrop={(e) => { e.preventDefault(); setArrastandoAnexo(false); void handleFiles(e.dataTransfer.files); }}
             onClick={() => inputAnexoRef.current?.click()}
             className="mt-2 rounded-xl border-2 border-dashed p-4 flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
             style={{ borderColor: arrastandoAnexo ? `rgba(${accent},0.5)` : "rgba(255,255,255,0.1)" }}
           >
-            <input ref={inputAnexoRef} type="file" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
+            <input ref={inputAnexoRef} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.docx,.xlsx,.xls,.csv" className="hidden" onChange={(e) => void handleFiles(e.target.files)} />
             {enviandoAnexo ? <Loader2 size={18} className="animate-spin text-slate-400" /> : <Upload size={18} className="text-slate-500" />}
-            <p className="text-xs text-slate-500">Arraste ou clique para enviar</p>
+            <p className="text-xs text-slate-500">{enviandoAnexo ? `Enviando anexo... ${progressoAnexo}%` : "Arraste ou clique para enviar"}</p>
           </div>
         </TabsContent>
 

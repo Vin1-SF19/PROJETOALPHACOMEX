@@ -6,7 +6,9 @@ const historicoMock = vi.hoisted(() => vi.fn());
 const notificarMock = vi.hoisted(() => vi.fn());
 const revalidatePathMock = vi.hoisted(() => vi.fn());
 const camposMock = vi.hoisted(() => vi.fn());
+const automacoesMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/bpm/requisitos-etapa-server", () => ({ carregarCamposAplicaveisCardEtapa: camposMock }));
+vi.mock("@/lib/bpm/automacoes/orquestrador", () => ({ executarAutomacoesCentraisDoCardAgora: automacoesMock }));
 const prismaMock = vi.hoisted(() => ({
   bpmCard: { findUnique: vi.fn() },
   bpmCardCampoValor: { upsert: vi.fn() },
@@ -15,6 +17,7 @@ const prismaMock = vi.hoisted(() => ({
     findUnique: vi.fn(),
     create: vi.fn(),
   },
+  bpmEventoDominio: { create: vi.fn() },
   $transaction: vi.fn(),
 }));
 
@@ -44,8 +47,9 @@ beforeEach(() => {
     vi.clearAllMocks();
     authMock.mockResolvedValue({ user: { id: "7", role: "COMERCIAL" } });
     acessoMock.mockResolvedValue({ isAdminGlobal: false, role: "MEMBRO" });
-    prismaMock.bpmCard.findUnique.mockResolvedValue({ pipelineId: "pipeline", etapaId: "etapa" });
+    prismaMock.bpmCard.findUnique.mockResolvedValue({ pipelineId: "clw0000000000000pipe", etapaId: "etapa" });
     prismaMock.bpmCardAnexo.findFirst.mockResolvedValue(null);
+    prismaMock.bpmEventoDominio.create.mockResolvedValue({ id: "evento" });
     prismaMock.$transaction.mockImplementation(async (callback: (tx: typeof prismaMock) => unknown) => callback(prismaMock));
   });
 
@@ -119,7 +123,7 @@ it.each([
   camposMock.mockResolvedValue(campos);
   const resultado = await RegistrarAnexoBpm({ cardId: CARD_ID, campoId: CAMPO_ID, recibo: RECIBO });
   expect(resultado.success).toBe(false);
-  expect(camposMock).toHaveBeenCalledWith(CARD_ID, "pipeline", "etapa", prismaMock, "MEMBRO");
+  expect(camposMock).toHaveBeenCalledWith(CARD_ID, "clw0000000000000pipe", "etapa", prismaMock, "MEMBRO");
   expect(prismaMock.bpmCardAnexo.create).not.toHaveBeenCalled();
   expect(prismaMock.bpmCardCampoValor.upsert).not.toHaveBeenCalled();
 });
@@ -140,4 +144,30 @@ it("mantém sucesso após o commit se a notificação de anexo falhar", async ()
   notificarMock.mockRejectedValueOnce(new Error("notificação indisponível"));
   const resultado = await RegistrarAnexoBpm({ cardId: CARD_ID, campoId: CAMPO_ID, recibo: RECIBO });
   expect(resultado).toMatchObject({ success: true, data: { id: "anexo" } });
+});
+
+it("registra contrato assinado com correlationId válido e confirma o anexo", async () => {
+  camposMock.mockResolvedValue([{
+    id: CAMPO_ID,
+    chave: "alpha.contrato.assinado.anexo",
+    nome: "Contrato assinado/anexo",
+    tipo: "arquivo",
+    editavel: true,
+  }]);
+  prismaMock.bpmCardAnexo.create.mockResolvedValue({ id: "anexo-assinado", cardId: CARD_ID, campoId: CAMPO_ID });
+
+  const resultado = await RegistrarAnexoBpm({ cardId: CARD_ID, campoId: CAMPO_ID, recibo: RECIBO });
+
+  expect(resultado).toMatchObject({ success: true, data: { id: "anexo-assinado" } });
+  expect(prismaMock.bpmEventoDominio.create).toHaveBeenCalledWith(expect.objectContaining({
+    data: expect.objectContaining({
+      tipo: "CARD_ATUALIZADO",
+      cardId: CARD_ID,
+      correlationId: expect.any(String),
+      causationId: "anexo-assinado",
+      idempotencyKey: "contrato-assinado-anexo:anexo-assinado",
+    }),
+  }));
+  expect(prismaMock.bpmEventoDominio.create.mock.calls[0][0].data.correlationId).not.toBe("");
+  expect(automacoesMock).toHaveBeenCalledWith(CARD_ID);
 });

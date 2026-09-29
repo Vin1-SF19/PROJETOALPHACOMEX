@@ -821,3 +821,44 @@ Diagnóstico confirmado pelo log da requisição em produção: `Vercel Blob: Ca
 ### Validação
 
 Scout mapeou o fluxo; Echo corrigiu armazenamento, limite e idempotência; Nova corrigiu interação e validade do recibo; Sage aprovou 47 testes focados dos casos adicionais; Probe confirmou o caminho até visualização/download; Anubis não encontrou falha crítica no diff; Lens detectou a corrida do registro e a validade do recibo, ambas corrigidas, e aprovou a revisão final. Forge reexecutou os gates após todas as correções: `lint` 0 erros/1.191 avisos, `typecheck` aprovado, `npm test` 558 arquivos/4.091 aprovados (4 ignorados, 1 pendente), `build` aprovado e `git diff --check` aprovado. Não houve mutação de banco nem upload real nesta validação.
+
+## Correção — registro do contrato assinado e anexos até 90 MiB (2026-09-29)
+
+Relato: o PDF selecionado permanecia pendente com “Erro ao registrar anexo” na etapa Contrato assinado/anexo. O usuário solicitou que o nome do arquivo escolhido substitua o seletor, com X para removê-lo, e limite de até 90 MiB. O log de produção identificou `ZodError` em `correlationId` ao publicar `CARD_ATUALIZADO` no registro do contrato assinado; a transação era desfeita. O fluxo anterior passava o arquivo pela Function e, portanto, não comportava 90 MiB.
+
+### Critérios de aceitação
+
+- [x] Registro do anexo de contrato assinado publica evento válido e confirma a transação em teste de regressão.
+- [x] Arquivos permitidos até 90 MiB seguem por upload direto para Blob privado, com autorização por card/usuário, validação do conteúdo e recibo assinado; a rota legada pela Function permanece limitada ao tamanho que ela suporta.
+- [x] Após selecionar, o nome substitui o seletor e o X remove a seleção e a pendência de salvamento sem excluir um anexo já vinculado.
+- [x] Falha de envio ou registro preserva a seleção e permite tentar novamente; o indicador de envio sempre termina.
+- [x] Testes focados e gates `lint`, `typecheck`, `test` e `build` passam.
+- [ ] Smoke autenticado com PDF e imagem reais, inclusive download após recarregar.
+
+### File List
+
+- `src/actions/bpm/Anexos.ts`
+- `src/app/api/bpm/upload/route.ts`
+- `src/app/api/bpm/upload/direct/route.ts`
+- `src/app/api/bpm/upload/finalize/route.ts`
+- `src/lib/bpm/anexos-storage.ts`
+- `src/lib/bpm/upload-conteudo.ts`
+- `src/lib/validations/bpm.ts`
+- `src/app/PainelAlpha/AlphaCRM/CampoBpmInput.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx`
+- `tests/bpm/anexos-idempotencia.test.ts`
+- `tests/bpm/anexo-limite-90mb.test.ts`
+- `tests/bpm/anexo-selecao-manual-react.test.ts`
+- `tests/bpm/arquivo-persistencia-react.test.ts`
+- `tests/bpm/upload-direto-privado.test.ts`
+- `tests/bpm/upload-validacao.test.ts`
+- `docs/stories/story-rm-2026-b88712-autosave-card-crm.md`
+
+### Diagnóstico e integração
+
+O log de produção mostrou que `RegistrarAnexoBpm` publicava o evento de contrato assinado sem `correlationId`. O teste com schema real reproduziu a falha e passou após a correção. O navegador agora envia o binário direto ao Blob privado; o callback autenticado marca o upload concluído e a finalização confere card, usuário, tamanho, MIME e conteúdo antes de assinar o recibo. O backend espera até 12 s pelo callback e permite repetir a finalização se ele atrasar. A aba geral de anexos também foi ligada ao envio direto.
+
+Probe encontrou que uma validação com Zod removia propriedades do callback e invalidava a assinatura verificada pelo SDK. A rota passou a validar sem transformar o corpo repassado ao SDK; um teste cobre a preservação integral desse payload. Anubis pediu que o histórico só fosse criado após o callback assinado e que o custo de leitura de ZIP fosse limitado; ambos os ajustes foram incorporados. Nenhuma migration ou mutação em massa foi executada.
+
+Forge aprovou os gates novamente após a revisão Lens: `npm run typecheck`, `npm run lint` (0 erros; 1.191 avisos existentes), `npm test` (561 arquivos, 4.114 testes aprovados, 4 ignorados e 1 pendente), `npm run build` e `git diff --check`. A troca de arquivo por URL agora limpa a seleção controlada, com teste de interface. O parser DOCX/XLSX confere cabeçalhos locais, offsets, nomes e limites das entradas ZIP, com teste de arquivo adulterado. Typecheck, ESLint focado e testes afetados foram repetidos após o último ajuste. Ainda falta teste autenticado com arquivo real em produção.

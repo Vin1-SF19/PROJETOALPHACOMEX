@@ -538,9 +538,8 @@ export const criarTarefaPresetSchema = z.object({
   ).min(1),
 });
 
-// O multipart passa pela Vercel Function (limite total de 4,5 MB).
-// A margem abaixo cobre os demais campos e cabeçalhos do formulário.
-const BPM_ANEXO_MAX_BYTES = 4 * 1024 * 1024;
+// Upload direto ao Blob privado; o binário não passa pela Function.
+const BPM_ANEXO_MAX_BYTES = 90 * 1024 * 1024;
 const BPM_ANEXO_ALLOWED_MIME = [
   "application/pdf",
   "image/png",
@@ -564,6 +563,11 @@ const BPM_ANEXO_MIME_POR_EXTENSAO: Record<string, (typeof BPM_ANEXO_ALLOWED_MIME
   csv: "text/csv",
 };
 
+/** Mantém a extensão dentro do limite do pathname usado pelo upload direto. */
+export function nomeSeguroUploadAnexo(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-200);
+}
+
 /** Só infere MIME pela extensão se o navegador omitiu o tipo ou enviou octet-stream. */
 export function obterTipoUploadAnexo(file: { name: string; type: string }): string | null {
   const extensao = /\.([a-z0-9]+)$/i.exec(file.name)?.[1]?.toLowerCase();
@@ -582,7 +586,7 @@ export const registrarAnexoSchema = z.object({
 });
 
 export function validarUploadAnexo(file: { size: number; type: string; name?: string }): string | null {
-  if (file.size > BPM_ANEXO_MAX_BYTES) return "Arquivo excede 4 MiB. Reduza o arquivo para enviar o anexo.";
+  if (file.size > BPM_ANEXO_MAX_BYTES) return "Arquivo excede 90 MiB. Reduza o arquivo para enviar o anexo.";
   const tipo = file.name === undefined ? file.type : obterTipoUploadAnexo({ name: file.name, type: file.type });
   if (!tipo || !BPM_ANEXO_ALLOWED_MIME.includes(tipo as (typeof BPM_ANEXO_ALLOWED_MIME)[number])) {
     return "Tipo de arquivo não permitido";
