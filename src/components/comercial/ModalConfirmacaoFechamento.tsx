@@ -6,6 +6,7 @@ import {
     X, CheckCircle2, FileCheck2, Upload, Loader2, AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { dataComercialHoje, parseDataComercial } from "@/lib/comercial/data-comercial";
 import { confirmarFechamento } from "@/actions/ContratoComercial";
 
 interface Contrato {
@@ -26,7 +27,7 @@ interface Props {
 export default function ModalConfirmacaoFechamento({ contrato, onFechar, onConfirmado }: Props) {
     const [pagamentoConfirmado, setPagamentoConfirmado] = useState(false);
     const [dataPagamento, setDataPagamento] = useState(
-        new Date().toISOString().split("T")[0],
+        () => dataComercialHoje(),
     );
     const [contratoAssinado, setContratoAssinado] = useState(false);
     const [contratoUrl, setContratoUrl] = useState("");
@@ -34,7 +35,7 @@ export default function ModalConfirmacaoFechamento({ contrato, onFechar, onConfi
     const [salvando, setSalvando] = useState(false);
     const fileRef = useRef<HTMLInputElement>(null);
 
-    const podeConfirmar = pagamentoConfirmado && (!contratoAssinado || contratoUrl !== "");
+    const podeConfirmar = pagamentoConfirmado && parseDataComercial(dataPagamento) !== null && (!contratoAssinado || contratoUrl !== "");
 
     const handleUpload = async (file: File) => {
         if (!file) return;

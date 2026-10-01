@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { parseDataComercial, periodoComercialMensal } from "@/lib/comercial/data-comercial";
 import db from "@/lib/prisma";
 import { auth } from "../../auth";
 import { isAdminRole } from "@/lib/roles";
@@ -148,7 +149,7 @@ async function resolverClienteDoContrato(
 const ConfirmarFechamentoSchema = z.object({
     id: z.string().cuid(),
     pagamentoConfirmado: z.boolean(),
-    pagamentoConfirmadoEm: z.string().optional(),
+    pagamentoConfirmadoEm: z.string().refine((value) => parseDataComercial(value) !== null, "Selecione uma data de fechamento válida"),
     contratoAssinado: z.boolean(),
     contratoUrl: z.string().url().optional().or(z.literal("")),
 });
@@ -347,9 +348,7 @@ export async function confirmarFechamento(raw: unknown) {
                 // Só Revisão RADAR 150K/ILIMITADO contam como venda; 50K (e outros) não.
                 contaComVenda: servicoContaComoVenda(contrato.servico),
                 pagamentoConfirmado: d.pagamentoConfirmado,
-                pagamentoConfirmadoEm: d.pagamentoConfirmadoEm
-                    ? new Date(d.pagamentoConfirmadoEm)
-                    : new Date(),
+                pagamentoConfirmadoEm: parseDataComercial(d.pagamentoConfirmadoEm)!,
                 contratoAssinado: d.contratoAssinado,
                 contratoUrl: d.contratoUrl || null,
             },
@@ -367,9 +366,7 @@ export async function confirmarFechamento(raw: unknown) {
             const resultadoSync = await criarRegistroClienteAPartirDeContrato({
                 clienteId: atualizado.clienteId,
                 servico: atualizado.servico,
-                dataContratacao: atualizado.pagamentoConfirmadoEm
-                    ? atualizado.pagamentoConfirmadoEm.toISOString()
-                    : new Date().toISOString(),
+                dataContratacao: parseDataComercial(d.pagamentoConfirmadoEm)!.toISOString(),
             });
 
             // Vínculo de indicação de parceiro: só faz sentido na PRIMEIRA criação real
@@ -465,8 +462,7 @@ export async function getContratos(options: GetContratosOptions) {
         whereUsuarioId = userId;
     }
 
-    const inicioMes = new Date(ano, mes - 1, 1);
-    const fimMes = new Date(ano, mes, 1);
+
     const usuarioFilter = whereUsuarioId !== undefined ? { usuarioId: whereUsuarioId } : {};
 
     try {
@@ -486,7 +482,7 @@ export async function getContratos(options: GetContratosOptions) {
                 where: {
                     status: "FECHADO",
                     arquivado: false,
-                    pagamentoConfirmadoEm: { gte: inicioMes, lt: fimMes },
+                    pagamentoConfirmadoEm: periodoComercialMensal(ano, mes),
                     ...usuarioFilter,
                 },
                 include: {

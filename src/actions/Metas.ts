@@ -1,6 +1,7 @@
 "use server";
 
 import db from "@/lib/prisma";
+import { periodoComercialMensal } from "@/lib/comercial/data-comercial";
 import { auth } from "../../auth";
 import { podeGerenciarMetas } from "@/lib/metas-permissoes";
 
@@ -71,10 +72,7 @@ export async function getDadosMetas(
                 where: {
                     status: "FECHADO",
                     contaComVenda: true,
-                    pagamentoConfirmadoEm: {
-                        gte: new Date(ano, mes - 1, 1),
-                        lt: new Date(ano, mes, 1),
-                    },
+                    pagamentoConfirmadoEm: periodoComercialMensal(ano, mes),
                 },
             }),
             db.metaUsuario.findMany({ where: { mes, ano } }),

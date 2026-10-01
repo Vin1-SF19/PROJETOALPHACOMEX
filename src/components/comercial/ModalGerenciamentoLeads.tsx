@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { formatarDataComercial } from "@/lib/comercial/data-comercial";
 import { fmtDate } from "@/lib/format-date";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -1561,7 +1562,7 @@ function TabelaFechados({
                                 <tr key={c.id} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
                                     {showCloser && <td className="px-3 py-3 text-[10px] font-bold text-slate-300 whitespace-nowrap">{c.closerNome}</td>}
                                     <td className="px-3 py-3 text-[10px] text-slate-500 whitespace-nowrap">
-                                        {c.pagamentoConfirmadoEm ? fmtDate(c.pagamentoConfirmadoEm) : "—"}
+                                        {c.pagamentoConfirmadoEm ? formatarDataComercial(c.pagamentoConfirmadoEm) : "—"}
                                     </td>
                                     <td className="px-3 py-3 text-[10px] font-mono text-slate-400 whitespace-nowrap">{formatCNPJ(c.cnpj)}</td>
                                     <td className="px-3 py-3 max-w-[200px]">
@@ -1656,7 +1657,7 @@ function TabelaArquivados({
                                 <tr key={c.id} className="border-b border-white/[0.03]">
                                     {showCloser && <td className="px-3 py-3 text-[10px] text-slate-500">{c.closerNome}</td>}
                                     <td className="px-3 py-3 text-[10px] text-slate-600 whitespace-nowrap">
-                                        {c.pagamentoConfirmadoEm ? fmtDate(c.pagamentoConfirmadoEm) : "—"}
+                                        {c.pagamentoConfirmadoEm ? formatarDataComercial(c.pagamentoConfirmadoEm) : "—"}
                                     </td>
                                     <td className="px-3 py-3 text-[10px] text-slate-500 max-w-[220px] truncate">{c.razaoSocial}</td>
                                     <td className="px-3 py-3 text-[10px] text-slate-500 whitespace-nowrap">{formatBRL(c.valorContrato)}</td>
