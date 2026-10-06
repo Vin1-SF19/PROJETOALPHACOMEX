@@ -1,0 +1,110 @@
+
+> alpha_sistema@0.1.0 test
+> vitest run --coverage --coverage.reportsDirectory=tmp/rm-3eae77-nova-session/coverage
+
+
+ RUN  v4.1.10 /home/ialpha/projetos/alpha-comex/painel-alpha
+      Coverage enabled with v8
+
+DOMException [AbortError]: The operation was aborted.
+    at Fetch.onAsyncTaskManagerAbort (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/fetch/Fetch.js:546:23)
+    at Object.<anonymous> (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/fetch/Fetch.js:416:101)
+    at AsyncTaskManager.abortAll (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/async-task-manager/AsyncTaskManager.js:292:30)
+    at AsyncTaskManager.destroy (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/async-task-manager/AsyncTaskManager.js:64:21)
+    at file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/browser/utilities/BrowserFrameFactory.js:43:22
+    at new Promise (<anonymous>)
+    at BrowserFrameFactory.destroyFrame (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/browser/utilities/BrowserFrameFactory.js:30:16)
+    at HTMLIFrameElement.#unloadPage (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/html-iframe-element/HTMLIFrameElement.js:363:33)
+    at HTMLIFrameElement.[disconnectedFromDocument] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/html-iframe-element/HTMLIFrameElement.js:238:25)
+    at HTMLIFrameElement.[connectedToNode] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:804:58)
+DOMException [NetworkError]: Failed to execute "fetch()" on "Window" with URL "http://localhost:3000/api/bpm/anexos/anexo-2/preview?formato=pdf": The operation was aborted.
+    at Fetch.onError (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/fetch/Fetch.js:540:21)
+    at ClientRequest.emit (node:events:508:28)
+    at emitErrorEvent (node:_http_client:107:11)
+    at Socket.socketErrorListener (node:_http_client:574:5)
+    at Socket.emit (node:events:508:28)
+    at emitErrorNT (node:internal/streams/destroy:170:8)
+    at emitErrorCloseNT (node:internal/streams/destroy:129:3)
+    at processTicksAndRejections (node:internal/process/task_queues:90:21)
+ ❯ tests/bibble/voice-proxy.test.ts (16 tests | 1 failed) 41ms
+     × keeps secrets server-side and never calls the old TTS or Web Speech 12ms
+DOMException [NotSupportedError]: Failed to load iframe page "https://builder-production-527f.up.railway.app/". Iframe page loading is disabled.
+    at HTMLIFrameElement.#loadPage (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/html-iframe-element/HTMLIFrameElement.js:333:27)
+    at HTMLIFrameElement.[connectedToDocument] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/html-iframe-element/HTMLIFrameElement.js:230:23)
+    at HTMLIFrameElement.[connectedToNode] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:801:53)
+    at HTMLDivElement.[connectedToNode] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:793:58)
+    at HTMLElement.[connectedToNode] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:793:58)
+    at HTMLDivElement.[appendChild] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:421:45)
+    at HTMLDivElement.[appendChild] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/element/Element.js:1102:62)
+    at HTMLDivElement.appendChild (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:314:48)
+    at insertOrAppendPlacementNodeIntoContainer (/home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/react-dom/cjs/react-dom-client.development.js:13662:22)
+    at insertOrAppendPlacementNodeIntoContainer (/home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/react-dom/cjs/react-dom-client.development.js:13676:11)
+DOMException [NotSupportedError]: Failed to load iframe page "https://builder-production-527f.up.railway.app/". Iframe page loading is disabled.
+    at HTMLIFrameElement.#loadPage (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/html-iframe-element/HTMLIFrameElement.js:333:27)
+    at HTMLIFrameElement.[connectedToDocument] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/html-iframe-element/HTMLIFrameElement.js:230:23)
+    at HTMLIFrameElement.[connectedToNode] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:801:53)
+    at HTMLDivElement.[connectedToNode] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:793:58)
+    at HTMLElement.[connectedToNode] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:793:58)
+    at HTMLDivElement.[appendChild] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:421:45)
+    at HTMLDivElement.[appendChild] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/element/Element.js:1102:62)
+    at HTMLDivElement.appendChild (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:314:48)
+    at insertOrAppendPlacementNodeIntoContainer (/home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/react-dom/cjs/react-dom-client.development.js:13662:22)
+    at insertOrAppendPlacementNodeIntoContainer (/home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/react-dom/cjs/react-dom-client.development.js:13676:11)
+DOMException [NotSupportedError]: Failed to load iframe page "https://builder-production-527f.up.railway.app/". Iframe page loading is disabled.
+    at HTMLIFrameElement.#loadPage (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/html-iframe-element/HTMLIFrameElement.js:333:27)
+    at HTMLIFrameElement.[connectedToDocument] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/html-iframe-element/HTMLIFrameElement.js:230:23)
+    at HTMLIFrameElement.[connectedToNode] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:801:53)
+    at HTMLDivElement.[connectedToNode] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:793:58)
+    at HTMLElement.[connectedToNode] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:793:58)
+    at HTMLDivElement.[appendChild] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:421:45)
+    at HTMLDivElement.[appendChild] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/element/Element.js:1102:62)
+    at HTMLDivElement.appendChild (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:314:48)
+    at insertOrAppendPlacementNodeIntoContainer (/home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/react-dom/cjs/react-dom-client.development.js:13662:22)
+    at insertOrAppendPlacementNodeIntoContainer (/home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/react-dom/cjs/react-dom-client.development.js:13676:11)
+DOMException [NotSupportedError]: Failed to load iframe page "https://builder-production-527f.up.railway.app/". Iframe page loading is disabled.
+    at HTMLIFrameElement.#loadPage (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/html-iframe-element/HTMLIFrameElement.js:333:27)
+    at HTMLIFrameElement.[connectedToDocument] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/html-iframe-element/HTMLIFrameElement.js:230:23)
+    at HTMLIFrameElement.[connectedToNode] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:801:53)
+    at HTMLDivElement.[connectedToNode] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:793:58)
+    at HTMLElement.[connectedToNode] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:793:58)
+    at HTMLDivElement.[appendChild] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:421:45)
+    at HTMLDivElement.[appendChild] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/element/Element.js:1102:62)
+    at HTMLDivElement.appendChild (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:314:48)
+    at insertOrAppendPlacementNodeIntoContainer (/home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/react-dom/cjs/react-dom-client.development.js:13662:22)
+    at insertOrAppendPlacementNodeIntoContainer (/home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/react-dom/cjs/react-dom-client.development.js:13676:11)
+DOMException [NotSupportedError]: Failed to load iframe page "https://builder-production-527f.up.railway.app/". Iframe page loading is disabled.
+    at HTMLIFrameElement.#loadPage (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/html-iframe-element/HTMLIFrameElement.js:333:27)
+    at HTMLIFrameElement.[connectedToDocument] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/html-iframe-element/HTMLIFrameElement.js:230:23)
+    at HTMLIFrameElement.[connectedToNode] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:801:53)
+    at HTMLDivElement.[connectedToNode] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:793:58)
+    at HTMLElement.[connectedToNode] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:793:58)
+    at HTMLDivElement.[appendChild] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:421:45)
+    at HTMLDivElement.[appendChild] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/element/Element.js:1102:62)
+    at HTMLDivElement.appendChild (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/happy-dom/lib/nodes/node/Node.js:314:48)
+    at insertOrAppendPlacementNodeIntoContainer (/home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/react-dom/cjs/react-dom-client.development.js:13662:22)
+    at insertOrAppendPlacementNodeIntoContainer (/home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/react-dom/cjs/react-dom-client.development.js:13676:11)
+(node:4161) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4398) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/bibble/voice-proxy.test.ts > Bibble voice proxy boundaries > keeps secrets server-side and never calls the old TTS or Web Speech
+Error: EACCES: permission denied, open '.env.example'
+ ❯ tests/bibble/voice-proxy.test.ts:167:50
+    165|
+    166|   it("keeps secrets server-side and never calls the old TTS or Web Spe…
+    167|     const [route, button, layout, status, env] = await Promise.all([
+       |                                                  ^
+    168|       readFile("src/app/api/bibble/voice/route.ts", "utf8"),
+    169|       readFile("src/components/BibbleChatHome/BotaoFalarMensagem.tsx",…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 564 passed (565)
+      Tests  1 failed | 4139 passed | 4 skipped | 1 todo (4145)
+   Start at  17:17:52
+   Duration  29.44s (transform 49.00s, setup 0ms, import 117.91s, tests 55.32s, environment 3.91s)
+

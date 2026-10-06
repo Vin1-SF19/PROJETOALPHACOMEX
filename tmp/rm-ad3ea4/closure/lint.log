@@ -1,0 +1,1885 @@
+
+> alpha_sistema@0.1.0 lint
+> eslint
+
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.agents/skills/design-system/scripts/generate-tokens.cjs
+  148:20  warning  'value' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/cli/commands/config/index.js
+  450:11  warning  'resolveConfig' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/cli/commands/manifest/regenerate.js
+  12:7  warning  'path' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/cli/commands/manifest/validate.js
+  12:7  warning  'path' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/cli/commands/mcp/link.js
+  17:3  warning  'getProjectMcpPath' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  25:3  warning  'getGlobalMcpDir' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  27:3  warning  'isWindows' is assigned a value but never used          @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/cli/commands/mcp/setup.js
+  21:3  warning  'getGlobalMcpDir' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/cli/commands/mcp/status.js
+  23:3  warning  'getGlobalMcpDir' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/cli/commands/migrate/analyze.js
+  153:20  warning  '_verbose' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/cli/commands/migrate/execute.js
+  210:17  warning  '_moduleName' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/cli/commands/migrate/index.js
+  315:33  warning  '_options' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/cli/commands/migrate/update-imports.js
+   13:25  warning  'categorizeFile' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   96:78  warning  'transformMap' is defined but never used             @typescript-eslint/no-unused-vars
+   99:9   warning  'resolvedPath' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  118:9   warning  'upCount' is assigned a value but never used         @typescript-eslint/no-unused-vars
+  135:17  warning  'newParts' is assigned a value but never used        @typescript-eslint/no-unused-vars
+  171:27  warning  'verbose' is assigned a value but never used         @typescript-eslint/no-unused-vars
+  187:13  warning  'relativePath' is assigned a value but never used    @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/cli/commands/pro/index.js
+   98:12  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+  235:26  warning  'item' is defined but never used   @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/cli/commands/workers/search-semantic.js
+  138:14  warning  'error' is defined but never used        @typescript-eslint/no-unused-vars
+  205:15  warning  'id' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/cli/commands/workers/search.js
+  13:7  warning  'path' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/cli/index.js
+  33:10  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/cli/utils/output-formatter-cli.js
+   25:29  warning  'query' is assigned a value but never used         @typescript-eslint/no-unused-vars
+   25:36  warning  'duration' is assigned a value but never used      @typescript-eslint/no-unused-vars
+   25:46  warning  'searchMethod' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   25:60  warning  'verbose' is assigned a value but never used       @typescript-eslint/no-unused-vars
+   91:30  warning  'options' is assigned a value but never used       @typescript-eslint/no-unused-vars
+  112:30  warning  'options' is assigned a value but never used       @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/code-intel/code-intel-client.js
+  100:16  warning  '_err' is defined but never used    @typescript-eslint/no-unused-vars
+  162:14  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/code-intel/hook-runtime.js
+  84:12  warning  '_err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/code-intel/providers/provider-interface.js
+   32:24  warning  '_symbol' is defined but never used   @typescript-eslint/no-unused-vars
+   32:33  warning  '_options' is defined but never used  @typescript-eslint/no-unused-vars
+   42:24  warning  '_symbol' is defined but never used   @typescript-eslint/no-unused-vars
+   42:33  warning  '_options' is defined but never used  @typescript-eslint/no-unused-vars
+   52:21  warning  '_symbol' is defined but never used   @typescript-eslint/no-unused-vars
+   52:30  warning  '_options' is defined but never used  @typescript-eslint/no-unused-vars
+   62:21  warning  '_symbol' is defined but never used   @typescript-eslint/no-unused-vars
+   62:30  warning  '_options' is defined but never used  @typescript-eslint/no-unused-vars
+   72:29  warning  '_path' is defined but never used     @typescript-eslint/no-unused-vars
+   72:36  warning  '_options' is defined but never used  @typescript-eslint/no-unused-vars
+   82:27  warning  '_path' is defined but never used     @typescript-eslint/no-unused-vars
+   82:34  warning  '_options' is defined but never used  @typescript-eslint/no-unused-vars
+   92:25  warning  '_path' is defined but never used     @typescript-eslint/no-unused-vars
+   92:32  warning  '_options' is defined but never used  @typescript-eslint/no-unused-vars
+  101:25  warning  '_options' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/code-intel/providers/registry-provider.js
+   86:16  warning  '_e' is defined but never used                    @typescript-eslint/no-unused-vars
+   98:14  warning  '_error' is defined but never used                @typescript-eslint/no-unused-vars
+  234:23  warning  '_options' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  317:32  warning  '_options' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  325:17  warning  '_category' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  328:19  warning  '_entityName' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  442:37  warning  '_options' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  479:25  warning  '_options' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  486:17  warning  '_path' is assigned a value but never used        @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/code-intel/registry-syncer.js
+  217:14  warning  '_error' is defined but never used              @typescript-eslint/no-unused-vars
+  250:14  warning  '_error' is defined but never used              @typescript-eslint/no-unused-vars
+  286:14  warning  '_error' is defined but never used              @typescript-eslint/no-unused-vars
+  300:17  warning  '_category' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/config/config-resolver.js
+  209:12  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/doctor/checks/ide-sync.js
+  79:12  warning  '_err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/elicitation/elicitation-engine.js
+  22:10  warning  '_e' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/elicitation/session-manager.js
+  141:18  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/elicitation/task-elicitation.js
+  145:20  warning  '_answers' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/execution/build-orchestrator.js
+   30:28  warning  '_BuildStateManager' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  678:16  warning  '_e' is defined but never used                           @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/execution/build-state-manager.js
+  1261:8  warning  '_message' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/execution/context-injector.js
+   88:22  warning  '_baseContext' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  209:14  warning  '_error' is defined but never used                 @typescript-eslint/no-unused-vars
+  249:14  warning  '_error' is defined but never used                 @typescript-eslint/no-unused-vars
+  331:14  warning  '_error' is defined but never used                 @typescript-eslint/no-unused-vars
+  346:14  warning  '_error' is defined but never used                 @typescript-eslint/no-unused-vars
+  365:14  warning  '_error' is defined but never used                 @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/execution/parallel-monitor.js
+  316:61  warning  '_total' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  385:16  warning  '_error' is defined but never used           @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/execution/semantic-merge-engine.js
+  243:33  warning  '_language' is defined but never used         @typescript-eslint/no-unused-vars
+  673:17  warning  '_taskId' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/execution/subagent-dispatcher.js
+   13:7   warning  '_path' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  598:52  warning  '_task' is defined but never used           @typescript-eslint/no-unused-vars
+  885:19  warning  '_' is defined but never used               @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/execution/wave-executor.js
+   10:7   warning  '_path' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  288:31  warning  '_context' is defined but never used        @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/external-executors/delegate-cli.js
+  536:54  warning  '_errorOutput' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/graph-dashboard/cli.js
+  208:12  warning  '_err' is defined but never used   @typescript-eslint/no-unused-vars
+  235:28  warning  '_args' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/graph-dashboard/data-sources/code-intel-source.js
+   76:14  warning  '_err' is defined but never used  @typescript-eslint/no-unused-vars
+  110:14  warning  '_err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/graph-dashboard/data-sources/metrics-source.js
+  51:14  warning  '_err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/graph-dashboard/data-sources/registry-source.js
+  35:14  warning  '_err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/graph-dashboard/renderers/stats-renderer.js
+  148:36  warning  '_isTTY' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/health-check/base-check.js
+  93:17  warning  '_context' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/health-check/checks/local/environment-vars.js
+  57:17  warning  '_context' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/health-check/checks/local/git-install.js
+  45:17  warning  '_context' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/health-check/checks/local/memory.js
+  50:17  warning  '_context' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/health-check/checks/local/network.js
+  49:17  warning  '_context' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/health-check/checks/local/npm-install.js
+  45:17  warning  '_context' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/health-check/checks/local/shell-environment.js
+  41:17  warning  '_context' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/health-check/checks/project/aiox-directory.js
+  126:19  warning  '_result' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/health-check/checks/project/dependencies.js
+  136:19  warning  '_result' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/health-check/checks/project/task-definitions.js
+  145:35  warning  '_filePath' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/health-check/checks/repository/conflicts.js
+  17:7  warning  '_CONFLICT_MARKERS' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/health-check/checks/repository/gitignore.js
+  161:19  warning  '_result' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/health-check/checks/repository/large-files.js
+  72:19  warning  '_sizeOutput' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/health-check/checks/repository/lockfile-integrity.js
+  13:7   warning  '_crypto' is assigned a value but never used           @typescript-eslint/no-unused-vars
+  85:13  warning  '_allLockfileDeps' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  88:13  warning  '_versionMismatch' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  90:24  warning  '_version' is assigned a value but never used          @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/health-check/checks/services/api-endpoints.js
+  48:17  warning  '_context' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/health-check/checks/services/github-cli.js
+  40:17  warning  '_context' is defined but never used  @typescript-eslint/no-unused-vars
+  80:14  warning  '_error' is defined but never used    @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/health-check/engine.js
+  123:11  warning  '_checksByDomain' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  126:11  warning  '_priorityOrder' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  153:67  warning  '_domain' is defined but never used                   @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/health-check/healers/backup-manager.js
+  177:14  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  209:20  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  216:14  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  239:14  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/health-check/healers/index.js
+  190:18  warning  '_rollbackError' is defined but never used   @typescript-eslint/no-unused-vars
+  249:11  warning  '_guide' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/health-check/reporters/console.js
+  72:59  warning  '_config' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/health-check/reporters/markdown.js
+  280:18  warning  '_config' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/ids/framework-governor.js
+  34:3   warning  '_RegistryHealer' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  35:10  warning  '_err' is defined but never used                      @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/ids/index.js
+  61:10  warning  '_err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/ids/registry-healer.js
+  481:25  warning  '_issue' is defined but never used  @typescript-eslint/no-unused-vars
+  513:32  warning  '_issue' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/ids/registry-updater.js
+  429:17  warning  '_category' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  448:19  warning  '_category' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/ids/verification-gate.js
+  220:19  warning  '_context' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/manifest/manifest-generator.js
+   42:14  warning  '_e' is defined but never used  @typescript-eslint/no-unused-vars
+   53:14  warning  '_e' is defined but never used  @typescript-eslint/no-unused-vars
+  101:12  warning  '_e' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/manifest/manifest-validator.js
+  323:14  warning  '_error' is defined but never used                @typescript-eslint/no-unused-vars
+  395:11  warning  '_totalValid' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/mcp/config-migrator.js
+  58:16  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  80:14  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/mcp/symlink-manager.js
+   47:12  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+   72:12  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+   85:12  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  125:12  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/orchestration/bob-orchestrator.js
+  787:25  warning  '_context' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/orchestration/brownfield-handler.js
+  710:29  warning  'context' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/orchestration/checklist-runner.js
+  114:16  warning  '_e' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/orchestration/executors/epic-3-executor.js
+  163:30  warning  '_context' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/orchestration/executors/epic-4-executor.js
+   75:63  warning  '_techStack' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  217:26  warning  '_storyId' is defined but never used             @typescript-eslint/no-unused-vars
+  217:36  warning  '_tracker' is defined but never used             @typescript-eslint/no-unused-vars
+  217:46  warning  '_context' is defined but never used             @typescript-eslint/no-unused-vars
+  253:19  warning  '_context' is defined but never used             @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/orchestration/executors/epic-5-executor.js
+  214:35  warning  '_context' is defined but never used  @typescript-eslint/no-unused-vars
+  256:27  warning  '_context' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/orchestration/executors/epic-6-executor.js
+  128:44  warning  '_techStack' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  175:29  warning  '_context' is defined but never used             @typescript-eslint/no-unused-vars
+  199:29  warning  '_context' is defined but never used             @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/orchestration/executors/epic-executor.js
+  60:17  warning  '_context' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/orchestration/gate-evaluator.js
+  257:52  warning  '_gateConfig' is defined but never used  @typescript-eslint/no-unused-vars
+  350:31  warning  '_toEpic' is defined but never used      @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/orchestration/greenfield-handler.js
+  769:29  warning  'context' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/orchestration/master-orchestrator.js
+    34:44  warning  '_RecoveryStrategy' is assigned a value but never used  @typescript-eslint/no-unused-vars
+    40:41  warning  '_SUPPORTED_AGENTS' is assigned a value but never used  @typescript-eslint/no-unused-vars
+    43:49  warning  '_NotificationType' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   791:17  warning  '_' is defined but never used                           @typescript-eslint/no-unused-vars
+   792:19  warning  '_' is defined but never used                           @typescript-eslint/no-unused-vars
+  1304:17  warning  '_' is defined but never used                           @typescript-eslint/no-unused-vars
+  1305:19  warning  '_' is defined but never used                           @typescript-eslint/no-unused-vars
+  1314:17  warning  '_' is defined but never used                           @typescript-eslint/no-unused-vars
+  1315:19  warning  '_' is defined but never used                           @typescript-eslint/no-unused-vars
+  1576:33  warning  '_context' is defined but never used                    @typescript-eslint/no-unused-vars
+  1611:17  warning  '_context' is defined but never used                    @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/orchestration/recovery-handler.js
+  245:56  warning  '_context' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/orchestration/subagent-prompt-builder.js
+  158:16  warning  '_e' is defined but never used  @typescript-eslint/no-unused-vars
+  214:16  warning  '_e' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/orchestration/workflow-executor.js
+    35:7   warning  'STATE_SAVE_INTERVAL_MS' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   660:40  warning  'agent' is defined but never used                            @typescript-eslint/no-unused-vars
+  1089:32  warning  'phase' is defined but never used                            @typescript-eslint/no-unused-vars
+  1089:39  warning  'agent' is defined but never used                            @typescript-eslint/no-unused-vars
+  1089:46  warning  'storyPath' is defined but never used                        @typescript-eslint/no-unused-vars
+  1155:28  warning  'result' is defined but never used                           @typescript-eslint/no-unused-vars
+  1166:32  warning  'result' is defined but never used                           @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/orchestration/workflow-orchestrator.js
+  227:36  warning  '_result' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/permissions/permission-mode.js
+  93:14  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/quality-gates/base-layer.js
+  40:17  warning  '_context' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/quality-gates/focus-area-recommender.js
+   49:43  warning  '_layer1Result' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  227:41  warning  '_layer2Result' is defined but never used           @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/quality-gates/human-review-orchestrator.js
+  329:24  warning  '_prContext' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/quality-gates/layer2-pr-automation.js
+  308:34  warning  '_context' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/quality-gates/layer3-human-review.js
+  47:39  warning  '_storyId' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/quality-gates/quality-gate-manager.js
+   60:14  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  394:34  warning  '_index' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/registry/build-registry.js
+  145:12  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  174:12  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/registry/validate-registry.js
+  309:9  warning  '_fieldIssues' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/session/context-detector.js
+  148:17  warning  '_workflowName' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/session/context-loader.js
+  353:33  warning  '_result' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/synapse/diagnostics/collectors/manifest-collector.js
+  35:15  warning  '_domainName' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  75:12  warning  '_' is defined but never used                     @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/synapse/diagnostics/collectors/session-collector.js
+  97:12  warning  '_' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/synapse/domain/domain-loader.js
+   53:12  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  161:12  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/synapse/layers/l5-squad.js
+  184:14  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  206:14  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  224:14  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/synapse/layers/layer-processor.js
+  54:11  warning  '_context' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/synapse/output/formatter.js
+  363:33  warning  '_metrics' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/synapse/runtime/hook-runtime.js
+  23:12  warning  '_err' is defined but never used         @typescript-eslint/no-unused-vars
+  77:16  warning  '_cleanupErr' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/synapse/session/session-manager.js
+  316:12  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  340:14  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/synapse/utils/atomic-write.js
+  68:14  warning  '_cleanupErr' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/synapse/utils/paths.js
+  32:12  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/ui/panel-renderer.js
+  112:5  warning  Unused eslint-disable directive (no problems were reported from 'no-control-regex')
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/core/utils/security-utils.js
+  118:7  warning  Unused eslint-disable directive (no problems were reported from 'no-control-regex')
+  317:5  warning  Unused eslint-disable directive (no problems were reported from 'no-control-regex')
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/agent-assignment-resolver.js
+  18:7  warning  '_AGENTS_DIR' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/agent-config-loader.js
+  340:18  warning  '_secondError' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/agent-exit-hooks.js
+  17:7   warning  '_fs' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  65:39  warning  '_result' is defined but never used       @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/approval-workflow.js
+   76:13  warning  '_config' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  105:14  warning  '_error' is defined but never used            @typescript-eslint/no-unused-vars
+  114:53  warning  'config' is defined but never used            @typescript-eslint/no-unused-vars
+  247:17  warning  'condition' is defined but never used         @typescript-eslint/no-unused-vars
+  251:17  warning  'condition' is defined but never used         @typescript-eslint/no-unused-vars
+  494:14  warning  '_error' is defined but never used            @typescript-eslint/no-unused-vars
+  536:16  warning  '_error' is defined but never used            @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/backlog-manager.js
+  13:7  warning  '_path' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/backup-manager.js
+  8:7  warning  '_gzip' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  9:7  warning  '_gunzip' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/branch-manager.js
+  268:16  warning  '_e' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/code-quality-improver.js
+   196:18  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+   221:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+   233:35  warning  'filePath' is defined but never used                 @typescript-eslint/no-unused-vars
+   257:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+   266:47  warning  'options' is defined but never used                  @typescript-eslint/no-unused-vars
+   286:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+   291:44  warning  'options' is defined but never used                  @typescript-eslint/no-unused-vars
+   313:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+   318:40  warning  '_filePath' is defined but never used                @typescript-eslint/no-unused-vars
+   318:51  warning  'options' is defined but never used                  @typescript-eslint/no-unused-vars
+   326:13  warning  '_varToLetConst' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   366:18  warning  'path' is defined but never used                     @typescript-eslint/no-unused-vars
+   384:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+   389:34  warning  '_filePath' is defined but never used                @typescript-eslint/no-unused-vars
+   389:45  warning  'options' is defined but never used                  @typescript-eslint/no-unused-vars
+   475:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+   480:35  warning  '_filePath' is defined but never used                @typescript-eslint/no-unused-vars
+   480:46  warning  'options' is defined but never used                  @typescript-eslint/no-unused-vars
+   576:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+   581:32  warning  '_filePath' is defined but never used                @typescript-eslint/no-unused-vars
+   581:43  warning  'options' is defined but never used                  @typescript-eslint/no-unused-vars
+   680:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+   685:39  warning  '_filePath' is defined but never used                @typescript-eslint/no-unused-vars
+   685:50  warning  'options' is defined but never used                  @typescript-eslint/no-unused-vars
+   778:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+   783:38  warning  '_filePath' is defined but never used                @typescript-eslint/no-unused-vars
+   783:49  warning  'options' is defined but never used                  @typescript-eslint/no-unused-vars
+   860:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+   865:36  warning  '_filePath' is defined but never used                @typescript-eslint/no-unused-vars
+   865:47  warning  'options' is defined but never used                  @typescript-eslint/no-unused-vars
+   952:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+   957:40  warning  '_filePath' is defined but never used                @typescript-eslint/no-unused-vars
+   957:51  warning  'options' is defined but never used                  @typescript-eslint/no-unused-vars
+  1039:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+  1051:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+  1078:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+  1197:14  warning  '_path' is defined but never used                    @typescript-eslint/no-unused-vars
+  1290:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+  1309:17  warning  'file' is assigned a value but never used            @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/commit-message-generator.js
+    2:9   warning  '_createHash' is assigned a value but never used      @typescript-eslint/no-unused-vars
+   11:15  warning  'options' is assigned a value but never used          @typescript-eslint/no-unused-vars
+  131:14  warning  '_error' is defined but never used                    @typescript-eslint/no-unused-vars
+  165:9   warning  '_currentSection' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  273:14  warning  '_error' is defined but never used                    @typescript-eslint/no-unused-vars
+  371:14  warning  '_error' is defined but never used                    @typescript-eslint/no-unused-vars
+  461:11  warning  '_changeCount' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  686:22  warning  'scope' is assigned a value but never used            @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/conflict-resolver.js
+    4:7   warning  '_diffLib' is assigned a value but never used   @typescript-eslint/no-unused-vars
+   41:15  warning  'content' is assigned a value but never used    @typescript-eslint/no-unused-vars
+   73:24  warning  '_content' is defined but never used            @typescript-eslint/no-unused-vars
+  122:16  warning  '_conflict' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  218:21  warning  '_fileInfo' is defined but never used           @typescript-eslint/no-unused-vars
+  240:23  warning  '_fileInfo' is defined but never used           @typescript-eslint/no-unused-vars
+  262:23  warning  '_fileInfo' is defined but never used           @typescript-eslint/no-unused-vars
+  264:11  warning  'content' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  286:21  warning  '_fileInfo' is defined but never used           @typescript-eslint/no-unused-vars
+  341:28  warning  '_fileInfo' is defined but never used           @typescript-eslint/no-unused-vars
+  455:16  warning  '_conflict' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  474:16  warning  '_conflict' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  490:16  warning  '_conflict' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  508:16  warning  '_conflict' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  546:25  warning  '_content' is defined but never used            @typescript-eslint/no-unused-vars
+  546:35  warning  'fileInfo' is defined but never used            @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/decision-log-generator.js
+  186:12  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/decision-log-indexer.js
+  188:14  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/decision-recorder.js
+  13:7  warning  '_path' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/dependency-analyzer.js
+  9:7  warning  '_yaml' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/dev-context-loader.js
+  211:14  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/elicitation-session-manager.js
+  139:18  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/git-wrapper.js
+    4:7   warning  '_path' is assigned a value but never used           @typescript-eslint/no-unused-vars
+    5:7   warning  '_fs' is assigned a value but never used             @typescript-eslint/no-unused-vars
+   35:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+   48:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+   87:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+  266:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+  304:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+  441:7   warning  '_componentName' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/greeting-builder.js
+    56:7   warning  '_TOTAL_GREETING_TIMEOUT' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   735:40  warning  '_currentStory' is defined but never used                     @typescript-eslint/no-unused-vars
+   811:28  warning  '_storyContext' is defined but never used                     @typescript-eslint/no-unused-vars
+  1037:52  warning  '_sessionType' is defined but never used                      @typescript-eslint/no-unused-vars
+  1415:14  warning  '_error' is defined but never used                            @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/metrics-tracker.js
+  348:24  warning  '_improvements' is defined but never used  @typescript-eslint/no-unused-vars
+  360:26  warning  '_improvements' is defined but never used  @typescript-eslint/no-unused-vars
+  497:20  warning  '_improvements' is defined but never used  @typescript-eslint/no-unused-vars
+  610:28  warning  '_improvements' is defined but never used  @typescript-eslint/no-unused-vars
+  622:21  warning  '_improvements' is defined but never used  @typescript-eslint/no-unused-vars
+  632:36  warning  '_improvements' is defined but never used  @typescript-eslint/no-unused-vars
+  653:18  warning  '_improvements' is defined but never used  @typescript-eslint/no-unused-vars
+  665:19  warning  '_improvements' is defined but never used  @typescript-eslint/no-unused-vars
+  683:16  warning  '_improvements' is defined but never used  @typescript-eslint/no-unused-vars
+  695:31  warning  '_improvements' is defined but never used  @typescript-eslint/no-unused-vars
+  713:27  warning  '_improvements' is defined but never used  @typescript-eslint/no-unused-vars
+  725:27  warning  '_improvements' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/migrate-task-to-v2.js
+  341:12  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/modification-validator.js
+   79:69  warning  'options' is defined but never used                     @typescript-eslint/no-unused-vars
+  140:14  warning  '_error' is defined but never used                      @typescript-eslint/no-unused-vars
+  152:68  warning  'options' is defined but never used                     @typescript-eslint/no-unused-vars
+  194:18  warning  '_error' is defined but never used                      @typescript-eslint/no-unused-vars
+  207:72  warning  'options' is defined but never used                     @typescript-eslint/no-unused-vars
+  216:13  warning  '_originalWorkflow' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  284:14  warning  '_error' is defined but never used                      @typescript-eslint/no-unused-vars
+  296:72  warning  'options' is defined but never used                     @typescript-eslint/no-unused-vars
+  348:18  warning  '_error' is defined but never used                      @typescript-eslint/no-unused-vars
+  391:35  warning  'componentType' is defined but never used               @typescript-eslint/no-unused-vars
+  441:18  warning  '_error' is defined but never used                      @typescript-eslint/no-unused-vars
+  462:17  warning  '_originalWorkflow' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  477:18  warning  '_error' is defined but never used                      @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/pattern-learner.js
+   484:31  warning  '_context' is defined but never used                @typescript-eslint/no-unused-vars
+   797:14  warning  '_error' is defined but never used                  @typescript-eslint/no-unused-vars
+   824:14  warning  '_error' is defined but never used                  @typescript-eslint/no-unused-vars
+  1015:44  warning  'context' is defined but never used                 @typescript-eslint/no-unused-vars
+  1051:49  warning  'context' is defined but never used                 @typescript-eslint/no-unused-vars
+  1098:14  warning  '_error' is defined but never used                  @typescript-eslint/no-unused-vars
+  1172:9   warning  '_matchedGoals' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/refactoring-suggester.js
+    10:47  warning  '_t' is assigned a value but never used        @typescript-eslint/no-unused-vars
+   236:11  warning  '_metrics' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   284:33  warning  '_content' is defined but never used           @typescript-eslint/no-unused-vars
+   284:43  warning  'metrics' is defined but never used            @typescript-eslint/no-unused-vars
+   313:40  warning  '_content' is defined but never used           @typescript-eslint/no-unused-vars
+   313:50  warning  'metrics' is defined but never used            @typescript-eslint/no-unused-vars
+   336:40  warning  '_content' is defined but never used           @typescript-eslint/no-unused-vars
+   336:50  warning  'metrics' is defined but never used            @typescript-eslint/no-unused-vars
+   361:41  warning  '_content' is defined but never used           @typescript-eslint/no-unused-vars
+   361:51  warning  'metrics' is defined but never used            @typescript-eslint/no-unused-vars
+   398:44  warning  '_content' is defined but never used           @typescript-eslint/no-unused-vars
+   398:54  warning  'metrics' is defined but never used            @typescript-eslint/no-unused-vars
+   442:30  warning  '_content' is defined but never used           @typescript-eslint/no-unused-vars
+   442:40  warning  'metrics' is defined but never used            @typescript-eslint/no-unused-vars
+   493:35  warning  '_content' is defined but never used           @typescript-eslint/no-unused-vars
+   493:45  warning  'metrics' is defined but never used            @typescript-eslint/no-unused-vars
+   523:40  warning  '_content' is defined but never used           @typescript-eslint/no-unused-vars
+   523:50  warning  'metrics' is defined but never used            @typescript-eslint/no-unused-vars
+   557:34  warning  '_content' is defined but never used           @typescript-eslint/no-unused-vars
+   557:44  warning  'metrics' is defined but never used            @typescript-eslint/no-unused-vars
+   589:34  warning  '_content' is defined but never used           @typescript-eslint/no-unused-vars
+   589:44  warning  'metrics' is defined but never used            @typescript-eslint/no-unused-vars
+   624:45  warning  '_ast' is defined but never used               @typescript-eslint/no-unused-vars
+   624:51  warning  'content' is defined but never used            @typescript-eslint/no-unused-vars
+   640:47  warning  '_ast' is defined but never used               @typescript-eslint/no-unused-vars
+   640:53  warning  'content' is defined but never used            @typescript-eslint/no-unused-vars
+   656:44  warning  '_ast' is defined but never used               @typescript-eslint/no-unused-vars
+   656:50  warning  'content' is defined but never used            @typescript-eslint/no-unused-vars
+   672:41  warning  '_ast' is defined but never used               @typescript-eslint/no-unused-vars
+   672:47  warning  'content' is defined but never used            @typescript-eslint/no-unused-vars
+   688:39  warning  '_ast' is defined but never used               @typescript-eslint/no-unused-vars
+   688:45  warning  'content' is defined but never used            @typescript-eslint/no-unused-vars
+   704:32  warning  '_detection' is defined but never used         @typescript-eslint/no-unused-vars
+   704:44  warning  '_ast' is defined but never used               @typescript-eslint/no-unused-vars
+   704:50  warning  'content' is defined but never used            @typescript-eslint/no-unused-vars
+   723:46  warning  '_ast' is defined but never used               @typescript-eslint/no-unused-vars
+   723:52  warning  'content' is defined but never used            @typescript-eslint/no-unused-vars
+   739:54  warning  '_ast' is defined but never used               @typescript-eslint/no-unused-vars
+   739:60  warning  'content' is defined but never used            @typescript-eslint/no-unused-vars
+   755:47  warning  '_ast' is defined but never used               @typescript-eslint/no-unused-vars
+   755:53  warning  'content' is defined but never used            @typescript-eslint/no-unused-vars
+   771:47  warning  '_ast' is defined but never used               @typescript-eslint/no-unused-vars
+   771:53  warning  'content' is defined but never used            @typescript-eslint/no-unused-vars
+   877:32  warning  'ast' is defined but never used                @typescript-eslint/no-unused-vars
+   909:38  warning  '_detection' is defined but never used         @typescript-eslint/no-unused-vars
+   927:40  warning  '_detection' is defined but never used         @typescript-eslint/no-unused-vars
+   935:37  warning  '_detection' is defined but never used         @typescript-eslint/no-unused-vars
+   944:34  warning  '_detection' is defined but never used         @typescript-eslint/no-unused-vars
+   953:32  warning  '_detection' is defined but never used         @typescript-eslint/no-unused-vars
+   962:35  warning  '_detection' is defined but never used         @typescript-eslint/no-unused-vars
+   979:47  warning  '_detection' is defined but never used         @typescript-eslint/no-unused-vars
+   987:40  warning  '_detection' is defined but never used         @typescript-eslint/no-unused-vars
+   997:40  warning  '_detection' is defined but never used         @typescript-eslint/no-unused-vars
+  1036:37  warning  'options' is assigned a value but never used   @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/security-checker.js
+   62:22  warning  'language' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  204:29  warning  'value' is defined but never used              @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/squad/squad-analyzer.js
+  273:44  warning  '_manifest' is defined but never used            @typescript-eslint/no-unused-vars
+  472:68  warning  '_squadPath' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/squad/squad-designer.js
+  755:30  warning  '_analysis' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/squad/squad-validator.js
+  289:11  warning  '_optionalDirs' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  487:14  warning  '_error' is defined but never used                  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/story-manager.js
+   26:12  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  102:14  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/story-update-hook.js
+   95:12  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  249:12  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/template-engine.js
+  8:7  warning  '_path' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/template-validator.js
+  8:7  warning  '_path' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  9:7  warning  '_yaml' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/test-generator.js
+   39:14  warning  '_error' is defined but never used     @typescript-eslint/no-unused-vars
+   70:14  warning  '_error' is defined but never used     @typescript-eslint/no-unused-vars
+   98:16  warning  '_error' is defined but never used     @typescript-eslint/no-unused-vars
+  170:14  warning  '_error' is defined but never used     @typescript-eslint/no-unused-vars
+  224:14  warning  '_error' is defined but never used     @typescript-eslint/no-unused-vars
+  308:31  warning  '_testType' is defined but never used  @typescript-eslint/no-unused-vars
+  308:42  warning  'config' is defined but never used     @typescript-eslint/no-unused-vars
+  340:26  warning  '_testType' is defined but never used  @typescript-eslint/no-unused-vars
+  340:37  warning  'config' is defined but never used     @typescript-eslint/no-unused-vars
+  365:34  warning  '_testType' is defined but never used  @typescript-eslint/no-unused-vars
+  365:45  warning  'config' is defined but never used     @typescript-eslint/no-unused-vars
+  550:14  warning  '_error' is defined but never used     @typescript-eslint/no-unused-vars
+  726:16  warning  '_error' is defined but never used     @typescript-eslint/no-unused-vars
+  737:14  warning  '_error' is defined but never used     @typescript-eslint/no-unused-vars
+  767:44  warning  'testType' is defined but never used   @typescript-eslint/no-unused-vars
+  816:18  warning  '_path' is defined but never used      @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/test-greeting-system.js
+  11:7  warning  '_fs' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  12:7  warning  '_path' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  13:7  warning  '_yaml' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/unified-activation-pipeline.js
+  40:1  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/usage-tracker.js
+   28:14  warning  '_error' is defined but never used            @typescript-eslint/no-unused-vars
+   94:14  warning  '_error' is defined but never used            @typescript-eslint/no-unused-vars
+  141:16  warning  '_usage' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  202:16  warning  '_error' is defined but never used            @typescript-eslint/no-unused-vars
+  213:44  warning  'options' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  221:16  warning  '_error' is defined but never used            @typescript-eslint/no-unused-vars
+  240:16  warning  '_error' is defined but never used            @typescript-eslint/no-unused-vars
+  277:14  warning  '_error' is defined but never used            @typescript-eslint/no-unused-vars
+  311:51  warning  'options' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  323:46  warning  'options' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  409:22  warning  '_options' is defined but never used          @typescript-eslint/no-unused-vars
+  426:16  warning  '_error' is defined but never used            @typescript-eslint/no-unused-vars
+  451:14  warning  '_error' is defined but never used            @typescript-eslint/no-unused-vars
+  479:16  warning  '_error' is defined but never used            @typescript-eslint/no-unused-vars
+  498:14  warning  '_error' is defined but never used            @typescript-eslint/no-unused-vars
+  538:56  warning  'usage' is defined but never used             @typescript-eslint/no-unused-vars
+  552:45  warning  'usage' is defined but never used             @typescript-eslint/no-unused-vars
+  558:58  warning  'usage' is defined but never used             @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/verify-workflow-gaps.js
+  13:7  warning  '_fsPromises' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/version-tracker.js
+   32:16  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+   42:14  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  126:14  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  271:14  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  308:14  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  364:14  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  474:14  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  483:14  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/scripts/yaml-validator.js
+  330:15  warning  '_key' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/development/templates/squad/script-template.js
+  26:7  warning  'fs' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  27:7  warning  'path' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/elicitation/task-elicitation.js
+  145:20  warning  '_answers' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/integrations/ai-providers/ai-provider-factory.js
+  342:26  warning  '_fetch' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/integrations/ai-providers/ai-provider.js
+  63:25  warning  '_options' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/integrations/ai-providers/openai-compatible-provider.js
+  337:19  warning  '_apiKey' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  337:35  warning  '_fetch' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  337:49  warning  '_name' is assigned a value but never used    @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/integrations/gemini-extensions/policy-sync.js
+  25:16  warning  '_err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/integrations/gemini-extensions/security-adapter.js
+   72:11  warning  '_checks' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  153:22  warning  '_content' is defined but never used          @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/integrations/pm-adapters/clickup-adapter.js
+   12:7   warning  '_path' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  151:13  warning  '_task' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  305:14  warning  '_error' is defined but never used          @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/integrations/pm-adapters/github-adapter.js
+  246:16  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  259:16  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  269:16  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/aiox-validator.js
+  14:7   warning  'path' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  42:10  warning  'printWarning' is defined but never used   @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/approval-workflow.js
+  114:53  warning  'config' is defined but never used     @typescript-eslint/no-unused-vars
+  247:17  warning  'condition' is defined but never used  @typescript-eslint/no-unused-vars
+  251:17  warning  'condition' is defined but never used  @typescript-eslint/no-unused-vars
+  536:16  warning  'error' is defined but never used      @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/asset-inventory.js
+   47:14  warning  'e' is defined but never used        @typescript-eslint/no-unused-vars
+   56:14  warning  'e' is defined but never used        @typescript-eslint/no-unused-vars
+   67:43  warning  'content' is defined but never used  @typescript-eslint/no-unused-vars
+  167:12  warning  'error' is defined but never used    @typescript-eslint/no-unused-vars
+  235:16  warning  'e' is defined but never used        @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/backup-manager.js
+  8:7  warning  'gzip' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  9:7  warning  'gunzip' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/batch-creator.js
+  278:11  warning  'created' is assigned a value but never used       @typescript-eslint/no-unused-vars
+  281:11  warning  'createdCount' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/branch-manager.js
+  269:16  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/capability-analyzer.js
+  214:16  warning  'error' is defined but never used                       @typescript-eslint/no-unused-vars
+  261:16  warning  'error' is defined but never used                       @typescript-eslint/no-unused-vars
+  302:9   warning  'networkOperations' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  311:16  warning  'error' is defined but never used                       @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/cicd-discovery.js
+  1035:14  warning  'options' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/clickup-helpers.js
+  28:12  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/code-quality-improver.js
+   246:14  warning  'error' is defined but never used                   @typescript-eslint/no-unused-vars
+   255:46  warning  'options' is defined but never used                 @typescript-eslint/no-unused-vars
+   277:43  warning  'options' is defined but never used                 @typescript-eslint/no-unused-vars
+   301:40  warning  'filePath' is defined but never used                @typescript-eslint/no-unused-vars
+   301:50  warning  'options' is defined but never used                 @typescript-eslint/no-unused-vars
+   309:13  warning  'varToLetConst' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   349:18  warning  'path' is defined but never used                    @typescript-eslint/no-unused-vars
+   372:34  warning  'filePath' is defined but never used                @typescript-eslint/no-unused-vars
+   372:44  warning  'options' is defined but never used                 @typescript-eslint/no-unused-vars
+   463:35  warning  'filePath' is defined but never used                @typescript-eslint/no-unused-vars
+   463:45  warning  'options' is defined but never used                 @typescript-eslint/no-unused-vars
+   564:32  warning  'filePath' is defined but never used                @typescript-eslint/no-unused-vars
+   564:42  warning  'options' is defined but never used                 @typescript-eslint/no-unused-vars
+   668:39  warning  'filePath' is defined but never used                @typescript-eslint/no-unused-vars
+   668:49  warning  'options' is defined but never used                 @typescript-eslint/no-unused-vars
+   766:38  warning  'filePath' is defined but never used                @typescript-eslint/no-unused-vars
+   766:48  warning  'options' is defined but never used                 @typescript-eslint/no-unused-vars
+   848:36  warning  'filePath' is defined but never used                @typescript-eslint/no-unused-vars
+   848:46  warning  'options' is defined but never used                 @typescript-eslint/no-unused-vars
+   940:40  warning  'filePath' is defined but never used                @typescript-eslint/no-unused-vars
+   940:50  warning  'options' is defined but never used                 @typescript-eslint/no-unused-vars
+  1034:14  warning  'error' is defined but never used                   @typescript-eslint/no-unused-vars
+  1061:14  warning  'error' is defined but never used                   @typescript-eslint/no-unused-vars
+  1292:17  warning  'file' is assigned a value but never used           @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/codebase-mapper.js
+  1220:15  warning  'savePath' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/codex-skills-sync/bootstrap.js
+  111:12  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  147:16  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  162:16  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  179:12  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/codex-skills-sync/validate.js
+  252:12  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  485:18  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/commit-message-generator.js
+    2:9   warning  'createHash' is assigned a value but never used      @typescript-eslint/no-unused-vars
+   11:15  warning  'options' is assigned a value but never used         @typescript-eslint/no-unused-vars
+  175:9   warning  'currentSection' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  273:14  warning  'error' is defined but never used                    @typescript-eslint/no-unused-vars
+  371:14  warning  'error' is defined but never used                    @typescript-eslint/no-unused-vars
+  461:11  warning  'changeCount' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  686:22  warning  'scope' is assigned a value but never used           @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/component-metadata.js
+  15:10  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/component-search.js
+   76:16  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+  105:16  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+  137:14  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+  181:16  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+  257:30  warning  'componentType' is defined but never used  @typescript-eslint/no-unused-vars
+  257:45  warning  'componentName' is defined but never used  @typescript-eslint/no-unused-vars
+  268:16  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/conflict-resolver.js
+    4:7   warning  'diffLib' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  264:11  warning  'content' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  455:16  warning  'conflict' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  490:16  warning  'conflict' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  546:34  warning  'fileInfo' is defined but never used           @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/coverage-analyzer.js
+  112:45  warning  'options' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  198:16  warning  'error' is defined but never used             @typescript-eslint/no-unused-vars
+  228:18  warning  'error' is defined but never used             @typescript-eslint/no-unused-vars
+  235:14  warning  'error' is defined but never used             @typescript-eslint/no-unused-vars
+  479:14  warning  'error' is defined but never used             @typescript-eslint/no-unused-vars
+  518:26  warning  'data' is defined but never used              @typescript-eslint/no-unused-vars
+  518:32  warning  'component' is defined but never used         @typescript-eslint/no-unused-vars
+  527:27  warning  'data' is defined but never used              @typescript-eslint/no-unused-vars
+  527:33  warning  'component' is defined but never used         @typescript-eslint/no-unused-vars
+  734:35  warning  'component' is defined but never used         @typescript-eslint/no-unused-vars
+  771:16  warning  'error' is defined but never used             @typescript-eslint/no-unused-vars
+  789:14  warning  'error' is defined but never used             @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/dependency-analyzer.js
+  9:7  warning  'yaml' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/dependency-impact-analyzer.js
+  150:16  warning  'error' is defined but never used   @typescript-eslint/no-unused-vars
+  320:83  warning  'config' is defined but never used  @typescript-eslint/no-unused-vars
+  601:14  warning  'error' is defined but never used   @typescript-eslint/no-unused-vars
+  623:14  warning  'error' is defined but never used   @typescript-eslint/no-unused-vars
+  635:14  warning  'error' is defined but never used   @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/diff-generator.js
+   9:7   warning  'path' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  27:14  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+  39:14  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+  53:14  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+  78:14  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/documentation-integrity/gitignore-generator.js
+  142:42  warning  '_options' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/documentation-synchronizer.js
+    13:7   warning  'generate' is assigned a value but never used   @typescript-eslint/no-unused-vars
+    16:7   warning  'marked' is assigned a value but never used     @typescript-eslint/no-unused-vars
+   517:47  warning  'options' is assigned a value but never used    @typescript-eslint/no-unused-vars
+   570:46  warning  'type' is defined but never used                @typescript-eslint/no-unused-vars
+   722:50  warning  'options' is assigned a value but never used    @typescript-eslint/no-unused-vars
+   843:48  warning  'options' is assigned a value but never used    @typescript-eslint/no-unused-vars
+   974:45  warning  'options' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  1049:50  warning  'options' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  1231:11  warning  'jsdocText' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  1283:30  warning  'actualCode' is defined but never used          @typescript-eslint/no-unused-vars
+  1341:16  warning  'route' is defined but never used               @typescript-eslint/no-unused-vars
+  1341:23  warning  'documented' is defined but never used          @typescript-eslint/no-unused-vars
+  1376:33  warning  'route' is defined but never used               @typescript-eslint/no-unused-vars
+  1376:40  warning  'documented' is defined but never used          @typescript-eslint/no-unused-vars
+  1382:30  warning  'validation' is defined but never used          @typescript-eslint/no-unused-vars
+  1401:14  warning  'error' is defined but never used               @typescript-eslint/no-unused-vars
+  1419:14  warning  'error' is defined but never used               @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/framework-analyzer.js
+  112:14  warning  'error' is defined but never used       @typescript-eslint/no-unused-vars
+  139:14  warning  'error' is defined but never used       @typescript-eslint/no-unused-vars
+  166:14  warning  'error' is defined but never used       @typescript-eslint/no-unused-vars
+  193:14  warning  'error' is defined but never used       @typescript-eslint/no-unused-vars
+  219:14  warning  'error' is defined but never used       @typescript-eslint/no-unused-vars
+  245:14  warning  'error' is defined but never used       @typescript-eslint/no-unused-vars
+  271:14  warning  'error' is defined but never used       @typescript-eslint/no-unused-vars
+  602:14  warning  'error' is defined but never used       @typescript-eslint/no-unused-vars
+  641:14  warning  'error' is defined but never used       @typescript-eslint/no-unused-vars
+  714:25  warning  'content' is defined but never used     @typescript-eslint/no-unused-vars
+  715:31  warning  'content' is defined but never used     @typescript-eslint/no-unused-vars
+  716:31  warning  'workflow' is defined but never used    @typescript-eslint/no-unused-vars
+  734:26  warning  'content' is defined but never used     @typescript-eslint/no-unused-vars
+  735:18  warning  'content' is defined but never used     @typescript-eslint/no-unused-vars
+  736:20  warning  'content' is defined but never used     @typescript-eslint/no-unused-vars
+  737:18  warning  'content' is defined but never used     @typescript-eslint/no-unused-vars
+  738:27  warning  'content' is defined but never used     @typescript-eslint/no-unused-vars
+  739:25  warning  'filePath' is defined but never used    @typescript-eslint/no-unused-vars
+  740:30  warning  'content' is defined but never used     @typescript-eslint/no-unused-vars
+  741:22  warning  'filePath' is defined but never used    @typescript-eslint/no-unused-vars
+  741:32  warning  'content' is defined but never used     @typescript-eslint/no-unused-vars
+  742:28  warning  'content' is defined but never used     @typescript-eslint/no-unused-vars
+  743:17  warning  'filePath' is defined but never used    @typescript-eslint/no-unused-vars
+  744:19  warning  'content' is defined but never used     @typescript-eslint/no-unused-vars
+  746:26  warning  'content' is defined but never used     @typescript-eslint/no-unused-vars
+  747:23  warning  'content' is defined but never used     @typescript-eslint/no-unused-vars
+  748:21  warning  'content' is defined but never used     @typescript-eslint/no-unused-vars
+  750:25  warning  'filePath' is defined but never used    @typescript-eslint/no-unused-vars
+  751:30  warning  'components' is defined but never used  @typescript-eslint/no-unused-vars
+  752:26  warning  'components' is defined but never used  @typescript-eslint/no-unused-vars
+  753:31  warning  'components' is defined but never used  @typescript-eslint/no-unused-vars
+  754:30  warning  'components' is defined but never used  @typescript-eslint/no-unused-vars
+  755:33  warning  'components' is defined but never used  @typescript-eslint/no-unused-vars
+  756:32  warning  'components' is defined but never used  @typescript-eslint/no-unused-vars
+  757:34  warning  'components' is defined but never used  @typescript-eslint/no-unused-vars
+  758:29  warning  'components' is defined but never used  @typescript-eslint/no-unused-vars
+  759:26  warning  'components' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/git-config-detector.js
+   70:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+  199:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+  218:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+  306:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+  324:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+  343:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/git-hooks/post-commit.js
+  62:18  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+  67:12  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/git-wrapper.js
+    2:7   warning  'path' is assigned a value but never used  @typescript-eslint/no-unused-vars
+    3:7   warning  'fs' is assigned a value but never used    @typescript-eslint/no-unused-vars
+   51:14  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+  231:14  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+  333:14  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+  381:14  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/ide-sync/agent-parser.js
+  52:14  warning  'fixError' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/ide-sync/index.js
+  121:12  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+  451:16  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+  502:18  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/ide-sync/transformers/claude-code.js
+  101:9  warning  'persona' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/ide-sync/transformers/github-copilot.js
+  75:48  warning  'persona' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/ide-sync/transformers/kimi.js
+  318:45  warning  'id' is defined but never used          @typescript-eslint/no-unused-vars
+  407:22  warning  '_agentData' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/ide-sync/validator.js
+  40:12  warning  'e' is defined but never used      @typescript-eslint/no-unused-vars
+  64:12  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/improvement-engine.js
+    1:7   warning  'fs' is assigned a value but never used      @typescript-eslint/no-unused-vars
+    2:7   warning  'path' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  483:32  warning  'analysisResults' is defined but never used  @typescript-eslint/no-unused-vars
+  605:29  warning  'analysisResults' is defined but never used  @typescript-eslint/no-unused-vars
+  605:46  warning  'improvements' is defined but never used     @typescript-eslint/no-unused-vars
+  658:24  warning  'improvements' is defined but never used     @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/improvement-validator.js
+  338:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/llm-routing/usage-tracker/index.js
+   17:7   warning  'url' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  183:14  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars
+  223:18  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars
+  264:14  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars
+  309:22  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/modification-risk-assessment.js
+  314:14  warning  'error' is defined but never used         @typescript-eslint/no-unused-vars
+  529:44  warning  'analysisData' is defined but never used  @typescript-eslint/no-unused-vars
+  652:39  warning  'analysisData' is defined but never used  @typescript-eslint/no-unused-vars
+  794:65  warning  'analysisData' is defined but never used  @typescript-eslint/no-unused-vars
+  794:79  warning  'config' is defined but never used        @typescript-eslint/no-unused-vars
+  887:16  warning  'error' is defined but never used         @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/modification-validator.js
+   79:69  warning  'options' is defined but never used                    @typescript-eslint/no-unused-vars
+  152:68  warning  'options' is defined but never used                    @typescript-eslint/no-unused-vars
+  194:18  warning  'error' is defined but never used                      @typescript-eslint/no-unused-vars
+  207:72  warning  'options' is defined but never used                    @typescript-eslint/no-unused-vars
+  216:13  warning  'originalWorkflow' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  296:72  warning  'options' is defined but never used                    @typescript-eslint/no-unused-vars
+  348:18  warning  'error' is defined but never used                      @typescript-eslint/no-unused-vars
+  391:35  warning  'componentType' is defined but never used              @typescript-eslint/no-unused-vars
+  441:18  warning  'error' is defined but never used                      @typescript-eslint/no-unused-vars
+  477:18  warning  'error' is defined but never used                      @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/path-analyzer.js
+   72:14  warning  'e' is defined but never used                 @typescript-eslint/no-unused-vars
+  215:15  warning  'type' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  250:14  warning  'e' is defined but never used                 @typescript-eslint/no-unused-vars
+  336:38  warning  'verbose' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/pattern-extractor.js
+   114:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+   133:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+  1366:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/performance-optimizer.js
+     9:7   warning  'path' is assigned a value but never used     @typescript-eslint/no-unused-vars
+   311:45  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   401:39  warning  'path' is defined but never used              @typescript-eslint/no-unused-vars
+   409:46  warning  'ast' is defined but never used               @typescript-eslint/no-unused-vars
+   409:51  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   446:35  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   572:33  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   613:17  warning  'object' is assigned a value but never used   @typescript-eslint/no-unused-vars
+   699:32  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   835:41  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   936:11  warning  'isPure' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  1028:35  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+  1171:37  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+  1478:33  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+  1566:33  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+  1769:24  warning  'filePath' is defined but never used          @typescript-eslint/no-unused-vars
+  1788:13  warning  'content' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/performance-tracker.js
+  13:7  warning  'path' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/plan-tracker.js
+   26:7   warning  'fsPromises' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  364:11  warning  'totalBar' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  678:11  warning  'savePath' is assigned a value but never used    @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/pm-adapter-factory.js
+  154:12  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/pm-adapter.js
+   43:19  warning  '_storyPath' is defined but never used  @typescript-eslint/no-unused-vars
+   63:19  warning  '_storyId' is defined but never used    @typescript-eslint/no-unused-vars
+   84:21  warning  '_storyData' is defined but never used  @typescript-eslint/no-unused-vars
+  102:22  warning  '_storyId' is defined but never used    @typescript-eslint/no-unused-vars
+  102:32  warning  '_status' is defined but never used     @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/pr-review-ai.js
+   62:11  warning  'fileRegex' is assigned a value but never used        @typescript-eslint/no-unused-vars
+   63:11  warning  'hunkRegex' is assigned a value but never used        @typescript-eslint/no-unused-vars
+  419:23  warning  'codebaseContext' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/project-status-loader.js
+   99:14  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+  152:14  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+  210:14  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+  307:14  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+  324:14  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+  331:16  warning  'fallbackError' is defined but never used  @typescript-eslint/no-unused-vars
+  363:14  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+  395:14  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+  431:14  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+  479:14  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+  506:14  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+  627:14  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+  642:14  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+  679:16  warning  'renameError' is defined but never used    @typescript-eslint/no-unused-vars
+  711:14  warning  'error' is defined but never used          @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/qa-loop-orchestrator.js
+   26:7   warning  'fsPromises' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  573:27  warning  'reviewResult' is defined but never used         @typescript-eslint/no-unused-vars
+  592:20  warning  'fixRequest' is defined but never used           @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/recovery-tracker.js
+  26:7  warning  'fsPromises' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/refactoring-suggester.js
+     7:7   warning  't' is assigned a value but never used        @typescript-eslint/no-unused-vars
+   275:32  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   275:41  warning  'metrics' is defined but never used           @typescript-eslint/no-unused-vars
+   304:39  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   304:48  warning  'metrics' is defined but never used           @typescript-eslint/no-unused-vars
+   327:39  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   327:48  warning  'metrics' is defined but never used           @typescript-eslint/no-unused-vars
+   352:40  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   352:49  warning  'metrics' is defined but never used           @typescript-eslint/no-unused-vars
+   389:43  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   389:52  warning  'metrics' is defined but never used           @typescript-eslint/no-unused-vars
+   433:29  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   433:38  warning  'metrics' is defined but never used           @typescript-eslint/no-unused-vars
+   484:34  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   484:43  warning  'metrics' is defined but never used           @typescript-eslint/no-unused-vars
+   514:39  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   514:48  warning  'metrics' is defined but never used           @typescript-eslint/no-unused-vars
+   548:33  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   548:42  warning  'metrics' is defined but never used           @typescript-eslint/no-unused-vars
+   580:33  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   580:42  warning  'metrics' is defined but never used           @typescript-eslint/no-unused-vars
+   615:44  warning  'ast' is defined but never used               @typescript-eslint/no-unused-vars
+   615:49  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   631:46  warning  'ast' is defined but never used               @typescript-eslint/no-unused-vars
+   631:51  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   647:43  warning  'ast' is defined but never used               @typescript-eslint/no-unused-vars
+   647:48  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   663:40  warning  'ast' is defined but never used               @typescript-eslint/no-unused-vars
+   663:45  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   679:38  warning  'ast' is defined but never used               @typescript-eslint/no-unused-vars
+   679:43  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   695:43  warning  'ast' is defined but never used               @typescript-eslint/no-unused-vars
+   695:48  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   714:45  warning  'ast' is defined but never used               @typescript-eslint/no-unused-vars
+   714:50  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   730:53  warning  'ast' is defined but never used               @typescript-eslint/no-unused-vars
+   730:58  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   746:46  warning  'ast' is defined but never used               @typescript-eslint/no-unused-vars
+   746:51  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   762:46  warning  'ast' is defined but never used               @typescript-eslint/no-unused-vars
+   762:51  warning  'content' is defined but never used           @typescript-eslint/no-unused-vars
+   935:34  warning  'detection' is defined but never used         @typescript-eslint/no-unused-vars
+   970:47  warning  'detection' is defined but never used         @typescript-eslint/no-unused-vars
+  1027:37  warning  'options' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/repository-detector.js
+  25:12  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/sandbox-tester.js
+  129:15  warning  'files' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  239:15  warning  'files' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  275:18  warning  'error' is defined but never used           @typescript-eslint/no-unused-vars
+  290:16  warning  'error' is defined but never used           @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/security-checker.js
+   62:22  warning  'language' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  204:29  warning  'value' is defined but never used              @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/spot-check-validator.js
+  9:7  warning  'fs' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/story-worktree-hooks.js
+  29:12  warning  'e' is defined but never used               @typescript-eslint/no-unused-vars
+  73:10  warning  'getStoryStatus' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/stuck-detector.js
+  968:12  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/template-engine.js
+  8:7  warning  'path' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/template-validator.js
+  8:7  warning  'path' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  9:7  warning  'yaml' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/test-discovery.js
+  723:15  warning  Unused eslint-disable directive (no problems were reported from 'no-eval')
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/test-generator.js
+  308:31  warning  '_testType' is defined but never used  @typescript-eslint/no-unused-vars
+  308:42  warning  'config' is defined but never used     @typescript-eslint/no-unused-vars
+  340:26  warning  '_testType' is defined but never used  @typescript-eslint/no-unused-vars
+  340:37  warning  'config' is defined but never used     @typescript-eslint/no-unused-vars
+  365:34  warning  '_testType' is defined but never used  @typescript-eslint/no-unused-vars
+  365:45  warning  'config' is defined but never used     @typescript-eslint/no-unused-vars
+  767:44  warning  'testType' is defined but never used   @typescript-eslint/no-unused-vars
+  816:18  warning  '_path' is defined but never used      @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/test-quality-assessment.js
+   93:36  warning  'options' is assigned a value but never used              @typescript-eslint/no-unused-vars
+  179:27  warning  '_content' is defined but never used                      @typescript-eslint/no-unused-vars
+  282:27  warning  '_content' is defined but never used                      @typescript-eslint/no-unused-vars
+  303:64  warning  '_' is defined but never used                             @typescript-eslint/no-unused-vars
+  323:30  warning  '_content' is defined but never used                      @typescript-eslint/no-unused-vars
+  336:65  warning  '_' is defined but never used                             @typescript-eslint/no-unused-vars
+  358:27  warning  '_content' is defined but never used                      @typescript-eslint/no-unused-vars
+  391:22  warning  '_content' is defined but never used                      @typescript-eslint/no-unused-vars
+  442:26  warning  '_content' is defined but never used                      @typescript-eslint/no-unused-vars
+  475:24  warning  '_content' is defined but never used                      @typescript-eslint/no-unused-vars
+  484:11  warning  '_sharedVariables' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  508:26  warning  '_content' is defined but never used                      @typescript-eslint/no-unused-vars
+  542:26  warning  '_content' is defined but never used                      @typescript-eslint/no-unused-vars
+  604:22  warning  '_content' is defined but never used                      @typescript-eslint/no-unused-vars
+  664:20  warning  '_content' is defined but never used                      @typescript-eslint/no-unused-vars
+  690:23  warning  '_content' is defined but never used                      @typescript-eslint/no-unused-vars
+  697:20  warning  '_content' is defined but never used                      @typescript-eslint/no-unused-vars
+  710:21  warning  '_content' is defined but never used                      @typescript-eslint/no-unused-vars
+  722:22  warning  '_content' is defined but never used                      @typescript-eslint/no-unused-vars
+  780:34  warning  'content' is defined but never used                       @typescript-eslint/no-unused-vars
+  853:11  warning  '_highImpactIssues' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  854:11  warning  '_mediumImpactIssues' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  930:17  warning  '_' is defined but never used                             @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/tool-resolver.js
+    2:7   warning  'path' is assigned a value but never used        @typescript-eslint/no-unused-vars
+  154:24  warning  'processors' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/usage-analytics.js
+  161:18  warning  'error' is defined but never used       @typescript-eslint/no-unused-vars
+  191:14  warning  'error' is defined but never used       @typescript-eslint/no-unused-vars
+  239:14  warning  'error' is defined but never used       @typescript-eslint/no-unused-vars
+  396:32  warning  'component' is defined but never used   @typescript-eslint/no-unused-vars
+  419:16  warning  'error' is defined but never used       @typescript-eslint/no-unused-vars
+  457:27  warning  'component' is defined but never used   @typescript-eslint/no-unused-vars
+  477:34  warning  'component' is defined but never used   @typescript-eslint/no-unused-vars
+  485:31  warning  'component' is defined but never used   @typescript-eslint/no-unused-vars
+  495:17  warning  '_' is defined but never used           @typescript-eslint/no-unused-vars
+  510:17  warning  '_' is defined but never used           @typescript-eslint/no-unused-vars
+  523:17  warning  '_' is defined but never used           @typescript-eslint/no-unused-vars
+  537:32  warning  'components' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/validate-claude-integration.js
+  80:14  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/visual-impact-generator.js
+    1:7   warning  'fs' is assigned a value but never used    @typescript-eslint/no-unused-vars
+    2:7   warning  'path' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  558:47  warning  'config' is defined but never used         @typescript-eslint/no-unused-vars
+  613:37  warning  'config' is defined but never used         @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/worktree-manager.js
+  222:13  warning  'expectedPath' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  277:14  warning  'error' is defined but never used                  @typescript-eslint/no-unused-vars
+  398:14  warning  'mergeError' is defined but never used             @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/scripts/yaml-validator.js
+  330:15  warning  'key' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/tests/project-status-loader.test.js
+    8:7   warning  'yaml' is assigned a value but never used    @typescript-eslint/no-unused-vars
+   27:14  warning  'error' is defined but never used            @typescript-eslint/no-unused-vars
+   49:16  warning  'error' is defined but never used            @typescript-eslint/no-unused-vars
+   79:16  warning  'error' is defined but never used            @typescript-eslint/no-unused-vars
+  113:16  warning  'error' is defined but never used            @typescript-eslint/no-unused-vars
+  135:16  warning  'error' is defined but never used            @typescript-eslint/no-unused-vars
+  158:16  warning  'error' is defined but never used            @typescript-eslint/no-unused-vars
+  182:16  warning  'error' is defined but never used            @typescript-eslint/no-unused-vars
+  240:13  warning  'status' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  330:16  warning  'error' is defined but never used            @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/infrastructure/tests/worktree-manager.test.js
+  46:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/product/templates/engine/validator.js
+  231:36  warning  'template' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/product/templates/mcp-workflow.js
+  55:22  warning  'path' is defined but never used     @typescript-eslint/no-unused-vars
+  56:23  warning  'path' is defined but never used     @typescript-eslint/no-unused-vars
+  56:29  warning  'content' is defined but never used  @typescript-eslint/no-unused-vars
+  57:27  warning  'path' is defined but never used     @typescript-eslint/no-unused-vars
+  58:20  warning  'path' is defined but never used     @typescript-eslint/no-unused-vars
+  62:17  warning  'url' is defined but never used      @typescript-eslint/no-unused-vars
+  62:22  warning  'options' is defined but never used  @typescript-eslint/no-unused-vars
+  63:18  warning  'url' is defined but never used      @typescript-eslint/no-unused-vars
+  63:23  warning  'body' is defined but never used     @typescript-eslint/no-unused-vars
+  63:29  warning  'options' is defined but never used  @typescript-eslint/no-unused-vars
+  67:21  warning  'owner' is defined but never used    @typescript-eslint/no-unused-vars
+  67:28  warning  'repo' is defined but never used     @typescript-eslint/no-unused-vars
+  68:25  warning  'owner' is defined but never used    @typescript-eslint/no-unused-vars
+  68:32  warning  'repo' is defined but never used     @typescript-eslint/no-unused-vars
+  68:38  warning  'title' is defined but never used    @typescript-eslint/no-unused-vars
+  68:45  warning  'body' is defined but never used     @typescript-eslint/no-unused-vars
+  69:21  warning  'owner' is defined but never used    @typescript-eslint/no-unused-vars
+  69:28  warning  'repo' is defined but never used     @typescript-eslint/no-unused-vars
+  69:34  warning  'state' is defined but never used    @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/schemas/validate-v3-schema.js
+  28:7   warning  '_AGENT_SCHEMA_PATH' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  29:7   warning  '_TASK_SCHEMA_PATH' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  38:16  warning  '_loadSchema' is defined but never used                  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/scripts/diagnostics/diagnose-installation.js
+  12:30  warning  '_spawnSync' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  30:12  warning  '_e' is defined but never used                   @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/scripts/diagnostics/health-dashboard/eslint.config.mjs
+  5:1  warning  Assign array to a variable before exporting as module default  import/no-anonymous-default-export
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/scripts/test-template-system.js
+   27:18  warning  '_framework' is assigned a value but never used        @typescript-eslint/no-unused-vars
+   46:46  warning  'framework' is assigned a value but never used         @typescript-eslint/no-unused-vars
+   71:11  warning  'template' is assigned a value but never used          @typescript-eslint/no-unused-vars
+  149:11  warning  '_baseTemplate' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  150:11  warning  '_frameworkConfig' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  508:44  warning  '_framework' is defined but never used                 @typescript-eslint/no-unused-vars
+  508:56  warning  'options' is defined but never used                    @typescript-eslint/no-unused-vars
+  509:11  warning  '_frameworkConfig' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  543:42  warning  '_framework' is defined but never used                 @typescript-eslint/no-unused-vars
+  543:54  warning  'options' is defined but never used                    @typescript-eslint/no-unused-vars
+  614:35  warning  'testType' is defined but never used                   @typescript-eslint/no-unused-vars
+  614:45  warning  '_framework' is defined but never used                 @typescript-eslint/no-unused-vars
+  614:57  warning  'options' is defined but never used                    @typescript-eslint/no-unused-vars
+  660:53  warning  '_framework' is defined but never used                 @typescript-eslint/no-unused-vars
+  660:65  warning  'options' is defined but never used                    @typescript-eslint/no-unused-vars
+  697:26  warning  'data' is defined but never used                       @typescript-eslint/no-unused-vars
+  701:22  warning  'data' is defined but never used                       @typescript-eslint/no-unused-vars
+  727:30  warning  'data' is defined but never used                       @typescript-eslint/no-unused-vars
+  745:28  warning  'data' is defined but never used                       @typescript-eslint/no-unused-vars
+  765:22  warning  'data' is defined but never used                       @typescript-eslint/no-unused-vars
+  776:30  warning  'data' is defined but never used                       @typescript-eslint/no-unused-vars
+  813:32  warning  'framework' is defined but never used                  @typescript-eslint/no-unused-vars
+  909:22  warning  'template' is assigned a value but never used          @typescript-eslint/no-unused-vars
+  910:40  warning  'testType' is assigned a value but never used          @typescript-eslint/no-unused-vars
+  924:20  warning  '_template' is defined but never used                  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/workflow-intelligence/__tests__/confidence-scorer.test.js
+  9:3  warning  'ConfidenceScorer' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/workflow-intelligence/__tests__/integration.test.js
+  330:56  warning  'state' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/workflow-intelligence/__tests__/wave-analyzer.test.js
+  313:13  warning  'tasks' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  390:13  warning  'result' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  404:13  warning  'result' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/workflow-intelligence/__tests__/workflow-registry.test.js
+   8:7  warning  'path' is assigned a value but never used              @typescript-eslint/no-unused-vars
+  10:3  warning  'WorkflowRegistry' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/workflow-intelligence/engine/suggestion-engine.js
+  205:13  warning  '_avgConfidence' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  313:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+  390:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+  412:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+  440:14  warning  '_error' is defined but never used                   @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/workflow-intelligence/engine/wave-analyzer.js
+  39:11  warning  '_lastEdge' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/workflow-intelligence/index.js
+  66:10  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/workflow-intelligence/learning/capture-hook.js
+  112:12  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  127:12  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.aiox-core/workflow-intelligence/learning/qa-feedback.js
+  393:35  warning  '_context' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/.codex/hooks/synapse-engine.cjs
+  59:14  warning  '_err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/scripts/verify-sla-e2e.ts
+  46:9  warning  'config' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/ChatAction.ts
+  110:12  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/DeleteFiles.ts
+  11:12  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+  22:12  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/GetVideos.ts
+   41:14  warning  'error' is defined but never used    @typescript-eslint/no-unused-vars
+  114:18  warning  'blobErr' is defined but never used  @typescript-eslint/no-unused-vars
+  204:14  warning  'error' is defined but never used    @typescript-eslint/no-unused-vars
+  273:14  warning  'error' is defined but never used    @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/NovoRadar.ts
+  110:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/OrdemPastas.ts
+  32:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/RadarAction.ts
+  160:12  warning  'error' is defined but never used              @typescript-eslint/no-unused-vars
+  251:12  warning  'error' is defined but never used              @typescript-eslint/no-unused-vars
+  262:11  warning  'formatar' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/RenamePastas.ts
+  55:12  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/Reservas.ts
+    7:7   warning  'toBRT' is assigned a value but never used        @typescript-eslint/no-unused-vars
+   12:7   warning  'formatToISO' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   57:12  warning  'e' is defined but never used                     @typescript-eslint/no-unused-vars
+   71:12  warning  'e' is defined but never used                     @typescript-eslint/no-unused-vars
+   84:12  warning  'error' is defined but never used                 @typescript-eslint/no-unused-vars
+   95:12  warning  'e' is defined but never used                     @typescript-eslint/no-unused-vars
+  135:12  warning  'e' is defined but never used                     @typescript-eslint/no-unused-vars
+  148:12  warning  'error' is defined but never used                 @typescript-eslint/no-unused-vars
+  161:12  warning  'error' is defined but never used                 @typescript-eslint/no-unused-vars
+  171:12  warning  'error' is defined but never used                 @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/avisos.ts
+  51:12  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/preferencias.ts
+  23:12  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
+  40:12  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/presets.ts
+  39:12  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/questoes.ts
+   70:12  warning  'error' is defined but never used                   @typescript-eslint/no-unused-vars
+   94:12  warning  'error' is defined but never used                   @typescript-eslint/no-unused-vars
+  196:7   warning  'todosUsuarios' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  210:12  warning  'error' is defined but never used                   @typescript-eslint/no-unused-vars
+  303:12  warning  'error' is defined but never used                   @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal.tsx
+   22:3   warning  'DadosEmpresaDrawer' is defined but never used             @typescript-eslint/no-unused-vars
+   23:3   warning  'DadosEmpresaToggle' is defined but never used             @typescript-eslint/no-unused-vars
+   88:10  warning  'abaAtiva' is assigned a value but never used              @typescript-eslint/no-unused-vars
+   88:20  warning  'setAbaAtiva' is assigned a value but never used           @typescript-eslint/no-unused-vars
+   93:9   warning  'dadosEmpresaDrawer' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  199:9   warning  'podeMoverEtapa' is assigned a value but never used        @typescript-eslint/no-unused-vars
+  201:9   warning  'podeTrabalharTarefas' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  202:9   warning  'podeGerenciarMembros' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaComm/page.tsx
+    6:49  warning  'Zap' is defined but never used                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+   48:10  warning  'loading' is assigned a value but never used                                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+  218:44  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  218:44  warning  img elements must have an alt prop, either with meaningful text, or an empty string for decorative images                                                                                                                                                                                jsx-a11y/alt-text
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaConnect/BotaoExportarTabelaCompleta.tsx
+  110:18  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaConnect/HeaderRadar.tsx
+  3:18  warning  'FileUp' is defined but never used      @typescript-eslint/no-unused-vars
+  3:26  warning  'Filter' is defined but never used      @typescript-eslint/no-unused-vars
+  3:34  warning  'Download' is defined but never used    @typescript-eslint/no-unused-vars
+  3:52  warning  'RefreshCcw' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaConnect/TabelaRadar.tsx
+  16:38  warning  'style' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaSchools/AlphaPresets.tsx
+   28:26  warning  'status' is assigned a value but never used                                                                                                                                                                                                                                              @typescript-eslint/no-unused-vars
+   38:10  warning  'selecionadas' is assigned a value but never used                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+   50:9   warning  'questoesDisponiveisDasTags' is assigned a value but never used                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+   54:9   warning  'toggleQuestao' is assigned a value but never used                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+   75:14  warning  'err' is defined but never used                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  157:14  warning  'err' is defined but never used                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  165:9   warning  'fotoFinal' is assigned a value but never used                                                                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+  166:9   warning  'initials' is assigned a value but never used                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  219:25  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  360:23  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaSchools/AlphaSchoolsWelcome.tsx
+  35:18  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaSchools/SaladeAula.tsx
+  10:5   warning  'Maximize2' is defined but never used                                                                                                                                                                                                                                                    @typescript-eslint/no-unused-vars
+  11:5   warning  'Clock' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  50:22  warning  'err' is defined but never used                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  96:37  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaSchools/presets/GerenciadorBancoQuestoes.tsx
+  3:30  warning  'ChevronLeft' is defined but never used  @typescript-eslint/no-unused-vars
+  3:43  warning  'ListChecks' is defined but never used   @typescript-eslint/no-unused-vars
+  3:55  warning  'AlignLeft' is defined but never used    @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaSchools/presets/ModalConfiguracaoPreset.tsx
+  226:27  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaSchools/presets/Questoes.tsx
+   12:3   warning  'HelpCircle' is defined but never used       @typescript-eslint/no-unused-vars
+   19:10  warning  'motion' is defined but never used           @typescript-eslint/no-unused-vars
+   19:18  warning  'AnimatePresence' is defined but never used  @typescript-eslint/no-unused-vars
+   59:22  warning  'e' is defined but never used                @typescript-eslint/no-unused-vars
+  105:18  warning  'error' is defined but never used            @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaSkills/Gerenciamento/CriarModulo.tsx
+  72:8  warning  React Hook useEffect has a missing dependency: 'fetchModulos'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaSkills/Gerenciamento/EdicaoOrdenacao.tsx
+   32:71  warning  'videos' is defined but never used                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+   33:11  warning  'router' is assigned a value but never used                                                                                                                                                                                                                                              @typescript-eslint/no-unused-vars
+   71:18  warning  'e' is defined but never used                                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  121:61  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  121:61  warning  img elements must have an alt prop, either with meaningful text, or an empty string for decorative images                                                                                                                                                                                jsx-a11y/alt-text
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaSkills/Gerenciamento/ModalAcessoGerenciamento.tsx
+  170:45  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaSkills/Gerenciamento/ModalEditar.tsx
+   4:19  warning  'Upload' is defined but never used  @typescript-eslint/no-unused-vars
+   4:76  warning  'Check' is defined but never used   @typescript-eslint/no-unused-vars
+  87:18  warning  'e' is defined but never used       @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaSkills/Gerenciamento/ModalExcluir.tsx
+   3:10  warning  'X' is defined but never used      @typescript-eslint/no-unused-vars
+  31:18  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaSkills/Gerenciamento/ModalModulosDoCurso.tsx
+  193:67  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  218:43  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaSkills/Gerenciamento/page.tsx
+  185:57  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  290:61  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  290:61  warning  img elements must have an alt prop, either with meaningful text, or an empty string for decorative images                                                                                                                                                                                jsx-a11y/alt-text
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaSkills/TrilhaCarrossel.tsx
+  143:19  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaSkills/modulo/[id]/ModuloDetalhesClient.tsx
+  6:23  warning  'LayoutGrid' is defined but never used       @typescript-eslint/no-unused-vars
+  7:18  warning  'AnimatePresence' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaVault/AdicionarSistema/ModalAdicionarSistema.tsx
+  4:42  warning  'ImageIcon' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/CadastroClientes/ModalCadastro/modal.tsx
+   4:52  warning  'CalendarIcon' is defined but never used  @typescript-eslint/no-unused-vars
+   4:72  warning  'Trash2' is defined but never used        @typescript-eslint/no-unused-vars
+   4:80  warning  'CheckCircle2' is defined but never used  @typescript-eslint/no-unused-vars
+  94:18  warning  'error' is defined but never used         @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/CadastroClientes/ModalCadastro/modalDados.tsx
+    5:19  warning  'fmtDateTime' is defined but never used                                                                            @typescript-eslint/no-unused-vars
+  296:18  warning  'error' is defined but never used                                                                                  @typescript-eslint/no-unused-vars
+  312:8   warning  React Hook useEffect has a missing dependency: 'cliente.socios'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  502:8   warning  React Hook useEffect has a missing dependency: 'cliente.logCs'. Either include it or remove the dependency array   react-hooks/exhaustive-deps
+  702:18  warning  'error' is defined but never used                                                                                  @typescript-eslint/no-unused-vars
+  876:18  warning  'error' is defined but never used                                                                                  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/CheckList/ChecklistView.tsx
+   76:10  warning  'useMouseGlow' is defined but never used  @typescript-eslint/no-unused-vars
+  101:3   warning  'userNome' is defined but never used      @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/CheckList/Embasamentos/EmbasamentoDAS.tsx
+  3:10  warning  'useState' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/CheckList/Embasamentos/EmbasamentoDisFinanc.tsx
+  3:10  warning  'useState' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/CheckList/Embasamentos/EmbasamentoRetomada.tsx
+   3:10  warning  'useState' is defined but never used                                                                                                                                                                                                                                                     @typescript-eslint/no-unused-vars
+   4:39  warning  'CheckCircle2' is defined but never used                                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+  27:17  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/CheckList/Embasamentos/[tipo]/ModeloEmbasamentoClient.tsx
+  6:21  warning  'Check' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/CheckList/Historico/HistoricoClient.tsx
+  7:31  warning  'FileText' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/CheckList/ListaClientesOperacional.tsx
+  48:11  warning  'listaUsuariosAcesso' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/ControleLeads/PaginaControle.tsx
+  152:29  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/Guia/page.tsx
+    7:19  warning  'Bug' is defined but never used    @typescript-eslint/no-unused-vars
+    9:18  warning  'Phone' is defined but never used  @typescript-eslint/no-unused-vars
+  335:35  warning  'ri' is defined but never used     @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/HistoricoArquivos/page.tsx
+   13:5   warning  'ExternalLink' is defined but never used             @typescript-eslint/no-unused-vars
+  156:11  warning  'handleReativar' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  168:18  warning  'err' is defined but never used                      @typescript-eslint/no-unused-vars
+  189:18  warning  'err' is defined but never used                      @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/InfosPerfil/Perfil/FotoPerfil/AvatarUpload.tsx
+   72:13  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  102:19  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/InfosPerfil/Perfil/page.tsx
+  2:10  warning  'Shield' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/PainelTarefas/GerenciarTarefas/GerenciamentoUserTarefa/page.tsx
+  209:49  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/PainelTarefas/GerenciarTarefas/page.tsx
+   10:30   warning  'Info' is defined but never used                                                                                  @typescript-eslint/no-unused-vars
+   10:103  warning  'AlertCircle' is defined but never used                                                                           @typescript-eslint/no-unused-vars
+   14:7    warning  'DIAS_NOMES' is assigned a value but never used                                                                   @typescript-eslint/no-unused-vars
+   48:22   warning  'setReservas' is assigned a value but never used                                                                  @typescript-eslint/no-unused-vars
+   49:32   warning  'setReservasConcluidas' is assigned a value but never used                                                        @typescript-eslint/no-unused-vars
+   50:12   warning  'dataSelecionada' is assigned a value but never used                                                              @typescript-eslint/no-unused-vars
+   50:29   warning  'setDataSelecionada' is assigned a value but never used                                                           @typescript-eslint/no-unused-vars
+   96:8    warning  React Hook useEffect has a missing dependency: 'carregarDados'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  246:11   warning  'statsDia' is assigned a value but never used                                                                     @typescript-eslint/no-unused-vars
+  293:18   warning  'error' is defined but never used                                                                                 @typescript-eslint/no-unused-vars
+  622:67   warning  'diasTexto' is assigned a value but never used                                                                    @typescript-eslint/no-unused-vars
+  641:69   warning  'proximaData' is assigned a value but never used                                                                  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/PainelTarefas/PainelTarefaC/page.tsx
+    7:13  warning  'Star' is defined but never used                                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+    8:14  warning  'CalendarDays' is defined but never used                                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+    8:34  warning  'Trash2' is defined but never used                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+    8:42  warning  'Filter' is defined but never used                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+    8:50  warning  'XCircle' is defined but never used                                                                                                                                                                                                                                                      @typescript-eslint/no-unused-vars
+    8:74  warning  'ShoppingCart' is defined but never used                                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+   35:22  warning  'setReservas' is assigned a value but never used                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+   41:12  warning  'abaAtual' is assigned a value but never used                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+   41:22  warning  'setAbaAtual' is assigned a value but never used                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+   43:12  warning  'produtos' is assigned a value but never used                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+   44:12  warning  'listaCompraDoBanco' is assigned a value but never used                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+   44:32  warning  'setListaCompraDoBanco' is assigned a value but never used                                                                                                                                                                                                                               @typescript-eslint/no-unused-vars
+   62:11  warning  'pulse' is assigned a value but never used                                                                                                                                                                                                                                               @typescript-eslint/no-unused-vars
+  100:8   warning  React Hook useEffect has a missing dependency: 'carregarTudo'. Either include it or remove the dependency array                                                                                                                                                                          react-hooks/exhaustive-deps
+  133:18  warning  'error' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  152:18  warning  'error' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  164:8   warning  React Hook useEffect has a missing dependency: 'carregarTarefas'. Either include it or remove the dependency array                                                                                                                                                                       react-hooks/exhaustive-deps
+  290:18  warning  'error' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  297:8   warning  React Hook useEffect has a missing dependency: 'carregarTudo'. Either include it or remove the dependency array                                                                                                                                                                          react-hooks/exhaustive-deps
+  301:11  warning  'calcularOcorrencia' is assigned a value but never used                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+  378:8   warning  React Hook useMemo has an unnecessary dependency: 'reservas'. Either exclude it or remove the dependency array                                                                                                                                                                           react-hooks/exhaustive-deps
+  389:37  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  560:92  warning  Expected an assignment or function call and instead saw an expression                                                                                                                                                                                                                    @typescript-eslint/no-unused-expressions
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/PainelTarefas/painelTarefaSG/ListaCompras.tsx
+  152:31  warning  'isSuave' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/PainelTarefas/painelTarefaSG/page.tsx
+    7:13  warning  'Star' is defined but never used                                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+    8:14  warning  'CalendarDays' is defined but never used                                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+    8:34  warning  'Trash2' is defined but never used                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+    8:42  warning  'Filter' is defined but never used                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+    8:50  warning  'XCircle' is defined but never used                                                                                                                                                                                                                                                      @typescript-eslint/no-unused-vars
+   67:11  warning  'pulse' is assigned a value but never used                                                                                                                                                                                                                                               @typescript-eslint/no-unused-vars
+  105:8   warning  React Hook useEffect has a missing dependency: 'carregarTudo'. Either include it or remove the dependency array                                                                                                                                                                          react-hooks/exhaustive-deps
+  142:18  warning  'error' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  150:11  warning  'diaAtivo' is assigned a value but never used                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  166:18  warning  'error' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  178:8   warning  React Hook useEffect has a missing dependency: 'carregarTarefas'. Either include it or remove the dependency array                                                                                                                                                                       react-hooks/exhaustive-deps
+  304:18  warning  'error' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  311:8   warning  React Hook useEffect has a missing dependency: 'carregarTudo'. Either include it or remove the dependency array                                                                                                                                                                          react-hooks/exhaustive-deps
+  314:12  warning  'diaFiltro' is assigned a value but never used                                                                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+  314:23  warning  'setDiaFiltro' is assigned a value but never used                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  316:11  warning  'calcularOcorrencia' is assigned a value but never used                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+  415:37  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  608:92  warning  Expected an assignment or function call and instead saw an expression                                                                                                                                                                                                                    @typescript-eslint/no-unused-expressions
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/ReservaSalas/page.tsx
+   5:85  warning  'Trash2' is defined but never used              @typescript-eslint/no-unused-vars
+  21:10  warning  'historico' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/UsuariosOnline/page.tsx
+  4:40  warning  'ShieldCheck' is defined but never used  @typescript-eslint/no-unused-vars
+  4:53  warning  'Zap' is defined but never used          @typescript-eslint/no-unused-vars
+  4:78  warning  'Search' is defined but never used       @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/prova/[presetId]/page.tsx
+    3:43  warning  'useMemo' is defined but never used  @typescript-eslint/no-unused-vars
+    8:5   warning  'XCircle' is defined but never used  @typescript-eslint/no-unused-vars
+   65:22  warning  'err' is defined but never used      @typescript-eslint/no-unused-vars
+  115:18  warning  'error' is defined but never used    @typescript-eslint/no-unused-vars
+  184:14  warning  'e' is defined but never used        @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/api/ChatBot/route.ts
+  14:12  warning  'error' is defined but never used                       @typescript-eslint/no-unused-vars
+  38:11  warning  'funcoesPermitidas' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/api/DownloadArquivos/route.ts
+  26:12  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/api/InfoSimples/route.ts
+  40:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/api/LimpezaBd/route.ts
+  20:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/api/Reconsulta/ReconsultaRadar.ts
+  17:12  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/api/UploadSkills/route.ts
+  12:37  warning  '_pathname' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/api/bibble/upload/route.ts
+  34:37  warning  'path' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/api/broadcast/route.ts
+  19:12  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/api/documentos/ordenar/route.ts
+  14:12  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/api/documentos/salvar/route.ts
+  12:12  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/AvatarBibble.tsx
+  1:10  warning  'useState' is defined but never used   @typescript-eslint/no-unused-vars
+  1:20  warning  'useEffect' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/Bibble.tsx
+  113:9  warning  'isAdmin' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/BibbleChatHome/BibbleChatInput.orig.tsx
+   62:44  warning  Image elements must have an alt prop, either with meaningful text, or an empty string for decorative images                                                                                                                                                                              jsx-a11y/alt-text
+  122:23  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/BibbleChatHome/BibbleEmptyState.orig.tsx
+  26:3  warning  'model' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/BibbleChatHome/BibbleFileUpload.tsx
+    3:41  warning  'useEffect' is defined but never used                                                                                                                                                                                                                                                    @typescript-eslint/no-unused-vars
+    4:51  warning  'Check' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+   30:7   warning  'SIZE_DISPLAY' is assigned a value but never used                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+   37:7   warning  'MAX_DISPLAY' is assigned a value but never used                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  191:42  warning  'fileName' is defined but never used                                                                                                                                                                                                                                                     @typescript-eslint/no-unused-vars
+  192:44  warning  Image elements must have an alt prop, either with meaningful text, or an empty string for decorative images                                                                                                                                                                              jsx-a11y/alt-text
+  258:21  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/BibbleChatHome/BibbleMessageBubble.orig.tsx
+   6:77  warning  'X' is defined but never used               @typescript-eslint/no-unused-vars
+  79:10  warning  'formatFileSize' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/BibbleChatHome/OllamaUrlManager.tsx
+  23:48  warning  'onUrlChange' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/BotaoVoltar.tsx
+  4:10  warning  'ArrowLeft' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/Checklist/Velocimetro.tsx
+  66:9  warning  'filterId' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/ComponentesRadar/DropzoneRadar.tsx
+  37:16  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/ComponentesRadar/FiltroTabela/FiltroTabela.tsx
+  85:5   warning  'totalSelecionados' is defined but never used     @typescript-eslint/no-unused-vars
+  91:12  warning  'empresas' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  91:22  warning  'setEmpresas' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  92:11  warning  'normalize' is assigned a value but never used    @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/ComponentesRadar/HabilitacaoRadarClient.tsx
+  222:26  warning  Compilation Skipped: Use of incompatible library
+
+This API returns functions which cannot be memoized without leading to stale UI. To prevent this, by default React Compiler will skip memoizing this component/hook. However, you may see issues if values from this API are passed to other components/hooks that are memoized.
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/ComponentesRadar/HabilitacaoRadarClient.tsx:222:26
+  220 |   // ── Virtualização da tabela (lotes de milhares de CNPJs deixavam o navegador lento) ──
+  221 |   const tabelaScrollRef = useRef<HTMLDivElement>(null);
+> 222 |   const rowVirtualizer = useVirtualizer({
+      |                          ^^^^^^^^^^^^^^ TanStack Virtual's `useVirtualizer()` API returns functions that cannot be memoized safely
+  223 |     count: empresasExibidas.length,
+  224 |     getScrollElement: () => tabelaScrollRef.current,
+  225 |     estimateSize: () => ALTURA_LINHA_ESTIMADA,  react-hooks/incompatible-library
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/ComponentesRadar/ModalHistorico.tsx
+   12:5   warning  'Trash2' is defined but never used              @typescript-eslint/no-unused-vars
+  168:12  warning  'usersList' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  189:11  warning  'filtrados' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  200:14  warning  'toggle' is defined but never used              @typescript-eslint/no-unused-vars
+  227:18  warning  'err' is defined but never used                 @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/EngrenagemFlutuante.tsx
+  5:41  warning  'EyeOff' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/FiltroChamado.tsx
+  30:5  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/GerarFicha.tsx
+  130:9   warning  'uf' is assigned a value but never used                                                                      @typescript-eslint/no-unused-vars
+  135:9   warning  'dataHoje' is assigned a value but never used                                                                @typescript-eslint/no-unused-vars
+  136:9   warning  'horaHoje' is assigned a value but never used                                                                @typescript-eslint/no-unused-vars
+  162:11  warning  Image elements must have an alt prop, either with meaningful text, or an empty string for decorative images  jsx-a11y/alt-text
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/GestaoOnboarding/GestaoOnboardingClient.tsx
+    6:40  warning  'Star' is defined but never used                   @typescript-eslint/no-unused-vars
+    6:46  warning  'StarOff' is defined but never used                @typescript-eslint/no-unused-vars
+  256:21  warning  'setTemplates' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/ModalOnboarding.tsx
+  9:3  warning  'User' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/PainelAlphaClient.tsx
+   34:9   warning  'userName' is assigned a value but never used                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  126:9   warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  289:13  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  312:15  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/Parceiros/Aquisicao/AquisicaoParceirosClient.tsx
+    7:67  warning  'ArrowLeftRight' is defined but never used    @typescript-eslint/no-unused-vars
+    7:83  warning  'Handshake' is defined but never used         @typescript-eslint/no-unused-vars
+  832:10  warning  'EditarLeadDialog' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/Parceiros/Relacionamento/KanbanRelacionamentoParceiros.tsx
+  68:31  warning  'cor' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/StatusConexao.tsx
+  4:19  warning  'Wifi' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/UserDropdown.tsx
+  26:28  warning  'update' is assigned a value but never used                                                                                                                                                                                                                                              @typescript-eslint/no-unused-vars
+  63:29  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/cadastro/ModalGerenciarSetor.tsx
+  35:6  warning  React Hook useEffect has a missing dependency: 'setorAtivo'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/components/holerites/HoleritesPage.tsx
+  7:8  warning  'Link' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bibble/pdfjs-polyfill.ts
+  22:18  warning  '_args' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/debug/error-bus.ts
+  14:7  warning  'DEBUG_LISTENER_KEY' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/gerador-documentos/html.ts
+  21:3  warning  '_fileName' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/gerador-documentos/pdf.tsx
+  64:10  warning  'formatarEndereco' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ialpha/projetos/alpha-comex/painel-alpha/tests/debug/error-bus.test.ts
+  2:28  warning  'emitDebugEvent' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 1191 problems (0 errors, 1191 warnings)
+  0 errors and 4 warnings potentially fixable with the `--fix` option.
+
+npm notice
+npm notice New minor version of npm available! 11.6.1 -> 11.21.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.21.0
+npm notice To update run: npm install -g npm@11.21.0
+npm notice

@@ -36,12 +36,13 @@ Draft — prazo de 24 horas e dois itens que devem estar em “Sim” definidos;
 
 ## Tasks / Subtasks
 
+- [x] Publicar os três campos próprios, o campo de data compartilhado e os dois requisitos de confirmação “Sim” em `scripts/configurar-campos-revisoes-operacional.mts` após backup Vault verificado e autorização específica; leitura de volta confirmou a versão 13.
 - [ ] Revalidar versão publicada, campos/formulário, requisitos de transição, eventos de protocolo/revisão e UI de configuração antes de alterar o pipeline (AC 1–6).
 - [ ] Resolver fonte do instante do protocolo, referência documental, efeito de resposta negativa, parâmetros de alertas e rótulo antes de publicar automações (AC 3–6).
 - [ ] Configurar data/número e os dois itens obrigatórios de conferência na UI; verificar persistência e validação no servidor (AC 1–3).
 - [ ] Configurar bloqueio da conclusão e alertas visuais segundo a versão publicada, sem duplicação de disparos (AC 2, 4–6).
 - [ ] Testar bordas de data/hora e fuso, edição retroativa, campos ausentes, checklist/conferência e avanço da etapa (AC 7).
-- [ ] Executar `npm run lint`, `npm run typecheck`, `npm test` e `npm run build`; atualizar checklist, File List e evidências (AC 7).
+- [x] Executar `npm run lint`, `npm run typecheck`, `npm test` e `npm run build` para a preparação dos campos; repetir após implementar alertas e prazo (AC 7).
 - [ ] Se houver necessidade de schema, migration, seed/backfill ou mutação em massa, cumprir antes o rito Vault do `AGENTS.md`: relatório, backup completo verificado e confirmação explícita específica.
 
 ## Dev Notes / Testing
@@ -65,12 +66,16 @@ Draft — prazo de 24 horas e dois itens que devem estar em “Sim” definidos;
 - [x] Critérios de aceite observáveis e cenários de teste preparados.
 - [ ] Decisões pendentes de produto resolvidas.
 - [ ] Implementação e testes concluídos.
-- [ ] Quality gates executados e evidências registradas.
+- [x] Quality gates da preparação executados e evidências registradas no relatório Vault; os gates da story completa continuam pendentes.
 - [x] File List desta criação documental atualizada.
 
 ## File List
 
 - `docs/stories/story-alpha-crm-operacional-revisao-protocolo.md` — criação desta story.
+- `scripts/configurar-campos-revisoes-operacional.mts` — prévia e publicação protegida dos campos e bloqueios.
+- `scripts/verificar-campos-revisoes-operacional.mts` — leitura de volta da configuração publicada.
+- `docs/reports/vault-operacional-revisoes-campos-2026-09-29.md` — plano, backup e reversão da publicação conjunta.
+- `tests/bpm/requisitos-transicao-obrigatoriedade.test.ts` — verifica bloqueio com confirmação vazia ou “Não” e passagem com ambas em “Sim”.
 - Arquivos da implementação: a preencher após inventário e alterações reais.
 
 ## Change Log

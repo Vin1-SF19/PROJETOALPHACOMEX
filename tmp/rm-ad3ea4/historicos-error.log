@@ -1,0 +1,2 @@
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+Auditoria indisponível: não foi possível consultar os contratos. Nenhum dado alterado.

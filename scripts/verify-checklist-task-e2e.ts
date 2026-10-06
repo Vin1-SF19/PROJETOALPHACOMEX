@@ -5,7 +5,7 @@ import path from "node:path";
 // Node 24 fornece node:sqlite; a versão de @types/node do projeto ainda não o declara.
 // @ts-expect-error módulo nativo disponível no ambiente de verificação
 import { DatabaseSync } from "node:sqlite";
-import { PrismaLibSql } from "@prisma/adapter-libsql";
+import { PrismaLibSQL as PrismaLibSql } from "@prisma/adapter-libsql";
 import { PrismaClient } from "@prisma/client";
 
 import { reconciliarTarefaChecklist } from "../src/lib/bpm/checklists/reconciliacao-tarefa";

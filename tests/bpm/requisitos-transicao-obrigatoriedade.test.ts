@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import { campoObrigatorioAoMover, requisitoAplicaAoMover, validarValorRequisitoCampo } from "@/lib/bpm/requisitos-etapa";
 import { avaliarGrupo } from "@/lib/bpm/regras/avaliador";
+import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 
 it("permite entrar em Elaboração antes de marcar os campos que serão preenchidos nessa etapa", () => {
   for (const nome of ["Contrato elaborado", "Contrato enviado para assinatura"]) {
@@ -39,4 +40,26 @@ it("aceita no avanço a forma de pagamento salva em opção relacional ativa", (
 
   expect(validarValorRequisitoCampo(campo, "Parcelamento Cartão de Crédito - até 12x com juros")).toBe(true);
   expect(validarValorRequisitoCampo(campo, "Opção removida")).toBe(false);
+});
+
+it("bloqueia a revisão do protocolo até as duas confirmações booleanas serem Sim", () => {
+  const campos = ["documentos", "codigos"].map((id) => ({ id, nome: id, tipo: "booleano", opcoesJson: null }));
+  const pendente = (campo: string) => ({ operador: "AND" as const, condicoes: [{
+    tipo: "condicao" as const,
+    campo: { fonte: "campo_dinamico" as const, campo },
+    operador: "diferente" as const,
+    valor: "Sim",
+  }] });
+
+  for (const valores of [
+    { documentos: null, codigos: null },
+    { documentos: "Não", codigos: "Sim" },
+    { documentos: "Sim", codigos: "Não" },
+  ]) {
+    expect(["documentos", "codigos"].some((id) => avaliarGrupo(pendente(id), { card: {}, camposDinamicos: valores }))).toBe(true);
+  }
+  const validos = { documentos: "Sim", codigos: "Sim" };
+  expect(validarValoresCamposBpm(campos, validos)).toEqual({ success: true, valores: validos });
+  expect(["documentos", "codigos"].some((id) => avaliarGrupo(pendente(id), { card: {}, camposDinamicos: validos }))).toBe(false);
+  expect(validarValoresCamposBpm(campos, { documentos: "Talvez" }).success).toBe(false);
 });

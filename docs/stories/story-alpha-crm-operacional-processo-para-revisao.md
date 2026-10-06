@@ -39,12 +39,13 @@ Draft — regras de prazo, retorno e alertas precisam dos parâmetros indicados 
 
 ## Tasks / Subtasks
 
+- [x] Publicar o campo de anotação em `scripts/configurar-campos-revisoes-operacional.mts` após backup Vault verificado e autorização específica; leitura de volta confirmou a versão 13.
 - [ ] Inventariar etapa e ordem publicadas, campos/formulário, histórico de acesso, fonte do envio ao diretor, eventos de revisão, motor de alertas/SLA e board (AC 1–7).
 - [ ] Resolver as decisões de produto e registrar as regras exatas antes de ligar automações temporais ou retorno automático (AC 3–7).
 - [ ] Configurar o campo de resultado e o formulário pela estrutura configurável existente; verificar leitura, edição, histórico e validação no servidor (AC 1–2).
 - [ ] Implementar detecção de prazo, retorno à etapa anterior e alertas com observabilidade e idempotência, respeitando configurações publicadas (AC 3–6).
 - [ ] Mostrar pendências de forma acessível no board/card e testar etapas distintas e transições (AC 5–8).
-- [ ] Executar `npm run lint`, `npm run typecheck`, `npm test` e `npm run build`; atualizar checklist, File List e evidências (AC 8).
+- [x] Executar `npm run lint`, `npm run typecheck`, `npm test` e `npm run build` para a preparação dos campos; repetir após implementar as automações (AC 8).
 - [ ] Se a solução exigir schema, migration, seed/backfill ou mutação em massa, cumprir o rito Vault do `AGENTS.md`: relatório, backup completo verificado e autorização específica antes de executar.
 
 ## Dev Notes / Testing
@@ -67,12 +68,16 @@ Draft — regras de prazo, retorno e alertas precisam dos parâmetros indicados 
 - [x] Critérios de aceite observáveis e cenários de teste preparados.
 - [ ] Decisões pendentes de produto resolvidas.
 - [ ] Implementação e testes concluídos.
-- [ ] Quality gates executados e evidências registradas.
-- [ ] File List atualizada com todos os arquivos efetivamente alterados.
+- [x] Quality gates da preparação executados e evidências registradas no relatório Vault; os gates da story completa continuam pendentes.
+- [x] File List da preparação atualizada com os arquivos efetivamente alterados.
 
 ## File List
 
 - `docs/stories/story-alpha-crm-operacional-processo-para-revisao.md` — criação desta story.
+- `scripts/configurar-campos-revisoes-operacional.mts` — prévia e publicação protegida do campo.
+- `scripts/verificar-campos-revisoes-operacional.mts` — leitura de volta da configuração publicada.
+- `docs/reports/vault-operacional-revisoes-campos-2026-09-29.md` — plano, backup e reversão da publicação conjunta.
+- `tests/bpm/requisitos-transicao-obrigatoriedade.test.ts` — cobre as duas confirmações booleanas exigidas pela revisão do protocolo.
 - Arquivos da implementação: a preencher após inventário e alterações reais.
 
 ## Change Log

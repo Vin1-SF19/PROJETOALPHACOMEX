@@ -794,3 +794,7 @@ Comparação literal e onChange marcavam pontuação como edição. PainelCampos
 **Causa:** o client Prisma gerado + o codebase passam do heap padrão (~4 GB) do Node.
 **Fix:** usar `npm run typecheck` (já define `NODE_OPTIONS=--max-old-space-size=8192`). Não é erro de tipo.
 **Adicionado em:** 2026-09-24 (Forge, Meta Alpha no Alpha Metas)
+
+
+### 2026-10-01 — Scribe — RM-2026-AD3EA4: fronteira mensal da venda
+Causa corrigida no código: escrita UTC e limites mensais locais misturavam fusos e deslocavam vendas entre meses. Helper data-comercial compartilhado alinha escrita, consulta e exibição em UTC; data ausente ou impossível é rejeitada. Testes de actions usam mocks, sem comprovar dados históricos reais. Na execução de encerramento, npm test falhou por EBUSY ao remover coverage; preservar o diretório e registrar a limitação, sem limpeza destrutiva. Evidências: tmp/rm-ad3ea4/closure/.

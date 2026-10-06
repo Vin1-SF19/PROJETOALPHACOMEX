@@ -1,0 +1,16 @@
+
+> alpha_sistema@0.1.0 build
+> prisma generate && npm run build:player && NODE_OPTIONS=--max-old-space-size=3072 next build --webpack
+
+Environment variables loaded from .env
+Prisma schema loaded from prisma/schema.prisma
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+Error: 
+EOVERFLOW: value too large for defined data type, unlink '/home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/.prisma/client/index.js'
+
+
+npm notice
+npm notice New minor version of npm available! 11.6.1 -> 11.20.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.20.0
+npm notice To update run: npm install -g npm@11.20.0
+npm notice

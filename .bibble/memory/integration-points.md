@@ -1,5 +1,48 @@
 # INTEGRATION POINTS — Pontos de Integração
 
+## Alpha Catcher (2026-10-05)
+
+CAPTCHA: `confirmarCaptcha` no job usa o mesmo worker/lock e só envia comandos
+permitidos por IPC. Endpoint autenticado admite `confirmar_captcha`/`tentar_captcha`
+para proprietário em espera, recusando duplicidade. Estado público captcha tem
+allowlist; não inclui email/token. UI oferece aba oficial e confirmação/retry,
+polling backend automático, sem inferir resolução por fechar popup.
+
+Importação automática: `logcomex-job.ts` inicia worker com parâmetros limitados,
+validados em `logcomex-input.ts`; GET/POST de coleta usam acessoCatcher e userId
+da sessão. Resultados/etapas IPC têm allowlist e nunca expõem credenciais.
+Lock no tmp do host serializa logins; snapshots preservam coleta parcial. Exige
+processo persistente e status na instância iniciadora. Caminhos da automação e
+fork configuráveis por variáveis server-only, documentadas em `docs/alpha-catcher.md`.
+
+`src/lib/modulos-registry.ts`: módulo e permissão `alphaCatcher`, grupo `leadsMarketing`.
+`KNOWN_MODULE_PERMISSIONS` deriva do registry; gate comum em
+`src/lib/alpha-catcher/access.ts` protege página e POST. Sem atribuição de acesso
+ao banco nesta entrega. UI usa RadarBackground/CardComScan e tema do usuário.
+`processarEmpresa` consulta Prisma antes das APIs, chama consultarRadar e ReceitaWS
+e faz CREATE em `consultas_radar`; P2002 recupera concorrente sem sobrescrever.
+CLI e API usam o mesmo serviço. Fila UI não é worker persistente; reserva de
+30 segundos só coordena chamadas Catcher no mesmo processo. Guia: `docs/alpha-catcher.md`.
+
+## Data comercial do fechamento — escrita, consulta e exibição pela data escolhida (RM-2026-AD3EA4)
+
+**Arquivos:** `src/lib/comercial/data-comercial.ts` (fonte única de verdade), `src/actions/ContratoComercial.ts` (`ConfirmarFechamentoSchema`, `confirmarFechamento`, `getContratos`), `src/actions/Metas.ts` (`getDadosMetas`), `src/components/comercial/ModalConfirmacaoFechamento.tsx`, `tests/metas/data-comercial.test.ts`, `scripts/auditar-datas-comerciais.mts`.
+
+**Propósito:** contabilizar e exibir vendas/contratos pela data comercial escolhida no fechamento (`YYYY-MM-DD`), sem deslocamento de dia nas fronteiras de mês/ano, sem dependência de `createdAt`/`updatedAt` e independente do fuso do servidor.
+
+**Caminho de integração:**
+
+1. `ModalConfirmacaoFechamento.tsx` inicializa `dataPagamento` com `dataComercialHoje()` (calendário local do navegador, apenas default) e valida o `<input type="date">` com `parseDataComercial` antes de enviar.
+2. `confirmarFechamento` valida `pagamentoConfirmadoEm` via `ConfirmarFechamentoSchema` (exige `parseDataComercial` válido — sem fallback `new Date()`), persiste `parseDataComercial(d.pagamentoConfirmadoEm)!` em `pagamentoConfirmadoEm` e usa a mesma data comercial no sync CS&NPS (`dataContratacao`).
+3. `getDadosMetas` e `getContratos` (fechados) filtram por `pagamentoConfirmadoEm: periodoComercialMensal(ano, mes)` — limites `{ gte, lt }` ambos UTC, consistentes com a escrita; `orderBy: pagamentoConfirmadoEm desc`.
+4. Exibição usa `formatarDataComercial` (pt-BR ancorado em UTC).
+
+**Editado quando:** mudança na convenção de armazenamento da data comercial, no contrato do modal de fechamento, nos limites de período mensal, no sync CS&NPS ou na exibição de datas comerciais.
+
+**Última atualização:** 2026-10-01 por Scribe (RM-2026-AD3EA4, Fase 3 — encerramento)
+
+---
+
 ## Exclusão definitiva de campo com dados — diálogo de confirmação, action e limpeza de blob (RM-2026-76D6E4)
 
 **Arquivos:** `src/lib/validations/bpm.ts` (`excluirCampoSchema` com `confirmarDescarteDados`/`usoConfirmado`), `src/actions/bpm/Campos.ts` (`ExcluirCampoBpm`), `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/FormularioEtapaWorkspace.tsx` (diálogo de exclusão), `src/lib/bpm/anexos-lifecycle.ts` (limpeza de blob reutilizada).
@@ -3017,3 +3060,28 @@ RM-2026-B5C986: page.tsx administrativa envolve AdminPipelineClient (chave id:co
 ### RM-2026-04A236 — Fase 5 Nova
 
 RM-2026-04A236: FormularioEtapaWorkspace → ListaCamposFormulario → moverItemFormulario → rascunho no PipelineEditorStateProvider → SalvarFormularioEtapaBpm. Contrato de seções e leitura por campoIds preservado; sem nova rota.
+
+
+### RM-2026-3EAE77 — 2026-09-30
+
+Builder: MODULOS_REGISTRY id/permission builder, grupo estudioConteudo, Globe → sidebar/abas → /PainelAlpha/Builder; rota auth + getPermissoesEfetivas; catálogo de setor automático. Sem banco novo.
+
+Alpha Catcher (2026-10-06): worker `scripts/alpha-catcher-logcomex.mjs` →
+`alpha-catcher-session.mjs` → cache privado por conta em
+`~/LogcomexAutomation/alpha-catcher-sessions`. Restauração exige sucesso BI antes
+de dispensar Gmail/OTP; falha invalida e volta ao login. CLI disable/enable ou
+env LOGCOMEX_SESSION_REUSE=false permite reversão; script
+`deploy-alpha-catcher-session.sh` instala com backup e restaura o worker original.
+Sem alteração de banco. Validação automatizada: 67 testes; sem login real.
+Publicado por sudo no staging em 2026-10-06, scripts ativos idênticos por hash,
+backup 700/root presente, serviço active e HTTPS 200; sem reinício.
+
+
+### 2026-10-01 — Scribe — RM-2026-AD3EA4: fechamento e metas
+
+**Arquivos:** `src/app/PainelAlpha/Metas/page.tsx`, `MetasClient.tsx`, `src/components/comercial/ModalGerenciamentoLeads.tsx`, `ModalConfirmacaoFechamento.tsx`, `src/actions/ContratoComercial.ts`, `src/actions/Metas.ts`.
+**Propósito:** consumir a data comercial escolhida na contabilização mensal e na exibição dos contratos fechados.
+**Editado quando:** mudar validação, persistência, exibição ou filtros da data de fechamento.
+**Exemplo:** `parseDataComercial("2026-09-30")` produz `2026-09-30T00:00:00.000Z`; `periodoComercialMensal(2026, 9)` delimita setembro em UTC, excluindo 01/10.
+**Acesso validado por inspeção:** sessão → `/PainelAlpha/Metas` → botão Gerenciamento de Leads → modal de gerenciamento → modal de confirmação → confirmarFechamento → atualização de getDadosMetas/getContratos. Autenticação na página e guardas existentes nas actions preservadas; nenhuma rota ou permissão nova. Smoke em navegador não executado.
+**Última atualização:** 2026-10-01 por Scribe.

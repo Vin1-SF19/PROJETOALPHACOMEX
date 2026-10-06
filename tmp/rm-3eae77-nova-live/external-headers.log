@@ -1,0 +1,22 @@
+HTTP/2 307 
+date: Wed, 30 Sep 2026 17:44:47 GMT
+location: https://gateway-production-3365.up.railway.app/auth/sign-in?callbackURL=https%3A%2F%2Fgateway-production-3365.up.railway.app%2F
+server: railway-hikari
+via: 1.1 Caddy
+x-railway-request-id: fubAQcPVSdmR5b7v6WHkDg
+content-type: text/plain; charset=utf-8
+x-railway-edge: gru1
+x-hikari-trace: gru1.jrt2
+
+HTTP/2 200 
+cache-control: private, no-cache, no-store, max-age=0, must-revalidate
+content-type: text/html; charset=utf-8
+date: Wed, 30 Sep 2026 17:44:47 GMT
+link: </_next/static/chunks/3eazdee460q3k.css>; rel=preload; as="style", </_next/static/chunks/1emqrgmppqmo4.css>; rel=preload; as="style"
+server: railway-hikari
+vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+via: 1.1 Caddy
+x-railway-request-id: okTaE5IuRB2WdaR6nPRhug
+x-railway-edge: gru1
+x-hikari-trace: gru1.jrt2
+

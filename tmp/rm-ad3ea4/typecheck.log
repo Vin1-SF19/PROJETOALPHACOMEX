@@ -1,0 +1,5 @@
+
+> alpha_sistema@0.1.0 typecheck
+> NODE_OPTIONS=--max-old-space-size=8192 tsc --noEmit
+
+scripts/auditar-datas-comerciais.mts(4,13): error TS2540: Cannot assign to 'NODE_ENV' because it is a read-only property.

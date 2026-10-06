@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createClient } from "@libsql/client";
-import { PrismaLibSql } from "@prisma/adapter-libsql";
+import { PrismaLibSQL as PrismaLibSql } from "@prisma/adapter-libsql";
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { archiveInventoryItem, deleteInventoryItemPermanently, saveInventoryItem } from "@/lib/estoque/items-service";

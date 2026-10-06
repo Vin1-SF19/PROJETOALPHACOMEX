@@ -19,6 +19,21 @@ Fonte: `src/lib/temas.ts` (`CONFIG_TEMAS`). Cada tema tem `text`, `bg`, `border`
 | Borda | `border-white/5` | Padrão em quase todo card do painel |
 | Accent indigo | `rgb(99, 102, 241)` / `text-indigo-400/500` | Cor de destaque mais comum |
 
+## Referência ChatbotX para convergência do Painel Alpha (2026-10-05)
+
+Fonte analisada: `/home/ialpha/projetos/ChatbotX/apps/builder` e `/home/ialpha/projetos/ChatbotX/packages/ui/src/styles/default.css`.
+
+- **Tipografia base:** `Inter, sans-serif`; dados técnicos/numéricos em `JetBrains Mono, monospace`; serif opcional `Source Serif 4`.
+- **Raiz clara:** `--background: oklch(1 0 0)`, `--foreground: oklch(0.141 0.005 285.823)`, cards brancos, borda `oklch(0.92 0.004 286.32)`.
+- **Raiz escura:** `--background: oklab(18.288% 0.00014 -0.01275)` (~`#17181c`), foreground `oklch(0.985 0 0)`, card `oklch(0.21 0.006 285.885)`, muted `oklch(0.274 0.006 286.033)`, texto secundário `oklch(0.705 0.015 286.067)`, borda branca em 10%.
+- **Primary azul:** claro `oklch(0.488 0.243 264.376)`; dark `oklch(0.707 0.165 254.624)`; foco dark `oklch(0.76 0 0)`.
+- **Forma:** radius base efetivo `0.65rem` no UI compartilhado; controles devem usar a escala semântica `sm/md/lg/xl`, sem radius arbitrário por tela.
+- **Modelo de tema:** tokens semânticos (`background`, `card`, `muted`, `border`, `primary`, `sidebar`) e tema por classe (`theme-blue`, `theme-emerald`, etc.), em vez de espalhar hex/RGB em componentes.
+
+### Regra de adoção
+
+O Painel Alpha deve adotar primeiro a **estrutura semântica e a tipografia Inter**, preservando seu fundo operacional dark e seus accents por usuário. A paleta clara/dark completa do ChatbotX só deve ser introduzida quando houver decisão explícita de produto; não misturar `--background` claro do ChatbotX com layouts Alpha que ainda dependem de `#020617`.
+
 ## Border Radius
 - Cards grandes: `rounded-[2.5rem]` a `rounded-[3rem]`
 - Botões/inputs: `rounded-xl` a `rounded-2xl`

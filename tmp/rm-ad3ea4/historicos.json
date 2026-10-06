@@ -1,0 +1,5 @@
+prisma:error 
+Invalid `prisma.contratoComercial.findMany()` invocation:
+
+
+URL_INVALID: The URL '' is not in a valid format

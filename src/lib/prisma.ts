@@ -1,8 +1,8 @@
 import { PrismaClient } from '@prisma/client'
-import { PrismaLibSql as PrismaLibSqlNode } from '@prisma/adapter-libsql'
+import { PrismaLibSQL as PrismaLibSqlNode } from '@prisma/adapter-libsql'
 // Variante /web usa @libsql/client/web (HTTP puro, sem binário nativo)
 // Necessário no Windows/Node 24 onde @libsql/win32-x64-msvc não carrega
-import { PrismaLibSql } from '@prisma/adapter-libsql/web'
+import { PrismaLibSQL as PrismaLibSql } from '@prisma/adapter-libsql/web'
 
 // libsql:// → https:// para usar transport HTTP puro
 const configuredUrl = process.env.TURSO_DATABASE_URL ?? ''

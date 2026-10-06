@@ -808,3 +808,8 @@ Registro histórico RM-2026-09A642, superado em 2026-09-22 por RM-2026-B88712: h
 ### RM-2026-04A236 — Fase 5 Nova
 
 ListaCamposFormulario: componente administrativo em src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/ListaCamposFormulario.tsx. Reutiliza Card, Badge e @dnd-kit; lista plana com metadados, sensores, anúncios e botões alternativos. Consumido por FormularioEtapaWorkspace.
+
+
+### RM-2026-3EAE77 — 2026-09-30
+
+BuilderClient (src/app/PainelAlpha/Builder/BuilderClient.tsx): iframe externo com controles permanentes, prazo 30s, retry por key, offline e estados acessíveis; reutiliza Button.

@@ -1,0 +1,7 @@
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+prisma:error 
+Invalid `prisma.contratoComercial.findMany()` invocation:
+
+
+URL_INVALID: The URL '' is not in a valid format
+Auditoria indisponível: não foi possível consultar os contratos. Nenhum dado alterado.

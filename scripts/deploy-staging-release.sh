@@ -40,6 +40,7 @@ rsync -a \
   --exclude='.next/' \
   --exclude='.next-dev/' \
   --exclude='.next-test/' \
+  --exclude='.next*/' \
   --exclude='node_modules/' \
   --exclude='.cache/' \
   --exclude='coverage/' \
@@ -52,7 +53,25 @@ rsync -a \
   --exclude='backup_*' \
   --exclude='tsconfig.tsbuildinfo' \
   "$source_root/" "$release_path/"
+# A automação fica no workspace, fora das releases isoladas do painel.
+printf '\nLOGCOMEX_AUTOMATION_DIR=%s\nLOGCOMEX_SHIPMENT_DIR=%s\n' \
+  "${LOGCOMEX_AUTOMATION_DIR:-$(dirname "$source_root")/API/automacao-logcomex}" \
+  "${LOGCOMEX_SHIPMENT_DIR:-$(dirname "$source_root")/API/green-coast-ncm-lgcmx-integracao}" \
+  >> "$release_path/.env"
 cp -al "$source_root/node_modules" "$release_path/node_modules"
+# Prisma generate rewrites files inside node_modules/.prisma/client. If this
+# directory remains hard-linked to the workspace, a later build can mutate
+# files used by an already active release (for example, truncating
+# query_compiler_bg.js while replacing the WASM). Give every release its own
+# generated Prisma client before copying the Next build.
+if [[ -d "$release_path/node_modules/.prisma/client" ]]; then
+  prisma_client_snapshot="$release_path/node_modules/.prisma/client.snapshot-$release_id"
+  prisma_client_hardlinks="$release_path/node_modules/.prisma/client.hardlinks-$release_id"
+  cp -a "$source_root/node_modules/.prisma/client" "$prisma_client_snapshot"
+  mv "$release_path/node_modules/.prisma/client" "$prisma_client_hardlinks"
+  mv "$prisma_client_snapshot" "$release_path/node_modules/.prisma/client"
+  rm -rf "$prisma_client_hardlinks"
+fi
 rsync -a "$source_root/.next/" "$release_path/.next/"
 
 smoke_port=""

@@ -1,0 +1,30 @@
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+▲ Next.js 16.1.6 (webpack)
+- Experiments (use with caution):
+  · cpus: 1
+  · serverActions
+  ✓ webpackMemoryOptimizations
+
+  Creating an optimized production build ...
+⚠ Compiled with warnings in 46s
+
+./src/lib/bibble/pdfjs-polyfill.ts
+Critical dependency: require function is used in a way in which dependencies cannot be statically extracted
+
+Import trace for requested module:
+./src/lib/bibble/pdfjs-polyfill.ts
+./src/lib/bibble/tika.ts
+./src/app/api/bibble/chat/route.ts
+
+./src/lib/bibble/pdfjs-polyfill.ts
+Critical dependency: the request of a dependency is an expression
+
+Import trace for requested module:
+./src/lib/bibble/pdfjs-polyfill.ts
+./src/lib/bibble/tika.ts
+./src/app/api/bibble/chat/route.ts
+

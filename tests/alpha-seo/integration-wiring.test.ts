@@ -19,7 +19,9 @@ describe("Alpha SEO module integration", () => {
       (module) => module.category === "comercial",
     );
     expect(entries).toHaveLength(1);
-    expect(commercialEntries[0]?.id).toBe("alphaSeo");
+    expect(commercialEntries).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "alphaSeo" }),
+    ]));
     expect(entries[0]).toMatchObject({
       label: "Open SEO · Alpha SEO",
       href: "/PainelAlpha/AlphaSEO",

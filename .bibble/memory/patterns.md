@@ -9,6 +9,21 @@
 
 <!-- Adicionar aqui -->
 
+### Convergência visual Painel Alpha ↔ ChatbotX
+**Mapeado em:** 2026-10-05.
+
+Para atualizar o design global do Painel Alpha com a linguagem do ChatbotX:
+
+1. Criar uma camada única de tokens semânticos (`background`, `foreground`, `card`, `muted`, `border`, `input`, `primary`, `ring`, `sidebar`) e fazer os componentes consumirem esses tokens.
+2. Usar `Inter` como fonte de interface em todos os módulos; reservar `JetBrains Mono` para IDs, logs, horários, valores técnicos e dados tabulares quando a largura fixa ajudar a comparação.
+3. Substituir gradualmente `font-black`, headings em caixa alta e tracking excessivo por pesos 400/500/600/700; caixa alta + tracking fica restrito a micro-labels de navegação/status.
+4. Manter o dark operacional Alpha (`#020617`) como decisão de continuidade, mas aproximar superfícies e contraste do ChatbotX: card elevado, muted neutro, borda semântica de 10% e primary azul por token.
+5. Accent de tema continua contextual (`blue`, `emerald`, etc.), porém só deve colorir ação, seleção, foco e status; não usar accent como fundo dominante nem como cor de texto para blocos longos.
+6. Padronizar radius e estados de foco/hover via componentes compartilhados; não criar novos valores arbitrários em cada módulo.
+7. Migrar por superfícies: shell/sidebar → componentes de formulário → tabelas/cards → módulos especiais. Cada etapa precisa validar contraste, navegação por teclado, responsividade e estados vazio/loading/erro.
+
+**Anti-padrões:** copiar literalmente a paleta clara do ChatbotX para telas Alpha dark; manter hex/RGB hardcoded quando já existir token; usar cor como único indicador de status; transformar toda tipografia em uppercase/bold; alterar layout e tema simultaneamente sem comparação visual por rota.
+
 ---
 
 ## Padrões de Componentes

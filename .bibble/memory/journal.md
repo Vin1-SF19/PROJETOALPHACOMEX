@@ -1,5 +1,29 @@
 # JOURNAL — Histórico Cronológico de Sessões
 
+## 2026-10-01 — Scribe — RM-2026-AD3EA4 — Fase 3 (CLOSURE) — Encerramento documental
+
+**Tags:** #comercial #metas #data-comercial #utc #sem-migration #concluido
+
+**Objetivo:** Corrigir a contabilização de vendas pela data escolhida no fechamento (data comercial `YYYY-MM-DD`), sem deslocamento de dia nas fronteiras de mês/ano e sem dependência de `createdAt`/`updatedAt`.
+
+**Story:** `docs/stories/story-rm-2026-ad3ea4-data-comercial.md` (Status: Ready for Review — encerramento documental local; validações pendentes registradas).
+
+**Causa raiz corrigida:** a data comercial `YYYY-MM-DD` do modal era convertida com `new Date("YYYY-MM-DD")` (UTC midnight) na escrita, mas as consultas usavam limites `new Date(ano, mes, 1)` em horário local do servidor; a mistura UTC (escrita) × local (consulta) deslocava dias/meses nas fronteiras, e o fallback `new Date()` gravava o instante do servidor quando a string era ausente.
+
+**Solução (fonte única de verdade em `src/lib/comercial/data-comercial.ts`):** `parseDataComercial` → `Date` em UTC midnight determinístico (`${value}T00:00:00.000Z`) com validação de formato e rejeição de datas impossíveis; `periodoComercialMensal(ano, mes)` → limites `{ gte, lt }` ambos UTC; `dataComercialHoje()` → default do modal (calendário local do navegador); `formatarDataComercial()` → exibição `pt-BR` ancorada em UTC.
+
+**Integração confirmada no código real:** `ConfirmarFechamentoSchema` exige `pagamentoConfirmadoEm` válido via `parseDataComercial` (sem fallback `new Date()`); `confirmarFechamento` persiste `parseDataComercial(...)` e usa a mesma data no sync CS&NPS (`dataContratacao`); `getDadosMetas` e `getContratos` usam `periodoComercialMensal`; `ModalConfirmacaoFechamento` inicializa com `dataComercialHoje()` e valida com `parseDataComercial`.
+
+**Gates desta sessão (encerramento):** `npm run lint` exit 0; `npm run typecheck` exit 0; `npm test` exit 1 (EBUSY no diretório coverage — limitação de ambiente); `npx vitest run tests/metas/data-comercial.test.ts --coverage.enabled=false` exit 0 (18/18). Build não repetido nesta fase; histórico da revalidação registra exit 1 por EOVERFLOW no client Prisma. Testes mockados não comprovam persistência no banco real.
+
+**Pendências reais (não impeditivas, nenhuma oculta):** auditoria histórica com acesso autorizado e evidência da data originalmente escolhida (script `scripts/auditar-datas-comerciais.mts` é somente leitura; indisponível nesta sessão por EACCES/URL_INVALID); suíte global/build completos e smoke autenticado em navegador antes de promoção pelo fluxo normal.
+
+**Sem banco:** nenhuma alteração de schema, migration, backfill, mutação de banco ou backup foi executada nesta fase documental; backup não se aplica.
+
+**Arquivos desta fase:** `.bibble/memory/journal.md` (este registro), `.bibble/memory/codebase-map.md`, `.bibble/memory/integration-points.md`, `.bibble/memory/decisions.md`, `docs/stories/story-rm-2026-ad3ea4-data-comercial.md`.
+
+**DELIVERY_READY:** `/PainelAlpha/Metas` (sessão autenticada) → botão Gerenciamento de Leads → `ModalGerenciamentoLeads` → `ModalConfirmacaoFechamento` → `confirmarFechamento` → `getDadosMetas`/`getContratos`. Caminho validado por inspeção do código; 18 regressões aprovadas, sem smoke em navegador.
+
 ## 2026-09-24 — Kowalski — RM-2026-8996E2 — Fase 10 (CLOSURE) — Arquivamento do plano
 
 **Tags:** #crm #alpha-crm #loading #arquivamento #sem-migration #nao-publicado
@@ -6898,3 +6922,154 @@ Publicação: commit 598efced na branch fix/crm-motor-automacoes-backend, merge 
 - A seleção do arquivo preserva o rascunho para o botão manual, valida extensão/MIME e conteúdo permitido, mostra erro específico e sempre encerra o indicador após erro ou timeout. Retry reutiliza recibo válido; recibo expirado é renovado. `RegistrarAnexoBpm` recupera corrida `P2002` quando o anexo existente pertence ao mesmo campo.
 - O upload via Function agora limita o arquivo a 4 MiB com mensagem clara, abaixo do limite de corpo total de 4,5 MB da Vercel. Arquivos maiores exigem fluxo futuro de upload direto ao Blob com autorização e recibo seguro.
 - Gates finais: lint 0 erros/1.191 avisos, typecheck, 558 arquivos/4.091 testes aprovados, build e diff check. Nenhuma mudança de schema/migration ou upload real de produção nesta validação.
+
+
+### RM-2026-3EAE77 — 2026-09-30
+
+Nova implementou RM-2026-3EAE77 fase 2 após reinspeção do blueprint da fase 0. Rota, registro e BuilderClient conectados; seis testes pertinentes passaram. npm test bloqueado por EBUSY coverage; build falhou antes da compilação no Prisma generate. Evidências tmp/rm-3eae77-*. Verificação visual/autenticada e embedding real pendentes; preservadas alterações alheias, sem Git mutável nem mudança de banco.
+
+### 2026-09-30 — Nova — RM-2026-3EAE77 revalidação executora
+Entrega Builder existente preservada e caminho de navegação reinspecionado. Lint/typecheck e 6 testes pertinentes passaram. Suíte com cobertura isolada: 4139 passaram; falha única Bibble por EACCES .env.example. Gates padrão test/build continuam com EBUSY coverage e EACCES/EOVERFLOW no Prisma, reproduzindo histórico. Diagnóstico next build isolado: 124. Sem banco/Git mutável; smoke desktop/mobile e build completo pendentes. Logs: tmp/rm-3eae77-revalidation/.
+
+
+### 2026-09-30 — Nova — RM-2026-3EAE77 gates finais locais
+Implementação Builder preservada; rota/menu/permissão/catálogo e retry reinspecionados. Lint e typecheck exit 0; seis testes Builder passaram. npm test EBUSY coverage; cobertura isolada 4139 passaram, falha única Bibble EACCES .env.example; build falhou no Prisma por EACCES/EOVERFLOW antes de compilar páginas, iguais ao histórico. Evidências tmp/rm-3eae77-nova-final/. PASS da implementação local; build completo e smoke autenticado desktop/mobile pendentes da verificação. Sem banco, Git mutável ou reescrita alheia.
+
+
+### 2026-09-30 — Nova — RM-2026-3EAE77, feedback filesystem
+
+Implementação Builder preservada após reinspeção. Menu → Estúdio de Conteúdo → Builder → aba /PainelAlpha/Builder; auth/permissão e catálogo integrados. Gates reais em tmp/rm-3eae77-nova-current: lint/typecheck/focado/lint focado 0; 6 testes Builder passaram. Test global 1 (EBUSY coverage); isolado 1 (4139 passaram, falha preexistente voice-proxy EACCES .env.example). Build 1 antes do Next (Prisma EACCES .env/EOVERFLOW default.js). Feedback atendido por reexecução, sem contornar filesystem ou alterar código alheio. PASS local; build completo e smoke autenticado desktop/mobile pendentes, sem aprovação de produção. Story/checklist/file list atualizados. Nenhuma alteração de banco ou Git mutável.
+
+
+### Nova — atendimento do feedback ambiental (2026-09-30, execução com shell)
+
+Blueprint da fase 0 e implementação reinspecionados: registry → sidebar/onOpenTab → aba interna; catálogo de setor deriva do registry; página verifica sessão e permissão builder no servidor; iframe usa URL requerida, layout flex/min-h-0, timeout 30s, offline, retry por remontagem e link externo permanente. Nenhuma correção funcional necessária; código existente preservado. Sem banco, migration ou Git mutável.
+
+DELIVERY_READY: integração local por código e 6 testes: usuário admin ou autorizado → menu Estúdio de Conteúdo → Builder · Aplicação externa → aba /PainelAlpha/Builder → iframe Railway. Smoke autenticado desktop/mobile e login externo ainda não comprovados; onLoad cross-origin não prova sucesso ou ausência de bloqueio.
+
+Feedback obrigatório: os comandos foram reexecutados, sem alterar arquivos especiais/protegidos ou apagar diretórios compartilhados. stat confirmou .env e .env.example como character special files neste ambiente; a falha não justifica mudar permissões nem substituir esses arquivos.
+
+Gates reais em tmp/rm-3eae77-nova-feedback-20260930/ (*.log e *.exit):
+- npm run lint: 0; zero erros, 1191 warnings globais, igual ao histórico.
+- npm run typecheck: 0; TS5033 anterior não se repetiu.
+- Lint focado Builder/page/test: 0.
+- npx vitest run tests/builder/embed.test.ts --coverage=false: 0; 6/6 passaram.
+- npm test: 1 antes dos testes; EBUSY ao remover coverage, preexistente.
+- npm test -- --coverage.reportsDirectory=tmp/rm-3eae77-nova-feedback-20260930/coverage: 1; 564 arquivos passaram, 4139 testes passaram, 1 falhou, 4 skipped, 1 todo. Falha exclusiva preexistente voice-proxy.test.ts:167 (EACCES .env.example); Builder incluído e aprovado.
+- npm run build (NEXT_DIST_DIR próprio, limite 600s): 1 em prisma generate, EACCES .env e EOVERFLOW ao remover node_modules/.prisma/client/index.js. Falhou imediatamente antes do Next; aumentar o limite não resolve este erro. Não houve build completo ou confirmação da rota pela listagem do build.
+
+AUTO_ADJUSTMENT_REQUIRED: filesystem impede leitura dos arquivos de ambiente e regeneração do client Prisma; falta build completo e smoke autenticado desktop/mobile.
+AUTO_ADJUSTMENT_ACCEPTANCE: em ambiente funcional, npm run build termina com 0 e lista /PainelAlpha/Builder; npm test executa sem falhas ambientais; smoke confirma menu/aba, layout, login externo e recuperação.
+
+- [x] Reinspecionar artefato, consumidores, navegação, permissões e blueprint.
+- [x] Reexecutar todos os gates e testes pertinentes; comparar falhas com histórico.
+- [x] Preservar implementação local e registrar evidências na story/journal.
+- [ ] Aprovação global de build/test e smoke autenticado pela verificação.
+
+File list desta execução: docs/stories/story-rm-2026-3eae77-embed-iframe.md; .bibble/memory/journal.md; tmp/rm-3eae77-nova-feedback-20260930/*.log, *.exit e cobertura isolada. Arquivos funcionais reinspecionados sem edição: src/lib/modulos-registry.ts; src/app/PainelAlpha/Builder/page.tsx; src/app/PainelAlpha/Builder/BuilderClient.tsx; tests/builder/embed.test.ts.
+
+Resultado local PASS conforme regra da fase executora: implementação e testes pertinentes prontos, sem evidência de regressão. Gates globais test/build não aprovados; impedimento ambiental permanece registrado, sem alegar que foi corrigido.
+
+
+### Nova — revalidação local com shell (2026-09-30, nova-check)
+
+Blueprint da fase 0 e implementação existente reinspecionados e preservados. Nenhuma mudança funcional necessária, nenhuma alteração de banco ou Git mutável. Autoajuste de rota/menu/componente já atendido.
+
+DELIVERY_READY: integração local confirmada por código e 6 testes: usuário autenticado admin ou com permissão builder → menu Estúdio de Conteúdo → Builder · Aplicação externa → aba /PainelAlpha/Builder → iframe Railway. Sidebar usa registry e onOpenTab; catálogo por setor deriva do mesmo registry; servidor verifica sessão e permissão. Smoke autenticado desktop/mobile não executado. onLoad cross-origin não comprova sucesso nem detecta todo bloqueio externo; controles permanentes permitem recuperação.
+
+Feedback ambiental atendido com reexecução real, sem alegar correção do ambiente. Evidências em tmp/rm-3eae77-nova-check/*.log e *.exit:
+- npm run lint: 0, zero erros e 1191 warnings globais, igual ao histórico.
+- npm run typecheck: 0; erro anterior de escrita do cache não se repetiu.
+- Lint focado Builder/page/test: 0.
+- npx vitest run tests/builder/embed.test.ts --coverage=false: 0; 6/6 passaram.
+- npm test: 1 antes dos testes, EBUSY em coverage, igual ao histórico.
+- npm test -- --coverage.reportsDirectory=tmp/rm-3eae77-nova-check/coverage: 1; 564 arquivos passaram, 4139 testes passaram, 1 falhou, 4 skipped e 1 todo. Falha exclusiva em tests/bibble/voice-proxy.test.ts:167, EACCES .env.example, preexistente e fora do escopo.
+- npm run build: 1 antes de compilar páginas, EACCES .env e EOVERFLOW em node_modules/.prisma/client/index.d.ts, igual ao histórico. Limite configurado de 600s; falha imediata no prisma generate. stat confirmou .env e .env.example como character special files; não substituídos nem expostos.
+
+AUTO_ADJUSTMENT_REQUIRED: ambiente impede leitura dos arquivos de configuração e regeneração do client Prisma; falta build completo e smoke autenticado desktop/mobile.
+AUTO_ADJUSTMENT_ACCEPTANCE: em ambiente funcional npm run build termina com 0 e lista /PainelAlpha/Builder; npm test executa sem falhas ambientais; smoke confirma menu/aba, layout desktop/mobile, login externo e recuperação.
+
+- [x] Reinspecionar implementação, blueprint, acesso e consumidores.
+- [x] Executar quatro gates e lint/testes pertinentes; comparar com histórico.
+- [x] Preservar código existente e atualizar checklist, file list e journal.
+- [ ] Build completo e smoke autenticado pela fase de verificação.
+
+File list desta execução: docs/stories/story-rm-2026-3eae77-embed-iframe.md; .bibble/memory/journal.md; tmp/rm-3eae77-nova-check/*.log, *.exit e cobertura isolada. Arquivos funcionais reinspecionados sem edição: src/lib/modulos-registry.ts; src/app/PainelAlpha/Builder/page.tsx; src/app/PainelAlpha/Builder/BuilderClient.tsx; tests/builder/embed.test.ts.
+
+Resultado local PASS conforme instrução da fase: implementação e testes pertinentes prontos, sem evidência de regressão. Gates globais test/build não aprovados; não há aprovação Forge/Probe/Lens.
+
+
+### Nova — revalidação do feedback com tools reais (2026-09-30, nova-session)
+
+Blueprint da fase 0 e entrega existente reinspecionados; código preservado, sem banco ou Git mutável. Autoajuste de rota/menu/componente já implementado. Consumidor: usuário autenticado admin ou com permissão builder. DELIVERY_READY: integração local menu Estúdio de Conteúdo → Builder · Aplicação externa → aba /PainelAlpha/Builder → iframe Railway, validada por registry/sidebar/catálogo/guard e seis testes. Não representa smoke autenticado desktop/mobile nem comprova sucesso cross-origin pelo onLoad.
+
+Feedback atendido por reexecução, sem alegar correção do ambiente. Logs e exits: tmp/rm-3eae77-nova-session/.
+- lint: 0; warnings globais preexistentes; lint focado: 0.
+- typecheck: 0; erro TS5033 anterior não se repetiu.
+- teste Builder: 0, 6/6.
+- npm test: 1 antes dos testes, EBUSY coverage, igual ao histórico.
+- suíte com cobertura isolada: 1; 564 arquivos e 4139 testes passaram; uma falha preexistente voice-proxy.test.ts:167, EACCES .env.example; 4 skipped e 1 todo.
+- build: 1 no prisma generate, EACCES .env e EOVERFLOW node_modules/.prisma/client/index.d.ts; nenhuma página compilada. Gates globais test/build não aprovados, sem evidência de regressão do Builder.
+
+AUTO_ADJUSTMENT_REQUIRED: ambiente impede build completo e suíte global sem erros ambientais; smoke autenticado desktop/mobile ainda pendente.
+AUTO_ADJUSTMENT_ACCEPTANCE: ambiente funcional permite npm test e npm run build com exit 0, build lista /PainelAlpha/Builder; smoke confirma menu/aba, layout desktop/mobile, login externo e recuperação.
+
+- [x] Reinspecionar implementação, acesso e blueprint preservando working tree.
+- [x] Executar quatro gates e lint/testes pertinentes, comparar com histórico.
+- [x] Atualizar checklist, file list e journal.
+- [ ] Build completo e smoke autenticado pela verificação.
+
+File list desta execução: docs/stories/story-rm-2026-3eae77-embed-iframe.md; .bibble/memory/journal.md; tmp/rm-3eae77-nova-session/*.log, *.exit e cobertura isolada. Arquivos funcionais preservados: src/app/PainelAlpha/Builder/page.tsx; BuilderClient.tsx; src/lib/modulos-registry.ts; tests/builder/embed.test.ts.
+Resultado local PASS pela regra da fase executora; sem aprovação global Forge/Probe/Lens.
+
+
+### Nova — reinspeção e gates reais (2026-09-30, audit-0930)
+
+Blueprint da fase 0 e entrega implementada reinspecionados; preservados registry, página, componente e testes. Nenhuma correção funcional necessária, nenhuma alteração de banco ou Git mutável. Artefato: página Builder; consumidor: usuário autenticado admin ou com permissão builder.
+
+DELIVERY_READY: caminho local validado por código e 6 testes: menu lateral → Estúdio de Conteúdo → Builder · Aplicação externa → aba /PainelAlpha/Builder → iframe da URL Railway requerida. Sidebar usa registry/onOpenTab, catálogo por setor e permissões efetivas derivam do registry, servidor verifica sessão/permissão. Não equivale a smoke autenticado desktop/mobile. onLoad cross-origin não comprova sucesso: timeout cobre ausência de load e controles permanentes oferecem recuperação.
+
+Feedback ambiental reavaliado por comandos reais. Logs/códigos: tmp/rm-3eae77-nova-audit-0930/.
+- npm run lint: exit 0; warnings globais preexistentes.
+- npm run typecheck: exit 0; TS5033 não se repetiu.
+- Lint focado nas páginas Builder/teste: exit 0.
+- npx vitest run tests/builder/embed.test.ts --coverage=false: exit 0; 6/6 testes passaram.
+- npm test: exit 1 antes dos testes, EBUSY em coverage, igual ao histórico.
+- npm run build: exit 1 no prisma generate, EACCES .env e EOVERFLOW node_modules/.prisma/client/index-browser.js, antes de compilar páginas, igual ao histórico.
+
+stat confirmou .env e .env.example como arquivos especiais de caractere. Não foram lidos, substituídos ou tiveram permissões alteradas. Não houve evidência de regressão do módulo; gates globais test/build não aprovados. Suíte isolada anterior não foi repetida: a falha preexistente em voice-proxy está documentada; esta sessão executou os testes pertinentes.
+
+AUTO_ADJUSTMENT_REQUIRED: filesystem impede execução da suíte global e build completo; smoke autenticado desktop/mobile permanece pendente.
+AUTO_ADJUSTMENT_ACCEPTANCE: em ambiente funcional npm test e npm run build terminam com 0, build lista /PainelAlpha/Builder; smoke confirma menu/aba, dimensões, login externo e recuperação.
+
+- [x] Reinspecionar blueprint, implementação, consumidores e integração.
+- [x] Executar os quatro gates e lint/testes pertinentes; comparar com histórico.
+- [x] Atualizar checklist, file list e journal, preservando trabalho existente.
+- [ ] Build completo e smoke autenticado na fase de verificação.
+
+File list desta execução: docs/stories/story-rm-2026-3eae77-embed-iframe.md; .bibble/memory/journal.md; tmp/rm-3eae77-nova-audit-0930/*.log e *.exit. Arquivos funcionais reinspecionados sem edição: src/lib/modulos-registry.ts; src/app/PainelAlpha/Builder/page.tsx; src/app/PainelAlpha/Builder/BuilderClient.tsx; tests/builder/embed.test.ts.
+
+Resultado local PASS conforme instrução da fase executora: implementação e testes pertinentes prontos; aprovação global e smoke permanecem pendentes, sem aprovação Forge/Probe/Lens.
+
+### 2026-09-30 — Nova, RM-2026-3EAE77 fase 1
+Contrato da story atualizado exclusivamente com auditoria da fase 0 e feedback obrigatório: endpoint gateway-production-3365, correção mínima da constante e testes literais na próxima fase. Integração existente preservada; nenhum código/banco/Git mutável alterado. Consumo da story pela fase dev; navegação final pelo menu Builder e rota /PainelAlpha/Builder. Gates desta sessão registrados na story.
+
+
+### 2026-09-30 — Nova, RM-2026-3EAE77 fase 2, gates executados
+Endpoint gateway já corrigido e testes literais preservados; nenhum código funcional alterado. Integração menu/registry/onOpenTab/rota protegida conferida e seis testes passaram. GET externo: 307 login → 200, sem X-Frame-Options/CSP observados; smoke autenticado e embedding real pendentes. Lint exit 0 (1191 warnings globais), typecheck 0, lint focado 0, teste Builder 0 (6/6), npm test 1 (EBUSY coverage), build 1 (EOVERFLOW Prisma). Falhas ambientais compatíveis com histórico, sem evidência de regressão. Story/checklist/file list atualizadas. Evidências: tmp/rm-3eae77-nova-live/. Sem banco ou Git mutável.
+
+
+### 2026-09-30 18:03 UTC — Nova, RM-2026-3EAE77 fase 2, checkpoint local
+Endpoint gateway e asserções literais já presentes, preservados. Integração menu/aba/rota/guardas revalidada. Lint e typecheck exit 0, lint focado 0, teste Builder 6/6. Test global 1 por EBUSY coverage; build 1 por EACCES .env/EOVERFLOW Prisma, antes do Next, compatíveis com histórico. HEAD gateway 307 login → 200, sem cabeçalhos de bloqueio observados; smoke autenticado pendente. Story/checklist/file list atualizadas. Evidências: tmp/rm-3eae77-nova-checkpoint-current/. Nenhum novo componente, decisão arquitetural, alteração de banco ou Git mutável. PASS local sem aprovação global Forge/Probe/Lens.
+
+
+## 2026-10-01 — Nova — RM-2026-AD3EA4
+Implementada data comercial validada YYYY-MM-DD ancorada em UTC, filtros mensais UTC compartilhados, modal sem default UTC e exibição de fechamento em UTC. Blueprint recebido da fase contexto; schema preservado. Tests de actions e fronteiras em tests/metas/data-comercial.test.ts. Auditoria histórica somente leitura indisponível (EACCES); nenhum registro alterado. Gates e evidências em tmp/rm-ad3ea4; limitações detalhadas na story.
+
+### 2026-10-01 — Nova — RM-2026-AD3EA4, revalidação local
+Preservada correção existente; adicionadas três regressões com relógio controlado. 18 testes passaram em quatro fusos; lint global/focado e typecheck passaram. Test global falhou por EBUSY coverage e build por EOVERFLOW Prisma, compatíveis com logs anteriores. Auditoria histórica somente leitura indisponível por EACCES/URL_INVALID; nenhum registro confirmado nem alterado. Integração /PainelAlpha/Metas → modais → actions confirmada por código e testes mockados, sem smoke em navegador. Story/checklist/file list atualizadas; evidências em tmp/rm-ad3ea4/revalidation/. Nenhum novo componente ou decisão arquitetural.
+
+
+### 2026-10-01 — Scribe — RM-2026-AD3EA4, fase 3 CLOSURE
+Encerramento exclusivamente documental. Código existente e acesso autenticado /PainelAlpha/Metas → Gerenciamento de Leads → modais → actions reinspecionados. Lacuna documental corrigida por acréscimos em codebase-map, integration-points, decisions e known-errors. Story contém relatório, checklist e file list atualizados; Ready for Review com pendências explícitas. Lint e typecheck exit 0; regressões 18/18 exit 0; npm test exit 1 por EBUSY coverage. Evidências locais: tmp/rm-ad3ea4/closure/. Build não repetido, falha EOVERFLOW registrada na fase anterior; auditoria histórica e smoke autenticado pendentes. Nenhum código, banco, schema, migration ou Git mutável alterado. PASS da fase documental não é aprovação global de qualidade nem promoção automática.
+Arquivos desta fase: docs/stories/story-rm-2026-ad3ea4-data-comercial.md; .bibble/memory/codebase-map.md; .bibble/memory/integration-points.md; .bibble/memory/decisions.md; .bibble/memory/known-errors.md; .bibble/memory/journal.md.

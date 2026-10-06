@@ -1,5 +1,36 @@
 # CODEBASE MAP — Mapa Estrutural do Projeto
 
+## Alpha Catcher (2026-10-05)
+
+Sessão reversível (2026-10-06): `scripts/alpha-catcher-session.mjs` persiste estado
+privado por conta, restaura e invalida antes de voltar ao login completo.
+Worker valida acesso BI antes de dispensar Gmail/OTP. CLI enable/disable e
+`scripts/deploy-alpha-catcher-session.sh` (apply/rollback) permitem reversão.
+Publicado no staging, backup do worker anterior mantido; 67 testes aprovados,
+sem teste de login real.
+
+CAPTCHA: helpers `scripts/alpha-catcher-captcha.mjs` verificam requisito da conta
+e etapas visíveis do login. Worker pausa, publica estados e aceita checagem
+imediata por IPC; UI abre página oficial e oferece confirmar/retry. API protege
+ações pelo dono do job. 56 testes em sete suítes. Sem compartilhamento de sessão
+entre aba externa e browser backend; liberação real da conta não validada.
+
+Ampliação Shipment Intel: worker privado `scripts/alpha-catcher-logcomex.mjs`,
+jobs `src/lib/alpha-catcher/logcomex-job.ts`, validação `logcomex-input.ts` e
+`POST/GET /api/alpha-catcher/logcomex`. Reutiliza Gmail/OTP da automação original
+e captura/coletor do fork green-coast para resolver caminho original ausente.
+Botão UI inicia coleta e encaminha resultado completo ao enriquecimento; mantém JSON.
+39 testes em seis suítes; sem login ou importação real nesta entrega.
+
+Leads & Marketing, registry/permissão `alphaCatcher`. Página/client em
+`src/app/PainelAlpha/AlphaCatcher/`; POST autenticado em `src/app/api/alpha-catcher/route.ts`;
+domínio, acesso e persistência em `src/lib/alpha-catcher/{core,access,service}.ts`;
+CLI `scripts/alpha-catcher.mts`. Reutiliza `consultas_radar`, RadarBackground,
+CardComScan e consultarRadar. 24 testes em `tests/alpha-catcher/`; guia
+`docs/alpha-catcher.md`. Fila local na aba e admissão por processo Node.
+Sem migration/importação real executada; build/testes globais bloqueados por EACCES de `.env`.
+
+- Data comercial do fechamento (RM-2026-AD3EA4, 2026-10-01): fonte única de verdade em `src/lib/comercial/data-comercial.ts` — `parseDataComercial` (string `YYYY-MM-DD` → `Date` em UTC midnight determinístico, com validação de formato e rejeição de datas impossíveis), `periodoComercialMensal(ano, mes)` (limites `{ gte, lt }` ambos UTC), `dataComercialHoje()` (default do modal, calendário local do navegador) e `formatarDataComercial()` (exibição `pt-BR` ancorada em UTC). Consumidores: `src/actions/ContratoComercial.ts` (`ConfirmarFechamentoSchema` exige `pagamentoConfirmadoEm` válido; `confirmarFechamento` persiste `parseDataComercial(...)` e usa a mesma data no sync CS&NPS `dataContratacao`; `getContratos` filtra por `periodoComercialMensal`), `src/actions/Metas.ts` (`getDadosMetas` filtra por `periodoComercialMensal`), `src/components/comercial/ModalConfirmacaoFechamento.tsx` (inicializa com `dataComercialHoje()` e valida com `parseDataComercial`). Sem migration; `pagamentoConfirmadoEm` continua `DateTime` (recipiente), ancorado em UTC. Testes: `tests/metas/data-comercial.test.ts` (18). Auditoria histórica somente leitura: `scripts/auditar-datas-comerciais.mts`.
 - Exclusão definitiva de campo com dados (RM-2026-76D6E4, 2026-09-24): `ExcluirCampoBpm` em `src/actions/bpm/Campos.ts` deixa de bloquear quando o campo tem valores/anexos; exige `confirmarDescarteDados: true` + `usoConfirmado` (cinco contagens) revalidados na transação (`USO_CAMPO_ALTERADO`/`CONFIRMACAO_DESCARTE_OBRIGATORIA`). Apaga anexos (`SetNull`) e mapeamentos (`Restrict`) explicitamente; valores, valores globais, componentes de formulário, opções, acessos e configurações de etapa saem por cascade. Limpeza de blobs privados pós-commit via `limparBlobAnexoPendente`/reconciliador; auditoria `campo_excluido`. Schema `excluirCampoSchema` em `src/lib/validations/bpm.ts` (`.strict()` em `usoConfirmado`). UI em `FormularioEtapaWorkspace.tsx` (diálogo "Excluir campo aplicável" com contagens + "Excluir definitivamente"). Sem migration. Testes: `tests/bpm/{campos-configuraveis-actions,pipeline-editor-react}.test.ts`.
 - Ressalva verificada em 2026-09-24 por Scribe (RM-2026-8996E2): o código atual de `CardModal/CardFullViewModal.tsx` aguarda `flushSaves()` e mantém “Campos não salvos”, divergindo da descrição histórica RM-2026-B88712 abaixo. `fechando` sinaliza essa espera; `pipeline/[pipelineId]/PipelineBoardClient.tsx` usa `cardMovendoId` para o overlay pós-drop. Nenhuma estrutura ou rota nova. Evidências e pendências: `docs/stories/story-rm-2026-8996e2-respostas-visuais-loading.md`.
 - Autosave universal do card CRM (RM-2026-B88712, 2026-09-22): `CardSaveProvider` em `src/app/PainelAlpha/AlphaCRM/layout.tsx` (acima do modal, sobrevive ao fechamento). Hook `useCardSave` em `CardModal/CardSaveContext.tsx` expõe `scheduleSave(key, cb, delay=500)`, `registerSave(cb, cardId, recoveryKey)`, `flushScheduled(prefix)`, `flushSaves(cardId)`, `getDraft`/`setDraft`, `getVersion`, `subscribeConfirmation`. Consumidores: `PainelCamposEtapaAtual`, `PainelProximoContato`, `PainelReuniao`, `PainelChecklistFollowUp`, `PainelStatusPosFechamento`, `PainelProximaEtapa`, `CampoBpmInput` (upload). Diálogo "Campos não salvos" removido de `CardFullViewModal.tsx`. Testes: `tests/bpm/{cpf-fechamento,cpf-pendencias,autosave-tipos-imediatos,autosave-recovery,autosave-fixed-recovery,card-save-flow,edicao-campos-card,arquivo-persistencia}-react.test.ts`.
@@ -1561,3 +1592,10 @@ Servidor: `src/actions/bpm/Cards.ts` + `src/lib/validations/bpm.ts` (valores); `
 ### RM-2026-04A236 — Fase 5 Nova
 
 RM-2026-04A236: ListaCamposFormulario.tsx no diretório administrativo de pipelines renderiza a lista plana; src/lib/bpm/ordem-formulario.ts projeta/move componentes preservando seções e identidades.
+
+
+### 2026-10-01 — Scribe — RM-2026-AD3EA4: data comercial de fechamento
+
+`src/lib/comercial/data-comercial.ts` centraliza validação YYYY-MM-DD, persistência em UTC midnight, limites mensais UTC e exibição pt-BR em UTC. O calendário local do navegador serve somente ao valor inicial do modal. `src/actions/ContratoComercial.ts` exige a data escolhida e a reutiliza no sync CS&NPS; contratos fechados e `src/actions/Metas.ts` consultam pagamentoConfirmadoEm, sem usar createdAt/updatedAt ou mes/ano de criação como mês da venda. Schema preservado.
+
+Arquivos consumidores: `src/components/comercial/ModalConfirmacaoFechamento.tsx`, `ModalGerenciamentoLeads.tsx` e `src/app/PainelAlpha/Metas/MetasClient.tsx`. Regressões: `tests/metas/data-comercial.test.ts`; auditoria histórica somente leitura: `scripts/auditar-datas-comerciais.mts`. Story e relatório: `docs/stories/story-rm-2026-ad3ea4-data-comercial.md` (seção Encerramento Scribe).

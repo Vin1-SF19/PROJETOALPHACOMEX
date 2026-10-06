@@ -118,6 +118,12 @@ para receber o erro conhecido quando o login for inválido e entrar no painel po
   - [x] Incluir explicitamente `query_compiler_bg.wasm` no output file tracing das funções Vercel.
   - [x] Adicionar teste de regressão para o contrato de empacotamento do Prisma.
   - [x] Validar o artefato na build e repetir o smoke HTTP do login em produção.
+  - [x] Alinhar `@prisma/adapter-libsql` com Prisma ORM 6.19.3 e corrigir os imports do export `PrismaLibSQL`.
+  - [x] Confirmar consulta read-only `SELECT 1` no Turso após regenerar o client Prisma.
+- [x] Task 13 — Isolar o Prisma Client gerado em cada release stage para evitar corrupção por hard links (AC: 1–3, 10–11)
+  - [x] Reproduzir regressão e confirmar `query_compiler_bg.js` vazio na release ativa, ainda hard-linked com o workspace.
+  - [x] Ajustar o deploy para copiar `.prisma/client` como arquivos independentes por release.
+  - [x] Publicar nova release e validar login/consulta Prisma; regenerar o client no workspace e confirmar que a cópia ativa permanece íntegra.
 
 ## Dev Notes
 
@@ -227,6 +233,8 @@ para receber o erro conhecido quando o login for inválido e entrar no painel po
 | 2026-09-11 | 1.5 | Refinado somente o material da água e o contato visual com o casco, sem alterar ondas, câmera, asset ou timeline. | Codex |
 | 2026-09-11 | 1.6 | Navio atraca sob o container, recebe a carga e parte rebocando a rota real com o PNG de corda fornecido. | Codex |
 | 2026-09-17 | 1.7 | Hotfix de produção: inclui o compilador WASM do Prisma no bundle serverless e adiciona regressão de empacotamento. | Codex |
+| 2026-10-05 | 1.8 | Alinhadas as versões do Prisma e adapter libSQL; corrigidos imports, build e consulta read-only; correção publicada em stage. | Codex |
+| 2026-10-05 | 1.9 | Corrigida a regressão causada por arquivos `.prisma/client` compartilhados por hard links entre workspace e release. | Codex |
 
 ## Dev Agent Record
 
@@ -245,6 +253,11 @@ Codex — agente de implementação e revisão desta sessão.
 - Incidente de 2026-09-17: logs da Vercel confirmaram `ENOENT` para `/var/task/node_modules/.prisma/client/query_compiler_bg.wasm` em toda consulta Prisma, inclusive `usuarios.findFirst()` no login. O banco e as credenciais locais permaneceram íntegros; nenhuma migration ou mutation foi executada.
 - `next.config.ts` passou a rastrear explicitamente o compilador WASM usado pelo Prisma com `engineType = "client"`; `tests/auth/prisma-vercel-runtime.test.ts` impede nova publicação sem esse contrato.
 - Hotfix publicado no deployment Vercel `dpl_HgBMaTUoabxFLHBydMGXugJRLRSo` e promovido para `https://painel.alpha-comex.com`. O smoke do Server Action voltou a responder `Dados de Login Incorretos` para credenciais deliberadamente inválidas, confirmando a consulta ao banco; os logs do novo deployment registraram apenas o `CredentialsSignin` esperado, sem `ENOENT` ou falha do Prisma.
+- Incidente stage de 2026-10-05: o projeto combinava `@prisma/client` 6.19.3 com `@prisma/adapter-libsql` 7.8.0; as consultas falhavam ao instanciar o compilador WASM. O adapter foi fixado em 6.19.3, versão documentada pela Prisma para ORM 6.19.3. Essa versão exporta `PrismaLibSQL`, não `PrismaLibSql`; os três imports de runtime/teste/script foram corrigidos. Client regenerado com Prisma 6.19.3; `SELECT 1` ao Turso passou; typecheck e testes Prisma/estoque focados passaram (15 testes). Nenhuma migration ou escrita foi executada.
+- Build indicou que o adapter 6 precisava ficar fora do bundle Webpack; `@prisma/adapter-libsql` foi adicionado a `serverExternalPackages`. `npm ci --ignore-scripts --dry-run` passou após sincronizar o lockfile, que já estava incompleto para instalação limpa.
+- Release stage `20261005-130748`, Build ID `qMmlC_e7CKfydiKaQU4kK`: build/typecheck e smoke da release passaram; serviço ativo (PID 111297), HTTP `/` respondeu 200. Um `SELECT 1` executado com a instalação da release ativa passou. Logs do processo novo mostram Next.js pronto e nenhum erro Prisma; seguem mostrando apenas o aviso existente do worker do pdfjs, fora do escopo desta correção.
+- Regressão de 2026-10-05: o deploy usava `cp -al` para todo `node_modules`. Uma geração posterior do Prisma alterou arquivos por inode compartilhado; na release ativa, `query_compiler_bg.js` ficou vazio e o WASM foi substituído, causando o `LinkError` no login. `scripts/deploy-staging-release.sh` agora substitui a árvore `.prisma/client` hard-linked por uma cópia privada da release.
+- Release stage `20261005-200626`, Build ID `EHKuD4Rp-lzM8QYhiZy1e`: build/typecheck e smoke passaram; serviço ativo, HTTP `/` respondeu 200. Com Node 22.22.3, a consulta Prisma e `findUserByCredentials` para identificador inexistente passaram. Depois de regenerar o client no workspace, hash, inode e tamanho da cópia ativa permaneceram estáveis (`query_compiler_bg.js`, 11.165 bytes, hard link count 1). Testes de login/Prisma passaram (10/10); `bash -n` e `git diff --check` passaram. Nenhuma migration ou escrita no banco foi executada.
 
 - Autenticação passou a concluir e confirmar a sessão antes de liberar qualquer estado visual de sucesso.
 - Credenciais inválidas preservam `Dados de Login Incorretos` e não montam navio, oceano ou overlay.
@@ -275,6 +288,13 @@ Codex — agente de implementação e revisão desta sessão.
 
 ### File List
 
+- `package.json`
+- `package-lock.json`
+- `next.config.ts`
+- `scripts/deploy-staging-release.sh`
+- `scripts/verify-checklist-task-e2e.ts`
+- `src/lib/prisma.ts`
+- `tests/estoque/movement-service.integration.test.ts`
 - `.bibble/memory/codebase-map.md`
 - `.bibble/memory/components.md`
 - `.bibble/memory/integration-points.md`
