@@ -1,3 +1,5 @@
+import { consultarReceitaWS, configReceitaWS, EsperaReceitaWS } from './receitaws';
+
 type JsonObject = Record<string, unknown>;
 
 function object(value: unknown): JsonObject {
@@ -100,8 +102,9 @@ async function consultarCnpjWs(cnpj: string) {
 export async function getReceitaData(cnpj: string) {
   const digits = cnpj.replace(/\D/g, "");
   if (digits.length !== 14) throw new Error("CNPJ inválido");
+  const comercial = configReceitaWS().mode === "commercial";
   try {
-    const dados = await jsonExterno(`https://www.receitaws.com.br/v1/cnpj/${digits}`);
+    const { dados, modo } = await consultarReceitaWS(digits);
     if (dados.status && dados.status !== "OK") throw new Error("ReceitaWS recusou a consulta");
     verificarCadastro(digits, dados.cnpj, dados.nome);
     const simples = object(dados.simples);
@@ -138,9 +141,10 @@ export async function getReceitaData(cnpj: string) {
       natureza_juridica: string(dados.natureza_juridica),
       porte: string(dados.porte),
       qsa: Array.isArray(dados.qsa) ? dados.qsa : [],
-      fonteCadastro: "receitaws",
+      fonteCadastro: modo === "commercial" ? "receitaws_comercial" : "receitaws",
     };
-  } catch {
+  } catch (error) {
+    if (comercial || error instanceof EsperaReceitaWS) throw error;
     return consultarCnpjWs(digits);
   }
 }

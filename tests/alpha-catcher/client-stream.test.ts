@@ -1,0 +1,65 @@
+// @vitest-environment happy-dom
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createElement, act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+vi.mock('@/components/ComponentesRadar/RadarBackground', () => ({ default: () => null }));
+vi.mock('@/components/ComponentesRadar/CardComScan', () => ({ CardComScan: ({ children }: { children: unknown }) => children }));
+vi.mock('@/app/PainelAlpha/AlphaCatcher/CalendarioColeta', () => ({ default: () => null }));
+import CatcherClient from '@/app/PainelAlpha/AlphaCatcher/CatcherClient';
+let root: Root;
+afterEach(async () => { if (root) await act(async () => root.unmount()); vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); document.body.innerHTML = ''; });
+describe('fila durante download da Logcomex', () => {
+  it.each([false, true])('consulta durante a coleta, preserva resultados e respeita pausa=%s', async pausar => {
+    vi.useFakeTimers();
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    let terminou = false;
+    const empresa = { cnpj: '33000167000101', consignatario: 'Banco' };
+    const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/alpha-catcher') {
+        expect(terminou).toBe(false);
+        return { ok: true, status: 200, json: async () => ({ ...empresa, estado: 'salvo', razaoSocial: 'BANCO', nomeFantasia: 'FANTASIA BANCO', dataConsulta: '2025-04-10T14:30:00.000Z', uf: 'DF', municipio: 'Brasília', regimeTributario: pausar ? 'Simples Nacional' : 'Regime Normal', optanteSimples: pausar, dataOpcao: '2020-01-01T00:00:00.000Z' }) };
+      }
+      if (init?.method === 'POST') return { ok: true, json: async () => ({ id: 'job' }) };
+      return { ok: true, json: async () => ({ estado: terminou ? 'concluido' : 'executando', etapa: 'Coletando', empresas: { empresas: [empresa], invalidos: 0, duplicados: 0 }, progresso: { fase: 'perfis', totalLista: 200, total: 200, coletadas: 1, cnpjs: 1, paginas: 2, paginasTotal: 2 } }) };
+    });
+    vi.stubGlobal('fetch', fetcher);
+    const host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+    await act(async () => root.render(createElement(CatcherClient, { temaInicial: 'blue' })));
+    const cabecalhoData = host.querySelector('thead th')!;
+    expect(cabecalhoData.textContent).toBe('Data da consulta');
+    expect([...host.querySelectorAll('thead th')].map(e => e.textContent)).toEqual(['Data da consulta', 'CNPJ', 'Razão social', 'Nome fantasia', 'Processamento', 'Situação Radar', 'Modalidade', 'UF', 'Município', 'Regime tributário', 'Data da opção', 'Capital social']);
+    expect(host.textContent).not.toContain('Ordenar por');
+    await act(async () => (cabecalhoData.querySelector('button')!).click());
+    expect(cabecalhoData.getAttribute('aria-sort')).toBe('ascending');
+    await act(async () => (cabecalhoData.querySelector('button')!).click());
+    expect(cabecalhoData.getAttribute('aria-sort')).toBe('descending');
+    const botao = [...host.querySelectorAll('button')].find(e => e.textContent?.includes('Importar automaticamente'))!;
+    await act(async () => botao.click());
+    if (pausar) await act(async () => [...host.querySelectorAll('button')].find(e => e.textContent === 'Pausar')!.click());
+    await act(async () => { await vi.advanceTimersByTimeAsync(2250); });
+    if (pausar) {
+      expect(fetcher.mock.calls.filter(c => c[0] === '/api/alpha-catcher')).toHaveLength(0);
+      expect(host.textContent).toContain('Lista Logcomex: 200 empresas');
+      await act(async () => [...host.querySelectorAll('button')].find(e => e.textContent === 'Retomar')!.click());
+      await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+    }
+    expect(fetcher.mock.calls.filter(c => c[0] === '/api/alpha-catcher')).toHaveLength(1);
+    expect(host.textContent).toContain('Lista Logcomex: 200 empresas');
+    expect(host.querySelector('tbody')?.textContent).toContain('Salva');
+    terminou = true;
+    await act(async () => { await vi.advanceTimersByTimeAsync(2250); });
+    expect(fetcher.mock.calls.filter(c => c[0] === '/api/alpha-catcher')).toHaveLength(1);
+    expect(host.querySelector('tbody')?.textContent).toContain('Salva');
+    expect(host.querySelectorAll('tbody tr')).toHaveLength(1);
+    expect(host.querySelector('time')?.getAttribute('datetime')).toBe('2025-04-10T14:30:00.000Z');
+    expect(host.querySelector('time')?.textContent).toBe('10/04/2025, 11:30');
+    expect(host.querySelector('tbody tr td:first-child time')).not.toBeNull();
+    const celulas = [...host.querySelectorAll('tbody tr td')];
+    expect(celulas[2].textContent).toBe('BANCO');
+    expect(celulas[3].textContent).toBe('FANTASIA BANCO');
+    expect(celulas[7].textContent).toBe('DF');
+    expect(celulas[8].textContent).toBe('Brasília');
+    expect(celulas[9].textContent).toBe(pausar ? 'Simples Nacional' : 'Regime Normal');
+    expect(celulas[10].textContent).toBe(pausar ? '01/01/2020' : '—');
+  });
+});

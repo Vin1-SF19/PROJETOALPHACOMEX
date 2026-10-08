@@ -1,7 +1,8 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ receita: vi.fn(), findUnique: vi.fn(), upsert: vi.fn() }));
+const mocks = vi.hoisted(() => ({ receita: vi.fn(), findUnique: vi.fn(), upsert: vi.fn(), acesso: vi.fn() }));
 vi.mock("@/lib/cnpj/receita-federal", () => ({ getReceitaData: mocks.receita }));
+vi.mock("@/lib/pre-analise/access", () => ({ requirePreAnaliseAccess: mocks.acesso }));
 vi.mock("@/lib/prisma", () => ({ default: { consultas_radar: { findUnique: mocks.findUnique, upsert: mocks.upsert } } }));
 
 import { GET } from "@/app/api/ConsultaCompleta/route";
@@ -11,6 +12,7 @@ const request = () => new Request(`http://localhost/api/ConsultaCompleta?cnpj=${
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.acesso.mockResolvedValue(null);
   process.env.CONSULTA_RADAR_TOKEN = "token-de-teste";
   mocks.receita.mockResolvedValue({ razaoSocial: "PETROBRAS", nomeFantasia: "", municipio: "RIO", uf: "RJ" });
   mocks.findUnique.mockResolvedValue(null);
@@ -23,6 +25,20 @@ afterEach(() => {
 });
 
 describe("ConsultaCompleta com API Radar Alpha", () => {
+  it('não consulta nem grava sem autorização', async () => {
+    mocks.acesso.mockResolvedValue(new Response(null, { status: 401 }));
+    expect((await GET(request())).status).toBe(401);
+    expect(mocks.receita).not.toHaveBeenCalled(); expect(mocks.upsert).not.toHaveBeenCalled();
+  });
+  it('Radar só começa depois de Receita responder', async () => {
+    let liberar!: (value: object) => void;
+    mocks.receita.mockImplementationOnce(() => new Promise(resolve => { liberar = resolve; }));
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 404 }); vi.stubGlobal('fetch', fetchMock);
+    const job = GET(request()); await Promise.resolve(); await Promise.resolve();
+    expect(fetchMock).not.toHaveBeenCalled();
+    liberar({ razaoSocial: 'Banco' }); expect((await job).status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
   it("grava modalidade, data brasileira e raw sem enviar CNPJ completo ao provedor", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({
       success: true, cnpj: "33000167", data: { cnpj: "33000167", razaoSocial: "PETROLEO BRASILEIRO", situacao: "Habilitada", modalidade: "Ilimitada", dataSituacao: "09/12/2021 10:36:07" }, raw: "resultado integral",

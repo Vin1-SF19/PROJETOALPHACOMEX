@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/prisma";
+import { requirePreAnaliseAccess } from "@/lib/pre-analise/access";
+import { EsperaReceitaWS, ErroReceitaWS } from "@/lib/cnpj/receitaws";
 import { getReceitaData } from "@/lib/cnpj/receita-federal";
 import { parseDateBR } from "@/lib/cnpj/parse-date-br";
 import { consultarRadar, ErroConsultaRadar } from "@/lib/radar/consulta";
@@ -7,8 +9,11 @@ import { validarCnpj } from "@/lib/gerador-documentos/cnpj";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+export const maxDuration = 180;
 
 export async function GET(req: Request) {
+  const denied = await requirePreAnaliseAccess("tributario");
+  if (denied) return denied;
   try {
     const { searchParams } = new URL(req.url);
     const cnpjRaw = searchParams.get("cnpj") || "";
@@ -45,15 +50,17 @@ export async function GET(req: Request) {
       return NextResponse.json(null, { status: 404 });
     }
 
-    // Consultas externas em paralelo (chamadas diretas, sem HTTP interno)
-    const [receitaResult, radarResult] = await Promise.allSettled([
-      getReceitaData(cnpj),
-      consultarRadar(cnpj),
-    ]);
+    // Valida ReceitaWS antes de chamar Radar: nenhuma consulta Radar em caso de falha cadastral.
+    const [receitaResult] = await Promise.allSettled([getReceitaData(cnpj)]);
 
     // Receita Federal é obrigatória
     if (receitaResult.status === "rejected") {
-      console.error("Receita Federal falhou:", receitaResult.reason);
+      const error = receitaResult.reason;
+      if (error instanceof EsperaReceitaWS) return NextResponse.json({ error: error.message, segundos: error.segundos }, {
+        status: 429, headers: { 'Retry-After': String(error.segundos) },
+      });
+      if (error instanceof ErroReceitaWS) return NextResponse.json({ error: error.message, code: error.codigo }, { status: error.status });
+      console.error("Receita Federal falhou");
 
       // Não sobrescreve dado bom já salvo por causa de uma falha transitória (ex: reconsulta).
       const existenteAntesDoErro = await db.consultas_radar.findUnique({
@@ -117,6 +124,7 @@ export async function GET(req: Request) {
     }
 
     const receita = receitaResult.value;
+    const [radarResult] = await Promise.allSettled([consultarRadar(cnpj)]);
 
     // Apenas 404 confirma ausência de habilitação; as demais falhas permanecem erro.
     let radar = {

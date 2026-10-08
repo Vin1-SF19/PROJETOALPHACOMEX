@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ spawn: vi.fn(), mkdir: vi.fn(), rm: vi.fn() }));
+const mocks = vi.hoisted(() => ({ spawn: vi.fn(), mkdir: vi.fn(), rm: vi.fn(), iniciarHistorico: vi.fn(), coletadas: vi.fn(), terminarHistorico: vi.fn(), temErro: vi.fn() }));
+vi.mock('@/lib/alpha-catcher/historico', () => ({ historicoCatcher: { iniciar: mocks.iniciarHistorico, coletadas: mocks.coletadas, terminarColeta: mocks.terminarHistorico, temErro: mocks.temErro } }));
 vi.mock('node:child_process', () => ({ spawn: mocks.spawn }));
 vi.mock('node:fs/promises', () => ({ mkdir: mocks.mkdir, rm: mocks.rm }));
 import { iniciarColeta, lerColeta, cancelarColeta, confirmarCaptcha } from '@/lib/alpha-catcher/logcomex-job';
@@ -9,15 +10,36 @@ const input = { data: '2026-10-05', limite: 5 };
 beforeEach(() => {
   vi.useFakeTimers(); vi.clearAllMocks();
   worker = Object.assign(new EventEmitter(), { send: vi.fn(), kill: vi.fn(), connected: true });
+  mocks.iniciarHistorico.mockResolvedValue(undefined); mocks.terminarHistorico.mockResolvedValue(undefined); mocks.temErro.mockReturnValue(false);
   mocks.spawn.mockReturnValue(worker); mocks.mkdir.mockResolvedValue(undefined); mocks.rm.mockResolvedValue(undefined);
 });
-afterEach(async () => { worker.emit('close'); await Promise.resolve(); vi.clearAllTimers(); vi.useRealTimers(); });
+afterEach(async () => { worker.emit('close'); await Promise.resolve(); await Promise.resolve(); vi.clearAllTimers(); vi.useRealTimers(); });
 describe('worker Shipment Intel', () => {
   it('envia só data/limite por IPC e restringe leitura ao dono', async () => {
     const job = await iniciarColeta(42, input);
     expect(worker.send).toHaveBeenCalledWith(input); expect(lerColeta(job.id, 99)).toBeNull();
     expect(lerColeta(job.id, 42)?.estado).toBe('executando');
     expect(mocks.spawn.mock.calls[0][1]).not.toContain('--password');
+  });
+  it('disponibiliza pares e progresso durante a coleta sem expor campos extras', async () => {
+    const job = await iniciarColeta(42, input);
+    worker.emit('message', { type: 'empresa', empresa: { cnpj: '33000167000101', consignatario: 'Banco', token: 'secret' } });
+    worker.emit('message', { type: 'empresa', empresa: { cnpj: '33000167000101', consignatario: 'Banco' } });
+    worker.emit('message', { type: 'progresso', progresso: { fase: 'perfis', totalLista: 150, total: 150, coletadas: 1, cnpjs: 1, paginas: 2, paginasTotal: 2, token: 'secret' } });
+    const atual = lerColeta(job.id, 42);
+    expect(atual?.estado).toBe('executando');
+    expect(atual?.empresas?.empresas).toHaveLength(1);
+    expect(atual?.progresso?.totalLista).toBe(150);
+    expect(mocks.coletadas).toHaveBeenCalledWith(job.id, 42, [{ cnpj: '33000167000101', consignatario: 'Banco' }]);
+    expect(JSON.stringify(atual)).not.toContain('secret');
+  });
+  it('aceita snapshots automáticos acima de 10 mil entradas no modo ilimitado', async () => {
+    const job = await iniciarColeta(42, { ...input, limite: 0 });
+    const resultado = { empresas: Array.from({ length: 10001 }, () => ({ cnpj: '33000167000101', consignatario: 'Banco' })) };
+    worker.emit('message', { type: 'parcial', resultado });
+    expect(lerColeta(job.id, 42)?.empresas?.duplicados).toBe(10000);
+    worker.emit('message', { type: 'resultado', completo: true, resultado });
+    expect(lerColeta(job.id, 42)?.estado).toBe('concluido');
   });
   it('não retransmite campos secretos da coleta', async () => {
     const job = await iniciarColeta(42, input);
@@ -32,12 +54,19 @@ describe('worker Shipment Intel', () => {
     expect(cancelarColeta(job.id, 42)).toBe(true); expect(worker.kill).toHaveBeenCalledWith('SIGTERM');
     expect(lerColeta(job.id, 42)?.empresas?.empresas).toHaveLength(1);
   });
+  it('resultado sem empresas mostra a falha observada no ranking', async () => {
+    const job = await iniciarColeta(42, input);
+    worker.emit('message', { type: 'resultado', completo: false, resultado: { empresas: [] }, diagnostico: { status: 'interrompido', recebidas: 0, semCnpj: 0, paginas: 0, falhas: ['http_429'] } });
+    expect(lerColeta(job.id, 42)?.estado).toBe('erro');
+    expect(lerColeta(job.id, 42)?.mensagem).toContain('HTTP 429');
+    expect(lerColeta(job.id, 42)?.mensagem).toContain('Nenhuma empresa válida');
+  });
   it('lock ocupado impede iniciar outro login', async () => {
     mocks.mkdir.mockRejectedValue({ code: 'EEXIST' }); await expect(iniciarColeta(42, input)).rejects.toThrow();
     expect(mocks.spawn).not.toHaveBeenCalled(); expect(mocks.rm).not.toHaveBeenCalled();
   });
   it('encerramento inesperado marca erro e libera lock', async () => {
-    const job = await iniciarColeta(42, input); worker.emit('close'); await Promise.resolve();
+    const job = await iniciarColeta(42, input); worker.emit('close'); await Promise.resolve(); await Promise.resolve();
     expect(lerColeta(job.id, 42)?.estado).toBe('erro'); expect(mocks.rm).toHaveBeenCalled();
   });
   it('confirmação solicita checagem uma vez e nunca declara liberação por clique', async () => {

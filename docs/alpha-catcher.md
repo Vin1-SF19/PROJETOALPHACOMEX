@@ -10,13 +10,33 @@ Admin, CEO e TI mantêm bypass administrativo. Nenhuma concessão foi aplicada a
 
 O botão **Importar automaticamente da Logcomex** inicia um worker privado com
 login, código Gmail, abertura do Shipment Intel, captura da sessão BI e coleta.
-Mantém filtros DIRETO/HOUSE e 1–2 embarques do coletor original. A referência
-tem default hoje em São Paulo e a janela do coletor vai de três meses antes até
-sete dias antes. Limite inicial 5, ajustável até 10.000 empresas.
+Mantém filtros DIRETO/HOUSE, com embarques mínimos e máximos digitáveis
+(default 1–2). Calendário seleciona intervalo inclusivo: dois cliques no mesmo
+dia consultam somente ele; dois dias distintos definem a janela, em qualquer
+ordem. Atalhos de três/seis meses contam para trás a partir do último dia
+clicado, incluindo esse dia e ajustando finais de mês. Clique novamente no
+atalho ativo para desmarcar a janela e voltar ao dia de referência. Dias e
+atalhos ativos acompanham o tema Alpha selecionado. Default: últimos três
+meses até sete dias antes de hoje em São Paulo. Datas mais recentes e
+futuras são desabilitadas no calendário e rejeitadas pela API antes do login. Limite padrão 0 (sem limite de empresas); valores positivos interrompem
+a coleta na quantidade informada. Coleta automática e importação por JSON não têm limite configurado de
+quantidade de empresas.
+O worker adapta o filtro data_operacao tanto no ranking quanto nos perfis,
+preservando autenticação, paginação e retries do coletor original.
 
-Coleta completa segue automaticamente para ReceitaWS/Radar e gravação. Coleta
-parcial ou cancelada conserva o snapshot recebido e exige início manual do
-processamento. CAPTCHA pausa a automação para resolução humana; OTP/login
+Cada par consignatário/CNPJ recebido entra imediatamente numa fila dinâmica.
+O servidor verifica primeiro consultas_radar; registros existentes dispensam as APIs.
+Para empresas novas, consulta ReceitaWS e depois Radar, gravando enquanto a
+Logcomex continua coletando. Snapshots posteriores não duplicam consultas nem
+apagam estados já concluídos. Coleta parcial ou cancelada preserva os pares
+recebidos e o processamento continua drenando essa fila. Interromper processamento
+deixa empresas aguardando para retomada manual. Pausar mantém a coleta ativa.
+A interface acompanha o worker a cada dois segundos e precisa permanecer aberta
+para continuar as consultas. Duas barras mostram perfis coletados e empresas
+processadas. No modo ilimitado, a última página do ranking é obtida em paralelo
+para calcular o total pela paginação, sem esperar todas as páginas ou bloquear
+os primeiros perfis. Falha dessa descoberta mantém total desconhecido até que
+a paginação normal permita calculá-lo. CAPTCHA pausa a automação para resolução humana; OTP/login
 inválido encerram com erro. Não há bypass do desafio.
 JSON manual continua disponível. Credenciais, código OTP e headers BI nunca
 são enviados ao browser ou gravados pelo worker em relatórios.
@@ -82,7 +102,7 @@ true → resolução externa → false → login backend ainda exige validação
 na conta/IP de produção. Se continuar exigindo desafio, o fluxo permanece pausado;
 não afirma que a resolução externa necessariamente libera o browser do servidor.
 
-JSON da Logcomex, até 5 MB e 10.000 entradas:
+JSON da Logcomex, sem limite configurado de tamanho ou quantidade de entradas:
 
 ```json
 {"empresas":[{"cnpj":"33.000.167/0001-01","consignatario":"BANCO DO BRASIL"}]}
@@ -92,7 +112,7 @@ Aceita CNPJ numérico com dígitos verificadores válidos. A API Radar atual exi
 raiz numérica; CNPJ alfanumérico não é suportado. Não altera o arquivo original.
 
 O servidor consulta `consultas_radar` antes de acessar as APIs. Qualquer registro
-existente é preservado. ReceitaWS pública e Radar são consultados em paralelo
+existente é preservado. ReceitaWS é consultada primeiro; após validar o cadastro, consulta-se o Radar
 para novos registros. Só grava Receita OK, CNPJ coincidente, nome válido e Radar
 válido ou 404. O 404 deixa situação/modalidade vazias: não distingue empresa não
 habilitada de empresa não encontrada. Falhas ficam pendentes, sem placeholders.
@@ -104,12 +124,19 @@ Não usa `RADAR_API_TOKEN` do protótipo, SQLite local ou migrations.
 
 ## Limites operacionais
 
-A admissão reserva uma chamada externa a cada 30 segundos, entre usuários no
-**mesmo processo Node**. Esse intervalo cobre os 21 segundos da ReceitaWS no
-protótipo. Sobrevive a HMR via globalThis, mas não é distribuída entre réplicas,
-nem persistida após reinício. Múltiplas réplicas precisam de coordenação
-distribuída antes de afirmar um limite global. O Radar legado e clientes externos
-não participam desta admissão.
+A ReceitaWS comercial usa `RECEITAWS_TOKEN` no servidor, modo `commercial`,
+limite configurado em `RECEITAWS_REQUESTS_PER_MINUTE=50` e fallback
+`RECEITAWS_FALLBACK=cacheOnError` ou `noCache`. A UI controla `days`: zero força
+atualização; um inteiro positivo define a idade máxima aceita do cache. Não é
+uma consulta histórica. Opções: 0, 7, 15, 30, 60, 90, 180, 365 ou personalizado.
+Não é necessário definir `RECEITAWS_DAYS` para o Catcher. Com `cacheOnError`,
+uma falha de atualização pode devolver dados mais antigos que o período escolhido.
+
+O limitador compartilha chamadas por token no **mesmo processo Node**, incluindo
+Consulta Completa. Reserva intervalos de 1,3 segundo no plano de 50/minuto e
+respeita respostas 429. Não coordena réplicas, CLI separado ou aplicações externas.
+Modo `public` permite reversão para a API pública, com limite de três/minuto.
+Erros comerciais de autenticação ou saldo não acionam fallback público silencioso.
 
 A fila fica na memória da página. Pausa/interrupção afetam próximos pedidos;
 requisições já enviadas podem terminar e salvar. Sair/recarregar encerra a fila
@@ -230,3 +257,163 @@ Os 56 testes do módulo passaram. Suíte global com Node 22: 4212 passaram,
 duas falhas no Builder (URL absoluta versus relativa), 4 skipped e 1 todo.
 Gmail exige `token.json` autorizado legível pelo usuário do serviço; não foi
 encontrado em `/home/ialpha/LogcomexAutomation`. Nenhum login real realizado.
+
+## Ordenação dos resultados
+
+Data da consulta é a primeira coluna. Clique diretamente no texto de qualquer
+título para ordenar: data, CNPJ, empresa/consignatário, processamento, situação
+Radar, modalidade, UF, município, regime tributário ou data da opção. Primeiro clique crescente; novo
+clique no mesmo título alterna a direção. Seta e cor do tema indicam o campo
+ativo; aria-sort informa a direção às tecnologias assistivas. Datas são
+comparadas pelo instante original, sem alterar o valor no banco.
+Ordem de importação restaura a apresentação original. A comparação usa pt-BR,
+ignora acentos e mantém campos ausentes no final nas duas direções.
+Filtro de status é aplicado antes da ordenação; paginação vem depois.
+Trocar campo ou direção volta à primeira página. A fila de consultas preserva
+a ordem de importação independentemente da apresentação dos resultados.
+
+## Diagnóstico de coleta parcial
+
+Coleta parcial mostra quantidades recebidas, válidas, sem CNPJ, descartadas e
+páginas consultadas. Falhas são códigos de HTTP, conexão, timeout, formato de
+ranking/perfil e paginação. O worker nunca retransmite mensagens livres do
+provedor, corpos HTTP, tokens ou credenciais. Resultados válidos continuam
+preservados na fila de processamento; não declara sucesso da coleta interrompida.
+
+Captura BI usa headers da resposta aceita na conta configurada, incluindo
+product-signature real (plataforma-bi na validação de 2026-10-06). Ranking
+e perfil preservam esse produto. Diagnóstico autenticado confirmou ranking
+de seis meses com faixa 1–2: HTTP 200 e 100 empresas na primeira página.
+Isso não substitui homologação da coleta completa de perfis e enriquecimento.
+
+Ranking da sessão restaurada é validado com os mesmos filtros antes de
+reutilizar login. A primeira página validada é reutilizada na coleta.
+Consultas de importação iniciam com bi-importacao (primeiro caso validado
+no diagnóstico); somente HTTP 406 permite uma comparação com o produto
+capturado, sem alterar período/faixa. Produto alternativo aceito permanece
+em uso nas próximas chamadas desse cliente. Nenhum retry adicional em
+401/403/429/5xx é introduzido por essa comparação.
+
+## Data original nos resultados
+A coluna Data da consulta exibe data e hora de inclusão do cadastro na base
+Consulta Radar, em America/Sao_Paulo. O valor vem de consultas_radar.data_consulta,
+retornado como dataConsulta ISO pelo serviço, inclusive quando o cadastro já
+existia ou foi criado por outra sessão concorrente. Novas inclusões usam o
+instante atribuído pelo banco; o Catcher não envia data_consulta no create nem
+atualiza registros existentes. Datas enviadas na entrada são ignoradas. A
+exportação JSON inclui o valor ISO. Empresas ainda não consultadas ou pendentes
+sem registro não recebem uma data inventada e aparecem com travessão.
+
+## Colunas cadastrais
+Ordem dos resultados: Data da consulta, CNPJ, Razão social, Nome fantasia,
+Processamento, Situação Radar, Modalidade, UF, Município, Regime tributário,
+Data da opção. UF e município são separados. Todos os títulos ordenam.
+As mensagens de pendência aparecem na célula Processamento. Regime, opção
+pelo Simples e data da opção são lidos do registro persistido, tanto existente
+quanto novo. Data da opção aparece apenas para optantes do Simples; para
+cadastros antigos sem optante_simples, considera regime Simples Nacional.
+Optante false prevalece sobre o texto do regime. A data da opção é exibida
+como data civil em UTC, evitando recuar um dia em valores salvos à meia-noite.
+Não atualiza cadastros nem substitui datas originais.
+
+## Histórico de consultas no monitor
+As importações automáticas Logcomex iniciadas após esta atualização registram
+um resumo durável em Auditoria, acao ALPHA_CATCHER_IMPORTACAO_LOGCOMEX, sem
+alterar o schema. A lista fica abaixo da barra e dos controles do Monitor de
+processamento, mais recentes primeiro, com páginas de 20 e atualização a cada
+cinco segundos durante a execução. Persistem após reload/restart:
+- Data e hora de início e fim (America/Sao_Paulo).
+- Total coletado: CNPJs válidos únicos, inclusive empresas já cadastradas.
+- Novas adicionadas: somente creates efetivos desta execução; conflitos de
+  unicidade retornam existente e não contam como nova.
+- Janela de datas e embarques mínimos/máximos escolhidos.
+Início é registrado no servidor antes de abrir o worker. Fim é registrado ao
+encerrar coleta e tentativas da fila; fila ainda não processada fica pendente,
+sem data final inventada. Falhas/cancelamentos não são declarados concluídos.
+Retries de empresas salvas não diminuem nem duplicam a contagem de novas e
+preservam o fim original. Resumos são restritos ao autor autenticado; a rota
+não aceita userId/contagens do cliente. Cada resultado só pode vincular-se a
+uma importação do mesmo usuário que realmente recebeu esse CNPJ.
+Atualizações são serializadas; pares da coleta são agrupados para persistência,
+e cada resposta de processamento aguarda a gravação do contador. Falha do
+histórico não apaga empresa já gravada: exibe aviso e preserva resultado.
+Reinício com execução incompleta mostra Interrompida e não inventa conclusão;
+histórico não retoma uma fila; a versão com modal preserva os resultados da tabela em snapshots.
+JSON manual permanece fora deste histórico de importações automáticas.
+Não reconstrói importações anteriores: seus horários e filtros não eram salvos.
+CLI operacional de leitura, no diretório do painel:
+`node --conditions=react-server --import tsx scripts/alpha-catcher-history.mts --user-id ID [--cursor ID]`.
+A CLI requer acesso de operador aos arquivos privados do servidor; não consulta
+ReceitaWS/Logcomex e nunca altera registros. Não expõe tokens nos resumos.
+
+## Modal da lista histórica
+Cada card do histórico abre um diálogo com a tabela ResultadosCatcher, a mesma
+usada pela tela principal: doze colunas, filtro de processamento, ordenação nos
+títulos, paginação de 50, ordem de importação e exportação JSON. Os controles do
+modal são independentes e não substituem nem processam a fila principal.
+Fecha por botão/Escape, mantém foco no diálogo e devolve foco ao card.
+As novas importações persistem pares e respostas finais em Auditoria, ação
+ALPHA_CATCHER_IMPORTACAO_LINHAS:<UUID>:<bloco>, cem linhas por bloco. Apenas
+blocos alterados são escritos, com fila serializada e cabeçalho congelado por
+atualização. Não limita a quantidade total de empresas. Falha de escrita mantém
+bloco pendente para retry; detalhe com blocos faltantes retorna erro.
+GET /api/alpha-catcher/historico/[id] exige o autor autenticado e retorna somente
+campos permitidos. Recupera snapshots após reinício sem consultar ReceitaWS,
+ou Radar. Para nome fantasia e capital social ausentes, lê somente esses dois
+campos do cadastro atual, em lotes de até 200 CNPJs e apenas para empresas
+salvas/existentes da lista autorizada. Não grava snapshots ou cadastros.
+Campos históricos preenchidos prevalecem; zero de capital é preservado.
+Nomes baixados, estados finais e datas originais de
+resultados salvos/existentes são preservados mesmo em tentativas posteriores.
+Resultados pendentes podem ser atualizados numa nova tentativa daquela fila.
+O modal de execução em andamento atualiza a cada cinco segundos e mostra
+consultas em curso. Após reinício não inventa consultas antigas ainda ativas.
+Históricos anteriores que guardaram apenas resumo exibem lista indisponível,
+sem reconstruir CNPJs ou resultados atuais como se fossem daquela importação.
+CLI permite --importacao UUID para ler lista e resumo persistidos por autor.
+Sem schema, migration, backfill ou sobrescrita de consultas_radar.
+
+A configuração de idade máxima dos dados fica no modal aberto pelo botão ReceitaWS no cabeçalho. As alterações são aplicadas à próxima consulta, permanecem ao fechar o modal e ficam bloqueadas durante coleta/processamento.
+
+O botão Exportar Excel gera uma planilha XLSX com as doze colunas da tabela, incluindo razão social, nome fantasia e mensagens de processamento. Exporta todas as linhas do filtro atual na ordem selecionada, não apenas a página visível. Está disponível nos resultados e no modal de histórico. CNPJ permanece texto, preservando zeros iniciais; datas mantêm o formato exibido e a data original. A geração ocorre no navegador sem consultar APIs.
+
+As colunas Razão social e Nome fantasia são separadas, com ordenação individual. Processamento fica logo após Nome fantasia. Dados ausentes são exibidos como traço; consignatário continua guardado na importação, mas não é exibido nessas colunas. Excel segue a mesma estrutura. Nome fantasia vem do campo existente no banco e integra novos snapshots históricos, sem reconstruir registros antigos.
+
+Capital social aparece como última coluna, em reais, com ordenação numérica e ausentes ao final. O valor vem do capital_social já persistido; novos snapshots incluem capitalSocial. Históricos antigos sem esse campo recebem o valor do cadastro atual somente na leitura; se o cadastro também não informar, mostram traço. No Excel a coluna L é numérica com formato de moeda, permitindo cálculos. Nenhuma migração, backfill ou nova consulta aos provedores para preencher históricos.
+
+### Data original de planilhas (JSON)
+O checkbox “Usar uma data específica na importação JSON” permite escolher
+um dia civil até hoje (São Paulo). A API recebe `dataConsulta: "AAAA-MM-DD"`,
+valida antes das consultas e grava `data_consulta` apenas no CREATE, ao meio-dia
+de São Paulo (15h UTC), mantendo o dia na tabela e exportações. Existentes e
+concorrência preservam a data do banco. A escolha fica congelada na primeira
+execução da fila, inclusive pausas/retries, e é liberada ao carregar outro JSON.
+Ausência do campo conserva o default do banco. Histórico Logcomex rejeita
+override. Sem migration, alteração de registros antigos ou backfill.
+
+### Fonte por importação
+Novos registros recebem `ALPHA_CATCHER+JSON+RECEITAWS_COMERCIAL+CONSULTA_RADAR`
+ou `ALPHA_CATCHER+LOGCOMEX+RECEITAWS_COMERCIAL+CONSULTA_RADAR` (PUBLICA
+quando aplicável). A rota determina Logcomex pelo historicoId autorizado;
+sem histórico a origem é JSON, ignorando origem arbitrária do cliente.
+json_completo inclui origemImportacao; chave logcomex mantida por compatibilidade.
+Registros já salvos mantêm sua fonte; nenhum backfill executado.
+
+
+## Histórico de importação JSON — 08/10/2026
+
+Ao iniciar processamento JSON, a interface registra primeiro o arquivo e a lista válida no histórico. Só após persistência do lote começa a consultar empresas. Resultados e contagens vêm do servidor; autoria, origem, data escolhida e associação do CNPJ são verificadas pelo histórico persistido. Histórico e detalhes respeitam a conta autenticada. Origem ausente nos registros legados continua Logcomex.
+
+`POST /api/alpha-catcher/importacoes/json` registra o lote, sem reconsultar empresas. A data escolhida fica fixada e só afeta CREATEs; retry não conta empresas novamente. Resultado `salvo` pode ser reconciliado por marcador do lote no JSON do cadastro após restart. Staging usa um processo Node; a fila do navegador não retoma automaticamente após reload, mas os resultados gravados continuam no histórico. Antes de ativar nova release, finalizar ou interromper consultas JSON em andamento.
+
+Recuperação operacional: `scripts/alpha-catcher-recuperar-historico-json.mts plan --arquivo PATH --email EMAIL [--data YYYY-MM-DD]` apenas consulta os cadastros e gera plano privado em database-backups/pre-change. `apply` exige SHA256 exato, backup do mesmo banco com até48h validado por restauração e aprovação Vault específica. `rollback` afeta apenas Auditoria criada pelo plano, exige aprovação própria e bloqueia conteúdo alterado. Nunca reconsulta provedores nem altera empresas.
+
+O lote recuperado é identificado com nome do arquivo e timestamp de recuperação; horários originais e quantidade de novas empresas permanecem desconhecidos. Seus resultados representam os cadastros atuais, não snapshots originais. Ativação manual do candidato validado: scripts/activate-alpha-catcher-json-history-stage.sh, com rollback da versão da aplicação se smoke falhar. Nenhuma migration faz parte da entrega.
+
+## Histórico compartilhado e autoria
+
+Usuários com acesso ao Alpha Catcher podem listar e abrir históricos de todos os autores, inclusive JSON, Logcomex e recuperados. Cards/modal mostram @usuarios.usuario atual, projetado pela relação Auditoria.usuario; sem handle válido, exibem autor indisponível. Sem migration/backfill. GETs mantêm acessoCatcher (401/403) e no-store. Autoria e registroId são metadados de leitura; não vêm do JSON do cliente.
+
+Detalhe utiliza registroId numérico de Auditoria como referência inequívoca. UUID legado é aceito somente quando resolve um único resumo. Blocos e estado ativo usam o userId real do resumo. Operações de processamento/resultado/contexto e controle de jobs seguem vinculadas ao proprietário.
+
+CLI: node --conditions=react-server --import tsx scripts/alpha-catcher-history.mts --user-id ID --compartilhado [--cursor ID] [--importacao REGISTRO_ID|UUID]. A leitura compartilhada confere permissões efetivas do usuário; sem a flag, preserva a leitura operacional por dono.

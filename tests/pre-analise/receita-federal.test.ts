@@ -13,10 +13,19 @@ const cnpjWs = {
   estabelecimento: { cnpj: CNPJ, data_inicio_atividade: "1808-10-12" },
 };
 
-beforeEach(() => vi.unstubAllGlobals());
-afterEach(() => vi.unstubAllGlobals());
+beforeEach(() => {
+  vi.unstubAllGlobals(); vi.stubEnv('RECEITAWS_MODE', 'public');
+  (globalThis as typeof globalThis & { receitawsLimitador?: unknown }).receitawsLimitador = undefined;
+});
+afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe("normalização e fallback de ReceitaFederal", () => {
+  it('comercial não esconde cota esgotada com fallback de outra fonte', async () => {
+    vi.stubEnv('RECEITAWS_MODE', 'commercial'); vi.stubEnv('RECEITAWS_TOKEN', 'test-token');
+    const fetchMock = vi.fn().mockResolvedValue(resposta({}, 402)); vi.stubGlobal('fetch', fetchMock);
+    await expect(getReceitaData(CNPJ)).rejects.toMatchObject({ codigo: 'RECEITA_QUOTA_EXHAUSTED' });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
   it("preserva Simples e MEI desconhecidos da ReceitaWS sem chamar outra fonte", async () => {
     const fetchMock = vi.fn().mockResolvedValue(resposta(receitaWs));
     vi.stubGlobal("fetch", fetchMock);

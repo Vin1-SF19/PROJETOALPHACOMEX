@@ -5,15 +5,24 @@ export type EmpresaCatcher = { cnpj: string; consignatario: string };
 export type ResultadoCatcher = EmpresaCatcher & {
   estado: 'existente' | 'salvo' | 'pendente';
   razaoSocial?: string | null;
+  nomeFantasia?: string | null;
+  capitalSocial?: string | null;
   situacao?: string | null;
   modalidade?: string | null;
   municipio?: string | null;
   uf?: string | null;
+  dataConsulta?: string | null;
+  regimeTributario?: string | null;
+  optanteSimples?: boolean | null;
+  dataOpcao?: string | null;
   mensagem?: string;
   codigo?: string;
 };
-export const MAX_ARQUIVO_BYTES = 5 * 1024 * 1024;
-export const MAX_EMPRESAS = 10000;
+
+export function normalizarDiasReceita(value: unknown): number | null {
+  const parsed = z.number().int().nonnegative().safeParse(value === undefined ? 30 : value);
+  return parsed.success ? parsed.data : null;
+}
 
 const empresaSchema = z.object({
   cnpj: z.string().max(32).transform(v => v.trim().replace(/[./\-\s]/g, '')).refine(v => /^\d{14}$/.test(v) && validarCnpj(v)),
@@ -28,7 +37,6 @@ export function importarEmpresas(value: unknown) {
   if (!value || typeof value !== 'object' || !('empresas' in value) || !Array.isArray(value.empresas)) {
     throw new Error('O JSON deve conter uma lista "empresas" com CNPJ e consignatário.');
   }
-  if (value.empresas.length > MAX_EMPRESAS) throw new Error(`Use até ${MAX_EMPRESAS} empresas por arquivo.`);
   const empresas: EmpresaCatcher[] = [];
   const vistos = new Set<string>();
   let invalidos = 0, duplicados = 0;
@@ -42,14 +50,14 @@ export function importarEmpresas(value: unknown) {
   return { empresas, invalidos, duplicados };
 }
 
-// Reserva síncrona compartilhada entre usuários do mesmo processo servidor.
-// O chamador recebe Retry-After; nenhuma requisição fica dormindo na fila.
-export function criarAdmissao(agora: () => number = Date.now) {
-  let proxima = 0;
-  return () => {
-    const atual = agora();
-    if (atual < proxima) return Math.ceil((proxima - atual) / 1000);
-    proxima = atual + 30000;
-    return 0;
-  };
+export function dataAtualConsulta(agora = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(agora);
+}
+
+/** Dia civil da planilha; meio-dia em São Paulo evita mudança de dia na exibição. */
+export function normalizarDataConsulta(value: unknown, agora = new Date()): Date | null | undefined {
+  if (value === undefined) return undefined;
+  const parsed = z.iso.date().safeParse(value);
+  if (!parsed.success || parsed.data > dataAtualConsulta(agora)) return null;
+  return new Date(`${parsed.data}T15:00:00.000Z`);
 }

@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Ativa apenas o candidato pré-buildado desta entrega; não altera o banco.
+# Ativa um candidato pré-buildado validado; não altera o banco.
 source_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-candidate="$source_root/tmp/alpha-catcher-stage-candidate"
+candidate="${1:-$source_root/tmp/alpha-catcher-stage-candidate}"
 deploy_root=/home/ialpha/deployments/painel-alpha-stage
 service=painel-alpha-stage.service
 node=/home/ialpha/.config/nvm/versions/node/v22.22.3/bin/node
-expected_build=zRGxCxf8vHCjxk-PFbNv2
+expected_build="$(cat "$source_root/.next/BUILD_ID")"
 [[ $(id -u) == 0 ]] || { echo 'Execute este script com sudo.' >&2; exit 1; }
+[[ ! -d /tmp/painel-alpha-logcomex-login.lock ]] || { echo 'Uma importação está ativa ou deixou um lock pendente. Verifique antes de publicar.' >&2; exit 1; }
 [[ $(cat "$candidate/.next/BUILD_ID") == "$expected_build" ]] || { echo 'Build do candidato divergente.' >&2; exit 1; }
 [[ $(systemctl show "$service" --property=WorkingDirectory --value) == "$deploy_root/current" ]] || exit 1
 "$node" -e 'const fs=require("fs");const m=JSON.parse(fs.readFileSync(process.argv[1]));if(!m["/api/alpha-catcher/logcomex/route"])process.exit(1)' "$candidate/.next/server/app-paths-manifest.json"
@@ -17,7 +18,11 @@ flock -n 9 || { echo 'Outro deploy está em andamento.' >&2; exit 1; }
 previous="$(readlink -f "$deploy_root/current")"
 release="$deploy_root/releases/$(date -u +%Y%m%d-%H%M%S)-alpha-catcher"
 mkdir "$release"
-rsync -a "$candidate/" "$release/"
+# App/env independentes; dependências idênticas reutilizam inodes anteriores.
+# Checksum compara conteúdo. Dependências divergentes são copiadas normalmente.
+rsync -a --exclude=/node_modules/ "$candidate/" "$release/"
+mkdir "$release/node_modules"
+rsync -rl --checksum --link-dest="$previous/node_modules" "$candidate/node_modules/" "$release/node_modules/"
 chown -R ialpha:ialpha "$release"
 for env_file in .env .env.local .env.production .env.production.local; do
   [[ ! -f "$release/$env_file" ]] || chmod 600 "$release/$env_file"

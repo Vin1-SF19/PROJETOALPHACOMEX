@@ -2,6 +2,37 @@
 
 ## Alpha Catcher (2026-10-05)
 
+Captura BI: scripts/alpha-catcher-bi.mjs valida domínio, conta e resposta HTTP
+bem-sucedida; product-signature observado é preservado no ranking/perfil.
+Helper shipment identifica card específico em caso de botões duplicados.
+Ranking de seis meses/1–2 embarques validado pelo usuário (HTTP 200, 100 linhas).
+
+
+Coleta parcial: alpha-catcher-diagnostic.mjs extrai códigos e contagens
+permitidos do resultado do coletor; logcomex-diagnostic.ts valida o diagnóstico
+IPC e explica a falha no job. Mensagens livres/credenciais nunca retransmitidas.
+
+
+Data máxima: dataMaximaColeta calcula hoje em São Paulo menos sete dias.
+Calendário bloqueia dias/meses posteriores; coletaSchema valida referência
+e ambos os extremos na API antes de iniciar login. Default termina no limite.
+
+
+Limite automático padrão zero: schema aceita zero/positivo; worker converte
+zero em Infinity para percorrer todas as páginas. Importação JSON manual e automática não têm teto de quantidade ou tamanho
+configurado; core valida estrutura/CNPJ e deduplica. CLI e UI usam o mesmo parser.
+
+
+Ordenação: resultados.ts centraliza comparação pt-BR sem mutar a fila;
+CatcherClient filtra, ordena e pagina, oferecendo campo/direção e ordem original.
+
+
+Filtros (2026-10-06): CalendarioColeta permite dia único, intervalo e atalhos
+de 3/6 meses anteriores. logcomex-input valida datas e faixa de embarques;
+worker usa alpha-catcher-filters.mjs para enviar o período exato em ranking
+e perfil, sem modificar o fork externo. API mantém acesso e proprietário.
+
+
 Sessão reversível (2026-10-06): `scripts/alpha-catcher-session.mjs` persiste estado
 privado por conta, restaura e invalida antes de voltar ao login completo.
 Worker valida acesso BI antes de dispensar Gmail/OTP. CLI enable/disable e
@@ -1599,3 +1630,138 @@ RM-2026-04A236: ListaCamposFormulario.tsx no diretório administrativo de pipeli
 `src/lib/comercial/data-comercial.ts` centraliza validação YYYY-MM-DD, persistência em UTC midnight, limites mensais UTC e exibição pt-BR em UTC. O calendário local do navegador serve somente ao valor inicial do modal. `src/actions/ContratoComercial.ts` exige a data escolhida e a reutiliza no sync CS&NPS; contratos fechados e `src/actions/Metas.ts` consultam pagamentoConfirmadoEm, sem usar createdAt/updatedAt ou mes/ano de criação como mês da venda. Schema preservado.
 
 Arquivos consumidores: `src/components/comercial/ModalConfirmacaoFechamento.tsx`, `ModalGerenciamentoLeads.tsx` e `src/app/PainelAlpha/Metas/MetasClient.tsx`. Regressões: `tests/metas/data-comercial.test.ts`; auditoria histórica somente leitura: `scripts/auditar-datas-comerciais.mts`. Story e relatório: `docs/stories/story-rm-2026-ad3ea4-data-comercial.md` (seção Encerramento Scribe).
+
+### 2026-10-06 — Alpha Catcher: coleta e enriquecimento simultâneos
+Worker alpha-catcher-logcomex.mjs usa alpha-catcher-stream.mjs para publicar
+empresa/progresso via IPC a cada perfil. logcomex-job.ts valida pares e métricas
+(logcomex-progress.ts). CatcherClient usa fila.ts para acrescentar CNPJs sem
+duplicar e processá-los enquanto o worker coleta. processarEmpresa continua
+banco → ReceitaWS → Radar → create. Barras independentes coleta/processamento;
+pausa das consultas não interrompe recepção. Sem mudança de schema/permissão.
+Total ilimitado obtido pela paginação em paralelo, sem baixar tudo primeiro.
+Build CgRKpAYNv1amTWeI6LwLy candidato validado; publicação sudo pendente.
+
+### 2026-10-06 — Alpha Catcher: data original de inclusão
+service.ts retorna dataConsulta ISO de consultas_radar.data_consulta no caminho
+existente, create e conflito de unicidade. CatcherClient mostra Data da consulta
+com formatarDataInclusaoCatcher (resultados.ts), em America/Sao_Paulo. JSON inclui
+ISO; sem data apresenta travessão. Não altera data_consulta, schema ou registros.
+Testes verificam entrada com data diferente ignorada, data atribuída pelo banco,
+conflito concorrente e preservação da data em snapshots da coleta.
+
+### 2026-10-06 — Alpha Catcher: ordenação nos títulos
+CatcherClient coloca Data da consulta primeiro e usa títulos clicáveis no lugar
+de Ordenar por/Direção. Direção alterna no mesmo campo; campo novo começa asc.
+Indicador acompanha tema Alpha e th expõe aria-sort. Ordem de importação restaura
+apresentação sem mudar fila. resultados.ts inclui dataConsulta (instante ISO
+normalizado) e mensagem; datas ausentes/inválidas seguem ao final. Sem escrita
+no banco. Testes: datas com fusos diferentes, primeira célula/header e toggle.
+
+### 2026-10-06 — Alpha Catcher: colunas tributárias e localização
+Sequência: Data da consulta, CNPJ, Empresa/consignatário, Processamento,
+Situação Radar, Modalidade, UF, Município, Regime tributário, Data da opção.
+service.ts expõe regime_tributario/optante_simples/data_opcao do cadastro lido
+ou criado. core.ts usa regimeTributario/optanteSimples/dataOpcao. resultados.ts
+controla visibilidade para Simples (false explícito prevalece), data civil UTC
+e ordenação. CatcherClient separa UF/Município; pendências ficam em Processamento.
+Sem alteração de banco nem sobrescrita das datas originais. Testes verificam
+cadastro existente sem APIs, Simples/normal, ordem de títulos e células novas.
+
+### 2026-10-06 — Alpha Catcher: histórico de importações
+historico.ts usa Auditoria existente com acao ALPHA_CATCHER_IMPORTACAO_LOGCOMEX,
+resumo JSON tipado por historico-tipos.ts, ownership e updates serializados.
+logcomex-job.ts inicia resumo antes do worker, contabiliza CNPJs únicos e encerra
+coleta; API processamento valida historicoId/dono/CNPJ e contabiliza somente
+resultados reais. Fim após coleta e fila; novas não duplicam em retries.
+GET /api/alpha-catcher/historico pagina 20 por autor, no-store. HistoricoConsultas
+fica abaixo dos controles do monitor, com atualização durante execução.
+CLI alpha-catcher-history.mts lista sem mutações. Sem schema/migration ou dados
+novos gerados nesta validação; SELECT confirmou Auditoria. Build NtA5ep3utWscLn7uRdr0v pronto
+para stage, ativação sudo pendente; histórico começa nas próximas importações.
+
+### 2026-10-06 — Alpha Catcher: modal do histórico
+ResultadosCatcher.tsx compartilha a tabela entre a lista atual e ModalHistorico.
+Cards abrem por clique/Enter/Espaço; diálogo possui filtro, ordenação, paginação,
+exportação e restauração de foco. GET /api/alpha-catcher/historico/[id] exige
+ownership e retorna snapshots, sem consultar provedores ou registros Radar.
+historico.ts persiste blocos de 100 linhas em Auditoria existente, sem limite
+total, preservando ordem, consignatário e datas/resultados de sucesso. Estados
+ativos são sobrepostos em memória; registros antigos somente com resumo mostram
+indisponibilidade da lista. CLI aceita --importacao UUID. Sem migration/backfill.
+Build EWYHqUEr-FjUflF3FSepm no candidato stage; ativação sudo pendente.
+
+### 2026-10-06 — Configuração ReceitaWS em modal
+CatcherClient.tsx substitui o atalho Consulta Radar por DialogTrigger ReceitaWS.
+Idade máxima dos dados movida para diálogo Radix, com estado existente no cliente
+e bloqueio ativo/coletando preservados. Build nP62We2fzLcp5ZN7Z7RvP no candidato;
+ativação sudo pendente.
+
+### 2026-10-06 — Modal histórico ampliado
+ModalHistorico usa largura 98vw sem teto 1600px e altura máxima 97dvh.
+Build 6mHXfSnHtIqHtzpwyUG7Q no candidato; ativação sudo pendente.
+
+### 2026-10-06 — Exportação Excel Alpha Catcher
+ResultadosCatcher oferece Exportar Excel junto ao JSON em resultados e histórico.
+exportar-excel.ts carrega ExcelJS sob demanda e gera XLSX com dez colunas,
+CNPJ textual e datas formatadas originais; exporta filtro/ordem sem paginação.
+Geração no navegador, sem API/DB. Build mpHaCaycFzWUigRyINXFZ no candidato stage, sudo pendente.
+
+### 2026-10-06 — Razão social e nome fantasia no Catcher
+service.ts retorna nomeFantasia do campo existente nome_fantasia; core e
+schema de snapshots incluem campo opcional para compatibilidade histórica.
+Resultados e Excel mostram razão social + fantasia, com consignatário como
+fallback enquanto aguardando. Build lvr9wqcTZZAcfl-h3yO6t no candidato; sudo pendente.
+
+### 2026-10-06 — Colunas de nomes separadas
+ResultadosCatcher e XLSX: Data da consulta, CNPJ, Razão social, Nome fantasia,
+Processamento, Situação Radar, Modalidade, UF, Município, Regime tributário,
+Data da opção. Ordenação individual dos nomes; ausentes mostram traço.
+Build q-yTJKCr7GEk4CAO0zqFA no candidato stage; ativação sudo pendente.
+
+### 2026-10-06 — Capital social no Catcher
+service retorna capitalSocial do campo existente; snapshot aceita campo opcional.
+Tabela compartilhada inclui última coluna Capital social com moeda BRL e
+ordenação numérica; ausentes ficam ao final. XLSX coluna L numérica/numFmt BRL.
+Históricos antigos sem snapshot do valor mostram traço. Sem migração/backfill.
+Build Mz9OL3QJrg-QZnOcayL8p aprovado no candidato; ativação sudo pendente.
+
+### 2026-10-06 — Complementação de cadastros ReceitaWS (aguardando autorização)
+CLI alpha-catcher-completar-cadastro.mts oferece plan/apply/rollback, checksum
+do plano, backup completo verificado <=48h, consulta comercial days0/noCache,
+patch apenas campos vazios e CAS por id/CNPJ/data/valores originais. Registro
+privado antes de UPDATE permite rollback condicionado; não altera históricos.
+Plano de hoje: 74 sem fantasia entre 149; todos têm capital. Backup revalidado,
+nenhuma API ou mutação executada. Relatório docs/alpha-catcher-complementacao-vault.md.
+
+### 2026-10-06 — Complementação autorizada e concluída
+Após "Autorizo", apply do plano de 74 empresas de hoje concluiu: uma fantasia
+preenchida, 73 ausentes na ReceitaWS; zero falhas/conflitos. Verificação no
+banco confirmou datas e capitais preservados. Backup completo validado antes;
+rollback privado alpha-catcher-cadastro-2026-10-06T23-04-32.604Z-rollback.json.
+Relatório e evidência em docs/alpha-catcher-complementacao-vault.md/pre-change.
+
+### 2026-10-06 — Complementos no histórico antigo
+Após validar dono/lista/blocos, historico.detalhar lê nome_fantasia/capital_social
+do cadastro para valores ausentes de salvo/existente, lotes de até 200.
+Complementação apenas em memória; campos preenchidos, zero, datas e snapshots
+intactos. Tabela/Excel compartilham DTO enriquecido, sem ReceitaWS/Radar.
+Histórico real 500: 429 fantasias e 498 capitais exibidos, zero datas alteradas.
+Build ttA62ywKm1iyZ5dEQIltt no candidato, sudo pendente.
+
+### Alpha Catcher — data original JSON (2026-10-07)
+CatcherClient envia `dataConsulta` opcional só em filas JSON. core valida dia
+real até hoje São Paulo, service aplica somente consultas_radar.create.
+route mantém auth/origem e rejeita override com historicoId Logcomex.
+Data da fila congelada no início; carregar novo arquivo libera escolha.
+Sem schema, migration, backfill ou alteração de registros existentes.
+
+Alpha Catcher fonte (2026-10-07): origem JSON por padrão; LOGCOMEX apenas
+com historicoId validado na rota. service CREATE usa origem em fonte e
+json_completo.origemImportacao, preservando existentes. Sem migração/backfill.
+
+
+### Alpha Catcher: histórico JSON (08/10/2026)
+
+POST /api/alpha-catcher/importacoes/json registra resumo e blocos em Auditoria antes da fila. historico.ts restaura contexto por userId:id; route.ts determina origem/data/consignatário persistidos. service.ts registra marcador importacaoId+userId em json_completo no CREATE para preservar atribuição em retries. UI existente diferencia JSON e histórico recuperado. CLI scripts/alpha-catcher-recuperar-historico-json.mts usa executor testável src/lib/alpha-catcher/recuperar-historico-json.ts para plano/apply/rollback; apply depende de Vault e confirmação específica. Sem schema/migration. Staging single-process; não reiniciar durante fila JSON ativa. Story: docs/stories/story-alpha-catcher-historico-json.md.
+
+Alpha Catcher — histórico compartilhado: GETs autorizados usam listarCompartilhado/detalharCompartilhado, autor via Auditoria.usuario.usuario e registroId numérico para evitar colisãoUUID. Shared detail resolve proprietário real para blocos e estado ativo. Métodos owner/contexto/job/escrita inalterados. CLI --compartilhado confere readEffectiveModulePermissions. Sem migration/backfill. Story docs/stories/story-alpha-catcher-historico-compartilhado.md.

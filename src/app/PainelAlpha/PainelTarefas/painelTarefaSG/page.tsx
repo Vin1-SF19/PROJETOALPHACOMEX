@@ -47,14 +47,25 @@ export default function PainelTarefas() {
 
     const [produtos, setProdutos] = useState<Produto[]>([]);
     const [listaCompraDoBanco, setListaCompraDoBanco] = useState<ItemCompra[]>([]);
+    const [comprasDisponiveis, setComprasDisponiveis] = useState(false);
 
-    useEffect(() => {
-        async function carregarEstoque() {
-            const dados = await buscarProdutos();
-            setProdutos(dados);
+    async function carregarCompras() {
+        try {
+            const [dadosProdutos, dadosCompras] = await Promise.all([
+                buscarProdutos(),
+                buscarListaCompra()
+            ]);
+            setProdutos(dadosProdutos);
+            setListaCompraDoBanco(dadosCompras);
+            setComprasDisponiveis(true);
+        } catch {
+            // Estoque é opcional: sua autorização não pode bloquear a agenda.
+            setProdutos([]);
+            setListaCompraDoBanco([]);
+            setComprasDisponiveis(false);
+            setAbaAtual("TAREFAS");
         }
-        carregarEstoque();
-    }, []);
+    }
 
 
 
@@ -125,8 +136,7 @@ export default function PainelTarefas() {
         const user = session?.user;
         if (!user?.id) return;
 
-        const dados = await buscarListaCompra();
-        setListaCompraDoBanco(dados);
+        void carregarCompras();
 
         setLoading(true);
         try {
@@ -453,7 +463,7 @@ export default function PainelTarefas() {
 
                         <div className="flex items-center justify-between gap-4">
 
-                            <button
+                            {comprasDisponiveis && <button
                                 onClick={() => setAbaAtual((prev) => (prev === "TAREFAS" ? "COMPRAS" : "TAREFAS"))}
                                 className={`flex items-center gap-3 px-6 py-3 rounded-[1.5rem] border transition-all duration-300 group ${(abaAtual as string) === "COMPRAS"
                                     ? "bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.2)]"
@@ -471,7 +481,7 @@ export default function PainelTarefas() {
                                 <span className="cursor-pointer text-[14px] font-black uppercase tracking-[0.2em]">
                                     {abaAtual === "TAREFAS" ? "Lista de Compras" : "Voltar para Tarefas"}
                                 </span>
-                            </button>
+                            </button>}
                         </div>
 
                         <div className="flex flex-wrap items-center gap-4">

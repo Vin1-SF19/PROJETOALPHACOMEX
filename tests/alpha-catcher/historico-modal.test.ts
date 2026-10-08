@@ -1,0 +1,44 @@
+// @vitest-environment happy-dom
+import { afterEach, expect, it, vi } from 'vitest';
+import { act, createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import HistoricoConsultas from '@/app/PainelAlpha/AlphaCatcher/HistoricoConsultas';
+import { getTema } from '@/lib/temas';
+let root: Root;
+afterEach(async () => { if (root) await act(async () => root.unmount()); vi.unstubAllGlobals(); document.body.innerHTML = ''; });
+it('abre card em modal com tabela completa e ordenação, fecha sem trocar resultados da tela', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const item = { versao: 1, id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', inicio: '2026-10-06T15:00:00Z', fim: '2026-10-06T15:20:00Z', fimColeta: '2026-10-06T15:15:00Z', estado: 'concluido', dataInicio: '2026-03-29', dataFinal: '2026-09-29', embarquesMin: 1, embarquesMax: 2, limite: 0, totalColetadas: 1, novasSalvas: 0, processadas: 1, pendentes: 0, listaDisponivel: true };
+  const linha = { cnpj: '33000167000101', consignatario: 'Empresa baixada', razaoSocial: 'RAZAO SOCIAL', nomeFantasia: 'FANTASIA', estado: 'existente', dataConsulta: '2025-01-02T15:00:00.000Z', situacao: 'DEFERIDA', modalidade: 'ILIMITADA', uf: 'DF', municipio: 'Brasília', regimeTributario: 'Simples Nacional', optanteSimples: true, dataOpcao: '2020-01-01T00:00:00.000Z' };
+  const fetcher = vi.fn(async (url: string) => ({ ok: true, json: async () => url.endsWith(item.id) ? { importacao: item, linhas: [linha] } : { importacoes: [item], proximoCursor: null } }));
+  vi.stubGlobal('fetch', fetcher);
+  const host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+  await act(async () => root.render(createElement(HistoricoConsultas, { visual: getTema('blue'), emAndamento: false, aviso: '' })));
+  const card = host.querySelector('[aria-haspopup="dialog"]') as HTMLElement;
+  await act(async () => card.click());
+  const dialog = document.querySelector('[role="dialog"]')!;
+  expect(dialog).not.toBeNull(); expect(dialog.textContent).toContain('RAZAO SOCIAL');
+  expect(dialog.textContent).toContain('FANTASIA');
+  expect([...dialog.querySelectorAll('th')].map(e => e.textContent)).toEqual(['Data da consulta', 'CNPJ', 'Razão social', 'Nome fantasia', 'Processamento', 'Situação Radar', 'Modalidade', 'UF', 'Município', 'Regime tributário', 'Data da opção', 'Capital social']);
+  expect(dialog.textContent).toContain('02/01/2025, 12:00'); expect(dialog.textContent).toContain('01/01/2020');
+  await act(async () => dialog.querySelector('th button')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  expect(dialog.querySelector('th')?.getAttribute('aria-sort')).toBe('ascending');
+  expect(fetcher.mock.calls.some(c => c[0] === '/api/alpha-catcher')).toBe(false);
+  await act(async () => (dialog.querySelector('[aria-label="Fechar histórico"]') as HTMLElement).click());
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+});
+it('mantém dois cards com o mesmo UUID e abre o autor correto pelo registroId', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const base = { versao: 1, id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', inicio: null, fim: null, fimColeta: null, recuperadoEm:'2026-10-08T17:00:00Z', origem:'JSON', estado:'concluido', dataInicio:'2026-09-28',dataFinal:'2026-09-28',embarquesMin:0,embarquesMax:0,limite:0,totalColetadas:1,novasSalvas:1,processadas:1,pendentes:0,listaDisponivel:true };
+  const itens = [{...base,registroId:198,autor:{usuario:'lucca'}},{...base,registroId:200,autor:{usuario:'ana'}}];
+  const fetcher=vi.fn(async(url:string)=>({ok:true,json:async()=>url.endsWith('/200') ? {importacao:itens[1],linhas:[{cnpj:'33000167000101',consignatario:'LOTE ANA',razaoSocial:'LOTE ANA',estado:'salvo'}]} : {importacoes:itens,proximoCursor:null}}));
+  vi.stubGlobal('fetch',fetcher);
+  const host=document.createElement('div');document.body.append(host);root=createRoot(host);
+  await act(async()=>root.render(createElement(HistoricoConsultas,{visual:getTema('blue'),emAndamento:false,aviso:''})));
+  const cards=host.querySelectorAll<HTMLElement>('[aria-haspopup="dialog"]');
+  expect(cards).toHaveLength(2);expect(cards[0].textContent).toContain('@lucca');expect(cards[1].textContent).toContain('@ana');
+  await act(async()=>cards[1].click());
+  expect(fetcher).toHaveBeenCalledWith('/api/alpha-catcher/historico/200',expect.objectContaining({cache:'no-store'}));
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('@ana');
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('LOTE ANA');
+});
