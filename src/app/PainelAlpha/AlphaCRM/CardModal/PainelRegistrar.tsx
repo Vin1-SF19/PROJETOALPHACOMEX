@@ -10,6 +10,7 @@ import { PainelResumoContratacao } from "./PainelResumoContratacao";
 import { PainelExcecaoOperacional } from "./PainelExcecaoOperacional";
 import { isAdminRole } from "@/lib/roles";
 import { PIPELINE_CHAVE } from "@/lib/bpm/financeiro-config.client";
+import { ChatClienteCard } from "./ChatClienteCard";
 
 
 
@@ -72,6 +73,7 @@ export default function PainelRegistrar({ card, etapaAtual, accent, podeEditar, 
             onAtualizado={onAtualizado}
             onEstadoFollowUpChange={onEstadoFollowUpChange}
           />
+          <ChatClienteCard cardId={card.id} clienteNome={card.empresa.razaoSocial || card.empresa.nomeFantasia || "cliente"} podeEnviar={podeEditar} />
         </TabsContent>
 
         <TabsContent value="script" className="m-0 mt-5 min-h-0 flex-1 overflow-y-auto px-5 pb-5">

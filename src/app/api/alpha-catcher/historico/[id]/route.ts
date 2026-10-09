@@ -1,3 +1,4 @@
+import { encaminharWorkerCatcher } from '@/lib/alpha-catcher/worker-client';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { acessoCatcher } from '@/lib/alpha-catcher/access';
@@ -10,6 +11,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const { id } = await ctx.params;
   const referencia = /^\d+$/.test(id) && Number.isSafeInteger(Number(id)) && Number(id) > 0 ? Number(id) : id;
   if (typeof referencia === 'string' && !z.string().uuid().safeParse(id).success) return NextResponse.json({ error: 'Importação inválida.' }, { status: 400 });
+  const remoto = await encaminharWorkerCatcher('detalhar-historico', acesso.userId!, referencia);
+  if (remoto) return remoto;
   try {
     const detalhe = await historicoCatcher.detalharCompartilhado(referencia);
     return detalhe ? NextResponse.json(detalhe, { headers: { 'Cache-Control': 'no-store' } }) : NextResponse.json({ error: 'Importação não encontrada.' }, { status: 404 });

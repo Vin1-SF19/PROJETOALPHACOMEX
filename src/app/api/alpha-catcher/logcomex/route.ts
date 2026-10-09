@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { encaminharWorkerCatcher } from '@/lib/alpha-catcher/worker-client';
 import { acessoCatcher } from '@/lib/alpha-catcher/access';
 import { coletaSchema } from '@/lib/alpha-catcher/logcomex-input';
 import { iniciarColeta, lerColeta, cancelarColeta, confirmarCaptcha } from '@/lib/alpha-catcher/logcomex-job';
@@ -8,7 +9,10 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: Request) {
   const acesso = await acessoCatcher();
   if (acesso.status !== 200) return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: acesso.status });
-  const job = lerColeta(new URL(req.url).searchParams.get('id') || '', acesso.userId!);
+  const id = new URL(req.url).searchParams.get('id') || '';
+  const remoto = await encaminharWorkerCatcher('ler', acesso.userId!, id);
+  if (remoto) return remoto;
+  const job = lerColeta(id, acesso.userId!);
   return job ? NextResponse.json(job, { headers: { 'Cache-Control': 'no-store' } }) : NextResponse.json({ error: 'Execução não encontrada.' }, { status: 404 });
 }
 export async function POST(req: Request) {
@@ -27,13 +31,20 @@ export async function POST(req: Request) {
   }
   let data;
   try { data = JSON.parse(Buffer.concat(partes).toString('utf8')); } catch { return NextResponse.json({ error: 'JSON inválido.' }, { status: 400 }); }
-  if (data?.acao === 'cancelar' && typeof data.id === 'string') return NextResponse.json({ cancelado: cancelarColeta(data.id, acesso.userId!) });
+  if (data?.acao === 'cancelar' && typeof data.id === 'string') {
+    const remoto = await encaminharWorkerCatcher('cancelar', acesso.userId!, data.id);
+    return remoto ?? NextResponse.json({ cancelado: cancelarColeta(data.id, acesso.userId!) });
+  }
   if (['confirmar_captcha', 'tentar_captcha'].includes(data?.acao) && typeof data.id === 'string') {
+    const remoto = await encaminharWorkerCatcher(data.acao, acesso.userId!, data.id);
+    if (remoto) return remoto;
     const aceita = confirmarCaptcha(data.id, acesso.userId!, data.acao);
     return NextResponse.json({ verificando: aceita }, { status: aceita ? 202 : 409 });
   }
   const parsed = coletaSchema.safeParse(data);
   if (!parsed.success) return NextResponse.json({ error: 'Informe datas até sete dias antes de hoje, embarques mínimos até máximos e um limite inteiro maior ou igual a zero (0 = sem limite).' }, { status: 400 });
+  const remoto = await encaminharWorkerCatcher('iniciar', acesso.userId!, parsed.data);
+  if (remoto) return remoto;
   try { return NextResponse.json(await iniciarColeta(acesso.userId!, parsed.data), { status: 202 }); }
   catch { return NextResponse.json({ error: 'Não foi possível iniciar. Confira a disponibilidade do banco e se há outra coleta em andamento.' }, { status: 409 }); }
 }

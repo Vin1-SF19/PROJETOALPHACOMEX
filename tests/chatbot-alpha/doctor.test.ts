@@ -9,6 +9,7 @@ function chatbotxCheck(env: Record<string, string | undefined>) {
 
 describe("chatbot-alpha doctor — configuração workspace-token", () => {
   it("exige URL e CHATBOTX_API_KEY", async () => {
+    expect(await chatbotxCheck({ CHATBOTX_URL: "https://example.com", CHATBOTX_API_KEY: "key" })).toMatchObject({ ok: true });
     expect(await chatbotxCheck({ CHATBOTX_API_URL: "https://example.com" })).toMatchObject({ ok: false });
     expect(await chatbotxCheck({ CHATBOTX_API_KEY: "key" })).toMatchObject({ ok: false });
     expect(await chatbotxCheck({ CHATBOTX_API_URL: "https://example.com", CHATBOTX_API_KEY: "key" })).toMatchObject({ ok: true });

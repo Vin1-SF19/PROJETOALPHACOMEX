@@ -38,7 +38,9 @@ function configCheck(id: string, keys: string[], env: Env, message: string): Cha
 }
 
 function chatbotxConfigCheck(env: Env): ChatbotAlphaCheck {
-  const hasUrl = chatbotxApiUrlSchema.safeParse(env.CHATBOTX_API_URL).success;
+  const hasAppUrl = chatbotxApiUrlSchema.safeParse(env.CHATBOTX_URL).success;
+  const hasLegacyApiUrl = chatbotxApiUrlSchema.safeParse(env.CHATBOTX_API_URL).success;
+  const hasUrl = hasAppUrl || hasLegacyApiUrl;
   const hasCanonicalKey = present(env, "CHATBOTX_API_KEY");
   const hasLegacyToken = present(env, "CHATBOTX_API_TOKEN");
   const ok = hasUrl && (hasCanonicalKey || hasLegacyToken);
@@ -48,10 +50,10 @@ function chatbotxConfigCheck(env: Env): ChatbotAlphaCheck {
     kind: "config",
     message: ok
       ? `ChatbotX workspace-token API URL and ${hasCanonicalKey ? "canonical key" : "legacy token fallback"} are configured`
-      : "Missing or invalid configuration: CHATBOTX_API_URL (HTTP/HTTPS) and CHATBOTX_API_KEY (CHATBOTX_API_TOKEN is accepted only as a legacy fallback)",
+      : "Missing or invalid configuration: CHATBOTX_URL (HTTP/HTTPS) and CHATBOTX_API_KEY (CHATBOTX_API_TOKEN is accepted only as a legacy fallback)",
     details: {
-      configured: [hasUrl ? "CHATBOTX_API_URL" : null, hasCanonicalKey ? "CHATBOTX_API_KEY" : hasLegacyToken ? "CHATBOTX_API_TOKEN" : null].filter(Boolean),
-      missing: [!hasUrl ? "CHATBOTX_API_URL" : null, !hasCanonicalKey && !hasLegacyToken ? "CHATBOTX_API_KEY" : null].filter(Boolean),
+      configured: [hasAppUrl ? "CHATBOTX_URL" : hasLegacyApiUrl ? "CHATBOTX_API_URL" : null, hasCanonicalKey ? "CHATBOTX_API_KEY" : hasLegacyToken ? "CHATBOTX_API_TOKEN" : null].filter(Boolean),
+      missing: [!hasUrl ? "CHATBOTX_URL" : null, !hasCanonicalKey && !hasLegacyToken ? "CHATBOTX_API_KEY" : null].filter(Boolean),
     },
   };
 }

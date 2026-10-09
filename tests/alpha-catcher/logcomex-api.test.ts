@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ acesso: vi.fn(), iniciar: vi.fn(), ler: vi.fn(), cancelar: vi.fn(), confirmar: vi.fn() }));
+const mocks = vi.hoisted(() => ({ acesso: vi.fn(), iniciar: vi.fn(), ler: vi.fn(), cancelar: vi.fn(), confirmar: vi.fn(), remoto: vi.fn() }));
+vi.mock('@/lib/alpha-catcher/worker-client', () => ({ encaminharWorkerCatcher: mocks.remoto }));
 vi.mock('@/lib/alpha-catcher/access', () => ({ acessoCatcher: mocks.acesso }));
 vi.mock('@/lib/alpha-catcher/logcomex-job', () => ({ iniciarColeta: mocks.iniciar, lerColeta: mocks.ler, cancelarColeta: mocks.cancelar, confirmarCaptcha: mocks.confirmar }));
 import { GET, POST } from '@/app/api/alpha-catcher/logcomex/route';
@@ -8,7 +9,7 @@ const post = (value: unknown, origin = 'https://alpha.test') => new Request('htt
   method: 'POST', headers: { origin, host: 'alpha.test', 'Content-Type': 'application/json' }, body: JSON.stringify(value),
 });
 afterEach(() => vi.useRealTimers());
-beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-01T15:00:00Z')); vi.clearAllMocks(); mocks.acesso.mockResolvedValue({ status: 200, userId: 42 }); mocks.iniciar.mockResolvedValue({ id: 'job', estado: 'executando' }); });
+beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-01T15:00:00Z')); vi.clearAllMocks(); mocks.remoto.mockResolvedValue(null); mocks.acesso.mockResolvedValue({ status: 200, userId: 42 }); mocks.iniciar.mockResolvedValue({ id: 'job', estado: 'executando' }); });
 describe('importação automática Shipment Intel', () => {
   it('inicia com parâmetros validados e proprietário da sessão', async () => {
     expect((await POST(post(input))).status).toBe(202); expect(mocks.iniciar).toHaveBeenCalledWith(42, { ...input, embarquesMin: 1, embarquesMax: 2 });
@@ -58,4 +59,17 @@ describe('importação automática Shipment Intel', () => {
     const response = await POST(post({ acao: 'confirmar_captcha', id: 'job' }));
     expect(response.status).toBe(409); expect(await response.json()).toEqual({ verificando: false });
   });
+});
+
+it('Vercel acompanha o mesmo worker entre chamadas e não consulta Map local', async () => {
+  mocks.remoto.mockResolvedValueOnce(new Response(JSON.stringify({id:'job-remote',estado:'executando'}),{status:202}));
+  expect((await POST(post(input))).status).toBe(202);
+  expect(mocks.remoto).toHaveBeenCalledWith('iniciar',42,expect.objectContaining(input));expect(mocks.iniciar).not.toHaveBeenCalled();
+  mocks.remoto.mockResolvedValueOnce(new Response(JSON.stringify({id:'job-remote',estado:'executando'})));
+  expect((await GET(new Request('https://alpha.test/api/alpha-catcher/logcomex?id=job-remote'))).status).toBe(200);
+  expect(mocks.remoto).toHaveBeenLastCalledWith('ler',42,'job-remote');expect(mocks.ler).not.toHaveBeenCalled();
+});
+it('proxy indisponível preserva 503 e não inicia outra coleta local', async () => {
+  mocks.remoto.mockResolvedValue(new Response(JSON.stringify({error:'Worker indisponível'}),{status:503}));
+  expect((await POST(post(input))).status).toBe(503);expect(mocks.iniciar).not.toHaveBeenCalled();
 });

@@ -7,10 +7,11 @@ function setEnvVar(key: string, value: string | undefined) {
   else process.env[key] = value;
 }
 
-async function loadModule(env: { url?: string; apiKey?: string; token?: string } = {}) {
+async function loadModule(env: { url?: string; appUrl?: string; apiKey?: string; token?: string } = {}) {
   vi.resetModules();
+  setEnvVar("CHATBOTX_URL", env.appUrl);
   setEnvVar("CHATBOTX_API_URL", env.url);
-  setEnvVar("CHATBOTX_API_KEY", env.apiKey ?? (env.url && !env.token ? "test-api-key" : undefined));
+  setEnvVar("CHATBOTX_API_KEY", env.apiKey ?? ((env.url || env.appUrl) && !env.token ? "test-api-key" : undefined));
   setEnvVar("CHATBOTX_API_TOKEN", env.token);
   return import("@/lib/chatbot-alpha/chat-api");
 }
@@ -82,6 +83,45 @@ describe("chat-api — identificador de contato", () => {
     expect(mod.contatoIdentifierSchema.safeParse("id:123").success).toBe(true);
     expect(mod.contatoIdentifierSchema.safeParse("email:a@b.com").success).toBe(true);
     expect(mod.contatoIdentifierSchema.safeParse("phone:5511999999999").success).toBe(true);
+  });
+});
+
+describe("chat-api — Inbox público por conversa", () => {
+  beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
+  afterEach(() => { vi.unstubAllGlobals(); process.env = { ...ORIGINAL_ENV }; });
+
+  it("usa CHATBOTX_URL e acrescenta /api apenas uma vez", async () => {
+    const mod = await loadModule({ appUrl: "https://chatbotx.example.com/" });
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ data: [], nextCursor: null, prevCursor: null }));
+    expect((await mod.listarConversasInbox({}, "corr-app-url")).success).toBe(true);
+    expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain("https://chatbotx.example.com/api/v1/conversations");
+  });
+
+  it("lista conversas mantendo cursor opaco e IDs como strings", async () => {
+    const mod = await loadModule({ url: "https://chatbotx.example.com/api" });
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ data: [{ id: "123", contactId: "456", contact: contatoValido, contactInboxes: [{ inboxId: "789" }], messages: [] }], nextCursor: "opaque/+cursor", prevCursor: null }));
+    const result = await mod.listarConversasInbox({ keyword: "Fulano", cursor: "opaque/+cursor", perPage: 20 }, "corr-inbox");
+    expect(result.success).toBe(true);
+    const requestUrl = String(vi.mocked(fetch).mock.calls[0][0]);
+    expect(requestUrl).toContain("cursor=opaque%2F%2Bcursor");
+    expect(requestUrl).toContain("/api/v1/conversations?");
+  });
+
+  it("usa conversationId e inboxId interno no envio", async () => {
+    const mod = await loadModule({ url: "https://chatbotx.example.com/api" });
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(null, 201));
+    const result = await mod.enviarMensagemConversa({ conversationId: "123", inboxId: "789", text: "  Olá  " }, "corr-send");
+    expect(result.success).toBe(true);
+    const [requestUrl, requestOptions] = vi.mocked(fetch).mock.calls[0];
+    expect(String(requestUrl)).toBe("https://chatbotx.example.com/api/v1/conversations/123/messages");
+    expect(requestOptions).toMatchObject({ method: "POST", body: JSON.stringify({ text: "Olá", inboxId: "789" }) });
+  });
+
+  it("rejeita IDs e texto fora do contrato antes da rede", async () => {
+    const mod = await loadModule({ url: "https://chatbotx.example.com/api" });
+    const result = await mod.enviarMensagemConversa({ conversationId: "1e3", text: "x".repeat(1001) }, "corr-invalid");
+    expect(result.success).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
   });
 });
 

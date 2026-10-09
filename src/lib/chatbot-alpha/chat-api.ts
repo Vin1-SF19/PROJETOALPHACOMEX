@@ -18,12 +18,16 @@ export const chatbotxApiUrlSchema = z
     if (!URL.canParse(value)) return false;
     const protocol = new URL(value).protocol;
     return protocol === "http:" || protocol === "https:";
-  }, "CHATBOTX_API_URL deve usar HTTP ou HTTPS");
+  }, "CHATBOTX_URL deve usar HTTP ou HTTPS");
 
 function getChatbotxConfig(): { baseUrl?: string; apiKey?: string } {
-  const parsedUrl = chatbotxApiUrlSchema.safeParse(process.env.CHATBOTX_API_URL);
+  const parsedAppUrl = chatbotxApiUrlSchema.safeParse(process.env.CHATBOTX_URL);
+  const parsedLegacyApiUrl = chatbotxApiUrlSchema.safeParse(process.env.CHATBOTX_API_URL);
+  const appBaseUrl = parsedAppUrl.success ? parsedAppUrl.data.replace(/\/+$/, "") : undefined;
   return {
-    baseUrl: parsedUrl.success ? parsedUrl.data : undefined,
+    baseUrl: appBaseUrl
+      ? /\/api$/i.test(appBaseUrl) ? appBaseUrl : `${appBaseUrl}/api`
+      : parsedLegacyApiUrl.success ? parsedLegacyApiUrl.data : undefined,
     apiKey: process.env.CHATBOTX_API_KEY?.trim() || process.env.CHATBOTX_API_TOKEN?.trim() || undefined,
   };
 }
@@ -83,13 +87,14 @@ const mensagemResourceSchema = z
     createdAt: z.string(),
     conversationId: z.string(),
     contactInboxId: z.string(),
-    workspaceId: z.string(),
-    text: z.string().nullable(),
+    workspaceId: z.string().optional(),
+    text: z.string().nullable().optional(),
     messageType: mensagemTypeSchema,
-    contentType: mensagemContentTypeSchema,
+    contentType: mensagemContentTypeSchema.optional(),
     senderType: mensagemSenderTypeSchema,
     senderId: z.string().nullable().optional(),
     contact: contatoResourceSchema.optional(),
+    attachments: z.array(z.unknown()).optional(),
   })
   .passthrough();
 
@@ -117,6 +122,35 @@ const listarMensagensResponseSchema = z.object({
   nextCursor: z.string().nullable(),
   prevCursor: z.string().nullable(),
 });
+
+const conversaInboxSchema = z.object({ inboxId: z.string() }).passthrough();
+const conversaPublicaSchema = z.object({
+  id: z.string(),
+  contactId: z.string(),
+  contact: z.object({
+    id: z.string(),
+    workspaceId: z.string().optional(),
+    avatar: z.string().nullable().optional(),
+    phoneNumber: z.string().nullable().optional(),
+    email: z.string().nullable().optional(),
+    firstName: z.string().nullable().optional(),
+    lastName: z.string().nullable().optional(),
+    fullName: z.string().nullable().optional(),
+    blockedAt: z.string().nullable().optional(),
+  }).passthrough().nullable().optional(),
+  contactInboxes: z.array(conversaInboxSchema).optional().default([]),
+  assignedUser: z.object({ id: z.string(), name: z.string().optional() }).nullable().optional(),
+  assignedInboxTeam: z.unknown().optional(),
+  messages: z.array(mensagemResourceSchema).optional().default([]),
+}).passthrough();
+const listarConversasPublicasResponseSchema = z.object({
+  data: z.array(conversaPublicaSchema),
+  nextCursor: z.string().nullable(),
+  prevCursor: z.string().nullable(),
+});
+
+export type ChatbotxConversaPublica = z.infer<typeof conversaPublicaSchema>;
+export type ChatbotxPaginaConversasPublicas = z.infer<typeof listarConversasPublicasResponseSchema>;
 
 export type ChatbotxPagina<T> = {
   data: T[];
@@ -171,7 +205,7 @@ async function chatbotxFetch(
   if (!baseUrl || !apiKey) {
     return {
       success: false,
-      error: "Backend ChatbotX não configurado. Defina CHATBOTX_API_URL e CHATBOTX_API_KEY no ambiente.",
+      error: "Backend ChatbotX não configurado. Defina CHATBOTX_URL e CHATBOTX_API_KEY no ambiente.",
       correlationId,
       supportId: correlationId,
       retryable: false,
@@ -340,6 +374,55 @@ export async function enviarMensagem(
     { method: "POST", body: { text: parsedInput.data.text } },
     correlationId,
   );
+  if (!result.success) return result;
+  return { success: true, data: undefined, correlationId };
+}
+
+// Client for the public Inbox API used by CRM card chat. IDs remain strings.
+export async function listarConversasInbox(
+  input: { keyword?: string; cursor?: string; perPage?: number },
+  correlationId: string,
+): Promise<ChatbotxApiResult<ChatbotxPaginaConversasPublicas>> {
+  const parsedInput = z.object({ keyword: z.string().trim().min(1).optional(), cursor: z.string().optional(), perPage: z.number().int().min(1).max(50).optional() }).safeParse(input);
+  if (!parsedInput.success) return { success: false, error: "Parâmetros inválidos para listar conversas.", correlationId, supportId: correlationId, retryable: false };
+  const result = await chatbotxFetch("/v1/conversations", {
+    query: { keyword: parsedInput.data.keyword, cursor: parsedInput.data.cursor, perPage: String(parsedInput.data.perPage ?? 20) },
+  }, correlationId);
+  return toApiResult(result, listarConversasPublicasResponseSchema, correlationId);
+}
+
+export async function listarMensagensConversa(
+  conversationId: string,
+  input: { cursor?: string; perPage?: number },
+  correlationId: string,
+): Promise<ChatbotxApiResult<ChatbotxPagina<ChatbotxMensagem>>> {
+  const parsed = z.object({ conversationId: z.string().regex(/^\d+$/), cursor: z.string().optional(), perPage: z.number().int().min(1).max(50).optional() }).safeParse({ conversationId, ...input });
+  if (!parsed.success) return { success: false, error: "Parâmetros inválidos para listar mensagens.", correlationId, supportId: correlationId, retryable: false };
+  const result = await chatbotxFetch(`/v1/conversations/${encodeURIComponent(parsed.data.conversationId)}/messages`, {
+    query: { cursor: parsed.data.cursor, perPage: String(parsed.data.perPage ?? 20) },
+  }, correlationId);
+  return toApiResult(result, listarMensagensResponseSchema, correlationId);
+}
+
+export async function obterConversaInbox(
+  conversationId: string,
+  correlationId: string,
+): Promise<ChatbotxApiResult<ChatbotxConversaPublica>> {
+  if (!/^\d+$/.test(conversationId)) return { success: false, error: "ID de conversa inválido.", correlationId, supportId: correlationId, retryable: false };
+  const result = await chatbotxFetch(`/v1/conversations/${encodeURIComponent(conversationId)}`, {}, correlationId);
+  const parsed = toApiResult(result, z.object({ data: conversaPublicaSchema }), correlationId);
+  return parsed.success ? { success: true, data: parsed.data.data, correlationId } : parsed;
+}
+
+export async function enviarMensagemConversa(
+  input: { conversationId: string; text: string; inboxId?: string },
+  correlationId: string,
+): Promise<ChatbotxApiResult<void>> {
+  const parsed = z.object({ conversationId: z.string().regex(/^\d+$/), text: z.string().trim().min(1).max(1000), inboxId: z.string().regex(/^\d+$/).optional() }).safeParse(input);
+  if (!parsed.success) return { success: false, error: "Parâmetros inválidos para enviar mensagem.", correlationId, supportId: correlationId, retryable: false };
+  const result = await chatbotxFetch(`/v1/conversations/${encodeURIComponent(parsed.data.conversationId)}/messages`, {
+    method: "POST", body: { text: parsed.data.text, ...(parsed.data.inboxId ? { inboxId: parsed.data.inboxId } : {}) },
+  }, correlationId);
   if (!result.success) return result;
   return { success: true, data: undefined, correlationId };
 }
