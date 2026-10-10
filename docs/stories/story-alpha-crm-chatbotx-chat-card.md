@@ -16,6 +16,7 @@ Como closer do Alpha CRM, quero conversar com o cliente pelo ChatbotX no formul�
 4. O navegador nunca recebe o token de workspace; ações server-side validam acesso ao card e revalidam o vínculo da conversa antes de ler ou enviar.
 5. O histórico suporta paginação opaca, deduplicação por ID, atualização após envio e estados de carregamento, vazio e erro.
 6. Não são adicionados anexos, criação de conversas ou polling nesta versão.
+7. A lista usa o campo personalizado CNPJ descoberto em `/contacts/filter-fields` e o `contactFilter` da Inbox; histórico e envio revalidam o valor do campo no contato.
 
 ## Checklist
 
@@ -24,6 +25,8 @@ Como closer do Alpha CRM, quero conversar com o cliente pelo ChatbotX no formul�
 - [x] Integrar modal ao final do formulário da etapa.
 - [x] Cobrir contrato de paginação, envio, IDs string e validação dos parâmetros.
 - [x] Documentar as variáveis server-side da API no `.env.example`.
+- [x] Substituir a busca por razão social pelo filtro de CNPJ e preservar a seleção entre várias conversas.
+- [x] Validar o CNPJ do contato antes de ler o histórico ou enviar uma mensagem.
 - [x] Executar os gates disponíveis e registrar as limitações ambientais.
 
 ## File List
@@ -33,6 +36,7 @@ Como closer do Alpha CRM, quero conversar com o cliente pelo ChatbotX no formul�
 - `src/app/PainelAlpha/AlphaCRM/CardModal/ChatClienteCard.tsx` — modal de seleção e conversa.
 - `src/app/PainelAlpha/AlphaCRM/CardModal/PainelRegistrar.tsx` — botão ao final do formulário.
 - `tests/chatbot-alpha/chat-api.test.ts` — testes do contrato Inbox.
+- `tests/chatbot-alpha/alpha-crm-card-chat.test.ts` — testes da busca por CNPJ e da autorização de histórico e envio.
 - `tests/chatbot-alpha/doctor.test.ts` — verifica a variável canônica da URL.
 - `src/lib/chatbot-alpha/doctor.ts` — diagnóstico da configuração do ChatbotX.
 - `.env.example` — parâmetros de configuração da API Inbox.
@@ -46,3 +50,9 @@ Como closer do Alpha CRM, quero conversar com o cliente pelo ChatbotX no formul�
 - `npm run build` não concluiu: Prisma não conseguiu ler `.env` e recebeu `EPERM` ao copiar runtime em `node_modules/.prisma/client`.
 - URL do ChatbotX corrigida para a variável canônica `CHATBOTX_URL`; o cliente acrescenta `/api` para a Inbox. `CHATBOTX_API_URL` permanece apenas como fallback para instalações legadas.
 - Após a correção da URL, typecheck e lint dos arquivos alterados passaram; os testes direcionados de API, doctor e actions passaram (63 passed, 1 todo).
+- A busca do card agora descobre `id`, `type` e `valueType` do campo CNPJ no ChatbotX e consulta `/v1/conversations` com `contactFilter` serializado. Aceita CNPJ com ou sem máscara e preserva a paginação de cada formato.
+- O token precisa de `contacts` e `inbox`; para envio, também precisa de permissão `full`. Nenhum banco ou migration foi alterado.
+- Após a correção por CNPJ, `npm run typecheck` e lint dos arquivos alterados passaram; 37 testes direcionados passaram.
+- `npm run lint` geral é bloqueado por `EACCES` em `database-backups/`; `npm test` padrão é bloqueado por `EACCES` no `.env`. Com configuração temporária, a suíte completa teve 4.417 testes aprovados, 2 falhas antigas em `tests/builder/embed.test.ts` e 2 suítes indisponíveis porque este Node não oferece `node:sqlite`.
+- `npm run build` compilou o código e gerou as páginas, mas falhou ao coletar os traces porque a conta atual não consegue ler o `.env`; o cache `.next` também apresentou `EACCES`.
+- Em 2026-10-10, a build completa passou nesta máquina com Node 22 e saída isolada em `.next-crm-chat-20261010` (Build ID `5SDnW-0TXkhC_7MFC6_zm`). `npm run lint` passou com 0 erros e 1192 warnings; `npm run typecheck` passou. A suíte completa teve 4.425 testes aprovados e 2 falhas preexistentes em `tests/builder/embed.test.ts` (URL absoluta do happy-dom). Nenhuma release foi ativada; os arquivos do colega foram preservados.

@@ -48,7 +48,7 @@ export function ChatClienteCard({ cardId, clienteNome, podeEnviar }: Props) {
     if (!resultado.success) { setErro(resultado.error); setEstado("error"); return; }
     setConversas(resultado.data.data);
     setCursorConversas(resultado.data.nextCursor);
-    setEstado(resultado.data.data.length ? "ready" : "empty");
+    setEstado(resultado.data.data.length || resultado.data.nextCursor ? "ready" : "empty");
   }, [cardId]);
 
   async function selecionarConversa(selecionada: ChatbotxConversaPublica) {
@@ -94,6 +94,7 @@ export function ChatClienteCard({ cardId, clienteNome, podeEnviar }: Props) {
         return [...atuais, ...resultado.data.data.filter((item) => !ids.has(item.id))];
       });
       setCursorConversas(resultado.data.nextCursor);
+      setEstado(conversas.length || resultado.data.data.length || resultado.data.nextCursor ? "ready" : "empty");
     } else setErro(resultado.error);
     setCarregandoAntigas(false);
   }
@@ -142,6 +143,7 @@ export function ChatClienteCard({ cardId, clienteNome, podeEnviar }: Props) {
           {estado === "loading" && <p className="flex items-center justify-center gap-2 py-10 text-sm text-slate-400"><LoaderCircle className="size-4 animate-spin" /> Buscando conversas…</p>}
           {estado === "error" && <div role="alert" className="py-8 text-center"><p className="text-sm text-rose-300">{erro}</p><Button type="button" variant="ghost" onClick={() => void carregarConversas()} className="mt-2 gap-2"><RefreshCw className="size-4" /> Tentar novamente</Button></div>}
           {estado === "empty" && <p className="py-10 text-center text-sm text-slate-400">Nenhuma conversa encontrada para este cliente.</p>}
+          {erro && estado !== "error" && <p role="alert" className="py-2 text-center text-sm text-rose-300">{erro}</p>}
           {conversas.map((item) => <button type="button" key={item.id} onClick={() => void selecionarConversa(item)} className="mb-2 block w-full rounded-xl border border-white/10 p-3 text-left hover:border-cyan-400/40 hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-cyan-400">
             <span className="block text-sm font-semibold">{nomeContato(item)}</span>
             <span className="mt-1 block truncate text-xs text-slate-400">{item.messages[0]?.text || "Sem prévia de mensagem"}</span>

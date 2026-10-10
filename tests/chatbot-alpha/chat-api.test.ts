@@ -107,6 +107,35 @@ describe("chat-api — Inbox público por conversa", () => {
     expect(requestUrl).toContain("/api/v1/conversations?");
   });
 
+  it("descobre o campo CNPJ e envia contactFilter com os metadados da API", async () => {
+    const mod = await loadModule({ appUrl: "https://chatbotx.example.com" });
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse({ staticFields: [], customFields: [{ id: "123", name: "CNPJ", type: "text", valueType: "text" }], botFields: [], tags: [] }))
+      .mockResolvedValueOnce(jsonResponse({ data: [], nextCursor: null, prevCursor: null }));
+
+    const campos = await mod.listarCamposFiltroContato("corr-fields");
+    expect(campos.success).toBe(true);
+    if (!campos.success) return;
+    const campo = campos.data[0];
+    const filtro = { operator: "and" as const, conditions: [{ field: "customField" as const, customFieldId: campo.id, customFieldType: campo.type, valueType: campo.valueType, operator: "eq" as const, value: "44.342.670/0001-61" }] as [{ field: "customField"; customFieldId: string; customFieldType: string; valueType: string; operator: "eq"; value: string }] };
+    const resultado = await mod.listarConversasInbox({ contactFilter: filtro }, "corr-filter");
+    expect(resultado.success).toBe(true);
+    const urlCampos = new URL(String(vi.mocked(fetch).mock.calls[0][0]));
+    const urlConversas = new URL(String(vi.mocked(fetch).mock.calls[1][0]));
+    expect(urlCampos.pathname).toBe("/api/v1/contacts/filter-fields");
+    expect(urlConversas.pathname).toBe("/api/v1/conversations");
+    expect(JSON.parse(urlConversas.searchParams.get("contactFilter") ?? "null")).toEqual(filtro);
+    expect(urlConversas.searchParams.has("keyword")).toBe(false);
+  });
+
+  it("lê o CNPJ do contato por identificador id:<id>", async () => {
+    const mod = await loadModule({ appUrl: "https://chatbotx.example.com" });
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ id: "123", value: "44342670000161" }));
+    const resultado = await mod.obterCampoPersonalizadoContato("456", "123", "corr-contact-field");
+    expect(resultado).toMatchObject({ success: true, data: "44342670000161" });
+    expect(new URL(String(vi.mocked(fetch).mock.calls[0][0])).pathname).toBe("/api/v1/contacts/id%3A456/custom-fields/123");
+  });
+
   it("usa conversationId e inboxId interno no envio", async () => {
     const mod = await loadModule({ url: "https://chatbotx.example.com/api" });
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(null, 201));

@@ -1,8 +1,7 @@
 // ChatBot Alpha — Cliente de API para o backend ChatbotX (self-hosted externo, workspace-token API)
 // Proxy server-side: nunca expõe tokens ou URLs internas ao navegador.
 //
-// Contrato confirmado em código real (apps/builder/src/features/.../api/workspace-token.ts
-// do ChatbotX-main): GET /v1/contacts, GET/POST /v1/contacts/{identifier}/messages.
+// Contrato confirmado em código real do ChatbotX para contacts e Inbox públicos.
 // O identificador de contato usa o formato "id:<id>" | "email:<email>" | "phone:<numero>"
 // (resolveContactId em apps/builder/src/features/contacts/queries/public-find-contact.ts).
 
@@ -379,14 +378,68 @@ export async function enviarMensagem(
 }
 
 // Client for the public Inbox API used by CRM card chat. IDs remain strings.
+const campoFiltroSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.string(),
+  valueType: z.string(),
+}).passthrough();
+
+export type ChatbotxCampoFiltro = z.infer<typeof campoFiltroSchema>;
+
+export async function listarCamposFiltroContato(
+  correlationId: string,
+): Promise<ChatbotxApiResult<ChatbotxCampoFiltro[]>> {
+  const result = await chatbotxFetch("/v1/contacts/filter-fields", {}, correlationId);
+  const parsed = toApiResult(result, z.object({ customFields: z.array(campoFiltroSchema) }), correlationId);
+  return parsed.success ? { success: true, data: parsed.data.customFields, correlationId } : parsed;
+}
+
+export async function obterCampoPersonalizadoContato(
+  contactId: string,
+  fieldId: string,
+  correlationId: string,
+): Promise<ChatbotxApiResult<string>> {
+  if (!/^\d+$/.test(contactId) || !/^\d+$/.test(fieldId)) {
+    return { success: false, error: "ID de contato ou campo inválido.", correlationId, supportId: correlationId, retryable: false };
+  }
+  const identifier = encodeURIComponent(identificadorPorId(contactId));
+  const result = await chatbotxFetch(`/v1/contacts/${identifier}/custom-fields/${encodeURIComponent(fieldId)}`, {}, correlationId);
+  const parsed = toApiResult(result, z.object({ value: z.string() }), correlationId);
+  return parsed.success ? { success: true, data: parsed.data.value, correlationId } : parsed;
+}
+
+export type ChatbotxFiltroContato = {
+  operator: "and";
+  conditions: [{
+    field: "customField";
+    customFieldId: string;
+    customFieldType: string;
+    valueType: string;
+    operator: "eq";
+    value: string;
+  }];
+};
+
 export async function listarConversasInbox(
-  input: { keyword?: string; cursor?: string; perPage?: number },
+  input: { keyword?: string; contactFilter?: ChatbotxFiltroContato; cursor?: string; perPage?: number },
   correlationId: string,
 ): Promise<ChatbotxApiResult<ChatbotxPaginaConversasPublicas>> {
-  const parsedInput = z.object({ keyword: z.string().trim().min(1).optional(), cursor: z.string().optional(), perPage: z.number().int().min(1).max(50).optional() }).safeParse(input);
+  const filterSchema = z.object({
+    operator: z.literal("and"),
+    conditions: z.tuple([z.object({
+      field: z.literal("customField"),
+      customFieldId: z.string().min(1),
+      customFieldType: z.string().min(1),
+      valueType: z.string().min(1),
+      operator: z.literal("eq"),
+      value: z.string().min(1),
+    })]),
+  });
+  const parsedInput = z.object({ keyword: z.string().trim().min(1).optional(), contactFilter: filterSchema.optional(), cursor: z.string().optional(), perPage: z.number().int().min(1).max(50).optional() }).safeParse(input);
   if (!parsedInput.success) return { success: false, error: "Parâmetros inválidos para listar conversas.", correlationId, supportId: correlationId, retryable: false };
   const result = await chatbotxFetch("/v1/conversations", {
-    query: { keyword: parsedInput.data.keyword, cursor: parsedInput.data.cursor, perPage: String(parsedInput.data.perPage ?? 20) },
+    query: { keyword: parsedInput.data.keyword, contactFilter: parsedInput.data.contactFilter ? JSON.stringify(parsedInput.data.contactFilter) : undefined, cursor: parsedInput.data.cursor, perPage: String(parsedInput.data.perPage ?? 20) },
   }, correlationId);
   return toApiResult(result, listarConversasPublicasResponseSchema, correlationId);
 }

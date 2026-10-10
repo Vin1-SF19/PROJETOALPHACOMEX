@@ -7,34 +7,59 @@ import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import {
   enviarMensagemConversa,
   isChatbotxConfigured,
+  listarCamposFiltroContato,
   listarConversasInbox,
   listarMensagensConversa,
+  obterCampoPersonalizadoContato,
   obterConversaInbox,
+  type ChatbotxCampoFiltro,
   type ChatbotxConversaPublica,
+  type ChatbotxFiltroContato,
   type ChatbotxMensagem,
 } from "@/lib/chatbot-alpha/chat-api";
 
 type Resultado<T> = { success: true; data: T } | { success: false; error: string; retryable: boolean };
-type IdentidadeCliente = { nomes: string[]; telefones: string[]; emails: string[] };
+type ClienteAutorizado = { cnpj: string; campoCnpj: ChatbotxCampoFiltro };
+type CursorConversas = { version: 1; formatIndex: number; cursor?: string };
 
-function normalizar(valor: string): string {
-  return valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]/g, "");
+function apenasDigitos(valor: string): string {
+  return valor.replace(/\D/g, "");
 }
 
-function contatoCorresponde(conversa: ChatbotxConversaPublica, identidade: IdentidadeCliente): boolean {
-  const contato = conversa.contact;
-  if (!contato) return false;
-  const nomeContato = normalizar(contato.fullName || [contato.firstName, contato.lastName].filter(Boolean).join(" "));
-  const telefoneContato = (contato.phoneNumber ?? "").replace(/\D/g, "");
-  const emailContato = (contato.email ?? "").trim().toLocaleLowerCase("pt-BR");
-  return identidade.nomes.some((nome) => {
-    const nomeNormalizado = normalizar(nome);
-    return nomeNormalizado.length >= 4 && nomeContato.length >= 4 && (nomeContato.includes(nomeNormalizado) || nomeNormalizado.includes(nomeContato));
-  }) || identidade.telefones.some((telefone) => { const valor = telefone.replace(/\D/g, ""); return valor.length >= 8 && telefoneContato.endsWith(valor.slice(-8)); })
-    || identidade.emails.some((email) => email.toLocaleLowerCase("pt-BR") === emailContato);
+function formatosCnpj(valor: string): string[] {
+  const original = valor.trim();
+  const digitos = apenasDigitos(original);
+  const formatado = digitos.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+  return [...new Set([original, digitos, formatado])];
 }
 
-async function carregarIdentidade(cardId: string, acao: "visualizar" | "editarCard"): Promise<IdentidadeCliente | null> {
+function filtroPorCnpj(campo: ChatbotxCampoFiltro, valor: string): ChatbotxFiltroContato {
+  return {
+    operator: "and",
+    conditions: [{
+      field: "customField",
+      customFieldId: campo.id,
+      customFieldType: campo.type,
+      valueType: campo.valueType,
+      operator: "eq",
+      value: valor,
+    }],
+  };
+}
+
+function lerCursor(valor?: string): CursorConversas | null {
+  if (!valor) return { version: 1, formatIndex: 0 };
+  try {
+    const cursor = JSON.parse(valor) as CursorConversas;
+    if (cursor.version !== 1 || !Number.isSafeInteger(cursor.formatIndex) || cursor.formatIndex < 0 ||
+      (cursor.cursor !== undefined && typeof cursor.cursor !== "string")) return null;
+    return cursor;
+  } catch {
+    return null;
+  }
+}
+
+async function carregarCnpj(cardId: string, acao: "visualizar" | "editarCard"): Promise<string | null> {
   const session = await auth();
   if (!session?.user?.id) return null;
   const userId = Number(session.user.id);
@@ -43,45 +68,74 @@ async function carregarIdentidade(cardId: string, acao: "visualizar" | "editarCa
 
   const card = await db.bpmCard.findUnique({
     where: { id: cardId },
-    select: {
-      empresa: { select: { razaoSocial: true, nomeFantasia: true } },
-      empresaId: true,
-    },
+    select: { empresa: { select: { cnpj: true } } },
   });
-  if (!card) return null;
-  const pessoas = await db.pessoaClienteVinculo.findMany({
-    where: { clienteId: card.empresaId },
-    select: { pessoa: { select: { nome: true, celular: true, email: true } } },
-  });
-  return {
-    nomes: [card.empresa.razaoSocial, card.empresa.nomeFantasia, ...pessoas.map(({ pessoa }) => pessoa.nome)].filter((value): value is string => Boolean(value?.trim())),
-    telefones: pessoas.map(({ pessoa }) => pessoa.celular).filter((value): value is string => Boolean(value?.trim())),
-    emails: pessoas.map(({ pessoa }) => pessoa.email).filter((value): value is string => Boolean(value?.trim())),
-  };
+  return card ? (card.empresa.cnpj?.trim() ?? "") : null;
 }
 
-async function identidadeAutorizada(cardId: string, acao: "visualizar" | "editarCard" = "visualizar"): Promise<Resultado<IdentidadeCliente>> {
+async function clienteAutorizado(cardId: string, acao: "visualizar" | "editarCard" = "visualizar"): Promise<Resultado<ClienteAutorizado>> {
+  let cnpj: string | null;
   try {
-    const identidade = await carregarIdentidade(cardId, acao);
-    if (!identidade) return { success: false, error: "Card não encontrado ou acesso negado.", retryable: false };
-    if (!isChatbotxConfigured()) return { success: false, error: "ChatbotX não está configurado.", retryable: false };
-    return { success: true, data: identidade };
+    cnpj = await carregarCnpj(cardId, acao);
   } catch {
     return { success: false, error: "Não foi possível validar o acesso ao card.", retryable: false };
   }
+  if (cnpj === null) return { success: false, error: "Card não encontrado ou acesso negado.", retryable: false };
+  if (apenasDigitos(cnpj).length !== 14) return { success: false, error: "O cliente do card não possui um CNPJ válido para localizar a conversa.", retryable: false };
+  if (!isChatbotxConfigured()) return { success: false, error: "ChatbotX não está configurado.", retryable: false };
+
+  const campos = await listarCamposFiltroContato(randomUUID());
+  if (!campos.success) return { success: false, error: campos.error, retryable: campos.retryable };
+  const campoCnpj = campos.data.find((campo) => campo.name.trim().toLocaleLowerCase("pt-BR") === "cnpj");
+  if (!campoCnpj) return { success: false, error: "O campo personalizado CNPJ não foi encontrado no ChatbotX.", retryable: false };
+  return { success: true, data: { cnpj, campoCnpj } };
+}
+
+async function conversaDoCliente(conversationId: string, cliente: ClienteAutorizado): Promise<Resultado<ChatbotxConversaPublica>> {
+  const conversa = await obterConversaInbox(conversationId, randomUUID());
+  if (!conversa.success) return { success: false, error: conversa.error, retryable: conversa.retryable };
+  const campo = await obterCampoPersonalizadoContato(conversa.data.contactId, cliente.campoCnpj.id, randomUUID());
+  if (!campo.success) {
+    if (campo.error === "Recurso não encontrado no backend ChatbotX.") {
+      return { success: false, error: "Conversa não encontrada para este cliente.", retryable: false };
+    }
+    return { success: false, error: campo.error, retryable: campo.retryable };
+  }
+  if (apenasDigitos(campo.data) !== apenasDigitos(cliente.cnpj)) {
+    return { success: false, error: "Conversa não encontrada para este cliente.", retryable: false };
+  }
+  return { success: true, data: conversa.data };
 }
 
 export async function ListarConversasChatbotxDoCard(
   cardId: string,
   cursor?: string,
 ): Promise<Resultado<{ data: ChatbotxConversaPublica[]; nextCursor: string | null }>> {
-  const autorizacao = await identidadeAutorizada(cardId);
+  const autorizacao = await clienteAutorizado(cardId);
   if (!autorizacao.success) return autorizacao;
-  const keyword = autorizacao.data.nomes[0];
-  if (!keyword) return { success: true, data: { data: [], nextCursor: null } };
-  const resultado = await listarConversasInbox({ keyword, cursor, perPage: 50 }, randomUUID());
-  if (!resultado.success) return { success: false, error: resultado.error, retryable: resultado.retryable };
-  return { success: true, data: { data: resultado.data.data.filter((conversa) => contatoCorresponde(conversa, autorizacao.data)), nextCursor: resultado.data.nextCursor } };
+  const formatos = formatosCnpj(autorizacao.data.cnpj);
+  const posicao = lerCursor(cursor);
+  if (!posicao || posicao.formatIndex >= formatos.length) {
+    return { success: false, error: "Cursor de conversas inválido.", retryable: false };
+  }
+
+  for (let index = posicao.formatIndex; index < formatos.length; index++) {
+    const resultado = await listarConversasInbox({
+      contactFilter: filtroPorCnpj(autorizacao.data.campoCnpj, formatos[index]),
+      cursor: index === posicao.formatIndex ? posicao.cursor : undefined,
+      perPage: 50,
+    }, randomUUID());
+    if (!resultado.success) return { success: false, error: resultado.error, retryable: resultado.retryable };
+    const nextCursor = resultado.data.nextCursor
+      ? JSON.stringify({ version: 1, formatIndex: index, cursor: resultado.data.nextCursor } satisfies CursorConversas)
+      : index + 1 < formatos.length
+        ? JSON.stringify({ version: 1, formatIndex: index + 1 } satisfies CursorConversas)
+        : null;
+    if (resultado.data.data.length || nextCursor === null || resultado.data.nextCursor) {
+      return { success: true, data: { data: resultado.data.data, nextCursor } };
+    }
+  }
+  return { success: true, data: { data: [], nextCursor: null } };
 }
 
 export async function ListarMensagensChatbotxDoCard(
@@ -89,11 +143,10 @@ export async function ListarMensagensChatbotxDoCard(
   conversationId: string,
   cursor?: string,
 ): Promise<Resultado<{ data: ChatbotxMensagem[]; nextCursor: string | null }>> {
-  const autorizacao = await identidadeAutorizada(cardId);
+  const autorizacao = await clienteAutorizado(cardId);
   if (!autorizacao.success) return autorizacao;
-  const conversa = await obterConversaInbox(conversationId, randomUUID());
-  if (!conversa.success) return { success: false, error: conversa.error, retryable: conversa.retryable };
-  if (!contatoCorresponde(conversa.data, autorizacao.data)) return { success: false, error: "Conversa não encontrada para este cliente.", retryable: false };
+  const conversa = await conversaDoCliente(conversationId, autorizacao.data);
+  if (!conversa.success) return conversa;
   const resultado = await listarMensagensConversa(conversationId, { cursor, perPage: 50 }, randomUUID());
   if (!resultado.success) return { success: false, error: resultado.error, retryable: resultado.retryable };
   return { success: true, data: { data: resultado.data.data, nextCursor: resultado.data.nextCursor } };
@@ -105,11 +158,10 @@ export async function EnviarMensagemChatbotxDoCard(
   texto: string,
   inboxId?: string,
 ): Promise<Resultado<void>> {
-  const autorizacao = await identidadeAutorizada(cardId, "editarCard");
+  const autorizacao = await clienteAutorizado(cardId, "editarCard");
   if (!autorizacao.success) return autorizacao;
-  const conversa = await obterConversaInbox(conversationId, randomUUID());
-  if (!conversa.success) return { success: false, error: conversa.error, retryable: conversa.retryable };
-  if (!contatoCorresponde(conversa.data, autorizacao.data)) return { success: false, error: "Conversa não encontrada para este cliente.", retryable: false };
+  const conversa = await conversaDoCliente(conversationId, autorizacao.data);
+  if (!conversa.success) return conversa;
   const canalPermitido = !inboxId || conversa.data.contactInboxes.some((item) => item.inboxId === inboxId);
   if (!canalPermitido) return { success: false, error: "Canal inválido para esta conversa.", retryable: false };
   const resultado = await enviarMensagemConversa({ conversationId, text: texto, inboxId }, randomUUID());
