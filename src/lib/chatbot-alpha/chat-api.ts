@@ -191,7 +191,15 @@ export type ChatbotxEnviarMensagemInput = z.infer<typeof chatbotxEnviarMensagemI
 
 export type ChatbotxApiResult<T> =
   | { success: true; data: T; correlationId: string }
-  | { success: false; error: string; correlationId: string; supportId: string; retryable: boolean };
+  | { success: false; error: string; correlationId: string; supportId: string; retryable: boolean; retryAfterMs?: number };
+
+function retryAfterMs(header: string | null): number | undefined {
+  if (!header) return undefined;
+  const seconds = Number(header);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.ceil(seconds * 1000);
+  const date = Date.parse(header);
+  return Number.isNaN(date) ? undefined : Math.max(0, date - Date.now());
+}
 
 // ─── Cliente HTTP ─────────────────────────────────────────────────────────────
 
@@ -262,6 +270,7 @@ async function chatbotxFetch(
       correlationId,
       supportId: correlationId,
       retryable: response.status >= 500 || response.status === 429,
+      ...(response.status === 429 ? { retryAfterMs: retryAfterMs(response.headers.get("Retry-After")) } : {}),
     };
   }
 

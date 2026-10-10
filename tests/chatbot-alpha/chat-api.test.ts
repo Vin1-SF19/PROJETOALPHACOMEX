@@ -262,12 +262,16 @@ describe("chat-api — respostas HTTP de erro", () => {
 
   it("classifica erro 429 (rate limit) como retryable no envio de mensagem", async () => {
     const mod = await loadModule({ url: "https://chatbotx.example.com" });
-    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ error: "rate limit excedido" }, 429));
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ error: "rate limit excedido" }), {
+      status: 429,
+      headers: { "Retry-After": "12" },
+    }));
 
     const result = await mod.enviarMensagem({ contatoIdentifier: "id:contact-1", text: "oi" }, "corr-6");
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.retryable).toBe(true);
+      expect(result.retryAfterMs).toBe(12_000);
     }
   });
 

@@ -18,7 +18,7 @@ import {
   type ChatbotxMensagem,
 } from "@/lib/chatbot-alpha/chat-api";
 
-type Resultado<T> = { success: true; data: T } | { success: false; error: string; retryable: boolean };
+type Resultado<T> = { success: true; data: T } | { success: false; error: string; retryable: boolean; retryAfterMs?: number };
 type ClienteAutorizado = { cnpj: string; campoCnpj: ChatbotxCampoFiltro };
 type CursorConversas = { version: 1; formatIndex: number; cursor?: string };
 
@@ -85,7 +85,7 @@ async function clienteAutorizado(cardId: string, acao: "visualizar" | "editarCar
   if (!isChatbotxConfigured()) return { success: false, error: "ChatbotX não está configurado.", retryable: false };
 
   const campos = await listarCamposFiltroContato(randomUUID());
-  if (!campos.success) return { success: false, error: campos.error, retryable: campos.retryable };
+  if (!campos.success) return { success: false, error: campos.error, retryable: campos.retryable, retryAfterMs: campos.retryAfterMs };
   const campoCnpj = campos.data.find((campo) => campo.name.trim().toLocaleLowerCase("pt-BR") === "cnpj");
   if (!campoCnpj) return { success: false, error: "O campo personalizado CNPJ não foi encontrado no ChatbotX.", retryable: false };
   return { success: true, data: { cnpj, campoCnpj } };
@@ -93,13 +93,13 @@ async function clienteAutorizado(cardId: string, acao: "visualizar" | "editarCar
 
 async function conversaDoCliente(conversationId: string, cliente: ClienteAutorizado): Promise<Resultado<ChatbotxConversaPublica>> {
   const conversa = await obterConversaInbox(conversationId, randomUUID());
-  if (!conversa.success) return { success: false, error: conversa.error, retryable: conversa.retryable };
+  if (!conversa.success) return { success: false, error: conversa.error, retryable: conversa.retryable, retryAfterMs: conversa.retryAfterMs };
   const campo = await obterCampoPersonalizadoContato(conversa.data.contactId, cliente.campoCnpj.id, randomUUID());
   if (!campo.success) {
     if (campo.error === "Recurso não encontrado no backend ChatbotX.") {
       return { success: false, error: "Conversa não encontrada para este cliente.", retryable: false };
     }
-    return { success: false, error: campo.error, retryable: campo.retryable };
+    return { success: false, error: campo.error, retryable: campo.retryable, retryAfterMs: campo.retryAfterMs };
   }
   if (apenasDigitos(campo.data) !== apenasDigitos(cliente.cnpj)) {
     return { success: false, error: "Conversa não encontrada para este cliente.", retryable: false };
@@ -125,7 +125,7 @@ export async function ListarConversasChatbotxDoCard(
       cursor: index === posicao.formatIndex ? posicao.cursor : undefined,
       perPage: 50,
     }, randomUUID());
-    if (!resultado.success) return { success: false, error: resultado.error, retryable: resultado.retryable };
+    if (!resultado.success) return { success: false, error: resultado.error, retryable: resultado.retryable, retryAfterMs: resultado.retryAfterMs };
     const nextCursor = resultado.data.nextCursor
       ? JSON.stringify({ version: 1, formatIndex: index, cursor: resultado.data.nextCursor } satisfies CursorConversas)
       : index + 1 < formatos.length
@@ -148,7 +148,7 @@ export async function ListarMensagensChatbotxDoCard(
   const conversa = await conversaDoCliente(conversationId, autorizacao.data);
   if (!conversa.success) return conversa;
   const resultado = await listarMensagensConversa(conversationId, { cursor, perPage: 50 }, randomUUID());
-  if (!resultado.success) return { success: false, error: resultado.error, retryable: resultado.retryable };
+  if (!resultado.success) return { success: false, error: resultado.error, retryable: resultado.retryable, retryAfterMs: resultado.retryAfterMs };
   return { success: true, data: { data: resultado.data.data, nextCursor: resultado.data.nextCursor } };
 }
 
@@ -165,6 +165,6 @@ export async function EnviarMensagemChatbotxDoCard(
   const canalPermitido = !inboxId || conversa.data.contactInboxes.some((item) => item.inboxId === inboxId);
   if (!canalPermitido) return { success: false, error: "Canal inválido para esta conversa.", retryable: false };
   const resultado = await enviarMensagemConversa({ conversationId, text: texto, inboxId }, randomUUID());
-  if (!resultado.success) return { success: false, error: resultado.error, retryable: resultado.retryable };
+  if (!resultado.success) return { success: false, error: resultado.error, retryable: resultado.retryable, retryAfterMs: resultado.retryAfterMs };
   return { success: true, data: undefined };
 }

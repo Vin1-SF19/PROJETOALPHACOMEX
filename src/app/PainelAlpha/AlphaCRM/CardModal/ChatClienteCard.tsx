@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { LoaderCircle, MessageSquare, RefreshCw, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -10,9 +10,12 @@ import {
   ListarMensagensChatbotxDoCard,
 } from "@/actions/AlphaCrmChatbotx";
 import type { ChatbotxConversaPublica, ChatbotxMensagem } from "@/lib/chatbot-alpha/chat-api";
+import { mesclarMensagens } from "@/lib/chatbot-alpha/mesclar-mensagens";
 
 interface Props { cardId: string; clienteNome: string; podeEnviar: boolean }
 type Estado = "idle" | "loading" | "ready" | "empty" | "error";
+const INTERVALO_ATUALIZACAO_MS = 8_000;
+const INTERVALO_MAXIMO_FALHA_MS = 60_000;
 
 function nomeContato(conversa: ChatbotxConversaPublica): string {
   const contato = conversa.contact;
@@ -31,6 +34,7 @@ export function ChatClienteCard({ cardId, clienteNome, podeEnviar }: Props) {
   const [mensagens, setMensagens] = useState<ChatbotxMensagem[]>([]);
   const [estado, setEstado] = useState<Estado>("idle");
   const [erro, setErro] = useState<string | null>(null);
+  const [erroAtualizacao, setErroAtualizacao] = useState<string | null>(null);
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [cursorAntigo, setCursorAntigo] = useState<string | null>(null);
@@ -39,10 +43,75 @@ export function ChatClienteCard({ cardId, clienteNome, podeEnviar }: Props) {
   const [inboxId, setInboxId] = useState("");
   const versaoConversa = useRef(0);
 
+  useEffect(() => {
+    if (!open || !conversa || estado !== "ready") return;
+    const conversationId = conversa.id;
+    const versao = versaoConversa.current;
+    let ativo = true;
+    let pendente = false;
+    let bloqueado = false;
+    let falhas = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const conversaAtual = () => ativo && versaoConversa.current === versao;
+
+    function programar(esperaMs: number) {
+      if (timer) clearTimeout(timer);
+      if (conversaAtual() && !bloqueado && document.visibilityState === "visible") {
+        timer = setTimeout(() => void atualizar(), esperaMs);
+      }
+    }
+
+    async function atualizar() {
+      if (!conversaAtual() || pendente || document.visibilityState !== "visible") return;
+      pendente = true;
+      let esperaMs = INTERVALO_ATUALIZACAO_MS;
+      try {
+        // Sem cursor: a página mais recente recupera respostas recebidas durante a pausa.
+        const resultado = await ListarMensagensChatbotxDoCard(cardId, conversationId);
+        if (!conversaAtual()) return;
+        if (resultado.success) {
+          setMensagens((atuais) => mesclarMensagens(atuais, resultado.data.data));
+          setErroAtualizacao(null);
+          falhas = 0;
+        } else {
+          setErroAtualizacao(resultado.error);
+          if (!resultado.retryable) { bloqueado = true; return; }
+          falhas += 1;
+          esperaMs = Math.max(
+            resultado.retryAfterMs ?? 0,
+            Math.min(INTERVALO_MAXIMO_FALHA_MS, INTERVALO_ATUALIZACAO_MS * 2 ** falhas),
+          );
+        }
+      } catch {
+        if (!conversaAtual()) return;
+        setErroAtualizacao("Não foi possível atualizar as mensagens. Nova tentativa em breve.");
+        falhas += 1;
+        esperaMs = Math.min(INTERVALO_MAXIMO_FALHA_MS, INTERVALO_ATUALIZACAO_MS * 2 ** falhas);
+      } finally {
+        pendente = false;
+        if (conversaAtual()) programar(esperaMs);
+      }
+    }
+
+    function aoMudarVisibilidade() {
+      if (timer) clearTimeout(timer);
+      if (document.visibilityState === "visible" && !pendente && !bloqueado) void atualizar();
+    }
+
+    document.addEventListener("visibilitychange", aoMudarVisibilidade);
+    programar(INTERVALO_ATUALIZACAO_MS);
+    return () => {
+      ativo = false;
+      if (timer) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", aoMudarVisibilidade);
+    };
+  }, [cardId, conversa, estado, open]);
+
   const carregarConversas = useCallback(async () => {
     const versao = versaoConversa.current;
     setEstado("loading");
     setErro(null);
+    setErroAtualizacao(null);
     const resultado = await ListarConversasChatbotxDoCard(cardId);
     if (versao !== versaoConversa.current) return;
     if (!resultado.success) { setErro(resultado.error); setEstado("error"); return; }
@@ -58,11 +127,12 @@ export function ChatClienteCard({ cardId, clienteNome, podeEnviar }: Props) {
     setMensagens([]);
     setCursorAntigo(null);
     setErro(null);
+    setErroAtualizacao(null);
     setEstado("loading");
     const resultado = await ListarMensagensChatbotxDoCard(cardId, selecionada.id);
     if (versao !== versaoConversa.current) return;
     if (!resultado.success) { setErro(resultado.error); setEstado("error"); return; }
-    setMensagens([...resultado.data.data].reverse());
+    setMensagens(mesclarMensagens([], resultado.data.data));
     setCursorAntigo(resultado.data.nextCursor);
     setEstado("ready");
   }
@@ -75,8 +145,7 @@ export function ChatClienteCard({ cardId, clienteNome, podeEnviar }: Props) {
     if (versao === versaoConversa.current) {
       if (resultado.success) {
         setMensagens((atuais) => {
-          const ids = new Set(atuais.map((mensagem) => mensagem.id));
-          return [...resultado.data.data].reverse().filter((mensagem) => !ids.has(mensagem.id)).concat(atuais);
+          return mesclarMensagens(atuais, resultado.data.data);
         });
         setCursorAntigo(resultado.data.nextCursor);
       } else setErro(resultado.error);
@@ -112,7 +181,10 @@ export function ChatClienteCard({ cardId, clienteNome, podeEnviar }: Props) {
     setTexto("");
     const atualizadas = await ListarMensagensChatbotxDoCard(cardId, conversaId);
     if (versao !== versaoConversa.current) return;
-    if (atualizadas.success) setMensagens([...atualizadas.data.data].reverse());
+    if (atualizadas.success) {
+      setMensagens((atuais) => mesclarMensagens(atuais, atualizadas.data.data));
+      setErroAtualizacao(null);
+    }
     else if (!atualizadas.success) setErro(atualizadas.error);
     setEnviando(false);
   }
@@ -122,6 +194,7 @@ export function ChatClienteCard({ cardId, clienteNome, podeEnviar }: Props) {
       versaoConversa.current += 1;
       setConversa(null);
       setMensagens([]);
+      setErroAtualizacao(null);
       setEstado("idle");
     }
     setOpen(aberto);
@@ -166,7 +239,7 @@ export function ChatClienteCard({ cardId, clienteNome, podeEnviar }: Props) {
                 <time className="mt-1 block text-right text-[10px] opacity-65">{horario(mensagem.createdAt)}</time>
               </div></div>;
             })}
-            {erro && <p role="alert" className="text-center text-xs text-rose-300">{erro}</p>}
+            {(erro || erroAtualizacao) && <p role="alert" className="text-center text-xs text-rose-300">{erro || erroAtualizacao}</p>}
           </div>
           <form className="flex gap-2 border-t border-white/10 p-3" onSubmit={(event) => { event.preventDefault(); void enviar(); }}>
             <textarea aria-label="Mensagem para o cliente" value={texto} onChange={(event) => setTexto(event.target.value.slice(0, 1000))} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void enviar(); } }} placeholder="Digite sua mensagem…" rows={2} className="min-h-10 flex-1 resize-none rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm outline-none focus-visible:border-cyan-400" disabled={enviando} />
