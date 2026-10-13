@@ -61,7 +61,7 @@ function SeletorCorTexto({ editor, ponto }: { editor: Editor; ponto?: { x: numbe
         <button type="button" title="Cor padrão" aria-label="Remover cor do texto" onMouseDown={(event) => event.preventDefault()} onClick={() => { editor.chain().focus().unsetColor().run(); setOpen(false); }} className="h-7 rounded-full border border-white/15 px-2 text-[10px] text-slate-300 hover:bg-white/10">Padrão</button>
         <label className="relative flex h-7 cursor-pointer items-center rounded-full border border-white/15 px-2 text-[10px] text-slate-300 hover:bg-white/10" title="Escolher qualquer cor">
           Personalizada
-          <input type="color" aria-label="Escolher cor personalizada" defaultValue="#f59e0b" onChange={(event) => { editor.chain().focus().setColor(event.currentTarget.value).run(); setOpen(false); }} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+          <input type="color" aria-label="Escolher cor personalizada" defaultValue="#f59e0b" onChange={(event) => { editor.chain().focus().setColor(event.currentTarget.value).run(); }} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
         </label>
       </div>
     </PopoverContent>

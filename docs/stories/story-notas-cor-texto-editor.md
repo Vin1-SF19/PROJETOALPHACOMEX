@@ -14,6 +14,7 @@ Como usuário do Alpha Notas, quero mudar a cor de um trecho selecionado pela ba
 - [x] O botão direito sobre texto selecionado abre a paleta no ponto do clique.
 - [x] A cor padrão pode ser restaurada.
 - [x] A opção “Personalizada” abre o seletor nativo para escolher qualquer cor.
+- [x] A paleta permanece aberta enquanto a cor personalizada está sendo escolhida.
 - [x] A formatação persiste pelo conteúdo JSON já utilizado pelas notas, sem mudança no banco.
 - [x] A função aparece na Central e nas notas abertas pela barra de tarefas pelo editor compartilhado.
 
