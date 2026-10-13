@@ -7,6 +7,7 @@ import { CrmSpaceBackground } from './CRMBackground';
 import { PerfilEmpresaProvider } from '@/components/PerfilEmpresaGlobal';
 import type { Session } from 'next-auth';
 import { getCrmBackDestination } from './crm-back-destination';
+import { cn } from '@/lib/utils';
 
 interface CRMLayoutClientProps {
   children: React.ReactNode;
@@ -17,14 +18,18 @@ interface CRMLayoutClientProps {
 export default function CRMLayoutClient({ children, standaloneUrl }: CRMLayoutClientProps) {
   const pathname = usePathname();
   const backDestination = getCrmBackDestination(pathname);
+  const isPipelineBoard = /^\/PainelAlpha\/AlphaCRM\/pipeline\/[^/]+\/?$/.test(pathname);
 
   return (
-    <div className="crm-scope relative flex min-h-screen" style={{ background: 'linear-gradient(180deg,#050b16,#020617)' }}>
+    <div
+      className={cn('crm-scope relative flex', isPipelineBoard ? 'h-dvh min-h-0 overflow-hidden' : 'min-h-screen')}
+      style={{ background: 'linear-gradient(180deg,#050b16,#020617)' }}
+    >
       <CrmSpaceBackground />
-      <main className="crm-scroll relative z-10 min-w-0 flex-1 overflow-auto">
+      <main className={cn('crm-scroll relative z-10 min-w-0 flex-1', isPipelineBoard ? 'flex min-h-0 flex-col overflow-hidden' : 'overflow-auto')}>
         <PerfilEmpresaProvider>
           {backDestination || standaloneUrl ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4 sm:px-7 lg:px-10">
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-5 pt-4 sm:px-7 lg:px-10">
               {backDestination ? (
                 <Link
                   href={backDestination}

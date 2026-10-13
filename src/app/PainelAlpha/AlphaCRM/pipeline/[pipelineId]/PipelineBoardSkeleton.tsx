@@ -13,7 +13,7 @@ export const SkeletonCard = memo(function SkeletonCard({ className }: { classNam
     <div
       aria-hidden="true"
       className={cn(
-        "alpha-skeleton h-[72px] w-full rounded-lg",
+        "alpha-skeleton h-[72px] w-full shrink-0 rounded-lg",
         className,
       )}
     />
@@ -37,16 +37,16 @@ export const SkeletonColumn = memo(function SkeletonColumn({
     <div
       aria-hidden="true"
       className={cn(
-        "alpha-pipeline-column-shell flex flex-col w-full md:w-[220px] lg:w-[240px] xl:w-[260px] max-w-full",
+        "alpha-pipeline-column-shell flex h-full min-h-0 flex-col w-full md:w-[220px] lg:w-[240px] xl:w-[260px] max-w-full",
         className,
       )}
     >
       {/* Header placeholder */}
-      <div className="alpha-pipeline-column-header mb-2 px-1 py-1">
+      <div className="alpha-pipeline-column-header mb-2 shrink-0 px-1 py-1">
         <div className="alpha-skeleton h-5 w-[60%] rounded-md" />
       </div>
       {/* Cards empilhados */}
-      <div className="flex-1 flex flex-col gap-2 p-2 min-h-[60px]">
+      <div className="flex-1 flex min-h-0 flex-col gap-2 overflow-hidden p-2">
         {cards.map((_, i) => (
           <SkeletonCard key={i} />
         ))}

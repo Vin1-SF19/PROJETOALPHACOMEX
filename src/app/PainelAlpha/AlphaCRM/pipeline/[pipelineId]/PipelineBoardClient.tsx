@@ -634,7 +634,7 @@ function KanbanColumn({
   const novosLeads = etapaEhNovosLeads(etapa.nome);
   return (
     <div className="alpha-pipeline-column-shell flex flex-col h-full min-h-0 w-full md:w-[220px] lg:w-[240px] xl:w-[260px] max-w-full">
-      <div className="alpha-pipeline-column-header flex items-center justify-between mb-2 px-1 py-1">
+      <div className="alpha-pipeline-column-header flex shrink-0 items-center justify-between mb-2 px-1 py-1">
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full" style={{ background: `rgb(${cor})` }} />
           <span className="text-xs font-bold text-white">{etapa.nome}</span>
@@ -658,7 +658,7 @@ function KanbanColumn({
         )}
       </div>
       {(etapa.automacoes?.length ?? 0) > 0 && (
-        <details className="group mb-2 rounded-lg border border-cyan-400/10 bg-cyan-400/[0.035] px-2 py-1.5">
+        <details className="group mb-2 max-h-[35%] shrink-0 overflow-y-auto rounded-lg border border-cyan-400/10 bg-cyan-400/[0.035] px-2 py-1.5">
           <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[10px] font-semibold text-cyan-300">
             <Bot size={11} aria-hidden="true" />
             {etapa.automacoes!.length} automação(ões)
@@ -678,7 +678,7 @@ function KanbanColumn({
       )}
       <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <div
-          className={cn("alpha-pipeline-column flex-1 min-h-0 overflow-y-auto rounded-2xl p-2 space-y-2 border border-dashed border-white/5", isOver && "is-over")}
+          className={cn("alpha-pipeline-column flex-1 min-h-0 overflow-y-auto overscroll-y-contain rounded-2xl p-2 space-y-2 border border-dashed border-white/5", isOver && "is-over")}
           style={{
             background: isOver ? `rgba(${cor},0.1)` : `rgba(${cor},0.03)`,
             borderColor: isOver ? `rgba(${cor},0.5)` : undefined,
@@ -718,7 +718,7 @@ function LazyPipelineColumn({
   const showSkeleton = atualizandoManual || !inView;
 
   return (
-    <div ref={vincularColuna} className="h-full w-[220px] shrink-0 lg:w-[240px] xl:w-[260px]">
+    <div ref={vincularColuna} className="h-full min-h-0 w-[220px] shrink-0 lg:w-[240px] xl:w-[260px]">
       {showSkeleton ? (
         <SkeletonColumn cardCount={cards.length || 4} />
       ) : (
@@ -1038,8 +1038,8 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
 
   const activeCard = cards.find((c) => c.id === activeId);
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between gap-3 p-6 pb-4">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 p-6 pb-4">
         <div className="min-w-0">
           <h1 className="truncate text-xl font-black text-white">{pipeline.nome}</h1>
           {(pipeline.automacoesGlobais?.length ?? 0) > 0 && (
@@ -1088,7 +1088,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
         <div
           role="alert"
           aria-live="assertive"
-          className="mx-6 mb-3 flex items-center justify-between gap-3 px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm"
+          className="mx-6 mb-3 flex shrink-0 items-center justify-between gap-3 px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm"
         >
           <span>{erro}</span>
           <button
@@ -1104,7 +1104,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
       {!erro && etapasOrdenadas.length === 0 && (
         <div
           role="status"
-          className="mx-6 mb-3 flex items-center gap-2 px-4 py-3 rounded-xl bg-white/[0.03] border border-white/10 text-slate-400 text-sm"
+          className="mx-6 mb-3 flex shrink-0 items-center gap-2 px-4 py-3 rounded-xl bg-white/[0.03] border border-white/10 text-slate-400 text-sm"
         >
           <ClipboardList size={16} aria-hidden="true" className="shrink-0 text-slate-500" />
           <span>Nenhuma etapa configurada neste pipeline. Configure a primeira etapa para começar.</span>
@@ -1114,7 +1114,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
       {!erro && etapasOrdenadas.length > 0 && cards.length === 0 && (
         <div
           role="status"
-          className="mx-6 mb-3 flex items-center gap-2 px-4 py-3 rounded-xl bg-white/[0.03] border border-white/10 text-slate-400 text-sm"
+          className="mx-6 mb-3 flex shrink-0 items-center gap-2 px-4 py-3 rounded-xl bg-white/[0.03] border border-white/10 text-slate-400 text-sm"
         >
           <ClipboardList size={16} aria-hidden="true" className="shrink-0 text-slate-500" />
           <span>Nenhum card neste pipeline. Crie um card na etapa inicial para começar.</span>
@@ -1128,7 +1128,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
         onDragEnd={onDragEnd}
         onDragCancel={onDragCancel}
       >
-        <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden px-6 pb-[clamp(8px,2vh,24px)]" style={{ perspective: "1200px" }}>
+        <div className="flex-1 min-h-0 min-w-0 overflow-x-auto overflow-y-hidden px-6 pb-[clamp(8px,2vh,24px)]" style={{ perspective: "1200px" }}>
           <div className="flex gap-3 h-full min-w-max">
             <span role="status" aria-live="polite" className="sr-only">
               {atualizandoManual ? "Carregando pipeline…" : ""}
