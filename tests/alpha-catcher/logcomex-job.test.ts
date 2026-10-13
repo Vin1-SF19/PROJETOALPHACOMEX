@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ spawn: vi.fn(), mkdir: vi.fn(), rm: vi.fn(), iniciarHistorico: vi.fn(), coletadas: vi.fn(), terminarHistorico: vi.fn(), temErro: vi.fn() }));
-vi.mock('@/lib/alpha-catcher/historico', () => ({ historicoCatcher: { iniciar: mocks.iniciarHistorico, coletadas: mocks.coletadas, terminarColeta: mocks.terminarHistorico, temErro: mocks.temErro } }));
+const mocks = vi.hoisted(() => ({ spawn: vi.fn(), mkdir: vi.fn(), rm: vi.fn(), iniciarHistorico: vi.fn(), diagnostico: vi.fn(), coletadas: vi.fn(), terminarHistorico: vi.fn(), temErro: vi.fn() }));
+vi.mock('@/lib/alpha-catcher/historico', () => ({ historicoCatcher: { iniciar: mocks.iniciarHistorico, diagnostico: mocks.diagnostico, coletadas: mocks.coletadas, terminarColeta: mocks.terminarHistorico, temErro: mocks.temErro } }));
 vi.mock('node:child_process', () => ({ spawn: mocks.spawn }));
 vi.mock('node:fs/promises', () => ({ mkdir: mocks.mkdir, rm: mocks.rm }));
 import { iniciarColeta, lerColeta, cancelarColeta, confirmarCaptcha } from '@/lib/alpha-catcher/logcomex-job';
@@ -10,7 +10,7 @@ const input = { data: '2026-10-05', limite: 5 };
 beforeEach(() => {
   vi.useFakeTimers(); vi.clearAllMocks();
   worker = Object.assign(new EventEmitter(), { send: vi.fn(), kill: vi.fn(), connected: true });
-  mocks.iniciarHistorico.mockResolvedValue(undefined); mocks.terminarHistorico.mockResolvedValue(undefined); mocks.temErro.mockReturnValue(false);
+  mocks.iniciarHistorico.mockResolvedValue(undefined); mocks.diagnostico.mockResolvedValue(undefined); mocks.terminarHistorico.mockResolvedValue(undefined); mocks.temErro.mockReturnValue(false);
   mocks.spawn.mockReturnValue(worker); mocks.mkdir.mockResolvedValue(undefined); mocks.rm.mockResolvedValue(undefined);
 });
 afterEach(async () => { worker.emit('close'); await Promise.resolve(); await Promise.resolve(); vi.clearAllTimers(); vi.useRealTimers(); });
@@ -40,6 +40,18 @@ describe('worker Shipment Intel', () => {
     expect(lerColeta(job.id, 42)?.empresas?.duplicados).toBe(10000);
     worker.emit('message', { type: 'resultado', completo: true, resultado });
     expect(lerColeta(job.id, 42)?.estado).toBe('concluido');
+    expect(lerColeta(job.id, 42)?.empresas?.duplicados).toBe(10000);
+  });
+  it('mantém a coleta além de 30 minutos e encerra no limite absoluto configurado', async () => {
+    const job = await iniciarColeta(42, input);
+    for (let i = 0; i < 23; i++) {
+      await vi.advanceTimersByTimeAsync(20 * 60000);
+      worker.emit('message', { type: 'etapa', etapa: 'coleta' });
+      if (i === 1) expect(lerColeta(job.id, 42)?.estado).toBe('executando');
+    }
+    await vi.advanceTimersByTimeAsync(20 * 60000);
+    expect(lerColeta(job.id, 42)?.estado).toBe('erro');
+    expect(lerColeta(job.id, 42)?.mensagem).toContain('8 horas');
   });
   it('não retransmite campos secretos da coleta', async () => {
     const job = await iniciarColeta(42, input);
@@ -66,7 +78,8 @@ describe('worker Shipment Intel', () => {
     expect(mocks.spawn).not.toHaveBeenCalled(); expect(mocks.rm).not.toHaveBeenCalled();
   });
   it('encerramento inesperado marca erro e libera lock', async () => {
-    const job = await iniciarColeta(42, input); worker.emit('close'); await Promise.resolve(); await Promise.resolve();
+    const job = await iniciarColeta(42, input); worker.emit('close');
+    for (let i = 0; i < 8; i++) await Promise.resolve();
     expect(lerColeta(job.id, 42)?.estado).toBe('erro'); expect(mocks.rm).toHaveBeenCalled();
   });
   it('confirmação solicita checagem uma vez e nunca declara liberação por clique', async () => {

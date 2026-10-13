@@ -5,6 +5,18 @@ const perfil = async () => ({ cnpj: '33000167000101', address: {} });
 type Evento = { type: string; empresa?: { consignatario: string }; progresso?: { total: number | null; totalLista: number | null; coletadas: number; cnpjs: number } };
 type Api = { ranking: (data: string, page: number) => Promise<ReturnType<typeof raw>>; perfil: (data: string, nome: string) => Promise<unknown> };
 describe('coleta progressiva', () => {
+  it('relê o ranking sem consultar novamente perfis já persistidos', async () => {
+    const consultar = vi.fn(async () => ({ cnpj: '22222222000122', address: {} }));
+    const eventos: Evento[] = [];
+    await coletarProgressivo({ api: { ranking: async () => raw(['Anterior', 'Nova']), perfil: consultar }, conhecidos: new Map([['Anterior', '11111111000111']]), data: '', limite: Infinity, faixa: [1, 2], emitir: async (e: Evento) => { eventos.push(e); }, coletar: async ({ api }: { api: Api }) => {
+      await api.ranking('', 1);
+      expect(await api.perfil('', 'Anterior')).toMatchObject({ cnpj: '11111111000111' });
+      await api.perfil('', 'Nova');
+    } });
+    expect(consultar).toHaveBeenCalledTimes(1);
+    expect(consultar).toHaveBeenCalledWith('', 'Nova');
+    expect(eventos.filter(e => e.type === 'empresa').map(e => e.empresa?.consignatario)).toEqual(['Nova']);
+  });
   it('publica o primeiro CNPJ sem esperar a última página usada para descobrir o total', async () => {
     let liberar!: (value: ReturnType<typeof raw>) => void;
     const ultima = new Promise(resolve => { liberar = resolve; });

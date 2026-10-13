@@ -15,6 +15,7 @@ import type { ProgressoColeta } from '@/lib/alpha-catcher/logcomex-progress';
 import CalendarioColeta from './CalendarioColeta';
 import HistoricoConsultas from './HistoricoConsultas';
 import { coletaSchema, janelaMeses, dataMaximaColeta } from '@/lib/alpha-catcher/logcomex-input';
+import { detalheHistoricoSchema } from '@/lib/alpha-catcher/historico-tipos';
 
 type Linha = EmpresaCatcher & Omit<Partial<ResultadoCatcher>, 'estado'> & { estado: ResultadoCatcher['estado'] | 'aguardando' | 'consultando' };
 const btn = 'inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-bold text-slate-200 transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-40';
@@ -47,6 +48,7 @@ export default function CatcherClient({ temaInicial }: { temaInicial: string }) 
   const [periodoReceita, setPeriodoReceita] = useState('30');
   const [diasReceita, setDiasReceita] = useState('30');
   const coletaId = useRef('');
+  const coletaOffset = useRef(0);
   const importacaoId = useRef('');
   const jsonId = useRef('');
   const [avisoHistorico, setAvisoHistorico] = useState('');
@@ -145,6 +147,7 @@ export default function CatcherClient({ temaInicial }: { temaInicial: string }) 
           await tick(); continue;
         }
         const empresa = fila[indice++];
+        if (duranteColeta && ['salvo', 'existente'].includes(empresa.estado)) continue;
         while (controle.current.pausar && !controle.current.cancelar) await tick();
         if (controle.current.cancelar) break;
         let finalizado = false;
@@ -198,21 +201,37 @@ export default function CatcherClient({ temaInicial }: { temaInicial: string }) 
     }
   }
 
-  async function importarAutomatico() {
+  async function importarAutomatico(retomarId?: string) {
     if (controle.current.executando || coletaId.current || coletando) return;
-    const entrada = coletaSchema.safeParse({ data: periodoColeta.dataFinal, ...periodoColeta, limite: limiteColeta, embarquesMin: embarquesMin.trim() ? Number(embarquesMin) : NaN, embarquesMax: embarquesMax.trim() ? Number(embarquesMax) : NaN });
-    if (!entrada.success) { setErro('Selecione datas até sete dias antes de hoje e confira o limite de empresas e os embarques mínimos e máximos (inteiros; mínimo não pode superar máximo).'); return; }
+    const entrada = retomarId ? null : coletaSchema.safeParse({ data: periodoColeta.dataFinal, ...periodoColeta, limite: limiteColeta, embarquesMin: embarquesMin.trim() ? Number(embarquesMin) : NaN, embarquesMax: embarquesMax.trim() ? Number(embarquesMax) : NaN });
+    if (entrada && !entrada.success) { setErro('Selecione datas até sete dias antes de hoje e confira o limite de empresas e os embarques mínimos e máximos (inteiros; mínimo não pode superar máximo).'); return; }
     const days = diasReceita.trim() ? normalizarDiasReceita(Number(diasReceita)) : null;
     if (days === null) { setErro('Informe uma idade máxima dos dados inteira, maior ou igual a zero.'); return; }
     importacaoId.current = ''; jsonId.current = ''; setAvisoHistorico('');
     filaColeta.current = criarFilaCatcher<Linha>();
+    coletaOffset.current = 0;
     setLinhas([]); setResumo({ invalidos: 0, duplicados: 0 }); setProgressoColeta(null);
     setArquivo(`Shipment Intel · ${periodoColeta.dataFinal}`); setTabelaKey(v => v + 1);
     coletaId.current = 'iniciando';
     setColetando(true); setErro(''); setCaptcha(''); setEtapaColeta('Iniciando acesso à Logcomex…');
     let processamento: Promise<void> | undefined;
     try {
-      const start = await fetch('/api/alpha-catcher/logcomex', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entrada.data) });
+      if (retomarId) {
+        const response = await fetch(`/api/alpha-catcher/historico/${encodeURIComponent(retomarId)}`, { cache: 'no-store' });
+        const raw = await response.json();
+        if (!response.ok) throw new Error(raw.error || 'Não foi possível carregar a importação.');
+        const detalhe = detalheHistoricoSchema.parse(raw);
+        if (detalhe.importacao.id !== retomarId || detalhe.importacao.origem !== 'LOGCOMEX' || !detalhe.importacao.listaDisponivel) throw new Error('Esta importação não pode ser continuada.');
+        const anteriores: Linha[] = detalhe.linhas.map(linha => ({ ...linha }));
+        filaColeta.current.adicionar(anteriores);
+        coletaOffset.current = anteriores.length;
+        setLinhas(anteriores);
+        setPeriodoColeta({ dataInicio: detalhe.importacao.dataInicio, dataFinal: detalhe.importacao.dataFinal });
+        setEmbarquesMin(String(detalhe.importacao.embarquesMin)); setEmbarquesMax(String(detalhe.importacao.embarquesMax));
+        setLimiteColeta(detalhe.importacao.limite);
+        setArquivo(`Shipment Intel · ${detalhe.importacao.dataFinal}`);
+      }
+      const start = await fetch('/api/alpha-catcher/logcomex', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(retomarId ? { acao: 'retomar', id: retomarId } : entrada!.data) });
       const inicial = await start.json();
       if (!start.ok) throw new Error(inicial.error || 'Não foi possível iniciar a coleta.');
       coletaId.current = inicial.id; importacaoId.current = inicial.id;
@@ -221,7 +240,7 @@ export default function CatcherClient({ temaInicial }: { temaInicial: string }) 
       while (montado.current) {
         await new Promise(resolve => setTimeout(resolve, 2000));
         if (!montado.current) break;
-        const response = await fetch(`/api/alpha-catcher/logcomex?id=${encodeURIComponent(inicial.id)}`, { cache: 'no-store' });
+        const response = await fetch(`/api/alpha-catcher/logcomex?id=${encodeURIComponent(inicial.id)}&desde=${coletaOffset.current}`, { cache: 'no-store' });
         const job = await response.json();
         if (!response.ok) throw new Error(job.error || 'Não foi possível acompanhar a coleta.');
         setEtapaColeta(job.etapa);
@@ -234,6 +253,7 @@ export default function CatcherClient({ temaInicial }: { temaInicial: string }) 
           if (novas.length) setLinhas(prev => [...prev, ...novas]);
           setResumo({ invalidos: job.empresas.invalidos, duplicados: job.empresas.duplicados });
         }
+        if (Number.isSafeInteger(job.totalEmpresas) && job.totalEmpresas >= coletaOffset.current) coletaOffset.current = job.totalEmpresas;
         if (job.estado === 'executando') continue;
         if (job.estado === 'erro') setErro(job.mensagem || 'A coleta não foi concluída.');
         setEtapaColeta(job.mensagem || (job.estado === 'cancelado' ? 'Coleta cancelada.' : 'Coleta concluída.'));
@@ -390,7 +410,7 @@ export default function CatcherClient({ temaInicial }: { temaInicial: string }) 
                 <button className={btn} onClick={() => { controle.current.cancelar = true; setStatus('Interrompendo após a consulta em andamento…'); }}><Square size={16} />Interromper</button></>}
               <button className={btn} disabled={ativo || carregando || coletando || !stats.pendentes} onClick={() => void executar(true)}><RefreshCw size={16} />Tentar pendências</button>
             </div>
-            <HistoricoConsultas visual={visual} emAndamento={ativo || coletando} aviso={avisoHistorico} />
+            <HistoricoConsultas visual={visual} emAndamento={ativo || coletando} aviso={avisoHistorico} onRetomar={id => void importarAutomatico(id)} podeRetomar={!ativo && !coletando && !carregando} />
             <p className="text-xs text-slate-400">ReceitaWS primeiro; Radar após validar o cadastro. Cada CNPJ recebido é verificado no banco e, se novo, consultado enquanto a coleta continua. O limite da ReceitaWS é controlado no servidor conforme o plano. Falhas permanecem pendentes.</p>
           </CardComScan>
         </section>

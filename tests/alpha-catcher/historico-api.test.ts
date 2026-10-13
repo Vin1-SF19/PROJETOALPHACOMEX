@@ -12,7 +12,7 @@ describe('acesso ao histórico Catcher', () => {
   });
   it('compartilha após gate do módulo, pagina e ignora usuário enviado', async () => {
     const res = await GET(new Request('https://alpha.test/api/alpha-catcher/historico?cursor=50&userId=99'));
-    expect(res.status).toBe(200); expect(mocks.listarCompartilhado).toHaveBeenCalledWith(50); expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(res.status).toBe(200); expect(mocks.listarCompartilhado).toHaveBeenCalledWith(50, 42); expect(res.headers.get('cache-control')).toBe('no-store');
   });
   it('rejeita cursor inválido', async () => { expect((await GET(new Request('https://alpha.test/api/alpha-catcher/historico?cursor=-1'))).status).toBe(400); expect(mocks.listarCompartilhado).not.toHaveBeenCalled(); });
 });
@@ -21,7 +21,7 @@ it('detalhe compartilhado mantém gate e aceita UUID legado único', async () =>
   const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   mocks.detalharCompartilhado.mockResolvedValue(null);
   const res = await DETALHE(new Request('https://alpha.test/api/alpha-catcher/historico/' + id), { params: Promise.resolve({ id }) });
-  expect(res.status).toBe(404); expect(mocks.detalharCompartilhado).toHaveBeenCalledWith(id);
+  expect(res.status).toBe(404); expect(mocks.detalharCompartilhado).toHaveBeenCalledWith(id, 42);
 });
 
 it.each([401, 403])('detalhe não chama leitura sem acesso %s', async status => {
@@ -35,7 +35,7 @@ it('usuários autorizados leem o mesmo registro por ID inequívoco', async () =>
     mocks.acesso.mockResolvedValue({ status: 200, userId });
     const res = await DETALHE(new Request('https://alpha.test'), { params: Promise.resolve({ id: '198' }) });
     expect(res.status).toBe(200); expect((await res.json()).importacao.autor.usuario).toBe('lucca');
-    expect(mocks.detalharCompartilhado).toHaveBeenLastCalledWith(198);
+    expect(mocks.detalharCompartilhado).toHaveBeenLastCalledWith(198, userId);
   }
 });
 it.each(['0', '-1', '9007199254740992', 'abc'])('rejeita referência inválida %s', async id => {

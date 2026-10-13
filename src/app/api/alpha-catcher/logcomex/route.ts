@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { encaminharWorkerCatcher } from '@/lib/alpha-catcher/worker-client';
 import { acessoCatcher } from '@/lib/alpha-catcher/access';
 import { coletaSchema } from '@/lib/alpha-catcher/logcomex-input';
-import { iniciarColeta, lerColeta, cancelarColeta, confirmarCaptcha } from '@/lib/alpha-catcher/logcomex-job';
+import { iniciarColeta, retomarColeta, lerColetaResposta, cancelarColeta, confirmarCaptcha } from '@/lib/alpha-catcher/logcomex-job';
+import { z } from 'zod';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -10,9 +11,12 @@ export async function GET(req: Request) {
   const acesso = await acessoCatcher();
   if (acesso.status !== 200) return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: acesso.status });
   const id = new URL(req.url).searchParams.get('id') || '';
-  const remoto = await encaminharWorkerCatcher('ler', acesso.userId!, id);
+  const desdeRaw = new URL(req.url).searchParams.get('desde');
+  const desde = desdeRaw === null ? undefined : Number(desdeRaw);
+  if (desdeRaw !== null && (!/^\d+$/.test(desdeRaw) || !Number.isSafeInteger(desde))) return NextResponse.json({ error: 'Índice inválido.' }, { status: 400 });
+  const remoto = await encaminharWorkerCatcher('ler', acesso.userId!, desde === undefined ? id : { id, desde });
   if (remoto) return remoto;
-  const job = lerColeta(id, acesso.userId!);
+  const job = lerColetaResposta(id, acesso.userId!, desde);
   return job ? NextResponse.json(job, { headers: { 'Cache-Control': 'no-store' } }) : NextResponse.json({ error: 'Execução não encontrada.' }, { status: 404 });
 }
 export async function POST(req: Request) {
@@ -31,6 +35,14 @@ export async function POST(req: Request) {
   }
   let data;
   try { data = JSON.parse(Buffer.concat(partes).toString('utf8')); } catch { return NextResponse.json({ error: 'JSON inválido.' }, { status: 400 }); }
+  if (data?.acao === 'retomar') {
+    const id = z.string().uuid().safeParse(data.id);
+    if (!id.success) return NextResponse.json({ error: 'Importação inválida.' }, { status: 400 });
+    const remoto = await encaminharWorkerCatcher('retomar', acesso.userId!, id.data);
+    if (remoto) return remoto;
+    try { return NextResponse.json(await retomarColeta(id.data, acesso.userId!), { status: 202 }); }
+    catch { return NextResponse.json({ error: 'Não foi possível retomar. Confira autoria, estado e execução ativa.' }, { status: 409 }); }
+  }
   if (data?.acao === 'cancelar' && typeof data.id === 'string') {
     const remoto = await encaminharWorkerCatcher('cancelar', acesso.userId!, data.id);
     return remoto ?? NextResponse.json({ cancelado: cancelarColeta(data.id, acesso.userId!) });

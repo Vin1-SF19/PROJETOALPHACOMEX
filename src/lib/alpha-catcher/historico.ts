@@ -58,6 +58,12 @@ const repositorio: Repositorio = {
 type Execucao = { userId: number; auditId: number; resumo: HistoricoImportacao; coleta: EstadoColeta;
   linhas: LinhaResultadoCatcher[]; posicoes: Map<string, number>; sujos: Set<number>; blocos: Map<number, number>;
   consultando: Set<string>; cnpjs: Set<string>; resultados: Map<string, ResultadoCatcher['estado']>; fila: Promise<unknown>; timer?: ReturnType<typeof setTimeout>; erro: boolean };
+function podeRetomarResumo(resumo: HistoricoImportacao) {
+  return resumo.origem === 'LOGCOMEX' && resumo.listaDisponivel && !resumo.recuperadoEm &&
+    resumo.tentativas?.at(-1)?.estado !== 'concluido' &&
+    Boolean(resumo.fimColeta || resumo.estado === 'interrompido') &&
+    ['erro', 'cancelado', 'interrompido', 'pendente'].includes(resumo.estado);
+}
 export function criarHistoricoCatcher(repo: Repositorio = repositorio, agora = () => new Date()) {
   const execucoes = new Map<string, Execucao>();
   const carregamentos = new Map<string, Promise<void>>();
@@ -70,7 +76,7 @@ export function criarHistoricoCatcher(repo: Repositorio = repositorio, agora = (
     e.resumo.processadas = e.resultados.size;
     e.resumo.novasSalvas = [...e.resultados.values()].filter(v => v === 'salvo').length;
     e.resumo.pendentes = [...e.resultados.values()].filter(v => v === 'pendente').length;
-    if (e.coleta === 'executando') e.resumo.estado = 'em_andamento';
+    if (e.coleta === 'executando') { e.resumo.estado = 'em_andamento'; e.resumo.fim = null; }
     else if (e.resultados.size < e.cnpjs.size) e.resumo.estado = e.resumo.origem === 'JSON' ? 'em_andamento' : 'pendente';
     else {
       e.resumo.fim ??= agora().toISOString();
@@ -115,7 +121,7 @@ export function criarHistoricoCatcher(repo: Repositorio = repositorio, agora = (
         linhas.push(...item.bloco.linhas); indices.set(indice, item.auditId);
       }
       if (linhas.length !== resumo.totalColetadas || new Set(linhas.map(l => l.cnpj)).size !== linhas.length) throw new Error('Lista incompleta.');
-      execucoes.set(`${userId}:${id}`, { userId, auditId: registro.id, resumo, coleta: resumo.fimColeta ? 'concluido' : 'executando', linhas,
+      execucoes.set(`${userId}:${id}`, { userId, auditId: registro.id, resumo, coleta: resumo.fimColeta ? (resumo.tentativas?.at(-1)?.estado === 'cancelado' ? 'cancelado' : resumo.tentativas?.at(-1)?.estado === 'erro' ? 'erro' : 'concluido') : 'executando', linhas,
         posicoes: new Map(linhas.map((l, i) => [l.cnpj, i])), sujos: new Set(), blocos: indices, consultando: new Set(),
         cnpjs: new Set(linhas.map(l => l.cnpj)), resultados: new Map(linhas.filter(l => ['salvo', 'existente', 'pendente'].includes(l.estado)).map(l => [l.cnpj, l.estado as ResultadoCatcher['estado']])), fila: Promise.resolve(), erro: false });
     })();
@@ -204,11 +210,59 @@ export function criarHistoricoCatcher(repo: Repositorio = repositorio, agora = (
       const janela = janelaMeses(input.data, 3);
       const fimLegado = new Date(`${input.data}T00:00:00Z`); fimLegado.setUTCDate(fimLegado.getUTCDate() - 7);
       const resumo: HistoricoImportacao = { versao: 1, id, inicio: agora().toISOString(), fim: null, fimColeta: null,
-        estado: 'em_andamento', listaDisponivel: true, origem: 'LOGCOMEX', dataInicio: input.dataInicio || janela.dataInicio, dataFinal: input.dataFinal || fimLegado.toISOString().slice(0, 10),
+        estado: 'em_andamento', listaDisponivel: true, origem: 'LOGCOMEX', dataPesquisa: input.data, dataInicio: input.dataInicio || janela.dataInicio, dataFinal: input.dataFinal || fimLegado.toISOString().slice(0, 10),
+        tentativas: [{ inicio: agora().toISOString(), fim: null, estado: 'executando' }], etapaColeta: 'Preparando acesso à Logcomex',
         embarquesMin: input.embarquesMin ?? 1, embarquesMax: input.embarquesMax ?? 2, limite: input.limite ?? 0,
         totalColetadas: 0, novasSalvas: 0, processadas: 0, pendentes: 0 };
       const registro = await repo.criar(userId, JSON.stringify(resumo));
       execucoes.set(`${userId}:${id}`, { userId, auditId: registro.id, resumo, coleta: 'executando', linhas: [], posicoes: new Map(), sujos: new Set(), blocos: new Map(), consultando: new Set(), cnpjs: new Set(), resultados: new Map(), fila: Promise.resolve(), erro: false });
+    },
+    async planoRetomada(id: string, userId: number) {
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+      const registro = await repo.buscar(userId, id);
+      if (!registro) return null;
+      const parsed = historicoImportacaoSchema.safeParse(JSON.parse(registro.detalhes || '{}'));
+      if (!parsed.success || parsed.data.id !== id) return null;
+      const resumo = parsed.data;
+      if (resumo.origem !== 'LOGCOMEX' || !resumo.listaDisponivel || resumo.recuperadoEm) return null;
+      const blocos = (await repo.blocos(userId, id)).map(r => blocoHistoricoSchema.parse(JSON.parse(r.detalhes || '{}'))).sort((a, b) => a.indice - b.indice);
+      const linhas: LinhaResultadoCatcher[] = [];
+      for (const [indice, bloco] of blocos.entries()) { if (bloco.indice !== indice || bloco.importacaoId !== id) throw new Error('Lista incompleta.'); linhas.push(...bloco.linhas); }
+      if (linhas.length !== resumo.totalColetadas || new Set(linhas.map(l => l.cnpj)).size !== linhas.length) throw new Error('Lista incompleta.');
+      // A UI legada enviava `data` igual ao fim do intervalo; o resumo antigo não guardava esse campo separado.
+      const data = resumo.dataPesquisa || resumo.dataFinal;
+      const emExecucao = obter(id, userId)?.coleta === 'executando';
+      const elegivel = !emExecucao && podeRetomarResumo(resumo.estado === 'em_andamento' ? { ...resumo, estado: 'interrompido' } : resumo);
+      return { elegivel, id, input: { data, dataInicio: resumo.dataInicio, dataFinal: resumo.dataFinal, embarquesMin: resumo.embarquesMin, embarquesMax: resumo.embarquesMax, limite: resumo.limite },
+        coletadas: resumo.totalColetadas, processadas: resumo.processadas, empresas: linhas.map(l => ({ cnpj: l.cnpj, consignatario: l.consignatario })),
+        ignorarNomes: linhas.map(l => l.consignatario), ignorarCnpjs: linhas.map(l => l.cnpj),
+        aviso: 'O ranking será relido; perfis de nomes já persistidos serão ignorados. Não há cursor remoto confiável.' };
+    },
+    async retomar(id: string, userId: number, planoFornecido?: Awaited<ReturnType<typeof this.planoRetomada>>) {
+      const plano = planoFornecido || await this.planoRetomada(id, userId);
+      if (!plano?.elegivel) throw new Error('Importação não elegível ou não encontrada.');
+      await restaurar(id, userId);
+      const e = obter(id, userId);
+      if (!e) throw new Error('Coleta não encontrada.');
+      const inicio = agora().toISOString();
+      e.resumo.tentativas ??= [{ inicio: e.resumo.inicio || inicio, fim: e.resumo.fimColeta || inicio,
+        estado: e.resumo.estado === 'erro' ? 'erro' : e.resumo.estado === 'cancelado' ? 'cancelado' : 'indeterminado',
+        motivo: e.resumo.motivoInterrupcao }];
+      const anterior = e.resumo.tentativas.at(-1);
+      if (anterior && !anterior.fim) { anterior.fim = inicio; anterior.estado = 'erro'; anterior.motivo = 'worker_encerrado'; }
+      e.resumo.tentativas.push({ inicio, fim: null, estado: 'executando' });
+      e.resumo.fimColeta = null; e.resumo.fim = null; e.resumo.motivoInterrupcao = undefined;
+      e.resumo.etapaColeta = 'Preparando acesso à Logcomex'; e.resumo.progressoColeta = undefined;
+      e.coleta = 'executando';
+      await salvar(e);
+      return plano;
+    },
+    async diagnostico(id: string, userId: number, etapa: string, progresso?: HistoricoImportacao['progressoColeta'], motivo?: HistoricoImportacao['motivoInterrupcao']) {
+      const e = obter(id, userId); if (!e) return;
+      e.resumo.etapaColeta = etapa;
+      if (progresso) e.resumo.progressoColeta = progresso;
+      if (motivo) e.resumo.motivoInterrupcao = motivo;
+      await salvar(e);
     },
     coletadas(id: string, userId: number, empresas: readonly EmpresaCatcher[]) {
       const e = obter(id, userId); if (!e) return;
@@ -239,7 +293,11 @@ export function criarHistoricoCatcher(repo: Repositorio = repositorio, agora = (
     },
     async terminarColeta(id: string, userId: number, estado: Exclude<EstadoColeta, 'executando'>) {
       const e = obter(id, userId); if (!e) return;
-      if (e.coleta === 'executando') { e.coleta = estado; e.resumo.fimColeta = agora().toISOString(); }
+      if (e.coleta === 'executando') {
+        e.coleta = estado; e.resumo.fimColeta = agora().toISOString();
+        const ultima = e.resumo.tentativas?.at(-1);
+        if (ultima && !ultima.fim) { ultima.fim = e.resumo.fimColeta; ultima.estado = estado; ultima.motivo = e.resumo.motivoInterrupcao; }
+      }
       await salvar(e);
     },
     temErro(id: string, userId: number) { return Boolean(obter(id, userId)?.erro); },
@@ -247,15 +305,17 @@ export function criarHistoricoCatcher(repo: Repositorio = repositorio, agora = (
       const registro = await repo.buscar(userId, id);
       return registro ? lerDetalhe(registro, id, userId) : null;
     },
-    async detalharCompartilhado(referencia: number | string) {
+    async detalharCompartilhado(referencia: number | string, viewerId?: number) {
       if (!repo.buscarCompartilhado) throw new Error('Leitura compartilhada indisponível.');
       const registro = await repo.buscarCompartilhado(referencia);
       if (!registro) return null;
       const parsed = historicoImportacaoSchema.safeParse(JSON.parse(registro.detalhes || '{}'));
       if (!parsed.success || (typeof referencia === 'string' && parsed.data.id !== referencia)) return null;
-      return lerDetalhe(registro, parsed.data.id, registro.userId);
+      const detalhe = await lerDetalhe(registro, parsed.data.id, registro.userId);
+      if (detalhe) detalhe.importacao.podeRetomar = viewerId === registro.userId && podeRetomarResumo(detalhe.importacao);
+      return detalhe;
     },
-    async listarCompartilhado(cursor?: number) {
+    async listarCompartilhado(cursor?: number, viewerId?: number) {
       if (!repo.listarCompartilhado) throw new Error('Leitura compartilhada indisponível.');
       const registros = await repo.listarCompartilhado(cursor);
       const importacoes: HistoricoImportacao[] = [];
@@ -267,6 +327,7 @@ export function criarHistoricoCatcher(repo: Repositorio = repositorio, agora = (
           item.registroId = registro.id;
           item.autor = { usuario: registro.usuario.usuario.replace(/^@+/, '').trim() };
           if (!item.recuperadoEm && !execucoes.has(`${registro.userId}:${item.id}`) && ['em_andamento', 'pendente'].includes(item.estado) && !item.fim) item.estado = 'interrompido';
+          item.podeRetomar = viewerId === registro.userId && podeRetomarResumo(item);
           importacoes.push(item);
         } catch { /* Resumo inválido não expõe detalhes internos. */ }
       }
@@ -281,6 +342,7 @@ export function criarHistoricoCatcher(repo: Repositorio = repositorio, agora = (
           if (parsed.success) {
             const item = parsed.data;
             if (!item.recuperadoEm && !execucoes.has(`${userId}:${item.id}`) && ['em_andamento', 'pendente'].includes(item.estado) && !item.fim) item.estado = 'interrompido';
+            item.podeRetomar = podeRetomarResumo(item);
             importacoes.push(item);
           }
         } catch { /* Registro alheio/inválido não expõe detalhes internos. */ }

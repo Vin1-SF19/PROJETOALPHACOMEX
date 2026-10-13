@@ -12,6 +12,6 @@ export async function GET(req: Request) {
   if (cursor !== undefined && (!/^\d+$/.test(valor!) || !Number.isSafeInteger(cursor) || cursor <= 0)) return NextResponse.json({ error: 'Página inválida.' }, { status: 400 });
   const remoto = await encaminharWorkerCatcher('listar-historico', acesso.userId!, cursor ?? null);
   if (remoto) return remoto;
-  try { return NextResponse.json(await historicoCatcher.listarCompartilhado(cursor), { headers: { 'Cache-Control': 'no-store' } }); }
+  try { return NextResponse.json(await historicoCatcher.listarCompartilhado(cursor, acesso.userId!), { headers: { 'Cache-Control': 'no-store' } }); }
   catch { return NextResponse.json({ error: 'Não foi possível carregar o histórico.' }, { status: 503 }); }
 }

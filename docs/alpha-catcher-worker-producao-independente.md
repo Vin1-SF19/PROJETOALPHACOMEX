@@ -1,5 +1,23 @@
 # Worker de produção independente
 
+## Upgrade da instalação existente
+
+O instalador inicial fixa a release de 09/10/2026 e bloqueia artefatos já existentes. Para publicar a correção de retomada/timeout, prepare antes uma **release isolada** contendo apenas o commit aprovado da story, com build Next, dependências próprias e manifesto `validated: true`, `buildId` igual a `.next/BUILD_ID` e `sha256` dos arquivos da release. O manifesto deve incluir `package.json`, os scripts Logcomex e `.next/server/app/api/internal/alpha-catcher/worker/route.js`. Não use diretamente o workspace sujo nem a release antiga de staging.
+
+```bash
+sudo bash scripts/upgrade-alpha-catcher-worker-prod.sh plan /caminho/absoluto/release-validada /caminho/absoluto/manifesto.json
+sudo bash scripts/upgrade-alpha-catcher-worker-prod.sh apply /caminho/absoluto/release-validada /caminho/absoluto/manifesto.json
+sudo bash scripts/upgrade-alpha-catcher-worker-prod.sh rollback
+```
+
+`plan` só lê a instalação; exige sudo para confirmar unit, proxy, segredo, processo, lock, serviço, build e hashes sem imprimir credenciais. `apply` copia para release versionada, mantém o segredo e env existentes, troca `current` atomicamente, reinicia somente `alpha-catcher-worker-prod.service` e executa smoke local. Se falhar, restaura o ponteiro anterior e tenta reiniciar a release anterior. O rollback preserva ambas as releases, estado e segredo. Nenhum comando altera staging, Tunnel, Vercel ou banco. Aguarde todas as coletas acabarem antes de aplicar ou reverter; jobs em memória se perdem no reinício. Após um upgrade, o inventário de rollback permanece até revisão operacional e bloqueia novo upgrade automático.
+
+O smoke local aguarda até 30 segundos por conexão recusada ou HTTP 502/503/504 durante a inicialização. Cada tentativa usa nonce e assinatura novos; erros de autenticação/permissão e HTTP 500 falham imediatamente. HTTPS não usa essa tolerância. Depois da leitura autenticada, verifica replay (401), POST sem assinatura (401) e UI bloqueada (404).
+
+Se uma tentativa já restaurou `current`, os arquivos `upgrade-previous` e `upgrade-current` ainda bloqueiam novo `apply`. Após confirmar o ponteiro anterior, serviço ativo, ausência de coletas e smoke local aprovado, preserve esses dois arquivos em `upgrade-audit/<tentativa>-rolled-back/` sob o lock operacional. Não apague releases ou segredos para repetir o upgrade.
+
+O upgrade não publica a UI/Vercel. Primeiro valide o worker local e HTTPS com os comandos abaixo, depois publique o mesmo código do bridge e da UI na Vercel com as variáveis Production. Guarde o deployment e os valores anteriores para rollback da Vercel. A retomada real de Andrew é separada dos smokes e exige autorização operacional.
+
 O instalador cria serviço, release, dependências, segredo, Gmail e sessões próprios na ialpha. O painel continua na Vercel. Staging continua com seu serviço atual. Nenhum comando executa migration, build, coleta ou escrita de banco.
 
 ## 1. Revisar e instalar na ialpha

@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ acesso: vi.fn(), iniciar: vi.fn(), ler: vi.fn(), cancelar: vi.fn(), confirmar: vi.fn(), remoto: vi.fn() }));
+const mocks = vi.hoisted(() => ({ acesso: vi.fn(), iniciar: vi.fn(), retomar: vi.fn(), ler: vi.fn(), cancelar: vi.fn(), confirmar: vi.fn(), remoto: vi.fn() }));
 vi.mock('@/lib/alpha-catcher/worker-client', () => ({ encaminharWorkerCatcher: mocks.remoto }));
 vi.mock('@/lib/alpha-catcher/access', () => ({ acessoCatcher: mocks.acesso }));
-vi.mock('@/lib/alpha-catcher/logcomex-job', () => ({ iniciarColeta: mocks.iniciar, lerColeta: mocks.ler, cancelarColeta: mocks.cancelar, confirmarCaptcha: mocks.confirmar }));
+vi.mock('@/lib/alpha-catcher/logcomex-job', () => ({ iniciarColeta: mocks.iniciar, retomarColeta: mocks.retomar, lerColetaResposta: mocks.ler, cancelarColeta: mocks.cancelar, confirmarCaptcha: mocks.confirmar }));
 import { GET, POST } from '@/app/api/alpha-catcher/logcomex/route';
 const input = { data: '2026-10-05', limite: 5 };
 const post = (value: unknown, origin = 'https://alpha.test') => new Request('https://alpha.test/api/alpha-catcher/logcomex', {
   method: 'POST', headers: { origin, host: 'alpha.test', 'Content-Type': 'application/json' }, body: JSON.stringify(value),
 });
 afterEach(() => vi.useRealTimers());
-beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-01T15:00:00Z')); vi.clearAllMocks(); mocks.remoto.mockResolvedValue(null); mocks.acesso.mockResolvedValue({ status: 200, userId: 42 }); mocks.iniciar.mockResolvedValue({ id: 'job', estado: 'executando' }); });
+beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-01T15:00:00Z')); vi.clearAllMocks(); mocks.remoto.mockResolvedValue(null); mocks.acesso.mockResolvedValue({ status: 200, userId: 42 }); mocks.iniciar.mockResolvedValue({ id: 'job', estado: 'executando' }); mocks.retomar.mockResolvedValue({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', estado: 'executando' }); });
 describe('importação automática Shipment Intel', () => {
   it('inicia com parâmetros validados e proprietário da sessão', async () => {
     expect((await POST(post(input))).status).toBe(202); expect(mocks.iniciar).toHaveBeenCalledWith(42, { ...input, embarquesMin: 1, embarquesMax: 2 });
@@ -41,7 +41,24 @@ describe('importação automática Shipment Intel', () => {
   });
   it('consulta status isolado pelo dono da execução', async () => {
     mocks.ler.mockReturnValue(null); expect((await GET(new Request('https://alpha.test/api/alpha-catcher/logcomex?id=job'))).status).toBe(404);
-    expect(mocks.ler).toHaveBeenCalledWith('job', 42);
+    expect(mocks.ler).toHaveBeenCalledWith('job', 42, undefined);
+  });
+  it('lê apenas o delta solicitado e preserva identidade do dono', async () => {
+    mocks.ler.mockReturnValue({ id: 'job', totalEmpresas: 200, empresas: { empresas: [{ cnpj: 'x' }] } });
+    const response = await GET(new Request('https://alpha.test/api/alpha-catcher/logcomex?id=job&desde=199'));
+    expect(response.status).toBe(200);
+    expect(mocks.ler).toHaveBeenCalledWith('job', 42, 199);
+    expect((await response.json()).totalEmpresas).toBe(200);
+  });
+  it('retoma somente UUID com proprietário da sessão e encaminha ao worker', async () => {
+    const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    expect((await POST(post({ acao: 'retomar', id, userId: 99 }))).status).toBe(202);
+    expect(mocks.retomar).toHaveBeenCalledWith(id, 42);
+    expect((await POST(post({ acao: 'retomar', id: 'invalido' }))).status).toBe(400);
+    mocks.remoto.mockResolvedValueOnce(new Response(JSON.stringify({ id }), { status: 202 }));
+    expect((await POST(post({ acao: 'retomar', id }))).status).toBe(202);
+    expect(mocks.remoto).toHaveBeenLastCalledWith('retomar', 42, id);
+    expect(mocks.retomar).toHaveBeenCalledTimes(1);
   });
   it('cancelamento usa identidade da sessão, sem aceitar identidade do payload', async () => {
     await POST(post({ acao: 'cancelar', id: 'job', userId: 99 })); expect(mocks.cancelar).toHaveBeenCalledWith('job', 42);

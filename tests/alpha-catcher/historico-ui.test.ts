@@ -33,3 +33,24 @@ it('exibe JSON recuperado sem inventar horários, contagem de novas ou filtros L
   expect(host.textContent).toContain('Histórico recuperado');
   expect(host.textContent).not.toContain('Embarques mínimos');
 });
+it('oferece continuação somente quando o servidor autoriza o dono e separa fim da coleta do processamento', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const base = { versao: 1, id, inicio: '2026-10-13T12:26:00Z', fim: null, fimColeta: '2026-10-13T12:56:00Z', estado: 'erro', origem: 'LOGCOMEX', listaDisponivel: true,
+    dataInicio: '2026-07-06', dataFinal: '2026-10-06', embarquesMin: 1, embarquesMax: 2, limite: 0, totalColetadas: 10, novasSalvas: 3, processadas: 3, pendentes: 0,
+    motivoInterrupcao: 'limite_execucao', etapaColeta: 'Coletando consignatários e CNPJs',
+    tentativas: [{ inicio: '2026-10-13T12:26:00Z', fim: '2026-10-13T12:56:00Z', estado: 'erro' }, { inicio: '2026-10-13T15:00:00Z', fim: '2026-10-13T15:30:00Z', estado: 'erro' }] };
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ importacoes: [{ ...base, podeRetomar: true }, { ...base, id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', podeRetomar: false }], proximoCursor: null }) })));
+  const retomar = vi.fn();
+  const host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+  await act(async () => root.render(createElement(HistoricoConsultas, { visual: getTema('blue'), emAndamento: false, aviso: '', podeRetomar: true, onRetomar: retomar })));
+  const botoes = [...host.querySelectorAll('button')].filter(botao => botao.textContent === 'Continuar coleta');
+  expect(botoes).toHaveLength(1);
+  expect(host.textContent).toContain('Fim da coleta');
+  expect(host.textContent).toContain('Não concluída');
+  expect(host.textContent).toContain('Última etapa registrada');
+  expect(host.textContent).toContain('2 tentativas de coleta');
+  await act(async () => botoes[0].click());
+  expect(retomar).toHaveBeenCalledWith(id);
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+});

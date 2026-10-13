@@ -62,4 +62,33 @@ describe('fila durante download da Logcomex', () => {
     expect(celulas[9].textContent).toBe(pausar ? 'Simples Nacional' : 'Regime Normal');
     expect(celulas[10].textContent).toBe(pausar ? '01/01/2020' : '—');
   });
+  it('continua uma importação parcial sem reconsultar empresa já salva', async () => {
+    vi.useFakeTimers(); vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const anterior = { cnpj: '33000167000101', consignatario: 'Banco', estado: 'salvo', razaoSocial: 'BANCO' };
+    const nova = { cnpj: '11222333000181', consignatario: 'Nova' };
+    const importacao = { versao: 1, id, inicio: '2026-10-13T12:26:00Z', fim: null, fimColeta: '2026-10-13T12:56:00Z', estado: 'erro', origem: 'LOGCOMEX', listaDisponivel: true, podeRetomar: true,
+      dataInicio: '2026-07-06', dataFinal: '2026-10-06', embarquesMin: 1, embarquesMax: 2, limite: 0, totalColetadas: 1, novasSalvas: 1, processadas: 1, pendentes: 0 };
+    const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/alpha-catcher/historico') return { ok: true, json: async () => ({ importacoes: [importacao], proximoCursor: null }) };
+      if (url.endsWith(`/historico/${id}`)) return { ok: true, json: async () => ({ importacao, linhas: [anterior] }) };
+      if (url === '/api/alpha-catcher/logcomex' && init?.method === 'POST') return { ok: true, json: async () => ({ id }) };
+      if (url.startsWith('/api/alpha-catcher/logcomex?id=')) return { ok: true, json: async () => ({ estado: 'concluido', etapa: 'Coleta concluída.', totalEmpresas: 2,
+        empresas: { empresas: [nova], invalidos: 0, duplicados: 0 } }) };
+      if (url === '/api/alpha-catcher') return { ok: true, status: 200, json: async () => ({ ...nova, estado: 'salvo' }) };
+      throw new Error(`URL inesperada: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetcher);
+    const host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+    await act(async () => root.render(createElement(CatcherClient, { temaInicial: 'blue' })));
+    await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Continuar coleta')!.click());
+    const inicio = fetcher.mock.calls.find(call => call[0] === '/api/alpha-catcher/logcomex' && call[1]?.method === 'POST');
+    expect(JSON.parse(String(inicio?.[1]?.body))).toEqual({ acao: 'retomar', id });
+    await act(async () => { await vi.advanceTimersByTimeAsync(2250); });
+    const consultas = fetcher.mock.calls.filter(call => call[0] === '/api/alpha-catcher');
+    expect(consultas).toHaveLength(1);
+    expect(JSON.parse(String(consultas[0][1]?.body)).cnpj).toBe(nova.cnpj);
+    expect(fetcher.mock.calls.some(call => String(call[0]).includes(`desde=1`))).toBe(true);
+    expect(host.querySelectorAll('tbody tr')).toHaveLength(2);
+  });
 });

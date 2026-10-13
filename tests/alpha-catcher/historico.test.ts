@@ -32,6 +32,34 @@ it('JSON persiste a lista antes das consultas e restaura contexto e contadores a
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-06T15:00:00Z')); });
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
 describe('histórico persistente das importações', () => {
+  it('não oferece continuação enquanto a coleta original ou a nova tentativa está ativa', async () => {
+    const { historico } = fixture();
+    await historico.iniciar(id, 42, input);
+    expect((await historico.listar(42)).importacoes[0].podeRetomar).toBe(false);
+    expect((await historico.planoRetomada(id, 42))?.elegivel).toBe(false);
+    await historico.terminarColeta(id, 42, 'erro');
+    expect((await historico.planoRetomada(id, 42))?.elegivel).toBe(true);
+    await historico.retomar(id, 42);
+    expect((await historico.listar(42)).importacoes[0].podeRetomar).toBe(false);
+    expect((await historico.planoRetomada(id, 42))?.elegivel).toBe(false);
+  });
+  it('retoma após restart com filtros originais e preserva resultados e tentativas', async () => {
+    const { historico, repo } = fixture();
+    await historico.iniciar(id, 42, input);
+    historico.coletadas(id, 42, empresas(['A', 'B']));
+    await historico.resultado(id, 42, { cnpj: 'A', consignatario: 'A', estado: 'salvo' });
+    await historico.diagnostico(id, 42, 'Coletando consignatários e CNPJs', undefined, 'limite_execucao');
+    await historico.terminarColeta(id, 42, 'erro');
+    const reiniciado = criarHistoricoCatcher(repo);
+    expect(await reiniciado.planoRetomada(id, 99)).toBeNull();
+    expect(await reiniciado.planoRetomada(id, 42)).toMatchObject({ elegivel: true, input, coletadas: 2, processadas: 1, ignorarNomes: ['A', 'B'] });
+    await reiniciado.retomar(id, 42);
+    expect((await reiniciado.listar(42)).importacoes[0]).toMatchObject({ estado: 'em_andamento', fim: null, fimColeta: null, totalColetadas: 2, processadas: 1 });
+    reiniciado.coletadas(id, 42, empresas(['A', 'B', 'C']));
+    await reiniciado.resultado(id, 42, { cnpj: 'C', consignatario: 'C', estado: 'existente' });
+    await reiniciado.terminarColeta(id, 42, 'concluido');
+    expect((await reiniciado.listar(42)).importacoes[0]).toMatchObject({ totalColetadas: 3, novasSalvas: 1, processadas: 2, tentativas: [{ estado: 'erro', motivo: 'limite_execucao' }, { estado: 'concluido' }] });
+  });
   it('inclui existentes no total e conta somente creates confirmados, sem duplicar retries', async () => {
     const { historico, repo } = fixture(); await historico.iniciar(id, 42, input);
     historico.coletadas(id, 42, empresas(['A', 'B', 'A']));

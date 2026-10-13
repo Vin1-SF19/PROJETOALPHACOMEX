@@ -1,5 +1,5 @@
 // Cada perfil é publicado imediatamente; obter o total não bloqueia a coleta.
-export async function coletarProgressivo({ api, coletar, data, limite, faixa, emitir, salvar = async () => {} }) {
+export async function coletarProgressivo({ api, coletar, data, limite, faixa, emitir, salvar = async () => {}, conhecidos = new Map() }) {
   const paginas = new Map(), pedidos = new Map();
   let paginaTotal = null, totalLista = null, alvo = Number.isFinite(limite) ? limite : null;
   let processadas = 0, cnpjs = 0, tamanhoPagina = null, fase = 'ranking', encerrado = false;
@@ -45,6 +45,7 @@ export async function coletarProgressivo({ api, coletar, data, limite, faixa, em
     },
     perfil: async (dataPerfil, nome) => {
       try {
+        if (conhecidos.has(nome)) return { cnpj: conhecidos.get(nome), address: {} };
         const perfil = await api.perfil(dataPerfil, nome);
         if (perfil && typeof perfil === 'object' && !Array.isArray(perfil) && 'cnpj' in perfil && 'address' in perfil && !publicados.has(nome)) {
           publicados.add(nome);

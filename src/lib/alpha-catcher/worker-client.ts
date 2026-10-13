@@ -1,7 +1,7 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { assinarWorkerCatcher } from './worker-auth';
-export type OperacaoWorkerCatcher = 'iniciar' | 'ler' | 'cancelar' | 'confirmar_captcha' | 'tentar_captcha' | 'processar' | 'listar-historico' | 'detalhar-historico';
+export type OperacaoWorkerCatcher = 'iniciar' | 'retomar' | 'ler' | 'cancelar' | 'confirmar_captcha' | 'tentar_captcha' | 'processar' | 'listar-historico' | 'detalhar-historico';
 export async function encaminharWorkerCatcher(operacao: OperacaoWorkerCatcher, userId: number, dados: unknown): Promise<Response | null> {
   // O host nunca encaminha para si próprio. Vercel nunca inicia subprocesso local.
   if (!process.env.VERCEL && process.env.ALPHA_CATCHER_WORKER_HOST === 'true') return null;
@@ -16,7 +16,7 @@ export async function encaminharWorkerCatcher(operacao: OperacaoWorkerCatcher, u
     const secret = process.env.ALPHA_CATCHER_WORKER_SECRET || '';
     const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...assinarWorkerCatcher(body, secret) }, body, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(operacao === 'processar' ? 175000 : 30000) });
     const resultado: unknown = await response.json();
-    if (!resultado || typeof resultado !== 'object' || (response.ok && operacao === 'iniciar' && !('id' in resultado))) throw new Error();
+    if (!resultado || typeof resultado !== 'object' || (response.ok && ['iniciar', 'retomar'].includes(operacao) && !('id' in resultado))) throw new Error();
     // Não encaminhar logs/stack de serviços de infraestrutura ou páginas de proxy.
     if (response.status >= 500) throw new Error();
     const headers: Record<string, string> = { 'Cache-Control': 'no-store' };

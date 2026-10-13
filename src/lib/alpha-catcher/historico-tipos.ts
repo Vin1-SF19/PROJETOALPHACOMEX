@@ -1,7 +1,9 @@
 import { z } from 'zod';
+import { progressoColetaSchema } from './logcomex-progress';
 const quantidade = z.number().int().nonnegative();
 export const historicoImportacaoSchema = z.object({
   registroId: z.number().int().positive().optional(),
+  podeRetomar: z.boolean().optional(),
   autor: z.object({ usuario: z.string() }).optional(),
   versao: z.literal(1), id: z.string().uuid(), inicio: z.string().datetime().nullable(), fim: z.string().datetime().nullable(),
   fimColeta: z.string().datetime().nullable(),
@@ -15,6 +17,11 @@ export const historicoImportacaoSchema = z.object({
   dataConsultaJson: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   recuperadoEm: z.string().datetime().optional(),
   arquivoSha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  etapaColeta: z.string().max(120).optional(),
+  dataPesquisa: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  progressoColeta: progressoColetaSchema.optional(),
+  motivoInterrupcao: z.enum(['limite_execucao', 'inatividade', 'cancelada', 'falha', 'worker_encerrado']).optional(),
+  tentativas: z.array(z.object({ inicio: z.string().datetime(), fim: z.string().datetime().nullable(), estado: z.enum(['executando', 'concluido', 'erro', 'cancelado', 'indeterminado']), motivo: z.string().max(120).optional() })).optional(),
 });
 export type HistoricoImportacao = z.infer<typeof historicoImportacaoSchema>;
 

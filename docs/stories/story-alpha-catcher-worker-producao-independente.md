@@ -97,9 +97,26 @@ Correção após apply do usuário: teste imediato da porta 3302 falhou após re
 - `scripts/alpha-catcher-worker-prod/smoke.mjs`
 - `docs/alpha-catcher-worker-producao-independente.md`
 - `docs/stories/story-alpha-catcher-worker-producao-independente.md`
+- `scripts/upgrade-alpha-catcher-worker-prod.sh`
+- `scripts/alpha-catcher-worker-prod/verify-upgrade.mjs`
+- `tests/alpha-catcher/upgrade-worker-prod.test.ts`
 
 Verificação final: `npm run typecheck` PASS; `npm run lint` PASS com 1192 avisos e zero erros. `npm test` passou 590 arquivos/4410 testes, mas teve falhas de ambiente (Node sem `node:sqlite`, processos/sockets bloqueados pelo sandbox) e duas falhas conhecidas do Builder. Os quatro arquivos afetados pelo ambiente foram repetidos com Node 22 fora do sandbox: 19 testes PASS. As duas falhas do Builder permanecem; não se declara suíte global aprovada. Evidências: `/tmp/alpha-catcher-prod-typecheck.log`, `/tmp/alpha-catcher-prod-lint.log`, `/tmp/alpha-catcher-prod-tests.log`, `/tmp/alpha-catcher-prod-tests-recheck.log`. QA e arquitetura aprovaram a preparação para revisão operacional; instalação/publicação permanecem pendentes.
 
 Consulta pública DNS confirmou `coco.ns.cloudflare.com` e `sean.ns.cloudflare.com`: DNS administrado na Cloudflare, enquanto o painel permanece hospedado na Vercel. O acesso à conta/zone do Tunnel ainda precisa ser conferido.
 
 Limitações: jobs em memória, automações externas e lock de login compartilhados; falhas parciais preservadas exigem revisão antes de reinstalar. Timeout padrão Cloudflare 125s permanece aplicável a processamento demorado.
+
+### Upgrade da release de retomada — 13/10/2026
+
+- [x] Preparar script separado de upgrade com `plan` somente leitura, verificação de manifesto/hash/build, cópia versionada, troca atômica, smoke e rollback sem excluir release/segredo antigos.
+- [x] Construir release isolada a partir de `HEAD` com sobreposição somente dos arquivos da story de retomada; dependências copiadas independentemente para não executar `prisma generate` sobre o workspace.
+- [x] Validar build e manifesto do artefato isolado: `/tmp/alpha-catcher-resume-rXbdf6-runtime`, manifesto `/tmp/alpha-catcher-resume-rXbdf6-runtime-manifest.json`, build ID `HF2WMwa2-LWt000xy3qsI`, 2.040 hashes. `verify-upgrade.mjs` PASS. Sem arquivos `.env` no candidato.
+- [x] Sintaxe Bash e Node PASS; teste focal de upgrade 2/2 PASS.
+- [x] Executar `plan` privilegiado, inspecionar serviço/release atuais e confirmar ausência de coletas; concluído em 13/10/2026.
+- [x] Executar `apply` e smoke local/HTTPS; concluído em 13/10/2026 após corrigir a espera de inicialização.
+- [ ] Publicar UI/bridge e conferir configuração da Vercel; pendente com o usuário.
+
+O primeiro build isolado falhou pela resolução DNS de `fonts.googleapis.com` no sandbox. A repetição com acesso de rede permitido compilou com sucesso. Nenhum comando de upgrade com sudo, alteração de staging, banco, DNS, Tunnel ou Vercel foi executado. Gates globais desta etapa ainda pendentes; os resultados anteriores da story permanecem registrados acima.
+
+Continuação operacional: worker atualizado para `releases/20261013-183316-upgrade`, com rollback preservado e smokes aprovados. Evidências, gates e correção do HTTP 502 estão em `docs/stories/story-alpha-catcher-worker-prod-upgrade-retomada.md`. Os registros anteriores acima descrevem a preparação, antes da execução operacional.

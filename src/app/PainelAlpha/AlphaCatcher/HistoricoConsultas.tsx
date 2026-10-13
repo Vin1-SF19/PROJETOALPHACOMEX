@@ -6,7 +6,14 @@ import { formatarDataInclusaoCatcher, formatarDataOpcaoCatcher } from '@/lib/alp
 import ModalHistorico from './ModalHistorico';
 import type { getTema } from '@/lib/temas';
 const nomes: Record<HistoricoImportacao['estado'], string> = { em_andamento: 'Em andamento', pendente: 'Processamento pendente', concluido: 'Concluída', erro: 'Coleta parcial ou com erro', cancelado: 'Coleta cancelada', interrompido: 'Execução interrompida' };
-export default function HistoricoConsultas({ visual, emAndamento, aviso }: { visual: ReturnType<typeof getTema>; emAndamento: boolean; aviso: string }) {
+const motivos: Record<NonNullable<HistoricoImportacao['motivoInterrupcao']>, string> = {
+  limite_execucao: 'A coleta atingiu o limite de duração. Os resultados recebidos foram preservados.',
+  inatividade: 'A coleta ficou sem progresso pelo tempo permitido. Os resultados recebidos foram preservados.',
+  cancelada: 'A coleta foi cancelada.',
+  falha: 'A automação encontrou uma falha. Os resultados recebidos foram preservados.',
+  worker_encerrado: 'O processo da automação encerrou antes de concluir.',
+};
+export default function HistoricoConsultas({ visual, emAndamento, aviso, onRetomar, podeRetomar = false }: { visual: ReturnType<typeof getTema>; emAndamento: boolean; aviso: string; onRetomar?: (id: string) => void; podeRetomar?: boolean }) {
   const [selecionada, setSelecionada] = useState<HistoricoImportacao | null>(null);
   const [lista, setLista] = useState<HistoricoImportacao[]>([]);
   const [cursor, setCursor] = useState<number | null>(null);
@@ -60,12 +67,17 @@ export default function HistoricoConsultas({ visual, emAndamento, aviso }: { vis
       <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
         <div><dt className="text-slate-400">Início</dt><dd>{item.inicio ? <time dateTime={item.inicio}>{formatarDataInclusaoCatcher(item.inicio)}</time> : 'Não registrado'}</dd></div>
         <div><dt className="text-slate-400">Fim</dt><dd>{item.fim ? <time dateTime={item.fim}>{formatarDataInclusaoCatcher(item.fim)}</time> : item.recuperadoEm ? 'Não registrado' : item.estado === 'em_andamento' ? 'Em andamento' : 'Não concluída'}</dd></div>
+        {item.origem === 'LOGCOMEX' && item.fimColeta && <div><dt className="text-slate-400">Fim da coleta</dt><dd><time dateTime={item.fimColeta}>{formatarDataInclusaoCatcher(item.fimColeta)}</time></dd></div>}
         <div><dt className="text-slate-400">Empresas coletadas (inclui já salvas)</dt><dd className="font-semibold">{item.totalColetadas}</dd></div>
         <div><dt className="text-slate-400">Novas adicionadas ao banco</dt><dd className="font-semibold text-emerald-300">{item.novasSalvas ?? 'Não registrado'}</dd></div>
         <div className="col-span-2"><dt className="text-slate-400">{item.origem === 'JSON' ? 'Data da consulta escolhida' : 'Janela de datas'}</dt><dd>{item.origem === 'JSON' ? item.dataConsultaJson ? formatarDataOpcaoCatcher(item.dataConsultaJson) : 'Data do processamento' : `${formatarDataOpcaoCatcher(item.dataInicio)} a ${formatarDataOpcaoCatcher(item.dataFinal)}`}</dd></div>
         {item.origem === 'LOGCOMEX' && <div><dt className="text-slate-400">Embarques mínimos</dt><dd>{item.embarquesMin}</dd></div>}
         {item.origem === 'LOGCOMEX' && <div><dt className="text-slate-400">Embarques máximos</dt><dd>{item.embarquesMax}</dd></div>}
       </dl>
+      {item.motivoInterrupcao && <p className="text-xs text-amber-300">{motivos[item.motivoInterrupcao]}</p>}
+      {item.etapaColeta && <p className="text-xs text-slate-400">Última etapa registrada: {item.etapaColeta}</p>}
+      {item.tentativas && item.tentativas.length > 1 && <p className="text-xs text-slate-400">{item.tentativas.length} tentativas de coleta nesta importação. A última começou em {formatarDataInclusaoCatcher(item.tentativas.at(-1)?.inicio)}.</p>}
+      {item.origem === 'LOGCOMEX' && item.podeRetomar && podeRetomar && onRetomar && <div className="space-y-1"><button type="button" className={`rounded-lg border border-white/20 px-3 py-2 text-xs font-semibold ${visual.text} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white`} onKeyDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onRetomar(item.id); }}>Continuar coleta</button><p className="text-xs text-slate-400">O ranking será relido; perfis já registrados serão aproveitados.</p></div>}
       {item.recuperadoEm && <p className="text-xs text-amber-300">Histórico recuperado em {formatarDataInclusaoCatcher(item.recuperadoEm)}. A lista mostra os cadastros atuais; horários e quantidade de novas empresas da execução original não foram registrados.</p>}
     </li>)}</ol>
     {cursor && <button type="button" disabled={carregando} onClick={() => void mais()} className={`text-xs ${visual.text} disabled:opacity-40`}>{carregando ? 'Carregando…' : 'Carregar mais importações'}</button>}

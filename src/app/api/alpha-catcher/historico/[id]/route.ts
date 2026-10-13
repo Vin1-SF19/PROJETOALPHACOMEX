@@ -14,7 +14,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const remoto = await encaminharWorkerCatcher('detalhar-historico', acesso.userId!, referencia);
   if (remoto) return remoto;
   try {
-    const detalhe = await historicoCatcher.detalharCompartilhado(referencia);
+    const detalhe = await historicoCatcher.detalharCompartilhado(referencia, acesso.userId!);
     return detalhe ? NextResponse.json(detalhe, { headers: { 'Cache-Control': 'no-store' } }) : NextResponse.json({ error: 'Importação não encontrada.' }, { status: 404 });
   } catch { return NextResponse.json({ error: 'Não foi possível carregar a lista desta importação.' }, { status: 503 }); }
 }

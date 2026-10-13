@@ -65,8 +65,11 @@ verificar que não há worker em execução antes de removê-lo.
   o pacote original recomenda Node 24.
 
 Requer servidor Node persistente e instância única/sticky para status em memória;
-não é compatível com execução serverless efêmera. O worker recebe timeout de
-30 minutos e cancelamento SIGTERM/SIGKILL. Se fechar a página, a coleta pode
+não é compatível com execução serverless efêmera. O job do painel tem limite
+total padrão de 8 horas (configurável por `ALPHA_CATCHER_JOB_MAX_MINUTES` entre
+30 e 480 minutos) e é encerrado após 30 minutos sem mensagens do worker.
+O encerramento usa SIGTERM/SIGKILL. A coleta via CLI externo não passa por esse
+temporizador do painel. Se fechar a página, a coleta pode
 continuar no servidor até concluir/expirar; o enriquecimento ainda depende da
 UI aberta, conforme limites abaixo. Snapshots/resultados permanecem somente
 em memória e expiram na próxima coleta após uma hora.
@@ -337,14 +340,36 @@ uma importação do mesmo usuário que realmente recebeu esse CNPJ.
 Atualizações são serializadas; pares da coleta são agrupados para persistência,
 e cada resposta de processamento aguarda a gravação do contador. Falha do
 histórico não apaga empresa já gravada: exibe aviso e preserva resultado.
-Reinício com execução incompleta mostra Interrompida e não inventa conclusão;
-histórico não retoma uma fila; a versão com modal preserva os resultados da tabela em snapshots.
+Reinício com execução incompleta mostra Interrompida e não inventa conclusão.
+O dono pode continuar uma coleta Logcomex interrompida pelo histórico; o ranking
+é relido com os filtros originais, pois históricos antigos não têm cursor da
+Logcomex. Nomes já recebidos dispensam nova chamada de perfil, e CNPJs já
+registrados conservam o estado e a contagem. A continuação usa a mesma
+importação e registra uma nova tentativa. A fila de enriquecimento ainda
+depende da página aberta; fechar ou recarregar a página não a retoma
+automaticamente. O histórico preserva seus resultados em snapshots.
 JSON manual permanece fora deste histórico de importações automáticas.
 Não reconstrói importações anteriores: seus horários e filtros não eram salvos.
 CLI operacional de leitura, no diretório do painel:
 `node --conditions=react-server --import tsx scripts/alpha-catcher-history.mts --user-id ID [--cursor ID]`.
 A CLI requer acesso de operador aos arquivos privados do servidor; não consulta
 ReceitaWS/Logcomex e nunca altera registros. Não expõe tokens nos resumos.
+
+Diagnóstico e plano de continuação somente leitura:
+`node --env-file=.env.local --conditions=react-server --import tsx scripts/alpha-catcher-retomar.mts list --usuario @Andrew --dia 2026-10-13`
+e `... plan --usuario @Andrew --id UUID`. O comando `resume` inicia a
+continuação pelo worker configurado; use-o apenas em operação autorizada, com
+o usuário disponível na interface para a fila de enriquecimento. A opção
+"Continuar coleta" no histórico aplica o mesmo contrato para o dono.
+
+O histórico apresenta separadamente fim da coleta (`fimColeta`) e fim do
+processamento (`fim`). Motivo, última etapa e progresso ficam registrados para
+as novas execuções. Em 13/10/2026, o job de @Andrew iniciado às 9h26 em São
+Paulo atingiu o corte antigo de 30 minutos às 9h56, com 2.159 CNPJs recebidos
+e 2.157 processados. A execução iniciada às 13h48 teve o mesmo corte, com
+2.165 recebidos e 1.842 processados. Esses metadados foram consultados sem
+alterar o banco. Não havia telemetria persistida para determinar a etapa exata
+que consumiu o tempo em nenhuma das duas execuções.
 
 ## Modal da lista histórica
 Cada card do histórico abre um diálogo com a tabela ResultadosCatcher, a mesma

@@ -139,6 +139,7 @@ process.once('message', async input => {
     const resumir = result => ({ empresas: result.empresas.map(row => ({ cnpj: row.cnpj, consignatario: row.consignatario })) });
     const result = await coletarProgressivo({
       coletar, emitir,
+      conhecidos: new Map((input.retomada?.empresas || []).filter(row => typeof row?.consignatario === 'string' && typeof row?.cnpj === 'string').map(row => [row.consignatario, row.cnpj])),
       api: apiComPrimeiroRanking(apiValidada || criarApi(credentials), rankingInicial), data: input.data, limite: (input.limite ?? 0) === 0 ? Infinity : input.limite, faixa: [input.embarquesMin ?? 1, input.embarquesMax ?? 2],
       salvar: async parcial => { parcial.periodo = intervalo; await emitir({ type: 'parcial', resultado: resumir(parcial) }); },
     });
