@@ -7073,3 +7073,40 @@ Preservada correção existente; adicionadas três regressões com relógio cont
 ### 2026-10-01 — Scribe — RM-2026-AD3EA4, fase 3 CLOSURE
 Encerramento exclusivamente documental. Código existente e acesso autenticado /PainelAlpha/Metas → Gerenciamento de Leads → modais → actions reinspecionados. Lacuna documental corrigida por acréscimos em codebase-map, integration-points, decisions e known-errors. Story contém relatório, checklist e file list atualizados; Ready for Review com pendências explícitas. Lint e typecheck exit 0; regressões 18/18 exit 0; npm test exit 1 por EBUSY coverage. Evidências locais: tmp/rm-ad3ea4/closure/. Build não repetido, falha EOVERFLOW registrada na fase anterior; auditoria histórica e smoke autenticado pendentes. Nenhum código, banco, schema, migration ou Git mutável alterado. PASS da fase documental não é aprovação global de qualidade nem promoção automática.
 Arquivos desta fase: docs/stories/story-rm-2026-ad3ea4-data-comercial.md; .bibble/memory/codebase-map.md; .bibble/memory/integration-points.md; .bibble/memory/decisions.md; .bibble/memory/known-errors.md; .bibble/memory/journal.md.
+
+### RM-2026-E04B53 — Nova — 2026-10-13
+Substituído bloco de observações somente no PDF de Pré Análise. Story criada conforme blueprint anterior; alterações existentes preservadas, nenhum Git mutável ou banco alterado.
+
+## Validação local — 2026-10-13 (Nova)
+- Testes direcionados: 5/5 passaram; PDF real extraído com PDF.js confirma perguntas literais, duas confirmações, uma página A4 e preservação do modelo padrão. Área manuscrita: 26pt por pergunta; conjunto com wrap=false.
+- Integração inspecionada: BlocoResultados abre ModalPDF, cuja ação gera o modelo pre-analise e abre o Blob em nova aba. Página verifica auth. Sem novo componente, rota, banco ou migration. Navegação autenticada/impressão física não executadas.
+- Lint do escopo: zero erros e quatro warnings preexistentes (uf, dataHoje, horaHoje e Image do react-pdf).
+- npm run lint: falhou por EACCES em database-backups/build-candidates.
+- npm test: 596 arquivos passaram e 3 falharam; 4414 testes passaram, 17 falharam, 4 skipped e 1 todo. Falhas em estoque, inventário de storage e voice-proxy; há erros de Prisma/query_compiler no ambiente. Nenhuma evidência de regressão do PDF. Não há baseline completo executado nesta sessão.
+- npm run build: falhou em prisma generate por EACCES em .env e EOVERFLOW em node_modules/.prisma/client/index.js; não chegou à compilação Next.
+- Saídas dos gates: {'lint': '2', 'typecheck': '2', 'test': '1', 'build': '1', 'scope-lint': '0'}
+- Evidências locais: .cache/rm-2026-e04b53/*.log e *.exit. Gates globais não aprovados; encaminhar limitações à verificação.
+- Decisão: finalidade opcional com padrão padrao preserva consumidores CRM/Bibble; somente o modal Pré Análise opta pelas perguntas. Mantido o campo de observações do modal e sua persistência para compatibilidade; não é impresso nesta variante.
+- DELIVERY_READY: /PainelAlpha/SistemaPreAnalise → consultar CNPJ → Gerar Ficha em PDF → Gerar Documento PDF → PDF em nova aba para closers (caminho confirmado no código, artefato validado por renderização real).
+
+Revalidação final: corrigida a tipagem do teste chamando o componente puro para obter o Document real. npm run typecheck exit 0.
+ RUN  v4.1.10 /home/ialpha/projetos/alpha-comex/painel-alpha
+
+
+ Test Files  2 passed (2)
+      Tests  5 passed (5)
+   Start at  13:45:42
+   Duration  489ms (transform 63ms, setup 0ms, import 375ms, tests 410ms, environment 0ms)
+
+
+Lint do escopo repetido: pty string for decorative images  jsx-a11y/alt-text
+
+✖ 4 problems (0 errors, 4 warnings)
+
+
+
+
+### RM-2026-E04B53 — Encerramento documental — 2026-10-13 (Scribe)
+Reinspecionados GerarFicha, ModalPdf, consulta/resultado, página protegida, menu e teste do PDF. Atualizados somente story e catálogo de integração, além deste registro. Story inicialmente ausente foi criada pela fase executora; nenhum novo autoajuste de código necessário. Entrega às closers: Pré Análise → consultar CNPJ → Gerar Ficha em PDF → Gerar Documento PDF → nova aba/impressão. Duas perguntas e duas confirmações exclusivas da variante pre-analise; padrão com observações preservado. Sem mudança estrutural, novo módulo, migration, backup ou Git mutável. Evidências anteriores e ausência dos logs locais explicitadas na story. Navegação autenticada/impressão física e aprovação dos gates globais permanecem pendentes. Encerramento local não promove card nem publica produção.
+
+Gates reais do encerramento (2026-10-13, Scribe): `npm run lint` exit 2, EACCES ao varrer `database-backups/build-candidates/bibble-out-DUHqIq`; `npm run typecheck` exit 0; `npm test` exit 1, 596 arquivos aprovados/3 falhos, 4414 testes aprovados/17 falhos/4 skipped/1 todo. Saída final inclui falhas de estoque por ausência de `query_compiler_bg.js` no cliente Prisma. Nenhum gate atingiu o limite de 45 segundos. Build não reexecutado nesta fase exclusivamente documental; falha anterior permanece registrada. Gates globais não aprovados.

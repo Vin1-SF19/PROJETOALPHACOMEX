@@ -813,3 +813,6 @@ ListaCamposFormulario: componente administrativo em src/app/PainelAlpha/AlphaCRM
 ### RM-2026-3EAE77 — 2026-09-30
 
 BuilderClient (src/app/PainelAlpha/Builder/BuilderClient.tsx): iframe externo com controles permanentes, prazo 30s, retry por key, offline e estados acessíveis; reutiliza Button.
+
+### RM-2026-E04B53 — FichaAlphaPDF
+Prop opcional finalidade: padrao (observações, CRM/Bibble) ou pre-analise (duas perguntas manuscritas e A CONFIRMAR). ModalPDF seleciona pre-analise. Sem novos componentes. Teste real em tests/pre-analise/ficha-reuniao.test.ts.

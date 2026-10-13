@@ -17,6 +17,10 @@ const eslintConfig = defineConfig([
     ".next-*/**",
     "out/**",
     "build/**",
+    // Database backups and generated build candidates are not application source.
+    // Some candidates are deliberately private to the process that created them;
+    // lint must not descend into them and fail with EACCES.
+    "database-backups/**",
     "next-env.d.ts",
     // Source templates contain literal {{placeholders}} and are not valid JS/TS
     // until rendered by the AIOX generators.

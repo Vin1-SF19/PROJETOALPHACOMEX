@@ -3253,3 +3253,13 @@ POST /api/alpha-catcher/importacoes/json registra resumo e blocos em Auditoria a
 Alpha Catcher — histórico compartilhado: GETs autorizados usam listarCompartilhado/detalharCompartilhado, autor via Auditoria.usuario.usuario e registroId numérico para evitar colisãoUUID. Shared detail resolve proprietário real para blocos e estado ativo. Métodos owner/contexto/job/escrita inalterados. CLI --compartilhado confere readEffectiveModulePermissions. Sem migration/backfill. Story docs/stories/story-alpha-catcher-historico-compartilhado.md.
 
 Logcomex Vercel: worker-client encaminha jobs/processamento/histórico ao endpointinternal assinado worker-auth; receiver HOST=true e !VERCEL, recheck effective permissions. Worker-executar chama serviçossameprocess; processar-entrada compartilha validadoresempresa existentes. EnvALPHA_CATCHER_WORKER_URL/SECRET/HOST, segredo exclusivo server-only. Single-process/restart perdeMaps, semretomadagarantida. Story story-alpha-catcher-logcomex-worker-persistente.md e docs/alpha-catcher-worker-producao.md.
+
+
+### Ficha de reunião do Pré Análise — RM-2026-E04B53
+**Arquivos:** `src/lib/modulos-registry.ts`, `src/app/PainelAlpha/SistemaPreAnalise/page.tsx`, `SistemaPreAnaliseClient.tsx` e `BlocoResultados.tsx` nessa mesma pasta; `src/components/ModalPdf.tsx` e `src/components/GerarFicha.tsx`.
+**Propósito:** entregar às closers o PDF imprimível pela consulta CNPJ existente.
+**Editado quando:** mudar a apresentação da ficha ou seu acionamento no Pré Análise; preservar o modelo compartilhado dos demais consumidores.
+**Exemplo existente:** `<FichaAlphaPDF dados={dados} userLogado={user} finalidade="pre-analise" />`; omitir finalidade mantém `padrao` com observações.
+**Acesso:** Pré Análise → `/PainelAlpha/SistemaPreAnalise` → consultar CNPJ → Gerar Ficha em PDF → Gerar Documento PDF → nova aba/impressão. Página verifica sessão e permissões; menu exige `analise`. Modal gera Blob com react-pdf e abre com `window.open`.
+**Validação:** encadeamento confirmado no código; teste `tests/pre-analise/ficha-reuniao.test.ts` verifica textos, confirmações, A4 e modelo padrão. Navegação autenticada não exercitada no encerramento. Sem novo menu, rota, módulo ou schema; mapa estrutural permanece válido.
+**Última atualização:** 2026-10-13 por Scribe.

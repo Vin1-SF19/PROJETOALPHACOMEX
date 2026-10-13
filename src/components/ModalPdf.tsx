@@ -85,7 +85,7 @@ export const ModalPDF = ({ dados: dadosEntrada, radarDados: radarEntrada, user, 
             extra: { ...dadosManuais }
         };
         await upsertConsulta(payload);
-        const doc = <FichaAlphaPDF dados={{ ...normalizarFichaDados(payload), extra: dadosManuais }} userLogado={user} />;
+        const doc = <FichaAlphaPDF dados={{ ...normalizarFichaDados(payload), extra: dadosManuais }} userLogado={user} finalidade="pre-analise" />;
         const blob = await pdf(doc).toBlob();
         window.open(URL.createObjectURL(blob), "_blank");
     };

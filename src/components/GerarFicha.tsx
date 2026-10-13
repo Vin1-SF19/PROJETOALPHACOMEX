@@ -112,7 +112,7 @@ export type FichaAlphaViabilidade = {
   resumoReuniao?: string; transcricaoRegistrada?: boolean;
 };
 
-export const FichaAlphaPDF = ({ dados, userLogado, logoPath }: { dados: FichaAlphaDados, userLogado: string, logoPath?: string }) => {
+export const FichaAlphaPDF = ({ dados, userLogado, logoPath, finalidade = "padrao" }: { dados: FichaAlphaDados, userLogado: string, logoPath?: string, finalidade?: "padrao" | "pre-analise" }) => {
   const rfb = dados?.rfb?.dados || dados?.rfb || {};
   const radar = dados?.radar || {};
   const eq = dados?.empresaqui?.dados || dados?.empresaqui || {};
@@ -393,6 +393,20 @@ export const FichaAlphaPDF = ({ dados, userLogado, logoPath }: { dados: FichaAlp
           </View>
         </View>
 
+        {finalidade === "pre-analise" ? (
+          <View style={{ marginTop: 5 }} wrap={false}>
+            {[
+              "Com a revisão do RADAR, quanto a empresa estima que poderia vender a mais, nos próximos seis meses?",
+              "A cada R$ 100,00 vendidos, qual o valor líquido costuma ficar para a empresa, tirando os custos?",
+            ].map((pergunta) => (
+              <View key={pergunta} style={{ borderWidth: 1, borderColor: '#000', padding: 6, marginBottom: 4 }} wrap={false}>
+                <Text style={{ fontSize: 9, fontWeight: 'bold', lineHeight: 1.3 }}>{pergunta}</Text>
+                <View style={{ height: 26, borderBottomWidth: 1, borderColor: '#aaa', marginBottom: 5 }} />
+                <Text style={{ fontSize: 9 }}>A CONFIRMAR (  )</Text>
+              </View>
+            ))}
+          </View>
+        ) : (
         <View style={styles.obsSection}>
           <Text style={[styles.cell, styles.titleCell, { textAlign: 'left', backgroundColor: '#f9f9f9', borderBottomWidth: 1, borderBottomColor: '#eee' }]}>
             OBSERVAÇÕES
@@ -403,6 +417,7 @@ export const FichaAlphaPDF = ({ dados, userLogado, logoPath }: { dados: FichaAlp
             </Text>
           </View>
         </View>
+        )}
 
         <View style={styles.funilRow}>
           <Text>ETAPA DO FUNIL (CRM): (   ) Leads Frios  (   ) Stand-by  (   ) Em tratativa  (   ) Hot leads</Text>
