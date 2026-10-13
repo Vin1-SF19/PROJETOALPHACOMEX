@@ -33,16 +33,23 @@ const dump = await db.$transaction(async (tx) => {
   for (const row of tables) chunks.push(`${row.sql};`);
   let totalRows = 0;
   for (const [index, table] of tables.entries()) {
-    const colunas = await tx.$queryRawUnsafe<Array<{ name: string; type: string }>>(`PRAGMA table_info(${qi(table.name)})`);
+    const colunas = await tx.$queryRawUnsafe<Array<{ name: string; type: string; pk: number }>>(`PRAGMA table_info(${qi(table.name)})`);
     const blobs = new Set(colunas.filter((coluna) => /BLOB/i.test(coluna.type)).map((coluna) => coluna.name));
     const select = colunas.map((coluna) => blobs.has(coluna.name)
       ? `CASE WHEN ${qi(coluna.name)} IS NULL THEN NULL ELSE hex(${qi(coluna.name)}) END AS ${qi(coluna.name)}`
       : qi(coluna.name)).join(", ");
-    const rows = await tx.$queryRawUnsafe<Array<Record<string, unknown>>>(`SELECT ${select} FROM ${qi(table.name)}`);
-    totalRows += rows.length;
-    for (const row of rows) {
-      const columns = Object.keys(row);
-      if (columns.length) chunks.push(`INSERT INTO ${qi(table.name)} (${columns.map(qi).join(", ")}) VALUES (${columns.map((column) => qv(row[column], blobs.has(column))).join(", ")});`);
+    const keys = colunas.filter((column) => column.pk > 0).sort((a, b) => a.pk - b.pk).map((column) => qi(column.name));
+    const order = keys.length ? keys.join(", ") : "rowid";
+    // Uma única resposta com todos os dados pode exceder o transporte HTTP.
+    // Paginar dentro da mesma transação preserva um snapshot consistente.
+    for (let offset = 0; ; offset += 250) {
+      const rows = await tx.$queryRawUnsafe<Array<Record<string, unknown>>>(`SELECT ${select} FROM ${qi(table.name)} ORDER BY ${order} LIMIT 250 OFFSET ${offset}`);
+      totalRows += rows.length;
+      for (const row of rows) {
+        const columns = Object.keys(row);
+        if (columns.length) chunks.push(`INSERT INTO ${qi(table.name)} (${columns.map(qi).join(", ")}) VALUES (${columns.map((column) => qv(row[column], blobs.has(column))).join(", ")});`);
+      }
+      if (rows.length < 250) break;
     }
     if ((index + 1) % 50 === 0) console.info(`backup: ${index + 1}/${tables.length} tabelas`);
   }
@@ -60,6 +67,7 @@ const sizeBytes = Buffer.byteLength(dump.content);
 const generatedAt = new Date().toISOString();
 await writeFile(`${base}.sql`, dump.content, { flag: "wx", mode: 0o600 });
 await writeFile(`${base}.manifest.json`, `${JSON.stringify({ generatedAt, reason, tables: dump.tables,
+  databaseHash: createHash("sha256").update(process.env.TURSO_DATABASE_URL!).digest("hex"),
   totalRows: dump.totalRows, sha256, sizeBytes }, null, 2)}\n`, { flag: "wx", mode: 0o600 });
 console.info(JSON.stringify({ dumpPath: `${base}.sql`, manifestPath: `${base}.manifest.json`,
   tables: dump.tables, totalRows: dump.totalRows, sha256, sizeBytes }));

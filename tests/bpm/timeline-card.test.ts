@@ -87,6 +87,12 @@ describe("montarFeedTimelineCard — agregação de múltiplas fontes", () => {
     expect(montarFeedTimelineCard([], [])).toEqual([]);
   });
 
+  it("identifica ajustes automáticos RD como Sistema sem expor códigos internos", () => {
+    for (const automacaoOrigem of ["RD_STATION_SERVICE_RECOVERY", "RD_STATION_SERVICE_ROLLBACK"]) {
+      expect(montarFeedTimelineCard([{ ...historico[2], automacaoOrigem }], [])[0].autor).toBe("Sistema");
+    }
+  });
+
   it("traduz ações conhecidas para rótulo legível e usa fallback para desconhecidas", () => {
     expect(rotuloEventoTimeline("CARD_MOVIDO")).toBe("Card movido de etapa");
     expect(rotuloEventoTimeline("TRANSCRICAO_REUNIAO_RECEBIDA")).toBe("Transcrição da reunião recebida");

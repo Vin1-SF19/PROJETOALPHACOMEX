@@ -7,7 +7,7 @@ const ler = (arquivo: string) => readFileSync(resolve(process.cwd(), arquivo), "
 describe("BPM - restrição de campos do card na etapa Novos leads", () => {
   const board = ler("src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx");
 
-  it("card na etapa Novos leads exibe apenas os 5 campos permitidos", () => {
+  it("card na etapa Novos leads mantém os campos permitidos", () => {
     expect(board).toContain(
       'const radarPretendido = card.campoValores?.find((campo) => campo.campo.nome === "Radar pretendido")?.valor;',
     );
@@ -20,7 +20,8 @@ describe("BPM - restrição de campos do card na etapa Novos leads", () => {
 
   it("mantém os campos originais para as demais etapas (regressão)", () => {
     expect(board).toContain("!novosLeads && nomeFantasiaSecundario");
-    expect(board).toContain("!novosLeads && card.servico");
+    // Cards RD precisam distinguir o serviço mesmo em Novos leads.
+    expect(board).toContain("(!novosLeads || card.origemExterna) && card.servico");
     expect(board).toContain("!novosLeads && canalOrigem");
     expect(board).toContain("!novosLeads && statusConfig");
     expect(board).toContain("!novosLeads && proximaTarefaComPrazo");

@@ -54,3 +54,15 @@ Manter a exportação somente leitura e adiar a aplicação. A camada de proveni
 
 - 2026-10-13: autorização explícita do usuário para executar a migração RD → Painel Alpha conforme o plano.
 - 2026-10-13: backup integral revalidado antes da implementação/aplicação; nenhuma escrita foi feita durante auditoria/preflight.
+
+## Resultado da execução
+
+- Preflight final consultou 1.212/1.212 negócios nos dez funis configurados: 0 falhas de API e 0 etapas sem destino Alpha. Assessoria Smart permaneceu fora do escopo.
+- Fingerprint da fotografia aplicada: `0d45bcd4ab61dbca58562b32397e53502d1828a72799f658f5bd88c533c2a29f`.
+- Contagens atuais da origem: 7.107 históricos de etapa, 3.605 atividades e 165 negócios sem atividade retornada. A quantidade de eventos de etapa estava diferente da auditoria anterior, por mudança de dados entre fotografias.
+- Resultado reconciliado no Turso: 1.212 cards, 7.107 eventos `DEAL_STAGE_HISTORY`, 3.605 eventos `ACTIVITY_*`, total de 10.712 eventos; 1.212 vínculos de proveniência/tags e 0 associações de evento sem origem. Os 47 deals além do número de CNPJs distintos seguem separados por ID RD.
+- Distribuição de cards confirmada: Revisão de Estimativa do Radar 572; Diretoria Operacional Vitor 1; Financeiro Entrada 16; Financeiro Êxito 221; Operacional Protocolo 8; Stand-by 35; Habilitação do Radar 151; Operacional Maria 16; Deferidos 176; Operacional Mariah 16.
+- 979 cards e 9.214 eventos foram inseridos pelo batch concluído `rdimp_630af8b7f81bfe76566870b54cea`. A tentativa anterior tinha 233 cards e 1.497 eventos; foi retomada por IDs estáveis e seu batch foi marcado `RETOMADO`. Na conferência dos 233 registros parciais, a API atual retornou um histórico de etapa adicional; ele foi acrescentado pela chave estável do evento, sem substituir o payload original do detalhe já salvo. O total final passou a coincidir com a origem consultada.
+- A consulta cadastral não enriqueceu 489 CNPJs; os leads correspondentes foram mantidos usando os dados de nome/organização disponíveis no RD, sem fallback por nome quando havia conflito de CNPJ com cliente existente.
+- Não houve escrita ou exclusão na origem RD. Não foi executado rollback; os registros permanecem identificáveis pelo provider, lote e IDs RD.
+- O backup descrito acima foi revalidado pelo gate automatizado imediatamente antes da migration aditiva e da gravação.

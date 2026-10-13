@@ -6,6 +6,8 @@ import { createClient } from "@libsql/client";
 import { config } from "dotenv";
 import { cnpjEhValido } from "../src/lib/format-cnpj.ts";
 import { projetarEventosHistoricoRd } from "../src/lib/bpm/rd-station-history.ts";
+import { carregarEtapasRd, completarEtapasHistoricasRd } from "../src/lib/bpm/rd-station-stages.ts";
+import { resolverServicoRd } from "../src/lib/bpm/rd-station-service.ts";
 
 config({ path: ".env.local", quiet: true });
 config({ path: ".env", quiet: true, override: false });
@@ -193,8 +195,8 @@ async function backupGate() {
 const summaries = new Map();
 const full = [];
 try {
-  const catalog = await paged("deal_stages", { limit: 200 });
-  const stageMap = new Map(catalog.map((stage) => [stage.id ?? stage._id, { id: stage.id ?? stage._id, name: stage.name, pipelineId: stage.deal_pipeline_id ?? stage.deal_pipeline?.id }]));
+  const stageNames = await carregarEtapasRd(PIPELINES.map((pipeline) => pipeline.id), rd);
+  const stageMap = new Map([...stageNames].map(([id, name]) => [id, { id, name }]));
   const configuredPipelines = await rows("SELECT id,nome FROM BpmPipeline");
   const configuredStages = await rows("SELECT id,pipelineId,nome FROM BpmEtapa");
   const alphaPipelineByName = new Map(configuredPipelines.map((item) => [item.nome, item]));
@@ -243,6 +245,8 @@ try {
     if (collected % 100 === 0 || collected === sourceDeals.length) console.info(`RD read-only preflight: ${collected}/${sourceDeals.length} negócios detalhados.`);
   });
   full.push(...detailed.filter((item) => item && !item.failed));
+  await completarEtapasHistoricasRd(stageNames, full.flatMap((item) => (item.detail.deal_stage_histories ?? []).map((h) => h.deal_stage_id)), rd);
+  for (const item of full) item.events = projetarEventosHistoricoRd(item.detail, item.activities, stageNames);
 
   const [users, clients] = await Promise.all([
     rows("SELECT id,nome FROM usuarios"), rows("SELECT id,cnpj,razaoSocial,nomeFantasia FROM Cliente"),
@@ -366,7 +370,7 @@ try {
       const originId = stableId("rdorigin", PROVIDER, dealId);
       const eventCounts = await withWriteTransaction(async (tx) => {
         await tx.execute({ sql: `INSERT OR IGNORE INTO BpmCard (id,empresaId,pipelineId,etapaId,responsavelId,servico,status,createdAt,updatedAt)
-          VALUES (?,?,?,?,?,NULL,'ATIVO',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`, args: [cardId, clientId, item.alphaPipeline.id, item.alphaStage.id, ownerId] });
+          VALUES (?,?,?,?,?,?,'ATIVO',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`, args: [cardId, clientId, item.alphaPipeline.id, item.alphaStage.id, ownerId, resolverServicoRd(item.detail).servico] });
         await tx.execute({ sql: `INSERT OR IGNORE INTO BpmCardMembro (id,cardId,userId,role,createdAt) VALUES (?,?,?,'RESPONSAVEL',CURRENT_TIMESTAMP)`, args: [stableId("rdmember", cardId, ownerId), cardId, ownerId] });
         await tx.execute({ sql: `INSERT OR IGNORE INTO BpmCardOrigemExterna (id,provider,sourceDealId,cardId,importacaoId,sourcePipelineId,sourcePipelineName,sourceStageId,sourceStageName,sourceOwnerId,sourceOwnerName,sourceDealName,rawJson)
           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, args: [originId, PROVIDER, dealId, cardId, importId, item.scope.id, item.detail.deal_pipeline?.name ?? item.scope.name, item.stageId ?? "", item.stageName, item.ownerId ? String(item.ownerId) : null, item.ownerName, dealName, json(item.detail)] });

@@ -7,6 +7,8 @@ import db from "@/lib/prisma";
 import { auth } from "../../../auth";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import { corrigirProjecaoHistoricoRd } from "@/lib/bpm/rd-station-history";
+import { ordenarHistoricoRd, periodoOriginalRd } from "@/lib/bpm/rd-station-display";
+import { textoLegivelRd } from "@/lib/bpm/rd-station-text";
 
 const PROVEDOR = "RD_STATION_CRM_V1";
 const correcaoSchema = z.object({
@@ -39,20 +41,20 @@ export async function ListarHistoricoExternoRd(cardId: string) {
     });
     return {
       success: true as const,
-      origem: { pipeline: origem.sourcePipelineName, etapa: origem.sourceStageName, nome: origem.sourceDealName },
-      data: eventos.map((evento) => ({
+      origem: { pipeline: textoLegivelRd(origem.sourcePipelineName), etapa: textoLegivelRd(origem.sourceStageName), nome: textoLegivelRd(origem.sourceDealName) },
+      data: ordenarHistoricoRd(eventos.map((evento) => ({
         id: evento.id,
         tipo: evento.eventType,
         data: evento.occurredAt,
         projecao: JSON.parse(evento.projectedJson) as Record<string, unknown>,
-        original: JSON.parse(evento.rawJson) as Record<string, unknown>,
+        periodoOriginal: periodoOriginalRd(JSON.parse(evento.rawJson) as Record<string, unknown>),
         correcoes: evento.correcoes.map((correcao) => ({
           versao: correcao.versao, campos: JSON.parse(correcao.camposAlteradosJson) as Record<string, unknown>,
           anterior: JSON.parse(correcao.projecaoAnteriorJson) as Record<string, unknown>,
           nova: JSON.parse(correcao.projecaoNovaJson) as Record<string, unknown>,
-          autor: correcao.autor?.nome ?? "Usuário removido", data: correcao.createdAt,
+          autor: correcao.autor?.nome ?? "Sistema / autor não disponível", data: correcao.createdAt,
         })),
-      })),
+      }))),
     };
   } catch {
     return { success: false as const, error: "Erro ao consultar histórico RD", data: [] };

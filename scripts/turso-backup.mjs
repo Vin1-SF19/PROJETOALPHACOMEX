@@ -108,11 +108,11 @@ chunks.push("COMMIT;", "PRAGMA foreign_keys=ON;", "");
 
 const dump = chunks.join("\n");
 const sha256 = createHash("sha256").update(dump).digest("hex");
-await writeFile(dumpPath, dump, "utf8");
+await writeFile(dumpPath, dump, { encoding: "utf8", mode: 0o600 });
 await writeFile(
   manifestPath,
   `${JSON.stringify({ generatedAt: new Date().toISOString(), databaseHash: createHash("sha256").update(rawUrl).digest("hex"), reason, tables: tables.length, totalRows, sha256, sizeBytes: Buffer.byteLength(dump) }, null, 2)}\n`,
-  "utf8",
+  { encoding: "utf8", mode: 0o600 },
 );
 
 console.info(JSON.stringify({ dumpPath, manifestPath, tables: tables.length, totalRows, sha256, sizeBytes: Buffer.byteLength(dump) }));

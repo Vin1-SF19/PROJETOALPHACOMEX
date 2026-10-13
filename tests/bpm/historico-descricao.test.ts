@@ -34,6 +34,9 @@ function descrever(
 }
 
 describe("descreverEventoHistorico", () => {
+  it("descreve o serviço recuperado sem expor evidências técnicas", () => {
+    expect(descrever("CARD_ATUALIZADO", { servico: null }, { servico: "Revisão RADAR", evidencias: [{ id: idTecnico }] })).toBe("Atualizado: serviço");
+  });
   it("formata reunião em São Paulo e omite o ID técnico do Google", () => {
     const descricao = descrever("REUNIAO_AGENDADA", undefined, {
       dataReuniao: "2026-09-05T12:00:00.000Z",

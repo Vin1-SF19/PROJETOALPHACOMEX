@@ -62,7 +62,7 @@ describe('Builder integrado ao painel', () => {
   it('exibe loading, expira em 30s e retry remonta com novo prazo', async () => {
     await render();
     const first = container.querySelector('iframe')!;
-    expect(first.src).toBe(BUILDER_URL);
+    expect(first.getAttribute('src')).toBe(BUILDER_URL);
     expect(first.src).toContain('/api/chatbotx/open');
     expect(container.querySelector('[role=status]')).not.toBeNull();
     await act(async () => vi.advanceTimersByTime(BUILDER_LOAD_TIMEOUT_MS));
@@ -82,7 +82,7 @@ describe('Builder integrado ao painel', () => {
     expect(container.querySelector('[role=status]')).toBeNull();
     expect(container.querySelector('[role=alert]')).toBeNull();
     const link = container.querySelector('a')!;
-    expect(link.href).toBe(BUILDER_URL);
+    expect(link.getAttribute('href')).toBe(BUILDER_URL);
     expect(link.href).toContain('/api/chatbotx/open');
     expect(link.rel).toBe('noopener noreferrer');
     expect(link.target).toBe('_blank');

@@ -205,13 +205,14 @@ function descricaoCardAtualizado(
   const chaves = ids.length > 0
     ? ids
     : ehRegistro(novo)
-      ? Object.keys(novo).filter((chave) => !["versao", "updatedAt"].includes(chave))
+      ? Object.keys(novo).filter((chave) => !["versao", "updatedAt", "evidencias"].includes(chave))
       : [];
   const rotulos = chaves.map((chave) => {
     const campo = contexto.campos.find((item) => item.id === chave);
     if (campo) return campo.nome;
     const conhecidos: Record<string, string> = {
       titulo: "título",
+      servico: "serviço",
       responsavelId: "responsável",
       proximoContatoEm: "próximo contato",
       statusPosFechamento: "status pós-fechamento",

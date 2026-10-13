@@ -123,7 +123,7 @@ export function montarFeedTimelineCard(
       id: h.id,
       tipo: "evento",
       data: new Date(h.createdAt),
-      autor: h.usuario?.nome ?? (h.automacaoOrigem ? `Automação (${h.automacaoOrigem})` : "Sistema"),
+      autor: h.usuario?.nome ?? (h.automacaoOrigem && !["RD_STATION_SERVICE_RECOVERY", "RD_STATION_SERVICE_ROLLBACK"].includes(h.automacaoOrigem) ? `Automação (${h.automacaoOrigem})` : "Sistema"),
       origem: origemDoEvento(h.automacaoOrigem, h.usuario),
       acao: h.acao,
       label: rotuloEventoTimeline(h.acao),

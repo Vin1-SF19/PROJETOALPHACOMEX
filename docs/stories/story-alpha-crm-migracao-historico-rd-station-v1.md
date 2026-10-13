@@ -234,7 +234,7 @@ Codex — implementação e execução da carga RD Station CRM v1 para Turso.
 - A consulta de enriquecimento cadastral falhou para 489 CNPJs; esses leads foram preservados usando os dados de organização/nome disponíveis no RD, sem associar a clientes Alpha por CNPJ divergente.
 - O evento de etapa novo identificado durante a reconciliação foi acrescentado sem sobrescrever o payload bruto anterior.
 - Não houve escrita no RD nem remoções de registros existentes; a migration de schema foi aditiva.
-- `npm run lint`: 0 erros, 1.192 avisos legados. `npm run typecheck`: passou. Teste unitário RD: 4 passaram. Suíte completa: 4.452 passaram, 2 falharam em `tests/builder/embed.test.ts` por expectativa de URLs relativas no happy-dom. `npm run build` falhou inicialmente em `prisma generate` com `EPERM` ao copiar o query compiler; `npx prisma generate` isolado passou, sem novo build concluído.
+- `npm run lint`: 0 erros, 1.192 avisos legados. `npm run typecheck`: passou. Teste unitário RD: 4 passaram. Suíte completa: 4.452 passaram, 2 falharam em `tests/builder/embed.test.ts` por expectativa de URLs relativas no happy-dom. `npm run build`: passou na segunda execução; emitiu avisos de cache webpack e do polyfill PDF.js já fora deste escopo.
 - Cobertura dedicada adicional de paginação/erros de API e permissões segue pendente de revisão QA.
 
 ### File List
@@ -253,6 +253,43 @@ Codex — implementação e execução da carga RD Station CRM v1 para Turso.
 ## QA Results
 
 _A preencher após revisão/implementação QA._
+
+### Retomada após interrupção — histórico amigável e serviço por negócio
+
+Solicitações recuperadas: corrigir histórico ausente/incorreto, conferir empresas repetidas pelo serviço, retirar JSON da interface e corrigir acentos como `emprÃ©stimo`.
+
+- [x] Confirmar os 1.212 cards e 10.712 eventos preservados e identificar causas de exibição/mapeamento.
+- [x] Integrar RD à aba Histórico e à timeline, com ordenação por data corrigida, estados de carregamento/erro e isolamento na troca de card.
+- [x] Mostrar nome da etapa, entrada, saída, atividades e ajustes em português, sem payload/IDs técnicos. Preservar originais no banco.
+- [x] Corrigir codificação somente na apresentação, com testes de acentos válidos, texto misto e dupla codificação.
+- [x] Corrigir catálogo por funil/paginação e recuperar etapas históricas por ID, preservando 404 sem inferência.
+- [x] Preparar prévia de 4.389 nomes de etapa e 1.068 serviços; 144 exceções (134 sem evidência e 10 com divergência) permanecem sem alteração. Não duplicar novamente cards já separados por negócio.
+- [x] Implementar aplicação idempotente, auditoria, verificações de concorrência, reconciliação e rollback seletivo.
+- [x] Executar revisão Vault do script, testes direcionados, lint, typecheck e build. Corrigidas duas assertivas legadas do Builder para comparar os atributos de URL; suíte completa aprovada: 608 arquivos e 4.499 testes, 4 ignorados e 1 todo.
+- [x] Gerar e verificar novo backup completo: 336 tabelas e 243.974 registros; restauração local, integridade, chaves estrangeiras e contagens aprovadas.
+- [x] Obter confirmação específica da correção de dados: usuário respondeu “Sim autorizo” ao plano apresentado; Vault aprovou a aplicação.
+- [x] Aplicar/reconciliar o plano aprovado: 4.389 nomes, 1.068 serviços/contextos, 144 exceções preservadas, zero originais alterados/ausências.
+- [ ] Publicar e verificar a correção na produção Vercel.
+
+Evidência, prévia, riscos, alternativa e rollback: `docs/reports/rd-alpha-recovery-2026-10-13.md`. A autorização da carga original não é registrada como autorização desta nova correção específica.
+
+#### File List adicional da retomada
+
+- `scripts/recuperar-rd-alpha.mjs` — prévia, aplicação, verificação e reversão por plano.
+- `scripts/migrar-rd-alpha.mjs` — catálogo completo de etapas e serviço explícito em cargas futuras.
+- `scripts/turso-backup-prisma.mts`, `scripts/turso-backup.mjs` — exportação paginada, identidade do banco e permissões dos backups.
+- `src/lib/bpm/rd-station-stages.ts`, `rd-station-service.ts`, `rd-station-recovery.ts` — catálogo, classificação de serviço e preservação de ajustes humanos.
+- `src/lib/bpm/rd-station-display.ts`, `rd-station-text.ts` — cronologia, campos legíveis e correção de codificação.
+- `src/actions/bpm/RdStationHistorico.ts` — resposta de apresentação sem payload bruto.
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx`, `PainelHistoricoRd.tsx` — histórico intercalado, período de etapa, edição amigável e ajustes legíveis.
+- `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx` — serviço e textos RD no card.
+- `src/lib/timeline/extractors/card.ts`, `src/components/PerfilEmpresaGlobal/Timeline.tsx` — eventos RD e datas ausentes sem falha de renderização.
+- `tests/bpm/rd-station-actions.test.ts`, `rd-station-recovery.test.ts`, `rd-station-recovery-cli.test.ts`, `rd-station-text.test.ts`, `rd-station-ui.test.ts` — testes de acesso, transformação, CLI, apresentação e acentos.
+- `tests/bpm/card-campos-novos-leads.test.ts` — expectativa de serviço visível para cards RD.
+- `tests/builder/embed.test.ts` — comparar atributos de URL declarados, sem confundir resolução absoluta do DOM com a rota relativa configurada.
+- `src/lib/bpm/historico-descricao.ts`, `src/lib/bpm/timeline.ts` — rótulo de serviço e autoria dos ajustes RD sem códigos internos ou evidências operacionais.
+- `tests/bpm/historico-descricao.test.ts`, `tests/bpm/timeline-card.test.ts` — apresentação legível da auditoria de serviços.
+- `docs/reports/rd-alpha-recovery-2026-10-13.md` — resultado e gate de aplicação.
 
 ## Change Log
 

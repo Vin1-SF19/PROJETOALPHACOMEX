@@ -20,6 +20,7 @@ import { RegistrarAnexoBpm, ExcluirAnexoBpm } from "@/actions/bpm/Anexos";
 import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 import { isAdminRole } from "@/lib/roles";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { combinarHistoricosRd } from "@/lib/bpm/rd-station-display";
 import { montarFeedTimelineCard, type ItemTimelineCard } from "@/lib/bpm/timeline";
 import { descreverEventoHistorico, type ContextoDescricaoHistorico } from "@/lib/bpm/historico-descricao";
 import PainelTimelineCard from "./PainelTimelineCard";
@@ -27,7 +28,7 @@ import { PainelCadenciasCard } from "@/components/bpm/cadencias/PainelCadenciasC
 
 import { PainelResumoEtapas } from "./PainelResumoEtapas";
 import PainelHistoricoPipeline from "./PainelHistoricoPipeline";
-import PainelHistoricoRd from "./PainelHistoricoRd";
+import PainelHistoricoRd, { useHistoricoRd, EstadoHistoricoRd, EventoHistoricoRdItem } from "./PainelHistoricoRd";
 import { PainelTarefasPorTipo } from "./PainelTarefasPorTipo";
 import { PainelChecklistsCard } from "./PainelChecklistsCard";
 import { EditorAnotacaoCard } from "./EditorAnotacaoCard";
@@ -81,6 +82,7 @@ export default function PainelHistorico({
   anotacoes,
   onAbrirCard,
 }: Props) {
+  const historicoRd = useHistoricoRd(card.id, realtimeRevision);
   const [enviandoAnexo, setEnviandoAnexo] = useState(false);
   const [progressoAnexo, setProgressoAnexo] = useState(0);
   const [arrastandoAnexo, setArrastandoAnexo] = useState(false);
@@ -204,8 +206,8 @@ export default function PainelHistorico({
           <TabsTrigger value="historico" className="flex-none gap-1.5">
             <History size={13} />
             Histórico
-            {feedHistorico.length > 0 && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300">{feedHistorico.length}</span>
+            {feedHistorico.length + historicoRd.eventos.length > 0 && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300">{feedHistorico.length + historicoRd.eventos.length}</span>
             )}
           </TabsTrigger>
         </TabsList>
@@ -244,7 +246,7 @@ export default function PainelHistorico({
         <TabsContent value="etapas" className="min-h-0 flex-1 overflow-y-auto">
           <div className="space-y-3">
             <PainelHistoricoPipeline cardId={card.id} pipelineId={card.pipelineId} pipelineNome={card.pipeline.nome} accent={accent} realtimeRevision={realtimeRevision} onAbrirCard={onAbrirCard} />
-            <PainelHistoricoRd cardId={card.id} accent={accent} podeEditar={podeEditar} />
+            <PainelHistoricoRd historico={historicoRd} accent={accent} podeEditar={podeEditar} />
             <details className="rounded-2xl border border-white/[0.06] p-3">
               <summary className="cursor-pointer text-xs font-semibold text-slate-300">Dados das etapas anteriores</summary>
               <div className="mt-3"><PainelResumoEtapas key={card.etapa.id} card={card} etapas={etapas} accent={accent} ocultarTitulo /></div>
@@ -283,10 +285,14 @@ export default function PainelHistorico({
         </TabsContent>
 
         <TabsContent value="historico" className="min-h-0 flex-1 overflow-y-auto">
-          <div className="space-y-1.5">
-            {feedHistorico.map((item) =>
+          <EstadoHistoricoRd historico={historicoRd} />
+          <ol className="space-y-1.5">
+            {combinarHistoricosRd(feedHistorico, historicoRd.eventos).map((entrada) => {
+              if (entrada.origem === "rd") return <EventoHistoricoRdItem key={`rd-${entrada.item.id}`} evento={entrada.item} podeEditar={podeEditar} onAtualizado={historicoRd.recarregar} />;
+              const item = entrada.item;
+              return (
               item.tipo === "anotacao" ? (
-                <div
+                <li
                   key={`anotacao-${item.id}`}
                   className="rounded-lg border-l-2 pl-2.5 pr-2 py-1.5"
                   style={{ borderColor: `rgb(${accent})`, background: `rgba(${accent},0.06)` }}
@@ -296,9 +302,9 @@ export default function PainelHistorico({
                   </div>
                   <p className="mt-1 whitespace-pre-wrap text-xs text-slate-300">{item.texto}</p>
                   <p className="mt-1 text-[10px] text-slate-500">{item.autor} · {fmtDateTime(item.data)}</p>
-                </div>
+                </li>
               ) : (
-                <div key={`evento-${item.id}`} className="flex items-start gap-1.5 text-xs text-slate-400 border-l-2 pl-2 py-0.5" style={{ borderColor: `rgba(${accent},0.3)` }}>
+                <li key={`evento-${item.id}`} className="flex items-start gap-1.5 text-xs text-slate-400 border-l-2 pl-2 py-0.5" style={{ borderColor: `rgba(${accent},0.3)` }}>
                   {(() => {
                     const Icone = iconePorAcao(item.acao ?? "");
                     return <Icone size={12} className="mt-0.5 shrink-0 text-slate-500" />;
@@ -320,11 +326,12 @@ export default function PainelHistorico({
                     {" · "}
                     {fmtDateTime(item.data)}
                   </div>
-                </div>
-              ),
-            )}
-            {feedHistorico.length === 0 && <p className="text-xs text-slate-600">Sem histórico.</p>}
-          </div>
+                </li>
+              )
+              );
+            })}
+          </ol>
+          {feedHistorico.length === 0 && historicoRd.eventos.length === 0 && !historicoRd.carregando && !historicoRd.erro && <p className="text-xs text-slate-600">Sem histórico.</p>}
         </TabsContent>
 
         <TabsContent value="timeline" className="min-h-0 flex-1 overflow-y-auto">

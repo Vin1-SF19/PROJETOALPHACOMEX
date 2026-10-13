@@ -25,6 +25,7 @@ interface TimelineProps {
 
 function getMonthYearLabel(iso: string): string {
   const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return "Data ausente na origem";
   return new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(date);
 }
 
@@ -107,7 +108,7 @@ export function Timeline({ events, onEventClick }: TimelineProps) {
                     dateTime={event.timestamp}
                     className="text-xs text-slate-500"
                   >
-                    {fmtDateTime(event.timestamp)}
+                    {Number.isFinite(Date.parse(event.timestamp)) ? fmtDateTime(event.timestamp) : "Data ausente na origem"}
                   </time>
                 </div>
                 <p className="mt-1 text-sm font-semibold text-slate-200">{event.title}</p>

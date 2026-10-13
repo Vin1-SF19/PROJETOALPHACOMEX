@@ -1,6 +1,7 @@
 "use client";
 
 import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
+import { textoLegivelRd } from "@/lib/bpm/rd-station-text";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -257,8 +258,8 @@ export function KanbanCard({
   const deferidoOperacional = processoOperacionalDeferido(etapaNome, card.encaminhamentos);
   const razaoSocial = card.empresa.razaoSocial;
   const nomeFantasia = card.empresa.nomeFantasia;
-  const etapaOrigemRd = card.origemExterna?.sourceStageName ?? null;
-  const nomeLeadRd = card.origemExterna?.sourceDealName ?? null;
+  const etapaOrigemRd = card.origemExterna ? textoLegivelRd(card.origemExterna.sourceStageName) : null;
+  const nomeLeadRd = card.origemExterna ? textoLegivelRd(card.origemExterna.sourceDealName) : null;
   const cnpjFormatado = formatCNPJ(card.empresa.cnpj);
   const nomeEmpresa = razaoSocial || nomeFantasia || "";
   const nomeFantasiaSecundario = nomeFantasia && nomeFantasia !== nomeEmpresa ? nomeFantasia : null;
@@ -437,7 +438,7 @@ export function KanbanCard({
                   {cnpjFormatado && <span className="font-mono text-[10px] leading-tight text-slate-500">{cnpjFormatado}</span>}
                 </div>
               )}
-              {!novosLeads && card.servico && <p className="mt-1 line-clamp-1 text-[11px] font-medium leading-tight text-slate-400">{card.servico}</p>}
+              {(!novosLeads || card.origemExterna) && card.servico && <p className="mt-1 line-clamp-1 text-[11px] font-medium leading-tight text-slate-400">{card.servico}</p>}
             </div>
           </div>
           )}

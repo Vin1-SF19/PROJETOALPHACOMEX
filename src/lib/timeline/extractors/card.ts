@@ -11,6 +11,7 @@
 import type { Prisma } from "@prisma/client";
 import db from "@/lib/prisma";
 import type { TimelineEvent } from "@/lib/timeline/types";
+import { apresentarEventoRd, apresentarAjusteServicoRd } from "@/lib/bpm/rd-station-display";
 
 type ClienteDb = Prisma.TransactionClient | typeof db;
 
@@ -48,7 +49,7 @@ export async function extractCardTimelineEvents(
     metadata: { tipo: "criacao" },
   });
 
-  const [historico, interacoes, tarefas, checklists, automacoes, slaDisparos] = await Promise.all([
+  const [historico, interacoes, tarefas, checklists, automacoes, slaDisparos, eventosRd] = await Promise.all([
     client.bpmCardHistorico.findMany({
       where: { cardId },
       select: { id: true, acao: true, valorAnteriorJson: true, valorNovoJson: true, automacaoOrigem: true, createdAt: true, usuario: { select: { nome: true } } },
@@ -73,9 +74,27 @@ export async function extractCardTimelineEvents(
       where: { cardId },
       select: { id: true, tipoDisparo: true, disparadoEm: true, slaConfig: { select: { nome: true } } },
     }).catch(() => []), // SLA (RM-2026-095B40) pode ainda não estar disponível em produção — fail-open.
+    client.bpmEventoExternoCard.findMany({
+      where: { origem: { cardId, provider: "RD_STATION_CRM_V1" } },
+      select: { id: true, eventType: true, occurredAt: true, projectedJson: true },
+    }),
   ]);
 
+  for (const evento of eventosRd) {
+    const display = apresentarEventoRd({ tipo: evento.eventType, data: evento.occurredAt, projecao: JSON.parse(evento.projectedJson) as Record<string, unknown> });
+    events.push({
+      id: `rd-${evento.id}`, timestamp: display.data, module: "rd-station", moduleLabel: "RD Station",
+      title: display.titulo, description: display.conteudo || undefined,
+      metadata: { tipo: evento.eventType, dataAusente: !display.data },
+    });
+  }
+
   for (const h of historico) {
+    const ajusteRd = apresentarAjusteServicoRd(h.automacaoOrigem, h.valorNovoJson);
+    if (ajusteRd) {
+      events.push({ id: `hist-${h.id}`, timestamp: h.createdAt.toISOString(), module: "historico", moduleLabel: "Histórico", ...ajusteRd });
+      continue;
+    }
     const anterior = resumirValor(h.valorAnteriorJson);
     const novo = resumirValor(h.valorNovoJson);
     events.push({
@@ -165,6 +184,9 @@ export async function extractCardTimelineEvents(
     });
   }
 
-  events.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  events.sort((a, b) => {
+    const da = Date.parse(a.timestamp), db = Date.parse(b.timestamp);
+    return (Number.isFinite(da) ? da : Infinity) - (Number.isFinite(db) ? db : Infinity) || a.id.localeCompare(b.id);
+  });
   return events;
 }
