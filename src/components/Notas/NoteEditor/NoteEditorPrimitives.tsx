@@ -44,20 +44,25 @@ import { mentionSuggestion } from "@/components/Notas/NoteEditor/mention-suggest
 import { SlashCommand } from "@/components/Notas/NoteEditor/slash-command";
 import { TableEditPanel } from "@/components/Notas/NoteEditor/TableEditPanel";
 import { TableSizePicker } from "@/components/Notas/NoteEditor/TableSizePicker";
-import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import { Z_INDEX } from "@/lib/z-index";
 
 const CORES_TEXTO = ["#ffffff", "#f59e0b", "#f43f5e", "#8b5cf6", "#06b6d4", "#10b981", "#3b82f6", "#ec4899", "#84cc16"];
 
 function SeletorCorTexto({ editor, ponto }: { editor: Editor; ponto?: { x: number; y: number } }) {
   const [open, setOpen] = useState(Boolean(ponto));
   const paleta = (
-    <PopoverContent align="start" className="w-52 border-white/10 bg-[#0b1120] p-3" onOpenAutoFocus={(event) => event.preventDefault()}>
+    <PopoverContent align="start" style={{ zIndex: Z_INDEX.dropdown }} className="w-52 border-white/10 bg-[#0b1120] p-3" onOpenAutoFocus={(event) => event.preventDefault()}>
       <p className="mb-2 text-[10px] uppercase tracking-wide text-slate-500">Cor do texto</p>
       <div className="flex flex-wrap gap-2">
         {CORES_TEXTO.map((cor) => (
           <button key={cor} type="button" title={cor} aria-label={`Aplicar cor ${cor}`} onMouseDown={(event) => event.preventDefault()} onClick={() => { editor.chain().focus().setColor(cor).run(); setOpen(false); }} style={{ backgroundColor: cor }} className="h-7 w-7 rounded-full border border-white/20 hover:ring-2 hover:ring-white/60" />
         ))}
         <button type="button" title="Cor padrão" aria-label="Remover cor do texto" onMouseDown={(event) => event.preventDefault()} onClick={() => { editor.chain().focus().unsetColor().run(); setOpen(false); }} className="h-7 rounded-full border border-white/15 px-2 text-[10px] text-slate-300 hover:bg-white/10">Padrão</button>
+        <label className="relative flex h-7 cursor-pointer items-center rounded-full border border-white/15 px-2 text-[10px] text-slate-300 hover:bg-white/10" title="Escolher qualquer cor">
+          Personalizada
+          <input type="color" aria-label="Escolher cor personalizada" defaultValue="#f59e0b" onChange={(event) => { editor.chain().focus().setColor(event.currentTarget.value).run(); setOpen(false); }} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+        </label>
       </div>
     </PopoverContent>
   );
@@ -71,9 +76,9 @@ function SeletorCorTexto({ editor, ponto }: { editor: Editor; ponto?: { x: numbe
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button type="button" title="Cor do texto" aria-label="Cor do texto" onMouseDown={(event) => event.preventDefault()} className="flex h-7 items-center justify-center rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-white/5 hover:text-white"><Palette size={15} /></button>
-      </PopoverTrigger>
+      <PopoverAnchor asChild>
+        <button type="button" title="Cor do texto" aria-label="Cor do texto" onMouseDown={(event) => event.preventDefault()} onClick={() => setOpen((atual) => !atual)} className="flex h-7 items-center justify-center rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-white/5 hover:text-white"><Palette size={15} /></button>
+      </PopoverAnchor>
       {paleta}
     </Popover>
   );
