@@ -2,7 +2,15 @@
 
 ## Estado
 
-Correção de código implementada; plano especificamente autorizado pelo usuário em 13/10/2026 com “Sim autorizo”. Aplicação no Turso concluída e reconciliada após aprovação final Vault; publicação Vercel em preparação. A carga original continua com 1.212 cards e 10.712 eventos.
+Correção de código publicada na produção Vercel às 22:50:48 UTC de 13/10/2026; plano especificamente autorizado pelo usuário com “Sim autorizo”. Aplicação no Turso concluída e reconciliada após aprovação final Vault. A carga original continua com 1.212 cards e 10.712 eventos.
+
+## Publicação verificada
+
+- Commit publicado: [`100a44420aef7a974cd4b31334460175b9670241`](https://github.com/Vin1-SF19/PROJETOALPHACOMEX/commit/100a44420aef7a974cd4b31334460175b9670241), com 29 arquivos do escopo RD/backup/testes/documentação. Alterações concorrentes de Alpha Catcher e o mini-site local foram preservados fora do commit.
+- Deployment GitHub `7052021078`, ambiente Production, estado `success`; Vercel `dpl_FNcbxUeCThFJ188auLcgKBWdbviF`.
+- [Deployment publicado](https://painel-alpha-projeto-5lr2yt6u9-alpha-comexs-projects.vercel.app) e [endereço de produção](https://painel-alpha-projeto.vercel.app/PainelAlpha/AlphaCRM).
+- O alias canônico respondeu 200 na entrada, com `text/html; charset=utf-8` e assets contendo o ID do novo deployment; a conferência com parâmetro único e `Cache-Control: no-cache` confirmou o mesmo ID.
+- A rota do CRM respondeu 307 para `/?acesso=bloqueado` sem sessão, comportamento esperado. Não foi realizado teste visual autenticado em produção; a apresentação foi validada nos testes de renderização e no build.
 
 ## Diagnóstico confirmado
 
@@ -108,4 +116,4 @@ Backup completo criado às 22:29 UTC em 13/10/2026 e verificado:
 - Primeira suíte completa: 4.493 passaram; duas falhas já existentes em `tests/builder/embed.test.ts` por URLs relativas versus absolutas no happy-dom. As duas assertivas foram corrigidas para ler os atributos declarados, sem alteração de comportamento do Builder. A execução seguinte passou 4.499 testes em 608 arquivos.
 - Após os ajustes finais de rótulos/serviço/autoria, build, lint e typecheck passaram novamente. Uma tentativa de suíte foi invalidada por outra execução concorrente apagando `coverage/.tmp`; o teste de Alpha Catcher que oscilou nessa execução passou isoladamente (5/5). A suíte final usou diretório de cobertura exclusivo: 608 arquivos aprovados, 4.506 testes passaram, quatro ignorados e um TODO. Alterações concorrentes de Alpha Catcher não integram este commit.
 - CodeRabbit CLI ausente. O runtime canônico `Layer2PRAutomation.runCodeRabbit` retornou `pass: true, skipped: true` pela degradação prevista em `.aiox-core/core/quality-gates/layer2-pr-automation.js`; nenhuma revisão automatizada CodeRabbit foi simulada. A revisão manual corrigiu a exposição de evidências/códigos na auditoria de serviços; os testes de descritores passaram.
-- Renderização testada com o exemplo de datas fornecido pelo usuário; sem payload/IDs e com acentos corretos. Teste autenticado na Vercel ainda depende da publicação.
+- Renderização testada com o exemplo de datas fornecido pelo usuário; sem payload/IDs e com acentos corretos. Publicação confirmada; teste visual autenticado não realizado por ausência de sessão disponível.

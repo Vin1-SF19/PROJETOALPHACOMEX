@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for review
+Done
 
 ## Executor Assignment
 
@@ -269,7 +269,7 @@ Solicitações recuperadas: corrigir histórico ausente/incorreto, conferir empr
 - [x] Gerar e verificar novo backup completo: 336 tabelas e 243.974 registros; restauração local, integridade, chaves estrangeiras e contagens aprovadas.
 - [x] Obter confirmação específica da correção de dados: usuário respondeu “Sim autorizo” ao plano apresentado; Vault aprovou a aplicação.
 - [x] Aplicar/reconciliar o plano aprovado: 4.389 nomes, 1.068 serviços/contextos, 144 exceções preservadas, zero originais alterados/ausências.
-- [ ] Publicar e verificar a correção na produção Vercel.
+- [x] Publicar e verificar a correção na produção Vercel: commit `100a4442`, deployment `7052021078`, status `success` às 22:50:48 UTC. Alias canônico confirmado pelo ID dos assets com cache bust; autenticação preservada. Teste visual autenticado não realizado por ausência de sessão.
 
 Evidência, prévia, riscos, alternativa e rollback: `docs/reports/rd-alpha-recovery-2026-10-13.md`. A autorização da carga original não é registrada como autorização desta nova correção específica.
 
@@ -298,3 +298,4 @@ Evidência, prévia, riscos, alternativa e rollback: `docs/reports/rd-alpha-reco
 | 2026-10-13 | 1.0 | Story Draft criada com escopo, auditoria, requisitos de histórico editável, prévia, idempotência e salvaguardas de migração. | River (SM) |
 | 2026-10-13 | 1.1 | Mapeamento acordado recuperado para a story; adicionadas regras de elegibilidade e exceção para leads sem cliente, etapas sem destino verificável e responsáveis financeiros pendentes. | River (SM) |
 | 2026-10-13 | 1.2 | Implementação, migração autorizada, retomada e reconciliação de 1.212 cards e 10.712 eventos RD; adicionada a trilha de proveniência/correções e interface da jornada. | Codex |
+| 2026-10-13 | 1.3 | Correção de 4.389 históricos e 1.068 serviços, acentos e apresentação amigável; publicação Vercel confirmada no commit 100a4442. | Gage (DevOps) |
