@@ -67,8 +67,6 @@ export async function iniciarColeta(userId: number, input: ColetaInput, retomada
       cwd: process.cwd(), env: { ...process.env, LOGCOMEX_HEADLESS: 'true' }, stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
     });
     let encerrando = false;
-    const limite = Number(process.env.ALPHA_CATCHER_JOB_MAX_MINUTES);
-    const maxMs = (Number.isFinite(limite) && limite >= 30 && limite <= 480 ? limite : 480) * 60000;
     const idleMs = 30 * 60000;
     let idleTimer: ReturnType<typeof setTimeout>;
     let ultimoDiagnostico = 0;
@@ -77,9 +75,6 @@ export async function iniciarColeta(userId: number, input: ColetaInput, retomada
       idleTimer = setTimeout(() => parar('erro', 'A coleta ficou 30 minutos sem progresso do worker. Os resultados já recebidos foram preservados.', 'inatividade'), idleMs);
       idleTimer.unref();
     };
-    const prazo = maxMs < 3600000 ? `${maxMs / 60000} minutos` : `${maxMs / 3600000} horas`;
-    const timeout = setTimeout(() => parar('erro', `A coleta excedeu ${prazo}. Os resultados já recebidos foram preservados.`, 'limite_execucao'), maxMs);
-    timeout.unref();
     const parar = (estado: 'erro' | 'cancelado', mensagem: string, motivo: 'limite_execucao' | 'inatividade' | 'cancelada' = 'cancelada') => {
       if (job.estado !== 'executando') return;
       job.estado = estado; job.mensagem = mensagem;
@@ -90,7 +85,7 @@ export async function iniciarColeta(userId: number, input: ColetaInput, retomada
     };
     const fechar = async () => {
       if (encerrando) return; encerrando = true;
-      clearTimeout(timeout); clearTimeout(idleTimer); cancelar.delete(id); globals.catcherCaptcha!.delete(id);
+      clearTimeout(idleTimer); cancelar.delete(id); globals.catcherCaptcha!.delete(id);
       if (job.estado === 'executando') { job.estado = 'erro'; job.mensagem = 'A automação encerrou sem concluir. Confira a configuração e autorização do Gmail.';
         await historicoCatcher.diagnostico(id, userId, job.etapa, job.progresso, 'worker_encerrado').catch(() => { job.historicoErro = true; }); }
       job.atualizado = Date.now();

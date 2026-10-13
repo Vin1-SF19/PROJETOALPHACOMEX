@@ -18,6 +18,7 @@ Como closer do Alpha CRM, quero conversar com o cliente pelo ChatbotX no formul�
 6. Não são adicionados anexos ou criação de conversas nesta versão.
 7. A lista usa o campo personalizado CNPJ descoberto em `/contacts/filter-fields` e o `contactFilter` da Inbox; histórico e envio revalidam o valor do campo no contato.
 8. Enquanto a conversa está aberta, respostas do lead aparecem por polling REST da página mais recente, sem perder o histórico carregado; a consulta pausa com a aba oculta e respeita `Retry-After` em respostas `429`.
+9. Ao abrir o histórico ou receber uma nova mensagem, o painel de mensagens rola até o final; a leitura de páginas antigas não força essa rolagem.
 
 ## Checklist
 
@@ -29,6 +30,7 @@ Como closer do Alpha CRM, quero conversar com o cliente pelo ChatbotX no formul�
 - [x] Substituir a busca por razão social pelo filtro de CNPJ e preservar a seleção entre várias conversas.
 - [x] Validar o CNPJ do contato antes de ler o histórico ou enviar uma mensagem.
 - [x] Atualizar a conversa aberta periodicamente, mesclar mensagens por ID e aplicar espera progressiva após falhas.
+- [x] Rolar o painel de mensagens ao final na abertura e quando chegar uma mensagem nova.
 - [x] Executar os gates disponíveis e registrar as limitações ambientais.
 
 ## File List
@@ -63,4 +65,5 @@ Como closer do Alpha CRM, quero conversar com o cliente pelo ChatbotX no formul�
 - O chat do card agora consulta a página mais recente a cada 8 segundos enquanto visível. Ao reabrir a aba, consulta imediatamente; após `429`, usa `Retry-After` e espera progressiva. A atualização preserva mensagens antigas e IDs como strings.
 - Após o polling, `npm run typecheck` e lint dos arquivos alterados passaram; 39 testes direcionados passaram. O lint geral ainda encontra uma pasta restrita em `database-backups/` e `npm test` não lê o `.env`. Em configuração isolada, 4.422 testes passaram; as 2 falhas preexistentes de `tests/builder/embed.test.ts` e 2 suítes que dependem de `node:sqlite` permanecem.
 - A tentativa de `npm run build` desta alteração parou em `prisma generate` por `EACCES` no `.env` e `EPERM` ao copiar o runtime para `node_modules/.prisma/client`. Nenhuma migração ou alteração de banco foi executada.
+- A rolagem do histórico foi ajustada para acompanhar a última mensagem ao abrir a conversa ou receber uma nova. Páginas antigas não acionam a rolagem. O lint do componente e o typecheck passaram; `npm test` segue bloqueado por `EACCES` no `.env`.
 - Em 2026-10-10, a nova build completa passou com Node 22 e saída isolada em `.next-crm-chat-20261010-r2` (Build ID `7-H4sEXj78-jjDeR66UIL`). `npm run lint` passou com 0 erros e 1192 warnings; `npm run typecheck` passou. A suíte completa teve 4.427 testes aprovados e as 2 falhas preexistentes em `tests/builder/embed.test.ts` (URL absoluta do happy-dom). Nenhuma release foi ativada.

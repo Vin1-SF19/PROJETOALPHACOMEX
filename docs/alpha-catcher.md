@@ -47,6 +47,23 @@ Catcher, inclusive entre processos locais. Não coordena outros programas
 Logcomex ou hosts. Em crash abrupto, o lock pode permanecer: o operador deve
 verificar que não há worker em execução antes de removê-lo.
 
+### Diagnóstico das APIs
+
+O botão **Verificar APIs** executa uma checagem autenticada somente de leitura no
+worker. Ele valida a configuração da ReceitaWS e da API Radar sem enviar CNPJ,
+consultar fornecedores, gravar dados ou alterar a fila. A ReceitaWS e o Radar
+não têm uma checagem de disponibilidade sem consulta de empresa neste fluxo;
+quando a configuração está presente, o resultado informa que a disponibilidade
+externa não foi confirmada. Uma configuração ausente ou inválida aparece como
+problema. O CLI equivalente é:
+
+```bash
+node --conditions=react-server --import tsx scripts/alpha-catcher-api-health.mts --user-id ID
+```
+
+`ID` é o identificador numérico do usuário autorizado no Painel Alpha. Sem
+`--user-id`, o comando informa apenas a configuração do ambiente local.
+
 ### Dependências da automação
 
 - `LOGCOMEX_AUTOMATION_DIR`: default `../API/automacao-logcomex` relativo ao cwd
@@ -65,14 +82,15 @@ verificar que não há worker em execução antes de removê-lo.
   o pacote original recomenda Node 24.
 
 Requer servidor Node persistente e instância única/sticky para status em memória;
-não é compatível com execução serverless efêmera. O job do painel tem limite
-total padrão de 8 horas (configurável por `ALPHA_CATCHER_JOB_MAX_MINUTES` entre
-30 e 480 minutos) e é encerrado após 30 minutos sem mensagens do worker.
+não é compatível com execução serverless efêmera. A coleta não tem limite total
+de duração e é encerrada após 30 minutos sem mensagens do worker.
 O encerramento usa SIGTERM/SIGKILL. A coleta via CLI externo não passa por esse
 temporizador do painel. Se fechar a página, a coleta pode
 continuar no servidor até concluir/expirar; o enriquecimento ainda depende da
 UI aberta, conforme limites abaixo. Snapshots/resultados permanecem somente
 em memória e expiram na próxima coleta após uma hora.
+Como o estado do job fica em memória, reiniciar ou atualizar o worker interrompe
+uma coleta ativa; só publique mudanças quando não houver coleta em execução.
 
 ### CAPTCHA — abertura externa, confirmação e nova tentativa
 

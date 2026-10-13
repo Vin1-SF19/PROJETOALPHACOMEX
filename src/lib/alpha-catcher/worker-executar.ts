@@ -6,7 +6,12 @@ import { coletaSchema } from './logcomex-input';
 import { iniciarColeta, retomarColeta, lerColetaResposta, cancelarColeta, confirmarCaptcha } from './logcomex-job';
 import { processarEntradaCatcher } from './processar-entrada';
 import type { OperacaoWorkerCatcher } from './worker-client';
+import { diagnosticarApisCatcher } from './diagnostico-apis';
 export async function executarWorkerCatcher(operacao: OperacaoWorkerCatcher, userId: number, dados: unknown) {
+  if (operacao === 'diagnosticar') {
+    if (dados !== null) return NextResponse.json({ error: 'Parâmetros inválidos.' }, { status: 400 });
+    return NextResponse.json(diagnosticarApisCatcher({ workerDisponivel: true }), { headers: { 'Cache-Control': 'no-store' } });
+  }
   if (operacao === 'listar-historico') {
     const cursor = z.number().int().positive().safe().nullable().safeParse(dados);
     if (!cursor.success) return NextResponse.json({ error: 'Página inválida.' }, { status: 400 });

@@ -12,6 +12,8 @@
     "lint": "eslint",
     "typecheck": "NODE_OPTIONS=--max-old-space-size=8192 tsc --noEmit",
     "test": "vitest run --coverage",
+    "rd-alpha:preview": "node --conditions=react-server --import tsx scripts/migrar-rd-alpha.mjs preview",
+    "rd-alpha:apply": "node --conditions=react-server --import tsx scripts/migrar-rd-alpha.mjs apply",
     "smoke:cs-nps-importacao": "node --no-warnings scripts/smoke-cs-nps-zip-streaming.mjs",
     "calendar-alpha:doctor": "tsx scripts/calendar-alpha-doctor.mjs",
     "calendar-alpha:health": "tsx scripts/calendar-alpha-health.mjs",

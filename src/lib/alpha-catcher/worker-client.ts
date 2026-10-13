@@ -1,7 +1,7 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { assinarWorkerCatcher } from './worker-auth';
-export type OperacaoWorkerCatcher = 'iniciar' | 'retomar' | 'ler' | 'cancelar' | 'confirmar_captcha' | 'tentar_captcha' | 'processar' | 'listar-historico' | 'detalhar-historico';
+export type OperacaoWorkerCatcher = 'iniciar' | 'retomar' | 'ler' | 'cancelar' | 'confirmar_captcha' | 'tentar_captcha' | 'processar' | 'listar-historico' | 'detalhar-historico' | 'diagnosticar';
 export async function encaminharWorkerCatcher(operacao: OperacaoWorkerCatcher, userId: number, dados: unknown): Promise<Response | null> {
   // O host nunca encaminha para si próprio. Vercel nunca inicia subprocesso local.
   if (!process.env.VERCEL && process.env.ALPHA_CATCHER_WORKER_HOST === 'true') return null;

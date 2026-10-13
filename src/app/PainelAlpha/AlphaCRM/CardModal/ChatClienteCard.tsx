@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { LoaderCircle, MessageSquare, RefreshCw, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -42,6 +42,17 @@ export function ChatClienteCard({ cardId, clienteNome, podeEnviar }: Props) {
   const [carregandoAntigas, setCarregandoAntigas] = useState(false);
   const [inboxId, setInboxId] = useState("");
   const versaoConversa = useRef(0);
+  const painelMensagens = useRef<HTMLDivElement>(null);
+  const ultimaMensagemExibida = useRef<string | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open || !conversa || !mensagens.length) return;
+    const ultimaId = mensagens[mensagens.length - 1].id;
+    if (ultimaMensagemExibida.current === ultimaId) return;
+    ultimaMensagemExibida.current = ultimaId;
+    const painel = painelMensagens.current;
+    if (painel) painel.scrollTop = painel.scrollHeight;
+  }, [open, conversa, mensagens]);
 
   useEffect(() => {
     if (!open || !conversa || estado !== "ready") return;
@@ -122,6 +133,7 @@ export function ChatClienteCard({ cardId, clienteNome, podeEnviar }: Props) {
 
   async function selecionarConversa(selecionada: ChatbotxConversaPublica) {
     const versao = ++versaoConversa.current;
+    ultimaMensagemExibida.current = null;
     setConversa(selecionada);
     setInboxId(selecionada.contactInboxes[0]?.inboxId ?? "");
     setMensagens([]);
@@ -192,6 +204,7 @@ export function ChatClienteCard({ cardId, clienteNome, podeEnviar }: Props) {
   function fechar(aberto: boolean) {
     if (!aberto) {
       versaoConversa.current += 1;
+      ultimaMensagemExibida.current = null;
       setConversa(null);
       setMensagens([]);
       setErroAtualizacao(null);
@@ -225,11 +238,11 @@ export function ChatClienteCard({ cardId, clienteNome, podeEnviar }: Props) {
           {cursorConversas && <div className="pt-2 text-center"><Button type="button" variant="ghost" size="sm" disabled={carregandoAntigas} onClick={() => void carregarMaisConversas()}>{carregandoAntigas ? "Carregando…" : "Carregar mais conversas"}</Button></div>}
         </div> : <>
           <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
-            <Button type="button" variant="ghost" size="sm" onClick={() => { versaoConversa.current += 1; setConversa(null); setEstado(conversas.length ? "ready" : "empty"); }}>← Conversas</Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => { versaoConversa.current += 1; ultimaMensagemExibida.current = null; setConversa(null); setEstado(conversas.length ? "ready" : "empty"); }}>← Conversas</Button>
             <div className="min-w-0"><p className="truncate text-sm font-semibold">{nomeContato(conversa)}</p><p className="text-xs text-slate-500">Conversa #{conversa.id}</p></div>
           </div>
           {conversa.contactInboxes.length > 1 && <div className="border-b border-white/10 px-4 py-2"><label className="flex items-center gap-2 text-xs text-slate-400">Canal de envio<select aria-label="Canal de envio" value={inboxId} onChange={(event) => setInboxId(event.target.value)} className="min-h-9 flex-1 rounded-md border border-white/10 bg-slate-900 px-2 text-sm text-slate-100">{conversa.contactInboxes.map((canal) => <option key={canal.inboxId} value={canal.inboxId}>Canal {canal.inboxId}</option>)}</select></label></div>}
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4" aria-live="polite">
+          <div ref={painelMensagens} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4" aria-live="polite">
             {cursorAntigo && <div className="text-center"><Button type="button" variant="ghost" size="sm" disabled={carregandoAntigas} onClick={() => void carregarAntigas()}>{carregandoAntigas ? "Carregando…" : "Carregar mensagens anteriores"}</Button></div>}
             {estado === "loading" && <p className="py-8 text-center text-sm text-slate-400">Carregando histórico…</p>}
             {mensagens.map((mensagem) => {

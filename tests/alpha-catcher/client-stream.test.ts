@@ -9,6 +9,31 @@ import CatcherClient from '@/app/PainelAlpha/AlphaCatcher/CatcherClient';
 let root: Root;
 afterEach(async () => { if (root) await act(async () => root.unmount()); vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); document.body.innerHTML = ''; });
 describe('fila durante download da Logcomex', () => {
+  it('exibe diagnóstico sob demanda sem iniciar uma consulta de empresa', async () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const resultado = {
+      verificadoEm: '2026-10-13T20:00:00.000Z',
+      worker: { estado: 'disponivel', mensagem: 'Worker respondeu à verificação autenticada.' },
+      receitaWS: { estado: 'inconclusivo', mensagem: 'Configuração válida; disponibilidade externa não confirmada.' },
+      radar: { estado: 'problema', mensagem: 'Credencial não configurada.' },
+    };
+    const fetcher = vi.fn(async (url: string) => {
+      if (url === '/api/alpha-catcher/historico') return { ok: true, json: async () => ({ importacoes: [], proximoCursor: null }) };
+      if (url === '/api/alpha-catcher/diagnostico') return { ok: true, status: 200, json: async () => resultado };
+      throw new Error(`Requisição inesperada: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetcher);
+    const host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+    await act(async () => root.render(createElement(CatcherClient, { temaInicial: 'blue' })));
+    const botao = [...host.querySelectorAll('button')].find(element => element.textContent?.includes('Verificar APIs'))!;
+    await act(async () => botao.click());
+    expect(fetcher.mock.calls.filter(call => call[0] === '/api/alpha-catcher/diagnostico')).toHaveLength(1);
+    expect(fetcher.mock.calls.some(call => call[0] === '/api/alpha-catcher')).toBe(false);
+    expect(host.textContent).toContain('Worker · Disponível');
+    expect(host.textContent).toContain('ReceitaWS · Não foi possível verificar');
+    expect(host.textContent).toContain('Radar · Com problema');
+  });
+
   it.each([false, true])('consulta durante a coleta, preserva resultados e respeita pausa=%s', async pausar => {
     vi.useFakeTimers();
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

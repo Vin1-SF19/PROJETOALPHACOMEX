@@ -27,6 +27,7 @@ import { PainelCadenciasCard } from "@/components/bpm/cadencias/PainelCadenciasC
 
 import { PainelResumoEtapas } from "./PainelResumoEtapas";
 import PainelHistoricoPipeline from "./PainelHistoricoPipeline";
+import PainelHistoricoRd from "./PainelHistoricoRd";
 import { PainelTarefasPorTipo } from "./PainelTarefasPorTipo";
 import { PainelChecklistsCard } from "./PainelChecklistsCard";
 import { EditorAnotacaoCard } from "./EditorAnotacaoCard";
@@ -243,6 +244,7 @@ export default function PainelHistorico({
         <TabsContent value="etapas" className="min-h-0 flex-1 overflow-y-auto">
           <div className="space-y-3">
             <PainelHistoricoPipeline cardId={card.id} pipelineId={card.pipelineId} pipelineNome={card.pipeline.nome} accent={accent} realtimeRevision={realtimeRevision} onAbrirCard={onAbrirCard} />
+            <PainelHistoricoRd cardId={card.id} accent={accent} podeEditar={podeEditar} />
             <details className="rounded-2xl border border-white/[0.06] p-3">
               <summary className="cursor-pointer text-xs font-semibold text-slate-300">Dados das etapas anteriores</summary>
               <div className="mt-3"><PainelResumoEtapas key={card.etapa.id} card={card} etapas={etapas} accent={accent} ocultarTitulo /></div>

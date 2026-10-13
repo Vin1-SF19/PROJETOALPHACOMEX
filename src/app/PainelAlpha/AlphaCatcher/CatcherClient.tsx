@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Radar, Upload, Play, Pause, Square, RefreshCw, Loader2, Database, X } from 'lucide-react';
+import { ArrowLeft, Radar, Upload, Play, Pause, Square, RefreshCw, Loader2, Database, X, Activity, CircleCheck, CircleAlert, CircleHelp } from 'lucide-react';
 import { Dialog, DialogTrigger, DialogClose, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import RadarBackground from '@/components/ComponentesRadar/RadarBackground';
 import { CardComScan } from '@/components/ComponentesRadar/CardComScan';
@@ -16,6 +16,7 @@ import CalendarioColeta from './CalendarioColeta';
 import HistoricoConsultas from './HistoricoConsultas';
 import { coletaSchema, janelaMeses, dataMaximaColeta } from '@/lib/alpha-catcher/logcomex-input';
 import { detalheHistoricoSchema } from '@/lib/alpha-catcher/historico-tipos';
+import type { DiagnosticoApisCatcher } from '@/lib/alpha-catcher/diagnostico-apis';
 
 type Linha = EmpresaCatcher & Omit<Partial<ResultadoCatcher>, 'estado'> & { estado: ResultadoCatcher['estado'] | 'aguardando' | 'consultando' };
 const btn = 'inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-bold text-slate-200 transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-40';
@@ -55,6 +56,9 @@ export default function CatcherClient({ temaInicial }: { temaInicial: string }) 
   const filaColeta = useRef(criarFilaCatcher<Linha>());
   const [progressoColeta, setProgressoColeta] = useState<ProgressoColeta | null>(null);
   const [pausado, setPausado] = useState(false);
+  const [diagnosticando, setDiagnosticando] = useState(false);
+  const [diagnostico, setDiagnostico] = useState<DiagnosticoApisCatcher | null>(null);
+  const [erroDiagnostico, setErroDiagnostico] = useState('');
   const [status, setStatus] = useState('Importe um JSON para começar.');
   const [tabelaKey, setTabelaKey] = useState(0);
   const controle = useRef({ cancelar: false, pausar: false, executando: false });
@@ -284,6 +288,45 @@ export default function CatcherClient({ temaInicial }: { temaInicial: string }) 
     } finally { setChecandoCaptcha(false); }
   }
 
+  async function verificarApis() {
+    if (diagnosticando) return;
+    setDiagnosticando(true); setErroDiagnostico('');
+    try {
+      const response = await fetch('/api/alpha-catcher/diagnostico', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(30000),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        if (response.status >= 500) {
+          setDiagnostico({
+            verificadoEm: new Date().toISOString(),
+            worker: { estado: 'problema', mensagem: 'O worker não respondeu à verificação autenticada.' },
+            receitaWS: { estado: 'inconclusivo', mensagem: 'Configuração não consultada porque o worker não respondeu.' },
+            radar: { estado: 'inconclusivo', mensagem: 'Configuração não consultada porque o worker não respondeu.' },
+          });
+          return;
+        }
+        setErroDiagnostico(data.error || 'Não foi possível verificar as dependências.');
+        return;
+      }
+      setDiagnostico(data as DiagnosticoApisCatcher);
+    } catch {
+      setErroDiagnostico('Falha de comunicação ao solicitar o diagnóstico.');
+      setDiagnostico({
+        verificadoEm: new Date().toISOString(),
+        worker: { estado: 'inconclusivo', mensagem: 'Não foi possível confirmar a comunicação com o worker.' },
+        receitaWS: { estado: 'inconclusivo', mensagem: 'Configuração não consultada porque o worker não respondeu.' },
+        radar: { estado: 'inconclusivo', mensagem: 'Configuração não consultada porque o worker não respondeu.' },
+      });
+    } finally { setDiagnosticando(false); }
+  }
+
+  function itemDiagnostico(estado: string) {
+    if (estado === 'disponivel') return <CircleCheck size={16} className="text-emerald-300" aria-hidden="true" />;
+    if (estado === 'problema') return <CircleAlert size={16} className="text-rose-300" aria-hidden="true" />;
+    return <CircleHelp size={16} className="text-amber-300" aria-hidden="true" />;
+  }
+
   function exportar() {
     const blob = new Blob([JSON.stringify({ arquivo, ...resumo, resultados: linhas }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -409,7 +452,16 @@ export default function CatcherClient({ temaInicial }: { temaInicial: string }) 
               {ativo && <><button className={btn} onClick={() => { controle.current.pausar = !controle.current.pausar; setPausado(controle.current.pausar); }}><Pause size={16} />{pausado ? 'Retomar' : 'Pausar'}</button>
                 <button className={btn} onClick={() => { controle.current.cancelar = true; setStatus('Interrompendo após a consulta em andamento…'); }}><Square size={16} />Interromper</button></>}
               <button className={btn} disabled={ativo || carregando || coletando || !stats.pendentes} onClick={() => void executar(true)}><RefreshCw size={16} />Tentar pendências</button>
+              <button className={btn} disabled={diagnosticando} onClick={() => void verificarApis()}><Activity size={16} className={diagnosticando ? 'animate-pulse' : ''} />{diagnosticando ? 'Verificando APIs…' : 'Verificar APIs'}</button>
             </div>
+            <p className="text-xs text-slate-400">O diagnóstico não consulta CNPJs nem interfere na fila. A disponibilidade da ReceitaWS e do Radar não pode ser confirmada sem uma consulta real.</p>
+            {erroDiagnostico && <p role="alert" className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-sm text-rose-300">{erroDiagnostico}</p>}
+            {diagnostico && <section aria-label="Resultado do diagnóstico das APIs" className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs">
+              <p className="text-slate-400">Verificado em {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(diagnostico.verificadoEm))}</p>
+              {([['Worker', diagnostico.worker], ['ReceitaWS', diagnostico.receitaWS], ['Radar', diagnostico.radar]] as const).map(([nome, item]) => <div key={nome} className="flex items-start gap-2">
+                {itemDiagnostico(item.estado)}<p><strong className="text-slate-200">{nome} · {item.estado === 'disponivel' ? 'Disponível' : item.estado === 'problema' ? 'Com problema' : 'Não foi possível verificar'}</strong><br /><span className="text-slate-400">{item.mensagem}</span></p>
+              </div>)}
+            </section>}
             <HistoricoConsultas visual={visual} emAndamento={ativo || coletando} aviso={avisoHistorico} onRetomar={id => void importarAutomatico(id)} podeRetomar={!ativo && !coletando && !carregando} />
             <p className="text-xs text-slate-400">ReceitaWS primeiro; Radar após validar o cadastro. Cada CNPJ recebido é verificado no banco e, se novo, consultado enquanto a coleta continua. O limite da ReceitaWS é controlado no servidor conforme o plano. Falhas permanecem pendentes.</p>
           </CardComScan>

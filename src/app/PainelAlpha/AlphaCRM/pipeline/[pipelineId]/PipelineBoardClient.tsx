@@ -109,6 +109,7 @@ export interface CardBpm {
   id: string;
   etapaId: string;
   servico: string | null;
+  origemExterna?: { sourcePipelineName: string; sourceStageName: string; sourceDealName: string } | null;
   status: string;
   origem: "real" | "noloss";
   nolossLeadId: string | null;
@@ -256,6 +257,8 @@ export function KanbanCard({
   const deferidoOperacional = processoOperacionalDeferido(etapaNome, card.encaminhamentos);
   const razaoSocial = card.empresa.razaoSocial;
   const nomeFantasia = card.empresa.nomeFantasia;
+  const etapaOrigemRd = card.origemExterna?.sourceStageName ?? null;
+  const nomeLeadRd = card.origemExterna?.sourceDealName ?? null;
   const cnpjFormatado = formatCNPJ(card.empresa.cnpj);
   const nomeEmpresa = razaoSocial || nomeFantasia || "";
   const nomeFantasiaSecundario = nomeFantasia && nomeFantasia !== nomeEmpresa ? nomeFantasia : null;
@@ -339,6 +342,10 @@ export function KanbanCard({
               <SlaStatusBadge sla={card.sla} />
             </div>
           )}
+          {!ehLeadVirtual && etapaOrigemRd && <div className="flex min-w-0 flex-col items-start gap-1">
+            <span aria-label={`Origem RD Station. Etapa de origem: ${etapaOrigemRd}`} className="inline-flex max-w-full items-center gap-1 self-start rounded-full border border-sky-400/25 bg-sky-400/10 px-2 py-0.5 text-[10px] font-semibold text-sky-200">RD Station · {etapaOrigemRd}</span>
+            {nomeLeadRd && <span title={nomeLeadRd} className="max-w-full truncate text-[10px] text-slate-400">Negócio RD: {nomeLeadRd}</span>}
+          </div>}
           {agendarReuniao && !ehLeadVirtual ? (
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-xs text-slate-300">

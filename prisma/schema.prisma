@@ -147,6 +147,7 @@ model usuarios {
   notaWorkspace           UserNotesWorkspace? @relation("UserNotesWorkspaceUser")
 
   bpmCardsResponsavel          BpmCard[]                     @relation("BpmCardResponsavel")
+  bpmEventosExternosCorrigidos BpmEventoExternoCorrecao[]
   bpmCardMembros               BpmCardMembro[]
   bpmTarefas                   BpmTarefa[]
   bpmCardHistorico             BpmCardHistorico[]
@@ -5204,6 +5205,7 @@ model BpmCard {
 
   vinculosOrigem  BpmCardVinculo[] @relation("CardOrigem")
   vinculosDestino BpmCardVinculo[] @relation("CardDestino")
+  origemExterna   BpmCardOrigemExterna?
 
   nolossLeadOrigem NolossLead[]
 
@@ -5746,6 +5748,87 @@ model BpmCardHistorico {
 
   @@index([cardId])
   @@index([createdAt])
+}
+
+/// Lote auditável de importação de um CRM externo.
+model BpmImportacaoExterna {
+  id             String   @id
+  provider       String
+  fingerprint   String
+  status         String
+  resumoJson     String
+  iniciadoEm     DateTime @default(now())
+  concluidoEm    DateTime?
+  origemCards    BpmCardOrigemExterna[]
+
+  @@unique([provider, fingerprint])
+  @@index([provider, iniciadoEm])
+  @@index([status])
+}
+
+/// Identidade imutável do negócio de origem associado a um card Alpha.
+model BpmCardOrigemExterna {
+  id                 String   @id
+  provider           String
+  sourceDealId       String
+  cardId             String   @unique
+  importacaoId       String
+  sourcePipelineId   String
+  sourcePipelineName String
+  sourceStageId      String
+  sourceStageName    String
+  sourceOwnerId      String?
+  sourceOwnerName    String?
+  sourceDealName     String
+  rawJson            String
+  createdAt          DateTime @default(now())
+
+  card       BpmCard               @relation(fields: [cardId], references: [id], onDelete: Restrict)
+  importacao BpmImportacaoExterna @relation(fields: [importacaoId], references: [id], onDelete: Restrict)
+  eventos    BpmEventoExternoCard[]
+
+  @@unique([provider, sourceDealId])
+  @@index([importacaoId])
+  @@index([provider, sourcePipelineId, sourceStageId])
+}
+
+/// Evento RD preservado em bruto e com projeção corrigível separadamente.
+model BpmEventoExternoCard {
+  id             String   @id
+  origemId       String
+  sourceKey      String
+  sourceEventId  String?
+  eventType      String
+  occurredAt     String?
+  rawJson        String
+  projectedJson  String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  origem     BpmCardOrigemExterna      @relation(fields: [origemId], references: [id], onDelete: Restrict)
+  correcoes  BpmEventoExternoCorrecao[]
+
+  @@unique([origemId, sourceKey])
+  @@index([origemId, occurredAt])
+  @@index([eventType])
+}
+
+/// Correção append-only da projeção, sem sobrescrever o payload de origem.
+model BpmEventoExternoCorrecao {
+  id                  String   @id
+  eventoId            String
+  versao              Int
+  camposAlteradosJson String
+  projecaoAnteriorJson String
+  projecaoNovaJson    String
+  autorId             Int?
+  createdAt           DateTime @default(now())
+
+  evento BpmEventoExternoCard @relation(fields: [eventoId], references: [id], onDelete: Restrict)
+  autor  usuarios?            @relation(fields: [autorId], references: [id], onDelete: Restrict)
+
+  @@unique([eventoId, versao])
+  @@index([autorId, createdAt])
 }
 
 model BpmPipelineConfigAuditoria {

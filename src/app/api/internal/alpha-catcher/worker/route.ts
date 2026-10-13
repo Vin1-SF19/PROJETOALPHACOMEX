@@ -6,7 +6,7 @@ import { executarWorkerCatcher } from '@/lib/alpha-catcher/worker-executar';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 180;
-const entrada = z.object({ operacao: z.enum(['iniciar', 'retomar', 'ler', 'cancelar', 'confirmar_captcha', 'tentar_captcha', 'processar', 'listar-historico', 'detalhar-historico']), userId: z.number().int().positive().safe(), dados: z.unknown() }).strict();
+const entrada = z.object({ operacao: z.enum(['iniciar', 'retomar', 'ler', 'cancelar', 'confirmar_captcha', 'tentar_captcha', 'processar', 'listar-historico', 'detalhar-historico', 'diagnosticar']), userId: z.number().int().positive().safe(), dados: z.unknown() }).strict();
 export async function POST(req: Request) {
   if (process.env.VERCEL || process.env.ALPHA_CATCHER_WORKER_HOST !== 'true') return NextResponse.json({ error: 'Não encontrado.' }, { status: 404 });
   if (!req.headers.get('content-type')?.startsWith('application/json')) return NextResponse.json({ error: 'Envie JSON.' }, { status: 415 });

@@ -215,6 +215,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
         id: true,
         etapaId: true,
         servico: true,
+        origemExterna: { select: { sourcePipelineName: true, sourceStageName: true, sourceDealName: true } },
         status: true,
         createdAt: true,
         primeiraVisualizacaoEm: true,

@@ -13,7 +13,7 @@ beforeEach(() => {
   mocks.iniciarHistorico.mockResolvedValue(undefined); mocks.diagnostico.mockResolvedValue(undefined); mocks.terminarHistorico.mockResolvedValue(undefined); mocks.temErro.mockReturnValue(false);
   mocks.spawn.mockReturnValue(worker); mocks.mkdir.mockResolvedValue(undefined); mocks.rm.mockResolvedValue(undefined);
 });
-afterEach(async () => { worker.emit('close'); await Promise.resolve(); await Promise.resolve(); vi.clearAllTimers(); vi.useRealTimers(); });
+afterEach(async () => { worker.emit('close'); await Promise.resolve(); await Promise.resolve(); vi.clearAllTimers(); vi.unstubAllEnvs(); vi.useRealTimers(); });
 describe('worker Shipment Intel', () => {
   it('envia só data/limite por IPC e restringe leitura ao dono', async () => {
     const job = await iniciarColeta(42, input);
@@ -42,16 +42,21 @@ describe('worker Shipment Intel', () => {
     expect(lerColeta(job.id, 42)?.estado).toBe('concluido');
     expect(lerColeta(job.id, 42)?.empresas?.duplicados).toBe(10000);
   });
-  it('mantém a coleta além de 30 minutos e encerra no limite absoluto configurado', async () => {
+  it('permite coleta acima de 8 horas enquanto o worker continua ativo', async () => {
+    vi.stubEnv('ALPHA_CATCHER_JOB_MAX_MINUTES', '30');
     const job = await iniciarColeta(42, input);
-    for (let i = 0; i < 23; i++) {
+    for (let i = 0; i < 26; i++) {
       await vi.advanceTimersByTimeAsync(20 * 60000);
       worker.emit('message', { type: 'etapa', etapa: 'coleta' });
-      if (i === 1) expect(lerColeta(job.id, 42)?.estado).toBe('executando');
     }
-    await vi.advanceTimersByTimeAsync(20 * 60000);
+    expect(lerColeta(job.id, 42)?.estado).toBe('executando');
+    expect(lerColeta(job.id, 42)?.mensagem).toBeUndefined();
+  });
+  it('encerra por inatividade após 30 minutos sem mensagens do worker', async () => {
+    const job = await iniciarColeta(42, input);
+    await vi.advanceTimersByTimeAsync(30 * 60000);
     expect(lerColeta(job.id, 42)?.estado).toBe('erro');
-    expect(lerColeta(job.id, 42)?.mensagem).toContain('8 horas');
+    expect(lerColeta(job.id, 42)?.mensagem).toContain('30 minutos sem progresso');
   });
   it('não retransmite campos secretos da coleta', async () => {
     const job = await iniciarColeta(42, input);
