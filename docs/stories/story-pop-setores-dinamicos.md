@@ -22,8 +22,10 @@ quality_gate_tools: ["lint", "typecheck", "tests"]
 2. Um setor recém-criado e ativo em Gestão de Equipe passa a aparecer no POP aberto assim que a criação é concluída, sem alteração de código ou lista hardcoded; setores inativos ou removidos deixam de ser oferecidos como setores disponíveis.
 3. A exibição e o acesso a cada setor continuam respeitando as permissões atuais do POP: usuários comuns veem somente o próprio setor, `Diretrizes` e setores extras concedidos; administradores mantêm o acesso amplo atual. A lista dinâmica não concede acesso por si só.
 4. O carregamento dos setores integra a resposta consumida por `DocsAlphaClient` e o cabeçalho `PopHeader`, preservando a seleção e filtragem de documentos por setor.
-5. Não há alteração de schema, migration, seed, backfill ou mutação de dados nesta story.
-6. Testes cobrem a inclusão dinâmica de setor ativo, a exclusão de setor inativo e a preservação das regras de acesso existentes.
+5. O Gerenciamento de Acessos do POP também lista setores ativos dinamicamente e permite conceder/revogar acesso a setores novos sem alterar uma lista no código.
+6. Quando um novo setor é criado, a matriz de acessos aberta atualiza as colunas disponíveis sem apagar alterações locais pendentes.
+7. Não há alteração de schema, migration, seed, backfill ou mutação de dados nesta story.
+8. Testes cobrem a inclusão dinâmica de setor ativo, a exclusão de setor inativo e a preservação das regras de acesso existentes.
 
 ## Tasks / Subtasks
 
@@ -31,6 +33,7 @@ quality_gate_tools: ["lint", "typecheck", "tests"]
 - [x] Atualizar o tipo de retorno dos acessos POP para incluir os setores disponíveis e conectar esse dado em `DocsAlphaClient` e `PopHeader` (AC: 1, 4).
 - [x] Manter a filtragem/autorização atual separada da lista de opções; novos setores não ampliam permissões automaticamente (AC: 3).
 - [x] Notificar módulos abertos quando um setor for criado ou excluído e atualizar os dados do POP sem recarregar a página (AC: 2).
+- [x] Usar a lista dinâmica de setores na matriz de Gerenciamento de Acessos do POP, preservando o estado de edição ao atualizar seu catálogo (AC: 5, 6).
 - [ ] Adicionar testes para setores dinâmicos, status ativo e permissões preservadas (AC: 6).
 - [x] Atualizar checklist e File List desta story com os arquivos efetivamente alterados.
 
@@ -75,6 +78,7 @@ quality_gate_tools: ["lint", "typecheck", "tests"]
 - `src/actions/PopAcessos.ts`
 - `src/app/PainelAlpha/DocsAlpha/_types/index.ts`
 - `src/components/GestaoSetores/GestaoSetoresClient.tsx`
+- `src/components/pop/ModalGerenciamentoAcessos.tsx`
 - `src/lib/gestao-setores-sync.ts`
 - `docs/stories/story-pop-setores-dinamicos.md`
 

@@ -11,17 +11,8 @@ import {
   type AcessoPayload,
 } from "@/actions/PopAcessos";
 import { SETOR_GERAL } from "@/lib/pop-acessos";
-
-const SETORES_EXTRAS = [
-  "T.I",
-  "OPERACIONAL",
-  "COMERCIAL",
-  "RECURSOS HUMANOS",
-  "FINANCEIRO",
-  "JURÍDICO",
-  "PARCEIRO",
-  "SERVIÇOS GERAIS",
-];
+import { isSameRole } from "@/lib/roles";
+import { assinarAtualizacaoSetores } from "@/lib/gestao-setores-sync";
 
 interface Props {
   onClose: () => void;
@@ -32,6 +23,7 @@ type AcessosGeraisLocais = Record<number, { podeUpload: boolean; podeGerenciar: 
 
 export default function ModalGerenciamentoAcessos({ onClose }: Props) {
   const [usuarios, setUsuarios] = useState<UsuarioMatriz[]>([]);
+  const [setoresExtras, setSetoresExtras] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [busca, setBusca] = useState("");
@@ -46,6 +38,7 @@ export default function ModalGerenciamentoAcessos({ onClose }: Props) {
       const res = await getMatrizAcessos();
       if (res.success && res.data) {
         setUsuarios(res.data);
+        setSetoresExtras(res.setoresDisponiveis ?? []);
         const inicial: AcessosLocais = {};
         const iniciaisGerais: AcessosGeraisLocais = {};
         for (const u of res.data) {
@@ -63,16 +56,24 @@ export default function ModalGerenciamentoAcessos({ onClose }: Props) {
     }
   }, []);
 
+  const atualizarSetores = useCallback(async () => {
+    const res = await getMatrizAcessos();
+    if (res.success) setSetoresExtras(res.setoresDisponiveis ?? []);
+  }, []);
+
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void carregar(); }, [carregar]);
 
+  useEffect(() => assinarAtualizacaoSetores(() => { void atualizarSetores(); }), [atualizarSetores]);
+
   const toggleAcesso = (usuarioId: number, setor: string, setorProprio: string) => {
-    if (setor.toUpperCase().trim() === setorProprio.toUpperCase().trim()) return;
+    if (isSameRole(setor, setorProprio)) return;
 
     setAcessosLocais((prev) => {
       const novo = new Set(prev[usuarioId] ?? []);
-      if (novo.has(setor)) {
-        novo.delete(setor);
+      const existente = [...novo].find((acesso) => isSameRole(acesso, setor));
+      if (existente) {
+        novo.delete(existente);
       } else {
         novo.add(setor);
       }
@@ -106,9 +107,9 @@ export default function ModalGerenciamentoAcessos({ onClose }: Props) {
         const setorProprio = u.setorProprio.toUpperCase().trim();
         const acessosDessesUsuario = acessosLocais[userId] ?? new Set<string>();
 
-        for (const setor of SETORES_EXTRAS) {
-          if (setor.toUpperCase().trim() === setorProprio) continue;
-          if (acessosDessesUsuario.has(setor)) {
+        for (const setor of setoresExtras) {
+          if (isSameRole(setor, setorProprio)) continue;
+          if ([...acessosDessesUsuario].some((acesso) => isSameRole(acesso, setor))) {
             payloadFinal.push({ usuarioId: userId, setor, podeVer: true, podeUpload: false, podeGerenciar: false });
           }
         }
@@ -238,7 +239,7 @@ export default function ModalGerenciamentoAcessos({ onClose }: Props) {
                     <th className="text-center px-3 py-3 text-[9px] font-black uppercase tracking-widest text-slate-500">
                       Próprio
                     </th>
-                    {SETORES_EXTRAS.map((s) => (
+                    {setoresExtras.map((s) => (
                       <th key={s} className="text-center px-3 py-3 text-[9px] font-black uppercase tracking-widest text-slate-500 whitespace-nowrap">
                         {s.split(" ")[0]}
                       </th>
@@ -279,10 +280,10 @@ export default function ModalGerenciamentoAcessos({ onClose }: Props) {
                           </div>
                         </td>
                         {/* Acessos extras */}
-                        {SETORES_EXTRAS.map((setor) => {
+                        {setoresExtras.map((setor) => {
                           const setorProprio = u.setorProprio;
-                          const ehProprio = setor.toUpperCase().trim() === setorProprio.toUpperCase().trim();
-                          const ativo = ehProprio || (acessosLocais[u.id]?.has(setor) ?? false);
+                          const ehProprio = isSameRole(setor, setorProprio);
+                          const ativo = ehProprio || [...(acessosLocais[u.id] ?? [])].some((acesso) => isSameRole(acesso, setor));
 
                           return (
                             <td key={setor} className="text-center px-3 py-3">

@@ -118,23 +118,30 @@ export type UsuarioMatriz = {
   podeGerenciarGeral: boolean;
 };
 
-export async function getMatrizAcessos(): Promise<{ success: boolean; data?: UsuarioMatriz[]; error?: string }> {
+export async function getMatrizAcessos(): Promise<{ success: boolean; data?: UsuarioMatriz[]; setoresDisponiveis?: string[]; error?: string }> {
   const session = await auth();
   const user = sessionUser(session);
   if (!user?.id || !ehAdmin(user.role)) {
     return { success: false, error: "Acesso restrito a administradores" };
   }
 
-  const usuarios = await db.usuarios.findMany({
-    where: { status: "ATIVO" },
-    select: {
-      id: true,
-      nome: true,
-      role: true,
-      popAcessos: { select: { setor: true, podeVer: true, podeUpload: true, podeGerenciar: true } },
-    },
-    orderBy: { nome: "asc" },
-  });
+  const [usuarios, setores] = await Promise.all([
+    db.usuarios.findMany({
+      where: { status: "ATIVO" },
+      select: {
+        id: true,
+        nome: true,
+        role: true,
+        popAcessos: { select: { setor: true, podeVer: true, podeUpload: true, podeGerenciar: true } },
+      },
+      orderBy: { nome: "asc" },
+    }),
+    db.setor.findMany({
+      where: { ativo: true },
+      orderBy: [{ protegido: "desc" }, { nome: "asc" }],
+      select: { nome: true },
+    }),
+  ]);
 
   const data: UsuarioMatriz[] = usuarios.map((u) => {
     const linhaGeral = u.popAcessos.find((a) => a.setor === SETOR_GERAL);
@@ -149,7 +156,11 @@ export async function getMatrizAcessos(): Promise<{ success: boolean; data?: Usu
     };
   });
 
-  return { success: true, data };
+  const setoresDisponiveis = setores
+    .map(({ nome }) => nome)
+    .filter((nome) => !["ADMIN", "CEO"].includes(normalizeRole(nome)));
+
+  return { success: true, data, setoresDisponiveis };
 }
 
 // ─── salvarAcessos ─────────────────────────────────────────────────────────────
