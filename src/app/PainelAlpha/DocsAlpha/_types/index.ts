@@ -14,6 +14,7 @@ export interface Documento {
 
 export interface AcessosPop {
   setoresAcessiveis: string[]
+  setoresDisponiveis: string[]
   podeUpload: boolean
   podeGerenciar: boolean
   ehAdminUser: boolean

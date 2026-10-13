@@ -13,6 +13,7 @@ import {
   criarCargo,
   excluirCargo,
 } from "@/actions/gestaoSetores";
+import { notificarAtualizacaoSetores } from "@/lib/gestao-setores-sync";
 
 type Setor = {
   id: number;
@@ -51,6 +52,7 @@ export default function GestaoSetoresClient({
       if (res.success) {
         toast.success(res.message);
         setNovoSetor("");
+        notificarAtualizacaoSetores();
         router.refresh();
       } else {
         toast.error(res.message);
@@ -63,6 +65,7 @@ export default function GestaoSetoresClient({
       const res = await excluirSetor(id);
       if (res.success) {
         toast.success(res.message);
+        notificarAtualizacaoSetores();
         router.refresh();
       } else {
         toast.error(res.message);

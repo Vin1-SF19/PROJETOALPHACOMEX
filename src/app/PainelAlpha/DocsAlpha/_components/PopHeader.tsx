@@ -5,11 +5,6 @@ import Link from 'next/link'
 import type { AcessosPop } from '../_types'
 import { isSameRole } from '@/lib/roles'
 
-const SETORES = [
-  "Diretrizes", "T.I", "OPERACIONAL", "COMERCIAL",
-  "RECURSOS HUMANOS", "FINANCEIRO", "JURÍDICO", "PARCEIRO", "SERVIÇOS GERAIS",
-]
-
 interface Props {
   roleUser: string
   setorAtivo: string
@@ -37,11 +32,7 @@ export function PopHeader({ roleUser, setorAtivo, acessosPop, onSetorChange, onA
       </div>
 
       <div className="flex flex-wrap justify-center gap-4 lg:gap-6">
-        {SETORES.map(s => {
-          const podeVer =
-            acessosPop.setoresAcessiveis.includes("*") ||
-            acessosPop.setoresAcessiveis.some(sv => isSameRole(sv, s))
-          if (!podeVer) return null
+        {acessosPop.setoresDisponiveis.map(s => {
           return (
             <button
               key={s}

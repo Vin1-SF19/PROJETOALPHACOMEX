@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { Lock, ShieldAlert, Globe, Folder, FileText, Video, ChevronRight, PlayCircle, BookCheck, CheckCircle2 } from 'lucide-react'
@@ -18,6 +18,7 @@ import { PopModalConfigurarPasta } from './_components/PopModalConfigurarPasta'
 import { PopModalConfirmarLeitura } from './_components/PopModalConfirmarLeitura'
 import { EmptyStateDoc } from './_components/EmptyStateDoc'
 import { isSameRole } from '@/lib/roles'
+import { assinarAtualizacaoSetores } from '@/lib/gestao-setores-sync'
 
 interface Props {
   documentosIniciais: Documento[]
@@ -42,6 +43,7 @@ export default function DocsAlphaClient({ documentosIniciais, documentosConfirma
   )
   const [acessosPop, setAcessosPop] = useState<AcessosPop>({
     setoresAcessiveis: [],
+    setoresDisponiveis: [],
     podeUpload: false,
     podeGerenciar: false,
     ehAdminUser: false,
@@ -50,19 +52,25 @@ export default function DocsAlphaClient({ documentosIniciais, documentosConfirma
   const roleUser = (session?.user?.role as string | undefined)?.toUpperCase().trim() ?? "USER"
   const userName = (session?.user?.nome as string | undefined) ?? "ALPHA"
 
-  useEffect(() => {
-    if (status !== "authenticated") return
-    getAcessosDoUsuario().then((res) => {
+  const atualizarAcessosPop = useCallback(() => {
+    void getAcessosDoUsuario().then((res) => {
       if (res.success) {
         setAcessosPop({
           setoresAcessiveis: res.setoresAcessiveis,
+          setoresDisponiveis: res.setoresDisponiveis,
           podeUpload: res.podeUpload,
           podeGerenciar: res.podeGerenciar,
           ehAdminUser: res.ehAdminUser,
         })
       }
     })
-  }, [status])
+  }, [])
+
+  useEffect(() => {
+    if (status !== "authenticated") return
+    atualizarAcessosPop()
+    return assinarAtualizacaoSetores(atualizarAcessosPop)
+  }, [status, atualizarAcessosPop])
 
   const documentosAgrupados = useMemo(() => {
     const filtrados = documentos.filter(d => {

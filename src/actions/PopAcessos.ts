@@ -49,6 +49,7 @@ async function getSetoresAcessiveis(userId: number): Promise<string[]> {
 export async function getAcessosDoUsuario(): Promise<{
   success: boolean;
   setoresAcessiveis: string[];
+  setoresDisponiveis: string[];
   podeUpload: boolean;
   podeGerenciar: boolean;
   ehAdminUser: boolean;
@@ -58,15 +59,30 @@ export async function getAcessosDoUsuario(): Promise<{
   const user = sessionUser(session);
 
   if (!user?.id) {
-    return { success: false, setoresAcessiveis: [], podeUpload: false, podeGerenciar: false, ehAdminUser: false, error: "Não autorizado" };
+    return { success: false, setoresAcessiveis: [], setoresDisponiveis: [], podeUpload: false, podeGerenciar: false, ehAdminUser: false, error: "Não autorizado" };
   }
 
   const userId = Number(user.id);
   const isAdminUser = ehAdmin(user.role);
-  const setoresAcessiveis = await getSetoresAcessiveis(userId);
+  const [setoresAcessiveis, setoresCadastrados] = await Promise.all([
+    getSetoresAcessiveis(userId),
+    db.setor.findMany({
+      where: { ativo: true },
+      orderBy: [{ protegido: "desc" }, { nome: "asc" }],
+      select: { nome: true },
+    }),
+  ]);
+  const setoresDisponiveis = [
+    "Diretrizes",
+    ...setoresCadastrados
+      .map(({ nome }) => nome)
+      .filter((setor) =>
+        setoresAcessiveis.includes("*") || setoresAcessiveis.some((acesso) => isSameRole(acesso, setor)),
+      ),
+  ];
 
   if (isAdminUser) {
-    return { success: true, setoresAcessiveis, podeUpload: true, podeGerenciar: true, ehAdminUser: true };
+    return { success: true, setoresAcessiveis, setoresDisponiveis, podeUpload: true, podeGerenciar: true, ehAdminUser: true };
   }
 
   const [acessos, usuarioDB] = await Promise.all([
@@ -84,7 +100,7 @@ export async function getAcessosDoUsuario(): Promise<{
   const podeUpload = acessos.some((a) => a.podeUpload) || permissoes.includes("UpDocumentos");
   const podeGerenciar = acessos.some((a) => a.podeGerenciar) || permissoes.includes("Historico");
 
-  return { success: true, setoresAcessiveis, podeUpload, podeGerenciar, ehAdminUser: false };
+  return { success: true, setoresAcessiveis, setoresDisponiveis, podeUpload, podeGerenciar, ehAdminUser: false };
 }
 
 // ─── getMatrizAcessos ──────────────────────────────────────────────────────────
