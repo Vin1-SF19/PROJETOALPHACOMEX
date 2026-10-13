@@ -122,6 +122,10 @@ quality_gate_tools: ["lint", "typecheck", "test", "build", "coderabbit"]
   - [x] Adicionar fixture inline sanitizada que cubra crédito, débito, descrição multilinha, valor quebrado e `SALDO DIA`.
   - [x] Validar resultado completo, autodetecção inequívoca e ausência de alteração no fallback de textos desconhecidos.
   - [x] Executar o parser contra o PDF local e conferir quantidade, primeira/última movimentação e reconciliação financeira sem registrar dados sensíveis.
+- [x] Task 9 — Processar todas as seções de movimentação do consolidado Santander com múltiplas contas
+  - [x] Reproduzir em fixture sanitizada o caso em que a primeira seção está sem lançamentos e as seguintes contêm movimentações.
+  - [x] Ajustar o parser Santander para percorrer todas as seções de conta corrente e remover números de conta das descrições.
+  - [x] Validar a regressão automatizada e o PDF local de 26 páginas sem enviar as páginas ao fallback por agente.
 
 ## Dev Notes
 
@@ -197,6 +201,8 @@ GPT-5 Codex
 - `npm run build` — bloqueado no `prisma generate` por `EPERM` no DLL local em uso; `npx next build` passou completamente.
 - CodeRabbit — indisponível porque o WSL não está instalado nesta máquina.
 - `npx vitest run tests/extratos/parsers-extratos-reais.test.ts` — 5 testes passaram após incluir a regressão sanitizada da CAIXA.
+- `npx vitest run tests/extratos/parsers-extratos-reais.test.ts` — 6 testes passaram, incluindo a regressão de múltiplas seções Santander.
+- Validação local do PDF `extrato SANTANDER junho.pdf` — 26 páginas, autodetecção Santander e 722 transações pelo parser determinístico; o fallback por agente deixa de ser acionado para esta amostra.
 - `npx vitest run tests/extratos` — 6 arquivos e 27 testes passaram.
 - Lint direcionado de `caixa.ts`, `index.ts` e do teste alterado — passou sem erros ou warnings.
 - Validação ponta a ponta com o PDF CAIXA fornecido — 6 páginas, autodetecção `caixa`, 99 transações, zero páginas com erro e reconciliação exata entre movimentações e saldos; o arquivo real não foi modificado nem versionado.
@@ -213,6 +219,7 @@ GPT-5 Codex
 - A CAIXA agora é resolvida localmente antes do Onyx: o layout fornecido deixa de depender da resposta JSON do agente e não produz mais as seis páginas com erro.
 - O parser da CAIXA recompõe históricos/valores quebrados, usa o valor anterior a `R$` como movimentação, preserva débitos e remove `SALDO DIA`.
 - O fallback por agentes permanece inalterado para layouts que não correspondem às assinaturas determinísticas conhecidas.
+- O parser Santander agora percorre cada bloco `Conta Corrente / Movimentação` do extrato consolidado; antes, limitava-se ao primeiro bloco, que neste PDF estava vazio, e fazia o fluxo encaminhar as 26 páginas ao agente. A amostra real foi reconhecida como Santander e retornou 722 transações.
 
 ### File List
 

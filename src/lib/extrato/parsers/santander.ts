@@ -15,13 +15,16 @@ function obterAnoDoExtrato(texto: string): string | null {
   return texto.match(new RegExp(`\\b(?:${MESES})\\s*\\/\\s*(\\d{4})`, "i"))?.[1] ?? null;
 }
 
-function recortarMovimentacaoContaCorrente(texto: string): string {
-  const inicio = texto.search(/Conta\s+Corrente\s*\n\s*Movimenta[cç][aã]o/i);
-  if (inicio === -1) return "";
+function recortarMovimentacoesContaCorrente(texto: string): string[] {
+  const cabecalho = /Conta\s+Corrente\s*\n\s*Movimenta[cç][aã]o/gi;
+  const inicios = [...texto.matchAll(cabecalho)].map((match) => match.index ?? -1).filter((i) => i >= 0);
 
-  const trecho = texto.slice(inicio);
-  const fim = trecho.search(/\n\s*Saldos\s+por\s+Per[ií]odo\b/i);
-  return fim === -1 ? trecho : trecho.slice(0, fim);
+  return inicios.map((inicio, indice) => {
+    const proximoInicio = inicios[indice + 1] ?? texto.length;
+    const trecho = texto.slice(inicio, proximoInicio);
+    const fim = trecho.search(/\n\s*Saldos\s+por\s+Per[ií]odo\b/i);
+    return fim === -1 ? trecho : trecho.slice(0, fim);
+  });
 }
 
 function deveIgnorarLinhaSantander(linha: string): boolean {
@@ -40,6 +43,7 @@ function deveIgnorarLinhaSantander(linha: string): boolean {
 function limparDescricaoSantander(texto: string): string {
   return limparDescricao(
     texto
+      .replace(/\b\d{4}\.\d{2}\.\d{6}-\d\b/g, "")
       .replace(/\b\d{5,14}\b/g, "")
       .replace(/(?:^|\s)-\s*$/g, ""),
   );
@@ -51,15 +55,19 @@ function limparDescricaoSantander(texto: string): string {
  * Neste layout a data aparece somente na primeira movimentação do dia, os
  * débitos são marcados por um hífen depois do valor ("1.000,00-") e a página
  * contém outros quadros com valores que não pertencem à conta corrente. O
- * parser limita-se à seção "Conta Corrente / Movimentação", herda a última
- * data explícita e recompõe descrições quebradas antes de ler o primeiro valor
- * monetário da linha lógica como valor da movimentação.
+ * parser limita-se às seções "Conta Corrente / Movimentação", herda a última
+ * data explícita dentro de cada seção e recompõe descrições quebradas antes de
+ * ler o primeiro valor monetário da linha lógica como valor da movimentação.
  */
 function parseDocumento(texto: string): TransacaoNormalizada[] {
   const ano = obterAnoDoExtrato(texto);
-  const movimentacao = recortarMovimentacaoContaCorrente(texto);
-  if (!ano || !movimentacao) return [];
+  const movimentacoes = recortarMovimentacoesContaCorrente(texto);
+  if (!ano || movimentacoes.length === 0) return [];
 
+  return movimentacoes.flatMap((movimentacao) => parseMovimentacao(movimentacao, ano));
+}
+
+function parseMovimentacao(movimentacao: string, ano: string): TransacaoNormalizada[] {
   const transacoes: TransacaoNormalizada[] = [];
   const linhas = movimentacao.split("\n").map((linha) => linha.trim()).filter(Boolean);
   let dataAtual: string | null = null;

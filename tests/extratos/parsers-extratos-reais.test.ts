@@ -47,6 +47,36 @@ Comprovantes de Pagamento
 03/06 INTERNET BANKING PIX FORNECEDOR EXEMPLO 99999999 0000 0000000000000 120,00
 `;
 
+const SANTANDER_MULTIPLAS_CONTAS = `
+EXTRATO CONSOLIDADO INTELIGENTE
+junho/2026
+Conta Corrente
+Movimentação
+Data Descrição Nº Documento Movimentos (R$) Saldo (R$)
+Créditos Débitos
+SALDO EM 31/05 0,50
+SALDO EM 30/06 0,50
+Saldos por Período
+Conta Corrente
+Movimentação
+Data Descrição Nº Documento Movimentos (R$) Saldo (R$)
+Créditos Débitos
+SALDO EM 31/05 26.460,92-
+01/06 TRANSFERENCIA ENTRE CONTAS
+DE: 2025.13.001869-9
+463802 10,00
+TRANSF VALOR P/ CONTA DIF TITULAR
+PARA: 2025.13.001869-9
+491926 10,00-
+Saldos por Período
+Conta Corrente
+Movimentação
+Data Descrição Nº Documento Movimentos (R$) Saldo (R$)
+Créditos Débitos
+02/06 PIX RECEBIDO CLIENTE - 1.250,00
+Saldos por Período
+`;
+
 const ITAU_MENSAL = `
 extrato mensal ag 0000 cc 00000-0 jul 2026 001|004
 Conta Corrente | Movimentação A = agendamento data descrição entradas R$ saídas R$ saldo R$
@@ -136,6 +166,14 @@ describe("parsers de extratos validados contra PDFs reais", () => {
         descricao: "TARIFA MENSALIDADE PACOTE SERVICOS MAIO / 2026",
         valor: -10,
       },
+    ]);
+  });
+
+  it("processa todas as seções de movimentação no consolidado Santander", () => {
+    expect(obterParser("santander").parse(SANTANDER_MULTIPLAS_CONTAS)).toEqual([
+      { data: "01/06/2026", descricao: "TRANSFERENCIA ENTRE CONTAS DE:", valor: 10 },
+      { data: "01/06/2026", descricao: "TRANSF VALOR P/ CONTA DIF TITULAR PARA:", valor: -10 },
+      { data: "02/06/2026", descricao: "PIX RECEBIDO CLIENTE", valor: 1250 },
     ]);
   });
 
