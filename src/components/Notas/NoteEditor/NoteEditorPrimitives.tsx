@@ -2,7 +2,7 @@
 
 import "./note-editor.css";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -22,6 +22,7 @@ import Mention from "@tiptap/extension-mention";
 import {
   Bold,
   Code,
+  Palette,
   Heading1,
   Heading2,
   Highlighter,
@@ -43,6 +44,40 @@ import { mentionSuggestion } from "@/components/Notas/NoteEditor/mention-suggest
 import { SlashCommand } from "@/components/Notas/NoteEditor/slash-command";
 import { TableEditPanel } from "@/components/Notas/NoteEditor/TableEditPanel";
 import { TableSizePicker } from "@/components/Notas/NoteEditor/TableSizePicker";
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
+const CORES_TEXTO = ["#ffffff", "#f59e0b", "#f43f5e", "#8b5cf6", "#06b6d4", "#10b981", "#3b82f6", "#ec4899", "#84cc16"];
+
+function SeletorCorTexto({ editor, ponto }: { editor: Editor; ponto?: { x: number; y: number } }) {
+  const [open, setOpen] = useState(Boolean(ponto));
+  const paleta = (
+    <PopoverContent align="start" className="w-52 border-white/10 bg-[#0b1120] p-3" onOpenAutoFocus={(event) => event.preventDefault()}>
+      <p className="mb-2 text-[10px] uppercase tracking-wide text-slate-500">Cor do texto</p>
+      <div className="flex flex-wrap gap-2">
+        {CORES_TEXTO.map((cor) => (
+          <button key={cor} type="button" title={cor} aria-label={`Aplicar cor ${cor}`} onMouseDown={(event) => event.preventDefault()} onClick={() => { editor.chain().focus().setColor(cor).run(); setOpen(false); }} style={{ backgroundColor: cor }} className="h-7 w-7 rounded-full border border-white/20 hover:ring-2 hover:ring-white/60" />
+        ))}
+        <button type="button" title="Cor padrão" aria-label="Remover cor do texto" onMouseDown={(event) => event.preventDefault()} onClick={() => { editor.chain().focus().unsetColor().run(); setOpen(false); }} className="h-7 rounded-full border border-white/15 px-2 text-[10px] text-slate-300 hover:bg-white/10">Padrão</button>
+      </div>
+    </PopoverContent>
+  );
+
+  if (ponto) return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverAnchor asChild><span aria-hidden="true" className="pointer-events-none fixed h-px w-px" style={{ left: ponto.x, top: ponto.y }} /></PopoverAnchor>
+      {paleta}
+    </Popover>
+  );
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button type="button" title="Cor do texto" aria-label="Cor do texto" onMouseDown={(event) => event.preventDefault()} className="flex h-7 items-center justify-center rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-white/5 hover:text-white"><Palette size={15} /></button>
+      </PopoverTrigger>
+      {paleta}
+    </Popover>
+  );
+}
 
 export function criarExtensoesEditorNote(placeholder: string) {
   return [
@@ -121,6 +156,7 @@ export function NoteEditorToolbar({ editor, status }: { editor: Editor; status?:
         <ToolbarButton title="Destaque" ativo={editor.isActive("highlight")} onClick={() => editor.chain().focus().toggleHighlight().run()}>
           <Highlighter size={15} />
         </ToolbarButton>
+        <DockItem><SeletorCorTexto editor={editor} /></DockItem>
         <ToolbarButton title="Lista" ativo={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()}>
           <List size={15} />
         </ToolbarButton>
@@ -163,9 +199,15 @@ export function NoteEditorToolbar({ editor, status }: { editor: Editor; status?:
 }
 
 export function NoteEditorContent({ editor, className }: { editor: Editor; className?: string }) {
+  const [pontoContexto, setPontoContexto] = useState<{ x: number; y: number; id: number } | undefined>();
   return (
-    <div className={cn("min-w-0 flex-1 overflow-y-auto", className)}>
+    <div className={cn("relative min-w-0 flex-1 overflow-y-auto", className)} onContextMenu={(event) => {
+      if (editor.state.selection.empty || !editor.isEditable) return;
+      event.preventDefault();
+      setPontoContexto({ x: event.clientX, y: event.clientY, id: Date.now() });
+    }}>
       <EditorContent editor={editor} />
+      {pontoContexto && <div key={pontoContexto.id} className="fixed z-40" style={{ left: pontoContexto.x, top: pontoContexto.y }}><SeletorCorTexto editor={editor} ponto={pontoContexto} /></div>}
     </div>
   );
 }
