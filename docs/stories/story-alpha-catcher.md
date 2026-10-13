@@ -546,6 +546,22 @@ docs/alpha-catcher.md.
 Smoke do candidato: login HTTP200, histórico sem sessão HTTP401 e processamento
 sem sessão HTTP401. Servidor temporário encerrado automaticamente após checagem.
 
+### Recuperar empresas aguardando do histórico
+- [x] Disponibilizar ação no detalhe do histórico para carregar registros `aguardando`/`pendente` no monitor, sem iniciar outra coleta Logcomex.
+- [x] Reutilizar o endpoint autenticado do detalhe e o processamento vinculado ao mesmo `historicoId`; excluir da fila registros já `salvo`/`existente`.
+- [x] Validar lint, typecheck, testes e build; atualizar File List e registrar limitações.
+File List adicional: `src/app/PainelAlpha/AlphaCatcher/CatcherClient.tsx`,
+`src/app/PainelAlpha/AlphaCatcher/HistoricoConsultas.tsx`,
+`src/app/PainelAlpha/AlphaCatcher/ModalHistorico.tsx`,
+`tests/alpha-catcher/client-stream.test.ts`,
+`tests/alpha-catcher/historico-ui.test.ts`.
+Validação 2026-10-13: testes focais 9/9; `npm run typecheck` aprovado;
+`npm run lint` aprovado sem erros (1192 warnings no repositório); suíte global
+com Node 22: 608 arquivos aprovados, 4506 testes aprovados, 4 skipped e 1 todo;
+`npm run build` aprovado. Não foi feita consulta externa nem alteração no banco.
+Ativação em produção permanece pendente. Build emitiu avisos preexistentes de
+`pdfjs-polyfill` e cache Webpack, sem impedir a compilação.
+
 ## Modal com lista exata da importação
 - [x] Persistir pares e resultados como snapshots por blocos em Auditoria existente.
 - [x] Ler snapshots do autor autenticado após reload/restart, preservando ordem/datas.

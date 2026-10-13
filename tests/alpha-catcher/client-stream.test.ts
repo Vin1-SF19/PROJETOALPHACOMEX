@@ -116,4 +116,29 @@ describe('fila durante download da Logcomex', () => {
     expect(fetcher.mock.calls.some(call => String(call[0]).includes(`desde=1`))).toBe(true);
     expect(host.querySelectorAll('tbody tr')).toHaveLength(2);
   });
+
+  it('restaura pendências do histórico para habilitar Iniciar e salvar sem iniciar outra coleta Logcomex', async () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const empresa = { cnpj: '08429993000123', consignatario: 'Aguardando', estado: 'aguardando' };
+    const importacao = { versao: 1, id, inicio: '2026-10-13T12:26:00Z', fim: null, fimColeta: '2026-10-13T12:56:00Z', estado: 'interrompido', origem: 'LOGCOMEX', listaDisponivel: true,
+      dataInicio: '2026-07-06', dataFinal: '2026-10-06', embarquesMin: 1, embarquesMax: 2, limite: 0, totalColetadas: 1, novasSalvas: 0, processadas: 0, pendentes: 1 };
+    const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/alpha-catcher/historico') return { ok: true, json: async () => ({ importacoes: [importacao], proximoCursor: null }) };
+      if (url.endsWith(`/historico/${id}`)) return { ok: true, json: async () => ({ importacao, linhas: [empresa] }) };
+      if (url === '/api/alpha-catcher' && init?.method === 'POST') return { ok: true, status: 200, json: async () => ({ ...empresa, estado: 'salvo' }) };
+      throw new Error(`Requisição inesperada: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetcher);
+    const host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+    await act(async () => root.render(createElement(CatcherClient, { temaInicial: 'blue' })));
+    await act(async () => (host.querySelector('[aria-label^="Abrir lista"]') as HTMLElement).click());
+    await act(async () => [...document.body.querySelectorAll('button')].find(button => button.textContent?.includes('Carregar pendentes no monitor'))!.click());
+    const iniciar = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('Iniciar e salvar'))! as HTMLButtonElement;
+    expect(iniciar.disabled).toBe(false);
+    await act(async () => iniciar.click());
+    const processar = fetcher.mock.calls.find(call => call[0] === '/api/alpha-catcher' && call[1]?.method === 'POST');
+    expect(JSON.parse(String(processar?.[1]?.body))).toMatchObject({ cnpj: empresa.cnpj, historicoId: id });
+    expect(fetcher.mock.calls.some(call => call[0] === '/api/alpha-catcher/logcomex')).toBe(false);
+  });
 });

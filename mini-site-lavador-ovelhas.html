@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LãViva — Limpeza inovadora para ovelhas</title>
+<style>
+  :root{
+    --branco:#ffffff;
+    --cinza-claro:#f4f4f5;
+    --cinza:#d4d4d8;
+    --cinza-texto:#71717a;
+    --vinho:#722f37;
+    --vinho-escuro:#4f1d24;
+    --preto:#111113;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{
+    font-family:'Segoe UI',Arial,Helvetica,sans-serif;
+    background:var(--branco);
+    color:var(--preto);
+    line-height:1.6;
+  }
+  .container{max-width:1100px;margin:0 auto;padding:0 24px;}
+
+  /* NAVEGAÇÃO */
+  header{
+    position:sticky;top:0;z-index:10;
+    background:rgba(255,255,255,.95);
+    border-bottom:1px solid var(--cinza);
+  }
+  nav{display:flex;align-items:center;justify-content:space-between;padding:18px 0;}
+  .logo{font-size:1.5rem;font-weight:800;letter-spacing:-.5px;color:var(--preto);}
+  .logo span{color:var(--vinho);}
+  nav ul{display:flex;gap:28px;list-style:none;}
+  nav a{text-decoration:none;color:var(--cinza-texto);font-size:.95rem;font-weight:500;transition:color .2s;}
+  nav a:hover{color:var(--vinho);}
+
+  /* HERO */
+  .hero{
+    background:linear-gradient(180deg,var(--branco) 0%,var(--cinza-claro) 100%);
+    padding:96px 0 80px;
+    text-align:center;
+  }
+  .hero .tag{
+    display:inline-block;background:var(--vinho);color:#fff;
+    font-size:.75rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+    padding:6px 16px;border-radius:999px;margin-bottom:24px;
+  }
+  .hero h1{font-size:3rem;font-weight:800;line-height:1.15;max-width:760px;margin:0 auto 20px;}
+  .hero h1 em{color:var(--vinho);font-style:normal;}
+  .hero p{color:var(--cinza-texto);font-size:1.15rem;max-width:620px;margin:0 auto 36px;}
+  .btn{
+    display:inline-block;background:var(--preto);color:#fff;text-decoration:none;
+    padding:14px 34px;border-radius:8px;font-weight:600;transition:background .2s;
+  }
+  .btn:hover{background:var(--vinho);}
+  .btn.vinho{background:var(--vinho);}
+  .btn.vinho:hover{background:var(--vinho-escuro);}
+
+  /* SEÇÕES */
+  section{padding:80px 0;}
+  section:nth-of-type(even){background:var(--cinza-claro);}
+  .kicker{
+    color:var(--vinho);font-weight:700;text-transform:uppercase;
+    letter-spacing:2px;font-size:.8rem;margin-bottom:12px;
+  }
+  h2{font-size:2.2rem;font-weight:800;margin-bottom:16px;}
+  .lead{color:var(--cinza-texto);font-size:1.05rem;max-width:680px;margin-bottom:44px;}
+
+  .grid{display:grid;gap:24px;}
+  .grid.c3{grid-template-columns:repeat(3,1fr);}
+  .grid.c2{grid-template-columns:repeat(2,1fr);}
+  .card{
+    background:var(--branco);border:1px solid var(--cinza);border-radius:12px;
+    padding:28px;transition:transform .2s,box-shadow .2s;
+  }
+  .card:hover{transform:translateY(-4px);box-shadow:0 12px 28px rgba(17,17,19,.08);}
+  .card .icone{
+    width:44px;height:44px;border-radius:10px;background:var(--cinza-claro);
+    display:flex;align-items:center;justify-content:center;font-size:1.3rem;margin-bottom:16px;
+  }
+  .card h3{font-size:1.15rem;margin-bottom:8px;}
+  .card p{color:var(--cinza-texto);font-size:.95rem;}
+
+  /* INOVAÇÃO */
+  .nova{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center;}
+  .nova .numeros{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  .stat{
+    background:var(--branco);border:1px solid var(--cinza);border-top:4px solid var(--vinho);
+    border-radius:10px;padding:24px;text-align:center;
+  }
+  .stat b{display:block;font-size:2.2rem;color:var(--vinho);font-weight:800;}
+  .stat span{color:var(--cinza-texto);font-size:.9rem;}
+
+  /* CUIDADO ANIMAL */
+  .cuidado{background:var(--preto);color:#fff;}
+  .cuidado .kicker{color:#e8b4b9;}
+  .cuidado .lead{color:#c9c9ce;}
+  .cuidado .card{background:#1a1a1d;border-color:#2e2e33;}
+  .cuidado .card h3{color:#fff;}
+  .cuidado .card p{color:#b9b9c0;}
+  .cuidado .icone{background:#26262b;}
+
+  /* RODAPÉ */
+  footer{background:var(--preto);color:#b9b9c0;padding:40px 0;text-align:center;font-size:.9rem;}
+  footer .logo{color:#fff;margin-bottom:10px;}
+  footer a{color:#e8b4b9;text-decoration:none;}
+
+  @media(max-width:820px){
+    .grid.c3,.grid.c2,.nova{grid-template-columns:1fr;}
+    .hero h1{font-size:2.1rem;}
+    nav ul{display:none;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <nav>
+      <div class="logo">Lã<span>Viva</span></div>
+      <ul>
+        <li><a href="#produto">O Produto</a></li>
+        <li><a href="#porque">Por que Comprar</a></li>
+        <li><a href="#como">Como Funciona</a></li>
+        <li><a href="#inovacao">Inovação</a></li>
+        <li><a href="#cuidado">Cuidado Animal</a></li>
+      </ul>
+      <a href="#contato" class="btn vinho" style="padding:10px 22px;font-size:.85rem;">Fale Conosco</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="container">
+    <span class="tag">Inovação no mercado de lã</span>
+    <h1>Lã mais limpa, mais fina e de <em>maior valor</em> — com as ovelhas felizes.</h1>
+    <p>O LãViva é o primeiro limpador de ovelhas 100% biodegradável que remove sujeira, ácaros e odores sem agredir a pele, melhorando a qualidade da lã desde a fonte.</p>
+    <a href="#produto" class="btn">Conheça o Produto</a>
+  </div>
+</section>
+
+<section id="produto">
+  <div class="container">
+    <div class="kicker">O Produto</div>
+    <h2>Um limpador feito para a lã que o seu rebanho produz</h2>
+    <p class="lead">O LãViva é uma solução de limpeza de uso externo, aplicada em banhos rápidos ou imersão parcial. Sua fórmula à base de extratos naturais e tensoativos suaves dissolve gordura, terra e resíduos sem remover o lanolino protetor natural — a parte mais valiosa da lã.</p>
+    <div class="grid c3">
+      <div class="card">
+        <div class="icone">🐑</div>
+        <h3>Uso externo, aplicação simples</h3>
+        <p>Banho de imersão curta ou aplicação com pulverizador. Sem estresse para o animal, sem enxágue prolongado.</p>
+      </div>
+      <div class="card">
+        <div class="icone">🌿</div>
+        <h3>Fórmula biodegradável</h3>
+        <p>Extratos vegetais e tensoativos de origem renovável. Seguro para o rebanho, para o solo e para os cursos d'água da fazenda.</p>
+      </div>
+      <div class="card">
+        <div class="icone">✨</div>
+        <h3>Preserva o lanolino</h3>
+        <p>Diferente dos detergentes comuns, o LãViva não stripa a lã. Ela sai limpa, com brilho natural e oleosidade na medida.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="porque">
+  <div class="container">
+    <div class="kicker">Por que Comprar</div>
+    <h2>Mais receita por quilo de lã, menos custo por ovelha</h2>
+    <p class="lead">Lã suja perde até 30% do valor na balança. O LãViva ataca exatamente esse ponto: lã limpa pesa menos água e impurezas, classifica melhor e é aceita por um preço superior.</p>
+    <div class="grid c3">
+      <div class="card">
+        <div class="icone">💰</div>
+        <h3>Lã que vende mais caro</h3>
+        <p>Limpesa e baixa contagem de impurezas elevam a classificação da lã. O retorno aparece já na primeira tesoura.</p>
+      </div>
+      <div class="card">
+        <div class="icone">📉</div>
+        <h3>Menos perdas no beneficiamento</h3>
+        <p>Menos terra e excretas na lã bruta significa menos descarte e menos retrabalho na planta de lavagem.</p>
+      </div>
+      <div class="card">
+        <div class="icone">🕐</div>
+        <h3>Operação mais rápida</h3>
+        <p>Ciclo de limpeza reduzido na estação de banhos. Mais ovelhas por dia, mesma equipe, mesmo tanque.</p>
+      </div>
+      <div class="card">
+        <div class="icone">🛡️</div>
+        <h3>Prevenção de parasitas</h3>
+        <p>A limpeza regular com LãViva reduz a carga de ácaros e piolhos, diminuindo a necessidade de banhos químicos repetidos.</p>
+      </div>
+      <div class="card">
+        <div class="icone">🏷️</div>
+        <h3>Certificação e selo de origem</h3>
+        <p>Documente a rastreabilidade da limpeza do seu rebanho e use o selo LãViva como diferencial na venda.</p>
+      </div>
+      <div class="card">
+        <div class="icone">🤝</div>
+        <h3>Suporte técnico dedicado</h3>
+        <p>Nossa equipe acompanha o protocolo do seu rebanho, do primeiro banho à tesoura.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="como">
+  <div class="container">
+    <div class="kicker">O Que Faz</div>
+    <h2>Como o LãViva trabalha na lã</h2>
+    <p class="lead">Três etapas simples, sem equipamento especial. O resultado visível já no primeiro uso.</p>
+    <div class="grid c3">
+      <div class="card">
+        <div class="icone">1️⃣</div>
+        <h3>Dissolve</h3>
+        <p>Aqueça a solução a 38 °C. Os tensoativos suaves penetram no felto e soltam gordura, terra e resíduos sem danificar as fibras.</p>
+      </div>
+      <div class="card">
+        <div class="icone">2️⃣</div>
+        <h3>Neutraliza</h3>
+        <p>Extratos naturais eliminam odores de amônia e inibem o crescimento de ácaros e fungos na base da lã.</p>
+      </div>
+      <div class="card">
+        <div class="icone">3️⃣</div>
+        <h3>Protege</h3>
+        <p>O enxágue final deposita um filme fino que mantém o lanolino, devolve brilho e deixa a lã pronta para a tesoura.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="inovacao">
+  <div class="container">
+    <div class="kicker">Inovação no Mercado</div>
+    <h2>Nenhum limpador de ovelhas faz o que o LãViva faz</h2>
+    <p class="lead">O mercado oferece detergentes genéricos ou químicos agressivos. Nós desenvolvemos uma fórmula exclusiva, com patente em registro, pensada para a ovelha de lã de alta performance.</p>
+    <div class="nova">
+      <div>
+        <p style="margin-bottom:16px;">Nossa inovação está na <b>seletividade molecular</b>: o LãViva reconhece e remove impurezas hidrofóbicas (gordura, terra, excretas) enquanto preserva o lanolino hidrofílico natural da lã. O resultado é uma lã limpa que continua oleada, macia e classificável.</p>
+        <p style="margin-bottom:24px;">Somos a primeira solução do mercado com <b>selo de biodegradabilidade auditada</b> e <b>protocolo de bem-estar animal certificado</b>, requisitos cada vez mais exigidos pelas indústrias de lã premium.</p>
+        <a href="#contato" class="btn vinho">Saiba mais</a>
+      </div>
+      <div class="numeros">
+        <div class="stat"><b>-32%</b><span>impurezas na lã bruta</span></div>
+        <div class="stat"><b>+18%</b><span>valor de venda por quilo</span></div>
+        <div class="stat"><b>100%</b><span>biodegradável e auditado</span></div>
+        <div class="stat"><b>0</b><span>resíduos tóxicos no solo</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="cuidado" class="cuidado">
+  <div class="container">
+    <div class="kicker">Cuidado com Suas Ovelhas</div>
+    <h2 style="color:#fff;">O animal vem primeiro. Sempre.</h2>
+    <p class="lead">Lã de qualidade começa com ovelhas saudáveis, estressadas e bem cuidadas. O LãViva foi desenvolvido para que a limpeza nunca seja um trauma.</p>
+    <div class="grid c3">
+      <div class="card">
+        <div class="icone">🩺</div>
+        <h3>Testado em rebanhos reais</h3>
+        <p>Avaliado por zootecnistas e veterinários em fazendas parceiras. Sem irritação dérmica em ovelhas de todas as idades.</p>
+      </div>
+      <div class="card">
+        <div class="icone">💧</div>
+        <h3>Água morna, sem choque térmico</h3>
+        <p>Protocolo de aplicação em 38 °C, a temperatura ideal de conforto do animal. Sem estresse térmico, sem pânico no tanque.</p>
+      </div>
+      <div class="card">
+        <div class="icone">🌱</div>
+        <h3>Seguro para fêmeas gestantes</h3>
+        <p>Formulação sem metais pesados, sem cloro e sem fragrâncias sintéticas. Pode ser usado em todas as etapas do rebanho.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer id="contato">
+  <div class="container">
+    <div class="logo">Lã<span style="color:#e8b4b9;">Viva</span></div>
+    <p>Limpeza inovadora para ovelhas. Lã mais limpa, mais fina, mais valiosa.</p>
+    <p style="margin-top:16px;">📧 <a href="mailto:contato@laviva.com.br">contato@laviva.com.br</a> &nbsp;·&nbsp; 📞 (00) 0000-0000</p>
+    <p style="margin-top:16px;font-size:.8rem;color:#6b6b70;">© 2026 LãViva. Todos os direitos reservados.</p>
+  </div>
+</footer>
+
+</body>
+</html>

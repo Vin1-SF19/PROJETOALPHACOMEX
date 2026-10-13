@@ -13,7 +13,7 @@ const motivos: Record<NonNullable<HistoricoImportacao['motivoInterrupcao']>, str
   falha: 'A automação encontrou uma falha. Os resultados recebidos foram preservados.',
   worker_encerrado: 'O processo da automação encerrou antes de concluir.',
 };
-export default function HistoricoConsultas({ visual, emAndamento, aviso, onRetomar, podeRetomar = false }: { visual: ReturnType<typeof getTema>; emAndamento: boolean; aviso: string; onRetomar?: (id: string) => void; podeRetomar?: boolean }) {
+export default function HistoricoConsultas({ visual, emAndamento, aviso, onRetomar, onCarregarPendentes, podeRetomar = false }: { visual: ReturnType<typeof getTema>; emAndamento: boolean; aviso: string; onRetomar?: (id: string) => void; onCarregarPendentes?: (id: string) => void; podeRetomar?: boolean }) {
   const [selecionada, setSelecionada] = useState<HistoricoImportacao | null>(null);
   const [lista, setLista] = useState<HistoricoImportacao[]>([]);
   const [cursor, setCursor] = useState<number | null>(null);
@@ -81,6 +81,6 @@ export default function HistoricoConsultas({ visual, emAndamento, aviso, onRetom
       {item.recuperadoEm && <p className="text-xs text-amber-300">Histórico recuperado em {formatarDataInclusaoCatcher(item.recuperadoEm)}. A lista mostra os cadastros atuais; horários e quantidade de novas empresas da execução original não foram registrados.</p>}
     </li>)}</ol>
     {cursor && <button type="button" disabled={carregando} onClick={() => void mais()} className={`text-xs ${visual.text} disabled:opacity-40`}>{carregando ? 'Carregando…' : 'Carregar mais importações'}</button>}
-    <ModalHistorico importacao={selecionada} visual={visual} onFechar={() => setSelecionada(null)} onRestaurarFoco={() => cardAtivo.current?.focus()} />
+    <ModalHistorico importacao={selecionada} visual={visual} onFechar={() => setSelecionada(null)} onRestaurarFoco={() => cardAtivo.current?.focus()} onCarregarPendentes={onCarregarPendentes} podeProcessar={podeRetomar} />
   </section>;
 }

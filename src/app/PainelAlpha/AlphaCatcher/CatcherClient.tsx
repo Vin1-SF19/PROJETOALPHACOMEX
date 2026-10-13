@@ -321,6 +321,27 @@ export default function CatcherClient({ temaInicial }: { temaInicial: string }) 
     } finally { setDiagnosticando(false); }
   }
 
+  async function carregarPendentesHistorico(id: string) {
+    if (controle.current.executando || coletando || carregando) return;
+    setErro(''); setCarregando(true);
+    try {
+      const response = await fetch(`/api/alpha-catcher/historico/${encodeURIComponent(id)}`, { cache: 'no-store' });
+      const raw = await response.json();
+      if (!response.ok) throw new Error(raw.error || 'Não foi possível carregar a importação.');
+      const detalhe = detalheHistoricoSchema.parse(raw);
+      if (detalhe.importacao.id !== id || !detalhe.importacao.listaDisponivel || detalhe.importacao.recuperadoEm) throw new Error('A lista desta importação não pode ser processada.');
+      const pendentes = detalhe.linhas.filter(linha => ['aguardando', 'pendente'].includes(linha.estado))
+        .map(linha => ({ ...linha, estado: 'aguardando' as const }));
+      if (!pendentes.length) throw new Error('Esta importação não tem empresas aguardando processamento.');
+      importacaoId.current = id; jsonId.current = ''; dataConsultaFila.current = null; setDataFilaFixada(true);
+      setLinhas(pendentes); setArquivo(`Pendências da importação · ${detalhe.importacao.dataFinal}`);
+      setResumo({ invalidos: 0, duplicados: 0 }); setProgressoColeta(null); setEtapaColeta(''); setTabelaKey(v => v + 1);
+      setStatus(`${pendentes.length} empresas aguardando carregadas do histórico. Clique em Iniciar e salvar.`);
+    } catch (error) {
+      setErro(error instanceof Error ? error.message : 'Não foi possível carregar as pendências do histórico.');
+    } finally { if (montado.current) setCarregando(false); }
+  }
+
   function itemDiagnostico(estado: string) {
     if (estado === 'disponivel') return <CircleCheck size={16} className="text-emerald-300" aria-hidden="true" />;
     if (estado === 'problema') return <CircleAlert size={16} className="text-rose-300" aria-hidden="true" />;
@@ -462,7 +483,7 @@ export default function CatcherClient({ temaInicial }: { temaInicial: string }) 
                 {itemDiagnostico(item.estado)}<p><strong className="text-slate-200">{nome} · {item.estado === 'disponivel' ? 'Disponível' : item.estado === 'problema' ? 'Com problema' : 'Não foi possível verificar'}</strong><br /><span className="text-slate-400">{item.mensagem}</span></p>
               </div>)}
             </section>}
-            <HistoricoConsultas visual={visual} emAndamento={ativo || coletando} aviso={avisoHistorico} onRetomar={id => void importarAutomatico(id)} podeRetomar={!ativo && !coletando && !carregando} />
+            <HistoricoConsultas visual={visual} emAndamento={ativo || coletando} aviso={avisoHistorico} onRetomar={id => void importarAutomatico(id)} onCarregarPendentes={carregarPendentesHistorico} podeRetomar={!ativo && !coletando && !carregando} />
             <p className="text-xs text-slate-400">ReceitaWS primeiro; Radar após validar o cadastro. Cada CNPJ recebido é verificado no banco e, se novo, consultado enquanto a coleta continua. O limite da ReceitaWS é controlado no servidor conforme o plano. Falhas permanecem pendentes.</p>
           </CardComScan>
         </section>

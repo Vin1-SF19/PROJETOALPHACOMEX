@@ -1,12 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { RefreshCw, X } from 'lucide-react';
+import { Play, RefreshCw, X } from 'lucide-react';
 import { Dialog, DialogClose, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import type { getTema } from '@/lib/temas';
 import { detalheHistoricoSchema, type DetalheHistorico, type HistoricoImportacao } from '@/lib/alpha-catcher/historico-tipos';
 import { formatarDataInclusaoCatcher } from '@/lib/alpha-catcher/resultados';
 import ResultadosCatcher from './ResultadosCatcher';
-export default function ModalHistorico({ importacao, visual, onFechar, onRestaurarFoco }: { importacao: HistoricoImportacao | null; visual: ReturnType<typeof getTema>; onFechar: () => void; onRestaurarFoco: () => void }) {
+export default function ModalHistorico({ importacao, visual, onFechar, onRestaurarFoco, onCarregarPendentes, podeProcessar }: { importacao: HistoricoImportacao | null; visual: ReturnType<typeof getTema>; onFechar: () => void; onRestaurarFoco: () => void; onCarregarPendentes?: (id: string) => void; podeProcessar: boolean }) {
   const [detalhe, setDetalhe] = useState<DetalheHistorico | null>(null);
   const [erro, setErro] = useState('');
   const [atualizacao, setAtualizacao] = useState(0);
@@ -31,6 +31,7 @@ export default function ModalHistorico({ importacao, visual, onFechar, onRestaur
     return () => { controller.abort(); if (timer) clearInterval(timer); };
   }, [id, registroId, referencia, acompanhar, atualizacao]);
   const atual = detalhe && detalhe.importacao.id === id && (!registroId || detalhe.importacao.registroId === registroId) ? detalhe : null;
+  const totalPendentes = atual?.linhas.filter(linha => ['aguardando', 'pendente'].includes(linha.estado)).length || 0;
   function exportar() {
     if (!atual) return;
     const url = URL.createObjectURL(new Blob([JSON.stringify({ importacao: atual.importacao, resultados: atual.linhas }, null, 2)], { type: 'application/json' }));
@@ -47,6 +48,11 @@ export default function ModalHistorico({ importacao, visual, onFechar, onRestaur
       {erro && <p role="alert" className="text-sm text-amber-300">{erro}</p>}
       {!atual && !erro && <p role="status" className="text-sm text-slate-400">Carregando lista…</p>}
       {atual && !atual.importacao.listaDisponivel && <p className="text-sm text-slate-400">Esta importação registrou somente o resumo. A lista de empresas não está disponível neste histórico.</p>}
+      {atual && !atual.importacao.recuperadoEm && totalPendentes > 0 && onCarregarPendentes && <section className="space-y-1 rounded-xl border border-amber-400/20 bg-amber-400/[0.05] p-3">
+        <p className="text-sm text-slate-200">{totalPendentes} empresas ainda aguardam processamento.</p>
+        <button type="button" disabled={!podeProcessar} onClick={() => { onCarregarPendentes(id!); onFechar(); }} className={`inline-flex items-center gap-2 rounded-lg border border-white/20 px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${visual.text}`}><Play size={14} />Carregar pendentes no monitor</button>
+        <p className="text-xs text-slate-400">Depois, clique em “Iniciar e salvar”. A coleta Logcomex não será repetida.</p>
+      </section>}
       {atual?.importacao.listaDisponivel && <ResultadosCatcher key={referencia} linhas={atual.linhas} visual={visual} onExportar={exportar} vazio="Nenhuma empresa foi coletada nesta importação." />}
     </DialogContent>
   </Dialog>;

@@ -54,3 +54,26 @@ it('oferece continuação somente quando o servidor autoriza o dono e separa fim
   expect(retomar).toHaveBeenCalledWith(id);
   expect(document.querySelector('[role="dialog"]')).toBeNull();
 });
+
+it('permite carregar no monitor apenas aguardando/pendentes do histórico sem retomar a coleta', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const item = { versao: 1, id, inicio: '2026-10-13T12:26:00Z', fim: null, fimColeta: '2026-10-13T12:56:00Z', estado: 'interrompido', origem: 'LOGCOMEX', listaDisponivel: true,
+    dataInicio: '2026-07-06', dataFinal: '2026-10-06', embarquesMin: 1, embarquesMax: 2, limite: 0, totalColetadas: 3, novasSalvas: 0, processadas: 0, pendentes: 3 };
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => url === '/api/alpha-catcher/historico'
+    ? { ok: true, json: async () => ({ importacoes: [item], proximoCursor: null }) }
+    : { ok: true, json: async () => ({ importacao: item, linhas: [
+      { cnpj: '08429993000123', consignatario: 'A', estado: 'aguardando' },
+      { cnpj: '11222333000181', consignatario: 'B', estado: 'pendente' },
+      { cnpj: '33000167000101', consignatario: 'C', estado: 'salvo' },
+    ] }) }));
+  const carregar = vi.fn();
+  const host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+  await act(async () => root.render(createElement(HistoricoConsultas, { visual: getTema('blue'), emAndamento: false, aviso: '', podeRetomar: true, onCarregarPendentes: carregar })));
+  await act(async () => (host.querySelector('[aria-label^="Abrir lista"]') as HTMLElement).click());
+  const botao = [...document.body.querySelectorAll('button')].find(button => button.textContent?.includes('Carregar pendentes no monitor'))!;
+  expect(botao).toBeTruthy();
+  await act(async () => botao.click());
+  expect(carregar).toHaveBeenCalledWith(id);
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+});
