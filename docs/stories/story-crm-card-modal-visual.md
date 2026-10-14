@@ -34,7 +34,7 @@ Revisão de UI e consulta de SLA. @qa deve avaliar contraste, foco, comportament
 
 ## Verificação
 
-Preparação documental: nenhum teste executado por @sm. Registrar aqui as verificações realizadas pelo fluxo principal, com resultados e limitações. Publicação e commit não fazem parte do pedido atual.
+Preparação documental: nenhum teste executado por @sm. Registrar aqui as verificações realizadas pelo fluxo principal, com resultados e limitações. Commit e publicação foram solicitados posteriormente pelo usuário.
 
 ## File List
 
@@ -59,3 +59,11 @@ A causa identificada do erro de consulta em cards RD era a validação exclusiva
 Verificações: 7 testes focais em dois arquivos aprovados (`/tmp/crm-modal-tests.log`), typecheck aprovado (`/tmp/crm-modal-typecheck.log`), lint dos arquivos alterados sem erros e com oito avisos preexistentes em CardFullViewModal (`/tmp/crm-modal-lint.log`), diff sem erros de whitespace. Revisão manual @qa: PASS estático. CodeRabbit não executado. Não houve smoke visual autenticado nem execução da suíte global nesta alteração.
 
 Arquivo adicional: `tests/bpm/sla-card-status.test.ts`.
+
+## Integração e publicação
+
+A main local foi integrada a origin/main por merge normal, preservando os commits de ambos os lados. O diff integrado do modal possui o mesmo patch-id de `342c3340`. O teste de tarefas foi ajustado para validar a existência do seletor Procedimento sem depender das classes CSS anteriores (`tests/bpm/tarefas-tipo.test.ts`).
+
+Lint global e typecheck passaram. Os testes focais de tarefas e SLA passaram (10 testes), assim como a repetição isolada do worker Calendar (15 testes), que havia falhado durante a geração concorrente do Prisma Client. A suíte global registrou 622 de 626 arquivos aprovados: a asserção visual foi corrigida e revalidada, e permanecem as três falhas conhecidas do Builder e a falha de carregamento next/server do teste de arquivamento, fora deste escopo. Logs: `/tmp/crm-sync-lint.log`, `/tmp/crm-sync-typecheck.log`, `/tmp/crm-sync-tests.log`, `/tmp/crm-sync-focal.log`, `/tmp/crm-sync-worker-recheck.log`.
+
+Build de produção concluído com sucesso (`/tmp/crm-sync-build.log`). As alterações não commitadas anteriores foram preservadas em backup externo com SHA-256 por arquivo, branch de segurança e stash; não fazem parte da publicação.
