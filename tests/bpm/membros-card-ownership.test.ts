@@ -7,7 +7,8 @@ const prismaMock = vi.hoisted(() => ({
   setorPermissao: { findMany: vi.fn() },
   usuarioPermissaoOverride: { findMany: vi.fn() },
   bpmPipeline: { findUnique: vi.fn() },
-  bpmCard: { findUnique: vi.fn() },
+  bpmCard: { findUnique: vi.fn(), findFirst: vi.fn() },
+  setor: { findMany: vi.fn() },
   bpmCardMembro: { findFirst: vi.fn(), findUnique: vi.fn() },
 }));
 
@@ -113,11 +114,68 @@ describe("CRM - elegibilidade de pessoas vinculáveis", () => {
     ).resolves.toMatchObject({ autorizado: false, role: null });
   });
 
-  it("mantém a listagem do board condicionada ao vínculo do usuário não administrador", () => {
+  it("mantém a listagem do board condicionada ao escopo autorizado no servidor", () => {
     const cardsAction = readFileSync(
       resolve(process.cwd(), "src/actions/bpm/Cards.ts"),
       "utf8",
     );
-    expect(cardsAction).toContain("...filtroVinculoCardBpm(userId, admin)");
+    expect(cardsAction).toContain("...escopoLeitura.where");
+  });
+});
+
+
+describe("supervisão por pipeline no guard real", () => {
+  const config = JSON.stringify({ version: 1, supervisores: [{ usuarioId: 9, setorIds: [2] }] });
+  const card = (pipelineId = "permitido", visualizacaoConfigJson: string | null = config) => ({
+    pipelineId, responsavelId: 20, status: "ATIVO", vinculosOrigem: [],
+    pipeline: { setores: [], visualizacaoConfigJson }, etapa: { nome: "Tratativa", ehFinal: false, visibilidades: [] },
+  });
+  beforeEach(() => {
+    vi.resetAllMocks();
+    prismaMock.usuarios.findUnique.mockResolvedValue({ id: 9, role: "COMERCIAL", status: "ATIVO", permissoes: "crm" });
+    prismaMock.usuarioPermissaoOverride.findMany.mockResolvedValue([]);
+    prismaMock.setorPermissao.findMany.mockResolvedValue([]);
+    prismaMock.bpmCardMembro.findUnique.mockResolvedValue(null);
+    prismaMock.bpmCard.findUnique.mockResolvedValue(card());
+    prismaMock.setor.findMany.mockResolvedValue([{ id: 2, nome: "Operacional" }]);
+    prismaMock.usuarios.findMany.mockResolvedValue([{ id: 20, role: "OPERACIONAL" }, { id: 30, role: "FINANCEIRO" }]);
+    prismaMock.bpmCard.findFirst.mockResolvedValue({ id: "terceiro" });
+  });
+  it("permite somente leitura e histórico de terceiro da equipe, sem conceder mutações", async () => {
+    for (const acao of ["visualizar", "visualizarHistorico"] as const) {
+      await expect(checarAcessoBpmCard("terceiro", 9, "COMERCIAL", acao)).resolves.toMatchObject({
+        autorizado: true, role: "VISUALIZADOR", podeAgirEtapa: false, isAdminGlobal: false,
+      });
+    }
+    expect(prismaMock.bpmCard.findFirst).toHaveBeenCalledWith({ where: { id: "terceiro", AND: [{ OR: [
+      { responsavelId: 9 }, { membros: { some: { userId: 9 } } },
+      { responsavelId: { in: [20] } }, { membros: { some: { userId: { in: [20] } } } },
+    ] }] }, select: { id: true } });
+    for (const acao of ["editarCard", "moverEtapa", "criarTarefa", "concluirTarefa", "enviarArquivo", "excluirArquivo", "adicionarParticipantes", "excluirCard"] as const) {
+      await expect(checarAcessoBpmCard("terceiro", 9, "COMERCIAL", acao)).resolves.toMatchObject({ autorizado: false });
+    }
+    expect(prismaMock.bpmCard.findFirst).toHaveBeenCalledTimes(2);
+  });
+  it("não herda supervisão de outro pipeline e revoga configuração removida ou inválida", async () => {
+    await expect(checarAcessoBpmCard("terceiro", 9, "COMERCIAL", "visualizar")).resolves.toMatchObject({ autorizado: true });
+    for (const json of [null, "{corrompido", JSON.stringify({ version: 1, supervisores: [] })]) {
+      prismaMock.bpmCard.findUnique.mockResolvedValue(card("outro", json));
+      await expect(checarAcessoBpmCard("outro-card", 9, "COMERCIAL", "visualizar")).resolves.toMatchObject({ autorizado: false });
+    }
+    expect(prismaMock.bpmCard.findFirst).toHaveBeenCalledTimes(1);
+  });
+  it("nega card fora do setor e revoga ao transferir as pessoas para outro setor", async () => {
+    prismaMock.bpmCard.findFirst.mockResolvedValue(null);
+    await expect(checarAcessoBpmCard("fora", 9, "COMERCIAL", "visualizar")).resolves.toMatchObject({ autorizado: false });
+    prismaMock.usuarios.findMany.mockResolvedValue([{ id: 20, role: "FINANCEIRO" }]);
+    await expect(checarAcessoBpmCard("transferido", 9, "COMERCIAL", "visualizar")).resolves.toMatchObject({ autorizado: false });
+    expect(prismaMock.bpmCard.findFirst).toHaveBeenCalledTimes(1);
+  });
+  it("não ignora restrições de acesso ao pipeline ou coluna", async () => {
+    prismaMock.bpmCard.findUnique.mockResolvedValue({ ...card(), pipeline: { visualizacaoConfigJson: config, setores: [{ setor: { nome: "FINANCEIRO" } }] } });
+    await expect(checarAcessoBpmCard("terceiro", 9, "COMERCIAL", "visualizar")).resolves.toMatchObject({ autorizado: false });
+    prismaMock.bpmCard.findUnique.mockResolvedValue({ ...card(), etapa: { nome: "Oculta", visibilidades: [{ perfil: "COMERCIAL", podeVer: false, podeAgir: false }] } });
+    await expect(checarAcessoBpmCard("terceiro", 9, "COMERCIAL", "visualizar")).resolves.toMatchObject({ autorizado: false });
+    expect(prismaMock.bpmCard.findFirst).not.toHaveBeenCalled();
   });
 });

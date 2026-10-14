@@ -1,4 +1,5 @@
 import db from "@/lib/prisma";
+import { carregarEscopoLeituraBpm } from "@/lib/bpm/visao-equipe-server";
 
 import { isAdminRole, isSameRole } from "@/lib/roles";
 import {
@@ -17,6 +18,7 @@ type ClienteAcessoBpm = Pick<
   | "bpmPipeline"
   | "bpmCard"
   | "bpmCardMembro"
+  | "setor"
 >;
 
 type UsuarioComAcessoBpm = {
@@ -360,7 +362,7 @@ export async function checarAcessoBpmCard(
       select: {
         pipelineId: true,
         responsavelId: true,
-        pipeline: { select: { setores: { select: { setor: { select: { nome: true } } } } } },
+        pipeline: { select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { nome: true } } } } } },
         status: true,
         etapa: {
           select: {
@@ -425,6 +427,14 @@ export async function checarAcessoBpmCard(
 
   const membro = membroExistente?.role === "ADMINISTRADOR" ? membroExistente
     : card.responsavelId === userId ? { role: "RESPONSAVEL" } : membroExistente;
+
+  if (!membro && apenasVisualizacao) {
+    const escopo = await carregarEscopoLeituraBpm(userId, false, card.pipelineId, card.pipeline.visualizacaoConfigJson ?? null, client);
+    if (escopo.usuarioIds.length) {
+      const permitido = await client.bpmCard.findFirst({ where: { id: cardId, ...escopo.where }, select: { id: true } });
+      if (permitido) return { autorizado: true, isAdminGlobal: false, role: "VISUALIZADOR", perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false, bloqueadoPorEncaminhamento };
+    }
+  }
 
   if (!membro) {
     return { autorizado: false, isAdminGlobal: false, role: null, perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false };

@@ -1,5 +1,5 @@
 "use server";
-import { filtroVinculoCardBpm } from "@/lib/bpm/visibilidade-card";
+import { carregarEscopoLeituraBpm } from "@/lib/bpm/visao-equipe-server";
 import db from "@/lib/prisma";
 import { auth } from "../../../auth";
 import {
@@ -270,11 +270,12 @@ export async function ObterPerfilEmpresaBpm(empresaId: number) {
     });
     if (!empresa) return { success: false, error: "Empresa não encontrada" };
 
+    const escopoLeitura = await carregarEscopoLeituraBpm(userId, admin);
     const cards = await db.bpmCard.findMany({
       where: {
         empresaId,
         etapaId: { in: etapaIdsVisiveis },
-        ...filtroVinculoCardBpm(userId, admin),
+        ...escopoLeitura.where,
       },
       select: {
         id: true,

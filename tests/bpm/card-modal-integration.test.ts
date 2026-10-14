@@ -38,7 +38,7 @@ describe("CRM - wiring do modal por etapa", () => {
     expect(modal).toContain('toast.error("Seu acesso a este card foi removido.")');
     expect(modal).toContain("if (resultadoRevogaAcessoCard(cardRes))");
     expect(modal).toContain("fecharPorAcessoRevogado();");
-    expect(cardsAction).toContain("...filtroVinculoCardBpm(userId, admin),");
+    expect(cardsAction).toContain("...escopoLeitura.where,");
   });
 
   it("propaga realtime aos quatro editores e preserva drafts sujos", () => {

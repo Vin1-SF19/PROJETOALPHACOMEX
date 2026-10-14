@@ -1,5 +1,6 @@
 "use client";
 
+import { usuariosDaVisao, type VisaoQuadro } from "@/lib/bpm/visao-equipe";
 import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
 import { textoLegivelRd } from "@/lib/bpm/rd-station-text";
 
@@ -291,7 +292,7 @@ export function KanbanCard({
           : deferidoOperacional ? `${nomeEmpresa}. Processo deferido no Operacional` : nomeEmpresa}
       className={cn(
         "relative select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
-        encaminhado ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
+        encaminhado || !card.podeAgirEtapa ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
         card.sla?.status === "ATRASADO" && "rounded-2xl ring-2 ring-rose-500/55 shadow-lg shadow-rose-950/40",
         (alertaBoasVindas || alertaAlinhamento || semCnpjNoloss) && "animate-pulse motion-reduce:animate-none",
         ehLeadVirtual
@@ -328,6 +329,7 @@ export function KanbanCard({
               Encaminhamento pendente · confira a automação
             </div>
           )}
+          {!card.podeAgirEtapa && !encaminhado && <span className="text-[10px] text-slate-400">Somente leitura</span>}
           {card.encaminhamentos?.map((destino, indice) => (
             <div key={`${destino.pipeline ?? "restrito"}-${indice}`} role="status"
               className="rounded-lg border border-sky-300/25 bg-sky-400/10 px-2 py-1 text-[10px] font-semibold text-sky-100">
@@ -373,7 +375,7 @@ export function KanbanCard({
                   <Video size={14} aria-hidden="true" />
                   Abrir Google Meet
                 </a>
-              ) : (
+              ) : card.podeAgirEtapa ? (
                 <button
                   type="button"
                   onClick={(event) => {
@@ -387,7 +389,7 @@ export function KanbanCard({
                   <Video size={14} aria-hidden="true" />
                   Agendar pelo Google Meet
                 </button>
-              )}
+              ) : null}
               {card.cardViewComposicao !== undefined && (
                 // RM-2026-E1E1F7: o widget de Agendar Reunião substitui o corpo
                 // padrão do card, então a composição configurável precisa ser
@@ -798,8 +800,12 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
   const [cards, setCards] = useState<CardBpm[]>(cardsIniciais);
   const [manifesto, setManifesto] = useState(manifestoInicial);
   const [busca, setBusca] = useState("");
+  const [visaoFiltro, setVisaoFiltro] = useState("MEUS");
+  const visao = (visaoFiltro.startsWith("SETOR:") ? "SETOR" : visaoFiltro) as VisaoQuadro;
+  const setorFiltro = visao === "SETOR" ? Number(visaoFiltro.slice(6)) : null;
+  const usuariosVisao = manifesto?.acesso ? usuariosDaVisao(manifesto.acesso, visao, setorFiltro) : null;
   const [carregandoPagina, setCarregandoPagina] = useState(false);
-  const quadroRef = useRef({ manifesto: manifestoInicial, ids: cardsIniciais.map((c) => c.id), limites: {} as Record<string, number>, busca: "", responsavelId: null as number | null, ultimaCompleta: 0 });
+  const quadroRef = useRef({ manifesto: manifestoInicial, ids: cardsIniciais.map((c) => c.id), limites: {} as Record<string, number>, busca: "", responsavelId: null as number | null, visao: "MEUS" as VisaoQuadro, setorId: null as number | null, ultimaCompleta: 0 });
   useEffect(() => { quadroRef.current.ultimaCompleta = Date.now(); }, []);
   const primeiraFiltragemRef = useRef(true);
   const [responsavelFiltro, setResponsavelFiltro] = useState<string | null>(null);
@@ -846,7 +852,8 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
   const responsaveisDisponiveis = useMemo(() => {
     const mapa = new Map<number, string>();
     if (manifesto) {
-      for (const card of manifesto.entradas) for (const pessoa of card.responsaveis) mapa.set(pessoa.id, pessoa.nome);
+      const ids = manifesto.acesso ? usuariosDaVisao(manifesto.acesso, visao, setorFiltro) : null;
+      for (const card of manifesto.entradas) for (const pessoa of card.responsaveis) if (ids === null || ids.includes(pessoa.id)) mapa.set(pessoa.id, pessoa.nome);
       return Array.from(mapa, ([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
     }
     for (const card of cards) {
@@ -860,12 +867,13 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
     return Array.from(mapa, ([id, nome]) => ({ id, nome })).sort((a, b) =>
       a.nome.localeCompare(b.nome)
     );
-  }, [cards, manifesto]);
+  }, [cards, manifesto, visao, setorFiltro]);
 
   const getByEtapa = (etapaId: string) =>
     cards.filter(
       (c) =>
         c.etapaId === etapaId &&
+        (usuariosVisao === null || c.origem === "noloss" || usuariosVisao.includes(c.responsavel.id) || c.membros.some((m) => usuariosVisao.includes(m.usuario.id))) &&
         (!responsavelFiltro ||
           String(c.responsavel.id) === responsavelFiltro ||
           c.membros.some((m) => String(m.usuario.id) === responsavelFiltro))
@@ -883,10 +891,11 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
         const idsCarregados = new Set(estado.ids);
         const result = await SincronizarQuadroBpm(pipeline.id, {
           conhecidos: estado.manifesto!.entradas.filter((c) => idsCarregados.has(c.id)).map(({ id, revision }) => ({ id, revision })),
-          limites: estado.limites, busca: estado.busca, responsavelId: estado.responsavelId, forcar,
+          limites: estado.limites, busca: estado.busca, responsavelId: estado.responsavelId, visao: estado.visao, setorId: estado.setorId, forcar,
         });
         if (requisicao !== ultimaRequisicaoRef.current || generation !== generationBoardRef.current) return false;
         if (!result.success) {
+          if ("visaoRevogada" in result && result.visaoRevogada) { setCards([]); setManifesto({ configVersion: -1, entradas: [] }); estado.ids = []; estado.manifesto = { configVersion: -1, entradas: [] }; setCardSelecionadoId(null); setCardAgendamentoId(null); setNolossLeadAberto(null); setVisaoFiltro("MEUS"); setResponsavelFiltro(null); }
           if (result.acessoNegado) { setCards([]); setManifesto({ configVersion: -1, entradas: [] }); setCardSelecionadoId(null); setCardAgendamentoId(null); setNolossLeadAberto(null); estado.ids = []; estado.manifesto = { configVersion: -1, entradas: [] }; }
           if (!opcoes.preservarErro) setErro(result.error);
           return false;
@@ -999,14 +1008,15 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
   useEffect(() => {
     if (!quadroRef.current.manifesto) return;
     if (primeiraFiltragemRef.current) { primeiraFiltragemRef.current = false; return; }
-    if (quadroRef.current.busca === busca && quadroRef.current.responsavelId === (responsavelFiltro ? Number(responsavelFiltro) : null)) return;
+    if (quadroRef.current.busca === busca && quadroRef.current.responsavelId === (responsavelFiltro ? Number(responsavelFiltro) : null) && quadroRef.current.visao === visao && quadroRef.current.setorId === setorFiltro) return;
+    quadroRef.current.visao = visao; quadroRef.current.setorId = setorFiltro;
     quadroRef.current.busca = busca;
     quadroRef.current.responsavelId = responsavelFiltro ? Number(responsavelFiltro) : null;
     quadroRef.current.limites = {};
     ultimaRequisicaoRef.current += 1;
     const timer = setTimeout(() => { void recarregarCards(); }, 300);
     return () => clearTimeout(timer);
-  }, [busca, responsavelFiltro, recarregarCards]);
+  }, [busca, responsavelFiltro, visao, setorFiltro, recarregarCards]);
 
   async function carregarMais(etapaId: string) {
     if (carregandoPagina || movimentoPendenteRef.current || snapshotArrastoRef.current) return;
@@ -1014,7 +1024,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
     setCarregandoPagina(true);
     try { await recarregarCards(); } finally { setCarregandoPagina(false); }
   }
-  const paginaManifesto = manifesto ? selecionarPaginaQuadro(manifesto.entradas, { busca, responsavelId: responsavelFiltro ? Number(responsavelFiltro) : null, }) : null;
+  const paginaManifesto = manifesto ? selecionarPaginaQuadro(manifesto.entradas, { busca, visao, setorId: setorFiltro, acesso: manifesto.acesso, responsavelId: responsavelFiltro ? Number(responsavelFiltro) : null, }) : null;
 
   const abrirCard = useCallback((cardId: string) => {
     const card = cards.find((c) => c.id === cardId);
@@ -1025,7 +1035,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
     cardSelecionadoIdRef.current = cardId;
     setCardAgendamentoId(null);
     setCardSelecionadoId(cardId);
-  }, [cards]);
+  }, [cards, setNolossLeadAberto, setCardAgendamentoId, setCardSelecionadoId]);
 
   const abrirAgendamento = useCallback((cardId: string) => {
     cardSelecionadoIdRef.current = cardId;
@@ -1144,6 +1154,15 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {manifesto && <input type="search" value={busca} maxLength={200} onChange={(event) => setBusca(event.target.value)} aria-label="Buscar em todos os cards do pipeline" placeholder="Buscar empresa, CNPJ ou serviço" className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white" />}
+          {manifesto?.acesso && <Select value={visaoFiltro} onValueChange={(value) => { setVisaoFiltro(value); setResponsavelFiltro(null); }}>
+            <SelectTrigger aria-label="Visualização dos leads" className="w-[230px] border-white/10 bg-white/[0.04] text-xs text-slate-200"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="MEUS">Meus leads e sem vínculo</SelectItem>
+              {!manifesto.acesso.admin && manifesto.acesso.setores.length > 0 && <SelectItem value="EQUIPE">Minha equipe</SelectItem>}
+              {manifesto.acesso.admin && <SelectItem value="TODOS">Todos os leads</SelectItem>}
+              {manifesto.acesso.setores.map((setor) => <SelectItem key={setor.id} value={`SETOR:${setor.id}`}>Setor: {setor.nome}</SelectItem>)}
+            </SelectContent>
+          </Select>}
           <Select
             value={responsavelFiltro ?? "todos"}
             onValueChange={(v) => setResponsavelFiltro(v === "todos" ? null : v)}
@@ -1153,10 +1172,10 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
               className="w-[180px] shrink-0 border-white/10 bg-white/[0.04] text-xs text-slate-200"
             >
               <Users className="h-4 w-4" aria-hidden="true" />
-              <SelectValue placeholder="Todos os responsáveis" />
+              <SelectValue placeholder="Todos desta visão" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="todos">Todos os responsáveis</SelectItem>
+              <SelectItem value="todos">Todos desta visão</SelectItem>
               {responsaveisDisponiveis.map((r) => (
                 <SelectItem key={r.id} value={String(r.id)} aria-label={r.nome}>
                   {r.nome}

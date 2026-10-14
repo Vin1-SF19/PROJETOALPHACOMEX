@@ -1,5 +1,5 @@
 "use server";
-import { filtroVinculoCardBpm } from "@/lib/bpm/visibilidade-card";
+import { carregarEscopoLeituraBpm } from "@/lib/bpm/visao-equipe-server";
 import db from "@/lib/prisma";
 import { auth } from "../../../auth";
 import {
@@ -65,11 +65,12 @@ export async function ObterDashboardBpm() {
     const pipelinesVisiveis = pipelines.filter((_, index) => acessoPipelines[index]);
     const pipelineIdsVisiveis = pipelinesVisiveis.map((pipeline) => pipeline.id);
 
+    const escopoLeitura = await carregarEscopoLeituraBpm(userId, admin);
     const cardIdsDoUsuario = admin
       ? null
       : (
           await db.bpmCard.findMany({
-            where: { ...filtroCardVisivel, pipelineId: { in: pipelineIdsVisiveis }, ...filtroVinculoCardBpm(userId, false) },
+            where: { ...filtroCardVisivel, pipelineId: { in: pipelineIdsVisiveis }, ...escopoLeitura.where },
             select: { id: true },
           })
         ).map((m) => m.id);

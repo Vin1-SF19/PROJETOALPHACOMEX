@@ -80,6 +80,14 @@ describe("ListarTelefonesCardBpm", () => {
     });
   });
 
+  it("exige ação para iniciar ligação; leitura de supervisor não basta", async () => {
+    authMock.mockResolvedValue({ user: { id: "42", role: "Lider Comercial" } });
+    exigirAcessoBpmCardMock.mockRejectedValue(new Error("Não autorizado"));
+    expect(await IniciarLigacaoTelefoneCardBpm("card-1", "11999990000")).toMatchObject({ success: false });
+    expect(exigirAcessoBpmCardMock).toHaveBeenCalledWith("card-1", 42, "Lider Comercial", "editarCard");
+    expect(iniciarLigacaoCallixMock).not.toHaveBeenCalled();
+  });
+
   it("inicia na Callix somente um telefone vinculado ao card autorizado", async () => {
     authMock.mockResolvedValue({ user: { id: "42", role: "User" } });
     prismaMock.bpmCard.findUnique.mockResolvedValue({ empresaId: 17 });

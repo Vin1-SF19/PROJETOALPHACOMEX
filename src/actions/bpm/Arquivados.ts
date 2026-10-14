@@ -1,5 +1,5 @@
 "use server";
-import { filtroVinculoCardBpm } from "@/lib/bpm/visibilidade-card";
+import { carregarEscopoLeituraBpm } from "@/lib/bpm/visao-equipe-server";
 
 import db from "@/lib/prisma";
 import { auth } from "../../../auth";
@@ -57,11 +57,12 @@ export async function ListarCardsArquivadosBpm(pagina = 1) {
     });
     const etapaIds = etapas.filter((etapa) => resolverVisibilidadeEtapa(contexto.role, etapa.visibilidades).podeVer)
       .map((etapa) => etapa.id);
+    const escopoLeitura = await carregarEscopoLeituraBpm(contexto.userId, contexto.admin);
     const where = {
       status: "ARQUIVADO",
       pipelineId: { in: contexto.pipelineIds },
       etapaId: { in: etapaIds },
-      ...filtroVinculoCardBpm(contexto.userId, contexto.admin),
+      ...escopoLeitura.where,
     };
     const [total, cards] = await Promise.all([
       db.bpmCard.count({ where }),

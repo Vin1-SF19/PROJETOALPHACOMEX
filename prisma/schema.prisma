@@ -4342,6 +4342,7 @@ model BpmPipeline {
   nome          String
   ordem         Int      @default(0)
   ativo         Boolean  @default(true)
+  visualizacaoConfigJson String?
   configVersion Int      @default(1)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

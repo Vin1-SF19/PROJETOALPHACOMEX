@@ -1,3 +1,4 @@
+import { usuariosDaVisao, type AcessoVisaoQuadro, type VisaoQuadro } from "@/lib/bpm/visao-equipe";
 export const TAMANHO_PAGINA_QUADRO = 30;
 export const REVALIDACAO_RESUMOS_MS = 90_000;
 
@@ -10,8 +11,8 @@ export type EntradaManifestoQuadro = {
   servico: string | null;
   responsaveis: { id: number; nome: string }[];
 };
-export type ManifestoQuadro = { configVersion: number; entradas: EntradaManifestoQuadro[] };
-export type FiltrosQuadro = { busca?: string; responsavelId?: number | null; limites?: Record<string, number> };
+export type ManifestoQuadro = { configVersion: number; entradas: EntradaManifestoQuadro[]; acesso?: AcessoVisaoQuadro };
+export type FiltrosQuadro = { visao?: VisaoQuadro; setorId?: number | null; acesso?: AcessoVisaoQuadro; busca?: string; responsavelId?: number | null; limites?: Record<string, number> };
 
 const normalizar = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").trim();
 
@@ -19,7 +20,10 @@ export function selecionarPaginaQuadro(entradas: EntradaManifestoQuadro[], filtr
   const termo = normalizar(filtros.busca ?? "");
   const totais: Record<string, number> = {};
   const ids: string[] = [];
+  const equipe = filtros.acesso ? usuariosDaVisao(filtros.acesso, filtros.visao ?? "MEUS", filtros.setorId) : null;
+  const permitidos = equipe === null ? null : new Set(equipe);
   for (const card of entradas) {
+    if (permitidos && card.responsaveis.length && !card.responsaveis.some((p) => permitidos.has(p.id))) continue;
     if (filtros.responsavelId && !card.responsaveis.some((p) => p.id === filtros.responsavelId)) continue;
     const texto = normalizar(`${card.nome} ${card.cnpj ?? ""} ${(card.cnpj ?? "").replace(/\D/g, "")} ${card.servico ?? ""}`);
     if (termo && !texto.includes(termo)) continue;

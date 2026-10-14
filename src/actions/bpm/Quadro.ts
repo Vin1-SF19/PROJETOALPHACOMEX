@@ -6,7 +6,7 @@ import { auth } from "../../../auth";
 import db from "@/lib/prisma";
 import { exigirAcessoBpmPipeline, isAdminRole } from "@/lib/bpm/ownership";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
-import { filtroVinculoCardBpm } from "@/lib/bpm/visibilidade-card";
+import { carregarEscopoLeituraBpm } from "@/lib/bpm/visao-equipe-server";
 import { cardApareceNoQuadro, etapasComSaidaDoQuadro } from "@/lib/bpm/cards-no-quadro";
 import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
 import { pipelineEhRevisaoRadar } from "@/lib/bpm/proximo-contato";
@@ -20,6 +20,8 @@ const entrada = z.object({
   limites: z.record(z.string().max(150), z.number().int().min(1).max(5000)).default({}),
   busca: z.string().max(200).default(""), responsavelId: z.number().int().positive().nullable().optional(),
   forcar: z.boolean().default(false),
+  visao: z.enum(["MEUS", "EQUIPE", "SETOR", "TODOS"]).default("MEUS"),
+  setorId: z.number().int().positive().nullable().optional(),
 });
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 24);
 
@@ -34,7 +36,7 @@ export async function SincronizarQuadroBpm(pipelineId: string, input: unknown = 
     catch { return { success: false as const, error: "Você não tem mais acesso a este pipeline.", acessoNegado: true }; }
     const [pipeline, usuario] = await Promise.all([
       db.bpmPipeline.findUnique({ where: { id: pipelineId }, select: {
-        nome: true, configVersion: true,
+        nome: true, configVersion: true, visualizacaoConfigJson: true,
         etapas: { where: { ativo: true }, select: { id: true, nome: true, ehFinal: true,
           visibilidades: { select: { perfil: true, podeVer: true, podeAgir: true } },
           automacoes: { where: { ativa: true }, select: { versoes: { where: { status: "ATIVA" }, select: { grafoJson: true } } } },
@@ -44,9 +46,15 @@ export async function SincronizarQuadroBpm(pipelineId: string, input: unknown = 
     ]);
     if (!pipeline || !usuario) return { success: false as const, error: "Pipeline indisponível", acessoNegado: true };
     const etapas = pipeline.etapas.filter((e) => resolverVisibilidadeEtapa(usuario.role, e.visibilidades).podeVer);
+    const admin = isAdminRole(usuario.role);
+    const escopo = await carregarEscopoLeituraBpm(userId, admin, pipelineId, pipeline.visualizacaoConfigJson ?? null, db, true);
+    const acesso = { userId, admin, setores: escopo.setores };
+    if ((parsed.data.visao === "TODOS" && !admin) || (parsed.data.visao === "SETOR" && !escopo.setores.some((s) => s.id === parsed.data.setorId)) || (parsed.data.visao === "EQUIPE" && !escopo.setores.length)) {
+      return { success: false as const, error: "Esta visualização não está mais disponível. Selecione Meus leads.", acessoNegado: false, visaoRevogada: true };
+    }
     // Só informações de identidade, busca e acesso. Nunca histórico, tarefas ou campos completos.
     const rows = await db.bpmCard.findMany({
-      where: { pipelineId, etapaId: { in: etapas.map((e) => e.id) }, OR: [{ status: "ATIVO" }, { status: "CONCLUIDO", etapa: { ehFinal: true } }], ...filtroVinculoCardBpm(userId, isAdminRole(usuario.role)) },
+      where: { pipelineId, etapaId: { in: etapas.map((e) => e.id) }, OR: [{ status: "ATIVO" }, { status: "CONCLUIDO", etapa: { ehFinal: true } }], ...escopo.where },
       select: { id: true, etapaId: true, updatedAt: true, servico: true, status: true,
         empresa: { select: { razaoSocial: true, nomeFantasia: true, cnpj: true } },
         responsavel: { select: { id: true, nome: true } },
@@ -65,8 +73,8 @@ export async function SincronizarQuadroBpm(pipelineId: string, input: unknown = 
       const leads = await buscarNolossLeadsPendentes();
       for (const lead of leads) entradas.push({ id: lead.id, etapaId: novos.id, revision: hash(lead), nome: lead.nome || lead.email || "Lead sem nome", cnpj: null, servico: null, responsaveis: [] });
     }
-    const manifesto: ManifestoQuadro = { configVersion: pipeline.configVersion, entradas };
-    const pagina = selecionarPaginaQuadro(entradas, parsed.data);
+    const manifesto: ManifestoQuadro = { configVersion: pipeline.configVersion, entradas, acesso };
+    const pagina = selecionarPaginaQuadro(entradas, { ...parsed.data, acesso });
     const conhecidos = new Map(parsed.data.conhecidos.map((c) => [c.id, c.revision]));
     const desejados = new Set(pagina.ids);
     const buscar = entradas.filter((c) => desejados.has(c.id) && (parsed.data.forcar || conhecidos.get(c.id) !== c.revision)).map((c) => c.id);

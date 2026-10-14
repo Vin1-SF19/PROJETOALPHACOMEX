@@ -45,7 +45,7 @@ describe("CRM/BPM authorization regression guards", () => {
     expect(vinculos).toContain("exigirAcessoBpmCard(cardOrigemId");
     expect(vinculos).toContain("cardIdsVisiveis");
     expect(cards).toContain("podeVerVinculado");
-    expect(cards).toContain("...filtroVinculoCardBpm(userId, admin)");
+    expect(cards).toContain("...escopoLeitura.where");
     expect(source("src/lib/bpm/visibilidade-card.ts")).toContain("{ responsavelId: userId }, { membros: { some: { userId } } }");
   });
 

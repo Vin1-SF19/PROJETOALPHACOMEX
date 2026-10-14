@@ -1,5 +1,5 @@
 "use server";
-import { filtroVinculoCardBpm } from "@/lib/bpm/visibilidade-card";
+import { carregarEscopoLeituraBpm } from "@/lib/bpm/visao-equipe-server";
 import { randomUUID } from "node:crypto";
 import { BuscarEmpresasBpm as buscarEmpresas, BuscarEmpresaPorCnpjBpm as buscarEmpresaPorCnpj, ListarUsuariosResponsavelBpm as listarResponsaveis } from "./CardsConsultas";
 import { ExcluirCardBpm as excluirCard } from "./CardsExcluir";
@@ -136,6 +136,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
         where: { id: pipelineId },
         select: {
           nome: true,
+          visualizacaoConfigJson: true,
           etapas: {
             where: { ativo: true },
             select: {
@@ -205,6 +206,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
         .map(([etapaId]) => etapaId),
     );
 
+    const escopoLeitura = await carregarEscopoLeituraBpm(userId, admin, pipelineId, pipelineInfo?.visualizacaoConfigJson ?? null);
     // D-021: card sempre tem empresa vinculada — select sempre inclui a empresa.
     const cards = await db.bpmCard.findMany({
       where: {
@@ -212,7 +214,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
         ...(cardIds ? { id: { in: cardIds } } : {}),
         OR: [{ status: "ATIVO" }, { status: "CONCLUIDO", etapa: { ehFinal: true } }],
         etapaId: { in: etapasVisiveis },
-        ...filtroVinculoCardBpm(userId, admin),
+        ...escopoLeitura.where,
       },
       select: {
         id: true,
@@ -348,7 +350,8 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
     });
 
     const agora = new Date();
-    const slaPorCard = await obterStatusSlaCards(cards.map((card) => card.id), agora);
+    const somenteLeituraIds = new Set(cards.filter((card) => !admin && card.responsavel.id !== userId && !card.membros.some((m) => m.userId === userId)).map((card) => card.id));
+    const slaPorCard = await obterStatusSlaCards(cards.map((card) => card.id), agora, somenteLeituraIds);
     if ([...slaPorCard.values()].some((itens) => itens.some((item) => item.statusAlterado))) {
       await notificarPipelineBpm({ pipelineId, tipo: "SLA_STATUS_ALTERADO" });
     }
@@ -508,7 +511,8 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
           ? calcularDiaCicloNovosLeads(card.createdAt, agora)
           : 1,
         podeAgirEtapa:
-          (visibilidadePorEtapa.get(card.etapaId)?.podeAgir ?? false) && encaminhamentos.length === 0
+          (admin || card.responsavel.id === userId || card.membros.some((m) => m.userId === userId))
+          && (visibilidadePorEtapa.get(card.etapaId)?.podeAgir ?? false) && encaminhamentos.length === 0
             && !(etapaFinal && card.status === "CONCLUIDO"),
         encaminhamentos,
         encaminhamentoPendente,
@@ -787,8 +791,8 @@ export async function ObterCardBpm(cardId: string) {
       if (emailLegado) emailClienteReuniao = emailLegado;
     }
 
-    // Indicador "nunca acessado" — primeiro acesso por QUALQUER usuário apaga a marcação.
-    if (!card.primeiraVisualizacaoEm) {
+    // Consulta de supervisão não registra atendimento nem inicia SLA.
+    if (!card.primeiraVisualizacaoEm && acessoCard.role !== "VISUALIZADOR") {
       const agora = new Date();
       const atualizacao = await db.$transaction(async (tx) => {
         const resultado = await tx.bpmCard.updateMany({
@@ -904,7 +908,7 @@ export async function IniciarLigacaoTelefoneCardBpm(cardId: string, telefone: st
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
     const userId = Number(session.user.id);
 
-    await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "visualizar");
+    await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
 
     const telefoneNormalizado = normalizarTelefoneCallix(telefone);
     if (!telefoneNormalizado) return { success: false, error: "Telefone inválido para ligação." };

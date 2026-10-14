@@ -9,7 +9,7 @@ const board = readFileSync(
 describe("filtro por responsável do board (RM-2026-70EFE1)", () => {
   it("fica ao lado da atualização e oferece a opção de exibir todos", () => {
     expect(board).toContain('aria-label="Filtrar cards por responsável"');
-    expect(board).toContain('<SelectItem value="todos">Todos os responsáveis</SelectItem>');
+    expect(board).toContain('<SelectItem value="todos">Todos desta visão</SelectItem>');
     expect(board.indexOf('aria-label="Filtrar cards por responsável"')).toBeLessThan(
       board.indexOf('aria-label="Atualizar pipeline"'),
     );

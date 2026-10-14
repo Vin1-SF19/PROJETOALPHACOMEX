@@ -334,8 +334,8 @@ export async function ObterStatusSlaCard(cardId: string) {
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
     const parsed = idSchema.safeParse(cardId);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
-    await exigirAcessoBpmCard(parsed.data, Number(session.user.id), session.user.role ?? null, "visualizar");
-    const data = await obterStatusSla({ cardId: parsed.data });
+    const acesso = await exigirAcessoBpmCard(parsed.data, Number(session.user.id), session.user.role ?? null, "visualizar");
+    const data = await obterStatusSla({ cardId: parsed.data }, undefined, new Date(), acesso?.role !== "VISUALIZADOR");
     if (data.some((item) => item.statusAlterado)) {
       await notificarPipelineBpm({ cardId: parsed.data, tipo: "SLA_STATUS_ALTERADO" });
     }
@@ -354,8 +354,8 @@ export async function ObterStatusSlaTarefa(tarefaId: string) {
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
     const tarefa = await contextoTarefa(parsed.data);
     if (!tarefa) return { success: false, error: "Tarefa não encontrada" };
-    await exigirAcessoBpmCard(tarefa.cardId, Number(session.user.id), session.user.role ?? null, "visualizar");
-    const data = await obterStatusSla({ tarefaId: parsed.data });
+    const acesso = await exigirAcessoBpmCard(tarefa.cardId, Number(session.user.id), session.user.role ?? null, "visualizar");
+    const data = await obterStatusSla({ tarefaId: parsed.data }, undefined, new Date(), acesso?.role !== "VISUALIZADOR");
     if (data.some((item) => item.statusAlterado)) {
       await notificarPipelineBpm({ cardId: tarefa.cardId, tipo: "SLA_STATUS_ALTERADO" });
     }

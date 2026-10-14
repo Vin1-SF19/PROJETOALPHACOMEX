@@ -1,4 +1,5 @@
 "use server";
+import { carregarEscopoLeituraBpm } from "@/lib/bpm/visao-equipe-server";
 import { randomUUID } from "node:crypto";
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
@@ -6,6 +7,7 @@ import { auth } from "../../../auth";
 import { criarTarefaSchema, concluirTarefaSchema, criarTarefaPresetSchema } from "@/lib/validations/bpm";
 import {
   checarAcessoConfigPipeline,
+  podeAcessarPipelineBpm,
   exigirAcessoBpmCard,
   exigirAcessoBpmPipeline,
   exigirAcessoConfigPipeline,
@@ -361,7 +363,7 @@ export async function CriarTarefaPresetBpm(dados: unknown) {
 /**
  * Central de tarefas (Fase 3, DOMAIN.md/FEATURES.md): visão agregada cross-card.
  * Admin vê todas as tarefas; usuário comum só vê tarefas de cards onde é
- * BpmCardMembro (mesma regra de ownership do dashboard).
+ * responsável, membro ou supervisor configurado (somente leitura).
  */
 export async function ListarTarefasGlobaisBpm(filtros?: { status?: string; responsavelId?: number }) {
   try {
@@ -372,30 +374,20 @@ export async function ListarTarefasGlobaisBpm(filtros?: { status?: string; respo
     const admin = await checarAcessoConfigPipeline(userId, "visualizarPipeline");
     const [usuarioAtual, etapas] = await Promise.all([
       db.usuarios.findUnique({ where: { id: userId }, select: { role: true } }),
-      db.bpmEtapa.findMany({ select: { id: true, visibilidades: {
+      db.bpmEtapa.findMany({ select: { id: true, pipeline: { select: { setores: { select: { setor: { select: { nome: true } } } } } }, visibilidades: {
         select: { perfil: true, podeVer: true, podeAgir: true },
       } } }),
     ]);
     const etapaIdsVisiveis = etapas.filter((etapa) =>
-      resolverVisibilidadeEtapa(usuarioAtual?.role, etapa.visibilidades).podeVer).map((etapa) => etapa.id);
+      resolverVisibilidadeEtapa(usuarioAtual?.role, etapa.visibilidades).podeVer && podeAcessarPipelineBpm({ role: usuarioAtual?.role ?? "", permissoes: ["crm"], setoresPipeline: etapa.pipeline.setores.map(({ setor }) => setor.nome), ehMembroPipeline: false })).map((etapa) => etapa.id);
 
-    let cardIdsPermitidos: string[] | undefined;
-    if (!admin) {
-      const membros = await db.bpmCardMembro.findMany({
-        where: {
-          userId,
-        },
-        select: { cardId: true },
-      });
-      cardIdsPermitidos = membros.map((m) => m.cardId);
-    }
+    const escopoLeitura = await carregarEscopoLeituraBpm(userId, admin);
 
     const tarefas = await db.bpmTarefa.findMany({
       where: {
         ...(filtros?.status ? { status: filtros.status } : {}),
         ...(filtros?.responsavelId ? { responsavelId: filtros.responsavelId } : {}),
-        card: { etapaId: { in: etapaIdsVisiveis } },
-        ...(cardIdsPermitidos ? { cardId: { in: cardIdsPermitidos } } : {}),
+        card: { etapaId: { in: etapaIdsVisiveis }, ...escopoLeitura.where },
       },
       select: {
         id: true,

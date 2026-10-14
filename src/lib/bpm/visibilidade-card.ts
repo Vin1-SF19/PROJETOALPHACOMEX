@@ -4,6 +4,6 @@ import type { Prisma } from "@prisma/client";
  * Cards reais exigem responsável; leads ainda sem vínculo vêm do staging NoLoss.
  * Nunca interpretar membros.none como um card livre com responsável atribuído.
  */
-export function filtroVinculoCardBpm(userId: number, admin: boolean): Prisma.BpmCardWhereInput {
-  return admin ? {} : { AND: [{ OR: [{ responsavelId: userId }, { membros: { some: { userId } } }] }] };
+export function filtroVinculoCardBpm(userId: number, admin: boolean, equipeIds: number[] = []): Prisma.BpmCardWhereInput {
+  return admin ? {} : { AND: [{ OR: [{ responsavelId: userId }, { membros: { some: { userId } } }, ...(equipeIds.length ? [{ responsavelId: { in: equipeIds } }, { membros: { some: { userId: { in: equipeIds } } } }] : [])] }] };
 }

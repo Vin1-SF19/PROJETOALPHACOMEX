@@ -1,4 +1,4 @@
-import { filtroVinculoCardBpm } from "@/lib/bpm/visibilidade-card";
+import { carregarEscopoLeituraBpm } from "@/lib/bpm/visao-equipe-server";
 import "server-only";
 
 import db from "@/lib/prisma";
@@ -47,6 +47,7 @@ export async function contarCardsVisiveisNoQuadro(
     where: { id: pipelineId },
     select: {
       nome: true,
+      visualizacaoConfigJson: true,
       etapas: {
         where: { ativo: true },
         select: {
@@ -63,12 +64,13 @@ export async function contarCardsVisiveisNoQuadro(
   const etapasVisiveis = pipeline.etapas.filter((etapa) =>
     resolverVisibilidadeEtapa(role, etapa.visibilidades).podeVer);
   const etapaIdsVisiveis = etapasVisiveis.map((etapa) => etapa.id);
+  const escopo = await carregarEscopoLeituraBpm(userId, admin, pipelineId, pipeline.visualizacaoConfigJson ?? null);
   const cards = etapaIdsVisiveis.length ? await db.bpmCard.findMany({
     where: {
       pipelineId,
       etapaId: { in: etapaIdsVisiveis },
       OR: [{ status: "ATIVO" }, { status: "CONCLUIDO", etapa: { ehFinal: true } }],
-      ...filtroVinculoCardBpm(userId, admin),
+      ...escopo.where,
     },
     select: {
       status: true, etapaId: true,

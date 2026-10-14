@@ -512,6 +512,7 @@ async function processarInstanciaSla(
   instancia: InstanciaSlaCarregada,
   client: ClienteSla,
   agora: Date,
+  persistir = true,
 ): Promise<ResumoSla> {
   const status = calcularStatusSla(instancia, instancia.slaConfig.alertaLimites, agora);
   const deadline = instancia.deadline ?? instancia.prazoFinal;
@@ -519,7 +520,7 @@ async function processarInstanciaSla(
   const tempoRestanteMs = deadline ? deadline.getTime() - referencia.getTime() : null;
   let statusAlterado = false;
 
-  if (status !== instancia.status && !["PAUSADO", "CONCLUIDO", "CANCELADO"].includes(instancia.status)) {
+  if (persistir && status !== instancia.status && !["PAUSADO", "CONCLUIDO", "CANCELADO"].includes(instancia.status)) {
     const statusAnterior = instancia.status;
     const atualizada = await client.bpmSlaInstancia.updateMany({
       where: { id: instancia.id, status: statusAnterior, updatedAt: instancia.updatedAt },
@@ -603,6 +604,7 @@ async function obterStatusSlaComCliente(
   alvo: { cardId?: string; tarefaId?: string },
   client: ClienteSla,
   agora: Date,
+  persistir = true,
 ): Promise<ResumoSla[]> {
   const instancias = await client.bpmSlaInstancia.findMany({
     where: alvo.tarefaId ? { tarefaId: alvo.tarefaId } : { cardId: alvo.cardId },
@@ -611,7 +613,7 @@ async function obterStatusSlaComCliente(
   });
   const resultados: ResumoSla[] = [];
   for (const instancia of instancias) {
-    resultados.push(await processarInstanciaSla(instancia, client, agora));
+    resultados.push(await processarInstanciaSla(instancia, client, agora, persistir));
   }
   return resultados;
 }
@@ -620,14 +622,16 @@ export async function obterStatusSla(
   alvo: { cardId?: string; tarefaId?: string },
   client?: ClienteSla,
   agora = new Date(),
+  persistir = true,
 ): Promise<ResumoSla[]> {
-  if (client) return obterStatusSlaComCliente(alvo, client, agora);
-  return db.$transaction((tx) => obterStatusSlaComCliente(alvo, tx, agora));
+  if (client || !persistir) return obterStatusSlaComCliente(alvo, client ?? db, agora, persistir);
+  return db.$transaction((tx) => obterStatusSlaComCliente(alvo, tx, agora, persistir));
 }
 
 export async function obterStatusSlaCards(
   cardIds: readonly string[],
   agora = new Date(),
+  somenteLeituraIds: ReadonlySet<string> = new Set(),
 ): Promise<Map<string, ResumoSla[]>> {
   const unicos = [...new Set(cardIds.filter(Boolean))];
   const porCard = new Map(unicos.map((cardId) => [cardId, [] as ResumoSla[]]));
@@ -642,7 +646,7 @@ export async function obterStatusSlaCards(
     for (const instancia of instancias) {
       if (!instancia.cardId) continue;
       const lista = porCard.get(instancia.cardId) ?? [];
-      lista.push(await processarInstanciaSla(instancia, tx, agora));
+      lista.push(await processarInstanciaSla(instancia, tx, agora, !somenteLeituraIds.has(instancia.cardId)));
       porCard.set(instancia.cardId, lista);
     }
     return porCard;

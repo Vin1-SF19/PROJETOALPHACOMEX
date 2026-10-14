@@ -24,7 +24,7 @@ describe("alertas visuais e automação de SLA", () => {
     }, agora)).toBe(900_000);
   });
 
-  it("persiste a transição, o disparo idempotente e o evento de domínio ao vencer", async () => {
+  it.each([true, false])("respeita persistência de SLA na leitura: %s", async (persistir) => {
     const agora = new Date("2026-09-04T12:00:01.000Z");
     const updateMany = vi.fn().mockResolvedValue({ count: 1 });
     const update = vi.fn().mockResolvedValue({});
@@ -70,7 +70,13 @@ describe("alertas visuais e automação de SLA", () => {
       bpmEventoDominio: { create: criarEventoDominio, findUnique: vi.fn() },
     };
 
-    const resultado = await obterStatusSla({ cardId: CARD_ID }, client as never, agora);
+    const resultado = await obterStatusSla({ cardId: CARD_ID }, client as never, agora, persistir);
+    if (!persistir) {
+      expect(resultado[0]).toMatchObject({ status: "ATRASADO", statusAlterado: false });
+      expect(updateMany).not.toHaveBeenCalled(); expect(update).not.toHaveBeenCalled();
+      expect(criarLog).not.toHaveBeenCalled(); expect(criarDisparo).not.toHaveBeenCalled(); expect(criarEventoDominio).not.toHaveBeenCalled();
+      return;
+    }
 
     expect(resultado[0]).toMatchObject({ status: "ATRASADO", cor: "VERMELHO", statusAlterado: true });
     expect(updateMany).toHaveBeenCalledWith(expect.objectContaining({
