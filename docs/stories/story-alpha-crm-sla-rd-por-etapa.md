@@ -162,3 +162,11 @@ A release parte do commit remoto em produção e contém somente arquivos SLA; a
 - `tests/bpm/sla-ciclos-migration.test.ts`
 - `tests/bpm/sla-reentrada-sqlite.test.ts`
 - `docs/stories/story-alpha-crm-sla-rd-por-etapa.md`
+
+## Validação integrada à versão remota
+
+Durante a publicação, outra tarefa avançou `origin/main` para `5e5ae132`. A release SLA incorporou esse commit por merge normal (`55da9862`), preservando as mudanças já publicadas. O diff contra esse novo remoto continua restrito aos 19 arquivos SLA; nenhum arquivo do Builder ou Dashboard foi alterado pela correção SLA.
+
+Build e lint integrados aprovados (zero erros, 1.193 avisos). Typecheck confirmado com exit 0 em `/tmp/rd-sla-merged-typecheck-confirmed.log`; a execução anterior foi interrompida por SIGTERM sem diagnóstico TypeScript. Suíte integrada: 624 arquivos e 4.644 testes aprovados, quatro ignorados, um todo e três falhas no Builder. As mesmas três falhas foram reproduzidas no checkout remoto `5e5ae132`, sem o patch SLA, em `/tmp/rd-sla-origin-builder-test.log`. QA aprovou o escopo SLA com essa limitação preexistente, sem declarar a suíte global integralmente verde. Logs adicionais: `/tmp/rd-sla-merged-build.log`, `/tmp/rd-sla-merged-lint.log` e `/tmp/rd-sla-merged-tests.log`.
+
+Esta publicação entrega o runtime; não executa migration nem importação produtiva. A carga permanece sujeita à confirmação específica do usuário e execução pelo fluxo principal.
