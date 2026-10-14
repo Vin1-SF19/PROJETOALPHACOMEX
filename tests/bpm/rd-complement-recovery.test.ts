@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createClient, type Client } from "@libsql/client";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { applyRecoveryBatch, guard, hash, projectTask, stableId, statement, stateHash } from "../../scripts/lib/rd-complement-recovery.mjs";
@@ -172,4 +173,17 @@ describe("hash de estado com datas", () => {
 
 it("normaliza a fração de segundo de timestamps SQL como UTC", () => {
   expect(stateHash([{ updatedAt: "2026-10-14 14:00:00.123" }])).toBe(stateHash([{ updatedAt: "2026-10-14T14:00:00.123Z" }]));
+});
+
+
+it("fingerprint do importador original vincula responsável aprovado sem chamar API ou banco", () => {
+  const source = readFileSync("scripts/migrar-rd-alpha.mjs", "utf8");
+  const expression = source.match(/const fingerprint = (sha\(full\.map[^\n]+);/)?.[1];
+  expect(expression).toBeTruthy();
+  const deal = { deal: { id: "rd-1" }, detail: { updated_at: "2025-09-28" }, resolvedOwner: 12, events: [{ id: "event" }] };
+  const fingerprintFor = (full: unknown[]) => runInNewContext(expression!, { full, sha: hash, json: JSON.stringify }, { timeout: 1000 });
+  expect(fingerprintFor([deal])).not.toBe(fingerprintFor([{ ...deal, resolvedOwner: 16 }]));
+  expect(fingerprintFor([deal])).not.toBe(fingerprintFor([{ ...deal, resolvedOwner: undefined }]));
+  const second = { ...deal, deal: { id: "rd-2" }, resolvedOwner: 22 };
+  expect(fingerprintFor([deal, second])).toBe(fingerprintFor([second, deal]));
 });
