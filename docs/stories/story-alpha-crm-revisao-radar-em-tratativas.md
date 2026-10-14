@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress — correção complementar da entrada manual em Em tratativas; deploy e homologação real pendentes
+In Progress — validação hardcoded de Próximo Contato na entrada removida; deploy e homologação real pendentes
 
 ## Executor Assignment
 
@@ -25,7 +25,7 @@ Esta story refina `story-alpha-crm-card-por-etapa-em-tratativa.md` para a config
 ## Acceptance Criteria
 
 1. A etapa ativa **Em tratativas** exibe no card o controle canônico **Próximo Contato** e o formulário de follow-up com **Anotações sobre o último follow-up**. Os controles também aparecem em **Configurações → Campos e Formulários** do pipeline/etapa, com visibilidade, ordem e regras administráveis pela UI, sem criar cópia paralela de `proximoContatoEm`.
-2. Próximo Contato exige data válida ao entrar manualmente em Em tratativas e ao concluir um follow-up. Se estiver ausente na entrada, a UI mostra o campo no diálogo de requisitos; o servidor persiste o valor junto ao movimento. Valor ausente, inválido ou não confirmado bloqueia a operação com mensagem específica. A UI mostra o valor atual e permite edição autorizada; regras de data/hora existentes continuam coerentes com a configuração.
+2. Próximo Contato exige data válida, persistida no card, ao concluir um follow-up. Valor ausente, inválido ou não confirmado pelo servidor bloqueia a conclusão com mensagem específica. A UI mostra o valor atual e permite edição autorizada; regras de data/hora existentes continuam coerentes com a configuração.
 3. Cada nova interação/follow-up exige anotações textuais não vazias após `trim()`. A action de conclusão valida as respostas obrigatórias do snapshot no servidor; uma falha mantém o follow-up em andamento e não produz conclusão ou histórico parcial. Uma conclusão anterior não satisfaz uma interação nova.
 4. O editor permite adicionar, editar, ordenar, obrigar/desobrigar e desativar perguntas do checklist para interações futuras; alterações posteriores não mudam as perguntas/respostas históricas. Enquanto não houver perguntas adicionais, apenas as anotações explícitas são exigidas.
 5. O card só oferece e o servidor só aceita as cinco saídas de **Em tratativas**: **Fechado**, **Lost**, **Stand By**, **Monitoramento** e **Sem viabilidade**. Drag, modal e chamada direta convergem na mesma regra; destino proibido ou ambíguo não altera card nem histórico.
@@ -41,7 +41,6 @@ Esta story refina `story-alpha-crm-card-por-etapa-em-tratativa.md` para a config
 - [x] Publicar controles configuráveis, perguntas de follow-up, transições e script vazio após gate Vault.
 - [x] Validar Próximo Contato e anotações na conclusão, em todos os caminhos de ação, mantendo histórico consistente.
 - [x] Integrar tarefa de Próximo Contato à Agenda Alpha do responsável e ao sino existente, com atualização/cancelamento idempotente.
-- [x] Expor atalho de requisitos quando o destino Em tratativas estiver bloqueado pela ausência de Próximo Contato; abrir o diálogo para preencher a data e preservar a gravação com o movimento.
 - [ ] Cobrir casos de negócio, UI, integração e regressão; executar gates e homologar card real. Gates completos; homologação real pendente da publicação.
 - [x] Atualizar checklist, File List, QA Results e Change Log.
 
@@ -87,7 +86,6 @@ Testes de domínio/actions em `tests/bpm/` e integração da Agenda Alpha nos te
 - `src/actions/bpm/Cards.ts`, `FollowUp.ts`, `FormulariosEtapa.ts`, `PerguntasFollowUp.ts` — validações e catálogo configurável.
 - `src/lib/bpm/em-tratativa.ts`, `transicao-command.ts`, `proximo-contato-agenda.ts`, `alertas-tarefas.ts` — transições, tarefa e alertas.
 - `src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximoContato.tsx` — edição e limpeza do contato.
-- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa.tsx` — atalho “Informar Próximo Contato” para abrir os requisitos ao entrar em Em tratativas.
 - `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/FormularioEtapaWorkspace.tsx`, `PerguntasFollowUpEditor.tsx` — UI administrativa.
 - `src/actions/google-calendar-agenda.ts`, `src/components/CalendarioAlpha/lib/tipos.ts`, `useAgendaAlphaController.ts` — tarefa na Agenda Alpha.
 - `src/app/api/bpm/jobs/alertas-tarefas/route.ts`, `vercel.json` — processamento programado de alertas.
@@ -99,8 +97,7 @@ Testes de domínio/actions em `tests/bpm/` e integração da Agenda Alpha nos te
 - `npm run typecheck` e `npm run build`: aprovados. `npm test`: 542 arquivos, 3993 testes aprovados, 4 ignorados, 1 TODO. `npm run lint`: 0 erros, 1191 avisos existentes.
 - Homologação autenticada do card, Agenda Alpha e sino: pendente após publicação.
 - Publicação Turso protegida: autorizada especificamente pelo usuário após prévia; backup completo de 170.445.077 bytes e 332 tabelas revalidado; auditor Vinicius de Souza Floriano (TI), ID 8. A configuração foi publicada na versão 17 e verificada por consulta somente leitura: formulário ativo, dois blocos e exatamente cinco saídas solicitadas.
-- 2026-10-14: corrigido o contrato da action `ObterRequisitosTransicaoBpm`: a mesma regra que exige Próximo Contato no movimento manual para Em tratativas agora marca o campo como obrigatório e faz o diálogo exibi-lo. `npx eslint src/actions/bpm/Cards.ts`, `npm run typecheck` e `git diff --check` passaram; homologação autenticada deste caminho permanece pendente.
-- 2026-10-14: incluído o atalho “Informar Próximo Contato” também para o destino Em tratativas quando a checagem bloquear a etapa, permitindo abrir o diálogo com a data. ESLint direcionado, typecheck e `git diff --check` passaram; homologação autenticada permanece pendente.
+- 2026-10-14: a tentativa anterior de exigir Próximo Contato ao entrar em Em tratativas foi removida por ser uma validação hardcoded. O guard de entrada correspondente e o atalho “Informar Próximo Contato” foram retirados; permanece a regra de Sem viabilidade baseada na configuração existente. ESLint direcionado, typecheck e `git diff --check` passaram.
 
 ## Change Log
 
@@ -110,7 +107,8 @@ Testes de domínio/actions em `tests/bpm/` e integração da Agenda Alpha nos te
 | 2026-09-28 | 0.2 | Código, prévia da configuração, testes focados e revisão QA; publicação protegida pendente. | Codex (`@dev`) |
 | 2026-09-28 | 0.3 | Configuração publicada no Turso com autorização específica e verificação pós-escrita. | Codex (`@dev`) |
 | 2026-09-28 | 0.4 | Story pronta para revisão após QA do código; deploy e homologação real registrados como pendências. | Codex (`@dev`) |
-| 2026-10-14 | 0.5 | Reaberta após relato de que a entrada em Em tratativas exigia Próximo Contato no servidor sem apresentar o campo no diálogo; requisitos da UI alinhados ao guard existente. | Codex (`@dev`) |
+| 2026-10-14 | 0.5 | Tentativa de apresentar Próximo Contato antes da entrada em Em tratativas; removida na versão 0.6 a pedido do usuário por introduzir validação hardcoded. | Codex (`@dev`) |
+| 2026-10-14 | 0.6 | Removida a obrigatoriedade hardcoded de Próximo Contato ao entrar em Em tratativas e restaurado o fluxo da etapa. | Codex (`@dev`) |
 
 ## Story Draft Validation
 

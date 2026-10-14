@@ -6,11 +6,7 @@ export const PERGUNTA_ANOTACOES_ULTIMO_FOLLOW_UP =
 export const ID_PERGUNTA_ANOTACOES_ULTIMO_FOLLOW_UP =
   "anotacoes-ultimo-follow-up";
 
-const ETAPAS_EXIGEM_PROXIMO_CONTATO = [
-  NOME_ETAPA_EM_TRATATIVA,
-  "Em Tratativas",
-  "Sem Viabilidade",
-].map(normalizarNomeEtapa);
+const ETAPAS_EXIGEM_PROXIMO_CONTATO = ["Sem Viabilidade"].map(normalizarNomeEtapa);
 
 const DESTINOS_EM_TRATATIVA = ["Fechado", "Lost", "Stand By", "Monitoramento", "Sem viabilidade"].map(normalizarNomeEtapa);
 
