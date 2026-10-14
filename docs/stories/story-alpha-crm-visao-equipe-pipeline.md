@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — implementação concluída, coluna autorizada e aplicada; gates finais e publicação em preparação.
+Done — coluna autorizada e verificada; aplicativo e ajuste de omissão publicados e confirmados na Vercel. Testes de interface automatizados; não houve sessão visual autenticada de produção.
 
 ## Executor Assignment
 
@@ -85,8 +85,8 @@ Os caminhos são pontos de investigação/integração, não uma lista de arquiv
 - [x] Atualizar visão/filtro de responsáveis e consultas de todos os caminhos pertinentes.
 - [x] Validar revogação, eventos, paginação e totais sem regressão de desempenho.
 - [x] Concluir gate Vault específico antes de incluir a coluna `visualizacaoConfigJson` no banco.
-- [ ] Executar testes direcionados, lint, typecheck, suíte e build.
-- [ ] Registrar revisão, resultados, file list e situação de publicação com evidências.
+- [x] Executar testes direcionados, lint, typecheck, suíte e build.
+- [x] Registrar revisão, resultados, file list e situação de publicação com evidências.
 
 ## Estratégia de testes
 
@@ -138,11 +138,17 @@ O manifesto contém somente o máximo autorizado; MEUS/EQUIPE/SETOR/TODOS e resp
 
 Testes direcionados aprovados: configuração salva/leitura de volta, seleção e persistência via UI, supervisor/coluna/pipeline, ações negadas, revogação, setor alterado, manifesto e filtros adulterados, modos da UI, projeção SLA sem efeitos, Callix negado e migration em SQLite descartável com confirmação/backup/idempotência. Testes completos no workspace: somente três falhas do Builder concorrente fora deste patch; será repetido em checkout isolado do CRM. Typecheck passou; erro inicial de dependências de memoização foi corrigido e lint do componente passou. O artefato `cfb5ba2d` foi então validado em worktree isolado `/tmp/crm-equipe-release`, com cópia privativa das dependências e sem os arquivos concorrentes do Builder/ChatbotX. Lint exit 0 (0 erros, 1.193 avisos), build exit 0, `npm test -- --maxWorkers=2` exit 0 (616 arquivos, 4.550 testes aprovados, 4 ignorados, 1 todo), typecheck pós-build exit 0. Logs: `/tmp/crm-equipe-isolated-lint.log`, `/tmp/crm-equipe-isolated-build.log`, `/tmp/crm-equipe-isolated-tests.log` e `/tmp/crm-equipe-isolated-typecheck.log`. Nenhuma das três falhas concorrentes do Builder ocorreu no artefato isolado.
 
-Revisão manual @qa sem novos bloqueios de autorização após correções; veredito final depende dos gates isolados. CodeRabbit CLI indisponível. Não houve sessão autenticada de navegador na Vercel; não afirmar teste manual de conta real.
+Revisão manual @qa: PASS final, sem bloqueios de autorização após correções e confirmação dos quatro gates isolados do artefato final `8e9a51a0`. CodeRabbit CLI indisponível. Não houve sessão autenticada de navegador na Vercel; não afirmar teste manual de conta real.
 
 ### Proteção da configuração administrativa
 
-O singleton Prisma omite `visualizacaoConfigJson` nas consultas comuns, incluindo relações e transações. Os leitores autorizados usam `select` explícito. A configuração é tipada como `Prisma.GlobalOmitConfig` para preservar compatibilidade com interfaces legadas de TransactionClient; a omissão é verificada em runtime com SQLite real. Não envolve nova alteração de banco. Gates do ajuste final pendentes.
+O singleton Prisma omite `visualizacaoConfigJson` nas consultas comuns, incluindo relações e transações. Os leitores autorizados usam `select` explícito. A configuração é tipada como `Prisma.GlobalOmitConfig` para preservar compatibilidade com interfaces legadas de TransactionClient; a omissão é verificada em runtime com SQLite real. Não envolve nova alteração de banco. Gates do ajuste final `8e9a51a0` aprovados no mesmo worktree isolado: lint exit 0 (0 erros, 1.193 avisos), build exit 0, suíte exit 0 (617 arquivos, 4.551 testes aprovados, 4 ignorados, 1 todo), typecheck pós-build exit 0. Logs `/tmp/crm-equipe-omit-isolated-{lint,build,tests,typecheck}.log`. As cópias privadas de `.env` e `.env.local` foram removidas do worktree após os gates; arquivos originais preservados.
+
+### Publicação final verificada
+
+Código da funcionalidade `cfb5ba2d`, registro de gates `46eb3dd8` e ajuste final [`8e9a51a014b4a99cacf1e58b58d4b18a72404b67`](https://github.com/Vin1-SF19/PROJETOALPHACOMEX/commit/8e9a51a014b4a99cacf1e58b58d4b18a72404b67) publicados em main, excluindo integralmente mudanças concorrentes do Builder/ChatbotX. Deployment final Production `7066704353` / `dpl_CahYtzywxRmAa5NFbXRxwwfcd7Bj` concluiu com sucesso às 13:29:08 UTC de 14/10/2026.
+
+[Deployment publicado](https://painel-alpha-projeto-aeh0ih5d8-alpha-comexs-projects.vercel.app) e [CRM em produção](https://painel-alpha-projeto.vercel.app/PainelAlpha/AlphaCRM). Alias conferido com parâmetro único e `Cache-Control: no-cache`: HTTP 200 na entrada, UTF-8, assets com o ID exato do deployment final. A rota CRM preserva HTTP 307 para `/?acesso=bloqueado` sem sessão. Nenhuma configuração real de supervisores foi criada automaticamente.
 
 ### File List
 
@@ -188,3 +194,4 @@ O singleton Prisma omite `visualizacaoConfigJson` nas consultas comuns, incluind
 |---|---|---|---|
 | 2026-10-14 | 1.0 | Story preparada com duas decisões funcionais pendentes no fluxo principal | @sm |
 | 2026-10-14 | 1.1 | Ready: setores por supervisor/pipeline, visão inicial individual para todos e contrato nullable aprovados; gate Vault pendente | @sm |
+| 2026-10-14 | 1.2 | Gates isolados e QA PASS; coluna aplicada e publicação final 8e9a51a0 confirmada na Vercel | @devops |
