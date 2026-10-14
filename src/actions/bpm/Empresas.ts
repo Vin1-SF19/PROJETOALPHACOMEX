@@ -1,8 +1,10 @@
 "use server";
+import { filtroVinculoCardBpm } from "@/lib/bpm/visibilidade-card";
 import db from "@/lib/prisma";
 import { auth } from "../../../auth";
 import {
   checarAcessoConfigPipeline,
+  podeAcessarPipelineBpm,
   exigirAcessoBpmCard,
   exigirAcessoModuloBpm,
 } from "@/lib/bpm/ownership";
@@ -255,12 +257,12 @@ export async function ObterPerfilEmpresaBpm(empresaId: number) {
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
     const [usuarioAtual, etapas] = await Promise.all([
       db.usuarios.findUnique({ where: { id: userId }, select: { role: true } }),
-      db.bpmEtapa.findMany({ select: { id: true, visibilidades: {
+      db.bpmEtapa.findMany({ select: { id: true, pipeline: { select: { setores: { select: { setor: { select: { nome: true } } } } } }, visibilidades: {
         select: { perfil: true, podeVer: true, podeAgir: true },
       } } }),
     ]);
     const etapaIdsVisiveis = etapas.filter((etapa) =>
-      resolverVisibilidadeEtapa(usuarioAtual?.role, etapa.visibilidades).podeVer).map((etapa) => etapa.id);
+      resolverVisibilidadeEtapa(usuarioAtual?.role, etapa.visibilidades).podeVer && podeAcessarPipelineBpm({ role: usuarioAtual?.role ?? "", permissoes: ["crm"], setoresPipeline: etapa.pipeline.setores.map(({ setor }) => setor.nome), ehMembroPipeline: false })).map((etapa) => etapa.id);
 
     const empresa = await db.cliente.findUnique({
       where: { id: empresaId },
@@ -272,7 +274,7 @@ export async function ObterPerfilEmpresaBpm(empresaId: number) {
       where: {
         empresaId,
         etapaId: { in: etapaIdsVisiveis },
-        ...(admin ? {} : { membros: { some: { userId } } }),
+        ...filtroVinculoCardBpm(userId, admin),
       },
       select: {
         id: true,
@@ -289,7 +291,7 @@ export async function ObterPerfilEmpresaBpm(empresaId: number) {
     });
 
     const cardIds = cards.map((c) => c.id);
-    if (cardIds.length === 0) return { success: false, error: "Empresa nÃ£o encontrada" };
+    if (cardIds.length === 0) return { success: false, error: "Empresa não encontrada" };
 
     const historico = cardIds.length
       ? await db.bpmCardHistorico.findMany({

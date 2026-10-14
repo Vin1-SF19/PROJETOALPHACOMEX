@@ -109,7 +109,7 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
   });
 
   it("promove o lead para uma etapa criada pela UI", async () => {
-    prismaMock.bpmEtapa.findFirst.mockResolvedValue({ id: ETAPA_UI_ID, nome: "Agendar Reunião", visibilidades: [] });
+    prismaMock.bpmEtapa.findFirst.mockImplementation(async ({ where }: { where: { id?: string; ehInicial?: boolean } }) => where.ehInicial || where.id === ETAPA_ID ? { id: ETAPA_ID, nome: "Novo Lead", visibilidades: [] } : { id: ETAPA_UI_ID, nome: "Agendar Reunião", visibilidades: [] });
     prismaMock.nolossLead.findUnique.mockResolvedValue({
       id: NOLOSS_LEAD_ID, status: "pending", nome: "Lead Teste", email: null,
     });
@@ -131,6 +131,15 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
     expect(prismaMock.bpmCard.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ etapaId: ETAPA_UI_ID }),
     }));
+  });
+
+  it("nega promoção quando a origem está oculta mesmo com destino permitido", async () => {
+    prismaMock.bpmEtapa.findFirst.mockResolvedValueOnce({ id: ETAPA_UI_ID, nome: "Agendar Reunião", visibilidades: [] })
+      .mockResolvedValueOnce({ id: ETAPA_ID, nome: "Novo Lead", visibilidades: [{ perfil: "COMERCIAL", podeVer: false, podeAgir: false }] });
+    const resultado = await PromoverNolossLead({ nolossLeadId: NOLOSS_LEAD_ID, etapaDestinoId: ETAPA_UI_ID, responsavelId: 7, radarPretendido: "Revisão de Radar Ilimitado" });
+    expect(resultado).toMatchObject({ success: false, error: "Seu perfil não pode agir na coluna de novos leads." });
+    expect(prismaMock.nolossLead.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
   it("rejeita quando o lead já foi processado (status !== pending)", async () => {

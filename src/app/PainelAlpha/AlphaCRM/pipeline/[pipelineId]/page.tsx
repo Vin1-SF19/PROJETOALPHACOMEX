@@ -1,7 +1,7 @@
 import { auth } from "../../../../../../auth";
 import { getTema } from "@/lib/temas";
 import { ObterPipelineBpm } from "@/actions/bpm/Pipelines";
-import { ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
+import { SincronizarQuadroBpm } from "@/actions/bpm/Quadro";
 import PipelineBoardClient from "./PipelineBoardClient";
 import { notFound } from "next/navigation";
 
@@ -19,15 +19,17 @@ export default async function PipelineBpmPage({
 
   const [pipelineResult, cardsResult] = await Promise.all([
     ObterPipelineBpm(pipelineId),
-    ListarCardsPipelineBpm(pipelineId),
+    SincronizarQuadroBpm(pipelineId),
   ]);
 
   if (!pipelineResult.success || !pipelineResult.data) notFound();
 
   return (
     <PipelineBoardClient
+      key={pipelineId}
       pipeline={pipelineResult.data}
-      cardsIniciais={cardsResult.data ?? []}
+      cardsIniciais={cardsResult.success ? cardsResult.cards : []}
+      manifestoInicial={cardsResult.success ? cardsResult.manifesto : { configVersion: 0, entradas: [] }}
       visual={visual}
       currentUserId={session?.user?.id ? Number(session.user.id) : null}
       currentUserRole={session?.user?.role ?? null}

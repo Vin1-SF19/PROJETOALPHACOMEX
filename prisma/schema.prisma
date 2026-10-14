@@ -5213,11 +5213,12 @@ model BpmCard {
   // aplicável. Puramente aditivo: nenhuma coluna nova em `BpmCard` (a FK vive em `Indicacao`).
   indicacaoOrigem Indicacao?
 
-  @@index([empresaId])
-  @@index([pipelineId])
-  @@index([etapaId])
-  @@index([responsavelId])
-  @@index([status])
+  @@index([empresaId], map: "BpmCard_board_empresaId_idx")
+  @@index([pipelineId], map: "BpmCard_board_pipelineId_idx")
+  @@index([etapaId], map: "BpmCard_board_etapaId_idx")
+  @@index([responsavelId], map: "BpmCard_board_responsavelId_idx")
+  @@index([status], map: "BpmCard_board_status_idx")
+  @@index([pipelineId, status, etapaId, createdAt, id], map: "BpmCard_quadro_pagina_idx")
 }
 
 // Dimensões runtime distintas da etapa e do lifecycle (`BpmCard.status`).

@@ -26,6 +26,7 @@ describe("consulta autorizada de cards arquivados", () => {
     vi.clearAllMocks();
     mocks.auth.mockResolvedValue({ user: { id: "10" } });
     mocks.config.mockResolvedValue(false);
+    mocks.card.mockResolvedValue(undefined);
     mocks.usuarioFind.mockResolvedValue({ role: "COMERCIAL" });
     mocks.pipelineFind.mockResolvedValue([{ id: "permitido" }, { id: "oculto" }]);
     mocks.pipeline.mockImplementation((id: string) => Promise.resolve(id === "permitido"));
@@ -42,7 +43,7 @@ describe("consulta autorizada de cards arquivados", () => {
     expect(resultado).toMatchObject({ success: true, data: { pagina: 2, total: 1 } });
     expect(mocks.cardList).toHaveBeenCalledWith(expect.objectContaining({
       where: { status: "ARQUIVADO", pipelineId: { in: ["permitido"] },
-        etapaId: { in: ["etapa"] }, membros: { some: { userId: 10 } } },
+        etapaId: { in: ["etapa"] }, AND: [{ OR: [{ responsavelId: 10 }, { membros: { some: { userId: 10 } } }] }] },
       skip: 20, take: 20,
     }));
   });
@@ -82,6 +83,19 @@ describe("consulta autorizada de cards arquivados", () => {
     expect(resultado).toMatchObject({ success: true, data: {
       localizacao: { pipelineNome: "Revisão de Radar", etapaNome: "Reunião agendada" },
     } });
+  });
+
+  it.each([
+    { membro: null, perfil: "RESPONSAVEL" },
+    { membro: { role: "ADMINISTRADOR" }, perfil: "ADMIN" },
+  ])("usa perfil $perfil dos campos para responsável arquivado", async ({ membro, perfil }) => {
+    mocks.membroFind.mockResolvedValue(membro);
+    mocks.cardFind.mockResolvedValue({
+      id: "card", responsavelId: 10, status: "ARQUIVADO", pipelineId: "permitido", etapaId: "etapa",
+      pipeline: { nome: "Radar" }, etapa: { nome: "Etapa" }, historico: [], anexos: [],
+    });
+    expect(await ObterCardArquivadoBpm("card")).toMatchObject({ success: true });
+    expect(mocks.campos).toHaveBeenCalledWith("card", "permitido", "etapa", expect.anything(), perfil);
   });
 
   it("nega acesso quando a permissão de leitura do card falha", async () => {

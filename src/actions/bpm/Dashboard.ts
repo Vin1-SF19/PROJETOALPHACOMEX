@@ -1,4 +1,5 @@
 "use server";
+import { filtroVinculoCardBpm } from "@/lib/bpm/visibilidade-card";
 import db from "@/lib/prisma";
 import { auth } from "../../../auth";
 import {
@@ -58,19 +59,20 @@ export async function ObterDashboardBpm() {
       }),
     ]);
 
-    const cardIdsDoUsuario = admin
-      ? null
-      : (
-          await db.bpmCardMembro.findMany({
-            where: { userId, card: filtroCardVisivel },
-            select: { cardId: true },
-          })
-        ).map((m) => m.cardId);
     const acessoPipelines = await Promise.all(
       pipelines.map((pipeline) => checarAcessoBpmPipeline(pipeline.id, userId)),
     );
     const pipelinesVisiveis = pipelines.filter((_, index) => acessoPipelines[index]);
     const pipelineIdsVisiveis = pipelinesVisiveis.map((pipeline) => pipeline.id);
+
+    const cardIdsDoUsuario = admin
+      ? null
+      : (
+          await db.bpmCard.findMany({
+            where: { ...filtroCardVisivel, pipelineId: { in: pipelineIdsVisiveis }, ...filtroVinculoCardBpm(userId, false) },
+            select: { id: true },
+          })
+        ).map((m) => m.id);
 
     const agora = new Date();
 

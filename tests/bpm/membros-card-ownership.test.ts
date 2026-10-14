@@ -68,7 +68,7 @@ describe("CRM - elegibilidade de pessoas vinculáveis", () => {
       status: "ATIVO",
       permissoes: "crm",
     });
-    prismaMock.bpmCard.findUnique.mockResolvedValue({ etapa: { nome: "Em Tratativa" } });
+    prismaMock.bpmCard.findUnique.mockResolvedValue({ pipelineId: "pipeline", responsavelId: 3, pipeline: { setores: [] }, etapa: { nome: "Em Tratativa" } });
     prismaMock.bpmCardMembro.findUnique.mockResolvedValue({ role: "PARTICIPANTE" });
     prismaMock.usuarioPermissaoOverride.findMany.mockResolvedValue([]);
 
@@ -101,7 +101,7 @@ describe("CRM - elegibilidade de pessoas vinculáveis", () => {
       status: "ATIVO",
       permissoes: "crm",
     });
-    prismaMock.bpmCard.findUnique.mockResolvedValue({ etapa: { nome: "Em Tratativa" } });
+    prismaMock.bpmCard.findUnique.mockResolvedValue({ pipelineId: "pipeline", responsavelId: 3, pipeline: { setores: [] }, etapa: { nome: "Em Tratativa" } });
     prismaMock.bpmCardMembro.findUnique.mockResolvedValue(null);
     prismaMock.usuarioPermissaoOverride.findMany.mockResolvedValue([]);
 
@@ -118,6 +118,6 @@ describe("CRM - elegibilidade de pessoas vinculáveis", () => {
       resolve(process.cwd(), "src/actions/bpm/Cards.ts"),
       "utf8",
     );
-    expect(cardsAction).toContain("...(admin ? {} : { membros: { some: { userId } } })");
+    expect(cardsAction).toContain("...filtroVinculoCardBpm(userId, admin)");
   });
 });

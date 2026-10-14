@@ -3,7 +3,10 @@
 import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
 import { textoLegivelRd } from "@/lib/bpm/rd-station-text";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { SincronizarQuadroBpm } from "@/actions/bpm/Quadro";
+import { mesclarResumosQuadro, selecionarPaginaQuadro, TAMANHO_PAGINA_QUADRO, REVALIDACAO_RESUMOS_MS, type ManifestoQuadro } from "@/lib/bpm/quadro-paginado";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -634,11 +637,20 @@ export function KanbanCard({
   );
 }
 
+const MemoKanbanCard = memo(KanbanCard);
+
 function KanbanColumn({
-  etapa, cor, cards, accent, arrastoDesabilitado, cardMovendoId, isOver, onAdd, onAbrirCard, onAgendarReuniao,
+  etapa, cor, cards, accent, arrastoDesabilitado, cardMovendoId, isOver, onAdd, onAbrirCard, onAgendarReuniao, total, onCarregarMais, carregandoPagina,
 }: {
   etapa: EtapaBpm; cor: string; cards: CardBpm[]; accent: string; arrastoDesabilitado: boolean; cardMovendoId: string | null; isOver: boolean; onAdd?: () => void; onAbrirCard: (cardId: string) => void; onAgendarReuniao: (cardId: string) => void;
+  total?: number; onCarregarMais?: () => void; carregandoPagina?: boolean;
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // Wrapper medido separado da transformação aplicada pelo dnd-kit ao card.
+  const virtual = useVirtualizer({ count: cards.length, getScrollElement: () => scrollRef.current,
+    estimateSize: () => 240, overscan: 3, gap: 8, getItemKey: (index) => cards[index].id,
+    initialRect: { width: 260, height: 800 },
+  });
   const novosLeads = etapaEhNovosLeads(etapa.nome);
   return (
     <div className="alpha-pipeline-column-shell flex flex-col h-full min-h-0 w-full md:w-[220px] lg:w-[240px] xl:w-[260px] max-w-full">
@@ -651,7 +663,7 @@ function KanbanColumn({
             className="text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center"
             style={{ background: `rgba(${cor},0.2)`, color: `rgb(${cor})` }}
           >
-            {cards.length}
+            {total ?? cards.length}
           </span>
         </div>
         {onAdd && (
@@ -686,26 +698,28 @@ function KanbanColumn({
       )}
       <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <div
+          ref={scrollRef}
           className={cn("alpha-pipeline-column flex-1 min-h-0 overflow-y-auto overscroll-y-contain rounded-2xl p-2 space-y-2 border border-dashed border-white/5", isOver && "is-over")}
           style={{
             background: isOver ? `rgba(${cor},0.1)` : `rgba(${cor},0.03)`,
             borderColor: isOver ? `rgba(${cor},0.5)` : undefined,
           }}
         >
-          {cards.map((c, i) => (
-            <KanbanCard
-              key={c.id}
-              card={c}
-              etapaNome={etapa.nome}
-              accent={accent}
-              novosLeads={novosLeads}
-              arrastoDesabilitado={arrastoDesabilitado || !c.podeAgirEtapa}
-              onAbrir={onAbrirCard}
-              onAgendarReuniao={onAgendarReuniao}
-              index={i}
-              movendo={cardMovendoId === c.id}
-            />
-          ))}
+          <div style={{ height: virtual.getTotalSize(), position: "relative", width: "100%" }}>
+            {virtual.getVirtualItems().map((item) => {
+              const c = cards[item.index];
+              return <div key={item.key} data-index={item.index} ref={virtual.measureElement}
+                style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${item.start}px)` }}>
+                <MemoKanbanCard card={c} etapaNome={etapa.nome} accent={accent} novosLeads={novosLeads}
+                  arrastoDesabilitado={arrastoDesabilitado || !c.podeAgirEtapa} onAbrir={onAbrirCard}
+                  onAgendarReuniao={onAgendarReuniao} movendo={cardMovendoId === c.id} />
+              </div>;
+            })}
+          </div>
+          {onCarregarMais && cards.length < (total ?? 0) && <button type="button" onClick={onCarregarMais}
+            disabled={carregandoPagina || arrastoDesabilitado} className="mt-3 w-full rounded-lg border border-white/10 p-2 text-xs text-cyan-200 disabled:opacity-50">
+            {carregandoPagina ? "Carregando…" : `Carregar mais (${cards.length} de ${total})`}
+          </button>}
         </div>
       </SortableContext>
     </div>
@@ -713,9 +727,10 @@ function KanbanColumn({
 }
 
 function LazyPipelineColumn({
-  etapa, cor, cards, accent, arrastoDesabilitado, cardMovendoId, onAdd, onAbrirCard, onAgendarReuniao, atualizandoManual,
+  etapa, cor, cards, accent, arrastoDesabilitado, cardMovendoId, onAdd, onAbrirCard, onAgendarReuniao, atualizandoManual, total, onCarregarMais, carregandoPagina,
 }: {
   etapa: EtapaBpm; cor: string; cards: CardBpm[]; accent: string; arrastoDesabilitado: boolean; cardMovendoId: string | null; onAdd?: () => void; onAbrirCard: (cardId: string) => void; onAgendarReuniao: (cardId: string) => void; atualizandoManual: boolean;
+  total?: number; onCarregarMais?: () => void; carregandoPagina?: boolean;
 }) {
   const [ref, inView] = useLazyColumn(200);
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id: etapa.id });
@@ -739,6 +754,7 @@ function LazyPipelineColumn({
             cardMovendoId={cardMovendoId}
             arrastoDesabilitado={arrastoDesabilitado}
             isOver={isOver}
+            total={total} onCarregarMais={onCarregarMais} carregandoPagina={carregandoPagina}
             onAdd={onAdd}
             onAbrirCard={onAbrirCard}
             onAgendarReuniao={onAgendarReuniao}
@@ -752,6 +768,7 @@ function LazyPipelineColumn({
 interface Props {
   pipeline: PipelineBpm;
   cardsIniciais: CardBpm[];
+  manifestoInicial?: ManifestoQuadro;
   visual: TemaAlpha;
   currentUserId: number | null;
   currentUserRole: string | null;
@@ -765,6 +782,7 @@ interface SnapshotArrasto {
 interface OpcoesRecarregarCards {
   generation?: number;
   preservarErro?: boolean;
+  forcar?: boolean;
 }
 
 interface PromocaoLeadPendente {
@@ -774,10 +792,16 @@ interface PromocaoLeadPendente {
   etapaDestinoNome: string;
 }
 
-export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, currentUserId, currentUserRole }: Props) {
+export default function PipelineBoardClient({ pipeline, cardsIniciais, manifestoInicial, visual, currentUserId, currentUserRole }: Props) {
   const accent = visual.accent;
   const router = useRouter();
   const [cards, setCards] = useState<CardBpm[]>(cardsIniciais);
+  const [manifesto, setManifesto] = useState(manifestoInicial);
+  const [busca, setBusca] = useState("");
+  const [carregandoPagina, setCarregandoPagina] = useState(false);
+  const quadroRef = useRef({ manifesto: manifestoInicial, ids: cardsIniciais.map((c) => c.id), limites: {} as Record<string, number>, busca: "", responsavelId: null as number | null, ultimaCompleta: 0 });
+  useEffect(() => { quadroRef.current.ultimaCompleta = Date.now(); }, []);
+  const primeiraFiltragemRef = useRef(true);
   const [responsavelFiltro, setResponsavelFiltro] = useState<string | null>(null);
   const [cardSelecionadoId, setCardSelecionadoId] = useState<string | null>(null);
   const [cardAgendamentoId, setCardAgendamentoId] = useState<string | null>(null);
@@ -792,6 +816,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
   const [atualizandoManual, setAtualizandoManual] = useState(false);
   const [realtimeRevision, setRealtimeRevision] = useState(0);
   const ultimaRequisicaoRef = useRef(0);
+  const consultasEmAndamentoRef = useRef(0);
   const realtimeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cardSelecionadoIdRef = useRef<string | null>(null);
   const snapshotArrastoRef = useRef<SnapshotArrasto | null>(null);
@@ -820,6 +845,10 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
 
   const responsaveisDisponiveis = useMemo(() => {
     const mapa = new Map<number, string>();
+    if (manifesto) {
+      for (const card of manifesto.entradas) for (const pessoa of card.responsaveis) mapa.set(pessoa.id, pessoa.nome);
+      return Array.from(mapa, ([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
+    }
     for (const card of cards) {
       if (card.responsavel.id > 0) {
         mapa.set(card.responsavel.id, card.responsavel.nome);
@@ -831,7 +860,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
     return Array.from(mapa, ([id, nome]) => ({ id, nome })).sort((a, b) =>
       a.nome.localeCompare(b.nome)
     );
-  }, [cards]);
+  }, [cards, manifesto]);
 
   const getByEtapa = (etapaId: string) =>
     cards.filter(
@@ -843,14 +872,45 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
     );
 
   const recarregarCards = useCallback(async (opcoes: OpcoesRecarregarCards = {}) => {
+    consultasEmAndamentoRef.current += 1;
+    try {
     const requisicao = ++ultimaRequisicaoRef.current;
     const generation = opcoes.generation ?? generationBoardRef.current;
+    if (quadroRef.current.manifesto) {
+      const estado = quadroRef.current;
+      const forcar = opcoes.forcar ?? Date.now() - estado.ultimaCompleta >= REVALIDACAO_RESUMOS_MS;
+      try {
+        const idsCarregados = new Set(estado.ids);
+        const result = await SincronizarQuadroBpm(pipeline.id, {
+          conhecidos: estado.manifesto!.entradas.filter((c) => idsCarregados.has(c.id)).map(({ id, revision }) => ({ id, revision })),
+          limites: estado.limites, busca: estado.busca, responsavelId: estado.responsavelId, forcar,
+        });
+        if (requisicao !== ultimaRequisicaoRef.current || generation !== generationBoardRef.current) return false;
+        if (!result.success) {
+          if (result.acessoNegado) { setCards([]); setManifesto({ configVersion: -1, entradas: [] }); setCardSelecionadoId(null); setCardAgendamentoId(null); setNolossLeadAberto(null); estado.ids = []; estado.manifesto = { configVersion: -1, entradas: [] }; }
+          if (!opcoes.preservarErro) setErro(result.error);
+          return false;
+        }
+        const mudouConfig = estado.manifesto!.configVersion !== result.manifesto.configVersion;
+        estado.manifesto = result.manifesto; estado.ids = result.ids;
+        if (forcar) estado.ultimaCompleta = Date.now();
+        setManifesto(result.manifesto);
+        setNolossLeadAberto((aberto) => aberto && !result.manifesto.entradas.some((c) => c.id === aberto.id) ? null : aberto);
+        setCards((atuais) => mesclarResumosQuadro(atuais, result.cards as CardBpm[], result.ids));
+        if (cardSelecionadoIdRef.current && !result.manifesto.entradas.some((c) => c.id === cardSelecionadoIdRef.current)) {
+          cardSelecionadoIdRef.current = null; setCardSelecionadoId(null); setCardAgendamentoId(null);
+        }
+        if (mudouConfig) router.refresh();
+        if (!opcoes.preservarErro) setErro(null);
+        return true;
+      } catch { if (requisicao === ultimaRequisicaoRef.current && !opcoes.preservarErro) setErro("Não foi possível atualizar o quadro."); return false; }
+    }
     let res: Awaited<ReturnType<typeof ListarCardsPipelineBpm>>;
     try {
       res = await ListarCardsPipelineBpm(pipeline.id);
     } catch {
       if (requisicao === ultimaRequisicaoRef.current && generation === generationBoardRef.current && !opcoes.preservarErro) {
-        setErro("Nao foi possivel atualizar os cards");
+        setErro("Não foi possível atualizar os cards");
       }
       return false;
     }
@@ -858,7 +918,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
     if (requisicao !== ultimaRequisicaoRef.current || generation !== generationBoardRef.current) return false;
     if (!res.success) {
       if (!opcoes.preservarErro) {
-        setErro(typeof res.error === "string" ? res.error : "Nao foi possivel atualizar os cards");
+        setErro(typeof res.error === "string" ? res.error : "Não foi possível atualizar os cards");
       }
       return false;
     }
@@ -866,7 +926,8 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
     setCards(res.data);
     if (!opcoes.preservarErro) setErro(null);
     return true;
-  }, [pipeline.id]);
+    } finally { consultasEmAndamentoRef.current -= 1; }
+  }, [pipeline.id, router]);
 
   const atualizarPipeline = useCallback(async () => {
     if (atualizacaoManualRef.current || movimentoPendenteRef.current || snapshotArrastoRef.current) return;
@@ -874,7 +935,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
     atualizacaoManualRef.current = true;
     setAtualizandoManual(true);
     try {
-      await recarregarCards();
+      await recarregarCards({ forcar: true });
     } finally {
       atualizacaoManualRef.current = false;
       setAtualizandoManual(false);
@@ -897,9 +958,9 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
           sincronizacaoRealtimePendenteRef.current = true;
           return;
         }
-        void recarregarCards();
+        void recarregarCards({ forcar: true });
         if (cardSelecionadoIdRef.current) setRealtimeRevision((revision) => revision + 1);
-      }, 100);
+      }, 500);
     };
 
     channel.bind(BPM_PIPELINE_EVENT, onAtualizado);
@@ -920,11 +981,11 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
   // um snapshot otimista enquanto o usuário move um card.
   useEffect(() => {
     const sincronizar = () => {
-      if (document.visibilityState === "hidden" || movimentoPendenteRef.current || snapshotArrastoRef.current || atualizacaoManualRef.current) return;
+      if (document.visibilityState === "hidden" || consultasEmAndamentoRef.current > 0 || movimentoPendenteRef.current || snapshotArrastoRef.current || atualizacaoManualRef.current) return;
       void recarregarCards();
     };
     const aoRetomarAba = () => {
-      if (document.visibilityState === "visible") sincronizar();
+      if (document.visibilityState === "visible") { quadroRef.current.ultimaCompleta = 0; sincronizar(); }
     };
     const intervalo = window.setInterval(sincronizar, 30_000);
     document.addEventListener("visibilitychange", aoRetomarAba);
@@ -934,6 +995,26 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
       ultimaRequisicaoRef.current += 1;
     };
   }, [recarregarCards]);
+
+  useEffect(() => {
+    if (!quadroRef.current.manifesto) return;
+    if (primeiraFiltragemRef.current) { primeiraFiltragemRef.current = false; return; }
+    if (quadroRef.current.busca === busca && quadroRef.current.responsavelId === (responsavelFiltro ? Number(responsavelFiltro) : null)) return;
+    quadroRef.current.busca = busca;
+    quadroRef.current.responsavelId = responsavelFiltro ? Number(responsavelFiltro) : null;
+    quadroRef.current.limites = {};
+    ultimaRequisicaoRef.current += 1;
+    const timer = setTimeout(() => { void recarregarCards(); }, 300);
+    return () => clearTimeout(timer);
+  }, [busca, responsavelFiltro, recarregarCards]);
+
+  async function carregarMais(etapaId: string) {
+    if (carregandoPagina || movimentoPendenteRef.current || snapshotArrastoRef.current) return;
+    quadroRef.current.limites[etapaId] = (quadroRef.current.limites[etapaId] ?? TAMANHO_PAGINA_QUADRO) + TAMANHO_PAGINA_QUADRO;
+    setCarregandoPagina(true);
+    try { await recarregarCards(); } finally { setCarregandoPagina(false); }
+  }
+  const paginaManifesto = manifesto ? selecionarPaginaQuadro(manifesto.entradas, { busca, responsavelId: responsavelFiltro ? Number(responsavelFiltro) : null, }) : null;
 
   const abrirCard = useCallback((cardId: string) => {
     const card = cards.find((c) => c.id === cardId);
@@ -961,6 +1042,11 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
   const removerCardLocal = useCallback((cardId: string) => {
     // Uma resposta iniciada antes da exclusão não deve recolocar o card no board.
     ultimaRequisicaoRef.current += 1;
+    quadroRef.current.ids = quadroRef.current.ids.filter((id) => id !== cardId);
+    if (quadroRef.current.manifesto) {
+      quadroRef.current.manifesto = { ...quadroRef.current.manifesto, entradas: quadroRef.current.manifesto.entradas.filter((c) => c.id !== cardId) };
+      setManifesto(quadroRef.current.manifesto);
+    }
     setCards((prev) => prev.filter((c) => c.id !== cardId));
   }, []);
 
@@ -986,7 +1072,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
       snapshotArrastoRef.current = null;
       if (sincronizacaoRealtimePendenteRef.current) {
         sincronizacaoRealtimePendenteRef.current = false;
-        void recarregarCards({ generation: snapshot.generation });
+        void recarregarCards({ generation: snapshot.generation, forcar: true });
       }
       return;
     }
@@ -1031,7 +1117,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
       sincronizacaoRealtimePendenteRef.current = false;
       // A resposta do servidor libera o arrasto; a leitura atualiza badges e
       // encaminhamentos sem manter o usuário preso ao spinner.
-      void recarregarCards({ generation: snapshot.generation, preservarErro: Boolean(mensagemErro) });
+      void recarregarCards({ generation: snapshot.generation, forcar: true, preservarErro: Boolean(mensagemErro) });
     }
   }
 
@@ -1040,7 +1126,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
     snapshotArrastoRef.current = null;
     if (sincronizacaoRealtimePendenteRef.current) {
       sincronizacaoRealtimePendenteRef.current = false;
-      void recarregarCards({ generation: generationBoardRef.current });
+      void recarregarCards({ generation: generationBoardRef.current, forcar: true });
     }
   }
 
@@ -1056,7 +1142,8 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
             </p>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {manifesto && <input type="search" value={busca} maxLength={200} onChange={(event) => setBusca(event.target.value)} aria-label="Buscar em todos os cards do pipeline" placeholder="Buscar empresa, CNPJ ou serviço" className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white" />}
           <Select
             value={responsavelFiltro ?? "todos"}
             onValueChange={(v) => setResponsavelFiltro(v === "todos" ? null : v)}
@@ -1147,6 +1234,9 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
                 etapa={etapa}
                 cor={CORES_ETAPA[i % CORES_ETAPA.length]}
                 cards={getByEtapa(etapa.id)}
+                total={paginaManifesto?.totais[etapa.id] ?? (manifesto ? 0 : undefined)}
+                onCarregarMais={manifesto ? () => void carregarMais(etapa.id) : undefined}
+                carregandoPagina={carregandoPagina}
                 accent={accent}
                 cardMovendoId={cardMovendoId}
                 arrastoDesabilitado={movimentoPendente}
@@ -1182,7 +1272,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
           onCriado={async (dados) => {
             const res = await CriarCardBpm(dados);
             if (res.success) {
-              await recarregarCards();
+              await recarregarCards({ forcar: true });
               setNovoCardAberto(false);
               router.refresh();
               return { success: true as const };
@@ -1202,7 +1292,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
           const resultado = await MoverCardBpm({ ...atribuicaoAgendarPendente, responsavelId });
           if (!resultado.success) return { success: false, error: typeof resultado.error === "string" ? resultado.error : "Não foi possível mover o lead." };
           setAtribuicaoAgendarPendente(null);
-          await recarregarCards();
+          await recarregarCards({ forcar: true });
           router.refresh();
           return { success: true };
         }}
@@ -1217,7 +1307,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
           accent={accent}
           onClose={fecharCard}
           onAtualizado={async () => {
-            await recarregarCards();
+            await recarregarCards({ forcar: true });
             router.refresh();
           }}
           onCardExcluido={removerCardLocal}
@@ -1244,7 +1334,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
           onClose={() => setNolossLeadAberto(null)}
           onPromovido={async () => {
             setNolossLeadAberto(null);
-            await recarregarCards();
+            await recarregarCards({ forcar: true });
             router.refresh();
           }}
           onConfirmarPromocao={async (responsavelId, cnpj, radarPretendido, qualificacao) => {
@@ -1280,7 +1370,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
             });
             if (res.success) {
               setPromocaoLeadPendente(null);
-              await recarregarCards();
+              await recarregarCards({ forcar: true });
               router.refresh();
               return { success: true as const };
             }

@@ -10,16 +10,16 @@ import {
   vinculoPessoaBoasVindasOperacionalRestrito,
 } from "@/lib/bpm/boas-vindas";
 
-function cliente(params: { role: string; membro?: boolean; podeVer?: boolean }) {
+function cliente(params: { role: string; membro?: boolean; podeVer?: boolean; responsavelId?: number; roleMembro?: string; setores?: string[] }) {
   return {
     usuarios: { findUnique: async () => ({ id: 7, role: params.role, status: "ATIVO", permissoes: "crm" }) },
     setorPermissao: { findMany: async () => [] },
     usuarioPermissaoOverride: { findMany: async () => [] },
-    bpmCard: { findUnique: async () => ({ status: "ATIVO", vinculosOrigem: [], etapa: {
+    bpmCard: { findUnique: async () => ({ pipelineId: "pipeline", responsavelId: params.responsavelId ?? 99, pipeline: { setores: (params.setores ?? []).map((nome) => ({ setor: { nome } })) }, status: "ATIVO", vinculosOrigem: [], etapa: {
       nome: "Boas-vindas", ehFinal: false,
       visibilidades: params.podeVer === undefined ? [] : [{ perfil: params.role, podeVer: params.podeVer, podeAgir: params.podeVer }],
     } }) },
-    bpmCardMembro: { findUnique: async () => (params.membro === false ? null : { role: "RESPONSAVEL" }) },
+    bpmCardMembro: { findUnique: async () => (params.membro === false ? null : { role: params.roleMembro ?? "RESPONSAVEL" }) },
   };
 }
 
@@ -56,6 +56,22 @@ describe("Boas-vindas — permissões configuradas", () => {
     await expect(checarAcessoBpmCard("card-1", 7, "COMERCIAL", "visualizar", cliente({
       role: "COMERCIAL", membro: false,
     }) as never)).resolves.toMatchObject({ autorizado: false });
+  });
+
+  it("autoriza responsável sem linha de membro, mas mantém limites de pipeline e coluna", async () => {
+    const params = { role: "COMERCIAL", membro: false, responsavelId: 7 };
+    await expect(checarAcessoBpmCard("card", 7, "COMERCIAL", "editarCard", cliente(params) as never))
+      .resolves.toMatchObject({ autorizado: true, role: "RESPONSAVEL" });
+    await expect(checarAcessoBpmCard("card", 7, "COMERCIAL", "visualizar", cliente({ ...params, setores: ["OPERACIONAL"] }) as never))
+      .resolves.toMatchObject({ autorizado: false });
+    await expect(checarAcessoBpmCard("card", 7, "COMERCIAL", "visualizar", cliente({ ...params, podeVer: false }) as never))
+      .resolves.toMatchObject({ autorizado: false });
+  });
+
+  it("preserva o perfil administrador do card quando também é responsável", async () => {
+    await expect(checarAcessoBpmCard("card", 7, "COMERCIAL", "visualizar", cliente({
+      role: "COMERCIAL", responsavelId: 7, roleMembro: "ADMINISTRADOR",
+    }) as never)).resolves.toMatchObject({ autorizado: true, role: "ADMINISTRADOR", isAdminGlobal: false });
   });
 
   it("retira o filtro fixo nas consultas e mantém o aviso visual do card nunca acessado", () => {

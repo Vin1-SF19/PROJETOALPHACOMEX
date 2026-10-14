@@ -33,7 +33,7 @@ describe("permissão CRM normalizada", () => {
     })).toBe(false);
   });
 
-  it("permite pipeline aberto, setor compatível ou membro, sempre com CRM", () => {
+  it("permite pipeline aberto ou setor compatível; vínculo não contorna restrição de pipeline", () => {
     const base = { role: "Comercial", permissoes: ["CRM"] };
     expect(podeAcessarPipelineBpm({
       ...base,
@@ -49,7 +49,7 @@ describe("permissão CRM normalizada", () => {
       ...base,
       setoresPipeline: ["OPERACIONAL"],
       ehMembroPipeline: true,
-    })).toBe(true);
+    })).toBe(false);
   });
 
   it("nega pipeline de outro setor sem membresia", () => {

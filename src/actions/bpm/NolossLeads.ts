@@ -55,20 +55,24 @@ export async function PromoverNolossLead(dados: unknown) {
       && !["agendar reunião", "standby", "stand by", "standby - follow up"].includes(normalizarNomeEtapa(etapaDestino.nome))) {
       return { success: false, error: "Novo Lead só pode avançar para Agendar reunião ou Standby." };
     }
-    if (!etapaEhNovosLeads(etapaDestino.nome)) {
-      const etapaInicial = await db.bpmEtapa.findFirst({
-        where: { pipelineId: pipeline.id, ativo: true, ehInicial: true }, select: { id: true },
-      });
-      if (!etapaInicial || !(await verificarTransicaoPermitidaBpm(etapaInicial.id, etapaDestinoId, "MANUAL")).permitida) {
-        return { success: false, error: "A transição de Novo Lead para esta etapa não está permitida." };
-      }
-    }
     if (!resolverVisibilidadeEtapa(
       usuarioAtual?.role,
       etapaDestino.visibilidades,
     ).podeAgir) {
       return { success: false, error: "Seu perfil não pode agir na etapa de destino." };
     }
+    const etapaInicial = etapaEhNovosLeads(etapaDestino.nome) ? etapaDestino : await db.bpmEtapa.findFirst({
+      where: { pipelineId: pipeline.id, ativo: true, ehInicial: true },
+      select: { id: true, nome: true, visibilidades: { select: { perfil: true, podeVer: true, podeAgir: true } } },
+    });
+    const acessoOrigem = etapaInicial && resolverVisibilidadeEtapa(usuarioAtual?.role, etapaInicial.visibilidades);
+    if (!etapaInicial || !etapaEhNovosLeads(etapaInicial.nome) || !acessoOrigem?.podeVer || !acessoOrigem.podeAgir) {
+      return { success: false, error: "Seu perfil não pode agir na coluna de novos leads." };
+    }
+    if (etapaInicial.id !== etapaDestinoId && !(await verificarTransicaoPermitidaBpm(etapaInicial.id, etapaDestinoId, "MANUAL")).permitida) {
+      return { success: false, error: "A transição de Novo Lead para esta etapa não está permitida." };
+    }
+
 
     if (!(await usuarioElegivelResponsavelBpm(pipeline.id, responsavelId))) {
       return { success: false, error: "Responsável inválido para este pipeline." };
@@ -83,7 +87,7 @@ export async function PromoverNolossLead(dados: unknown) {
     }
 
     const resultado = await db.$transaction(async (tx) => {
-      const [destinoAtual, perfilAtual] = await Promise.all([
+      const [destinoAtual, perfilAtual, origemAtual] = await Promise.all([
         tx.bpmEtapa.findFirst({
           where: { id: etapaDestinoId, pipelineId: pipeline.id, ativo: true },
           select: {
@@ -93,8 +97,11 @@ export async function PromoverNolossLead(dados: unknown) {
           },
         }),
         tx.usuarios.findUnique({ where: { id: userId }, select: { role: true } }),
+        tx.bpmEtapa.findFirst({ where: { id: etapaInicial.id, pipelineId: pipeline.id, ativo: true },
+          select: { visibilidades: { select: { perfil: true, podeVer: true, podeAgir: true } } } }),
       ]);
-      if (!destinoAtual || !resolverVisibilidadeEtapa(
+      const origemPermitida = origemAtual && resolverVisibilidadeEtapa(perfilAtual?.role, origemAtual.visibilidades);
+      if (!origemPermitida?.podeVer || !origemPermitida.podeAgir || !destinoAtual || !resolverVisibilidadeEtapa(
         perfilAtual?.role,
         destinoAtual.visibilidades,
       ).podeAgir) {

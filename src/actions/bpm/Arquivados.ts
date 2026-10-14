@@ -1,4 +1,5 @@
 "use server";
+import { filtroVinculoCardBpm } from "@/lib/bpm/visibilidade-card";
 
 import db from "@/lib/prisma";
 import { auth } from "../../../auth";
@@ -60,7 +61,7 @@ export async function ListarCardsArquivadosBpm(pagina = 1) {
       status: "ARQUIVADO",
       pipelineId: { in: contexto.pipelineIds },
       etapaId: { in: etapaIds },
-      ...(contexto.admin ? {} : { membros: { some: { userId: contexto.userId } } }),
+      ...filtroVinculoCardBpm(contexto.userId, contexto.admin),
     };
     const [total, cards] = await Promise.all([
       db.bpmCard.count({ where }),
@@ -105,7 +106,7 @@ export async function ObterCardArquivadoBpm(cardId: string) {
     const card = await db.bpmCard.findUnique({
       where: { id: cardId },
       select: {
-        id: true, status: true, pipelineId: true, etapaId: true, createdAt: true,
+        id: true, status: true, pipelineId: true, etapaId: true, createdAt: true, responsavelId: true,
         servico: true, tipoProcesso: true, proximoContatoEm: true, dataReuniao: true,
         transcricaoReuniao: true, statusPosFechamento: true,
         empresa: { select: { razaoSocial: true, nomeFantasia: true, cnpj: true } },
@@ -127,7 +128,7 @@ export async function ObterCardArquivadoBpm(cardId: string) {
       where: { cardId_userId: { cardId, userId: contexto.userId } }, select: { role: true },
     });
     const perfil = acesso || membro?.role === "ADMINISTRADOR" ? "ADMIN"
-      : membro?.role === "RESPONSAVEL" ? "RESPONSAVEL" : "MEMBRO";
+      : card.responsavelId === contexto.userId || membro?.role === "RESPONSAVEL" ? "RESPONSAVEL" : "MEMBRO";
     const campos = await carregarCamposAplicaveisCardEtapa(card.id, card.pipelineId, card.etapaId, db, perfil);
     const evento = await db.bpmCardHistorico.findFirst({
       where: { cardId: card.id, acao: "CARD_ARQUIVADO" },

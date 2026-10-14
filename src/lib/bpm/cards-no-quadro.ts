@@ -1,3 +1,4 @@
+import { filtroVinculoCardBpm } from "@/lib/bpm/visibilidade-card";
 import "server-only";
 
 import db from "@/lib/prisma";
@@ -67,7 +68,7 @@ export async function contarCardsVisiveisNoQuadro(
       pipelineId,
       etapaId: { in: etapaIdsVisiveis },
       OR: [{ status: "ATIVO" }, { status: "CONCLUIDO", etapa: { ehFinal: true } }],
-      ...(admin ? {} : { membros: { some: { userId } } }),
+      ...filtroVinculoCardBpm(userId, admin),
     },
     select: {
       status: true, etapaId: true,

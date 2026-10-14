@@ -1,4 +1,5 @@
 "use server";
+import { filtroVinculoCardBpm } from "@/lib/bpm/visibilidade-card";
 import { randomUUID } from "node:crypto";
 import { BuscarEmpresasBpm as buscarEmpresas, BuscarEmpresaPorCnpjBpm as buscarEmpresaPorCnpj, ListarUsuariosResponsavelBpm as listarResponsaveis } from "./CardsConsultas";
 import { ExcluirCardBpm as excluirCard } from "./CardsExcluir";
@@ -121,8 +122,9 @@ async function destinoEhEtapaCanonicaNovosLeads(
     && candidatas[0].id === etapaId;
 }
 
-export async function ListarCardsPipelineBpm(pipelineId: string) {
+export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: string[]) {
   try {
+    if (cardIds !== undefined && (!Array.isArray(cardIds) || cardIds.length > 5000 || cardIds.some((id) => typeof id !== "string" || id.length > 150))) return { success: false, error: "Seleção inválida", data: [] };
     const session = await auth();
     const userId = Number(session?.user?.id);
     const admin = Number.isFinite(userId)
@@ -207,9 +209,10 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
     const cards = await db.bpmCard.findMany({
       where: {
         pipelineId,
+        ...(cardIds ? { id: { in: cardIds } } : {}),
         OR: [{ status: "ATIVO" }, { status: "CONCLUIDO", etapa: { ehFinal: true } }],
         etapaId: { in: etapasVisiveis },
-        ...(admin ? {} : { membros: { some: { userId } } }),
+        ...filtroVinculoCardBpm(userId, admin),
       },
       select: {
         id: true,
@@ -265,7 +268,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
           select: { valor: true, campo: { select: { id: true, nome: true, chave: true } } },
         },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     });
 
     const idsDestinos = [...new Set(cards.flatMap((card) => card.vinculosOrigem.map((vinculo) => vinculo.cardDestino.id)))];
@@ -595,7 +598,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
 
     return {
       success: true,
-      data: [...cardsReais, ...cardsVirtuais],
+      data: [...cardsReais, ...cardsVirtuais].filter((card) => !cardIds || cardIds.includes(card.id)),
     };
   } catch (error) {
     console.error("[ListarCardsPipelineBpm]", error);

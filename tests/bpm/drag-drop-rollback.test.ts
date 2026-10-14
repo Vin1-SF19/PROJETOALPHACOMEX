@@ -109,7 +109,7 @@ describe("CRM - rollback do drag-and-drop", () => {
     expect(board).toContain("const generation = ++generationBoardRef.current;");
     expect(board).toContain("generation !== generationBoardRef.current");
     expect(board).toContain("movimentoPendenteRef.current = false;");
-    expect(board).toContain("void recarregarCards({ generation: snapshot.generation, preservarErro: Boolean(mensagemErro) });");
+    expect(board).toContain("void recarregarCards({ generation: snapshot.generation, forcar: true, preservarErro: Boolean(mensagemErro) });");
 
     const inicioDnD = board.indexOf("function onDragStart");
     const fimDnD = board.indexOf("const activeCard = cards.find", inicioDnD);

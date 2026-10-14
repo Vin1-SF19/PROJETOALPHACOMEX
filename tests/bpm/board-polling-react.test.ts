@@ -2,7 +2,7 @@
 import React, { act, createElement as h } from "react";
 import type { ComponentProps } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import PipelineBoardClient from "@/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient";
 import { MoverCardBpm, ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
 
@@ -14,8 +14,9 @@ vi.mock("@dnd-kit/core", async (original) => {
     return h(actual.DndContext, props);
   } };
 });
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock("next/navigation", () => { const router = { refresh: vi.fn() }; return { useRouter: () => router }; });
 vi.mock("@/lib/pusher", () => ({ pusherClient: null }));
+vi.mock("@/actions/bpm/Quadro", () => ({ SincronizarQuadroBpm: vi.fn() }));
 vi.mock("@/actions/bpm/Cards", () => ({
   ListarCardsPipelineBpm: vi.fn(),
   MoverCardBpm: vi.fn(),
@@ -62,7 +63,13 @@ function montarBoard() {
   return { container, root, props };
 }
 
+beforeEach(() => {
+  vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) { return this.classList.contains("alpha-pipeline-column") ? 800 : 240; });
+  vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(260);
+});
+
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.useRealTimers();
   vi.clearAllMocks();
 });
@@ -247,4 +254,79 @@ it("permite o drop em etapa anterior quando a transição manual foi configurada
     await act(async () => root.unmount());
     container.remove();
   }
+});
+
+it("pagina 381 cards com DOM limitado, preserva total e busca detalhes apenas quando necessário", async () => {
+  Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
+  vi.useFakeTimers();
+  const { SincronizarQuadroBpm } = await import("@/actions/bpm/Quadro");
+  const { container, root, props } = montarBoard();
+  const todos = Array.from({ length: 381 }, (_, i) => ({ ...card, id: `lead-${i}`, empresa: { ...card.empresa, razaoSocial: `Empresa ${i}` } }));
+  props.cardsIniciais = todos.slice(0, 30);
+  props.manifestoInicial = { configVersion: 1, entradas: todos.map((c) => ({ id: c.id, etapaId: c.etapaId, revision: "v1", nome: c.empresa.razaoSocial, cnpj: null, servico: null, responsaveis: [c.responsavel] })) };
+  vi.mocked(SincronizarQuadroBpm).mockResolvedValue({ success: true, manifesto: props.manifestoInicial, cards: [], ids: todos.slice(0, 30).map((c) => c.id) });
+  try {
+    await act(async () => root.render(h(PipelineBoardClient, props)));
+    expect(container.textContent).toContain("30 de 381");
+    const montados = container.querySelectorAll('[aria-label^="Abrir card de Empresa"]');
+    expect(montados.length).toBeGreaterThan(0);
+    expect(montados.length).toBeLessThan(20);
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(ListarCardsPipelineBpm).not.toHaveBeenCalled();
+    expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ forcar: false, conhecidos: expect.any(Array) }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ forcar: true }));
+    vi.mocked(SincronizarQuadroBpm).mockResolvedValue({ success: true, manifesto: props.manifestoInicial, cards: todos.slice(30, 60), ids: todos.slice(0, 60).map((c) => c.id) } as never);
+    await act(async () => { [...container.querySelectorAll("button")].find((b) => b.textContent?.includes("Carregar mais"))?.click(); });
+    expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ limites: { "etapa-1": 60 } }));
+    expect(container.textContent).toContain("60 de 381");
+    expect(container.querySelectorAll('[aria-label^="Abrir card de Empresa"]').length).toBeLessThan(20);
+  } finally { await act(async () => root.unmount()); container.remove(); }
+});
+
+it("fecha o card aberto e limpa o quadro quando perde acesso ao pipeline", async () => {
+  Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
+  vi.useFakeTimers();
+  const { SincronizarQuadroBpm } = await import("@/actions/bpm/Quadro");
+  const { container, root, props } = montarBoard();
+  props.manifestoInicial = { configVersion: 1, entradas: [{ id: card.id, etapaId: card.etapaId, revision: "v1", nome: "Empresa", cnpj: null, servico: null, responsaveis: [card.responsavel] }] };
+  vi.mocked(SincronizarQuadroBpm).mockResolvedValue({ success: false, acessoNegado: true, error: "Você não tem mais acesso a este pipeline." });
+  try {
+    await act(async () => root.render(h(PipelineBoardClient, props)));
+    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Abrir card de Empresa"]')?.click());
+    expect(container.textContent).toContain("Confirmar exclusão");
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(container.textContent).not.toContain("Confirmar exclusão");
+    expect(container.textContent).toContain("Você não tem mais acesso");
+    expect(container.querySelector('[aria-label="Abrir card de Empresa"]')).toBeNull();
+  } finally { await act(async () => root.unmount()); container.remove(); }
+});
+
+it("busca fora do lote inicial e descarta resposta antiga após mudar o filtro", async () => {
+  Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
+  vi.useFakeTimers();
+  const { SincronizarQuadroBpm } = await import("@/actions/bpm/Quadro");
+  const { container, root, props } = montarBoard();
+  const remoto = { ...card, id: "fora-do-lote", empresa: { ...card.empresa, razaoSocial: "Empréstimo" } };
+  const entradas = [card, remoto].map((c) => ({ id: c.id, etapaId: c.etapaId, revision: "v1", nome: c.empresa.razaoSocial, cnpj: null, servico: null, responsaveis: [c.responsavel] }));
+  const manifesto = { configVersion: 1, entradas };
+  props.manifestoInicial = manifesto;
+  let antiga!: (r: Awaited<ReturnType<typeof SincronizarQuadroBpm>>) => void;
+  vi.mocked(SincronizarQuadroBpm).mockImplementationOnce(() => new Promise((resolve) => { antiga = resolve; }));
+  vi.mocked(SincronizarQuadroBpm).mockResolvedValue({ success: true, manifesto, cards: [remoto], ids: [remoto.id] } as never);
+  try {
+    await act(async () => root.render(h(PipelineBoardClient, props)));
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    const input = container.querySelector<HTMLInputElement>('input[type="search"]')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "emprestimo");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+    expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ busca: "emprestimo" }));
+    expect(container.querySelector('[aria-label="Abrir card de Empréstimo"]')).not.toBeNull();
+    await act(async () => antiga({ success: true, manifesto, cards: [card], ids: [card.id] } as never));
+    expect(container.querySelector('[aria-label="Abrir card de Empréstimo"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Abrir card de Empresa"]')).toBeNull();
+  } finally { await act(async () => root.unmount()); container.remove(); }
 });

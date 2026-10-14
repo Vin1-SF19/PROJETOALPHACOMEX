@@ -34,7 +34,7 @@ describe("listarPendenciasBpm", () => {
     prismaMock.usuarios.findUnique.mockResolvedValue({ id: 1, role: "COMERCIAL", status: "ATIVO", permissoes: "crm" });
     prismaMock.setorPermissao.findMany.mockResolvedValue([]);
     prismaMock.usuarioPermissaoOverride.findMany.mockResolvedValue([]);
-    prismaMock.bpmCard.findUnique.mockResolvedValue({ etapa: { nome: "Em tratativa", visibilidades: [] } });
+    prismaMock.bpmCard.findUnique.mockResolvedValue({ pipelineId: CARD_BASE.pipelineId, responsavelId: 99, pipeline: { setores: [] }, etapa: { nome: "Em tratativa", visibilidades: [] } });
     prismaMock.bpmCardMembro.findUnique.mockResolvedValue({ role: "PARTICIPANTE" });
     prismaMock.bpmTarefa.findMany.mockResolvedValue([]);
     prismaMock.bpmCardChecklist.findMany.mockResolvedValue([]);
@@ -74,14 +74,14 @@ describe("listarPendenciasBpm", () => {
   it.each(["sem vínculo", "etapa oculta"])("não expõe dados: %s", async (caso) => {
     prismaMock.bpmCard.findMany.mockResolvedValue([CARD_BASE]);
     if (caso === "sem vínculo") prismaMock.bpmCardMembro.findUnique.mockResolvedValue(null);
-    if (caso === "etapa oculta") prismaMock.bpmCard.findUnique.mockResolvedValue({ etapa: { nome: "Em tratativa", visibilidades: [{ perfil: "COMERCIAL", podeVer: false, podeAgir: false }] } });
+    if (caso === "etapa oculta") prismaMock.bpmCard.findUnique.mockResolvedValue({ pipelineId: CARD_BASE.pipelineId, responsavelId: 99, pipeline: { setores: [] }, etapa: { nome: "Em tratativa", visibilidades: [{ perfil: "COMERCIAL", podeVer: false, podeAgir: false }] } });
     await expect(listarPendenciasBpm(1, true)).resolves.toEqual([]);
     expect(prismaMock.bpmTarefa.findMany).not.toHaveBeenCalled();
   });
 
   it("permite à conta TI consultar Boas-vindas", async () => {
     prismaMock.usuarios.findUnique.mockResolvedValue({ id: 1, role: "TI", status: "ATIVO", permissoes: null });
-    prismaMock.bpmCard.findUnique.mockResolvedValue({ etapa: { nome: "Boas-vindas", visibilidades: [] } });
+    prismaMock.bpmCard.findUnique.mockResolvedValue({ pipelineId: CARD_BASE.pipelineId, responsavelId: 99, pipeline: { setores: [] }, etapa: { nome: "Boas-vindas", visibilidades: [] } });
     prismaMock.bpmCard.findMany.mockResolvedValue([{ ...CARD_BASE, proximoContatoEm: new Date(0) }]);
     expect(await listarPendenciasBpm(1, true)).toHaveLength(1);
   });

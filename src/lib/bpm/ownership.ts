@@ -71,7 +71,6 @@ export function podeAcessarPipelineBpm(params: {
   if (isAdminRole(params.role)) return true;
   if (!possuiPermissaoCrm(params.permissoes)) return false;
   return params.setoresPipeline.length === 0
-    || params.ehMembroPipeline
     || params.setoresPipeline.some((setor) => isSameRole(setor, params.role));
 }
 
@@ -186,24 +185,16 @@ export async function checarAcessoBpmPipeline(
   if (isAdminRole(acesso.usuario.role)) return true;
   if (!possuiPermissaoCrm(acesso.permissoes)) return false;
 
-  const [pipeline, membro] = await Promise.all([
-    client.bpmPipeline.findUnique({
-      where: { id: pipelineId },
-      select: {
-        setores: { select: { setor: { select: { nome: true } } } },
-      },
-    }),
-    client.bpmCardMembro.findFirst({
-      where: { userId, card: { pipelineId } },
-      select: { id: true },
-    }),
-  ]);
+  const pipeline = await client.bpmPipeline.findUnique({
+    where: { id: pipelineId },
+    select: { setores: { select: { setor: { select: { nome: true } } } } },
+  });
   if (!pipeline) return false;
   return podeAcessarPipelineBpm({
     role: acesso.usuario.role,
     permissoes: acesso.permissoes,
     setoresPipeline: pipeline.setores.map(({ setor }) => setor.nome),
-    ehMembroPipeline: Boolean(membro),
+    ehMembroPipeline: false,
   });
 }
 
@@ -368,6 +359,8 @@ export async function checarAcessoBpmCard(
       where: { id: cardId },
       select: {
         pipelineId: true,
+        responsavelId: true,
+        pipeline: { select: { setores: { select: { setor: { select: { nome: true } } } } } },
         status: true,
         etapa: {
           select: {
@@ -406,6 +399,13 @@ export async function checarAcessoBpmCard(
     return { autorizado: false, isAdminGlobal: false, role: null, perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false };
   }
 
+  if (!card.pipeline || !podeAcessarPipelineBpm({
+    role: acessoModulo.usuario.role,
+    permissoes: acessoModulo.permissoes,
+    setoresPipeline: card.pipeline.setores.map(({ setor }) => setor.nome),
+    ehMembroPipeline: false,
+  })) return { autorizado: false, isAdminGlobal: false, role: null, perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false };
+
   const permissaoEtapa = resolverVisibilidadeEtapa(
     acessoModulo.usuario.role,
     card.etapa.visibilidades,
@@ -418,10 +418,13 @@ export async function checarAcessoBpmCard(
       podeAgirEtapa: false, bloqueadoPorEncaminhamento };
   }
 
-  const membro = await client.bpmCardMembro.findUnique({
+  const membroExistente = await client.bpmCardMembro.findUnique({
     where: { cardId_userId: { cardId, userId } },
     select: { role: true },
   });
+
+  const membro = membroExistente?.role === "ADMINISTRADOR" ? membroExistente
+    : card.responsavelId === userId ? { role: "RESPONSAVEL" } : membroExistente;
 
   if (!membro) {
     return { autorizado: false, isAdminGlobal: false, role: null, perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false };
@@ -485,34 +488,15 @@ export async function checarAcessoConfigPipeline(
 
 /**
  * Eventos no canal do pipeline são apenas invalidações genéricas e não carregam
- * `cardId` nem dados do card. Assim, uma pessoa CRM ativa vinculada a qualquer
- * card daquele pipeline pode assinar o canal para perceber a revogação do
- * próprio vínculo; a recarga posterior continua filtrando cards por membro.
+ * `cardId` nem dados do card. Pessoas com acesso ao pipeline podem assinar o canal; a recarga posterior
+ * reaplica as permissões do pipeline, da coluna e o vínculo com cada card.
  */
 export async function checarAcessoRealtimeBpmPipeline(
   pipelineId: string,
   userId: number,
   client: ClienteAcessoBpm = db,
 ): Promise<boolean> {
-  const acesso = await carregarUsuarioEPermissoesBpm(userId, client);
-  if (!acesso) return false;
-  if (isAdminRole(acesso.usuario.role)) return true;
-  if (!possuiPermissaoCrm(acesso.permissoes)) return false;
-
-  const [pipeline, membro] = await Promise.all([
-    client.bpmPipeline.findUnique({
-      where: { id: pipelineId },
-      select: { setores: { select: { setor: { select: { nome: true } } } } },
-    }),
-    client.bpmCardMembro.findFirst({
-      where: { userId, card: { pipelineId } },
-      select: { id: true },
-    }),
-  ]);
-  if (!pipeline) return false;
-  return pipeline.setores.length === 0
-    || pipeline.setores.some(({ setor }) => isSameRole(setor.nome, acesso.usuario.role))
-    || Boolean(membro);
+  return checarAcessoBpmPipeline(pipelineId, userId, client);
 }
 
 export async function exigirAcessoConfigPipeline(

@@ -54,7 +54,7 @@ describe("contagem do quadro", () => {
     ]);
     expect(await contarCardsVisiveisNoQuadro("radar", 10, "COMERCIAL", false)).toBe(3);
     expect(mocks.cards).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({
-      membros: { some: { userId: 10 } },
+      AND: [{ OR: [{ responsavelId: 10 }, { membros: { some: { userId: 10 } } }] }],
       OR: [{ status: "ATIVO" }, { status: "CONCLUIDO", etapa: { ehFinal: true } }],
     }) }));
   });

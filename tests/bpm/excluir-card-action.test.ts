@@ -59,7 +59,7 @@ describe("arquivamento: action e guard reais", () => {
   mocks.db.setorPermissao.findMany.mockResolvedValue([]);
   mocks.db.usuarioPermissaoOverride.findMany.mockResolvedValue([]);
   mocks.db.bpmCardMembro.findUnique.mockResolvedValue({ role: "RESPONSAVEL" });
-  mocks.db.bpmCard.findUnique.mockResolvedValue({ status: "ATIVO", pipelineId: "pipeline", etapaId: "etapa", pipeline: { nome: "Revisão de Radar" }, etapa: { nome: "Em tratativa", visibilidades: [] } });
+  mocks.db.bpmCard.findUnique.mockResolvedValue({ status: "ATIVO", pipelineId: "pipeline", etapaId: "etapa", responsavelId: 99, pipeline: { nome: "Revisão de Radar", setores: [] }, etapa: { nome: "Em tratativa", visibilidades: [] } });
   mocks.db.$transaction.mockImplementation((fn: (tx: typeof mocks.db) => Promise<unknown>) => fn(mocks.db));
  });
  it("exige sessão antes de consultar o banco", async () => {
@@ -75,7 +75,7 @@ describe("arquivamento: action e guard reais", () => {
   if (caso === "PARTICIPANTE") mocks.db.bpmCardMembro.findUnique.mockResolvedValue({ role: caso });
   if (caso === "sem vínculo") mocks.db.bpmCardMembro.findUnique.mockResolvedValue(null);
   if (caso === "revogado") mocks.db.usuarioPermissaoOverride.findMany.mockResolvedValue([{ modulo: "crm", acao: "REMOVE" }]);
-  if (caso === "oculta") mocks.db.bpmCard.findUnique.mockResolvedValue({ etapa: { nome: "Etapa", visibilidades: [{ perfil: "COMERCIAL", podeVer: false, podeAgir: false }] } });
+  if (caso === "oculta") mocks.db.bpmCard.findUnique.mockResolvedValue({ pipelineId: "pipeline", responsavelId: 99, pipeline: { setores: [] }, etapa: { nome: "Etapa", visibilidades: [{ perfil: "COMERCIAL", podeVer: false, podeAgir: false }] } });
   expect(await ExcluirCardBpm("card")).toMatchObject({ success: false });
   expect(mocks.db.bpmCard.update).not.toHaveBeenCalled();
  });
@@ -92,7 +92,7 @@ describe("arquivamento: action e guard reais", () => {
   expect(mocks.db.bpmCard.update).not.toHaveBeenCalled();
  });
  it("não duplica histórico ao repetir arquivamento", async () => {
-  mocks.db.bpmCard.findUnique.mockResolvedValue({ status: "ARQUIVADO", pipelineId: "pipeline", etapa: { nome: "Em tratativa", visibilidades: [] } });
+  mocks.db.bpmCard.findUnique.mockResolvedValue({ status: "ARQUIVADO", pipelineId: "pipeline", responsavelId: 99, pipeline: { setores: [] }, etapa: { nome: "Em tratativa", visibilidades: [] } });
   expect(await ExcluirCardBpm("card")).toEqual({ success: true });
   expect(mocks.db.bpmCardHistorico.create).not.toHaveBeenCalled();
  });
@@ -128,7 +128,7 @@ describe("arquivamento: action e guard reais", () => {
   expect(mocks.db.bpmCard.update).toHaveBeenCalledTimes(1);
   expect(mocks.db.bpmCardHistorico.create).toHaveBeenCalledTimes(1);
   // Simula que a primeira chamada já commitou: card agora ARQUIVADO
-  mocks.db.bpmCard.findUnique.mockResolvedValue({ status: "ARQUIVADO", pipelineId: "pipeline", etapa: { nome: "Em tratativa", visibilidades: [] } });
+  mocks.db.bpmCard.findUnique.mockResolvedValue({ status: "ARQUIVADO", pipelineId: "pipeline", responsavelId: 99, pipeline: { setores: [] }, etapa: { nome: "Em tratativa", visibilidades: [] } });
   // Segunda chamada: card já ARQUIVADO → idempotente
   expect(await ExcluirCardBpm("card")).toEqual({ success: true });
   // update NÃO é chamado novamente (early return na transação)
@@ -165,7 +165,7 @@ describe("arquivamento com SQLite descartável", () => {
    mocks.db.setorPermissao.findMany.mockResolvedValue([]);
    mocks.db.usuarioPermissaoOverride.findMany.mockResolvedValue([]);
    mocks.db.bpmCardMembro.findUnique.mockResolvedValue({ role: "RESPONSAVEL" });
-   mocks.db.bpmCard.findUnique.mockResolvedValue({ status: "ATIVO", pipelineId: "pipeline", etapaId: "etapa", pipeline: { nome: "Revisão de Radar" }, etapa: { nome: "Em tratativa", visibilidades: [] } });
+   mocks.db.bpmCard.findUnique.mockResolvedValue({ status: "ATIVO", pipelineId: "pipeline", etapaId: "etapa", responsavelId: 99, pipeline: { nome: "Revisão de Radar", setores: [] }, etapa: { nome: "Em tratativa", visibilidades: [] } });
    mocks.db.$transaction.mockImplementation(async (fn: (tx: typeof mocks.db) => Promise<unknown>) => {
     const tx = await sqlite.transaction("write");
     mocks.db.bpmCard.update.mockImplementation(async ({ data }: { data: { status: string } }) => {
