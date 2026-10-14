@@ -1710,8 +1710,11 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
       }));
     const capacidadesObrigatorias = await capacidadesObrigatoriasPorEtapa([card.etapaId, etapaDestinoId]);
     const guardas: string[] = [];
-    const proximoContatoObrigatorio = card.pipeline.nome === "Revisão de Radar" && etapaEhSemViabilidade(etapaDestino.nome)
-      && await capacidadeObrigatoriaEntrada(etapaDestinoId, BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER);
+    const proximoContatoObrigatorio = card.pipeline.nome === "Revisão de Radar" && (
+      etapaEhEmTratativa(etapaDestino.nome)
+      || (etapaEhSemViabilidade(etapaDestino.nome)
+        && await capacidadeObrigatoriaEntrada(etapaDestinoId, BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER))
+    );
     if (proximoContatoObrigatorio) {
       const erroContato = obterErroProximoContatoParaEntrada({
         etapaDestinoNome: etapaDestino.nome, proximoContatoEm: card.proximoContatoEm,
