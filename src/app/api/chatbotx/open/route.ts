@@ -73,11 +73,12 @@ export async function GET() {
 
   const email = session.user.email?.trim().toLowerCase();
   const userId = session.user.id?.trim();
-  if (!email || !userId) {
+  const role = session.user.role?.trim();
+  if (!email || !userId || !role) {
     return errorPage("Não foi possível identificar o usuário autenticado.", 500);
   }
 
-  const assertion = await new SignJWT({ email })
+  const assertion = await new SignJWT({ email, role })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuer("painel-alpha")
     .setAudience("chatbotx")

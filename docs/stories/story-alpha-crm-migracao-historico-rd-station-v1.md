@@ -2,7 +2,7 @@
 
 ## Status
 
-Reopened — usuário relata ausência de tarefas/anotações do RD e de vínculos com closers comerciais. Diagnóstico e preparação autorizados; eventual backfill depende de plano específico, Vault, backup verificado e confirmação do usuário.
+Done — recuperação complementar autorizada aplicada e reconciliada, interface publicada. As 69 identidades fora do de/para confirmado permanecem reportadas para decisão; não houve teste visual autenticado em produção.
 
 ## Executor Assignment
 
@@ -316,15 +316,15 @@ A migração e a correção anteriores permanecem registradas nesta story. Suas 
 ### Checklist da retomada
 
 - [x] Registrar relato do usuário e separar sintoma de diagnóstico confirmado.
-- [ ] Auditar API RD e banco Alpha somente em leitura e produzir reconciliação por tipo.
-- [ ] Verificar modelo de tarefas/notas e impacto em notificações/automações.
-- [ ] Identificar closers reais e classificar correspondências/exceções sem inferências por nome.
-- [ ] Preparar prévia idempotente, guards de conflito e rollback restrito.
-- [ ] Implementar correções necessárias e testes sem aplicar carga em produção.
-- [ ] Obter revisão Vault, backup completo verificado e confirmação específica do plano.
-- [ ] Aplicar exclusivamente operações autorizadas e reconciliar resultados.
-- [ ] Validar apresentação, acentos e efeitos de acesso dos vínculos.
-- [ ] Atualizar resultados, file list e situação de publicação com evidências.
+- [x] Auditar API RD e banco Alpha somente em leitura e produzir reconciliação por tipo.
+- [x] Verificar modelo de tarefas/notas e impacto em notificações/automações.
+- [x] Identificar closers reais e classificar correspondências/exceções sem inferências por nome.
+- [x] Preparar prévia idempotente, guards de conflito e rollback restrito.
+- [x] Implementar correções necessárias e testes sem aplicar carga em produção.
+- [x] Obter revisão Vault, backup completo verificado e confirmação específica do plano.
+- [x] Aplicar exclusivamente operações autorizadas e reconciliar resultados.
+- [x] Validar apresentação, acentos e efeitos de acesso dos vínculos.
+- [x] Atualizar resultados, file list e situação de publicação com evidências.
 
 ### Pontos iniciais de integração
 
@@ -359,7 +359,7 @@ Plano guardado fora do Git: 1.596 tarefas e proveniências, identificação/auto
 
 CLI complementar tem prévia/hash de confirmação, transações pequenas, guards em leitura antes de escrita, marcadores idempotentes, verify de estados e rollback compensatório auditável. Rollback bloqueia mudanças posteriores, novas correções e dependências de SLA. Importador original deixa de inferir responsáveis por nome e exige --owner-map explícito quando não há destino operacional fixo; nunca mais usa fallback8.
 
-Fontes oficiais conferidas: [tarefas](https://developers.rdstation.com/reference/crm-v1-list-tasks) e [anotações](https://developers.rdstation.com/reference/crm-v1-list-activities). Consulta API e snapshots privados sem credenciais no log. Vault revisando novo backup completo; autorização específica da carga pendente.
+Fontes oficiais conferidas: [tarefas](https://developers.rdstation.com/reference/crm-v1-list-tasks) e [anotações](https://developers.rdstation.com/reference/crm-v1-list-activities). Consulta API e snapshots privados sem credenciais no log. Vault aprovou o backup e o plano final; o usuário autorizou especificamente a carga e a configuração necessária da conta de teste.
 
 File list complementar:
 - `scripts/coletar-complemento-rd-alpha.mjs`
@@ -381,4 +381,16 @@ Simulação integral em cópia privada do backup novo aprovada: 5.866 operaçõe
 
 GET atual dos negócios confirmou os 662 responsáveis dos cards em escopo, nenhum alterado desde a origem. Outros 69 vínculos antigos da Revisão sem de/para confirmado são explicitamente reportados e não alterados. O perfil de Thais é Líder Comercial; manter a visão ampla do usuário de teste requer incluir esse setor na configuração, mediante confirmação explícita com a carga.
 
-Backup novo: `database-backups/pre-change/painelalpha_turso_pre_change_2026-10-14T14-01-55-182Z.sql`, 336 tabelas/253.213 linhas/317.529.032 bytes; SHA256 `175b7787b6ff856ee18b83d2cce00aaaa1c123c03d05e414649938d67cbc91d6`; Vault verificou identidade, restauração, integridade, FKs e contagens. Execução em produção ainda pendente da confirmação específica.
+Backup novo: `database-backups/pre-change/painelalpha_turso_pre_change_2026-10-14T14-01-55-182Z.sql`, 336 tabelas/253.213 linhas/317.529.032 bytes; SHA256 `175b7787b6ff856ee18b83d2cce00aaaa1c123c03d05e414649938d67cbc91d6`; Vault verificou identidade, restauração, integridade, FKs e contagens. Após confirmação específica e revisão Vault final, o fluxo principal aplicou 5.866 de 5.866 operações em produção, exit 0 (`/tmp/rd-complement-apply.log`). Verificação final aprovada: 5.866 planejadas/aplicadas, 14.924 verificações correspondentes e zero divergências. A primeira leitura sofreu ConnectTimeout; a repetição somente de leitura concluiu com exit 0 (`/tmp/rd-complement-verify-retry.log`), sem reaplicar a carga. Nenhum dump, plano privado ou credencial foi versionado.
+
+### Gates e publicação complementar
+
+Artefato de implementação `49893642`: lint exit 0 (0 erros, 1.193 avisos), build exit 0, typecheck pós-build exit 0 e suíte isolada aprovada. A correção de fingerprint `9ec27e02` inclui o responsável resolvido na confirmação da importação original e passou nova suíte completa: 618 arquivos, 4.579 testes aprovados, quatro ignorados, um todo. O commit exclusivamente de teste `44e23a4a` adicionou regressão dessa expressão: 26 testes focais e lint aprovados. Build e typecheck não foram repetidos por essa adição, que não altera código de aplicação. QA final PASS. Logs `/tmp/rd-complement-isolated-{lint,build,typecheck}.log`, `/tmp/rd-complement-final-isolated-tests.log`, `/tmp/rd-complement-fingerprint-final-test.log` e `/tmp/rd-complement-final-lint.log`.
+
+Publicação confirmada do commit [`44e23a4a9f65a3de29271bda28c6add21e374b0e`](https://github.com/Vin1-SF19/PROJETOALPHACOMEX/commit/44e23a4a9f65a3de29271bda28c6add21e374b0e): deployment Production `7067773448`, Vercel `dpl_CBdBYUhWkbFMDbgBAKSiUPg6aQUz`, sucesso em 14/10/2026 às 14:12:47 UTC. [Deployment publicado](https://painel-alpha-projeto-84gsas1z4-alpha-comexs-projects.vercel.app). Alias canônico conferido com parâmetro único e `Cache-Control: no-cache`: entrada HTTP 200 UTF-8, assets do deployment exato e CRM HTTP 307 para login sem sessão. Não houve teste visual autenticado em produção. Alterações concorrentes Builder/ChatbotX foram preservadas fora dos commits; cópias privadas de ambiente removidas do checkout isolado após os gates.
+
+### Reconciliação final complementar
+
+Verificação independente do arquiteto confirmou 1.596 tarefas (89 pendentes e 1.507 concluídas), 3.608 anotações e 662 responsáveis/vínculos comerciais corretos: 235 para Giselle, 221 para Sheila e 206 para Thais. Os 129 casos com múltiplos responsáveis preservam todos os nomes na descrição sem escolher arbitrariamente um único responsável. Permanecem 69 outros vínculos sem de/para confirmado, fora das três closers aprovadas; foram reportados e preservados. Nenhum alerta de tarefa foi criado.
+
+A configuração autorizada da conta de teste está na versão 27; a verificação independente confirmou acesso a 763 de 763 cards ativos e nove de nove colunas. Não foram alterados leads para conceder acesso. Contagens e verificação de regras são evidências de leitura do servidor; não representam inspeção visual autenticada da conta na Vercel. Arquivos de ambiente originais foram preservados.
