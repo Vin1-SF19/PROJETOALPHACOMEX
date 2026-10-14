@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — implementação e gates concluídos; publicação em preparação. Índices de produção aguardam confirmação específica do usuário.
+Done — aplicativo publicado e verificado em produção; seis índices autorizados aplicados e reconciliados. Limitação: interação visual autenticada em produção não foi medida nesta sessão.
 
 ## Executor Assignment
 
@@ -71,7 +71,7 @@ O escopo inclui virtualização por coluna, seleção resumida e carregamento em
 - [x] Validar plano de consultas e medições antes/depois.
 - [x] Executar testes e gates, registrar evidências e limitações.
 - [x] Revisar autorização e regressões; atualizar lista de arquivos implementados.
-- [ ] Publicar pelo fluxo @devops e verificar versão efetiva quando autorizado no fluxo principal.
+- [x] Publicar pelo fluxo @devops e verificar versão efetiva: commit `e018a881`, deployment Production `7065510898`, sucesso em 14/10/2026 às 12:37:53 UTC.
 
 ## Estratégia de testes
 
@@ -114,7 +114,7 @@ A autorização considera responsável OU membro, acesso ao setor do pipeline e 
 - `npm run build`: exit 0; `/tmp/crm-perf-build2.log`. Primeira tentativa falhou ao copiar artefato Prisma gerado; nova geração/build concluídos. Typecheck foi repetido após build para evitar corrida nos arquivos `.next/types`.
 - Testes React: 13 aprovados, incluindo 381 cards com menos de 20 cards montados, carga de 30 para 60 sem aumento proporcional do DOM, busca fora do lote, TTL, revogação e resposta antiga; `/tmp/crm-perf-board-tests4.log`.
 - Índices: teste em SQLite descartável verifica confirmação, backup, seis criações, contagem, idempotência e rejeição de definição incompatível; nenhuma escrita remota nos testes.
-- Revisão manual @qa corrigiu e validou perfil de responsável/administrador, arquivo e invalidação após cancelar arrasto. CodeRabbit CLI indisponível; nenhum scan automatizado alegado.
+- Revisão manual @qa corrigiu e validou perfil de responsável/administrador, arquivo e invalidação após cancelar arrasto; veredito final PASS para o aplicativo, independente dos índices. CodeRabbit CLI indisponível; nenhum scan automatizado alegado.
 
 ### Medição de desempenho somente leitura
 
@@ -128,13 +128,25 @@ Comparação no mesmo banco/dataset, desta máquina até Turso, seleção princi
 
 O manifesto enviado ao cliente serializou 254984 bytes. A primeira carga combina manifesto e resumos; não se afirma que o tempo total caiu pela metade: estas duas consultas somam aproximadamente o tempo da seleção anterior nesta amostra, enquanto a quantidade de detalhes e elementos renderizados cai. O poll sem alterações evita as 14 consultas de resumos e a remontagem integral. Há quatro leads virtuais adicionais. Métricas são amostra diagnóstica, não medição HTTP comprimida nem perfil de navegador autenticado na Vercel. Não foi possível medir interação autenticada em produção nesta sessão.
 
-### Vault e índices pendentes
+### Vault e índices aplicados
 
 Inspeção consistente confirmou somente PK em `BpmCard`; quatro índices de nomes antigos pertencem a `BpmCard_old_fixfk`. Preservar integralmente essa tabela. Plano aditivo: `BpmCard_board_empresaId_idx`, `BpmCard_board_pipelineId_idx`, `BpmCard_board_etapaId_idx`, `BpmCard_board_responsavelId_idx`, `BpmCard_board_status_idx`, `BpmCard_quadro_pagina_idx` (pipelineId/status/etapaId/createdAt/id).
 
 Vault aprovou tecnicamente o artefato, condicionado à resposta específica do usuário. Fingerprint `0d7faef93c392324b414e917431a7cf03fb9fd643278a20f88fc74bbd1f213d9`. Backup completo verificado por restauração local, integridade, FK, contagens e hash: `database-backups/pre-change/painelalpha_turso_pre_change_2026-10-14T12-21-14-740Z.sql`, 336 tabelas, 252896 linhas, 316916207 bytes, SHA256 `c74d447596df814760aef0498c7f341c9e92d26d69d068cddeaad455a386b4fa`.
 
-Após confirmação, executar exclusivamente `node scripts/crm-board-indexes.mjs apply --confirm=<fingerprint acima> --backup=<backup acima>`, seguido de `verify` e plano de consulta. Nenhum índice aplicado até este registro. `npm run build` não aplica migrations. O diff Prisma diagnóstico contém drops de nomes antigos e NÃO deve ser executado. Rollback só dos índices novos confirmados; recibo `prepared` representa intenção e exige reconciliar antes de qualquer rollback. Alternativa: publicar o aplicativo com índices pendentes.
+O usuário confirmou especificamente os seis índices em 14/10/2026, após aprovação Vault. O fluxo principal executou `node scripts/crm-board-indexes.mjs apply --confirm=<fingerprint acima> --backup=<backup acima>` e depois `verify`: exit 0, seis índices criados, `missing: []`, `complete: true`, `quick_check: ok`, 1.222 cards antes e depois. O plano por coluna usa `BpmCard_quadro_pagina_idx`; o plano por responsável usa `BpmCard_board_responsavelId_idx`. Evidências: `/tmp/crm-perf-index-apply.log`, `/tmp/crm-perf-index-verify.log`, `/tmp/crm-perf-index-plan.log`.
+
+A amostra posterior aos índices (`/tmp/crm-perf-measure-after-index.log`) mediu seleção anterior 4.478 ms / 14 SQL / 775.238 bytes; 184 resumos 1.975 ms / 14 SQL / 183.630 bytes; metadados 2.103 ms / 6 SQL / 362.074 bytes, manifesto enviado de 254.984 bytes. Não comprova ganho de latência total; comprova redução dos detalhes e DOM no fluxo novo, conforme os testes.
+
+O plano real do manifesto, capturado de Prisma e validado com `EXPLAIN` (`/tmp/crm-perf-real-query-plan.log`), usa `BpmCard_board_pipelineId_idx` para o filtro de pipeline e PK no join de etapa, mas ainda possui `TEMP B-TREE FOR ORDER BY`. O índice composto foi usado na consulta por coluna testada; não elimina comprovadamente a ordenação do manifesto global.
+
+`npm run build` não aplica migrations. O diff Prisma diagnóstico contém drops de nomes antigos e NÃO deve ser executado. Rollback só dos índices novos confirmados; recibo `prepared` representa intenção e exige reconciliar antes de qualquer rollback.
+
+### Publicação verificada
+
+Commit [`e018a881499b088a097a3467012d714bdc65558a`](https://github.com/Vin1-SF19/PROJETOALPHACOMEX/commit/e018a881499b088a097a3467012d714bdc65558a), 36 arquivos do escopo CRM, publicado em main sem incluir mudanças concorrentes ChatbotX. Deployment Production `7065510898` / Vercel `dpl_8qJrzryiQPwnEeQqUGGgPzALH1LF` concluiu com sucesso às 12:37:53 UTC.
+
+[Deployment publicado](https://painel-alpha-projeto-2encqh6qv-alpha-comexs-projects.vercel.app) e [CRM em produção](https://painel-alpha-projeto.vercel.app/PainelAlpha/AlphaCRM). O alias canônico foi conferido com parâmetro único e `Cache-Control: no-cache`: entrada HTTP 200 UTF-8, assets com o ID do deployment novo. A rota CRM mantém HTTP 307 para `/?acesso=bloqueado` sem sessão. Não houve teste visual autenticado em produção; os testes de interface e autorização são automatizados locais.
 
 ### File List
 
@@ -182,3 +194,5 @@ Arquivos do escopo CRM (mudanças concorrentes do ChatbotX excluídas):
 | Data | Versão | Alteração | Autor |
 |---|---|---|---|
 | 2026-10-14 | 1.0 | Story criada a partir do pedido autorizado e confirmação das regras de visibilidade | @sm |
+
+| 2026-10-14 | 1.2 | QA PASS, seis índices autorizados e verificados, publicação CRM e018a881 confirmada na Vercel | @devops |
