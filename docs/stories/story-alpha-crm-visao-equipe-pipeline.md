@@ -140,8 +140,14 @@ Testes direcionados aprovados: configuração salva/leitura de volta, seleção 
 
 Revisão manual @qa sem novos bloqueios de autorização após correções; veredito final depende dos gates isolados. CodeRabbit CLI indisponível. Não houve sessão autenticada de navegador na Vercel; não afirmar teste manual de conta real.
 
+### Proteção da configuração administrativa
+
+O singleton Prisma omite `visualizacaoConfigJson` nas consultas comuns, incluindo relações e transações. Os leitores autorizados usam `select` explícito. A configuração é tipada como `Prisma.GlobalOmitConfig` para preservar compatibilidade com interfaces legadas de TransactionClient; a omissão é verificada em runtime com SQLite real. Não envolve nova alteração de banco. Gates do ajuste final pendentes.
+
 ### File List
 
+- `src/lib/prisma.ts`
+- `tests/bpm/visao-equipe-prisma-omit.test.ts`
 - `prisma/schema.prisma`
 - `src/actions/bpm/Arquivados.ts`
 - `src/actions/bpm/Cards.ts`
