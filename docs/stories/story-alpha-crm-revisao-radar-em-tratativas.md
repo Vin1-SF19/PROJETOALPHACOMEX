@@ -41,7 +41,7 @@ Esta story refina `story-alpha-crm-card-por-etapa-em-tratativa.md` para a config
 - [x] Publicar controles configuráveis, perguntas de follow-up, transições e script vazio após gate Vault.
 - [x] Validar Próximo Contato e anotações na conclusão, em todos os caminhos de ação, mantendo histórico consistente.
 - [x] Integrar tarefa de Próximo Contato à Agenda Alpha do responsável e ao sino existente, com atualização/cancelamento idempotente.
-- [x] Expor o campo Próximo Contato no diálogo de entrada manual em Em tratativas quando a data estiver ausente e preservar a gravação atômica com o movimento.
+- [x] Expor atalho de requisitos quando o destino Em tratativas estiver bloqueado pela ausência de Próximo Contato; abrir o diálogo para preencher a data e preservar a gravação com o movimento.
 - [ ] Cobrir casos de negócio, UI, integração e regressão; executar gates e homologar card real. Gates completos; homologação real pendente da publicação.
 - [x] Atualizar checklist, File List, QA Results e Change Log.
 
@@ -87,6 +87,7 @@ Testes de domínio/actions em `tests/bpm/` e integração da Agenda Alpha nos te
 - `src/actions/bpm/Cards.ts`, `FollowUp.ts`, `FormulariosEtapa.ts`, `PerguntasFollowUp.ts` — validações e catálogo configurável.
 - `src/lib/bpm/em-tratativa.ts`, `transicao-command.ts`, `proximo-contato-agenda.ts`, `alertas-tarefas.ts` — transições, tarefa e alertas.
 - `src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximoContato.tsx` — edição e limpeza do contato.
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa.tsx` — atalho “Informar Próximo Contato” para abrir os requisitos ao entrar em Em tratativas.
 - `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/FormularioEtapaWorkspace.tsx`, `PerguntasFollowUpEditor.tsx` — UI administrativa.
 - `src/actions/google-calendar-agenda.ts`, `src/components/CalendarioAlpha/lib/tipos.ts`, `useAgendaAlphaController.ts` — tarefa na Agenda Alpha.
 - `src/app/api/bpm/jobs/alertas-tarefas/route.ts`, `vercel.json` — processamento programado de alertas.
@@ -99,6 +100,7 @@ Testes de domínio/actions em `tests/bpm/` e integração da Agenda Alpha nos te
 - Homologação autenticada do card, Agenda Alpha e sino: pendente após publicação.
 - Publicação Turso protegida: autorizada especificamente pelo usuário após prévia; backup completo de 170.445.077 bytes e 332 tabelas revalidado; auditor Vinicius de Souza Floriano (TI), ID 8. A configuração foi publicada na versão 17 e verificada por consulta somente leitura: formulário ativo, dois blocos e exatamente cinco saídas solicitadas.
 - 2026-10-14: corrigido o contrato da action `ObterRequisitosTransicaoBpm`: a mesma regra que exige Próximo Contato no movimento manual para Em tratativas agora marca o campo como obrigatório e faz o diálogo exibi-lo. `npx eslint src/actions/bpm/Cards.ts`, `npm run typecheck` e `git diff --check` passaram; homologação autenticada deste caminho permanece pendente.
+- 2026-10-14: incluído o atalho “Informar Próximo Contato” também para o destino Em tratativas quando a checagem bloquear a etapa, permitindo abrir o diálogo com a data. ESLint direcionado, typecheck e `git diff --check` passaram; homologação autenticada permanece pendente.
 
 ## Change Log
 

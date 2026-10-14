@@ -15,6 +15,7 @@ import { formularioExigeCapacidade } from "@/lib/bpm/formulario-renderer";
 import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
 import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
 import { etapaEhLost } from "@/lib/bpm/lost";
+import { etapaEhEmTratativa, etapaEhSemViabilidade } from "@/lib/bpm/em-tratativa";
 import { BpmDateTimeField } from "./BpmDateTimeField";
 import { formatarDataHoraLocalBpm, parseDataHoraLocalBpm } from "@/lib/format-date";
 import { AtribuirLeadAgendarModal } from "./AtribuirLeadAgendarModal";
@@ -379,7 +380,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
           );
           const podeInformarMotivo = card.pipeline?.nome === "Revisão de Radar" && etapaEhLost(etapa.nome);
           const podeInformarProximoContato = card.pipeline?.nome === "Revisão de Radar"
-            && etapa.nome.toLocaleLowerCase("pt-BR") === "sem viabilidade"
+            && (etapaEhEmTratativa(etapa.nome) || etapaEhSemViabilidade(etapa.nome))
             && pendencias.some((pendencia) => pendencia.includes("Próximo Contato"));
           return bloqueada ? (
             <div key={etapa.id} className="space-y-1.5">
