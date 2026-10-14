@@ -37,12 +37,12 @@ export function cardApareceNoQuadro(card: {
 }
 
 /** A mesma seleção de estados, etapas, membros e leads virtuais do Kanban. */
-export async function contarCardsVisiveisNoQuadro(
+export async function contarCardsVisiveisPorEtapaNoQuadro(
   pipelineId: string,
   userId: number,
   role: string | null,
   admin: boolean,
-): Promise<number> {
+): Promise<{ etapaId: string; quantidade: number }[]> {
   const pipeline = await db.bpmPipeline.findUnique({
     where: { id: pipelineId },
     select: {
@@ -60,7 +60,7 @@ export async function contarCardsVisiveisNoQuadro(
       },
     },
   });
-  if (!pipeline) return 0;
+  if (!pipeline) return [];
   const etapasVisiveis = pipeline.etapas.filter((etapa) =>
     resolverVisibilidadeEtapa(role, etapa.visibilidades).podeVer);
   const etapaIdsVisiveis = etapasVisiveis.map((etapa) => etapa.id);
@@ -81,9 +81,25 @@ export async function contarCardsVisiveisNoQuadro(
     },
   }) : [];
   const etapasComSaida = etapasComSaidaDoQuadro(pipeline.etapas);
-  const reais = cards.filter((card) => cardApareceNoQuadro(card, pipeline.etapas, etapasComSaida)).length;
+  const contagens = new Map(etapasVisiveis.map((etapa) => [etapa.id, 0]));
+  for (const card of cards) {
+    if (!cardApareceNoQuadro(card, pipeline.etapas, etapasComSaida)) continue;
+    contagens.set(card.etapaId, (contagens.get(card.etapaId) ?? 0) + 1);
+  }
   const mostraNoloss = pipelineEhRevisaoRadar(pipeline.nome)
     && etapasVisiveis.some((etapa) => etapaEhNovosLeads(etapa.nome));
   const virtuais = mostraNoloss ? (await buscarNolossLeadsPendentes()).length : 0;
-  return reais + virtuais;
+  const etapaNovosLeads = etapasVisiveis.find((etapa) => etapaEhNovosLeads(etapa.nome));
+  if (etapaNovosLeads) contagens.set(etapaNovosLeads.id, (contagens.get(etapaNovosLeads.id) ?? 0) + virtuais);
+  return [...contagens].map(([etapaId, quantidade]) => ({ etapaId, quantidade }));
+}
+
+export async function contarCardsVisiveisNoQuadro(
+  pipelineId: string,
+  userId: number,
+  role: string | null,
+  admin: boolean,
+): Promise<number> {
+  const contagens = await contarCardsVisiveisPorEtapaNoQuadro(pipelineId, userId, role, admin);
+  return contagens.reduce((total, etapa) => total + etapa.quantidade, 0);
 }
