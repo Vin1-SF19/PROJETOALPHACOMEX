@@ -38,8 +38,8 @@ Não há mudança de dados, contrato de API ou estrutura de banco neste escopo.
 
 ## Dev Notes
 
-- `src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx` documenta o slot central como formulário da etapa ativa (`children`) e monta o grid de três painéis. O ajuste aplicado permite que os contêineres encolham para que o conteúdo rolável caiba na área disponível.
-- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelRegistrar.tsx` contém os painéis de formulário e script com conteúdo rolável.
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx` documenta o slot central como formulário da etapa ativa (`children`) e monta o grid de três painéis. A coluna central é a área de rolagem independente em desktop.
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelRegistrar.tsx` contém os painéis de formulário e script; seu conteúdo precisa crescer naturalmente para a rolagem da coluna central alcançar o fim.
 - `src/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal.tsx` monta o layout do card aberto. Preservar os fluxos e permissões existentes.
 - A story `story-alpha-crm-rolagem-interna-pipelines.md` trata das colunas do quadro, não do painel aberto.
 - `accumulated-context.md`, `.aiox/gotchas.json` e os documentos de arquitetura/frontend configurados não foram encontrados; os critérios acima derivam do pedido direto e do código existente.
@@ -70,18 +70,21 @@ Verificar visualmente o cenário descrito em desktop e mobile; percorrer o paine
 
 ### Implementação
 
-O layout do card aberto passou a permitir redução vertical do contêiner raiz (`min-h-0`), a grade dos painéis define uma linha que pode encolher em desktop e o contêiner central permite encolhimento horizontal (`min-w-0`). O ajuste é estrutural e não altera dados, campos ou permissões.
+O layout do card aberto permite redução vertical do contêiner raiz (`min-h-0`) e define uma linha de grade que pode encolher em desktop. A coluna central agora é uma região rolável por teclado e mouse em desktop. `PainelRegistrar` deixa de criar um segundo scroll interno e deixa o conteúdo das abas crescer, para que a rolagem da coluna central alcance todos os campos e ações. A estrutura também permanece rolável pela área geral em mobile. Nenhum dado, campo ou permissão foi alterado.
 
 ### Validação
 
 - `git diff --check`: passou.
-- `npm run lint`: passou sem erros, com 1.193 avisos no repositório.
+- `npm run lint`: passou sem erros, com 1.193 avisos no repositório (execução anterior à revisão adicional).
+- `npx eslint src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx src/app/PainelAlpha/AlphaCRM/CardModal/PainelRegistrar.tsx`: passou após a revisão adicional.
 - `npm run typecheck`: passou.
+- `git diff --check`: passou após a revisão adicional.
 - Reprodução visual manual da rolagem até o último campo/ação em desktop e mobile: pendente.
 
 ### File List
 
 - `src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx` — ajuste dos contêineres do layout para permitir rolagem e redução do painel central.
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelRegistrar.tsx` — remoção do scroll interno para que a coluna central controle a rolagem completa.
 - `docs/stories/story-alpha-crm-rolagem-painel-central-card.md` — atualização do status, checklist, implementação e validação.
 
 ## Change Log

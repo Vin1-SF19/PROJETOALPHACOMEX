@@ -330,7 +330,14 @@ export function CardAbertoLayout({
         )}
 
         {/* Centro: slot do formulário da etapa ativa */}
-        <div className="min-h-0 min-w-0 lg:h-full lg:overflow-hidden">{children}</div>
+        <div
+          role="region"
+          aria-label="Conteúdo do card"
+          tabIndex={0}
+          className="min-h-0 min-w-0 lg:h-full lg:overflow-y-auto lg:overscroll-y-contain"
+        >
+          {children}
+        </div>
 
         {/* Direita: próxima etapa */}
         <div className="flex flex-col gap-5 min-w-0 min-h-0 overflow-y-auto">
