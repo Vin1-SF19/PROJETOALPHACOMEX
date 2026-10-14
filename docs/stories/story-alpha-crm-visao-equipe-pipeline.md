@@ -2,7 +2,7 @@
 
 ## Status
 
-Reopened — correção solicitada pelo usuário: concentrar a seleção no filtro existente de responsáveis e investigar a visão incompleta da conta de teste Líder Comercial. A entrega anterior permanece registrada abaixo; esta correção ainda não foi implementada ou validada.
+Done — filtro único publicado e configuração da conta de teste ajustada com autorização explícita; escopo confirmado por verificação independente. Não houve teste visual autenticado em produção.
 
 ## Executor Assignment
 
@@ -73,13 +73,13 @@ O usuário pediu usar **somente o select de responsáveis já existente**, sem c
 ### Checklist da reabertura
 
 - [x] Registrar a exigência de select único e o relato da conta Líder Comercial.
-- [ ] Diagnosticar configuração e escopo efetivos da conta/pipeline, somente em leitura.
-- [ ] Registrar causa encontrada e diferença entre expectativa, autorização e resultado.
-- [ ] Consolidar visão/responsável no select existente e remover o seletor adicional.
-- [ ] Corrigir eventual divergência funcional sem ampliar permissões indevidamente.
-- [ ] Validar testes de filtro, isolamento, totais, atualizações e leitura versus ação.
-- [ ] Executar gates aplicáveis e registrar evidências reais da correção/publicação.
-- [ ] Atualizar file list da correção preservando o histórico da entrega anterior.
+- [x] Diagnosticar configuração e escopo efetivos da conta/pipeline, somente em leitura.
+- [x] Registrar causa encontrada e diferença entre expectativa, autorização e resultado.
+- [x] Consolidar visão/responsável no select existente e remover o seletor adicional.
+- [x] Corrigir eventual divergência funcional sem ampliar permissões indevidamente.
+- [x] Validar testes de filtro, isolamento, totais, atualizações e leitura versus ação.
+- [x] Executar gates aplicáveis e registrar evidências reais da correção/publicação.
+- [x] Atualizar file list da correção preservando o histórico da entrega anterior.
 
 ### File list da preparação da correção
 
@@ -231,4 +231,12 @@ Leitura de produção pelo arquiteto: Revisão Radar possui um supervisor config
 
 O filtro existente agora reúne Meus leads e sem vínculo (padrão), Todos os responsáveis (máximo autorizado), setores autorizados e pessoas. Não há um segundo select de visão. A seleção de pessoa consulta diretamente o máximo autorizado, sem continuar presa ao filtro Meus. A visão EQUIPE inclui próprios e setores, mantendo o mesmo limite de leitura do servidor; TODOS continua exclusivo do administrador no contrato servidor.
 
-Testes direcionados iniciais: 4 arquivos, 16 testes aprovados. Lint direcionado sem erros. Validação completa e publicação da correção pendentes. A ampliação de setores para a conta de teste depende de identificação e confirmação do usuário; não será substituída por bypass de perfil.
+Testes direcionados iniciais: 4 arquivos, 16 testes aprovados; QA adicionou e aprovou a cobertura React do filtro único. Artefato isolado `0b0f8a45`: lint exit 0 (0 erros, 1.193 avisos), build exit 0, typecheck pós-build exit 0 e suíte completa exit 0 (617 arquivos, 4.553 testes aprovados, quatro ignorados e um todo). Logs `/tmp/crm-unified-isolated-{lint,build,typecheck,tests}.log`; QA final PASS para a correção de UI. Publicação confirmada abaixo. A ampliação de setores foi realizada somente após identificação da conta e autorização explícita do usuário, sem bypass de perfil.
+
+### Conclusão da correção e acesso da conta de teste
+
+Após o usuário identificar a conta de teste e autorizar TI e OPERACIONAL mantendo COMERCIAL, o fluxo principal atualizou somente a configuração do pipeline Revisão de Radar, com CAS de versão 25 para 26. Não houve alteração de leads, responsáveis ou membros; contagem e maior data de atualização dos cards permaneceram iguais. Recibo privado, não versionado: `database-backups/pre-change/crm-pipeline-visao-equipe/usuario-teste-config-receipt.json`.
+
+Verificação independente do arquiteto, somente leitura: configuração versão 26 com três setores; acesso ao pipeline permitido, 9 de 9 colunas visíveis e 763 de 763 cards ativos dentro do escopo da conta de teste. Esses resultados validam as regras no servidor; não equivalem a um teste visual autenticado de navegador.
+
+Publicação final do filtro único: commit [`0b0f8a45d71fbbb2673dce96c45f5a0bd3aa9aa4`](https://github.com/Vin1-SF19/PROJETOALPHACOMEX/commit/0b0f8a45d71fbbb2673dce96c45f5a0bd3aa9aa4), deployment Production `7067119608`, Vercel `dpl_Ae3kdLEdSEBNB1SKU9FuiXTmBJyv`, sucesso às 13:46:17 UTC de 14/10/2026. [Deployment publicado](https://painel-alpha-projeto-khiq4os86-alpha-comexs-projects.vercel.app). Alias canônico conferido com parâmetro único e `Cache-Control: no-cache`: HTTP 200 UTF-8 na entrada e assets com o ID exato; CRM mantém 307 para login sem sessão. Builder/ChatbotX concorrentes excluídos dos commits. Cópias privadas de ambiente removidas do checkout isolado após validação.
