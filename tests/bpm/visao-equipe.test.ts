@@ -36,6 +36,7 @@ it("todos iniciam com próprios e livres; filtros de equipe e setor não ampliam
   const acesso = { userId: 7, admin: true, setores: [{ id: 3, nome: "Comercial", usuarioIds: [9] }] };
   expect(selecionarPaginaQuadro(entradas, { acesso }).ids).toEqual(["c0", "c3"]);
   expect(selecionarPaginaQuadro(entradas, { acesso, visao: "TODOS" }).ids).toHaveLength(4);
+  expect(selecionarPaginaQuadro(entradas, { acesso: { ...acesso, admin: false }, visao: "EQUIPE" }).ids).toEqual(["c0", "c1", "c3"]);
   expect(selecionarPaginaQuadro(entradas, { acesso, visao: "SETOR", setorId: 3 }).ids).toEqual(["c1", "c3"]);
   expect(selecionarPaginaQuadro(entradas, { acesso: { ...acesso, admin: false }, visao: "TODOS" }).ids).toEqual(["c0", "c3"]);
 });

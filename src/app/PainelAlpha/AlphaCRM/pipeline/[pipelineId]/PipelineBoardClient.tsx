@@ -800,15 +800,16 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
   const [cards, setCards] = useState<CardBpm[]>(cardsIniciais);
   const [manifesto, setManifesto] = useState(manifestoInicial);
   const [busca, setBusca] = useState("");
-  const [visaoFiltro, setVisaoFiltro] = useState("MEUS");
-  const visao = (visaoFiltro.startsWith("SETOR:") ? "SETOR" : visaoFiltro) as VisaoQuadro;
-  const setorFiltro = visao === "SETOR" ? Number(visaoFiltro.slice(6)) : null;
+  const [filtroResponsaveis, setFiltroResponsaveis] = useState("MEUS");
+  const visaoAmpliada: VisaoQuadro = manifesto?.acesso?.admin ? "TODOS" : manifesto?.acesso?.setores.length ? "EQUIPE" : "MEUS";
+  const visao: VisaoQuadro = filtroResponsaveis === "MEUS" ? "MEUS" : filtroResponsaveis.startsWith("SETOR:") ? "SETOR" : visaoAmpliada;
+  const setorFiltro = visao === "SETOR" ? Number(filtroResponsaveis.slice(6)) : null;
+  const responsavelFiltro = /^\d+$/.test(filtroResponsaveis) ? filtroResponsaveis : null;
   const usuariosVisao = manifesto?.acesso ? usuariosDaVisao(manifesto.acesso, visao, setorFiltro) : null;
   const [carregandoPagina, setCarregandoPagina] = useState(false);
   const quadroRef = useRef({ manifesto: manifestoInicial, ids: cardsIniciais.map((c) => c.id), limites: {} as Record<string, number>, busca: "", responsavelId: null as number | null, visao: "MEUS" as VisaoQuadro, setorId: null as number | null, ultimaCompleta: 0 });
   useEffect(() => { quadroRef.current.ultimaCompleta = Date.now(); }, []);
   const primeiraFiltragemRef = useRef(true);
-  const [responsavelFiltro, setResponsavelFiltro] = useState<string | null>(null);
   const [cardSelecionadoId, setCardSelecionadoId] = useState<string | null>(null);
   const [cardAgendamentoId, setCardAgendamentoId] = useState<string | null>(null);
   const [nolossLeadAberto, setNolossLeadAberto] = useState<CardBpm | null>(null);
@@ -852,7 +853,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
   const responsaveisDisponiveis = useMemo(() => {
     const mapa = new Map<number, string>();
     if (manifesto) {
-      const ids = manifesto.acesso ? usuariosDaVisao(manifesto.acesso, visao, setorFiltro) : null;
+      const ids = manifesto.acesso ? usuariosDaVisao(manifesto.acesso, visaoAmpliada) : null;
       for (const card of manifesto.entradas) for (const pessoa of card.responsaveis) if (ids === null || ids.includes(pessoa.id)) mapa.set(pessoa.id, pessoa.nome);
       return Array.from(mapa, ([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
     }
@@ -867,7 +868,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
     return Array.from(mapa, ([id, nome]) => ({ id, nome })).sort((a, b) =>
       a.nome.localeCompare(b.nome)
     );
-  }, [cards, manifesto, visao, setorFiltro]);
+  }, [cards, manifesto, visaoAmpliada]);
 
   const getByEtapa = (etapaId: string) =>
     cards.filter(
@@ -895,7 +896,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
         });
         if (requisicao !== ultimaRequisicaoRef.current || generation !== generationBoardRef.current) return false;
         if (!result.success) {
-          if ("visaoRevogada" in result && result.visaoRevogada) { setCards([]); setManifesto({ configVersion: -1, entradas: [] }); estado.ids = []; estado.manifesto = { configVersion: -1, entradas: [] }; setCardSelecionadoId(null); setCardAgendamentoId(null); setNolossLeadAberto(null); setVisaoFiltro("MEUS"); setResponsavelFiltro(null); }
+          if ("visaoRevogada" in result && result.visaoRevogada) { setCards([]); setManifesto({ configVersion: -1, entradas: [] }); estado.ids = []; estado.manifesto = { configVersion: -1, entradas: [] }; setCardSelecionadoId(null); setCardAgendamentoId(null); setNolossLeadAberto(null); setFiltroResponsaveis("MEUS"); }
           if (result.acessoNegado) { setCards([]); setManifesto({ configVersion: -1, entradas: [] }); setCardSelecionadoId(null); setCardAgendamentoId(null); setNolossLeadAberto(null); estado.ids = []; estado.manifesto = { configVersion: -1, entradas: [] }; }
           if (!opcoes.preservarErro) setErro(result.error);
           return false;
@@ -1154,28 +1155,20 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {manifesto && <input type="search" value={busca} maxLength={200} onChange={(event) => setBusca(event.target.value)} aria-label="Buscar em todos os cards do pipeline" placeholder="Buscar empresa, CNPJ ou serviço" className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white" />}
-          {manifesto?.acesso && <Select value={visaoFiltro} onValueChange={(value) => { setVisaoFiltro(value); setResponsavelFiltro(null); }}>
-            <SelectTrigger aria-label="Visualização dos leads" className="w-[230px] border-white/10 bg-white/[0.04] text-xs text-slate-200"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="MEUS">Meus leads e sem vínculo</SelectItem>
-              {!manifesto.acesso.admin && manifesto.acesso.setores.length > 0 && <SelectItem value="EQUIPE">Minha equipe</SelectItem>}
-              {manifesto.acesso.admin && <SelectItem value="TODOS">Todos os leads</SelectItem>}
-              {manifesto.acesso.setores.map((setor) => <SelectItem key={setor.id} value={`SETOR:${setor.id}`}>Setor: {setor.nome}</SelectItem>)}
-            </SelectContent>
-          </Select>}
-          <Select
-            value={responsavelFiltro ?? "todos"}
-            onValueChange={(v) => setResponsavelFiltro(v === "todos" ? null : v)}
-          >
+          <Select value={filtroResponsaveis} onValueChange={setFiltroResponsaveis}>
             <SelectTrigger
               aria-label="Filtrar cards por responsável"
-              className="w-[180px] shrink-0 border-white/10 bg-white/[0.04] text-xs text-slate-200"
+              className="w-[230px] shrink-0 border-white/10 bg-white/[0.04] text-xs text-slate-200"
             >
               <Users className="h-4 w-4" aria-hidden="true" />
-              <SelectValue placeholder="Todos desta visão" />
+              <SelectValue placeholder="Meus leads e sem vínculo" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="todos">Todos desta visão</SelectItem>
+              <SelectItem value="MEUS">Meus leads e sem vínculo</SelectItem>
+              <SelectItem value="todos">Todos os responsáveis</SelectItem>
+              {manifesto?.acesso?.setores.map((setor) => (
+                <SelectItem key={`setor:${setor.id}`} value={`SETOR:${setor.id}`}>Setor: {setor.nome}</SelectItem>
+              ))}
               {responsaveisDisponiveis.map((r) => (
                 <SelectItem key={r.id} value={String(r.id)} aria-label={r.nome}>
                   {r.nome}

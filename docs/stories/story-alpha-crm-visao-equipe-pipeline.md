@@ -2,7 +2,7 @@
 
 ## Status
 
-Done — coluna autorizada e verificada; aplicativo e ajuste de omissão publicados e confirmados na Vercel. Testes de interface automatizados; não houve sessão visual autenticada de produção.
+Reopened — correção solicitada pelo usuário: concentrar a seleção no filtro existente de responsáveis e investigar a visão incompleta da conta de teste Líder Comercial. A entrega anterior permanece registrada abaixo; esta correção ainda não foi implementada ou validada.
 
 ## Executor Assignment
 
@@ -56,6 +56,34 @@ A coluna foi aplicada após revisão Vault e resposta específica do usuário: �
 11. Preservar virtualização, lotes por coluna, busca em todo o conjunto autorizado, totais completos, arrasto autorizado e atualização incremental existentes. A nova visão não reintroduz download integral periódico de detalhes do pipeline.
 12. Implementar a persistência aprovada em `BpmPipeline.visualizacaoConfigJson`, nullable e validada conforme o contrato acima; `NULL` e conteúdo inválido não concedem supervisão. A inclusão da coluna exige plano concreto, Vault, backup verificado de até 48 horas e autorização específica antes de executar; autorização geral de implementação não substitui esse gate.
 13. Registrar testes e revisão de autorização, executar os gates do projeto e documentar limitações de validação visual/produção. Não declarar como publicado ou verificado um estado que não tenha evidência.
+
+## Correção solicitada após publicação
+
+O usuário pediu usar **somente o select de responsáveis já existente**, sem criar outro seletor para visão. Também relatou que a conta de teste **Líder Comercial** não visualiza todos os cards esperados. O relato é um sintoma a investigar; não comprova defeito na consulta nem autoriza conceder acesso irrestrito por nome de cargo.
+
+### Critérios adicionais de aceite
+
+14. A barra do quadro utiliza apenas o select existente de responsáveis para as escolhas pertinentes de visão e responsável. Remover o segundo seletor de visão, preservando o padrão inicial confirmado “Meus leads + sem vínculo”, a possibilidade de escolher o conjunto autorizado e a filtragem por responsável específico. Rótulos devem tornar o efeito de cada opção inequívoco.
+15. O valor escolhido no select único determina um estado coerente de visão/filtro enviado ao servidor; não manter combinações ocultas de dois seletores que limitem silenciosamente o resultado. Troca de opção limpa filtros incompatíveis, descarta respostas antigas e atualiza totais, manifesto e lotes de modo consistente.
+16. Investigar a configuração efetiva da conta de teste Líder Comercial em leitura: identidade da sessão, pipeline consultado, entrada explícita de supervisor, setores selecionados, vínculo real dos responsáveis/participantes, restrições de coluna e modo/responsável selecionado. Registrar contagens agregadas esperadas versus retornadas por etapa e motivo de exclusão, sem versionar dados pessoais ou credenciais.
+17. Corrigir divergências entre o conjunto autorizado e o conjunto retornado/exibido. Se a causa for ausência ou insuficiência de configuração, apresentar o diagnóstico e a configuração necessária; não cadastrar supervisão automaticamente nem converter o cargo Líder Comercial em bypass global. “Todos” corresponde ao conjunto que a pessoa está autorizada a consultar naquele pipeline.
+18. Preservar a separação entre leitura ampliada e ação, o bypass administrativo existente e as restrições de pipeline/coluna. A correção visual não pode conceder acesso adicional por adulteração do valor do select, por estado antigo ou por um evento de atualização.
+19. Testes cobrem select único, padrão inicial, escolha do universo autorizado, responsável específico, mudança de opção, configuração nula/inválida, supervisor com setores e conta sem configuração. Comparar dados, totais e opções da interface com o escopo do servidor; registrar explicitamente se não houver validação autenticada da conta real em produção.
+
+### Checklist da reabertura
+
+- [x] Registrar a exigência de select único e o relato da conta Líder Comercial.
+- [ ] Diagnosticar configuração e escopo efetivos da conta/pipeline, somente em leitura.
+- [ ] Registrar causa encontrada e diferença entre expectativa, autorização e resultado.
+- [ ] Consolidar visão/responsável no select existente e remover o seletor adicional.
+- [ ] Corrigir eventual divergência funcional sem ampliar permissões indevidamente.
+- [ ] Validar testes de filtro, isolamento, totais, atualizações e leitura versus ação.
+- [ ] Executar gates aplicáveis e registrar evidências reais da correção/publicação.
+- [ ] Atualizar file list da correção preservando o histórico da entrega anterior.
+
+### File list da preparação da correção
+
+- `docs/stories/story-alpha-crm-visao-equipe-pipeline.md` (reabertura e critérios; nenhum código alterado por @sm).
 
 ## Pontos de integração verificados
 
@@ -195,3 +223,12 @@ Código da funcionalidade `cfb5ba2d`, registro de gates `46eb3dd8` e ajuste fina
 | 2026-10-14 | 1.0 | Story preparada com duas decisões funcionais pendentes no fluxo principal | @sm |
 | 2026-10-14 | 1.1 | Ready: setores por supervisor/pipeline, visão inicial individual para todos e contrato nullable aprovados; gate Vault pendente | @sm |
 | 2026-10-14 | 1.2 | Gates isolados e QA PASS; coluna aplicada e publicação final 8e9a51a0 confirmada na Vercel | @devops |
+| 2026-10-14 | 1.3 | Reaberta: select único de responsáveis e diagnóstico da visão da conta Líder Comercial, sem ampliar autorização por inferência | @sm |
+
+### Diagnóstico e correção do filtro único — 14/10
+
+Leitura de produção pelo arquiteto: Revisão Radar possui um supervisor configurado para COMERCIAL; os 763 cards ativos estão vinculados a TI (736) e OPERACIONAL (27), tanto pelo responsável quanto pelos membros. Não há vínculo COMERCIAL nesses cards. O perfil Líder Comercial, por si só, não concede supervisão; quatro usuários têm esse perfil. A conta de teste ainda precisa ser identificada pelo usuário. Nenhum vínculo ou configuração foi alterado durante o diagnóstico.
+
+O filtro existente agora reúne Meus leads e sem vínculo (padrão), Todos os responsáveis (máximo autorizado), setores autorizados e pessoas. Não há um segundo select de visão. A seleção de pessoa consulta diretamente o máximo autorizado, sem continuar presa ao filtro Meus. A visão EQUIPE inclui próprios e setores, mantendo o mesmo limite de leitura do servidor; TODOS continua exclusivo do administrador no contrato servidor.
+
+Testes direcionados iniciais: 4 arquivos, 16 testes aprovados. Lint direcionado sem erros. Validação completa e publicação da correção pendentes. A ampliação de setores para a conta de teste depende de identificação e confirmação do usuário; não será substituída por bypass de perfil.

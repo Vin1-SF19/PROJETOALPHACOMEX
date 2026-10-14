@@ -18,5 +18,5 @@ export function usuariosDaVisao(acesso: AcessoVisaoQuadro, visao: VisaoQuadro, s
   if (visao === "MEUS") return [acesso.userId];
   if (visao === "TODOS") return acesso.admin ? null : [acesso.userId];
   if (visao === "SETOR") return acesso.setores.find((s) => s.id === setorId)?.usuarioIds ?? [];
-  return [...new Set(acesso.setores.flatMap((s) => s.usuarioIds))];
+  return [...new Set([acesso.userId, ...acesso.setores.flatMap((s) => s.usuarioIds)])];
 }

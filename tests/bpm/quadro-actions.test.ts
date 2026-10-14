@@ -57,11 +57,11 @@ it("não aceita todos ou setor não autorizado enviado diretamente por usuário 
   expect(await SincronizarQuadroBpm("pipeline", { visao: "SETOR", setorId: 99 })).toMatchObject({ success: false, visaoRevogada: true });
   expect(m.cards).not.toHaveBeenCalled();
 });
-it("equipe seleciona apenas usuários dos setores configurados e inclui leads sem vínculo", async () => {
+it("equipe inclui próprios, usuários dos setores configurados e leads sem vínculo", async () => {
   const pipeline = await m.pipeline(); m.pipeline.mockResolvedValue({ ...pipeline, visualizacaoConfigJson: JSON.stringify({ version: 1, supervisores: [{ usuarioId: 7, setorIds: [3] }] }) });
   m.cards.mockResolvedValue([card, { ...card, id: "c2", responsavel: { id: 9, nome: "Equipe" } }]);
   m.leads.mockResolvedValue([{ id: "livre", nome: "Sem vínculo" }]);
   m.resumos.mockImplementation(async (_pipeline, ids: string[]) => ({ success: true, data: ids.map((id) => ({ id })) }));
-  expect(await SincronizarQuadroBpm("pipeline", { visao: "EQUIPE" })).toMatchObject({ success: true, ids: ["c2", "livre"], manifesto: { acesso: { setores: [{ id: 3, nome: "Comercial", usuarioIds: [9] }] } } });
+  expect(await SincronizarQuadroBpm("pipeline", { visao: "EQUIPE" })).toMatchObject({ success: true, ids: ["c1", "c2", "livre"], manifesto: { acesso: { setores: [{ id: 3, nome: "Comercial", usuarioIds: [9] }] } } });
   expect(m.cards).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ AND: [{ OR: [{ responsavelId: 7 }, { membros: { some: { userId: 7 } } }, { responsavelId: { in: [9] } }, { membros: { some: { userId: { in: [9] } } } }] }] }) }));
 });

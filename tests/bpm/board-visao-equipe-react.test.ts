@@ -93,19 +93,66 @@ it("abre em meus leads e permite alternar equipe/setor sem mostrar responsáveis
     await act(async () => root.render(h(PipelineBoardClient, props)));
     const select = container.querySelector("select")!;
     expect(select.value).toBe("MEUS");
-    expect([...select.options].map((o) => o.value)).toEqual(["MEUS", "EQUIPE", "SETOR:3"]);
+    expect(container.querySelectorAll("select")).toHaveLength(1);
+    expect([...select.options].map((o) => o.value)).toEqual(["MEUS", "todos", "SETOR:3", "9", "1"]);
     expect(container.querySelector('[aria-label="Abrir card de Empresa da equipe"]')).toBeNull();
-    expect(container.querySelectorAll("select")[1].textContent).not.toContain("Pessoa Comercial");
-    await act(async () => { select.value = "EQUIPE"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+    expect(select.textContent).toContain("Pessoa Comercial");
+    await act(async () => { select.value = "todos"; select.dispatchEvent(new Event("change", { bubbles: true })); });
     await act(async () => { await vi.advanceTimersByTimeAsync(300); });
     expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ visao: "EQUIPE", setorId: null }));
     expect(container.querySelector('[aria-label="Abrir card de Empresa da equipe"]')).not.toBeNull();
-    expect(container.querySelectorAll("select")[1].textContent).toContain("Pessoa Comercial");
+    expect(select.textContent).toContain("Pessoa Comercial");
+    await act(async () => { select.value = "9"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+    expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ visao: "EQUIPE", responsavelId: 9 }));
+    await act(async () => { select.value = "SETOR:3"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+    expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ visao: "SETOR", setorId: 3, responsavelId: null }));
     vi.mocked(SincronizarQuadroBpm).mockResolvedValueOnce({ success: false, acessoNegado: false, visaoRevogada: true, error: "Revogado" });
     vi.mocked(SincronizarQuadroBpm).mockResolvedValue({ success: true, manifesto: { ...manifesto, acesso: { ...manifesto.acesso, setores: [] }, entradas: manifesto.entradas.slice(0, 1) }, cards: [card], ids: [card.id] } as never);
     await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
     await act(async () => { await vi.advanceTimersByTimeAsync(300); });
     expect(container.querySelector("select")?.value).toBe("MEUS");
     expect(container.querySelector('[aria-label="Abrir card de Empresa da equipe"]')).toBeNull();
+  } finally { await act(async () => root.unmount()); container.remove(); }
+});
+
+it.each([true, false])("select único preserva Meus inicialmente e limita Todos/pessoa conforme admin=%s", async (admin) => {
+  Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
+  vi.useFakeTimers();
+  const { container, root, props } = montarBoard();
+  const terceiro = { ...card, id: "terceiro", empresa: { ...card.empresa, razaoSocial: "Terceiro" }, responsavel: { id: 9, nome: "Outra pessoa" } };
+  const manifesto = {
+    configVersion: 1, acesso: { userId: 1, admin, setores: [] },
+    entradas: (admin ? [card, terceiro] : [card]).map((c) => ({ id: c.id, etapaId: c.etapaId, revision: "1", nome: c.empresa.razaoSocial, cnpj: null, servico: null, responsaveis: [c.responsavel] })),
+  };
+  props.manifestoInicial = manifesto;
+  props.currentUserRole = admin ? "ADMIN" : "COMERCIAL";
+  vi.mocked(SincronizarQuadroBpm).mockResolvedValue({ success: true, manifesto, cards: admin ? [card, terceiro] : [card], ids: admin ? [card.id, terceiro.id] : [card.id] } as never);
+  try {
+    await act(async () => root.render(h(PipelineBoardClient, props)));
+    const select = container.querySelector("select")!;
+    expect(container.querySelectorAll("select")).toHaveLength(1);
+    expect(select.value).toBe("MEUS");
+    expect(container.querySelector('[aria-label="Abrir card de Terceiro"]')).toBeNull();
+    expect([...select.options].some((option) => option.value === "9")).toBe(admin);
+    expect([...select.options].some((option) => option.value.startsWith("SETOR:"))).toBe(false);
+    await act(async () => { select.value = "todos"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+    // O usuário comum permanece no mesmo escopo MEUS; admin solicita a visão completa.
+    if (admin) {
+      expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ visao: "TODOS", responsavelId: null, setorId: null }));
+      expect(container.querySelector('[aria-label="Abrir card de Terceiro"]')).not.toBeNull();
+    } else {
+      expect(SincronizarQuadroBpm).not.toHaveBeenCalled();
+      expect(container.querySelector('[aria-label="Abrir card de Terceiro"]')).toBeNull();
+    }
+    await act(async () => { select.value = admin ? "9" : "1"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+    expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ visao: admin ? "TODOS" : "MEUS", responsavelId: admin ? 9 : 1, setorId: null }));
+    await act(async () => { select.value = "MEUS"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+    expect(container.querySelector('[aria-label="Abrir card de Terceiro"]')).toBeNull();
+    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+    expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ visao: "MEUS", responsavelId: null, setorId: null }));
   } finally { await act(async () => root.unmount()); container.remove(); }
 });
