@@ -121,8 +121,8 @@ function PipelineCard({
 }) {
   const totalEtapas = pipeline.cardsVisiveis;
   return (
-    <article className="rounded-2xl border border-slate-700/70 bg-slate-900/75 p-5 shadow-sm shadow-black/10 sm:p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <article className="overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-900/75 p-4 shadow-sm shadow-black/10 sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-lg font-semibold tracking-tight text-slate-50">{pipeline.nome}</h3>
@@ -133,37 +133,27 @@ function PipelineCard({
           <p className="mt-1.5 text-sm text-slate-400">
             {pipeline._count.cards.toLocaleString('pt-BR')} cards visíveis
           </p>
-          <p className="mt-3 text-sm text-slate-400">Acompanhe o avanço dos cards pelas etapas do processo.</p>
         </div>
         <Link
           href={`/PainelAlpha/AlphaCRM/pipeline/${pipeline.id}`}
-          className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-600/80 px-3.5 text-sm font-medium text-slate-200 transition-colors hover:border-slate-400 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70"
+          className="inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-600/80 px-3 text-xs font-medium text-slate-200 transition-colors hover:border-slate-400 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70"
         >
           Acessar módulo <ArrowRight size={15} aria-hidden="true" />
         </Link>
       </div>
 
       {pipeline.etapas.length === 0 ? (
-        <p className="mt-6 rounded-lg border border-slate-700/60 bg-slate-950/40 px-4 py-3 text-sm text-slate-400">Este pipeline não tem etapas visíveis para seu perfil.</p>
+        <p className="mt-3 rounded-lg border border-slate-700/60 bg-slate-950/40 px-3 py-2 text-xs text-slate-400">Este pipeline não tem etapas visíveis para seu perfil.</p>
       ) : (
-        <ol className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <ol aria-label={`Etapas do pipeline ${pipeline.nome}`} className="crm-scroll mt-3 flex w-full min-w-0 touch-pan-x gap-2 overflow-x-auto overscroll-x-contain pb-1">
           {pipeline.etapas.map((etapa) => {
             const percentual = totalEtapas > 0 ? Math.round((etapa.cardsVisiveis / totalEtapas) * 100) : 0;
             return (
-              <li key={etapa.id} className="rounded-xl border border-slate-700/60 bg-slate-950/35 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <span className="text-xs text-slate-500">Etapa {etapa.ordem + 1}</span>
-                    <h4 className="mt-1 truncate text-sm font-medium text-slate-200" title={etapa.nome}>{etapa.nome}</h4>
-                  </div>
-                  <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-100">{etapa.cardsVisiveis}</span>
-                </div>
-                <div className="mt-4 flex items-center gap-3">
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-800" role="progressbar" aria-label={`${etapa.nome}: ${percentual}% dos cards ativos`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentual}>
-                    <div className="h-full rounded-full bg-sky-500/80 transition-[width] duration-300" style={{ width: `${percentual}%` }} />
-                  </div>
-                  <span className="w-9 text-right text-xs tabular-nums text-slate-400">{percentual}%</span>
-                </div>
+              <li key={etapa.id} className="flex h-9 w-[190px] shrink-0 items-center gap-2 rounded-lg border border-slate-700/60 bg-slate-950/35 px-2.5" title={`${etapa.nome}: ${etapa.cardsVisiveis} cards, ${percentual}% do pipeline`}>
+                <span className="shrink-0 text-[10px] font-medium tabular-nums text-slate-500">{etapa.ordem + 1}</span>
+                <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-200">{etapa.nome}</span>
+                <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-100">{etapa.cardsVisiveis}</span>
+                <span className="w-8 shrink-0 text-right text-[10px] tabular-nums text-slate-400">{percentual}%</span>
               </li>
             );
           })}
