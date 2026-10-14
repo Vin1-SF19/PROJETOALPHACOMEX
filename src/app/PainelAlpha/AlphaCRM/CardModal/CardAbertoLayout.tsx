@@ -124,7 +124,7 @@ export function CardAbertoLayout({
   );
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Handle visual do bottom-sheet */}
       <div className="flex justify-center pt-3 pb-1 shrink-0">
         <div className="w-10 h-1 rounded-full bg-white/15" />
@@ -286,7 +286,7 @@ export function CardAbertoLayout({
       </div>
 
       {/* 3 painéis */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(240px,0.7fr)] gap-5 px-5 sm:px-8 lg:px-10 pb-8 overflow-y-auto lg:overflow-hidden min-h-0">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 overflow-y-auto px-5 pb-8 sm:px-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(240px,0.7fr)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden lg:px-10">
         {dadosEmpresaDrawer.aberto ? (
           <DadosEmpresaDrawer
             accent={accent}
@@ -330,7 +330,7 @@ export function CardAbertoLayout({
         )}
 
         {/* Centro: slot do formulário da etapa ativa */}
-        <div className="min-h-0 lg:h-full lg:overflow-hidden">{children}</div>
+        <div className="min-h-0 min-w-0 lg:h-full lg:overflow-hidden">{children}</div>
 
         {/* Direita: próxima etapa */}
         <div className="flex flex-col gap-5 min-w-0 min-h-0 overflow-y-auto">
