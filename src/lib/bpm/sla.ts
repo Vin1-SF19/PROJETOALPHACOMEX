@@ -277,11 +277,18 @@ export async function criarSlaInstancia(
   }
   const aplicavel = await resolverConfiguracaoAplicavel(alvo, gatilho, client);
   if (!aplicavel) return null;
+  // Uma entrada posterior na etapa inicia um novo ciclo após o encerramento.
+  // Instâncias abertas (inclusive pausadas) continuam idempotentes; os outros
+  // gatilhos mantêm a política existente de uma instância por alvo/configuração.
+  const whereExistente: Prisma.BpmSlaInstanciaWhereInput = {
+    slaConfigId: aplicavel.config.id,
+    ...(alvo.tarefaId ? { tarefaId: alvo.tarefaId } : { cardId: aplicavel.cardId, tarefaId: null }),
+    ...(gatilho === "ENTRADA_ETAPA" && !alvo.tarefaId
+      ? { concluidoEm: null, status: { notIn: ["CONCLUIDO", "CANCELADO"] } }
+      : {}),
+  };
   const existente = await client.bpmSlaInstancia.findFirst({
-    where: {
-      slaConfigId: aplicavel.config.id,
-      ...(alvo.tarefaId ? { tarefaId: alvo.tarefaId } : { cardId: aplicavel.cardId, tarefaId: null }),
-    },
+    where: whereExistente,
     include: { slaConfig: { include: { alertaLimites: true } } },
   });
   if (existente) return existente;
@@ -307,10 +314,7 @@ export async function criarSlaInstancia(
   } catch (error) {
     if (!erroUnicidade(error)) throw error;
     return client.bpmSlaInstancia.findFirst({
-      where: {
-        slaConfigId: aplicavel.config.id,
-        ...(alvo.tarefaId ? { tarefaId: alvo.tarefaId } : { cardId: aplicavel.cardId, tarefaId: null }),
-      },
+      where: whereExistente,
       include: { slaConfig: { include: { alertaLimites: true } } },
     });
   }

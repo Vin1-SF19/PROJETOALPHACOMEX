@@ -1,0 +1,42 @@
+import { expect, it } from 'vitest';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createRequire } from 'node:module';
+import { PrismaClient } from '@prisma/client';
+import { PrismaLibSQL } from '@prisma/adapter-libsql';
+import { criarSlaInstancia, sincronizarSlaMovimentoBpm } from '@/lib/bpm/sla';
+const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite') as { DatabaseSync: new(path:string)=>{exec(sql:string):void;close():void} };
+it('motor real Prisma/SQLite preserva ciclo encerrado e inicia outro após sair e voltar',async()=>{
+ const dir=mkdtempSync(join(tmpdir(),'sla-runtime-')), file=join(dir,'test.db');
+ const sqlite=new DatabaseSync(file);
+ sqlite.exec(`CREATE TABLE BpmPipeline(id TEXT PRIMARY KEY,nome TEXT); CREATE TABLE BpmEtapa(id TEXT PRIMARY KEY,nome TEXT);
+ CREATE TABLE usuarios(id INTEGER PRIMARY KEY); CREATE TABLE servicos_comerciais(id INTEGER PRIMARY KEY,nome TEXT); CREATE TABLE BpmTarefa(id TEXT PRIMARY KEY);
+ CREATE TABLE BpmCard(id TEXT PRIMARY KEY,pipelineId TEXT,etapaId TEXT,responsavelId INTEGER,servico TEXT,status TEXT,createdAt DATETIME,updatedAt DATETIME,concluidoEm DATETIME,primeiraVisualizacaoEm DATETIME,proximoContatoEm DATETIME,dataReuniao DATETIME,statusPosFechamento TEXT);
+ INSERT INTO BpmPipeline VALUES('pipeline','Pipeline'); INSERT INTO BpmEtapa VALUES('etapa','Etapa'),('outra','Outra');
+ INSERT INTO BpmCard(id,pipelineId,etapaId,status,createdAt,updatedAt) VALUES('card','pipeline','etapa','ATIVO','2026-10-01T10:00:00.000Z','2026-10-01T10:00:00.000Z');`);
+ sqlite.exec(readFileSync('prisma/migrations/20260904182000_bpm_sla_contrato_definitivo/migration.sql','utf8').replace(/^DROP TABLE .*;$/gm,''));
+ sqlite.exec(readFileSync('prisma/migrations/20261014151000_sla_ciclos_etapa_abertos/migration.sql','utf8'));sqlite.close();
+ const db=new PrismaClient({adapter:new PrismaLibSQL({url:`file:${file}`})});
+ try{
+  await db.bpmSlaConfig.create({data:{id:'config',nome:'Prazo etapa',pipelineId:'pipeline',etapaId:'etapa',quantidade:1,unidade:'DIAS',inicioMomento:'ENTRADA_ETAPA'}});
+  const start=new Date('2026-10-01T10:00:00Z');
+  const first=await db.$transaction(tx=>criarSlaInstancia({cardId:'card'},'ENTRADA_ETAPA',tx,start));
+  expect(first).not.toBeNull();expect(first?.deadline).toEqual(new Date('2026-10-02T10:00:00Z'));
+  expect((await criarSlaInstancia({cardId:'card'},'ENTRADA_ETAPA',db,start))?.id).toBe(first!.id);
+  await db.$executeRawUnsafe("UPDATE BpmCard SET etapaId='outra' WHERE id='card'");
+  await db.$transaction(tx=>sincronizarSlaMovimentoBpm({cardId:'card',etapaOrigemId:'etapa',etapaOrigemNome:'Etapa',etapaDestinoNome:'Outra',client:tx,agora:new Date('2026-10-02T09:00:00Z')}));
+  expect((await db.bpmSlaInstancia.findUnique({where:{id:first!.id}}))?.status).toBe('CONCLUIDO');
+  await db.$executeRawUnsafe("UPDATE BpmCard SET etapaId='etapa' WHERE id='card'");
+  const returnAt=new Date('2026-10-03T11:00:00Z');
+  await db.$transaction(tx=>sincronizarSlaMovimentoBpm({cardId:'card',etapaOrigemId:'outra',etapaOrigemNome:'Outra',etapaDestinoNome:'Etapa',client:tx,agora:returnAt}));
+  const cycles=await db.bpmSlaInstancia.findMany({orderBy:{inicioContagem:'asc'},include:{eventos:true}});
+  expect(cycles).toHaveLength(2);expect(cycles[0].id).toBe(first!.id);expect(cycles[0].status).toBe('CONCLUIDO');expect(cycles[0].inicioContagem).toEqual(start);
+  expect(cycles[1].inicioContagem).toEqual(returnAt);expect(cycles[1].deadline).toEqual(new Date('2026-10-04T11:00:00Z'));expect(cycles[1].status).toBe('DENTRO_PRAZO');expect(cycles[1].eventos).toHaveLength(1);
+  expect((await criarSlaInstancia({cardId:'card'},'ENTRADA_ETAPA',db,returnAt))?.id).toBe(cycles[1].id);
+  for(const cycle of cycles)await db.bpmSlaDisparo.create({data:{instanciaId:cycle.id,slaConfigId:'config',cardId:'card',tipoDisparo:'ALERTA_VENCIDO'}});
+  expect(await db.bpmSlaDisparo.count()).toBe(2);
+  await expect(db.bpmSlaDisparo.create({data:{instanciaId:cycles[1].id,slaConfigId:'config',cardId:'card',tipoDisparo:'ALERTA_VENCIDO'}})).rejects.toMatchObject({code:'P2002'});
+  await expect(db.bpmSlaInstancia.create({data:{cardId:'card',slaConfigId:'config',status:'DENTRO_PRAZO'}})).rejects.toMatchObject({code:'P2002'});
+ }finally{await db.$disconnect();rmSync(dir,{recursive:true,force:true});}
+});

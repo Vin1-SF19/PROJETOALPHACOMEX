@@ -1,4 +1,5 @@
 import db from "@/lib/prisma";
+import { criarSlaInstancia } from "@/lib/bpm/sla";
 import { etapaEhFechado } from "@/lib/bpm/status-pos-fechamento";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { copiarCamposCardVinculado } from "@/lib/bpm/copiar-campos-card-vinculado";
@@ -107,6 +108,7 @@ export async function executarAutomacaoFechamentoComercial(
         },
       });
 
+      await criarSlaInstancia({ cardId: novoCard.id }, "ENTRADA_ETAPA", tx, novoCard.createdAt);
       await ativarCadenciasNaEntradaBpm({
         cardId: novoCard.id,
         pipelineAnteriorId: null,
