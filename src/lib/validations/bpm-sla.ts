@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { BPM_TAREFA_TIPOS } from "@/lib/bpm/tarefas-tipo";
+import { etapaIdCardSchema } from "@/lib/validations/bpm";
 
 export const SLA_ESCOPOS = ["PIPELINE", "ETAPA", "TAREFA", "TIPO_PROCESSO", "SERVICO"] as const;
 export const SLA_UNIDADES = ["MINUTOS", "HORAS", "DIAS", "DIAS_UTEIS"] as const;
@@ -14,7 +15,6 @@ export const SLA_INICIOS = [
 export const SLA_TIPOS_LIMITE = ["PERCENTUAL_CONSUMIDO", "TEMPO_RESTANTE", "ATRASO"] as const;
 export const SLA_REGRAS_PAUSA = ["NUNCA", "STANDBY"] as const;
 
-const nullableCuid = z.string().cuid().nullable();
 const nullableTexto = z.string().trim().max(120).nullable();
 
 export const slaConfiguracaoAdminSchema = z.object({
@@ -22,7 +22,7 @@ export const slaConfiguracaoAdminSchema = z.object({
   pipelineId: z.string().cuid(),
   nome: z.string().trim().min(2, "Informe um nome.").max(120),
   escopo: z.enum(SLA_ESCOPOS),
-  etapaId: nullableCuid,
+  etapaId: etapaIdCardSchema.nullable(),
   tipoTarefa: z.enum(BPM_TAREFA_TIPOS).nullable(),
   tipoProcesso: nullableTexto,
   servicoId: z.number().int().positive().nullable(),

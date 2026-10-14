@@ -5,7 +5,7 @@ import { Resend } from "resend";
 import type { Prisma } from "@prisma/client";
 
 import db from "@/lib/prisma";
-import { calcularPrazoFinal } from "@/lib/bpm/sla";
+import { calcularPrazoFinal, criarSlaInstancia } from "@/lib/bpm/sla";
 import { executarTransicaoBpm } from "@/lib/bpm/transicao-command";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 import { carregarValoresCanonicosCampos } from "@/lib/bpm/campos-configuraveis-server";
@@ -532,6 +532,7 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
           }),
         } });
       }
+      await criarSlaInstancia({ cardId: criado.id }, "ENTRADA_ETAPA", tx, criado.createdAt);
       await ativarCadenciasNaEntradaBpm({
         cardId: criado.id,
         pipelineAnteriorId: null,

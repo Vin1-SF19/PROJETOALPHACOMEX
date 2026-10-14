@@ -1,5 +1,6 @@
 "use server";
 import db from "@/lib/prisma";
+import { criarSlaInstancia } from "@/lib/bpm/sla";
 import { auth } from "../../../auth";
 import { promoverNolossLeadSchema } from "@/lib/validations/bpm";
 import {
@@ -148,7 +149,7 @@ export async function PromoverNolossLead(dados: unknown) {
           responsavelId,
           status: "ATIVO",
         },
-        select: { id: true },
+        select: { id: true, createdAt: true },
       });
 
       const canalOrigem = nolossLead.utmSource?.trim() || nolossLead.utmMedium?.trim() || "NoLoss";
@@ -173,6 +174,7 @@ export async function PromoverNolossLead(dados: unknown) {
         },
       });
 
+      await criarSlaInstancia({ cardId: card.id }, "ENTRADA_ETAPA", tx, card.createdAt);
       await ativarCadenciasNaEntradaBpm({
         cardId: card.id,
         pipelineAnteriorId: null,

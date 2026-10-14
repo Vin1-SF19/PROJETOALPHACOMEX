@@ -1114,6 +1114,7 @@ export async function CriarCardBpm(dados: unknown) {
       }, tx);
 
       await criarSlaInstancia({ cardId: novoCard.id }, "CRIACAO_CARD", tx, novoCard.createdAt);
+      await criarSlaInstancia({ cardId: novoCard.id }, "ENTRADA_ETAPA", tx, novoCard.createdAt);
 
       await ativarCadenciasNaEntradaBpm({
         cardId: novoCard.id,

@@ -91,7 +91,7 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
         responsavelId: 7,
         status: "ATIVO",
       },
-      select: { id: true },
+      select: { id: true, createdAt: true },
     });
     expect(prismaMock.nolossLead.update).toHaveBeenCalledWith({
       where: { id: NOLOSS_LEAD_ID },

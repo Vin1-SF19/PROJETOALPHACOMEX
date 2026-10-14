@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const criarSlaMock = vi.hoisted(() => vi.fn().mockResolvedValue(null));
 const authMock = vi.hoisted(() => vi.fn());
 const exigirAcessoBpmPipelineMock = vi.hoisted(() => vi.fn());
 const exigirAcessoModuloBpmMock = vi.hoisted(() => vi.fn());
@@ -21,6 +22,7 @@ const prismaMock = vi.hoisted(() => ({
 }));
 
 vi.mock("../../auth", () => ({ auth: authMock }));
+vi.mock("@/lib/bpm/sla", async (importOriginal) => ({ ...await importOriginal<typeof import("@/lib/bpm/sla")>(), criarSlaInstancia: criarSlaMock }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
 vi.mock("server-only", () => ({}));
@@ -87,7 +89,7 @@ describe("CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master)", 
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: 501 });
     prismaMock.cliente.create.mockResolvedValue({ id: 501 });
-    prismaMock.bpmCard.create.mockResolvedValue({ id: "cmu8n1508008hihrqtgerc2u7", empresaId: 501 });
+    prismaMock.bpmCard.create.mockResolvedValue({ id: "cmu8n1508008hihrqtgerc2u7", empresaId: 501, createdAt: new Date("2026-10-14T15:00:00Z") });
 
     const resultado = await CriarCardBpm({
       novaEmpresa: { cnpj: "CNPJ: 12.345.678/0001-90", razaoSocial: "Empresa Nova Ltda", nomeFantasia: "Nova", uf: "sp", municipio: "São Paulo" },
@@ -97,6 +99,9 @@ describe("CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master)", 
     });
 
     expect(resultado.success).toBe(true);
+    expect(criarSlaMock).toHaveBeenCalledWith({ cardId: "cmu8n1508008hihrqtgerc2u7" }, "CRIACAO_CARD", expect.any(Object), new Date("2026-10-14T15:00:00Z"));
+    expect(criarSlaMock).toHaveBeenCalledWith({ cardId: "cmu8n1508008hihrqtgerc2u7" }, "ENTRADA_ETAPA", expect.any(Object), new Date("2026-10-14T15:00:00Z"));
+    expect(prismaMock.bpmCardHistorico.create).toHaveBeenCalledTimes(1);
     expect(prismaMock.cliente.create).toHaveBeenCalledWith({
       data: {
         cnpj: "12345678000190",

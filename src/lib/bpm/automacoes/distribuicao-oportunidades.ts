@@ -3,6 +3,7 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 
 import db from "@/lib/prisma";
+import { criarSlaInstancia } from "@/lib/bpm/sla";
 import { usuarioElegivelResponsavelBpm } from "@/lib/bpm/ownership";
 import { montarContextoAvaliacaoDoCard } from "@/lib/bpm/regras/contexto";
 import {
@@ -435,6 +436,7 @@ export async function executarOportunidadeBpm(params: {
         pipelineId: novo.pipelineId,
         etapaId: novo.etapaId,
       }, tx);
+      await criarSlaInstancia({ cardId: novo.id }, "ENTRADA_ETAPA", tx, novo.createdAt);
       await ativarCadenciasNaEntradaBpm({
         cardId: novo.id,
         pipelineAnteriorId: null,
