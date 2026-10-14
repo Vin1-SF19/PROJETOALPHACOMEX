@@ -2,7 +2,7 @@
 
 ## Status
 
-Implementado e validado — aguardando confirmação específica do usuário para a carga em produção.
+Done — importação autorizada, aplicada e reconciliada em produção.
 
 ## Executor Assignment
 
@@ -52,9 +52,9 @@ O modelo existente possui `BpmEtapa.script`; a story `story-rm-2026-6a27b0-geren
 - [x] Preparar resultado composto por etapa, sem substituir conteúdo nem criar obrigações.
 - [x] Implementar prévia idempotente, guards, auditoria e rollback restrito.
 - [x] Validar testes e gates técnicos pertinentes.
-- [ ] Obter relatório Vault, backup completo verificado e consentimento específico para o plano.
-- [ ] Aplicar exclusivamente o plano autorizado e reconciliar guias/etapas.
-- [ ] Verificar apresentação e registrar evidências, limitações e file list final.
+- [x] Obter relatório Vault, backup completo verificado e consentimento específico para o plano.
+- [x] Aplicar exclusivamente o plano autorizado e reconciliar guias/etapas.
+- [x] Verificar apresentação e registrar evidências, limitações e file list final.
 
 ## Integrações e fontes
 
@@ -134,7 +134,7 @@ CLI: `node --import tsx scripts/importar-playbooks-rd-alpha.mts <preview|apply|v
 - Typecheck em checkout isolado: PASS.
 - Suíte completa em checkout isolado: 619 arquivos, 4.590 testes aprovados, quatro ignorados e um todo; inclui os dez novos testes de composição.
 - Testes existentes do editor, ações e apresentação: 17 aprovados.
-- QA transacional: 16 testes aprovados (dez composição e seis CLI/SQLite). Revisão Vault favorável; aguardando consentimento específico para escrita.
+- QA transacional: 16 testes aprovados (dez composição e seis CLI/SQLite). Revisão Vault favorável; consentimento específico recebido e execução concluída.
 - Nenhuma mudança no aplicativo ou schema; não exige publicação Vercel para apresentar os scripts após a carga.
 - CodeRabbit indisponível; revisão manual por arquitetura/QA/Vault.
 
@@ -151,3 +151,13 @@ Backup completo de 14/10/2026 às 14:31 UTC: `database-backups/pre-change/painel
 Simulação em cópia privada restaurada: prévia local → aplicação dos dez scripts/três versões → verificação 13/13 sem divergências → repetição sem duplicação → rollback. Conferência independente confirmou os dez scripts restaurados, versões monotônicas e dois registros de auditoria preservados. A prévia de produção permaneceu intacta.
 
 Plano em produção: aplicar o fingerprint acima no Turso, verificar os 13 estados esperados e consultar os roteiros pela aba Scripts da etapa. Transação única evita carga parcial; mudança concorrente aborta o lote. Em falha de conexão, verificar antes de retomar. Risco de perda baixo, sem indisponibilidade programada; rollback restrito somente se não houver edição posterior. Alternativa sem escrita é manter a prévia para consulta. Nenhuma escrita remota efetuada; aprovação de cargas anteriores não cobre esta importação.
+
+## Execução em produção concluída
+
+Consentimento específico recebido do usuário: “sim, confirmo”. Aplicado o mesmo fingerprint aprovado, com o backup das 14:31 UTC novamente verificado pelo CLI antes da transação. Resultado: 14 guias, dez etapas, três pipelines, auditoria registrada.
+
+Verificação pós-carga: `applied=true`, `rolledBack=false`, 13 verificações, 13 correspondências, zero divergências. Leitura independente confirmou os dez scripts nos pipelines previstos, igualdade com o plano, validade para o renderer existente e ausência de sinais de acentuação corrompida. Não houve inspeção visual autenticada de produção.
+
+Logs locais: `/tmp/rd-playbooks-production-apply.log` e `/tmp/rd-playbooks-production-verify.log`. Não foi necessário deploy: a página dinâmica consulta os scripts do banco ao atualizar.
+
+Registro concluído em 2026-10-14T14:37:31.173210+00:00.
