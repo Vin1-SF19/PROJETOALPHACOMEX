@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { LoaderCircle, MessageSquare, RefreshCw, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -213,12 +214,30 @@ export function ChatClienteCard({ cardId, clienteNome, podeEnviar }: Props) {
     setOpen(aberto);
   }
 
+  function abrirChat() {
+    versaoConversa.current += 1;
+    setOpen(true);
+    void carregarConversas();
+  }
+
   return <>
-    {podeEnviar && <div className="border-t border-white/10 pt-4">
-      <Button type="button" variant="outline" onClick={() => { versaoConversa.current += 1; setOpen(true); void carregarConversas(); }} className="w-full justify-center gap-2 border-cyan-400/25 bg-cyan-400/5 text-cyan-100 hover:bg-cyan-400/10">
-        <MessageSquare className="size-4" aria-hidden="true" /> Conversar com o cliente no ChatbotX
-      </Button>
-    </div>}
+    {podeEnviar && (
+      <TooltipPrimitive.Provider delayDuration={200}>
+        <TooltipPrimitive.Root>
+          <TooltipPrimitive.Trigger asChild>
+            <button type="button" onClick={abrirChat} aria-label="Conversar com o cliente no ChatbotX" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cyan-400/25 bg-cyan-400/5 text-cyan-200 transition-colors hover:border-cyan-300/50 hover:bg-cyan-400/15 hover:text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
+              <MessageSquare className="size-4" aria-hidden="true" />
+            </button>
+          </TooltipPrimitive.Trigger>
+          <TooltipPrimitive.Portal>
+            <TooltipPrimitive.Content side="bottom" sideOffset={8} className="z-[120] rounded-lg border border-cyan-400/20 bg-slate-950 px-3 py-2 text-xs font-medium text-slate-100 shadow-xl">
+              Conversar com o cliente no ChatbotX
+              <TooltipPrimitive.Arrow className="fill-slate-950" />
+            </TooltipPrimitive.Content>
+          </TooltipPrimitive.Portal>
+        </TooltipPrimitive.Root>
+      </TooltipPrimitive.Provider>
+    )}
     <Dialog open={open} onOpenChange={fechar}>
       <DialogContent className="flex h-[min(720px,90vh)] max-w-3xl flex-col gap-0 overflow-hidden border-slate-700 bg-slate-950 p-0 text-slate-100">
         <DialogHeader className="border-b border-white/10 p-5 text-left">

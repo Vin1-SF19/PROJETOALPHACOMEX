@@ -35,6 +35,7 @@ import { TelefonesCardButton } from "./TelefonesCardButton";
 import { usePerfilEmpresa } from "@/components/PerfilEmpresaGlobal";
 import { SeletorMembrosCard } from "./SeletorMembrosCard";
 import { PainelSlaCard } from "./PainelSlaCard";
+import { ChatClienteCard } from "./ChatClienteCard";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type EtapaOpcao = { id: string; chave?: string | null; nome: string; ordem: number; script: string | null };
@@ -169,22 +170,31 @@ export function CardAbertoLayout({
                 </button>
               </div>
             </div>
-            <DadosEmpresaToggle
-              aberto={dadosEmpresaDrawer.aberto}
-              empresaNome={card.empresa.nomeFantasia || card.empresa.razaoSocial}
-              onToggle={dadosEmpresaDrawer.alternar}
-            />
+            <div className="flex shrink-0 items-center gap-2">
+              <DadosEmpresaToggle
+                aberto={dadosEmpresaDrawer.aberto}
+                empresaNome={card.empresa.nomeFantasia || card.empresa.razaoSocial}
+                onToggle={dadosEmpresaDrawer.alternar}
+              />
+              <SeletorMembrosCard
+                cardId={card.id}
+                membros={card.membros}
+                podeGerenciar={podeGerenciarMembros}
+                accent={accent}
+                onMembrosAtualizados={() => { onAtualizado(); }}
+                onAtualizado={() => { onAtualizado(); }}
+              />
+            </div>
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            <SeletorMembrosCard
-              cardId={card.id}
-              membros={card.membros}
-              podeGerenciar={podeGerenciarMembros}
-              accent={accent}
-              onMembrosAtualizados={() => { onAtualizado(); }}
-              onAtualizado={() => { onAtualizado(); }}
-            />
+            {(card.pipeline.chave === "comercial" || card.pipeline.nome === "Revisão de Radar") && (
+              <ChatClienteCard
+                cardId={card.id}
+                clienteNome={card.empresa.razaoSocial || card.empresa.nomeFantasia || "cliente"}
+                podeEnviar={podeEditar}
+              />
+            )}
             <TelefonesCardButton
               cardId={card.id}
               empresaNome={card.empresa.nomeFantasia || card.empresa.razaoSocial}
