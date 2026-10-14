@@ -84,7 +84,7 @@ export async function extractCardTimelineEvents(
     const display = apresentarEventoRd({ tipo: evento.eventType, data: evento.occurredAt, projecao: JSON.parse(evento.projectedJson) as Record<string, unknown> });
     events.push({
       id: `rd-${evento.id}`, timestamp: display.data, module: "rd-station", moduleLabel: "RD Station",
-      title: display.titulo, description: display.conteudo || undefined,
+      title: display.titulo, description: display.conteudo || undefined, actor: display.autor ?? undefined,
       metadata: { tipo: evento.eventType, dataAusente: !display.data },
     });
   }

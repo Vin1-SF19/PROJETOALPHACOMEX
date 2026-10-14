@@ -37,7 +37,7 @@ export function EstadoHistoricoRd({ historico }: { historico: ReturnType<typeof 
 export function EventoHistoricoRdItem({ evento, podeEditar, onAtualizado }: { evento: Evento; podeEditar: boolean; onAtualizado: () => void }) {
   const [edicao, setEdicao] = useState(false);
   const [salvando, setSalvando] = useState(false);
-  const { titulo, conteudo, data, tipo, etapaIndisponivel } = apresentarEventoRd(evento);
+  const { titulo, conteudo, data, tipo, autor, situacao, prazo, etapaIndisponivel } = apresentarEventoRd(evento);
   async function salvar(event: React.FormEvent<HTMLFormElement>, evento: Evento) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -65,7 +65,7 @@ export function EventoHistoricoRdItem({ evento, podeEditar, onAtualizado }: { ev
               </form>
             ) : (
               <div className="flex items-start gap-3">
-                <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-slate-100">{titulo}</p><p className="mt-0.5 text-[10px] text-slate-500">{data ? fmtDateTime(data) : "Data ausente na origem"} · RD Station · {tipo}</p>{conteudo && <p className="mt-2 whitespace-pre-wrap break-words text-xs text-slate-300">{conteudo}</p>}</div>
+                <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-slate-100">{titulo}</p><p className="mt-0.5 text-[10px] text-slate-500">{data ? fmtDateTime(data) : "Data ausente na origem"} · RD Station · {tipo}{autor && ` · ${autor}`}</p>{situacao && <p className="mt-1 text-[11px] text-slate-400">{situacao}{prazo && ` · Prazo: ${fmtDateTime(prazo)}`}</p>}{conteudo && <p className="mt-2 whitespace-pre-wrap break-words text-xs text-slate-300">{conteudo}</p>}</div>
                 {podeEditar && <button type="button" onClick={() => setEdicao(true)} aria-label={`Corrigir ${titulo}`} className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white"><Pencil size={14} /></button>}
               </div>
             )}

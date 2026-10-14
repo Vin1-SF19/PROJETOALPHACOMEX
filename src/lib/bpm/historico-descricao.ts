@@ -375,6 +375,8 @@ function descreverCatalogado(
     case "NOTA_FISCAL_ATUALIZADA": return `Nota fiscal ${nome("numero", "atualizada")} atualizada no card`;
     case "NOTA_FISCAL_PENDENTE": return "Nota fiscal voltou ao estado pendente";
     case "TAREFA_NF_REABERTA": return "Tarefa de emissão de NF reaberta";
+    case "RD_COMPLEMENTO_IMPORTADO":
+    case "RD_COMPLEMENTO_REVERTIDO": return texto(novo, "descricao") || "Dados do RD Station atualizados";
     case "TAREFA_CRIADA": {
       const tipo = tipoTarefa(texto(novo, "tipo"));
       const prazo = dataFormatada(novo, "prazo");

@@ -48,7 +48,7 @@ export function projetarEventosHistoricoRd(
     const activity = asRecord(value);
     const sourceId = activity.id ?? activity._id;
     const occurredAt = activity.date ?? activity.created_at ?? activity.updated_at ?? activity.done_at;
-    const rawType = activity.type ?? activity.activity_type ?? "UNKNOWN";
+    const rawType = activity.type ?? activity.activity_type ?? (typeof activity.text === "string" ? "NOTE" : "UNKNOWN");
     events.push({
       sourceKey: sourceId ? `activity:${String(sourceId)}` : `activity:${digest(serialize(activity))}:${index}`,
       sourceEventId: sourceId == null ? null : String(sourceId),
@@ -59,7 +59,7 @@ export function projetarEventosHistoricoRd(
         title: activity.subject ?? activity.title ?? null,
         content: activity.text ?? activity.content ?? activity.description ?? null,
         date: occurredAt ?? null,
-        type: rawType,
+        type: rawType === "NOTE" ? "ANOTACAO" : rawType,
       },
     });
   }

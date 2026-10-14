@@ -21,3 +21,11 @@ describe("histórico RD para o usuário", () => {
     for (const technical of ["Payload", "sourceStageId", "private-stage-id", "private-event-id", "<pre", "emprÃ"]) expect(html).not.toContain(technical);
   });
 });
+
+it("mostra anotação com autora e tarefa com prazo e estado em linguagem amigável", () => {
+  const common = { id: "id-privado", data: "2026-10-13T12:00:00Z", periodoOriginal: { entrada: null, saida: null }, correcoes: [] };
+  const html = renderToStaticMarkup(createElement(EventoHistoricoRdItem, { evento: { ...common, tipo: "ACTIVITY_UNKNOWN", projecao: { type: "ANOTACAO", content: "Crédito para emprÃ©stimo", authorName: "Closer Comercial" } }, podeEditar: false, onAtualizado: vi.fn() }));
+  expect(html).toContain("Anotação"); expect(html).toContain("Closer Comercial"); expect(html).toContain("empréstimo"); expect(html).not.toContain("ACTIVITY_UNKNOWN");
+  const task = renderToStaticMarkup(createElement(EventoHistoricoRdItem, { evento: { ...common, tipo: "TASK_RD", projecao: { title: "Retornar ligação", status: "CONCLUIDA", dueDate: "2026-10-14T14:00:00Z", authorName: "Closer Comercial" } }, podeEditar: false, onAtualizado: vi.fn() }));
+  expect(task).toContain("Concluída"); expect(task).toContain("Prazo:"); expect(task).toContain("14/10/2026"); expect(task).not.toContain("TASK_RD");
+});

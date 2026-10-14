@@ -260,6 +260,14 @@ try {
     const key = normalize(name); const ids = clientByName.get(key) ?? new Set(); ids.add(client.id); clientByName.set(key, ids);
   }
   const existingIds = new Set(existing.map((item) => item.sourceDealId));
+  // De/para explícito aprovado; nomes abreviados não podem virar um usuário padrão.
+  const mappingPath = process.argv.find((a) => a.startsWith("--owner-map="))?.slice(12);
+  const ownerMappings = mappingPath ? JSON.parse(await readFile(mappingPath, "utf8")) : [];
+  if (!Array.isArray(ownerMappings) || ownerMappings.some((m) => typeof m.rd !== "string" || !users.some((u) => Number(u.id) === m.alpha && u.nome === m.name))) throw new Error("De/para de responsáveis inválido.");
+  const ownersBySourceId = new Map(ownerMappings.map((m) => [m.rd, m.alpha]));
+  for (const item of full) item.resolvedOwner = item.scope.owner ?? ownersBySourceId.get(String(item.ownerId));
+  const unresolvedOwners = full.filter((item) => !existingIds.has(String(item.deal.id ?? item.deal._id)) && !item.resolvedOwner).length;
+
   const cnpjCounts = new Map();
   for (const row of full) if (row.cnpj) cnpjCounts.set(row.cnpj, (cnpjCounts.get(row.cnpj) ?? 0) + 1);
   const duplicates = [...cnpjCounts.values()].reduce((n, count) => n + Math.max(0, count - 1), 0);
@@ -271,7 +279,7 @@ try {
   }).length;
   const fingerprint = sha(full.map((item) => `${item.deal.id ?? item.deal._id}:${item.detail.updated_at ?? item.detail.created_at ?? ""}:${sha(json(item.events))}`).sort().join("\n"));
   const summary = {
-    mode, fingerprint, sourceDeals: sourceDeals.length, detailedDeals: full.length, failedDeals: [...summaries.values()].reduce((n, item) => n + item.apiErrors, 0), sourceStageHistories: [...summaries.values()].reduce((n, item) => n + item.histories, 0),
+    mode, fingerprint, unresolvedOwners, sourceDeals: sourceDeals.length, detailedDeals: full.length, failedDeals: [...summaries.values()].reduce((n, item) => n + item.apiErrors, 0), sourceStageHistories: [...summaries.values()].reduce((n, item) => n + item.histories, 0),
     sourceActivities: [...summaries.values()].reduce((n, item) => n + item.activities, 0),
     missingActivityDeals: [...summaries.values()].reduce((n, item) => n + item.missingActivities, 0),
     repeatedCnpjDeals: duplicates, dealsUsingCreatedClient: noDirectClient,
@@ -279,14 +287,14 @@ try {
     sourceStageMap: Object.fromEntries([...summaries.values()].map((item) => [item.name, { leads: item.leads, stageHistories: item.histories, activities: item.activities, missingActivities: item.missingActivities, apiErrors: item.apiErrors, stages: item.bySourceStage, unmapped: item.unmappedStages }])),
   };
 
-  const hasUnmapped = summary.failedDeals > 0 || Object.values(summary.sourceStageMap).some((pipeline) => Object.values(pipeline.unmapped).some(Boolean));
+  const hasUnmapped = unresolvedOwners > 0 || summary.failedDeals > 0 || Object.values(summary.sourceStageMap).some((pipeline) => Object.values(pipeline.unmapped).some(Boolean));
 
   if (mode === "preview") {
     console.log(JSON.stringify(summary, null, 2));
     process.exitCode = hasUnmapped ? 2 : 0;
   } else {
     console.log(JSON.stringify({ preflight: summary }, null, 2));
-    if (hasUnmapped) throw new Error("Há etapas sem destino Alpha verificado; nenhuma alteração foi aplicada. Execute preview e resolva o de/para.");
+    if (hasUnmapped) throw new Error("Há etapas ou responsáveis sem destino Alpha verificado; nenhuma alteração foi aplicada. Execute preview e resolva o de/para.");
     await backupGate();
     const sql = await readFile(MIGRATION_FILE, "utf8");
     const executableSql = sql.split(/\r?\n/).filter((line) => !line.trimStart().startsWith("--")).join("\n");
@@ -294,14 +302,6 @@ try {
     const importId = stableId("rdimp", PROVIDER, fingerprint);
     await executeWithRetry({ sql: "INSERT OR IGNORE INTO BpmImportacaoExterna (id,provider,fingerprint,status,resumoJson) VALUES (?,?,?,'EM_ANDAMENTO',?)", args: [importId, PROVIDER, fingerprint, json(summary)] });
 
-    const usersByNormalizedName = new Map();
-    for (const user of users) {
-      const key = normalize(user.nome);
-      const matches = usersByNormalizedName.get(key) ?? [];
-      matches.push(Number(user.id));
-      usersByNormalizedName.set(key, matches);
-    }
-    const mappedOwners = new Map([...usersByNormalizedName].filter(([, ids]) => ids.length === 1).map(([name, ids]) => [name, ids[0]]));
     const lookup = new Map();
     const unmatchedCnpjs = new Set(full.filter((item) => item.cnpj && !clientByCnpj.has(item.cnpj)).map((item) => item.cnpj));
     let cnpjEnrichmentFailures = 0;
@@ -365,7 +365,8 @@ try {
       }
       if (!clientId) throw new Error("Não foi possível criar ou resolver a empresa do negócio RD.");
       if (!item.cnpj && sourceOrganizationId) clientBySourceOrganization.set(String(sourceOrganizationId), clientId);
-      const ownerId = item.scope.owner ?? mappedOwners.get(normalize(item.ownerName)) ?? 8;
+      const ownerId = item.resolvedOwner;
+      if (!ownerId) throw new Error("Responsável sem de/para explícito; importação bloqueada.");
       const cardId = stableId("rdcard", PROVIDER, dealId);
       const originId = stableId("rdorigin", PROVIDER, dealId);
       const eventCounts = await withWriteTransaction(async (tx) => {

@@ -2,7 +2,7 @@
 
 ## Status
 
-Done
+Reopened — usuário relata ausência de tarefas/anotações do RD e de vínculos com closers comerciais. Diagnóstico e preparação autorizados; eventual backfill depende de plano específico, Vault, backup verificado e confirmação do usuário.
 
 ## Executor Assignment
 
@@ -291,6 +291,54 @@ Evidência, prévia, riscos, alternativa e rollback: `docs/reports/rd-alpha-reco
 - `tests/bpm/historico-descricao.test.ts`, `tests/bpm/timeline-card.test.ts` — apresentação legível da auditoria de serviços.
 - `docs/reports/rd-alpha-recovery-2026-10-13.md` — resultado e gate de aplicação.
 
+## Retomada — tarefas, anotações e vínculos comerciais
+
+### Pedido e limite das evidências
+
+O usuário relatou que tarefas/anotações do RD não vieram e que nenhum vínculo com as closers comerciais está presente. O relato requer comparação da origem, persistência Alpha e apresentação na interface. As contagens anteriores de eventos/atividades importados não comprovam que todos os tipos de tarefa e anotação foram consultados, transformados ou exibidos corretamente. Não tratar a hipótese de perda como fato antes de reconciliar essas camadas.
+
+A migração e a correção anteriores permanecem registradas nesta story. Suas autorizações e backups não autorizam automaticamente o novo backfill. Não alterar RD nem ampliar permissões para compensar vínculos ausentes. Mudanças concorrentes no Builder/ChatbotX e a correção do seletor de responsáveis são escopos distintos.
+
+### Critérios adicionais de aceite
+
+1. Realizar diagnóstico somente de leitura na API RD e no banco Alpha, cobrindo negócios do escopo migrado, tarefas abertas/concluídas e anotações/atividades disponíveis. Verificar endpoints e semântica reais, paginação, filtros, limites e erros; não pressupor que um único endpoint de atividades contém todos os tipos.
+2. Reconciliar por identificador estável do negócio/evento de origem: existentes no RD, importados no Alpha, exibidos na interface, ausentes, duplicados e registros inacessíveis/sem correspondência. Distinguir ausência de dado, falha de coleta, falha de transformação e falha de exibição. Relatórios versionados contêm agregados e motivos, sem dados pessoais/payloads reais.
+3. Identificar se tarefas devem ser representadas como tarefas operacionais no Alpha ou como histórico, conforme estado e modelo existente; apresentar essa decisão no plano. Preservar título/texto, datas conhecidas, prazo, conclusão, autoria e responsável quando a origem os fornecer. Não transformar automaticamente tarefas concluídas em pendências nem disparar lembretes/automações durante a recuperação.
+4. Exibir anotações e tarefas em linguagem amigável, com acentuação correta, sem JSON ou IDs técnicos. Preservar fonte/original e trilha auditável; não inventar datas, responsáveis ou conteúdo ausente.
+5. Mapear closers reais usando a identidade verificável dos usuários RD e Alpha e a relação comercial efetiva no negócio. Correspondência por nome aproximado, cargo genérico, CNPJ repetido ou usuário executor não é suficiente. Identidades ambíguas, usuários inativos/ausentes e múltiplas relações não resolvidas ficam em exceções para decisão, sem atribuição automática.
+6. Distinguir responsável operacional atual de vínculo comercial/participação. Recuperar o vínculo de closer no campo/relação semanticamente correto sem sobrescrever responsáveis, membros e alterações humanas existentes. Explicitar no plano como o vínculo afeta a visualização atual de leads; não conceder bypass administrativo, supervisão de setor ou ações extras por efeito colateral.
+7. Preparar prévia fechada por negócio com operações propostas, IDs de origem estáveis, estado esperado atual, vínculos resolvidos e exceções. Registrar fingerprint/identidade do banco, contagens e critérios de conflito, permitindo revisão concreta antes da confirmação de execução.
+8. Importação/backfill idempotente: reexecutar ou retomar não duplica tarefas, anotações, eventos ou membros. Reutilizar registros já presentes em vez de repetir conteúdo; guardar proveniência e auditoria. Se o estado divergir da prévia, interromper/segregar o conflito preservando mudanças humanas.
+9. Antes de qualquer alteração estrutural ou backfill, acionar Vault e apresentar ambiente/banco, comandos, impacto, riscos, alternativa não destrutiva e rollback. Exigir backup completo, verificado e com até 48 horas e confirmação específica do usuário para o plano exato. Nenhuma gravação de recuperação está autorizada apenas por esta reabertura.
+10. Após aplicação autorizada, reconciliar contagens por tipo e negócio, verificar idempotência e preservação dos originais, confirmar vínculos resolvidos e listar exceções remanescentes. Rollback deve ser restrito ao lote e protegido contra edições posteriores; não restaurar banco completo como primeira medida.
+11. Validar autorização de leitura/ação de tarefas, anotações e histórico, inclusive após novos vínculos. Testes devem cobrir paginação, falhas RD, distinção aberta/concluída, ausência de datas/autores, mojibake, duplicação, retomada, conflitos e mapeamentos ambíguos. Executar gates do projeto e registrar evidências sem afirmar inspeção autenticada não realizada.
+
+### Checklist da retomada
+
+- [x] Registrar relato do usuário e separar sintoma de diagnóstico confirmado.
+- [ ] Auditar API RD e banco Alpha somente em leitura e produzir reconciliação por tipo.
+- [ ] Verificar modelo de tarefas/notas e impacto em notificações/automações.
+- [ ] Identificar closers reais e classificar correspondências/exceções sem inferências por nome.
+- [ ] Preparar prévia idempotente, guards de conflito e rollback restrito.
+- [ ] Implementar correções necessárias e testes sem aplicar carga em produção.
+- [ ] Obter revisão Vault, backup completo verificado e confirmação específica do plano.
+- [ ] Aplicar exclusivamente operações autorizadas e reconciliar resultados.
+- [ ] Validar apresentação, acentos e efeitos de acesso dos vínculos.
+- [ ] Atualizar resultados, file list e situação de publicação com evidências.
+
+### Pontos iniciais de integração
+
+- `scripts/migrar-rd-alpha.mjs` e `scripts/recuperar-rd-alpha.mjs`: coleta, proveniência, aplicação e reconciliação existentes.
+- `src/lib/bpm/rd-station-history.ts`, `rd-station-recovery.ts`, `rd-station-display.ts` e `rd-station-text.ts`: transformação, preservação e apresentação.
+- `src/actions/bpm/RdStationHistorico.ts`, `src/actions/bpm/Tarefas.ts` e componentes de histórico/tarefas: leitura, autorização e exibição a verificar.
+- `src/lib/bpm/ownership.ts`, `visibilidade-card.ts` e modelo de membros: impacto de vínculo comercial na visibilidade.
+- `prisma/schema.prisma`: confirmar relações reais antes de escolher destino ou propor estrutura.
+- Testes RD existentes em `tests/bpm/rd-station-*.test.ts`; ampliar casos úteis sem fixtures privadas.
+
+### File list da preparação da retomada
+
+- `docs/stories/story-alpha-crm-migracao-historico-rd-station-v1.md` — reabertura e critérios. Apenas documentação alterada por @sm; implementação e diagnóstico ainda não executados nesta preparação.
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -299,3 +347,38 @@ Evidência, prévia, riscos, alternativa e rollback: `docs/reports/rd-alpha-reco
 | 2026-10-13 | 1.1 | Mapeamento acordado recuperado para a story; adicionadas regras de elegibilidade e exceção para leads sem cliente, etapas sem destino verificável e responsáveis financeiros pendentes. | River (SM) |
 | 2026-10-13 | 1.2 | Implementação, migração autorizada, retomada e reconciliação de 1.212 cards e 10.712 eventos RD; adicionada a trilha de proveniência/correções e interface da jornada. | Codex |
 | 2026-10-13 | 1.3 | Correção de 4.389 históricos e 1.068 serviços, acentos e apresentação amigável; publicação Vercel confirmada no commit 100a4442. | Gage (DevOps) |
+| 2026-10-14 | 1.4 | Reaberta para diagnóstico de tarefas/anotações e vínculos de closers; backfill condicionado a prévia, Vault, backup e confirmação específica. | River (SM) |
+
+### Diagnóstico e implementação complementar — 14/10/2026
+
+Confirmado por leitura: nenhum BpmTarefa nos cards RD; 3.605 anotações já persistidas como ACTIVITY_UNKNOWN, todas com conteúdo; API tasks não era consultada. Importador usava fallback silencioso para usuário 8 quando nomes completos não coincidiam. De/para das três closers foi confirmado pelo usuário na conversa; arquivo contendo identidades reais fica fora do Git. Cards operacionais/financeiros e cards nativos são preservados.
+
+Coleta paginada GET tasks (done=false e done=true), activities e users: 1.596 tarefas (89 pendentes, 1.507 concluídas), 3.608 anotações vinculadas a cards migrados. As 129 tarefas com múltiplos responsáveis preservam todos os nomes na descrição; o campo único Alpha não recebe escolha arbitrária. Responsáveis não mapeados também ficam sem atribuição na tarefa, com nome da origem preservado. Nenhum alerta, SLA ou automação é criado/disparado pela carga.
+
+Plano guardado fora do Git: 1.596 tarefas e proveniências, identificação/autoria das 3.605 notas existentes, três notas novas e 662 vínculos confirmados de closers em Revisão de Radar. Atualização dos vínculos troca somente o membro de fallback comprovadamente criado pelo importador, preserva demais participantes, verifica snapshot e avança updatedAt. Notes mantêm raw original; correções existentes humanas ficam protegidas.
+
+CLI complementar tem prévia/hash de confirmação, transações pequenas, guards em leitura antes de escrita, marcadores idempotentes, verify de estados e rollback compensatório auditável. Rollback bloqueia mudanças posteriores, novas correções e dependências de SLA. Importador original deixa de inferir responsáveis por nome e exige --owner-map explícito quando não há destino operacional fixo; nunca mais usa fallback8.
+
+Fontes oficiais conferidas: [tarefas](https://developers.rdstation.com/reference/crm-v1-list-tasks) e [anotações](https://developers.rdstation.com/reference/crm-v1-list-activities). Consulta API e snapshots privados sem credenciais no log. Vault revisando novo backup completo; autorização específica da carga pendente.
+
+File list complementar:
+- `scripts/coletar-complemento-rd-alpha.mjs`
+- `scripts/complementar-rd-alpha.mjs`
+- `scripts/lib/rd-complement-recovery.mjs`
+- `scripts/migrar-rd-alpha.mjs`
+- `src/lib/bpm/rd-station-history.ts`
+- `src/lib/bpm/rd-station-display.ts`
+- `src/lib/bpm/historico-descricao.ts`
+- `src/lib/bpm/timeline.ts`
+- `src/lib/timeline/extractors/card.ts`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistoricoRd.tsx`
+- `tests/bpm/rd-complement-recovery.test.ts`
+- `tests/bpm/rd-station-ui.test.ts`
+
+Validação inicial: 35 testes direcionados passaram, incluindo 16 testes de SQLite real do helper e apresentação amigável sem JSON; simulação integral na cópia restaurada e gates finais pendentes.
+
+Simulação integral em cópia privada do backup novo aprovada: 5.866 operações aplicadas; todos os guards posteriores coincidem; segunda aplicação não grava novamente; 5.866 compensações executadas com auditoria preservada; integrity_check/foreign_key_check sem falhas. Testes unitários adicionais cobrem equivalência UTC dos DATETIME restaurados pelo backup, sem normalizar payload JSON nem alterar datas originais da API. Arquivos privados de simulação em /tmp/rd-complement-simulation e logs /tmp/rd-complement-simulation.log.
+
+GET atual dos negócios confirmou os 662 responsáveis dos cards em escopo, nenhum alterado desde a origem. Outros 69 vínculos antigos da Revisão sem de/para confirmado são explicitamente reportados e não alterados. O perfil de Thais é Líder Comercial; manter a visão ampla do usuário de teste requer incluir esse setor na configuração, mediante confirmação explícita com a carga.
+
+Backup novo: `database-backups/pre-change/painelalpha_turso_pre_change_2026-10-14T14-01-55-182Z.sql`, 336 tabelas/253.213 linhas/317.529.032 bytes; SHA256 `175b7787b6ff856ee18b83d2cce00aaaa1c123c03d05e414649938d67cbc91d6`; Vault verificou identidade, restauração, integridade, FKs e contagens. Execução em produção ainda pendente da confirmação específica.

@@ -5,6 +5,11 @@ export function periodoOriginalRd(raw: Record<string, unknown>) {
 
 /** Auditoria operacional fica no banco; a timeline mostra apenas o serviço. */
 export function apresentarAjusteServicoRd(origem: string | null, valorNovoJson: string | null) {
+  if (origem === "RD_STATION_COMPLEMENT_RECOVERY" || origem === "RD_STATION_COMPLEMENT_ROLLBACK") {
+    let descricao: unknown;
+    try { descricao = JSON.parse(valorNovoJson ?? "null")?.descricao; } catch { /* descrição opcional */ }
+    return { title: origem.endsWith("ROLLBACK") ? "Recuperação do RD Station desfeita" : "Dados do RD Station recuperados", description: typeof descricao === "string" ? textoLegivelRd(descricao) : "Dados importados do RD Station atualizados.", actor: "Sistema", metadata: { origem: "rd-station" } };
+  }
   if (origem !== "RD_STATION_SERVICE_RECOVERY" && origem !== "RD_STATION_SERVICE_ROLLBACK") return null;
   let servico: unknown;
   try { servico = JSON.parse(valorNovoJson ?? "null")?.servico; } catch { /* Registro incompleto: usar descrição neutra. */ }
@@ -27,10 +32,12 @@ export function ajustesLegiveisRd(antes: Record<string, unknown>, depois: Record
 export function apresentarEventoRd(evento: { tipo: string; data: string | null; projecao: Record<string, unknown> }) {
   const p = evento.projecao;
   const etapa = evento.tipo === "DEAL_STAGE_HISTORY";
-  const titulo = typeof p.title === "string" && p.title.trim() ? p.title : etapa ? String(p.sourceStageName || "Movimentação de etapa RD") : "Atividade RD Station";
+  const anotacao = p.type === "ANOTACAO" || evento.tipo === "ACTIVITY_NOTE";
+  const tarefa = evento.tipo === "TASK_RD";
+  const titulo = typeof p.title === "string" && p.title.trim() ? p.title : etapa ? String(p.sourceStageName || "Movimentação de etapa RD") : anotacao ? "Anotação" : tarefa ? "Tarefa" : "Atividade RD Station";
   // Uma data removida por correção deve continuar ausente, sem voltar à data original.
   const data = typeof p.date === "string" ? p.date : p.date === null ? "" : evento.data ?? "";
-  return { titulo: textoLegivelRd(titulo), conteudo: typeof p.content === "string" ? textoLegivelRd(p.content) : "", data, tipo: etapa ? "Movimentação de etapa" : "Atividade", etapaIndisponivel: etapa && !p.sourceStageName };
+  return { titulo: textoLegivelRd(titulo), conteudo: typeof p.content === "string" ? textoLegivelRd(p.content) : "", data, tipo: etapa ? "Movimentação de etapa" : anotacao ? "Anotação" : tarefa ? "Tarefa" : "Atividade", autor: typeof p.authorName === "string" && p.authorName ? textoLegivelRd(p.authorName) : null, situacao: tarefa ? p.status === "CONCLUIDA" ? "Concluída" : "Pendente" : null, prazo: tarefa && typeof p.dueDate === "string" ? p.dueDate : null, etapaIndisponivel: etapa && !p.sourceStageName };
 }
 
 export function ordenarHistoricoRd<T extends { id: string; tipo: string; data: string | null; projecao: Record<string, unknown> }>(eventos: T[]): T[] {

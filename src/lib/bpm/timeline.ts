@@ -37,6 +37,8 @@ const LABELS_EVENTO_TIMELINE: Record<string, string> = {
   CARD_CRIADO_POR_OPORTUNIDADE: "Card criado a partir de oportunidade",
   CARD_MOVIDO: "Card movido de etapa",
   CARD_MOVIDO_POR_AUTOMACAO: "Card movido por automação",
+  RD_COMPLEMENTO_IMPORTADO: "Dados do RD Station recuperados",
+  RD_COMPLEMENTO_REVERTIDO: "Recuperação do RD Station desfeita",
   CARD_ATUALIZADO: "Campo atualizado",
   MEMBROS_ATUALIZADOS: "Membros atualizados",
   TAREFA_CRIADA: "Tarefa criada",
