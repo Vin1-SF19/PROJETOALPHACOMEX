@@ -28,6 +28,7 @@ Como usuário autorizado do Alpha CRM, quero uma Home operacional que reúna ind
 - [x] Ajustar a leitura server-side da Home para compor os indicadores, comparativos, etapas e listagens a partir dos dados existentes, respeitando autorização por pipeline, etapa, card e setor (AC: 2–7, 9).
 - [x] Atualizar a Home para o tema dark clean, cabeçalho institucional e quatro cards de resumo, incluindo a visibilidade autorizada de Configurações (AC: 1–3, 8).
 - [x] Implementar o card principal de pipeline com etapas reais, contagens, percentuais, CTA e apresentação de escopo individual ou consolidado conforme o perfil (AC: 4–5, 8).
+- [x] O CTA do pipeline mostra estado de carregamento após o clique e bloqueia ativações duplicadas até a navegação terminar.
 - [x] Implementar filtros e tabela de tarefas e feed de atividade, com links/destinos existentes e estados vazios/indisponíveis honestos (AC: 6–7).
 - [ ] Validar autorização e dados exibidos com perfis comuns de setores distintos, Admin, TI e demais perfis administrativos atualmente reconhecidos; cobrir comparativos ausentes, filtros de prazo, etapa sem cards e viewport estreita (AC: 2–9).
 - [ ] Executar verificações de qualidade do projeto e registrar resultados, checklist e File List na conclusão da implementação.
@@ -97,7 +98,7 @@ Codex GPT-6
 
 ### Debug Log References
 
-Lint direcionado passou sem erros nem warnings para `Dashboard.ts`, `DashboardClient.tsx`, `page.tsx` e `cards-no-quadro.ts`. `npm run typecheck` foi executado e falhou em `scripts/importar-sla-rd-alpha.mts` (dois `@ts-expect-error` não utilizados e duas referências a `id` ausente); não apresentou erros nos arquivos desta story. `npm test` não foi executado.
+Lint direcionado passou sem erros nem warnings para `Dashboard.ts`, `DashboardClient.tsx`, `page.tsx` e `cards-no-quadro.ts`. `npm run typecheck` passou após a inclusão do estado de carregamento no CTA. `npm test` não foi executado.
 
 ### Completion Notes List
 
@@ -105,6 +106,7 @@ Lint direcionado passou sem erros nem warnings para `Dashboard.ts`, `DashboardCl
 - “Pendências críticas” usa o critério objetivo já disponível de tarefas pendentes com prazo vencido. Não foi criada severidade nova.
 - Pipelines, etapas, tarefas e eventos permanecem filtrados no servidor por permissões existentes, etapa visível, pipeline/setor e escopo de cards.
 - Não houve alteração de schema, migration ou dados.
+- O CTA de pipeline troca “Acessar” por “Carregando…” com spinner e impede cliques repetidos enquanto a rota está pendente.
 - Validação de UI autenticada e testes permanecem pendentes.
 
 ### File List

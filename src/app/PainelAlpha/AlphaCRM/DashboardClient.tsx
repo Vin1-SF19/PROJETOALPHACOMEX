@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
-import Link from 'next/link';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import Link, { useLinkStatus } from 'next/link';
 import {
   AlertTriangle,
   ArrowDownRight,
@@ -9,6 +9,7 @@ import {
   ArrowUpRight,
   Check,
   ChevronRight,
+  LoaderCircle,
   ListChecks,
   Settings2,
   UsersRound,
@@ -28,6 +29,53 @@ interface Props {
   visual: TemaAlpha;
   currentUserId: number | null;
   currentUserRole: string | null;
+}
+
+function PipelineAccessLinkContent() {
+  const { pending } = useLinkStatus();
+  const [clickStarted, setClickStarted] = useState(false);
+  const clickStartedRef = useRef(false);
+  const pendingSeenRef = useRef(false);
+  const loading = pending || clickStarted;
+
+  useEffect(() => {
+    if (pending) {
+      pendingSeenRef.current = true;
+      return;
+    }
+    if (pendingSeenRef.current) {
+      pendingSeenRef.current = false;
+      clickStartedRef.current = false;
+      setClickStarted(false);
+    }
+  }, [pending]);
+
+  return (
+    <span
+      aria-busy={loading}
+      onClickCapture={(event) => {
+        if (clickStartedRef.current || pending) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+        clickStartedRef.current = true;
+        setClickStarted(true);
+      }}
+      className="group relative inline-flex min-h-9 shrink-0 cursor-pointer items-center justify-center rounded-lg focus-within:ring-2 focus-within:ring-sky-400/70"
+    >
+      <span className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-slate-600/80 px-3 text-xs font-medium text-slate-200 transition-colors group-hover:border-slate-400 group-hover:bg-slate-800">
+        {loading
+          ? <><LoaderCircle size={14} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />Carregando…</>
+          : <>Acessar <ArrowRight size={14} aria-hidden="true" /></>}
+      </span>
+      {loading && (
+        <span role="status" className="absolute inset-0 z-10 grid cursor-progress place-items-center rounded-lg bg-slate-950/80 text-xs font-medium text-slate-100">
+          <span className="inline-flex items-center gap-2"><LoaderCircle size={14} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />Carregando…</span>
+        </span>
+      )}
+    </span>
+  );
 }
 
 const brDataHora = new Intl.DateTimeFormat('pt-BR', {
@@ -136,9 +184,9 @@ function PipelineCard({
         </div>
         <Link
           href={`/PainelAlpha/AlphaCRM/pipeline/${pipeline.id}`}
-          className="inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-600/80 px-3 text-xs font-medium text-slate-200 transition-colors hover:border-slate-400 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70"
+          className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70"
         >
-          Acessar módulo <ArrowRight size={15} aria-hidden="true" />
+          <PipelineAccessLinkContent />
         </Link>
       </div>
 
