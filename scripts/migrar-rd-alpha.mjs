@@ -277,7 +277,7 @@ try {
     const matches = orgName ? clientByName.get(normalize(orgName)) : null;
     return !(matches?.size === 1);
   }).length;
-  const fingerprint = sha(full.map((item) => `${item.deal.id ?? item.deal._id}:${item.detail.updated_at ?? item.detail.created_at ?? ""}:${sha(json(item.events))}`).sort().join("\n"));
+  const fingerprint = sha(full.map((item) => `${item.deal.id ?? item.deal._id}:${item.detail.updated_at ?? item.detail.created_at ?? ""}:${item.resolvedOwner ?? "SEM_RESPONSAVEL"}:${sha(json(item.events))}`).sort().join("\n"));
   const summary = {
     mode, fingerprint, unresolvedOwners, sourceDeals: sourceDeals.length, detailedDeals: full.length, failedDeals: [...summaries.values()].reduce((n, item) => n + item.apiErrors, 0), sourceStageHistories: [...summaries.values()].reduce((n, item) => n + item.histories, 0),
     sourceActivities: [...summaries.values()].reduce((n, item) => n + item.activities, 0),
