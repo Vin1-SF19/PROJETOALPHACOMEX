@@ -131,20 +131,16 @@ export function CardAbertoLayout({
       </div>
 
       {/* Header */}
-      <div className="px-6 sm:px-8 pt-2 pb-5 shrink-0">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5 min-w-0">
+      <div className="px-5 pt-4 pb-6 shrink-0 sm:px-8 lg:px-10">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
             <div
-              className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-lg"
-              style={{
-                background: `linear-gradient(135deg, rgba(${accent},0.35), rgba(${accent},0.08))`,
-                boxShadow: `0 8px 24px -8px rgba(${accent},0.5)`,
-              }}
+              className="w-11 h-11 rounded-xl border border-slate-700 bg-slate-800 flex items-center justify-center shrink-0"
             >
-              <Building2 size={19} style={{ color: `rgb(${accent})` }} />
+              <Building2 size={19} className="text-slate-300" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-xl font-black text-white tracking-tight truncate">
+              <h1 className="text-xl font-semibold text-slate-100 tracking-tight truncate">
                 {card.empresa.nomeFantasia || card.empresa.razaoSocial}
               </h1>
               <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
@@ -290,7 +286,7 @@ export function CardAbertoLayout({
       </div>
 
       {/* 3 painéis */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_max-content] gap-4 px-4 sm:px-6 pb-6 overflow-y-auto lg:overflow-hidden min-h-0">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(240px,0.7fr)] gap-5 px-5 sm:px-8 lg:px-10 pb-8 overflow-y-auto lg:overflow-hidden min-h-0">
         {dadosEmpresaDrawer.aberto ? (
           <DadosEmpresaDrawer
             accent={accent}
@@ -337,7 +333,7 @@ export function CardAbertoLayout({
         <div className="min-h-0 lg:h-full lg:overflow-hidden">{children}</div>
 
         {/* Direita: próxima etapa */}
-        <div className="flex flex-col gap-4 min-h-0 overflow-y-auto">
+        <div className="flex flex-col gap-5 min-w-0 min-h-0 overflow-y-auto">
           <PainelSlaCard cardId={card.id} realtimeRevision={realtimeRevision} />
           <PainelProximaEtapa
             card={card}

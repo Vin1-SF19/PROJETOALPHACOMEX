@@ -178,32 +178,32 @@ export default function PainelHistorico({
   }
 
   return (
-    <div className="flex max-h-[85vh] min-h-0 flex-col gap-3 overflow-hidden rounded-3xl border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent p-4 lg:h-full lg:max-h-none">
+    <div className="flex max-h-[85vh] min-h-0 flex-col gap-3 overflow-hidden rounded-xl border border-slate-700/60 bg-slate-900/40 p-5 lg:h-full lg:max-h-none">
       <Tabs value={abaEsquerda} onValueChange={setAbaEsquerda} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <TabsList className="h-auto w-full flex-wrap justify-start gap-1">
-          <TabsTrigger value="tarefas" className="flex-none gap-1.5">
+        <TabsList className="h-auto w-full shrink-0 flex-wrap justify-start gap-1.5 border-0 bg-transparent px-1 py-2">
+          <TabsTrigger value="tarefas" className="relative flex-none gap-1.5 border border-transparent px-2 text-xs scale-95 transition-[transform,background-color,border-color,color] duration-150 hover:scale-100 focus-visible:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 data-[state=active]:z-10 data-[state=active]:scale-105 data-[state=active]:font-semibold motion-reduce:transition-none motion-reduce:transform-none text-sky-200/65 hover:bg-sky-400/10 hover:text-sky-200 data-[state=active]:border-sky-300/30 data-[state=active]:bg-sky-400/15 data-[state=active]:text-sky-100">
             <ListTodo size={13} />
             Tarefas
             {tarefasDoCard.length > 0 && (
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300">{tarefasDoCard.length}</span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="checklist" className="flex-none gap-1.5">
+          <TabsTrigger value="checklist" className="relative flex-none gap-1.5 border border-transparent px-2 text-xs scale-95 transition-[transform,background-color,border-color,color] duration-150 hover:scale-100 focus-visible:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 data-[state=active]:z-10 data-[state=active]:scale-105 data-[state=active]:font-semibold motion-reduce:transition-none motion-reduce:transform-none text-emerald-200/65 hover:bg-emerald-400/10 hover:text-emerald-200 data-[state=active]:border-emerald-300/30 data-[state=active]:bg-emerald-400/15 data-[state=active]:text-emerald-100">
             <ClipboardCheck size={13} />
             Procedimento
           </TabsTrigger>
-          <TabsTrigger value="etapas" className="flex-none gap-1.5">
+          <TabsTrigger value="etapas" className="relative flex-none gap-1.5 border border-transparent px-2 text-xs scale-95 transition-[transform,background-color,border-color,color] duration-150 hover:scale-100 focus-visible:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 data-[state=active]:z-10 data-[state=active]:scale-105 data-[state=active]:font-semibold motion-reduce:transition-none motion-reduce:transform-none text-violet-200/65 hover:bg-violet-400/10 hover:text-violet-200 data-[state=active]:border-violet-300/30 data-[state=active]:bg-violet-400/15 data-[state=active]:text-violet-100">
             <CheckCircle2 size={13} />
             Jornada
           </TabsTrigger>
-          <TabsTrigger value="anexos" className="flex-none gap-1.5">
+          <TabsTrigger value="anexos" className="relative flex-none gap-1.5 border border-transparent px-2 text-xs scale-95 transition-[transform,background-color,border-color,color] duration-150 hover:scale-100 focus-visible:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 data-[state=active]:z-10 data-[state=active]:scale-105 data-[state=active]:font-semibold motion-reduce:transition-none motion-reduce:transform-none text-amber-200/65 hover:bg-amber-400/10 hover:text-amber-200 data-[state=active]:border-amber-300/30 data-[state=active]:bg-amber-400/15 data-[state=active]:text-amber-100">
             <Paperclip size={13} />
             Anexos
             {card.anexos.length > 0 && (
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300">{card.anexos.length}</span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="historico" className="flex-none gap-1.5">
+          <TabsTrigger value="historico" className="relative flex-none gap-1.5 border border-transparent px-2 text-xs scale-95 transition-[transform,background-color,border-color,color] duration-150 hover:scale-100 focus-visible:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 data-[state=active]:z-10 data-[state=active]:scale-105 data-[state=active]:font-semibold motion-reduce:transition-none motion-reduce:transform-none text-rose-200/65 hover:bg-rose-400/10 hover:text-rose-200 data-[state=active]:border-rose-300/30 data-[state=active]:bg-rose-400/15 data-[state=active]:text-rose-100">
             <History size={13} />
             Histórico
             {feedHistorico.length + historicoRd.eventos.length > 0 && (

@@ -256,7 +256,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
   const proximoContatoInvalido = Boolean(requisitos?.proximoContatoObrigatorio && !parseDataHoraLocalBpm(proximoContatoRascunho));
 
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent overflow-y-auto p-3 space-y-1.5">
+    <div className="rounded-xl border border-slate-700/60 bg-slate-900/40 overflow-y-auto p-5 space-y-2">
       <AtribuirLeadAgendarModal
         pipelineId={card.pipelineId}
         currentUserId={currentUserId}

@@ -44,11 +44,7 @@ export default function PainelRegistrar({ card, etapaAtual, accent, podeEditar, 
 
   return (
     <div
-      className="relative flex min-h-0 flex-col overflow-hidden rounded-3xl border lg:h-full"
-      style={{
-        borderColor: `rgba(${accent},0.15)`,
-        background: `linear-gradient(180deg, rgba(${accent},0.06), transparent 40%)`,
-      }}
+      className="relative flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-700/60 bg-slate-900/40 lg:h-full"
     >
       <Tabs value={abaAtiva} onValueChange={setAbaAtiva} className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <TabsList className="mx-5 mt-5 w-auto shrink-0">

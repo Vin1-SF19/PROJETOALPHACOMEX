@@ -73,26 +73,9 @@ export function TelefonesCardButton({ cardId, empresaNome }: TelefonesCardButton
         aria-label={`Ver telefones vinculados a ${empresaNome}`}
         title="Ver telefones vinculados"
         whileTap={reduzirMovimento ? undefined : { scale: 0.96 }}
-        className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
-        style={{
-          background: "linear-gradient(135deg, rgba(52,211,153,0.35), rgba(52,211,153,0.1))",
-          boxShadow: "0 10px 28px -8px rgba(52,211,153,0.55)",
-        }}
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-400/5 text-emerald-200 transition-colors hover:bg-emerald-400/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
       >
-        <motion.span
-          aria-hidden="true"
-          className="absolute inset-2 rounded-xl border border-emerald-300/40"
-          animate={reduzirMovimento ? undefined : { opacity: [0.25, 0.8, 0.25], scale: [0.82, 1.08, 0.82] }}
-          transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.span
-          aria-hidden="true"
-          className="relative flex items-center justify-center"
-          animate={reduzirMovimento ? undefined : { scale: [1, 1.14, 1] }}
-          transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-        >
-          <Phone size={28} className="text-emerald-300 drop-shadow-[0_0_10px_rgba(52,211,153,0.7)]" />
-        </motion.span>
+        <Phone size={18} aria-hidden="true" />
       </motion.button>
 
       <Dialog open={aberto} onOpenChange={setAberto}>

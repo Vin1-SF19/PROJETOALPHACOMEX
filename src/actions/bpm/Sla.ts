@@ -36,6 +36,7 @@ const criarInstanciaSchema = z.object({
 });
 
 const idSchema = z.string().cuid();
+const cardStatusIdSchema = z.union([idSchema, z.string().regex(/^rdcard_[a-f0-9]{28}$/)]);
 const simularSlaSchema = z.object({
   pipelineId: z.string().cuid(),
   cardId: z.string().cuid(),
@@ -332,10 +333,26 @@ export async function ObterStatusSlaCard(cardId: string) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
-    const parsed = idSchema.safeParse(cardId);
+    const parsed = cardStatusIdSchema.safeParse(cardId);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
     const acesso = await exigirAcessoBpmCard(parsed.data, Number(session.user.id), session.user.role ?? null, "visualizar");
-    const data = await obterStatusSla({ cardId: parsed.data }, undefined, new Date(), acesso?.role !== "VISUALIZADOR");
+    const card = await db.bpmCard.findUniqueOrThrow({ where: { id: parsed.data }, select: { etapaId: true } });
+    // O painel acompanha somente ciclos abertos e aplicáveis à etapa atual.
+    // Sem um ciclo, não há prazo para consultar ou quadro a exibir.
+    const instancias = await db.bpmSlaInstancia.findMany({
+      where: {
+        cardId: parsed.data,
+        tarefaId: null,
+        concluidoEm: null,
+        status: { notIn: ["CONCLUIDO", "CANCELADO"] },
+        slaConfig: { ativa: true, OR: [{ etapaId: null }, { etapaId: card.etapaId }] },
+      },
+      select: { id: true },
+    });
+    if (instancias.length === 0) return { success: true, data: [] };
+    const ids = new Set(instancias.map((item) => item.id));
+    const data = (await obterStatusSla({ cardId: parsed.data }, undefined, new Date(), acesso?.role !== "VISUALIZADOR"))
+      .filter((item) => ids.has(item.id));
     if (data.some((item) => item.statusAlterado)) {
       await notificarPipelineBpm({ cardId: parsed.data, tipo: "SLA_STATUS_ALTERADO" });
     }

@@ -271,7 +271,7 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
           event.preventDefault();
           void solicitarFechamento();
         }}
-        className="[&>button:last-child]:hidden h-[94vh] max-h-[94vh] rounded-t-[2rem] border-t border-white/10 bg-[radial-gradient(ellipse_120%_60%_at_50%_-10%,rgba(var(--accent-rgb),0.12),transparent_60%)] p-0 overflow-hidden sm:max-w-none"
+        className="[&>button:last-child]:hidden h-[94vh] max-h-[94vh] rounded-t-[2rem] border-t border-white/10 bg-[#141b24] p-0 overflow-hidden sm:max-w-none"
         style={{ ["--accent-rgb" as string]: accent }}
       >
         <div className="absolute top-4 right-4 z-10 flex items-center gap-2">

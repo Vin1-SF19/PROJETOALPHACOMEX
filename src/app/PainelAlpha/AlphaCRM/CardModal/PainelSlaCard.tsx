@@ -38,18 +38,24 @@ export function PainelSlaCard({ cardId, realtimeRevision }: { cardId: string; re
     let cancelado = false;
     void ObterStatusSlaCard(cardId).then((resultado) => {
       if (!cancelado) aplicarResultado(resultado);
+    }).catch(() => {
+      if (!cancelado) aplicarResultado({ success: false, error: "Não foi possível consultar o prazo. Tente novamente." });
     });
     return () => { cancelado = true; };
   }, [aplicarResultado, cardId, realtimeRevision]);
 
   const carregar = useCallback(async () => {
-    aplicarResultado(await ObterStatusSlaCard(cardId));
+    try {
+      aplicarResultado(await ObterStatusSlaCard(cardId));
+    } catch {
+      aplicarResultado({ success: false, error: "Não foi possível consultar o prazo. Tente novamente." });
+    }
   }, [aplicarResultado, cardId]);
 
-  if (!carregando && !erro && itens.length === 0) return null;
+  if (!erro && itens.length === 0) return null;
 
   return (
-    <section aria-labelledby={`sla-card-${cardId}`} className="rounded-2xl border border-white/[0.07] bg-slate-950/45 p-3">
+    <section aria-labelledby={`sla-card-${cardId}`} className="rounded-xl border border-slate-700/60 bg-slate-900/40 p-5">
       <div className="flex items-center justify-between gap-2">
         <h2 id={`sla-card-${cardId}`} className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-200">
           <ShieldAlert size={14} className="text-amber-300" aria-hidden="true" /> SLA
