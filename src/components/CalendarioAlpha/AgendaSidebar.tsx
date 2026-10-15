@@ -42,7 +42,6 @@ interface AgendaSidebarProps {
   onGerenciarPermissoes: () => void;
   onAlternarCalendario: (calendario: CalendarioSelecionadoView) => void;
   onAlternarColega: (colegaId: number, visivel: boolean) => void;
-  footer?: ReactNode;
 }
 
 function MarcadorSelecao({
@@ -105,7 +104,6 @@ function AgendaSidebarContent({
   onGerenciarPermissoes,
   onAlternarCalendario,
   onAlternarColega,
-  footer,
 }: Omit<AgendaSidebarProps, "mobileOpen" | "onMobileOpenChange"> & { recolhida: boolean }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -118,6 +116,23 @@ function AgendaSidebarContent({
         <CalendarPlus className="size-4" />
         {!recolhida && "Criar"}
       </Button>
+
+      {isAdmin && (
+        <button
+          type="button"
+          onClick={onGerenciarPermissoes}
+          data-guia-agenda="permissoes"
+          title={recolhida ? "Permissões" : undefined}
+          aria-label="Gerenciar permissões"
+          className={cn(
+            "flex min-h-10 w-full items-center gap-2 rounded-xl border border-white/10 px-2 text-xs font-semibold text-slate-400 transition-colors hover:bg-white/5 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
+            recolhida && "justify-center px-0",
+          )}
+        >
+          <ShieldCheck className="size-4" />
+          {!recolhida && "Permissões"}
+        </button>
+      )}
 
       {!recolhida && (
         <MiniCalendarioAgenda dataReferencia={dataReferencia} tema={tema} onSelecionarDia={onSelecionarDia} />
@@ -191,24 +206,6 @@ function AgendaSidebarContent({
         </GrupoAgenda>
       </div>
 
-      <div className="space-y-2 border-t border-white/5 pt-3">
-        {isAdmin && (
-          <button
-            type="button"
-            onClick={onGerenciarPermissoes}
-            data-guia-agenda="permissoes"
-            title={recolhida ? "Permissões" : undefined}
-            className={cn(
-              "flex min-h-10 w-full items-center gap-2 rounded-xl px-2 text-xs font-semibold text-slate-500 hover:bg-white/5 hover:text-slate-200",
-              recolhida && "justify-center px-0",
-            )}
-          >
-            <ShieldCheck className="size-4" />
-            {!recolhida && "Permissões"}
-          </button>
-        )}
-        {!recolhida && footer}
-      </div>
     </div>
   );
 }

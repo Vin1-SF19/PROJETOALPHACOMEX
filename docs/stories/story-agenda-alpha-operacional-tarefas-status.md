@@ -24,6 +24,8 @@ Como usuário da Agenda Alpha, quero criar e acompanhar compromissos, tarefas, f
 - [x] Usuários com vínculo de compartilhamento aprovado como Editor podem criar, editar e concluir eventos e tarefas na agenda compartilhada; Visualizador permanece somente leitura.
 - [x] Notificações da Agenda Alpha ativam a aba interna do módulo e pedidos recebidos abrem diretamente o painel de aprovação/recusa, sem navegação por rota no shell.
 - [x] A visão mensal reproduz a referência `public/melhoriaAgenda.png`: grade compacta, cabeçalho integrado à primeira semana, itens com hierarquia por tipo e contador de excedentes, sem perder ações existentes.
+- [x] O acesso administrativo a Permissões fica no topo da barra lateral, abaixo de Criar, liberando o rodapé e espaço vertical para Minhas agendas em telas menores.
+- [x] O indicador Requer atenção aparece apenas no cabeçalho da Agenda Alpha, sem duplicação no rodapé da barra lateral.
 
 ## Vault
 
@@ -111,6 +113,7 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - `src/actions/google-calendar-{conexao,eventos,reconciliacao,sync}.ts`
 - `src/app/api/calendario-alpha/jobs/maintenance/route.ts`
 - `src/components/CalendarioAlpha/{CalendarioAlphaDashboard,EstadoDesconectado,SeletorCalendarios,StatusSincronizacao}.tsx`
+- `src/components/CalendarioAlpha/AgendaSidebar.tsx`
 - `src/components/CalendarioAlpha/lib/{datas,layout-eventos,useAgendaAlphaController}.ts`
 - `src/lib/bibble/calendar-tools.ts`
 - `src/lib/google-calendar/{concurrency,health,health-report,maintenance,sync-orchestrator,sync}.ts`
@@ -162,6 +165,8 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - 2026-09-09: reformulação da visão mensal conforme `melhoriaAgenda.png`, com grade compacta e adaptativa, hierarquia visual por tipo de compromisso e preservação integral das interações.
 - 2026-09-09: correção do fundo da visão mensal para manter consistência visual com as abas Dia e Semana.
 - 2026-09-15: ciclo operacional completo da Agenda Alpha com ativação sincronizada, seleção com sync imediato, reconciliação por intervalo, concorrência controlada, status de saúde real, CLI de diagnóstico e cron de manutenção autorreparável.
+- 2026-10-15: acesso a Permissões movido para o topo da barra lateral para liberar espaço vertical na seção Minhas agendas.
+- 2026-10-15: removida a duplicação do status Requer atenção no rodapé da barra lateral; mantido no cabeçalho.
 
 ## Notas operacionais
 

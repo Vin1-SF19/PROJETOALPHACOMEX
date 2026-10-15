@@ -225,7 +225,6 @@ export function CalendarioAlphaDashboard({ temaName, statusConexao, conexaoId, c
           onGerenciarPermissoes={agenda.abrirPermissoes}
           onAlternarCalendario={agenda.alternarCalendario}
           onAlternarColega={agenda.alternarColega}
-          footer={status}
         />
         <main className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden" aria-label="Grade da Agenda Alpha">
           <AgendaFeedback
