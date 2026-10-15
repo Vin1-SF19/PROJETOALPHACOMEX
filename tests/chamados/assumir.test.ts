@@ -2,6 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.hoisted(() => vi.fn());
 const prismaMock = vi.hoisted(() => ({
+    usuarios: { findUnique: vi.fn(async ({ where }: { where: { id: number } }) => {
+      const session = await authMock.mock.results.at(-1)?.value;
+      if (!session?.user) return null;
+      return { id: where.id, nome: session.user.nome ?? "Colaborador", role: session.user.role, status: "ATIVO" };
+    }) },
+    setor: { findMany: vi.fn().mockResolvedValue([{ id: 14, nome: "TI" }, { id: 4, nome: "Comercial" }]) },
+  $transaction: vi.fn(),
   chamados: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
 }));
 const notificarAgendaMock = vi.hoisted(() => vi.fn());
@@ -36,6 +43,7 @@ function chamadoAberto(overrides: Record<string, unknown> = {}) {
     usuarioId: 1,
     solucao: null,
     status: "ABERTO",
+    setorDestinoId: null,
     tecnicoId: null,
     tecnicoSolicitadoId: null,
     tecnicoSolicitado: null,
@@ -47,6 +55,7 @@ function chamadoAberto(overrides: Record<string, unknown> = {}) {
 describe("assumirChamado — fluxo 'Assumir Chamado'", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prismaMock.$transaction.mockImplementation(async (callback) => callback(prismaMock));
     authMock.mockResolvedValue(SESSION);
     criarTarefaMock.mockResolvedValue(undefined);
     notificarAssumidoMock.mockResolvedValue(true);
@@ -100,7 +109,7 @@ describe("assumirChamado — fluxo 'Assumir Chamado'", () => {
     expect(resultado.success).toBe(true);
     expect(resultado.chamado).toEqual({ id: 10, status: "EM_ATENDIMENTO", tecnicoId: 3 });
     expect(prismaMock.chamados.updateMany).toHaveBeenCalledWith({
-      where: { id: 10, tecnicoId: null, status: "ABERTO", tecnicoSolicitadoId: null },
+      where: { id: 10, tecnicoId: null, status: "ABERTO", tecnicoSolicitadoId: null, setorDestinoId: null },
       data: { status: "EM_ATENDIMENTO", tecnicoId: 3 },
     });
     expect(notificarAgendaMock).toHaveBeenCalledWith(
@@ -160,13 +169,13 @@ describe("assumirChamado — fluxo 'Assumir Chamado'", () => {
     }));
   });
 
-  it("bloqueia ator sem role administrativa no servidor", async () => {
+  it("bloqueia ator sem vínculo ao setor de destino no servidor", async () => {
     authMock.mockResolvedValue({ user: { id: "4", role: "User", nome: "Colaborador" } });
 
     const resultado = await assumirChamado(10);
 
-    expect(resultado).toEqual({ success: false, error: "Permissão insuficiente" });
-    expect(prismaMock.chamados.findUnique).not.toHaveBeenCalled();
+    expect(resultado).toMatchObject({ success: false });
+    expect(prismaMock.chamados.updateMany).not.toHaveBeenCalled();
   });
 
   it("notifica o solicitante antes de aguardar a automação da Agenda Alpha", async () => {
@@ -188,4 +197,14 @@ describe("assumirChamado — fluxo 'Assumir Chamado'", () => {
     liberarAgenda();
     await expect(resultadoPendente).resolves.toMatchObject({ success: true });
   });
+  it("revalida colaborador dentro da transação antes do CAS", async () => {
+    prismaMock.chamados.findUnique.mockResolvedValue(chamadoAberto());
+    prismaMock.$transaction.mockImplementationOnce(async (callback) => callback({
+      ...prismaMock,
+      usuarios: { findUnique: vi.fn().mockResolvedValue({ id: 3, nome: "Carlos", role: "Comercial", status: "ATIVO" }) },
+    }));
+    expect(await assumirChamado(10)).toMatchObject({ success: false });
+    expect(prismaMock.chamados.updateMany).not.toHaveBeenCalled();
+  });
+
 });

@@ -2555,3 +2555,13 @@ O domínio interno do BPM preserva `CHECKLIST` como contrato estável em models 
 A mudança não altera schema, persistência ou comportamento. Typecheck, build e lint direcionado foram aprovados; a suíte BPM concluiu 927/927 testes. DELIVERY_READY: Alpha CRM → pipeline → card → aba “Procedimento”.
 
 **Última atualização:** 2026-09-22 por Codex (RM-2026-FFD798)
+
+
+### 2026-10-15 — Chamados multissetorial (implementação local; banco pendente)
+
+O módulo preserva a página/tabela e formulário atuais. `src/lib/chamados/acesso.ts` centraliza ator persistido, leitura e capacidades; `criacao.ts` atende formulário, API ChatBot e Bibble; `catalogo.ts` consulta Setor e ChamadoCategoria. A visão global Admin/CEO/TI não concede operação fora do destino. Mutação crítica revalida ator/destino/reserva em transação com CAS. `setorDestinoId` nulo preserva legados TI, sem backfill. Schema e CLI aditivos preparados, NÃO aplicados ao Turso; ver relatório Vault e story. Não publicar esta versão antes da migração especificamente autorizada.
+
+
+### 2026-10-15 — Chamados: migração autorizada aplicada
+
+A migração do Chamados foi aplicada no Turso `banco-alpha` após consentimento específico do usuário e gate Vault; estado APPLIED_VERIFIED. Catálogo real 13 destinos/53 categorias disponível. Os 224 legados mantêm destino nulo; não houve backfill. Smoke Prisma/catálogo/autorização e integridade aprovados. Publicação do código e E2E autenticado não executados.

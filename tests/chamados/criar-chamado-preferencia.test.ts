@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
   usuarioFindUnique: vi.fn(),
+  setorFindUnique: vi.fn(),
+  categoriaFindUnique: vi.fn(),
   chamadoFindFirst: vi.fn(),
   chamadoCreate: vi.fn(),
   notificarNovo: vi.fn(),
@@ -14,6 +16,12 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("@/lib/prisma", () => ({
   default: {
+    $transaction: vi.fn(async (callback) => callback({
+      usuarios: { findUnique: mocks.usuarioFindUnique },
+      setor: { findUnique: mocks.setorFindUnique },
+      chamadoCategoria: { findUnique: mocks.categoriaFindUnique },
+      chamados: { findFirst: mocks.chamadoFindFirst, create: mocks.chamadoCreate },
+    })),
     usuarios: { findUnique: mocks.usuarioFindUnique },
     chamados: {
       findFirst: mocks.chamadoFindFirst,
@@ -42,7 +50,8 @@ function formData(overrides: Record<string, string> = {}): FormData {
   const dados = new FormData();
   const valores = {
     titulo: "Acesso ao sistema",
-    categoria: "Acesso",
+    setorDestinoId: "14",
+    categoriaId: "5",
     prioridade: "MEDIA",
     descricao: "Preciso que meu perfil seja liberado",
     tecnicoSolicitadoId: "3",
@@ -59,12 +68,15 @@ describe("createChamadoAction — preferência e prazo", () => {
     mocks.auth.mockResolvedValue({
       user: { id: "7", nome: "Solicitante", role: "Comercial" },
     });
-    mocks.usuarioFindUnique.mockResolvedValue({ id: 3, role: "T.I", status: "ATIVO" });
+    mocks.usuarioFindUnique.mockImplementation(async ({ where }) => where.id === 7 ? { id: 7, nome: "Solicitante", role: "Comercial", status: "ATIVO" } : { id: 3, nome: "Carlos", role: "T.I", status: "ATIVO" });
+    mocks.setorFindUnique.mockResolvedValue({ id: 14, nome: "TI", ativo: true, isBase: false });
+    mocks.categoriaFindUnique.mockResolvedValue({ id: 5, setorId: 14, nome: "Acesso", ativo: true });
     mocks.chamadoFindFirst.mockResolvedValue(null);
     mocks.chamadoCreate.mockResolvedValue({
       id: 10,
       titulo: "Acesso ao sistema",
       prioridade: "MEDIA",
+      setorDestinoId: 14, setorDestinoNome: "TI", tecnicoSolicitadoId: 3,
       createdAt: new Date("2026-09-11T13:00:00.000Z"),
     });
     mocks.notificarNovo.mockResolvedValue(undefined);
@@ -78,7 +90,7 @@ describe("createChamadoAction — preferência e prazo", () => {
 
     expect(mocks.usuarioFindUnique).toHaveBeenCalledWith({
       where: { id: 3 },
-      select: { id: true, role: true, status: true },
+      select: { id: true, nome: true, role: true, status: true },
     });
     expect(mocks.chamadoCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -93,12 +105,12 @@ describe("createChamadoAction — preferência e prazo", () => {
   });
 
   it("rejeita usuário inativo ou fora de TI antes de criar", async () => {
-    mocks.usuarioFindUnique.mockResolvedValueOnce({ id: 3, role: "Financeiro", status: "ATIVO" });
+    mocks.usuarioFindUnique.mockResolvedValueOnce({ id: 7, nome: "Solicitante", role: "Comercial", status: "ATIVO" }).mockResolvedValueOnce({ id: 3, role: "Financeiro", status: "ATIVO" });
 
     const resultado = await createChamadoAction(formData());
 
     expect(resultado).toEqual({
-      error: "O técnico solicitado não está disponível para receber chamados.",
+      error: "O responsável solicitado não está disponível no setor de destino.",
     });
     expect(mocks.chamadoCreate).not.toHaveBeenCalled();
   });
@@ -109,7 +121,7 @@ describe("createChamadoAction — preferência e prazo", () => {
       dataDesejadaConclusao: "",
     }))).rejects.toThrow("NEXT_REDIRECT");
 
-    expect(mocks.usuarioFindUnique).not.toHaveBeenCalled();
+    expect(mocks.usuarioFindUnique).toHaveBeenCalledTimes(1); // Somente o solicitante é revalidado.
     expect(mocks.chamadoCreate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         tecnicoSolicitadoId: null,

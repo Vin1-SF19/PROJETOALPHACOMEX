@@ -3,6 +3,9 @@
 import db from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-guard";
 import { revalidatePath } from "next/cache";
+import { isSameRole } from "@/lib/roles";
+import { getCategoriasIniciaisDoSetor } from "@/lib/chamados/categorias-iniciais";
+import { normalizarNomeCategoria } from "@/lib/chamados/catalogo";
 
 const SETOR_BASE = "DESVINCULADO";
 
@@ -97,7 +100,16 @@ export async function criarSetor(nome: string) {
   const existe = await db.setor.findUnique({ where: { nome: nomeTrim } });
   if (existe) return { success: false, message: "Setor já existe" };
 
-  await db.setor.create({ data: { nome: nomeTrim } });
+  const criado = await db.$transaction(async (tx) => {
+    const existentes = await tx.setor.findMany({ select: { nome: true } });
+    if (existentes.some((setor) => isSameRole(setor.nome, nomeTrim))) return false;
+    const setor = await tx.setor.create({ data: { nome: nomeTrim } });
+    for (const categoria of getCategoriasIniciaisDoSetor(setor.nome)) {
+      await tx.chamadoCategoria.create({ data: { ...categoria, setorId: setor.id, nomeNormalizado: normalizarNomeCategoria(categoria.nome) } });
+    }
+    return true;
+  }, { isolationLevel: "Serializable" });
+  if (!criado) return { success: false, message: "Já existe um setor com nome equivalente." };
   revalidatePath("/PainelAlpha/GestaoSetores");
   revalidatePath("/PainelAlpha/cadastro");
 
@@ -109,32 +121,29 @@ export async function excluirSetor(id: number) {
 
   const setor = await db.setor.findUnique({ where: { id } });
   if (!setor) return { success: false, message: "Setor não encontrado" };
+  if (isSameRole(setor.nome, "TI")) return { success: false, message: "O setor TI é usado no histórico de chamados e não pode ser excluído." };
   if (setor.protegido) return { success: false, message: "Setor protegido não pode ser excluído" };
 
   await ensureSetorBase();
-
-  const usuariosNoSetor = await db.usuarios.count({ where: { role: setor.nome } });
-  if (usuariosNoSetor > 0) {
-    await db.usuarios.updateMany({
-      where: { role: setor.nome },
-      data: {
-        role: SETOR_BASE,
-        authSessionVersion: { increment: 1 },
-      },
+  const resultado = await db.$transaction(async (tx) => {
+    const atual = await tx.setor.findUnique({ where: { id }, select: { nome: true, protegido: true } });
+    if (!atual || atual.protegido || isSameRole(atual.nome, "TI")) return { success: false, message: "Setor protegido ou não encontrado.", total: 0 };
+    const vinculados = await tx.chamados.count({ where: { setorDestinoId: id } });
+    const categorias = await tx.chamadoCategoria.count({ where: { setorId: id } });
+    if (vinculados > 0 || categorias > 0) return { success: false, message: "Este setor possui chamados ou categorias vinculados e não pode ser excluído.", total: 0 };
+    const usuariosNoSetor = await tx.usuarios.count({ where: { role: atual.nome } });
+    if (usuariosNoSetor > 0) await tx.usuarios.updateMany({
+      where: { role: atual.nome }, data: { role: SETOR_BASE, authSessionVersion: { increment: 1 } },
     });
-  }
-
-  await db.setor.delete({ where: { id } });
+    await tx.setor.delete({ where: { id } });
+    return { success: true, message: usuariosNoSetor > 0 ? `Setor excluído. ${usuariosNoSetor} usuário(s) movido(s) para DESVINCULADO.` : "Setor excluído.", total: usuariosNoSetor };
+  }, { isolationLevel: "Serializable" });
+  if (!resultado.success) return { success: false, message: resultado.message };
 
   revalidatePath("/PainelAlpha/GestaoSetores");
   revalidatePath("/PainelAlpha/cadastro");
 
-  return {
-    success: true,
-    message: usuariosNoSetor > 0
-      ? `Setor excluído. ${usuariosNoSetor} usuário(s) movido(s) para DESVINCULADO.`
-      : "Setor excluído.",
-  };
+  return { success: true, message: resultado.message };
 }
 
 export async function criarCargo(nome: string) {

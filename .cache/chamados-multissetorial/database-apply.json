@@ -1,0 +1,81 @@
+{
+  "applied": true,
+  "categoriasInseridas": 53,
+  "chamadosPreservados": 224,
+  "integrity": "ok",
+  "foreignKeyViolations": 0,
+  "verifiedAt": "2026-10-15T17:58:10.110Z",
+  "indexesConferidos": [
+    "chamado_categoria_setorId_nomeNormalizado_key",
+    "chamado_categoria_setorId_ativo_ordem_idx",
+    "chamados_setorDestinoId_status_idx",
+    "chamados_categoriaId_idx"
+  ],
+  "categoriasPorSetor": [
+    {
+      "id": 1,
+      "nome": "Admin",
+      "categorias": 4
+    },
+    {
+      "id": 2,
+      "nome": "CEO",
+      "categorias": 4
+    },
+    {
+      "id": 4,
+      "nome": "OPERACIONAL",
+      "categorias": 4
+    },
+    {
+      "id": 5,
+      "nome": "COMERCIAL",
+      "categorias": 4
+    },
+    {
+      "id": 6,
+      "nome": "Lider Comercial",
+      "categorias": 4
+    },
+    {
+      "id": 7,
+      "nome": "RECURSOS HUMANOS",
+      "categorias": 4
+    },
+    {
+      "id": 8,
+      "nome": "FINANCEIRO",
+      "categorias": 4
+    },
+    {
+      "id": 9,
+      "nome": "JURÍDICO",
+      "categorias": 4
+    },
+    {
+      "id": 10,
+      "nome": "PARCEIRO",
+      "categorias": 4
+    },
+    {
+      "id": 11,
+      "nome": "Serviços Gerais",
+      "categorias": 4
+    },
+    {
+      "id": 12,
+      "nome": "MARKETING",
+      "categorias": 4
+    },
+    {
+      "id": 13,
+      "nome": "ADMINISTRATIVO",
+      "categorias": 4
+    },
+    {
+      "id": 14,
+      "nome": "TI",
+      "categorias": 5
+    }
+  ]
+}

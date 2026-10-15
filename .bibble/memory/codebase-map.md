@@ -1767,3 +1767,15 @@ POST /api/alpha-catcher/importacoes/json registra resumo e blocos em Auditoria a
 Alpha Catcher — histórico compartilhado: GETs autorizados usam listarCompartilhado/detalharCompartilhado, autor via Auditoria.usuario.usuario e registroId numérico para evitar colisãoUUID. Shared detail resolve proprietário real para blocos e estado ativo. Métodos owner/contexto/job/escrita inalterados. CLI --compartilhado confere readEffectiveModulePermissions. Sem migration/backfill. Story docs/stories/story-alpha-catcher-historico-compartilhado.md.
 
 Logcomex Vercel: worker-client encaminha jobs/processamento/histórico ao endpointinternal assinado worker-auth; receiver HOST=true e !VERCEL, recheck effective permissions. Worker-executar chama serviçossameprocess; processar-entrada compartilha validadoresempresa existentes. EnvALPHA_CATCHER_WORKER_URL/SECRET/HOST, segredo exclusivo server-only. Single-process/restart perdeMaps, semretomadagarantida. Story story-alpha-catcher-logcomex-worker-persistente.md e docs/alpha-catcher-worker-producao.md.
+
+
+### 2026-10-15 — Chamados multissetorial
+
+- UI: `src/app/PainelAlpha/Chamados/{page.tsx,NovoChamado/page.tsx,NovoChamado/NovoChamadoForm.tsx}`, `src/components/chamados/GerenciarCategoriasDialog.tsx`, `DetalhesChamado.tsx`, `ChatChamado.tsx`.
+- Domínio: `src/lib/chamados/{acesso,catalogo,criacao,schemas,conclusao,notificacoes,notificacoes-server,categorias-iniciais}.ts`; actions `chamados.ts`, `chamados-categorias.ts`, `protocolos.ts`, `gestaoSetores.ts`.
+- Banco/CLI preparados: `prisma/migrations/20261015190000_chamados_multissetorial/migration.sql`, `scripts/chamados-multissetorial.mjs`. Runtime depende do delta ainda NÃO aplicado. Relatório: `docs/reports/vault-chamados-multissetorial-2026-10-15.md`; story `docs/stories/story-chamados-multissetorial.md`.
+
+
+### 2026-10-15 — Chamados: migração autorizada aplicada
+
+Atualização de estado Chamados: estrutura e 53 categorias aplicadas no Turso após autorização específica; scripts/módulos mapeados acima agora foram exercitados em leitura real (13 destinos/29 atores ativos). Evidências em `.cache/chamados-multissetorial/{database-apply,runtime-readonly,preservacao-after}.json`.

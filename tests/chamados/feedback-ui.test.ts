@@ -56,15 +56,17 @@ describe("experiência de feedback dos chamados", () => {
 });
 
 describe("abertura e detalhes do chamado", () => {
-  it("lista somente técnicos ativos normalizados e mantém os novos campos opcionais", () => {
+  it("carrega catálogo autenticado e mantém responsável e prazo opcionais", () => {
     const pagina = ler("src/app/PainelAlpha/Chamados/NovoChamado/page.tsx");
     const formulario = ler("src/app/PainelAlpha/Chamados/NovoChamado/NovoChamadoForm.tsx");
 
-    expect(pagina).toContain('where: { status: "ATIVO" }');
-    expect(pagina).toContain('isSameRole(usuario.role, "TI")');
+    expect(pagina).toContain("obterAtorChamados(Number(session.user.id))");
+    expect(pagina).toContain("getChamadosCatalogo()");
+    expect(formulario).toContain('name: "setorDestinoId"');
+    expect(formulario).toContain('register("categoriaId")');
     expect(formulario).toContain('name="tecnicoSolicitadoId"');
     expect(formulario).toContain('register("dataDesejadaConclusao")');
-    expect(formulario).toContain("técnico e prazo são opcionais");
+    expect(formulario).toContain("responsável e prazo são opcionais");
   });
 
   it("lê o formulário pelo alvo persistente após a validação assíncrona", () => {
@@ -74,10 +76,10 @@ describe("abertura e detalhes do chamado", () => {
     expect(formulario).not.toContain("const formulario = event?.currentTarget;");
   });
 
-  it("mostra preferência e só oferece finalização ao técnico vinculado", () => {
+  it("mostra preferência e só oferece finalização ao responsável vinculado", () => {
     const detalhes = ler("src/components/DetalhesChamado.tsx");
 
-    expect(detalhes).toContain("Técnico solicitado");
+    expect(detalhes).toContain("Responsável desejado");
     expect(detalhes).toContain("Conclusão desejada");
     expect(detalhes).toContain('status === "EM_ATENDIMENTO" && tecnicoId === usuarioAtualId');
   });

@@ -1,0 +1,31 @@
+{
+  "passed": true,
+  "source": "actual NovoChamadoForm and GerenciarCategoriasDialog React components",
+  "serverActions": "mocked; no database reads or writes",
+  "cases": [
+    "required fields block submission",
+    "sector controls categories and staff",
+    "TI-only icon visibility",
+    "category CRUD and archive/reactivate",
+    "portal form does not submit outer ticket",
+    "archive clears selected category",
+    "changing sector clears both dependents",
+    "actual FormData submit carries destination/category IDs",
+    "Admin cannot see category manager",
+    "390px mobile without horizontal overflow"
+  ],
+  "submitted": {
+    "titulo": "Solicitação de reembolso",
+    "setorDestinoId": "7",
+    "categoriaId": "4",
+    "prioridade": "MEDIA",
+    "tecnicoSolicitadoId": "",
+    "dataDesejadaConclusao": "",
+    "descricao": "Preciso solicitar o reembolso das despesas da visita ao cliente."
+  },
+  "errors": [],
+  "widths": {
+    "viewport": 390,
+    "document": 390
+  }
+}

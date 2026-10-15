@@ -3,7 +3,7 @@
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../auth";
-import { isAdminRole } from "@/lib/roles";
+import { obterAtorChamados, chamadoAcessoSelect, podeResponderChamado } from "@/lib/chamados/acesso";
 import {
   notificarAgendaChamadoAtualizada,
   notificarChamadoConcluido,
@@ -33,13 +33,15 @@ export type ProtocoloTemplate = {
 async function requireAdmin() {
   const session = await auth();
   if (!session) throw new Error("Não autorizado");
-  const role = session.user.role;
-  if (!isAdminRole(role)) throw new Error("Permissão insuficiente");
+  const ator = await obterAtorChamados(session.user.id);
+  if (!ator?.visaoGlobal) throw new Error("Permissão insuficiente");
   return session;
 }
 
 export async function listarTemplates(categoria?: string): Promise<ProtocoloTemplate[]> {
   try {
+    const session = await auth();
+    if (!await obterAtorChamados(session?.user?.id)) return [];
     const templates = await protocoloTemplateModel.findMany({
       where: {
         ativo: true,
@@ -55,6 +57,7 @@ export async function listarTemplates(categoria?: string): Promise<ProtocoloTemp
 
 export async function listarTodosTemplates(): Promise<ProtocoloTemplate[]> {
   try {
+    await requireAdmin();
     const templates = await protocoloTemplateModel.findMany({
       orderBy: [{ categoria: "asc" }, { nome: "asc" }],
     });
@@ -129,7 +132,6 @@ export async function finalizarComProtocolo(
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
-    if (!isAdminRole(session.user.role)) return { success: false, error: "Permissão insuficiente" };
 
     const parsed = finalizarComProtocoloSchema.safeParse({ chamadoId, ...dados });
     if (!parsed.success) return { success: false, error: primeiraMensagemZod(parsed.error) };
@@ -151,7 +153,7 @@ export async function finalizarComProtocolo(
     });
 
     try {
-      await concluirTarefaAgendadaDoChamado({
+      if (chamado.destinoEhTI) await concluirTarefaAgendadaDoChamado({
         chamadoId: chamado.id,
         concluidoEm,
         tecnicoId,
@@ -167,7 +169,7 @@ export async function finalizarComProtocolo(
       });
     }
 
-    await notificarChamadoConcluido(chamado.usuarioId, {
+    if (chamado.usuarioId !== tecnicoId) await notificarChamadoConcluido(chamado.usuarioId, {
       chamadoId: chamado.id,
       titulo: chamado.titulo,
       solucao: parsed.data.solucao,
@@ -201,7 +203,11 @@ export async function salvarWhatsAppLog(dados: {
     const session = await auth();
     if (!session) return { success: false, error: "Não autorizado" };
 
-    const enviadoPorId = Number(session.user.id);
+    const ator = await obterAtorChamados(session.user.id);
+    if (!ator) return { success: false, error: "Não autorizado" };
+    const chamado = await db.chamados.findUnique({ where: { id: dados.chamadoId }, select: chamadoAcessoSelect });
+    if (!chamado || !podeResponderChamado(ator, chamado) || chamado.usuarioId !== dados.usuarioId) return { success: false, error: "Permissão insuficiente" };
+    const enviadoPorId = ator.id;
 
     await db.$executeRawUnsafe(
       `INSERT INTO whatsapp_log (chamadoId, usuarioId, telefone, mensagem, enviadoPorId, createdAt) VALUES (?, ?, ?, ?, ?, ?)`,
@@ -221,6 +227,11 @@ export async function salvarWhatsAppLog(dados: {
 
 export async function buscarTelefoneSolicitante(chamadoId: number): Promise<string | null> {
   try {
+    const session = await auth();
+    const ator = await obterAtorChamados(session?.user?.id);
+    if (!ator || !Number.isInteger(chamadoId) || chamadoId <= 0) return null;
+    const chamado = await db.chamados.findUnique({ where: { id: chamadoId }, select: chamadoAcessoSelect });
+    if (!chamado || !podeResponderChamado(ator, chamado)) return null;
     type Row = { telefone: string | null; telefone_corporativo: string | null };
     const rows = await db.$queryRawUnsafe<Row[]>(
       `SELECT u.telefone, u.telefone_corporativo FROM chamados c JOIN usuarios u ON u.id = c.usuarioId WHERE c.id = ?`,

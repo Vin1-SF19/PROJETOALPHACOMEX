@@ -71,6 +71,8 @@ describe("central geral de notificações do Painel Alpha", () => {
     expect(hook).toContain("userChannel.bind(CHAMADO_MENSAGEM_EVENT, mensagemHandler)");
     expect(hook).toContain("channel.unbind(CHAMADO_MENSAGEM_EVENT, mensagemHandler)");
     expect(hook).toContain("userChannel.unbind(CHAMADO_MENSAGEM_EVENT, mensagemHandler)");
-    expect(hook).toContain("if (payload.autorId === userId) return");
+    expect(hook).toContain("payload.autorId === userId || eventosRecebidos.has(`mensagem-${payload.mensagemId}`)");
+    expect(hook).toContain("eventosRecebidos.add(`mensagem-${payload.mensagemId}`)");
+    expect(hook).toContain("id: `mensagem-${payload.mensagemId}`");
   });
 });

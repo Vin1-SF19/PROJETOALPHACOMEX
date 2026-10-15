@@ -704,6 +704,9 @@ model chamados {
   titulo                String
   descricao             String
   categoria             String
+  setorDestinoId        Int?
+  setorDestinoNome      String?
+  categoriaId           Int?
   status                String                      @default("ABERTO")
   prioridade            String                      @default("MEDIA")
   solucao               String?
@@ -720,6 +723,8 @@ model chamados {
   solicitante           usuarios                    @relation("Solicitante", fields: [usuarioId], references: [id], onDelete: Cascade)
   tecnico               usuarios?                   @relation("TecnicoChamado", fields: [tecnicoId], references: [id], onDelete: SetNull)
   tecnicoSolicitado     usuarios?                   @relation("TecnicoSolicitadoChamado", fields: [tecnicoSolicitadoId], references: [id], onDelete: SetNull)
+  setorDestino          Setor?                      @relation(fields: [setorDestinoId], references: [id], onDelete: Restrict)
+  categoriaCadastro     ChamadoCategoria?           @relation(fields: [categoriaId], references: [id], onDelete: Restrict)
   mensagens             MensagensChamado[]
   tarefaAgendada        GoogleCalendarTaskSchedule?
   feedback              ChamadoFeedback?
@@ -728,6 +733,26 @@ model chamados {
   @@index([status])
   @@index([tecnicoId])
   @@index([tecnicoSolicitadoId])
+  @@index([setorDestinoId, status])
+  @@index([categoriaId])
+}
+
+model ChamadoCategoria {
+  id              Int       @id @default(autoincrement())
+  setorId         Int
+  nome            String
+  nomeNormalizado String
+  descricao       String?
+  ativo           Boolean   @default(true)
+  ordem           Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  setor           Setor     @relation(fields: [setorId], references: [id], onDelete: Restrict)
+  chamados        chamados[]
+
+  @@unique([setorId, nomeNormalizado])
+  @@index([setorId, ativo, ordem])
+  @@map("chamado_categoria")
 }
 
 model ChamadoFeedback {
@@ -2460,6 +2485,8 @@ model Setor {
   createdAt DateTime @default(now())
 
   bpmPipelines BpmPipelineSetor[]
+  chamadosRecebidos chamados[]
+  categoriasChamados ChamadoCategoria[]
 
   @@map("setor")
 }

@@ -1,0 +1,22 @@
+{
+  "passed": true,
+  "source": "actual DetalhesChamado React component; same mounted instance and same chamado ID across parent props updates",
+  "serverActions": "mocked; no database reads or writes",
+  "mockedDependencies": [
+    "assumirChamado",
+    "ModalProtocolo",
+    "NotesContextButton"
+  ],
+  "cases": [
+    "ABERTO eligible shows Assumir and hides Finalizar",
+    "successful assume shows Finalizar immediately while canonical parent props remain ABERTO/unassigned",
+    "assumption action called exactly once with the called ticket ID",
+    "close then rerender parent props CONCLUIDO for same ID",
+    "reopen completed details shows persisted solution and no Assumir or Finalizar"
+  ],
+  "optimistic": {
+    "propsStatus": "ABERTO",
+    "propsResponsavel": null
+  },
+  "errors": []
+}

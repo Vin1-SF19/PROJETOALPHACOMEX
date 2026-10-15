@@ -3,6 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   usuariosFindMany: vi.fn(),
   usuariosFindFirst: vi.fn(),
+  setoresFindMany: vi.fn(),
+  setoresFindUnique: vi.fn(),
+  categoriasFindMany: vi.fn(),
+  categoriasFindUnique: vi.fn(),
   chamadosFindFirst: vi.fn(),
   chamadosCreate: vi.fn(),
   transaction: vi.fn(),
@@ -12,6 +16,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/prisma", () => ({
   default: {
     usuarios: { findMany: mocks.usuariosFindMany },
+    setor: { findMany: mocks.setoresFindMany },
+    chamadoCategoria: { findMany: mocks.categoriasFindMany },
     chamados: {
       findFirst: mocks.chamadosFindFirst,
       create: mocks.chamadosCreate,
@@ -43,7 +49,7 @@ const requester: UserCtx = {
   permissoes: [],
 };
 
-const authorizedRequest = "Abra um chamado para Exclusão do manual de CS/NPS. Substituído por versão mais completa, autorizada pela Thaís. Responsável Vinicius.";
+const authorizedRequest = "Abra um chamado para Exclusão do manual de CS/NPS. Substituído por versão mais completa, autorizada pela Thaís. Responsável Vinicius. Setor TI.";
 
 function grant(userId = requester.userId, requestId = "req-ticket", authorizedText = authorizedRequest) {
   return issueBibbleMutationGrant({
@@ -67,29 +73,37 @@ const validParams = {
   titulo: "Exclusão do manual de CS/NPS",
   descricao: "Substituído por versão mais completa, autorizada pela Thaís",
   responsavel: "Vinicius",
+  setor: "TI",
 };
 
 describe("Bibble ticket mutation grant", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.chamadosFindFirst.mockResolvedValue(null);
+    mocks.setoresFindMany.mockResolvedValue([{ id: 8, nome: "TI" }, { id: 3, nome: "Financeiro" }]);
+    mocks.setoresFindUnique.mockResolvedValue({ id: 8, nome: "TI", ativo: true, isBase: false });
+    mocks.categoriasFindMany.mockResolvedValue([{ id: 9, nome: "Outros do setor" }]);
+    mocks.categoriasFindUnique.mockResolvedValue({ id: 9, nome: "Outros do setor", setorId: 8, ativo: true });
     mocks.usuariosFindFirst.mockImplementation(async (query: { where?: { id?: number } }) => (
       query.where?.id === requester.userId
-        ? { id: requester.userId }
-        : { id: 44, nome: "Vinicius de Souza", role: "TI" }
+        ? { id: requester.userId, nome: "Solicitante", role: "USER", status: "ATIVO" }
+        : { id: 44, nome: "Vinicius de Souza", role: "TI", status: "ATIVO" }
     ));
     mocks.chamadosCreate.mockResolvedValue({
       id: 321,
       titulo: validParams.titulo,
       prioridade: "MEDIA",
       createdAt: new Date("2026-09-17T12:00:00.000Z"),
+      setorDestinoId: 8, setorDestinoNome: "TI", tecnicoSolicitadoId: 44,
     });
     mocks.notificar.mockResolvedValue(true);
     mocks.usuariosFindMany.mockResolvedValue([
       { id: 44, nome: "Vinicius de Souza", role: "TI" },
     ]);
     mocks.transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => callback({
-      usuarios: { findFirst: mocks.usuariosFindFirst },
+      usuarios: { findUnique: mocks.usuariosFindFirst },
+      setor: { findUnique: mocks.setoresFindUnique },
+      chamadoCategoria: { findUnique: mocks.categoriasFindUnique },
       chamados: {
         findFirst: mocks.chamadosFindFirst,
         create: mocks.chamadosCreate,
@@ -105,22 +119,26 @@ describe("Bibble ticket mutation grant", () => {
     const result = await executarTool("abrir_chamado", validParams, requester, options(grant()));
 
     expect(result).toContain("SUCESSO_ABRIR_CHAMADO: Chamado #321");
-    expect(mocks.chamadosCreate).toHaveBeenCalledWith({
+    expect(mocks.chamadosCreate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         titulo: validParams.titulo,
         prioridade: "MEDIA",
-        categoria: "Outro",
+        categoria: "Outros do setor",
+        setorDestinoId: 8,
+        categoriaId: 9,
         usuarioId: requester.userId,
         tecnicoSolicitadoId: 44,
         status: "ABERTO",
       }),
-    });
+    }));
     expect(mocks.transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: "Serializable" });
     expect(mocks.notificar).toHaveBeenCalledWith({
       chamadoId: 321,
       titulo: validParams.titulo,
       usuario: requester.userName,
-      setor: requester.role,
+      usuarioId: requester.userId,
+      setor: requester.role, setorOrigem: requester.role,
+      setorDestinoId: 8, setorDestinoNome: "TI", tecnicoSolicitadoId: 44,
       urgencia: "MEDIA",
       createdAt: "2026-09-17T12:00:00.000Z",
     });
@@ -137,8 +155,9 @@ describe("Bibble ticket mutation grant", () => {
       titulo: "Falha no acesso fiscal",
       descricao: "Usuário não consegue acessar o módulo fiscal",
       prioridade: "ALTA",
+      setor: "TI",
     };
-    const authorizedText = "Abra um chamado. Falha no acesso fiscal. Usuário não consegue acessar o módulo fiscal. Prioridade ALTA.";
+    const authorizedText = "Abra um chamado. Falha no acesso fiscal. Usuário não consegue acessar o módulo fiscal. Prioridade ALTA. Setor TI.";
 
     const result = await executarTool(
       "abrir_chamado",
@@ -148,17 +167,18 @@ describe("Bibble ticket mutation grant", () => {
     );
 
     expect(result).toContain("SUCESSO_ABRIR_CHAMADO");
-    expect(mocks.chamadosCreate).toHaveBeenCalledWith({
+    expect(mocks.chamadosCreate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ prioridade: "ALTA" }),
-    });
+    }));
   });
 
   it("matches authorized Portuguese text after Unicode accent normalization", async () => {
     const params = {
       titulo: "Correção de acesso à área fiscal",
       descricao: "Usuário não consegue emitir a certidão",
+      setor: "TI",
     };
-    const authorizedText = "Abra um chamado para correcao de acesso a area fiscal. Usuario nao consegue emitir a certidao.";
+    const authorizedText = "Abra um chamado para correcao de acesso a area fiscal. Usuario nao consegue emitir a certidao. Setor TI.";
 
     const result = await executarTool(
       "abrir_chamado",
@@ -265,20 +285,20 @@ describe("Bibble ticket mutation grant", () => {
 
     mocks.usuariosFindMany.mockResolvedValueOnce([]);
     const missing = await executarTool("abrir_chamado", validParams, requester, options(grant()));
-    expect(missing).toContain("não corresponde a um usuário de TI ativo");
+    expect(missing).toContain("não corresponde a um usuário ativo do setor de destino");
 
     mocks.usuariosFindMany.mockResolvedValueOnce([
       { id: 44, nome: "Vinicius de Souza", role: "TI" },
       { id: 45, nome: "Vinicius Almeida", role: "T.I" },
     ]);
     const ambiguous = await executarTool("abrir_chamado", validParams, requester, options(grant()));
-    expect(ambiguous).toContain("mais de um usuário de TI ativo");
+    expect(ambiguous).toContain("mais de um usuário ativo do setor");
 
     mocks.usuariosFindMany.mockResolvedValueOnce([
       { id: 46, nome: "Vinicius", role: "COMERCIAL" },
     ]);
     const nonTi = await executarTool("abrir_chamado", validParams, requester, options(grant()));
-    expect(nonTi).toContain("não corresponde a um usuário de TI ativo");
+    expect(nonTi).toContain("não corresponde a um usuário ativo do setor de destino");
     expect(mocks.chamadosCreate).not.toHaveBeenCalled();
   });
 
@@ -315,10 +335,10 @@ describe("Bibble ticket mutation grant", () => {
 
     const result = await executarTool("abrir_chamado", validParams, requester, options(grant()));
 
-    expect(result).toContain("usuário não está mais ativo");
+    expect(result).toContain("Colaborador não está ativo");
     expect(mocks.usuariosFindFirst).toHaveBeenCalledWith({
-      where: { id: requester.userId, status: "ATIVO" },
-      select: { id: true },
+      where: { id: requester.userId },
+      select: { id: true, nome: true, role: true, status: true },
     });
     expect(mocks.chamadosFindFirst).not.toHaveBeenCalled();
     expect(mocks.chamadosCreate).not.toHaveBeenCalled();
@@ -326,36 +346,36 @@ describe("Bibble ticket mutation grant", () => {
 
   it("revalidates the selected technician inside the transaction immediately before write", async () => {
     mocks.usuariosFindFirst
-      .mockResolvedValueOnce({ id: requester.userId })
+      .mockResolvedValueOnce({ id: requester.userId, nome: "Solicitante", role: "USER", status: "ATIVO" })
       .mockResolvedValueOnce(null);
 
     const result = await executarTool("abrir_chamado", validParams, requester, options(grant()));
 
-    expect(result).toContain("responsável de TI deixou de estar elegível");
+    expect(result).toContain("responsável solicitado não está disponível no setor de destino");
     expect(mocks.usuariosFindFirst).toHaveBeenNthCalledWith(2, {
-      where: { id: 44, status: "ATIVO" },
-      select: { id: true, nome: true, role: true },
+      where: { id: 44 },
+      select: { id: true, nome: true, role: true, status: true },
     });
     expect(mocks.chamadosCreate).not.toHaveBeenCalled();
   });
 
   it("fails closed when the technician stays active but changes role or no longer matches the requested name", async () => {
     mocks.usuariosFindFirst
-      .mockResolvedValueOnce({ id: requester.userId })
-      .mockResolvedValueOnce({ id: 44, nome: "Vinicius de Souza", role: "COMERCIAL" });
+      .mockResolvedValueOnce({ id: requester.userId, nome: "Solicitante", role: "USER", status: "ATIVO" })
+      .mockResolvedValueOnce({ id: 44, nome: "Vinicius de Souza", role: "COMERCIAL", status: "ATIVO" });
     const changedRole = await executarTool("abrir_chamado", validParams, requester, options(grant()));
-    expect(changedRole).toContain("responsável de TI deixou de estar elegível");
+    expect(changedRole).toContain("responsável solicitado não está disponível no setor de destino");
 
     mocks.usuariosFindFirst
-      .mockResolvedValueOnce({ id: requester.userId })
-      .mockResolvedValueOnce({ id: 44, nome: "Carlos Silva", role: "TI" });
+      .mockResolvedValueOnce({ id: requester.userId, nome: "Solicitante", role: "USER", status: "ATIVO" })
+      .mockResolvedValueOnce({ id: 44, nome: "Carlos Silva", role: "TI", status: "ATIVO" });
     const changedName = await executarTool(
       "abrir_chamado",
       validParams,
       requester,
       options(grant(requester.userId, "req-ticket-name"), "req-ticket-name"),
     );
-    expect(changedName).toContain("responsável de TI deixou de estar elegível");
+    expect(changedName).toContain("responsável selecionado não corresponde ao nome solicitado");
     expect(mocks.chamadosCreate).not.toHaveBeenCalled();
   });
 
@@ -389,10 +409,32 @@ describe("Bibble ticket mutation grant", () => {
     );
 
     expect(first).toContain("SUCESSO_ABRIR_CHAMADO");
-    expect(second).toContain("já havia sido registrado há poucos minutos");
+    expect(second).toContain("já enviou um chamado similar");
     expect(mocks.transaction).toHaveBeenCalledTimes(2);
     expect(mocks.transaction).toHaveBeenNthCalledWith(1, expect.any(Function), { isolationLevel: "Serializable" });
     expect(mocks.transaction).toHaveBeenNthCalledWith(2, expect.any(Function), { isolationLevel: "Serializable" });
     expect(mocks.chamadosCreate).toHaveBeenCalledTimes(1);
   });
+  it("asks for the destination instead of silently selecting TI", async () => {
+    const semSetor = { titulo: validParams.titulo, descricao: validParams.descricao, responsavel: validParams.responsavel };
+    const result = await executarTool("abrir_chamado", semSetor, requester, options(grant()));
+    expect(result).toContain("informe para qual setor");
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects a destination or category invented by the model", async () => {
+    for (const params of [{ ...validParams, setor: "Financeiro" }, { ...validParams, categoria: "Pagamentos" }]) {
+      const result = await executarTool("abrir_chamado", params, requester, options(grant()));
+      expect(result).toContain("não foram informados literalmente");
+    }
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("revalidates destination and category in the common creation service", async () => {
+    mocks.categoriasFindUnique.mockResolvedValueOnce({ id: 9, nome: "Outros do setor", setorId: 3, ativo: true });
+    const result = await executarTool("abrir_chamado", validParams, requester, options(grant()));
+    expect(result).toContain("categoria ativa do setor de destino");
+    expect(mocks.chamadosCreate).not.toHaveBeenCalled();
+  });
+
 });

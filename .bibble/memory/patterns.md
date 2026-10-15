@@ -1,5 +1,9 @@
 # PATTERNS — Padrões de UX e Visual
 
+## Chamados entre setores — interação implementada, 2026-10-15
+
+Planejamento em `docs/stories/story-chamados-multissetorial.md`. A primeira prévia visual foi rejeitada por mudar demais o módulo. O próprio HTML foi substituído na revisão 0.3, disponível em `docs/previews/chamados-multissetorial.html` e `chamados-multissetorial-v3.html`; a versão corrigida orientou a implementação autorizada. Preservar cabeçalho, quatro indicadores, tabela e formulário atuais. Setor de destino precede categorias; mudar setor limpa categoria e responsável desejado. Ícone com tooltip/nome acessível imediatamente ao lado de Categoria abre gestão de todos os setores, exclusivamente para TI, incluindo guard no servidor. Mostrar destino junto à categoria na célula existente; acesso a próprios pedidos e fila do setor é filtro de dados da listagem atual, sem exigir novas abas ou navegação. Confirmado pelo usuário: qualquer colaborador ativo do destino pode assumir; Admin/CEO/TI conservam visão global. Código implementado preservando o layout; migração e 53 categorias aplicadas após consentimento específico. Homologação autenticada completa/realtime e publicação permanecem pendentes.
+
 > Mantido por: Atlas (visual analyst) e Scribe (cartógrafo)
 > Registrar padrões descobertos no projeto ou extraídos de sites de referência.
 

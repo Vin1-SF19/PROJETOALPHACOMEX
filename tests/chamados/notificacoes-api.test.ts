@@ -2,10 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
+  ator: vi.fn(),
   mensagensFindMany: vi.fn(),
   feedbacksFindMany: vi.fn(),
 }));
 
+vi.mock("@/lib/chamados/acesso", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/lib/chamados/acesso")>();
+  return { ...original, obterAtorChamados: mocks.ator };
+});
 vi.mock("../../auth", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/prisma", () => ({
   default: {
@@ -20,6 +25,7 @@ describe("GET /api/notificacoes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.feedbacksFindMany.mockResolvedValue([]);
+    mocks.ator.mockResolvedValue({ id: 42, role: "Financeiro", setorId: 3, setorNome: "Financeiro", visaoGlobal: false });
   });
 
   it("recupera todas as mensagens não lidas do solicitante nos status atuais", async () => {
@@ -38,8 +44,11 @@ describe("GET /api/notificacoes", () => {
 
     expect(mocks.mensagensFindMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
-        lida_usuario: false,
-        chamado: { status: { in: ["ABERTO", "EM_ATENDIMENTO"] }, usuarioId: 42 },
+        OR: [
+          { chamado: { usuarioId: 42 }, lida_usuario: false },
+          { chamado: { usuarioId: { not: 42 }, OR: [{ tecnicoId: null }, { tecnicoId: 42, OR: [{ setorDestinoId: 3, setorDestino: { ativo: true, isBase: false } }] }] }, lida_admin: false },
+        ],
+        chamado: { status: { in: ["ABERTO", "EM_ATENDIMENTO"] }, OR: [{ usuarioId: 42 }, { setorDestinoId: 3, setorDestino: { ativo: true, isBase: false } }] },
       }),
       take: 50,
     }));
@@ -55,13 +64,17 @@ describe("GET /api/notificacoes", () => {
 
   it("usa a leitura administrativa sem restringir ao solicitante", async () => {
     mocks.auth.mockResolvedValue({ user: { id: "8", role: "TI" } });
+    mocks.ator.mockResolvedValue({ id: 8, role: "TI", setorId: 8, setorNome: "TI", visaoGlobal: true });
     mocks.mensagensFindMany.mockResolvedValue([]);
 
     await GET();
 
     expect(mocks.mensagensFindMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
-        lida_admin: false,
+        OR: [
+          { chamado: { usuarioId: 8 }, lida_usuario: false },
+          { chamado: { usuarioId: { not: 8 }, OR: [{ tecnicoId: null }, { tecnicoId: 8, OR: [{ setorDestinoId: 8, setorDestino: { ativo: true, isBase: false } }, { setorDestinoId: null }] }] }, lida_admin: false },
+        ],
         chamado: { status: { in: ["ABERTO", "EM_ATENDIMENTO"] } },
       }),
     }));
@@ -98,6 +111,14 @@ describe("GET /api/notificacoes", () => {
         closedAt: "2026-09-11T13:00:00.000Z",
       }],
     });
+  });
+
+  it("nega recuperação de notificações para um usuário inativo mesmo com sessão válida", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "42", role: "Admin" } });
+    mocks.ator.mockResolvedValue(null);
+    const resposta = await GET();
+    expect(resposta.status).toBe(403);
+    expect(mocks.mensagensFindMany).not.toHaveBeenCalled();
   });
 
   it("não apresenta uma fila vazia como autoritativa quando a leitura falha", async () => {

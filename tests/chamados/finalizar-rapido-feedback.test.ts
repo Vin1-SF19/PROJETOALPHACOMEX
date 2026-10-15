@@ -41,6 +41,7 @@ describe("updateChamadosStatus — conclusão rápida", () => {
       titulo: "Falha no acesso",
       usuarioId: 7,
       tecnicoId: 3,
+      destinoEhTI: true,
       tecnicoRole: "TI",
       solucao: "Perfil liberado",
       closedAt: fechadoEm,
@@ -65,12 +66,13 @@ describe("updateChamadosStatus — conclusão rápida", () => {
     expect(mocks.notificarAgenda).toHaveBeenCalledOnce();
   });
 
-  it("nega a conclusão para colaborador sem papel administrativo", async () => {
+  it("propaga recusa do serviço de conclusão para colaborador sem atribuição", async () => {
     mocks.auth.mockResolvedValueOnce({ user: { id: "7", role: "User" } });
+    mocks.concluirChamado.mockRejectedValueOnce(new Error("Permissão insuficiente"));
 
     const resultado = await updateChamadosStatus(10, "CONCLUIDO", "Tentativa");
 
-    expect(resultado).toEqual({ success: false, error: "Permissão insuficiente" });
-    expect(mocks.concluirChamado).not.toHaveBeenCalled();
+    expect(resultado).toEqual({ success: false, error: "Erro ao atualizar status." });
+    expect(mocks.concluirChamado).toHaveBeenCalled();
   });
 });

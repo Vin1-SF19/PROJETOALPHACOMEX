@@ -59,7 +59,7 @@ const BIBBLE_TOOL_REGISTRY: OllamaTool[] = [
     function: {
       name: "abrir_chamado",
       description:
-        "Cria um chamado somente quando o usuário pedir explicitamente para abrir, criar, registrar ou fazer um chamado. Título, descrição e responsável devem copiar trechos literais do pedido atual; não resuma nem invente dados.",
+        "Cria um chamado somente quando o usuário pedir explicitamente para abrir, criar, registrar ou fazer um chamado. Título, descrição, setor, categoria e responsável devem copiar trechos literais do pedido atual; não resuma nem invente dados.",
       parameters: {
         type: "object",
         properties: {
@@ -75,16 +75,24 @@ const BIBBLE_TOOL_REGISTRY: OllamaTool[] = [
             type: "string",
             description: "Prioridade: BAIXA, MEDIA, ALTA ou URGENTE. Se não for informada, use MEDIA.",
           },
+          setor: {
+            type: "string",
+            description: "Nome literal do setor de destino solicitado pelo usuário. Se ausente, pergunte o setor antes de abrir. Nunca envie ID nem escolha TI automaticamente.",
+          },
+          categoria: {
+            type: "string",
+            description: "Nome literal da categoria solicitada para esse setor (opcional). Se ausente, utiliza a categoria cadastrada Outros do setor.",
+          },
           tecnico_solicitado_nome: {
             type: "string",
-            description: "Nome do responsável/técnico de TI solicitado pelo usuário (opcional). Nunca envie ID.",
+            description: "Nome do responsável do setor de destino solicitado pelo usuário (opcional). Nunca envie ID.",
           },
           responsavel: {
             type: "string",
-            description: "Nome do responsável/técnico de TI solicitado pelo usuário (alias opcional). Nunca envie ID.",
+            description: "Nome do responsável do setor de destino solicitado pelo usuário (alias opcional). Nunca envie ID.",
           },
         },
-        required: ["titulo", "descricao"],
+        required: ["titulo", "descricao", "setor"],
         additionalProperties: false,
       },
     },
@@ -246,7 +254,7 @@ const BIBBLE_TOOL_REGISTRY: OllamaTool[] = [
     function: {
       name: "consultar_chamados",
       description:
-        "Consulta chamados de suporte do sistema. Usuários comuns veem apenas seus próprios chamados. Admins/CEOs podem ver todos ou filtrar por usuário. Retorna título, status, prioridade, categoria e data. Use quando o usuário perguntar sobre chamados abertos, pendentes, histórico de suporte ou quantidade de chamados.",
+        "Consulta chamados internos entre setores. Colaboradores ativos veem seus pedidos e a fila do próprio setor. Admin, CEO e TI podem ver todos ou filtrar por usuário. Retorna título, status, prioridade, categoria e data. Use quando o usuário perguntar sobre chamados abertos, pendentes, histórico de suporte ou quantidade de chamados.",
       parameters: {
         type: "object",
         properties: {
@@ -260,7 +268,7 @@ const BIBBLE_TOOL_REGISTRY: OllamaTool[] = [
           },
           usuario_nome: {
             type: "string",
-            description: "Admin/CEO apenas: nome parcial do usuário para filtrar chamados dele.",
+            description: "Admin/CEO/TI apenas: nome parcial do usuário para filtrar chamados dele.",
           },
         },
         required: [],

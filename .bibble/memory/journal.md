@@ -1,5 +1,21 @@
 # JOURNAL — Histórico Cronológico de Sessões
 
+## 2026-10-15 — Chamados — prévia efetivamente corrigida, v0.3
+
+Usuário apontou que o link da prévia continuava exibindo o desenho antigo após a correção apenas documental. Nova substituiu `docs/previews/chamados-multissetorial.html`, copiando a estrutura/classes reais da página, FiltroChamado e NovoChamadoForm e incorporando Tailwind compilado/Geist offline. Preservados cabeçalho CHAMADOS INTERNOS, quatro cards, tabela com Chat/Gestão e formulário centralizado. Somente os novos elementos de destino/categorias/responsável/gestor TI foram incorporados. Criada cópia `chamados-multissetorial-v3.html` e quatro screenshots `chamados-v3-*.png`; aliases anteriores também atualizados. Chromium confirmou identidade do título, cards/colunas, centralização, CRUD/arquivamento, permissões visuais e mobile de 390 px; zero erros JS e zero requisições externas. Evidência `docs/previews/chamados-v3-validacao.json`. Fonte/style atuais aguardam revisão do usuário. Nenhuma alteração em src/, prisma/ ou banco. Story/checklist/file list atualizadas para v0.3; testes do aplicativo não reexecutados nesta alteração isolada do protótipo.
+
+## 2026-10-15 — Chamados multissetorial — correção de escopo visual
+
+Usuário rejeitou a prévia anterior: “voce mudou demais a visualização, analise o codigo do chamados e ai sim crie o plano correto”. Releitura do código de listagem, FiltroChamado, NovoChamadoForm/página, DetalhesChamado, ChatChamado, actions e schema. Plano revisado preserva visual atual (Chamados Internos, quatro cards, tabela e formulário centralizado) e adiciona apenas os elementos necessários à abertura entre setores. Descartadas as três novas direções visuais e a navegação proposta; seus artefatos ficam históricos, sem aprovação para implementar. Mantidas as decisões confirmadas de acesso e o requisito de gestão de categorias exclusivamente TI. Nenhuma mudança no aplicativo, schema ou banco nesta revisão. Gates da análise anterior permanecem como evidência histórica; revisão documental não valida implementação.
+
+## 2026-10-15 — Bibble — planejamento de Chamados multissetorial
+
+Usuário solicitou análise, plano e prévia visual, sem implementar no aplicativo nesta etapa. Scout e arquitetura mapearam Setor dinâmico, categorias fixas, reserva de técnico, guards administrativos e dependências de chat/notificações/Bibble/protocolo/Agenda. Confirmado pelo usuário: qualquer colaborador ativo do destino assume e Admin/CEO/TI mantêm visão global. Story Draft em `docs/stories/story-chamados-multissetorial.md`; prévia visual com dados fictícios em `docs/previews/chamados-multissetorial.html`. Gestão das categorias exclusivamente TI; nomes gerais de responsável; histórico preservado por proposta aditiva. Nenhuma alteração de banco, migration, seed, backfill, commit ou publicação executada. Futura alteração estrutural depende de Vault, backup verificado de até 48h e confirmação específica conforme AGENTS.md. Estilo proposto ainda aguarda escolha do usuário.
+
+Baseline da análise: lint exit 0 (1.193 warnings), typecheck exit 0; npm test exit 1, 624 arquivos aprovados/4 falhos e 4.648 testes aprovados/6 falhos/4 skipped/1 todo. Falhas observadas fora de Chamados em BPM e Builder; nenhum código de aplicação alterado. Logs em `/tmp/chamados-planejamento-{lint,typecheck,tests}.log`. Build não executado nesta entrega de planejamento.
+
+Prévia concluída e validada em Chromium: listagem, formulário, setores/categorias/responsáveis dependentes, criação/edição/exclusão de categoria sem uso, arquivar/reativar categoria usada, visibilidade TI/Admin/Comercial, três estilos e mobile de 390 px sem overflow. Zero erros JS e zero requisições externas. Seis screenshots e relatório `chamados-validacao.json` em `docs/previews/`. Prévia simula catálogo e alterações apenas na memória do navegador; não é implementação do módulo.
+
 ## 2026-10-01 — Scribe — RM-2026-AD3EA4 — Fase 3 (CLOSURE) — Encerramento documental
 
 **Tags:** #comercial #metas #data-comercial #utc #sem-migration #concluido
@@ -7110,3 +7126,15 @@ Lint do escopo repetido: pty string for decorative images  jsx-a11y/alt-text
 Reinspecionados GerarFicha, ModalPdf, consulta/resultado, página protegida, menu e teste do PDF. Atualizados somente story e catálogo de integração, além deste registro. Story inicialmente ausente foi criada pela fase executora; nenhum novo autoajuste de código necessário. Entrega às closers: Pré Análise → consultar CNPJ → Gerar Ficha em PDF → Gerar Documento PDF → nova aba/impressão. Duas perguntas e duas confirmações exclusivas da variante pre-analise; padrão com observações preservado. Sem mudança estrutural, novo módulo, migration, backup ou Git mutável. Evidências anteriores e ausência dos logs locais explicitadas na story. Navegação autenticada/impressão física e aprovação dos gates globais permanecem pendentes. Encerramento local não promove card nem publica produção.
 
 Gates reais do encerramento (2026-10-13, Scribe): `npm run lint` exit 2, EACCES ao varrer `database-backups/build-candidates/bibble-out-DUHqIq`; `npm run typecheck` exit 0; `npm test` exit 1, 596 arquivos aprovados/3 falhos, 4414 testes aprovados/17 falhos/4 skipped/1 todo. Saída final inclui falhas de estoque por ausência de `query_compiler_bg.js` no cliente Prisma. Nenhum gate atingiu o limite de 45 segundos. Build não reexecutado nesta fase exclusivamente documental; falha anterior permanece registrada. Gates globais não aprovados.
+
+
+### 2026-10-15 — Aplicação local da reformulação Chamados
+
+Após “Aplique as atualizações”, implementados catálogo por setor, categorias TI-only, responsável por destino, autorização central/CAS/reserva, compatibilidade TI dos legados, chat privado e integrações de notificações/IA. Layout original preservado. Typecheck e lint aprovados; build final isolado aprovado (`/tmp/chamados-implementacao-build-final.log`). Suíte geral: 629 arquivos aprovados, 4 falhos; 4693 testes aprovados, 6 falhos (mesmos BPM/builder do baseline), 4 skipped e 1 todo. Testes Chamados aprovados; navegador exercitou Form/Dialog reais com actions simuladas. Backup completo verificado por restauração: 336 tabelas/270656 registros/346696791 bytes, gerado em 15/10; dados protegidos e ignorados pelo Git. Nenhuma migration/seed remota executada: aguardando consentimento específico exigido por AGENTS/Vault. Story/checklist/file list registram pendências de ativação e E2E autenticado; sem commit/push/deploy.
+
+Revisão final Lens: aprovada com ressalvas operacionais, sem bloqueantes/importantes remanescentes. Regressão de DetalhesChamado verificada em Chromium com a mesma instância após assunção e props CONCLUIDO: nenhuma ação obsoleta ao reabrir, zero erros JS. Evidência `.cache/chamados-multissetorial/browser-details.json`; actions simuladas, sem gravações reais.
+
+
+### 2026-10-15 — Chamados: migração autorizada aplicada
+
+Usuário respondeu “sim autorizo” à migração específica. Vault liberou o plano exato e o script apply concluiu com backup novamente restaurado/verificado, 53 categorias inseridas/13 destinos/224 chamados preservados/integridade ok/FK0. Comparação de conteúdo antes/depois por hash confirmou preservação de chamados, mensagens, feedbacks e templates. Smoke somente leitura dos módulos reais Prisma/catálogo/autorização passou para 29 atores ativos e 27 responsáveis elegíveis. Quatro índices conferidos. Relatório atualizado APPLIED_VERIFIED; nenhum chamado de teste, notificação, commit, push ou deploy. E2E autenticado e realtime real não exercitados.

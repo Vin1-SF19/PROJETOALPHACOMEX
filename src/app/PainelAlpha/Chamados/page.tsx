@@ -9,7 +9,7 @@ import { DetalhesChamado } from "@/components/DetalhesChamado";
 import ChatChamado from "@/components/ChatChamado";
 import { FiltroChamadosCards } from "@/components/FiltroChamado";
 import { listarTemplates } from "@/actions/protocolos";
-import { isAdminRole } from "@/lib/roles";
+import { chamadoVisivelWhere, obterAtorChamados, pertenceAoDestino, podeAssumirChamado, podeConcluirChamado, podeResponderChamado } from "@/lib/chamados/acesso";
 
 const STATUS_STYLES: Record<string, string> = {
   ABERTO: "text-amber-400 bg-amber-400/10 border-amber-400/20",
@@ -56,17 +56,18 @@ export default async function Chamados({
   if (!session) redirect("/");
 
   const { status } = await searchParams;
-  const isAdmin = isAdminRole(session.user.role);
-  const isCeo = session.user.role === "CEO";
   const userId = Number(session.user.id);
-  const podeVerTodos = isAdmin || isCeo;
-  const podeAbrirChamado = !isAdmin || isCeo;
+  const ator = await obterAtorChamados(userId);
+  if (!ator) redirect("/");
+  const podeVerTodos = ator.visaoGlobal;
+  const mostrarSolicitante = podeVerTodos || ator.setorId !== null;
 
   const [todosChamados, templates] = await Promise.all([
     db.chamados.findMany({
-      where: podeVerTodos ? {} : { usuarioId: userId },
+      where: chamadoVisivelWhere(ator),
       orderBy: { createdAt: "desc" },
       include: {
+        setorDestino: { select: { id: true, nome: true, ativo: true, isBase: true } },
         solicitante: {
           select: { nome: true, usuario: true, telefone: true, telefone_corporativo: true },
         },
@@ -79,21 +80,9 @@ export default async function Chamados({
           },
           orderBy: { createdAt: "asc" },
         },
-        _count: {
-          select: {
-            mensagens: {
-              where: {
-                AND: [
-                  { autorId: { not: userId } },
-                  isAdmin ? { lida_admin: false } : { lida_usuario: false },
-                ],
-              },
-            },
-          },
-        },
       },
     }),
-    podeVerTodos ? listarTemplates().catch(() => []) : Promise.resolve([]),
+    listarTemplates().catch(() => []),
   ]);
 
   const total = todosChamados.length;
@@ -148,14 +137,12 @@ export default async function Chamados({
               </Button>
             </Link>
           )}
-          {podeAbrirChamado && (
-            <Link href="/PainelAlpha/Chamados/NovoChamado">
+          <Link href="/PainelAlpha/Chamados/NovoChamado">
               <Button className="cursor-pointer bg-blue-600 hover:bg-blue-500 text-white rounded-[1.5rem] px-8 h-14 font-black uppercase tracking-widest shadow-2xl shadow-blue-900/40 border-t border-white/20 transition-all active:scale-95 group">
                 <PlusCircle className="mr-2 w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
                 Novo Chamado
               </Button>
             </Link>
-          )}
         </div>
       </div>
 
@@ -191,7 +178,7 @@ export default async function Chamados({
                 <tr className="text-slate-600 text-[9px] font-black uppercase tracking-[0.2em] bg-black/20">
                   <th className="px-8 py-4">#</th>
                   <th className="px-8 py-4">Assunto / Categoria</th>
-                  {podeVerTodos && <th className="px-8 py-4">Solicitante</th>}
+                  {mostrarSolicitante && <th className="px-8 py-4">Solicitante</th>}
                   <th className="px-8 py-4 text-center">Urgência</th>
                   <th className="px-8 py-4">Status</th>
                   <th className="px-8 py-4">Abertura</th>
@@ -220,13 +207,13 @@ export default async function Chamados({
                             {chamado.titulo}
                           </span>
                           <span className="text-[10px] font-bold text-slate-500 uppercase">
-                            {chamado.categoria}
+                            {chamado.categoria} <span className="text-slate-600">• {chamado.setorDestinoNome ?? chamado.setorDestino?.nome ?? "TI"}</span>
                           </span>
                         </div>
                       </td>
 
-                      {/* Solicitante (admin/CEO) */}
-                      {podeVerTodos && (
+                      {/* Solicitante (visão global ou fila do setor) */}
+                      {mostrarSolicitante && (
                         <td className="px-8 py-5">
                           <div className="flex flex-col">
                             <span className="text-slate-300 text-xs font-bold">{chamado.solicitante.nome}</span>
@@ -276,22 +263,22 @@ export default async function Chamados({
                           chamadoId={chamado.id}
                           titulo={chamado.titulo}
                           mensagensIniciais={chamado.mensagens}
-                          contagem={chamado._count.mensagens}
+                          contagem={chamado.mensagens.filter((mensagem) => podeResponderChamado(ator, chamado) && mensagem.autorId !== userId && (chamado.usuarioId === userId ? !mensagem.lida_usuario : pertenceAoDestino(ator, chamado) && !mensagem.lida_admin)).length}
                           status={chamado.status}
                           usuarioAtualId={userId}
-                          isAdmin={isAdmin}
+                          podeResponder={podeResponderChamado(ator, chamado)}
                         />
                       </td>
 
                       {/* Ações */}
                       <td className="px-8 py-5 text-right">
-                        <DetalhesChamado chamado={chamado} isAdmin={isAdmin} usuarioAtualId={userId} templates={templates} />
+                        <DetalhesChamado chamado={chamado} podeAssumir={podeAssumirChamado(ator, chamado)} podeConcluir={podeConcluirChamado(ator, chamado)} pertenceAoDestino={pertenceAoDestino(ator, chamado)} usuarioAtualId={userId} templates={templates} />
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={podeVerTodos ? 8 : 7} className="px-8 py-24 text-center">
+                    <td colSpan={mostrarSolicitante ? 8 : 7} className="px-8 py-24 text-center">
                       <div className="flex flex-col items-center gap-4 opacity-20">
                         <Headphones size={48} />
                         <div>

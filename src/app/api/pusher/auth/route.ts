@@ -1,3 +1,5 @@
+import db from "@/lib/prisma";
+import { obterAtorChamados, podeVerChamado, chamadoAcessoSelect } from "@/lib/chamados/acesso";
 import { NextResponse } from "next/server";
 import { isAdminRole, isParceirosAdminRole } from "@/lib/roles";
 import { auth } from "../../../../../auth";
@@ -5,7 +7,8 @@ import { pusherServer } from "@/lib/pusher-server.ts";
 import {
   CHAMADO_USUARIO_CHANNEL_PREFIX,
   extrairUsuarioIdDoCanalChamados,
-  podeReceberNovosChamados,
+  CHAT_CHAMADO_CHANNEL_PREFIX,
+  extrairChamadoIdDoCanalChat,
 } from "@/lib/chamados/notificacoes";
 import { NOTA_USUARIO_CHANNEL_PREFIX, extrairUsuarioIdDoCanalNotas } from "@/lib/notas/notificacoes";
 import {
@@ -54,9 +57,18 @@ export async function POST(req: Request) {
       return NextResponse.json(authResponse);
     }
 
+    if (channelName?.startsWith(CHAT_CHAMADO_CHANNEL_PREFIX)) {
+      const chamadoId = extrairChamadoIdDoCanalChat(channelName);
+      const ator = await obterAtorChamados(session.user.id);
+      if (!chamadoId || !ator) return new NextResponse("Proibido", { status: 403 });
+      const chamado = await db.chamados.findUnique({ where: { id: chamadoId }, select: chamadoAcessoSelect });
+      if (!chamado || !podeVerChamado(ator, chamado)) return new NextResponse("Proibido", { status: 403 });
+      return NextResponse.json(pusherServer.authorizeChannel(socketId, channelName));
+    }
+
     if (ADMIN_CHANNELS.includes(channelName)) {
-      const role = session.user.role ?? "";
-      if (!podeReceberNovosChamados(role)) {
+      const ator = await obterAtorChamados(session.user.id);
+      if (!ator?.visaoGlobal) {
         return new NextResponse("Proibido", { status: 403 });
       }
       const authResponse = pusherServer.authorizeChannel(socketId, channelName);
@@ -74,7 +86,7 @@ export async function POST(req: Request) {
 
     if (channelName.startsWith(CHAMADO_USUARIO_CHANNEL_PREFIX)) {
       const channelUserId = extrairUsuarioIdDoCanalChamados(channelName);
-      if (channelUserId === null || channelUserId !== Number(session.user.id)) {
+      if (channelUserId === null || channelUserId !== Number(session.user.id) || !await obterAtorChamados(session.user.id)) {
         return new NextResponse("Proibido", { status: 403 });
       }
       const authResponse = pusherServer.authorizeChannel(socketId, channelName);
@@ -112,6 +124,8 @@ export async function POST(req: Request) {
       const authResponse = pusherServer.authorizeChannel(socketId, channelName);
       return NextResponse.json(authResponse);
     }
+
+    if (channelName.startsWith("chat-chamado-")) return new NextResponse("Proibido", { status: 403 });
 
     const presenceData = {
       user_id: session.user.id.toString(),

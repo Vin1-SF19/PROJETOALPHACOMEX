@@ -13,6 +13,11 @@ export interface NovoChamadoPayload {
   titulo: string;
   usuario: string;
   setor: string;
+  setorOrigem?: string;
+  setorDestinoId?: number | null;
+  setorDestinoNome?: string | null;
+  tecnicoSolicitadoId?: number | null;
+  usuarioId?: number;
   urgencia: string;
   createdAt: string;
 }
@@ -71,4 +76,17 @@ export function extrairUsuarioIdDoCanalChamados(channelName: string): number | n
 
   const userId = Number(value);
   return Number.isSafeInteger(userId) ? userId : null;
+}
+
+export const CHAT_CHAMADO_CHANNEL_PREFIX = "private-chat-chamado-";
+export function canalChatChamado(chamadoId: number): string {
+  if (!Number.isSafeInteger(chamadoId) || chamadoId <= 0) throw new Error("ID de chamado inválido.");
+  return `${CHAT_CHAMADO_CHANNEL_PREFIX}${chamadoId}`;
+}
+export function extrairChamadoIdDoCanalChat(channelName: string): number | null {
+  if (!channelName.startsWith(CHAT_CHAMADO_CHANNEL_PREFIX)) return null;
+  const value = channelName.slice(CHAT_CHAMADO_CHANNEL_PREFIX.length);
+  if (!/^[1-9]\d*$/.test(value)) return null;
+  const id = Number(value);
+  return Number.isSafeInteger(id) ? id : null;
 }

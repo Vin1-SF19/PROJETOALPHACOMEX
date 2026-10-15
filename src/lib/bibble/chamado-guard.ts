@@ -54,7 +54,7 @@ export function protegerRespostaDeFalsoChamado(
   chamadoAbertoComSucesso: boolean,
 ): string {
   if (!chamadoAbertoComSucesso && respostaAlegaChamadoAberto(resposta)) {
-    return "Não consegui confirmar a abertura do chamado no sistema. Pode me passar novamente o título, a descrição e a prioridade para eu tentar registrar de novo?";
+    return "Não consegui confirmar a abertura do chamado no sistema. Pode me passar novamente o título, a descrição, o setor de destino e a prioridade para eu tentar registrar de novo?";
   }
   return resposta;
 }

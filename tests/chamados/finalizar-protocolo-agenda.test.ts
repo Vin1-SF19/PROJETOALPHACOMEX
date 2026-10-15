@@ -40,6 +40,7 @@ describe("finalizarComProtocolo — integração com Agenda Alpha", () => {
       titulo: "Falha no acesso",
       usuarioId: 7,
       tecnicoId: 3,
+      destinoEhTI: true,
       tecnicoRole: "T.I",
       solucao: "Acesso restabelecido",
       closedAt: INSTANTE_CONCLUSAO,
@@ -106,8 +107,9 @@ describe("finalizarComProtocolo — integração com Agenda Alpha", () => {
     consoleError.mockRestore();
   });
 
-  it("bloqueia role não autorizada antes da conclusão", async () => {
+  it("propaga recusa do serviço sem disparar automação da Agenda", async () => {
     authMock.mockResolvedValueOnce({ user: { id: "7", role: "User" } });
+    concluirChamadoMock.mockRejectedValueOnce(new Error("Permissão insuficiente"));
 
     const resultado = await finalizarComProtocolo(11, {
       solucao: "Tratativa administrativa",
@@ -116,7 +118,7 @@ describe("finalizarComProtocolo — integração com Agenda Alpha", () => {
     });
 
     expect(resultado).toEqual({ success: false, error: "Permissão insuficiente" });
-    expect(concluirChamadoMock).not.toHaveBeenCalled();
+    expect(concluirChamadoMock).toHaveBeenCalled();
     expect(concluirTarefaMock).not.toHaveBeenCalled();
   });
 });

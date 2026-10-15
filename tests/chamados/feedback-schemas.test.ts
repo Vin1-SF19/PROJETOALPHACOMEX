@@ -8,7 +8,8 @@ describe("schemas de Chamados", () => {
   it("converte a data civil desejada sem deslocar o dia em São Paulo", () => {
     const resultado = criarChamadoSchema.parse({
       titulo: "Acesso ao sistema",
-      categoria: "Acesso",
+      setorDestinoId: "14",
+      categoriaId: "5",
       prioridade: "MEDIA",
       descricao: "Solicito a liberação do perfil",
       tecnicoSolicitadoId: "9",
@@ -22,7 +23,8 @@ describe("schemas de Chamados", () => {
   it("aceita preferência e data vazias como nulas", () => {
     const resultado = criarChamadoSchema.parse({
       titulo: "Mouse",
-      categoria: "Hardware",
+      setorDestinoId: "14",
+      categoriaId: "6",
       prioridade: "BAIXA",
       descricao: "Mouse sem funcionamento",
       tecnicoSolicitadoId: "",
@@ -36,7 +38,8 @@ describe("schemas de Chamados", () => {
   it("rejeita dia inexistente", () => {
     const resultado = criarChamadoSchema.safeParse({
       titulo: "Mouse",
-      categoria: "Hardware",
+      setorDestinoId: "14",
+      categoriaId: "6",
       prioridade: "BAIXA",
       descricao: "Mouse sem funcionamento",
       dataDesejadaConclusao: "2026-02-31",
@@ -48,7 +51,8 @@ describe("schemas de Chamados", () => {
   it("rejeita data fora do intervalo sem lançar exceção", () => {
     expect(() => criarChamadoSchema.safeParse({
       titulo: "Mouse",
-      categoria: "Hardware",
+      setorDestinoId: "14",
+      categoriaId: "6",
       prioridade: "BAIXA",
       descricao: "Mouse sem funcionamento",
       dataDesejadaConclusao: "2026-99-99",
@@ -56,7 +60,8 @@ describe("schemas de Chamados", () => {
 
     expect(criarChamadoSchema.safeParse({
       titulo: "Mouse",
-      categoria: "Hardware",
+      setorDestinoId: "14",
+      categoriaId: "6",
       prioridade: "BAIXA",
       descricao: "Mouse sem funcionamento",
       dataDesejadaConclusao: "2026-99-99",

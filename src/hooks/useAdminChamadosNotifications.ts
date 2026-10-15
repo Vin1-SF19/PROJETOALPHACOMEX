@@ -44,8 +44,10 @@ export function useChamadosNotifications(role: string | undefined, userId: numbe
       }
     };
 
+    const eventosRecebidos = new Set<string>();
     const mensagemHandler = (payload: ChamadoMensagemPayload) => {
-      if (payload.autorId === userId) return;
+      if (payload.autorId === userId || eventosRecebidos.has(`mensagem-${payload.mensagemId}`)) return;
+      eventosRecebidos.add(`mensagem-${payload.mensagemId}`);
       adicionarNotificacao({
         id: `mensagem-${payload.mensagemId}`,
         chamadoId: payload.chamadoId,
@@ -59,10 +61,11 @@ export function useChamadosNotifications(role: string | undefined, userId: numbe
       playAudio();
     };
 
-    if (podeReceberNovosChamados(role)) {
-      const channel = client.subscribe(CHAMADOS_ADMIN_CHANNEL);
-      const handler = (payload: NovoChamadoPayload) => {
+    const novoChamadoHandler = (payload: NovoChamadoPayload) => {
+        if (payload.usuarioId === userId || eventosRecebidos.has(`novo-${payload.chamadoId}`)) return;
+        eventosRecebidos.add(`novo-${payload.chamadoId}`);
         adicionarNotificacao({
+          id: `novo-${payload.chamadoId}`,
           chamadoId: payload.chamadoId,
           titulo: payload.titulo,
           usuario: payload.usuario,
@@ -73,10 +76,13 @@ export function useChamadosNotifications(role: string | undefined, userId: numbe
         window.dispatchEvent(new Event(CHAMADOS_OPERACIONAIS_ATUALIZAR_EVENT));
         playAudio();
       };
-      channel.bind(NOVO_CHAMADO_EVENT, handler);
+
+    if (podeReceberNovosChamados(role)) {
+      const channel = client.subscribe(CHAMADOS_ADMIN_CHANNEL);
+      channel.bind(NOVO_CHAMADO_EVENT, novoChamadoHandler);
       channel.bind(CHAMADO_MENSAGEM_EVENT, mensagemHandler);
       cleanups.push(() => {
-        channel.unbind(NOVO_CHAMADO_EVENT, handler);
+        channel.unbind(NOVO_CHAMADO_EVENT, novoChamadoHandler);
         channel.unbind(CHAMADO_MENSAGEM_EVENT, mensagemHandler);
         client.unsubscribe(CHAMADOS_ADMIN_CHANNEL);
       });
@@ -100,6 +106,7 @@ export function useChamadosNotifications(role: string | undefined, userId: numbe
       });
       playAudio();
     };
+    userChannel.bind(NOVO_CHAMADO_EVENT, novoChamadoHandler);
     userChannel.bind(CHAMADO_CONCLUIDO_EVENT, concluidoHandler);
 
     const assumidoHandler = (payload: ChamadoAssumidoPayload) => {
@@ -116,6 +123,7 @@ export function useChamadosNotifications(role: string | undefined, userId: numbe
     userChannel.bind(CHAMADO_ASSUMIDO_EVENT, assumidoHandler);
     userChannel.bind(CHAMADO_MENSAGEM_EVENT, mensagemHandler);
     cleanups.push(() => {
+      userChannel.unbind(NOVO_CHAMADO_EVENT, novoChamadoHandler);
       userChannel.unbind(CHAMADO_CONCLUIDO_EVENT, concluidoHandler);
       userChannel.unbind(CHAMADO_ASSUMIDO_EVENT, assumidoHandler);
       userChannel.unbind(CHAMADO_MENSAGEM_EVENT, mensagemHandler);

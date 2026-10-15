@@ -46,12 +46,18 @@ describe("origem dos chamados abertos via Bibble", () => {
     });
   });
 
-  it("liga os dois caminhos de criação ao helper compartilhado", () => {
+  it("liga os dois caminhos ao serviço canônico que marca a origem após validar a descrição", () => {
     const executor = ler("src/lib/bibble/tool-executor.ts");
     const rota = ler("src/app/api/ChatBot/AbrirChamado/route.ts");
 
-    expect(executor).toContain("descricao: marcarDescricaoComoAbertaViaBibble(descricao)");
-    expect(rota).toContain("descricao: marcarDescricaoComoAbertaViaBibble(String(descricao ?? \"\"))");
+    const criacao = ler("src/lib/chamados/criacao.ts");
+    expect(executor).toContain("criarChamadoMultissetorial(userId, input, { origemBibble: true, responsavelNome: responsavel })");
+    expect(rota).toContain("criarChamadoMultissetorial(Number(session.user.id), parsed.data, { origemBibble: true })");
+    expect(executor).not.toContain("db.chamados.create(");
+    expect(rota).not.toContain("db.chamados.create(");
+    expect(criacao).toContain("options.origemBibble ? marcarDescricaoComoAbertaViaBibble(input.descricao) : input.descricao");
+    expect(criacao.indexOf("persistenciaSchema.safeParse(input)"))
+      .toBeLessThan(criacao.indexOf("marcarDescricaoComoAbertaViaBibble(input.descricao)"));
   });
 
   it("exibe badge e ocorrência limpa nas duas interfaces de atendimento", () => {

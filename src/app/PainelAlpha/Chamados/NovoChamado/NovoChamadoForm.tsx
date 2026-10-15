@@ -1,9 +1,9 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, CalendarClock, Loader2, MessageSquare, Send, ShieldAlert, Tag, UserRoundSearch, Zap } from "lucide-react";
+import { ArrowLeft, Building2, CalendarClock, Loader2, MessageSquare, Send, ShieldAlert, Tag, UserRoundSearch, Zap } from "lucide-react";
 import Link from "next/link";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -13,20 +13,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { getChamadosCatalogo } from "@/actions/chamados-categorias";
+import { GerenciarCategoriasDialog } from "@/components/chamados/GerenciarCategoriasDialog";
 import { criarChamadoSchema } from "@/lib/chamados/schemas";
 
-interface NovoChamadoFormProps {
-  tecnicos: Array<{ id: number; nome: string }>;
-}
+type CatalogoChamados = Awaited<ReturnType<typeof getChamadosCatalogo>>;
 
-const CATEGORIAS = [
-  ["Hardware", "🛠️ Hardware", "Equipamentos e infraestrutura física"],
-  ["Software", "💻 Software", "Sistemas, aplicativos e atualizações"],
-  ["Rede", "🌐 Rede / Infraestrutura", "Conexão, VPN e acesso remoto"],
-  ["Acesso", "🔑 Acesso / Permissões", "Login, senhas e permissões"],
-  ["Financeiro", "💰 Financeiro / Contábil", "Dúvidas ou problemas financeiros"],
-  ["Outro", "📋 Outro", "Solicitações de outras categorias"],
-] as const;
+interface NovoChamadoFormProps {
+  catalogoInicial: CatalogoChamados;
+  podeGerenciarCategorias: boolean;
+}
 
 const PRIORIDADES = [
   ["BAIXA", "Baixa", "Pode aguardar", "peer-checked:bg-emerald-600 peer-checked:border-emerald-400"],
@@ -38,19 +34,36 @@ const PRIORIDADES = [
 type ChamadoInput = z.input<typeof criarChamadoSchema>;
 type ChamadoOutput = z.output<typeof criarChamadoSchema>;
 
-export function NovoChamadoForm({ tecnicos }: NovoChamadoFormProps) {
+export function NovoChamadoForm({ catalogoInicial, podeGerenciarCategorias }: NovoChamadoFormProps) {
+  const [catalogo, setCatalogo] = useState(catalogoInicial);
   const [isPending, startTransition] = useTransition();
-  const { control, register, handleSubmit, formState: { errors } } = useForm<ChamadoInput, unknown, ChamadoOutput>({
+  const { control, register, handleSubmit, setValue, getValues, formState: { errors } } = useForm<ChamadoInput, unknown, ChamadoOutput>({
     resolver: zodResolver(criarChamadoSchema),
     defaultValues: {
       titulo: "",
       descricao: "",
-      categoria: "Hardware",
+      setorDestinoId: "",
+      categoriaId: "",
       prioridade: "MEDIA",
       tecnicoSolicitadoId: "",
       dataDesejadaConclusao: "",
     },
   });
+  const setorDestinoId = useWatch({ control, name: "setorDestinoId" });
+  const categorias = catalogo.categorias.filter((categoria) => categoria.ativo && categoria.setorId === Number(setorDestinoId));
+  const responsaveis = catalogo.responsaveis.filter((pessoa) => pessoa.setorId === Number(setorDestinoId));
+  const atualizarCatalogo = (atualizado: CatalogoChamados) => {
+    setCatalogo(atualizado);
+    const categoriaId = Number(getValues("categoriaId"));
+    const destinoId = Number(getValues("setorDestinoId"));
+    const responsavelId = Number(getValues("tecnicoSolicitadoId"));
+    if (!atualizado.categorias.some((categoria) => categoria.id === categoriaId && categoria.ativo && categoria.setorId === destinoId)) {
+      setValue("categoriaId", "");
+    }
+    if (!atualizado.responsaveis.some((pessoa) => pessoa.id === responsavelId && pessoa.setorId === destinoId)) {
+      setValue("tecnicoSolicitadoId", "");
+    }
+  };
   const descricao = useWatch({ control, name: "descricao" }) ?? "";
 
   const onSubmit = handleSubmit((_dados, event) => {
@@ -93,7 +106,7 @@ export function NovoChamadoForm({ tecnicos }: NovoChamadoFormProps) {
               <div className="rounded-2xl border border-blue-500/20 bg-blue-600/15 p-2.5"><Zap className="size-5 text-blue-400" aria-hidden="true" /></div>
               <h1 className="text-3xl font-black uppercase italic tracking-tighter sm:text-4xl">Abrir <span className="text-blue-500">Chamado</span></h1>
             </div>
-            <p className="ml-1 mt-2 text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500 sm:tracking-[0.3em]">Informe a ocorrência; técnico e prazo são opcionais</p>
+            <p className="ml-1 mt-2 text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500 sm:tracking-[0.3em]">Informe a ocorrência; responsável e prazo são opcionais</p>
           </header>
 
           <form onSubmit={onSubmit} className="relative space-y-7" noValidate>
@@ -103,11 +116,26 @@ export function NovoChamadoForm({ tecnicos }: NovoChamadoFormProps) {
               {errors.titulo && <p id="erro-titulo" role="alert" className="text-xs text-rose-300">{errors.titulo.message}</p>}
             </div>
 
-            <fieldset className="space-y-3">
-              <legend className="ml-1 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400"><Tag size={13} className="text-purple-400" aria-hidden="true" />Categoria</legend>
+            <div className="space-y-2">
+              <Label htmlFor="chamado-setor" className="ml-1 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400"><Building2 size={13} className="text-blue-400" aria-hidden="true" />Setor de destino</Label>
+              <Controller control={control} name="setorDestinoId" render={({ field }) => <>
+                <input type="hidden" name={field.name} value={field.value ? String(field.value) : ""} />
+                <Select value={field.value ? String(field.value) : ""} onValueChange={(valor) => { field.onChange(valor); setValue("categoriaId", ""); setValue("tecnicoSolicitadoId", ""); }} disabled={isPending}>
+                  <SelectTrigger id="chamado-setor" ref={field.ref} onBlur={field.onBlur} aria-invalid={Boolean(errors.setorDestinoId)} aria-describedby={errors.setorDestinoId ? "erro-setor" : undefined} className={`${inputClass} w-full`}><SelectValue placeholder="Selecione o setor" /></SelectTrigger>
+                  <SelectContent>{catalogo.setores.map((setor) => <SelectItem key={setor.id} value={String(setor.id)}>{setor.nome}</SelectItem>)}</SelectContent>
+                </Select>
+              </>} />
+              {errors.setorDestinoId && <p id="erro-setor" role="alert" className="text-xs text-rose-300">{String(errors.setorDestinoId.message)}</p>}
+              {!catalogo.setores.length && <p role="status" className="text-xs text-amber-300">Nenhum setor disponível para abertura de chamados.</p>}
+            </div>
+
+            <fieldset className="space-y-3" aria-describedby={errors.categoriaId ? "erro-categoria" : undefined}>
+              <legend className="ml-1 text-[10px] font-black uppercase tracking-widest text-slate-400"><span className="inline-flex items-center gap-2"><Tag size={13} className="text-purple-400" aria-hidden="true" />Categoria{podeGerenciarCategorias && <GerenciarCategoriasDialog setorInicialId={Number(setorDestinoId) || undefined} onCatalogoAtualizado={atualizarCatalogo} />}</span></legend>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {CATEGORIAS.map(([value, label, desc]) => <label key={value} className="group relative cursor-pointer"><input type="radio" value={value} {...register("categoria")} className="peer sr-only" /><span className="flex flex-col rounded-2xl border border-white/5 bg-white/[0.03] p-4 transition-all group-hover:border-white/15 peer-checked:border-purple-500/40 peer-checked:bg-purple-600/10 peer-focus-visible:ring-2 peer-focus-visible:ring-purple-400"><span className="text-sm font-black text-slate-300">{label}</span><span className="mt-0.5 text-[10px] font-bold text-slate-600">{desc}</span></span></label>)}
+                {categorias.map((categoria) => <label key={categoria.id} className="group relative cursor-pointer"><input type="radio" value={String(categoria.id)} {...register("categoriaId")} disabled={isPending} className="peer sr-only" /><span className="flex flex-col rounded-2xl border border-white/5 bg-white/[0.03] p-4 transition-all group-hover:border-white/15 peer-checked:border-purple-500/40 peer-checked:bg-purple-600/10 peer-focus-visible:ring-2 peer-focus-visible:ring-purple-400"><span className="text-sm font-black text-slate-300">{categoria.nome}</span>{categoria.descricao && <span className="mt-0.5 text-[10px] font-bold text-slate-600">{categoria.descricao}</span>}</span></label>)}
               </div>
+              {!categorias.length && <p role="status" className="ml-1 text-xs text-slate-500">{setorDestinoId ? "Nenhuma categoria ativa neste setor." : "Selecione o setor para ver as categorias."}</p>}
+              {errors.categoriaId && <p id="erro-categoria" role="alert" className="text-xs text-rose-300">{String(errors.categoriaId.message)}</p>}
             </fieldset>
 
             <fieldset className="space-y-3">
@@ -119,8 +147,8 @@ export function NovoChamadoForm({ tecnicos }: NovoChamadoFormProps) {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label className="ml-1 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400"><UserRoundSearch size={13} className="text-blue-400" aria-hidden="true" />Técnico desejado <span className="normal-case text-slate-600">(opcional)</span></Label>
-                <Controller control={control} name="tecnicoSolicitadoId" render={({ field }) => <><input type="hidden" name={field.name} value={field.value ? String(field.value) : ""} /><Select value={field.value ? String(field.value) : "nenhum"} onValueChange={(value) => field.onChange(value === "nenhum" ? "" : value)} disabled={isPending}><SelectTrigger aria-label="Técnico desejado" aria-invalid={Boolean(errors.tecnicoSolicitadoId)} className={`${inputClass} w-full`}><SelectValue placeholder="Sem preferência" /></SelectTrigger><SelectContent><SelectItem value="nenhum">Sem preferência</SelectItem>{tecnicos.map((tecnico) => <SelectItem key={tecnico.id} value={String(tecnico.id)}>{tecnico.nome}</SelectItem>)}</SelectContent></Select></>} />
+                <Label htmlFor="chamado-responsavel" className="ml-1 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400"><UserRoundSearch size={13} className="text-blue-400" aria-hidden="true" />Responsável desejado <span className="normal-case text-slate-600">(opcional)</span></Label>
+                <Controller control={control} name="tecnicoSolicitadoId" render={({ field }) => <><input type="hidden" name={field.name} value={field.value ? String(field.value) : ""} /><Select value={field.value ? String(field.value) : "nenhum"} onValueChange={(value) => field.onChange(value === "nenhum" ? "" : value)} disabled={isPending || !setorDestinoId}><SelectTrigger id="chamado-responsavel" aria-label="Responsável desejado" aria-invalid={Boolean(errors.tecnicoSolicitadoId)} className={`${inputClass} w-full`}><SelectValue placeholder="Sem preferência" /></SelectTrigger><SelectContent><SelectItem value="nenhum">Sem preferência</SelectItem>{responsaveis.map((pessoa) => <SelectItem key={pessoa.id} value={String(pessoa.id)}>{pessoa.nome}</SelectItem>)}</SelectContent></Select></>} />
                 <p className="text-[10px] leading-relaxed text-slate-600">Se você escolher alguém, somente essa pessoa poderá assumir o chamado.</p>
               </div>
               <div className="space-y-2">

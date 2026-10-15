@@ -3263,3 +3263,13 @@ Logcomex Vercel: worker-client encaminha jobs/processamento/histórico ao endpoi
 **Acesso:** Pré Análise → `/PainelAlpha/SistemaPreAnalise` → consultar CNPJ → Gerar Ficha em PDF → Gerar Documento PDF → nova aba/impressão. Página verifica sessão e permissões; menu exige `analise`. Modal gera Blob com react-pdf e abre com `window.open`.
 **Validação:** encadeamento confirmado no código; teste `tests/pre-analise/ficha-reuniao.test.ts` verifica textos, confirmações, A4 e modelo padrão. Navegação autenticada não exercitada no encerramento. Sem novo menu, rota, módulo ou schema; mapa estrutural permanece válido.
 **Última atualização:** 2026-10-13 por Scribe.
+
+
+### 2026-10-15 — Chamados: abertura e atendimento por setor
+
+Menu existente `chamados` → `/PainelAlpha/Chamados` → NovoChamado. Todos os atores ativos autorizados podem abrir; formulário depende de setor para categorias e responsáveis. `criarChamadoMultissetorial` é compartilhado por action, `/api/ChatBot/AbrirChamado` e ferramenta Bibble. Bibble exige destino literal na autorização; não há fallback implícito para TI. `acesso.ts` limita listas, detalhes, protocolos e chat. Pusher `private-chat-chamado-{id}` tem autorização por chamado; central/polling e canais de usuário notificam apenas destinatários pertinentes. Agenda e WhatsApp fixo continuam exclusivos de destino TI. Fluxos React reais foram exercitados com actions simuladas; persistência autenticada/E2E e ativação aguardam migração específica autorizada. Ver story Chamados multissetorial.
+
+
+### 2026-10-15 — Chamados: migração autorizada aplicada
+
+Atualização Chamados: catálogo persistido ativo no Turso após migração autorizada; smoke real de Prisma/catálogo/visibilidade aprovado para 29 atores ativos. Páginas autenticadas e transporte realtime não foram exercitados nesta ativação; publicação do código continua pendente.

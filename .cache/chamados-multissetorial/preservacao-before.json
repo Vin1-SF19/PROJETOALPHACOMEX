@@ -1,0 +1,73 @@
+{
+  "timestamp": "2026-10-15T17:55:39.328Z",
+  "tables": {
+    "chamados": {
+      "count": 224,
+      "columns": [
+        "id",
+        "titulo",
+        "descricao",
+        "categoria",
+        "status",
+        "prioridade",
+        "solucao",
+        "usuarioId",
+        "createdAt",
+        "updatedAt",
+        "causa",
+        "mensagemFinal",
+        "templateId",
+        "closedAt",
+        "tecnicoId",
+        "dataDesejadaConclusao",
+        "tecnicoSolicitadoId"
+      ],
+      "sha256": "472fa072b524df0b1aaf287ff411f3a829ac1e0435fbac2f322ffbb08004c53f"
+    },
+    "MensagensChamado": {
+      "count": 179,
+      "columns": [
+        "id",
+        "texto",
+        "createdAt",
+        "chamadoId",
+        "autorId",
+        "lida",
+        "lida_admin",
+        "lida_usuario",
+        "arquivoUrl",
+        "arquivoTipo"
+      ],
+      "sha256": "6da0572366d516827166531901f08d5410a08c6faad7802487a9cb424e8d3a66"
+    },
+    "chamados_feedback": {
+      "count": 43,
+      "columns": [
+        "chamadoId",
+        "status",
+        "notaRapidezResposta",
+        "notaPrazoConclusao",
+        "solucionadaComoEsperado",
+        "comentario",
+        "notaQualidadeSolucao",
+        "createdAt",
+        "updatedAt",
+        "decidedAt"
+      ],
+      "sha256": "a0d012e58d3c84034ed7a2dc4197cf4f2be6ffcc598a7ce6d9f5dee08784568e"
+    },
+    "protocolo_template": {
+      "count": 3,
+      "columns": [
+        "id",
+        "nome",
+        "categoria",
+        "template",
+        "ativo",
+        "createdAt",
+        "updatedAt"
+      ],
+      "sha256": "4c552e3963bcca63466152d5abfa6dc85629722dc2a5d794c094d82381562db6"
+    }
+  }
+}

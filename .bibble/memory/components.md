@@ -816,3 +816,13 @@ BuilderClient (src/app/PainelAlpha/Builder/BuilderClient.tsx): iframe externo co
 
 ### RM-2026-E04B53 — FichaAlphaPDF
 Prop opcional finalidade: padrao (observações, CRM/Bibble) ou pre-analise (duas perguntas manuscritas e A CONFIRMAR). ModalPDF seleciona pre-analise. Sem novos componentes. Teste real em tests/pre-analise/ficha-reuniao.test.ts.
+
+
+### 2026-10-15 — NovoChamadoForm / GerenciarCategoriasDialog / DetalhesChamado
+
+`NovoChamadoForm` mantém card central e estilos originais; recebe catálogo inicial do servidor e encadeia setor/categoria/responsável e limpa dependências inválidas após troca/refetch. `GerenciarCategoriasDialog` (`src/components/chamados/`) monta provider React Query local e reutiliza Dialog/Button/Select/RHF/Zod; ícone acessível imediatamente junto a Categoria, renderizado apenas para TI; actions repetem permissão persistida. CRUD permite arquivamento/reativação; nomes históricos permanecem no chamado. `DetalhesChamado` usa resultado local da assunção apenas enquanto props persistidas ainda estão ABERTO/sem responsável; atualização CONCLUIDO prevalece ao reabrir. Evidências React desktop/mobile/gestor em `.cache/chamados-multissetorial/`, com actions simuladas; banco ainda não migrado.
+
+
+### 2026-10-15 — Chamados: migração autorizada aplicada
+
+Atualização de estado Chamados: banco migrado e catálogo real validado, 13 destinos/53 categorias/27 responsáveis elegíveis. Ensaios visuais continuam sendo dos componentes reais com actions simuladas, sem equivalência a navegação autenticada completa.

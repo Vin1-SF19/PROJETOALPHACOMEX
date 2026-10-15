@@ -15,7 +15,8 @@ import {
   canalCalendarioAlphaDoUsuario,
 } from "@/lib/google-calendar/notificacoes";
 
-const trigger = vi.fn();
+const { trigger, setores, usuarios } = vi.hoisted(() => ({ trigger: vi.fn(), setores: vi.fn(), usuarios: vi.fn() }));
+vi.mock("@/lib/prisma", () => ({ default: { setor: { findMany: setores }, usuarios: { findMany: usuarios } } }));
 
 vi.mock("@/lib/pusher-server.ts", () => ({
   pusherServer: { trigger },
@@ -23,7 +24,10 @@ vi.mock("@/lib/pusher-server.ts", () => ({
 
 describe("notificações de chamados", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     trigger.mockReset();
+    setores.mockResolvedValue([]);
+    usuarios.mockResolvedValue([]);
   });
 
   it("normaliza os papéis autorizados a receber novos chamados", () => {
@@ -60,6 +64,25 @@ describe("notificações de chamados", () => {
 
     await expect(notificarNovoChamado(payload)).resolves.toBe(true);
     expect(trigger).toHaveBeenCalledWith(CHAMADOS_ADMIN_CHANNEL, NOVO_CHAMADO_EVENT, payload);
+  });
+
+  it("encaminha a fila somente aos colaboradores ativos do destino canônico e exclui o solicitante", async () => {
+    setores.mockResolvedValue([{ id: 3, nome: "Financeiro" }, { id: 8, nome: "TI" }]);
+    usuarios.mockResolvedValue([{ id: 42, role: "Financeiro" }, { id: 43, role: "FINANCEIRO" }, { id: 8, role: "TI" }]);
+    const { notificarNovoChamado } = await import("@/lib/chamados/notificacoes-server");
+    const payload = { chamadoId: 2, titulo: "Pagamento", usuario: "Ana", usuarioId: 42, setor: "Financeiro", setorDestinoId: 3, setorDestinoNome: "TI", urgencia: "MEDIA", createdAt: "2026-10-15T12:00:00Z" };
+    await expect(notificarNovoChamado(payload)).resolves.toBe(true);
+    expect(trigger).toHaveBeenCalledWith([CHAMADOS_ADMIN_CHANNEL, "private-chamados-usuario-43"], NOVO_CHAMADO_EVENT, payload);
+    expect(usuarios).toHaveBeenCalledWith(expect.objectContaining({ where: { status: "ATIVO" } }));
+  });
+
+  it("não confia no nome enviado para ampliar uma fila sem destino válido", async () => {
+    setores.mockResolvedValue([{ id: 3, nome: "Financeiro" }]);
+    const { notificarNovoChamado } = await import("@/lib/chamados/notificacoes-server");
+    const payload = { chamadoId: 2, titulo: "Pagamento", usuario: "Ana", setor: "TI", setorDestinoId: 99, setorDestinoNome: "Financeiro", urgencia: "MEDIA", createdAt: "2026-10-15T12:00:00Z" };
+    await notificarNovoChamado(payload);
+    expect(trigger).toHaveBeenCalledWith(CHAMADOS_ADMIN_CHANNEL, NOVO_CHAMADO_EVENT, payload);
+    expect(usuarios).not.toHaveBeenCalled();
   });
 
   it("publica a conclusão somente no canal do solicitante", async () => {

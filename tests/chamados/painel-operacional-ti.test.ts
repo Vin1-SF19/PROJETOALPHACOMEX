@@ -11,6 +11,12 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({
   default: {
+    usuarios: { findUnique: vi.fn(async ({ where }: { where: { id: number } }) => {
+      const session = await mocks.auth.mock.results.at(-1)?.value;
+      if (!session?.user) return null;
+      return { id: where.id, nome: session.user.nome ?? "Colaborador", role: session.user.role, status: "ATIVO" };
+    }) },
+    setor: { findMany: vi.fn().mockResolvedValue([{ id: 14, nome: "TI" }, { id: 4, nome: "Comercial" }]) },
     chamados: {
       findMany: mocks.chamadosFindMany,
       findUnique: mocks.chamadosFindUnique,
@@ -87,7 +93,7 @@ describe("listarChamadosAtivosTIAction", () => {
 
     expect(resultado.success).toBe(true);
     expect(mocks.chamadosFindMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { status: { in: ["ABERTO", "EM_ATENDIMENTO"] } },
+      where: { status: { in: ["ABERTO", "EM_ATENDIMENTO"] }, OR: [{ setorDestinoId: null }, { setorDestino: { nome: "TI" } }] },
       orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
     }));
     expect(resultado.chamados[0]).toMatchObject({

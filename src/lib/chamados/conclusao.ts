@@ -1,11 +1,12 @@
 import db from "@/lib/prisma";
+import { chamadoDestinoEhTI, obterAtorChamados, podeConcluirChamado } from "./acesso";
 
 export class ErroConclusaoChamado extends Error {
   constructor(public readonly code: "NAO_ENCONTRADO" | "STATUS_INVALIDO" | "SEM_PERMISSAO" | "CONCORRENCIA") {
     const mensagens = {
       NAO_ENCONTRADO: "Chamado não encontrado.",
       STATUS_INVALIDO: "Somente chamados em atendimento podem ser finalizados.",
-      SEM_PERMISSAO: "Somente o técnico que assumiu o chamado pode finalizá-lo.",
+      SEM_PERMISSAO: "Somente o responsável ativo do setor de destino que assumiu o chamado pode finalizá-lo.",
       CONCORRENCIA: "O chamado foi alterado por outro usuário. Atualize a página e tente novamente.",
     } satisfies Record<ErroConclusaoChamado["code"], string>;
     super(mensagens[code]);
@@ -25,6 +26,8 @@ type DadosConclusao = {
 
 export async function concluirChamadoComFeedback(dados: DadosConclusao) {
   return db.$transaction(async (tx) => {
+    const ator = await obterAtorChamados(dados.tecnicoId, tx);
+    if (!ator) throw new ErroConclusaoChamado("SEM_PERMISSAO");
     const chamado = await tx.chamados.findUnique({
       where: { id: dados.chamadoId },
       select: {
@@ -33,22 +36,28 @@ export async function concluirChamadoComFeedback(dados: DadosConclusao) {
         usuarioId: true,
         tecnicoId: true,
         status: true,
-        tecnico: { select: { role: true } },
+        tecnicoSolicitadoId: true,
+        setorDestinoId: true,
+        setorDestino: { select: { id: true, nome: true, ativo: true, isBase: true } },
+        tecnico: { select: { role: true, status: true } },
       },
     });
 
     if (!chamado) throw new ErroConclusaoChamado("NAO_ENCONTRADO");
-    if (chamado.tecnicoId !== dados.tecnicoId) {
+    if (chamado.tecnicoId !== dados.tecnicoId || chamado.tecnico?.status !== "ATIVO" || chamado.tecnico.role !== ator.role) {
       throw new ErroConclusaoChamado("SEM_PERMISSAO");
     }
     if (chamado.status !== "EM_ATENDIMENTO") {
       throw new ErroConclusaoChamado("STATUS_INVALIDO");
     }
 
+    if (!podeConcluirChamado(ator, chamado)) throw new ErroConclusaoChamado("SEM_PERMISSAO");
+
     const alteracao = await tx.chamados.updateMany({
       where: {
         id: chamado.id,
         tecnicoId: dados.tecnicoId,
+        setorDestinoId: chamado.setorDestinoId,
         status: "EM_ATENDIMENTO",
       },
       data: {
@@ -64,7 +73,7 @@ export async function concluirChamadoComFeedback(dados: DadosConclusao) {
 
     if (alteracao.count !== 1) throw new ErroConclusaoChamado("CONCORRENCIA");
 
-    await tx.chamadoFeedback.create({
+    if (chamado.usuarioId !== dados.tecnicoId) await tx.chamadoFeedback.create({
       data: {
         chamadoId: chamado.id,
         status: "PENDENTE",
@@ -78,6 +87,7 @@ export async function concluirChamadoComFeedback(dados: DadosConclusao) {
       usuarioId: chamado.usuarioId,
       tecnicoId: chamado.tecnicoId,
       tecnicoRole: chamado.tecnico?.role ?? null,
+      destinoEhTI: chamadoDestinoEhTI(chamado),
       solucao: dados.solucao ?? null,
       closedAt: dados.concluidoEm,
       updatedAt: dados.concluidoEm,

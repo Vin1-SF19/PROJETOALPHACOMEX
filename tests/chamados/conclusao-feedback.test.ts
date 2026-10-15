@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 const tx = {
+  usuarios: { findUnique: vi.fn().mockResolvedValue({ id: 3, nome: "Carlos", role: "TI", status: "ATIVO" }) },
+  setor: { findMany: vi.fn().mockResolvedValue([{ id: 14, nome: "TI" }]) },
   chamados: {
     findUnique: mocks.findUnique,
     updateMany: mocks.updateMany,
@@ -16,7 +18,10 @@ const tx = {
 };
 
 vi.mock("@/lib/prisma", () => ({
-  default: { $transaction: mocks.transaction },
+  default: { $transaction: mocks.transaction,
+    usuarios: { findUnique: vi.fn().mockResolvedValue({ id: 3, nome: "Carlos", role: "TI", status: "ATIVO" }) },
+    setor: { findMany: vi.fn().mockResolvedValue([{ id: 14, nome: "TI" }]) },
+  },
 }));
 
 import {
@@ -35,7 +40,7 @@ describe("concluirChamadoComFeedback", () => {
       usuarioId: 7,
       tecnicoId: 3,
       status: "EM_ATENDIMENTO",
-      tecnico: { role: "TI" },
+      tecnico: { role: "TI", status: "ATIVO" },
     });
     mocks.updateMany.mockResolvedValue({ count: 1 });
     mocks.feedbackCreate.mockResolvedValue({ chamadoId: 10 });
@@ -50,7 +55,7 @@ describe("concluirChamadoComFeedback", () => {
     });
 
     expect(mocks.updateMany).toHaveBeenCalledWith({
-      where: { id: 10, tecnicoId: 3, status: "EM_ATENDIMENTO" },
+      where: { id: 10, tecnicoId: 3, status: "EM_ATENDIMENTO", setorDestinoId: undefined },
       data: expect.objectContaining({
         status: "CONCLUIDO",
         closedAt: CONCLUIDO_EM,
@@ -92,7 +97,7 @@ describe("concluirChamadoComFeedback", () => {
       usuarioId: 7,
       tecnicoId: 3,
       status: "CONCLUIDO",
-      tecnico: { role: "TI" },
+      tecnico: { role: "TI", status: "ATIVO" },
     });
     await expect(concluirChamadoComFeedback({
       chamadoId: 10,
@@ -115,4 +120,12 @@ describe("concluirChamadoComFeedback", () => {
 
     expect(mocks.feedbackCreate).not.toHaveBeenCalled();
   });
+  it("conclui autoatendimento sem criar avaliação própria", async () => {
+    mocks.findUnique.mockResolvedValueOnce({ id: 10, titulo: "Meu acesso", usuarioId: 3, tecnicoId: 3, status: "EM_ATENDIMENTO", tecnico: { role: "TI", status: "ATIVO" } });
+    const resultado = await concluirChamadoComFeedback({ chamadoId: 10, tecnicoId: 3, concluidoEm: CONCLUIDO_EM });
+    expect(resultado.id).toBe(10);
+    expect(mocks.updateMany).toHaveBeenCalledOnce();
+    expect(mocks.feedbackCreate).not.toHaveBeenCalled();
+  });
+
 });

@@ -1,0 +1,41 @@
+{
+  "version": "0.3",
+  "status": "corrected_preview_pending_user_review",
+  "javascriptSyntax": "passed",
+  "browserErrors": [],
+  "externalRequests": [],
+  "mobileWidth": {
+    "viewport": 390,
+    "document": 390
+  },
+  "sourceMetrics": {
+    "fontWeight": "900",
+    "fontStyle": "italic",
+    "textTransform": "uppercase",
+    "fontSize": "48px"
+  },
+  "formGeometry": {
+    "width": 590,
+    "left": 473
+  },
+  "checked": [
+    "original header uppercase italic font-weight900",
+    "original 4 status cards and table columns",
+    "no alternative sidebar or art directions",
+    "single centered form max672px",
+    "sector-dependent categories and staff",
+    "TI-only category manager",
+    "Admin and TI New button",
+    "category CRUD/archive/reactivate",
+    "sector change resets category/staff",
+    "Comercial permission display",
+    "390px mobile without horizontal overflow"
+  ],
+  "artifacts": [
+    "chamados-multissetorial-v3.html",
+    "chamados-v3-painel.png",
+    "chamados-v3-novo.png",
+    "chamados-v3-categorias.png",
+    "chamados-v3-mobile.png"
+  ]
+}

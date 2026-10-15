@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/prisma";
+import { isSameRole } from "@/lib/roles";
 import { auth } from "../../../../auth";
-import { isAdminRole } from "@/lib/roles";
+import { obterAtorChamados, chamadoVisivelWhere } from "@/lib/chamados/acesso";
 import { resumirMensagemChamado } from "@/lib/chamados/notificacoes";
 
 export const dynamic = "force-dynamic";
@@ -14,18 +15,36 @@ export async function GET() {
   }
 
   const userId = Number(session.user.id);
-  const isAdmin = isAdminRole(session.user.role);
+
 
   try {
+    const ator = await obterAtorChamados(userId);
+    if (!ator) return NextResponse.json({ notificacoes: [], feedbacksPendentes: [] }, { status: 403 });
+    const destinosDoAtor = ator.setorId === null ? [] : [
+      { setorDestinoId: ator.setorId, setorDestino: { ativo: true, isBase: false } },
+      ...(isSameRole(ator.setorNome, "TI") ? [{ setorDestinoId: null }] : []),
+    ];
     const [mensagens, feedbacksPendentes] = await Promise.all([
       db.mensagensChamado.findMany({
         where: {
           autorId: { not: userId },
           chamado: {
             status: { in: ["ABERTO", "EM_ATENDIMENTO"] },
-            ...(!isAdmin && { usuarioId: userId }),
+            ...chamadoVisivelWhere(ator),
           },
-          ...(isAdmin ? { lida_admin: false } : { lida_usuario: false }),
+          OR: [
+            { chamado: { usuarioId: userId }, lida_usuario: false },
+            {
+              chamado: {
+                usuarioId: { not: userId },
+                OR: [
+                  { tecnicoId: null },
+                  ...(destinosDoAtor.length ? [{ tecnicoId: userId, OR: destinosDoAtor }] : []),
+                ],
+              },
+              lida_admin: false,
+            },
+          ],
         },
         select: {
           id: true,

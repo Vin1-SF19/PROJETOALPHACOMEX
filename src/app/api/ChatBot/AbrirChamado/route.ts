@@ -1,40 +1,42 @@
 import { NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
-import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { notificarNovoChamado } from "@/lib/chamados/notificacoes-server";
-import { marcarDescricaoComoAbertaViaBibble } from "@/lib/chamados/origem-bibble";
+import { criarChamadoSchema, primeiraMensagemZod } from "@/lib/chamados/schemas";
+import { criarChamadoMultissetorial, ErroCriacaoChamado } from "@/lib/chamados/criacao";
 
 export async function POST(req: Request) {
   const session = await auth();
-  if (!session) return NextResponse.json({ error: "Sessão expirada" }, { status: 401 });
+  if (!session?.user?.id) return NextResponse.json({ error: "Sessão expirada" }, { status: 401 });
+
+  let payload: unknown;
+  try {
+    payload = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Dados do chamado inválidos" }, { status: 400 });
+  }
+  const parsed = criarChamadoSchema.strict().safeParse(payload);
+  if (!parsed.success) return NextResponse.json({ error: primeiraMensagemZod(parsed.error) }, { status: 400 });
 
   try {
-    const { titulo, descricao, prioridade, categoria } = await req.json();
-
-    const novoChamado = await db.chamados.create({
-      data: {
-        titulo,
-        descricao: marcarDescricaoComoAbertaViaBibble(String(descricao ?? "")),
-        categoria: categoria || "SUPORTE",
-        prioridade: prioridade || "MEDIA",
-        usuarioId: Number(session.user.id),
-        status: "ABERTO",
-      },
-    });
-
-    await notificarNovoChamado({
-      chamadoId: novoChamado.id,
-      titulo: novoChamado.titulo,
-      usuario: session.user.nome || "Usuário",
-      setor: session.user.role || "",
-      urgencia: novoChamado.prioridade,
-      createdAt: novoChamado.createdAt.toISOString(),
-    });
-
+    const chamado = await criarChamadoMultissetorial(Number(session.user.id), parsed.data, { origemBibble: true });
+    // A persistência continua autoritativa se o transporte de notificações falhar.
+    try {
+      await notificarNovoChamado({
+        chamadoId: chamado.id, titulo: chamado.titulo, usuario: chamado.autor.nome,
+        usuarioId: chamado.autor.id, setor: chamado.autor.role, setorOrigem: chamado.autor.role,
+        setorDestinoId: chamado.setorDestinoId, setorDestinoNome: chamado.setorDestinoNome,
+        tecnicoSolicitadoId: chamado.tecnicoSolicitadoId, urgencia: chamado.prioridade,
+        createdAt: chamado.createdAt.toISOString(),
+      });
+    } catch {
+      console.warn("[AbrirChamado] Falha ao entregar notificação do chamado persistido");
+    }
     revalidatePath("/PainelAlpha/Chamados");
-    return NextResponse.json({ success: true, id: novoChamado.id });
-  } catch {
+    return NextResponse.json({ success: true, id: chamado.id });
+  } catch (error) {
+    if (error instanceof ErroCriacaoChamado) return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error("[AbrirChamado] Falha ao criar chamado");
     return NextResponse.json({ error: "Erro ao criar via Bibble" }, { status: 500 });
   }
 }

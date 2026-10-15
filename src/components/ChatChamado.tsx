@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { canalChatChamado } from "@/lib/chamados/notificacoes";
 import { fmtTime } from "@/lib/format-date";
 import { createPortal } from "react-dom";
 import { pusherClient } from "@/lib/pusher";
@@ -36,7 +37,7 @@ type Props = {
   contagem: number;
   status: string;
   usuarioAtualId: number;
-  isAdmin: boolean;
+  podeResponder: boolean;
 };
 
 export default function ChatChamado({
@@ -46,7 +47,7 @@ export default function ChatChamado({
   contagem,
   status,
   usuarioAtualId,
-  isAdmin,
+  podeResponder,
 }: Props) {
   const [aberto, setAberto] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -77,7 +78,7 @@ export default function ChatChamado({
     const client = pusherClient;
     if (!mounted || !chamadoId || !client) return;
 
-    const channel = client.subscribe(`chat-${chamadoId}`);
+    const channel = client.subscribe(canalChatChamado(chamadoId));
 
     channel.bind("nova-mensagem", (novaMsg: Mensagem) => {
       setMensagens((prev) => {
@@ -85,7 +86,7 @@ export default function ChatChamado({
         return [...prev, novaMsg];
       });
 
-      if (!abertoRef.current && novaMsg.autorId !== usuarioAtualId) {
+      if (podeResponder && !abertoRef.current && novaMsg.autorId !== usuarioAtualId) {
         setNovasNoFront((prev) => prev + 1);
       }
     });
@@ -93,12 +94,12 @@ export default function ChatChamado({
     return () => {
       try {
         channel.unbind("nova-mensagem");
-        client.unsubscribe(`chat-${chamadoId}`);
+        client.unsubscribe(canalChatChamado(chamadoId));
       } catch {
         // ignore cleanup errors on closed connection
       }
     };
-  }, [mounted, chamadoId, usuarioAtualId]);
+  }, [mounted, chamadoId, usuarioAtualId, podeResponder]);
 
   useEffect(() => {
     if (aberto && scrollRef.current) {
@@ -106,10 +107,17 @@ export default function ChatChamado({
     }
   }, [aberto, mensagens]);
 
+  useEffect(() => {
+    if (!aberto) return;
+    const fecharComEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setAberto(false); };
+    document.addEventListener("keydown", fecharComEscape);
+    return () => document.removeEventListener("keydown", fecharComEscape);
+  }, [aberto]);
+
   const limparNotificacoes = useCallback(async () => {
     setNovasNoFront(0);
-    await marcarComoLidaAction(chamadoId, isAdmin);
-  }, [chamadoId, isAdmin]);
+    await marcarComoLidaAction(chamadoId);
+  }, [chamadoId]);
 
   useEffect(() => {
     if (aberto && novasNoFront > 0) {
@@ -119,7 +127,7 @@ export default function ChatChamado({
   }, [aberto, novasNoFront, limparNotificacoes]);
 
   const handleEnviar = async () => {
-    if (!texto.trim() || enviando) return;
+    if (!podeResponder || !texto.trim() || enviando) return;
     setEnviando(true);
     const res = await enviarMensagemAction(chamadoId, texto);
     if (!res.success) toast.error("Erro ao transmitir mensagem");
@@ -172,7 +180,7 @@ export default function ChatChamado({
   const temNotificacao = !aberto && novasNoFront > 0;
 
   const modalContent = (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+    <div role="dialog" aria-modal="true" aria-labelledby={`chat-titulo-${chamadoId}`} className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
       <div
         className="absolute inset-0 bg-black/90 backdrop-blur-xl"
         onClick={() => setAberto(false)}
@@ -188,7 +196,7 @@ export default function ChatChamado({
             </div>
             <div className="space-y-0.5">
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-black text-white uppercase italic tracking-tighter">Canal de Suporte</h3>
+                <h3 id={`chat-titulo-${chamadoId}`} className="text-base font-black text-white uppercase italic tracking-tighter">Canal de Suporte</h3>
                 <div className="px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Ao vivo</span>
@@ -200,6 +208,7 @@ export default function ChatChamado({
             </div>
           </div>
           <button
+            aria-label="Fechar chat"
             onClick={() => setAberto(false)}
             className="cursor-pointer p-3 hover:bg-rose-500/10 rounded-xl text-slate-500 hover:text-rose-400 transition-all border border-white/5 hover:border-rose-500/20 group"
           >
@@ -268,7 +277,7 @@ export default function ChatChamado({
 
         {/* Input */}
         <div className="p-6 bg-slate-950/60 border-t border-white/5 backdrop-blur-xl flex-shrink-0">
-          {status !== "CONCLUIDO" ? (
+          {status !== "CONCLUIDO" && podeResponder ? (
             <div className="flex items-center gap-3 bg-black/40 border border-white/10 rounded-2xl p-2 focus-within:border-blue-500/40 transition-all shadow-inner">
               <input
                 type="file"
@@ -294,7 +303,8 @@ export default function ChatChamado({
 
                     const newBlob = await response.json();
                     const fileType = file.name.split(".").pop()?.toUpperCase() || "FILE";
-                    await enviarMensagemAction(chamadoId, "", newBlob.url, fileType);
+                    const resultado = await enviarMensagemAction(chamadoId, "", newBlob.url, fileType);
+                    if (!resultado.success) throw new Error("Não foi possível enviar o anexo.");
                     toast.success("Arquivo enviado!", { id: toastId });
                   } catch (err: unknown) {
                     const msg = err instanceof Error ? err.message : "Erro desconhecido";
@@ -314,6 +324,7 @@ export default function ChatChamado({
               </label>
 
               <input
+                aria-label="Mensagem"
                 value={texto}
                 onChange={(e) => setTexto(e.target.value)}
                 placeholder="Escreva sua mensagem..."
@@ -327,6 +338,7 @@ export default function ChatChamado({
               />
 
               <button
+                aria-label="Enviar mensagem"
                 disabled={enviando || !texto.trim()}
                 onClick={handleEnviar}
                 className="cursor-pointer p-3 bg-blue-600 hover:bg-blue-500 rounded-xl text-white shadow-lg shadow-blue-900/40 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
@@ -342,7 +354,7 @@ export default function ChatChamado({
             <div className="py-5 text-center rounded-2xl bg-slate-800/40 border border-white/5">
               <span className="text-[10px] font-black uppercase text-slate-500 tracking-[0.3em] flex items-center justify-center gap-3">
                 <ShieldCheck size={14} className="text-emerald-500" />
-                Protocolo encerrado
+                {status === "CONCLUIDO" ? "Protocolo encerrado" : "Visualização do chamado"}
               </span>
             </div>
           )}
@@ -354,6 +366,7 @@ export default function ChatChamado({
   return (
     <>
       <button
+        aria-label={`Abrir chat do chamado #${chamadoId}`}
         onClick={() => setAberto(true)}
         className={`cursor-pointer relative p-3 rounded-xl transition-all duration-300 group border ${
           temNotificacao

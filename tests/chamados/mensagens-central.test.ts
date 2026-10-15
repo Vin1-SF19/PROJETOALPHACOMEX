@@ -13,6 +13,12 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({
   default: {
+    usuarios: { findUnique: vi.fn(async ({ where }: { where: { id: number } }) => {
+      const session = await mocks.auth.mock.results.at(-1)?.value;
+      if (!session?.user) return null;
+      return { id: where.id, nome: session.user.nome ?? "Colaborador", role: session.user.role, status: "ATIVO" };
+    }) },
+    setor: { findMany: vi.fn().mockResolvedValue([{ id: 14, nome: "TI" }, { id: 4, nome: "Comercial" }]) },
     chamados: {
       findUnique: mocks.chamadoFindUnique,
       update: vi.fn(),
@@ -76,7 +82,7 @@ describe("mensagens de chamados na central global", () => {
     );
   });
 
-  it("notifica a equipe administrativa quando o chamado ainda não tem técnico", async () => {
+  it("notifica o setor de destino quando o chamado ainda não tem técnico", async () => {
     mocks.auth.mockResolvedValue({ user: { id: "42", role: "User", nome: "Ana" } });
     mocks.chamadoFindUnique.mockResolvedValue({
       id: 15,
@@ -87,7 +93,7 @@ describe("mensagens de chamados na central global", () => {
 
     await enviarMensagemAction(15, "Alguém pode ajudar?");
     expect(mocks.notificarMensagem).toHaveBeenCalledWith(
-      { administradores: true },
+      { setorDestinoId: undefined, setorDestinoNome: "TI", excluirUsuarioIds: [42] },
       expect.objectContaining({ chamadoId: 15 }),
     );
   });
@@ -142,4 +148,12 @@ describe("mensagens de chamados na central global", () => {
     await expect(enviarMensagemAction(15, "Mensagem persistida")).resolves.toEqual({ success: true });
     expect(mocks.notificarMensagem).toHaveBeenCalledTimes(1);
   });
+  it("autoatendimento não transforma mensagem própria em notificação de todo o setor", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "8", role: "TI", nome: "Carlos" } });
+    mocks.chamadoFindUnique.mockResolvedValue({ id: 15, titulo: "Meu acesso", usuarioId: 8, tecnicoId: 8 });
+    await expect(enviarMensagemAction(15, "Resolvido por mim")).resolves.toEqual({ success: true });
+    expect(mocks.mensagemCreate).toHaveBeenCalledOnce();
+    expect(mocks.notificarMensagem).not.toHaveBeenCalled();
+  });
+
 });

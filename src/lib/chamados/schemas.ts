@@ -44,7 +44,8 @@ const dataDesejadaOpcionalSchema = z.preprocess(
 
 export const criarChamadoSchema = z.object({
   titulo: z.string().trim().min(1, "Informe o título").max(120, "O título deve ter no máximo 120 caracteres"),
-  categoria: z.enum(["Hardware", "Software", "Rede", "Acesso", "Financeiro", "Outro"]),
+  setorDestinoId: z.coerce.number().int().positive("Selecione o setor de destino"),
+  categoriaId: z.coerce.number().int().positive("Selecione uma categoria"),
   prioridade: z.enum(["BAIXA", "MEDIA", "ALTA", "URGENTE"]),
   descricao: z.string().trim().min(1, "Informe a descrição").max(800, "A descrição deve ter no máximo 800 caracteres"),
   tecnicoSolicitadoId: idOpcionalSchema,
@@ -115,3 +116,9 @@ export const finalizarComProtocoloSchema = z.object({
 export function primeiraMensagemZod(erro: z.ZodError): string {
   return erro.issues[0]?.message ?? "Dados inválidos";
 }
+
+export const chamadoCategoriaSchema = z.object({
+  id: z.number().int().positive().optional(), setorId: z.number().int().positive(),
+  nome: z.string().trim().min(1, "Informe o nome da categoria").max(80),
+  descricao: z.string().trim().max(240).optional(), ativo: z.boolean().optional(), ordem: z.number().int().min(0).max(9999).optional(),
+});

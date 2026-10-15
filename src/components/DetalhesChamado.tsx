@@ -28,6 +28,8 @@ type ChamadoDetalhes = {
   titulo: string;
   descricao: string;
   categoria: string;
+  setorDestinoNome?: string | null;
+  setorDestino?: { nome: string } | null;
   status: string;
   prioridade: string;
   solucao: string | null;
@@ -52,7 +54,9 @@ type Template = {
 
 type Props = {
   chamado: ChamadoDetalhes;
-  isAdmin: boolean;
+  podeAssumir: boolean;
+  podeConcluir: boolean;
+  pertenceAoDestino: boolean;
   usuarioAtualId: number;
   templates?: Template[];
 };
@@ -73,20 +77,23 @@ function tempoAberto(data: Date | string): string {
   return `${d}d`;
 }
 
-export function DetalhesChamado({ chamado, isAdmin, usuarioAtualId, templates = [] }: Props) {
+export function DetalhesChamado({ chamado, podeAssumir: podeAssumirInicial, podeConcluir, pertenceAoDestino, usuarioAtualId, templates = [] }: Props) {
   const [open, setOpen] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [modalProtocolo, setModalProtocolo] = useState(false);
-  const [tecnicoId, setTecnicoId] = useState(chamado.tecnicoId ?? null);
-  const [status, setStatus] = useState(chamado.status);
+  const [assuncaoLocal, setAssuncaoLocal] = useState<{ tecnicoId: number | null; status: string } | null>(null);
+  // A resposta da assunção antecipa o refresh; os próximos estados persistidos
+  // prevalecem, principalmente após a conclusão com protocolo.
+  const assuncaoPendente = chamado.status === "ABERTO" && chamado.tecnicoId == null ? assuncaoLocal : null;
+  const tecnicoId = assuncaoPendente?.tecnicoId ?? chamado.tecnicoId ?? null;
+  const status = assuncaoPendente?.status ?? chamado.status;
 
   const handleAssumir = async () => {
     setCarregando(true);
     try {
       const res = await assumirChamado(chamado.id);
       if (res.success && res.chamado) {
-        setTecnicoId(res.chamado.tecnicoId);
-        setStatus(res.chamado.status);
+        setAssuncaoLocal({ tecnicoId: res.chamado.tecnicoId, status: res.chamado.status });
         toast.success("Chamado assumido com sucesso");
       } else {
         toast.error(res.error || "Erro ao assumir chamado");
@@ -100,8 +107,8 @@ export function DetalhesChamado({ chamado, isAdmin, usuarioAtualId, templates = 
 
   const prio = prioridadeConfig[chamado.prioridade] ?? prioridadeConfig.MEDIA;
   const origemBibble = separarOrigemBibbleDaDescricao(chamado.descricao);
-  const podeAssumir = isAdmin && status === "ABERTO" && tecnicoId == null;
-  const podeFinalizar = isAdmin && status === "EM_ATENDIMENTO" && tecnicoId === usuarioAtualId;
+  const podeAssumir = podeAssumirInicial && status === "ABERTO" && tecnicoId == null;
+  const podeFinalizar = (podeConcluir || pertenceAoDestino) && status === "EM_ATENDIMENTO" && tecnicoId === usuarioAtualId;
 
   return (
     <>
@@ -182,7 +189,7 @@ export function DetalhesChamado({ chamado, isAdmin, usuarioAtualId, templates = 
                 </div>
                 <div className="min-w-0">
                   <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-0.5">Categoria</p>
-                  <p className="break-words font-bold text-white text-sm">{chamado.categoria}</p>
+                  <p className="break-words font-bold text-white text-sm">{chamado.categoria} <span className="text-slate-500">• {chamado.setorDestinoNome ?? chamado.setorDestino?.nome ?? "TI"}</span></p>
                 </div>
               </div>
             </div>
@@ -195,7 +202,7 @@ export function DetalhesChamado({ chamado, isAdmin, usuarioAtualId, templates = 
                       <UserRoundCheck className="size-4 text-blue-400" aria-hidden="true" />
                     </div>
                     <div className="min-w-0">
-                      <p className="mb-0.5 text-[9px] font-black uppercase tracking-widest text-slate-500">Técnico solicitado</p>
+                      <p className="mb-0.5 text-[9px] font-black uppercase tracking-widest text-slate-500">Responsável desejado</p>
                       <p className="break-words text-sm font-bold text-white">{chamado.tecnicoSolicitado.nome}</p>
                       <p className="mt-0.5 text-[10px] font-medium text-slate-600">Preferência informada pelo solicitante</p>
                     </div>
@@ -249,8 +256,8 @@ export function DetalhesChamado({ chamado, isAdmin, usuarioAtualId, templates = 
               </div>
             )}
 
-            {/* Ações do admin */}
-            {isAdmin && status !== "CONCLUIDO" && (
+            {/* Ações do atendimento */}
+            {status !== "CONCLUIDO" && (
               <div className="pt-5 border-t border-white/5 space-y-2">
                 {podeAssumir ? (
                   <Button
@@ -272,7 +279,7 @@ export function DetalhesChamado({ chamado, isAdmin, usuarioAtualId, templates = 
                   </Button>
                 ) : tecnicoId != null ? (
                   <p className="rounded-xl border border-white/5 bg-white/[0.03] p-3 text-center text-xs font-medium text-slate-500">
-                    Este chamado está em atendimento por outro técnico.
+                    Este chamado está em atendimento por outro responsável.
                   </p>
                 ) : null}
               </div>

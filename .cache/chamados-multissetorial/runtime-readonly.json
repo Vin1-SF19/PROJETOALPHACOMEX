@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "timestamp": "2026-10-15T17:57:10.922Z",
+  "mode": "read-only actual Prisma/runtime modules; no mutations or notifications",
+  "setores": 13,
+  "categorias": 53,
+  "responsaveisElegiveis": 27,
+  "atoresAtivosConferidos": 29,
+  "chamadosLegados": 224,
+  "legadosSemBackfill": true,
+  "escopoConsultaVsPredicadoCoerente": true,
+  "categoriasDateTimeValidas": true
+}

@@ -1620,3 +1620,13 @@ Cobertura Vitest inclui actions e bibliotecas BPM; staging roda typecheck indepe
 
 ### 2026-10-01 — Scribe — RM-2026-AD3EA4: registrar convenção implementada
 DateTime existente representa o dia comercial em UTC midnight; escrita, filtro mensal e apresentação usam a mesma convenção. Não introduzir fallback de data do servidor no fechamento. Divergência de mes/ano da criação não comprova erro histórico: validar comprovante original antes de qualquer correção. Nenhuma nova decisão arquitetural nesta fase documental; registro da implementação inspecionada.
+
+
+### 2026-10-15 — Chamados: destino, reserva e autoatendimento
+
+Regras do usuário: qualquer ativo do destino assume; Admin/CEO/TI leem globalmente, demais leem próprios pedidos OU fila do setor; manter preferência exclusiva. Gestão de categorias exige exatamente TI/T.I, não privilégio administrativo geral. Elegibilidade vem do usuário/setor persistidos, não de props ou sessão antiga. Autoassunção é permitida pelo mesmo critério de destino; conclusão pelo próprio solicitante não cria feedback pendente para si nem autoalerta. Categorias/setores são snapshots no chamado; categorias utilizadas são arquivadas. Os 224 legados permanecem intactos, destino nulo significa TI. Backup verificado não substitui consentimento específico para aplicar migration/seed; nenhuma escrita estrutural real foi executada.
+
+
+### 2026-10-15 — Chamados: migração autorizada aplicada
+
+Usuário confirmou “sim autorizo” ao delta específico de Chamados. Aplicado uma vez o plano aprovado, com backup completo novamente restaurado/verificado antes do DDL. 53 categorias em 13 setores; 224 chamados/179 mensagens/43 feedbacks/3 templates com conteúdo anterior idêntico por SHA-256. Não houve mudança de escopo nem publicação.

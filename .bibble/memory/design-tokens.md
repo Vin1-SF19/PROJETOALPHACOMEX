@@ -1,5 +1,11 @@
 # DESIGN TOKENS — Cores, Tipografia, Espaçamento
 
+## Chamados multissetorial — correção solicitada pelo usuário, 2026-10-15
+
+O usuário rejeitou a primeira versão da prévia por alterar demais a visualização. Os estilos Central de serviços, Atelier e Operação estão DESCARTADOS. O HTML `docs/previews/chamados-multissetorial.html` foi efetivamente substituído na revisão 0.3, com cópia versionada `chamados-multissetorial-v3.html` e novos screenshots `chamados-v3-*.png`, usados como referência da implementação autorizada. Fonte visual: código real de `src/app/PainelAlpha/Chamados/page.tsx`, `src/components/FiltroChamado.tsx`, `src/app/PainelAlpha/Chamados/NovoChamado/NovoChamadoForm.tsx` e print original `/home/ialpha/projetos/image.png`. A prévia corrigida incorpora Geist/Geist Mono e CSS Tailwind compilado das classes originais, sem rede.
+
+Preservar título uppercase/italic/font-black, fundo dark, azul/púrpura e cores de status existentes, cards grandes arredondados e glass. Listagem continua `max-w-7xl`; formulário continua `max-w-2xl` com um único card e botão azul de largura inteira. Novo Select de setor reutiliza o `Select` e `inputClass` atuais (`h-12 rounded-2xl border-white/5 bg-black/40`). Categorias mantêm os cards radio descritivos e seleção púrpura; urgência mantém os quatro cards originais. Não aplicar nesta story a convergência tipográfica geral, compactar o dashboard, introduzir nova sidebar ou trocar a identidade visual. Na implementação posterior, os componentes reais foram adaptados preservando esses tokens e a identidade visual; a publicação permanece pendente.
+
 > Mantido por: Atlas (visual analyst) e Scribe (cartógrafo)
 > Fonte de verdade para Nova e qualquer agente que crie componentes visuais.
 

@@ -4,7 +4,9 @@ import { gerarFichaServer } from "@/lib/bibble/gerar-ficha-server";
 import { executarCalendarTool, isCalendarTool } from "@/lib/bibble/calendar-tools";
 import type { EventoCancelamentoPendente } from "@/lib/bibble/calendar-cancellation";
 import { notificarNovoChamado } from "@/lib/chamados/notificacoes-server";
-import { marcarDescricaoComoAbertaViaBibble } from "@/lib/chamados/origem-bibble";
+import { criarChamadoMultissetorial, ErroCriacaoChamado } from "@/lib/chamados/criacao";
+import { criarChamadoSchema } from "@/lib/chamados/schemas";
+import { obterAtorChamados, chamadoVisivelWhere } from "@/lib/chamados/acesso";
 import { isAdminRole } from "@/lib/roles";
 import {
   consultarManualModulo,
@@ -47,6 +49,8 @@ const abrirChamadoParamsSchema = z.object({
   titulo: z.string().trim().min(1).max(120),
   descricao: z.string().trim().min(1).max(800),
   prioridade: z.enum(["BAIXA", "MEDIA", "ALTA", "URGENTE"]).default("MEDIA"),
+  setor: z.string().trim().min(1).max(120).optional(),
+  categoria: z.string().trim().min(1).max(80).optional(),
   tecnico_solicitado_nome: z.string().trim().min(1).max(120).optional(),
   responsavel: z.string().trim().min(1).max(120).optional(),
 }).strict().superRefine((value, ctx) => {
@@ -78,7 +82,7 @@ function validarPayloadDerivadoDoPedido(
 ): boolean {
   if (!pedidoAutorizado?.trim()) return false;
   const pedido = normalizarNomeResponsavel(pedidoAutorizado);
-  const campos = [payload.titulo, payload.descricao, payload.tecnico_solicitado_nome ?? payload.responsavel]
+  const campos = [payload.titulo, payload.descricao, payload.setor, payload.categoria, payload.tecnico_solicitado_nome ?? payload.responsavel]
     .filter((value): value is string => Boolean(value))
     .map(normalizarNomeResponsavel);
   if (campos.some((value) => value.length < 2 || !pedido.includes(value))) return false;
@@ -188,116 +192,51 @@ async function executarToolUnsafe(
     }
 
     case "abrir_chamado": {
-      // Abrir chamado é liberado para QUALQUER usuário autenticado — igual ao
-      // fluxo manual (createChamadoAction / API AbrirChamado). A permissão
-      // "chamados" controla apenas a gestão/visualização do módulo, não o
-      // direito de registrar o próprio chamado de suporte.
       const parsed = abrirChamadoParamsSchema.safeParse(params);
       if (!parsed.success) {
-        return "FALHA_ABRIR_CHAMADO: os dados do chamado são inválidos ou excedem os limites permitidos. Nenhum chamado foi criado — confirme título, descrição, prioridade e responsável.";
+        return "FALHA_ABRIR_CHAMADO: os dados do chamado são inválidos ou excedem os limites permitidos. Nenhum chamado foi criado — confirme título, descrição, setor, categoria, prioridade e responsável.";
       }
-      const { titulo, descricao, prioridade } = parsed.data;
-      const responsavel = parsed.data.tecnico_solicitado_nome ?? parsed.data.responsavel;
       if (!validarPayloadDerivadoDoPedido(authorizedMutationText, parsed.data)) {
-        return "FALHA_ABRIR_CHAMADO: título, descrição, prioridade ou responsável não foram informados literalmente no pedido atual. Nenhum chamado foi criado — peça ao usuário os dados que faltam.";
+        return "FALHA_ABRIR_CHAMADO: título, descrição, setor, categoria, prioridade ou responsável não foram informados literalmente no pedido atual. Nenhum chamado foi criado — peça ao usuário os dados que faltam.";
       }
-
+      const { titulo, descricao, prioridade, setor: nomeSetor, categoria: nomeCategoria } = parsed.data;
+      const responsavel = parsed.data.tecnico_solicitado_nome ?? parsed.data.responsavel;
+      if (!nomeSetor) return "FALHA_ABRIR_CHAMADO: informe para qual setor deseja abrir o chamado. Nenhum chamado foi criado.";
       try {
+        const setores = await db.setor.findMany({ where: { ativo: true, isBase: false }, select: { id: true, nome: true } });
+        const destinos = setores.filter((setor) => isSameRole(setor.nome, nomeSetor));
+        if (destinos.length !== 1) return "FALHA_ABRIR_CHAMADO: o setor informado não corresponde a um único setor ativo. Confirme o nome do setor. Nenhum chamado foi criado.";
+        const setor = destinos[0];
+        const categorias = await db.chamadoCategoria.findMany({ where: { setorId: setor.id, ativo: true }, select: { id: true, nome: true } });
+        const candidatas = categorias.filter((categoria) => normalizarNomeResponsavel(categoria.nome) === normalizarNomeResponsavel(nomeCategoria ?? "Outros do setor"));
+        if (candidatas.length !== 1) return "FALHA_ABRIR_CHAMADO: informe uma categoria ativa do setor de destino. Nenhum chamado foi criado.";
         let tecnicoSolicitadoId: number | null = null;
-        let nomeResponsavelNormalizado: string | null = null;
         if (responsavel) {
-          const tecnicosAtivos = await db.usuarios.findMany({
-            where: { status: "ATIVO" },
-            select: { id: true, nome: true, role: true },
-          });
-          const nomeBuscado = normalizarNomeResponsavel(responsavel);
-          nomeResponsavelNormalizado = nomeBuscado;
-          const tecnicos = tecnicosAtivos.filter((usuario) => isSameRole(usuario.role, "TI"));
-          const exatos = tecnicos.filter((usuario) => normalizarNomeResponsavel(usuario.nome) === nomeBuscado);
-          const candidatos = exatos.length > 0
-            ? exatos
-            : tecnicos.filter((usuario) => normalizarNomeResponsavel(usuario.nome).includes(nomeBuscado));
-
-          if (candidatos.length === 0) {
-            return "FALHA_ABRIR_CHAMADO: o responsável informado não corresponde a um usuário de TI ativo. Nenhum chamado foi criado.";
-          }
-          if (candidatos.length > 1) {
-            return "FALHA_ABRIR_CHAMADO: há mais de um usuário de TI ativo com esse nome. Nenhum chamado foi criado — peça o nome completo do responsável.";
-          }
+          const usuarios = await db.usuarios.findMany({ where: { status: "ATIVO" }, select: { id: true, nome: true, role: true } });
+          const elegiveis = usuarios.filter((usuario) => isSameRole(usuario.role, setor.nome));
+          const nome = normalizarNomeResponsavel(responsavel);
+          const exatos = elegiveis.filter((usuario) => normalizarNomeResponsavel(usuario.nome) === nome);
+          const candidatos = exatos.length ? exatos : elegiveis.filter((usuario) => normalizarNomeResponsavel(usuario.nome).includes(nome));
+          if (!candidatos.length) return "FALHA_ABRIR_CHAMADO: o responsável informado não corresponde a um usuário ativo do setor de destino. Nenhum chamado foi criado.";
+          if (candidatos.length > 1) return "FALHA_ABRIR_CHAMADO: há mais de um usuário ativo do setor com esse nome. Peça o nome completo do responsável. Nenhum chamado foi criado.";
           tecnicoSolicitadoId = candidatos[0].id;
         }
-
-        const cincoMinAtras = new Date(Date.now() - 5 * 60 * 1000);
-        const transactionResult = await db.$transaction(async (tx) => {
-          const solicitanteAtivo = await tx.usuarios.findFirst({
-            where: { id: userId, status: "ATIVO" },
-            select: { id: true },
-          });
-          if (!solicitanteAtivo) return { kind: "inactive" as const };
-
-          const duplicado = await tx.chamados.findFirst({
-            where: { usuarioId: userId, titulo, createdAt: { gte: cincoMinAtras } },
-            select: { id: true },
-          });
-          if (duplicado) return { kind: "duplicate" as const, id: duplicado.id };
-
-          if (tecnicoSolicitadoId !== null && nomeResponsavelNormalizado !== null) {
-            const tecnicoAindaElegivel = await tx.usuarios.findFirst({
-              where: { id: tecnicoSolicitadoId, status: "ATIVO" },
-              select: { id: true, nome: true, role: true },
-            });
-            if (
-              !tecnicoAindaElegivel
-              || !isSameRole(tecnicoAindaElegivel.role, "TI")
-              || !normalizarNomeResponsavel(tecnicoAindaElegivel.nome).includes(nomeResponsavelNormalizado)
-            ) {
-              return { kind: "technician-unavailable" as const };
-            }
-          }
-
-          const chamado = await tx.chamados.create({
-            data: {
-              titulo,
-              descricao: marcarDescricaoComoAbertaViaBibble(descricao),
-              categoria: "Outro",
-              prioridade,
-              usuarioId: userId,
-              tecnicoSolicitadoId,
-              status: "ABERTO",
-            },
-          });
-          return { kind: "created" as const, chamado };
-        }, { isolationLevel: "Serializable" });
-
-        if (transactionResult.kind === "inactive") {
-          return "FALHA_ABRIR_CHAMADO: o usuário não está mais ativo. Nenhum chamado foi criado.";
-        }
-        if (transactionResult.kind === "duplicate") {
-          return `FALHA_ABRIR_CHAMADO: um chamado igual já havia sido registrado há poucos minutos (ID #${transactionResult.id}). Nenhum chamado novo foi criado — informe o ID existente ao usuário.`;
-        }
-        if (transactionResult.kind === "technician-unavailable") {
-          return "FALHA_ABRIR_CHAMADO: o responsável de TI deixou de estar elegível antes da criação. Nenhum chamado foi criado — confirme novamente o responsável.";
-        }
-        const { chamado } = transactionResult;
-
+        const input = criarChamadoSchema.parse({ titulo, descricao, prioridade, setorDestinoId: setor.id, categoriaId: candidatas[0].id, tecnicoSolicitadoId });
+        const chamado = await criarChamadoMultissetorial(userId, input, { origemBibble: true, responsavelNome: responsavel });
         try {
           const notificado = await notificarNovoChamado({
-            chamadoId: chamado.id,
-            titulo: chamado.titulo,
-            usuario: ctx.userName || "Usuário",
-            setor: ctx.role || "",
-            urgencia: chamado.prioridade,
-            createdAt: chamado.createdAt.toISOString(),
+            chamadoId: chamado.id, titulo: chamado.titulo, usuario: chamado.autor.nome,
+            usuarioId: chamado.autor.id, setor: chamado.autor.role, setorOrigem: chamado.autor.role,
+            setorDestinoId: chamado.setorDestinoId, setorDestinoNome: chamado.setorDestinoNome,
+            tecnicoSolicitadoId: chamado.tecnicoSolicitadoId, urgencia: chamado.prioridade, createdAt: chamado.createdAt.toISOString(),
           });
-          if (!notificado) {
-            console.warn("[BIBBLE_TOOL] notification-failed", { requestId, tool: nome });
-          }
+          if (!notificado) console.warn("[BIBBLE_TOOL] notification-failed", { requestId, tool: nome });
         } catch {
           console.warn("[BIBBLE_TOOL] notification-failed", { requestId, tool: nome });
         }
-
-        return `SUCESSO_ABRIR_CHAMADO: Chamado #${chamado.id} criado com prioridade ${prioridade}${responsavel ? ` e responsável de TI ${responsavel}` : ""}.`;
-      } catch {
+        return `SUCESSO_ABRIR_CHAMADO: Chamado #${chamado.id} criado para ${chamado.setorDestinoNome} com prioridade ${prioridade}${responsavel ? ` e responsável ${responsavel}` : ""}.`;
+      } catch (error) {
+        if (error instanceof ErroCriacaoChamado) return `FALHA_ABRIR_CHAMADO: ${error.message} Nenhum chamado foi criado.`;
         console.error("[BIBBLE_TOOL] execution-failed", { requestId, tool: nome });
         return "FALHA_ABRIR_CHAMADO: erro interno ao gravar no banco de dados. Nenhum chamado foi criado — informe ao usuário que a abertura falhou e peça para tentar novamente em instantes.";
       }
@@ -593,69 +532,33 @@ async function executarToolUnsafe(
     // ── Chamados ─────────────────────────────────────────────────────────────
 
     case "consultar_chamados": {
+      const ator = await obterAtorChamados(userId);
+      if (!ator) return "Acesso negado: colaborador não está ativo.";
       const statusFiltro = params.status ? String(params.status).toUpperCase() : undefined;
-      const limite = Math.min(Number(params.limite || 10), 20);
+      if (statusFiltro && !["ABERTO", "EM_ATENDIMENTO", "CONCLUIDO"].includes(statusFiltro)) return "Status de chamado inválido.";
+      const limiteInformado = Number(params.limite || 10);
+      const limite = Number.isFinite(limiteInformado) ? Math.max(1, Math.min(Math.floor(limiteInformado), 20)) : 10;
       const usuarioNome = params.usuario_nome ? String(params.usuario_nome).trim() : undefined;
-
-      // Admin pode filtrar por nome de usuário e ver todos
-      // Usuário comum vê apenas os seus
-      let whereUsuarioId: number | undefined = isAdmin(ctx) ? undefined : userId;
-
-      if (isAdmin(ctx) && usuarioNome) {
-        const usuario = await db.usuarios.findFirst({
-          where: { nome: { contains: usuarioNome } },
-          select: { id: true },
-        });
+      let whereUsuarioId: number | undefined;
+      if (ator.visaoGlobal && usuarioNome) {
+        const usuario = await db.usuarios.findFirst({ where: { nome: { contains: usuarioNome } }, select: { id: true } });
         if (!usuario) return `Nenhum usuário encontrado com nome "${usuarioNome}".`;
         whereUsuarioId = usuario.id;
       }
-
+      const escopo = { ...chamadoVisivelWhere(ator), ...(whereUsuarioId !== undefined ? { usuarioId: whereUsuarioId } : {}) };
       const chamados = await db.chamados.findMany({
-        where: {
-          ...(whereUsuarioId !== undefined ? { usuarioId: whereUsuarioId } : {}),
-          ...(statusFiltro ? { status: statusFiltro } : {}),
-        },
-        orderBy: { createdAt: "desc" },
-        take: limite,
-        select: {
-          id: true,
-          titulo: true,
-          status: true,
-          prioridade: true,
-          categoria: true,
-          createdAt: true,
-          solicitante: { select: { nome: true } },
-        },
+        where: { ...escopo, ...(statusFiltro ? { status: statusFiltro } : {}) },
+        orderBy: { createdAt: "desc" }, take: limite,
+        select: { id: true, titulo: true, status: true, prioridade: true, categoria: true, setorDestinoId: true, setorDestinoNome: true, createdAt: true, solicitante: { select: { nome: true } } },
       });
-
-      if (!chamados.length) {
-        const contexto = statusFiltro ? ` com status ${statusFiltro}` : "";
-        return `Nenhum chamado encontrado${contexto}.`;
-      }
-
-      // Contagem por status para resumo
-      const totalConsultados = isAdmin(ctx) ? await db.chamados.count() : undefined;
-      const abertos = isAdmin(ctx)
-        ? await db.chamados.count({ where: { status: "ABERTO" } })
-        : chamados.filter((c) => c.status === "ABERTO").length;
-
-      const lista = chamados.map((c) => ({
-        id: c.id,
-        titulo: c.titulo,
-        status: c.status,
-        prioridade: c.prioridade,
-        categoria: c.categoria,
-        solicitante: c.solicitante.nome,
-        criado_em: new Date(c.createdAt).toLocaleDateString("pt-BR"),
-      }));
-
+      if (!chamados.length) return `Nenhum chamado encontrado${statusFiltro ? ` com status ${statusFiltro}` : ""}.`;
+      const [total, abertos] = await Promise.all([
+        db.chamados.count({ where: escopo }), db.chamados.count({ where: { ...escopo, status: "ABERTO" } }),
+      ]);
       return JSON.stringify({
-        resumo: {
-          total_sistema: totalConsultados,
-          total_abertos: abertos,
-          exibindo: chamados.length,
-        },
-        chamados: lista,
+        resumo: { total_sistema: total, total_abertos: abertos, exibindo: chamados.length },
+        chamados: chamados.map((c) => ({ id: c.id, titulo: c.titulo, status: c.status, prioridade: c.prioridade, categoria: c.categoria,
+          setor_destino: c.setorDestinoNome ?? (c.setorDestinoId == null ? "TI" : null), solicitante: c.solicitante.nome, criado_em: new Date(c.createdAt).toLocaleDateString("pt-BR") })),
       });
     }
 
