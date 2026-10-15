@@ -36,6 +36,8 @@ quality_gate_tools: ["lint", "typecheck", "tests"]
 - [x] Usar a lista dinâmica de setores na matriz de Gerenciamento de Acessos do POP, preservando o estado de edição ao atualizar seu catálogo (AC: 5, 6).
 - [ ] Adicionar testes para setores dinâmicos, status ativo e permissões preservadas (AC: 6).
 - [x] Atualizar checklist e File List desta story com os arquivos efetivamente alterados.
+- [x] Corrigir o seletor Setor Destino de Upload POP para consultar setores ativos, atualizar após mudanças no cadastro e preservar Diretrizes e as pastas legadas por alias.
+- [x] Adicionar regressões da consulta e do seletor real de upload, cobrindo novos setores, remoção, carregamento, falha e permissões de leitura preservadas.
 
 ## Dev Notes
 
@@ -68,6 +70,7 @@ quality_gate_tools: ["lint", "typecheck", "tests"]
 |---|---:|---|---|
 | 2026-10-13 | 1.0 | Story criada para sincronizar setores ativos de Gestão de Equipe com o POP. | River (@sm) |
 | 2026-10-13 | 1.1 | POP passou a ler setores ativos dinamicamente e recebe atualização quando Gestão de Setores cria ou remove um setor. | Dex (@dev) |
+| 2026-10-15 | 1.2 | Corrigida a lista fixa remanescente em Upload POP; destinos consultam setores ativos e acompanham atualizações do cadastro. | Dex (@dev) |
 
 ## Dev Agent Record
 
@@ -81,10 +84,40 @@ quality_gate_tools: ["lint", "typecheck", "tests"]
 - `src/components/pop/ModalGerenciamentoAcessos.tsx`
 - `src/lib/gestao-setores-sync.ts`
 - `docs/stories/story-pop-setores-dinamicos.md`
+- `src/app/PainelAlpha/GerenciamentoArquivos/page.tsx`
+- `tests/pop/setores-upload.test.ts`
+- `tests/pop/upload-setores-react.test.ts`
 
 ### Validação
 
+- Entrega original (2026-10-13):
 - ESLint direcionado nos arquivos alterados: aprovado.
 - `npm run typecheck`: aprovado.
 - `git diff --check`: aprovado.
-- Testes não executados e não adicionados.
+- Na entrega original (2026-10-13), testes não executados e não adicionados.
+
+### Correção do Upload POP (2026-10-15)
+
+- Causa confirmada: `GerenciamentoArquivos/page.tsx` ainda usava uma constante com nove destinos; a entrega anterior atualizou apenas a consulta do POP e a matriz de acessos.
+- `getSetoresParaUploadPop` consulta apenas setores ativos após verificar a permissão de upload existente. A lista de destinos continua global para quem pode enviar; isso não altera os setores que a pessoa pode ler.
+- O select recebe os nomes cadastrados, mantém Diretrizes sem duplicação, acompanha o evento existente de atualização de setores e limpa uma seleção que saiu do catálogo.
+- Pastas predefinidas continuam disponíveis ao comparar nomes e aliases normalizados (inclusive TI/T.I).
+- Nenhuma alteração de banco, migration, seed, backfill ou mutação em massa foi executada. A consulta nova é somente leitura.
+- Testes direcionados: `npx vitest run tests/pop` — 2 arquivos e 7 testes aprovados, incluindo o componente React real.
+- `npm run lint`: aprovado, sem erros; 1.193 avisos no repositório. ESLint direcionado dos arquivos desta correção: aprovado sem avisos.
+- `npm run typecheck`: aprovado após o build. A primeira tentativa coincidiu com a regeneração de `.next/types` e foi descartada.
+- `npm run build`: aprovado; avisos em `bibble/pdfjs-polyfill.ts`, pré-carregamento de pdfjs e cache webpack durante a compilação.
+- `npm test`: 624 arquivos aprovados e 4 com falhas; 4.648 testes aprovados, 6 falhas, 4 ignorados e 1 TODO. Falhas fora do POP em `tests/bpm/em-tratativa.test.ts`, `tests/bpm/card-modal-integration.test.ts` e `tests/builder/embed.test.ts`; `tests/bpm/arquivamento-modal-react.test.ts` não carregou por resolução de `next/server`. Os dois arquivos novos do POP passaram também nesta execução completa.
+- `git diff --check`: aprovado.
+- CodeRabbit indisponível: executável ausente em `PATH` e em `/home/ialpha/.local/bin/coderabbit`.
+- Permanece pendente a cobertura específica da preservação de edições abertas na matriz de Gerenciamento de Acessos da entrega original.
+
+### Checklist da correção de upload
+
+- [x] Requisito atendido no código e integração real do seletor exercitada por teste React.
+- [x] Novos setores, atualização do cadastro, seleção removida, aliases e falhas de carregamento verificados.
+- [x] Sem dependências novas e sem mudança na autorização de leitura ou no banco.
+- [x] Lint, typecheck e build concluídos; File List e Change Log atualizados.
+- [ ] Suíte global inteiramente verde: falhas fora do escopo do POP descritas acima.
+- [ ] Revisão CodeRabbit: CLI indisponível neste ambiente.
+- [ ] Smoke visual em navegador/produção: não executado; alteração local ainda não publicada.

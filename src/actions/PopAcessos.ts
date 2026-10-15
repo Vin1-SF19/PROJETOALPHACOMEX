@@ -103,6 +103,29 @@ export async function getAcessosDoUsuario(): Promise<{
   return { success: true, setoresAcessiveis, setoresDisponiveis, podeUpload, podeGerenciar, ehAdminUser: false };
 }
 
+// O upload mantém destinos globais; permissão de envio não concede leitura.
+export async function getSetoresParaUploadPop(): Promise<{
+  success: boolean;
+  setores: string[];
+  error?: string;
+}> {
+  const acessos = await getAcessosDoUsuario();
+  if (!acessos.success || !acessos.podeUpload) {
+    return { success: false, setores: [], error: "Sem permissão para upload de POP" };
+  }
+
+  const setores = await db.setor.findMany({
+    where: { ativo: true },
+    orderBy: [{ protegido: "desc" }, { nome: "asc" }],
+    select: { nome: true },
+  });
+
+  return {
+    success: true,
+    setores: ["Diretrizes", ...setores.map(({ nome }) => nome).filter((nome) => !isSameRole(nome, "Diretrizes"))],
+  };
+}
+
 // ─── getMatrizAcessos ──────────────────────────────────────────────────────────
 // Admin only. Retorna todos usuários + seus acessos extras.
 

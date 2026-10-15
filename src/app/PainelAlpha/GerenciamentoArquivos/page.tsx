@@ -3,6 +3,9 @@
 import React, { useState, useEffect } from "react";
 import { UploadCloud, FileCheck, Loader2, ShieldCheck, ChevronLeft, FolderPlus, Edit3, History, FileText, Video } from "lucide-react";
 import { uploadDocumento } from "@/actions/UploadDocs";
+import { getSetoresParaUploadPop } from "@/actions/PopAcessos";
+import { assinarAtualizacaoSetores } from "@/lib/gestao-setores-sync";
+import { normalizeRole } from "@/lib/roles";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react"
@@ -10,8 +13,6 @@ import { Switch } from "@/components/ui/switch";
 import { upload } from '@vercel/blob/client';
 
 type DocumentoPasta = { setor?: string; PastaArquivos?: string; tipo?: string };
-
-const SETORES = ["Diretrizes", "T.I", "OPERACIONAL", "COMERCIAL", "RECURSOS HUMANOS", "FINANCEIRO", "JURÍDICO", "PARCEIRO", "SERVIÇOS GERAIS"];
 
 const PASTAS_ESTATICAS: Record<string, string[]> = {
   "Diretrizes": ["MANUAIS", "POLÍTICAS", "CÓDIGO DE CONDUTA"],
@@ -35,9 +36,40 @@ export default function AdminUploadDocs() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [comProtecao, setComProtecao] = useState(true);
   const [midiaTipo, setMidiaTipo] = useState<"PDF" | "VIDEO">("PDF");
+  const [setores, setSetores] = useState<string[]>([]);
+  const [carregandoSetores, setCarregandoSetores] = useState(true);
 
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    let ativo = true;
+    let ultimaConsulta = 0;
+
+    async function carregarSetores() {
+      const consulta = ++ultimaConsulta;
+      setCarregandoSetores(true);
+      try {
+        const res = await getSetoresParaUploadPop();
+        if (!ativo || consulta !== ultimaConsulta) return;
+        if (!res.success) throw new Error(res.error);
+        setSetores(res.setores);
+        setSetorSelecionado((atual) => res.setores.includes(atual) ? atual : "");
+      } catch {
+        if (!ativo || consulta !== ultimaConsulta) return;
+        setSetores([]);
+        setSetorSelecionado("");
+        toast.error("Não foi possível carregar os setores. Reabra o Upload POP para tentar novamente.");
+      } finally {
+        if (ativo && consulta === ultimaConsulta) setCarregandoSetores(false);
+      }
+    }
+
+    void carregarSetores();
+    const cancelar = assinarAtualizacaoSetores(() => { void carregarSetores(); });
+    return () => { ativo = false; cancelar(); };
+  }, [status]);
 
   useEffect(() => {
     async function carregarPastas() {
@@ -61,7 +93,7 @@ export default function AdminUploadDocs() {
   }, [setorSelecionado]);
 
   const todasAsPastas = Array.from(new Set([
-    ...(PASTAS_ESTATICAS[setorSelecionado] || []),
+    ...(Object.entries(PASTAS_ESTATICAS).find(([setor]) => normalizeRole(setor) === normalizeRole(setorSelecionado))?.[1] || []),
     ...pastasDoBanco
   ])).sort();
 
@@ -70,7 +102,7 @@ export default function AdminUploadDocs() {
 
   async function handleUpload(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!file || !setorSelecionado || !valorFinalTipo) {
+    if (carregandoSetores || !setores.includes(setorSelecionado) || !file || !valorFinalTipo) {
       return toast.error("Por favor, preencha todos os campos!", {
         style: { background: '#020617', color: '#ef4444', border: '1px solid #ef444450', fontWeight: '900', fontSize: '10px', textTransform: 'uppercase' }
       });
@@ -173,16 +205,18 @@ export default function AdminUploadDocs() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-blue-400 ml-1">Setor Destino</label>
+                <label htmlFor="setor-destino" className="text-[10px] font-black uppercase tracking-widest text-blue-400 ml-1">Setor Destino</label>
                 <select
+                  id="setor-destino"
                   name="setor"
                   required
+                  disabled={carregandoSetores || setores.length === 0}
                   value={setorSelecionado}
                   onChange={(e) => { setSetorSelecionado(e.target.value); setTipoSelecionado(""); }}
                   className="w-full bg-black/40 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold uppercase tracking-widest outline-none appearance-none cursor-pointer"
                 >
-                  <option value="" className="bg-slate-950 text-slate-500">SELECIONE O SETOR...</option>
-                  {SETORES.map(s => <option key={s} value={s} className="bg-slate-950">{s}</option>)}
+                  <option value="" className="bg-slate-950 text-slate-500">{carregandoSetores ? "CARREGANDO SETORES..." : "SELECIONE O SETOR..."}</option>
+                  {setores.map(s => <option key={s} value={s} className="bg-slate-950">{s}</option>)}
                 </select>
               </div>
             </div>
