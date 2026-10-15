@@ -193,6 +193,8 @@ export function CalendarioAlphaDashboard({ temaName, statusConexao, conexaoId, c
         visao={agenda.visaoAtual}
         dataReferencia={agenda.dataReferencia}
         status={status}
+        isAdmin={isAdmin}
+        onGerenciarPermissoes={agenda.abrirPermissoes}
         onMudarVisao={(novaVisao) => agenda.navegarPara(novaVisao, agenda.dataReferencia)}
         onHoje={() => agenda.navegarPara(agenda.visaoAtual, new Date())}
         onAnterior={() => agenda.navegarPara(
@@ -215,14 +217,12 @@ export function CalendarioAlphaDashboard({ temaName, statusConexao, conexaoId, c
           dataReferencia={agenda.dataReferencia}
           calendarios={calendarios}
           colegas={agenda.compartilhadas.colegas}
-          isAdmin={isAdmin}
           mobileOpen={agenda.sidebarMobileAberta}
           onMobileOpenChange={agenda.setSidebarMobileAberta}
           onCriar={() => agenda.abrirNovoEvento()}
           onSelecionarDia={(data) => agenda.navegarPara("dia", data)}
           onGerenciarCalendarios={agenda.abrirConfiguracoes}
           onGerenciarColegas={agenda.abrirColegas}
-          onGerenciarPermissoes={agenda.abrirPermissoes}
           onAlternarCalendario={agenda.alternarCalendario}
           onAlternarColega={agenda.alternarColega}
         />

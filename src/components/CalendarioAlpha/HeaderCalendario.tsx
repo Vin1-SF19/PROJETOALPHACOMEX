@@ -10,6 +10,7 @@ import {
   CircleHelp,
   Grid3x3,
   Menu,
+  ShieldCheck,
   Settings2,
 } from "lucide-react";
 
@@ -29,12 +30,14 @@ interface HeaderCalendarioProps {
   visao: VisaoCalendario;
   dataReferencia: Date;
   status: ReactNode;
+  isAdmin: boolean;
   onMudarVisao: (visao: VisaoCalendario) => void;
   onHoje: () => void;
   onAnterior: () => void;
   onProximo: () => void;
   onNovoEvento: () => void;
   onAbrirSidebar: () => void;
+  onGerenciarPermissoes: () => void;
   onAbrirConfiguracoes: () => void;
   onAbrirTutorial: () => void;
 }
@@ -80,12 +83,14 @@ export function HeaderCalendario({
   visao,
   dataReferencia,
   status,
+  isAdmin,
   onMudarVisao,
   onHoje,
   onAnterior,
   onProximo,
   onNovoEvento,
   onAbrirSidebar,
+  onGerenciarPermissoes,
   onAbrirConfiguracoes,
   onAbrirTutorial,
 }: HeaderCalendarioProps) {
@@ -192,6 +197,19 @@ export function HeaderCalendario({
             </button>
           ))}
         </div>
+
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={onGerenciarPermissoes}
+            data-guia-agenda="permissoes"
+            aria-label="Gerenciar permissões"
+            title="Permissões"
+            className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.025] px-2.5 text-[10px] font-black uppercase tracking-wide text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 lg:min-h-9"
+          >
+            <ShieldCheck className="size-3.5" /> Permissões
+          </button>
+        )}
       </div>
     </header>
   );

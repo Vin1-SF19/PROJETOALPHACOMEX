@@ -8,7 +8,6 @@ import {
   ChevronRight,
   Plus,
   Settings2,
-  ShieldCheck,
   Users,
 } from "lucide-react";
 
@@ -32,14 +31,12 @@ interface AgendaSidebarProps {
   dataReferencia: Date;
   calendarios: CalendarioSelecionadoView[];
   colegas: ColegaAgendaSidebar[];
-  isAdmin: boolean;
   mobileOpen: boolean;
   onMobileOpenChange: (open: boolean) => void;
   onCriar: () => void;
   onSelecionarDia: (data: Date) => void;
   onGerenciarCalendarios: () => void;
   onGerenciarColegas: () => void;
-  onGerenciarPermissoes: () => void;
   onAlternarCalendario: (calendario: CalendarioSelecionadoView) => void;
   onAlternarColega: (colegaId: number, visivel: boolean) => void;
 }
@@ -95,13 +92,11 @@ function AgendaSidebarContent({
   dataReferencia,
   calendarios,
   colegas,
-  isAdmin,
   recolhida,
   onCriar,
   onSelecionarDia,
   onGerenciarCalendarios,
   onGerenciarColegas,
-  onGerenciarPermissoes,
   onAlternarCalendario,
   onAlternarColega,
 }: Omit<AgendaSidebarProps, "mobileOpen" | "onMobileOpenChange"> & { recolhida: boolean }) {
