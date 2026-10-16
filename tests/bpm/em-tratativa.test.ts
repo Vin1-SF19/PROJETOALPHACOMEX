@@ -23,12 +23,12 @@ const CUID_ETAPA = "clz223456789012345678901";
 const CUID_CAMPO = "clz323456789012345678901";
 
 describe("etapaExigeProximoContato", () => {
-  it("normaliza nomes e reconhece somente as etapas declaradas pelo dominio", () => {
-    expect(etapaExigeProximoContato("  EM TRATATIVA ")).toBe(true);
+  it("normaliza Sem viabilidade sem reintroduzir a exigência removida de Em tratativas", () => {
+    expect(etapaExigeProximoContato("  EM TRATATIVA ")).toBe(false);
     expect(etapaExigeProximoContato(" sem   viabilidade ")).toBe(true);
     expect(etapaExigeProximoContato("SÉM VIABILIDADE")).toBe(true);
     expect(etapaExigeProximoContato("Fechado")).toBe(false);
-    expect(etapaExigeProximoContato("Em tratativas")).toBe(true);
+    expect(etapaExigeProximoContato("Em tratativas")).toBe(false);
     expect(etapaEhEmTratativa("Em tratativas")).toBe(true);
     expect(destinoPermitidoEmTratativa("Fechado")).toBe(true);
     expect(destinoPermitidoEmTratativa("Novo Lead")).toBe(false);
@@ -37,10 +37,22 @@ describe("etapaExigeProximoContato", () => {
 });
 
 describe("Próximo Contato e movimento em Em Tratativa", () => {
-  it("normaliza o nome da etapa e exige Próximo Contato na entrada", () => {
+  it("exige Próximo Contato válido em Sem viabilidade e mantém Em tratativas sem esse guard", () => {
     expect(obterErroProximoContatoParaEntrada({
       etapaDestinoNome: "  EM TRATATIVA ",
       proximoContatoEm: null,
+    })).toBeNull();
+    expect(obterErroProximoContatoParaEntrada({
+      etapaDestinoNome: "Em tratativas",
+      proximoContatoEm: null,
+    })).toBeNull();
+    expect(obterErroProximoContatoParaEntrada({
+      etapaDestinoNome: " sem   viabilidade ",
+      proximoContatoEm: null,
+    })).toContain("Próximo Contato");
+    expect(obterErroProximoContatoParaEntrada({
+      etapaDestinoNome: "Sem viabilidade",
+      proximoContatoEm: "data inválida",
     })).toContain("Próximo Contato");
     expect(obterErroProximoContatoParaEntrada({
       etapaDestinoNome: "Sem viabilidade",

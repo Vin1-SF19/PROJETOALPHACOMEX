@@ -16,6 +16,7 @@ vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa", () => ({ defa
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/TelefonesCardButton", () => ({ TelefonesCardButton: () => null }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/SeletorMembrosCard", () => ({ SeletorMembrosCard: () => null }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/PainelSlaCard", () => ({ PainelSlaCard: () => null }));
+vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/ChatClienteCard", () => ({ ChatClienteCard: () => null }));
 Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
 const container = document.createElement("div");
 let root: ReturnType<typeof createRoot>;

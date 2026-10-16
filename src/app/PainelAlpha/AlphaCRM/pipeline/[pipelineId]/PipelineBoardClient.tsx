@@ -25,7 +25,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import { Loader2, AlertTriangle, Bot, Building2, CalendarClock, ClipboardList, Paperclip, Plus, RefreshCw, StickyNote, Users, Video } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MoverCardBpm, CriarCardBpm, ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
+import { MoverCardBpm, ObterRequisitosTransicaoBpm, CriarCardBpm, ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
 import { PromoverNolossLead } from "@/actions/bpm/NolossLeads";
 import {
   BPM_PIPELINE_EVENT,
@@ -38,6 +38,7 @@ import NovoCardModal from "./NovoCardModal";
 import AtribuirResponsavelPromocaoModal from "./AtribuirResponsavelPromocaoModal";
 import CardFullViewModal from "../../CardModal/CardFullViewModal";
 import { AtribuirLeadAgendarModal } from "../../CardModal/AtribuirLeadAgendarModal";
+import { ConfirmarMovimentoRdModal, type MovimentoRdPendente } from "../../CardModal/ConfirmarMovimentoRdModal";
 import NolossLeadModal from "./NolossLeadModal";
 import { GrupoAvataresMembrosCard, type MembroCard } from "../../CardModal/SeletorMembrosCard";
 import { obterStatusPosFechamentoVisivel } from "@/lib/bpm/status-pos-fechamento";
@@ -112,6 +113,7 @@ function opcoesRadarPretendido(pipeline: PipelineBpm): string[] {
 
 export interface CardBpm {
   id: string;
+  importadoRd?: boolean;
   etapaId: string;
   servico: string | null;
   origemExterna?: { sourcePipelineName: string; sourceStageName: string; sourceDealName: string } | null;
@@ -819,6 +821,9 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
   const [atribuicaoAgendarPendente, setAtribuicaoAgendarPendente] = useState<{ cardId: string; etapaDestinoId: string } | null>(null);
   const [cardMovendoId, setCardMovendoId] = useState<string | null>(null);
   const [movimentoPendente, setMovimentoPendente] = useState(false);
+  const [movimentoRdPendente, setMovimentoRdPendente] = useState<(MovimentoRdPendente & { snapshot: SnapshotArrasto }) | null>(null);
+  const [confirmandoMovimentoRd, setConfirmandoMovimentoRd] = useState(false);
+  const confirmandoMovimentoRdRef = useRef(false);
   const [atualizandoManual, setAtualizandoManual] = useState(false);
   const [realtimeRevision, setRealtimeRevision] = useState(0);
   const ultimaRequisicaoRef = useRef(0);
@@ -1076,7 +1081,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
     const activeCard = snapshot.cards.find((c) => c.id === active.id);
     const origem = etapasOrdenadas.find((etapa) => etapa.id === activeCard?.etapaId);
     const destino = etapasOrdenadas.find((etapa) => etapa.id === over?.id);
-    if (!activeCard || !origem || !destino || !origem.transicoesEtapaOrigem?.some((transicao) => transicao.etapaDestinoId === destino.id)) {
+    if (!activeCard || !origem || !destino || origem.id === destino.id || (!activeCard.importadoRd && !origem.transicoesEtapaOrigem?.some((transicao) => transicao.etapaDestinoId === destino.id))) {
       snapshotArrastoRef.current = null;
       if (sincronizacaoRealtimePendenteRef.current) {
         sincronizacaoRealtimePendenteRef.current = false;
@@ -1096,7 +1101,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
       return;
     }
 
-    if (pipeline.nome === "Revisão de Radar" && etapaEhNovosLeads(origem.nome) && etapaEhAgendarReuniao(destino.nome)) {
+    if (!activeCard.importadoRd && pipeline.nome === "Revisão de Radar" && etapaEhNovosLeads(origem.nome) && etapaEhAgendarReuniao(destino.nome)) {
       snapshotArrastoRef.current = null;
       setAtribuicaoAgendarPendente({ cardId: activeCard.id, etapaDestinoId: destino.id });
       return;
@@ -1105,15 +1110,29 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
     movimentoPendenteRef.current = true;
     setMovimentoPendente(true);
     setCardMovendoId(activeCard.id);
-    setCards((prev) => moverCardOtimistaNoBoard(prev, activeCard.id, destino.id));
+    // Importados permanecem na origem até a confirmação efetiva do servidor.
+    if (!activeCard.importadoRd) setCards((prev) => moverCardOtimistaNoBoard(prev, activeCard.id, destino.id));
     let mensagemErro: string | null = null;
+    let aguardandoConfirmacaoRd = false;
+    const idempotencyKey = activeCard.importadoRd ? crypto.randomUUID() : undefined;
     try {
-      const resultado = await MoverCardBpm({ cardId: activeCard.id, etapaDestinoId: destino.id });
+      const resultado = await MoverCardBpm({ cardId: activeCard.id, etapaDestinoId: destino.id,
+        ...(idempotencyKey ? { idempotencyKey, etapaOrigemEsperadaId: origem.id } : {}) });
+      if (!resultado.success && "code" in resultado && resultado.code === "RD_MOVE_CONFIRMATION_REQUIRED"
+        && "confirmacao" in resultado && resultado.confirmacao && "avisos" in resultado && resultado.avisos && idempotencyKey) {
+        setCards(restaurarSnapshotBoard(snapshot.cards));
+        setCardMovendoId(null);
+        setMovimentoRdPendente({ cardId: activeCard.id, etapaDestinoId: destino.id, etapaDestinoNome: destino.nome,
+          idempotencyKey, confirmacao: resultado.confirmacao, avisos: resultado.avisos, snapshot });
+        aguardandoConfirmacaoRd = true;
+        return;
+      }
+      if (resultado.success && activeCard.importadoRd) setCards((prev) => moverCardOtimistaNoBoard(prev, activeCard.id, destino.id));
       if (!resultado.success) mensagemErro = typeof resultado.error === "string" ? resultado.error : "Não foi possível mover o card";
     } catch {
       mensagemErro = "Não foi possível mover o card";
     } finally {
-      if (snapshotArrastoRef.current !== snapshot) return;
+      if (snapshotArrastoRef.current !== snapshot || aguardandoConfirmacaoRd) return;
       if (mensagemErro) {
         setCards(restaurarSnapshotBoard(snapshot.cards));
         setErro(mensagemErro);
@@ -1129,7 +1148,58 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
     }
   }
 
+  function encerrarMovimentoRd(intencao: MovimentoRdPendente & { snapshot: SnapshotArrasto }, mensagemErro: string | null, movido = false) {
+    if (snapshotArrastoRef.current !== intencao.snapshot) return;
+    setCards(movido ? moverCardOtimistaNoBoard(intencao.snapshot.cards, intencao.cardId, intencao.etapaDestinoId)
+      : restaurarSnapshotBoard(intencao.snapshot.cards));
+    setErro(mensagemErro);
+    setMovimentoRdPendente(null);
+    snapshotArrastoRef.current = null;
+    movimentoPendenteRef.current = false;
+    setMovimentoPendente(false);
+    setCardMovendoId(null);
+    const precisaReconciliar = movido || Boolean(mensagemErro) || sincronizacaoRealtimePendenteRef.current;
+    sincronizacaoRealtimePendenteRef.current = false;
+    if (precisaReconciliar) void recarregarCards({ generation: intencao.snapshot.generation, forcar: true, preservarErro: Boolean(mensagemErro) });
+  }
+
+  async function confirmarMovimentoRd() {
+    if (!movimentoRdPendente || confirmandoMovimentoRdRef.current) return;
+    const intencao = movimentoRdPendente;
+    confirmandoMovimentoRdRef.current = true;
+    setConfirmandoMovimentoRd(true);
+    try {
+      const resultado = await MoverCardBpm({ cardId: intencao.cardId, etapaDestinoId: intencao.etapaDestinoId,
+        idempotencyKey: intencao.idempotencyKey, confirmacaoPendenciasRd: intencao.confirmacao,
+        etapaOrigemEsperadaId: intencao.confirmacao.etapaOrigemEsperadaId, versaoEsperada: intencao.confirmacao.versaoEsperada });
+      if (!resultado.success && "code" in resultado && resultado.code === "RD_MOVE_CONFIRMATION_REQUIRED"
+        && "confirmacao" in resultado && resultado.confirmacao && "avisos" in resultado && resultado.avisos) {
+        setMovimentoRdPendente({ ...intencao, confirmacao: resultado.confirmacao, avisos: resultado.avisos });
+        return;
+      }
+      if (!resultado.success) {
+        const mensagemErro = typeof resultado.error === "string" ? resultado.error : "Não foi possível mover o card";
+        setErro(mensagemErro);
+        // Nunca reaplica automaticamente uma intenção que ficou obsoleta.
+        const previa = await ObterRequisitosTransicaoBpm(intencao.cardId, intencao.etapaDestinoId);
+        if (previa.success && previa.data?.podeMoverComConfirmacao && previa.data.confirmacao && previa.data.avisos?.length) {
+          setMovimentoRdPendente({ ...intencao, confirmacao: previa.data.confirmacao, avisos: previa.data.avisos });
+          return;
+        }
+        encerrarMovimentoRd(intencao, mensagemErro);
+        return;
+      }
+      encerrarMovimentoRd(intencao, null, true);
+    } catch {
+      setErro("Não foi possível mover o card. Tente novamente.");
+    } finally {
+      confirmandoMovimentoRdRef.current = false;
+      setConfirmandoMovimentoRd(false);
+    }
+  }
+
   function onDragCancel() {
+    if (movimentoPendenteRef.current) return;
     setActiveId(null);
     snapshotArrastoRef.current = null;
     if (sincronizacaoRealtimePendenteRef.current) {
@@ -1288,6 +1358,10 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
         />
       )}
 
+      <ConfirmarMovimentoRdModal open={Boolean(movimentoRdPendente)} etapaDestinoNome={movimentoRdPendente?.etapaDestinoNome ?? ""}
+        avisos={movimentoRdPendente?.avisos ?? []} processando={confirmandoMovimentoRd}
+        onCancelar={() => { if (movimentoRdPendente) encerrarMovimentoRd(movimentoRdPendente, null); }}
+        onConfirmar={() => void confirmarMovimentoRd()} />
       <AtribuirLeadAgendarModal
         pipelineId={pipeline.id}
         currentUserId={currentUserId}

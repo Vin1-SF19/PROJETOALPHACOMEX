@@ -53,4 +53,22 @@ describe("disponibilidade das etapas do card", () => {
       { etapaId: "sem-saida", oculta: true, pendencias: [] },
     ]);
   });
+
+  it("RD pode consultar destino sem aresta e distingue falta confirmável de bloqueio", async () => {
+    mocks.card.mockResolvedValue({ etapaId: "origem", origemExterna: { provider: "RD_STATION_CRM_V1" },
+      etapa: { transicoesEtapaOrigem: [] } });
+    mocks.avaliar.mockImplementation(async (input: { etapaDestinoId: string }) => input.etapaDestinoId === "negada"
+      ? { success: false, code: "TRANSITION_DISABLED", error: "Negada pelo administrador" }
+      : input.etapaDestinoId === "aviso"
+        ? { success: false, code: "RD_MOVE_CONFIRMATION_REQUIRED", pendencias: ["Documento X"] }
+        : { success: true });
+    const result = await ObterDisponibilidadeEtapasCardBpm("card", ["origem", "livre", "aviso", "negada"]);
+    expect(result).toMatchObject({ success: true, data: [
+      { etapaId: "livre", oculta: false, pendencias: [], podeConfirmarPendenciasRd: false },
+      { etapaId: "aviso", oculta: false, pendencias: ["Documento X"], podeConfirmarPendenciasRd: true },
+      { etapaId: "negada", oculta: true, pendencias: [] },
+    ] });
+    expect(mocks.requisitos).not.toHaveBeenCalled();
+    expect(mocks.avaliar).toHaveBeenCalledTimes(3);
+  });
 });
