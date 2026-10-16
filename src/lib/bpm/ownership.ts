@@ -1,5 +1,4 @@
 import db from "@/lib/prisma";
-import { carregarEscopoLeituraBpm } from "@/lib/bpm/visao-equipe-server";
 
 import { isAdminRole, isSameRole } from "@/lib/roles";
 import {
@@ -117,9 +116,9 @@ export type UsuarioVinculavelBpm = {
  * reaplicada durante a mutação, para que um payload antigo nunca consiga
  * vincular uma conta desativada ou sem a permissão CRM.
  */
-export async function listarUsuariosVinculaveisBpm(
-  client: ClienteAcessoBpm = db,
-): Promise<UsuarioVinculavelBpm[]> {
+export async function listarUsuariosComAcessoCrmBpm(
+  client: Pick<ClienteAcessoBpm, "usuarios" | "setorPermissao" | "usuarioPermissaoOverride"> = db,
+): Promise<(UsuarioVinculavelBpm & { role: string })[]> {
   const [usuarios, permissoesSetorTodas] = await Promise.all([
     client.usuarios.findMany({
       where: { status: "ATIVO" },
@@ -156,6 +155,14 @@ export async function listarUsuariosVinculaveisBpm(
         overridesPorUsuario.get(usuario.id) ?? [],
       ),
     ))
+    .map(({ id, nome, imagemUrl, role }) => ({ id, nome, imagemUrl, role }));
+}
+
+/** Mantém o contrato público da seleção de pessoas vinculáveis ao card. */
+export async function listarUsuariosVinculaveisBpm(
+  client: ClienteAcessoBpm = db,
+): Promise<UsuarioVinculavelBpm[]> {
+  return (await listarUsuariosComAcessoCrmBpm(client))
     .map(({ id, nome, imagemUrl }) => ({ id, nome, imagemUrl }));
 }
 
@@ -428,12 +435,11 @@ export async function checarAcessoBpmCard(
   const membro = membroExistente?.role === "ADMINISTRADOR" ? membroExistente
     : card.responsavelId === userId ? { role: "RESPONSAVEL" } : membroExistente;
 
+  // O acesso ao pipeline e à coluna já foi verificado. Consultar colegas não
+  // cria vínculo nem concede trabalho no card, mesmo quando a coluna permite agir.
   if (!membro && apenasVisualizacao) {
-    const escopo = await carregarEscopoLeituraBpm(userId, false, card.pipelineId, card.pipeline.visualizacaoConfigJson ?? null, client);
-    if (escopo.usuarioIds.length) {
-      const permitido = await client.bpmCard.findFirst({ where: { id: cardId, ...escopo.where }, select: { id: true } });
-      if (permitido) return { autorizado: true, isAdminGlobal: false, role: "VISUALIZADOR", perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false, bloqueadoPorEncaminhamento };
-    }
+    return { autorizado: true, isAdminGlobal: false, role: "VISUALIZADOR",
+      perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false, bloqueadoPorEncaminhamento };
   }
 
   if (!membro) {

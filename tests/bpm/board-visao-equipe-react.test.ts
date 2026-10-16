@@ -82,77 +82,120 @@ vi.mock("@/components/ui/select", () => ({
   SelectItem: ({ value, children }: { value: string; children: React.ReactNode }) => h("option", { value }, children),
 }));
 
-it("abre em meus leads e permite alternar equipe/setor sem mostrar responsáveis fora da visão", async () => {
+const colega = { ...card, id: "colega", empresa: { ...card.empresa, razaoSocial: "Empresa da colega" }, responsavel: { id: 9, nome: "Ana Operacional" }, podeAgirEtapa: false };
+const historico = { ...card, id: "historico", empresa: { ...card.empresa, razaoSocial: "Responsável histórico" }, responsavel: { id: 77, nome: "Pessoa de outro setor" }, podeAgirEtapa: false };
+const pessoas = [{ id: 7, nome: "Usuária sem cards" }, card.responsavel, colega.responsavel];
+function manifestoBoard(admin = false) {
+  return {
+    configVersion: 1,
+    acesso: { userId: 1, admin, setores: [{ id: 3, nome: "Operacional", usuarioIds: [1, 7, 9] }], responsaveis: pessoas },
+    entradas: [card, colega, historico].map((c) => ({ id: c.id, etapaId: c.etapaId, revision: "1", nome: c.empresa.razaoSocial, cnpj: null, servico: null, responsaveis: [c.responsavel] })),
+  };
+}
+async function selecionar(container: HTMLElement, valor: string) {
+  await act(async () => { const select = container.querySelector("select")!; select.value = valor; select.dispatchEvent(new Event("change", { bubbles: true })); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+}
+async function atualizar(container: HTMLElement) {
+  await act(async () => { container.querySelector<HTMLButtonElement>('[aria-label="Atualizar pipeline"]')!.click(); });
+}
+const cardColega = '[aria-label="Abrir card de Empresa da colega"]';
+
+it.each(["TI", "OPERACIONAL"])("%s usa a mesma lista setorial, inclui pessoa sem cards e consulta pessoa/Todos", async (role) => {
   Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true }); vi.useFakeTimers();
   const { container, root, props } = montarBoard();
-  const equipe = { ...card, id: "equipe", empresa: { ...card.empresa, razaoSocial: "Empresa da equipe" }, responsavel: { id: 9, nome: "Pessoa Comercial" }, podeAgirEtapa: false };
-  const manifesto = { configVersion: 1, acesso: { userId: 1, admin: false, setores: [{ id: 3, nome: "Comercial", usuarioIds: [9] }] }, entradas: [card, equipe].map((c) => ({ id: c.id, etapaId: c.etapaId, revision: "1", nome: c.empresa.razaoSocial, cnpj: null, servico: null, responsaveis: [c.responsavel] })) };
-  props.manifestoInicial = manifesto;
-  vi.mocked(SincronizarQuadroBpm).mockResolvedValue({ success: true, manifesto, cards: [equipe], ids: [equipe.id] } as never);
+  const manifesto = manifestoBoard(role === "TI");
+  props.currentUserRole = role; props.manifestoInicial = manifesto;
+  vi.mocked(SincronizarQuadroBpm).mockResolvedValue({ success: true, manifesto, cards: [card, colega, historico], ids: [card.id, colega.id, historico.id] } as never);
   try {
     await act(async () => root.render(h(PipelineBoardClient, props)));
     const select = container.querySelector("select")!;
-    expect(select.value).toBe("MEUS");
     expect(container.querySelectorAll("select")).toHaveLength(1);
-    expect([...select.options].map((o) => o.value)).toEqual(["MEUS", "todos", "SETOR:3", "9", "1"]);
-    expect(container.querySelector('[aria-label="Abrir card de Empresa da equipe"]')).toBeNull();
-    expect(select.textContent).toContain("Pessoa Comercial");
-    await act(async () => { select.value = "todos"; select.dispatchEvent(new Event("change", { bubbles: true })); });
-    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
-    expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ visao: "EQUIPE", setorId: null }));
-    expect(container.querySelector('[aria-label="Abrir card de Empresa da equipe"]')).not.toBeNull();
-    expect(select.textContent).toContain("Pessoa Comercial");
-    await act(async () => { select.value = "9"; select.dispatchEvent(new Event("change", { bubbles: true })); });
-    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
-    expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ visao: "EQUIPE", responsavelId: 9 }));
-    await act(async () => { select.value = "SETOR:3"; select.dispatchEvent(new Event("change", { bubbles: true })); });
-    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
-    expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ visao: "SETOR", setorId: 3, responsavelId: null }));
-    vi.mocked(SincronizarQuadroBpm).mockResolvedValueOnce({ success: false, acessoNegado: false, visaoRevogada: true, error: "Revogado" });
-    vi.mocked(SincronizarQuadroBpm).mockResolvedValue({ success: true, manifesto: { ...manifesto, acesso: { ...manifesto.acesso, setores: [] }, entradas: manifesto.entradas.slice(0, 1) }, cards: [card], ids: [card.id] } as never);
-    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
-    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
-    expect(container.querySelector("select")?.value).toBe("MEUS");
-    expect(container.querySelector('[aria-label="Abrir card de Empresa da equipe"]')).toBeNull();
+    expect(select.value).toBe("MEUS");
+    expect([...select.options].map((o) => [o.value, o.textContent])).toEqual([
+      ["MEUS", "Meus e sem vínculos"], ["9", "Ana Operacional"], ["1", "Responsável"], ["7", "Usuária sem cards"], ["todos", "Todos"],
+    ]);
+    expect(select.textContent).not.toContain("Pessoa de outro setor");
+    expect(container.querySelector(cardColega)).toBeNull();
+    await selecionar(container, "todos");
+    expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ visao: "TODOS", responsavelId: null, setorId: null }));
+    expect(container.querySelector(cardColega)).not.toBeNull();
+    expect(container.querySelector('[aria-label="Abrir card de Responsável histórico"]')).not.toBeNull();
+    expect(container.textContent).toContain("Somente leitura");
+    await selecionar(container, "9");
+    expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ visao: "TODOS", responsavelId: 9, setorId: null }));
+    expect(container.querySelector('[aria-label="Abrir card de Empresa"]')).toBeNull();
+    await act(async () => { container.querySelector<HTMLButtonElement>(cardColega)!.click(); });
+    expect(container.textContent).toContain("Confirmar exclusão");
+    await selecionar(container, "MEUS");
+    expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ visao: "MEUS", responsavelId: null, setorId: null }));
+    expect(container.querySelector(cardColega)).toBeNull();
+    expect(container.textContent).not.toContain("Confirmar exclusão");
+    vi.mocked(SincronizarQuadroBpm).mockResolvedValue({ success: true, manifesto, cards: [], ids: [] } as never);
+    await selecionar(container, "7");
+    expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ visao: "TODOS", responsavelId: 7 }));
+    expect(select.value).toBe("7"); expect(select.textContent).toContain("Usuária sem cards");
+    expect(container.querySelector('[aria-label="Abrir card de Empresa"]')).toBeNull();
   } finally { await act(async () => root.unmount()); container.remove(); }
 });
 
-it.each([true, false])("select único preserva Meus inicialmente e limita Todos/pessoa conforme admin=%s", async (admin) => {
-  Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
-  vi.useFakeTimers();
-  const { container, root, props } = montarBoard();
-  const terceiro = { ...card, id: "terceiro", empresa: { ...card.empresa, razaoSocial: "Terceiro" }, responsavel: { id: 9, nome: "Outra pessoa" } };
-  const manifesto = {
-    configVersion: 1, acesso: { userId: 1, admin, setores: [] },
-    entradas: (admin ? [card, terceiro] : [card]).map((c) => ({ id: c.id, etapaId: c.etapaId, revision: "1", nome: c.empresa.razaoSocial, cnpj: null, servico: null, responsaveis: [c.responsavel] })),
-  };
-  props.manifestoInicial = manifesto;
-  props.currentUserRole = admin ? "ADMIN" : "COMERCIAL";
-  vi.mocked(SincronizarQuadroBpm).mockResolvedValue({ success: true, manifesto, cards: admin ? [card, terceiro] : [card], ids: admin ? [card.id, terceiro.id] : [card.id] } as never);
+it("opção removida na reconciliação fecha detalhes, limpa cards e retorna à consulta padrão", async () => {
+  Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true }); vi.useFakeTimers();
+  const { container, root, props } = montarBoard(); const manifesto = manifestoBoard(); props.manifestoInicial = manifesto;
+  vi.mocked(SincronizarQuadroBpm).mockResolvedValue({ success: true, manifesto, cards: [colega], ids: [colega.id] } as never);
   try {
     await act(async () => root.render(h(PipelineBoardClient, props)));
-    const select = container.querySelector("select")!;
-    expect(container.querySelectorAll("select")).toHaveLength(1);
-    expect(select.value).toBe("MEUS");
-    expect(container.querySelector('[aria-label="Abrir card de Terceiro"]')).toBeNull();
-    expect([...select.options].some((option) => option.value === "9")).toBe(admin);
-    expect([...select.options].some((option) => option.value.startsWith("SETOR:"))).toBe(false);
-    await act(async () => { select.value = "todos"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+    await selecionar(container, "9");
+    await act(async () => { container.querySelector<HTMLButtonElement>(cardColega)!.click(); });
+    expect(container.textContent).toContain("Confirmar exclusão");
+    const revogado = { ...manifesto, acesso: { ...manifesto.acesso, responsaveis: pessoas.filter((p) => p.id !== 9) } };
+    vi.mocked(SincronizarQuadroBpm).mockResolvedValueOnce({ success: true, manifesto: revogado, cards: [colega], ids: [colega.id] } as never);
+    vi.mocked(SincronizarQuadroBpm).mockResolvedValue({ success: true, manifesto: revogado, cards: [card], ids: [card.id] } as never);
+    await atualizar(container);
+    expect(container.querySelector("select")?.value).toBe("MEUS");
+    expect([...container.querySelector("select")!.options].map((o) => o.value)).not.toContain("9");
+    expect(container.querySelector(cardColega)).toBeNull();
+    expect(container.textContent).not.toContain("Confirmar exclusão");
     await act(async () => { await vi.advanceTimersByTimeAsync(300); });
-    // O usuário comum permanece no mesmo escopo MEUS; admin solicita a visão completa.
-    if (admin) {
-      expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ visao: "TODOS", responsavelId: null, setorId: null }));
-      expect(container.querySelector('[aria-label="Abrir card de Terceiro"]')).not.toBeNull();
-    } else {
-      expect(SincronizarQuadroBpm).not.toHaveBeenCalled();
-      expect(container.querySelector('[aria-label="Abrir card de Terceiro"]')).toBeNull();
-    }
-    await act(async () => { select.value = admin ? "9" : "1"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+    expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ visao: "MEUS", responsavelId: null }));
+    expect(container.querySelector('[aria-label="Abrir card de Empresa"]')).not.toBeNull();
+  } finally { await act(async () => root.unmount()); container.remove(); }
+});
+
+it("revogação de acesso remove cards, opções e detalhes antes de reconsultar Meus", async () => {
+  Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true }); vi.useFakeTimers();
+  const { container, root, props } = montarBoard(); const manifesto = manifestoBoard(); props.manifestoInicial = manifesto;
+  vi.mocked(SincronizarQuadroBpm).mockResolvedValue({ success: true, manifesto, cards: [colega], ids: [colega.id] } as never);
+  try {
+    await act(async () => root.render(h(PipelineBoardClient, props)));
+    await selecionar(container, "todos");
+    await act(async () => { container.querySelector<HTMLButtonElement>(cardColega)!.click(); });
+    vi.mocked(SincronizarQuadroBpm).mockResolvedValue({ success: false, acessoNegado: true, visaoRevogada: true, error: "Acesso revogado" });
+    await atualizar(container);
+    expect(container.querySelector("select")?.value).toBe("MEUS");
+    expect([...container.querySelector("select")!.options].map((o) => o.value)).toEqual(["MEUS", "todos"]);
+    expect(container.querySelector(cardColega)).toBeNull(); expect(container.textContent).not.toContain("Confirmar exclusão");
+    expect(container.textContent).toContain("Acesso revogado");
     await act(async () => { await vi.advanceTimersByTimeAsync(300); });
-    expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ visao: admin ? "TODOS" : "MEUS", responsavelId: admin ? 9 : 1, setorId: null }));
-    await act(async () => { select.value = "MEUS"; select.dispatchEvent(new Event("change", { bubbles: true })); });
-    expect(container.querySelector('[aria-label="Abrir card de Terceiro"]')).toBeNull();
-    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
-    expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ visao: "MEUS", responsavelId: null, setorId: null }));
+    expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ visao: "MEUS", responsavelId: null }));
+  } finally { await act(async () => root.unmount()); container.remove(); }
+});
+
+it("ignora resposta de pessoa anterior após voltar ao padrão", async () => {
+  Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true }); vi.useFakeTimers();
+  const { container, root, props } = montarBoard(); const manifesto = manifestoBoard(); props.manifestoInicial = manifesto;
+  type Resultado = Awaited<ReturnType<typeof SincronizarQuadroBpm>>;
+  let concluir: ((result: Resultado) => void) | undefined;
+  const pendente = new Promise<Resultado>((resolve) => { concluir = resolve; });
+  vi.mocked(SincronizarQuadroBpm).mockReturnValueOnce(pendente);
+  vi.mocked(SincronizarQuadroBpm).mockResolvedValue({ success: true, manifesto, cards: [card], ids: [card.id] } as never);
+  try {
+    await act(async () => root.render(h(PipelineBoardClient, props)));
+    await selecionar(container, "9");
+    await selecionar(container, "MEUS");
+    await act(async () => { concluir?.({ success: true, manifesto, cards: [colega], ids: [colega.id] } as never); });
+    expect(container.querySelector("select")?.value).toBe("MEUS");
+    expect(container.querySelector('[aria-label="Abrir card de Empresa"]')).not.toBeNull();
+    expect(container.querySelector(cardColega)).toBeNull();
   } finally { await act(async () => root.unmount()); container.remove(); }
 });

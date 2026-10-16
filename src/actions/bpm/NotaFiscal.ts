@@ -28,6 +28,7 @@ const ROTA = "/PainelAlpha/AlphaCRM";
 async function exigirAcessoNotaFiscal(cardId: string, userId: number, role: string | null, client: typeof db = db, editar = false) {
   const acesso = await checarAcessoBpmCard(cardId, userId, role, "visualizar", client);
   if (!acesso.autorizado || (!acesso.isAdminGlobal && !acesso.role)) throw new Error("Não autorizado");
+  if (editar && acesso.role === "VISUALIZADOR") throw new Error("Não autorizado");
   if (editar && !acesso.isAdminGlobal) {
     const card = await client.bpmCard.findUnique({
       where: { id: cardId },
@@ -73,7 +74,9 @@ export async function ObterNotaFiscalFinanceiroBpm(cardId: string) {
     const acesso = await exigirAcessoNotaFiscal(cardId, Number(session.user.id), session.user.role ?? null);
     const { card, dados, arquivoUrl } = await carregarNotaFiscal(cardId);
     const permissao = await db.bpmCard.findUnique({ where: { id: cardId }, select: { etapa: { select: { visibilidades: { select: { perfil: true, podeVer: true, podeAgir: true } } } } } });
-    const podeEditar = acesso.isAdminGlobal || Boolean(permissao && resolverVisibilidadeEtapa(acesso.perfilGlobal, permissao.etapa.visibilidades).podeAgir);
+    // A NF concluída tem edição própria, mas leitura de colegas nunca a habilita.
+    const podeEditar = acesso.isAdminGlobal || (acesso.role !== "VISUALIZADOR"
+      && Boolean(permissao && resolverVisibilidadeEtapa(acesso.perfilGlobal, permissao.etapa.visibilidades).podeAgir));
     return { success: true as const, data: { ...dados, arquivoUrl, concluido: card.status === "CONCLUIDO", podeEditar } };
   } catch (error) {
     return { success: false as const, error: error instanceof Error ? error.message : "Não foi possível carregar a NF." };

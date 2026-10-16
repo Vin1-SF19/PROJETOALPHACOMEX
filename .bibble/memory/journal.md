@@ -7138,3 +7138,37 @@ Revisão final Lens: aprovada com ressalvas operacionais, sem bloqueantes/import
 ### 2026-10-15 — Chamados: migração autorizada aplicada
 
 Usuário respondeu “sim autorizo” à migração específica. Vault liberou o plano exato e o script apply concluiu com backup novamente restaurado/verificado, 53 categorias inseridas/13 destinos/224 chamados preservados/integridade ok/FK0. Comparação de conteúdo antes/depois por hash confirmou preservação de chamados, mensagens, feedbacks e templates. Smoke somente leitura dos módulos reais Prisma/catálogo/autorização passou para 29 atores ativos e 27 responsáveis elegíveis. Quatro índices conferidos. Relatório atualizado APPLIED_VERIFIED; nenhum chamado de teste, notificação, commit, push ou deploy. E2E autenticado e realtime real não exercitados.
+
+
+---
+
+## [2026-10-15 21:00 UTC] — CRM: pessoas e Todos por pipeline
+
+**Tags:** #bugfix #decision #integration #auth #nextjs
+**Agentes envolvidos:** Bibble, arquitetura/Scout, Nova, backend, Scribe, Kowalski
+**Arquivos tocados:** `src/lib/bpm/{visao-equipe-server,visao-equipe,ownership}.ts`; `src/actions/bpm/{Quadro,Checklists,NotaFiscal}.ts`; `PipelineBoardClient.tsx`; `VisibilidadePipelineSection.tsx`; testes BPM; story CRM; quatro memórias abaixo.
+
+### Contexto
+Usuário definiu o select em todos os pipelines: “Meus e sem vínculos” padrão, pessoas do setor e Todos, inclusive para TI. A lista anterior dependia de cards e a consulta de colegas exigia supervisão individual.
+
+### O que foi feito
+- Catálogo explícito de contas ativas com CRM dos setores do pipeline, incluindo quem não tem cards, igual para TI/comum. Consulta de colegas/Todos liberada após autorização do pipeline; escrita mantém vínculo/permissões.
+- UI remove itens de setor/supervisão, ordena pessoas, fecha detalhes na troca/revogação e ignora respostas antigas. Administração envia setores/versão e preserva JSON histórico; sem migration ou escrita remota.
+- Smoke Prisma somente leitura: catálogos TI/comum iguais em três pipelines; usuária operacional sem cards só na lista Operacional. Guard real autorizou visualizar terceiro Operacional como VISUALIZADOR/sem ação e negou edição; Financeiro/Radar negados.
+
+### Decisões tomadas
+- Catálogo independente de cards; Todos inclui atribuições históricas fora da lista. Consulta ampliada não equivale a permissão de ação nem substitui módulo/pipeline/coluna.
+
+### Problemas encontrados / resolvidos
+- Auditoria detectou leitores capazes de mutar: NF recebeu bloqueio de edição para visualizador; checklist passou a listar existentes sem materializar para quem não pode agir. POST de oportunidades passou a exigir `editarCard`, preservando GET consultável; três regressões usam ownership real, mais quatro de NF/checklists.
+- Frontend: 21 testes aprovados; backend direcionado: 47 aprovados. Gates finais: build/typecheck/lint exit 0; 1193 warnings de lint iguais ao baseline. `npm test` exit 1: 631 arquivos aprovados/4 falhos, 4706 testes aprovados/6 falhos/4 skipped/1 todo. Mesmas quatro suites e seis falhas do baseline (629 arquivos aprovados/4 falhos, 4693 testes aprovados/6 falhos): import `next/server` em arquivamento-modal, Builder (3), layout card-modal (1), em-tratativa (2). Sem aprovação global dos testes.
+
+### Pendências
+- Lens/Sage: APROVADO COM RESSALVAS, sem bloqueio novo; ressalvas são as quatro suites/seis testes já falhos no baseline, CodeRabbit indisponível e ausência de navegador autenticado/deploy. Publicação permanece pendente.
+- Evidências `.cache/crm-filtro-setor/{build,lint,typecheck-final,test-final,baseline-test}.log` e `smoke-readonly.json`: Prisma sem escritas, runtime compilado iniciado (260 ms), CRM sem sessão 307 e servidor encerrado após checagem. Esse smoke não substitui navegador autenticado.
+
+### Refletido também em
+- `decisions.md`: precedência do contrato por pipeline e separação entre consulta/ação.
+- `codebase-map.md` e `integration-points.md`: resolvedor, manifesto, filtros e guardas. Nenhum componente novo.
+
+Virtus manual: candidato de produção isolado sobre origin/main, somente os 26 arquivos CRM; commits Agenda preservados fora da entrega. Gates repetidos e baseline de seis falhas confirmado; smoke isolado 20/20. Publicação/rollback na Vercel preparados; aguarda confirmação final, sem stage/commit/push. Evidências privadas em /tmp/virtus-crm-preflight/.

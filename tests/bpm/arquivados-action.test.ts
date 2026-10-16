@@ -38,12 +38,12 @@ describe("consulta autorizada de cards arquivados", () => {
     mocks.eventoFind.mockResolvedValue(null);
   });
 
-  it("pagina apenas cards arquivados dos pipelines, etapas e membros acessíveis", async () => {
+  it("pagina apenas cards arquivados dos pipelines e etapas acessíveis incluindo colegas", async () => {
     const resultado = await ListarCardsArquivadosBpm(2);
     expect(resultado).toMatchObject({ success: true, data: { pagina: 2, total: 1 } });
     expect(mocks.cardList).toHaveBeenCalledWith(expect.objectContaining({
       where: { status: "ARQUIVADO", pipelineId: { in: ["permitido"] },
-        etapaId: { in: ["etapa"] }, AND: [{ OR: [{ responsavelId: 10 }, { membros: { some: { userId: 10 } } }] }] },
+        etapaId: { in: ["etapa"] } },
       skip: 20, take: 20,
     }));
   });

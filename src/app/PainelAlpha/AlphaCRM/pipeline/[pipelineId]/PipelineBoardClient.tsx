@@ -801,9 +801,8 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
   const [manifesto, setManifesto] = useState(manifestoInicial);
   const [busca, setBusca] = useState("");
   const [filtroResponsaveis, setFiltroResponsaveis] = useState("MEUS");
-  const visaoAmpliada: VisaoQuadro = manifesto?.acesso?.admin ? "TODOS" : manifesto?.acesso?.setores.length ? "EQUIPE" : "MEUS";
-  const visao: VisaoQuadro = filtroResponsaveis === "MEUS" ? "MEUS" : filtroResponsaveis.startsWith("SETOR:") ? "SETOR" : visaoAmpliada;
-  const setorFiltro = visao === "SETOR" ? Number(filtroResponsaveis.slice(6)) : null;
+  const visao: VisaoQuadro = filtroResponsaveis === "MEUS" ? "MEUS" : "TODOS";
+  const setorFiltro = null;
   const responsavelFiltro = /^\d+$/.test(filtroResponsaveis) ? filtroResponsaveis : null;
   const usuariosVisao = manifesto?.acesso ? usuariosDaVisao(manifesto.acesso, visao, setorFiltro) : null;
   const [carregandoPagina, setCarregandoPagina] = useState(false);
@@ -850,25 +849,8 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
       idsColunas.has(String(container.id))),
   }), [idsColunas]);
 
-  const responsaveisDisponiveis = useMemo(() => {
-    const mapa = new Map<number, string>();
-    if (manifesto) {
-      const ids = manifesto.acesso ? usuariosDaVisao(manifesto.acesso, visaoAmpliada) : null;
-      for (const card of manifesto.entradas) for (const pessoa of card.responsaveis) if (ids === null || ids.includes(pessoa.id)) mapa.set(pessoa.id, pessoa.nome);
-      return Array.from(mapa, ([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
-    }
-    for (const card of cards) {
-      if (card.responsavel.id > 0) {
-        mapa.set(card.responsavel.id, card.responsavel.nome);
-      }
-      for (const m of card.membros) {
-        mapa.set(m.usuario.id, m.usuario.nome);
-      }
-    }
-    return Array.from(mapa, ([id, nome]) => ({ id, nome })).sort((a, b) =>
-      a.nome.localeCompare(b.nome)
-    );
-  }, [cards, manifesto, visaoAmpliada]);
+  const responsaveisDisponiveis = useMemo(() => [...(manifesto?.acesso?.responsaveis ?? [])]
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")), [manifesto?.acesso?.responsaveis]);
 
   const getByEtapa = (etapaId: string) =>
     cards.filter(
@@ -879,6 +861,12 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
           String(c.responsavel.id) === responsavelFiltro ||
           c.membros.some((m) => String(m.usuario.id) === responsavelFiltro))
     );
+
+  const fecharDetalhes = useCallback(() => {
+    cardSelecionadoIdRef.current = null;
+    setCardSelecionadoId(null); setCardAgendamentoId(null); setNolossLeadAberto(null);
+    setPromocaoLeadPendente(null); setAtribuicaoAgendarPendente(null); setNovoCardAberto(false);
+  }, [setNolossLeadAberto, setPromocaoLeadPendente, setAtribuicaoAgendarPendente, setNovoCardAberto]);
 
   const recarregarCards = useCallback(async (opcoes: OpcoesRecarregarCards = {}) => {
     consultasEmAndamentoRef.current += 1;
@@ -895,10 +883,19 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
           limites: estado.limites, busca: estado.busca, responsavelId: estado.responsavelId, visao: estado.visao, setorId: estado.setorId, forcar,
         });
         if (requisicao !== ultimaRequisicaoRef.current || generation !== generationBoardRef.current) return false;
+        const limparVisao = (novoManifesto: ManifestoQuadro) => {
+          setCards([]); setManifesto(novoManifesto);
+          estado.ids = []; estado.manifesto = novoManifesto;
+          fecharDetalhes();
+          setFiltroResponsaveis("MEUS");
+        };
         if (!result.success) {
-          if ("visaoRevogada" in result && result.visaoRevogada) { setCards([]); setManifesto({ configVersion: -1, entradas: [] }); estado.ids = []; estado.manifesto = { configVersion: -1, entradas: [] }; setCardSelecionadoId(null); setCardAgendamentoId(null); setNolossLeadAberto(null); setFiltroResponsaveis("MEUS"); }
-          if (result.acessoNegado) { setCards([]); setManifesto({ configVersion: -1, entradas: [] }); setCardSelecionadoId(null); setCardAgendamentoId(null); setNolossLeadAberto(null); estado.ids = []; estado.manifesto = { configVersion: -1, entradas: [] }; }
+          if (("visaoRevogada" in result && result.visaoRevogada) || result.acessoNegado) limparVisao({ configVersion: -1, entradas: [] });
           if (!opcoes.preservarErro) setErro(result.error);
+          return false;
+        }
+        if (estado.responsavelId && !result.manifesto.acesso?.responsaveis?.some((pessoa) => pessoa.id === estado.responsavelId)) {
+          limparVisao(result.manifesto);
           return false;
         }
         const mudouConfig = estado.manifesto!.configVersion !== result.manifesto.configVersion;
@@ -937,7 +934,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
     if (!opcoes.preservarErro) setErro(null);
     return true;
     } finally { consultasEmAndamentoRef.current -= 1; }
-  }, [pipeline.id, router]);
+  }, [pipeline.id, router, fecharDetalhes]);
 
   const atualizarPipeline = useCallback(async () => {
     if (atualizacaoManualRef.current || movimentoPendenteRef.current || snapshotArrastoRef.current) return;
@@ -1155,25 +1152,22 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {manifesto && <input type="search" value={busca} maxLength={200} onChange={(event) => setBusca(event.target.value)} aria-label="Buscar em todos os cards do pipeline" placeholder="Buscar empresa, CNPJ ou serviço" className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white" />}
-          <Select value={filtroResponsaveis} onValueChange={setFiltroResponsaveis}>
+          <Select value={filtroResponsaveis} onValueChange={(value) => { ultimaRequisicaoRef.current += 1; fecharDetalhes(); setFiltroResponsaveis(value); }}>
             <SelectTrigger
               aria-label="Filtrar cards por responsável"
               className="w-[230px] shrink-0 border-white/10 bg-white/[0.04] text-xs text-slate-200"
             >
               <Users className="h-4 w-4" aria-hidden="true" />
-              <SelectValue placeholder="Meus leads e sem vínculo" />
+              <SelectValue placeholder="Meus e sem vínculos" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="MEUS">Meus leads e sem vínculo</SelectItem>
-              <SelectItem value="todos">Todos os responsáveis</SelectItem>
-              {manifesto?.acesso?.setores.map((setor) => (
-                <SelectItem key={`setor:${setor.id}`} value={`SETOR:${setor.id}`}>Setor: {setor.nome}</SelectItem>
-              ))}
+              <SelectItem value="MEUS">Meus e sem vínculos</SelectItem>
               {responsaveisDisponiveis.map((r) => (
                 <SelectItem key={r.id} value={String(r.id)} aria-label={r.nome}>
                   {r.nome}
                 </SelectItem>
               ))}
+              <SelectItem value="todos">Todos</SelectItem>
             </SelectContent>
           </Select>
 
