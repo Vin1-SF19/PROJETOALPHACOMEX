@@ -1,6 +1,6 @@
 import { auth } from "../../../../../../auth";
 import { getTema } from "@/lib/temas";
-import { ObterPipelineBpm } from "@/actions/bpm/Pipelines";
+import { ListarPipelinesBpm, ObterPipelineBpm } from "@/actions/bpm/Pipelines";
 import { SincronizarQuadroBpm } from "@/actions/bpm/Quadro";
 import PipelineBoardClient from "./PipelineBoardClient";
 import { notFound } from "next/navigation";
@@ -17,9 +17,10 @@ export default async function PipelineBpmPage({
   const temaNome = (session?.user as { tema_interface?: string })?.tema_interface || "blue";
   const visual = getTema(temaNome);
 
-  const [pipelineResult, cardsResult] = await Promise.all([
+  const [pipelineResult, cardsResult, pipelinesResult] = await Promise.all([
     ObterPipelineBpm(pipelineId),
     SincronizarQuadroBpm(pipelineId),
+    ListarPipelinesBpm(),
   ]);
 
   if (!pipelineResult.success || !pipelineResult.data) notFound();
@@ -28,6 +29,7 @@ export default async function PipelineBpmPage({
     <PipelineBoardClient
       key={pipelineId}
       pipeline={pipelineResult.data}
+      pipelinesDisponiveis={pipelinesResult.success ? pipelinesResult.data.map(({ id, nome }) => ({ id, nome })) : []}
       cardsIniciais={cardsResult.success ? cardsResult.cards : []}
       manifestoInicial={cardsResult.success ? cardsResult.manifesto : { configVersion: 0, entradas: [] }}
       visual={visual}

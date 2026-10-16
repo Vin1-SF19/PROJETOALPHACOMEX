@@ -14,7 +14,8 @@ vi.mock("@dnd-kit/core", async (original) => {
     return h(actual.DndContext, props);
   } };
 });
-vi.mock("next/navigation", () => { const router = { refresh: vi.fn() }; return { useRouter: () => router }; });
+const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("@/lib/pusher", () => ({ pusherClient: null }));
 vi.mock("@/actions/bpm/Quadro", () => ({ SincronizarQuadroBpm: vi.fn() }));
 vi.mock("@/actions/bpm/Cards", () => ({
@@ -76,7 +77,7 @@ afterEach(() => {
 
 
 vi.mock("@/components/ui/select", () => ({
-  Select: ({ value, onValueChange, children }: { value: string; onValueChange: (v: string) => void; children: React.ReactNode }) => h("select", { value, onChange: (e: React.ChangeEvent<HTMLSelectElement>) => onValueChange(e.target.value) }, children),
+  Select: ({ value, onValueChange, disabled, children }: { value: string; onValueChange: (v: string) => void; disabled?: boolean; children: React.ReactNode }) => h("select", { value, disabled, onChange: (e: React.ChangeEvent<HTMLSelectElement>) => onValueChange(e.target.value) }, children),
   SelectTrigger: () => null, SelectValue: () => null,
   SelectContent: ({ children }: { children: React.ReactNode }) => h(React.Fragment, {}, children),
   SelectItem: ({ value, children }: { value: string; children: React.ReactNode }) => h("option", { value }, children),
@@ -101,6 +102,49 @@ async function atualizar(container: HTMLElement) {
 }
 const cardColega = '[aria-label="Abrir card de Empresa da colega"]';
 
+it("troca pelo segundo select sem alterar o filtro; arrasto e detalhes impedem navegação", async () => {
+  Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true }); vi.useFakeTimers();
+  const { container, root, props } = montarBoard();
+  props.pipelinesDisponiveis = [{ id: "pipeline-1", nome: "Pipeline" }, { id: "outro-funil", nome: "Outro funil" }];
+  try {
+    await act(async () => root.render(h(PipelineBoardClient, props)));
+    const [responsaveis, funis] = container.querySelectorAll("select");
+    expect(funis).toBeDefined();
+    expect(funis.value).toBe("pipeline-1");
+    expect([...funis.options].map((o) => o.textContent)).toEqual(["Pipeline", "Outro funil"]);
+    const escolher = async (id: string) => act(async () => { funis.value = id; funis.dispatchEvent(new Event("change", { bubbles: true })); });
+    await escolher("pipeline-1");
+    await escolher("nao-autorizado");
+    expect(router.push).not.toHaveBeenCalled();
+    await escolher("outro-funil");
+    expect(router.push).toHaveBeenCalledExactlyOnceWith("/PainelAlpha/AlphaCRM/pipeline/outro-funil");
+    expect(responsaveis.value).toBe("MEUS");
+    router.push.mockClear();
+    await act(async () => { drag.current?.onDragStart?.({ active: { id: card.id } } as never); });
+    expect(funis.disabled).toBe(true);
+    await escolher("outro-funil");
+    expect(router.push).not.toHaveBeenCalled();
+    await act(async () => { drag.current?.onDragEnd?.({ active: { id: card.id }, over: null } as never); });
+    expect(funis.disabled).toBe(false);
+    await act(async () => { container.querySelector<HTMLButtonElement>('[aria-label="Abrir card de Empresa"]')!.click(); });
+    expect(funis.disabled).toBe(true);
+    await escolher("outro-funil");
+    expect(router.push).not.toHaveBeenCalled();
+  } finally { await act(async () => root.unmount()); container.remove(); }
+});
+
+it("sem lista de funis mantém apenas o atual e não permite navegar", async () => {
+  Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true }); vi.useFakeTimers();
+  const { container, root, props } = montarBoard();
+  try {
+    await act(async () => root.render(h(PipelineBoardClient, props)));
+    const funis = container.querySelectorAll("select")[1];
+    expect(funis.disabled).toBe(true);
+    expect([...funis.options].map((o) => o.value)).toEqual(["pipeline-1"]);
+    expect(router.push).not.toHaveBeenCalled();
+  } finally { await act(async () => root.unmount()); container.remove(); }
+});
+
 it.each(["TI", "OPERACIONAL"])("%s usa a mesma lista setorial, inclui pessoa sem cards e consulta pessoa/Todos", async (role) => {
   Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true }); vi.useFakeTimers();
   const { container, root, props } = montarBoard();
@@ -110,7 +154,7 @@ it.each(["TI", "OPERACIONAL"])("%s usa a mesma lista setorial, inclui pessoa sem
   try {
     await act(async () => root.render(h(PipelineBoardClient, props)));
     const select = container.querySelector("select")!;
-    expect(container.querySelectorAll("select")).toHaveLength(1);
+    expect(container.querySelectorAll("select")).toHaveLength(2);
     expect(select.value).toBe("MEUS");
     expect([...select.options].map((o) => [o.value, o.textContent])).toEqual([
       ["MEUS", "Meus e sem vínculos"], ["9", "Ana Operacional"], ["1", "Responsável"], ["7", "Usuária sem cards"], ["todos", "Todos"],

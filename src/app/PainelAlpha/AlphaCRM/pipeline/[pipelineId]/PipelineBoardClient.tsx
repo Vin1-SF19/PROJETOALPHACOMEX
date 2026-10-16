@@ -61,6 +61,7 @@ import { CardKanbanRenderer, type CardKanbanValores } from "@/components/bpm/kan
 import type { CardKanbanComposicao } from "@/lib/bpm/card-kanban";
 
 import { SkeletonColumn } from "./PipelineBoardSkeleton";
+import { SeletorPipelineBoard, type PipelineDisponivel } from "./SeletorPipelineBoard";
 import { useLazyColumn } from "@/hooks/useLazyColumn";
 
 interface AutomacaoBoard {
@@ -771,6 +772,7 @@ function LazyPipelineColumn({
 
 interface Props {
   pipeline: PipelineBpm;
+  pipelinesDisponiveis?: PipelineDisponivel[];
   cardsIniciais: CardBpm[];
   manifestoInicial?: ManifestoQuadro;
   visual: TemaAlpha;
@@ -796,7 +798,7 @@ interface PromocaoLeadPendente {
   etapaDestinoNome: string;
 }
 
-export default function PipelineBoardClient({ pipeline, cardsIniciais, manifestoInicial, visual, currentUserId, currentUserRole }: Props) {
+export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [], cardsIniciais, manifestoInicial, visual, currentUserId, currentUserRole }: Props) {
   const accent = visual.accent;
   const router = useRouter();
   const [cards, setCards] = useState<CardBpm[]>(cardsIniciais);
@@ -1240,6 +1242,10 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
               <SelectItem value="todos">Todos</SelectItem>
             </SelectContent>
           </Select>
+
+          <SeletorPipelineBoard atual={pipeline} pipelines={pipelinesDisponiveis}
+            bloqueado={Boolean(activeId || movimentoPendente || movimentoRdPendente || cardSelecionadoId || cardAgendamentoId
+              || novoCardAberto || nolossLeadAberto || promocaoLeadPendente || atribuicaoAgendarPendente)} />
 
           <button
             type="button"
