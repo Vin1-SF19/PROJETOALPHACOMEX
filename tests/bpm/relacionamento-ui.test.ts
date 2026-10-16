@@ -92,3 +92,34 @@ it.each([false, true])("renderiza valor existente com readOnly=%s", async (readO
     expect(onChange).toHaveBeenCalledWith("Novo parceiro");
   }
 });
+
+
+it.each([false, true])("usuário automático exibe nome readonly mesmo com flags de edição globais, readOnly=%s", async (readOnly) => {
+  const onChange = vi.fn();
+  const onBlur = vi.fn();
+  const campoUsuario = { ...campo, id: "vendedor", nome: "Vendedor responsável · automático", tipo: "usuario",
+    escopo: "GLOBAL", fonteEntidade: "CARD", fonteAtributo: "responsavelId", editavel: true, somenteLeitura: false,
+    valorExibicao: "Vendedora do ID efetivo" };
+  await act(async () => root.render(h(CampoBpmInput, { campo: campoUsuario, value: "42", onChange, onBlur, className: "", readOnly })));
+  const input = container.querySelector<HTMLInputElement>("input")!;
+  expect(input.type).toBe("text"); expect(input.value).toBe("Vendedora do ID efetivo");
+  expect(input.readOnly).toBe(true); expect(input.getAttribute("aria-readonly")).toBe("true");
+  expect(container.querySelector('input[type="number"]')).toBeNull();
+  await act(async () => { input.dispatchEvent(new Event("input", { bubbles: true })); input.dispatchEvent(new Event("blur", { bubbles: true })); });
+  expect(onChange).not.toHaveBeenCalled(); expect(onBlur).not.toHaveBeenCalled();
+  await act(async () => root.render(h(CampoBpmInput, { campo: { ...campoUsuario, valorExibicao: "Nova responsável" }, value: "51", onChange, className: "" })));
+  expect(input.value).toBe("Nova responsável");
+});
+
+it.each([
+  ["42", null, "Usuário não encontrado"],
+  ["42", undefined, "Usuário não encontrado"],
+  ["", null, "Não informado"],
+  [" ", "Nome antigo", "Não informado"],
+])("referência automática %s com label %s tem fallback %s sem ID cru", async (value, valorExibicao, esperado) => {
+  await act(async () => root.render(h(CampoBpmInput, {
+    campo: { ...campo, tipo: "usuario", escopo: "GLOBAL", fonteEntidade: "CARD", fonteAtributo: "responsavelId", valorExibicao },
+    value, onChange: vi.fn(), className: "",
+  })));
+  expect(container.querySelector<HTMLInputElement>("input")!.value).toBe(esperado);
+});

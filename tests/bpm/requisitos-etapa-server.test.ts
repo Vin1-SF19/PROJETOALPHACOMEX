@@ -11,6 +11,7 @@ import {
 
 function criarCliente(overrides: Record<string, unknown>) {
   return {
+    usuarios: { findMany: vi.fn().mockResolvedValue([]) },
     bpmCampo: { findMany: vi.fn().mockResolvedValue([]) },
     bpmCampoObrigatorioEtapa: { findMany: vi.fn().mockResolvedValue([]) },
     bpmCampoOcultoEtapa: { findMany: vi.fn().mockResolvedValue([]) },
@@ -656,5 +657,87 @@ describe("RM-2026-6F4E3F: override local GLOBAL", () => {
     expect(campos[0].valor).toBe(esperado);
     expect(campos[0].somenteLeitura).toBe(somenteLeitura);
     expect(campos[0].editavel).toBe(editavel);
+  });
+});
+
+
+describe("referência automática de usuário: ID efetivo e nome separados", () => {
+  const campoUsuario = (id: string, patch = {}) => ({
+    id, nome: "Vendedor responsável · automático", tipo: "usuario", pipelineId: "pipeline", etapaId: "etapa",
+    opcoesJson: null, obrigatorio: false, ordem: 0, visivel: true,
+    escopo: "GLOBAL", fonteEntidade: "CARD", fonteAtributo: "responsavelId", somenteLeitura: false, editavel: true,
+    ...patch,
+  });
+  const clienteReferencia = (overrides: Record<string, unknown> = {}) => criarCliente({
+    bpmCard: { findUnique: vi.fn().mockResolvedValue({
+      responsavelId: 7, responsavel: { id: 7, nome: "Responsável atual" }, empresa: { pessoas: [] },
+    }) },
+    usuarios: { findMany: vi.fn().mockResolvedValue([{ id: 7, nome: "Responsável atual" }]) },
+    ...overrides,
+  });
+  it("hidrata nome do responsável sem trocar ID nem flags de edição do backend", async () => {
+    const client = clienteReferencia();
+    const campos = await carregarCamposAplicaveisCardEtapa("card", "pipeline", "etapa", client as never, undefined, [campoUsuario("vendedor")]);
+    expect(campos[0]).toMatchObject({ valor: "7", valorExibicao: "Responsável atual", editavel: true, somenteLeitura: false });
+    expect(client.usuarios.findMany).toHaveBeenCalledExactlyOnceWith({ where: { id: { in: [7] } }, select: { id: true, nome: true } });
+  });
+  it("override usa nome do seu ID, deduplica e inclui referência histórica sem filtro de status", async () => {
+    const client = clienteReferencia({
+      bpmCardCampoValor: { findMany: vi.fn().mockResolvedValue([{ campoId: "override", valor: "42" }]) },
+      usuarios: { findMany: vi.fn().mockResolvedValue([{ id: 42, nome: "Vendedora histórica" }, { id: 7, nome: "Responsável atual" }]) },
+    });
+    const campos = await carregarCamposAplicaveisCardEtapa("card", "pipeline", "etapa", client as never, undefined, [
+      campoUsuario("override"), campoUsuario("canonica"), campoUsuario("duplicada"), campoUsuario("restrita", { visivel: false }),
+    ]);
+    expect(campos.map(({ id, valor, valorExibicao }) => ({ id, valor, valorExibicao }))).toEqual([
+      { id: "override", valor: "42", valorExibicao: "Vendedora histórica" },
+      { id: "canonica", valor: "7", valorExibicao: "Responsável atual" },
+      { id: "duplicada", valor: "7", valorExibicao: "Responsável atual" },
+    ]);
+    expect(client.usuarios.findMany).toHaveBeenCalledExactlyOnceWith({ where: { id: { in: [42, 7] } }, select: { id: true, nome: true } });
+    // O DTO nunca carrega a entidade usuário ou dados pessoais extras.
+    expect(Object.keys(campos[0]).sort()).toEqual(Object.keys({ ...campoUsuario("override"), valor: "42", valorExibicao: "Vendedora histórica", mapeamentoModo: null, campoOrigemId: null }).sort());
+  });
+  it.each([{ somenteLeitura: true, editavel: true }, { somenteLeitura: false, editavel: false }])(
+    "restrição existente %j mantém fonte canônica e seu nome em vez do override",
+    async (restricao) => {
+      const client = clienteReferencia({ bpmCardCampoValor: { findMany: vi.fn().mockResolvedValue([{ campoId: "vendedor", valor: "42" }]) } });
+      const campos = await carregarCamposAplicaveisCardEtapa("card", "pipeline", "etapa", client as never, undefined, [campoUsuario("vendedor", restricao)]);
+      expect(campos[0]).toMatchObject({ ...restricao, valor: "7", valorExibicao: "Responsável atual" });
+      expect(client.usuarios.findMany).toHaveBeenCalledExactlyOnceWith({ where: { id: { in: [7] } }, select: { id: true, nome: true } });
+    },
+  );
+  it("referência ausente mantém ID e retorna label nulo sem inventar nome", async () => {
+    const client = clienteReferencia({ usuarios: { findMany: vi.fn().mockResolvedValue([]) } });
+    const campos = await carregarCamposAplicaveisCardEtapa("card", "pipeline", "etapa", client as never, undefined, [campoUsuario("ausente")]);
+    expect(campos[0]).toMatchObject({ valor: "7", valorExibicao: null });
+  });
+  it.each([null, "", "1e2", "-1", "1.5", "9007199254740992"])("ID vazio/inválido %s não gera consulta irrestrita", async (valor) => {
+    const client = clienteReferencia({
+      bpmCard: { findUnique: vi.fn().mockResolvedValue({ responsavelId: null, empresa: { pessoas: [] } }) },
+      bpmCardCampoValor: { findMany: vi.fn().mockResolvedValue([{ campoId: "vendedor", valor }]) },
+    });
+    const campos = await carregarCamposAplicaveisCardEtapa("card", "pipeline", "etapa", client as never, undefined, [campoUsuario("vendedor")]);
+    expect(campos[0].valorExibicao).toBeNull(); expect(client.usuarios.findMany).not.toHaveBeenCalled();
+  });
+  it("campos manuais, fontes sem referência e campos ocultos não consultam usuários", async () => {
+    const client = clienteReferencia();
+    const campos = await carregarCamposAplicaveisCardEtapa("card", "pipeline", "etapa", client as never, undefined, [
+      campoUsuario("manual", { escopo: "CARD", fonteEntidade: null, fonteAtributo: null }),
+      campoUsuario("atributo-textual", { tipo: "texto", fonteAtributo: "responsavelNome" }),
+      campoUsuario("oculto", { visivel: false }),
+    ]);
+    expect(campos).toHaveLength(2);
+    expect(campos.every((campo) => !("valorExibicao" in campo))).toBe(true);
+    expect(client.usuarios.findMany).not.toHaveBeenCalled();
+  });
+  it("recarga após mudança do responsável atualiza ID e nome sem persistência auxiliar", async () => {
+    const client = clienteReferencia();
+    const consultar = () => carregarCamposAplicaveisCardEtapa("card", "pipeline", "etapa", client as never, undefined, [campoUsuario("vendedor")]);
+    expect((await consultar())[0]).toMatchObject({ valor: "7", valorExibicao: "Responsável atual" });
+    client.bpmCard.findUnique.mockResolvedValue({ responsavelId: 8, empresa: { pessoas: [] } });
+    client.usuarios.findMany.mockResolvedValue([{ id: 8, nome: "Nova responsável" }]);
+    expect((await consultar())[0]).toMatchObject({ valor: "8", valorExibicao: "Nova responsável" });
+    expect(client.usuarios.findMany).toHaveBeenLastCalledWith({ where: { id: { in: [8] } }, select: { id: true, nome: true } });
   });
 });

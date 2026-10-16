@@ -1687,6 +1687,10 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
     const contexto = await carregarContextoMovimento(cardId, etapaDestinoId);
     if ("error" in contexto) return { success: false, error: contexto.error };
     const { card, etapaDestino } = contexto;
+    if (!acessoCard.isAdminGlobal
+      && !resolverVisibilidadeEtapa(acessoCard.perfilGlobal, etapaDestino.visibilidades).podeVer) {
+      return { success: false, error: "Não autorizado" };
+    }
     const campos = await carregarCamposTransicao({
       cardId,
       pipelineId: card.pipelineId,

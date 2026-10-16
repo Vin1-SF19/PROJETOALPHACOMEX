@@ -7172,3 +7172,40 @@ Usuário definiu o select em todos os pipelines: “Meus e sem vínculos” padr
 - `codebase-map.md` e `integration-points.md`: resolvedor, manifesto, filtros e guardas. Nenhum componente novo.
 
 Virtus manual: candidato de produção isolado sobre origin/main, somente os 26 arquivos CRM; commits Agenda preservados fora da entrega. Gates repetidos e baseline de seis falhas confirmado; smoke isolado 20/20. Publicação/rollback na Vercel preparados; aguarda confirmação final, sem stage/commit/push. Evidências privadas em /tmp/virtus-crm-preflight/.
+
+
+---
+
+## [2026-10-16 12:33 UTC] — CRM: contratação em Em tratativa e nome do vendedor
+
+**Tags:** #bugfix #decision #integration #auth
+**Agentes envolvidos:** arquitetura/Scout, frontend, backend/configuração, Vault, Scribe, Kowalski
+**Arquivos tocados:** story `story-alpha-crm-revisao-radar-fechado.md`; `requisitos-etapa-server.ts`; `referencia-usuario-campo.ts`; `CampoBpmInput.tsx`; `Cards.ts`; `contratacao-em-tratativa-config.ts`; CLI correspondente; quatro testes BPM e estas quatro memórias.
+
+### Contexto
+Usuário escolheu preencher os dois campos contratuais no formulário de Em tratativa antes de Fechado e ver o nome da pessoa efetiva no campo automático, preservando IDs.
+
+### O que foi feito
+- Nome separado em `valorExibicao`, resolvido em lote após ID efetivo/override; referência automática readonly, legado sem fonte editável. Guard de leitura do destino adicionado antes de carregar requisitos.
+- CLI/plano reversível: quatro inserções (configurações 116/117 e componentes 16/17) em seção existente; campos opcionais na origem, Fechado intacto, pipeline 31→32/formulário 2→3. Preview/fingerprint, CAS e auditoria transacional; testes em banco descartável.
+- Vault/backup preparados: 337 tabelas/271590 linhas/347346721 bytes, integridade/FK/hash verificados. Evidências privadas em `/tmp/crm-fechado-preflight/{vault-report.md,vault-report.json,vault-backup-verification.json}`; nenhum dado real ou segredo copiado.
+
+### Decisões tomadas
+- Fonte de valor continua ID, inclusive overrides; apresentação não altera persistência/permissões. Formulário canônico de origem atende requisitos existentes do destino; não criar atalho genérico de transição.
+
+### Problemas encontrados / resolvidos
+- Typecheck detectou literal incompatível no helper configuracional, corrigido e tsc subsequente aprovado; fluxo principal repetirá. Lint exit 0/1193 warnings. `npm test`: 632 arquivos passam/4 falham, 4738 testes passam/6 falham/4 skipped/1 todo, mesmas falhas baseline (import next/server em arquivamento-modal-react, embed 3, layout card-modal 1, em-tratativa 2). Suíte global não aprovada.
+
+### Pendências
+- Consentimento específico e aplicação configuracional reais pendentes; não houve banco aplicado, publicação nem browser autenticado. Build exit 0, Probe/Anubis e Lens sem bloqueios novos; nove arquivos/126 testes direcionados passam. Typecheck pré-build exit 0; duas repetições extras pós-build interrompidas (143/Terminated), sem diagnóstico TS, não declaradas aprovadas.
+
+### Refletido também em
+- `decisions.md`, `codebase-map.md`, `integration-points.md` e story: contratos, plano, file list e limites das evidências. Nenhum componente novo.
+
+### Aplicação autorizada — 2026-10-16T12:43:33.127Z
+
+Usuário autorizou especificamente o plano após Vault/backup. Configuração aplicada e verificada no Turso: duas associações opcionais e dois componentes em Em tratativa, pipeline v32/formulário v3, auditoria e exigência de Fechado preservadas. Preview anterior idêntico; verificações transacionais e leitura independente passaram. Recibo e evidências privados em `/tmp/crm-fechado-preflight/`; nenhum dado de card alterado. Nome do vendedor continua aguardando publicação do código; sem commit/push/deploy ou browser autenticado nesta etapa.
+
+### Gate de publicação — Virtus
+
+Usuário solicitou publicar a entrega. Typecheck pós-build final aprovado; runtime compilado com 22/22 checks de assets e rotas protegidas sem sessão, sem mutação no banco. Candidato restrito aos 15 arquivos desta correção sobre origin/main; deploy não reaplica a configuração. Suíte global mantém seis falhas anteriores; navegador autenticado não executado. Rollback de código referencia a versão anterior saudável, preservando o banco.

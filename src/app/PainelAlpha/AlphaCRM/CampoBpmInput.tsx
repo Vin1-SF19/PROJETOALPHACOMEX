@@ -5,6 +5,7 @@ import { upload } from "@vercel/blob/client";
 import { X } from "lucide-react";
 import { toast, type ExternalToast } from "sonner";
 import { cn } from "@/lib/utils";
+import { campoEhReferenciaAutomaticaUsuarioBpm } from "@/lib/bpm/referencia-usuario-campo";
 import { campoBpmEhCnpj } from "@/lib/bpm/campos-dinamicos";
 import { formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";
 import { RegistrarAnexoBpm } from "@/actions/bpm/Anexos";
@@ -36,6 +37,7 @@ export interface CampoBpmEditavel {
   fonteAtributo?: string | null;
   editavel?: boolean;
   somenteLeitura?: boolean;
+  valorExibicao?: string | null;
 }
 
 interface CampoBpmInputProps {
@@ -119,13 +121,16 @@ export function CampoBpmInput({
     ? [VALORES.SIM, VALORES.NAO]
     : lerOpcoes(campo.opcoesJson);
 
-  if ((campo.tipo === "selecao" || campo.tipo === "multiselecao") && campo.fonteEntidade) {
+  const referenciaUsuarioAutomatica = campoEhReferenciaAutomaticaUsuarioBpm(campo);
+  if (referenciaUsuarioAutomatica || ((campo.tipo === "selecao" || campo.tipo === "multiselecao") && campo.fonteEntidade)) {
     return (
       <input
         id={`campo-bpm-${campo.id}`}
         className={className}
         type="text"
-        value={value}
+        value={referenciaUsuarioAutomatica
+          ? (value.trim() ? campo.valorExibicao?.trim() || "Usuário não encontrado" : "Não informado")
+          : value}
         disabled={disabled}
         readOnly
         aria-readonly="true"

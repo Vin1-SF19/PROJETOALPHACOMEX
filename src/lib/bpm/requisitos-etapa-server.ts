@@ -19,9 +19,11 @@ import { avaliarGrupo } from "@/lib/bpm/regras/avaliador";
 import { montarContextoAvaliacaoDoCard } from "@/lib/bpm/regras/contexto";
 import type { ContextoAvaliacao } from "@/lib/bpm/regras/types";
 import { BPM_PIPELINE_KEYS } from "@/lib/bpm/ontology";
+import { campoEhReferenciaAutomaticaUsuarioBpm, idUsuarioReferenciaCampoBpm } from "@/lib/bpm/referencia-usuario-campo";
 
 type ClienteRequisitosEtapa = Pick<
   typeof db,
+  | "usuarios"
   | "bpmCampo"
   | "bpmCardCampoValor"
   | "bpmCard"
@@ -95,6 +97,7 @@ export type CampoAplicavelEtapaBpm = {
   condicaoVisibilidadeJson?: string | null;
   condicaoObrigatoriedadeJson?: string | null;
   valor: string | null;
+  valorExibicao?: string | null;
 };
 
 export type PerfilAcessoCampoBpm = "ADMIN" | "RESPONSAVEL" | "MEMBRO";
@@ -396,7 +399,7 @@ export async function carregarCamposAplicaveisCardEtapa(
     };
   }
 
-  return campos.map((campo) => {
+  const camposComValor = campos.map((campo) => {
     const valorPersistido = valorPorCampo.get(campo.id) ?? null;
     const mapeamento = mapeamentos.find((item) => item.campoDestinoId === campo.id);
     const valorPadraoExibivel = campo.valorPadrao === "{{agora.data}}" || campo.valorPadrao === "{{agora.instante}}"
@@ -421,6 +424,22 @@ export async function carregarCamposAplicaveisCardEtapa(
       editavel: campo.editavel !== false && !resolvidos.somenteLeitura.has(campo.id),
     };
   });
+
+  // O nome descreve o ID efetivo, inclusive override, nunca presume que seja o
+  // responsável atual. Consultar referências históricas não exige conta ativa.
+  const referencias = camposComValor.filter(campoEhReferenciaAutomaticaUsuarioBpm);
+  const usuarioIds = [...new Set(referencias.flatMap((campo) => {
+    const id = idUsuarioReferenciaCampoBpm(campo.valor);
+    return id === null ? [] : [id];
+  }))];
+  const usuarios = usuarioIds.length ? await client.usuarios.findMany({
+    where: { id: { in: usuarioIds } },
+    select: { id: true, nome: true },
+  }) : [];
+  const nomePorUsuario = new Map(usuarios.map(({ id, nome }) => [id, nome]));
+  return camposComValor.map((campo) => campoEhReferenciaAutomaticaUsuarioBpm(campo)
+    ? { ...campo, valorExibicao: nomePorUsuario.get(idUsuarioReferenciaCampoBpm(campo.valor) ?? 0) ?? null }
+    : campo);
 }
 
 /**
