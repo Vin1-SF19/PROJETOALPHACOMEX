@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — publicação solicitada explicitamente pelo usuário; candidato isolado com revisão funcional/arquitetural e quatro gates aprovados. Sem alteração de esquema, migration, backfill ou mutação no banco remoto. Histórico das validações anteriores preservado abaixo.
+Ready for Review — hotfix do identificador RD no evento de movimento aprovado em quatro gates, revisão QA e smoke local; republicação da mesma entrega autorizada. Sem alteração de schema ou mutação de dados reais durante a investigação.
 
 ## Executor Assignment
 
@@ -179,6 +179,9 @@ Preparação: River (SM). Implementação: executor Dev, com blueprint Scout/Arc
 - `tests/bpm/card-modal-integration.test.ts` — valida tokens responsivos do mesmo grid sem depender da ordem literal das classes.
 - `tests/bpm/arquivamento-modal-react.test.ts` — isola o chat não relacionado para preservar testes de arquivamento.
 - `tests/builder/embed.test.ts` — alinha testes ao contrato publicado sem controles externos e preserva timeout, carregamento e falha de rede.
+- `src/lib/bpm/automacoes/central-schemas.ts` — usa a identidade canônica dos cards no evento de domínio; correção pós-publicação.
+- `tests/bpm/movimentacao-rd-eventos-reais.test.ts` — movimento e publicador reais, sem simular o parser do evento.
+- `tests/bpm/eventos-rd-sqlite.test.ts` — publicador e Prisma/SQLite reais, atomicidade e retry em banco temporário.
 
 ## QA Results
 
@@ -245,6 +248,21 @@ O checkout foi movido para `/home/ialpha/projetos/alpha-comex/painel-alpha-workt
 
 Nenhum CRITICAL/HIGH permanece aberto no escopo funcional revisado. A aprovação abrange a implementação e os gates deste candidato; a continuidade da publicação solicitada pertence ao fluxo DevOps. **Inspeção visual autenticada não realizada.** O QA não executou deploy nem mutação em dados reais.
 
+### Addendum v3 — revisão do hotfix do publicador de eventos, 2026-10-16
+
+O erro relatado após a publicação foi identificado no contrato real de `CARD_MOVIDO`: o parser do publicador exigia CUID para `cardId`, apesar de as ações de movimentação já aceitarem a identidade RD persistida. A revisão anterior usava um mock do publicador nos testes do comando e não cobria essa fronteira. A correção compartilha `bpmCardIdSchema` no schema de eventos, com duas linhas alteradas em `central-schemas.ts`; os demais identificadores, permissões, requisitos, confirmação e CAS permanecem com seus contratos anteriores.
+
+**Parecer funcional do hotfix: APPROVED**, sem CRITICAL/HIGH abertos na revisão desse patch. A reprodução RED registrou cinco falhas por identidade RD recusada; os novos testes GREEN mantêm comando, parser e publicador reais. Conferidos **2 arquivos / 9 testes aprovados**, incluindo publicação com identidades RD e CUID nativo, rejeição de identificadores malformados antes da persistência, cancelamento/prévia sem escrita e retry sem duplicar movimento, histórico ou outbox. Um teste adicional usa Prisma e SQLite temporário reais para demonstrar commit conjunto de etapa/evento, unicidade da publicação e rollback da etapa/versão quando a publicação falha. Evidência final: `/tmp/rd-hotfix-integration-final.log`.
+
+| Gate do hotfix | Resultado conferido |
+|---|---|
+| `npm test` | **PASS:** 642 arquivos e 4805 testes aprovados; 4 skipped e 1 todo; `/tmp/rd-hotfix-tests.log`. |
+| `npm run typecheck` | **PASS:** execução final sem erros; `/tmp/rd-hotfix-typecheck-final.log`. |
+| `npm run lint` | **PASS:** zero erros e 1193 warnings anteriores; `/tmp/rd-hotfix-lint.log`. |
+| `npm run build` | **PASS:** execução concluída com saída 0, confirmada pelo executor e log final conferido pelo QA; `/home/ialpha/projetos/alpha-comex/painel-alpha-worktrees/rd-hotfix-build.log`. |
+
+**Gate final do hotfix: PASS. Parecer: APPROVED.** Os quatro gates foram concluídos para o hotfix de quatro arquivos: contrato de eventos, duas regressões novas e esta story. A publicação corretiva solicitada pelo usuário pode seguir pelo fluxo DevOps. Esta revisão não executou movimentação em dados reais nem inspeção visual autenticada; os testes usam apenas dados sintéticos e banco descartável. O QA alterou somente esta seção da story nesta etapa.
+
 ## Change Log
 
 | Data | Versão | Descrição | Autor |
@@ -252,3 +270,26 @@ Nenhum CRITICAL/HIGH permanece aberto no escopo funcional revisado. A aprovaçã
 | 2026-10-16 | 1.0 | Story focada na movimentação manual de importados RD com confirmação auditável de pendências, dois caminhos da UI e transição ausente sem hardcode. | River (SM) |
 | 2026-10-16 | 1.1 | Implementação do contrato de confirmação manual RD, duas interfaces, auditoria e testes; revisão funcional corrigida. | Dev / QA |
 | 2026-10-16 | 1.2 | Publicação autorizada; candidato isolado com 640 arquivos de testes aprovados, quatro fixtures antigas corrigidas, build e smoke local aprovados. | Dev / QA / DevOps |
+
+## Correção pós-publicação: identificador no evento de movimento — 2026-10-16
+
+Usuário testou arrastando um card RD e recebeu mensagem genérica de falha de transição. Logs contemporâneos da produção mostraram `[TransitionCommand] ZodError`, `invalid_format`, `cuid`, caminho `cardId`. A aplicação aceita o identificador importado no pedido de movimentação, mas `eventoDominioInputSchema` ainda o recusava na publicação de `CARD_MOVIDO`; a transação desfazia a alteração em seguida. O problema é o contrato de identidade do publicador, e não uma exigência de informação obrigatória.
+
+- [x] Confirmar erro real de produção e reproduzir a rejeição de identidade localmente, sem escrever em dados reais.
+- [x] Compartilhar `bpmCardIdSchema` também no contrato de eventos, preservando validação restrita dos demais identificadores.
+- [x] Reproduzir a falha com comando e publicador de eventos reais, sem simular a validação que falhou.
+- [x] Validar prévia/cancelamento sem escrita, movimento com/sem pendências, histórico/outbox, retry e identidades inválidas.
+- [x] Executar quatro gates, obter revisão QA e preparar a republicação autorizada; acompanhar o deploy até READY e health correspondente.
+
+Os testes anteriores simulavam `publicarEventoBpm`, por isso não exercitaram o contrato de publicação real. A regressão nova deve manter o parser e o publicador reais. Nenhuma exceção por cliente, pipeline ou ID individual será introduzida; nenhum valor obrigatório será inventado para liberar a operação.
+
+### Evidência do hotfix
+
+- Antes do patch: a nova regressão com comando/publicador/schema reais falhou em 5 casos, reproduzindo `ZodError: cardId / Invalid cuid`; 3 casos negativos já passavam.
+- Depois: **8/8 casos passaram**, mais um caso com **Prisma/SQLite reais**, total **9/9**. A transação de teste grava mudança de etapa e outbox juntas, reaproveita a mesma publicação no retry e desfaz a mudança quando o publicador recebe identidade inválida.
+- `npm test`: **642 arquivos / 4805 testes aprovados**, 4 skipped e 1 todo; `/tmp/rd-hotfix-tests.log`. Lint global: zero erros e 1193 warnings anteriores; `/tmp/rd-hotfix-lint.log`.
+- O teste SQLite segue o padrão existente `createRequire` para o módulo nativo do Node 24, mantendo compatibilidade com os tipos Node 20 do projeto; teste focal e lint repetidos após esse ajuste de tipagem, sem alterar o produto.
+- Escopo executável do hotfix: duas linhas no contrato do evento. Identidades de pipeline, etapa, campo e execução continuam restritas; autenticação, permissões, confirmação de pendências e CAS não foram flexibilizados. Banco temporário de teste não contém dados reais e é removido ao terminar.
+
+- Typecheck final aprovado (`/tmp/rd-hotfix-typecheck-final.log`), regressões focais repetidas aprovadas (`/tmp/rd-hotfix-integration-final.log`) e lint focal sem erros (`/tmp/rd-hotfix-focal-lint.log`). Build final saída 0 em `/home/ialpha/projetos/alpha-comex/painel-alpha-worktrees/rd-hotfix-build.log`.
+- QA hotfix APPROVED. Smoke local do artefato aprovado (raiz/providers 200 e CRM protegido sem sessão); servidor temporário encerrado. Artefato contém somente o contrato compartilhado, dois testes novos e esta story. Publicação deve preservar rollback anterior, confirmar `/api/health/version` na SHA final e conferir logs contemporâneos.
