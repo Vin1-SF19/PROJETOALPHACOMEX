@@ -33,7 +33,7 @@ Como colaborador do Painel Alpha, quero abrir e acompanhar chamados para qualque
 6. O gestor permite listar por setor, adicionar, renomear, arquivar/reativar e excluir categorias. Nomes vazios/duplicados no mesmo setor são rejeitados; categorias usadas são arquivadas, não apagadas. Exclusão física exige ausência de referências verificada também na transação; renomear/arquivar não altera rótulos históricos dos chamados.
 7. Responsável desejado lista somente colaboradores ativos do destino selecionado. **Sem preferência** mantém fila aberta ao setor; uma escolha preserva a reserva exclusiva atual. Preferência não preenche a atribuição efetiva, e a elegibilidade é revalidada na abertura e na assunção.
 8. Admin, CEO e TI mantêm visão global. Demais usuários ativos veem somente seus próprios pedidos e chamados destinados ao próprio setor. Listas, contadores, detalhe, chat, protocolos, notificações e integrações aplicam o mesmo escopo no servidor.
-9. Visão global não concede operação global. Assunção exige colaborador ativo do destino, estado `ABERTO`, ausência de atendente e respeito à reserva. Conclusão rápida/com protocolo exige atendente efetivamente atribuído, ativo e elegível no destino. Dois atores concorrentes não podem assumir o mesmo chamado.
+9. Revisão de 19/10/2026: perfis administrativos globais (TI/T.I, Admin e CEO) podem assumir chamados de qualquer destino ativo e real; colaboradores comuns continuam restritos ao próprio setor. Assunção exige ator ativo, estado `ABERTO`, ausência de atendente e respeito à reserva. Conclusão rápida/com protocolo e resposta operacional exigem o responsável efetivamente atribuído e autorizado. Dois atores concorrentes não podem assumir o mesmo chamado.
 10. Mensagens distinguem solicitante e atendente por IDs persistidos. O solicitante pode participar do próprio chamado, e a resposta operacional exige o responsável efetivo conforme contrato atual. Ser Admin/TI/CEO ou abrir um pedido para o próprio setor não transforma o usuário automaticamente em atendente.
 11. Os 224 chamados antigos preservam categoria textual, protocolo, atendentes, mensagens, prazo e feedback. Não há backfill: destino nulo é interpretado como TI pela autorização central. Uma categoria antiga chamada Financeiro não altera o destino legado para Financeiro.
 12. Notificações persistidas e realtime respeitam destinatário/visibilidade; não encaminham automaticamente demandas de outros setores ao contato fixo de WhatsApp usado pelo TI. A integração legada de WhatsApp e Agenda TI mantém seu comportamento para chamados TI, sem criar agenda para os demais setores neste escopo.
@@ -48,8 +48,8 @@ Como colaborador do Painel Alpha, quero abrir e acompanhar chamados para qualque
 | Ator ativo | Leitura | Assumir | Responder como atendente / concluir | Categorias |
 |---|---|---|---|---|
 | Colaborador comum | Próprios pedidos + fila do seu setor | Destino = seu setor; respeita reserva | Apenas se atribuído e elegível | Consultar ativas |
-| Admin / CEO | Global | Mesmas regras de destino e reserva | Apenas se atribuído e elegível | Consultar ativas |
-| TI / T.I | Global | Mesmas regras de destino e reserva | Apenas se atribuído e elegível | Gerenciar todos os setores |
+| Admin / CEO | Global | Qualquer destino ativo e real; respeita reserva | Apenas se atribuído e elegível | Consultar ativas |
+| TI / T.I | Global | Qualquer destino ativo e real; respeita reserva | Apenas se atribuído e elegível | Gerenciar todos os setores |
 | Solicitante | Próprio chamado | Só se também elegível para a fila | Mensagens como solicitante; sem autoatribuição | Consultar ativas |
 | Não autenticado / inativo | Negado | Negado | Negado | Negado |
 
@@ -268,7 +268,7 @@ Codex, com agentes de backend, frontend, integrações, dados/Vault e revisão L
 ### Completion Notes
 
 - Implementados catálogo dinâmico, abertura multissetorial, gestor TI e autorização compartilhada, preservando layout e contratos de reserva/CAS.
-- Colaborador vê próprios pedidos + destino do setor; Admin/CEO/TI mantêm leitura global sem operação global. Autoassunção elegível permanece; não há feedback/autoalertas para si.
+- Colaborador vê próprios pedidos + destino do setor; Na entrega de 15/10, Admin/CEO/TI mantinham leitura global sem operação global; a revisão de 19/10 ao final desta story substitui essa restrição para os administradores. Autoassunção elegível permanece; não há feedback/autoalertas para si.
 - Integrações manual/Bibble/ChatBot, protocolos/chat e notificações usam escopo canônico; Agenda e WhatsApp fixo permanecem TI. Detalhe reconcilia estado local após conclusão.
 - Schema/SQL aditivos e seed idempotente aplicados após consentimento específico, com 13 destinos e 53 categorias inseridas. Os 224 chamados antigos não foram atualizados; destino null significa TI.
 - Backup dedicado verificado, gate Vault aprovado e aplicação com exit 0. Hashes antigos, integridade e FKs preservados; Prisma real somente leitura aprovado. Homologação autenticada/realtime e publicação não executadas.
@@ -295,3 +295,42 @@ Codex, com agentes de backend, frontend, integrações, dados/Vault e revisão L
 - **Preservação real:** hashes antes/depois iguais para todos os campos antigos de 224 chamados, 179 mensagens, 43 feedbacks e 3 templates. Nenhum backfill; destinos legados continuam null=TI.
 - **Runtime real somente leitura:** `runtime-readonly.json` aprovado via Prisma; 13 destinos, 53 categorias com datas válidas, 27 responsáveis elegíveis e 29 atores ativos. Escopo SQL coincide com predicado de acesso para cada ator; legados null preservados. Uma leitura adicional sofreu ConnectTimeout pontual e passou no retry somente leitura; nenhuma mutação foi repetida.
 - **Limites:** não houve E2E autenticado com criação/atendimento persistido, validação realtime real, PR, commit, push, deploy ou publicação. Componentes com actions simuladas e Prisma real readonly não substituem essas etapas. Status Ready for Review, sem Done integral.
+
+## Correção de 19/10/2026 — assunção administrativa entre setores
+
+O usuário relatou ausência de **Assumir Chamado** nos dois pendentes e esclareceu que utiliza o perfil de TI com acesso administrativo. Consulta real somente leitura confirmou os chamados #265 e #268 em `ABERTO`, sem técnico atribuído ou solicitado, com destino Comercial ativo. O commit `44a84fe6` passou a exigir pertencimento ao destino também dos perfis administrativos. A correção revisa o AC 9: mantém o destino dos registros e permite atuação administrativa entre setores, incluindo resposta e conclusão somente após atribuição efetiva. Reserva exclusiva, concorrência, atores inativos e destinos inválidos continuam bloqueados. Não há alteração do banco nem assunção dos chamados nesta sessão.
+
+- [x] Centralizar autorização administrativa de atendimento e reutilizar na action de assunção, resposta e conclusão.
+- [x] Exibir a ação no detalhe e permitir transição imediata para finalização; preservar contador de mensagens do atendente administrativo.
+- [x] Cobrir TI/T.I/Admin/CEO fora do destino, colaborador comum, reserva, concorrência, destino inválido e fluxo React.
+- [x] Executar lint, typecheck, testes e build; registrar resultados e File List efetiva (build interrompido pelo ambiente, não aprovado).
+
+### File List da correção
+
+- `docs/stories/story-chamados-multissetorial.md`
+- `src/lib/chamados/acesso.ts`
+- `src/lib/chamados/conclusao.ts`
+- `src/actions/chamados.ts`
+- `src/app/PainelAlpha/Chamados/page.tsx`
+- `src/components/DetalhesChamado.tsx`
+- `tests/chamados/multissetorial-acesso.test.ts`
+- `tests/chamados/assumir.test.ts`
+- `tests/chamados/conclusao-feedback.test.ts`
+- `tests/chamados/assumir-administrativo-react.test.ts`
+
+
+### Validações de 19/10/2026
+
+- Consulta somente leitura: dois chamados abertos (#265 e #268), ambos com `tecnicoId: null`, `tecnicoSolicitadoId: null` e setor Comercial ativo. Sem escrita real ou alteração dos destinos.
+- `npx vitest run tests/chamados --coverage=false`: 23 arquivos e 158 testes aprovados antes da adição do ensaio React.
+- `npx vitest run tests/chamados/assumir-administrativo-react.test.ts --coverage=false`: 5 testes aprovados com página e detalhe reais, policies reais e persistência simulada. Cobrem botão TI fora do destino, transição imediata para protocolo, falha da assunção, bloqueio de usuário comum/reserva e contador/chat do atendente administrativo.
+- `npm test -- --maxWorkers=4`: exit 0, 649 arquivos aprovados; 4.894 testes aprovados, 4 ignorados e 1 todo. Sem falhas.
+- `npm run lint`: exit 0, zero erros e 1.193 warnings preexistentes. Lint focado dos nove arquivos de código/testes: zero diagnósticos.
+- `npm run typecheck`: exit 0.
+- `NEXT_DIST_DIR=.next-chamados-assumir-admin-validation npm run build`: exit 1; após tentativas de carregamento de recursos, o worker terminou com `signal: SIGTERM`. Build completo não validado. O log não aponta erro de compilação nos arquivos desta correção; lint e typecheck passaram separadamente. Não houve nova tentativa, pois as duas execuções de build da correção anterior nesta sessão também terminaram por SIGTERM.
+- Logs em `/tmp/chamados-assumir-admin-{focused,react,tests,lint,lint-focused,typecheck,build}.log`.
+- O usuário solicitou commit local após a implementação. Os chamados reais permanecem pendentes para o usuário assumir após disponibilização do código; sem push ou deploy nesta sessão.
+
+### Commit solicitado
+
+Em 19/10/2026, os dez arquivos desta correção foram isolados na worktree da `main`, sobre `29585847`. Nessa base, os 163 testes de Chamados (24 arquivos) passaram, assim como o lint dos nove arquivos de código/testes. As demais alterações da `staging` foram preservadas. O build permanece com a limitação registrada acima.
