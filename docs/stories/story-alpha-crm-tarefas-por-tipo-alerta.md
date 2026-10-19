@@ -80,3 +80,38 @@ O card de Francisco recusava tarefa sem título com “Não foi possível criar 
 
 - Teste focado: 2 casos aprovados (título ausente e erro estruturado do servidor).
 - Lint: 0 erros; typecheck: passou; suíte completa: 504 arquivos e 3.793 testes aprovados, 4 ignorados e 1 todo; build: passou.
+
+## Correção — tarefas e anotações em cards RD (2026-10-19)
+
+### Checklist da correção
+
+- [x] Reproduzir a rejeição de IDs RD na criação de tarefas e anotações (4 falhas de regressão antes da correção).
+- [x] Usar `bpmCardIdSchema` nos dois fluxos, mantendo autorização antes e dentro da transação.
+- [x] Cobrir criação de tarefa com prazo e anotação com autor/histórico em cards nativos e RD.
+- [x] Preservar rejeição de IDs inválidos, prazo/alerta inválidos, título ausente e anotação vazia.
+- [x] Concluir lint, typecheck, suíte geral e build.
+
+### File List da correção
+
+- `src/lib/validations/bpm.ts`
+- `tests/bpm/card-rd-tarefas-anotacoes.test.ts`
+- `docs/stories/story-alpha-crm-tarefas-por-tipo-alerta.md`
+- `docs/stories/story-alpha-crm-anotacao-fixa-formulario-etapa.md`
+
+### Dev Agent Record
+
+- Causa: `criarTarefaSchema` e `criarInteracaoCardSchema` exigiam CUID, recusando IDs `rdcard_<hash>` antes de avaliar permissões ou gravar.
+- Alteração restrita à validação do identificador do card; regras de preenchimento, autoria, histórico e realtime mantidas.
+- Nenhuma alteração de banco ou migration.
+- Logs das verificações: `/tmp/crm-tarefas-anotacoes-*.log`.
+
+### Validação da correção
+
+- Antes da correção: 4 testes de regressão falharam por rejeição de IDs RD.
+- Depois: 40 testes direcionados passaram em 5 arquivos.
+- `npm run lint`: passou sem erros (1193 warnings existentes).
+- `npm run typecheck`: passou.
+- `npm test`: 649 arquivos passaram; 4869 testes passaram, 4 skipped e 1 todo.
+- `npm run build`: passou após limpeza dos caches gerados pelas verificações; a primeira tentativa falhou por cota de disco.
+- ESLint focado e `git diff --check`: passaram.
+- CodeRabbit CLI indisponível neste ambiente.
