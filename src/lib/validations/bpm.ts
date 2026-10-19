@@ -208,6 +208,13 @@ export const etapaIdCardSchema = z.union([
   z.string().regex(/^draft-stage-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i),
 ]);
 
+// Identidades persistidas pelos cards nativos e pelo importador; o formato
+// aceito não concede acesso nem comprova proveniência de integração.
+export const bpmCardIdSchema = z.union([
+  z.string().cuid(),
+  z.string().regex(/^rdcard_[a-f0-9]{28}$/),
+]);
+
 const campoEtapaConfigSchema = z.object({
   etapaId: etapaIdCardSchema,
   visivel: z.boolean().default(true),
@@ -390,11 +397,11 @@ export const atualizarCardSchema = z.object({
 export const MAX_MEMBROS_CARD_BPM = 50;
 
 export const listarUsuariosVinculaveisCardSchema = z.object({
-  cardId: z.string().cuid(),
+  cardId: bpmCardIdSchema,
 });
 
 export const atualizarMembrosCardSchema = z.object({
-  cardId: z.string().cuid(),
+  cardId: bpmCardIdSchema,
   userIds: z
     .array(z.number().int().positive())
     .max(

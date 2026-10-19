@@ -23,6 +23,7 @@ vi.mock("@/lib/bpm/ownership", () => ({
 vi.mock("@/lib/bpm/realtime-server", () => ({
   notificarPipelineBpm: notificarPipelineBpmMock,
 }));
+vi.mock("@/lib/bpm/automacoes/eventos", () => ({ publicarEventoBpm: vi.fn() }));
 
 import {
   AtualizarMembrosCardBpm,
@@ -159,6 +160,34 @@ describe("CRM - membros vinculados ao card", () => {
     expect(prismaMock.bpmCardMembro.deleteMany).not.toHaveBeenCalled();
     expect(prismaMock.bpmCardHistorico.create).not.toHaveBeenCalled();
     expect(notificarPipelineBpmMock).not.toHaveBeenCalled();
+  });
+
+  it("carrega e salva pessoas de cards importados do RD com a mesma autorização", async () => {
+    const cardId = `rdcard_${"a".repeat(28)}`;
+    const membros = [
+      { userId: 7, role: "RESPONSAVEL", usuario: { id: 7, nome: "Responsável", imagemUrl: null } },
+      { userId: 9, role: "PARTICIPANTE", usuario: { id: 9, nome: "Participante", imagemUrl: null } },
+    ];
+    prismaMock.bpmCardMembro.findMany
+      .mockResolvedValueOnce([{ userId: 7, role: "RESPONSAVEL" }])
+      .mockResolvedValueOnce(membros);
+
+    await expect(ListarUsuariosVinculaveisCardBpm({ cardId })).resolves.toMatchObject({ success: true });
+    await expect(AtualizarMembrosCardBpm({ cardId, userIds: [9] })).resolves.toEqual({ success: true, data: membros });
+    expect(exigirAcessoBpmCardMock).toHaveBeenCalledWith(cardId, 7, "COMERCIAL", "adicionarParticipantes");
+    expect(exigirAcessoBpmCardMock).toHaveBeenCalledWith(cardId, 7, "COMERCIAL", "adicionarParticipantes", prismaMock);
+    expect(prismaMock.bpmCardMembro.upsert).toHaveBeenCalledWith({
+      where: { cardId_userId: { cardId, userId: 9 } },
+      create: { cardId, userId: 9, role: "PARTICIPANTE" },
+      update: { role: "PARTICIPANTE" },
+    });
+  });
+
+  it.each(["", "rdcard_invalido", `rdcard_${"a".repeat(29)}`, "outro_card"])("recusa ID inválido %j antes de consultar vínculos", async (cardId) => {
+    await expect(ListarUsuariosVinculaveisCardBpm({ cardId })).resolves.toMatchObject({ success: false });
+    await expect(AtualizarMembrosCardBpm({ cardId, userIds: [9] })).resolves.toMatchObject({ success: false });
+    expect(exigirAcessoBpmCardMock).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
   it("não aceita duplicatas nem mais pessoas que o limite", async () => {
