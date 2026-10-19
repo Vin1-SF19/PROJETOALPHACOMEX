@@ -404,11 +404,11 @@ export const atualizarCardSchema = z.object({
 export const MAX_MEMBROS_CARD_BPM = 50;
 
 export const listarUsuariosVinculaveisCardSchema = z.object({
-  cardId: z.string().cuid(),
+  cardId: bpmCardIdSchema,
 });
 
 export const atualizarMembrosCardSchema = z.object({
-  cardId: z.string().cuid(),
+  cardId: bpmCardIdSchema,
   userIds: z
     .array(z.number().int().positive())
     .max(

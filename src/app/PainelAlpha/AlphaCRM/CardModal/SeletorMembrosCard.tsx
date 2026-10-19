@@ -105,14 +105,19 @@ export function SeletorMembrosCard({ cardId, membros, podeGerenciar, accent, onM
     let cancelado = false;
     async function carregarUsuarios() {
       setCarregando(true);
-      const resultado = await ListarUsuariosVinculaveisCardBpm({ cardId });
-      if (cancelado) return;
-      setCarregando(false);
-      if (resultado.success) {
-        setUsuarios(resultado.data);
-        return;
+      try {
+        const resultado = await ListarUsuariosVinculaveisCardBpm({ cardId });
+        if (cancelado) return;
+        if (resultado.success) {
+          setUsuarios(resultado.data);
+          return;
+        }
+        toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível carregar as pessoas disponíveis.");
+      } catch {
+        if (!cancelado) toast.error("Não foi possível carregar as pessoas disponíveis. Feche e abra o seletor para tentar novamente.");
+      } finally {
+        if (!cancelado) setCarregando(false);
       }
-      toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível carregar as pessoas disponíveis.");
     }
 
     void carregarUsuarios();
