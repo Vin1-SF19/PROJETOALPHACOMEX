@@ -24,7 +24,6 @@ import {
     restaurarContrato,
     criarObservacaoContrato,
     buscarClienteParaContrato,
-    listarClientesEmConstituicao,
 } from "@/actions/ContratoComercial";
 import { listarParceirosSimples, buscarParceiroDetalheSimples } from "@/actions/parceiros";
 import { SERVICOS_COMERCIAIS_PADRAO } from "@/lib/comercial/servicos";
@@ -238,11 +237,6 @@ function FormNovoContrato({
     const [consultado, setConsultado] = useState(isEdicao);
     const [empresaEmConstituicao, setEmpresaEmConstituicao] = useState(eConstituicaoInicial);
     const [clienteEncontrado, setClienteEncontrado] = useState(isEdicao);
-    const [clientesConstituicao, setClientesConstituicao] = useState<{ id: number; razaoSocial: string }[]>([]);
-    const [carregandoConstituicao, setCarregandoConstituicao] = useState(false);
-    const [clienteConstituicaoId, setClienteConstituicaoId] = useState<number | null>(
-        isEdicao && eConstituicaoInicial ? initialData!.clienteId : null,
-    );
 
     const padraoFormaPag = (v: string) => (["ENTRADA_EXITO","PARCELADO_CC","INTEGRAL_PIX"].includes(v) ? v : v === "OUTRO" ? "" : "");
     const isCustomPag = initialData ? !["ENTRADA_EXITO","PARCELADO_CC","INTEGRAL_PIX"].includes(initialData.formaPagamento) : false;
@@ -340,31 +334,17 @@ function FormNovoContrato({
             .finally(() => setCarregandoParceiroDetalhe(false));
     }, [indicadoPorParceiroId]);
 
-    // Fase 3.6 do Cliente Master (2026-08-14): "Empresa em Constituição" NUNCA cria
-    // Cliente novo — só vincula um já existente (cnpj null, cadastrado no BPM).
+    // Cadastro direto sem CNPJ. Na edição, mantém o vínculo original mesmo
+    // quando o usuário desmarca e marca novamente a opção.
     const ativarConstituicao = (ativo: boolean) => {
         setEmpresaEmConstituicao(ativo);
         setCnpj("");
-        setDadosEmpresa({ razaoSocial: "", nomeFantasia: "", dataConstituicao: "", regimeTributario: "", uf: "" });
-        setConsultado(false);
+        setDadosEmpresa({
+            razaoSocial: ativo ? (eConstituicaoInicial ? initialData!.razaoSocial : "Em constituição") : "",
+            nomeFantasia: "", dataConstituicao: "", regimeTributario: "", uf: "",
+        });
+        setConsultado(ativo);
         setClienteEncontrado(false);
-        setClienteConstituicaoId(null);
-        if (ativo && clientesConstituicao.length === 0) {
-            setCarregandoConstituicao(true);
-            listarClientesEmConstituicao()
-                .then((res) => {
-                    if (res.success) setClientesConstituicao(res.clientes);
-                    else toast.error(res.error);
-                })
-                .catch(() => toast.error("Erro ao listar empresas em constituição"))
-                .finally(() => setCarregandoConstituicao(false));
-        }
-    };
-
-    const selecionarClienteConstituicao = (id: number, razaoSocial: string) => {
-        setClienteConstituicaoId(id);
-        setDadosEmpresa({ razaoSocial, nomeFantasia: "", dataConstituicao: "", regimeTributario: "", uf: "" });
-        setConsultado(true);
     };
 
     // Consulta o Cliente já cadastrado no CRM primeiro (mais rápido, evita chamada
@@ -441,8 +421,7 @@ function FormNovoContrato({
     const formaPagamentoFinal = mostraFormaPagCustom ? formaPagamentoCustom.trim() : formaPagamento;
 
     const handleSalvar = async () => {
-        if (!consultado) { toast.error("Consulte o CNPJ primeiro"); return; }
-        if (empresaEmConstituicao && !clienteConstituicaoId) { toast.error("Selecione a empresa em constituição"); return; }
+        if (!empresaEmConstituicao && !consultado) { toast.error("Consulte o CNPJ primeiro"); return; }
         if (!empresaEmConstituicao && !dadosEmpresa.razaoSocial.trim()) { toast.error("Informe a razão social"); return; }
         if (!valorContrato) { toast.error("Informe o valor do contrato"); return; }
         if (!formaPagamentoFinal) { toast.error("Selecione a forma de pagamento"); return; }
@@ -467,11 +446,12 @@ function FormNovoContrato({
 
         setSalvando(true);
         try {
-            // Fase 3.6 do Cliente Master (2026-08-14): identifica a empresa por CNPJ
-            // (resolve OU cria o Cliente) ou por clienteId direto (empresa em
-            // constituição, sempre um Cliente já existente).
+            // Novas empresas sem CNPJ são criadas ao salvar. Na edição,
+            // reutiliza o cliente original para não duplicá-lo.
             const identificacaoEmpresa = empresaEmConstituicao
-                ? { clienteId: clienteConstituicaoId! }
+                ? (eConstituicaoInicial
+                    ? { clienteId: initialData!.clienteId }
+                    : { empresaEmConstituicao: true as const })
                 : {
                     cnpj: cnpj.replace(/\D/g, ""),
                     razaoSocial: dadosEmpresa.razaoSocial,
@@ -559,31 +539,11 @@ function FormNovoContrato({
                     </div>
                     {empresaEmConstituicao ? (
                         <div>
-                            <label className={labelCls}>Empresa em constituição (cadastrada no BPM) *</label>
-                            {carregandoConstituicao ? (
-                                <div className={`${inputCls} flex items-center gap-2 text-slate-500`}>
-                                    <Loader2 size={13} className="animate-spin" /> Carregando...
-                                </div>
-                            ) : clientesConstituicao.length === 0 ? (
-                                <p className="text-[10px] text-amber-400">
-                                    Nenhuma empresa em constituição cadastrada no BPM — cadastre-a lá primeiro.
-                                </p>
-                            ) : (
-                                <select
-                                    value={clienteConstituicaoId ?? ""}
-                                    onChange={(e) => {
-                                        const id = Number(e.target.value);
-                                        const cliente = clientesConstituicao.find((c) => c.id === id);
-                                        if (cliente) selecionarClienteConstituicao(cliente.id, cliente.razaoSocial);
-                                    }}
-                                    className={inputCls}
-                                >
-                                    <option value="">Selecionar empresa...</option>
-                                    {clientesConstituicao.map((c) => (
-                                        <option key={c.id} value={c.id}>{c.razaoSocial}</option>
-                                    ))}
-                                </select>
-                            )}
+                            <label className={labelCls}>Razão Social</label>
+                            <input readOnly value={dadosEmpresa.razaoSocial} className={`${inputCls} cursor-not-allowed`} />
+                            <p className="mt-2 text-[10px] text-amber-400">
+                                Empresa ainda sem CNPJ. Preencha os dados do contrato para continuar.
+                            </p>
                         </div>
                     ) : (
                         <>
