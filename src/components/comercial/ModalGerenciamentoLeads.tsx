@@ -26,6 +26,7 @@ import {
     buscarClienteParaContrato,
 } from "@/actions/ContratoComercial";
 import { listarParceirosSimples, buscarParceiroDetalheSimples } from "@/actions/parceiros";
+import { CANAIS_ORIGEM_PADRAO } from "@/lib/comercial/canais-origem";
 import { SERVICOS_COMERCIAIS_PADRAO } from "@/lib/comercial/servicos";
 import QuadroSocios, { type Socio } from "./QuadroSocios";
 import ModalConfirmacaoFechamento from "./ModalConfirmacaoFechamento";
@@ -127,18 +128,11 @@ const FORMAS_LABEL: Record<string, string> = {
     OUTRO: "Outra forma",
 };
 
-const CANAIS_AQUISICAO = [
-    { value: "Tráfego Pago (Meta - Instagram)", label: "Tráfego Pago (Meta - Instagram)" },
-    { value: "Tráfego Pago (Google)", label: "Tráfego Pago (Google)" },
-    { value: CANAL_INDICACAO_PARCEIRO, label: LABEL_INDICACAO_PARCEIRO },
-    { value: CANAL_INDICACAO_CLIENTE, label: LABEL_INDICACAO_CLIENTE },
-    { value: "WhatsApp", label: "WhatsApp" },
-    { value: "Instagram", label: "Instagram" },
-    { value: "Orgânico", label: "Orgânico" },
-    { value: "Evento", label: "Evento" },
-    { value: CANAL_PROSPECCAO_ATIVA, label: CANAL_PROSPECCAO_ATIVA },
-    { value: "Outro", label: "Outro" },
-];
+const CANAIS_AQUISICAO = CANAIS_ORIGEM_PADRAO.map((value) => ({
+    value,
+    label: value === CANAL_INDICACAO_PARCEIRO ? LABEL_INDICACAO_PARCEIRO
+        : value === CANAL_INDICACAO_CLIENTE ? LABEL_INDICACAO_CLIENTE : value,
+}));
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

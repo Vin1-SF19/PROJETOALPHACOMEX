@@ -2,6 +2,7 @@
 import React, { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { CANAIS_ORIGEM_PADRAO } from "@/lib/comercial/canais-origem";
 import NovoCardModal from "@/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/NovoCardModal";
 
 const buscarPorCnpj = vi.hoisted(() => vi.fn());
@@ -120,4 +121,90 @@ it("aguarda a consulta do CNPJ antes de criar o card, mesmo após edição manua
   expect(onCriado).toHaveBeenCalledWith(expect.objectContaining({
     novaEmpresa: expect.objectContaining({ cnpj: "11222333000181", razaoSocial: "Nome digitado" }),
   }));
+});
+
+it("oferece canal de origem em select, retira Qualificação e deixa radar opcional", () => {
+  const canal = container.querySelector<HTMLSelectElement>("select#novo-card-canal")!;
+  expect(canal).not.toBeNull();
+  expect([...canal.options].map((option) => option.value)).toEqual(["", ...CANAIS_ORIGEM_PADRAO]);
+  expect(container.querySelector("#novo-card-qualificacao")).toBeNull();
+  expect(container.textContent).not.toContain("Qualificação");
+  expect(container.querySelector<HTMLSelectElement>("#novo-card-radar")?.required).toBe(false);
+  expect(container.textContent).toContain("Radar pretendido (opcional)");
+});
+
+async function preencherEmpresaExistente() {
+  buscarPorCnpj.mockResolvedValueOnce({ success: true, data: {
+    id: 42, cnpj: "11222333000181", razaoSocial: "Empresa cadastrada", nomeFantasia: null, uf: "SP", municipio: "São Paulo",
+  } });
+  await act(async () => editar("CNPJ", "11222333000181"));
+}
+async function clicar(texto: string) {
+  const button = [...container.querySelectorAll("button")].find((item) => item.textContent?.trim() === texto)!;
+  expect(button).toBeDefined();
+  await act(async () => button.click());
+}
+async function escreverCanal(valor: string) {
+  const input = container.querySelector<HTMLInputElement>("#novo-card-canal-novo")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, valor);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+it("cadastra com canal padrão e sem radar ou Qualificação no payload", async () => {
+  await preencherEmpresaExistente();
+  await act(async () => {
+    const select = container.querySelector<HTMLSelectElement>("#novo-card-canal")!;
+    select.value = "Evento";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await clicar("Criar Card");
+  expect(onCriado).toHaveBeenCalledOnce();
+  const dados = onCriado.mock.calls[0][0];
+  expect(dados).toMatchObject({ empresaId: 42, canalOrigem: "Evento" });
+  expect(dados.radarPretendido).toBeUndefined();
+  expect(dados).not.toHaveProperty("qualificacao");
+});
+
+it("permite cadastrar mesmo sem opções de radar configuradas", async () => {
+  await act(async () => root.render(createElement(NovoCardModal, {
+    pipelineId: "pipeline", etapaId: "etapa", etapaNome: "Novo Lead", currentUserId: 1, accent: "1,2,3",
+    radarOpcoes: [], onClose: vi.fn(), onCriado,
+  })));
+  await preencherEmpresaExistente();
+  await clicar("Criar Card");
+  expect(onCriado).toHaveBeenCalledWith(expect.objectContaining({ empresaId: 42, radarPretendido: undefined }));
+});
+
+it("adiciona e seleciona canal personalizado e o envia no cadastro", async () => {
+  await preencherEmpresaExistente();
+  await clicar("Personalizar");
+  expect(container.querySelector<HTMLInputElement>("#novo-card-canal-novo")?.maxLength).toBe(120);
+  await escreverCanal("  Feira   internacional  ");
+  await clicar("Adicionar canal");
+  expect(container.querySelector<HTMLSelectElement>("#novo-card-canal")?.value).toBe("Feira internacional");
+  expect(container.querySelector("#novo-card-canal-novo")).toBeNull();
+  await clicar("Criar Card");
+  expect(onCriado).toHaveBeenCalledWith(expect.objectContaining({ canalOrigem: "Feira internacional", radarPretendido: undefined }));
+});
+
+it("recusa personalização vazia e permite cancelar sem alterar a seleção", async () => {
+  await clicar("Personalizar");
+  await escreverCanal("   ");
+  const adicionar = [...container.querySelectorAll("button")].find((button) => button.textContent === "Adicionar canal")!;
+  expect(adicionar.disabled).toBe(true);
+  await escreverCanal("Não confirmado");
+  await clicar("Cancelar personalização");
+  expect(container.querySelector<HTMLSelectElement>("#novo-card-canal")?.value).toBe("");
+  expect(container.textContent).not.toContain("Não confirmado");
+});
+
+it("reutiliza canal existente sem duplicar opções por diferenças de caixa e espaços", async () => {
+  await clicar("Personalizar");
+  await escreverCanal("  evento ");
+  await clicar("Adicionar canal");
+  const select = container.querySelector<HTMLSelectElement>("#novo-card-canal")!;
+  expect(select.value).toBe("Evento");
+  expect(select.options.length).toBe(CANAIS_ORIGEM_PADRAO.length + 1);
 });
