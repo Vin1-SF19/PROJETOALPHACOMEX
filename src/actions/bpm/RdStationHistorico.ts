@@ -6,7 +6,7 @@ import { z } from "zod";
 import db from "@/lib/prisma";
 import { auth } from "../../../auth";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
-import { corrigirProjecaoHistoricoRd } from "@/lib/bpm/rd-station-history";
+import { comAutoriaOriginalRd, corrigirProjecaoHistoricoRd } from "@/lib/bpm/rd-station-history";
 import { ordenarHistoricoRd, periodoOriginalRd } from "@/lib/bpm/rd-station-display";
 import { textoLegivelRd } from "@/lib/bpm/rd-station-text";
 
@@ -46,7 +46,7 @@ export async function ListarHistoricoExternoRd(cardId: string) {
         id: evento.id,
         tipo: evento.eventType,
         data: evento.occurredAt,
-        projecao: JSON.parse(evento.projectedJson) as Record<string, unknown>,
+        projecao: comAutoriaOriginalRd(JSON.parse(evento.projectedJson) as Record<string, unknown>, JSON.parse(evento.rawJson)),
         periodoOriginal: periodoOriginalRd(JSON.parse(evento.rawJson) as Record<string, unknown>),
         correcoes: evento.correcoes.map((correcao) => ({
           versao: correcao.versao, campos: JSON.parse(correcao.camposAlteradosJson) as Record<string, unknown>,

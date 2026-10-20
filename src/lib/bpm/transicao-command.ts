@@ -40,13 +40,13 @@ import {
   type BpmTransitionRequester,
 } from "@/lib/bpm/ontology";
 import { exigirAcessoBpmCard, usuarioElegivelResponsavelBpm } from "@/lib/bpm/ownership";
-import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
+import { etapaEhNovosLeads, etapaEhStandbyFollowUp } from "@/lib/bpm/novos-leads";
 import { etapaEhLost } from "@/lib/bpm/lost";
 import { sincronizarProximoContatoAgenda } from "@/lib/bpm/proximo-contato-agenda";
 import { destinoPermitidoEmTratativa, etapaEhEmTratativa, etapaEhSemViabilidade, obterErroChecklistParaSaidaEmTratativa, obterErroProximoContatoParaEntrada } from "@/lib/bpm/em-tratativa";
 import { etapaEhAgendarReuniao, destinoEhReuniaoAgendada, obterErroDataReuniaoParaMovimento } from "@/lib/bpm/agendar-reuniao";
 import { destinoPermitidoReuniaoAgendada, etapaEhReuniaoAgendada, obterErroTranscricaoParaMovimento } from "@/lib/bpm/reuniao-agendada";
-import { statusInicialAoEntrarFechado } from "@/lib/bpm/status-pos-fechamento";
+import { etapaEhFechado, statusInicialAoEntrarFechado } from "@/lib/bpm/status-pos-fechamento";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { enfileirarAutomacoesMovimentoBpm } from "@/lib/bpm/automacoes/fila";
@@ -670,7 +670,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
         item.startsWith("Alíquota ") || item === "Total de retenções superior ao valor bruto"));
     }
   }
-  if (!manualRd && card.pipeline.nome === "Revisão de Radar" && destino.nome === "Fechado") {
+  if (!manualRd && card.pipeline.nome === "Revisão de Radar" && etapaEhFechado(destino.nome, destino.chave)) {
     for (const chave of ["alpha.radar.viabilidade.valor_acordado", "alpha.radar.viabilidade.forma_pagamento"]) {
       const campo = camposRequisito.find((item) => item.chave === chave
         && item.etapaConfiguracoes.some((config) => config.etapaId === destino.id && config.visivel && config.obrigatorioEntrada));
@@ -713,7 +713,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     if (erroReuniao) erro("MEETING_DATE_REQUIRED", erroReuniao);
     if (etapaEhAgendarReuniao(card.etapa.nome)
       && !destinoEhReuniaoAgendada(destino.nome)
-      && destino.nome !== "Stand By") {
+      && !etapaEhStandbyFollowUp(destino.nome, destino.chave)) {
       erro("STAGE_EXIT_BLOCKED", "Agendar Reunião só pode avançar para Reunião Agendada ou Stand By.");
     }
   }
@@ -893,6 +893,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
       const statusPosFechamentoInicial = prepared.manualRd ? null : statusInicialAoEntrarFechado({
         pipelineNome: card.pipeline.nome,
         etapaDestinoNome: destino.nome,
+        etapaDestinoChave: destino.chave,
         statusAtual: card.statusPosFechamento,
       });
 

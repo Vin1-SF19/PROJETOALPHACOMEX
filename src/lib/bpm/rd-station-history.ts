@@ -22,6 +22,16 @@ export function corrigirProjecaoHistoricoRd(original: Record<string, unknown>, c
   return { ...original, ...changes };
 }
 
+/** Autoria da atividade, nunca o responsável pelo negócio. Não resolve IDs sem fonte. */
+export function comAutoriaOriginalRd(projection: RecordLike, rawInput: unknown): RecordLike {
+  if (typeof projection.authorName === "string" && projection.authorName.trim()) return projection;
+  const raw = asRecord(rawInput);
+  const author = asRecord(raw.author);
+  const user = asRecord(raw.user);
+  const name = [raw.author_name, author.name, user.name].find((value) => typeof value === "string" && value.trim());
+  return name ? { ...projection, authorName: name } : projection;
+}
+
 /** Projeta atividades e movimentos RD sem descartar o payload original ou inventar datas. */
 export function projetarEventosHistoricoRd(
   detailInput: unknown,
@@ -55,12 +65,12 @@ export function projetarEventosHistoricoRd(
       eventType: `ACTIVITY_${String(rawType).toUpperCase().slice(0, 100)}`,
       occurredAt: typeof occurredAt === "string" ? occurredAt : null,
       raw: activity,
-      projection: {
+      projection: comAutoriaOriginalRd({
         title: activity.subject ?? activity.title ?? null,
         content: activity.text ?? activity.content ?? activity.description ?? null,
         date: occurredAt ?? null,
         type: rawType === "NOTE" ? "ANOTACAO" : rawType,
-      },
+      }, activity),
     });
   }
   return events.sort((a, b) => String(a.occurredAt ?? "\uffff").localeCompare(String(b.occurredAt ?? "\uffff")) || a.sourceKey.localeCompare(b.sourceKey));

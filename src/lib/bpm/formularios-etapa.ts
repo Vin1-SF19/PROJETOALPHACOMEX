@@ -21,8 +21,8 @@ export const BPM_FORM_COMPONENT_REGISTRY = {
   [BPM_CAPABILITIES.STAGE_CHECKLIST]: {
     tipo: "CHECKLIST",
     target: BPM_CAPABILITIES.STAGE_CHECKLIST,
-    label: "Procedimentos da etapa",
-    description: "Procedimentos aplicáveis ao card na etapa atual.",
+    label: "Checklist da etapa",
+    description: "Itens do checklist aplicáveis ao card na etapa atual.",
     rendererId: "stage-checklist",
     multiple: false,
     configSchema: presentationConfigSchema,
@@ -57,7 +57,7 @@ export const BPM_FORM_COMPONENT_REGISTRY = {
   [BPM_CAPABILITIES.FOLLOW_UP_CHECKLIST]: {
     tipo: "CAPABILITY",
     target: BPM_CAPABILITIES.FOLLOW_UP_CHECKLIST,
-    label: "Procedimento de follow-up",
+    label: "Checklist de follow-up",
     description: "Acompanha as ações de follow-up da etapa.",
     rendererId: "follow-up-checklist",
     multiple: false,
@@ -101,7 +101,7 @@ export const BPM_CARD_SHELL_REGISTRY = {
   CADENCES: { rendererId: "card-cadences", label: "Cadências", configurable: false },
   SLA: { rendererId: "card-sla", label: "SLA", configurable: false },
   STAGE_NAVIGATION: { rendererId: "stage-navigation", label: "Próxima etapa", configurable: false },
-  SCRIPTS: { rendererId: "stage-scripts", label: "Scripts", configurable: false },
+  SCRIPTS: { rendererId: "stage-scripts", label: "Orientações da etapa", configurable: false },
 } as const;
 
 export type BpmFormComponentTarget = keyof typeof BPM_FORM_COMPONENT_REGISTRY;

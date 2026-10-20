@@ -1,4 +1,4 @@
-import { normalizarNomeEtapa } from "@/lib/bpm/novos-leads";
+import { etapaEhStandbyFollowUp, normalizarNomeEtapa } from "@/lib/bpm/novos-leads";
 
 export const NOME_ETAPA_EM_TRATATIVA = "Em Tratativa";
 export const PERGUNTA_ANOTACOES_ULTIMO_FOLLOW_UP =
@@ -8,10 +8,10 @@ export const ID_PERGUNTA_ANOTACOES_ULTIMO_FOLLOW_UP =
 
 const ETAPAS_EXIGEM_PROXIMO_CONTATO = ["Sem Viabilidade"].map(normalizarNomeEtapa);
 
-const DESTINOS_EM_TRATATIVA = ["Fechado", "Lost", "Stand By", "Monitoramento", "Sem viabilidade"].map(normalizarNomeEtapa);
+const DESTINOS_EM_TRATATIVA = ["Contrato fechado", "Fechado", "Lost", "Stand By", "Monitoramento", "Sem viabilidade"].map(normalizarNomeEtapa);
 
 export function destinoPermitidoEmTratativa(nome: string): boolean {
-  return DESTINOS_EM_TRATATIVA.includes(normalizarNomeEtapa(nome));
+  return DESTINOS_EM_TRATATIVA.includes(normalizarNomeEtapa(nome)) || etapaEhStandbyFollowUp(nome);
 }
 
 export type TipoPerguntaFollowUp = "texto" | "selecao" | "booleano";

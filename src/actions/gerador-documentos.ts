@@ -1,5 +1,7 @@
 "use server";
 
+import { disponibilizarContratoComercial } from "@/lib/bpm/contratacao-comercial-server";
+import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
@@ -1131,10 +1133,17 @@ export async function FinalizarDocumento(documentoId: string) {
       token: blobToken,
     });
 
-    await db.documentoGerado.update({
-      where: { id: documentoId },
-      data: { status: "FINALIZADO", finalizadoEm: new Date(), pdfUrl: blob.url },
-    });
+    const cardId = valoresSalvos.success ? valoresSalvos.data.__bpmCardId : null;
+    const conclusao = { status: "FINALIZADO", finalizadoEm: new Date(), pdfUrl: blob.url };
+    if (typeof cardId === "string") {
+      const retornoComercial = await db.$transaction(async (tx) => {
+        await tx.documentoGerado.update({ where: { id: documentoId }, data: conclusao });
+        return disponibilizarContratoComercial(tx, cardId, ctx.userId);
+      });
+      if (retornoComercial) await notificarPipelineBpm({ ...retornoComercial, tipo: "CARD_ATUALIZADO" });
+    } else {
+      await db.documentoGerado.update({ where: { id: documentoId }, data: conclusao });
+    }
 
     revalidatePath(`${ROTA_BASE}/conferencia`);
     return { success: true as const, pdfDisponivel: true as const };
