@@ -36,6 +36,15 @@ describe("histórico RD — acesso e consulta", () => {
     expect(response.data[1].projecao.content).toBe("Nota");
     expect(mocks.access).toHaveBeenCalledWith("card", 1, "ADMIN", "visualizarHistorico");
   });
+  it("preserva remoção explícita de autoria mesmo quando payload bruto contém nome", async () => {
+    mocks.origin.mockResolvedValue({ id: "origem", sourcePipelineName: "Funil", sourceStageName: "Etapa", sourceDealName: "Negócio" });
+    mocks.events.mockResolvedValue([{ id: "a", eventType: "ACTIVITY_NOTE", occurredAt: null,
+      projectedJson: '{"authorName":null}', rawJson: '{"user":{"name":"Autor no bruto"}}',
+      correcoes: [{ id: "manual", autorId: 1, camposAlteradosJson: '{"authorName":true}', projecaoAnteriorJson: '{}', projecaoNovaJson: '{}', createdAt: new Date(), autor: { nome: "Editora" } }] }]);
+    const response = await ListarHistoricoExternoRd("card");
+    expect(response.success).toBe(true);
+    expect(response.data[0].projecao.authorName).toBeNull();
+  });
   it("rejeita escrita não autenticada e entradas inválidas", async () => {
     mocks.auth.mockResolvedValue(null);
     expect((await CorrigirHistoricoExternoRd({ eventoId: "e", titulo: "a", conteudo: "b", data: "2026-01-01" })).success).toBe(false);

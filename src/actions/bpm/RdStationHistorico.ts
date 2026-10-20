@@ -7,7 +7,7 @@ import db from "@/lib/prisma";
 import { auth } from "../../../auth";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import { comAutoriaOriginalRd, corrigirProjecaoHistoricoRd } from "@/lib/bpm/rd-station-history";
-import { ordenarHistoricoRd, periodoOriginalRd } from "@/lib/bpm/rd-station-display";
+import { autorAjusteHistoricoRd, ordenarHistoricoRd, periodoOriginalRd } from "@/lib/bpm/rd-station-display";
 import { textoLegivelRd } from "@/lib/bpm/rd-station-text";
 
 const PROVEDOR = "RD_STATION_CRM_V1";
@@ -33,7 +33,7 @@ export async function ListarHistoricoExternoRd(cardId: string) {
       select: {
         id: true, eventType: true, occurredAt: true, projectedJson: true, rawJson: true,
         correcoes: { select: {
-          versao: true, camposAlteradosJson: true, projecaoAnteriorJson: true, projecaoNovaJson: true, createdAt: true,
+          id: true, autorId: true, versao: true, camposAlteradosJson: true, projecaoAnteriorJson: true, projecaoNovaJson: true, createdAt: true,
           autor: { select: { nome: true } },
         }, orderBy: { versao: "asc" } },
       },
@@ -42,19 +42,23 @@ export async function ListarHistoricoExternoRd(cardId: string) {
     return {
       success: true as const,
       origem: { pipeline: textoLegivelRd(origem.sourcePipelineName), etapa: textoLegivelRd(origem.sourceStageName), nome: textoLegivelRd(origem.sourceDealName) },
-      data: ordenarHistoricoRd(eventos.map((evento) => ({
-        id: evento.id,
+      data: ordenarHistoricoRd(eventos.map((evento) => {
+        const projection = JSON.parse(evento.projectedJson) as Record<string, unknown>;
+        const autoriaCorrigida = evento.correcoes.some(c => JSON.parse(c.camposAlteradosJson)?.authorName === true);
+        return {
+          id: evento.id,
         tipo: evento.eventType,
         data: evento.occurredAt,
-        projecao: comAutoriaOriginalRd(JSON.parse(evento.projectedJson) as Record<string, unknown>, JSON.parse(evento.rawJson)),
-        periodoOriginal: periodoOriginalRd(JSON.parse(evento.rawJson) as Record<string, unknown>),
+        projecao: autoriaCorrigida || evento.eventType === "TASK_RD" ? projection : comAutoriaOriginalRd(projection, JSON.parse(evento.rawJson)),
+        periodoOriginal: periodoOriginalRd(JSON.parse(evento.rawJson) as Record<string, unknown>, JSON.parse(evento.projectedJson)),
         correcoes: evento.correcoes.map((correcao) => ({
           versao: correcao.versao, campos: JSON.parse(correcao.camposAlteradosJson) as Record<string, unknown>,
           anterior: JSON.parse(correcao.projecaoAnteriorJson) as Record<string, unknown>,
           nova: JSON.parse(correcao.projecaoNovaJson) as Record<string, unknown>,
-          autor: correcao.autor?.nome ?? "Sistema / autor não disponível", data: correcao.createdAt,
+          autor: autorAjusteHistoricoRd(correcao), data: correcao.createdAt,
         })),
-      }))),
+        };
+      })),
     };
   } catch {
     return { success: false as const, error: "Erro ao consultar histórico RD", data: [] };
