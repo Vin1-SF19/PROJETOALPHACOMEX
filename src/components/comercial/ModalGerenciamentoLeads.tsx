@@ -1,4 +1,5 @@
 "use client";
+import { CANAIS_AQUISICAO } from "@/lib/comercial/origens-lead";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { formatarDataComercial } from "@/lib/comercial/data-comercial";
@@ -34,10 +35,7 @@ import { CampoProspeccaoAtiva } from "./CampoProspeccaoAtiva";
 import { SeletorParceiroPesquisavel, type ParceiroOpcao } from "./SeletorParceiroPesquisavel";
 import { isAdminRole } from "@/lib/roles";
 import {
-    CANAL_INDICACAO_CLIENTE,
     CANAL_INDICACAO_PARCEIRO,
-    LABEL_INDICACAO_CLIENTE,
-    LABEL_INDICACAO_PARCEIRO,
     parseParceiroNaoCadastrado,
 } from "@/lib/comercial/parceiro-nao-cadastrado";
 import {
@@ -128,18 +126,7 @@ const FORMAS_LABEL: Record<string, string> = {
     OUTRO: "Outra forma",
 };
 
-const CANAIS_AQUISICAO = [
-    { value: "Tráfego Pago (Meta - Instagram)", label: "Tráfego Pago (Meta - Instagram)" },
-    { value: "Tráfego Pago (Google)", label: "Tráfego Pago (Google)" },
-    { value: CANAL_INDICACAO_PARCEIRO, label: LABEL_INDICACAO_PARCEIRO },
-    { value: CANAL_INDICACAO_CLIENTE, label: LABEL_INDICACAO_CLIENTE },
-    { value: "WhatsApp", label: "WhatsApp" },
-    { value: "Instagram", label: "Instagram" },
-    { value: "Orgânico", label: "Orgânico" },
-    { value: "Evento", label: "Evento" },
-    { value: CANAL_PROSPECCAO_ATIVA, label: CANAL_PROSPECCAO_ATIVA },
-    { value: "Outro", label: "Outro" },
-];
+
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

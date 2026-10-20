@@ -1,5 +1,6 @@
 "use client";
 import { criarRastreadorRascunho } from "@/lib/bpm/rascunho-versionado";
+import { criarRascunhoOrigem, extrairPayloadOrigem, lerRascunhoOrigem, valorInicialCampo } from "@/lib/bpm/origem-cliente";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, ClipboardPaste, Loader2, Save, SlidersHorizontal } from "lucide-react";
@@ -61,16 +62,16 @@ export function PainelCamposEtapaAtual({
     .sort((a, b) => (ordemCampos.get(a.id) ?? 0) - (ordemCampos.get(b.id) ?? 0));
   const [revisaoInicial] = useState(realtimeRevision);
   const [valoresCamposAtuais, setValoresCamposAtuais] = useState<Record<string, string>>(() =>
-    getDraft(idInstancia) ?? Object.fromEntries(camposDoComponente.map((campo) => [campo.id, campo.valor ?? ""])),
+    getDraft(idInstancia) ?? Object.fromEntries(camposDoComponente.map((campo) => [campo.id, valorInicialCampo(campo)])),
   );
   const [valoresConfirmados, setBaseCamposAtuais] = useState<Record<string, string>>(() =>
-    Object.fromEntries(camposDoComponente.map((campo) => [campo.id, campo.valor ?? ""])),
+    Object.fromEntries(camposDoComponente.map((campo) => [campo.id, valorInicialCampo(campo)])),
   );
   const [camposEtapaBase, setCamposEtapaBase] = useState(camposDoComponente);
   const [versaoBaseCampos, setVersaoBaseCampos] = useState(() => new Date(card.updatedAt).toISOString());
   const versaoBaseCamposRef = useRef(versaoBaseCampos);
   const snapshotAtivoRef = useRef<SnapshotCamposRealtime>({
-    valores: Object.fromEntries(camposDoComponente.map((campo) => [campo.id, campo.valor ?? ""])),
+    valores: Object.fromEntries(camposDoComponente.map((campo) => [campo.id, valorInicialCampo(campo)])),
     versao: new Date(card.updatedAt).toISOString(),
   });
   const [snapshotRemotoPendente, setSnapshotRemotoPendente] = useState<SnapshotCamposRealtime | null>(null);
@@ -113,7 +114,7 @@ export function PainelCamposEtapaAtual({
     const campoId = key.slice(`${card.id}:arquivo:`.length);
     const campo = confirmed.camposEtapa.find((item) => item.id === campoId);
     if (!campo || !(campoId in valoresRef.current)) return;
-    const valor = campo.valor ?? "";
+    const valor = valorInicialCampo(campo);
     valoresRef.current = { ...valoresRef.current, [campoId]: valor };
     snapshotAtivoRef.current = {
       valores: { ...snapshotAtivoRef.current.valores, [campoId]: valor },
@@ -137,8 +138,8 @@ export function PainelCamposEtapaAtual({
     setDraft(idInstancia, pendentes.length ? { ...valoresRef.current } : undefined);
     setPendingFields(`${card.id}:${idInstancia}`, pendentes.map((campo) => ({
       label: campoLabels[campo.id] ?? campo.nome,
-      before: snapshotAtivoRef.current.valores[campo.id] ?? "",
-      after: valoresRef.current[campo.id] ?? "",
+      before: lerRascunhoOrigem(snapshotAtivoRef.current.valores[campo.id] ?? "")?.origem ?? snapshotAtivoRef.current.valores[campo.id] ?? "",
+      after: lerRascunhoOrigem(valoresRef.current[campo.id] ?? "")?.origem ?? valoresRef.current[campo.id] ?? "",
     })));
   }
   function alterarCampo(id: string, valor: string) {
@@ -188,7 +189,7 @@ export function PainelCamposEtapaAtual({
   const versaoRemotaCampos = new Date(card.updatedAt).toISOString();
   useEffect(() => {
     const camposRemotos = JSON.parse(snapshotCamposEtapa) as CamposEtapaCard;
-    const novosValores = Object.fromEntries(camposRemotos.map((campo) => [campo.id, campo.valor ?? ""]));
+    const novosValores = Object.fromEntries(camposRemotos.map((campo) => [campo.id, valorInicialCampo(campo)]));
     const snapshotRemoto = { valores: novosValores, versao: versaoRemotaCampos };
     const timer = setTimeout(() => {
       if (snapshotRemoto.versao < snapshotAtivoRef.current.versao) return;
@@ -260,19 +261,27 @@ export function PainelCamposEtapaAtual({
         if (!idsPermitidos.has(campo.id) && !configuracaoAtual.exigeComplemento) continue;
         if (campo.somenteLeitura || campo.editavel === false
           || valorComparavel(campo.tipo, valoresAtuais[campo.id]) === valorComparavel(campo.tipo, snapshotAtivoRef.current.valores[campo.id])) continue;
-        const validacao = validarValoresCamposBpm([campo], montarPayloadCamposDestino([campo], valoresAtuais));
+        let payload;
+        try { payload = extrairPayloadOrigem(montarPayloadCamposDestino([campo], valoresAtuais)); }
+        catch (error) {
+          erroDaTentativa = error instanceof Error ? error.message : "Origem inválida.";
+          if (revisaoEdicao.current === revisaoEnviada) setEstadoSave("invalido");
+          return false;
+        }
+        const validacao = validarValoresCamposBpm([campo], payload.camposValores);
         if (!validacao.success) {
           erroDaTentativa = validacao.error;
           if (revisaoEdicao.current === revisaoEnviada) setEstadoSave("invalido");
           return false;
         }
         Object.assign(camposValores, validacao.valores);
+        if (payload.parceiroOrigem) camposValores[campo.id] = valoresAtuais[campo.id];
       }
       if (!Object.keys(camposValores).length) return true;
       const valoresAntesDaRequisicao = { ...valoresRef.current };
       const baseAntesDaRequisicao = { ...snapshotAtivoRef.current.valores };
       const atualizar = (versao: string) => AtualizarCardBpm({
-        cardId: card.id, camposValores, versaoEsperadaEm: versao,
+        cardId: card.id, ...extrairPayloadOrigem(camposValores), versaoEsperadaEm: versao,
       });
       let resultado;
       let camposRemotos: Record<string, string> = {};
@@ -286,14 +295,14 @@ export function PainelCamposEtapaAtual({
               const campoRemoto = porId.get(id);
               const campoLocal = configuracaoAtual.camposVisiveis.find((campo) => campo.id === id);
               return campoRemoto && campoLocal
-                && valorComparavel(campoLocal.tipo, campoRemoto.valor ?? "")
+                && valorComparavel(campoLocal.tipo, valorInicialCampo(campoRemoto))
                   === valorComparavel(campoLocal.tipo, snapshotAtivoRef.current.valores[id]);
             });
             if (semConflitoNoCampo) {
               const versaoRemota = new Date(remoto.data.updatedAt).toISOString();
               camposRemotos = Object.fromEntries(remoto.data.camposEtapa
                 .filter((campo) => Object.hasOwn(snapshotAtivoRef.current.valores, campo.id))
-                .map((campo) => [campo.id, campo.valor ?? ""]));
+                .map((campo) => [campo.id, valorInicialCampo(campo)]));
               confirmVersion(card.id, versaoRemota);
               versaoBaseCamposRef.current = versaoRemota;
               resultado = await atualizar(versaoRemota);
@@ -301,7 +310,7 @@ export function PainelCamposEtapaAtual({
               setSnapshotRemotoPendente({
                 valores: Object.fromEntries(remoto.data.camposEtapa
                   .filter((campo) => Object.hasOwn(snapshotAtivoRef.current.valores, campo.id))
-                  .map((campo) => [campo.id, campo.valor ?? ""])),
+                  .map((campo) => [campo.id, valorInicialCampo(campo)])),
                 versao: new Date(remoto.data.updatedAt).toISOString(),
               });
               setCamposRemotosPendentes(remoto.data.camposEtapa
@@ -333,9 +342,15 @@ export function PainelCamposEtapaAtual({
       }
       const novaVersao = new Date(confirmacao?.updatedAt ?? cardAtualizado!.data!.updatedAt).toISOString();
       confirmVersion(card.id, novaVersao);
-      const confirmados = confirmacao?.camposValores ?? Object.fromEntries(cardAtualizado!.data!.camposEtapa
+      const confirmados = { ...(confirmacao?.camposValores ?? Object.fromEntries(cardAtualizado!.data!.camposEtapa
         .filter((campo) => Object.hasOwn(camposValores, campo.id))
-        .map((campo) => [campo.id, campo.valor ?? ""]));
+        .map((campo) => [campo.id, valorInicialCampo(campo)]))) };
+      if (confirmacao) {
+        for (const [id, valor] of Object.entries(confirmados)) {
+          const rascunho = lerRascunhoOrigem(camposValores[id] ?? "");
+          if (rascunho) confirmados[id] = criarRascunhoOrigem(valor, rascunho.parceiroId);
+        }
+      }
       Object.assign(confirmados, Object.fromEntries(Object.entries(camposRemotos)
         .filter(([id]) => !Object.hasOwn(confirmados, id))));
       const antesDaConfirmacao = valoresRef.current;

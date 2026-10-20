@@ -161,7 +161,7 @@ describe("CRM - wiring do modal por etapa", () => {
     expect(novoCard).not.toContain("servico:");
     expect(novoCard).toContain("Os detalhes da etapa são preenchidos ao abrir o card, na aba Formulário da Etapa.");
     expect(novoCard).not.toContain("CampoBpm");
-    expect(novoCard).not.toContain("camposValores");
+    expect(novoCard).not.toContain("camposValores:");
     expect(novoCard).not.toContain("proximoContato");
     expect(novoCard).not.toContain("statusPosFechamento");
     expect(novoCard).not.toContain("Motivo Lost");

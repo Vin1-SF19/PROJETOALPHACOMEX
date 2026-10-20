@@ -67,6 +67,8 @@ import { cardApareceNoQuadro, etapasComSaidaDoQuadro } from "@/lib/bpm/cards-no-
 import { paraExibicaoTelefone } from "@/lib/validations/cs-nps";
 import { iniciarLigacaoCallix, normalizarTelefoneCallix } from "@/lib/callix/click-to-call";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
+import { resolverParceiroOrigem, validarParceiroOrigem, salvarParceiroOrigem } from "@/lib/bpm/origem-cliente-server";
+import type { ParceiroOrigemBpm } from "@/lib/bpm/origem-cliente";
 import { executarTransicaoBpm } from "@/lib/bpm/transicao-command";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { processarCadenciasImediatasDoCardBpm } from "@/lib/bpm/cadencias/executor";
@@ -956,7 +958,7 @@ export async function CriarCardBpm(dados: unknown) {
 
     const parsed = criarCardSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos para criar o card" };
-    const { empresaId, novaEmpresa, pipelineId, etapaId, responsavelId, servico, radarPretendido, canalOrigem, qualificacao } = parsed.data;
+    const { empresaId, novaEmpresa, pipelineId, etapaId, responsavelId, servico, radarPretendido, canalOrigem, parceiroOrigemId, qualificacao } = parsed.data;
     await exigirAcessoBpmPipeline(pipelineId, userId);
     if (!(await usuarioElegivelResponsavelBpm(pipelineId, responsavelId))) {
       return { success: false, error: "Responsável inválido para este pipeline." };
@@ -1067,6 +1069,13 @@ export async function CriarCardBpm(dados: unknown) {
         const campo = camposNovoLead.find((item) => item.nome === nome);
         if (!campo) throw new Error("NOVO_LEAD_CAMPO_NAO_CONFIGURADO");
         await tx.bpmCardCampoValor.create({ data: { cardId: novoCard.id, campoId: campo.id, valor } });
+      }
+
+      if (parceiroOrigemId !== undefined) {
+        const campoOrigem = camposNovoLead.find((campo) => campo.nome === "Canal de origem");
+        const selecao = { campoId: campoOrigem?.id ?? "", parceiroId: parceiroOrigemId };
+        await validarParceiroOrigem(selecao, camposNovoLead, campoOrigem ? { [campoOrigem.id]: canalOrigem ?? "" } : {}, tx);
+        await salvarParceiroOrigem(selecao, novoCard, userId, tx);
       }
 
       // D-041: responsável principal também é registrado como membro RESPONSAVEL.
@@ -1185,7 +1194,10 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
           : parsed.error.flatten(),
       };
     }
-    const { cardId, camposValores, versaoEsperadaEm, ...campos } = parsed.data;
+    const { cardId, camposValores, versaoEsperadaEm, parceiroOrigem, ...campos } = parsed.data;
+    if (parceiroOrigem && !Object.hasOwn(camposValores ?? {}, parceiroOrigem.campoId)) {
+      return { success: false, error: "Envie a origem junto com o parceiro." };
+    }
     if (campos.statusPosFechamento !== undefined && !versaoEsperadaEm) {
       return {
         success: false,
@@ -1307,6 +1319,7 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
 
       let valoresValidados: Record<string, string> = {};
       let valoresAnteriores: Record<string, string | null> = {};
+      let selecaoParceiroOrigem: ParceiroOrigemBpm | undefined;
       if (camposValores && Object.keys(camposValores).length > 0) {
         const camposAplicaveis = await carregarCamposAplicaveisCardEtapa(
           cardId,
@@ -1321,6 +1334,8 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
         );
         if (!validacao.success) throw new Error(`CAMPO_INVALIDO:${validacao.error}`);
         valoresValidados = validacao.valores;
+        selecaoParceiroOrigem = await resolverParceiroOrigem(parceiroOrigem, camposAplicaveis, valoresValidados, cardId, tx);
+        await validarParceiroOrigem(selecaoParceiroOrigem, camposAplicaveis, valoresValidados, tx);
         // Uma referência de arquivo só é válida depois do upload autenticado
         // e do registro do anexo neste mesmo card e campo.
         const referenciasArquivo = camposAplicaveis.filter(
@@ -1407,6 +1422,7 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
         data: { ...campos, updatedAt: proximaVersao },
       });
       if (atualizacao.count !== 1) throw new Error("CONFLITO_ATUALIZACAO_CARD");
+      await salvarParceiroOrigem(selecaoParceiroOrigem, cardAtual, userId, tx);
 
       if (campos.proximoContatoEm !== undefined) {
         await tx.bpmCardFollowUpEstado.upsert({
@@ -1568,6 +1584,7 @@ type DadosMovimentoComRequisitos = {
   etapaDestinoId: string;
   responsavelId?: number;
   camposValores: Record<string, string>;
+  parceiroOrigem?: ParceiroOrigemBpm;
   proximoContatoEm?: Date | null;
   origemMovimentacao?: "MANUAL" | "AUTOMACAO";
 };
@@ -1787,6 +1804,7 @@ async function executarMovimentoCanonico(
     idempotencyKey: dados.idempotencyKey ?? randomUUID(),
     ator: { tipo: "MANUAL", userId, userRole },
     camposValores: dados.camposValores,
+    parceiroOrigem: dados.parceiroOrigem,
     proximoContatoEm: dados.proximoContatoEm,
     responsavelId: dados.responsavelId,
   });

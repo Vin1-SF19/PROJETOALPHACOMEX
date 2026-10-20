@@ -32,6 +32,7 @@ export function validarValorRequisitoCampo(
 ): boolean {
   return validarValoresCamposBpm([{
     id: campo.id,
+    chave: campo.chave,
     nome: campo.nome,
     tipo: campo.tipo,
     opcoesJson: campo.opcoes.length

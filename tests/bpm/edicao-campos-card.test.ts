@@ -15,6 +15,8 @@ const prismaMock = vi.hoisted(() => ({
   bpmCardAnexo: { findMany: vi.fn() },
   bpmCardHistorico: { create: vi.fn() },
   bpmCardMembro: { updateMany: vi.fn(), upsert: vi.fn() },
+  parceiro: { findUnique: vi.fn() },
+  indicacao: { findUnique: vi.fn(), update: vi.fn(), create: vi.fn() },
   $transaction: vi.fn(),
 }));
 
@@ -112,6 +114,29 @@ describe("CRM - edição dos campos definidos da etapa", () => {
     expect(exigirAcessoBpmCardMock).not.toHaveBeenCalled();
     expect(prismaMock.bpmCard.findUnique).not.toHaveBeenCalled();
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("salva origem textual e parceiro juntos na transação existente", async () => {
+    carregarCamposAplicaveisCardEtapaMock.mockResolvedValue([{ ...campoNulo, nome: "Origem do cliente", tipo: "selecao", opcoesJson: '["Direto","Parceiro"]' }]);
+    prismaMock.bpmCard.findUnique.mockResolvedValue({ ...cardNaEtapaAtual(), empresaId: 21 });
+    prismaMock.parceiro.findUnique.mockResolvedValue({ id: 42, nome: "Parceiro" });
+    prismaMock.indicacao.findUnique.mockResolvedValue(null);
+    const resultado = await AtualizarCardBpm({ cardId: CARD_ID, camposValores: { [CAMPO_ID]: "Indicação Parceiro" },
+      parceiroOrigem: { campoId: CAMPO_ID, parceiroId: 42 }, versaoEsperadaEm: UPDATED_AT });
+    expect(resultado.success).toBe(true);
+    expect(prismaMock.indicacao.create).toHaveBeenCalledWith({ data: { bpmCardId: CARD_ID, clienteId: 21, parceiroId: 42, criadoPorId: 7, servicoIndicado: null } });
+    expect(prismaMock.bpmCardCampoValor.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: { valor: "Indicação Parceiro" } }));
+    expect(prismaMock.$transaction).toHaveBeenCalledOnce();
+  });
+
+  it("não altera vínculo se parceiro inexistente ou campo não for origem", async () => {
+    const dados = { cardId: CARD_ID, camposValores: { [CAMPO_ID]: "Indicação Parceiro" }, parceiroOrigem: { campoId: CAMPO_ID, parceiroId: 42 } };
+    expect((await AtualizarCardBpm(dados)).success).toBe(false);
+    carregarCamposAplicaveisCardEtapaMock.mockResolvedValue([{ ...campoNulo, nome: "Origem do cliente" }]);
+    prismaMock.parceiro.findUnique.mockResolvedValue(null);
+    expect((await AtualizarCardBpm(dados)).success).toBe(false);
+    expect(prismaMock.bpmCard.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.indicacao.create).not.toHaveBeenCalled();
   });
 
   it("recusa autosave sem acesso de edição sem escrita ou notificação", async () => {
@@ -420,7 +445,7 @@ describe("PainelCamposEtapaAtual", () => {
   );
 
   it("renderiza a definição inclusive valor nulo, sinaliza obrigatório e envia o payload atual", () => {
-    expect(painel).toContain('map((campo) => [campo.id, campo.valor ?? ""])');
+    expect(painel).toContain('map((campo) => [campo.id, valorInicialCampo(campo)])');
     expect(painel).toContain('campo.obrigatorio ? " *" : ""');
     expect(painel).toContain("montarPayloadCamposDestino([campo], valoresAtuais)");
     expect(painel).toContain("<CampoBpmInput");

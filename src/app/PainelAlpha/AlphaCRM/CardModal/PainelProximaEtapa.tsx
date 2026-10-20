@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowRight, Loader2, Settings2 } from "lucide-react";
 import { ObterCardBpm, MoverCardBpm, ObterRequisitosTransicaoBpm, SalvarRequisitosEMoverCardBpm, type CardFilhoCriado } from "@/actions/bpm/Cards";
 import { ObterResumoChecklistCardBpm } from "@/actions/bpm/Checklists";
+import { extrairPayloadOrigem, lerRascunhoOrigem, valorInicialCampo, type ParceiroOrigemBpm } from "@/lib/bpm/origem-cliente";
 import { CampoBpmInput } from "@/app/PainelAlpha/AlphaCRM/CampoBpmInput";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCardSave } from "./CardSaveContext";
@@ -40,7 +41,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
   const { flushSaves } = useCardSave();
   const [movendoEtapa, setMovendoEtapa] = useState(false);
   const [requisitos, setRequisitos] = useState<RequisitosTransicao | null>(null);
-  const [atribuicaoPendente, setAtribuicaoPendente] = useState<{ etapaDestinoId: string; camposValores?: Record<string, string> } | null>(null);
+  const [atribuicaoPendente, setAtribuicaoPendente] = useState<{ etapaDestinoId: string; camposValores?: Record<string, string>; parceiroOrigem?: ParceiroOrigemBpm } | null>(null);
   const [valoresRequisitos, setValoresRequisitos] = useState<Record<string, string>>({});
   const [proximoContatoRascunho, setProximoContatoRascunho] = useState("");
   const [consultaDisponibilidade, setConsultaDisponibilidade] = useState<{
@@ -168,7 +169,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
     }
     if (mostrarMesmoSemPendencias || resposta.data.faltantes.length || resposta.data.guardas.length) setRequisitos(resposta.data);
     else setRequisitos(null);
-    setValoresRequisitos(Object.fromEntries(resposta.data.campos.map((campo) => [campo.id, campo.valor ?? ""])));
+    setValoresRequisitos(Object.fromEntries(resposta.data.campos.map((campo) => [campo.id, valorInicialCampo(campo)])));
     setProximoContatoRascunho(formatarDataHoraLocalBpm(resposta.data.proximoContatoEm));
     return resposta.data;
   }
@@ -217,18 +218,20 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
         return;
       }
       const camposValores = Object.fromEntries(requisitos.campos
-        .filter((campo) => campo.editavel && !campo.somenteLeitura && (valoresRequisitos[campo.id] ?? "") !== (campo.valor ?? ""))
+        .filter((campo) => campo.editavel && !campo.somenteLeitura && (valoresRequisitos[campo.id] ?? "") !== (valorInicialCampo(campo)))
         .map((campo) => [campo.id, valoresRequisitos[campo.id] ?? ""]));
       if (card.pipeline?.nome === "Revisão de Radar" && etapaEhNovosLeads(card.etapa.nome)
         && etapaEhAgendarReuniao(requisitos.etapaDestino.nome)) {
-        setAtribuicaoPendente({ etapaDestinoId: requisitos.etapaDestino.id, camposValores });
+        setAtribuicaoPendente({ etapaDestinoId: requisitos.etapaDestino.id, ...extrairPayloadOrigem(camposValores) });
         setRequisitos(null);
         return;
       }
       confirmarMovimento(await SalvarRequisitosEMoverCardBpm({
-        cardId: card.id, etapaDestinoId: requisitos.etapaDestino.id, camposValores,
+        cardId: card.id, etapaDestinoId: requisitos.etapaDestino.id, ...extrairPayloadOrigem(camposValores),
         ...(requisitos.proximoContatoObrigatorio ? { proximoContatoEm: dataProximoContato?.toISOString() } : {}),
       }));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível salvar e mover.");
     } finally {
       setMovendoEtapa(false);
     }
@@ -248,8 +251,8 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
     : [];
   const camposSemEdicao = camposPendentes.filter((campo) => !campo.editavel || campo.somenteLeitura);
   const faltantesNoRascunho = requisitosLost
-    ? requisitos?.campos.filter((campo) => campo.obrigatorio && !valoresRequisitos[campo.id]?.trim()) ?? []
-    : requisitos?.faltantes.filter((campo) => !valoresRequisitos[campo.id]?.trim()) ?? [];
+    ? requisitos?.campos.filter((campo) => campo.obrigatorio && !(lerRascunhoOrigem(valoresRequisitos[campo.id] ?? "")?.origem ?? valoresRequisitos[campo.id])?.trim()) ?? []
+    : requisitos?.faltantes.filter((campo) => !(lerRascunhoOrigem(valoresRequisitos[campo.id] ?? "")?.origem ?? valoresRequisitos[campo.id])?.trim()) ?? [];
   const camposIndisponiveis = requisitos?.faltantes.filter((pendente) => !requisitos.campos.some((campo) => campo.id === pendente.id)) ?? [];
   const guardasSemProximoContato = requisitos?.guardas.filter((guarda) =>
     !(requisitos.proximoContatoObrigatorio && guarda.includes('campo "Próximo Contato"'))) ?? [];
@@ -266,7 +269,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
           if (!atribuicaoPendente) return { success: false, error: "Movimento não encontrado." };
           const dados = { cardId: card.id, etapaDestinoId: atribuicaoPendente.etapaDestinoId, responsavelId };
           const resultado = atribuicaoPendente.camposValores
-            ? await SalvarRequisitosEMoverCardBpm({ ...dados, camposValores: atribuicaoPendente.camposValores })
+            ? await SalvarRequisitosEMoverCardBpm({ ...dados, camposValores: atribuicaoPendente.camposValores, parceiroOrigem: atribuicaoPendente.parceiroOrigem })
             : await MoverCardBpm(dados);
           if (!resultado.success) return { success: false, error: typeof resultado.error === "string" ? resultado.error : "Não foi possível mover o lead." };
           setAtribuicaoPendente(null);

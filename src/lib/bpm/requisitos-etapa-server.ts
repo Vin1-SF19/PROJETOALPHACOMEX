@@ -19,6 +19,7 @@ import { avaliarGrupo } from "@/lib/bpm/regras/avaliador";
 import { montarContextoAvaliacaoDoCard } from "@/lib/bpm/regras/contexto";
 import type { ContextoAvaliacao } from "@/lib/bpm/regras/types";
 import { BPM_PIPELINE_KEYS } from "@/lib/bpm/ontology";
+import { campoEhOrigemCliente } from "@/lib/bpm/origem-cliente";
 
 type ClienteRequisitosEtapa = Pick<
   typeof db,
@@ -95,6 +96,7 @@ export type CampoAplicavelEtapaBpm = {
   condicaoVisibilidadeJson?: string | null;
   condicaoObrigatoriedadeJson?: string | null;
   valor: string | null;
+  parceiroOrigemId?: number | null;
 };
 
 export type PerfilAcessoCampoBpm = "ADMIN" | "RESPONSAVEL" | "MEMBRO";
@@ -396,6 +398,9 @@ export async function carregarCamposAplicaveisCardEtapa(
     };
   }
 
+  const cardOrigem = campos.some(campoEhOrigemCliente)
+    ? await client.bpmCard.findUnique({ where: { id: cardId }, select: { indicacaoOrigem: { select: { parceiroId: true, status: true } } } })
+    : null;
   return campos.map((campo) => {
     const valorPersistido = valorPorCampo.get(campo.id) ?? null;
     const mapeamento = mapeamentos.find((item) => item.campoDestinoId === campo.id);
@@ -415,6 +420,7 @@ export async function carregarCamposAplicaveisCardEtapa(
     return {
       ...campo,
       valor,
+      ...(campoEhOrigemCliente(campo) ? { parceiroOrigemId: cardOrigem?.indicacaoOrigem?.status === "ATIVA" ? cardOrigem.indicacaoOrigem.parceiroId : null } : {}),
       mapeamentoModo: mapeamento?.modo ?? null,
       campoOrigemId: mapeamento?.campoOrigemId ?? null,
       somenteLeitura: campo.somenteLeitura === true || resolvidos.somenteLeitura.has(campo.id),

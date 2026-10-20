@@ -5,6 +5,8 @@ import type { Prisma } from "@prisma/client";
 
 import db from "@/lib/prisma";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
+import { resolverParceiroOrigem, validarParceiroOrigem, salvarParceiroOrigem } from "@/lib/bpm/origem-cliente-server";
+import type { ParceiroOrigemBpm } from "@/lib/bpm/origem-cliente";
 import { requisitoAplicaAoMover, validarValorRequisitoCampo } from "@/lib/bpm/requisitos-etapa";
 import { registrarConclusaoContratoFinanceiro } from "@/lib/bpm/financeiro-assinatura-server";
 import { sincronizarNotaFiscalCard } from "@/lib/bpm/financeiro-nota-fiscal-server";
@@ -74,6 +76,7 @@ export type ComandoTransicaoBpm = {
   causationId?: string;
   ator: AtorTransicaoBpm;
   camposValores?: Record<string, string>;
+  parceiroOrigem?: ParceiroOrigemBpm;
   proximoContatoEm?: Date | null;
   responsavelId?: number;
 };
@@ -357,6 +360,15 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
   }));
   const formato = validarValoresCamposBpm(formataveis, valoresSubmetidos);
   if (!formato.success) erro("FORMAT_INVALID", formato.error);
+  let parceiroSelecionado;
+  let selecaoParceiroOrigem;
+  try {
+    selecaoParceiroOrigem = await resolverParceiroOrigem(input.parceiroOrigem, camposSubmetidos, formato.valores, card.id, tx);
+    if (input.parceiroOrigem && !input.ator.userId) throw new Error("CAMPO_INVALIDO:Usuário obrigatório para selecionar parceiro.");
+    parceiroSelecionado = await validarParceiroOrigem(selecaoParceiroOrigem, camposSubmetidos, formato.valores, tx);
+  } catch (falha) {
+    erro("FORMAT_INVALID", falha instanceof Error ? falha.message.replace(/^CAMPO_INVALIDO:/, "") : "Parceiro inválido.");
+  }
   if (card.pipeline.chave === "financeiro"
     && ["solicitacao_contrato", "elaboracao_contrato", "formalizacao_contratacao",
       "confirmacao_pagamento", "emissao_nota_fiscal"].includes(card.etapa.chave ?? "")) {
@@ -417,6 +429,14 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     }
   }
 
+  if (selecaoParceiroOrigem) {
+    for (const campo of camposPorId.values()) {
+      if (campo.fonteEntidade === "PARCEIRO" && campo.fonteAtributo) {
+        const valor = parceiroSelecionado?.[campo.fonteAtributo as keyof NonNullable<typeof parceiroSelecionado>];
+        valoresEfetivosPorId.set(campo.id, valor == null ? "" : String(valor));
+      }
+    }
+  }
   const contextoRegra = await montarContextoAvaliacaoDoCard(card, tx);
   contextoRegra.camposDinamicos = {
     ...Object.fromEntries([...camposPorId.keys()].map((campoId) => [campoId, null])),
@@ -690,6 +710,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     destino,
     transicao,
     valoresValidados: formato.valores,
+    selecaoParceiroOrigem,
     proximoContato,
     responsavelId: atribuirAoEntrarEmAgendar ? input.responsavelId : undefined,
   };
@@ -761,6 +782,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
       });
 
       const valores = prepared.valoresValidados;
+      await salvarParceiroOrigem(prepared.selecaoParceiroOrigem, card, input.ator.userId ?? null, tx);
       const idsGlobais = await salvarValoresGlobaisPersonalizadosCampos(card.id, valores, tx);
       for (const [campoId, valor] of Object.entries(valores)) {
         if (idsGlobais.has(campoId)) continue;

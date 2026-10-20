@@ -1,7 +1,9 @@
 import { cnpjEhValido, normalizarCNPJ } from "@/lib/format-cnpj";
+import { campoEhOrigemCliente, origemClienteValida } from "@/lib/bpm/origem-cliente";
 
 export type CampoDinamicoBpm = {
   id: string;
+  chave?: string | null;
   nome: string;
   tipo: string;
   opcoesJson: string | null;
@@ -80,6 +82,14 @@ export function validarValoresCamposBpm(
     const valor = valorOriginal.trim();
     if (!valor) {
       validados[campoId] = "";
+      continue;
+    }
+
+    if (campoEhOrigemCliente(campo)) {
+      if (!origemClienteValida(valor, lerOpcoesSeguras(campo) ?? [])) {
+        return { success: false, error: `O campo "${campo.nome}" possui uma opção inválida.` };
+      }
+      validados[campoId] = valor;
       continue;
     }
 

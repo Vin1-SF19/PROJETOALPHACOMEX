@@ -12,6 +12,8 @@ import { VisualizadorAnexoCard, type AnexoParaVisualizar } from "@/components/bp
 import { VALORES } from "@/lib/bpm/financeiro-config.client";
 import { nomeSeguroUploadAnexo, obterTipoUploadAnexo, validarUploadAnexo } from "@/lib/validations/bpm";
 import { CAMPO_CHECKLIST_EXCEL, planilhaChecklistValida } from "@/lib/bpm/checklist-envio-operacional";
+import { campoEhOrigemCliente } from "@/lib/bpm/origem-cliente";
+import { CampoOrigemCliente } from "@/app/PainelAlpha/AlphaCRM/CampoOrigemCliente";
 
 const TIPOS_ANEXO_ACEITOS = ".pdf,.png,.jpg,.jpeg,.webp,.docx,.xlsx,.xls,.csv";
 const TEMPO_LIMITE_UPLOAD_MS = 10 * 60_000;
@@ -118,6 +120,12 @@ export function CampoBpmInput({
   const opcoes = campo.tipo === "booleano"
     ? [VALORES.SIM, VALORES.NAO]
     : lerOpcoes(campo.opcoesJson);
+
+  if (campoEhOrigemCliente(campo)) {
+    return <CampoOrigemCliente id={`campo-bpm-${campo.id}`} value={value} onChange={onChange} onBlur={onBlur}
+      className={className} disabled={bloqueado || campo.somenteLeitura === true || campo.editavel === false}
+      required={campo.obrigatorio} invalid={invalid} describedBy={describedBy} />;
+  }
 
   if ((campo.tipo === "selecao" || campo.tipo === "multiselecao") && campo.fonteEntidade) {
     return (

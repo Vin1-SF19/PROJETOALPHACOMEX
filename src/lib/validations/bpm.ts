@@ -353,6 +353,7 @@ export const criarCardSchema = z.object({
   responsavelId: z.number().int().positive(),
   radarPretendido: z.string().trim().min(1).max(120).optional(),
   canalOrigem: z.string().trim().max(120).optional(),
+  parceiroOrigemId: z.number().int().positive().optional(),
   qualificacao: z.enum(["Qualificado", "Sem qualificação"]).optional(),
   // Fase 3 (RM-2026-54DC86): omitido, `servico` é derivado do nome do pipeline em CriarCardBpm.
   // RM-2026-97934A: informado explicitamente por callers que já sabem o serviço de origem
@@ -382,6 +383,11 @@ const camposAutosaveBpmSchema = z.record(z.string().cuid(), valorAutosaveBpmSche
   .refine((valores) => Object.keys(valores).length <= MAX_CAMPOS_VALORES_BPM,
     `No máximo ${MAX_CAMPOS_VALORES_BPM} campos podem ser enviados por operação.`);
 
+const parceiroOrigemSchema = z.object({
+  campoId: z.string().cuid(),
+  parceiroId: z.number().int().positive().nullable(),
+}).strict();
+
 export const atualizarCardSchema = z.object({
   cardId: z.string().cuid(),
   responsavelId: z.number().int().positive().optional(),
@@ -392,6 +398,7 @@ export const atualizarCardSchema = z.object({
   versaoEsperadaEm: z.coerce.date().optional(),
   proximoContatoEm: dataHoraOpcionalBpmSchema,
   camposValores: camposAutosaveBpmSchema.optional(),
+  parceiroOrigem: parceiroOrigemSchema.optional(),
 });
 
 export const MAX_MEMBROS_CARD_BPM = 50;
@@ -444,6 +451,7 @@ export const moverCardSchema = z.object({
 
 export const salvarRequisitosEMoverCardSchema = moverCardSchema.extend({
   camposValores: camposValoresBpmSchema.default({}),
+  parceiroOrigem: parceiroOrigemSchema.optional(),
   proximoContatoEm: dataHoraOpcionalBpmSchema,
 });
 

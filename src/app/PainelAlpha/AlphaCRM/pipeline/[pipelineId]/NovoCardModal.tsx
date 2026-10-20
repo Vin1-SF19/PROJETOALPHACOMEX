@@ -5,6 +5,8 @@ import { ClipboardCheck, Loader2, X } from "lucide-react";
 import { BuscarEmpresaPorCnpjBpm, BuscarEmpresasBpm, ListarUsuariosResponsavelBpm } from "@/actions/bpm/Cards";
 import { ConsultarDadosCnpjNovoLeadBpm } from "@/actions/bpm/CardsConsultas";
 import { cnpjEhValido, formatCNPJ, formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";
+import { CampoOrigemCliente } from "@/app/PainelAlpha/AlphaCRM/CampoOrigemCliente";
+import { extrairPayloadOrigem } from "@/lib/bpm/origem-cliente";
 
 interface EmpresaOpcao {
   id: number;
@@ -249,6 +251,7 @@ export default function NovoCardModal({
     try {
       const pendente = consultaPendente.current;
       if (pendente?.cnpj === normalizarCNPJ(cnpj)) await pendente.promise;
+      const origem = extrairPayloadOrigem({ origem: canalOrigem });
       const resultado = await onCriado({
         ...(empresaSelecionada
           ? { empresaId: empresaSelecionada.id }
@@ -265,12 +268,13 @@ export default function NovoCardModal({
         etapaId,
         responsavelId,
         radarPretendido,
-        canalOrigem: canalOrigem.trim() || undefined,
+        canalOrigem: origem.camposValores.origem.trim() || undefined,
+        parceiroOrigemId: origem.parceiroOrigem?.parceiroId ?? undefined,
         qualificacao: qualificacao || undefined,
       });
       if (!resultado.success) setErro(resultado.error);
-    } catch {
-      setErro("Não foi possível criar o card. Tente novamente.");
+    } catch (error) {
+      setErro(error instanceof Error ? error.message : "Não foi possível criar o card. Tente novamente.");
     } finally {
       setSalvando(false);
     }
@@ -411,7 +415,8 @@ export default function NovoCardModal({
           </FieldRow>
 
           <FieldRow label="Canal de origem" htmlFor="novo-card-canal">
-            <input id="novo-card-canal" className={inputCls} value={canalOrigem} onChange={(e) => setCanalOrigem(e.target.value)} maxLength={120} placeholder="Informe o canal, se conhecido" />
+            <CampoOrigemCliente id="novo-card-canal" className={inputCls} value={canalOrigem} onChange={setCanalOrigem}
+              disabled={salvando} required={false} invalid={false} />
           </FieldRow>
 
           <FieldRow label="Qualificação" htmlFor="novo-card-qualificacao">
