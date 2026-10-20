@@ -31,6 +31,7 @@ import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { executarAutomacoesCentraisDoCardAgora } from "@/lib/bpm/automacoes/orquestrador";
 import { carregarValoresCanonicosCampos, salvarValoresGlobaisPersonalizadosCampos } from "@/lib/bpm/campos-configuraveis-server";
 import { prepararSalvamentoConfigurado } from "@/lib/bpm/validacao-salvamento-configurado";
+import { disponibilizarContratoComercial } from "@/lib/bpm/contratacao-comercial-server";
 import { registrarConclusaoContratoFinanceiro } from "@/lib/bpm/financeiro-assinatura-server";
 import { sincronizarNotaFiscalCard } from "@/lib/bpm/financeiro-nota-fiscal-server";
 import { carregarResumoContratacao } from "@/lib/bpm/resumo-contratacao-server";
@@ -1464,7 +1465,9 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
         }
       }
 
+      let retornoComercial = null;
       if (cardAtual.pipeline?.chave === PIPELINE_CHAVE && Object.keys(valoresValidados).length > 0) {
+        retornoComercial = await disponibilizarContratoComercial(tx, cardId, userId);
         await registrarConclusaoContratoFinanceiro(tx, cardId, cardAtual.pipelineId, userId);
         await sincronizarNotaFiscalCard({ tx, cardId, pipelineId: cardAtual.pipelineId, usuarioId: userId });
       }
@@ -1521,9 +1524,10 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
           update: { role: "RESPONSAVEL" },
         });
       }
-      return { updatedAt: proximaVersao, camposValores: valoresValidados };
+      return { updatedAt: proximaVersao, camposValores: valoresValidados, retornoComercial };
     }, { maxWait: 10_000, timeout: 60_000 });
 
+    if (confirmacao.retornoComercial) await notificarPipelineBpm({ ...confirmacao.retornoComercial, tipo: "CARD_ATUALIZADO" });
     if (cardAnterior.pipeline.chave === PIPELINE_CHAVE
       && Object.keys(confirmacao.camposValores).length > 0) {
       try {
@@ -1547,7 +1551,7 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
     } catch (notificationError) {
       console.error("[AtualizarCardBpm/pos-salvamento/realtime]", notificationError);
     }
-    return { success: true, data: confirmacao };
+    return { success: true, data: { updatedAt: confirmacao.updatedAt, camposValores: confirmacao.camposValores } };
   } catch (error) {
     console.error("[AtualizarCardBpm]", error);
     const msg = error instanceof Error && error.message === "Não autorizado"

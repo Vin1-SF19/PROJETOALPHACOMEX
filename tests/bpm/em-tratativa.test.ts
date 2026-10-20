@@ -32,7 +32,7 @@ describe("etapaExigeProximoContato", () => {
     expect(etapaEhEmTratativa("Em tratativas")).toBe(true);
     expect(destinoPermitidoEmTratativa("Fechado")).toBe(true);
     expect(destinoPermitidoEmTratativa("Novo Lead")).toBe(false);
-    expect(destinoPermitidoEmTratativa("Standby - Follow Up")).toBe(false);
+    expect(destinoPermitidoEmTratativa("Standby - Follow Up")).toBe(true);
   });
 });
 

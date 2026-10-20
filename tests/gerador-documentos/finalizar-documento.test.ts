@@ -11,9 +11,12 @@ const mocks = vi.hoisted(() => ({
   renderHtmlParaPdf: vi.fn(),
   queryRaw: vi.fn(),
   carregarContratoPadrao: vi.fn(),
+  disponibilizar: vi.fn(),
 }));
 
 vi.mock("../../auth", () => ({ auth: mocks.auth }));
+vi.mock("@/lib/bpm/contratacao-comercial-server", () => ({ disponibilizarContratoComercial: mocks.disponibilizar }));
+vi.mock("@/lib/bpm/realtime-server", () => ({ notificarPipelineBpm: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("server-only", () => ({}));
 
@@ -33,6 +36,7 @@ vi.mock("@/lib/prisma", () => ({
       update: mocks.updateDocumento,
     },
     documentoTemplate: { findUnique: vi.fn() },
+    $transaction: async (fn: (tx: unknown) => unknown) => fn({ documentoGerado: { update: mocks.updateDocumento } }),
     $queryRaw: (...args: unknown[]) => mocks.queryRaw(...args),
   },
 }));
@@ -246,4 +250,18 @@ describe("FinalizarDocumento", () => {
     expect(mocks.put).not.toHaveBeenCalled();
     expect(mocks.updateDocumento).not.toHaveBeenCalled();
   });
+
+  it("finalizar PDF do BPM sincroniza retorno comercial dentro da transação", async () => {
+  process.env.BLOB_READ_WRITE_TOKEN = "fake-token";
+  mocks.auth.mockResolvedValue({ user: { id: "10", role: "User" } });
+  mocks.getPermissoesEfetivas.mockResolvedValue(["geradorDocumentos"]);
+  mocks.findUniqueDocumentoOwnership.mockResolvedValue({ id: DOCUMENTO_ID, criadoPorId: 10, status: "CONFERENCIA", templateId: "template-1" });
+  mocks.findUniqueDocumento.mockResolvedValue({ titulo: "Contrato BPM", variaveisJson: { __bpmCardId: "financeiro" }, template: { variaveisJson: [] }, clausulas: [] });
+  mocks.gerarPdfDocumento.mockResolvedValue(Buffer.from("%PDF"));
+  mocks.put.mockResolvedValue({ url: "https://store.public.blob.vercel-storage.com/gerador-documentos/pdfs-gerados/10/contrato.pdf" });
+  mocks.disponibilizar.mockResolvedValue(null);
+  expect(await FinalizarDocumento(DOCUMENTO_ID)).toMatchObject({ success: true });
+  expect(mocks.disponibilizar).toHaveBeenCalledWith(expect.objectContaining({ documentoGerado: { update: mocks.updateDocumento } }), "financeiro", 10);
+});
+
 });

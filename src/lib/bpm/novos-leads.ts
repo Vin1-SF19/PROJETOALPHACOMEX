@@ -29,9 +29,11 @@ export function etapaEhNovosLeads(nome: string): boolean {
     || nomeNormalizado === "novos leads";
 }
 
-export function etapaEhStandbyFollowUp(nome: string): boolean {
+export function etapaEhStandbyFollowUp(nome: string, chave?: string | null): boolean {
+  if (chave) return chave === "standby_follow_up";
   return normalizarNomeEtapa(nome) === normalizarNomeEtapa(NOME_ETAPA_STANDBY)
-    || normalizarNomeEtapa(nome) === "standby - follow up";
+    || normalizarNomeEtapa(nome) === "standby - follow up"
+    || normalizarNomeEtapa(nome) === "stand-by — follow-up semanal";
 }
 
 export function intervaloDiaCivilSaoPaulo(agora = new Date()): {

@@ -18,11 +18,12 @@ export function ConteudoScriptEtapa({ script }: { script: string }) {
     editorProps: {
       attributes: {
         class: "prose prose-invert prose-sm max-w-none focus:outline-none px-0 py-0 text-slate-300",
-        "aria-label": "Script da etapa",
+        "aria-label": "Orientações da etapa",
       },
     },
   });
 
   if (!editor) return null;
+  if (editor.isEmpty) return <p className="text-xs text-slate-500">Nenhuma orientação configurada para esta etapa.</p>;
   return <NoteEditorContent editor={editor} className="overflow-visible" />;
 }

@@ -43,8 +43,8 @@ describe("Base de Conhecimento como gerenciador de scripts", () => {
   });
 
   it("renderiza a aba Scripts somente para leitura e mantém o estado vazio", () => {
-    expect(registrar).toContain("> Scripts");
+    expect(registrar).toContain("> Orientações da etapa");
     expect(registrar).toContain("<ConteudoScriptEtapa");
-    expect(registrar).toContain("Nenhum script configurado para esta etapa ainda.");
+    expect(registrar).toContain("Nenhuma orientação configurada para esta etapa.");
   });
 });

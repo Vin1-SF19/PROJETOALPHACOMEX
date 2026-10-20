@@ -128,16 +128,18 @@ export function configuracaoEntradaFechadoEhValida(
     && catalogoSelecaoEhValido(forma[0].opcoesJson);
 }
 
-export function etapaEhFechado(nome: string | null | undefined): boolean {
-  return typeof nome === "string" && normalizarNomeEtapa(nome) === "fechado";
+export function etapaEhFechado(nome: string | null | undefined, chave?: string | null): boolean {
+  if (chave) return chave === "fechado";
+  return typeof nome === "string" && ["fechado", "contrato fechado"].includes(normalizarNomeEtapa(nome));
 }
 
 export function statusInicialAoEntrarFechado(params: {
   pipelineNome: string;
   etapaDestinoNome: string;
+  etapaDestinoChave?: string | null;
   statusAtual: string | null;
 }): StatusPosFechamento | undefined {
-  return params.pipelineNome === "Revisão de Radar" && etapaEhFechado(params.etapaDestinoNome)
+  return params.pipelineNome === "Revisão de Radar" && etapaEhFechado(params.etapaDestinoNome, params.etapaDestinoChave)
     && !params.statusAtual ? STATUS_POS_FECHAMENTO_INICIAL : undefined;
 }
 

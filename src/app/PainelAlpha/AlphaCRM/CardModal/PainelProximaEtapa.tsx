@@ -299,7 +299,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
             )}
             {camposPendentes.map((campo) => <label key={campo.id} className="block space-y-1.5 text-xs text-slate-300">
               <span className="font-semibold">{campo.nome} <span className="text-amber-300">*</span></span>
-              <span className="block text-[11px] text-slate-500">{campo.etapaAplicacaoNome} · {campo.contexto === "ORIGEM" ? "exigido na saída" : "exigido na entrada"}</span>
+              <span className="block text-[11px] text-slate-500">{campo.etapaAplicacaoNome}{campo.contexto === "ORIGEM" ? " · exigido na saída" : ["alpha.radar.viabilidade.valor_acordado", "alpha.radar.viabilidade.forma_pagamento"].includes(campo.chave ?? "") ? "" : " · exigido na entrada"}</span>
               <CampoBpmInput campo={campo} value={valoresRequisitos[campo.id] ?? ""} onChange={(valor) => setValoresRequisitos((atuais) => ({ ...atuais, [campo.id]: valor }))} className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white" disabled={movendoEtapa} readOnly={!campo.editavel || campo.somenteLeitura} cardId={card.id} />
             </label>)}
             {camposObrigatoriosLost.map((campo) => <label key={campo.id} className="block space-y-1.5 text-xs text-slate-300">
