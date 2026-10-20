@@ -2,7 +2,15 @@
 
 Data: 20/10/2026. Escopo confirmado pelo usuário: **Histórico e autoria**.
 
-**Situação: comparação e simulação concluídas; aplicação em produção aguardando autorização específica.** A correção de apresentação está preparada; esta entrega ainda não foi publicada.
+**Situação: concluído — lote aplicado e correção publicada em produção.**
+
+Painel: [painel.alpha-comex.com](https://painel.alpha-comex.com). Deployment `dpl_6w5Pbv2Jw3VM72gmtB7LkpAuq6hz`, estado **READY**, commit [`4ce99fe6`](https://github.com/Vin1-SF19/PROJETOALPHACOMEX/commit/4ce99fe67f1041d69f1b535613208bd32d368645), mensagem **“fix(crm): reconciliar histórico e autoria do RD”**. O alias de produção foi conferido pela API após a promoção; [deployment imutável](https://painel-alpha-projeto-h9u01lpqn-alpha-comexs-projects.vercel.app).
+
+Smoke após promoção: página inicial HTTP 200; rota CRM protegida HTTP 307 para `/?acesso=bloqueado`; API sem credenciais HTTP 401. Nenhum 500 nos checks. Esses testes confirmam disponibilidade e proteção das rotas; não simulam sessão visual autenticada. Audiência, variáveis de ambiente e demais serviços foram preservados.
+
+O usuário autorizou expressamente o plano com “Sim vida autorizo”. Vault revalidou e liberou o mesmo fingerprint. Aplicação concluída em 20/10/2026 às 18:02 UTC: **447 operações aplicadas, zero ignoradas e 1.341 condições verificadas**. A consulta independente confirmou novamente todas as condições.
+
+A reconciliação integral posterior, às 18:04 UTC, conferiu os 1.234 cards/1.221 vínculos: **12.483 eventos equivalentes e zero alterações restantes contra a fonte aprovada**. Todos os **12.361 payloads originais** e as **7.994 correções anteriores** foram preservados. O banco contém 8.319 correções e 447 recibos deste lote. Nenhuma reversão foi necessária.
 
 ## Resultado da comparação
 
@@ -26,7 +34,7 @@ A V1 forneceu os eventos e os catálogos; a V2 forneceu 31 usuários e a confer�
 
 Os 30 usuários V1 e os 31 usuários V2 não apresentaram nomes divergentes para IDs compartilhados. A V2 apresenta conteúdo de anotação em HTML, enquanto a V1 apresenta texto: diferenças de representação foram registradas, sem substituir automaticamente o texto V1 por HTML ou declarar equivalência textual integral.
 
-## Lote proposto
+## Lote aplicado — plano aprovado
 
 | Tipo de registro histórico | Inserções | Atualizações |
 |---|---:|---:|
@@ -54,7 +62,9 @@ Na apresentação das correções, o código passa a distinguir:
 - Correção feita por usuário Alpha: preserva o nome desse usuário.
 - Correção sem proveniência suficiente: **“Autor do ajuste não identificado”**.
 
-O autor original da anotação permanece separado do autor da correção local. Nenhuma autoria humana será inventada para correções automáticas.
+O autor original da anotação permanece separado do autor da correção local. Nenhuma autoria humana foi inventada para correções automáticas.
+
+Após a carga, os helpers reais de apresentação foram executados sobre o snapshot remoto atualizado: **3.682 de 3.682 anotações com autor exibível**, 4.389 correções identificadas como ajuste automático da importação, 3.605 como recuperação automática de autoria e 325 como reconciliação automática. Nenhum registro desse conjunto retorna o antigo rótulo ambíguo. Isso verifica transformação/apresentação com dados reais, sem equivaler a uma sessão visual autenticada no navegador.
 
 ## Limitações preservadas
 
@@ -94,7 +104,7 @@ SHA-256: `2aa3ae96a30e4a08f17ee27fd2cdc05edeb4b0cae9c73b00776b01fc057ad2bd`. Res
 
 O rollback padrão é seletivo: restaura projeções alteradas, remove somente eventos inseridos por este lote e acrescenta auditoria de reversão. Preserva registros e atividades posteriores; qualquer edição posterior no evento bloqueia sua reversão. Lotes nunca aplicados são preservados, inclusive se mudaram depois da prévia. Restauração integral do banco não é a operação padrão.
 
-Comandos preparados, **ainda não executados remotamente**:
+Comandos executados remotamente após a autorização específica e a liberação Vault:
 
 ```bash
 TMPDIR="$PWD/database-backups/pre-change/vault-verificacao" node scripts/reconciliar-historico-autoria-rd.mjs apply --backup=database-backups/pre-change/painelalpha_turso_pre_change_2026-10-20T17-26-08-703Z.sql --confirm=apply:4be6d3428252a7c6aca9d9463ea7a520d1fa6643d355ba39a61b1e566c89bece
@@ -112,10 +122,11 @@ node scripts/reconciliar-historico-autoria-rd.mjs verify --state=rollback
 
 - Simulação em cópia restaurada: **447 aplicadas; reexecução com zero novas alterações; 447 revertidas; 1.341 condições conferidas; integridade OK e zero violações de FK**.
 - Testes focados finais: **24 aprovados**, incluindo paginação incompleta, autores conflitantes, campos removidos manualmente, identidade entre APIs, concorrência, repetição e rollback parcial.
-- Suite geral executada: **657 arquivos aprovados; 4.975 testes aprovados, quatro ignorados e um TODO**, na rodada final após todas as alterações.
-- Typecheck aprovado. Lint sem erros; avisos preexistentes registrados no log.
+- Suite geral do workspace: **657 arquivos aprovados; 4.975 testes aprovados, quatro ignorados e um TODO**. No checkout isolado exato de publicação: **655 arquivos e 4.943 testes aprovados**, quatro ignorados e um TODO; a diferença corresponde a trabalho alheio excluído do pacote.
+- Typecheck aprovado no workspace e no pacote exato. Lint sem erros e 1.193 avisos existentes.
+- Audit de dependências no pre-push: 10 críticos/59 altos já pertencentes ao baseline; `package.json` e lock são idênticos à produção anterior. QA revisou o delta e não identificou dependência, endpoint ou relaxamento de acesso novo. Exceção contextual registrada para esta correção, sem afirmar segurança da árvore completa nem atualizar dependências fora do escopo.
 - Build isolado aprovado (exit 0): Prisma/player executados; Next compilado e 80 páginas estáticas geradas em 171 segundos com heap de 4.096 MB. A execução padrão de `npm run build` havia atingido o limite de 3.072 MB; `package.json` não foi alterado.
 - Entrega anterior de cards/fluxo agora registrada no commit local `aa5a50761944ecf049a61b254980675926288af3`. A existência desse commit não significa push ou novo deploy.
-- Pacote isolado na branch local `fix/crm-historico-autoria-rd-20261020`, sobre `aa5a5076`, com mensagem de commit `fix(crm): reconciliar histórico e autoria do RD`. Esta reconciliação ainda não foi aplicada no banco, publicada ou verificada visualmente em produção.
+- Pacote isolado na branch local `fix/crm-historico-autoria-rd-20261020`, sobre `aa5a5076`, com mensagem de commit `fix(crm): reconciliar histórico e autoria do RD`. Commit de código [`4ce99fe6`](https://github.com/Vin1-SF19/PROJETOALPHACOMEX/commit/4ce99fe67f1041d69f1b535613208bd32d368645), publicado na branch; [PR #3](https://github.com/Vin1-SF19/PROJETOALPHACOMEX/pull/3) aberto como draft, sem merge em main/staging. Lote aplicado e reconsultado em produção; apresentação publicada e alias conferido no deployment acima. Validação visual autenticada não foi realizada; a apresentação foi coberta por testes da action/helpers e pelo build isolado.
 
 Referências: [story](story-alpha-crm-reconciliacao-historico-autoria-rd.md), [relatório Vault](relatorio-vault-rd-historico-autoria.md), [contrato V2 de anotações](https://developers.rdstation.com/reference/crm-v2-list-notes-from-deal), [catálogo V1 de usuários](https://developers.rdstation.com/reference/crm-v1-list-users), [tarefas V1](https://developers.rdstation.com/reference/crm-v1-list-tasks).

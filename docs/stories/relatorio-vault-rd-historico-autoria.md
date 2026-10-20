@@ -1,12 +1,12 @@
-# Vault Report — BLOQUEADO somente para aguardar autorização específica
+# Vault Report — CONCLUÍDO: plano autorizado aplicado e conferido
 
-Revisão inicial: 2026-10-20, 17:24 UTC. Backup concluído e verificado nesta sessão após 17:30 UTC. Revisão do plano final: 2026-10-20, aproximadamente 17:53 UTC.
+Revisão inicial: 2026-10-20, 17:24 UTC. Backup concluído e verificado nesta sessão após 17:30 UTC. Revisão do plano final: 2026-10-20, aproximadamente 17:53 UTC. Liberação após autorização: 2026-10-20, 18:01:34 UTC. Execução concluída às 18:02:56 UTC; reconciliação final às 18:04:52 UTC.
 
 Skill aplicada: [Vault](../../.agents/skills/vault/SKILL.md). O `AGENTS.md` exige plano concreto, backup completo verificado com até 48 horas e confirmação específica antes de executar importação/backfill em massa.
 
 ## Pedido e limites
 
-O novo pedido é comparar os cards do Alpha com o RD Station e atualizar **somente histórico e autoria original dos registros**, conforme confirmado pelo usuário. A comparação e a prévia estão concluídas; a carga persistente aguarda autorização específica para o plano concreto abaixo. A confirmação do escopo ainda não é a confirmação de aplicação deste lote.
+O novo pedido é comparar os cards do Alpha com o RD Station e atualizar **somente histórico e autoria original dos registros**, conforme confirmado pelo usuário. A comparação e a prévia estão concluídas. Após a apresentação explícita do lote de **447 alterações em 237 cards**, o usuário respondeu **“Sim vida autorizo”**, autorizando a aplicação em produção do fingerprint abaixo. Essa autorização específica foi comunicada a Vault pelo agente responsável pela conversa.
 
 A autorização anterior do alinhamento do CRM, fingerprint `22095fae6cc62886d0dae11557f41a1bdf690c5b9a0e886c5c1f2882ef31dca1`, já foi consumada no escopo de configuração daquela entrega e **não autoriza esta importação de histórico/autoria**.
 
@@ -143,9 +143,9 @@ O rollback é seletivo, em ordem inversa, baseado no mesmo plano e nos marcadore
 
 Antes de rollback, obter autorização própria e revalidar backup, plano e estado. Não executar rollback automaticamente após falha de um lote. Uma restauração integral do dump pode descartar gravações posteriores e não será feita automaticamente; requer plano e autorização específicos.
 
-## Comandos preparados — carga não executada
+## Comandos autorizados e executados pelo responsável
 
-Após confirmação específica do usuário, executar o mesmo script revisado com o mesmo fingerprint:
+A confirmação específica foi recebida. O agente responsável executou o mesmo script revisado com o mesmo fingerprint, preservando todas as revalidações internas:
 
 ```bash
 TMPDIR="$PWD/database-backups/pre-change/vault-verificacao" node scripts/reconciliar-historico-autoria-rd.mjs apply --dir=database-backups/pre-change/rd-historico-autoria-2026-10-20 --confirm=apply:4be6d3428252a7c6aca9d9463ea7a520d1fa6643d355ba39a61b1e566c89bece --backup=database-backups/pre-change/painelalpha_turso_pre_change_2026-10-20T17-26-08-703Z.sql
@@ -161,14 +161,50 @@ node scripts/reconciliar-historico-autoria-rd.mjs verify --dir=database-backups/
 
 O modo `rollback` exige `--confirm=rollback:4be6d3428252a7c6aca9d9463ea7a520d1fa6643d355ba39a61b1e566c89bece`, backup válido e autorização específica. A verificação de reversão usa `verify --state=rollback` com o mesmo diretório.
 
-## Confirmação necessária
+## Confirmação apresentada e recebida
 
-Apresentar este plano ao usuário e pedir autorização para:
+O agente responsável apresentou o plano e perguntou explicitamente sobre sua aplicação em produção, com este escopo:
 
 > Aplicar o plano `4be6d342…89bece` no Alpha, somente no histórico RD de 237 cards: inserir 122 eventos e atualizar 325 projeções, recuperar autoria comprovada e registrar auditoria, preservando dados comerciais, etapas atuais, responsáveis e o RD.
 
-Uma resposta inequívoca à apresentação desse lote autoriza o comando exato de aplicação, sem ampliar o escopo. Não utilizar a autorização anterior das renomeações/configuração do CRM.
+O usuário respondeu **“Sim vida autorizo”** em 2026-10-20, aproximadamente 18:01 UTC, diretamente à pergunta de aplicação deste lote. Essa resposta autoriza o comando exato de aplicação e não amplia o escopo. A autorização utilizada é esta confirmação nova; não é a autorização anterior das renomeações/configuração do CRM.
+
+## Revalidação imediatamente antes da execução
+
+Leituras locais concluídas em **2026-10-20 18:01:34.966 UTC**, sem consulta ou escrita no banco nesta etapa:
+
+- Fingerprint recalculado e igual ao autorizado: `4be6d3428252a7c6aca9d9463ea7a520d1fa6643d355ba39a61b1e566c89bece`.
+- Hashes dos três arquivos do executor e hash agregado inalterados em relação à revisão.
+- Banco configurado, plano e manifesto apontam para o mesmo identificador seguro.
+- Simulação aprovada corresponde ao mesmo fingerprint.
+- Manifesto permanece com SHA-256, tamanho, 337 tabelas e 293.950 linhas iguais à evidência de restauração previamente verificada.
+- Backup com aproximadamente **32 minutos**, dentro das 48 horas.
+- Fonte com aproximadamente **15 minutos**, dentro das 24 horas.
+
+Esta revalidação não repetiu a restauração pesada: o próprio CLI deve restaurar/verificar o dump novamente antes da escrita, como previsto no código revisado. Se qualquer guarda de banco, arquivo, validade ou concorrência falhar, o executor deve interromper; não contornar a proteção.
+
+## Execução concluída e evidências posteriores
+
+Vault leu os três artefatos privados produzidos pelo responsável pela aplicação, todos vinculados ao fingerprint autorizado `4be6d3428252a7c6aca9d9463ea7a520d1fa6643d355ba39a61b1e566c89bece`. Esta etapa de encerramento não executou consultas ou escritas no banco.
+
+| Evidência | Timestamp UTC em 20/10/2026 | Resultado |
+| --- | --- | --- |
+| `apply-result.json` | 18:02:56.803 | **447 operações aplicadas**, zero ignoradas; **1.341 guardas verificadas e coincidentes**. |
+| `verification.json` | 18:03:38.407 | Verificação posterior somente leitura: **1.341 guardas verificadas e coincidentes**. |
+| `post-apply-reconciliation.json` | 18:04:52.414 | Reconciliação com a coleta aprovada: **zero diferenças restantes**, 12.483 eventos sem necessidade de nova mudança. |
+
+A conferência final registra:
+
+- **1.234 cards e 1.221 vínculos**, preservando o universo inventariado.
+- **12.483 eventos** após as 122 inserções.
+- Os **12.361 payloads brutos dos eventos originais foram preservados**.
+- As **7.994 correções originais foram preservadas**; o total passou a **8.319**, coerente com as 325 correções acrescentadas.
+- **447 marcadores `RD_COMPLEMENTO_IMPORTADO`**, coerentes com as operações autorizadas.
+- Zero inserções/atualizações pendentes em nova comparação com a mesma coleta.
+- Permanecem as limitações de origem já informadas: 7.177 históricos de etapa sem autor identificado, 71 nomes de etapa indisponíveis e 2 campos de data de tarefa ausentes. Não foram preenchidos com suposições.
+
+Não houve rollback. A ausência de diferenças refere-se à coleta aprovada concluída em **17:46:24 UTC**, não a futuras alterações realizadas no RD depois desse instante.
 
 ## Decisão final desta revisão
 
-**Prévia, backup, simulação e revisão técnica concluídos. BLOQUEADO somente até a confirmação específica do usuário para este fingerprint.** Nenhuma carga remota foi executada nesta revisão. Antes de aplicar, o executor repetirá as validações de validade, hashes e concorrência; se elas divergirem, interromper e revisar o plano.
+**CONCLUÍDO — plano autorizado aplicado pelo responsável e evidências de verificação/reconciliação conferidas por Vault.** Nenhuma mudança de banco permanece pendente neste lote. Vault não executou a carga ou rollback. Qualquer nova coleta que gere outro lote deve produzir seu próprio plano, revisão e autorização.
