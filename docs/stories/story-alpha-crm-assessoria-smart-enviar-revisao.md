@@ -123,6 +123,8 @@ Checklist `.aiox-core/product/checklists/story-draft-checklist.md` aplicado em m
 
 ## Dev Agent Record
 
+Atualização em 2026-10-20: esta configuração também foi aplicada e verificada no banco isolado de staging (automação `cmvh5pf9a001yg5ihmwgah3mh`, Smart versão 2). O script agora usa `.env.staging.local` por padrão e exige seleção explícita/autorização para produção. A decisão permanente é staging antes de produção; detalhes de publicação e backup constam em `story-staging-sincronizacao-fluxo-staging-primeiro.md`.
+
 Configuração administrativa CRUD publicada via CLI, transação e CAS da versão Smart 1→2. Sem alteração de schema, migration, seed, backfill ou movimentação de cards existentes; aplica-se a exceção de CRUD comum do AGENTS.md.
 
 - Etapa `csmartenviarevisao00000001`: **Enviar para REVISÃO**, ativa, ordem 3, `ehFinal=true`. CLIENTES CANCELADOS passou para ordem 4; demais etapas preservadas.

@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — pacote isolado e quatro gates aprovados; publicação e configuração de staging em andamento, sem alteração em produção.
+Done — aplicativo e configuração publicados e verificados no staging; produção preservada. Audit de dependências permanece como CONCERNS de baseline herdado.
 
 ## Executor Assignment
 
@@ -35,10 +35,10 @@ Origem: pedido direto do usuário em 2026-10-20. A story relacionada `story-alph
 - [x] Confirmar serviço, URL e ambiente efetivo do staging, incluindo isolamento do banco (AC 2).
 - [x] Registrar política de staging primeiro em `AGENTS.md` e `docs/dev-tools.md` (AC 7).
 - [x] Executar gates reais e revisar escopo/configuração da release (AC 1, 5–6).
-- [ ] Publicar somente o aplicativo de staging e verificar commit/release e disponibilidade remota (AC 1–2, 5–6).
-- [ ] Inventariar Smart e Operacional/Revisão no staging; conferir ou aplicar configuração administrativa delimitada pelos mecanismos existentes (AC 3–5).
-- [ ] Validar configuração persistida e cenários de entrada/reentrada em ambiente isolado; registrar eventual limitação de sessão autenticada (AC 3–6).
-- [ ] Atualizar status, checklist, File List, evidências e limitações reais (AC 8).
+- [x] Publicar somente o aplicativo de staging e verificar commit/release e disponibilidade remota (AC 1–2, 5–6).
+- [x] Inventariar Smart e Operacional/Revisão no staging; conferir ou aplicar configuração administrativa delimitada pelos mecanismos existentes (AC 3–5).
+- [x] Validar configuração persistida e cenários de entrada/reentrada em ambiente isolado; registrar eventual limitação de sessão autenticada (AC 3–6).
+- [x] Atualizar status, checklist, File List, evidências e limitações reais (AC 8).
 
 ## Dev Notes e referências
 
@@ -98,11 +98,19 @@ Checklist `.aiox-core/product/checklists/story-draft-checklist.md` aplicado em m
 
 Ambiente confirmado: Vercel custom `staging` (`env_sKT0JOh0HB03g20jmcqN5pTHMjqT`), branch `staging`, domínio `https://staging.alpha-comex.com`. O serviço systemd antigo está inativo e não foi usado. A base do pacote isolado é `1ab82aec`; o inventário completo de arquivos e exclusões está em `docs/reports/staging-sincronizacao-20261020.md`.
 
-- Banco de staging distinto de produção, selecionado por `.env.staging.local`; inventário real confirmou Smart versão 1, quatro etapas e ausência da automação; destino Operacional/Revisão presente com IDs conferidos. Backup completo de staging em preparação antes do CRUD delimitado.
+- Banco de staging distinto de produção, selecionado por `.env.staging.local`; inventário inicial confirmou Smart versão 1, quatro etapas e ausência da automação; destino Operacional/Revisão presente com IDs conferidos.
+- Configuração aplicada no staging e verificada em `2026-10-20T20:50:06.837Z`: Smart versão 2, etapa `csmartenviarevisao00000001` na ordem 3, CLIENTES CANCELADOS na ordem 4; automação `cmvh5pf9a001yg5ihmwgah3mh` ativa, versão 1 ATIVA, ENTRAR_COLUNA restrito à nova etapa e ação CRIAR_CARD_OUTRO_PIPELINE para Operacional/Revisão, vínculo verdadeiro e reutilização por empresa desabilitada. Formulário/33 configurações de campo reutilizados e duas transições mínimas sem lifecycle. Repetição da CLI retornou JA_CONFIGURADO.
+- Comparação antes/depois no banco de staging comprovou preservação dos cards Smart existentes e das etapas do Operacional. Evidências locais ignoradas pelo Git: `database-backups/pre-change/staging-validation-20261020/{antes,depois}.json`. Não houve retroprocessamento nem movimentação de cards reais para fabricar teste.
+- Backup completo do staging, anterior à mudança: `database-backups/pre-change/painelalpha_staging_pre_change_2026-10-20T20-48-42-794641+00-00.sql` e manifesto correspondente; snapshot SQLite consistente da réplica completa de staging, 337 tabelas, 295.171 linhas, 308.225.012 bytes, SHA-256 `f23c7834fa0348c6836843ae8836cf7166a15b1ef01d3d4b9739b863182a1b0c`. Integrity/FK conferidos no snapshot; o helper oficial restaurou o dump e validou hash, tamanho e contagens antes da escrita. A primeira exportação nativa foi encerrada por lentidão após a réplica completa estar disponível; o snapshot consistente dessa réplica permitiu concluir a exportação e a verificação sem copiar produção.
 - `AGENTS.md` e `docs/dev-tools.md` atualizados com a decisão permanente do usuário. `.env.development.local` local/ignorado passou a selecionar o banco de staging, preservando as outras variáveis. Arquivos `.env.local`/`.env` de produção não foram alterados e nenhum segredo foi versionado.
 - Script Smart agora usa staging por padrão, aceita `--env-file`, rejeita URL herdada divergente e exige `--production` para aplicar em outro banco remoto. QA independente aprovou esses ajustes, três negativas reais de preflight e ESLint individual sem erros/avisos.
-- DevOps confirmou os quatro gates: lint sem erros (1.193 avisos legados), 674 arquivos e 5.083 testes aprovados (4 skipped, 1 todo), typecheck final aprovado após geração do bundle do player e build completo aprovado (81 páginas). Ainda não se declara publicação nesta entrada parcial.
+- DevOps confirmou os quatro gates: lint sem erros (1.193 avisos legados), 674 arquivos e 5.083 testes aprovados (4 skipped, 1 todo), typecheck final aprovado após geração do bundle do player e build completo aprovado (81 páginas).
+- Código publicado na branch `staging`, commit `2d80e4f0ccd3142b1b1f7b6ccc6345c33a127d1c` (98 arquivos, 6.862 inserções e 609 remoções). Deploy Vercel `dpl_FXxXhhByQ5g4wppqZd4ZTTpQjvo4` confirmado READY em `2026-10-20T20:51:54Z`; alias `https://staging.alpha-comex.com` associado exatamente a esse deployment/custom staging. URL direta: `https://painel-alpha-projeto-gdsrpte2n-alpha-comexs-projects.vercel.app`.
+- Smoke remoto: `/` HTTP 200, CRM e automações HTTP 307 sem sessão, endpoint de oportunidades HTTP 401 sem autenticação. Esses resultados comprovam disponibilidade e proteção de acesso, sem alegar navegação autenticada. Evidências DevOps: `/tmp/alpha-staging-deployment-evidence.json` e `/tmp/alpha-staging-remote-smoke.json`.
+- Variáveis TURSO do custom staging regravadas exclusivamente nesse ambiente a partir do arquivo local de staging. IDs/escopo e hashes, sem valores secretos, em `/tmp/alpha-staging-env-update-evidence.json`; demais variáveis/objetos preservados. Não foi necessário compartilhar o banco de produção ou ativar o serviço systemd legado.
+- Preservação remota: deployment de produção `dpl_6w5Pbv2Jw3VM72gmtB7LkpAuq6hz` e branch main `1504a1c62556` permaneceram inalterados. Nenhuma publicação, alteração de banco ou promoção em produção nesta entrega.
 - Audit de dependências: 126 avisos herdados (10 critical, 53 high, 61 moderate, 2 low), registrados como CONCERNS de baseline; não se declara npm audit aprovado. dependencies/devDependencies e package-lock são idênticos à base `1ab82aec`, sem dependência nova nesta entrega. Atualizar a stack inteira fica fora do escopo da publicação de staging; nenhuma promoção para produção está autorizada.
+- Cenários de entrada/reentrada: smoke isolado do runtime desta automação já executado e aprovado, registrado na story Smart e em `database-backups/pre-change/smart-validation/runtime-test.log`: cria na Revisão, mantém origem/vínculo, não duplica reentrada, outra etapa não dispara e processo avulso da mesma empresa é preservado. A configuração de staging usa o mesmo grafo conferido por leitura. Não se reivindica um evento real autenticado no navegador do staging; não havia sessão disponível.
 
 ### File List
 
@@ -116,10 +124,11 @@ Os demais arquivos do aplicativo, testes e documentação efetivamente incluído
 
 ## QA Results
 
-Pendente de execução e revisão da entrega.
+**Revisão QA independente: sem defeito novo identificado no escopo entregue; CONCERNS limitado ao audit herdado, sem nova dependência.** Conferidos os três arquivos de política/preflight, negativas reais de ambiente e ESLint. A revisão do pacote conferiu 98/98 arquivos do manifesto contra o commit, ausência de segredos/artefatos no delta, dependências/lockfile idênticos à base e evidências da configuração de staging. DevOps comprovou os quatro gates, READY, alias correto e preservação de produção/main. Limitação explícita: sem sessão de navegador para homologação autenticada e sem evento real criado artificialmente em staging.
 
 ## Change Log
 
 | Data | Versão | Descrição | Autor |
 | --- | --- | --- | --- |
 | 2026-10-20 | 0.1 | Preparação a partir do pedido direto, critérios e checklist de draft | River (@sm) |
+| 2026-10-20 | 0.2 | Pacote de 98 arquivos publicado em staging, configuração Smart verificada, gates e política permanente registrados; produção preservada | Codex / DevOps |
