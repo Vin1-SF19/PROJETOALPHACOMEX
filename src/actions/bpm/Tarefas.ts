@@ -294,10 +294,15 @@ export async function ConcluirTarefaBpm(dados: unknown) {
           if (!anexo) throw new Error("Anexe a planilha Excel do checklist antes de concluir esta tarefa.");
         }
       }
-      await tx.bpmTarefa.update({
-        where: { id: tarefaId },
+      const conclusao = await tx.bpmTarefa.updateMany({
+        where: { id: tarefaId, cardId: atual.cardId, status: "PENDENTE" },
         data: { status: "CONCLUIDA", concluidaEm: new Date() },
       });
+      if (conclusao.count !== 1) {
+        const final = await tx.bpmTarefa.findUnique({ where: { id: tarefaId }, select: { status: true } });
+        if (final?.status === "CONCLUIDA") return { alterou: false, cardId: atual.cardId };
+        throw new Error(final?.status === "CANCELADA" ? "Tarefa cancelada não pode ser concluída" : "Tarefa não encontrada");
+      }
       await registrarHistoricoCard(
         {
           cardId: atual.cardId,
@@ -320,10 +325,13 @@ export async function ConcluirTarefaBpm(dados: unknown) {
     });
 
     if (resultado.alterou) {
-      revalidatePath(`${ROTA_BASE}/pipeline`);
-      revalidatePath(ROTA_BASE);
-      revalidatePath(`${ROTA_BASE}/tarefas`);
-      await notificarPipelineBpm({ cardId: resultado.cardId, tipo: "TAREFA_ALTERADA" });
+      try {
+        revalidatePath(`${ROTA_BASE}/pipeline`);
+        revalidatePath(ROTA_BASE);
+        revalidatePath(`${ROTA_BASE}/tarefas`);
+      } catch (error) { console.error("[ConcluirTarefaBpm/cache-pos-commit]", error); }
+      try { await notificarPipelineBpm({ cardId: resultado.cardId, tipo: "TAREFA_ALTERADA" }); }
+      catch (error) { console.error("[ConcluirTarefaBpm/realtime-pos-commit]", error); }
     }
     return { success: true };
   } catch (error) {

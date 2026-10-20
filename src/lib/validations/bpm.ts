@@ -489,7 +489,7 @@ export const criarInteracaoCardSchema = z.object({
 });
 
 export const criarTarefaSchema = z.object({
-  cardId: z.string().cuid(),
+  cardId: bpmCardIdSchema,
   tipo: z.enum(BPM_TAREFA_TIPOS),
   titulo: z.string().trim().max(MAX_NOME).optional(),
   descricao: z.string().trim().max(MAX_DESCRICAO).optional(),
@@ -525,7 +525,11 @@ export const criarTarefaSchema = z.object({
 });
 
 export const concluirTarefaSchema = z.object({
-  tarefaId: z.string().cuid(),
+  tarefaId: z.union([
+    z.string().cuid(), z.string().regex(/^rdtask_[a-f0-9]{28}$/),
+    z.string().refine((id) => id.startsWith("crm-proximo-contato:")
+      && bpmCardIdSchema.safeParse(id.slice("crm-proximo-contato:".length)).success),
+  ]),
 });
 
 export const criarTarefaPresetSchema = z.object({

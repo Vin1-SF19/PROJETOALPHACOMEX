@@ -19,7 +19,8 @@ import {
   BPM_PIPELINE_CHANNEL_PREFIX,
   extrairPipelineIdCanalBpm,
 } from "@/lib/bpm/realtime";
-import { checarAcessoRealtimeBpmPipeline } from "@/lib/bpm/ownership";
+import { BPM_TAREFA_USUARIO_CHANNEL_PREFIX, extrairUsuarioIdCanalTarefasBpm } from "@/lib/bpm/notificacoes-tarefas";
+import { checarAcessoModuloBpm, checarAcessoRealtimeBpmPipeline } from "@/lib/bpm/ownership";
 
 const ADMIN_CHANNELS = ["private-admin-chamados"];
 const PARCEIROS_PRECADASTROS_CHANNEL = "private-parceiros-precadastros";
@@ -38,6 +39,14 @@ export async function POST(req: Request) {
     const formData = await req.formData();
     const socketId = formData.get("socket_id") as string;
     const channelName = formData.get("channel_name") as string;
+
+    if (channelName?.startsWith(BPM_TAREFA_USUARIO_CHANNEL_PREFIX)) {
+      const usuarioId = extrairUsuarioIdCanalTarefasBpm(channelName);
+      if (usuarioId === null || usuarioId !== Number(session.user.id) || !await checarAcessoModuloBpm(usuarioId)) {
+        return new NextResponse("Proibido", { status: 403 });
+      }
+      return NextResponse.json(pusherServer.authorizeChannel(socketId, channelName));
+    }
 
     if (channelName?.startsWith(BPM_PIPELINE_CHANNEL_PREFIX)) {
       const pipelineId = extrairPipelineIdCanalBpm(channelName);

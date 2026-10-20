@@ -33,7 +33,7 @@ describe("central geral de notificações do Painel Alpha", () => {
     const toastChamados = ler("src/components/chamados/NotificationToast.tsx");
 
     expect(layout).toContain("<CentralNotificacoesPainel");
-    expect(layout).toContain("onAbrirModulo={openTab}");
+    expect(layout).toContain("onAbrirModulo={abrirModuloPorNotificacao}");
     expect(layout).not.toContain("temAcessoCalendarioAlpha && <CentralNotificacoesPainel");
     expect(central).toContain('onAbrirModulo("/PainelAlpha/Chamados", "Chamados")');
     expect(toastChamados).toContain("onAbrirChamados()");

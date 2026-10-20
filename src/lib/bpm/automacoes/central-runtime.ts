@@ -1,5 +1,7 @@
 import "server-only";
 
+import { dispararAlertaTarefaBpm, tarefaAlertaSelect } from "@/lib/bpm/alertas-tarefas";
+
 import { randomUUID } from "node:crypto";
 import { Resend } from "resend";
 import type { Prisma } from "@prisma/client";
@@ -385,12 +387,13 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
   if (tipo === "MARCAR_ALERTA_TAREFA") {
     const tarefaId = execucao.evento?.entidadeTipo === "TAREFA" ? execucao.evento.entidadeId : null;
     if (!tarefaId) throw new Error("O alerta exige um evento de tarefa");
-    const alterada = await db.bpmTarefa.updateMany({ where: { id: tarefaId, cardId: card.id, status: "PENDENTE", alertaEm: { lte: new Date() }, alertaDisparadoEm: null }, data: { alertaDisparadoEm: new Date() } });
-    if (alterada.count) {
-      await db.bpmCardHistorico.create({ data: { cardId: card.id, acao: "TAREFA_ALERTA_DISPARADO", automacaoOrigem: execucao.automacaoId, valorNovoJson: JSON.stringify({ tarefaId, execucaoId: execucao.id }) } });
-      await notificarPipelineBpm({ pipelineId: card.pipelineId, cardId: card.id, tipo: "TAREFA_ALTERADA" });
-    }
-    return { tarefaId, disparado: alterada.count === 1 };
+    const agora = new Date();
+    const tarefa = await db.bpmTarefa.findFirst({
+      where: { id: tarefaId, cardId: card.id, status: "PENDENTE", alertaEm: { lte: agora }, alertaDisparadoEm: null },
+      select: tarefaAlertaSelect,
+    });
+    const disparado = tarefa ? await dispararAlertaTarefaBpm(tarefa, agora, execucao.automacaoId) : false;
+    return { tarefaId, disparado };
   }
   if (tipo === "SINCRONIZAR_TRANSCRICAO_REUNIAO") {
     const resultado = await sincronizarTranscricaoCardBpm(card.id, "automatica");

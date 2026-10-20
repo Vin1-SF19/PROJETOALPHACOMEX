@@ -1,5 +1,6 @@
 "use client";
 
+import { BPM_CARD_ABERTO_EVENT, BPM_CARD_ABRIR_EVENT, BPM_CARD_PRONTO_EVENT, intencaoCardBpmSchema } from "@/lib/bpm/notificacoes-tarefas";
 import { usuariosDaVisao, type VisaoQuadro } from "@/lib/bpm/visao-equipe";
 import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
 import { textoLegivelRd } from "@/lib/bpm/rd-station-text";
@@ -769,6 +770,7 @@ function LazyPipelineColumn({
 interface Props {
   pipeline: PipelineBpm;
   cardsIniciais: CardBpm[];
+  cardInicialId?: string | null;
   manifestoInicial?: ManifestoQuadro;
   visual: TemaAlpha;
   currentUserId: number | null;
@@ -793,7 +795,7 @@ interface PromocaoLeadPendente {
   etapaDestinoNome: string;
 }
 
-export default function PipelineBoardClient({ pipeline, cardsIniciais, manifestoInicial, visual, currentUserId, currentUserRole }: Props) {
+export default function PipelineBoardClient({ pipeline, cardsIniciais, cardInicialId = null, manifestoInicial, visual, currentUserId, currentUserRole }: Props) {
   const accent = visual.accent;
   const router = useRouter();
   const [cards, setCards] = useState<CardBpm[]>(cardsIniciais);
@@ -809,7 +811,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
   const quadroRef = useRef({ manifesto: manifestoInicial, ids: cardsIniciais.map((c) => c.id), limites: {} as Record<string, number>, busca: "", responsavelId: null as number | null, visao: "MEUS" as VisaoQuadro, setorId: null as number | null, ultimaCompleta: 0 });
   useEffect(() => { quadroRef.current.ultimaCompleta = Date.now(); }, []);
   const primeiraFiltragemRef = useRef(true);
-  const [cardSelecionadoId, setCardSelecionadoId] = useState<string | null>(null);
+  const [cardSelecionadoId, setCardSelecionadoId] = useState<string | null>(cardInicialId);
   const [cardAgendamentoId, setCardAgendamentoId] = useState<string | null>(null);
   const [nolossLeadAberto, setNolossLeadAberto] = useState<CardBpm | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -824,7 +826,25 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
   const ultimaRequisicaoRef = useRef(0);
   const consultasEmAndamentoRef = useRef(0);
   const realtimeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cardSelecionadoIdRef = useRef<string | null>(null);
+  const cardSelecionadoIdRef = useRef<string | null>(cardInicialId);
+  const cardAbertoPorAlertaRef = useRef<string | null>(cardInicialId);
+  useEffect(() => {
+    if (window.parent === window) return;
+    const handler = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.source !== window.parent
+        || event.data?.type !== BPM_CARD_ABRIR_EVENT) return;
+      const parsed = intencaoCardBpmSchema.safeParse(event.data);
+      if (!parsed.success || parsed.data.pipelineId !== pipeline.id) return;
+      cardAbertoPorAlertaRef.current = parsed.data.cardId;
+      cardSelecionadoIdRef.current = parsed.data.cardId;
+      setCardAgendamentoId(null);
+      setCardSelecionadoId(parsed.data.cardId);
+      window.parent.postMessage({ type: BPM_CARD_ABERTO_EVENT, ...parsed.data }, window.location.origin);
+    };
+    window.addEventListener("message", handler);
+    window.parent.postMessage({ type: BPM_CARD_PRONTO_EVENT }, window.location.origin);
+    return () => window.removeEventListener("message", handler);
+  }, [pipeline.id]);
   const snapshotArrastoRef = useRef<SnapshotArrasto | null>(null);
   const generationBoardRef = useRef(0);
   const sincronizacaoRealtimePendenteRef = useRef(false);
@@ -907,7 +927,13 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
         setNolossLeadAberto((aberto) => aberto && !result.manifesto.entradas.some((c) => c.id === aberto.id) ? null : aberto);
         setCards((atuais) => mesclarResumosQuadro(atuais, result.cards as CardBpm[], result.ids));
         if (cardSelecionadoIdRef.current && !result.manifesto.entradas.some((c) => c.id === cardSelecionadoIdRef.current)) {
-          cardSelecionadoIdRef.current = null; setCardSelecionadoId(null); setCardAgendamentoId(null);
+          if (cardAbertoPorAlertaRef.current === cardSelecionadoIdRef.current) {
+            // Ausência no filtro não prova perda de acesso. O detalhe revalida
+            // sua ACL e fecha o modal se o acesso foi revogado, mesmo sem realtime.
+            setRealtimeRevision((revision) => revision + 1);
+          } else {
+            cardSelecionadoIdRef.current = null; setCardSelecionadoId(null); setCardAgendamentoId(null);
+          }
         }
         if (mudouConfig) router.refresh();
         if (!opcoes.preservarErro) setErro(null);
@@ -1027,6 +1053,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
   const paginaManifesto = manifesto ? selecionarPaginaQuadro(manifesto.entradas, { busca, visao, setorId: setorFiltro, acesso: manifesto.acesso, responsavelId: responsavelFiltro ? Number(responsavelFiltro) : null, }) : null;
 
   const abrirCard = useCallback((cardId: string) => {
+    cardAbertoPorAlertaRef.current = null;
     const card = cards.find((c) => c.id === cardId);
     if (card?.origem === "noloss") {
       setNolossLeadAberto(card);
@@ -1038,12 +1065,14 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
   }, [cards, setNolossLeadAberto, setCardAgendamentoId, setCardSelecionadoId]);
 
   const abrirAgendamento = useCallback((cardId: string) => {
+    cardAbertoPorAlertaRef.current = null;
     cardSelecionadoIdRef.current = cardId;
     setCardAgendamentoId(cardId);
     setCardSelecionadoId(cardId);
   }, []);
 
   const fecharCard = useCallback(() => {
+    cardAbertoPorAlertaRef.current = null;
     cardSelecionadoIdRef.current = null;
     setCardAgendamentoId(null);
     setCardSelecionadoId(null);

@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useConclusaoTarefasBpm } from "@/hooks/useConclusaoTarefasBpm";
 import { Bell, Calendar, CheckCircle2, ClipboardCheck, Mail, MessageCircle, Phone, Plus, User, X } from "lucide-react";
 import { toast } from "sonner";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
-import { CriarTarefaBpm, ConcluirTarefaBpm } from "@/actions/bpm/Tarefas";
+import { CriarTarefaBpm } from "@/actions/bpm/Tarefas";
 import { fmtDateTime, parseDataHoraLocalBpm } from "@/lib/format-date";
 import { BPM_TAREFA_TIPOS, obterConfigTipoTarefa, type BpmTarefaTipo } from "@/lib/bpm/tarefas-tipo";
 import { BpmDateTimeField } from "./BpmDateTimeField";
@@ -49,6 +50,7 @@ function IconeTipo({ tipo, size = 15 }: { tipo: string; size?: number }) {
 }
 
 export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, podeTrabalharTarefas, onAtualizado, permitirCriar = true }: Props) {
+  const conclusao = useConclusaoTarefasBpm(cardId, tarefas, onAtualizado);
   const [aberto, setAberto] = useState(false);
   const [tipo, setTipo] = useState<BpmTarefaTipo>("TAREFA");
   const [titulo, setTitulo] = useState("");
@@ -139,7 +141,7 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
           <p className="text-xs text-slate-500">Nenhuma tarefa cadastrada para este card</p>
         </div>
       )}
-      {tarefas.map((tarefa) => {
+      {conclusao.tarefas.map((tarefa) => {
         const config = obterConfigTipoTarefa(tarefa.tipo);
         const alertaAtivo = tarefa.status === "PENDENTE" && Boolean(tarefa.alertaDisparadoEm);
         const prioridadeCor = tarefa.prioridade === "ALTA" ? "bg-red-500/15 text-red-300" : tarefa.prioridade === "MEDIA" ? "bg-amber-500/15 text-amber-300" : "bg-slate-500/15 text-slate-300";
@@ -157,8 +159,8 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
                   window.dispatchEvent(new CustomEvent("bpm:abrir-pendencias-checklist", { detail: { cardId } }));
                   return;
                 }
-                void ConcluirTarefaBpm({ tarefaId: tarefa.id }).then((res) => res.success ? onAtualizado() : toast.error(typeof res.error === "string" ? res.error : "Erro ao concluir tarefa"));
-              }} disabled={!podeTrabalharTarefas || encerrada} className="mt-0.5 text-slate-500 disabled:cursor-not-allowed" aria-label={tarefa.status === "CANCELADA" ? "Tarefa cancelada" : tarefa.status === "CONCLUIDA" ? "Tarefa concluída" : gerenciadaPorChecklist ? "Abrir procedimento para concluir" : "Concluir tarefa"}>
+                if (podeTrabalharTarefas) void conclusao.concluir(tarefa);
+              }} disabled={!podeTrabalharTarefas || encerrada || conclusao.salvando(tarefa.id)} aria-busy={conclusao.salvando(tarefa.id)} className="mt-0.5 text-slate-500 disabled:cursor-not-allowed" aria-label={tarefa.status === "CANCELADA" ? "Tarefa cancelada" : tarefa.status === "CONCLUIDA" ? "Tarefa concluída" : gerenciadaPorChecklist ? "Abrir procedimento para concluir" : "Concluir tarefa"}>
                 <CheckCircle2 size={16} className={tarefa.status === "CONCLUIDA" ? "text-emerald-400" : ""} />
               </button>
               <div className="min-w-0 flex-1">
@@ -166,6 +168,7 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
                   <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300"><IconeTipo tipo={tarefa.tipo} size={11} />{config.label}</span>
                   {tarefa.prioridade && <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${prioridadeCor}`}>{tarefa.prioridade}</span>}
                   <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusCor}`}>{tarefa.status === "CANCELADA" ? "Cancelada" : tarefa.status === "CONCLUIDA" ? "Concluída" : VALORES.PENDENTE}</span>
+                  {conclusao.salvando(tarefa.id) && <span role="status" className="text-[10px] text-slate-400">Salvando...</span>}
                   {alertaAtivo && <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300"><Bell size={11} /> Alerta ativo</span>}
                 </div>
                 <p className={`mt-1.5 text-sm font-semibold ${encerrada ? "text-slate-500 line-through" : "text-white"}`}>{tarefa.titulo || "Tarefa sem título"}</p>

@@ -18,6 +18,8 @@ import OnboardingModal from './OnboardingModal';
 import { NotesGlobalTaskbar } from '@/components/Notas/NotesGlobalTaskbar';
 import { NotaNotificacaoToast } from '@/components/Notas/NotaNotificacaoToast';
 import { useNotasWorkspace } from '@/store/useNotasWorkspace';
+import { useBpmCardNotificacaoNavigation } from '@/hooks/useBpmCardNotificacaoNavigation';
+import { useBpmTarefasNotifications } from '@/hooks/useBpmTarefasNotifications';
 import { useNotasNotifications } from '@/hooks/useNotasNotifications';
 import { useNotasLembretesPendentes } from '@/hooks/useNotasLembretesPendentes';
 import { useCalendarioAlphaNotifications } from '@/hooks/useCalendarioAlphaNotifications';
@@ -240,6 +242,9 @@ export default function PainelLayoutClient({
     });
   }, []);
 
+  const abrirModuloPorNotificacao = useBpmCardNotificacaoNavigation(tabs, iframesRef, openTab);
+  useBpmTarefasNotifications(isAdminRole(role) || permissoes.includes('crm') ? userId : 0, abrirModuloPorNotificacao);
+
   const entregarIntencaoAgenda = useCallback((intencao: IntencaoAgendaAlpha): boolean => {
     const abaAgenda = tabs.find(tab => tab.url === AGENDA_ALPHA_URL);
     const iframe = abaAgenda ? iframesRef.current.get(abaAgenda.id) : undefined;
@@ -457,7 +462,7 @@ export default function PainelLayoutClient({
             <div className="shrink-0 flex items-center gap-2 pr-3">
               <CentralNotificacoesPainel
                 onAbrirAgenda={abrirAgendaPorNotificacao}
-                onAbrirModulo={openTab}
+                onAbrirModulo={abrirModuloPorNotificacao}
                 onAbrirNota={abrirNotasPorNotificacao}
               />
               {isSameRole(role, 'TI') && (

@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Bell,
   CalendarDays,
+  ListTodo,
   CheckCheck,
   FileCheck2,
   Headphones,
@@ -21,6 +22,8 @@ import { useChamadoNotificacoes } from "@/store/useChamadoNotificacoes";
 import { useChecklistNotificacoes } from "@/store/useChecklistNotificacoes";
 import { useHoleriteNotificacoes } from "@/store/useHoleriteNotificacoes";
 import { useNotasNotificacoes } from "@/store/useNotasNotificacoes";
+import { useBpmTarefasNotificacoes } from "@/store/useBpmTarefasNotificacoes";
+import { detalhesAlertaTarefaBpm, urlCardAlertaBpm } from "@/lib/bpm/notificacoes-tarefas";
 import { useCsNpsNotificacoes } from "@/store/useCsNpsNotificacoes";
 
 interface ItemCentralNotificacoes {
@@ -28,6 +31,7 @@ interface ItemCentralNotificacoes {
   origem: string;
   titulo: string;
   subtitulo: string;
+  detalhes?: string;
   criadoEm: string;
   cor: string;
   lida: boolean;
@@ -131,8 +135,9 @@ function CartaoCentral({
           <span className="text-[8px] font-black uppercase tracking-widest text-slate-500">{item.origem}</span>
           {!item.lida && <span className="size-1.5 rounded-full bg-sky-400" aria-label="Não lida" />}
         </span>
-        <span className="mt-0.5 block truncate text-xs font-semibold text-white">{item.titulo}</span>
+        <span className={`mt-0.5 block text-xs font-semibold text-white ${item.detalhes ? "whitespace-normal break-words" : "truncate"}`}>{item.titulo}</span>
         <span className="block truncate text-[10px] text-slate-400">{item.subtitulo}</span>
+        {item.detalhes && <span className="mt-1 block whitespace-pre-wrap break-words text-[10px] leading-relaxed text-slate-300">{item.detalhes}</span>}
         <span className="mt-1 block text-[9px] font-medium text-slate-600">{formatarMomento(item.criadoEm)}</span>
       </button>
       {item.remover && (
@@ -168,6 +173,7 @@ export function CentralNotificacoesPainel({
   const notas = useNotasNotificacoes();
   const holerite = useHoleriteNotificacoes();
   const csNps = useCsNpsNotificacoes();
+  const tarefasCrm = useBpmTarefasNotificacoes();
   const quantidadeSemCs = csNps.pendencias.filter((pendencia) => pendencia.tipo === "SEM_CS").length;
   const quantidadeCsVencido = csNps.pendencias.length - quantidadeSemCs;
   const resumoCsNps = quantidadeSemCs > 0 && quantidadeCsVencido > 0
@@ -179,6 +185,13 @@ export function CentralNotificacoesPainel({
     ?? "sem-data";
 
   const itens: ItemCentralNotificacoes[] = [
+    ...tarefasCrm.notificacoes.map((alerta) => ({
+      id: `crm-tarefa-${alerta.id}`, origem: "CRM · Tarefas", titulo: alerta.titulo,
+      subtitulo: "Lembrete de tarefa", detalhes: detalhesAlertaTarefaBpm(alerta),
+      criadoEm: alerta.alertaEm, cor: "#22d3ee", lida: alerta.lida, Icone: ListTodo,
+      abrir: () => onAbrirModulo(urlCardAlertaBpm(alerta), "CRM · Tarefa"),
+      remover: () => tarefasCrm.removerNotificacao(alerta.id),
+    })),
     ...calendario.notificacoes.map((notificacao) => {
       const conteudo = conteudoAgenda(notificacao);
       return {
@@ -283,6 +296,7 @@ export function CentralNotificacoesPainel({
   }, []);
 
   function marcarTodasLidas() {
+    tarefasCrm.marcarTodasLidas();
     calendario.marcarTodasLidas();
     chamados.marcarTodasLidas();
     checklist.marcarTodasLidas();

@@ -136,7 +136,8 @@ describe("BPM - ações de tarefas por tipo", () => {
     prismaMock.bpmTarefa.findMany.mockResolvedValue([{
       id: "clw0000000000000task",
       cardId: CARD_ID,
-      card: { pipelineId: "clw0000000000000pipe" },
+      tipo: "TAREFA", titulo: "Retornar", prazo: agora, alertaEm: agora, responsavelId: 7,
+      card: { pipelineId: "clw0000000000000pipe", responsavelId: 7 },
     }]);
 
     await expect(executarAlertasTarefasBpm(agora)).resolves.toEqual({ examinadas: 1, disparados: 1 });
@@ -144,6 +145,7 @@ describe("BPM - ações de tarefas por tipo", () => {
       where: expect.objectContaining({ id: "clw0000000000000task", alertaDisparadoEm: null }),
       data: { alertaDisparadoEm: agora },
     });
+    expect(pusherTriggerMock).toHaveBeenCalledWith("private-bpm-tarefas-usuario-7", "tarefa-alerta", { tarefaId: "clw0000000000000task" });
     expect(historicoMock).toHaveBeenCalledWith(expect.objectContaining({ acao: "TAREFA_ALERTA_DISPARADO" }));
     expect(notificarMock).toHaveBeenCalledAfter(historicoMock);
   });
@@ -153,7 +155,7 @@ describe("BPM - ações de tarefas por tipo", () => {
     prismaMock.bpmTarefa.findMany.mockResolvedValue([{
       id: "crm-proximo-contato:card-1", cardId: CARD_ID,
       tipo: "CRM_PROXIMO_CONTATO", titulo: "Próximo contato — Empresa Teste",
-      prazo, responsavelId: 7, card: { pipelineId: "pipeline" },
+      prazo, alertaEm: new Date("2026-09-30T14:50:00Z"), responsavelId: 7, card: { pipelineId: "pipeline" },
     }]);
     await executarAlertasTarefasBpm(new Date("2026-09-30T14:50:00Z"));
     expect(pusherTriggerMock).toHaveBeenCalledWith(
@@ -169,7 +171,7 @@ describe("BPM - ações de tarefas por tipo", () => {
     prismaMock.bpmTarefa.findMany.mockResolvedValue([{
       id: "crm-proximo-contato:card-1", cardId: CARD_ID,
       tipo: "CRM_PROXIMO_CONTATO", titulo: "Próximo contato",
-      prazo, responsavelId: 7, card: { pipelineId: "pipeline" },
+      prazo, alertaEm: new Date("2026-09-30T14:50:00Z"), responsavelId: 7, card: { pipelineId: "pipeline" },
     }]);
     pusherTriggerMock.mockRejectedValueOnce(new Error("Pusher indisponível"));
 
@@ -186,7 +188,7 @@ describe("BPM - ações de tarefas por tipo", () => {
     prismaMock.bpmTarefa.findMany.mockResolvedValue([{
       id: "crm-proximo-contato:card-1", cardId: CARD_ID,
       tipo: "CRM_PROXIMO_CONTATO", prazo: new Date("2026-09-30T15:00:00Z"),
-      responsavelId: 7, card: { pipelineId: "pipeline" },
+      alertaEm: agora, responsavelId: 7, card: { pipelineId: "pipeline" },
     }]);
     prismaMock.bpmTarefa.updateMany.mockResolvedValueOnce({ count: 0 });
 
@@ -194,4 +196,25 @@ describe("BPM - ações de tarefas por tipo", () => {
     expect(pusherTriggerMock).not.toHaveBeenCalled();
     expect(historicoMock).not.toHaveBeenCalled();
   });
+  it.each(["CHECKLIST", "LIGACAO", "WHATSAPP", "EMAIL", "TAREFA", "LEMBRETE_RAPIDO"])("entrega alerta %s ao responsável, com fallback para responsável do card", async (tipo) => {
+    const agora = new Date("2026-10-20T14:00:00Z");
+    prismaMock.bpmTarefa.findMany.mockResolvedValue([{
+      id: "tarefa", cardId: CARD_ID, tipo, titulo: "Retornar", alertaEm: agora, prazo: agora,
+      responsavelId: null, card: { pipelineId: "pipeline", responsavelId: 9 },
+    }]);
+    expect(await executarAlertasTarefasBpm(agora)).toEqual({ examinadas: 1, disparados: 1 });
+    expect(pusherTriggerMock).toHaveBeenCalledWith("private-bpm-tarefas-usuario-9", "tarefa-alerta", { tarefaId: "tarefa" });
+  });
+
+  it("retenta também tarefas comuns quando a entrega falha", async () => {
+    const agora = new Date("2026-10-20T14:00:00Z");
+    prismaMock.bpmTarefa.findMany.mockResolvedValue([{
+      id: "tarefa", cardId: CARD_ID, tipo: "TAREFA", titulo: "Retornar", alertaEm: agora, prazo: agora,
+      responsavelId: 7, card: { pipelineId: "pipeline", responsavelId: 9 },
+    }]);
+    pusherTriggerMock.mockRejectedValueOnce(new Error("offline"));
+    expect(await executarAlertasTarefasBpm(agora)).toEqual({ examinadas: 1, disparados: 0 });
+    expect(prismaMock.bpmTarefa.updateMany).toHaveBeenLastCalledWith(expect.objectContaining({ data: { alertaDisparadoEm: null } }));
+  });
+
 });

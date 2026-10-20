@@ -68,7 +68,7 @@ describe("BPM - tarefas por tipo", () => {
     expect(historico).not.toContain("formularioPossuiChecklist");
     expect(historico).not.toContain("const checklistHabilitado");
     expect(painel).toContain("podeTrabalharTarefas: boolean");
-    expect(painel).toContain("disabled={!podeTrabalharTarefas || encerrada}");
+    expect(painel).toContain("disabled={!podeTrabalharTarefas || encerrada || conclusao.salvando(tarefa.id)}");
     expect(painel).toContain('tarefa.status === "CANCELADA"');
     expect(painel).toContain("disabled={!podeTrabalharTarefas}");
     expect(job).toContain("alertaDisparadoEm: null");
