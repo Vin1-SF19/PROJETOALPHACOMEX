@@ -15,6 +15,7 @@ import { POST as autorizarUpload } from "@/app/api/bpm/upload/direct/route";
 import { POST as finalizarUpload } from "@/app/api/bpm/upload/finalize/route";
 
 const CARD_ID = "clw0000000000000card";
+const RD_CARD_ID = "rdcard_0123456789abcdef0123456789ab";
 const PATHNAME = `bpm/${CARD_ID}/550e8400-e29b-41d4-a716-446655440000-contrato.pdf`;
 const PDF = "%PDF-1.7\n%%EOF";
 const PDF_BYTES = new TextEncoder().encode(PDF);
@@ -69,22 +70,23 @@ afterEach(() => {
   else process.env.CRM_ANEXO_RECEIPT_SECRET = segredoAnterior;
 });
 
-it("autoriza upload multipart privado somente para usuário com acesso e limite de 90 MiB", async () => {
+it.each([CARD_ID, RD_CARD_ID])("autoriza upload multipart privado para %s com ACL e limite de 90 MiB", async (cardId) => {
+  const pathname = PATHNAME.replace(CARD_ID, cardId);
   mocks.historicoFind.mockResolvedValueOnce(null);
-  const response = await autorizarUpload(requestDirect());
+  const response = await autorizarUpload(requestDirect(cardId, pathname));
   expect(response.status).toBe(200);
-  expect(mocks.acesso).toHaveBeenCalledWith(CARD_ID, 7, "COMERCIAL", "enviarArquivo");
+  expect(mocks.acesso).toHaveBeenCalledWith(cardId, 7, "COMERCIAL", "enviarArquivo");
   expect(mocks.historicoCreate).not.toHaveBeenCalled();
   const config = mocks.handleUpload.mock.calls[0][0];
   expect(config.token).toBe("token-privado-teste");
-  const limites = await config.onBeforeGenerateToken(PATHNAME, JSON.stringify({ cardId: CARD_ID }));
+  const limites = await config.onBeforeGenerateToken(pathname, JSON.stringify({ cardId }));
   expect(limites.maximumSizeInBytes).toBe(90 * 1024 * 1024);
   expect(limites.allowedContentTypes).toContain("application/pdf");
   expect(limites.addRandomSuffix).toBe(false);
-  expect(limites.tokenPayload).toBe(JSON.stringify({ cardId: CARD_ID, userId: 7, pathname: PATHNAME }));
-  await config.onUploadCompleted({ blob: { pathname: PATHNAME }, tokenPayload: limites.tokenPayload });
+  expect(limites.tokenPayload).toBe(JSON.stringify({ cardId, userId: 7, pathname }));
+  await config.onUploadCompleted({ blob: { pathname }, tokenPayload: limites.tokenPayload });
   expect(mocks.historicoCreate).toHaveBeenCalledWith({ data: expect.objectContaining({
-    cardId: CARD_ID, usuarioId: 7, valorAnteriorJson: `bpm-blob:${PATHNAME}`,
+    cardId, usuarioId: 7, valorAnteriorJson: `bpm-blob:${pathname}`,
   }) });
 });
 
@@ -115,18 +117,20 @@ it("nega sessão ausente, card alheio e caminho fora do card antes de emitir tok
   expect(mocks.handleUpload).not.toHaveBeenCalled();
 });
 
-it("finaliza apenas upload próprio e presente no Blob privado, gerando recibo", async () => {
-  const response = await finalizarUpload(requestFinalize());
+it.each([CARD_ID, RD_CARD_ID])("finaliza upload próprio de %s gerando recibo", async (cardId) => {
+  const pathname = PATHNAME.replace(CARD_ID, cardId);
+  mocks.head.mockResolvedValue({ pathname, size: PDF_BYTES.length, contentType: "application/pdf" });
+  const response = await finalizarUpload(requestFinalize({ cardId, pathname }));
   expect(response.status).toBe(200);
   expect(await response.json()).toMatchObject({ success: true, file: {
     originalName: "contrato.pdf", mimeType: "application/pdf", size: PDF_BYTES.length,
     recibo: expect.any(String),
   } });
   expect(mocks.historicoFind).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({
-    cardId: CARD_ID, usuarioId: 7, valorAnteriorJson: `bpm-blob:${PATHNAME}`,
+    cardId, usuarioId: 7, valorAnteriorJson: `bpm-blob:${pathname}`,
   }) }));
-  expect(mocks.head).toHaveBeenCalledWith(PATHNAME, { token: "token-privado-teste" });
-  expect(mocks.get).toHaveBeenCalledWith(PATHNAME, { access: "private", token: "token-privado-teste", useCache: false });
+  expect(mocks.head).toHaveBeenCalledWith(pathname, { token: "token-privado-teste" });
+  expect(mocks.get).toHaveBeenCalledWith(pathname, { access: "private", token: "token-privado-teste", useCache: false });
 });
 
 it("não assina arquivo alheio, adulterado ou maior que 90 MiB", async () => {
@@ -154,4 +158,15 @@ it("recusa conteúdo com assinatura falsa mesmo que metadata declare PDF", async
     stream: new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode("<script>fake</script>")); controller.close(); } }),
   });
   expect((await finalizarUpload(requestFinalize())).status).toBe(400);
+});
+
+
+it("nega card RD alheio e caminhos trocados antes do upload", async () => {
+  const pathname = PATHNAME.replace(CARD_ID, RD_CARD_ID);
+  mocks.acesso.mockRejectedValueOnce(new Error("sem acesso"));
+  expect((await autorizarUpload(requestDirect(RD_CARD_ID, pathname))).status).toBe(403);
+  expect((await autorizarUpload(requestDirect(RD_CARD_ID, PATHNAME))).status).toBe(400);
+  expect((await finalizarUpload(requestFinalize({ cardId: RD_CARD_ID }))).status).toBe(400);
+  expect(mocks.handleUpload).not.toHaveBeenCalled();
+  expect(mocks.head).not.toHaveBeenCalled();
 });

@@ -54,10 +54,10 @@ const click = async (label: string) => { expect(button(label)).toBeDefined(); aw
 async function painel(card = detalhe, destino = "Destino") {
   await act(async () => root.render(h(PainelProximaEtapa, { card, etapas: [{ id: "destino", nome: destino, chave: null, ordem: 1, script: null }], podeMoverEtapa: true, accent: "1,2,3", onMovido })));
 }
-async function board(podeMoverLivremente = false) {
+async function board(podeMoverLivremente = false, contagens = { tarefas: 0, anexos: 0 }) {
   await act(async () => root.render(h(PipelineBoardClient, {
     pipeline: { id: "pipeline", nome: "Funil Sintético", etapas: [{ id: "origem", nome: "Origem", ordem: 0 }, { id: "destino", nome: "Destino", ordem: 1 }] },
-    cardsIniciais: [{ ...cardBoard, podeMoverLivremente, podeAgirEtapa: !podeMoverLivremente }], visual: { accent: "1,2,3" } as ComponentProps<typeof PipelineBoardClient>["visual"], currentUserId: 1, currentUserRole: "ADMIN",
+    cardsIniciais: [{ ...cardBoard, _count: contagens, podeMoverLivremente, podeAgirEtapa: !podeMoverLivremente }], visual: { accent: "1,2,3" } as ComponentProps<typeof PipelineBoardClient>["visual"], currentUserId: 1, currentUserRole: "ADMIN",
   })));
 }
 async function drop() {
@@ -96,4 +96,11 @@ describe("movimento livre com autoridade calculada no servidor", () => {
     expect(api.preflight).not.toHaveBeenCalled();
     expect(api.error).not.toHaveBeenCalled();
   });
+});
+
+
+it("identifica contadores de tarefas e anexos por texto no Kanban", async () => {
+  await board(false, { tarefas: 2, anexos: 1 });
+  expect(host.textContent).toContain("2 tarefas");
+  expect(host.textContent).toContain("1 anexo");
 });

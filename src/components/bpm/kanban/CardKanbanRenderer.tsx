@@ -106,7 +106,11 @@ export function CardKanbanRenderer({
         {
           chave: elementoCardKanbanChaveEstavel(elemento),
           label: definicaoLabel[elemento.key] ?? "Campo",
-          valor: dado.valor,
+          valor: elemento.key === "TAREFAS"
+            ? `${dado.valor} ${Number(dado.valor) === 1 ? "tarefa" : "tarefas"}`
+            : elemento.key === "ANEXOS"
+              ? `${dado.valor} ${Number(dado.valor) === 1 ? "anexo" : "anexos"}`
+              : dado.valor,
           icone: ICONE_NATIVO[elemento.key],
           tom: (elemento.key === "PENDENCIAS" ? "atencao" : "neutro") as "atencao" | "neutro",
         },

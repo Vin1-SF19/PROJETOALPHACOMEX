@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { etapaIdCardSchema } from "@/lib/validations/bpm";
+import { bpmCardIdSchema, etapaIdCardSchema } from "@/lib/validations/bpm";
 
 const idSchema = z.string().cuid();
 const textoOpcional = (maximo: number) => z.string().trim().max(maximo).nullable().optional();
@@ -23,7 +23,7 @@ const dadosTemplateSchema = z.object({
   etapaIds: etapaIdsSchema.optional(),
   // Compatibilidade temporária com clientes ainda no contrato singular.
   etapaId: etapaIdCardSchema.nullable().optional(),
-  cardId: idSchema.nullable().optional(),
+  cardId: bpmCardIdSchema.nullable().optional(),
 });
 
 export const criarTemplateChecklistSchema = dadosTemplateSchema.extend({
@@ -49,7 +49,7 @@ export const reordenarItensTemplateChecklistSchema = z.object({
   templateId: idSchema,
   itemIds: z.array(idSchema).min(1).max(200).refine((ids) => new Set(ids).size === ids.length, "Itens duplicados"),
 });
-export const cardChecklistSchema = z.object({ cardId: idSchema });
+export const cardChecklistSchema = z.object({ cardId: bpmCardIdSchema });
 export const adicionarItemExclusivoChecklistSchema = z.object({
   cardChecklistId: idSchema,
   nome: z.string().trim().min(1).max(200),

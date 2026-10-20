@@ -255,6 +255,11 @@ export default function PainelHistorico({
         </TabsContent>
 
         <TabsContent value="anexos" className="min-h-0 flex-1 overflow-y-auto">
+          {card.anexos.length === 0 && <div role="status" className="rounded-xl border border-dashed border-white/10 p-5 text-center">
+            <Paperclip size={20} aria-hidden="true" className="mx-auto mb-2 text-slate-500" />
+            <p className="text-sm font-medium text-slate-300">Nenhum anexo neste card</p>
+            <p className="mt-1 text-xs leading-relaxed text-slate-400">Os arquivos enviados para este card aparecerão aqui.</p>
+          </div>}
           <div className="space-y-1.5">
             {card.anexos.map((a) => (
               <div key={a.id} className="flex items-center justify-between gap-2 bg-white/[0.03] border border-white/5 rounded-xl px-3 py-2">

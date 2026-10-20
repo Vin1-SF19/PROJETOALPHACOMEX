@@ -7,12 +7,12 @@ import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import { conteudoUploadDiretoCompativel } from "@/lib/bpm/upload-conteudo";
 import { criarReciboUploadAnexoBpm, criarReferenciaAnexoBpm, obterTokenBlobPrivadoAnexoBpm, pathnameUploadDiretoAnexoBpmValido, recibosAnexoBpmConfigurados } from "@/lib/bpm/anexos-storage";
 import { ACAO_UPLOAD_ANEXO_SEM_REGISTRO } from "@/lib/bpm/anexos-lifecycle";
-import { nomeSeguroUploadAnexo, obterTipoUploadAnexo, validarUploadAnexo } from "@/lib/validations/bpm";
+import { bpmCardIdSchema, nomeSeguroUploadAnexo, obterTipoUploadAnexo, validarUploadAnexo } from "@/lib/validations/bpm";
 
 export const dynamic = "force-dynamic";
 
 const finalizarSchema = z.object({
-  cardId: z.string().cuid(),
+  cardId: bpmCardIdSchema,
   pathname: z.string().min(1).max(1024),
   originalName: z.string().trim().min(1).max(255),
   mimeType: z.string().max(150),

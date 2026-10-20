@@ -595,7 +595,7 @@ export function obterTipoUploadAnexo(file: { name: string; type: string }): stri
 }
 
 export const registrarAnexoSchema = z.object({
-  cardId: z.string().cuid(),
+  cardId: bpmCardIdSchema,
   campoId: z.string().cuid().optional(),
   recibo: z.string().trim().min(20).max(4_096),
 });

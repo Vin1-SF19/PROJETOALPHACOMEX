@@ -210,3 +210,15 @@ it("upload como última condição de prontidão disponibiliza contrato na mesma
   expect(prismaMock.bpmCardCampoValor.upsert.mock.invocationCallOrder[0]).toBeLessThan(retornoComercialMock.mock.invocationCallOrder[0]);
   expect(notificarMock).toHaveBeenCalledWith({ cardId: "comercial", pipelineId: "radar", tipo: "CARD_ATUALIZADO" });
 });
+
+
+it("registra anexo em card RD com recibo vinculado e autorização revalidada", async () => {
+  const cardId = "rdcard_0123456789abcdef0123456789ab";
+  const anexo = { id: "anexo-rd", cardId, nome: "contrato.pdf", url: "bpm-blob:bpm/arquivo-rd.pdf" };
+  reciboMock.mockReturnValue({ cardId, pathname: "bpm/arquivo-rd.pdf", nome: "contrato.pdf", tipo: "application/pdf", tamanho: 100 });
+  prismaMock.bpmCardAnexo.create.mockResolvedValue(anexo);
+  expect(await RegistrarAnexoBpm({ cardId, recibo: RECIBO })).toMatchObject({ success: true, data: { id: "anexo-rd" } });
+  expect(acessoMock).toHaveBeenCalledWith(cardId, 7, "COMERCIAL", "enviarArquivo");
+  expect(acessoMock).toHaveBeenCalledWith(cardId, 7, "COMERCIAL", "enviarArquivo", expect.anything());
+  expect(prismaMock.bpmCardAnexo.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ cardId }) }));
+});

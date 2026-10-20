@@ -6,7 +6,7 @@ import { auth } from "../../../../../../auth";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import { criarReferenciaAnexoBpm, obterTokenBlobPrivadoAnexoBpm, pathnameUploadDiretoAnexoBpmValido, recibosAnexoBpmConfigurados } from "@/lib/bpm/anexos-storage";
 import { ACAO_UPLOAD_ANEXO_SEM_REGISTRO } from "@/lib/bpm/anexos-lifecycle";
-import { BPM_ANEXO_ALLOWED_MIME, BPM_ANEXO_MAX_BYTES, obterTipoUploadAnexo } from "@/lib/validations/bpm";
+import { bpmCardIdSchema, BPM_ANEXO_ALLOWED_MIME, BPM_ANEXO_MAX_BYTES, obterTipoUploadAnexo } from "@/lib/validations/bpm";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,7 @@ const eventoSchema = z.discriminatedUnion("type", [
     blob: z.object({ pathname: z.string().min(1).max(1024) }), tokenPayload: z.string().nullable().optional(),
   }) }),
 ]);
-const payloadSchema = z.object({ cardId: z.string().cuid() });
+const payloadSchema = z.object({ cardId: bpmCardIdSchema });
 
 function caminhoDoCard(pathname: string, cardId: string): boolean {
   return pathnameUploadDiretoAnexoBpmValido(pathname, cardId)

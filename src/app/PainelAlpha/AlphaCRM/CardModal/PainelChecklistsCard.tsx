@@ -66,7 +66,7 @@ export function PainelChecklistsCard({ card, accent, podeEditar, realtimeRevisio
     sujosRef.current.clear();
     setConflitoRealtime(false);
     } catch {
-      setErro("Não foi possível carregar o checklist. Tente novamente.");
+      setErro("Não foi possível carregar os procedimentos. Tente novamente.");
     } finally {
       setCarregando(false);
     }
@@ -138,11 +138,14 @@ export function PainelChecklistsCard({ card, accent, podeEditar, realtimeRevisio
   }
 
   return <section id="checklist-pendencias" tabIndex={-1} className="space-y-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 outline-none focus-visible:ring-2 focus-visible:ring-white/30" aria-labelledby={`checklists-card-titulo-${card.id}`}>
-    <div className="flex items-start justify-between gap-3"><div className="flex items-start gap-2.5"><div className="flex size-8 shrink-0 items-center justify-center rounded-lg" style={{ background: `rgba(${accent},0.15)` }}><ListChecks size={15} aria-hidden="true" style={{ color: `rgb(${accent})` }} /></div><h3 id={`checklists-card-titulo-${card.id}`} className="self-center text-xs font-bold uppercase tracking-wide text-white">{documentacaoEmAnalise ? "Documentos pendentes" : "Checklist da etapa"}</h3></div>{!carregando && checklists.length > 0 && <Badge variant={totais.obrigatorios ? "destructive" : "secondary"}>{totais.obrigatorios ? `${totais.obrigatorios} pendentes` : "Em dia"}</Badge>}</div>
+    <div className="flex items-start justify-between gap-3"><div className="flex items-start gap-2.5"><div className="flex size-8 shrink-0 items-center justify-center rounded-lg" style={{ background: `rgba(${accent},0.15)` }}><ListChecks size={15} aria-hidden="true" style={{ color: `rgb(${accent})` }} /></div><h3 id={`checklists-card-titulo-${card.id}`} className="self-center text-xs font-bold uppercase tracking-wide text-white">{documentacaoEmAnalise ? "Documentos pendentes" : "Procedimentos da etapa"}</h3></div>{!carregando && checklists.length > 0 && <Badge variant={totais.obrigatorios ? "destructive" : "secondary"}>{totais.obrigatorios ? `${totais.obrigatorios} pendentes` : "Em dia"}</Badge>}</div>
     {carregando && <div aria-live="polite" className="space-y-2"><span className="sr-only">Carregando procedimentos</span><Skeleton className="h-3 w-full" /><Skeleton className="h-20 w-full" /></div>}
     {erro && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-200"><span><AlertTriangle size={14} className="mr-1 inline" />{erro}</span><Button size="sm" variant="ghost" onClick={() => void carregar()}><RefreshCw size={13} className="mr-1" />Tentar novamente</Button></div>}
     {conflitoRealtime && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-500/30 bg-sky-500/10 p-3 text-xs text-sky-100"><span>O procedimento mudou em tempo real. Seu rascunho foi preservado.</span><Button size="sm" variant="ghost" onClick={() => void carregar()}>Usar dados atualizados</Button></div>}
-    {!carregando && !erro && checklists.length === 0 && !ocultarVazio && <p className="rounded-xl border border-dashed border-white/10 p-5 text-center text-xs text-slate-500">{documentacaoEmAnalise ? "Nenhum checklist de documentos está configurado para este card. Cadastre um template em Configurações → Checklists." : "Nenhum checklist se aplica a este card."}</p>}
+    {!carregando && !erro && checklists.length === 0 && !ocultarVazio && <div role="status" className="rounded-xl border border-dashed border-white/10 p-5 text-center">
+      <p className="text-sm font-medium text-slate-300">{documentacaoEmAnalise ? "Nenhum documento pendente cadastrado" : "Nenhum procedimento para esta etapa"}</p>
+      <p className="mt-1 text-xs leading-relaxed text-slate-400">Quando houver um procedimento vinculado a este card, ele aparecerá aqui.</p>
+    </div>}
     {!carregando && !erro && checklists.length === 0 && documentacaoEmAnalise && podeEditar &&
       <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); void criarPrimeiroDocumento(); }}>
         <Input aria-label="Adicionar primeiro documento fora do template" placeholder="Adicionar documento necessário" maxLength={200}

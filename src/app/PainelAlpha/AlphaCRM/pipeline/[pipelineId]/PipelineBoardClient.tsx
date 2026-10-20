@@ -610,15 +610,13 @@ export function KanbanCard({
               {card.cardViewComposicao === undefined && !novosLeads && card._count.tarefas > 0 && (
                 <span className="inline-flex items-center gap-1" title={`${card._count.tarefas} tarefa(s)`}>
                   <ClipboardList size={12} aria-hidden="true" />
-                  <span className="tabular-nums">{card._count.tarefas}</span>
-                  <span className="sr-only">tarefa(s)</span>
+                  <span className="tabular-nums">{card._count.tarefas} {card._count.tarefas === 1 ? "tarefa" : "tarefas"}</span>
                 </span>
               )}
               {card.cardViewComposicao === undefined && !novosLeads && card._count.anexos > 0 && (
                 <span className="inline-flex items-center gap-1" title={`${card._count.anexos} anexo(s)`}>
                   <Paperclip size={12} aria-hidden="true" />
-                  <span className="tabular-nums">{card._count.anexos}</span>
-                  <span className="sr-only">anexo(s)</span>
+                  <span className="tabular-nums">{card._count.anexos} {card._count.anexos === 1 ? "anexo" : "anexos"}</span>
                 </span>
               )}
               {card.cardViewComposicao === undefined && !novosLeads && card._count.tarefas === 0 && card._count.anexos === 0 && (
