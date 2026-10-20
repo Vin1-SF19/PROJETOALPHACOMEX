@@ -54,7 +54,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
     templates: string[];
     primeiroItemId: string | null;
   } | null>(null);
-  const aguardandoTranscricao = card.etapa.chave === BPM_STAGE_KEYS.REUNIAO_AGENDADA
+  const aguardandoTranscricao = !card.podeMoverLivremente && card.etapa.chave === BPM_STAGE_KEYS.REUNIAO_AGENDADA
     && !transcricaoRealRegistrada(card.transcricaoReuniao)
     && formularioExigeCapacidade(card.formularioEtapa, BPM_CAPABILITIES.MEETING_TRANSCRIPT);
   const destinos = etapas.filter((etapa) => etapa.id !== card.etapa.id);
@@ -187,6 +187,11 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
         toast.error("Não foi possível salvar os campos. O card não foi movido.");
         return;
       }
+      if (card.podeMoverLivremente) {
+        confirmarMovimento(await MoverCardBpm({ cardId: card.id, etapaDestinoId,
+          etapaOrigemEsperadaId: card.etapa.id, idempotencyKey: crypto.randomUUID() }));
+        return;
+      }
       const dados = await buscarRequisitos(etapaDestinoId);
       if (!dados || dados.faltantes.length || dados.guardas.length) return;
       if (card.pipeline?.nome === "Revisão de Radar" && etapaEhLost(dados.etapaDestino.nome)) {
@@ -241,7 +246,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
     const campo = requisitos.campos.find((item) => item.id === pendente.id);
     return campo ? [{ ...campo, contexto: pendente.contexto, etapaAplicacaoNome: pendente.etapaAplicacaoNome }] : [];
   }) ?? [];
-  const requisitosLost = card.pipeline?.nome === "Revisão de Radar"
+  const requisitosLost = !card.podeMoverLivremente && card.pipeline?.nome === "Revisão de Radar"
     && etapaEhLost(requisitos?.etapaDestino.nome);
   const camposObrigatoriosLost = requisitosLost
     ? requisitos?.campos.filter((campo) => campo.obrigatorio && campo.contexto !== "ORIGEM" && !camposPendentes.some((pendente) => pendente.id === campo.id)) ?? []
@@ -380,8 +385,8 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
                     : <ArrowRight size={14} className="shrink-0 opacity-70" aria-hidden="true" />}
             </button>
           );
-          const podeInformarMotivo = card.pipeline?.nome === "Revisão de Radar" && etapaEhLost(etapa.nome);
-          const podeInformarProximoContato = card.pipeline?.nome === "Revisão de Radar"
+          const podeInformarMotivo = !card.podeMoverLivremente && card.pipeline?.nome === "Revisão de Radar" && etapaEhLost(etapa.nome);
+          const podeInformarProximoContato = !card.podeMoverLivremente && card.pipeline?.nome === "Revisão de Radar"
             && etapa.nome.toLocaleLowerCase("pt-BR") === "sem viabilidade"
             && pendencias.some((pendencia) => pendencia.includes("Próximo Contato"));
           return bloqueada ? (

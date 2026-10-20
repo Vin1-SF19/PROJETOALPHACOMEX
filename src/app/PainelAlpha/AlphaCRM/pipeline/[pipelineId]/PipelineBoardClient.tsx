@@ -112,6 +112,7 @@ function opcoesRadarPretendido(pipeline: PipelineBpm): string[] {
 
 export interface CardBpm {
   id: string;
+  podeMoverLivremente?: boolean;
   etapaId: string;
   servico: string | null;
   origemExterna?: { sourcePipelineName: string; sourceStageName: string; sourceDealName: string } | null;
@@ -287,12 +288,12 @@ export function KanbanCard({
       {...listeners}
       onClick={() => onAbrir(card.id)}
       aria-label={ehLeadVirtual ? `${nomeEmpresa}. Lead do site, ainda sem card` : encaminhado
-        ? `${nomeEmpresa}. ${card.encaminhamentoPendente ? "Encaminhamento pendente" : "Card encaminhado"}, somente leitura.`
+        ? `${nomeEmpresa}. ${card.encaminhamentoPendente ? "Encaminhamento pendente" : "Card encaminhado"}${card.podeMoverLivremente ? "." : ", somente leitura."}`
         : statusConfig ? `${nomeEmpresa}. Status pós-fechamento: ${statusConfig.label}${deferidoOperacional ? ". Processo deferido no Operacional" : ""}`
           : deferidoOperacional ? `${nomeEmpresa}. Processo deferido no Operacional` : nomeEmpresa}
       className={cn(
         "relative select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
-        encaminhado || !card.podeAgirEtapa ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
+        !card.podeMoverLivremente && (encaminhado || !card.podeAgirEtapa) ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
         card.sla?.status === "ATRASADO" && "rounded-2xl ring-2 ring-rose-500/55 shadow-lg shadow-rose-950/40",
         (alertaBoasVindas || alertaAlinhamento || semCnpjNoloss) && "animate-pulse motion-reduce:animate-none",
         ehLeadVirtual
@@ -329,7 +330,7 @@ export function KanbanCard({
               Encaminhamento pendente · confira a automação
             </div>
           )}
-          {!card.podeAgirEtapa && !encaminhado && <span className="text-[10px] text-slate-400">Somente leitura</span>}
+          {!card.podeAgirEtapa && !card.podeMoverLivremente && !encaminhado && <span className="text-[10px] text-slate-400">Somente leitura</span>}
           {card.encaminhamentos?.map((destino, indice) => (
             <div key={`${destino.pipeline ?? "restrito"}-${indice}`} role="status"
               className="rounded-lg border border-sky-300/25 bg-sky-400/10 px-2 py-1 text-[10px] font-semibold text-sky-100">
@@ -713,7 +714,7 @@ function KanbanColumn({
               return <div key={item.key} data-index={item.index} ref={virtual.measureElement}
                 style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${item.start}px)` }}>
                 <MemoKanbanCard card={c} etapaNome={etapa.nome} accent={accent} novosLeads={novosLeads}
-                  arrastoDesabilitado={arrastoDesabilitado || !c.podeAgirEtapa} onAbrir={onAbrirCard}
+                  arrastoDesabilitado={arrastoDesabilitado || (!c.podeAgirEtapa && !c.podeMoverLivremente)} onAbrir={onAbrirCard}
                   onAgendarReuniao={onAgendarReuniao} movendo={cardMovendoId === c.id} />
               </div>;
             })}
@@ -1079,7 +1080,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
     const activeCard = snapshot.cards.find((c) => c.id === active.id);
     const origem = etapasOrdenadas.find((etapa) => etapa.id === activeCard?.etapaId);
     const destino = etapasOrdenadas.find((etapa) => etapa.id === over?.id);
-    if (!activeCard || !origem || !destino || !origem.transicoesEtapaOrigem?.some((transicao) => transicao.etapaDestinoId === destino.id)) {
+    if (!activeCard || !origem || !destino || origem.id === destino.id || (!activeCard.podeMoverLivremente && !origem.transicoesEtapaOrigem?.some((transicao) => transicao.etapaDestinoId === destino.id))) {
       snapshotArrastoRef.current = null;
       if (sincronizacaoRealtimePendenteRef.current) {
         sincronizacaoRealtimePendenteRef.current = false;
@@ -1099,7 +1100,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
       return;
     }
 
-    if (pipeline.nome === "Revisão de Radar" && etapaEhNovosLeads(origem.nome) && etapaEhAgendarReuniao(destino.nome)) {
+    if (!activeCard.podeMoverLivremente && pipeline.nome === "Revisão de Radar" && etapaEhNovosLeads(origem.nome) && etapaEhAgendarReuniao(destino.nome)) {
       snapshotArrastoRef.current = null;
       setAtribuicaoAgendarPendente({ cardId: activeCard.id, etapaDestinoId: destino.id });
       return;
@@ -1111,7 +1112,8 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, manifesto
     setCards((prev) => moverCardOtimistaNoBoard(prev, activeCard.id, destino.id));
     let mensagemErro: string | null = null;
     try {
-      const resultado = await MoverCardBpm({ cardId: activeCard.id, etapaDestinoId: destino.id });
+      const resultado = await MoverCardBpm({ cardId: activeCard.id, etapaDestinoId: destino.id,
+        ...(activeCard.podeMoverLivremente ? { idempotencyKey: crypto.randomUUID(), etapaOrigemEsperadaId: origem.id } : {}) });
       if (!resultado.success) mensagemErro = typeof resultado.error === "string" ? resultado.error : "Não foi possível mover o card";
     } catch {
       mensagemErro = "Não foi possível mover o card";

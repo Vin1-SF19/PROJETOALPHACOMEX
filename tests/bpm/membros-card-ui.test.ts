@@ -42,7 +42,7 @@ describe("CRM - pessoas vinculadas ao card na interface", () => {
 
   it("permite que participante vinculado trabalhe no card, mantendo a gestão de membros restrita", () => {
     expect(modal).toContain("|| (Boolean(meuVinculo) && podeAgirNaEtapa)");
-    expect(modal).toContain("const podeMoverEtapa = podeTrabalharNoCard");
+    expect(modal).toContain("const podeMoverEtapa = Boolean(card?.podeMoverLivremente) || podeTrabalharNoCard");
     expect(modal).toContain("const podeEditar = podeTrabalharNoCard");
     expect(modal).toContain("const podeTrabalharTarefas = podeTrabalharNoCard");
     expect(modal).toContain("podeTrabalharTarefas={podeTrabalharTarefas}");

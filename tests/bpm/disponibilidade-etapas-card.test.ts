@@ -14,6 +14,7 @@ import { ObterDisponibilidadeEtapasCardBpm } from "@/actions/bpm/Disponibilidade
 describe("disponibilidade das etapas do card", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.acesso.mockResolvedValue({});
     mocks.auth.mockResolvedValue({ user: { id: "7", role: "Admin" } });
     mocks.card.mockResolvedValue({ etapaId: "origem", etapa: { transicoesEtapaOrigem: [
       { etapaDestinoId: "permitida" }, { etapaDestinoId: "restrita" }, { etapaDestinoId: "sem-saida" },

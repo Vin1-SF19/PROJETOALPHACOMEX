@@ -1,3 +1,4 @@
+import { resolverAutoridadeMovimentoLivre, type AutoridadeMovimentoLivre } from "@/lib/bpm/lideranca-setor";
 import db from "@/lib/prisma";
 import { carregarEscopoLeituraBpm } from "@/lib/bpm/visao-equipe-server";
 
@@ -72,7 +73,8 @@ export function podeAcessarPipelineBpm(params: {
 }): boolean {
   if (isAdminRole(params.role)) return true;
   if (!possuiPermissaoCrm(params.permissoes)) return false;
-  return params.setoresPipeline.length === 0
+  return Boolean(resolverAutoridadeMovimentoLivre({ id: -1, role: params.role }, params.setoresPipeline.map((nome) => ({ nome }))))
+    || params.setoresPipeline.length === 0
     || params.setoresPipeline.some((setor) => isSameRole(setor, params.role));
 }
 
@@ -336,6 +338,7 @@ export interface AcessoBpmCard {
   perfilGlobal: string | null;
   podeAgirEtapa: boolean;
   bloqueadoPorEncaminhamento?: boolean;
+  autoridadeMovimentoLivre?: AutoridadeMovimentoLivre | null;
 }
 
 /**
@@ -362,7 +365,7 @@ export async function checarAcessoBpmCard(
       select: {
         pipelineId: true,
         responsavelId: true,
-        pipeline: { select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { nome: true } } } } } },
+        pipeline: { select: { ativo: true, visualizacaoConfigJson: true, setores: { select: { setor: { select: { nome: true, ativo: true } } } } } },
         status: true,
         etapa: {
           select: {
@@ -383,6 +386,17 @@ export async function checarAcessoBpmCard(
   if (!acessoModulo || !card) {
     return { autorizado: false, isAdminGlobal: false, role: null, perfilGlobal: null, podeAgirEtapa: false };
   }
+  const acessoPipeline = isAdminRole(acessoModulo.usuario.role) || Boolean(card.pipeline && podeAcessarPipelineBpm({
+    role: acessoModulo.usuario.role, permissoes: acessoModulo.permissoes,
+    setoresPipeline: card.pipeline.setores.map(({ setor }) => setor.nome), ehMembroPipeline: false,
+  }));
+  const autoridadeMovimentoLivre = acessoPipeline && possuiPermissaoCrm(acessoModulo.permissoes) && card.pipeline?.ativo !== false
+    ? resolverAutoridadeMovimentoLivre(acessoModulo.usuario, card.pipeline?.setores.map(({ setor }) => setor) ?? []) : null;
+  if (acao === "moverEtapa" && autoridadeMovimentoLivre) {
+    return { autorizado: true, isAdminGlobal: isAdminRole(acessoModulo.usuario.role),
+      role: isAdminRole(acessoModulo.usuario.role) ? "ADMINISTRADOR" : null,
+      perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false, autoridadeMovimentoLivre };
+  }
   const bloqueadoPorEncaminhamento = card.etapa.ehFinal
     && (card.status === "CONCLUIDO" || Boolean(card.vinculosOrigem?.length));
   const apenasVisualizacao = acaoBpmExigeSomenteVisualizacao(acao);
@@ -395,7 +409,7 @@ export async function checarAcessoBpmCard(
   if (isAdminRole(acessoModulo.usuario.role)) {
     return { autorizado: apenasVisualizacao || !bloqueadoPorEncaminhamento, isAdminGlobal: true,
       role: "ADMINISTRADOR", perfilGlobal: acessoModulo.usuario.role,
-      podeAgirEtapa: !bloqueadoPorEncaminhamento, bloqueadoPorEncaminhamento };
+      podeAgirEtapa: !bloqueadoPorEncaminhamento, bloqueadoPorEncaminhamento, autoridadeMovimentoLivre };
   }
   if (!possuiPermissaoCrm(acessoModulo.permissoes)) {
     return { autorizado: false, isAdminGlobal: false, role: null, perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false };
@@ -428,6 +442,10 @@ export async function checarAcessoBpmCard(
   const membro = membroExistente?.role === "ADMINISTRADOR" ? membroExistente
     : card.responsavelId === userId ? { role: "RESPONSAVEL" } : membroExistente;
 
+  if (!membro && apenasVisualizacao && autoridadeMovimentoLivre) {
+    return { autorizado: true, isAdminGlobal: false, role: "VISUALIZADOR",
+      perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false, bloqueadoPorEncaminhamento, autoridadeMovimentoLivre };
+  }
   if (!membro && apenasVisualizacao) {
     const escopo = await carregarEscopoLeituraBpm(userId, false, card.pipelineId, card.pipeline.visualizacaoConfigJson ?? null, client);
     if (escopo.usuarioIds.length) {
@@ -448,6 +466,7 @@ export async function checarAcessoBpmCard(
     perfilGlobal: acessoModulo.usuario.role,
     podeAgirEtapa: permissaoEtapa.podeAgir && !bloqueadoPorEncaminhamento,
     bloqueadoPorEncaminhamento,
+    autoridadeMovimentoLivre,
   };
 }
 

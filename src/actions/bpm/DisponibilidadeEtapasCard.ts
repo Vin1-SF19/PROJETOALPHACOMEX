@@ -31,7 +31,8 @@ export async function ObterDisponibilidadeEtapasCardBpm(cardId: string, etapaIds
       return { success: false as const, error: "Destinos inválidos" };
     }
     const userId = Number(session.user.id);
-    await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "visualizar");
+    const acesso = await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "visualizar");
+    const movimentoLivre = Boolean(acesso.autoridadeMovimentoLivre);
     const card = await db.bpmCard.findUnique({
       where: { id: cardId },
       select: {
@@ -49,8 +50,15 @@ export async function ObterDisponibilidadeEtapasCardBpm(cardId: string, etapaIds
     if (!card) return { success: false as const, error: "Card não encontrado" };
 
     const permitidos = new Set(card.etapa.transicoesEtapaOrigem.map((transicao) => transicao.etapaDestinoId));
-    const destinos = [...new Set(etapaIds)].filter((id) => id !== card.etapaId && permitidos.has(id));
+    const destinos = [...new Set(etapaIds)].filter((id) => id !== card.etapaId && (movimentoLivre || permitidos.has(id)));
     const data: DisponibilidadeEtapaCard[] = await Promise.all(destinos.map(async (etapaId) => {
+      if (movimentoLivre) {
+        const validacao = await avaliarTransicaoBpm({ cardId, etapaOrigemEsperadaId: card.etapaId,
+          etapaDestinoId: etapaId, idempotencyKey: randomUUID(),
+          ator: { tipo: "MANUAL", userId, userRole: session.user.role ?? null } });
+        return { etapaId, pendencias: validacao.success ? [] : [validacao.error],
+          oculta: !validacao.success && ERROS_DESTINO_INACESSIVEL.has(validacao.code) };
+      }
       const [previa, validacao] = await Promise.all([
         ObterRequisitosTransicaoBpm(cardId, etapaId),
         avaliarTransicaoBpm({
