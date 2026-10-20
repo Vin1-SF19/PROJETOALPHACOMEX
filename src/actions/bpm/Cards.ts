@@ -1,4 +1,5 @@
 "use server";
+import { resolverAutoridadeMovimentoLivre } from "@/lib/bpm/lideranca-setor";
 import { carregarEscopoLeituraBpm } from "@/lib/bpm/visao-equipe-server";
 import { randomUUID } from "node:crypto";
 import { BuscarEmpresasBpm as buscarEmpresas, BuscarEmpresaPorCnpjBpm as buscarEmpresaPorCnpj, ListarUsuariosResponsavelBpm as listarResponsaveis } from "./CardsConsultas";
@@ -69,7 +70,7 @@ import { iniciarLigacaoCallix, normalizarTelefoneCallix } from "@/lib/callix/cli
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 import { resolverParceiroOrigem, validarParceiroOrigem, salvarParceiroOrigem } from "@/lib/bpm/origem-cliente-server";
 import type { ParceiroOrigemBpm } from "@/lib/bpm/origem-cliente";
-import { executarTransicaoBpm } from "@/lib/bpm/transicao-command";
+import { avaliarTransicaoBpm, executarTransicaoBpm } from "@/lib/bpm/transicao-command";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { processarCadenciasImediatasDoCardBpm } from "@/lib/bpm/cadencias/executor";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
@@ -139,6 +140,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
         select: {
           nome: true,
           visualizacaoConfigJson: true,
+          setores: { select: { setor: { select: { nome: true, ativo: true } } } },
           etapas: {
             where: { ativo: true },
             select: {
@@ -160,6 +162,8 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
         select: { role: true },
       }),
     ]);
+    const movimentoLivre = usuarioAtual && resolverAutoridadeMovimentoLivre(
+      { id: userId, role: usuarioAtual.role }, pipelineInfo?.setores?.map(({ setor }) => setor) ?? []);
     const visibilidadePorEtapa = new Map(
       (pipelineInfo?.etapas ?? []).map((etapa) => [
         etapa.id,
@@ -208,7 +212,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
         .map(([etapaId]) => etapaId),
     );
 
-    const escopoLeitura = await carregarEscopoLeituraBpm(userId, admin, pipelineId, pipelineInfo?.visualizacaoConfigJson ?? null);
+    const escopoLeitura = await carregarEscopoLeituraBpm(userId, admin || Boolean(movimentoLivre), pipelineId, pipelineInfo?.visualizacaoConfigJson ?? null);
     // D-021: card sempre tem empresa vinculada — select sempre inclui a empresa.
     const cards = await db.bpmCard.findMany({
       where: {
@@ -500,6 +504,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
         && card.status === "CONCLUIDO" && encaminhamentos.length === 0;
       return {
         ...cardSemVinculos,
+        podeMoverLivremente: Boolean(movimentoLivre),
         sla,
         origem: "real" as const,
         nolossLeadId: null as string | null,
@@ -577,6 +582,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
           campoValores: [],
           sla: null,
           origem: "noloss" as const,
+          podeMoverLivremente: false,
           nolossLeadId: lead.id,
           nolossEmail: lead.email,
           nolossTelefone: lead.telefone,
@@ -841,6 +847,7 @@ export async function ObterCardBpm(cardId: string) {
       success: true,
       data: {
         ...card,
+        podeMoverLivremente: Boolean(acessoCard.autoridadeMovimentoLivre),
         dataPerdaEm,
         resumoContratacao,
         emailClienteReuniao,
@@ -1598,6 +1605,7 @@ async function carregarContextoMovimento(
   cardId: string,
   etapaDestinoId: string,
   client: ClienteContextoMovimento = db,
+  movimentoLivre = false,
 ) {
   const [card, etapaDestino] = await Promise.all([
     client.bpmCard.findUnique({
@@ -1630,7 +1638,7 @@ async function carregarContextoMovimento(
     },
     select: { permitida: true, origem: true },
   });
-  if (!transicao?.permitida || !["MANUAL", "AMBOS"].includes(transicao.origem)) {
+  if (!movimentoLivre && (!transicao?.permitida || !["MANUAL", "AMBOS"].includes(transicao.origem))) {
     return {
       error: `Não é possível mover diretamente desta etapa para "${etapaDestino.nome}" — verifique as etapas permitidas.`,
     } as const;
@@ -1701,9 +1709,22 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
     const userId = Number(session.user.id);
     const acessoCard = await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "visualizar");
 
-    const contexto = await carregarContextoMovimento(cardId, etapaDestinoId);
+    const contexto = await carregarContextoMovimento(cardId, etapaDestinoId, db, Boolean(acessoCard.autoridadeMovimentoLivre));
     if ("error" in contexto) return { success: false, error: contexto.error };
     const { card, etapaDestino } = contexto;
+    if (acessoCard.autoridadeMovimentoLivre) {
+      const avaliacao = await avaliarTransicaoBpm({ cardId, etapaOrigemEsperadaId: card.etapaId,
+        etapaDestinoId, versaoEsperada: card.versao, idempotencyKey: randomUUID(),
+        ator: { tipo: "MANUAL", userId, userRole: session.user.role ?? null } });
+      if (!avaliacao.success) return { success: false, error: avaliacao.error, code: avaliacao.code };
+      return { success: true, data: {
+        etapaDestino: { id: etapaDestino.id, nome: etapaDestino.nome },
+        campos: [] as Awaited<ReturnType<typeof carregarCamposTransicao>>,
+        faltantes: [] as { id: string; nome: string; tipo: string; contexto: string; etapaAplicacaoNome: string }[],
+        guardas: [] as string[], proximoContatoEm: card.proximoContatoEm,
+        proximoContatoObrigatorio: false, podeMover: true,
+      } };
+    }
     const campos = await carregarCamposTransicao({
       cardId,
       pipelineId: card.pipelineId,
@@ -1810,7 +1831,7 @@ async function executarMovimentoCanonico(
   });
   if (!resultado.success) return { success: false, error: resultado.error };
 
-  try {
+  if (!resultado.data.idempotente && !resultado.data.movimentoLivre) try {
     await executarAutomacoesCentraisDoCardAgora(dados.cardId);
   } catch (error) {
     console.error("[executarAutomacoesCentraisDoCardAgora]", error);

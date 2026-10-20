@@ -101,10 +101,11 @@ describe("card de saída encaminhado", () => {
       vinculosOrigem: [{ id: "vinculo" }] }) },
   };
 
-  it("mantém visualização e bloqueia edição e movimento inclusive para administrador", async () => {
+  it("mantém bloqueio de edição mas permite reposicionamento administrativo", async () => {
+    await expect(exigirAcessoBpmCard("card", 1, "Admin", "moverEtapa", client as never)).resolves.toMatchObject({ autoridadeMovimentoLivre: { tipo: "ADMIN" } });
     const leitura = await checarAcessoBpmCard("card", 1, "Admin", "visualizar", client as never);
     expect(leitura).toMatchObject({ autorizado: true, podeAgirEtapa: false, bloqueadoPorEncaminhamento: true });
-    for (const acao of ["editarCard", "moverEtapa"] as const) {
+    for (const acao of ["editarCard"] as const) {
       await expect(exigirAcessoBpmCard("card", 1, "Admin", acao, client as never))
         .rejects.toThrow("Card encaminhado; somente leitura");
     }

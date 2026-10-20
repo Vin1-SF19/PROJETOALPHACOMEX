@@ -1,4 +1,5 @@
 import "server-only";
+import type { AutoridadeMovimentoLivre } from "@/lib/bpm/lideranca-setor";
 
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
@@ -86,7 +87,7 @@ export type ResultadoTransicaoBpm =
       success: true;
       data: {
         cardId: string;
-        transicaoId: string;
+        transicaoId: string | null;
         etapaOrigemId: string;
         etapaDestinoId: string;
         versao: number;
@@ -95,6 +96,7 @@ export type ResultadoTransicaoBpm =
         historicoId: string;
         eventoId: string;
         idempotente: boolean;
+        movimentoLivre?: boolean;
       };
     }
   | { success: false; error: string; code: string; pendencias?: string[] };
@@ -141,15 +143,15 @@ async function validarAutorizacao(
   card: { id: string },
   destino: { chave: string | null; nome: string; visibilidades: Array<{ perfil: string; podeVer: boolean; podeAgir: boolean }> },
   tx: Tx,
-): Promise<string | null> {
-  if (input.ator.tipo !== "MANUAL") return null;
+): Promise<{ perfil: string | null; autoridade: AutoridadeMovimentoLivre | null }> {
+  if (input.ator.tipo !== "MANUAL") return { perfil: null, autoridade: null };
   if (!input.ator.userId) erro("UNAUTHORIZED", "Não autorizado");
   const acesso = await exigirAcessoBpmCard(card.id, input.ator.userId, input.ator.userRole ?? null, "moverEtapa", tx);
-  if (!resolverVisibilidadeEtapa(acesso.perfilGlobal, destino.visibilidades).podeAgir) {
+  if (!acesso.autoridadeMovimentoLivre && !resolverVisibilidadeEtapa(acesso.perfilGlobal, destino.visibilidades).podeAgir) {
     erro("UNAUTHORIZED_DESTINATION", `Seu perfil não pode agir na etapa "${destino.nome}".`);
   }
-  if (acesso.isAdminGlobal || acesso.role === "ADMINISTRADOR") return "ADMIN";
-  return acesso.role === "RESPONSAVEL" ? "RESPONSAVEL" : "MEMBRO";
+  return { perfil: acesso.isAdminGlobal || acesso.role === "ADMINISTRADOR" ? "ADMIN" : acesso.role === "RESPONSAVEL" ? "RESPONSAVEL" : "MEMBRO",
+    autoridade: acesso.autoridadeMovimentoLivre ?? null };
 }
 
 async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
@@ -169,8 +171,8 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
   const card = await tx.bpmCard.findUnique({
     where: { id: input.cardId },
     include: {
-      pipeline: { select: { id: true, chave: true, nome: true } },
-      etapa: { select: { id: true, chave: true, nome: true, ordem: true, capabilitiesJson: true } },
+      pipeline: { select: { id: true, chave: true, nome: true, ativo: true } },
+      etapa: { select: { id: true, pipelineId: true, chave: true, nome: true, ordem: true, capabilitiesJson: true, ativo: true } },
       empresa: { select: { razaoSocial: true } },
       estadoOntologico: { include: { subStatus: { select: { id: true, etapaId: true, chave: true } } } },
       servicoContexto: true,
@@ -181,6 +183,38 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     },
   });
   if (!card) erro("CARD_NOT_FOUND", "Card não encontrado.");
+  const [destino, transicao] = await Promise.all([
+    tx.bpmEtapa.findFirst({
+      where: { id: input.etapaDestinoId, pipelineId: card.pipelineId, ativo: true },
+      include: { visibilidades: { select: { perfil: true, podeVer: true, podeAgir: true } } },
+    }),
+    tx.bpmTransicaoEtapa.findUnique({
+      where: { etapaOrigemId_etapaDestinoId: { etapaOrigemId: input.etapaOrigemEsperadaId, etapaDestinoId: input.etapaDestinoId } },
+    }),
+  ]);
+  if (!destino) erro("INVALID_DESTINATION", "Etapa de destino inválida para este pipeline.");
+  const autorizacao = await validarAutorizacao(input, card, destino, tx);
+  let perfilCampo = autorizacao.perfil;
+  const movimentoLivre = autorizacao.autoridade;
+  if (movimentoLivre) {
+    const anterior = await tx.bpmEventoDominio.findUnique({ where: { idempotencyKey: `transition:${input.idempotencyKey}` } });
+    if (anterior) {
+      let origem: Record<string, unknown>, novo: Record<string, unknown>;
+      try { origem = JSON.parse(anterior.valorAnteriorJson ?? "{}"); novo = JSON.parse(anterior.valorNovoJson ?? "{}"); }
+      catch { erro("IDEMPOTENCY_CONFLICT", "Auditoria de movimento inválida."); }
+      if (anterior.tipo !== "CARD_MOVIDO" || anterior.cardId !== card.id || anterior.atorTipo !== "USUARIO"
+        || anterior.atorUserId !== input.ator.userId || origem.etapaId !== input.etapaOrigemEsperadaId
+        || novo.etapaId !== destino.id || typeof novo.versao !== "number" || typeof novo.lifecycle !== "string") {
+        erro("IDEMPOTENCY_CONFLICT", "A chave desta solicitação já foi utilizada em outro movimento.");
+      }
+      return { idempotente: true as const, movimentoLivre: true as const, data: {
+        cardId: card.id, transicaoId: typeof novo.transicaoId === "string" ? novo.transicaoId : null,
+        etapaOrigemId: input.etapaOrigemEsperadaId, etapaDestinoId: destino.id,
+        versao: novo.versao, lifecycle: novo.lifecycle, outcome: typeof novo.outcome === "string" ? novo.outcome : null,
+        historicoId: anterior.causationId ?? "", eventoId: anterior.id, idempotente: true, pipelineId: card.pipelineId,
+      } };
+    }
+  }
   if (card.etapaId !== input.etapaOrigemEsperadaId) {
     erro("STALE_STAGE", "O card mudou de etapa. Recarregue e tente novamente.");
   }
@@ -189,30 +223,30 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
   }
   if (card.etapaId === input.etapaDestinoId) erro("SAME_STAGE", "O card já está nesta etapa.");
 
-  const [destino, transicao] = await Promise.all([
-    tx.bpmEtapa.findFirst({
-      where: { id: input.etapaDestinoId, pipelineId: card.pipelineId, ativo: true },
-      include: { visibilidades: { select: { perfil: true, podeVer: true, podeAgir: true } } },
-    }),
-    tx.bpmTransicaoEtapa.findUnique({
-      where: { etapaOrigemId_etapaDestinoId: { etapaOrigemId: card.etapaId, etapaDestinoId: input.etapaDestinoId } },
-    }),
-  ]);
-  if (!destino) erro("INVALID_DESTINATION", "Etapa de destino inválida para este pipeline.");
-  if (!transicao) erro("TRANSITION_NOT_DEFINED", "Esta transição não está definida no pipeline.");
-  if (!transicao.permitida) erro("TRANSITION_DISABLED", "Esta transição foi desativada pelo administrador.");
-  if (!origemCompativel(transicao.origem, input.ator.tipo)) {
+  if (movimentoLivre && (!card.etapa.ativo || card.etapa.pipelineId !== card.pipelineId || !card.pipeline.ativo)) {
+    erro("INVALID_ORIGIN", "A etapa atual ou o pipeline está inativo ou possui vínculo inválido.");
+  }
+  if (!transicao && !movimentoLivre) erro("TRANSITION_NOT_DEFINED", "Esta transição não está definida no pipeline.");
+  if (!movimentoLivre && transicao && !transicao.permitida) erro("TRANSITION_DISABLED", "Esta transição foi desativada pelo administrador.");
+  if (!movimentoLivre && transicao && !origemCompativel(transicao.origem, input.ator.tipo)) {
     erro("REQUESTER_NOT_ALLOWED", "O solicitante não é permitido nesta transição.");
   }
-
-  const perfilCampo = await validarAutorizacao(input, card, destino, tx);
-  const atribuirAoEntrarEmAgendar = input.ator.tipo === "MANUAL"
+  const atribuirAoEntrarEmAgendar = !movimentoLivre && input.ator.tipo === "MANUAL"
     && card.pipeline.nome === "Revisão de Radar"
     && etapaEhNovosLeads(card.etapa.nome)
     && etapaEhAgendarReuniao(destino.nome);
   if (atribuirAoEntrarEmAgendar) {
     if (!input.responsavelId) erro("ASSIGNMENT_REQUIRED", "Escolha se o lead ficará com você ou com outro responsável.");
     if (!(await usuarioElegivelResponsavelBpm(card.pipelineId, input.responsavelId, tx))) {
+      erro("ASSIGNEE_INVALID", "O responsável selecionado não pode receber leads deste pipeline.");
+    }
+  }
+  if (movimentoLivre && (Object.keys(input.camposValores ?? {}).length || input.parceiroOrigem
+    || input.proximoContatoEm !== undefined || input.responsavelId !== undefined)) {
+    // Permissão de reposicionar não concede edição de dados ou de responsáveis.
+    const acessoEdicao = await exigirAcessoBpmCard(card.id, input.ator.userId!, input.ator.userRole ?? null, "editarCard", tx);
+    perfilCampo = acessoEdicao.isAdminGlobal || acessoEdicao.role === "ADMINISTRADOR" ? "ADMIN" : acessoEdicao.role === "RESPONSAVEL" ? "RESPONSAVEL" : "MEMBRO";
+    if (input.responsavelId !== undefined && !await usuarioElegivelResponsavelBpm(card.pipelineId, input.responsavelId, tx)) {
       erro("ASSIGNEE_INVALID", "O responsável selecionado não pode receber leads deste pipeline.");
     }
   }
@@ -237,7 +271,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       pipelineId: card.pipelineId,
       ativo: true,
       OR: [
-        { transicaoId: transicao.id },
+        ...(transicao ? [{ transicaoId: transicao.id }] : []),
         { etapaId: null },
         { etapaId: { in: [card.etapaId, destino.id] } },
       ],
@@ -262,7 +296,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       })()
     : null;
   const requisitosAplicaveis = requisitos.filter((item) =>
-    requisitoAplicaAoMover(item, transicao.id, card.etapaId, destino.id)
+    requisitoAplicaAoMover(item, transicao?.id ?? "", card.etapaId, destino.id)
     && (!item.campoId || Boolean(item.campo?.ativo
       && camposPublicadosDoPipeline?.has(item.campoId))),
   );
@@ -368,6 +402,25 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     parceiroSelecionado = await validarParceiroOrigem(selecaoParceiroOrigem, camposSubmetidos, formato.valores, tx);
   } catch (falha) {
     erro("FORMAT_INVALID", falha instanceof Error ? falha.message.replace(/^CAMPO_INVALIDO:/, "") : "Parceiro inválido.");
+  }
+  if (movimentoLivre) {
+    // Somente as informações efetivamente enviadas continuam sujeitas a validação.
+    const referencias = camposSubmetidos.flatMap((campo) => {
+      const valor = formato.valores[campo.id]?.trim();
+      return campo.tipo === "url_ou_arquivo" && valor && !valor.startsWith("https://")
+        ? [{ campoId: campo.id, id: valor }] : [];
+    });
+    if (referencias.length) {
+      const anexos = await tx.bpmCardAnexo.findMany({ where: { cardId: card.id, OR: referencias }, select: { id: true, campoId: true } });
+      if (referencias.some((ref) => !anexos.some((anexo) => anexo.id === ref.id && anexo.campoId === ref.campoId))) {
+        erro("INVALID_ATTACHMENT_REFERENCE", "Arquivo não vinculado ao campo deste card.");
+      }
+    }
+    if (input.proximoContatoEm && !Number.isFinite(new Date(input.proximoContatoEm).getTime())) erro("FORMAT_INVALID", "Data de próximo contato inválida.");
+    return { idempotente: false as const, card, destino, transicao: null,
+      valoresValidados: formato.valores, selecaoParceiroOrigem,
+      proximoContato: input.proximoContatoEm ?? card.proximoContatoEm,
+      movimentoLivre, responsavelId: input.responsavelId };
   }
   if (card.pipeline.chave === "financeiro"
     && ["solicitacao_contrato", "elaboracao_contrato", "formalizacao_contratacao",
@@ -712,6 +765,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     valoresValidados: formato.valores,
     selecaoParceiroOrigem,
     proximoContato,
+    movimentoLivre,
     responsavelId: atribuirAoEntrarEmAgendar ? input.responsavelId : undefined,
   };
 }
@@ -720,6 +774,7 @@ export async function avaliarTransicaoBpm(input: ComandoTransicaoBpm): Promise<R
   try {
     const result = await db.$transaction((tx) => prepararTransicao(input, tx), { maxWait: 10_000, timeout: 60_000 });
     if (result.idempotente) {
+      if (result.data) return { success: true, data: result.data };
       return { success: true, data: {
         cardId: result.execucao.cardId,
         transicaoId: result.execucao.transicaoId,
@@ -735,7 +790,7 @@ export async function avaliarTransicaoBpm(input: ComandoTransicaoBpm): Promise<R
     }
     return { success: true, data: {
       cardId: result.card.id,
-      transicaoId: result.transicao.id,
+      transicaoId: result.transicao?.id ?? null,
       etapaOrigemId: result.card.etapaId,
       etapaDestinoId: result.destino.id,
       versao: result.card.versao,
@@ -756,6 +811,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
     const result = await repetirTransacaoOcupada(() => db.$transaction(async (tx) => {
       const prepared = await prepararTransicao(input, tx);
       if (prepared.idempotente) {
+        if (prepared.data) return prepared.data;
         return {
           cardId: prepared.execucao.cardId,
           transicaoId: prepared.execucao.transicaoId,
@@ -772,10 +828,10 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
       }
       const { card, destino, transicao } = prepared;
       const agora = new Date();
-      const lifecycle = transicao.lifecycleDestino ?? card.status;
-      const concluidoEm = lifecycle === "CONCLUIDO" ? (card.concluidoEm ?? agora) : null;
-      const outcome = lifecycle === "ATIVO" ? null : (transicao.outcomeDestino ?? card.estadoOntologico?.outcome ?? null);
-      const statusPosFechamentoInicial = statusInicialAoEntrarFechado({
+      const lifecycle = transicao?.lifecycleDestino ?? card.status;
+      const concluidoEm = !transicao ? card.concluidoEm : lifecycle === "CONCLUIDO" ? (card.concluidoEm ?? agora) : null;
+      const outcome = !transicao ? (card.estadoOntologico?.outcome ?? null) : lifecycle === "ATIVO" ? null : (transicao.outcomeDestino ?? card.estadoOntologico?.outcome ?? null);
+      const statusPosFechamentoInicial = prepared.movimentoLivre ? null : statusInicialAoEntrarFechado({
         pipelineNome: card.pipeline.nome,
         etapaDestinoNome: destino.nome,
         statusAtual: card.statusPosFechamento,
@@ -792,7 +848,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
           update: { valor },
         });
       }
-      if (card.pipeline.chave === BPM_PIPELINE_KEYS.FINANCEIRO && Object.keys(valores).length > 0) {
+      if (!prepared.movimentoLivre && card.pipeline.chave === BPM_PIPELINE_KEYS.FINANCEIRO && Object.keys(valores).length > 0) {
         await registrarConclusaoContratoFinanceiro(tx, card.id, card.pipelineId, input.ator.userId ?? null);
         await sincronizarNotaFiscalCard({ tx, cardId: card.id, pipelineId: card.pipelineId, usuarioId: input.ator.userId ?? null });
       }
@@ -806,7 +862,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
       }
 
       let subStatusId: string | null = card.estadoOntologico?.subStatusId ?? null;
-      if (transicao.limparSubStatus) subStatusId = null;
+      if (!transicao || transicao.limparSubStatus) subStatusId = null;
       if (subStatusId) {
         const valido = await tx.bpmSubStatus.findFirst({ where: { id: subStatusId, etapaId: destino.id, ativo: true }, select: { id: true } });
         if (!valido) erro("INVALID_SUBSTATUS", "O substatus atual não é válido na etapa de destino.");
@@ -826,7 +882,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
         },
       });
       if (movimento.count !== 1) erro("CONCURRENT_TRANSITION", "Outra operação moveu este card. Recarregue e tente novamente.");
-      if (card.pipelineId === PIPELINE_OPERACIONAL_CHECKLIST_ID && destino.id === ETAPA_ENVIO_CHECKLIST_ID) {
+      if (!prepared.movimentoLivre && card.pipelineId === PIPELINE_OPERACIONAL_CHECKLIST_ID && destino.id === ETAPA_ENVIO_CHECKLIST_ID) {
         const campoChecklist = await tx.bpmCampo.findFirst({ where: { pipelineId: card.pipelineId,
           chave: CAMPO_CHECKLIST_EXCEL, ativo: true,
           etapaConfiguracoes: { some: { etapaId: destino.id, visivel: true } } }, select: { id: true } });
@@ -842,7 +898,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
             data: { prazo, alertaEm: prazo, responsavelId: prepared.responsavelId ?? card.responsavelId } });
         }
       }
-      if (card.pipeline.nome === "Revisão de Radar") {
+      if (!prepared.movimentoLivre && card.pipeline.nome === "Revisão de Radar") {
         await sincronizarProximoContatoAgenda({
           cardId: card.id, etapaNome: destino.nome, status: lifecycle,
           proximoContatoEm: input.proximoContatoEm === undefined ? card.proximoContatoEm : input.proximoContatoEm,
@@ -882,7 +938,8 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
           usuarioId: input.ator.tipo === "MANUAL" ? input.ator.userId : null,
           automacaoOrigem: input.ator.automacaoId,
           valorAnteriorJson: JSON.stringify({ etapaId: card.etapaId, lifecycle: card.status, outcome: card.estadoOntologico?.outcome ?? null, versao: card.versao }),
-          valorNovoJson: JSON.stringify({ etapaId: destino.id, lifecycle, outcome, subStatusId, statusPosFechamento: statusPosFechamentoInicial ?? card.statusPosFechamento, versao: card.versao + 1, responsavelId: prepared.responsavelId ?? card.responsavelId, camposPreenchidos: Object.keys(prepared.valoresValidados) }),
+          valorNovoJson: JSON.stringify({ etapaId: destino.id, lifecycle, outcome, subStatusId, statusPosFechamento: statusPosFechamentoInicial ?? card.statusPosFechamento, versao: card.versao + 1, responsavelId: prepared.responsavelId ?? card.responsavelId, camposPreenchidos: Object.keys(prepared.valoresValidados),
+            ...(prepared.movimentoLivre ? { movimentoLivre: prepared.movimentoLivre, obrigatoriedadesDispensadas: true } : {}) }),
         },
       });
       const evento = await publicarEventoBpm({
@@ -892,7 +949,8 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
         cardId: card.id,
         pipelineId: card.pipelineId,
         valorAnterior: { etapaId: card.etapaId, lifecycle: card.status, outcome: card.estadoOntologico?.outcome ?? null, versao: card.versao },
-        valorNovo: { etapaId: destino.id, lifecycle, outcome, subStatusId, versao: card.versao + 1 },
+        valorNovo: { etapaId: destino.id, lifecycle, outcome, subStatusId, versao: card.versao + 1, transicaoId: transicao?.id ?? null,
+          ...(prepared.movimentoLivre ? { movimentoLivre: prepared.movimentoLivre, automacoesSuprimidas: true } : {}) },
         atorTipo: input.ator.tipo === "MANUAL" ? "USUARIO" : input.ator.tipo,
         atorUserId: input.ator.tipo === "MANUAL" ? input.ator.userId : undefined,
         atorExecucaoId: input.ator.automacaoExecucaoId,
@@ -913,7 +971,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
         agora,
       });
 
-      await ativarCadenciasNaEntradaBpm({
+      if (!prepared.movimentoLivre) await ativarCadenciasNaEntradaBpm({
         cardId: card.id,
         pipelineAnteriorId: card.pipelineId,
         etapaAnteriorId: card.etapaId,
@@ -925,7 +983,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
         agora,
       }, tx);
 
-      await tx.bpmTransicaoExecucao.create({
+      if (transicao) await tx.bpmTransicaoExecucao.create({
         data: {
           idempotencyKey: input.idempotencyKey,
           cardId: card.id,
@@ -945,7 +1003,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
 
       return {
         cardId: card.id,
-        transicaoId: transicao.id,
+        transicaoId: transicao?.id ?? null,
         etapaOrigemId: card.etapaId,
         etapaDestinoId: destino.id,
         versao: card.versao + 1,
@@ -954,11 +1012,12 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
         historicoId: historico.id,
         eventoId: evento.id,
         idempotente: false,
+        movimentoLivre: Boolean(prepared.movimentoLivre),
         pipelineId: card.pipelineId,
       };
     }, { maxWait: 10_000, timeout: 60_000 }));
 
-    if (!result.idempotente) {
+    if (!result.idempotente && !("movimentoLivre" in result && result.movimentoLivre)) {
       try {
         await enfileirarAutomacoesMovimentoBpm({
           cardId: result.cardId,

@@ -196,7 +196,7 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
     || (currentUserId !== null && podeAgirBoasVindasOperacional(currentUserId, currentUserRole));
   const podeTrabalharNoCard = permitidoBoasVindas && !card?.encaminhado && (isAdminRole(currentUserRole)
     || (Boolean(meuVinculo) && podeAgirNaEtapa));
-  const podeMoverEtapa = podeTrabalharNoCard;
+  const podeMoverEtapa = Boolean(card?.podeMoverLivremente) || podeTrabalharNoCard;
   const podeEditar = podeTrabalharNoCard;
   const podeTrabalharTarefas = podeTrabalharNoCard;
   const podeGerenciarMembros = permitidoBoasVindas && !card?.encaminhado && (isAdminRole(currentUserRole)

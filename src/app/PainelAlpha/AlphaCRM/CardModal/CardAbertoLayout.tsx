@@ -112,7 +112,7 @@ export function CardAbertoLayout({
     || (currentUserId !== null && podeAgirBoasVindasOperacional(currentUserId, currentUserRole));
   const podeTrabalharNoCard = permitidoBoasVindas && (isAdminRole(currentUserRole)
     || (Boolean(meuVinculo) && podeAgirNaEtapa));
-  const podeMoverEtapa = podeTrabalharNoCard;
+  const podeMoverEtapa = Boolean(card?.podeMoverLivremente) || podeTrabalharNoCard;
   const podeEditar = podeTrabalharNoCard;
   const podeTrabalharTarefas = podeTrabalharNoCard;
   const podeGerenciarMembros = permitidoBoasVindas && (isAdminRole(currentUserRole) || (podeAgirNaEtapa && (
@@ -120,7 +120,7 @@ export function CardAbertoLayout({
     )));
   const transicoesDaEtapaAtual = card.etapa.transicoesEtapaOrigem ?? [];
   const etapasParaMover = etapas.filter(
-    (e) => e.id === card.etapa.id || transicoesDaEtapaAtual.some((t) => t.etapaDestinoId === e.id),
+    (e) => e.id === card.etapa.id || card.podeMoverLivremente || transicoesDaEtapaAtual.some((t) => t.etapaDestinoId === e.id),
   );
 
   return (

@@ -97,7 +97,7 @@ describe("integração da visibilidade por coluna no CRM/BPM", () => {
       "utf8",
     );
     expect(admin).toContain("<VisibilidadeEtapasSection");
-    expect(board).toContain("arrastoDesabilitado || !c.podeAgirEtapa");
+    expect(board).toContain("arrastoDesabilitado || (!c.podeAgirEtapa && !c.podeMoverLivremente)");
     expect(modal).toContain("card.permissaoEtapa?.podeAgir ?? true");
   });
 
