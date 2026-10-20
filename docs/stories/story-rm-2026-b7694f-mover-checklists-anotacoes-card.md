@@ -327,6 +327,33 @@ Falhas de baseline devem ser registradas com comando, contagem e evidência de q
 - As fases foram concluídas manualmente, sem iniciar nem executar fases pelo worker. O worker de fundo já ativo detectou o estado final e publicou o ambiente de staging com sucesso; não houve commit, push ou deploy de produção.
 - O objetivo está pronto para validação manual autenticada em desktop e viewport reduzido na coluna **Em testes**.
 
+## Ajuste visual solicitado — 2026-10-16
+
+Pedido: integrar o editor de Anotação ao estilo do CRM, removendo o degradê e mantendo sua função.
+
+Critérios de aceite deste ajuste:
+
+- [x] Substituir degradês, brilho e selo em caixa alta por fundo neutro, divisória discreta e título simples.
+- [x] Harmonizar campo, espaçamento, foco e botão com o painel escuro existente.
+- [x] Preservar expansão/recolhimento, posição, limites de rolagem, textos, permissões, estados, action e callback de salvamento.
+- [x] Executar lint, typecheck, testes e build, registrando eventuais limitações do ambiente.
+
+File List deste ajuste:
+
+- `src/app/PainelAlpha/AlphaCRM/CardModal/EditorAnotacaoCard.tsx` — somente apresentação do editor existente.
+- `docs/stories/story-rm-2026-b7694f-mover-checklists-anotacoes-card.md` — escopo, checklist e evidências do ajuste.
+
+Evidências deste ajuste:
+
+- `npm run lint`: exit 0; zero erros e 1.193 warnings globais. ESLint do editor: zero diagnósticos.
+- `npm run typecheck`: exit 0 após a geração local do bundle do player exigido pelo projeto.
+- `npm run build`: exit 0 fora do sandbox; compilação e geração de páginas concluídas. Warnings externos em `src/lib/bibble/pdfjs-polyfill.ts` sobre dependências dinâmicas. Log: `/tmp/alpha-anotacao-build-unrestricted.log`.
+- Testes direcionados existentes: 51/52 aprovados. A falha compara uma classe de rolagem de `CardAbertoLayout.tsx`; o arquivo e seu teste estão idênticos ao HEAD e não foram alterados neste ajuste.
+- `npm test`, repetido fora do sandbox após bloqueios de subprocessos: 4.693 aprovados, 6 falhas, 4 ignorados e 1 todo; 629 arquivos aprovados e 4 com falhas. Falhas em Builder/embed, Em Tratativa, import de `next/server` no teste de arquivamento e a verificação de rolagem acima; nenhuma aponta para estilos do editor. Log: `/tmp/alpha-anotacao-test-unrestricted.log`.
+- Comparação AST com HEAD confirmou estados e lógica de salvamento idênticos; nenhuma action ou regra de permissão foi alterada.
+- Prévia isolada do componente real, com React e CSS Tailwind, inspecionada em Chrome headless: expandido em 440 px e 280 px, além do estado recolhido. Screenshot: `/tmp/alpha-anotacao-preview.png`. Não equivale a um smoke autenticado do modal completo.
+- `git diff --check`: aprovado. Nenhuma dependência ou lockfile alterado; dependências instaladas localmente para executar os checks.
+
 ## Notas de segurança e banco
 
 - Esta story não autoriza alteração de banco, schema ou migration.

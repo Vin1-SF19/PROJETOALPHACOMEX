@@ -115,8 +115,8 @@ function opcoesRadarPretendido(pipeline: PipelineBpm): string[] {
 
 export interface CardBpm {
   id: string;
-  importadoRd?: boolean;
   podeMoverLivremente?: boolean;
+  importadoRd?: boolean;
   etapaId: string;
   servico: string | null;
   origemExterna?: { sourcePipelineName: string; sourceStageName: string; sourceDealName: string } | null;
@@ -1142,7 +1142,7 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
     setMovimentoPendente(true);
     setCardMovendoId(activeCard.id);
     // Importados permanecem na origem até a confirmação efetiva do servidor.
-    if (!activeCard.importadoRd) setCards((prev) => moverCardOtimistaNoBoard(prev, activeCard.id, destino.id));
+    if (activeCard.podeMoverLivremente || !activeCard.importadoRd) setCards((prev) => moverCardOtimistaNoBoard(prev, activeCard.id, destino.id));
     let mensagemErro: string | null = null;
     let aguardandoConfirmacaoRd = false;
     const idempotencyKey = activeCard.importadoRd || activeCard.podeMoverLivremente ? crypto.randomUUID() : undefined;
@@ -1158,7 +1158,7 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
         aguardandoConfirmacaoRd = true;
         return;
       }
-      if (resultado.success && activeCard.importadoRd) setCards((prev) => moverCardOtimistaNoBoard(prev, activeCard.id, destino.id));
+      if (resultado.success && activeCard.importadoRd && !activeCard.podeMoverLivremente) setCards((prev) => moverCardOtimistaNoBoard(prev, activeCard.id, destino.id));
       if (!resultado.success) mensagemErro = typeof resultado.error === "string" ? resultado.error : "Não foi possível mover o card";
     } catch {
       mensagemErro = "Não foi possível mover o card";

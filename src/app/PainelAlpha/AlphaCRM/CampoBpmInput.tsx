@@ -5,6 +5,7 @@ import { upload } from "@vercel/blob/client";
 import { X } from "lucide-react";
 import { toast, type ExternalToast } from "sonner";
 import { cn } from "@/lib/utils";
+import { campoEhReferenciaAutomaticaUsuarioBpm } from "@/lib/bpm/referencia-usuario-campo";
 import { campoBpmEhCnpj } from "@/lib/bpm/campos-dinamicos";
 import { formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";
 import { RegistrarAnexoBpm } from "@/actions/bpm/Anexos";
@@ -40,6 +41,7 @@ export interface CampoBpmEditavel {
   editavel?: boolean;
   somenteLeitura?: boolean;
   usuariosOpcoes?: OpcaoUsuarioCampoBpm[];
+  valorExibicao?: string | null;
 }
 
 interface CampoBpmInputProps {
@@ -123,6 +125,12 @@ export function CampoBpmInput({
     ? [VALORES.SIM, VALORES.NAO]
     : lerOpcoes(campo.opcoesJson);
 
+  const referenciaUsuarioAutomatica = campoEhReferenciaAutomaticaUsuarioBpm(campo);
+  if (referenciaUsuarioAutomatica) {
+    return <input id={`campo-bpm-${campo.id}`} className={className} type="text"
+      value={value.trim() ? campo.valorExibicao?.trim() || "Usuário não encontrado" : "Não informado"}
+      readOnly disabled={disabled} aria-readonly="true" aria-invalid={invalid || undefined} aria-describedby={describedBy} />;
+  }
   if (campo.tipo === "usuario") {
     const usuarios = campo.usuariosOpcoes ?? [];
     const usuarioSelecionado = usuarios.find((usuario) => usuario.id === idUsuarioCampoBpm(value));
@@ -155,7 +163,9 @@ export function CampoBpmInput({
         id={`campo-bpm-${campo.id}`}
         className={className}
         type="text"
-        value={value}
+        value={referenciaUsuarioAutomatica
+          ? (value.trim() ? campo.valorExibicao?.trim() || "Usuário não encontrado" : "Não informado")
+          : value}
         disabled={disabled}
         readOnly
         aria-readonly="true"

@@ -5,7 +5,7 @@ import { ClipboardCheck, Loader2, X } from "lucide-react";
 import { BuscarEmpresaPorCnpjBpm, BuscarEmpresasBpm, ListarUsuariosResponsavelBpm } from "@/actions/bpm/Cards";
 import { ConsultarDadosCnpjNovoLeadBpm } from "@/actions/bpm/CardsConsultas";
 import { cnpjEhValido, formatCNPJ, formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";
-import { CampoOrigemCliente } from "@/app/PainelAlpha/AlphaCRM/CampoOrigemCliente";
+import { SeletorCanalOrigemLead } from "./SeletorCanalOrigemLead";
 import { extrairPayloadOrigem } from "@/lib/bpm/origem-cliente";
 
 interface EmpresaOpcao {
@@ -79,7 +79,6 @@ export default function NovoCardModal({
   const [responsavelId, setResponsavelId] = useState<number | null>(currentUserId);
   const [radarPretendido, setRadarPretendido] = useState("");
   const [canalOrigem, setCanalOrigem] = useState("");
-  const [qualificacao, setQualificacao] = useState<"Qualificado" | "Sem qualificação" | "">("");
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [buscandoCnpj, setBuscandoCnpj] = useState(false);
@@ -232,7 +231,7 @@ export default function NovoCardModal({
       setErro("Informe um CNPJ válido com dígitos verificadores corretos.");
       return;
     }
-    if (!radarPretendido || !radarOpcoes.includes(radarPretendido)) {
+    if (radarPretendido && !radarOpcoes.includes(radarPretendido)) {
       setErro("Selecione uma opção válida em Radar pretendido.");
       return;
     }
@@ -267,10 +266,9 @@ export default function NovoCardModal({
         pipelineId,
         etapaId,
         responsavelId,
-        radarPretendido,
+        radarPretendido: radarPretendido || undefined,
         canalOrigem: origem.camposValores.origem.trim() || undefined,
         parceiroOrigemId: origem.parceiroOrigem?.parceiroId ?? undefined,
-        qualificacao: qualificacao || undefined,
       });
       if (!resultado.success) setErro(resultado.error);
     } catch (error) {
@@ -406,28 +404,17 @@ export default function NovoCardModal({
             </select>
           </FieldRow>
 
-          <FieldRow label="Radar pretendido *" htmlFor="novo-card-radar">
-            <select id="novo-card-radar" className={inputCls} value={radarPretendido} onChange={(e) => setRadarPretendido(e.target.value)} disabled={radarOpcoes.length === 0} required>
+          <FieldRow label="Radar pretendido (opcional)" htmlFor="novo-card-radar">
+            <select id="novo-card-radar" className={inputCls} value={radarPretendido} onChange={(e) => setRadarPretendido(e.target.value)} disabled={radarOpcoes.length === 0 || salvando}>
               <option value="">Selecione...</option>
               {radarOpcoes.map((opcao) => <option key={opcao} value={opcao}>{opcao}</option>)}
             </select>
-            {radarOpcoes.length === 0 && <p role="status" className="text-[11px] text-amber-300">Configure as opções de Radar pretendido no editor do pipeline para cadastrar leads.</p>}
+            {radarOpcoes.length === 0 && <p role="status" className="text-[11px] text-amber-300">Nenhuma opção de radar configurada. Você pode cadastrar o lead sem preencher este campo.</p>}
           </FieldRow>
 
           <FieldRow label="Canal de origem" htmlFor="novo-card-canal">
-            <CampoOrigemCliente id="novo-card-canal" className={inputCls} value={canalOrigem} onChange={setCanalOrigem}
-              disabled={salvando} required={false} invalid={false} />
+            <SeletorCanalOrigemLead id="novo-card-canal" className={inputCls} value={canalOrigem} onChange={setCanalOrigem} disabled={salvando} />
           </FieldRow>
-
-          <FieldRow label="Qualificação" htmlFor="novo-card-qualificacao">
-            <select id="novo-card-qualificacao" className={inputCls} value={qualificacao} onChange={(e) => setQualificacao(e.target.value as typeof qualificacao)}>
-              <option value="">Selecione...</option>
-              <option value="Qualificado">Qualificado</option>
-              <option value="Sem qualificação">Sem qualificação</option>
-            </select>
-          </FieldRow>
-
-
         </div>
 
         <div className="flex gap-2 p-5 border-t border-white/5">

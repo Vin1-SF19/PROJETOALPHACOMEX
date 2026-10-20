@@ -74,3 +74,22 @@ it("oculta colunas sem permissão também em Todos", async () => {
   await SincronizarQuadroBpm("pipeline", { visao: "TODOS" });
   expect(m.cards).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ pipelineId: "pipeline", etapaId: { in: [] } }) }));
 });
+
+it.each([
+  { userId: 7, role: "Lider Comercial", setor: "Comercial" },
+  { userId: 10, role: "OPERACIONAL", setor: "Operacional" },
+])("permite ao líder $role consultar cards de colegas no setor liderado", async ({ userId, role, setor }) => {
+  m.auth.mockResolvedValue({ user: { id: String(userId) } });
+  m.usuario.mockResolvedValue({ role });
+  const pipeline = await m.pipeline();
+  m.pipeline.mockResolvedValue({ ...pipeline, setores: [{ setor: { nome: setor, ativo: true } }] });
+  m.cards.mockResolvedValue([{ ...card, responsavel: { id: 99, nome: "Colega" } }]);
+  expect(await SincronizarQuadroBpm("pipeline", { visao: "TODOS" })).toMatchObject({ success: true, ids: ["c1"] });
+  expect(m.cards.mock.calls[0][0].where.AND).toBeUndefined();
+});
+it("não concede autoridade administrativa ao líder de outro setor", async () => {
+  m.usuario.mockResolvedValue({ role: "Lider Comercial" });
+  const pipeline = await m.pipeline();
+  m.pipeline.mockResolvedValue({ ...pipeline, setores: [{ setor: { nome: "Operacional", ativo: true } }] });
+  expect(await SincronizarQuadroBpm("pipeline", { visao: "TODOS" })).toMatchObject({ success: true, manifesto: { acesso: { admin: false } } });
+});

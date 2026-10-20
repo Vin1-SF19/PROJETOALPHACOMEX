@@ -977,7 +977,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
       }
 
       let subStatusId: string | null = card.estadoOntologico?.subStatusId ?? null;
-      if (transicao?.limparSubStatus) subStatusId = null;
+      if (prepared.movimentoLivre || transicao?.limparSubStatus) subStatusId = null;
       if (subStatusId) {
         const valido = await tx.bpmSubStatus.findFirst({ where: { id: subStatusId, etapaId: destino.id, ativo: true }, select: { id: true } });
         if (!valido) {

@@ -1054,13 +1054,13 @@ export async function CriarCardBpm(dados: unknown) {
           })
         : [];
       const campoRadar = camposNovoLead.find((campo) => campo.nome === "Radar pretendido");
-      if (pipelineAtual?.nome === "Revisão de Radar") {
+      if (pipelineAtual?.nome === "Revisão de Radar" && radarPretendido) {
         if (!campoRadar || campoRadar.tipo !== "selecao") throw new Error("RADAR_CAMPO_NAO_CONFIGURADO");
         const opcoesLegadas = (() => { try { return JSON.parse(campoRadar.opcoesJson ?? "[]"); } catch { return []; } })();
         const opcoes = campoRadar.opcoes.length > 0
           ? campoRadar.opcoes.map((opcao) => opcao.rotulo)
           : Array.isArray(opcoesLegadas) ? opcoesLegadas.filter((opcao): opcao is string => typeof opcao === "string") : [];
-        if (!radarPretendido || !opcoes.includes(radarPretendido)) throw new Error("RADAR_OPCAO_INVALIDA");
+        if (!opcoes.includes(radarPretendido)) throw new Error("RADAR_OPCAO_INVALIDA");
       }
 
       const empresaAtual = await tx.cliente.findUnique({
@@ -1181,7 +1181,7 @@ export async function CriarCardBpm(dados: unknown) {
         : error instanceof Error && error.message === "RADAR_OPCAO_INVALIDA"
           ? "Selecione uma opção válida de Radar pretendido."
         : error instanceof Error && error.message === "NOVO_LEAD_CAMPO_NAO_CONFIGURADO"
-          ? "Configure Canal de origem e Qualificação no Novo Lead antes de usá-los."
+          ? "Um dos campos informados não está configurado no Novo Lead."
         : error instanceof Error && error.message === "CRIACAO_CARD_INVALIDA"
           ? "Os dados de criação mudaram ou não são mais válidos. Recarregue e tente novamente."
         : error instanceof Error && error.message === "CRIACAO_CARD_CONTEXTO_ALTERADO"
@@ -1747,6 +1747,10 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
         proximoContatoObrigatorio: false, podeMover: true, importadoRd: false,
         podeMoverComConfirmacao: false, confirmacao: undefined, avisos: [] as AvisoMovimentoRd[],
       } };
+    }
+    if (!acessoCard.isAdminGlobal
+      && !resolverVisibilidadeEtapa(acessoCard.perfilGlobal, etapaDestino.visibilidades).podeVer) {
+      return { success: false, error: "Não autorizado" };
     }
     const campos = await carregarCamposTransicao({
       cardId,
