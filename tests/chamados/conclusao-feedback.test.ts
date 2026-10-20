@@ -83,6 +83,20 @@ describe("concluirChamadoComFeedback", () => {
     expect(mocks.feedbackCreate).not.toHaveBeenCalled();
   });
 
+  it("permite ao responsável TI concluir atendimento assumido para o Comercial", async () => {
+    mocks.findUnique.mockResolvedValue({
+      id: 10, titulo: "Demanda de outro setor", usuarioId: 7, tecnicoId: 3,
+      status: "EM_ATENDIMENTO", tecnico: { role: "TI", status: "ATIVO" },
+      setorDestinoId: 5, setorDestino: { id: 5, nome: "COMERCIAL", ativo: true, isBase: false },
+    });
+    const resultado = await concluirChamadoComFeedback({ chamadoId: 10, tecnicoId: 3, concluidoEm: CONCLUIDO_EM, solucao: "Resolvido" });
+    expect(resultado).toMatchObject({ tecnicoId: 3, destinoEhTI: false });
+    expect(mocks.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 10, tecnicoId: 3, setorDestinoId: 5, status: "EM_ATENDIMENTO" },
+    }));
+    expect(mocks.feedbackCreate).toHaveBeenCalledOnce();
+  });
+
   it("distingue chamado inexistente de status que já não permite conclusão", async () => {
     mocks.findUnique.mockResolvedValueOnce(null);
     await expect(concluirChamadoComFeedback({

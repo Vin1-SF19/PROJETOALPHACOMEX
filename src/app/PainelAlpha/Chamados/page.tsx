@@ -9,7 +9,7 @@ import { DetalhesChamado } from "@/components/DetalhesChamado";
 import ChatChamado from "@/components/ChatChamado";
 import { FiltroChamadosCards } from "@/components/FiltroChamado";
 import { listarTemplates } from "@/actions/protocolos";
-import { chamadoVisivelWhere, obterAtorChamados, pertenceAoDestino, podeAssumirChamado, podeConcluirChamado, podeResponderChamado } from "@/lib/chamados/acesso";
+import { chamadoVisivelWhere, obterAtorChamados, podeAssumirChamado, podeConcluirChamado, podeResponderChamado } from "@/lib/chamados/acesso";
 
 const STATUS_STYLES: Record<string, string> = {
   ABERTO: "text-amber-400 bg-amber-400/10 border-amber-400/20",
@@ -263,7 +263,7 @@ export default async function Chamados({
                           chamadoId={chamado.id}
                           titulo={chamado.titulo}
                           mensagensIniciais={chamado.mensagens}
-                          contagem={chamado.mensagens.filter((mensagem) => podeResponderChamado(ator, chamado) && mensagem.autorId !== userId && (chamado.usuarioId === userId ? !mensagem.lida_usuario : pertenceAoDestino(ator, chamado) && !mensagem.lida_admin)).length}
+                          contagem={chamado.mensagens.filter((mensagem) => podeResponderChamado(ator, chamado) && mensagem.autorId !== userId && (chamado.usuarioId === userId ? !mensagem.lida_usuario : !mensagem.lida_admin)).length}
                           status={chamado.status}
                           usuarioAtualId={userId}
                           podeResponder={podeResponderChamado(ator, chamado)}
@@ -272,7 +272,7 @@ export default async function Chamados({
 
                       {/* Ações */}
                       <td className="px-8 py-5 text-right">
-                        <DetalhesChamado chamado={chamado} podeAssumir={podeAssumirChamado(ator, chamado)} podeConcluir={podeConcluirChamado(ator, chamado)} pertenceAoDestino={pertenceAoDestino(ator, chamado)} usuarioAtualId={userId} templates={templates} />
+                        <DetalhesChamado chamado={chamado} podeAssumir={podeAssumirChamado(ator, chamado)} podeConcluir={podeConcluirChamado(ator, chamado)} usuarioAtualId={userId} templates={templates} />
                       </td>
                     </tr>
                   ))

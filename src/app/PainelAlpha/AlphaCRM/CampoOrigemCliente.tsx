@@ -11,9 +11,9 @@ import { criarRascunhoOrigem, lerRascunhoOrigem, origemEhParceiro } from "@/lib/
 const ORIGEM_VAZIA = "__origem_nao_informada__";
 const estiloOpcao = "min-h-10 cursor-pointer rounded-lg px-3 pr-9 text-slate-200 focus:bg-sky-400/10 focus:text-sky-100 data-[state=checked]:bg-sky-400/15 data-[state=checked]:text-sky-100 [&_svg]:text-sky-300";
 
-export function CampoOrigemCliente({ id, value, onChange, onBlur, className, disabled, required, invalid, describedBy }: {
+export function CampoOrigemCliente({ id, value, onChange, onBlur, className, disabled, required, invalid, describedBy, nativo = false, opcoesAdicionais = [] }: {
   id: string; value: string; onChange: (value: string) => void; onBlur?: () => void;
-  className: string; disabled: boolean; required: boolean; invalid: boolean; describedBy?: string;
+  className: string; disabled: boolean; required: boolean; invalid: boolean; describedBy?: string; nativo?: boolean; opcoesAdicionais?: readonly string[];
 }) {
   const rascunho = lerRascunhoOrigem(value);
   const origem = rascunho?.origem ?? value;
@@ -35,12 +35,22 @@ export function CampoOrigemCliente({ id, value, onChange, onBlur, className, dis
     return () => { ativo = false; };
   }, [ehParceiro, tentativa]);
 
+  const canaisExtras = [...new Set([...opcoesAdicionais, ...(origem ? [origem] : [])])]
+    .filter((canal) => !CANAIS_AQUISICAO.some((item) => item.value === canal));
+  function escolherOrigem(valor: string) {
+    const proximaOrigem = valor === ORIGEM_VAZIA ? "" : valor;
+    if (proximaOrigem !== origem) onChange(criarRascunhoOrigem(proximaOrigem, null));
+  }
   return <div className="space-y-3">
-    <Select value={origem} disabled={disabled} required={required}
-      onValueChange={(valor) => {
-        const proximaOrigem = valor === ORIGEM_VAZIA ? "" : valor;
-        if (proximaOrigem !== origem) onChange(criarRascunhoOrigem(proximaOrigem, null));
-      }}>
+    {nativo ? <select id={id} value={origem} disabled={disabled} required={required} onBlur={onBlur}
+      aria-label="Origem do cliente" aria-invalid={invalid || undefined} aria-describedby={describedBy}
+      onChange={(event) => escolherOrigem(event.target.value)} style={{ colorScheme: "dark" }}
+      className={cn(className, "min-h-11 w-full rounded-xl border-slate-700 bg-slate-950 text-slate-100 focus-visible:ring-2 focus-visible:ring-sky-400/20")}>
+      <option value="" className="bg-slate-950 text-slate-400">Selecione...</option>
+      {CANAIS_AQUISICAO.map((item) => <option key={item.value} value={item.value} className="bg-slate-950 text-slate-100">{item.label}</option>)}
+      {canaisExtras.map((canal) => <option key={canal} value={canal} className="bg-slate-950 text-slate-100">{canal}</option>)}
+    </select> : <Select value={origem} disabled={disabled} required={required}
+      onValueChange={escolherOrigem}>
       <SelectTrigger id={id} aria-label="Origem do cliente" onBlur={onBlur}
         aria-required={required} aria-invalid={invalid || undefined} aria-describedby={describedBy}
         className={cn(className, "min-h-11 w-full min-w-0 rounded-xl border border-slate-700/80 bg-slate-950 px-3 text-left text-sm text-slate-100 shadow-sm transition-colors hover:border-slate-500 hover:bg-slate-900 data-[placeholder]:text-slate-400 focus-visible:border-sky-400/70 focus-visible:ring-2 focus-visible:ring-sky-400/20 dark:bg-slate-950 dark:hover:bg-slate-900 [&>svg]:text-slate-400")}>
@@ -59,7 +69,7 @@ export function CampoOrigemCliente({ id, value, onChange, onBlur, className, dis
           {CANAIS_AQUISICAO.map((item) => <SelectItem key={item.value} value={item.value} className={estiloOpcao}>{item.label}</SelectItem>)}
         </SelectGroup>
       </SelectContent>
-    </Select>
+    </Select>}
     {ehParceiro && <div className="space-y-2.5 rounded-xl border border-sky-400/15 bg-sky-400/[0.04] p-3">
       <div className="flex items-center gap-2 text-xs font-medium text-slate-200">
         <Users size={14} aria-hidden="true" className="text-sky-300" />

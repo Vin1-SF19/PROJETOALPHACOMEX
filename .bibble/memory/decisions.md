@@ -1630,3 +1630,19 @@ Regras do usuário: qualquer ativo do destino assume; Admin/CEO/TI leem globalme
 ### 2026-10-15 — Chamados: migração autorizada aplicada
 
 Usuário confirmou “sim autorizo” ao delta específico de Chamados. Aplicado uma vez o plano aprovado, com backup completo novamente restaurado/verificado antes do DDL. 53 categorias em 13 setores; 224 chamados/179 mensagens/43 feedbacks/3 templates com conteúdo anterior idêntico por SHA-256. Não houve mudança de escopo nem publicação.
+
+
+### 2026-10-15 — Scribe — CRM: filtro por pessoas substitui supervisão individual
+
+Pedido explícito vigente substitui o contrato anterior de supervisor: todos com acesso ao pipeline consultam seus cards, uma pessoa elegível ou Todos, respeitando módulo/pipeline/coluna. Select único abre em “Meus e sem vínculos”, seguido de pessoas alfabeticamente e “Todos”. Catálogo vem de contas ativas com CRM dos setores do pipeline, inclusive sem cards; TI recebe a mesma lista. Pipeline aberto sem setores mantém elegibilidade geral de contas com CRM. Responsáveis históricos fora da lista continuam consultáveis em Todos.
+
+Consulta de terceiro é somente leitura (`VISUALIZADOR`, sem ação), mantendo responsabilidade/participação e permissões para mutações. Não transformar catálogo do select em ACL de card. Administração deixa de exigir supervisão individual e preserva JSON antigo; não há migration, backfill ou reatribuição. Revogação remove resumos/opções e fecha detalhes; respostas de filtro anterior são ignoradas. Fonte: story `story-alpha-crm-visao-equipe-pipeline.md`, AC20–30; decisão anterior à implementação registrada pela arquitetura. Build/typecheck/lint finais exit 0; suíte global conserva as mesmas falhas preexistentes registradas no journal. Revisão final e publicação pendentes.
+
+
+### 2026-10-16 — Scribe — CRM: referência nominal e preenchimento na origem
+
+Pedido confirmado escolhe preencher valor/forma pelo formulário atual de Em tratativa, compartilhando os mesmos campos com Fechado. A configuração preparada é aditiva: dois campos opcionais na origem, quatro inserções em composição/aplicabilidade, sem nova seção e mantendo obrigação de entrada em Fechado. Aplicação exige plano versionado/CAS, backup verificado e consentimento específico; não reutilizar aprovação histórica de outra etapa.
+
+`valorExibicao` separa apresentação nominal do ID efetivo e seus overrides. Referência automática de usuário fica readonly na UI; flags/permissões/backend e edição legada sem fonte são preservados. Consulta em lote apenas dos IDs autorizados, sem catálogo global. Leitura de requisitos também exige visibilidade do destino antes de resolver referências. Código/plano não significam banco aplicado/publicação: consentimento, homologação autenticada e gates finais permanecem explicitamente pendentes na story.
+
+- 16/10/2026 — Configuração acima autorizada, aplicada e verificada no Turso: Radar v32/formulário Em tratativa v3; dois campos opcionais na origem, entrada de Fechado preservada. Correção nominal do vendedor ainda depende de publicação do código.

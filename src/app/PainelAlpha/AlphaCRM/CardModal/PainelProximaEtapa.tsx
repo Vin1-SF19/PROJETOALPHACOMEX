@@ -1,7 +1,7 @@
 "use client";
 
 import { toast } from "sonner";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowRight, Loader2, Settings2 } from "lucide-react";
 import { ObterCardBpm, MoverCardBpm, ObterRequisitosTransicaoBpm, SalvarRequisitosEMoverCardBpm, type CardFilhoCriado } from "@/actions/bpm/Cards";
@@ -19,6 +19,7 @@ import { etapaEhLost } from "@/lib/bpm/lost";
 import { BpmDateTimeField } from "./BpmDateTimeField";
 import { formatarDataHoraLocalBpm, parseDataHoraLocalBpm } from "@/lib/format-date";
 import { AtribuirLeadAgendarModal } from "./AtribuirLeadAgendarModal";
+import { ConfirmarMovimentoRdModal, type MovimentoRdPendente } from "./ConfirmarMovimentoRdModal";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { ObterDisponibilidadeEtapasCardBpm, type DisponibilidadeEtapaCard } from "@/actions/bpm/DisponibilidadeEtapasCard";
 
@@ -40,6 +41,8 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
   const router = useRouter();
   const { flushSaves } = useCardSave();
   const [movendoEtapa, setMovendoEtapa] = useState(false);
+  const [movimentoRdPendente, setMovimentoRdPendente] = useState<MovimentoRdPendente | null>(null);
+  const movimentoRdEmCursoRef = useRef(false);
   const [requisitos, setRequisitos] = useState<RequisitosTransicao | null>(null);
   const [atribuicaoPendente, setAtribuicaoPendente] = useState<{ etapaDestinoId: string; camposValores?: Record<string, string>; parceiroOrigem?: ParceiroOrigemBpm } | null>(null);
   const [valoresRequisitos, setValoresRequisitos] = useState<Record<string, string>>({});
@@ -54,7 +57,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
     templates: string[];
     primeiroItemId: string | null;
   } | null>(null);
-  const aguardandoTranscricao = !card.podeMoverLivremente && card.etapa.chave === BPM_STAGE_KEYS.REUNIAO_AGENDADA
+  const aguardandoTranscricao = !card.podeMoverLivremente && !card.importadoRd && card.etapa.chave === BPM_STAGE_KEYS.REUNIAO_AGENDADA
     && !transcricaoRealRegistrada(card.transcricaoReuniao)
     && formularioExigeCapacidade(card.formularioEtapa, BPM_CAPABILITIES.MEETING_TRANSCRIPT);
   const destinos = etapas.filter((etapa) => etapa.id !== card.etapa.id);
@@ -139,6 +142,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
   function confirmarMovimento(res: Awaited<ReturnType<typeof MoverCardBpm>>) {
       if (res.success) {
         setRequisitos(null);
+        setMovimentoRdPendente(null);
         toast.success("Card movido");
         const filhos = (res as { cardsFilhosCriados?: CardFilhoCriado[] }).cardsFilhosCriados;
         if (filhos && filhos.length > 0) {
@@ -167,18 +171,41 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
       toast.error(typeof resposta.error === "string" ? resposta.error : "Não foi possível consultar os requisitos da etapa.");
       return null;
     }
-    if (mostrarMesmoSemPendencias || resposta.data.faltantes.length || resposta.data.guardas.length) setRequisitos(resposta.data);
-    else setRequisitos(null);
-    setValoresRequisitos(Object.fromEntries(resposta.data.campos.map((campo) => [campo.id, valorInicialCampo(campo)])));
-    setProximoContatoRascunho(formatarDataHoraLocalBpm(resposta.data.proximoContatoEm));
+    if (!resposta.data.importadoRd || mostrarMesmoSemPendencias) {
+      if (mostrarMesmoSemPendencias || resposta.data.faltantes.length || resposta.data.guardas.length) setRequisitos(resposta.data);
+      else setRequisitos(null);
+      setValoresRequisitos(Object.fromEntries(resposta.data.campos.map((campo) => [campo.id, valorInicialCampo(campo)])));
+      setProximoContatoRascunho(formatarDataHoraLocalBpm(resposta.data.proximoContatoEm));
+    }
     return resposta.data;
   }
 
-  async function handleMover(etapaDestinoId: string) {
-    if (etapaDestinoId === card.etapa.id || movendoEtapa || !podeMoverEtapa
-      || !disponibilidade?.[etapaDestinoId]
-      || disponibilidade[etapaDestinoId].oculta
-      || disponibilidade[etapaDestinoId].pendencias.length) return;
+  function abrirConfirmacaoRd(dados: RequisitosTransicao, etapaDestinoId: string, idempotencyKey: string) {
+    if (!dados.podeMoverComConfirmacao || !dados.confirmacao || !dados.avisos?.length) return false;
+    setRequisitos(null);
+    setMovimentoRdPendente({ cardId: card.id, etapaDestinoId, etapaDestinoNome: dados.etapaDestino.nome,
+      idempotencyKey, confirmacao: dados.confirmacao, avisos: dados.avisos });
+    return true;
+  }
+
+  async function receberMovimentoRd(resposta: Awaited<ReturnType<typeof MoverCardBpm>>, intencao: { etapaDestinoId: string; etapaDestinoNome: string; idempotencyKey: string }) {
+    if (!resposta.success && "code" in resposta && resposta.code === "RD_MOVE_CONFIRMATION_REQUIRED"
+      && "confirmacao" in resposta && resposta.confirmacao && "avisos" in resposta && resposta.avisos) {
+      setMovimentoRdPendente({ cardId: card.id, ...intencao, confirmacao: resposta.confirmacao, avisos: resposta.avisos });
+      return;
+    }
+    confirmarMovimento(resposta);
+    if (!resposta.success) {
+      // Reconsulta somente leitura: uma confirmação obsoleta exige nova decisão.
+      const dados = await buscarRequisitos(intencao.etapaDestinoId);
+      if (!dados || !abrirConfirmacaoRd(dados, intencao.etapaDestinoId, intencao.idempotencyKey)) setMovimentoRdPendente(null);
+    }
+  }
+
+  async function confirmarMovimentoRd() {
+    if (!movimentoRdPendente || movimentoRdEmCursoRef.current) return;
+    const intencao = movimentoRdPendente;
+    movimentoRdEmCursoRef.current = true;
     setMovendoEtapa(true);
     try {
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
@@ -187,9 +214,51 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
         toast.error("Não foi possível salvar os campos. O card não foi movido.");
         return;
       }
+      await receberMovimentoRd(await MoverCardBpm({ cardId: card.id, etapaDestinoId: intencao.etapaDestinoId,
+        idempotencyKey: intencao.idempotencyKey,
+        etapaOrigemEsperadaId: intencao.confirmacao.etapaOrigemEsperadaId,
+        versaoEsperada: intencao.confirmacao.versaoEsperada,
+        confirmacaoPendenciasRd: intencao.confirmacao }), intencao);
+    } catch {
+      toast.error("Não foi possível mover o card. Tente novamente.");
+    } finally {
+      movimentoRdEmCursoRef.current = false;
+      setMovendoEtapa(false);
+      setRevisaoDisponibilidade((atual) => atual + 1);
+    }
+  }
+
+  async function handleMover(etapaDestinoId: string) {
+    const estado = disponibilidade?.[etapaDestinoId];
+    if (etapaDestinoId === card.etapa.id || movendoEtapa || !podeMoverEtapa || movimentoRdPendente
+      || !estado || estado.oculta || (estado.pendencias.length && !estado.podeConfirmarPendenciasRd)) return;
+    setMovendoEtapa(true);
+    try {
       if (card.podeMoverLivremente) {
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+        if (!await flushSaves(card.id)) { toast.error("Não foi possível salvar os campos. O card não foi movido."); return; }
         confirmarMovimento(await MoverCardBpm({ cardId: card.id, etapaDestinoId,
           etapaOrigemEsperadaId: card.etapa.id, idempotencyKey: crypto.randomUUID() }));
+        return;
+      }
+      // O aviso RD vem antes de salvar: cancelar preserva todos os rascunhos.
+      if (card.importadoRd) {
+        const idempotencyKey = crypto.randomUUID();
+        const dados = await buscarRequisitos(etapaDestinoId);
+        if (!dados || abrirConfirmacaoRd(dados, etapaDestinoId, idempotencyKey)) return;
+        if (dados.faltantes.length || dados.guardas.length) return;
+        if (!await flushSaves(card.id)) {
+          toast.error("Não foi possível salvar os campos. O card não foi movido.");
+          return;
+        }
+        await receberMovimentoRd(await MoverCardBpm({ cardId: card.id, etapaDestinoId, idempotencyKey,
+          etapaOrigemEsperadaId: card.etapa.id }), { etapaDestinoId, etapaDestinoNome: dados.etapaDestino.nome, idempotencyKey });
+        return;
+      }
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      const savesConcluidos = await flushSaves(card.id);
+      if (!savesConcluidos) {
+        toast.error("Não foi possível salvar os campos. O card não foi movido.");
         return;
       }
       const dados = await buscarRequisitos(etapaDestinoId);
@@ -225,7 +294,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
       const camposValores = Object.fromEntries(requisitos.campos
         .filter((campo) => campo.editavel && !campo.somenteLeitura && (valoresRequisitos[campo.id] ?? "") !== (valorInicialCampo(campo)))
         .map((campo) => [campo.id, valoresRequisitos[campo.id] ?? ""]));
-      if (card.pipeline?.nome === "Revisão de Radar" && etapaEhNovosLeads(card.etapa.nome)
+      if (!card.podeMoverLivremente && !card.importadoRd && card.pipeline?.nome === "Revisão de Radar" && etapaEhNovosLeads(card.etapa.nome)
         && etapaEhAgendarReuniao(requisitos.etapaDestino.nome)) {
         setAtribuicaoPendente({ etapaDestinoId: requisitos.etapaDestino.id, ...extrairPayloadOrigem(camposValores) });
         setRequisitos(null);
@@ -246,7 +315,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
     const campo = requisitos.campos.find((item) => item.id === pendente.id);
     return campo ? [{ ...campo, contexto: pendente.contexto, etapaAplicacaoNome: pendente.etapaAplicacaoNome }] : [];
   }) ?? [];
-  const requisitosLost = !card.podeMoverLivremente && card.pipeline?.nome === "Revisão de Radar"
+  const requisitosLost = !card.podeMoverLivremente && !card.importadoRd && card.pipeline?.nome === "Revisão de Radar"
     && etapaEhLost(requisitos?.etapaDestino.nome);
   const camposObrigatoriosLost = requisitosLost
     ? requisitos?.campos.filter((campo) => campo.obrigatorio && campo.contexto !== "ORIGEM" && !camposPendentes.some((pendente) => pendente.id === campo.id)) ?? []
@@ -265,6 +334,9 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
 
   return (
     <div className="rounded-xl border border-slate-700/60 bg-slate-900/40 overflow-y-auto p-5 space-y-2">
+      <ConfirmarMovimentoRdModal open={Boolean(movimentoRdPendente)} etapaDestinoNome={movimentoRdPendente?.etapaDestinoNome ?? ""}
+        avisos={movimentoRdPendente?.avisos ?? []} processando={movendoEtapa}
+        onCancelar={() => setMovimentoRdPendente(null)} onConfirmar={() => void confirmarMovimentoRd()} />
       <AtribuirLeadAgendarModal
         pipelineId={card.pipelineId}
         currentUserId={currentUserId}
@@ -369,7 +441,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
         {podeMoverEtapa && disponibilidade && destinos.filter((etapa) => !disponibilidade[etapa.id]?.oculta).map((etapa) => {
           const estado = disponibilidade?.[etapa.id];
           const pendencias = estado?.pendencias ?? ["Verificando requisitos desta etapa..."];
-          const bloqueada = !estado || pendencias.length > 0;
+          const bloqueada = !estado || (pendencias.length > 0 && !estado.podeConfirmarPendenciasRd);
           const botao = (
             <button
               type="button"
@@ -385,8 +457,8 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
                     : <ArrowRight size={14} className="shrink-0 opacity-70" aria-hidden="true" />}
             </button>
           );
-          const podeInformarMotivo = !card.podeMoverLivremente && card.pipeline?.nome === "Revisão de Radar" && etapaEhLost(etapa.nome);
-          const podeInformarProximoContato = !card.podeMoverLivremente && card.pipeline?.nome === "Revisão de Radar"
+          const podeInformarMotivo = !card.podeMoverLivremente && !card.importadoRd && card.pipeline?.nome === "Revisão de Radar" && etapaEhLost(etapa.nome);
+          const podeInformarProximoContato = !card.podeMoverLivremente && !card.importadoRd && card.pipeline?.nome === "Revisão de Radar"
             && etapa.nome.toLocaleLowerCase("pt-BR") === "sem viabilidade"
             && pendencias.some((pendencia) => pendencia.includes("Próximo Contato"));
           return bloqueada ? (

@@ -7138,3 +7138,74 @@ Revisão final Lens: aprovada com ressalvas operacionais, sem bloqueantes/import
 ### 2026-10-15 — Chamados: migração autorizada aplicada
 
 Usuário respondeu “sim autorizo” à migração específica. Vault liberou o plano exato e o script apply concluiu com backup novamente restaurado/verificado, 53 categorias inseridas/13 destinos/224 chamados preservados/integridade ok/FK0. Comparação de conteúdo antes/depois por hash confirmou preservação de chamados, mensagens, feedbacks e templates. Smoke somente leitura dos módulos reais Prisma/catálogo/autorização passou para 29 atores ativos e 27 responsáveis elegíveis. Quatro índices conferidos. Relatório atualizado APPLIED_VERIFIED; nenhum chamado de teste, notificação, commit, push ou deploy. E2E autenticado e realtime real não exercitados.
+
+
+---
+
+## [2026-10-15 21:00 UTC] — CRM: pessoas e Todos por pipeline
+
+**Tags:** #bugfix #decision #integration #auth #nextjs
+**Agentes envolvidos:** Bibble, arquitetura/Scout, Nova, backend, Scribe, Kowalski
+**Arquivos tocados:** `src/lib/bpm/{visao-equipe-server,visao-equipe,ownership}.ts`; `src/actions/bpm/{Quadro,Checklists,NotaFiscal}.ts`; `PipelineBoardClient.tsx`; `VisibilidadePipelineSection.tsx`; testes BPM; story CRM; quatro memórias abaixo.
+
+### Contexto
+Usuário definiu o select em todos os pipelines: “Meus e sem vínculos” padrão, pessoas do setor e Todos, inclusive para TI. A lista anterior dependia de cards e a consulta de colegas exigia supervisão individual.
+
+### O que foi feito
+- Catálogo explícito de contas ativas com CRM dos setores do pipeline, incluindo quem não tem cards, igual para TI/comum. Consulta de colegas/Todos liberada após autorização do pipeline; escrita mantém vínculo/permissões.
+- UI remove itens de setor/supervisão, ordena pessoas, fecha detalhes na troca/revogação e ignora respostas antigas. Administração envia setores/versão e preserva JSON histórico; sem migration ou escrita remota.
+- Smoke Prisma somente leitura: catálogos TI/comum iguais em três pipelines; usuária operacional sem cards só na lista Operacional. Guard real autorizou visualizar terceiro Operacional como VISUALIZADOR/sem ação e negou edição; Financeiro/Radar negados.
+
+### Decisões tomadas
+- Catálogo independente de cards; Todos inclui atribuições históricas fora da lista. Consulta ampliada não equivale a permissão de ação nem substitui módulo/pipeline/coluna.
+
+### Problemas encontrados / resolvidos
+- Auditoria detectou leitores capazes de mutar: NF recebeu bloqueio de edição para visualizador; checklist passou a listar existentes sem materializar para quem não pode agir. POST de oportunidades passou a exigir `editarCard`, preservando GET consultável; três regressões usam ownership real, mais quatro de NF/checklists.
+- Frontend: 21 testes aprovados; backend direcionado: 47 aprovados. Gates finais: build/typecheck/lint exit 0; 1193 warnings de lint iguais ao baseline. `npm test` exit 1: 631 arquivos aprovados/4 falhos, 4706 testes aprovados/6 falhos/4 skipped/1 todo. Mesmas quatro suites e seis falhas do baseline (629 arquivos aprovados/4 falhos, 4693 testes aprovados/6 falhos): import `next/server` em arquivamento-modal, Builder (3), layout card-modal (1), em-tratativa (2). Sem aprovação global dos testes.
+
+### Pendências
+- Lens/Sage: APROVADO COM RESSALVAS, sem bloqueio novo; ressalvas são as quatro suites/seis testes já falhos no baseline, CodeRabbit indisponível e ausência de navegador autenticado/deploy. Publicação permanece pendente.
+- Evidências `.cache/crm-filtro-setor/{build,lint,typecheck-final,test-final,baseline-test}.log` e `smoke-readonly.json`: Prisma sem escritas, runtime compilado iniciado (260 ms), CRM sem sessão 307 e servidor encerrado após checagem. Esse smoke não substitui navegador autenticado.
+
+### Refletido também em
+- `decisions.md`: precedência do contrato por pipeline e separação entre consulta/ação.
+- `codebase-map.md` e `integration-points.md`: resolvedor, manifesto, filtros e guardas. Nenhum componente novo.
+
+Virtus manual: candidato de produção isolado sobre origin/main, somente os 26 arquivos CRM; commits Agenda preservados fora da entrega. Gates repetidos e baseline de seis falhas confirmado; smoke isolado 20/20. Publicação/rollback na Vercel preparados; aguarda confirmação final, sem stage/commit/push. Evidências privadas em /tmp/virtus-crm-preflight/.
+
+
+---
+
+## [2026-10-16 12:33 UTC] — CRM: contratação em Em tratativa e nome do vendedor
+
+**Tags:** #bugfix #decision #integration #auth
+**Agentes envolvidos:** arquitetura/Scout, frontend, backend/configuração, Vault, Scribe, Kowalski
+**Arquivos tocados:** story `story-alpha-crm-revisao-radar-fechado.md`; `requisitos-etapa-server.ts`; `referencia-usuario-campo.ts`; `CampoBpmInput.tsx`; `Cards.ts`; `contratacao-em-tratativa-config.ts`; CLI correspondente; quatro testes BPM e estas quatro memórias.
+
+### Contexto
+Usuário escolheu preencher os dois campos contratuais no formulário de Em tratativa antes de Fechado e ver o nome da pessoa efetiva no campo automático, preservando IDs.
+
+### O que foi feito
+- Nome separado em `valorExibicao`, resolvido em lote após ID efetivo/override; referência automática readonly, legado sem fonte editável. Guard de leitura do destino adicionado antes de carregar requisitos.
+- CLI/plano reversível: quatro inserções (configurações 116/117 e componentes 16/17) em seção existente; campos opcionais na origem, Fechado intacto, pipeline 31→32/formulário 2→3. Preview/fingerprint, CAS e auditoria transacional; testes em banco descartável.
+- Vault/backup preparados: 337 tabelas/271590 linhas/347346721 bytes, integridade/FK/hash verificados. Evidências privadas em `/tmp/crm-fechado-preflight/{vault-report.md,vault-report.json,vault-backup-verification.json}`; nenhum dado real ou segredo copiado.
+
+### Decisões tomadas
+- Fonte de valor continua ID, inclusive overrides; apresentação não altera persistência/permissões. Formulário canônico de origem atende requisitos existentes do destino; não criar atalho genérico de transição.
+
+### Problemas encontrados / resolvidos
+- Typecheck detectou literal incompatível no helper configuracional, corrigido e tsc subsequente aprovado; fluxo principal repetirá. Lint exit 0/1193 warnings. `npm test`: 632 arquivos passam/4 falham, 4738 testes passam/6 falham/4 skipped/1 todo, mesmas falhas baseline (import next/server em arquivamento-modal-react, embed 3, layout card-modal 1, em-tratativa 2). Suíte global não aprovada.
+
+### Pendências
+- Consentimento específico e aplicação configuracional reais pendentes; não houve banco aplicado, publicação nem browser autenticado. Build exit 0, Probe/Anubis e Lens sem bloqueios novos; nove arquivos/126 testes direcionados passam. Typecheck pré-build exit 0; duas repetições extras pós-build interrompidas (143/Terminated), sem diagnóstico TS, não declaradas aprovadas.
+
+### Refletido também em
+- `decisions.md`, `codebase-map.md`, `integration-points.md` e story: contratos, plano, file list e limites das evidências. Nenhum componente novo.
+
+### Aplicação autorizada — 2026-10-16T12:43:33.127Z
+
+Usuário autorizou especificamente o plano após Vault/backup. Configuração aplicada e verificada no Turso: duas associações opcionais e dois componentes em Em tratativa, pipeline v32/formulário v3, auditoria e exigência de Fechado preservadas. Preview anterior idêntico; verificações transacionais e leitura independente passaram. Recibo e evidências privados em `/tmp/crm-fechado-preflight/`; nenhum dado de card alterado. Nome do vendedor continua aguardando publicação do código; sem commit/push/deploy ou browser autenticado nesta etapa.
+
+### Gate de publicação — Virtus
+
+Usuário solicitou publicar a entrega. Typecheck pós-build final aprovado; runtime compilado com 22/22 checks de assets e rotas protegidas sem sessão, sem mutação no banco. Candidato restrito aos 15 arquivos desta correção sobre origin/main; deploy não reaplica a configuração. Suíte global mantém seis falhas anteriores; navegador autenticado não executado. Rollback de código referencia a versão anterior saudável, preservando o banco.

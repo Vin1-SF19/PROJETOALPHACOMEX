@@ -17,7 +17,7 @@ interface EditorAnotacaoCardProps {
   onInteracaoCriada: (interacao: Interacao) => void;
 }
 
-const inputCls = "w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-white/25";
+const inputCls = "w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm leading-relaxed text-slate-100 outline-none transition-colors placeholder:text-slate-500 focus-visible:border-slate-400 focus-visible:ring-1 focus-visible:ring-slate-400 disabled:cursor-not-allowed disabled:opacity-50";
 
 export function EditorAnotacaoCard({
   card,
@@ -54,29 +54,17 @@ export function EditorAnotacaoCard({
 
   return (
     <details
-      className="group max-h-[42.5vh] shrink-0 overflow-y-auto border-t-2 backdrop-blur-xl lg:max-h-[50%]"
-      style={{
-        borderColor: `rgba(${accent},0.55)`,
-        background: `linear-gradient(180deg, rgba(${accent},0.12), rgba(2,6,23,0.92) 65%)`,
-      }}
+      className="group max-h-[42.5vh] shrink-0 overflow-y-auto border-t border-white/10 bg-slate-950/40 lg:max-h-[50%]"
     >
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
-        <span
-          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] shadow-lg"
-          style={{
-            background: `linear-gradient(110deg, rgba(${accent},0.4), rgba(${accent},0.15))`,
-            borderColor: `rgba(${accent},0.55)`,
-            borderWidth: 1,
-            color: `rgb(${accent})`,
-            boxShadow: `0 6px 18px -10px rgba(${accent},0.9)`,
-          }}
-        >
-          <MessageSquareText size={13} aria-hidden="true" /> Anotação
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3.5 transition-colors hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-400 [&::-webkit-details-marker]:hidden">
+        <span className="flex min-w-0 items-center gap-2.5">
+          <MessageSquareText size={16} aria-hidden="true" className="shrink-0 text-slate-400" />
+          <span className="min-w-0">
+            <span className="block text-sm font-medium text-slate-200">Anotação</span>
+            <span className="mt-0.5 block text-[11px] text-slate-400">Aparece no Histórico</span>
+          </span>
         </span>
-        <span className="flex shrink-0 items-center gap-2 text-[10px] text-slate-500">
-          Aparece no Histórico
-          <ChevronDown size={14} aria-hidden="true" className="shrink-0 text-slate-500 transition-transform group-open:rotate-180" />
-        </span>
+        <ChevronDown size={14} aria-hidden="true" className="shrink-0 text-slate-400 transition-transform group-open:rotate-180 motion-reduce:transition-none" />
       </summary>
 
       <div className="px-5 pb-4">
@@ -85,16 +73,15 @@ export function EditorAnotacaoCard({
         </label>
         <textarea
           id={`anotacao-card-${card.id}`}
-          className={`${inputCls} min-h-20 resize-none`}
+          className={`${inputCls} min-h-24 resize-none`}
           placeholder="Registre uma anotação sobre este contato..."
           value={anotacao}
           onChange={(event) => setAnotacao(event.target.value)}
           disabled={!podeEditar || salvandoAnotacao}
-          style={{ borderColor: `rgba(${accent},0.3)` }}
         />
-        <div className="mt-2 flex items-center justify-end gap-3">
+        <div className="mt-3 flex items-center justify-end gap-3">
           {salvandoAnotacao && (
-            <p className="inline-flex items-center gap-1.5 text-[11px] text-slate-500" role="status">
+            <p className="inline-flex items-center gap-1.5 text-[11px] text-slate-400" role="status">
               <MessageSquareText size={13} aria-hidden="true" /> Salvando...
             </p>
           )}
@@ -102,7 +89,7 @@ export function EditorAnotacaoCard({
             type="button"
             onClick={() => void salvarAnotacao()}
             disabled={!podeEditar || salvandoAnotacao || !anotacao.trim()}
-            className="rounded-lg px-4 py-2 text-xs font-bold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
             style={{ background: `rgb(${accent})` }}
           >
             Salvar

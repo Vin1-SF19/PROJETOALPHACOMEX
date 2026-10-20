@@ -59,40 +59,42 @@ describe('Builder integrado ao painel', () => {
     expect((await BuilderPage()).type).toBe('main');
     expect(guards.permissions).toHaveBeenCalledWith(12);
   });
-  it('exibe loading, expira em 30s e retry remonta com novo prazo', async () => {
+  it('exibe loading, respeita o prazo de 30s e orienta recarregar a página quando expira', async () => {
     await render();
     const first = container.querySelector('iframe')!;
     expect(first.getAttribute('src')).toBe(BUILDER_URL);
     expect(first.src).toContain('/api/chatbotx/open');
     expect(container.querySelector('[role=status]')).not.toBeNull();
-    await act(async () => vi.advanceTimersByTime(BUILDER_LOAD_TIMEOUT_MS));
-    expect(container.querySelector('[role=alert]')?.textContent).toContain('Não foi possível carregar');
-    expect(container.querySelector('iframe')).toBeNull();
-    await act(async () => container.querySelector('button')!.click());
-    expect(container.querySelector('iframe')).not.toBe(first);
-    expect(container.querySelector('[role=status]')).not.toBeNull();
     await act(async () => vi.advanceTimersByTime(BUILDER_LOAD_TIMEOUT_MS - 1));
+    expect(container.querySelector('[role=status]')).not.toBeNull();
     expect(container.querySelector('[role=alert]')).toBeNull();
+    await act(async () => vi.advanceTimersByTime(1));
+    expect(container.querySelector('[role=alert]')?.textContent).toContain('Não foi possível carregar');
+    expect(container.querySelector('[role=alert]')?.textContent).toContain('Recarregue a página para tentar novamente.');
+    expect(container.querySelector('iframe')).toBeNull();
+    expect(container.querySelector('[role=status]')).toBeNull();
+    expect(container.querySelector('button, a')).toBeNull();
   });
-  it('load cancela prazo, mantém alternativa para bloqueio cross-origin e retry funciona', async () => {
+  it('load cancela o prazo e mantém o iframe integrado sem controles externos', async () => {
     await render();
     const first = container.querySelector('iframe')!;
     await act(async () => first.dispatchEvent(new Event('load')));
     await act(async () => vi.advanceTimersByTime(BUILDER_LOAD_TIMEOUT_MS));
     expect(container.querySelector('[role=status]')).toBeNull();
     expect(container.querySelector('[role=alert]')).toBeNull();
-    const link = container.querySelector('a')!;
-    expect(link.getAttribute('href')).toBe(BUILDER_URL);
-    expect(link.href).toContain('/api/chatbotx/open');
-    expect(link.rel).toBe('noopener noreferrer');
-    expect(link.target).toBe('_blank');
-    await act(async () => container.querySelector('button')!.click());
-    expect(container.querySelector('iframe')).not.toBe(first);
+    expect(container.querySelector('iframe')).toBe(first);
+    expect(container.querySelector('[aria-busy]')?.getAttribute('aria-busy')).toBe('false');
+    expect(first.getAttribute('referrerPolicy')).toBe('strict-origin-when-cross-origin');
+    expect(first.getAttribute('sandbox')).toContain('allow-scripts');
+    expect(container.querySelector('button, a')).toBeNull();
   });
-  it('trata perda de rede sem perder controles', async () => {
+  it('trata perda de rede removendo o iframe e orientando recarregar a página', async () => {
     await render();
     await act(async () => window.dispatchEvent(new Event('offline')));
     expect(container.querySelector('[role=alert]')).not.toBeNull();
-    expect(container.querySelector('a')).not.toBeNull();
+    expect(container.querySelector('[role=alert]')?.textContent).toContain('Recarregue a página para tentar novamente.');
+    expect(container.querySelector('iframe')).toBeNull();
+    expect(container.querySelector('[role=status]')).toBeNull();
+    expect(container.querySelector('button, a')).toBeNull();
   });
 });

@@ -1,5 +1,5 @@
-import "server-only";
 import type { AutoridadeMovimentoLivre } from "@/lib/bpm/lideranca-setor";
+import "server-only";
 
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
@@ -9,6 +9,7 @@ import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 import { resolverParceiroOrigem, validarParceiroOrigem, salvarParceiroOrigem } from "@/lib/bpm/origem-cliente-server";
 import type { ParceiroOrigemBpm } from "@/lib/bpm/origem-cliente";
 import { requisitoAplicaAoMover, validarValorRequisitoCampo } from "@/lib/bpm/requisitos-etapa";
+import { BPM_FORM_FIELD_CONFIG_SCHEMA } from "@/lib/bpm/formularios-etapa";
 import { registrarConclusaoContratoFinanceiro } from "@/lib/bpm/financeiro-assinatura-server";
 import { sincronizarNotaFiscalCard } from "@/lib/bpm/financeiro-nota-fiscal-server";
 import { avaliarFormalizacaoFinanceira } from "@/lib/bpm/financeiro-formalizacao";
@@ -25,6 +26,11 @@ import {
   salvarValoresGlobaisPersonalizadosCampos,
 } from "@/lib/bpm/campos-configuraveis-server";
 import { obterErroChecklistParaMovimento } from "@/lib/bpm/checklists/integracao";
+import { carregarResumoChecklistAplicavelCard } from "@/lib/bpm/checklists/integracao";
+import {
+  possuiOrigemImportadaRd, criarConfirmacaoPendenciasRd, confirmacaoPendenciasRdCorresponde, faltasQueAtivamCondicaoRd,
+  type AvisoMovimentoRd, type ConfirmacaoPendenciasRd,
+} from "@/lib/bpm/movimento-importado-rd";
 import { obterErroRegrasParaMovimento } from "@/lib/bpm/regras/guarda-movimento";
 import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
 import { avaliarGrupo } from "@/lib/bpm/regras/avaliador";
@@ -80,6 +86,7 @@ export type ComandoTransicaoBpm = {
   parceiroOrigem?: ParceiroOrigemBpm;
   proximoContatoEm?: Date | null;
   responsavelId?: number;
+  confirmacaoPendenciasRd?: ConfirmacaoPendenciasRd;
 };
 
 export type ResultadoTransicaoBpm =
@@ -99,7 +106,7 @@ export type ResultadoTransicaoBpm =
         movimentoLivre?: boolean;
       };
     }
-  | { success: false; error: string; code: string; pendencias?: string[] };
+  | { success: false; error: string; code: string; pendencias?: string[]; avisos?: AvisoMovimentoRd[]; confirmacao?: ConfirmacaoPendenciasRd };
 
 type Tx = Prisma.TransactionClient;
 
@@ -108,6 +115,8 @@ class TransicaoBpmError extends Error {
     readonly code: string,
     message: string,
     readonly pendencias?: string[],
+    readonly avisos?: AvisoMovimentoRd[],
+    readonly confirmacao?: ConfirmacaoPendenciasRd,
   ) {
     super(message);
     this.name = "TransicaoBpmError";
@@ -129,7 +138,8 @@ function vazio(valor: string | null | undefined): boolean {
 
 function mensagemErroDesconhecido(errorValue: unknown): ResultadoTransicaoBpm {
   if (errorValue instanceof TransicaoBpmError) {
-    return { success: false, code: errorValue.code, error: errorValue.message, pendencias: errorValue.pendencias };
+    return { success: false, code: errorValue.code, error: errorValue.message, pendencias: errorValue.pendencias,
+      ...(errorValue.avisos ? { avisos: errorValue.avisos, confirmacao: errorValue.confirmacao } : {}) };
   }
   console.error("[TransitionCommand]", errorValue);
   if (erroSqliteBusy(errorValue)) {
@@ -155,23 +165,11 @@ async function validarAutorizacao(
 }
 
 async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
-  const idempotente = await tx.bpmTransicaoExecucao.findUnique({
-    where: { idempotencyKey: input.idempotencyKey },
-    include: { card: { include: { estadoOntologico: true } } },
-  });
-  if (idempotente) {
-    return {
-      idempotente: true as const,
-      execucao: idempotente,
-      lifecycle: idempotente.card.status,
-      outcome: idempotente.card.estadoOntologico?.outcome ?? null,
-    };
-  }
-
   const card = await tx.bpmCard.findUnique({
     where: { id: input.cardId },
     include: {
-      pipeline: { select: { id: true, chave: true, nome: true, ativo: true } },
+      pipeline: { select: { id: true, chave: true, nome: true, configVersion: true, ativo: true } },
+      origemExterna: { select: { id: true, provider: true, sourceDealId: true } },
       etapa: { select: { id: true, pipelineId: true, chave: true, nome: true, ordem: true, capabilitiesJson: true, ativo: true } },
       empresa: { select: { razaoSocial: true } },
       estadoOntologico: { include: { subStatus: { select: { id: true, etapaId: true, chave: true } } } },
@@ -183,6 +181,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     },
   });
   if (!card) erro("CARD_NOT_FOUND", "Card não encontrado.");
+  const manualRd = input.ator.tipo === "MANUAL" && possuiOrigemImportadaRd(card.origemExterna);
   const [destino, transicao] = await Promise.all([
     tx.bpmEtapa.findFirst({
       where: { id: input.etapaDestinoId, pipelineId: card.pipelineId, ativo: true },
@@ -196,9 +195,29 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
   const autorizacao = await validarAutorizacao(input, card, destino, tx);
   let perfilCampo = autorizacao.perfil;
   const movimentoLivre = autorizacao.autoridade;
-  if (movimentoLivre) {
+  const idempotente = await tx.bpmTransicaoExecucao.findUnique({
+    where: { idempotencyKey: input.idempotencyKey },
+    include: { card: { include: { estadoOntologico: true } } },
+  });
+  if (idempotente) {
+    if (idempotente.cardId !== card.id || idempotente.etapaOrigemId !== input.etapaOrigemEsperadaId
+      || idempotente.etapaDestinoId !== destino.id || idempotente.atorTipo !== input.ator.tipo
+      || (idempotente.atorUserId ?? null) !== (input.ator.userId ?? null)
+      || (idempotente.atorExecucaoId ?? null) !== (input.ator.automacaoExecucaoId ?? null)) {
+      erro("IDEMPOTENCY_CONFLICT", "A chave desta solicitação já foi utilizada em outro movimento.");
+    }
+    return { idempotente: true as const, data: {
+      cardId: card.id, transicaoId: idempotente.transicaoId,
+      etapaOrigemId: idempotente.etapaOrigemId, etapaDestinoId: idempotente.etapaDestinoId,
+      versao: idempotente.versaoResultante, lifecycle: idempotente.card.status,
+      outcome: idempotente.card.estadoOntologico?.outcome ?? null,
+      historicoId: "", eventoId: "", idempotente: true, pipelineId: card.pipelineId,
+    } };
+  }
+  {
     const anterior = await tx.bpmEventoDominio.findUnique({ where: { idempotencyKey: `transition:${input.idempotencyKey}` } });
     if (anterior) {
+      if (!manualRd && !movimentoLivre) erro("IDEMPOTENCY_CONFLICT", "A chave desta solicitação já foi utilizada em outro movimento.");
       let origem: Record<string, unknown>, novo: Record<string, unknown>;
       try { origem = JSON.parse(anterior.valorAnteriorJson ?? "{}"); novo = JSON.parse(anterior.valorNovoJson ?? "{}"); }
       catch { erro("IDEMPOTENCY_CONFLICT", "Auditoria de movimento inválida."); }
@@ -207,7 +226,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
         || novo.etapaId !== destino.id || typeof novo.versao !== "number" || typeof novo.lifecycle !== "string") {
         erro("IDEMPOTENCY_CONFLICT", "A chave desta solicitação já foi utilizada em outro movimento.");
       }
-      return { idempotente: true as const, movimentoLivre: true as const, data: {
+      return { idempotente: true as const, data: {
         cardId: card.id, transicaoId: typeof novo.transicaoId === "string" ? novo.transicaoId : null,
         etapaOrigemId: input.etapaOrigemEsperadaId, etapaDestinoId: destino.id,
         versao: novo.versao, lifecycle: novo.lifecycle, outcome: typeof novo.outcome === "string" ? novo.outcome : null,
@@ -223,15 +242,15 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
   }
   if (card.etapaId === input.etapaDestinoId) erro("SAME_STAGE", "O card já está nesta etapa.");
 
-  if (movimentoLivre && (!card.etapa.ativo || card.etapa.pipelineId !== card.pipelineId || !card.pipeline.ativo)) {
+  if ((manualRd || movimentoLivre) && (!card.etapa.ativo || card.etapa.pipelineId !== card.pipelineId || !card.pipeline.ativo)) {
     erro("INVALID_ORIGIN", "A etapa atual ou o pipeline está inativo ou possui vínculo inválido.");
   }
-  if (!transicao && !movimentoLivre) erro("TRANSITION_NOT_DEFINED", "Esta transição não está definida no pipeline.");
+  if (!transicao && !manualRd && !movimentoLivre) erro("TRANSITION_NOT_DEFINED", "Esta transição não está definida no pipeline.");
   if (!movimentoLivre && transicao && !transicao.permitida) erro("TRANSITION_DISABLED", "Esta transição foi desativada pelo administrador.");
   if (!movimentoLivre && transicao && !origemCompativel(transicao.origem, input.ator.tipo)) {
     erro("REQUESTER_NOT_ALLOWED", "O solicitante não é permitido nesta transição.");
   }
-  const atribuirAoEntrarEmAgendar = !movimentoLivre && input.ator.tipo === "MANUAL"
+  const atribuirAoEntrarEmAgendar = !movimentoLivre && !manualRd && input.ator.tipo === "MANUAL"
     && card.pipeline.nome === "Revisão de Radar"
     && etapaEhNovosLeads(card.etapa.nome)
     && etapaEhAgendarReuniao(destino.nome);
@@ -279,8 +298,8 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     include: {
       campo: {
         include: {
-          opcoes: { where: { ativo: true }, orderBy: { ordem: "asc" } },
-          etapaConfiguracoes: { where: { etapaId: { in: [card.etapaId, destino.id] } } },
+          opcoes: { where: { ativo: true }, orderBy: [{ ordem: "asc" }, { id: "asc" }] },
+          etapaConfiguracoes: { where: { etapaId: { in: [card.etapaId, destino.id] } }, orderBy: { etapaId: "asc" } },
           acessos: perfilCampo ? { where: { perfil: perfilCampo } } : false,
         },
       },
@@ -324,8 +343,8 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       ],
     },
     include: {
-      opcoes: { where: { ativo: true }, orderBy: { ordem: "asc" } },
-      etapaConfiguracoes: { where: { etapaId: { in: [card.etapaId, destino.id] } } },
+      opcoes: { where: { ativo: true }, orderBy: [{ ordem: "asc" }, { id: "asc" }] },
+      etapaConfiguracoes: { where: { etapaId: { in: [card.etapaId, destino.id] } }, orderBy: { etapaId: "asc" } },
       acessos: perfilCampo ? { where: { perfil: perfilCampo } } : false,
     },
   });
@@ -343,8 +362,8 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
           etapaConfiguracoes: { some: { etapaId: { in: [card.etapaId, destino.id] } } },
         },
         include: {
-          opcoes: { where: { ativo: true }, orderBy: { ordem: "asc" } },
-          etapaConfiguracoes: { where: { etapaId: { in: [card.etapaId, destino.id] } } },
+          opcoes: { where: { ativo: true }, orderBy: [{ ordem: "asc" }, { id: "asc" }] },
+          etapaConfiguracoes: { where: { etapaId: { in: [card.etapaId, destino.id] } }, orderBy: { etapaId: "asc" } },
           acessos: perfilCampo ? { where: { perfil: perfilCampo } } : false,
         },
       })
@@ -363,8 +382,8 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
         componentesFormulario: { some: { secao: { formulario: { ativo: true, etapa: { pipelineId: card.pipelineId } } } } },
       },
       include: {
-        opcoes: { where: { ativo: true }, orderBy: { ordem: "asc" } },
-        etapaConfiguracoes: { where: { etapaId: { in: [card.etapaId, destino.id] } } },
+        opcoes: { where: { ativo: true }, orderBy: [{ ordem: "asc" }, { id: "asc" }] },
+        etapaConfiguracoes: { where: { etapaId: { in: [card.etapaId, destino.id] } }, orderBy: { etapaId: "asc" } },
         acessos: perfilCampo ? { where: { perfil: perfilCampo } } : false,
       },
   });
@@ -420,9 +439,10 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     return { idempotente: false as const, card, destino, transicao: null,
       valoresValidados: formato.valores, selecaoParceiroOrigem,
       proximoContato: input.proximoContatoEm ?? card.proximoContatoEm,
-      movimentoLivre, responsavelId: input.responsavelId };
+      movimentoLivre, manualRd: false, avisosRd: [] as AvisoMovimentoRd[],
+      confirmacaoRd: undefined, responsavelId: input.responsavelId };
   }
-  if (card.pipeline.chave === "financeiro"
+  if (!manualRd && card.pipeline.chave === "financeiro"
     && ["solicitacao_contrato", "elaboracao_contrato", "formalizacao_contratacao",
       "confirmacao_pagamento", "emissao_nota_fiscal"].includes(card.etapa.chave ?? "")) {
     try {
@@ -466,22 +486,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       ? (canonicos[campoId] || null)
       : value);
   }
-  const referenciasArquivo = [...camposPorId.values()].flatMap((campo) => {
-    const valor = valoresEfetivosPorId.get(campo.id)?.trim();
-    return campo.tipo === "url_ou_arquivo" && valor && !valor.startsWith("https://")
-      ? [{ campoId: campo.id, id: valor }] : [];
-  });
-  if (referenciasArquivo.length) {
-    const anexosValidos = await tx.bpmCardAnexo.findMany({
-      where: { cardId: card.id, OR: referenciasArquivo },
-      select: { id: true, campoId: true },
-    });
-    if (referenciasArquivo.some((referencia) => !anexosValidos.some((anexo) =>
-      anexo.id === referencia.id && anexo.campoId === referencia.campoId))) {
-      erro("INVALID_ATTACHMENT_REFERENCE", "Arquivo não vinculado ao campo deste card.");
-    }
-  }
-
+  const camposValidadosNoMovimento = new Set(campoIdsSubmetidos);
   if (selecaoParceiroOrigem) {
     for (const campo of camposPorId.values()) {
       if (campo.fonteEntidade === "PARCEIRO" && campo.fonteAtributo) {
@@ -497,14 +502,18 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     ...Object.fromEntries(valoresEfetivosPorId),
   };
   const pendencias: string[] = [];
-  if (card.pipelineId === PIPELINE_OPERACIONAL_ATIVO_ID && etapaEhBoasVindas(card.etapa.nome)) {
+  const avisosRd: AvisoMovimentoRd[] = [];
+  const faltanteRd = (aviso: Omit<AvisoMovimentoRd, "kind">) => {
+    if (!avisosRd.some(item => item.key === aviso.key)) avisosRd.push({ ...aviso, kind: "MISSING_DATA" });
+  };
+  if (!manualRd && card.pipelineId === PIPELINE_OPERACIONAL_ATIVO_ID && etapaEhBoasVindas(card.etapa.nome)) {
     const analista = await tx.usuarios.findUnique({ where: { id: card.responsavelId },
       select: { role: true, cargo: true, status: true } });
     pendencias.push(...pendenciasSaidaBoasVindasOperacional({ ...card,
       responsavelRole: analista?.status === "ATIVO" ? analista.role : null,
       responsavelCargo: analista?.status === "ATIVO" ? analista.cargo : null }));
   }
-  if (card.pipeline.chave === BPM_PIPELINE_KEYS.FINANCEIRO && destino.chave === "contratacao_finalizada") {
+  if (!manualRd && card.pipeline.chave === BPM_PIPELINE_KEYS.FINANCEIRO && destino.chave === "contratacao_finalizada") {
     const idCampo = (chave: string) => [...camposPorId.values()].find((campo) => campo.chave === chave)?.id;
     const valorCampo = (chave: string) => valoresEfetivosPorId.get(idCampo(chave) ?? "") ?? null;
     const anexoId = valorCampo(CHAVES_CAMPOS.ANEXO_ASSINADO);
@@ -573,7 +582,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       }
     }
   }
-  if (card.pipeline.nome === "Revisão de Radar" && etapaEhLost(destino.nome)) {
+  if (!manualRd && card.pipeline.nome === "Revisão de Radar" && etapaEhLost(destino.nome)) {
     const motivos = camposRequisito.filter((campo) =>
       campo.chave === BPM_FIELD_KEYS.LOST_REASON
       && campo.tipo === "selecao"
@@ -600,19 +609,27 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       if (!avaliarGrupo(validada.data, contextoRegra)) continue;
     }
     if (requisito.alvoTipo === "CAMPO" && requisito.campoId) {
+      camposValidadosNoMovimento.add(requisito.campoId);
       const valor = valoresEfetivosPorId.get(requisito.campoId);
       if (vazio(valor)) {
-        pendencias.push(requisito.campo?.nome ?? requisito.alvoChave ?? requisito.mensagem);
+        const nome = requisito.campo?.nome ?? requisito.mensagem;
+        if (manualRd) faltanteRd({ key: `requisito:${requisito.id}`, nome, campoId: requisito.campoId, requisitoId: requisito.id, fase: requisito.fase });
+        else pendencias.push(requisito.campo?.nome ?? requisito.alvoChave ?? requisito.mensagem);
       } else {
         const campo = camposPorId.get(requisito.campoId);
         if (campo && !validarValorRequisitoCampo(campo, valor ?? "")) {
+          if (manualRd) erro("FORMAT_INVALID", `O campo "${campo.nome}" contém um valor inválido.`);
           pendencias.push(requisito.campo?.nome ?? campo.nome);
         }
       }
     }
     if (requisito.alvoTipo === "REGRA") {
       if (!requisito.condicaoJson) erro("INVALID_REQUIREMENT", `Requisito inválido: ${requisito.chave}.`);
-      pendencias.push(requisito.mensagem);
+      if (manualRd) {
+        const faltas = faltasQueAtivamCondicaoRd(grupoCondicaoSchema.parse(JSON.parse(requisito.condicaoJson)), contextoRegra);
+        if (!faltas) erro("BUSINESS_RULE_BLOCKED", requisito.mensagem);
+        faltanteRd({ key: `requisito:${requisito.id}`, nome: requisito.mensagem, requisitoId: requisito.id, fase: requisito.fase });
+      } else pendencias.push(requisito.mensagem);
     }
   }
   for (const campo of camposRequisito) {
@@ -628,7 +645,11 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
         let parsed: unknown;
         try { parsed = JSON.parse(config.condicaoVisibilidadeJson); } catch { erro("INVALID_FIELD_CONFIG", `Configuração inválida do campo ${campo.nome}.`); }
         const validada = grupoCondicaoSchema.safeParse(parsed);
-        if (!validada.success || !avaliarGrupo(validada.data, contextoRegra)) continue;
+        if (!validada.success) {
+          if (manualRd) erro("INVALID_FIELD_CONFIG", `Configuração inválida do campo ${campo.nome}.`);
+          continue;
+        }
+        if (!avaliarGrupo(validada.data, contextoRegra)) continue;
       }
       let obrigatorio = config.etapaId === card.etapaId
         ? config.obrigatorio || config.obrigatorioSaida
@@ -641,8 +662,13 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
         obrigatorio = obrigatorio || avaliarGrupo(validada.data, contextoRegra);
       }
       const valorEfetivo = valoresEfetivosPorId.get(campo.id);
-      if (obrigatorio && vazio(valorEfetivo)) pendencias.push(campo.nome);
-      else if (obrigatorio && valorEfetivo && card.pipelineId === PIPELINE_OPERACIONAL_ATIVO_ID
+      if (obrigatorio) camposValidadosNoMovimento.add(campo.id);
+      if (obrigatorio && vazio(valorEfetivo)) {
+        if (manualRd) faltanteRd({ key: `campo:${campo.id}:${config.etapaId}`, nome: campo.nome, campoId: campo.id, fase: config.etapaId === card.etapaId ? "EXIT_STAGE" : "ENTER_STAGE" });
+        else pendencias.push(campo.nome);
+      } else if (manualRd && obrigatorio && valorEfetivo && !validarValorRequisitoCampo(campo, valorEfetivo)) {
+        erro("FORMAT_INVALID", `O campo "${campo.nome}" contém um valor inválido.`);
+      } else if (!manualRd && obrigatorio && valorEfetivo && card.pipelineId === PIPELINE_OPERACIONAL_ATIVO_ID
         && etapaEhAlinhamentoEstrategico(card.etapa.nome)
         && (campo.chave === BPM_FIELD_KEYS.STRATEGIC_ALIGNMENT_RESPONSIBLE_CPF
           || campo.chave === BPM_FIELD_KEYS.STRATEGIC_ALIGNMENT_SUMMARY_LINK)
@@ -653,7 +679,24 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       }
     }
   }
-  if (card.pipeline.chave === "financeiro" && card.etapa.chave === "solicitacao_contrato"
+  const referenciasArquivo = [...camposPorId.values()].flatMap((campo) => {
+    if (manualRd && !camposValidadosNoMovimento.has(campo.id)) return [];
+    const valor = valoresEfetivosPorId.get(campo.id)?.trim();
+    return campo.tipo === "url_ou_arquivo" && valor && !valor.startsWith("https://")
+      ? [{ campoId: campo.id, id: valor }] : [];
+  });
+  if (referenciasArquivo.length) {
+    const anexosValidos = await tx.bpmCardAnexo.findMany({
+      where: { cardId: card.id, OR: referenciasArquivo },
+      select: { id: true, campoId: true },
+    });
+    if (referenciasArquivo.some((referencia) => !anexosValidos.some((anexo) =>
+      anexo.id === referencia.id && anexo.campoId === referencia.campoId))) {
+      erro("INVALID_ATTACHMENT_REFERENCE", "Arquivo não vinculado ao campo deste card.");
+    }
+  }
+
+  if (!manualRd && card.pipeline.chave === "financeiro" && card.etapa.chave === "solicitacao_contrato"
     && destino.chave === "elaboracao_contrato") {
     const valoresNovoContrato = Object.fromEntries([...camposPorId.values()]
       .filter((campo) => campo.chave)
@@ -680,7 +723,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
         item.startsWith("Alíquota ") || item === "Total de retenções superior ao valor bruto"));
     }
   }
-  if (card.pipeline.nome === "Revisão de Radar" && etapaEhFechado(destino.nome, destino.chave)) {
+  if (!manualRd && card.pipeline.nome === "Revisão de Radar" && etapaEhFechado(destino.nome, destino.chave)) {
     for (const chave of ["alpha.radar.viabilidade.valor_acordado", "alpha.radar.viabilidade.forma_pagamento"]) {
       const campo = camposRequisito.find((item) => item.chave === chave
         && item.etapaConfiguracoes.some((config) => config.etapaId === destino.id && config.visivel && config.obrigatorioEntrada));
@@ -696,12 +739,12 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
   }
 
   const proximoContato = input.proximoContatoEm === undefined ? card.proximoContatoEm : input.proximoContatoEm;
-  if (card.pipeline.nome === "Revisão de Radar" && etapaEhSemViabilidade(destino.nome)
+  if (!manualRd && card.pipeline.nome === "Revisão de Radar" && etapaEhSemViabilidade(destino.nome)
     && await capacidadeObrigatoriaEntrada(destino.id, BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER, tx)) {
     const erroContato = obterErroProximoContatoParaEntrada({ etapaDestinoNome: destino.nome, proximoContatoEm: proximoContato });
     if (erroContato) erro("NEXT_CONTACT_REQUIRED", erroContato);
   }
-  if (card.pipeline.nome === "Revisão de Radar" && etapaEhEmTratativa(card.etapa.nome)) {
+  if (!manualRd && card.pipeline.nome === "Revisão de Radar" && etapaEhEmTratativa(card.etapa.nome)) {
     if (!destinoPermitidoEmTratativa(destino.nome)) {
       erro("STAGE_EXIT_BLOCKED", "Em tratativas só pode avançar para Fechado, Lost, Stand By, Monitoramento ou Sem viabilidade.");
     }
@@ -714,7 +757,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     });
     if (erroFollowUp) erro("FOLLOW_UP_INCOMPLETE", erroFollowUp);
   }
-  if (card.pipeline.nome === "Revisão de Radar" && input.ator.tipo === "MANUAL") {
+  if (!manualRd && card.pipeline.nome === "Revisão de Radar" && input.ator.tipo === "MANUAL") {
     const erroReuniao = obterErroDataReuniaoParaMovimento({
       etapaOrigemNome: card.etapa.nome,
       etapaDestinoNome: destino.nome,
@@ -727,7 +770,7 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
       erro("STAGE_EXIT_BLOCKED", "Agendar Reunião só pode avançar para Reunião Agendada ou Stand By.");
     }
   }
-  if (card.pipeline.nome === "Revisão de Radar" && etapaEhReuniaoAgendada(card.etapa.nome)) {
+  if (!manualRd && card.pipeline.nome === "Revisão de Radar" && etapaEhReuniaoAgendada(card.etapa.nome)) {
     if (!destinoPermitidoReuniaoAgendada(destino.nome)) {
       erro("STAGE_EXIT_BLOCKED", "Reunião Agendada só pode avançar para Em tratativas, Stand By ou Sem viabilidade.");
     }
@@ -748,13 +791,106 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     valoresEfetivosPorId: Object.fromEntries(valoresEfetivosPorId),
   });
   if (erroRegra) erro("BUSINESS_RULE_BLOCKED", erroRegra);
-  if (exige(card.etapaId, BPM_CAPABILITIES.STAGE_CHECKLIST)) {
+  if (!manualRd && exige(card.etapaId, BPM_CAPABILITIES.STAGE_CHECKLIST)) {
     const erroChecklist = await obterErroChecklistParaMovimento({
       id: card.id,
       pipelineId: card.pipelineId,
       etapaId: card.etapaId,
     }, tx);
     if (erroChecklist) erro("CHECKLIST_BLOCKED", erroChecklist);
+  }
+
+  let confirmacaoRd: ConfirmacaoPendenciasRd | undefined;
+  if (manualRd) {
+    // Capture raw publication metadata too: malformed JSON is never a missing-data waiver.
+    const blocos = await tx.bpmFormularioComponente.findMany({
+      where: { tipo: { in: ["CAPABILITY", "CHECKLIST"] },
+        secao: { formulario: { ativo: true, etapaId: { in: [card.etapaId, destino.id] } } } },
+      select: { id: true, tipo: true, capability: true, configJson: true,
+        secao: { select: { formulario: { select: { etapaId: true } } } } },
+      orderBy: { id: "asc" },
+    });
+    const snapshotsCapacidades: unknown[] = [];
+    const avaliarCapacidade = async (capability: string, etapaId: string, key: string, nome?: string, templateId?: string) => {
+      const fase = etapaId === destino.id ? "ENTER_STAGE" : "EXIT_STAGE";
+      let falta = false;
+      let rotulo = nome ?? "Informação obrigatória";
+      if (capability === BPM_CAPABILITIES.STAGE_CHECKLIST) {
+        const resumo = await carregarResumoChecklistAplicavelCard({ id: card.id, pipelineId: card.pipelineId, etapaId }, tx);
+        snapshotsCapacidades.push({ key, resumo });
+        for (const item of resumo.itensObrigatoriosPendentes.filter(item => !templateId || item.templateId === templateId)) {
+          faltanteRd({ key: `${key}:${item.id}`, nome: `${item.templateNome}: ${item.nome}`, fase });
+        }
+        return;
+      }
+      if (capability === BPM_CAPABILITIES.MEETING_SCHEDULER) {
+        falta = !card.dataReuniao; rotulo = nome ?? "Data da reunião";
+        if (card.dataReuniao && !Number.isFinite(new Date(card.dataReuniao).getTime())) erro("FORMAT_INVALID", "Data de reunião inválida.");
+      }
+      else if (capability === BPM_CAPABILITIES.MEETING_TRANSCRIPT) { falta = !card.transcricaoReuniao?.trim(); rotulo = nome ?? "Transcrição da reunião"; }
+      else if (capability === BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER || capability === BPM_CAPABILITIES.STANDBY_FOLLOW_UP) {
+        falta = !proximoContato; rotulo = nome ?? "Próximo contato";
+        if (proximoContato && !Number.isFinite(new Date(proximoContato).getTime())) erro("FORMAT_INVALID", "Data de próximo contato inválida.");
+      } else if (capability === BPM_CAPABILITIES.FOLLOW_UP_CHECKLIST) {
+        const checklist = await tx.bpmChecklistFollowUp.findFirst({ where: { cardId: card.id }, orderBy: [{ criadoEm: "desc" }, { id: "desc" }], select: { id: true, completo: true } });
+        snapshotsCapacidades.push({ key, checklist }); falta = !checklist?.completo; rotulo = nome ?? "Checklist de acompanhamento";
+      } else if (capability === BPM_CAPABILITIES.MONITORING_STATUS) {
+        // The published registry defines this block as a read-only calculated date.
+        return;
+      } else if (capability === BPM_CAPABILITIES.COMMERCIAL_POST_CLOSING) {
+        falta = !card.statusPosFechamento?.trim(); rotulo = nome ?? "Status de acompanhamento";
+      } else erro("INVALID_REQUIREMENT", "Capacidade obrigatória sem validador disponível.");
+      if (falta) faltanteRd({ key, nome: rotulo, fase });
+    };
+    for (const bloco of blocos) {
+      let config: Record<string, unknown> = {};
+      if (bloco.configJson) {
+        try {
+          const parsed: unknown = JSON.parse(bloco.configJson);
+          const validada = BPM_FORM_FIELD_CONFIG_SCHEMA.safeParse(parsed);
+          if (!validada.success) throw Error();
+          config = validada.data;
+        } catch { erro("INVALID_FIELD_CONFIG", "Configuração inválida de bloco do formulário."); }
+      }
+      const etapaId = bloco.secao.formulario.etapaId;
+      // Match capacidadesObrigatoriasPorEtapa and the published renderer's
+      // existing default: an explicitly published block requires exit unless disabled.
+      const obrigatorio = etapaId === card.etapaId ? config.obrigatorioSaida !== false : config.obrigatorioEntrada === true;
+      if (obrigatorio && bloco.capability) await avaliarCapacidade(bloco.capability, etapaId, `bloco:${bloco.id}`, typeof config.label === "string" ? config.label : undefined);
+    }
+    for (const requisito of requisitosAplicaveis) {
+      if (requisito.condicaoJson && !avaliarGrupo(grupoCondicaoSchema.parse(JSON.parse(requisito.condicaoJson)), contextoRegra)) continue;
+      const etapaId = requisito.fase === "ENTER_STAGE" ? destino.id : card.etapaId;
+      if (requisito.alvoTipo === "CHECKLIST") await avaliarCapacidade(BPM_CAPABILITIES.STAGE_CHECKLIST, etapaId, `requisito:${requisito.id}`, requisito.mensagem, requisito.checklistTemplateId ?? undefined);
+      if (requisito.alvoTipo === "CAPABILITY") {
+        if (!requisito.alvoChave) erro("INVALID_REQUIREMENT", "Capacidade obrigatória não configurada.");
+        await avaliarCapacidade(requisito.alvoChave, etapaId, `requisito:${requisito.id}`, requisito.mensagem);
+      }
+    }
+    if (!avisosRd.length && input.confirmacaoPendenciasRd) {
+      erro("STALE_CONFIRMATION", "As pendências desta movimentação mudaram. Solicite o movimento novamente.");
+    }
+    if (avisosRd.length) {
+      avisosRd.sort((a, b) => a.key.localeCompare(b.key));
+      confirmacaoRd = criarConfirmacaoPendenciasRd({ cardId: card.id, atorId: input.ator.userId!,
+        etapaOrigemEsperadaId: card.etapaId, etapaDestinoId: destino.id, versaoEsperada: card.versao,
+        configVersion: card.pipeline.configVersion, avisos: avisosRd,
+        origem: card.origemExterna!,
+        configuracao: { requisitos: [...requisitos].sort((a, b) => a.id.localeCompare(b.id)),
+          campos: [...camposPorId.values()].sort((a, b) => a.id.localeCompare(b.id)).map(campo => ({ ...campo,
+            etapaConfiguracoes: [...campo.etapaConfiguracoes].sort((a, b) => a.etapaId.localeCompare(b.etapaId)),
+            opcoes: [...campo.opcoes].sort((a, b) => a.id.localeCompare(b.id)),
+          })), blocos, transicao, destino,
+          publicados: [...camposFormulario].sort(([a], [b]) => a.localeCompare(b)).map(([id, valores]) => [id, [...valores].sort()]) },
+        valores: { campos: Object.fromEntries(valoresEfetivosPorId), snapshotsCapacidades,
+          dataReuniao: card.dataReuniao, transcricaoReuniao: card.transcricaoReuniao,
+          proximoContato, statusPosFechamento: card.statusPosFechamento },
+      });
+      if (!confirmacaoPendenciasRdCorresponde(input.confirmacaoPendenciasRd, confirmacaoRd)) {
+        throw new TransicaoBpmError("RD_MOVE_CONFIRMATION_REQUIRED", "Há informações obrigatórias pendentes. Confirme para mover mesmo assim.",
+          [...new Set(avisosRd.map(item => item.nome))], avisosRd, confirmacaoRd);
+      }
+    }
   }
 
   return {
@@ -766,6 +902,9 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     selecaoParceiroOrigem,
     proximoContato,
     movimentoLivre,
+    manualRd,
+    avisosRd,
+    confirmacaoRd,
     responsavelId: atribuirAoEntrarEmAgendar ? input.responsavelId : undefined,
   };
 }
@@ -774,19 +913,9 @@ export async function avaliarTransicaoBpm(input: ComandoTransicaoBpm): Promise<R
   try {
     const result = await db.$transaction((tx) => prepararTransicao(input, tx), { maxWait: 10_000, timeout: 60_000 });
     if (result.idempotente) {
-      if (result.data) return { success: true, data: result.data };
-      return { success: true, data: {
-        cardId: result.execucao.cardId,
-        transicaoId: result.execucao.transicaoId,
-        etapaOrigemId: result.execucao.etapaOrigemId,
-        etapaDestinoId: result.execucao.etapaDestinoId,
-        versao: result.execucao.versaoResultante,
-        lifecycle: result.lifecycle,
-        outcome: result.outcome,
-        historicoId: "",
-        eventoId: "",
-        idempotente: true,
-      } };
+      const { pipelineId: _pipelineId, ...data } = result.data;
+      void _pipelineId;
+      return { success: true, data };
     }
     return { success: true, data: {
       cardId: result.card.id,
@@ -810,28 +939,13 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
   try {
     const result = await repetirTransacaoOcupada(() => db.$transaction(async (tx) => {
       const prepared = await prepararTransicao(input, tx);
-      if (prepared.idempotente) {
-        if (prepared.data) return prepared.data;
-        return {
-          cardId: prepared.execucao.cardId,
-          transicaoId: prepared.execucao.transicaoId,
-          etapaOrigemId: prepared.execucao.etapaOrigemId,
-          etapaDestinoId: prepared.execucao.etapaDestinoId,
-          versao: prepared.execucao.versaoResultante,
-          lifecycle: prepared.lifecycle,
-          outcome: prepared.outcome,
-          historicoId: "",
-          eventoId: "",
-          idempotente: true,
-          pipelineId: prepared.execucao.card.pipelineId,
-        };
-      }
+      if (prepared.idempotente) return prepared.data;
       const { card, destino, transicao } = prepared;
       const agora = new Date();
       const lifecycle = transicao?.lifecycleDestino ?? card.status;
       const concluidoEm = !transicao ? card.concluidoEm : lifecycle === "CONCLUIDO" ? (card.concluidoEm ?? agora) : null;
       const outcome = !transicao ? (card.estadoOntologico?.outcome ?? null) : lifecycle === "ATIVO" ? null : (transicao.outcomeDestino ?? card.estadoOntologico?.outcome ?? null);
-      const statusPosFechamentoInicial = prepared.movimentoLivre ? null : statusInicialAoEntrarFechado({
+      const statusPosFechamentoInicial = (prepared.manualRd || prepared.movimentoLivre) ? null : statusInicialAoEntrarFechado({
         pipelineNome: card.pipeline.nome,
         etapaDestinoNome: destino.nome,
         etapaDestinoChave: destino.chave,
@@ -849,7 +963,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
           update: { valor },
         });
       }
-      if (!prepared.movimentoLivre && card.pipeline.chave === BPM_PIPELINE_KEYS.FINANCEIRO && Object.keys(valores).length > 0) {
+      if (!prepared.movimentoLivre && !prepared.manualRd && card.pipeline.chave === BPM_PIPELINE_KEYS.FINANCEIRO && Object.keys(valores).length > 0) {
         await registrarConclusaoContratoFinanceiro(tx, card.id, card.pipelineId, input.ator.userId ?? null);
         await sincronizarNotaFiscalCard({ tx, cardId: card.id, pipelineId: card.pipelineId, usuarioId: input.ator.userId ?? null });
       }
@@ -863,10 +977,13 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
       }
 
       let subStatusId: string | null = card.estadoOntologico?.subStatusId ?? null;
-      if (!transicao || transicao.limparSubStatus) subStatusId = null;
+      if (prepared.movimentoLivre || transicao?.limparSubStatus) subStatusId = null;
       if (subStatusId) {
         const valido = await tx.bpmSubStatus.findFirst({ where: { id: subStatusId, etapaId: destino.id, ativo: true }, select: { id: true } });
-        if (!valido) erro("INVALID_SUBSTATUS", "O substatus atual não é válido na etapa de destino.");
+        if (!valido) {
+          if (!transicao) subStatusId = null;
+          else erro("INVALID_SUBSTATUS", "O substatus atual não é válido na etapa de destino.");
+        }
       }
 
       const movimento = await tx.bpmCard.updateMany({
@@ -883,7 +1000,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
         },
       });
       if (movimento.count !== 1) erro("CONCURRENT_TRANSITION", "Outra operação moveu este card. Recarregue e tente novamente.");
-      if (!prepared.movimentoLivre && card.pipelineId === PIPELINE_OPERACIONAL_CHECKLIST_ID && destino.id === ETAPA_ENVIO_CHECKLIST_ID) {
+      if (!prepared.movimentoLivre && !prepared.manualRd && card.pipelineId === PIPELINE_OPERACIONAL_CHECKLIST_ID && destino.id === ETAPA_ENVIO_CHECKLIST_ID) {
         const campoChecklist = await tx.bpmCampo.findFirst({ where: { pipelineId: card.pipelineId,
           chave: CAMPO_CHECKLIST_EXCEL, ativo: true,
           etapaConfiguracoes: { some: { etapaId: destino.id, visivel: true } } }, select: { id: true } });
@@ -899,7 +1016,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
             data: { prazo, alertaEm: prazo, responsavelId: prepared.responsavelId ?? card.responsavelId } });
         }
       }
-      if (!prepared.movimentoLivre && card.pipeline.nome === "Revisão de Radar") {
+      if (!prepared.movimentoLivre && !prepared.manualRd && card.pipeline.nome === "Revisão de Radar") {
         await sincronizarProximoContatoAgenda({
           cardId: card.id, etapaNome: destino.nome, status: lifecycle,
           proximoContatoEm: input.proximoContatoEm === undefined ? card.proximoContatoEm : input.proximoContatoEm,
@@ -940,7 +1057,8 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
           automacaoOrigem: input.ator.automacaoId,
           valorAnteriorJson: JSON.stringify({ etapaId: card.etapaId, lifecycle: card.status, outcome: card.estadoOntologico?.outcome ?? null, versao: card.versao }),
           valorNovoJson: JSON.stringify({ etapaId: destino.id, lifecycle, outcome, subStatusId, statusPosFechamento: statusPosFechamentoInicial ?? card.statusPosFechamento, versao: card.versao + 1, responsavelId: prepared.responsavelId ?? card.responsavelId, camposPreenchidos: Object.keys(prepared.valoresValidados),
-            ...(prepared.movimentoLivre ? { movimentoLivre: prepared.movimentoLivre, obrigatoriedadesDispensadas: true } : {}) }),
+            ...(prepared.movimentoLivre ? { movimentoLivre: prepared.movimentoLivre, obrigatoriedadesDispensadas: true } : {}),
+            ...(prepared.confirmacaoRd ? { confirmacaoPendenciasRd: prepared.confirmacaoRd, pendenciasConfirmadas: prepared.avisosRd } : {}) }),
         },
       });
       const evento = await publicarEventoBpm({

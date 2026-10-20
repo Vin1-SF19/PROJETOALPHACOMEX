@@ -22,9 +22,11 @@ import { BPM_PIPELINE_KEYS } from "@/lib/bpm/ontology";
 import { campoEhOrigemCliente } from "@/lib/bpm/origem-cliente";
 import { carregarUsuariosCamposBpm } from "@/lib/bpm/usuarios-campos-server";
 import { idUsuarioCampoBpm, type OpcaoUsuarioCampoBpm } from "@/lib/bpm/usuarios-campos";
+import { campoEhReferenciaAutomaticaUsuarioBpm, idUsuarioReferenciaCampoBpm } from "@/lib/bpm/referencia-usuario-campo";
 
 type ClienteRequisitosEtapa = Pick<
   typeof db,
+  | "usuarios"
   | "bpmCampo"
   | "bpmCardCampoValor"
   | "bpmCard"
@@ -101,6 +103,7 @@ export type CampoAplicavelEtapaBpm = {
   valor: string | null;
   parceiroOrigemId?: number | null;
   usuariosOpcoes?: OpcaoUsuarioCampoBpm[];
+  valorExibicao?: string | null;
 };
 
 export type PerfilAcessoCampoBpm = "ADMIN" | "RESPONSAVEL" | "MEMBRO";
@@ -431,18 +434,32 @@ export async function carregarCamposAplicaveisCardEtapa(
       editavel: campo.editavel !== false && !resolvidos.somenteLeitura.has(campo.id),
     };
   });
-  const camposUsuario = camposComValores.filter((campo) => campo.tipo === "usuario");
-  if (!camposUsuario.length) return camposComValores;
-  const usuarios = await carregarUsuariosCamposBpm(
-    camposUsuario.map((campo) => campo.valor),
-    camposUsuario.some((campo) => campo.editavel && !campo.somenteLeitura),
-    client,
-  );
-  return camposComValores.map((campo) => campo.tipo === "usuario" ? {
-    ...campo,
-    usuariosOpcoes: usuarios.filter((usuario) => usuario.id === idUsuarioCampoBpm(campo.valor)
-      || (usuario.ativo && campo.editavel && !campo.somenteLeitura)),
-  } : campo);
+  const camposUsuario = camposComValores.filter((campo) => campo.tipo === "usuario" && !campoEhReferenciaAutomaticaUsuarioBpm(campo));
+  const referencias = camposComValores.filter(campoEhReferenciaAutomaticaUsuarioBpm);
+  if (camposUsuario.length) {
+    // Campos editáveis e referências automáticas compartilham uma única consulta.
+    const usuarios = await carregarUsuariosCamposBpm(
+      [...camposUsuario, ...referencias].map((campo) => campo.valor),
+      camposUsuario.some((campo) => campo.editavel && !campo.somenteLeitura), client,
+    );
+    return camposComValores.map((campo) => ({
+      ...campo,
+      ...(campo.tipo === "usuario" ? { usuariosOpcoes: usuarios.filter((usuario) => usuario.id === idUsuarioCampoBpm(campo.valor)
+        || (usuario.ativo && campo.editavel && !campo.somenteLeitura)) } : {}),
+      ...(campoEhReferenciaAutomaticaUsuarioBpm(campo) ? { valorExibicao: usuarios.find((usuario) => usuario.id === idUsuarioReferenciaCampoBpm(campo.valor))?.nome ?? null } : {}),
+    }));
+  }
+  const usuarioIds = [...new Set(referencias.flatMap((campo) => {
+    const id = idUsuarioReferenciaCampoBpm(campo.valor);
+    return id === null ? [] : [id];
+  }))];
+  const usuarios = usuarioIds.length ? await client.usuarios.findMany({
+    where: { id: { in: usuarioIds } }, select: { id: true, nome: true },
+  }) : [];
+  const nomePorUsuario = new Map(usuarios.map(({ id, nome }) => [id, nome]));
+  return camposComValores.map((campo) => campoEhReferenciaAutomaticaUsuarioBpm(campo)
+    ? { ...campo, valorExibicao: nomePorUsuario.get(idUsuarioReferenciaCampoBpm(campo.valor) ?? 0) ?? null }
+    : campo);
 }
 
 /**

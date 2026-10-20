@@ -1779,3 +1779,19 @@ Logcomex Vercel: worker-client encaminha jobs/processamento/histórico ao endpoi
 ### 2026-10-15 — Chamados: migração autorizada aplicada
 
 Atualização de estado Chamados: estrutura e 53 categorias aplicadas no Turso após autorização específica; scripts/módulos mapeados acima agora foram exercitados em leitura real (13 destinos/29 atores ativos). Evidências em `.cache/chamados-multissetorial/{database-apply,runtime-readonly,preservacao-after}.json`.
+
+
+### 2026-10-15 — Scribe — CRM: consulta de colegas por pipeline
+
+`src/lib/bpm/visao-equipe-server.ts` resolve leitura compartilhada e catálogo de contas ativas com CRM pelos setores do pipeline; `ownership.ts` distingue leitura `VISUALIZADOR` de ação. `src/actions/bpm/Quadro.ts` envia `manifesto.acesso.responsaveis` explícito, independente dos cards/paginação. `PipelineBoardClient.tsx` no diretório `pipeline/[pipelineId]` reutiliza o select: “Meus e sem vínculos”, pessoas alfabeticamente, “Todos”; TI recebe o mesmo catálogo e pessoas sem cards aparecem. Troca/revogação limpa detalhes e descarta respostas antigas; `page.tsx` remonta pelo ID do pipeline.
+
+`VisibilidadePipelineSection.tsx` no diretório administrativo publica apenas setores/versão, retirando concessão individual; JSON histórico de supervisores preservado, sem migration. `NotaFiscal.ts` impede edição pelo visualizador; `Checklists.ts` apenas lista materializados para quem não pode agir. `src/app/api/integrations/alpha-crm/opportunities/route.ts` exige `editarCard` no POST, mantendo GET consultável. Story: `docs/stories/story-alpha-crm-visao-equipe-pipeline.md`, reabertura de 15/10. Nenhum componente/rota novo. Build/typecheck/lint finais concluídos; suíte global mantém as falhas do baseline, detalhadas no journal. Revisão final e publicação pendentes.
+
+
+### 2026-10-16 — Scribe — CRM: formulário de contratação e referência de usuário
+
+`src/lib/bpm/referencia-usuario-campo.ts` identifica fonte automática `usuario/GLOBAL/CARD/responsavelId`; `requisitos-etapa-server.ts` resolve IDs efetivos/overrides e hidrata `valorExibicao` por consulta única `{id,nome}`. `CampoBpmInput.tsx` mostra nome readonly sem alterar o ID/payload e preserva editor legado sem fonte. `Cards.ts` exige `destino.podeVer` antes do lookup de campos na consulta de requisitos.
+
+`contratacao-em-tratativa-config.ts` e `scripts/configurar-contratacao-em-tratativa.mts` preparam preview/apply/verify/rollback protegido: duas configurações opcionais 116/117 e dois componentes 16/17 em `dados_financeiro`, pipeline 31→32/formulário 2→3, preservando obrigação de Fechado. Testes de configuração usam banco descartável. Banco real não aplicado; consentimento, publicação, browser, build/revisão finais pendentes no checkpoint. Story: `story-alpha-crm-revisao-radar-fechado.md`, reabertura de 16/10.
+
+- 16/10/2026 — Configuração acima autorizada, aplicada e verificada no Turso: Radar v32/formulário Em tratativa v3; dois campos opcionais na origem, entrada de Fechado preservada. Correção nominal do vendedor ainda depende de publicação do código.

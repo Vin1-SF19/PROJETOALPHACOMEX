@@ -36,15 +36,21 @@ export function pertenceAoDestino(ator: AtorChamados, chamado: ChamadoAcesso): b
 export function podeVerChamado(ator: AtorChamados, chamado: ChamadoAcesso): boolean {
   return ator.visaoGlobal || chamado.usuarioId === ator.id || pertenceAoDestino(ator, chamado);
 }
+/** Administradores podem atender entre setores; atribuição e reserva são verificadas nas ações. */
+export function podeAtenderChamado(ator: AtorChamados, chamado: ChamadoAcesso): boolean {
+  const destinoValido = chamado.setorDestinoId == null
+    || (chamado.setorDestino?.ativo === true && !chamado.setorDestino.isBase);
+  return destinoValido && (isAdminRole(ator.role) || pertenceAoDestino(ator, chamado));
+}
 export function podeAssumirChamado(ator: AtorChamados, chamado: ChamadoAcesso): boolean {
-  return pertenceAoDestino(ator, chamado) && chamado.status === "ABERTO" && chamado.tecnicoId == null
+  return podeAtenderChamado(ator, chamado) && chamado.status === "ABERTO" && chamado.tecnicoId == null
     && (chamado.tecnicoSolicitadoId == null || chamado.tecnicoSolicitadoId === ator.id);
 }
 export function podeConcluirChamado(ator: AtorChamados, chamado: ChamadoAcesso): boolean {
-  return pertenceAoDestino(ator, chamado) && chamado.status === "EM_ATENDIMENTO" && chamado.tecnicoId === ator.id;
+  return podeAtenderChamado(ator, chamado) && chamado.status === "EM_ATENDIMENTO" && chamado.tecnicoId === ator.id;
 }
 export function podeResponderChamado(ator: AtorChamados, chamado: ChamadoAcesso): boolean {
-  return chamado.usuarioId === ator.id || (chamado.tecnicoId === ator.id && pertenceAoDestino(ator, chamado));
+  return chamado.usuarioId === ator.id || (chamado.tecnicoId === ator.id && podeAtenderChamado(ator, chamado));
 }
 export function chamadoVisivelWhere(ator: AtorChamados): Prisma.chamadosWhereInput {
   if (ator.visaoGlobal) return {};

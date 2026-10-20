@@ -48,3 +48,13 @@ Disponibilizar uma **Anotação** persistente no rodapé do painel central do ca
 - `src/lib/validations/bpm.ts`
 - `tests/bpm/formulario-etapa.test.ts`
 - `docs/stories/story-alpha-crm-anotacao-fixa-formulario-etapa.md`
+
+## Dev Agent Record — correção de anotação em card RD (2026-10-19)
+
+- [x] Corrigir validação de `cardId` de anotações usando `bpmCardIdSchema`, mantendo conteúdo obrigatório e autorização transacional.
+- [x] Cobrir autoria, histórico e realtime, além da recusa por falta de permissão e IDs inválidos.
+- Validação conjunta registrada em `docs/stories/story-alpha-crm-tarefas-por-tipo-alerta.md`.
+
+### File List complementar
+
+- `tests/bpm/card-rd-tarefas-anotacoes.test.ts`

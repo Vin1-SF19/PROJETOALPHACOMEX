@@ -257,12 +257,12 @@ export async function ObterPerfilEmpresaBpm(empresaId: number) {
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
     const [usuarioAtual, etapas] = await Promise.all([
       db.usuarios.findUnique({ where: { id: userId }, select: { role: true } }),
-      db.bpmEtapa.findMany({ select: { id: true, pipeline: { select: { setores: { select: { setor: { select: { nome: true } } } } } }, visibilidades: {
+      db.bpmEtapa.findMany({ select: { id: true, pipeline: { select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { nome: true } } } } } }, visibilidades: {
         select: { perfil: true, podeVer: true, podeAgir: true },
       } } }),
     ]);
     const etapaIdsVisiveis = etapas.filter((etapa) =>
-      resolverVisibilidadeEtapa(usuarioAtual?.role, etapa.visibilidades).podeVer && podeAcessarPipelineBpm({ role: usuarioAtual?.role ?? "", permissoes: ["crm"], setoresPipeline: etapa.pipeline.setores.map(({ setor }) => setor.nome), ehMembroPipeline: false })).map((etapa) => etapa.id);
+      resolverVisibilidadeEtapa(usuarioAtual?.role, etapa.visibilidades).podeVer && podeAcessarPipelineBpm({ role: usuarioAtual?.role ?? "", permissoes: ["crm"], usuarioId: userId, visualizacaoConfigJson: etapa.pipeline.visualizacaoConfigJson, setoresPipeline: etapa.pipeline.setores.map(({ setor }) => setor.nome), ehMembroPipeline: false })).map((etapa) => etapa.id);
 
     const empresa = await db.cliente.findUnique({
       where: { id: empresaId },

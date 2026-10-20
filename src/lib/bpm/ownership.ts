@@ -1,6 +1,6 @@
 import { resolverAutoridadeMovimentoLivre, type AutoridadeMovimentoLivre } from "@/lib/bpm/lideranca-setor";
+import { lerUsuariosAutorizadosPipeline } from "@/lib/bpm/acesso-individual-pipeline";
 import db from "@/lib/prisma";
-import { carregarEscopoLeituraBpm } from "@/lib/bpm/visao-equipe-server";
 
 import { isAdminRole, isSameRole } from "@/lib/roles";
 import {
@@ -69,11 +69,14 @@ export function podeAcessarPipelineBpm(params: {
   role: string;
   permissoes: readonly string[];
   setoresPipeline: readonly string[];
+  usuarioId?: number;
+  visualizacaoConfigJson?: string | null;
   ehMembroPipeline: boolean;
 }): boolean {
   if (isAdminRole(params.role)) return true;
   if (!possuiPermissaoCrm(params.permissoes)) return false;
-  return Boolean(resolverAutoridadeMovimentoLivre({ id: -1, role: params.role }, params.setoresPipeline.map((nome) => ({ nome }))))
+  return Boolean(resolverAutoridadeMovimentoLivre({ id: params.usuarioId ?? -1, role: params.role }, params.setoresPipeline.map((nome) => ({ nome }))))
+    || (params.usuarioId != null && lerUsuariosAutorizadosPipeline(params.visualizacaoConfigJson).includes(params.usuarioId))
     || params.setoresPipeline.length === 0
     || params.setoresPipeline.some((setor) => isSameRole(setor, params.role));
 }
@@ -82,6 +85,8 @@ export function podeSerResponsavelPipelineBpm(params: {
   role: string;
   permissoes: readonly string[];
   setoresPipeline: readonly string[];
+  usuarioId?: number;
+  visualizacaoConfigJson?: string | null;
 }): boolean {
   return podeAcessarPipelineBpm({ ...params, ehMembroPipeline: false });
 }
@@ -119,9 +124,9 @@ export type UsuarioVinculavelBpm = {
  * reaplicada durante a mutação, para que um payload antigo nunca consiga
  * vincular uma conta desativada ou sem a permissão CRM.
  */
-export async function listarUsuariosVinculaveisBpm(
-  client: ClienteAcessoBpm = db,
-): Promise<UsuarioVinculavelBpm[]> {
+export async function listarUsuariosComAcessoCrmBpm(
+  client: Pick<ClienteAcessoBpm, "usuarios" | "setorPermissao" | "usuarioPermissaoOverride"> = db,
+): Promise<(UsuarioVinculavelBpm & { role: string })[]> {
   const [usuarios, permissoesSetorTodas] = await Promise.all([
     client.usuarios.findMany({
       where: { status: "ATIVO" },
@@ -158,6 +163,14 @@ export async function listarUsuariosVinculaveisBpm(
         overridesPorUsuario.get(usuario.id) ?? [],
       ),
     ))
+    .map(({ id, nome, imagemUrl, role }) => ({ id, nome, imagemUrl, role }));
+}
+
+/** Mantém o contrato público da seleção de pessoas vinculáveis ao card. */
+export async function listarUsuariosVinculaveisBpm(
+  client: ClienteAcessoBpm = db,
+): Promise<UsuarioVinculavelBpm[]> {
+  return (await listarUsuariosComAcessoCrmBpm(client))
     .map(({ id, nome, imagemUrl }) => ({ id, nome, imagemUrl }));
 }
 
@@ -191,12 +204,13 @@ export async function checarAcessoBpmPipeline(
 
   const pipeline = await client.bpmPipeline.findUnique({
     where: { id: pipelineId },
-    select: { setores: { select: { setor: { select: { nome: true } } } } },
+    select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { nome: true } } } } },
   });
   if (!pipeline) return false;
   return podeAcessarPipelineBpm({
     role: acesso.usuario.role,
     permissoes: acesso.permissoes,
+    usuarioId: acesso.usuario.id, visualizacaoConfigJson: pipeline.visualizacaoConfigJson,
     setoresPipeline: pipeline.setores.map(({ setor }) => setor.nome),
     ehMembroPipeline: false,
   });
@@ -224,12 +238,13 @@ export async function usuarioElegivelResponsavelBpm(
 
   const pipeline = await client.bpmPipeline.findUnique({
     where: { id: pipelineId },
-    select: { setores: { select: { setor: { select: { nome: true } } } } },
+    select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { nome: true } } } } },
   });
   if (!pipeline) return false;
   return podeSerResponsavelPipelineBpm({
     role: acesso.usuario.role,
     permissoes: acesso.permissoes,
+    usuarioId: acesso.usuario.id, visualizacaoConfigJson: pipeline.visualizacaoConfigJson,
     setoresPipeline: pipeline.setores.map(({ setor }) => setor.nome),
   });
 }
@@ -252,7 +267,7 @@ export async function resolverResponsavelAutomaticoBpm(
 
   const pipeline = await client.bpmPipeline.findUnique({
     where: { id: pipelineId },
-    select: { setores: { select: { setor: { select: { nome: true } } } } },
+    select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { nome: true } } } } },
   });
   if (!pipeline) return null;
   const setoresPipeline = pipeline.setores.map(({ setor }) => setor.nome);
@@ -285,7 +300,7 @@ export async function resolverResponsavelAutomaticoBpm(
       permissoesSetorTodas,
       overridesPorUsuario.get(usuario.id) ?? [],
     ),
-    setoresPipeline,
+    setoresPipeline, usuarioId: usuario.id, visualizacaoConfigJson: pipeline.visualizacaoConfigJson,
   }));
   return elegivel?.id ?? null;
 }
@@ -388,6 +403,7 @@ export async function checarAcessoBpmCard(
   }
   const acessoPipeline = isAdminRole(acessoModulo.usuario.role) || Boolean(card.pipeline && podeAcessarPipelineBpm({
     role: acessoModulo.usuario.role, permissoes: acessoModulo.permissoes,
+    usuarioId: userId, visualizacaoConfigJson: card.pipeline.visualizacaoConfigJson,
     setoresPipeline: card.pipeline.setores.map(({ setor }) => setor.nome), ehMembroPipeline: false,
   }));
   const autoridadeMovimentoLivre = acessoPipeline && possuiPermissaoCrm(acessoModulo.permissoes) && card.pipeline?.ativo !== false
@@ -418,6 +434,7 @@ export async function checarAcessoBpmCard(
   if (!card.pipeline || !podeAcessarPipelineBpm({
     role: acessoModulo.usuario.role,
     permissoes: acessoModulo.permissoes,
+    usuarioId: acessoModulo.usuario.id, visualizacaoConfigJson: card.pipeline.visualizacaoConfigJson,
     setoresPipeline: card.pipeline.setores.map(({ setor }) => setor.nome),
     ehMembroPipeline: false,
   })) return { autorizado: false, isAdminGlobal: false, role: null, perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false };
@@ -442,16 +459,11 @@ export async function checarAcessoBpmCard(
   const membro = membroExistente?.role === "ADMINISTRADOR" ? membroExistente
     : card.responsavelId === userId ? { role: "RESPONSAVEL" } : membroExistente;
 
-  if (!membro && apenasVisualizacao && autoridadeMovimentoLivre) {
+  // O acesso ao pipeline e à coluna já foi verificado. Consultar colegas não
+  // cria vínculo nem concede trabalho no card, mesmo quando a coluna permite agir.
+  if (!membro && apenasVisualizacao) {
     return { autorizado: true, isAdminGlobal: false, role: "VISUALIZADOR",
       perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false, bloqueadoPorEncaminhamento, autoridadeMovimentoLivre };
-  }
-  if (!membro && apenasVisualizacao) {
-    const escopo = await carregarEscopoLeituraBpm(userId, false, card.pipelineId, card.pipeline.visualizacaoConfigJson ?? null, client);
-    if (escopo.usuarioIds.length) {
-      const permitido = await client.bpmCard.findFirst({ where: { id: cardId, ...escopo.where }, select: { id: true } });
-      if (permitido) return { autorizado: true, isAdminGlobal: false, role: "VISUALIZADOR", perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false, bloqueadoPorEncaminhamento };
-    }
   }
 
   if (!membro) {

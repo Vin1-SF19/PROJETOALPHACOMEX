@@ -16,7 +16,8 @@ const prismaMock = vi.hoisted(() => ({
   bpmEtapa: { findUnique: vi.fn(), findMany: vi.fn() },
   bpmCard: { create: vi.fn() },
   bpmCardMembro: { create: vi.fn() },
-  bpmCardCampoValor: { createMany: vi.fn() },
+  bpmCardCampoValor: { createMany: vi.fn(), create: vi.fn() },
+  bpmCampo: { findMany: vi.fn() },
   bpmCardHistorico: { create: vi.fn() },
   $transaction: vi.fn(),
 }));
@@ -57,6 +58,7 @@ function mockTransacaoFeliz() {
     bpmCard: prismaMock.bpmCard,
     bpmCardMembro: prismaMock.bpmCardMembro,
     bpmCardCampoValor: prismaMock.bpmCardCampoValor,
+    bpmCampo: prismaMock.bpmCampo,
     bpmCardHistorico: prismaMock.bpmCardHistorico,
   }));
 }
@@ -113,6 +115,49 @@ describe("CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master)", 
     });
     expect(prismaMock.bpmCard.create).toHaveBeenCalledWith({
       data: { empresaId: 501, pipelineId: PIPELINE_ID, etapaId: ETAPA_ID, responsavelId: 7, servico: null },
+    });
+  });
+
+  describe("radar opcional e canal no cadastro Revisão de Radar", () => {
+    const dados = { empresaId: 42, pipelineId: PIPELINE_ID, etapaId: ETAPA_ID, responsavelId: 7 };
+    beforeEach(() => {
+      prismaMock.bpmPipeline.findUnique.mockResolvedValue({ ativo: true, nome: "Revisão de Radar" });
+      prismaMock.cliente.findUnique.mockResolvedValue({ id: 42, cnpj: "11222333000181" });
+      prismaMock.bpmCard.create.mockResolvedValue({ id: "cmu8n150b008lihrq0tcunqj0", empresaId: 42 });
+      prismaMock.bpmCardCampoValor.create.mockResolvedValue({});
+      prismaMock.bpmCampo.findMany.mockResolvedValue([]);
+    });
+
+    it("cria sem radar mesmo quando o campo não foi configurado", async () => {
+      await expect(CriarCardBpm(dados)).resolves.toMatchObject({ success: true });
+      expect(prismaMock.bpmCardCampoValor.create).not.toHaveBeenCalled();
+    });
+
+    it.each(["Evento", "Feira internacional"])("persiste canal %s sem exigir radar ou Qualificação", async (canalOrigem) => {
+      prismaMock.bpmCampo.findMany.mockResolvedValue([{ id: "campo-canal", nome: "Canal de origem", tipo: "texto" }]);
+      await expect(CriarCardBpm({ ...dados, canalOrigem })).resolves.toMatchObject({ success: true });
+      expect(prismaMock.bpmCardCampoValor.create).toHaveBeenCalledExactlyOnceWith({
+        data: { cardId: "cmu8n150b008lihrq0tcunqj0", campoId: "campo-canal", valor: canalOrigem },
+      });
+    });
+
+    it("continua aceitando e persistindo radar válido quando informado", async () => {
+      prismaMock.bpmCampo.findMany.mockResolvedValue([{ id: "campo-radar", nome: "Radar pretendido", tipo: "selecao", opcoesJson: null, opcoes: [{ rotulo: "Revisão de Radar Ilimitado" }] }]);
+      await expect(CriarCardBpm({ ...dados, radarPretendido: "Revisão de Radar Ilimitado" })).resolves.toMatchObject({ success: true });
+      expect(prismaMock.bpmCardCampoValor.create).toHaveBeenCalledWith({
+        data: { cardId: "cmu8n150b008lihrq0tcunqj0", campoId: "campo-radar", valor: "Revisão de Radar Ilimitado" },
+      });
+    });
+
+    it("recusa radar informado sem configuração", async () => {
+      await expect(CriarCardBpm({ ...dados, radarPretendido: "Inventado" })).resolves.toMatchObject({ success: false });
+      expect(prismaMock.bpmCard.create).not.toHaveBeenCalled();
+    });
+
+    it("recusa radar fora das opções configuradas", async () => {
+      prismaMock.bpmCampo.findMany.mockResolvedValue([{ id: "campo-radar", nome: "Radar pretendido", tipo: "selecao", opcoesJson: null, opcoes: [{ rotulo: "Revisão de Radar Ilimitado" }] }]);
+      await expect(CriarCardBpm({ ...dados, radarPretendido: "Inventado" })).resolves.toMatchObject({ success: false, error: "Selecione uma opção válida de Radar pretendido." });
+      expect(prismaMock.bpmCard.create).not.toHaveBeenCalled();
     });
   });
 

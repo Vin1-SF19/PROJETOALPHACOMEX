@@ -52,9 +52,9 @@ export async function SincronizarQuadroBpm(pipelineId: string, input: unknown = 
     const leituraAmpliada = admin || Boolean(resolverAutoridadeMovimentoLivre(
       { id: userId, role: usuario.role }, pipeline.setores?.map(({ setor }) => setor) ?? []));
     const escopo = await carregarEscopoLeituraBpm(userId, leituraAmpliada, pipelineId, pipeline.visualizacaoConfigJson ?? null, db, true);
-    const acesso = { userId, admin: leituraAmpliada, setores: escopo.setores };
-    if ((parsed.data.visao === "TODOS" && !leituraAmpliada) || (parsed.data.visao === "SETOR" && !escopo.setores.some((s) => s.id === parsed.data.setorId)) || (parsed.data.visao === "EQUIPE" && !escopo.setores.length)) {
-      return { success: false as const, error: "Esta visualização não está mais disponível. Selecione Meus leads.", acessoNegado: false, visaoRevogada: true };
+    const acesso = { userId, admin: leituraAmpliada, setores: escopo.setores, responsaveis: escopo.responsaveis };
+    if ((parsed.data.visao === "SETOR" && !escopo.setores.some((s) => s.id === parsed.data.setorId)) || (parsed.data.visao === "EQUIPE" && !escopo.setores.length) || (parsed.data.responsavelId != null && !escopo.responsaveis.some((pessoa) => pessoa.id === parsed.data.responsavelId))) {
+      return { success: false as const, error: "Esta visualização não está mais disponível. Selecione Meus e sem vínculos.", acessoNegado: false, visaoRevogada: true };
     }
     // Só informações de identidade, busca e acesso. Nunca histórico, tarefas ou campos completos.
     const rows = await db.bpmCard.findMany({

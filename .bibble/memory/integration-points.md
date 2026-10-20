@@ -3273,3 +3273,22 @@ Menu existente `chamados` → `/PainelAlpha/Chamados` → NovoChamado. Todos os 
 ### 2026-10-15 — Chamados: migração autorizada aplicada
 
 Atualização Chamados: catálogo persistido ativo no Turso após migração autorizada; smoke real de Prisma/catálogo/visibilidade aprovado para 29 atores ativos. Páginas autenticadas e transporte realtime não foram exercitados nesta ativação; publicação do código continua pendente.
+
+
+### CRM — filtro pessoal e leitura do pipeline (2026-10-15, Scribe)
+
+**Arquivos:** `src/actions/bpm/Quadro.ts`, `src/lib/bpm/{visao-equipe-server,visao-equipe,ownership}.ts`, `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`.
+**Contrato:** `manifesto.acesso.responsaveis: { id, nome }[]` fornece exclusivamente as pessoas elegíveis dos setores daquele pipeline, inclusive para TI e sem cards; pipeline aberto sem setores usa elegibilidade geral de contas ativas com CRM. Não inferir catálogo de cards nem setores globais. Exemplo: padrão `visao: "MEUS"`; pessoa `visao: "TODOS", responsavelId: id`; Todos `visao: "TODOS", responsavelId: null`; sempre `setorId: null`.
+**Acesso:** módulo → pipeline → coluna continuam obrigatórios. Consultar colegas dispensa supervisor e não concede escrita; `ownership.ts` retorna `VISUALIZADOR`/`podeAgirEtapa: false` para terceiro. “Todos” admite responsáveis históricos fora do catálogo. Ao integrar leitores, conferir que abrir detalhes não materializa dados nem oferece mutações ao visualizador (guards em NF/checklists; POST de `/api/integrations/alpha-crm/opportunities` exige `editarCard`, GET permanece consulta).
+**Administração:** `VisibilidadePipelineSection` → `SalvarVisibilidadePipelineBpm` envia somente `pipelineId`, `setorIds`, `versao`; preservar `visualizacaoConfigJson` legado. Reutilizados menu CRM, rota, modal e canal realtime existentes, sem novos atalhos.
+**Evidência:** smoke Prisma somente leitura encontrou catálogos iguais TI/comum em três pipelines, usuária operacional sem cards apenas no Operacional, leitura de terceiro autorizada e edição negada; Financeiro/Radar negados. Runtime compilado iniciou e CRM sem sessão respondeu 307; servidor encerrado após a checagem. Não equivale a navegador autenticado nem publicação. Build/typecheck/lint finais exit 0; suíte global mantém falhas preexistentes, detalhadas no journal; Lens/Sage aprovou com ressalvas, sem bloqueio novo.
+
+
+### CRM — rótulo de usuário e contratação em Em tratativa (2026-10-16, Scribe)
+
+**Arquivos:** `src/lib/bpm/{requisitos-etapa-server,referencia-usuario-campo,contratacao-em-tratativa-config}.ts`, `CampoBpmInput.tsx`, `src/actions/bpm/Cards.ts`, `scripts/configurar-contratacao-em-tratativa.mts`.
+**Contrato:** fonte automática de responsável resolve `valor: "<id efetivo>"` e `valorExibicao: "<nome>"`; overrides continuam representados pelo próprio ID. Backend consulta somente IDs únicos autorizados, selecionando ID/nome; UI exibe nome readonly, mantém payload ID e editor legado sem fonte. Leitura de requisitos verifica visibilidade do destino antes da hidratação.
+**Configuração:** reutilizar formulário canônico/autosave/editor atuais. Exemplo seguro: CLI `--preview --out=<plano privado>`; execução exige fingerprint, consentimento específico, administrador, backup completo verificado e CAS. Acrescenta dois campos existentes opcionais em Em tratativa, sem afrouxar entrada de Fechado. Menu/rota/modal/atalhos permanecem existentes.
+**Estado:** código/plano preparados, backup verificado; banco não aplicado e nenhuma publicação/browser autenticado. Lint passou; typecheck corrigido passou, repetição final pendente; suíte global conserva seis falhas preexistentes. Build/Lens pendentes.
+
+- 16/10/2026 — Configuração acima autorizada, aplicada e verificada no Turso: Radar v32/formulário Em tratativa v3; dois campos opcionais na origem, entrada de Fechado preservada. Correção nominal do vendedor ainda depende de publicação do código.

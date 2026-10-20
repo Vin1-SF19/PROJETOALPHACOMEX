@@ -137,6 +137,39 @@ describe("assumirChamado — fluxo 'Assumir Chamado'", () => {
     expect(notificarAssumidoMock).not.toHaveBeenCalled();
   });
 
+  it.each(["TI", "T.I", "Admin", "CEO"])("permite %s assumir chamado do Comercial sem alterar seu destino", async (role) => {
+    authMock.mockResolvedValue({ user: { id: "3", role, nome: "Administrador" } });
+    prismaMock.chamados.findUnique.mockResolvedValue(chamadoAberto({
+      setorDestinoId: 5, setorDestino: { id: 5, nome: "COMERCIAL", ativo: true, isBase: false },
+    }));
+    prismaMock.chamados.updateMany.mockResolvedValue({ count: 1 });
+    expect(await assumirChamado(10)).toMatchObject({ success: true, chamado: { tecnicoId: 3, status: "EM_ATENDIMENTO" } });
+    expect(prismaMock.chamados.updateMany).toHaveBeenCalledWith({
+      where: { id: 10, tecnicoId: null, status: "ABERTO", tecnicoSolicitadoId: null, setorDestinoId: 5 },
+      data: { status: "EM_ATENDIMENTO", tecnicoId: 3 },
+    });
+    expect(criarTarefaMock).not.toHaveBeenCalled();
+  });
+
+  it("não confia no papel administrativo da sessão quando o cadastro foi alterado", async () => {
+    prismaMock.chamados.findUnique.mockResolvedValue(chamadoAberto({
+      setorDestinoId: 5, setorDestino: { id: 5, nome: "COMERCIAL", ativo: true, isBase: false },
+    }));
+    prismaMock.usuarios.findUnique.mockResolvedValueOnce({ id: 3, nome: "Colaborador", role: "User", status: "ATIVO" });
+    prismaMock.$transaction.mockImplementationOnce(async (callback) => callback({
+      ...prismaMock,
+      usuarios: { findUnique: vi.fn().mockResolvedValue({ id: 3, nome: "Colaborador", role: "User", status: "ATIVO" }) },
+    }));
+    expect(await assumirChamado(10)).toMatchObject({ success: false });
+    expect(prismaMock.chamados.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("bloqueia administrador inativo antes de atribuir chamado", async () => {
+    prismaMock.usuarios.findUnique.mockResolvedValueOnce({ id: 3, nome: "Administrador", role: "TI", status: "INATIVO" });
+    expect(await assumirChamado(10)).toMatchObject({ success: false });
+    expect(prismaMock.chamados.updateMany).not.toHaveBeenCalled();
+  });
+
   it("bloqueia outro técnico quando o solicitante indicou um responsável", async () => {
     prismaMock.chamados.findUnique.mockResolvedValue(chamadoAberto({
       tecnicoSolicitadoId: 9,

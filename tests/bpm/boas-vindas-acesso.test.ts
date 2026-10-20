@@ -46,7 +46,7 @@ describe("Boas-vindas — permissões configuradas", () => {
     }) as never)).resolves.toMatchObject({ autorizado: true });
   });
 
-  it("usa visibilidade da etapa e vínculo para usuários comuns", async () => {
+  it("usa visibilidade da etapa e mantém terceiros como visualizadores", async () => {
     await expect(checarAcessoBpmCard("card-1", 7, "COMERCIAL", "visualizar", cliente({
       role: "COMERCIAL", podeVer: true,
     }) as never)).resolves.toMatchObject({ autorizado: true });
@@ -55,7 +55,7 @@ describe("Boas-vindas — permissões configuradas", () => {
     }) as never)).resolves.toMatchObject({ autorizado: false });
     await expect(checarAcessoBpmCard("card-1", 7, "COMERCIAL", "visualizar", cliente({
       role: "COMERCIAL", membro: false,
-    }) as never)).resolves.toMatchObject({ autorizado: false });
+    }) as never)).resolves.toMatchObject({ autorizado: true, role: "VISUALIZADOR", podeAgirEtapa: false });
   });
 
   it("autoriza responsável sem linha de membro, mas mantém limites de pipeline e coluna", async () => {

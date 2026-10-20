@@ -29,12 +29,36 @@ describe("política multissetorial de chamados", () => {
     expect(podeResponderChamado(financeiro, assumido)).toBe(true);
     expect(podeConcluirChamado(financeiro, assumido)).toBe(true);
   });
-  it("visão global não concede operação em outro setor", () => {
+  it("administração pode assumir em outro setor e atender somente após atribuição", () => {
     expect(chamadoVisivelWhere(admin)).toEqual({});
     expect(podeVerChamado(admin, chamado)).toBe(true);
-    expect(podeAssumirChamado(admin, chamado)).toBe(false);
-    expect(podeResponderChamado(admin, { ...chamado, tecnicoId: 20 })).toBe(false);
-    expect(podeConcluirChamado(admin, { ...chamado, tecnicoId: 20, status: "EM_ATENDIMENTO" })).toBe(false);
+    expect(podeAssumirChamado(admin, chamado)).toBe(true);
+    expect(podeResponderChamado(admin, chamado)).toBe(false);
+    expect(podeConcluirChamado(admin, chamado)).toBe(false);
+    expect(podeResponderChamado(admin, { ...chamado, tecnicoId: 20 })).toBe(true);
+    expect(podeConcluirChamado(admin, { ...chamado, tecnicoId: 20, status: "EM_ATENDIMENTO" })).toBe(true);
+    expect(podeConcluirChamado(admin, { ...chamado, tecnicoId: 8, status: "EM_ATENDIMENTO" })).toBe(false);
+  });
+  it.each(["TI", "T.I", "Admin", "CEO"])("%s assume destino externo sem depender de vínculo com o setor", (role) => {
+    const ator = { ...admin, role, setorId: null, setorNome: null };
+    expect(podeAssumirChamado(ator, chamado)).toBe(true);
+    expect(podeAssumirChamado(ator, { ...chamado, tecnicoSolicitadoId: 8 })).toBe(false);
+    expect(podeAssumirChamado(ator, { ...chamado, tecnicoId: 8 })).toBe(false);
+    expect(podeAssumirChamado(ator, { ...chamado, status: "CONCLUIDO" })).toBe(false);
+  });
+  it("continua bloqueando atuação de colaborador comum em outro setor", () => {
+    const outroSetor = { ...financeiro, setorId: 5, setorNome: "COMERCIAL", role: "COMERCIAL" };
+    expect(podeAssumirChamado(outroSetor, chamado)).toBe(false);
+    expect(podeResponderChamado(outroSetor, { ...chamado, tecnicoId: outroSetor.id })).toBe(false);
+    expect(podeConcluirChamado(outroSetor, { ...chamado, tecnicoId: outroSetor.id, status: "EM_ATENDIMENTO" })).toBe(false);
+  });
+  it.each([
+    null,
+    { ...chamado.setorDestino!, ativo: false },
+    { ...chamado.setorDestino!, isBase: true },
+  ])("administração não atende destino inválido: %j", (setorDestino) => {
+    expect(podeAssumirChamado(admin, { ...chamado, setorDestino })).toBe(false);
+    expect(podeConcluirChamado(admin, { ...chamado, setorDestino, tecnicoId: admin.id, status: "EM_ATENDIMENTO" })).toBe(false);
   });
   it("reserva exclusiva continua exigida e autoatendimento do próprio setor é permitido", () => {
     expect(podeAssumirChamado(financeiro, { ...chamado, tecnicoSolicitadoId: 7 })).toBe(false);

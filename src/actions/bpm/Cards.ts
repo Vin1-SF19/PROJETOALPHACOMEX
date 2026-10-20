@@ -74,6 +74,7 @@ import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 import { resolverParceiroOrigem, validarParceiroOrigem, salvarParceiroOrigem } from "@/lib/bpm/origem-cliente-server";
 import type { ParceiroOrigemBpm } from "@/lib/bpm/origem-cliente";
 import { avaliarTransicaoBpm, executarTransicaoBpm } from "@/lib/bpm/transicao-command";
+import { possuiOrigemImportadaRd, type AvisoMovimentoRd, type ConfirmacaoPendenciasRd } from "@/lib/bpm/movimento-importado-rd";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { processarCadenciasImediatasDoCardBpm } from "@/lib/bpm/cadencias/executor";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
@@ -215,7 +216,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
         .map(([etapaId]) => etapaId),
     );
 
-    const escopoLeitura = await carregarEscopoLeituraBpm(userId, admin || Boolean(movimentoLivre), pipelineId, pipelineInfo?.visualizacaoConfigJson ?? null);
+    const escopoLeitura = await carregarEscopoLeituraBpm(userId, admin, pipelineId, pipelineInfo?.visualizacaoConfigJson ?? null);
     // D-021: card sempre tem empresa vinculada — select sempre inclui a empresa.
     const cards = await db.bpmCard.findMany({
       where: {
@@ -229,7 +230,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
         id: true,
         etapaId: true,
         servico: true,
-        origemExterna: { select: { sourcePipelineName: true, sourceStageName: true, sourceDealName: true } },
+        origemExterna: { select: { provider: true, sourcePipelineName: true, sourceStageName: true, sourceDealName: true } },
         status: true,
         createdAt: true,
         primeiraVisualizacaoEm: true,
@@ -507,6 +508,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
         && card.status === "CONCLUIDO" && encaminhamentos.length === 0;
       return {
         ...cardSemVinculos,
+        importadoRd: possuiOrigemImportadaRd(card.origemExterna),
         podeMoverLivremente: Boolean(movimentoLivre),
         sla,
         origem: "real" as const,
@@ -585,6 +587,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
           campoValores: [],
           sla: null,
           origem: "noloss" as const,
+          importadoRd: false,
           podeMoverLivremente: false,
           nolossLeadId: lead.id,
           nolossEmail: lead.email,
@@ -640,6 +643,7 @@ export async function ObterCardBpm(cardId: string) {
       where: { id: cardId },
       include: {
         empresa: { select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true } },
+        origemExterna: { select: { provider: true } },
         pipeline: { select: { id: true, chave: true, nome: true } },
         etapa: {
           include: {
@@ -857,6 +861,7 @@ export async function ObterCardBpm(cardId: string) {
           ...item,
           valorExibicao: item.campo.tipo === "usuario" ? nomeUsuarioCampoBpm(item.valor, usuariosCampos) : item.valor,
         })),
+        importadoRd: possuiOrigemImportadaRd(card.origemExterna),
         podeMoverLivremente: Boolean(acessoCard.autoridadeMovimentoLivre),
         dataPerdaEm,
         resumoContratacao,
@@ -1049,13 +1054,13 @@ export async function CriarCardBpm(dados: unknown) {
           })
         : [];
       const campoRadar = camposNovoLead.find((campo) => campo.nome === "Radar pretendido");
-      if (pipelineAtual?.nome === "Revisão de Radar") {
+      if (pipelineAtual?.nome === "Revisão de Radar" && radarPretendido) {
         if (!campoRadar || campoRadar.tipo !== "selecao") throw new Error("RADAR_CAMPO_NAO_CONFIGURADO");
         const opcoesLegadas = (() => { try { return JSON.parse(campoRadar.opcoesJson ?? "[]"); } catch { return []; } })();
         const opcoes = campoRadar.opcoes.length > 0
           ? campoRadar.opcoes.map((opcao) => opcao.rotulo)
           : Array.isArray(opcoesLegadas) ? opcoesLegadas.filter((opcao): opcao is string => typeof opcao === "string") : [];
-        if (!radarPretendido || !opcoes.includes(radarPretendido)) throw new Error("RADAR_OPCAO_INVALIDA");
+        if (!opcoes.includes(radarPretendido)) throw new Error("RADAR_OPCAO_INVALIDA");
       }
 
       const empresaAtual = await tx.cliente.findUnique({
@@ -1176,7 +1181,7 @@ export async function CriarCardBpm(dados: unknown) {
         : error instanceof Error && error.message === "RADAR_OPCAO_INVALIDA"
           ? "Selecione uma opção válida de Radar pretendido."
         : error instanceof Error && error.message === "NOVO_LEAD_CAMPO_NAO_CONFIGURADO"
-          ? "Configure Canal de origem e Qualificação no Novo Lead antes de usá-los."
+          ? "Um dos campos informados não está configurado no Novo Lead."
         : error instanceof Error && error.message === "CRIACAO_CARD_INVALIDA"
           ? "Os dados de criação mudaram ou não são mais válidos. Recarregue e tente novamente."
         : error instanceof Error && error.message === "CRIACAO_CARD_CONTEXTO_ALTERADO"
@@ -1607,6 +1612,7 @@ type DadosMovimentoComRequisitos = {
   parceiroOrigem?: ParceiroOrigemBpm;
   proximoContatoEm?: Date | null;
   origemMovimentacao?: "MANUAL" | "AUTOMACAO";
+  confirmacaoPendenciasRd?: ConfirmacaoPendenciasRd;
 };
 
 type ClienteContextoMovimento = Pick<
@@ -1626,6 +1632,7 @@ async function carregarContextoMovimento(
       include: {
         etapa: { select: { nome: true, chave: true } },
         pipeline: { select: { nome: true } },
+        origemExterna: { select: { provider: true } },
       },
     }),
     client.bpmEtapa.findUnique({
@@ -1651,7 +1658,9 @@ async function carregarContextoMovimento(
     },
     select: { permitida: true, origem: true },
   });
-  if (!movimentoLivre && (!transicao?.permitida || !["MANUAL", "AMBOS"].includes(transicao.origem))) {
+  const importadoRd = possuiOrigemImportadaRd(card.origemExterna);
+  if (!movimentoLivre && ((!transicao && !importadoRd)
+    || (transicao && (!transicao.permitida || !["MANUAL", "AMBOS"].includes(transicao.origem))))) {
     return {
       error: `Não é possível mover diretamente desta etapa para "${etapaDestino.nome}" — verifique as etapas permitidas.`,
     } as const;
@@ -1735,8 +1744,13 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
         campos: [] as Awaited<ReturnType<typeof carregarCamposTransicao>>,
         faltantes: [] as { id: string; nome: string; tipo: string; contexto: string; etapaAplicacaoNome: string }[],
         guardas: [] as string[], proximoContatoEm: card.proximoContatoEm,
-        proximoContatoObrigatorio: false, podeMover: true,
+        proximoContatoObrigatorio: false, podeMover: true, importadoRd: false,
+        podeMoverComConfirmacao: false, confirmacao: undefined, avisos: [] as AvisoMovimentoRd[],
       } };
+    }
+    if (!acessoCard.isAdminGlobal
+      && !resolverVisibilidadeEtapa(acessoCard.perfilGlobal, etapaDestino.visibilidades).podeVer) {
+      return { success: false, error: "Não autorizado" };
     }
     const campos = await carregarCamposTransicao({
       cardId,
@@ -1759,6 +1773,37 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
         contexto: campo.contexto,
         etapaAplicacaoNome: campo.etapaAplicacaoNome,
       }));
+    if (possuiOrigemImportadaRd(card.origemExterna)) {
+      // A mesma avaliação usada na gravação decide os avisos. Não duplicar
+      // regras por nomes de etapa nem transformar falhas de acesso em aviso.
+      const avaliacao = await avaliarTransicaoBpm({
+        cardId,
+        etapaOrigemEsperadaId: card.etapaId,
+        etapaDestinoId,
+        versaoEsperada: card.versao,
+        idempotencyKey: randomUUID(),
+        ator: { tipo: "MANUAL", userId, userRole: session.user.role ?? null },
+      });
+      if (!avaliacao.success && avaliacao.code !== "RD_MOVE_CONFIRMATION_REQUIRED") {
+        return { success: false, error: avaliacao.error, code: avaliacao.code };
+      }
+      return {
+        success: true,
+        data: {
+          etapaDestino: { id: etapaDestino.id, nome: etapaDestino.nome },
+          campos,
+          faltantes,
+          guardas: [] as string[],
+          proximoContatoEm: card.proximoContatoEm,
+          proximoContatoObrigatorio: false,
+          podeMover: avaliacao.success,
+          importadoRd: true,
+          podeMoverComConfirmacao: !avaliacao.success,
+          confirmacao: avaliacao.success ? undefined : avaliacao.confirmacao,
+          avisos: avaliacao.success ? [] : (avaliacao.avisos ?? []),
+        },
+      };
+    }
     const capacidadesObrigatorias = await capacidadesObrigatoriasPorEtapa([card.etapaId, etapaDestinoId]);
     const guardas: string[] = [];
     const proximoContatoObrigatorio = card.pipeline.nome === "Revisão de Radar" && etapaEhSemViabilidade(etapaDestino.nome)
@@ -1796,6 +1841,10 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
         proximoContatoEm: card.proximoContatoEm,
         proximoContatoObrigatorio,
         podeMover: faltantes.length === 0 && guardas.length === 0,
+        importadoRd: false,
+        podeMoverComConfirmacao: false,
+        confirmacao: undefined as ConfirmacaoPendenciasRd | undefined,
+        avisos: [] as AvisoMovimentoRd[],
       },
     };
   } catch (error) {
@@ -1821,8 +1870,8 @@ async function executarMovimentoCanonico(
     select: { etapaId: true, versao: true, pipelineId: true },
   });
   if (!atual) return { success: false, error: "Card não encontrado" };
-  const etapaEsperada = dados.etapaOrigemEsperadaId ?? atual.etapaId;
-  const versaoEsperada = dados.versaoEsperada ?? atual.versao;
+  const etapaEsperada = dados.etapaOrigemEsperadaId ?? dados.confirmacaoPendenciasRd?.etapaOrigemEsperadaId ?? atual.etapaId;
+  const versaoEsperada = dados.versaoEsperada ?? dados.confirmacaoPendenciasRd?.versaoEsperada ?? atual.versao;
   const clienteVinculos = db.bpmCardVinculo as typeof db.bpmCardVinculo | undefined;
   const vinculosAntes = new Set(clienteVinculos?.findMany
     ? (await clienteVinculos.findMany({
@@ -1841,13 +1890,16 @@ async function executarMovimentoCanonico(
     parceiroOrigem: dados.parceiroOrigem,
     proximoContatoEm: dados.proximoContatoEm,
     responsavelId: dados.responsavelId,
+    confirmacaoPendenciasRd: dados.confirmacaoPendenciasRd,
   });
-  if (!resultado.success) return { success: false, error: resultado.error };
+  if (!resultado.success) return resultado;
 
-  if (!resultado.data.idempotente && !resultado.data.movimentoLivre) try {
-    await executarAutomacoesCentraisDoCardAgora(dados.cardId);
-  } catch (error) {
-    console.error("[executarAutomacoesCentraisDoCardAgora]", error);
+  if (!resultado.data.idempotente && !resultado.data.movimentoLivre) {
+    try {
+      await executarAutomacoesCentraisDoCardAgora(dados.cardId);
+    } catch (error) {
+      console.error("[executarAutomacoesCentraisDoCardAgora]", error);
+    }
   }
   const criados = clienteVinculos?.findMany
     ? await clienteVinculos.findMany({
