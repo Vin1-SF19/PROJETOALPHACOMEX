@@ -34,12 +34,23 @@ async function render(podeEditar = true) {
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 25)); });
 }
 async function selecionar(selector: string, value: string) {
+  if (selector === "#campo-bpm-origem") {
+    await act(async () => {
+      container.querySelector(selector)!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    });
+    const label = value === "Indicação Parceiro" ? "Indicação de parceiros" : value;
+    const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((item) => item.textContent === label)!;
+    expect(option).toBeTruthy();
+    await act(async () => option.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
+    return;
+  }
   await act(async () => { const select = container.querySelector<HTMLSelectElement>(selector)!;
     select.value = value; select.dispatchEvent(new Event("change", { bubbles: true })); });
 }
 function salvar() { return [...container.querySelectorAll("button")].find((b) => b.textContent?.includes("Salvar alterações"))!; }
 beforeEach(() => {
   vi.clearAllMocks(); Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
+  HTMLElement.prototype.scrollIntoView = vi.fn();
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
   vi.mocked(AtualizarCardBpm).mockImplementation(async (dados) => ({ success: true, data: {
     updatedAt: new Date("2026-10-20T10:01:00Z"), camposValores: (dados as { camposValores: Record<string, string> }).camposValores,
@@ -71,6 +82,6 @@ it("trocar origem oculta seletor e envia remoção do vínculo; voltar exige nov
 });
 it("bloqueia origem e parceiro quando usuário não pode editar", async () => {
   await render(false);
-  expect(container.querySelector<HTMLSelectElement>("#campo-bpm-origem")?.disabled).toBe(true);
+  expect(container.querySelector<HTMLButtonElement>("#campo-bpm-origem")?.disabled).toBe(true);
   expect(container.querySelector<HTMLSelectElement>('[aria-label="Parceiro"]')?.disabled).toBe(true);
 });

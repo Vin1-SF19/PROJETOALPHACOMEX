@@ -46,6 +46,7 @@ Fontes verificadas:
 
 ## Tasks / Subtasks
 
+- [x] Melhorar o contraste e o visual do seletor de origem conforme solicitação de 20/10/2026, mantendo catálogo, vínculo de parceiro e acessibilidade por teclado.
 - [x] Inventariar todos os renderizadores e caminhos de criação/edição dos campos de origem no CRM, incluindo origem legada e configurações já existentes (AC 1, 2, 6).
 - [x] Reconciliar e reutilizar as definições de origem entre CRM, Metas e CadastroClientes, mantendo compatibilidade com valores existentes (AC 1, 2, 6).
 - [x] Reutilizar o seletor pesquisável de parceiros no campo de origem do CRM e preservar estados de leitura, carregamento e ausência de opções (AC 3, 5).
@@ -53,6 +54,18 @@ Fontes verificadas:
 - [x] Cobrir o comportamento com testes de domínio e interação, além da persistência pelo caminho efetivamente adotado (AC 1–6).
 - [x] Executar `npm run lint`, `npm run typecheck`, `npm test` e `npm run build`; registrar resultados e eventuais limitações preexistentes.
 - [x] Atualizar checklist, File List efetiva e evidências de validação antes da conclusão.
+
+### Ajuste visual do seletor — 20/10/2026
+
+- Menu nativo substituído pelo Select/Radix existente no projeto, com fundo escuro explícito também no portal, texto claro, destaque da opção selecionada, bordas e foco consistentes com o CRM.
+- Bloco de indicação agrupado visualmente, com orientação de pesquisa e informação de que o vínculo é registrado ao salvar.
+- Rótulos e valores legados preservados; selecionar novamente a mesma origem não limpa o parceiro. O catálogo e o armazenamento permanecem inalterados.
+- Arquivos desta correção: `src/app/PainelAlpha/AlphaCRM/CampoOrigemCliente.tsx`, `tests/bpm/origem-cliente-react.test.ts` e esta story.
+- `npm run lint`: zero erros e 1.193 warnings preexistentes; `npm run typecheck`: exit 0; `npm test`: 663 arquivos e 5.032 testes aprovados, 4 ignorados e 1 todo.
+- Chrome real em uma prévia local do componente, com parceiros sintéticos: menu com fundo escuro/texto claro, seleção por teclado, pesquisa por representante, preservação do parceiro ao reeleger a origem e troca para outra origem verificados. Em viewport de 360 px, menu de 286 px ficou dentro da tela. Nenhum erro de JavaScript.
+- Evidências locais: `/tmp/alpha-origem-visual-{lint,typecheck,full-tests}.log`, `/tmp/alpha-origem-visual-browser.json` e capturas `/tmp/alpha-origem-{menu,parceiro,mobile}.png`. A prévia não representa homologação autenticada em produção.
+- Fluxo conferido no código: escolha do parceiro compõe o rascunho; ao salvar, o servidor valida e vincula a indicação ao card/cliente/serviço e registra histórico. Alterar para outra origem desvincula a indicação anterior ao salvar.
+- Sem alteração de banco ou migration. A validação inicial foi local; commit/push e build da entrega isolada estão registrados abaixo.
 
 ## Dev Notes
 
@@ -166,3 +179,13 @@ Checklist aplicado: `.aiox-core/product/checklists/story-draft-checklist.md`.
 | 2026-10-20 | 1.0 | Story criada a partir do pedido, fontes verificadas e checklist de draft aplicado | River (SM) |
 
 | 2026-10-20 | 1.1 | Catálogo compartilhado, seleção e persistência atômica de parceiro; testes e revisão QA concluídos | Codex |
+
+
+### Entrega do ajuste visual para staging — 20/10/2026
+
+- Base isolada: `f101d168b52299bbc5005624b640abe98b941f72`. Somente componente de origem, teste de interação e esta story integram o commit.
+- `npm run lint`: exit 0, zero erros e 1.193 warnings preexistentes; `npm run typecheck`: exit 0.
+- `npm test`: 641 arquivos aprovados, 4 com falha e 1 ignorado; 4.809 testes aprovados, 6 com falha, 7 ignorados e 1 todo. As falhas são idênticas à base já documentada: Builder (3), scroll do modal (1), Próximo Contato (2) e importação da suíte de arquivamento. Nenhuma nova falha no delta.
+- Build equivalente aprovado com Prisma/player oficiais e `next build --webpack`, heap de 4.096 MiB e uma CPU; exit 0 em 62,70 segundos. Configuração e dependências versionadas preservadas.
+- Evidências: `/tmp/alpha-origem-visual-staging-{lint,typecheck,tests,build}.log` e `/tmp/alpha-origem-visual-staging-build-result.json`.
+- Preferência expressa pelo usuário para a continuidade da colaboração: após realizar e validar cada alteração solicitada, executar commit e push automaticamente para `staging`, sem pedir novamente autorização genérica. Preservar mudanças de outras tarefas e as demais políticas do projeto.
