@@ -374,12 +374,12 @@ export async function ListarTarefasGlobaisBpm(filtros?: { status?: string; respo
     const admin = await checarAcessoConfigPipeline(userId, "visualizarPipeline");
     const [usuarioAtual, etapas] = await Promise.all([
       db.usuarios.findUnique({ where: { id: userId }, select: { role: true } }),
-      db.bpmEtapa.findMany({ select: { id: true, pipeline: { select: { setores: { select: { setor: { select: { nome: true } } } } } }, visibilidades: {
+      db.bpmEtapa.findMany({ select: { id: true, pipeline: { select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { nome: true } } } } } }, visibilidades: {
         select: { perfil: true, podeVer: true, podeAgir: true },
       } } }),
     ]);
     const etapaIdsVisiveis = etapas.filter((etapa) =>
-      resolverVisibilidadeEtapa(usuarioAtual?.role, etapa.visibilidades).podeVer && podeAcessarPipelineBpm({ role: usuarioAtual?.role ?? "", permissoes: ["crm"], setoresPipeline: etapa.pipeline.setores.map(({ setor }) => setor.nome), ehMembroPipeline: false })).map((etapa) => etapa.id);
+      resolverVisibilidadeEtapa(usuarioAtual?.role, etapa.visibilidades).podeVer && podeAcessarPipelineBpm({ role: usuarioAtual?.role ?? "", permissoes: ["crm"], usuarioId: userId, visualizacaoConfigJson: etapa.pipeline.visualizacaoConfigJson, setoresPipeline: etapa.pipeline.setores.map(({ setor }) => setor.nome), ehMembroPipeline: false })).map((etapa) => etapa.id);
 
     const escopoLeitura = await carregarEscopoLeituraBpm(userId, admin);
 

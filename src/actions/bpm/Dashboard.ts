@@ -1,4 +1,5 @@
 "use server";
+import { lerUsuariosAutorizadosPipeline } from "@/lib/bpm/acesso-individual-pipeline";
 import { carregarEscopoLeituraBpm } from "@/lib/bpm/visao-equipe-server";
 import db from "@/lib/prisma";
 import { auth } from "../../../auth";
@@ -65,6 +66,7 @@ export async function ObterDashboardBpm() {
         select: {
           id: true,
           nome: true,
+          visualizacaoConfigJson: true,
           setores: { select: { setor: { select: { nome: true } } } },
           etapas: {
             where: { ativo: true },
@@ -91,7 +93,7 @@ export async function ObterDashboardBpm() {
     );
     const pipelinesVisiveis = pipelines.filter((pipeline, index) =>
       acessoPipelines[index]
-      && (papelConsolidado || pipeline.setores.some(({ setor }) => isSameRole(setor.nome, usuarioAtual?.role))),
+      && (papelConsolidado || lerUsuariosAutorizadosPipeline(pipeline.visualizacaoConfigJson).includes(userId) || pipeline.setores.some(({ setor }) => isSameRole(setor.nome, usuarioAtual?.role))),
     );
     const pipelineIdsVisiveis = pipelinesVisiveis.map((pipeline) => pipeline.id);
 

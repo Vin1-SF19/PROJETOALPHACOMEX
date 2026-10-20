@@ -49,3 +49,7 @@ it("todos iniciam com próprios e livres e qualquer usuário pode consultar todo
   expect(selecionarPaginaQuadro(entradas, { acesso, visao: "TODOS" }).ids).toHaveLength(4);
   expect(selecionarPaginaQuadro(entradas, { acesso, visao: "TODOS", responsavelId: 9 }).ids).toEqual(["c1"]);
 });
+it("inclui pessoa de outro setor autorizada individualmente, sem incluir contas revogadas", async () => {
+  m.pipeline.mockResolvedValue({ setores: [{ setor: { id: 3, nome: "Comercial" } }], visualizacaoConfigJson: JSON.stringify({ version: 1, usuariosAutorizados: [10, 11, 12, 13] }) });
+  expect((await carregarEscopoLeituraBpm(8, false, "p1", null, undefined, true)).usuarioIds).toEqual([9, 10]);
+});

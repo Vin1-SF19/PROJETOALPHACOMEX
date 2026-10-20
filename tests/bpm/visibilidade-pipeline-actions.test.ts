@@ -49,3 +49,38 @@ it("lê de volta a configuração publicada", async () => {
   m.setores.mockResolvedValue([{ id: 3, nome: "Comercial" }]);
   expect(await LerVisibilidadePipelineBpm(pipelineId)).toMatchObject({ success: true, data: { versao: 5, visualizacao, usuarios: [{ id: 7, nome: "Líder" }] } });
 });
+
+it("salva exceções por pessoa preservando legado e audita a lista", async () => {
+  const anterior = { version: 1, supervisores: [{ usuarioId: 8, setorIds: [3] }] };
+  m.config.mockResolvedValue({ visualizacaoConfigJson: JSON.stringify(anterior) });
+  expect(await SalvarVisibilidadePipelineBpm({ pipelineId, versao: 4, setorIds: [3], usuariosAutorizados: [7, 7] })).toMatchObject({ success: true });
+  expect(m.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ visualizacaoConfigJson: JSON.stringify({ ...anterior, usuariosAutorizados: [7] }) }) }));
+  expect(m.audit).toHaveBeenCalledWith({ data: expect.objectContaining({ campoAlterado: "acesso_individual_pipeline", valorNovoJson: "[7]" }) });
+});
+it("nega exceções fora do catálogo ativo CRM e preserva lista em payload antigo", async () => {
+  expect(await SalvarVisibilidadePipelineBpm({ pipelineId, versao: 4, setorIds: [3], usuariosAutorizados: [99] })).toMatchObject({ success: false });
+  expect(m.transaction).not.toHaveBeenCalled();
+  const visualizacao = { version: 1, supervisores: [] };
+  m.count.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
+  m.config.mockResolvedValue({ visualizacaoConfigJson: JSON.stringify({ ...visualizacao, usuariosAutorizados: [7] }) });
+  expect(await SalvarVisibilidadePipelineBpm({ pipelineId, versao: 4, setorIds: [3], visualizacao })).toMatchObject({ success: true });
+  expect(m.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ visualizacaoConfigJson: JSON.stringify({ ...visualizacao, usuariosAutorizados: [7] }) }) }));
+});
+it("remove autorização explicitamente e lê de volta as pessoas", async () => {
+  m.config.mockResolvedValue({ visualizacaoConfigJson: JSON.stringify({ version: 1, supervisores: [], usuariosAutorizados: [7] }) });
+  expect(await SalvarVisibilidadePipelineBpm({ pipelineId, versao: 4, setorIds: [3], usuariosAutorizados: [] })).toMatchObject({ success: true });
+  expect(m.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ visualizacaoConfigJson: JSON.stringify({ version: 1, supervisores: [], usuariosAutorizados: [] }) }) }));
+  m.pipeline.mockResolvedValue({ configVersion: 5, setores: [], visualizacaoConfigJson: JSON.stringify({ version: 1, usuariosAutorizados: [7] }) });
+  expect(await LerVisibilidadePipelineBpm(pipelineId)).toMatchObject({ success: true, data: { usuariosAutorizados: [7] } });
+});
+
+it("ignora autorizações aninhadas em payload legado, sem conceder nem revogar acesso", async () => {
+  m.count.mockImplementation(({ where }) => Promise.resolve(where.id.in.length));
+  const original = { version: 1, supervisores: [], usuariosAutorizados: [7] };
+  m.config.mockResolvedValue({ visualizacaoConfigJson: JSON.stringify(original) });
+  for (const ids of [[99], []]) {
+    expect(await SalvarVisibilidadePipelineBpm({ pipelineId, versao: 4, setorIds: [3], visualizacao: { version: 1, supervisores: [], usuariosAutorizados: ids } })).toMatchObject({ success: true });
+    expect(m.update).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ visualizacaoConfigJson: JSON.stringify(original) }) }));
+  }
+  expect(m.audit).not.toHaveBeenCalledWith({ data: expect.objectContaining({ campoAlterado: "acesso_individual_pipeline" }) });
+});

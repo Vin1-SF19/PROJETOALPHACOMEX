@@ -1,3 +1,4 @@
+import { lerUsuariosAutorizadosPipeline } from "@/lib/bpm/acesso-individual-pipeline";
 import db from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { isSameRole } from "@/lib/roles";
@@ -21,12 +22,13 @@ export async function carregarEscopoLeituraBpm(
 
   const pipeline = await client.bpmPipeline.findUnique({
     where: { id: pipelineId },
-    select: { setores: { select: { setor: { select: { id: true, nome: true } } } } },
+    select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { id: true, nome: true } } } } },
   });
   if (!pipeline) return vazio;
   const usuarios = await listarUsuariosComAcessoCrmBpm(client);
   const setores = pipeline.setores.map(({ setor }) => setor);
-  const elegiveis = usuarios.filter((usuario) => setores.length === 0
+  const autorizados = lerUsuariosAutorizadosPipeline(pipeline.visualizacaoConfigJson);
+  const elegiveis = usuarios.filter((usuario) => autorizados.includes(usuario.id) || setores.length === 0
     || setores.some((setor) => isSameRole(usuario.role, setor.nome)));
   const opcoes = setores.map((setor) => ({ ...setor,
     usuarioIds: elegiveis.filter((usuario) => isSameRole(usuario.role, setor.nome)).map((usuario) => usuario.id),

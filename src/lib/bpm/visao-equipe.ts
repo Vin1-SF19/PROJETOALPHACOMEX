@@ -1,7 +1,9 @@
 import { z } from "zod";
+import { usuariosAutorizadosPipelineSchema } from "@/lib/bpm/acesso-individual-pipeline";
 
 export const configuracaoVisaoEquipeSchema = z.object({
   version: z.literal(1),
+  usuariosAutorizados: usuariosAutorizadosPipelineSchema.optional(),
   supervisores: z.array(z.object({ usuarioId: z.number().int().positive(), setorIds: z.array(z.number().int().positive()).max(100) })).max(200),
 }).strict().superRefine((value, ctx) => {
   if (new Set(value.supervisores.map((s) => s.usuarioId)).size !== value.supervisores.length) ctx.addIssue({ code: "custom", message: "Selecione cada supervisor apenas uma vez." });
