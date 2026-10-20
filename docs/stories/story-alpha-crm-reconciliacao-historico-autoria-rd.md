@@ -2,7 +2,7 @@
 
 ## Status
 
-Em revisão final — diagnóstico, implementação, plano fechado e simulação concluídos. Aplicação em produção aguardando confirmação específica do plano `4be6d3428252a7c6aca9d9463ea7a520d1fa6643d355ba39a61b1e566c89bece`.
+Done — aplicação autorizada e concluída, reconciliação posterior sem diferenças e correção publicada em produção. QA APPROVED. Plano `4be6d3428252a7c6aca9d9463ea7a520d1fa6643d355ba39a61b1e566c89bece`; commit funcional `4ce99fe67f1041d69f1b535613208bd32d368645`.
 
 ## Executor Assignment
 
@@ -57,9 +57,9 @@ Não alterar campos comerciais, empresas, contatos, etapas atuais, pipelines, me
 - [x] Implementar recuperação preservando originais, correções locais e escopo exclusivamente histórico. (AC: 6–8)
 - [x] Testar paginação, conflitos, retomada, ausência de autor, deduplicação V1/V2 e proteção de dados. (AC: 1–8, 12)
 - [x] Simular lote, reexecução e rollback guardado em cópia restaurada. (AC: 9)
-- [ ] Obter revisão Vault, evidência de backup e confirmação específica do plano final. (AC: 10)
-- [ ] Aplicar somente lote confirmado e reconciliar resultados e exceções. (AC: 8, 11)
-- [ ] Verificar apresentação, concluir gates e registrar aplicação/publicação separadamente. (AC: 11–12)
+- [x] Obter revisão Vault, evidência de backup e confirmação específica do plano final. (AC: 10)
+- [x] Aplicar somente lote confirmado e reconciliar resultados e exceções. (AC: 8, 11)
+- [x] Verificar apresentação, concluir gates e registrar aplicação/publicação separadamente. (AC: 11–12)
 
 ## Dev Notes e referências
 
@@ -115,11 +115,16 @@ Implementação e diagnóstico concluídos em 20/10/2026. [Relatório completo](
 - Comparação: 3.682 anotações, 7.177 movimentos, 1.624 tarefas históricas; 12.036 registros equivalentes. V2 confirmou IDs/autoria/datas de 266 notas em 54 negócios cobrindo todas as notas alteradas/acrescentadas; usuários V1/V2 identificados por ID.
 - Lote: 122 inserções e 325 atualizações em 237 cards. Fingerprint `4be6d3428252a7c6aca9d9463ea7a520d1fa6643d355ba39a61b1e566c89bece`.
 - Simulação final: 447 aplicadas, reexecução sem novas mutações, 447 revertidas, 1.341 guardas, integridade OK e zero violações de FK. Rollback parcial e concorrência cobertos por testes.
-- Backup completo verificado por Vault em 20/10 às 17:30 UTC. Relatório Vault identifica comandos, banco, riscos e retorno; falta consentimento específico.
+- Backup completo verificado por Vault em 20/10 às 17:30 UTC. Relatório Vault identifica comandos, banco, riscos e retorno; consentimento específico recebido com “Sim vida autorizo” e liberação revalidada às 18:01 UTC.
 - Correção de apresentação distingue ajustes automáticos comprovados e autores reais; remoção manual de autor é preservada. Nenhum autor é deduzido do responsável pelo negócio.
 - Testes focados finais: 24 aprovados. Suite geral, lint e typecheck aprovados; build equivalente isolado aprovado com heap 4.096 MB após limite de 3.072 MB no comando padrão.
-- Nenhuma escrita de reconciliação foi aplicada em produção; nenhuma escrita no RD. Publicação e validação visual autenticada pendentes.
-- O commit local `aa5a50761944ecf049a61b254980675926288af3` registra a entrega anterior de cards/fluxo; não representa aplicação deste lote.
+- Aplicação em produção concluída às 18:02:56 UTC: 447 operações, zero ignoradas, 1.341 guardas coincidentes. Verificação independente às 18:03:38 UTC também passou. Nenhuma escrita no RD e nenhum rollback.
+- Reconciliação integral às 18:04:52 UTC: 12.483 eventos equivalentes, zero diferenças contra a coleta aprovada; 12.361 payloads e 7.994 correções anteriores preservados; 447 recibos auditáveis.
+- Helpers reais sobre snapshot pós-carga: 3.682/3.682 anotações com autor exibível; 8.319 correções com identificação automática comprovada, zero rótulo legado ambíguo. Inspeção visual autenticada não realizada, explicitamente diferenciada de testes de apresentação e disponibilidade.
+- Publicação: [painel.alpha-comex.com](https://painel.alpha-comex.com), deployment `dpl_6w5Pbv2Jw3VM72gmtB7LkpAuq6hz` READY, alias conferido, SHA `4ce99fe67f1041d69f1b535613208bd32d368645`. Smoke pós-promoção: raiz 200 / CRM 307 para `/?acesso=bloqueado` / API sem credenciais 401. Audiência e env preservados.
+- Código commitado e branch publicada; [PR #3](https://github.com/Vin1-SF19/PROJETOALPHACOMEX/pull/3) draft sem merge. Main e staging não foram alteradas.
+- Gates do pacote exato: 655 arquivos/4.943 testes aprovados, 4 skip/1 todo; lint 0 erros/1.193 avisos, typecheck PASS, build local ajustado e build remoto READY. Suíte do workspace: 657 arquivos/4.975 testes. Auditoria de dependências baseline registrada por QA/DevOps, sem novos pacotes ou relaxamento de acesso no delta.
+- O commit `aa5a50761944ecf049a61b254980675926288af3` registra a entrega anterior de cards/fluxo; não representa aplicação deste lote.
 
 ### File List
 
@@ -154,10 +159,23 @@ A conferência V2 cobre 54 negócios e 266 notas; todas as anotações alteradas
 
 **Gates finais conferidos:** suíte do workspace em `/tmp/rd-history-tests.log` com exit 0, 657 arquivos e **4.975 testes aprovados**, quatro ignorados e um pendente; 24 testes focais aprovados. Lint e typecheck finais retornaram exit 0; lint sem erros e com 1.193 avisos existentes. Build isolado revisado no relatório DevOps `../painel-alpha-worktrees/crm-rd-historico-build-report.md`: comando original falhou por limite de heap de 3.072 MB; build equivalente com heap de 4.096 MB concluiu com exit 0, geração de 80 páginas e tracing. Não houve mudança de `package.json` nem publicação nessa validação.
 
-**Pendências para encerrar:** obter consentimento para este fingerprint conforme relatório final [Vault](relatorio-vault-rd-historico-autoria.md); executar somente o lote autorizado e comprovar pós-condições/nova prévia sem diferenças; validar a apresentação publicada de forma honesta, distinguindo autoria original, responsável histórico e autor da correção. Código e plano congelados nesta revisão; sem bloqueador de código identificado.
+**Pendências daquela etapa:** obter consentimento para este fingerprint conforme relatório final [Vault](relatorio-vault-rd-historico-autoria.md); executar somente o lote autorizado e comprovar pós-condições/nova prévia sem diferenças; validar a apresentação de forma honesta, distinguindo autoria original, responsável histórico e autor da correção. Essas pendências foram verificadas na revalidação abaixo.
+
+### Revalidação após aplicação e publicação — 2026-10-20 — Quinn (@qa)
+
+**Decisão final: APPROVED.** Substitui o `NEEDS_WORK` da etapa de preparação. O usuário autorizou especificamente a aplicação; Vault liberou o plano exato e registrou a conclusão. QA conferiu os artefatos locais de aplicação, reconciliação e produção, sem executar mutações no banco.
+
+- **Aplicação autorizada:** `preflight.json`, `apply-result.json` e `verification.json` correspondem ao fingerprint `4be6d3428252a7c6aca9d9463ea7a520d1fa6643d355ba39a61b1e566c89bece`. Foram aplicadas 447 operações, sem itens ignorados; 1.341 de 1.341 guardas coincidem antes da carga, após a carga e na verificação independente.
+- **Reconciliação integral:** `post-apply-reconciliation.json` confirma 1.234 cards, 1.221 origens, 12.483 eventos e 8.319 correções. Os 12.361 registros brutos anteriores e as 7.994 correções anteriores foram preservados; há 447 recibos do lote. Nova comparação com a coleta aprovada resultou em **zero inserções e zero atualizações restantes**, com 12.483 eventos equivalentes. Permanecem explícitas duas datas de tarefa indisponíveis e 71 nomes de etapa indisponíveis, sem substituição por informação inventada.
+- **Apresentação sobre dados reais:** execução dos helpers atuais sobre o snapshot remoto pós-carga, registrada em `presentation-check.json`, encontrou autor exibível em todas as 3.682 anotações. As 8.319 correções apresentam 4.389 rótulos “Ajuste automático da importação”, 3.605 “Autoria recuperada automaticamente do RD” e 325 “Histórico reconciliado automaticamente com o RD”; nenhum rótulo legado “Sistema / autor não disponível”. Essa evidência complementa os testes da action e dos helpers. Não foi realizada inspeção visual em sessão autenticada; a limitação está registrada e não é apresentada como teste visual realizado.
+- **Publicação:** metadados de produção confirmam deployment `dpl_6w5Pbv2Jw3VM72gmtB7LkpAuq6hz`, estado `READY`, commit `4ce99fe67f1041d69f1b535613208bd32d368645` e o fingerprint aprovado. O alias [painel.alpha-comex.com](https://painel.alpha-comex.com) aponta para esse deployment. Smoke após promoção em 18:10:43 UTC: raiz HTTP 200, CRM sem sessão HTTP 307 para `/?acesso=bloqueado` e API sem credenciais HTTP 401, sem resposta 500.
+- **Dependências:** o audit reportado por DevOps identificou dívida anterior na árvore de dependências. QA confirmou diff vazio de `package.json` e lockfiles entre a base de produção `1504a1c6` e o commit publicado. A revisão do delta não identificou nova dependência, endpoint ou relaxamento de autenticação/autorização. Isso não equivale a declarar a árvore inteira livre de vulnerabilidades; a dívida preexistente permanece documentada.
+
+Evidências privadas de dados em `database-backups/pre-change/rd-historico-autoria-2026-10-20/`. Evidências de publicação em `../painel-alpha-worktrees/crm-rd-production-metadata.json`, `crm-rd-production-alias-after-promote.json` e `crm-rd-production-smoke-after-promote.json`. Gates finais permanecem os 4.975 testes aprovados, lint/typecheck sem erros e build validado descritos acima. Nenhum achado bloqueante aberto no escopo desta entrega.
 
 ## Change Log
 
 | Data | Versão | Descrição | Autor |
 |---|---|---|---|
+| 2026-10-20 | 2.0 | Lote autorizado aplicado, reconciliação posterior sem diferenças, publicação READY e QA APPROVED. | Codex / Vault / QA / DevOps |
 | 2026-10-20 | 1.0 | Story para comparação global e atualização exclusiva de histórico/autoria, com prévia e salvaguardas de backfill. | River (SM) |
