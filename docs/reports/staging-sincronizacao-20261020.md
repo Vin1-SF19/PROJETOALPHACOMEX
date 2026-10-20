@@ -142,4 +142,14 @@ Checksum SHA-256 do lockfile idêntico ao da base: `3bf04c2b4134bb44c017189c574a
 
 ## Publicação e verificação
 
-Pendente: commit, push somente para staging, deployment READY e verificação do domínio remoto e da preservação do target production. A configuração administrativa Smart/Revisão tem backup e evidências próprios registrados na story principal.
+Commit do aplicativo: `2d80e4f0ccd3142b1b1f7b6ccc6345c33a127d1c`, 98 arquivos. Push `HEAD:staging` concluído sem force; branch `main` preservada. Deploy automático custom staging READY identificado como `dpl_FXxXhhByQ5g4wppqZd4ZTTpQjvo4`, URL `https://painel-alpha-projeto-gdsrpte2n-alpha-comexs-projects.vercel.app`.
+
+Verificação remota às `2026-10-20T20:51:54Z`:
+
+- Deployment READY, `customEnvironment.id = env_sKT0JOh0HB03g20jmcqN5pTHMjqT`, slug `staging`, SHA do aplicativo `2d80e4f0ccd3142b1b1f7b6ccc6345c33a127d1c`.
+- Alias `staging.alpha-comex.com` aponta para o mesmo deployment `dpl_FXxXhhByQ5g4wppqZd4ZTTpQjvo4` na API da Vercel.
+- HTTP `/`: 200; CRM e central de automações: 307 para `/?acesso=bloqueado` sem sessão, conforme proteção esperada; API de oportunidades: 401 sem credenciais.
+- Target production segue `dpl_6w5Pbv2Jw3VM72gmtB7LkpAuq6hz`; branch remota `main` segue `1504a1c6255693073ef437d2103d271065d7168a`.
+- Evidência local sem segredos: `/tmp/alpha-staging-deployment-evidence.json` e `/tmp/alpha-staging-remote-smoke.json`.
+
+Configuração administrativa staging concluída pelo agente principal às `2026-10-20T20:50:06.837Z`: Smart versão 2, `Enviar para REVISÃO` na ordem 3 antes de `CLIENTES CANCELADOS` na ordem 4; automação `cmvh5pf9a001yg5ihmwgah3mh` ativa, versão 1, destino Operacional/Revisão. Preflight repetido confirmou `JA_CONFIGURADO`. Cards Smart e etapas Operacional preservados por comparação antes/depois. Backup consistente staging anterior à configuração: 337 tabelas, 295171 linhas, dump de 308225012 bytes, SHA-256 `f23c7834fa0348c6836843ae8836cf7166a15b1ef01d3d4b9739b863182a1b0c`. Dump e manifesto permanecem em `database-backups/pre-change/`, fora do Git. Evidências completas e limites da validação autenticada estão nas stories da entrega.
