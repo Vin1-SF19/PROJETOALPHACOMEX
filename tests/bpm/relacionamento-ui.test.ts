@@ -3,6 +3,7 @@ import React, { act, createElement as h } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { CampoBpmInput } from "@/app/PainelAlpha/AlphaCRM/CampoBpmInput";
+import { PainelResumoEtapas } from "@/app/PainelAlpha/AlphaCRM/CardModal/PainelResumoEtapas";
 import { FormularioEtapaWorkspace, type FormularioEtapaAdmin } from "@/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/FormularioEtapaWorkspace";
 import { PipelineEditorStateProvider } from "@/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/PipelineEditorStateProvider";
 import { SalvarFormularioEtapaBpm } from "@/actions/bpm/FormulariosEtapa";
@@ -58,23 +59,43 @@ it("mantém relacionamento na composição/publicação e remove apenas da cria�
   ]);
 });
 
-it("mantém campo Usuário existente renderizável apesar de removê-lo da criação", async () => {
+it("exibe nomes no campo Usuário e envia somente o ID ao selecionar", async () => {
   const onChange = vi.fn();
-  const campoUsuario = { ...campo, id: "usuario-existente", nome: "Responsável legado", tipo: "usuario" };
+  const campoUsuario = { ...campo, id: "usuario-existente", nome: "Vendedor responsável", tipo: "usuario",
+    usuariosOpcoes: [{ id: 42, nome: "Closer original", ativo: true }, { id: 51, nome: "Outro vendedor", ativo: true }] };
   await act(async () => root.render(h(CampoBpmInput, {
     campo: campoUsuario,
     value: "42",
     onChange,
     className: "",
   })));
-  const input = container.querySelector<HTMLInputElement>("input")!;
-  expect(input.type).toBe("number");
+  const input = container.querySelector<HTMLSelectElement>("select")!;
   expect(input.value).toBe("42");
+  expect(input.selectedOptions[0].textContent).toBe("Closer original");
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "51");
-    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.value = "51";
+    input.dispatchEvent(new Event("change", { bubbles: true }));
   });
   expect(onChange).toHaveBeenCalledWith("51");
+});
+
+it.each([
+  { value: "42", nome: "Closer original" },
+  { value: "999", nome: "Usuário indisponível" },
+  { value: "Closer legado", nome: "Closer legado" },
+  { value: "", nome: "" },
+])("campo de usuário somente leitura mostra '$nome' sem expor ID", async ({ value, nome }) => {
+  const onChange = vi.fn();
+  await act(async () => root.render(h(CampoBpmInput, {
+    campo: { ...campo, tipo: "usuario", somenteLeitura: true,
+      usuariosOpcoes: [{ id: 42, nome: "Closer original", ativo: false }] },
+    value, onChange, className: "",
+  })));
+  const input = container.querySelector<HTMLInputElement>("input")!;
+  expect(input.type).toBe("text");
+  expect(input.value).toBe(nome);
+  expect(input.readOnly).toBe(true);
+  expect(onChange).not.toHaveBeenCalled();
 });
 
 it.each([false, true])("renderiza valor existente com readOnly=%s", async (readOnly) => {
@@ -91,4 +112,17 @@ it.each([false, true])("renderiza valor existente com readOnly=%s", async (readO
     });
     expect(onChange).toHaveBeenCalledWith("Novo parceiro");
   }
+});
+
+it("resumo de etapas anteriores apresenta o nome resolvido do vendedor", async () => {
+  await act(async () => root.render(h(PainelResumoEtapas, {
+    accent: "1,2,3",
+    etapas: [{ id: "antes", nome: "Comercial", ordem: 0 }, { id: "atual", nome: "Financeiro", ordem: 1 }],
+    card: {
+      id: "card", etapa: { id: "atual" }, historico: [],
+      campoValores: [{ id: "valor", valor: "42", valorExibicao: "Closer original",
+        campo: { nome: "Vendedor responsável", etapaConfiguracoes: [{ etapaId: "antes" }] } }],
+    } as unknown as React.ComponentProps<typeof PainelResumoEtapas>["card"],
+  })));
+  expect(container.querySelector("dd")?.textContent).toBe("Closer original");
 });

@@ -29,6 +29,7 @@ Como usuário do CRM/BPM, quero que o AlphaCRM independente e o Painel Alpha se 
 
 ## Checklist
 
+- [x] Remover o botão “Abrir CRM independente” e sua propriedade no layout, conforme correção solicitada pelo usuário em 20/10/2026.
 - [x] Story criada a partir do pedido do usuário e do inventário inicial dos módulos CRM/BPM.
 - [x] Expor snapshot paginado dos recursos do BPM e manifesto de 66 recursos para a sincronização do CRM.
 - [x] Implementar autenticação por token de servidor, cliente HTTP e exemplo das variáveis de integração no Painel Alpha.
@@ -58,8 +59,8 @@ O link do Painel Alpha agora emite um ticket assinado de 30 segundos para o Alph
 - `src/lib/alpha-crm/client.ts` — cliente HTTP do AlphaCRM independente.
 - `src/app/api/integrations/alpha-crm/snapshot/route.ts` — snapshot paginado do CRM/BPM.
 - `src/app/api/integrations/alpha-crm/opportunities/route.ts` — consulta e criação de oportunidades via CRM independente.
-- `src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx` — integração no layout do CRM.
-- `src/app/PainelAlpha/AlphaCRM/layout.tsx` — integração no layout do CRM.
+- `src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx` — botão “Abrir CRM independente” removido por solicitação do usuário.
+- `src/app/PainelAlpha/AlphaCRM/layout.tsx` — removido envio da URL de entrada independente ao layout.
 - `src/app/api/integrations/alpha-crm/entry/route.ts` — entrada assinada após sessão e permissão no Painel Alpha.
 - `package.json` e `package-lock.json` — declaração direta da dependência `jose` usada para assinar tickets.
 
@@ -67,8 +68,29 @@ O link do Painel Alpha agora emite um ticket assinado de 30 segundos para o Alph
 
 | Date | Description |
 | --- | --- |
+| 2026-10-20 | Removido o botão “Abrir CRM independente”, criado sem solicitação do usuário, e o parâmetro que o exibia no layout. |
 | 2026-09-26 | Story criada para integração bidirecional do CRM/BPM com banco separado e API autenticada. |
 | 2026-09-26 | Atualizado escopo implementado, verificação local e lacunas de paridade. |
 | 2026-09-26 | Removido login próprio do CRM; adicionada entrada assinada pelo Painel Alpha. |
 | 2026-09-26 | Typecheck e build dos dois projetos concluídos; teste local do ticket e da entrada sem sessão concluído. |
 | 2026-09-26 | Corrigido o redirecionamento do CRM sem sessão para a entrada assinada; usuário sem sessão no painel volta à página inicial do painel. A rota pública da entrada ainda não foi implantada. |
+
+## Dev Agent Record — remoção do botão (20/10/2026)
+
+- Pedido: remover o botão “Abrir CRM independente”, que o usuário informou não ter solicitado.
+- Removidos o link, ícone e propriedade `standaloneUrl`; layout não envia mais o endereço da entrada independente. Navegação “Voltar” preservada.
+- Checklist e File List atualizados. Nenhuma alteração de banco.
+- `npm run typecheck`: exit 0; `npm run lint`: exit 0, warnings registrados no log; `npm test`: 661 arquivos e 5.021 testes aprovados, 4 ignorados e 1 todo.
+- Evidências: `/tmp/alpha-remove-crm-button-{typecheck,lint,tests}.log`. Build não executado nesta correção visual. Sem commit/push naquele momento; solicitação posterior atendida pela entrega abaixo.
+
+
+### Entrega isolada para staging — 20/10/2026
+
+Correções preparadas sobre `80078d9e43530fd7d4babbd153dc695ea36688b2`, com commit/push solicitado pelo usuário. Alterações concorrentes mantidas fora deste patch.
+
+- `npm run typecheck`: exit 0, `/tmp/alpha-vendedor-staging-typecheck.log`.
+- `npm run lint`: exit 0, zero erros e 1.193 warnings, `/tmp/alpha-vendedor-staging-lint.log`.
+- `npm test`: 641 arquivos aprovados, 4 com falha e 1 ignorado; 4.809 testes aprovados, 6 com falha, 7 ignorados e 1 todo. Falhas idênticas às já documentadas na base: Builder (3), scroll do modal (1), Próximo Contato (2) e importação da suíte de arquivamento. Nenhuma falha nova no delta. `/tmp/alpha-vendedor-staging-tests.log`.
+- Build equivalente aprovado: Prisma/player oficiais, `next build --webpack`, heap de 4.096 MiB e uma CPU, sem alterar package/configuração versionada. Exit 0, 147,57 segundos; `/tmp/alpha-vendedor-staging-build-result.json` e `/tmp/alpha-vendedor-staging-build.log`.
+- A suíte do workspace integrado registrada acima e esta validação isolada possuem conjuntos diferentes de alterações. As falhas preexistentes não são apresentadas como aprovação global.
+- Nenhuma migration ou escrita no banco realizada nesta entrega.

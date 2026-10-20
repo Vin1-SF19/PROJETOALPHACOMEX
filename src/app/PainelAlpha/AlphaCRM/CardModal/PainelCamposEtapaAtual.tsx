@@ -1,5 +1,6 @@
 "use client";
 import { criarRastreadorRascunho } from "@/lib/bpm/rascunho-versionado";
+import { nomeUsuarioCampoBpm } from "@/lib/bpm/usuarios-campos";
 import { criarRascunhoOrigem, extrairPayloadOrigem, lerRascunhoOrigem, valorInicialCampo } from "@/lib/bpm/origem-cliente";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 import { useEffect, useRef, useState } from "react";
@@ -138,8 +139,12 @@ export function PainelCamposEtapaAtual({
     setDraft(idInstancia, pendentes.length ? { ...valoresRef.current } : undefined);
     setPendingFields(`${card.id}:${idInstancia}`, pendentes.map((campo) => ({
       label: campoLabels[campo.id] ?? campo.nome,
-      before: lerRascunhoOrigem(snapshotAtivoRef.current.valores[campo.id] ?? "")?.origem ?? snapshotAtivoRef.current.valores[campo.id] ?? "",
-      after: lerRascunhoOrigem(valoresRef.current[campo.id] ?? "")?.origem ?? valoresRef.current[campo.id] ?? "",
+      before: campo.tipo === "usuario"
+        ? nomeUsuarioCampoBpm(snapshotAtivoRef.current.valores[campo.id], campo.usuariosOpcoes ?? [])
+        : lerRascunhoOrigem(snapshotAtivoRef.current.valores[campo.id] ?? "")?.origem ?? snapshotAtivoRef.current.valores[campo.id] ?? "",
+      after: campo.tipo === "usuario"
+        ? nomeUsuarioCampoBpm(valoresRef.current[campo.id], campo.usuariosOpcoes ?? [])
+        : lerRascunhoOrigem(valoresRef.current[campo.id] ?? "")?.origem ?? valoresRef.current[campo.id] ?? "",
     })));
   }
   function alterarCampo(id: string, valor: string) {

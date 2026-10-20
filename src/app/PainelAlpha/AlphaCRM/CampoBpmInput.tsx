@@ -14,6 +14,7 @@ import { nomeSeguroUploadAnexo, obterTipoUploadAnexo, validarUploadAnexo } from 
 import { CAMPO_CHECKLIST_EXCEL, planilhaChecklistValida } from "@/lib/bpm/checklist-envio-operacional";
 import { campoEhOrigemCliente } from "@/lib/bpm/origem-cliente";
 import { CampoOrigemCliente } from "@/app/PainelAlpha/AlphaCRM/CampoOrigemCliente";
+import { idUsuarioCampoBpm, nomeUsuarioCampoBpm, type OpcaoUsuarioCampoBpm } from "@/lib/bpm/usuarios-campos";
 
 const TIPOS_ANEXO_ACEITOS = ".pdf,.png,.jpg,.jpeg,.webp,.docx,.xlsx,.xls,.csv";
 const TEMPO_LIMITE_UPLOAD_MS = 10 * 60_000;
@@ -38,6 +39,7 @@ export interface CampoBpmEditavel {
   fonteAtributo?: string | null;
   editavel?: boolean;
   somenteLeitura?: boolean;
+  usuariosOpcoes?: OpcaoUsuarioCampoBpm[];
 }
 
 interface CampoBpmInputProps {
@@ -120,6 +122,26 @@ export function CampoBpmInput({
   const opcoes = campo.tipo === "booleano"
     ? [VALORES.SIM, VALORES.NAO]
     : lerOpcoes(campo.opcoesJson);
+
+  if (campo.tipo === "usuario") {
+    const usuarios = campo.usuariosOpcoes ?? [];
+    const usuarioSelecionado = usuarios.find((usuario) => usuario.id === idUsuarioCampoBpm(value));
+    if (bloqueado || campo.somenteLeitura || campo.editavel === false) {
+      return <input id={`campo-bpm-${campo.id}`} className={className} type="text"
+        value={nomeUsuarioCampoBpm(value, usuarios)} readOnly disabled={disabled}
+        aria-readonly="true" aria-invalid={invalid || undefined} aria-describedby={describedBy} />;
+    }
+    return <select id={`campo-bpm-${campo.id}`} className={cn(className, "bg-slate-900 text-slate-100")}
+      value={usuarioSelecionado ? String(usuarioSelecionado.id) : value} required={campo.obrigatorio}
+      aria-required={campo.obrigatorio} aria-invalid={invalid || undefined} aria-describedby={describedBy}
+      onChange={(event) => onChange(event.target.value)} onBlur={onBlur}>
+      <option value="">Selecione...</option>
+      {value && !usuarioSelecionado && <option value={value} disabled>{nomeUsuarioCampoBpm(value, usuarios)}</option>}
+      {usuarios.map((usuario) => <option key={usuario.id} value={String(usuario.id)} disabled={!usuario.ativo}>
+        {usuario.nome}
+      </option>)}
+    </select>;
+  }
 
   if (campoEhOrigemCliente(campo)) {
     return <CampoOrigemCliente id={`campo-bpm-${campo.id}`} value={value} onChange={onChange} onBlur={onBlur}
@@ -491,7 +513,7 @@ export function CampoBpmInput({
       aria-invalid={invalid || undefined}
       aria-describedby={describedBy}
       type={
-        ["numero", "moeda", "percentual", "usuario"].includes(campo.tipo) ? "number"
+        ["numero", "moeda", "percentual"].includes(campo.tipo) ? "number"
           : campo.tipo === "data" ? "date"
             : campo.tipo === "data_hora" ? "datetime-local"
               : campo.tipo === "email" ? "email"

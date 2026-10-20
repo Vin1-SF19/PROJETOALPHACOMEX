@@ -102,7 +102,7 @@ export function PainelResumoEtapas({ card, etapas, accent, ocultarTitulo }: Prop
                     {camposPreenchidos.map((campoValor) => (
                       <div key={campoValor.id} className="border-l-2 border-white/10 pl-2.5">
                         <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{campoValor.campo.nome}</dt>
-                        <dd className="mt-0.5 break-words text-xs leading-relaxed text-slate-300">{formatarValorResumo(campoValor.valor ?? "")}</dd>
+                        <dd className="mt-0.5 break-words text-xs leading-relaxed text-slate-300">{formatarValorResumo(campoValor.valorExibicao ?? campoValor.valor ?? "")}</dd>
                       </div>
                     ))}
                   </dl>

@@ -6,6 +6,8 @@ import { PIPELINE_CHAVE, CHAVES_CAMPOS, VALORES, CHAVE_AUTOMACAO_HANDOFF } from 
 import { PIPELINE_OPERACIONAL_ID } from "@/lib/bpm/financeiro-config.client";
 import { extrairPathnamePrivadoAnexoBpm } from "@/lib/bpm/anexos-storage";
 import { avaliarFormalizacaoFinanceira } from "@/lib/bpm/financeiro-formalizacao";
+import { carregarUsuariosCamposBpm } from "@/lib/bpm/usuarios-campos-server";
+import { nomeUsuarioCampoBpm } from "@/lib/bpm/usuarios-campos";
 
 const CAMPOS = [
   ["Contato", CHAVES_CAMPOS.CONTATO_RESPONSAVEL],
@@ -67,6 +69,11 @@ export async function carregarResumoContratacao(financeiroCardId: string) {
       || valoresComerciais.get(campo.id)?.trim() || null;
   };
   const anexoContratoId = valor(CHAVES_CAMPOS.ANEXO_ASSINADO);
+  const vendedor = valor(CHAVES_CAMPOS.VENDEDOR_RESPONSAVEL);
+  const usuariosVendedor = await carregarUsuariosCamposBpm([vendedor], false);
+  // Resumos antigos podem conter o nome como texto; nunca trocar pelo responsável
+  // atual do Financeiro/Operacional, que pode ser outra pessoa.
+  const vendedorNome = vendedor ? nomeUsuarioCampoBpm(vendedor, usuariosVendedor) : null;
   const anexoPrivadoVinculado = Boolean(anexoContratoId && card.anexos.some((anexo) =>
     anexo.id === anexoContratoId && extrairPathnamePrivadoAnexoBpm(anexo.url)));
   const contratoAssinado = avaliarFormalizacaoFinanceira({
@@ -93,7 +100,9 @@ export async function carregarResumoContratacao(financeiroCardId: string) {
       { nome: "CNPJ", valor: card.empresa.cnpj ?? null },
       { nome: "Razão Social", valor: card.empresa.razaoSocial ?? null },
       { nome: "Contrato assinado", valor: contratoAssinado ? "Sim" : "Não" },
-      ...CAMPOS.map(([nome, chave]) => ({ nome, valor: valor(chave) })),
+      ...CAMPOS.map(([nome, chave]) => ({
+        nome, valor: chave === CHAVES_CAMPOS.VENDEDOR_RESPONSAVEL ? vendedorNome : valor(chave),
+      })),
       { nome: "Data de conclusão da contratação", valor: card.concluidoEm?.toISOString() ?? null },
     ],
     documentos: [...card.anexos, ...(comercial?.anexos ?? [])].map((anexo) => ({

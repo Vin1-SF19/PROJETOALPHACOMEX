@@ -20,6 +20,8 @@ import { montarContextoAvaliacaoDoCard } from "@/lib/bpm/regras/contexto";
 import type { ContextoAvaliacao } from "@/lib/bpm/regras/types";
 import { BPM_PIPELINE_KEYS } from "@/lib/bpm/ontology";
 import { campoEhOrigemCliente } from "@/lib/bpm/origem-cliente";
+import { carregarUsuariosCamposBpm } from "@/lib/bpm/usuarios-campos-server";
+import { idUsuarioCampoBpm, type OpcaoUsuarioCampoBpm } from "@/lib/bpm/usuarios-campos";
 
 type ClienteRequisitosEtapa = Pick<
   typeof db,
@@ -30,6 +32,7 @@ type ClienteRequisitosEtapa = Pick<
   | "contratoComercial"
   | "servicosComerciais"
   | "businessProcess"
+  | "usuarios"
 >;
 
 type ClienteTransicaoBpm = typeof db | Prisma.TransactionClient;
@@ -97,6 +100,7 @@ export type CampoAplicavelEtapaBpm = {
   condicaoObrigatoriedadeJson?: string | null;
   valor: string | null;
   parceiroOrigemId?: number | null;
+  usuariosOpcoes?: OpcaoUsuarioCampoBpm[];
 };
 
 export type PerfilAcessoCampoBpm = "ADMIN" | "RESPONSAVEL" | "MEMBRO";
@@ -401,7 +405,7 @@ export async function carregarCamposAplicaveisCardEtapa(
   const cardOrigem = campos.some(campoEhOrigemCliente)
     ? await client.bpmCard.findUnique({ where: { id: cardId }, select: { indicacaoOrigem: { select: { parceiroId: true, status: true } } } })
     : null;
-  return campos.map((campo) => {
+  const camposComValores = campos.map((campo) => {
     const valorPersistido = valorPorCampo.get(campo.id) ?? null;
     const mapeamento = mapeamentos.find((item) => item.campoDestinoId === campo.id);
     const valorPadraoExibivel = campo.valorPadrao === "{{agora.data}}" || campo.valorPadrao === "{{agora.instante}}"
@@ -427,6 +431,18 @@ export async function carregarCamposAplicaveisCardEtapa(
       editavel: campo.editavel !== false && !resolvidos.somenteLeitura.has(campo.id),
     };
   });
+  const camposUsuario = camposComValores.filter((campo) => campo.tipo === "usuario");
+  if (!camposUsuario.length) return camposComValores;
+  const usuarios = await carregarUsuariosCamposBpm(
+    camposUsuario.map((campo) => campo.valor),
+    camposUsuario.some((campo) => campo.editavel && !campo.somenteLeitura),
+    client,
+  );
+  return camposComValores.map((campo) => campo.tipo === "usuario" ? {
+    ...campo,
+    usuariosOpcoes: usuarios.filter((usuario) => usuario.id === idUsuarioCampoBpm(campo.valor)
+      || (usuario.ativo && campo.editavel && !campo.somenteLeitura)),
+  } : campo);
 }
 
 /**

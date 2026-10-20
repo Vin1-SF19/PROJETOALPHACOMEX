@@ -1,4 +1,6 @@
 "use server";
+import { carregarUsuariosCamposBpm } from "@/lib/bpm/usuarios-campos-server";
+import { nomeUsuarioCampoBpm } from "@/lib/bpm/usuarios-campos";
 import { resolverAutoridadeMovimentoLivre } from "@/lib/bpm/lideranca-setor";
 import { carregarEscopoLeituraBpm } from "@/lib/bpm/visao-equipe-server";
 import { randomUUID } from "node:crypto";
@@ -843,11 +845,18 @@ export async function ObterCardBpm(cardId: string) {
       ? await carregarResumoContratacao(card.id)
       : origemFinanceira ? await carregarResumoContratacao(origemFinanceira.cardOrigemId)
         : financeiroVisivel ? await carregarResumoContratacao(financeiroVisivel) : null;
+    const usuariosCampos = await carregarUsuariosCamposBpm(
+      card.campoValores.filter(({ campo }) => campo.tipo === "usuario").map(({ valor }) => valor), false,
+    );
 
     return {
       success: true,
       data: {
         ...card,
+        campoValores: card.campoValores.map((item) => ({
+          ...item,
+          valorExibicao: item.campo.tipo === "usuario" ? nomeUsuarioCampoBpm(item.valor, usuariosCampos) : item.valor,
+        })),
         podeMoverLivremente: Boolean(acessoCard.autoridadeMovimentoLivre),
         dataPerdaEm,
         resumoContratacao,
