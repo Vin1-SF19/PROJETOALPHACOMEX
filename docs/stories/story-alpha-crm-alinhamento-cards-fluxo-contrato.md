@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress — código implementado e revisado em 20/10/2026. Lint/typecheck/testes aprovados; build de produção interrompido por OOM do ambiente. Publicação bloqueada até build aprovado. Configuração persistente preparada, não aplicada, aguardando checkpoint Vault específico.
+Ready for Review — entrega publicada em 20/10/2026 e configuração autorizada aplicada, versão 34. QA APPROVED; lint/typecheck, 4.924 testes e builds remotos aprovados. Vault confirmou 21 verificações pós-aplicação sem divergências. Resta homologação operacional autenticada com Nai/Naila.
 
 ## Executor Assignment
 
@@ -51,8 +51,8 @@ In Progress — código implementado e revisado em 20/10/2026. Lint/typecheck/te
 - [x] Completar consulta e retorno do contrato validado via vínculo Comercial/Financeiro, com proteção contra regressão de status (AC 7–8, 11–12).
 - [x] Implementar ação pós-fechamento estreita e autorizada para acompanhamento de envio; manter somente leitura geral (AC 9, 12).
 - [x] Revisar registro de pagamento e deduplicação pela contratação, incluindo duas contratações da mesma empresa (AC 10–12).
-- [x] Cobrir cenários focais, executar gates e revisar autorização/concorrência/idempotência (AC 14). Build executado e bloqueado por OOM; não aprovado.
-- [x] Atualizar evidências, limitações, File List e status; distinguir código entregue de configuração ainda não aplicada (AC 13–14).
+- [x] Cobrir cenários focais, executar gates e revisar autorização/concorrência/idempotência (AC 14). Build remoto aprovado após as tentativas locais interrompidas por memória.
+- [x] Atualizar evidências, limitações, File List e status; registrar publicação e aplicação autorizada da configuração (AC 13–14).
 
 ## Dev Notes
 
@@ -132,13 +132,13 @@ Checklist aplicado: `.aiox-core/product/checklists/story-draft-checklist.md`.
 
 ### Completion Notes
 
-Implementação local concluída nos pontos de UI, compatibilidade de etapas, autoria RD e acompanhamento contratual. Nenhuma mudança persistente de banco ou publicação foi executada. Configuração revisável e rollback preparados, com backup completo verificado pelo Vault; aguardam autorização específica e publicação do código compatível.
+Implementação publicada no domínio de produção em `dpl_9ExDHA2EK2Te4nZCSRpKDr9Zdh5t`, sobre base `1504a1c6255693073ef437d2103d271065d7168a`, com somente o patch próprio desta story. Configuração aplicada após autorização específica e verificação completa do backup. A primeira transação encontrou SQLITE_BUSY e não alterou o estado, confirmado por leitura independente; a repetição do mesmo comando concluiu com sucesso. Vault confirmou nomes/chaves, obrigatoriedade do e-mail, tarifário opcional, pagamentos preservados, pipeline 34/formulário 3 e auditoria única `cmvgxpdh90005adihbf9xxa10`.
 
 Relatório funcional e pendências: [entrega](./relatorio-alpha-crm-alinhamento-cards-fluxo.md). Revisão de dados: [Vault](./relatorio-vault-crm-alinhamento.md).
 
 Decisões adicionais verificadas no código: o UUID da URL de conferência é `tokenAcesso`, não ID do documento; o upload confirma o campo diretamente, por isso tem hook próprio; eventos de sistema omitem `atorUserId`; IDs determinísticos de tarefas reutilizam o gerador compatível com CUID. Tarefa de envio é única por contratação, inclusive após substituição do PDF. A solicitação de conferência financeira não confirma pagamento.
 
-DoD: requisitos de código e configuração preparada atendidos; segurança/revisão e testes executados; nenhuma dependência ou variável de ambiente nova. Homologação autenticada com Nai/Naila, aplicação da configuração e publicação permanecem pendentes. Não houve exercício de movimentação/upload em dados reais. Documentos de framework ausentes foram registrados nas Dev Notes. Modelo executor: GPT-6/Codex.
+DoD: requisitos de código e configuração aplicada atendidos; segurança/revisão, testes e builds executados; nenhuma dependência ou variável de ambiente nova. Homologação autenticada com Nai/Naila permanece pendente. Não houve exercício de movimentação/upload em dados reais. Documentos de framework ausentes foram registrados nas Dev Notes. Modelo executor: GPT-6/Codex.
 
 ### File List
 
@@ -214,6 +214,24 @@ DoD: requisitos de código e configuração preparada atendidos; segurança/revi
 
 **Arquivo alterado pelo QA:** somente esta seção da story. Recomendação: manter a entrega sem publicação até a confirmação do build; não há correção de código aberta decorrente desta revisão.
 
+
+#### Revalidação do artefato de publicação — Quinn — 20/10/2026
+
+**Decisão atual: APPROVED para o patch revisado.** O bloqueio anterior de build foi resolvido pela compilação remota. Nenhum achado de código permanece aberto. A aprovação técnica não registra aplicação de configuração ao banco nem promoção do domínio; essas operações seguem a coordenação do executor e do Vault.
+
+**Identidade do artefato:** checkout `/home/ialpha/projetos/alpha-comex/painel-alpha-worktrees/crm-alinhamento-prod-base-20261020`, baseado na produção confirmada `1504a1c6255693073ef437d2103d271065d7168a`; patch SHA-256 `23ad30083b76a0c4e61be3867fcbfd7d62549f6052e6a5197220e011ee6604a9`. Manifesto conferido com **39/39 arquivos presentes**. A omissão inicial do teste de actions foi identificada pelo QA, corrigida pelo DevOps e revalidada byte a byte. O tratamento preexistente `manualRd`, as permissões de destino e as melhorias anteriores de cadastro foram preservados.
+
+**Gates do artefato exato de publicação:**
+
+- Typecheck: **exit 0**, informado pelo DevOps; `../painel-alpha-worktrees/crm-alinhamento-prod-typecheck.log`.
+- Lint: **exit 0, 0 erros e 1.193 warnings**; `../painel-alpha-worktrees/crm-alinhamento-prod-lint.log`, conferido pelo QA.
+- Suíte completa: **654 arquivos aprovados; 4.924 testes aprovados, 4 ignorados e 1 todo**; `../painel-alpha-worktrees/crm-alinhamento-prod-full-tests.log`, conferido pelo QA. Este resultado substitui, para a publicação, os 4.941 testes do workspace mais amplo registrados na revisão anterior.
+- Regressões focais no checkout: **9 arquivos, 74 testes aprovados**, informados pelo DevOps.
+- Build remoto: deployment de preview `dpl_HGxKK2fARxUvHCVX9axXBmMkrjXj`, estado **READY** confirmado pelo DevOps na API. Log conferido: compilação concluída e 80 páginas estáticas geradas; warnings de `pdfjs-polyfill` não bloquearam o build. Preview: `https://painel-alpha-projeto-mjbf487bd-alpha-comexs-projects.vercel.app`. Evidências em `../painel-alpha-worktrees/crm-alinhamento-preview-build.log` e `crm-alinhamento-preview-metadata.json`.
+- Smokes não autenticados, conferidos no arquivo `../painel-alpha-worktrees/crm-alinhamento-preview-smoke.json`: `/` retorna **200**, `/PainelAlpha/AlphaCRM` retorna **307** para `/?acesso=bloqueado`, e `/api/bpm/cards/invalid/contrato` retorna **401**.
+
+**Limites:** os smokes comprovam resposta pública e proteção de acesso; não substituem homologação autenticada do documento com Nai/Naila. Alterações persistidas dependem da execução do plano autorizado e validado pelo Vault. Nenhuma escrita de banco, alteração de código ou promoção foi realizada pelo QA. Esta revalidação alterou somente a seção QA Results da story original.
+
 ## Change Log
 
 | Data | Versão | Descrição | Autor |
@@ -223,14 +241,18 @@ DoD: requisitos de código e configuração preparada atendidos; segurança/revi
 
 ## DoD e liberação
 
-- [x] Implementação e critérios locais revisados; proteção de autorizações, transações, documentos e idempotência verificada.
-- [x] Checklist da story e File List atualizados; relatório funcional e relatório Vault disponíveis.
-- [x] `npm run lint`: zero erros, 1.193 avisos existentes; sem novos avisos nos arquivos desta implementação.
-- [x] `npm run typecheck`: aprovado.
-- [x] `npm test`: 654 arquivos, 4.941 testes aprovados, 4 ignorados, 1 todo. Cobertura agregada: 64,91% statements / 68,41% lines; sem meta nova definida nesta story.
-- [ ] Build de produção concluído. `npm run build` e repetição isolada (`NEXT_DIST_DIR=.next-crm-alinhamento`) compilaram com avisos em módulo Bibble preexistente, mas worker foi encerrado. A última tentativa sequencial teve SIGKILL; kernel em 20/10/2026 16:34:19 UTC registrou `global_oom` e processo de cerca de 13 GB RSS. Não alterar serviços de terceiros nem publicar com gate incompleto. Log: `/tmp/crm-build-complete.log`.
+- [x] Implementação e critérios revisados; proteção de autorizações, transações, documentos e idempotência verificada.
+- [x] Checklist e File List atualizados; relatório funcional e relatório Vault disponíveis.
+- [x] `npm run lint`: zero erros, 1.193 avisos existentes.
+- [x] `npm run typecheck`: aprovado no pacote isolado baseado em produção.
+- [x] `npm test`: 654 arquivos, 4.924 testes aprovados, 4 ignorados, 1 todo no pacote publicado. Cobertura: 65,66% statements / 69,13% lines.
+- [x] Builds de preview e produção concluídos na Vercel; QA APPROVED. As tentativas locais com OOM permanecem documentadas como histórico e não contam como aprovação.
+- [x] Código compatível publicado no domínio existente, sem incluir alterações de outras tarefas.
+- [x] Autorização específica recebida para o plano do banco; Vault revalidou fingerprint, backup e conta auditora.
+- [x] Configuração aplicada e verificada por 21 checks independentes; pipeline 33→34, formulário 2→3, auditoria com fingerprint aprovado e três formas de pagamento preservadas.
+- [x] Nenhuma dependência/schema/variável de ambiente nova; audiência e proteções preservadas. Sem commit ou push nesta entrega.
 - [ ] Homologação autenticada/visual e ciclo com Nai/Naila em ambiente apropriado.
-- [ ] Aplicação da configuração no banco (prévia + rollback prontos; depende do código publicado e aprovação específica).
-- [x] Nenhuma dependência/schema/variável de ambiente nova. Sem mutation remota, deploy, commit ou push nesta entrega.
 
-**Estado de entrega:** código disponível para revisão; liberação permanece pendente de build em ambiente com recursos suficientes, homologação e checkpoint do banco. A falha de build não foi atribuída ao código e também não foi contada como aprovação.
+**Estado de entrega:** melhorias publicadas e configuração aplicada. Admin/líderes sem obrigatoriedades e novas formas de pagamento permanecem nas pendências já registradas, sem ampliação deste escopo.
+
+**Artefato publicado:** checkout `/home/ialpha/projetos/alpha-comex/painel-alpha-worktrees/crm-alinhamento-prod-base-20261020`; patch SHA-256 `23ad30083b76a0c4e61be3867fcbfd7d62549f6052e6a5197220e011ee6604a9`. Deployment ativo `dpl_9ExDHA2EK2Te4nZCSRpKDr9Zdh5t`. Logs, manifesto e relatório DevOps estão no diretório pai do checkout. Antes de futura publicação pelo Git, incorporar o patch à linha correspondente para preservar as melhorias.

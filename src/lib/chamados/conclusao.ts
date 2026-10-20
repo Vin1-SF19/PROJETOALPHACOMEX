@@ -6,7 +6,7 @@ export class ErroConclusaoChamado extends Error {
     const mensagens = {
       NAO_ENCONTRADO: "Chamado não encontrado.",
       STATUS_INVALIDO: "Somente chamados em atendimento podem ser finalizados.",
-      SEM_PERMISSAO: "Somente o responsável ativo do setor de destino que assumiu o chamado pode finalizá-lo.",
+      SEM_PERMISSAO: "Somente o responsável ativo e autorizado que assumiu o chamado pode finalizá-lo.",
       CONCORRENCIA: "O chamado foi alterado por outro usuário. Atualize a página e tente novamente.",
     } satisfies Record<ErroConclusaoChamado["code"], string>;
     super(mensagens[code]);

@@ -71,9 +71,9 @@ describe("listarPendenciasBpm", () => {
     expect(prismaMock.bpmCard.findMany).not.toHaveBeenCalled();
   });
 
-  it.each(["sem vínculo", "etapa oculta"])("não expõe dados: %s", async (caso) => {
+  it.each(["pipeline negado", "etapa oculta"])("não expõe dados: %s", async (caso) => {
     prismaMock.bpmCard.findMany.mockResolvedValue([CARD_BASE]);
-    if (caso === "sem vínculo") prismaMock.bpmCardMembro.findUnique.mockResolvedValue(null);
+    if (caso === "pipeline negado") prismaMock.bpmCard.findUnique.mockResolvedValue({ pipelineId: CARD_BASE.pipelineId, responsavelId: 99, pipeline: { setores: [{ setor: { nome: "FINANCEIRO" } }] }, etapa: { nome: "Em tratativa", visibilidades: [] } });
     if (caso === "etapa oculta") prismaMock.bpmCard.findUnique.mockResolvedValue({ pipelineId: CARD_BASE.pipelineId, responsavelId: 99, pipeline: { setores: [] }, etapa: { nome: "Em tratativa", visibilidades: [{ perfil: "COMERCIAL", podeVer: false, podeAgir: false }] } });
     await expect(listarPendenciasBpm(1, true)).resolves.toEqual([]);
     expect(prismaMock.bpmTarefa.findMany).not.toHaveBeenCalled();

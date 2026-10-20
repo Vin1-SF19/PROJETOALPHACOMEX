@@ -20,6 +20,14 @@ Este arquivo define as instrucoes do projeto para o Codex CLI.
 - Atualize checklist e file list da story antes de concluir
 <!-- AIOX-MANAGED-END: quality -->
 
+## Fluxo de ambientes — staging primeiro
+
+- Por decisão explícita do usuário em 2026-10-20, toda mudança deve ser desenvolvida, configurada, publicada e validada primeiro no staging (`https://staging.alpha-comex.com`, branch `staging`).
+- Produção só recebe a entrega após validação no staging e pedido explícito do usuário para promover a versão. Pedido de desenvolvimento ou atualização de staging não autoriza publicação nem configuração em produção.
+- Antes de executar scripts ou alterar configurações, confira o ambiente efetivo e o banco de destino. Use `.env.staging.local` para operações CLI de staging; não presuma que `.env.local` aponta para staging.
+- Mantenha os bancos de staging e produção separados. Não copie banco, dados, arquivos de ambiente ou credenciais de produção para staging como parte de um deploy de código.
+- Os quality gates e a política de segurança/backup de banco abaixo continuam obrigatórios em ambos os ambientes.
+
 ## Database Safety and Backup Policy (NON-NEGOTIABLE)
 
 - Acione o agente `Vault` antes de qualquer alteracao de estrutura ou migracao de banco: tabelas, colunas, indices, chaves, relacionamentos, constraints, tipos, seeds/backfills e operacoes em massa.

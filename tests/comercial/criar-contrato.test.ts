@@ -13,7 +13,7 @@ vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
 vi.mock("@/lib/pusher-server.ts", () => ({ pusherServer: { trigger: vi.fn().mockResolvedValue(undefined) } }));
 vi.mock("./Clientes", () => ({ criarRegistroClienteAPartirDeContrato: vi.fn() }));
 
-import { criarContrato, buscarClienteParaContrato, listarClientesEmConstituicao } from "@/actions/ContratoComercial";
+import { criarContrato, atualizarContrato, buscarClienteParaContrato, listarClientesEmConstituicao } from "@/actions/ContratoComercial";
 
 const SESSION_COMERCIAL = { user: { id: "7", role: "COMERCIAL" } };
 
@@ -108,6 +108,100 @@ describe("criarContrato — resolve OU cria Cliente por CNPJ (Fase 3.6 do Client
 
     expect(resultado).toEqual({ success: false, error: "Empresa em constituição não encontrada" });
     expect(prismaMock.contratoComercial.create).not.toHaveBeenCalled();
+  });
+
+  it("cadastra empresa em constituição sem CNPJ ou cadastro prévio, junto ao contrato", async () => {
+    prismaMock.contratoComercial.create.mockResolvedValue({ id: "contrato-novo" });
+
+    const resultado = await criarContrato(payloadBase({
+      cnpj: undefined, razaoSocial: undefined, empresaEmConstituicao: true,
+    }));
+
+    expect(resultado.success).toBe(true);
+    expect(prismaMock.cliente.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.cliente.create).not.toHaveBeenCalled();
+    expect(prismaMock.contratoComercial.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        cliente: { create: { cnpj: null, razaoSocial: "Em constituição" } },
+        usuario: { connect: { id: 7 } },
+      }),
+    });
+    expect(prismaMock.contratoComercial.create.mock.calls[0][0].data).not.toHaveProperty("clienteId");
+  });
+
+  it("não reaproveita uma empresa genérica entre dois cadastros sem CNPJ", async () => {
+    prismaMock.contratoComercial.create.mockResolvedValue({ id: "contrato-novo" });
+    const payload = payloadBase({ cnpj: undefined, razaoSocial: undefined, empresaEmConstituicao: true });
+    await criarContrato(payload);
+    await criarContrato(payload);
+
+    expect(prismaMock.cliente.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.contratoComercial.create).toHaveBeenCalledTimes(2);
+    for (const [args] of prismaMock.contratoComercial.create.mock.calls) {
+      expect(args.data.cliente).toEqual({ create: { cnpj: null, razaoSocial: "Em constituição" } });
+    }
+  });
+
+  it("trata falha na gravação conjunta sem criar empresa em uma operação separada", async () => {
+    prismaMock.contratoComercial.create.mockRejectedValueOnce(new Error("falha simulada"));
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const resultado = await criarContrato(payloadBase({
+        cnpj: undefined, razaoSocial: undefined, empresaEmConstituicao: true,
+      }));
+      expect(resultado).toEqual({ success: false, error: "Erro ao criar contrato" });
+      expect(prismaMock.cliente.create).not.toHaveBeenCalled();
+    } finally { log.mockRestore(); }
+  });
+
+  it.each([undefined, false, "true"])("não aceita cadastro sem identificação com marcador %s", async (marcador) => {
+    const resultado = await criarContrato(payloadBase({
+      cnpj: undefined, razaoSocial: undefined, empresaEmConstituicao: marcador,
+    }));
+    expect(resultado.success).toBe(false);
+    expect(prismaMock.contratoComercial.create).not.toHaveBeenCalled();
+  });
+
+  it("aplica permissões também ao cadastro em constituição", async () => {
+    prismaMock.usuarios.findUnique.mockResolvedValue({ role: "OPERACIONAL" });
+    const resultado = await criarContrato(payloadBase({ empresaEmConstituicao: true }));
+    expect(resultado).toEqual({ success: false, error: "Sem permissão" });
+    expect(prismaMock.contratoComercial.create).not.toHaveBeenCalled();
+  });
+
+  it("preserva a empresa existente ao editar contrato sem CNPJ", async () => {
+    const id = "cmuh4n69p00000agm844kax9s";
+    prismaMock.contratoComercial.findUnique.mockResolvedValue({ id, clienteId: 42, usuarioId: 7 });
+    prismaMock.cliente.findUnique.mockResolvedValue({ id: 42 });
+    prismaMock.contratoComercial.update.mockResolvedValue({ id, clienteId: 42 });
+
+    const resultado = await atualizarContrato(payloadBase({
+      id, cnpj: undefined, razaoSocial: undefined, clienteId: 42,
+    }));
+
+    expect(resultado.success).toBe(true);
+    expect(prismaMock.contratoComercial.update).toHaveBeenCalledWith({
+      where: { id }, data: expect.objectContaining({ clienteId: 42 }),
+    });
+    expect(prismaMock.contratoComercial.update.mock.calls[0][0].data).not.toHaveProperty("cliente");
+    expect(prismaMock.cliente.create).not.toHaveBeenCalled();
+  });
+
+  it("permite trocar para empresa em constituição na edição sem alterar a empresa anterior", async () => {
+    const id = "cmuh4n69p00000agm844kax9s";
+    prismaMock.contratoComercial.findUnique.mockResolvedValue({ id, clienteId: 42, usuarioId: 7 });
+    prismaMock.contratoComercial.update.mockResolvedValue({ id, clienteId: 99 });
+    const resultado = await atualizarContrato(payloadBase({
+      id, cnpj: undefined, razaoSocial: undefined, empresaEmConstituicao: true,
+    }));
+    expect(resultado.success).toBe(true);
+    expect(prismaMock.contratoComercial.update).toHaveBeenCalledWith({
+      where: { id }, data: expect.objectContaining({
+        cliente: { create: { cnpj: null, razaoSocial: "Em constituição" } },
+      }),
+    });
+    expect(prismaMock.cliente.create).not.toHaveBeenCalled();
+    expect(prismaMock.cliente.findUnique).not.toHaveBeenCalled();
   });
 });
 

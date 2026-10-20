@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
-import { etapaIdCardSchema } from "@/lib/validations/bpm";
+import { bpmCardIdSchema, etapaIdCardSchema } from "@/lib/validations/bpm";
 import { validarParametrosAutomacaoBpm, type AcaoAutomacaoBpm } from "./schemas";
 
 export const TIPOS_EVENTO_AUTOMACAO = [
@@ -186,7 +186,7 @@ export function validarGrafoAutomacao(valor: unknown): GrafoAutomacao {
 
 export const eventoDominioInputSchema = z.object({
   tipo: z.enum(TIPOS_EVENTO_AUTOMACAO), entidadeTipo: z.enum(["CARD", "CAMPO", "TAREFA", "MEMBRO", "VINCULO", "WEBHOOK", "SLA", "SISTEMA"]),
-  entidadeId: z.string().trim().min(1).max(200), cardId: z.string().cuid().optional(), pipelineId: z.string().cuid().optional(),
+  entidadeId: z.string().trim().min(1).max(200), cardId: bpmCardIdSchema.optional(), pipelineId: z.string().cuid().optional(),
   valorAnterior: z.unknown().optional(), valorNovo: z.unknown().optional(), atorTipo: z.enum(["USUARIO", "AUTOMACAO", "SISTEMA", "WEBHOOK"]),
   atorUserId: z.number().int().positive().optional(), atorExecucaoId: z.string().cuid().optional(), correlationId: z.string().trim().min(1).max(200),
   causationId: z.string().trim().max(200).optional(), profundidade: z.number().int().min(0).max(10).default(0),

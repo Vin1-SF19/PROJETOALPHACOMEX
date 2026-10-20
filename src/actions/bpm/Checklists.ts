@@ -25,6 +25,7 @@ import {
 } from "@/lib/bpm/checklists/schemas";
 import {
   materializarChecklistsAplicaveisCard,
+  listarChecklistsMaterializadosCard,
 } from "@/lib/bpm/checklists/service";
 import { carregarResumoChecklistAplicavelCard } from "@/lib/bpm/checklists/integracao";
 import { reconciliarTarefaChecklist } from "@/lib/bpm/checklists/reconciliacao-tarefa";
@@ -45,8 +46,8 @@ async function exigirUsuarioCard(cardId: string, acao: "visualizar" | "editarCar
   const session = await auth();
   if (!session?.user?.id) throw new Error("Não autorizado");
   const userId = Number(session.user.id);
-  await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, acao);
-  return { userId, role: session.user.role ?? null };
+  const acesso = await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, acao);
+  return { userId, role: session.user.role ?? null, acesso };
 }
 
 function erroPublico(error: unknown): string {
@@ -483,7 +484,10 @@ export async function ReordenarItensTemplateChecklistBpm(payload: unknown) {
 export async function ListarChecklistsCardBpm(payload: unknown) {
   try {
     const dados = cardChecklistSchema.parse(payload);
-    const { userId } = await exigirUsuarioCard(dados.cardId, "visualizar");
+    const { userId, acesso } = await exigirUsuarioCard(dados.cardId, "visualizar");
+    if (!acesso.podeAgirEtapa) {
+      return { success: true as const, data: await listarChecklistsMaterializadosCard(dados.cardId), materializados: 0 };
+    }
     const resultado = await materializarChecklistsAplicaveisCard({ cardId: dados.cardId, usuarioId: userId });
     return { success: true as const, data: resultado.checklists, materializados: resultado.criados.length };
   } catch (error) {

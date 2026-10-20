@@ -56,7 +56,6 @@ type Props = {
   chamado: ChamadoDetalhes;
   podeAssumir: boolean;
   podeConcluir: boolean;
-  pertenceAoDestino: boolean;
   usuarioAtualId: number;
   templates?: Template[];
 };
@@ -77,7 +76,7 @@ function tempoAberto(data: Date | string): string {
   return `${d}d`;
 }
 
-export function DetalhesChamado({ chamado, podeAssumir: podeAssumirInicial, podeConcluir, pertenceAoDestino, usuarioAtualId, templates = [] }: Props) {
+export function DetalhesChamado({ chamado, podeAssumir: podeAssumirInicial, podeConcluir, usuarioAtualId, templates = [] }: Props) {
   const [open, setOpen] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [modalProtocolo, setModalProtocolo] = useState(false);
@@ -108,7 +107,7 @@ export function DetalhesChamado({ chamado, podeAssumir: podeAssumirInicial, pode
   const prio = prioridadeConfig[chamado.prioridade] ?? prioridadeConfig.MEDIA;
   const origemBibble = separarOrigemBibbleDaDescricao(chamado.descricao);
   const podeAssumir = podeAssumirInicial && status === "ABERTO" && tecnicoId == null;
-  const podeFinalizar = (podeConcluir || pertenceAoDestino) && status === "EM_ATENDIMENTO" && tecnicoId === usuarioAtualId;
+  const podeFinalizar = (podeConcluir || podeAssumirInicial) && status === "EM_ATENDIMENTO" && tecnicoId === usuarioAtualId;
 
   return (
     <>

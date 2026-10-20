@@ -141,27 +141,6 @@ Implementação e diagnóstico concluídos em 20/10/2026. [Relatório completo](
 
 Snapshots, plano e simulação com dados reais permanecem em `database-backups/pre-change/rd-historico-autoria-2026-10-20/`, ignorados pelo Git.
 
-## Integração restrita em staging — 2026-10-20
-
-O usuário solicitou explicitamente que esta entrega também fosse commitada em `staging`, onde realiza os testes. Foi criado checkout isolado sobre `origin/staging` em `bcc3373c9afda0d455961efcf2e313c5e2dd0784`, sem mover a branch local usada pelo workspace de trabalho.
-
-Foram transportados somente os commits desta entrega: `aa5a5076` → `28cdade7` (cards/fluxo), `4ce99fe6` → `35b50984` (histórico/autoria) e `ef9b739c` → `f387409b` (documentação). O único conflito foi a condição de reconhecimento de Fechado em `transicao-command.ts`: aplicado o alias `etapaEhFechado`, mantendo a política preexistente de staging sem incorporar a funcionalidade `manualRd` que pertence a outra entrega. Origem/parceiro/liderança/ownership de staging foram preservados. Nenhum módulo de chamados/metas, dependência ou lockfile foi incorporado; todos os imports do delta foram resolvidos sem dependência adicional.
-
-Durante a revalidação anterior ao push, staging avançou para `e0a2576cc0f619ffcd1b2e5d1c194a99973ea0ce` com movimentação livre para administradores e líderes. Esse avanço foi integrado no merge `8b194a43`, sem conflito de código. O único conflito documental preservou integralmente a story implementada de administradores/líderes. A comparação final contra `e0a2576c` contém somente 47 arquivos desta entrega CRM; todos os retornos antecipados, guardas e auditoria do movimento livre permanecem intactos.
-
-Validação final do conjunto integrado sobre `e0a2576c`:
-
-- Lint passou: zero erros e 1.193 avisos existentes.
-- Typecheck final passou com heap de 6.144 MiB e afinidade de uma CPU, sem alteração do package. Uma tentativa anterior recebeu SIGTERM sem erro TypeScript; a repetição isolada concluiu. O bundle player foi gerado pelo script oficial.
-- Suíte completa executada: **644 arquivos, 640 aprovados e 4 com falhas; 4.801 testes aprovados, 6 falhas, 4 ignorados e 1 todo**. Não é uma suíte global aprovada.
-- As mesmas seis falhas nos mesmos quatro arquivos foram reproduzidas no baseline final `e0a2576c` (e também no inicial `bcc3373c`), com package/lock/configuração e dependências iguais: Builder (3), layout do modal (1), expectativas antigas de Próximo Contato (2), além da falha de importação da suíte de arquivamento. Nenhuma falha nova foi atribuída ao delta.
-- Build final equivalente aprovado: Prisma/player oficiais e `next build --webpack` com heap de 4.096 MiB, uma CPU e supervisor de 7 GiB; exit 0, 64,71 segundos, pico de 6.065.655.808 bytes, 80 páginas e tracing concluídos. Package intacto; removidas somente inclusões automáticas do diretório temporário no tsconfig.
-- Revisão QA do delta: sem achados; **gate global NEEDS_WORK por falhas preexistentes**, preservado.
-
-**Decisão contextual do orquestrador:** publicar somente em staging após build integrado aprovado, conforme pedido explícito do usuário, com a dívida baseline reproduzida e nenhuma regressão identificada no delta. A exceção não transforma o gate global em aprovado, não autoriza mudanças em produção/main e não amplia o escopo para correções alheias. A aplicação de 447 operações no banco não será repetida.
-
-Evidências externas ao Git: `../painel-alpha-worktrees/crm-staging-e0-gates.json`, `crm-staging-e0-tests.log`, `crm-staging-e0-baseline.log`, `crm-staging-e0-typecheck-final.log`, `crm-staging-e0-lint.log` e `crm-staging-e0-build-4096-result.json`. Destino de testes já conectado ao Git/Vercel: [staging.alpha-comex.com](https://staging.alpha-comex.com). O push deve ser fast-forward, sem force push, com verificação posterior do SHA remoto e do deployment de staging.
-
 ## QA Results
 
 ### Revisão de preparação — 2026-10-20 — Quinn (@qa)
@@ -193,25 +172,6 @@ A conferência V2 cobre 54 negócios e 266 notas; todas as anotações alteradas
 - **Dependências:** o audit reportado por DevOps identificou dívida anterior na árvore de dependências. QA confirmou diff vazio de `package.json` e lockfiles entre a base de produção `1504a1c6` e o commit publicado. A revisão do delta não identificou nova dependência, endpoint ou relaxamento de autenticação/autorização. Isso não equivale a declarar a árvore inteira livre de vulnerabilidades; a dívida preexistente permanece documentada.
 
 Evidências privadas de dados em `database-backups/pre-change/rd-historico-autoria-2026-10-20/`. Evidências de publicação em `../painel-alpha-worktrees/crm-rd-production-metadata.json`, `crm-rd-production-alias-after-promote.json` e `crm-rd-production-smoke-after-promote.json`. Gates finais permanecem os 4.975 testes aprovados, lint/typecheck sem erros e build validado descritos acima. Nenhum achado bloqueante aberto no escopo desta entrega.
-
-### Integração restrita em staging — 2026-10-20 — Quinn (@qa)
-
-**Gate global deste candidato staging: NEEDS_WORK**, por testes preexistentes que continuam falhando. **Revisão do delta da entrega: sem achados ou regressões identificadas.** Esta decisão não altera a aprovação anterior do pacote de produção nem apresenta a suíte staging como aprovada.
-
-Candidato final revisado `8b194a43850c9f383476cf9285bd630defb4871f`, comparado com a base staging atualizada `e0a2576cc0f619ffcd1b2e5d1c194a99973ea0ce`. Ele preserva os cherry-picks `28cdade7`, `35b50984` e `f387409b` e incorpora o avanço concorrente de administradores/líderes antes de qualquer push. A revisão anterior de `f387409b` sobre `bcc3373c` foi substituída por esta revalidação; seus gates não foram usados como prova para a nova base. O delta final de **47 arquivos** contém somente a entrega CRM de cards/contratos e histórico/autoria, seus testes, scripts e documentação. Não foram incorporadas alterações de chamados, metas ou dependências do merge amplo usado apenas como referência.
-
-QA conferiu a preservação das funcionalidades de origem do cliente, parceiro e liderança existentes em staging. `ownership.ts`, `lideranca-setor.ts` e a story implementada de movimento livre são idênticos à base `e0a2576c`; o rascunho anterior de 104 linhas não substitui a story atual de 185 linhas. As alterações em `Cards.ts` acrescentam o acompanhamento do contrato sem substituir o movimento livre, a validação ou o salvamento de origem/parceiro. Em `transicao-command.ts`, o retorno antecipado de `movimentoLivre` permanece antes das obrigatoriedades e as condições que suprimem inicialização de status e efeitos automáticos permanecem intactas. A entrega apenas acrescenta o reconhecimento dos nomes/chaves de Fechado e Stand-by e passa `etapaDestinoChave` no ramo normal protegido por `prepared.movimentoLivre`. `PainelProximaEtapa.tsx` preserva os controles novos e muda somente o rótulo desta entrega. `git diff --check` e a inspeção dos imports não apontaram problemas.
-
-**Gates e comparação de baseline:**
-
-- Lint aprovado, zero erros e 1.193 avisos. Typecheck final aprovado, exit 0, com heap de 6.144 MB e afinidade em uma CPU; a tentativa anterior interrompida com exit 143 está documentada como interrupção, não como aprovação nem diagnóstico de erro de código.
-- Suíte completa do candidato final: **644 arquivos, 640 aprovados e quatro com falha; 4.801 testes aprovados**, seis falhas, quatro ignorados e um pendente. Falhas: três testes de `builder/embed`, uma suíte de arquivamento por importação `next-auth`, um teste de layout do modal e dois testes com expectativa antiga de próximo contato em Em Tratativa. Os testes novos de movimento livre passaram.
-- DevOps reproduziu os mesmos quatro arquivos/seis testes falhos no checkout limpo do baseline atualizado `e0a2576c`; QA confirmou o SHA do checkout, os logs e o setup comparável. `package.json`, lockfile, configuração Vitest e pacotes relevantes têm hashes idênticos; baseline e candidato usam o mesmo `node_modules`. A regra de próximo contato apenas em Sem Viabilidade já existe no baseline e não foi revertida para satisfazer testes antigos.
-- Build equivalente **do candidato atualizado** aprovado com heap de 4.096 MB: exit 0, 64,71 segundos, pico de 6.065.655.808 bytes, 80 páginas e tracing concluídos. Prisma/player gerados pelos comandos oficiais; nenhuma alteração de `package.json` e nenhum delta residual de `tsconfig`.
-
-Evidências finais no diretório pai do checkout: `crm-staging-e0-tests.log`, `crm-staging-e0-baseline.log`, `crm-staging-e0-lint.log`, `crm-staging-e0-typecheck-final.log`, `crm-staging-e0-gates.json` e `crm-staging-e0-build-4096-result.json`. A análise de imports da rodada inicial permanece em `crm-staging-import-check.json`. QA não executou nova carga de banco nem duplicou os gates pesados.
-
-**Decisão de release do orquestrador, separada do verdict QA:** atendendo ao pedido explícito do usuário para testar em staging, o orquestrador autorizou commit/push e publicação **exclusivamente em staging** após o build aprovado, com exceção contextual para as falhas de baseline reproduzidas. Essa decisão não converte o gate global em `APPROVED`, não autoriza mudança em produção/main ou banco e não amplia a entrega para corrigir funcionalidades alheias. A ressalva global permanece registrada; não há nova falha atribuída ao delta CRM revisado.
 
 ## Change Log
 

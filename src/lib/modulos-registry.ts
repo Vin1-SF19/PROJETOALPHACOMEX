@@ -97,6 +97,7 @@ export const MODULOS_REGISTRY: ModuloRegistryItem[] = [
   { id: 'geradorDocumentos',  label: 'Gerador de Documentos', href: '/PainelAlpha/GeradorDocumentos',                                               iconName: 'FileText',      category: 'infra',       permission: 'geradorDocumentos', desc: 'Templates contratuais com geração, conferência e reescrita IA.', tag: 'Documentos', color: 'from-emerald-600/20', grupo: 'estudioConteudo' },
 
   { id: 'builder', label: 'ChatbotX', href: '/PainelAlpha/Builder', iconName: 'Globe', category: 'infra', permission: 'builder', desc: 'ChatbotX integrado ao painel com login automático.', tag: 'ChatbotX', color: 'from-cyan-600/20', grupo: 'estudioConteudo' },
+  { id: 'AlphaBI', label: 'Alpha BI', href: '/PainelAlpha/AlphaBI', iconName: 'BarChart3', category: 'comercial', permission: 'AlphaBI', desc: 'Painel de Business Intelligence com dashboards e relatórios interativos.', tag: 'BI', color: 'from-violet-600/20', grupo: 'leadsMarketing' },
 
   // ─── ADMIN ───
   { id: 'skillsGerenciamento', label: 'Ger. Alpha Skills', href: '/PainelAlpha/AlphaSkills/Gerenciamento', iconName: 'Settings', category: 'admin', permission: 'skillsGerenciamento', allowedRoles: ['Admin', 'CEO', 'TI'], img: '/elearning.png', desc: 'Gerenciamento de cursos, módulos e vídeos do Alpha Skills.', tag: 'Admin', color: 'from-green-600/20' },

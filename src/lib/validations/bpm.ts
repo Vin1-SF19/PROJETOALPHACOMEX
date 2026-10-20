@@ -215,6 +215,13 @@ export const bpmCardIdSchema = z.union([
   z.string().regex(/^rdcard_[a-f0-9]{28}$/),
 ]);
 
+export const confirmacaoPendenciasRdSchema = z.object({
+  avisosHash: z.string().regex(/^[a-f0-9]{64}$/),
+  etapaOrigemEsperadaId: etapaIdCardSchema,
+  versaoEsperada: z.number().int().min(0),
+  configVersion: z.number().int().min(0),
+}).strict();
+
 const campoEtapaConfigSchema = z.object({
   etapaId: etapaIdCardSchema,
   visivel: z.boolean().default(true),
@@ -389,7 +396,7 @@ const parceiroOrigemSchema = z.object({
 }).strict();
 
 export const atualizarCardSchema = z.object({
-  cardId: z.string().cuid(),
+  cardId: bpmCardIdSchema,
   responsavelId: z.number().int().positive().optional(),
   servico: z.string().trim().max(120).nullable().optional(),
   tipoProcesso: z.string().trim().max(200).nullable().optional(),
@@ -441,12 +448,13 @@ export const interromperStandbyFollowUpSchema = z.object({
 });
 
 export const moverCardSchema = z.object({
-  cardId: z.string().cuid(),
+  cardId: bpmCardIdSchema,
   etapaDestinoId: etapaIdCardSchema,
   responsavelId: z.number().int().positive().optional(),
   etapaOrigemEsperadaId: etapaIdCardSchema.optional(),
   versaoEsperada: z.number().int().min(0).optional(),
   idempotencyKey: z.string().trim().min(8).max(200).optional(),
+  confirmacaoPendenciasRd: confirmacaoPendenciasRdSchema.optional(),
 });
 
 export const salvarRequisitosEMoverCardSchema = moverCardSchema.extend({

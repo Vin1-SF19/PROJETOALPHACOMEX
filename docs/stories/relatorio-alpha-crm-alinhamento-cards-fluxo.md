@@ -2,7 +2,9 @@
 
 Data: 20/10/2026. Fonte: `RESUMO PLAUD - ALINHAMENTO 1 CRM.pdf` e decisões do usuário nesta conversa.
 
-## Código implementado localmente
+Código publicado em [painel.alpha-comex.com](https://painel.alpha-comex.com), com configuração autorizada aplicada em 20/10/2026.
+
+## Melhorias publicadas
 
 - Compatibilidade com **Fechado / Contrato fechado** e **Stand By / Stand-by — follow-up semanal**, preservando códigos dos status e o ciclo semanal existente. Chaves técnicas reconhecidas nas guardas da transição.
 - Nos dois campos comerciais de valor e forma de pagamento, retirada da expressão **exigido na entrada**, preservando o asterisco e as validações. Ajuste no formulário e no painel de requisitos da movimentação.
@@ -15,21 +17,21 @@ Data: 20/10/2026. Fonte: `RESUMO PLAUD - ALINHAMENTO 1 CRM.pdf` e decisões do u
 - Ações específicas para usuários autorizados, inclusive no card final encaminhado; edição e movimentação geral continuam bloqueadas. Consulta de colega não ganha escrita. Controle de concorrência protege os dois cards.
 - Download via endpoint autenticado do card Comercial, limitado ao documento validado dessa contratação, sem conceder acesso global ao Financeiro.
 
-## Configuração preparada, ainda não aplicada
+## Configuração aplicada
 
-A prévia foi executada somente para leitura no banco Turso configurado em `.env.local`, tratado como produção. Nenhuma alteração persistente, migration ou backfill foi executado nesta entrega.
+A identidade do banco Turso foi confirmada contra a variável de produção da Vercel. A autorização “autorizo” foi registrada para o plano exato, e o backup completo foi restaurado e verificado antes da execução. Não houve alteração de schema, backfill ou alteração de valores preenchidos em cards.
 
-O script `scripts/configurar-alinhamento-crm.mts` prepara, em uma transação:
+O script `scripts/configurar-alinhamento-crm.mts` aplicou, em uma transação:
 
-1. Renomear Fechado para **Contrato fechado**, com chave `fechado`.
-2. Renomear Stand By do Radar para **Stand-by — follow-up semanal**, com chave `standby_follow_up`.
-3. Exigir o e-mail canônico do contato na entrada em Contrato fechado, inclusive em futura reentrada. A consulta de cards antigos permanece disponível; não há backfill.
-4. Acrescentar **Fechado no tarifário padrão**, campo opcional de seleção **Sim/Não**, no formulário Contratação.
-5. Incrementar versões de configuração/formulário e registrar auditoria administrativa.
+1. Fechado renomeado para **Contrato fechado**, com chave `fechado`.
+2. Stand By do Radar renomeado para **Stand-by — follow-up semanal**, com chave `standby_follow_up`.
+3. E-mail canônico do contato obrigatório na entrada em Contrato fechado, inclusive em futura reentrada. A consulta de cards antigos permanece disponível; não há backfill.
+4. **Fechado no tarifário padrão**, campo opcional de seleção **Sim/Não**, acrescentado no formulário Contratação.
+5. Versão da configuração **33 → 34**, versão do formulário **2 → 3**, com auditoria administrativa.
 
-A aplicação exige código compatível publicado, administrador auditor, backup completo verificado de até 48 horas e autorização específica. O script compara o estado atual com a prévia e aborta em divergência. O rollback restaura nomes/regra do e-mail e desativa o campo novo sem apagar respostas eventualmente preenchidas.
+A primeira tentativa encontrou `SQLITE_BUSY`. Vault verificou por leitura que não houve aplicação parcial: snapshot idêntico ao plano, versão 33, sem campo novo nem auditoria da operação. A repetição do mesmo comando guardado concluiu com sucesso, versão 34. Não houve mudança do plano, ampliação do escopo ou rollback.
 
-Detalhes, backup, comandos exatos, riscos e alternativa: [relatório Vault](./relatorio-vault-crm-alinhamento.md). O banco, os nomes e os campos ativos ainda estão como antes; esta entrega não publicou o código.
+Detalhes, backup, comandos, auditoria e verificação: [relatório Vault](./relatorio-vault-crm-alinhamento.md). O rollback preparado restaura nomes/regra do e-mail e desativa o campo novo sem apagar respostas; sua execução exige autorização própria.
 
 ## Formas de pagamento preservadas
 
@@ -42,7 +44,6 @@ Detalhes, backup, comandos exatos, riscos e alternativa: [relatório Vault](./re
 ## Pendências para continuidade
 
 - **Admin e líderes de setor moverem cards sem obrigatoriedades:** registrado no [backlog específico](./story-alpha-crm-movimentacao-excepcional-admin-lideres.md), para definição de abrangência, justificativa e auditoria. Não implementado nesta entrega.
-- Autorizar a aplicação da configuração descrita no Vault, após publicação do código compatível.
 - Homologar com Nai/Naila um ciclo real: elaborar/validar documento → abrir no Comercial → registrar envio → conferir pagamento. Os testes usam dados sintéticos e não enviam comunicações reais.
 - Recuperar autores RD ausentes somente quando houver fonte original ou de/para verificável. Nenhuma recuperação em lote foi executada.
 - Novos funis TTD/Habilitação, novas cadências, mensagens automáticas e BI permanecem fora deste escopo.
@@ -51,10 +52,26 @@ Detalhes, backup, comandos exatos, riscos e alternativa: [relatório Vault](./re
 
 - `npm run lint`: zero erros (1.193 avisos existentes).
 - `npm run typecheck`: aprovado.
-- `npm test`: **4.941 testes aprovados**, 654 arquivos; 4 ignorados e 1 todo.
-- Build: compilação ocorreu, mas o processo foi encerrado por falta de memória. O kernel confirmou OOM na tentativa isolada/sequencial. **Publicação bloqueada até build completo aprovado.**
-- QA: todos os achados de código corrigidos; **NEEDS_WORK** exclusivamente pelo gate de build não concluído. Sem homologação em dados reais.
+- `npm test` no pacote baseado em produção: **4.924 testes aprovados**, 654 arquivos; 4 ignorados e 1 todo. Os 4.941 testes do workspace original incluem alterações de outras tarefas e são evidência anterior, não o gate do pacote publicado.
+- Build: **aprovado na Vercel**, tanto no preview como no target de produção. As tentativas locais foram interrompidas por memória e não foram contadas como aprovação.
+- QA: **APPROVED**, sem achados de código abertos para o patch publicado.
+- Verificações HTTP: página inicial 200, CRM sem autenticação redirecionado, download sem autenticação negado. No domínio principal a proteção da Vercel apresentou desafio 403; na URL isolada da mesma release o endpoint respondeu 401. Nenhuma proteção foi relaxada.
+- Homologação de um ciclo autenticado com dados reais permanece pendente com Nai/Naila.
 
 Resultados finais e decisão independente constam na [story de implementação](./story-alpha-crm-alinhamento-cards-fluxo-contrato.md#qa-results). Foram adicionados cenários de autorização, estados financeiros posteriores, prontidão do documento, token de conferência, schemas reais de evento/tarefa, concorrência, idempotência, download, upload e finalização do PDF.
 
-CodeRabbit CLI não está instalada no PATH nem em `~/.local/bin/coderabbit`. A revisão foi realizada pelo agente QA, com correção dos achados e nova execução dos testes. Não há aprovação de produção ou publicação implícita nesse resultado.
+CodeRabbit CLI não está instalada no PATH nem em `~/.local/bin/coderabbit`. A revisão foi realizada pelo agente QA, com correção dos achados e nova execução dos testes.
+
+## Evidências da publicação
+
+O pacote foi preparado em checkout isolado sobre a versão de produção confirmada `1504a1c6255693073ef437d2103d271065d7168a`, preservando as proteções e alterações já publicadas. Alterações locais de outras tarefas ficaram fora da entrega.
+
+- Checkout: `/home/ialpha/projetos/alpha-comex/painel-alpha-worktrees/crm-alinhamento-prod-base-20261020`.
+- Patch aprovado: `23ad30083b76a0c4e61be3867fcbfd7d62549f6052e6a5197220e011ee6604a9`, 39 arquivos conferidos.
+- Preview READY: `dpl_HGxKK2fARxUvHCVX9axXBmMkrjXj`.
+- Produção READY e ativa no domínio: `dpl_9ExDHA2EK2Te4nZCSRpKDr9Zdh5t`.
+- A produção foi construída com suas próprias variáveis existentes, antes da promoção. Alias anterior conferido imediatamente antes da troca, sem publicação concorrente.
+- Não houve alteração de variáveis remotas, audiência, proteção de acesso ou serviços locais. A sessão expirada da Vercel foi renovada automaticamente pelo CLI, sem necessidade de nova conexão.
+- Patch, manifesto, logs e relatório DevOps: `/home/ialpha/projetos/alpha-comex/painel-alpha-worktrees/crm-alinhamento-prod-base-20261020-report.md`.
+
+O código permanece no workspace e no patch isolado; esta entrega não criou commit nem fez push. Antes de uma publicação futura pelo Git, incorporar esse patch à linha correspondente para preservar as melhorias já ativas.

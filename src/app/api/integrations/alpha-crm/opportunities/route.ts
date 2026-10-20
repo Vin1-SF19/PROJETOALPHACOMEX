@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
   if (!userId) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   const parsed = z.object({ cardId: z.string().min(1).max(100) }).safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "cardId inválido" }, { status: 400 });
-  try { await exigirAcessoBpmCard(parsed.data.cardId, userId.id, userId.role, "visualizar"); }
+  try { await exigirAcessoBpmCard(parsed.data.cardId, userId.id, userId.role, "editarCard"); }
   catch { return NextResponse.json({ error: "Acesso negado ao card" }, { status: 403 }); }
   const card = await db.bpmCard.findUnique({ where: { id: parsed.data.cardId }, select: { id: true, empresaId: true, servico: true, tipoProcesso: true,
     empresa: { select: { razaoSocial: true, nomeFantasia: true, cnpj: true } } } });

@@ -1,7 +1,9 @@
 import { z } from "zod";
+import { usuariosAutorizadosPipelineSchema } from "@/lib/bpm/acesso-individual-pipeline";
 
 export const configuracaoVisaoEquipeSchema = z.object({
   version: z.literal(1),
+  usuariosAutorizados: usuariosAutorizadosPipelineSchema.optional(),
   supervisores: z.array(z.object({ usuarioId: z.number().int().positive(), setorIds: z.array(z.number().int().positive()).max(100) })).max(200),
 }).strict().superRefine((value, ctx) => {
   if (new Set(value.supervisores.map((s) => s.usuarioId)).size !== value.supervisores.length) ctx.addIssue({ code: "custom", message: "Selecione cada supervisor apenas uma vez." });
@@ -13,10 +15,10 @@ export function lerConfiguracaoVisaoEquipe(value?: string | null): ConfiguracaoV
 }
 export type OpcaoSetorEquipe = { id: number; nome: string; usuarioIds: number[] };
 export type VisaoQuadro = "MEUS" | "EQUIPE" | "SETOR" | "TODOS";
-export type AcessoVisaoQuadro = { userId: number; admin: boolean; setores: OpcaoSetorEquipe[] };
+export type AcessoVisaoQuadro = { userId: number; admin: boolean; setores: OpcaoSetorEquipe[]; responsaveis?: { id: number; nome: string }[] };
 export function usuariosDaVisao(acesso: AcessoVisaoQuadro, visao: VisaoQuadro, setorId?: number | null): number[] | null {
   if (visao === "MEUS") return [acesso.userId];
-  if (visao === "TODOS") return acesso.admin ? null : [acesso.userId];
+  if (visao === "TODOS") return null;
   if (visao === "SETOR") return acesso.setores.find((s) => s.id === setorId)?.usuarioIds ?? [];
   return [...new Set([acesso.userId, ...acesso.setores.flatMap((s) => s.usuarioIds)])];
 }

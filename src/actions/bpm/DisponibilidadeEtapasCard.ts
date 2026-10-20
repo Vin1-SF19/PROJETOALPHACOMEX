@@ -6,11 +6,13 @@ import db from "@/lib/prisma";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import { avaliarTransicaoBpm } from "@/lib/bpm/transicao-command";
 import { ObterRequisitosTransicaoBpm } from "./Cards";
+import { possuiOrigemImportadaRd } from "@/lib/bpm/movimento-importado-rd";
 
 export type DisponibilidadeEtapaCard = {
   etapaId: string;
   pendencias: string[];
   oculta: boolean;
+  podeConfirmarPendenciasRd?: boolean;
 };
 
 const ERROS_DESTINO_INACESSIVEL = new Set([
@@ -37,6 +39,7 @@ export async function ObterDisponibilidadeEtapasCardBpm(cardId: string, etapaIds
       where: { id: cardId },
       select: {
         etapaId: true,
+        origemExterna: { select: { provider: true } },
         etapa: {
           select: {
             transicoesEtapaOrigem: {
@@ -50,14 +53,34 @@ export async function ObterDisponibilidadeEtapasCardBpm(cardId: string, etapaIds
     if (!card) return { success: false as const, error: "Card não encontrado" };
 
     const permitidos = new Set(card.etapa.transicoesEtapaOrigem.map((transicao) => transicao.etapaDestinoId));
-    const destinos = [...new Set(etapaIds)].filter((id) => id !== card.etapaId && (movimentoLivre || permitidos.has(id)));
+    const importadoRd = possuiOrigemImportadaRd(card.origemExterna);
+    const destinos = [...new Set(etapaIds)].filter((id) => id !== card.etapaId && (movimentoLivre || importadoRd || permitidos.has(id)));
     const data: DisponibilidadeEtapaCard[] = await Promise.all(destinos.map(async (etapaId) => {
-      if (movimentoLivre) {
-        const validacao = await avaliarTransicaoBpm({ cardId, etapaOrigemEsperadaId: card.etapaId,
-          etapaDestinoId: etapaId, idempotencyKey: randomUUID(),
-          ator: { tipo: "MANUAL", userId, userRole: session.user.role ?? null } });
-        return { etapaId, pendencias: validacao.success ? [] : [validacao.error],
-          oculta: !validacao.success && ERROS_DESTINO_INACESSIVEL.has(validacao.code) };
+      if (importadoRd || movimentoLivre) {
+        const validacao = await avaliarTransicaoBpm({
+          cardId,
+          etapaOrigemEsperadaId: card.etapaId,
+          etapaDestinoId: etapaId,
+          idempotencyKey: randomUUID(),
+          ator: { tipo: "MANUAL", userId, userRole: session.user.role ?? null },
+        });
+        if (!validacao.success && ERROS_DESTINO_INACESSIVEL.has(validacao.code)) {
+          return { etapaId, pendencias: [], oculta: true };
+        }
+        if (!validacao.success && validacao.code === "RD_MOVE_CONFIRMATION_REQUIRED") {
+          return {
+            etapaId,
+            pendencias: validacao.pendencias ?? validacao.avisos?.map((aviso) => aviso.nome) ?? [],
+            oculta: false,
+            podeConfirmarPendenciasRd: true,
+          };
+        }
+        return {
+          etapaId,
+          pendencias: validacao.success ? [] : [validacao.error],
+          oculta: false,
+          podeConfirmarPendenciasRd: false,
+        };
       }
       const [previa, validacao] = await Promise.all([
         ObterRequisitosTransicaoBpm(cardId, etapaId),

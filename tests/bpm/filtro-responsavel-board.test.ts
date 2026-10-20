@@ -9,14 +9,16 @@ const board = readFileSync(
 describe("filtro por responsável do board (RM-2026-70EFE1)", () => {
   it("fica ao lado da atualização e oferece a opção de exibir todos", () => {
     expect(board).toContain('aria-label="Filtrar cards por responsável"');
-    expect(board).toContain('<SelectItem value="todos">Todos os responsáveis</SelectItem>');
+    expect(board).toContain('<SelectItem value="todos">Todos</SelectItem>');
     expect(board.indexOf('aria-label="Filtrar cards por responsável"')).toBeLessThan(
       board.indexOf('aria-label="Atualizar pipeline"'),
     );
   });
 
   it("inclui e filtra tanto o responsável principal quanto os membros do card", () => {
-    expect(board).toContain("mapa.set(card.responsavel.id, card.responsavel.nome)");
+    expect(board).toContain("manifesto?.acesso?.responsaveis ?? []");
+    expect(board).not.toContain("mapa.set(card.responsavel.id, card.responsavel.nome)");
+    expect(board).not.toContain('value={`SETOR:');
     expect(board).toContain("String(c.responsavel.id) === responsavelFiltro");
     expect(board).toContain(
       "c.membros.some((m) => String(m.usuario.id) === responsavelFiltro)",

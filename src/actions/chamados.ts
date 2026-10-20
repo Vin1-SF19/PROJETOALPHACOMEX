@@ -14,7 +14,7 @@ import {
 } from "@/lib/chamados/notificacoes-server";
 import { resumirMensagemChamado } from "@/lib/chamados/notificacoes";
 import { isSameRole } from "@/lib/roles";
-import { chamadoAcessoSelect, chamadoDestinoEhTI, obterAtorChamados, pertenceAoDestino, podeResponderChamado, podeVerChamado } from "@/lib/chamados/acesso";
+import { chamadoAcessoSelect, chamadoDestinoEhTI, obterAtorChamados, podeAtenderChamado, podeResponderChamado, podeVerChamado } from "@/lib/chamados/acesso";
 import { criarChamadoMultissetorial, ErroCriacaoChamado } from "@/lib/chamados/criacao";
 import { canalChatChamado } from "@/lib/chamados/notificacoes";
 import {
@@ -379,7 +379,7 @@ export async function assumirChamado(id: number) {
         },
       });
       if (!chamado) return { error: "Chamado não encontrado" };
-      if (!pertenceAoDestino(atorAtual, chamado)) return { error: "Somente colaboradores ativos do setor de destino podem assumir." };
+      if (!podeAtenderChamado(atorAtual, chamado)) return { error: "Somente administradores ou colaboradores ativos do setor de destino podem assumir chamados de um setor ativo." };
       if (chamado.tecnicoId !== null) return { error: "Chamado já foi assumido por outro técnico" };
       if (chamado.status !== "ABERTO") return { error: "Chamado não está em estado inicial" };
       if (chamado.tecnicoSolicitadoId !== null && chamado.tecnicoSolicitadoId !== tecnicoId) {

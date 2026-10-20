@@ -1,24 +1,38 @@
+import { lerUsuariosAutorizadosPipeline } from "@/lib/bpm/acesso-individual-pipeline";
 import db from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
-import { normalizeRole } from "@/lib/roles";
-import { filtroVinculoCardBpm } from "@/lib/bpm/visibilidade-card";
-import { lerConfiguracaoVisaoEquipe, type OpcaoSetorEquipe } from "@/lib/bpm/visao-equipe";
+import { isSameRole } from "@/lib/roles";
+import { listarUsuariosComAcessoCrmBpm } from "@/lib/bpm/ownership";
+import type { OpcaoSetorEquipe } from "@/lib/bpm/visao-equipe";
 
-type Cliente = Pick<typeof db, "bpmPipeline" | "setor" | "usuarios">;
-/** Apenas calcula concessões de leitura; o chamador ainda exige módulo, pipeline e coluna. */
-export async function carregarEscopoLeituraBpm(userId: number, admin: boolean, pipelineId?: string, configJson?: string | null, client: Cliente = db, incluirOpcoes = false) {
-  if (admin && !incluirOpcoes) return { where: {} as Prisma.BpmCardWhereInput, usuarioIds: [] as number[], setores: [] as OpcaoSetorEquipe[] };
-  const pipelines = pipelineId && configJson !== undefined ? [{ id: pipelineId, visualizacaoConfigJson: configJson }] : await client.bpmPipeline.findMany({
-    where: pipelineId ? { id: pipelineId } : undefined, select: { id: true, visualizacaoConfigJson: true },
+type Cliente = Pick<typeof db, "bpmPipeline" | "usuarios" | "setorPermissao" | "usuarioPermissaoOverride">;
+
+/**
+ * Leitura é compartilhada no pipeline. Cada chamador exige módulo, pipeline e
+ * coluna antes de aplicar este escopo; filtros pessoais são apenas seleção do quadro.
+ * O JSON legado de supervisores não restringe mais a consulta dos colegas.
+ */
+export async function carregarEscopoLeituraBpm(
+  _userId: number, _admin: boolean, pipelineId?: string, _configJson?: string | null,
+  client: Cliente = db, incluirOpcoes = false,
+) {
+  const where: Prisma.BpmCardWhereInput = {};
+  const vazio = { where, usuarioIds: [] as number[], setores: [] as OpcaoSetorEquipe[], responsaveis: [] as { id: number; nome: string }[] };
+  if (!incluirOpcoes || !pipelineId) return vazio;
+
+  const pipeline = await client.bpmPipeline.findUnique({
+    where: { id: pipelineId },
+    select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { id: true, nome: true } } } } },
   });
-  const regras = pipelines.map((p) => ({ pipelineId: p.id, setorIds: lerConfiguracaoVisaoEquipe(p.visualizacaoConfigJson).supervisores.find((s) => s.usuarioId === userId)?.setorIds ?? [] }));
-  const setorIds = [...new Set(regras.flatMap((r) => r.setorIds))];
-  const setores = admin || setorIds.length ? await client.setor.findMany({ where: { ativo: true, ...(admin ? {} : { id: { in: setorIds } }) }, select: { id: true, nome: true }, orderBy: { nome: "asc" } }) : [];
-  const usuarios = setores.length ? await client.usuarios.findMany({ select: { id: true, role: true } }) : [];
-  const opcoes: OpcaoSetorEquipe[] = setores.map((s) => ({ ...s, usuarioIds: usuarios.filter((u) => normalizeRole(u.role) === normalizeRole(s.nome)).map((u) => u.id) }));
-  const ids = [...new Set(opcoes.flatMap((s) => s.usuarioIds))];
-  const where: Prisma.BpmCardWhereInput = admin ? {} : !ids.length ? filtroVinculoCardBpm(userId, false) : pipelineId ? filtroVinculoCardBpm(userId, false, ids) : {
-    AND: [{ OR: [filtroVinculoCardBpm(userId, false), ...regras.filter((r) => r.setorIds.length).map((r) => ({ pipelineId: r.pipelineId, ...filtroVinculoCardBpm(userId, false, opcoes.filter((s) => r.setorIds.includes(s.id)).flatMap((s) => s.usuarioIds)) }))] }],
-  };
-  return { where, usuarioIds: ids, setores: opcoes };
+  if (!pipeline) return vazio;
+  const usuarios = await listarUsuariosComAcessoCrmBpm(client);
+  const setores = pipeline.setores.map(({ setor }) => setor);
+  const autorizados = lerUsuariosAutorizadosPipeline(pipeline.visualizacaoConfigJson);
+  const elegiveis = usuarios.filter((usuario) => autorizados.includes(usuario.id) || setores.length === 0
+    || setores.some((setor) => isSameRole(usuario.role, setor.nome)));
+  const opcoes = setores.map((setor) => ({ ...setor,
+    usuarioIds: elegiveis.filter((usuario) => isSameRole(usuario.role, setor.nome)).map((usuario) => usuario.id),
+  }));
+  return { where, usuarioIds: elegiveis.map((usuario) => usuario.id), setores: opcoes,
+    responsaveis: elegiveis.map(({ id, nome }) => ({ id, nome })) };
 }

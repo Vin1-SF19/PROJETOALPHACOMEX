@@ -1,6 +1,6 @@
-# Vault Report — autorização recebida; aplicação aguarda validação de entrega
+# Vault Report — APROVADO: configuração aplicada e verificada
 
-Revisão inicial: 2026-10-20, 16:24 UTC. Revalidação após autorização: 2026-10-20, aproximadamente 16:39 UTC.
+Revisão inicial: 2026-10-20, 16:24 UTC. Revalidação após autorização: 2026-10-20, aproximadamente 16:39 UTC. Verificação final: 2026-10-20, 17:06:19 UTC.
 
 Story: [Alinhamento dos cards e fluxo de contrato](story-alpha-crm-alinhamento-cards-fluxo-contrato.md).
 
@@ -86,7 +86,7 @@ mkdir -p database-backups/pre-change/vault-verificacao
 TMPDIR="$PWD/database-backups/pre-change/vault-verificacao" node scripts/verify-turso-backup.mjs database-backups/pre-change/painelalpha_turso_pre_change_2026-10-19T12-54-41-780Z.sql database-backups/pre-change/painelalpha_turso_pre_change_2026-10-19T12-54-41-780Z.manifest.json
 ```
 
-Comando de aplicação preparado, **autorização recebida, ainda não executado nesta revisão**:
+Comando de aplicação autorizado e executado pelo agente responsável, com `CRM_ADMIN_ID=8`; resultado e verificação registrados ao final:
 
 ```bash
 TMPDIR="$PWD/database-backups/pre-change/vault-verificacao" NODE_ENV=production node --conditions=react-server --import tsx scripts/configurar-alinhamento-crm.mts apply --confirm=apply:22095fae6cc62886d0dae11557f41a1bdf690c5b9a0e886c5c1f2882ef31dca1 --backup=database-backups/pre-change/painelalpha_turso_pre_change_2026-10-19T12-54-41-780Z.sql --admin-id="$CRM_ADMIN_ID"
@@ -133,10 +133,66 @@ A leitura de `usuarios` confirmou a conta **ID 8**, role **TI**, status **ATIVO*
 
 Os relatórios anteriores [Novo Lead](../reports/vault-revisao-radar-novo-lead-2026-09-28.md) e [Reunião Agendada](../reports/vault-revisao-radar-reuniao-agendada-2026-09-28.md) documentam explicitamente a auditoria das configurações com **Vinicius/TI, ID 8**. Essa evidência identifica a conta já utilizada para auditoria operacional; **não identifica nem presume quem é o usuário desta conversa**. A configuração pode registrar `CRM_ADMIN_ID=8` com essa atribuição operacional documentada.
 
+### Correspondência com o ambiente publicado
+
+O agente DevOps conferiu por leitura a variável `TURSO_DATABASE_URL` configurada no projeto Vercel. A evidência local `../painel-alpha-worktrees/crm-alinhamento-production-db-identity.json`, examinada nesta continuidade, informa os targets `production`, `preview` e `development` e registra `urlSha256=3a07b72d638b9528ba4a373d5c293551467ea154c6770966967b8cc11d0cc662`, com `matchesVault=true`. Portanto, o identificador do banco de produção corresponde ao banco do plano aprovado. A URL e os tokens não foram copiados para o relatório.
+
+Conforme evidências encaminhadas pelo agente responsável, a entrega isolada usa a base de produção `1504a1c6`, com patch SHA-256 `23ad30083b76a0c4e61be3867fcbfd7d62549f6052e6a5197220e011ee6604a9`; typecheck, lint, 654 arquivos/4.924 testes e revisão QA foram aprovados. Esses gates de aplicação são evidências da equipe, não foram repetidos por Vault. O build de preview ficou pronto. Antes da tentativa de aplicação, o agente responsável confirmou o novo código ativo no domínio de produção pelo deployment `dpl_9ExDHA2EK2Te4nZCSRpKDr9Zdh5t`.
+
+### Verificação somente leitura preparada para depois do apply
+
+Após o agente responsável informar o resultado do apply, Vault fará leitura restrita dos registros de configuração/auditoria e verificará:
+
+1. Os mesmos IDs de Fechado e Stand By permanecem ativos no Radar, agora com nomes **Contrato fechado** e **Stand-by — follow-up semanal**, e chaves `fechado` e `standby_follow_up`.
+2. O e-mail canônico mantém sua identidade/tipo/origem e apresenta `obrigatorioEntrada=true` tanto na configuração da etapa quanto no componente do formulário; as outras propriedades do componente são preservadas.
+3. Existe exatamente um campo ativo `alpha.radar.fechado.tarifario_padrao`, com nome **Fechado no tarifário padrão**, tipo `selecao`, escopo `CARD`, opções ativas **Sim**/`sim` e **Não**/`nao`, associação à etapa fechada e um componente na seção Contratação. O campo e a associação continuam opcionais.
+4. O registro e todas as opções da forma de pagamento coincidem com a prévia, mantendo as três opções ativas e sua ordem.
+5. A versão do pipeline passa de 33 para 34; a versão do formulário aumenta exatamente um em relação ao plano.
+6. Existe auditoria `ALINHAMENTO_CRM_CARDS`, atribuída ao administrador operacional validado, com o fingerprint aprovado, estado anterior correspondente ao plano e estado posterior correspondente à leitura. Os IDs do campo/componente criado coincidem com a auditoria e, quando disponível, com o recibo local.
+
+Essa checagem não criará cards ou dados de teste, não repetirá o apply e não executará rollback. Se houver divergência, ela será reportada antes de qualquer correção.
+
+### Primeira tentativa e verificação após erro de concorrência
+
+O agente responsável informou a execução do comando exato autorizado, com o backup validado e `adminId=8`. O processo terminou com código 1 e `DriverAdapterError SQLITE_BUSY database is locked` durante a transação; nenhum recibo foi impresso.
+
+Vault realizou somente consultas após esse resultado, concluídas em **2026-10-20 17:05:11.923 UTC**:
+
+- Snapshot integral das configurações exatamente igual ao estado anterior do plano, SHA-256 `c2d04c32ad7347039e29cc995566bf0575f74f9ed6cd81a5093ccf3b35d8c564`.
+- Pipeline na versão **33** e formulário na versão **2**, ambos iguais à prévia.
+- Etapas ainda **Fechado** e **Stand By**, ambas com chave nula.
+- Nenhum campo `alpha.radar.fechado.tarifario_padrao`.
+- E-mail ainda com `obrigatorioEntrada=false`.
+- Nenhum registro de auditoria `ALINHAMENTO_CRM_CARDS` no pipeline.
+
+**Conclusão: a configuração autorizada não foi persistida; não há mudança parcial no escopo capturado.** As evidências são compatíveis com a transação revertida pelo erro de concorrência. Vault não repetiu o comando, não executou rollback e não alterou plano/script. Uma nova tentativa do mesmo comando continua coberta pela autorização existente e deve preservar as revalidações de snapshot, backup e administrador; se essas pré-condições divergirem, a tentativa deve parar.
+
+### Nova tentativa aplicada e verificação final
+
+Após confirmar que a primeira tentativa não havia persistido, o agente responsável repetiu o **mesmo comando autorizado**, sem alterar script/plano. O processo terminou com código **0**, `aplicado=true`, fingerprint aprovado e `versao=34`. O próprio script repetiu a verificação completa do backup, validade/identidade, administrador e igualdade do snapshot antes de gravar. O código compatível já estava ativo no deployment de produção `dpl_9ExDHA2EK2Te4nZCSRpKDr9Zdh5t`.
+
+Vault concluiu a checagem somente leitura em **2026-10-20 17:06:19.989 UTC**, com **21 verificações aprovadas**:
+
+- Etapas ativas nos mesmos IDs e no mesmo pipeline, com nomes/chaves exatos do plano.
+- E-mail canônico preservado e obrigatório na entrada nas duas camadas; demais propriedades do componente preservadas.
+- Tarifário único, ativo, opcional, tipo seleção e escopo de card, com **Sim**/`sim` e **Não**/`nao`, associação correta e componente único na seção Contratação.
+- Registro completo do campo forma de pagamento e suas opções **idênticos à prévia**, incluindo as três opções ativas e sua ordem.
+- Pipeline passou de **33 para 34**; formulário passou de **2 para 3**.
+- Recibo local com fingerprint correto e snapshots anterior/posterior iguais ao plano e ao estado remoto, respectivamente.
+- Auditoria única do fingerprint aprovado, atribuída à conta operacional **8 / TI / ATIVO**, com snapshots e IDs dos registros criados coerentes com o recibo.
+
+Identificadores da evidência final:
+
+- Auditoria: `cmvgxpdh90005adihbf9xxa10`.
+- Data da auditoria: **2026-10-20 17:05:32.541 UTC**.
+- Fingerprint aplicado: `22095fae6cc62886d0dae11557f41a1bdf690c5b9a0e886c5c1f2882ef31dca1`.
+- SHA-256 do snapshot posterior remoto: `d730a1adc45cd0901f76451c9acf51786b5e7e58e53105247d99c99edea2415c`.
+- Recibo: `database-backups/pre-change/crm-alinhamento/receipt.json`, mantido fora do Git.
+
+Nenhuma divergência foi encontrada. Vault não realizou escritas remotas, correções, geração de dados de teste ou rollback nesta verificação.
+
 ## Decisão atual
 
-**Autorização específica recebida e pré-condições de backup/plano verificadas. Nenhuma aplicação foi executada por Vault.**
-
-Permanece a condição de entrega: o agente responsável deve confirmar que o código compatível está disponível no ambiente que consumirá os nomes novos e concluir sua verificação de build antes de executar. O script ainda deve repetir seu controle de concorrência na transação, conferir o administrador e verificar novamente o backup na aplicação. Mudança de plano/escopo exige nova análise e autorização; mero prosseguimento do mesmo plano já autorizado não exige outra pergunta.
+**APROVADO — configuração aplicada pelo agente responsável sob autorização específica e backup válido, com verificação independente somente leitura concluída.** A primeira tentativa encontrou concorrência e não persistiu; a repetição guardada concluiu uma única aplicação auditada. Não resta mudança de banco pendente neste plano.
 
 Novas formas de pagamento continuam pendentes de definição do usuário. A dispensa de obrigatórios para administradores/líderes permanece no backlog.

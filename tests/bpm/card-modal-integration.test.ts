@@ -54,7 +54,11 @@ describe("CRM - wiring do modal por etapa", () => {
   });
 
   it("mantem o painel esquerdo rolavel e o mobile com scroll externo", () => {
-    expect(layout).toContain("overflow-y-auto lg:overflow-hidden");
+    const classesGrid = layout.match(/<div className="(grid [^"]+)"/u)?.[1].split(/\s+/u);
+    expect(classesGrid).toEqual(expect.arrayContaining([
+      "min-h-0", "flex-1", "grid-cols-1", "overflow-y-auto",
+      "lg:grid-rows-[minmax(0,1fr)]", "lg:overflow-hidden",
+    ]));
     expect(historico).toContain("max-h-[85vh]");
     expect(historico).toContain("min-h-0 flex-1 overflow-y-auto");
     expect(editorAnotacao).toContain("shrink-0");

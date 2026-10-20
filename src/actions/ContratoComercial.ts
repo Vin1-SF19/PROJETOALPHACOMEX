@@ -58,13 +58,14 @@ const SocioSchema = z.object({
 
 // Fase 3.6 do Cliente Master (2026-08-14): identificação da empresa passa a ser
 // resolução/criação de `Cliente` por CNPJ — cnpj/razaoSocial/nomeFantasia/etc não
-// são mais gravados como campos próprios de ContratoComercial. Duas formas de
+// são mais gravados como campos próprios de ContratoComercial. Três formas de
 // identificar a empresa: (1) `cnpj` real, resolvido OU CRIADO em `Cliente` (o BPM
 // ainda não é a porta de entrada real de Cliente novo — time comercial usa CRM
 // externo hoje; bloquear quebraria o fluxo diário, diferente de Extratos/Operacional);
-// (2) `clienteId` explícito, usado pelo fluxo "Empresa em Constituição" — sempre um
-// `Cliente` já existente com `cnpj: null` (criado no BPM), NUNCA cria um novo.
+// (2) `clienteId` explícito para preservar vínculos existentes; (3) nova empresa
+// em constituição, criada com CNPJ null junto ao contrato, sem cadastro prévio.
 const IdentificacaoEmpresaSchema = z.union([
+    z.object({ empresaEmConstituicao: z.literal(true) }),
     z.object({
         cnpj: z.string().min(14).max(18),
         razaoSocial: z.string().min(1),
@@ -226,13 +227,21 @@ export async function criarContrato(raw: unknown) {
     const origem = resolverOrigemParceiro(d);
     if (!origem.success) return origem;
 
-    const clienteResolvido = await resolverClienteDoContrato(d);
-    if (!clienteResolvido.success) return { success: false as const, error: clienteResolvido.error };
+    const clienteResolvido = "empresaEmConstituicao" in d ? null : await resolverClienteDoContrato(d);
+    if (clienteResolvido && !clienteResolvido.success) return { success: false as const, error: clienteResolvido.error };
 
     try {
         const contrato = await db.contratoComercial.create({
             data: {
-                clienteId: clienteResolvido.clienteId,
+                // Nested create mantém empresa e contrato na mesma transação.
+                // Sem CNPJ, cada cadastro representa uma empresa distinta.
+                ...(clienteResolvido ? {
+                    clienteId: clienteResolvido.clienteId,
+                    usuarioId: Number(userId),
+                } : {
+                    cliente: { create: { cnpj: null, razaoSocial: "Em constituição" } },
+                    usuario: { connect: { id: Number(userId) } },
+                }),
                 valorContrato: d.valorContrato,
                 formaPagamento: d.formaPagamento,
                 servico: d.servico,
@@ -243,7 +252,6 @@ export async function criarContrato(raw: unknown) {
                 mes: d.mes,
                 ano: d.ano,
                 socios: d.socios ?? [],
-                usuarioId: Number(userId),
             },
         });
 
@@ -280,14 +288,16 @@ export async function atualizarContrato(raw: unknown) {
         return { success: false as const, error: "Sem permissão" };
     }
 
-    const clienteResolvido = await resolverClienteDoContrato(d);
-    if (!clienteResolvido.success) return { success: false as const, error: clienteResolvido.error };
+    const clienteResolvido = "empresaEmConstituicao" in d ? null : await resolverClienteDoContrato(d);
+    if (clienteResolvido && !clienteResolvido.success) return { success: false as const, error: clienteResolvido.error };
 
     try {
         const atualizado = await db.contratoComercial.update({
             where: { id: d.id },
             data: {
-                clienteId: clienteResolvido.clienteId,
+                ...(clienteResolvido ? { clienteId: clienteResolvido.clienteId } : {
+                    cliente: { create: { cnpj: null, razaoSocial: "Em constituição" } },
+                }),
                 valorContrato: d.valorContrato,
                 formaPagamento: d.formaPagamento,
                 servico: d.servico,
@@ -573,9 +583,8 @@ export async function buscarClienteParaContrato(cnpj: string) {
 }
 
 /**
- * Lista `Cliente`s "em constituição" (cnpj null) já cadastrados no BPM — Fase 3.6
- * do Cliente Master. O fluxo "Empresa em Constituição" do Metas NUNCA cria um
- * `Cliente` novo, só vincula um já existente (única porta de entrada é o BPM).
+ * Lista empresas já cadastradas sem CNPJ. Mantido por compatibilidade;
+ * o cadastro direto no Metas não depende desta lista.
  */
 export async function listarClientesEmConstituicao() {
     const session = await auth();
