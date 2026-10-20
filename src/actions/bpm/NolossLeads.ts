@@ -53,7 +53,7 @@ export async function PromoverNolossLead(dados: unknown) {
     ]);
     if (!etapaDestino) return { success: false, error: "Etapa de destino inválida" };
     if (!etapaEhNovosLeads(etapaDestino.nome)
-      && !["agendar reunião", "standby", "stand by", "standby - follow up"].includes(normalizarNomeEtapa(etapaDestino.nome))) {
+      && !["agendar reunião", "standby", "stand by", "standby - follow up", "stand-by — follow-up semanal"].includes(normalizarNomeEtapa(etapaDestino.nome))) {
       return { success: false, error: "Novo Lead só pode avançar para Agendar reunião ou Standby." };
     }
     if (!resolverVisibilidadeEtapa(

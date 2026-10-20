@@ -1,6 +1,8 @@
 "use server";
 import { randomUUID } from "node:crypto";
 import db from "@/lib/prisma";
+import { disponibilizarContratoComercial } from "@/lib/bpm/contratacao-comercial-server";
+import { CHAVES_CAMPOS } from "@/lib/bpm/financeiro-config.client";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
 import { registrarAnexoSchema } from "@/lib/validations/bpm";
@@ -48,6 +50,7 @@ export async function RegistrarAnexoBpm(dados: unknown) {
     const resultado = await db.$transaction(async (tx) => {
       const acesso = await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "enviarArquivo", tx);
       let campoContratoAssinado = false;
+      let campoContratoParaEnvio = false;
       let campoChecklistExcel = false;
       let dataReuniaoChecklist: Date | null = null;
       let pipelineIdCard: string | null = null;
@@ -62,6 +65,7 @@ export async function RegistrarAnexoBpm(dados: unknown) {
         if (!campo || !validarValoresCamposBpm([campo], { [campoId]: "" }).success) {
           throw new Error("CAMPO_ARQUIVO_INVALIDO");
         }
+        campoContratoParaEnvio = campo.chave === CHAVES_CAMPOS.LINK_CONTRATO;
         campoContratoAssinado = campo.chave === "alpha.contrato.assinado.anexo";
         campoChecklistExcel = card.pipelineId === PIPELINE_OPERACIONAL_CHECKLIST_ID && campo.chave === CAMPO_CHECKLIST_EXCEL;
         if (campoChecklistExcel && !planilhaChecklistValida(nome, tipo)) throw new Error("CHECKLIST_EXCEL_INVALIDO");
@@ -124,9 +128,11 @@ export async function RegistrarAnexoBpm(dados: unknown) {
           causationId: criado.id, idempotencyKey: `contrato-assinado-anexo:${criado.id}`,
         }, tx);
       }
-      return { anexo: criado, criado: true, campoContratoAssinado };
+      const retornoComercial = campoContratoParaEnvio ? await disponibilizarContratoComercial(tx, cardId, userId) : null;
+      return { anexo: criado, criado: true, campoContratoAssinado, retornoComercial };
     });
 
+    if (resultado.retornoComercial) await notificarPipelineBpm({ ...resultado.retornoComercial, tipo: "CARD_ATUALIZADO" });
     if (resultado.criado) {
       try {
         revalidatePath(`${ROTA_BASE}/pipeline`);

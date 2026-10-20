@@ -498,6 +498,7 @@ export async function executarAutomacaoFollowUpBpm(
               "Agendar Reunião",
               NOME_ETAPA_REUNIAO_AGENDADA,
               NOME_ETAPA_STANDBY,
+              "Stand-by — follow-up semanal",
               "Standby - Follow Up",
               NOME_ETAPA_MONITORAMENTO,
             ],

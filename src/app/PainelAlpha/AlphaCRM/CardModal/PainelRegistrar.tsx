@@ -5,6 +5,8 @@ import { CalendarClock, ScrollText } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { CardOpenFormSlot } from "./CardOpenFormSlot";
+import { PainelAcompanhamentoContratacao } from "./PainelAcompanhamentoContratacao";
+import { etapaEhFechado } from "@/lib/bpm/status-pos-fechamento";
 import { ConteudoScriptEtapa } from "@/app/PainelAlpha/AlphaCRM/CardModal/ConteudoScriptEtapa";
 import { PainelResumoContratacao } from "./PainelResumoContratacao";
 import { PainelExcecaoOperacional } from "./PainelExcecaoOperacional";
@@ -52,11 +54,13 @@ export default function PainelRegistrar({ card, etapaAtual, accent, podeEditar, 
             <CalendarClock size={13} /> Formulário da Etapa
           </TabsTrigger>
           <TabsTrigger value="script" className="gap-1.5">
-            <ScrollText size={13} /> Scripts
+            <ScrollText size={13} /> Orientações da etapa
           </TabsTrigger>
         </TabsList>
 
         <TabsContent id={`formulario-etapa-${card.id}`} value="formulario-etapa" className="m-0 mt-5 flex-none space-y-4 px-5 pb-5" tabIndex={-1}>
+          {etapaEhFechado(card.etapa.nome, card.etapa.chave) && (card.pipeline.chave === "comercial" || card.pipeline.nome === "Revisão de Radar")
+            && <PainelAcompanhamentoContratacao key={card.id} cardId={card.id} realtimeRevision={realtimeRevision} onAtualizado={onAtualizado} />}
           {card.resumoContratacao && <PainelResumoContratacao resumo={card.resumoContratacao} />}
           {card.pipeline.chave === PIPELINE_CHAVE && card.resumoContratacao && !card.resumoContratacao.operacionalCardId && isAdminRole(currentUserRole)
             && <PainelExcecaoOperacional cardId={card.id} onAtualizado={onAtualizado} />}
@@ -75,7 +79,7 @@ export default function PainelRegistrar({ card, etapaAtual, accent, podeEditar, 
           {etapaAtual?.script ? (
             <ConteudoScriptEtapa key={etapaAtual.id} script={etapaAtual.script} />
           ) : (
-            <p className="text-xs text-slate-600">Nenhum script configurado para esta etapa ainda.</p>
+            <p className="text-xs text-slate-600">Nenhuma orientação configurada para esta etapa.</p>
           )}
         </TabsContent>
       </Tabs>

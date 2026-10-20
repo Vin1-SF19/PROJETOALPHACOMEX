@@ -539,7 +539,7 @@ export default function AdminPipelineClient({
               <Bot size={14} /> Automações
             </TabsTrigger>
             <TabsTrigger value="checklists">
-              <ClipboardCheck size={14} /> Procedimentos
+              <ClipboardCheck size={14} /> Checklists
             </TabsTrigger>
             <TabsTrigger value="knowledge">
               <BookOpen size={14} /> Base de Conhecimento

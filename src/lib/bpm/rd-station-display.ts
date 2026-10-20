@@ -1,6 +1,29 @@
-export function periodoOriginalRd(raw: Record<string, unknown>) {
+export function periodoOriginalRd(raw: Record<string, unknown>, projection: Record<string, unknown> = {}) {
   const date = (value: unknown) => typeof value === "string" && Number.isFinite(Date.parse(value)) ? value : null;
-  return { entrada: date(raw.start_date), saida: date(raw.end_date) };
+  // Reconciliação preserva o bruto e guarda o período atual comprovado na projeção.
+  const reconciled = projection.rdHistorySource && typeof projection.rdHistorySource === "object";
+  return {
+    entrada: date(reconciled && Object.hasOwn(projection, "startDate") ? projection.startDate : raw.start_date),
+    saida: date(reconciled && Object.hasOwn(projection, "endDate") ? projection.endDate : raw.end_date),
+  };
+}
+
+/** Autor da correção local não é o autor da anotação original do RD. */
+export function autorAjusteHistoricoRd(correction: {
+  id?: string; autorId?: number | null; autor?: { nome: string } | null; camposAlteradosJson: string;
+}) {
+  if (correction.autor?.nome?.trim()) return correction.autor.nome;
+  if (correction.autorId != null) return "Autor do ajuste não identificado";
+  let fields: Record<string, unknown>;
+  try { fields = JSON.parse(correction.camposAlteradosJson); } catch { return "Autor do ajuste não identificado"; }
+  if (!fields || typeof fields !== "object" || Array.isArray(fields)) return "Autor do ajuste não identificado";
+  const keys = Object.keys(fields);
+  const only = (allowed: string[]) => keys.length > 0 && keys.every(key => allowed.includes(key) && fields[key] === true);
+  if (/^rdrepair_[a-f0-9]{28}$/.test(correction.id ?? "") && only(["title", "sourceStageName"])) return "Ajuste automático da importação";
+  if (/^rdnote_[a-f0-9]{28}$/.test(correction.id ?? "") && only(["type", "authorName"])) return "Autoria recuperada automaticamente do RD";
+  if (/^rdhistsync_[a-f0-9]{28}$/.test(correction.id ?? "") && fields.rdHistorySource === true) return "Histórico reconciliado automaticamente com o RD";
+  if (/^rdhistundo_[a-f0-9]{28}$/.test(correction.id ?? "") && fields.rdHistorySource === true) return "Reconciliação do histórico revertida";
+  return "Autor do ajuste não identificado";
 }
 
 /** Auditoria operacional fica no banco; a timeline mostra apenas o serviço. */
@@ -23,9 +46,9 @@ export function apresentarAjusteServicoRd(origem: string | null, valorNovoJson: 
 }
 
 export function ajustesLegiveisRd(antes: Record<string, unknown>, depois: Record<string, unknown>) {
-  const labels: Record<string, string> = { title: "Título", content: "Observação", date: "Data", sourceStageName: "Nome da etapa" };
+  const labels: Record<string, string> = { title: "Título", content: "Observação", date: "Data", sourceStageName: "Nome da etapa", authorName: "Autor no RD", startDate: "Entrada na etapa", endDate: "Saída da etapa", status: "Situação", dueDate: "Prazo", completedAt: "Conclusão" };
   return Object.entries(labels).filter(([key]) => antes[key] !== depois[key]).map(([key, label]) => ({
-    campo: label, data: key === "date", antes: typeof antes[key] === "string" ? textoLegivelRd(antes[key] as string) : "", depois: typeof depois[key] === "string" ? textoLegivelRd(depois[key] as string) : "",
+    campo: label, data: ["date", "startDate", "endDate", "dueDate", "completedAt"].includes(key), antes: typeof antes[key] === "string" ? textoLegivelRd(antes[key] as string) : "", depois: typeof depois[key] === "string" ? textoLegivelRd(depois[key] as string) : "",
   }));
 }
 
@@ -37,7 +60,11 @@ export function apresentarEventoRd(evento: { tipo: string; data: string | null; 
   const titulo = typeof p.title === "string" && p.title.trim() ? p.title : etapa ? String(p.sourceStageName || "Movimentação de etapa RD") : anotacao ? "Anotação" : tarefa ? "Tarefa" : "Atividade RD Station";
   // Uma data removida por correção deve continuar ausente, sem voltar à data original.
   const data = typeof p.date === "string" ? p.date : p.date === null ? "" : evento.data ?? "";
-  return { titulo: textoLegivelRd(titulo), conteudo: typeof p.content === "string" ? textoLegivelRd(p.content) : "", data, tipo: etapa ? "Movimentação de etapa" : anotacao ? "Anotação" : tarefa ? "Tarefa" : "Atividade", autor: typeof p.authorName === "string" && p.authorName ? textoLegivelRd(p.authorName) : null, situacao: tarefa ? p.status === "CONCLUIDA" ? "Concluída" : "Pendente" : null, prazo: tarefa && typeof p.dueDate === "string" ? p.dueDate : null, etapaIndisponivel: etapa && !p.sourceStageName };
+  const responsible = typeof p.responsibleNames === "string" ? p.responsibleNames : tarefa && !p.authorSource ? p.authorName : null;
+  const autor = tarefa && typeof responsible === "string" && responsible
+    ? `Responsável no RD: ${textoLegivelRd(responsible)}`
+    : typeof p.authorName === "string" && p.authorName && (!tarefa || p.authorSource) ? textoLegivelRd(p.authorName) : null;
+  return { titulo: textoLegivelRd(titulo), conteudo: typeof p.content === "string" ? textoLegivelRd(p.content) : "", data, tipo: etapa ? "Movimentação de etapa" : anotacao ? "Anotação" : tarefa ? "Tarefa" : "Atividade", autor, situacao: tarefa ? p.status === "CONCLUIDA" ? "Concluída" : "Pendente" : null, prazo: tarefa && typeof p.dueDate === "string" ? p.dueDate : null, etapaIndisponivel: etapa && !p.sourceStageName };
 }
 
 export function ordenarHistoricoRd<T extends { id: string; tipo: string; data: string | null; projecao: Record<string, unknown> }>(eventos: T[]): T[] {

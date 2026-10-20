@@ -13,7 +13,7 @@ describe("CRM - configurações centralizadas e card editável", () => {
 
     for (const label of [
       "Automações",
-      "Procedimentos",
+      "Checklists",
       "Base de Conhecimento",
       "Cadências",
     ]) {

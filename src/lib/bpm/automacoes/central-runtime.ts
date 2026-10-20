@@ -16,6 +16,7 @@ import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { copiarCamposCardVinculado } from "@/lib/bpm/copiar-campos-card-vinculado";
 import { carregarCamposFaltantesCardEtapa } from "@/lib/bpm/requisitos-etapa-server";
+import { disponibilizarContratoComercial } from "@/lib/bpm/contratacao-comercial-server";
 import { sincronizarNotaFiscalCard } from "@/lib/bpm/financeiro-nota-fiscal-server";
 import { montarContextoAvaliacaoDoCard } from "@/lib/bpm/regras/contexto";
 import { avaliarPagamentoFinanceiro } from "@/lib/bpm/financeiro-pagamento-validacao";
@@ -228,9 +229,12 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
       if ((anterior?.valor ?? "") === (valor ?? "")) return { campoId, valor, ignorada: true, motivo: "VALOR_IGUAL" };
       await tx.bpmCardCampoValor.upsert({ where: { cardId_campoId: { cardId: card.id, campoId } }, create: { cardId: card.id, campoId, valor }, update: { valor } });
       await publicarEventoDaAcao(execucao, "CAMPO_ALTERADO", "CAMPO", campoId, { campoId, valor: anterior?.valor ?? null }, { campoId, valor }, tx);
-      return { campoId, valor };
+      const retornoComercial = [CHAVES_CAMPOS.CONTRATO_ELABORADO, CHAVES_CAMPOS.LINK_CONTRATO].some((chave) => chave === campo.chave)
+        ? await disponibilizarContratoComercial(tx, card.id, null) : null;
+      return { campoId, valor, retornoComercial };
     });
     if (resultado.ignorada) return resultado;
+    if (resultado.retornoComercial) await notificarPipelineBpm({ ...resultado.retornoComercial, tipo: "CARD_ATUALIZADO" });
     await notificarPipelineBpm({ pipelineId: card.pipelineId, cardId: card.id, tipo: "CARD_ATUALIZADO" });
     return resultado;
   }

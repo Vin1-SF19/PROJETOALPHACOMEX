@@ -602,7 +602,7 @@ export function PainelCamposEtapaAtual({
             return (
               <div key={campo.id} className="space-y-1.5">
                 <label htmlFor={`campo-bpm-${campo.id}`} className="text-[11px] font-medium text-slate-400">
-                  {campoLabels[campo.id] ?? campo.nome}{campo.obrigatorio ? " *" : ""}{campo.obrigatorioEntrada ? " · exigido na entrada" : ""}{campo.obrigatorioSaida ? " · exigido na saída" : ""}{fonteAutomatica ? " · automático" : ""}
+                  {campoLabels[campo.id] ?? campo.nome}{campo.obrigatorio ? " *" : ""}{campo.obrigatorioEntrada && !["alpha.radar.viabilidade.valor_acordado", "alpha.radar.viabilidade.forma_pagamento"].includes(campo.chave ?? "") ? " · exigido na entrada" : ""}{campo.obrigatorioSaida ? " · exigido na saída" : ""}{fonteAutomatica ? " · automático" : ""}
                 </label>
                 {origemFinanceiro && <p className="text-[10px] text-sky-300/80">{origemFinanceiro}</p>}
                 {campo.chave === BPM_FIELD_KEYS.MEETING_SUMMARY && (
