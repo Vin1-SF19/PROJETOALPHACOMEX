@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -92,6 +92,7 @@ function cardNaEtapaAtual(updatedAt = UPDATED_AT) {
 }
 
 describe("CRM - edição dos campos definidos da etapa", () => {
+  afterEach(() => vi.useRealTimers());
   beforeEach(() => {
     vi.clearAllMocks();
     authMock.mockResolvedValue({ user: { id: "7", role: "COMERCIAL" } });
@@ -115,6 +116,46 @@ describe("CRM - edição dos campos definidos da etapa", () => {
     expect(exigirAcessoBpmCardMock).not.toHaveBeenCalled();
     expect(prismaMock.bpmCard.findUnique).not.toHaveBeenCalled();
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("retoma a transação inteira após lock transitório sem duplicar a auditoria", async () => {
+    vi.useFakeTimers();
+    prismaMock.bpmCard.updateMany.mockRejectedValueOnce(new Error("SQLITE_BUSY: database is locked"));
+    const resultado = AtualizarCardBpm({ cardId: CARD_ID, camposValores: { [CAMPO_ID]: "Novo" }, versaoEsperadaEm: UPDATED_AT });
+    await vi.advanceTimersByTimeAsync(200);
+    expect((await resultado).success).toBe(true);
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);
+    expect(prismaMock.bpmCardHistorico.create).toHaveBeenCalledOnce();
+    expect(notificarPipelineBpmMock).toHaveBeenCalledOnce();
+    expect(exigirAcessoBpmCardMock).toHaveBeenCalledTimes(3); // Pré-checagem e duas transações.
+    expect(exigirAcessoBpmCardMock).toHaveBeenCalledWith(CARD_ID, 7, "COMERCIAL", "editarCard", prismaMock);
+  });
+
+  it("limita lock persistente e não informa salvamento sem commit", async () => {
+    vi.useFakeTimers();
+    prismaMock.$transaction.mockRejectedValue(new Error("SQLITE_BUSY: database is locked"));
+    const resultado = AtualizarCardBpm({ cardId: CARD_ID, camposValores: { [CAMPO_ID]: "Novo" } });
+    await vi.advanceTimersByTimeAsync(1_400);
+    expect(await resultado).toEqual({ success: false, error: "O banco estava ocupado e não concluiu o salvamento. Tente novamente." });
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(4);
+    expect(prismaMock.bpmCardHistorico.create).not.toHaveBeenCalled();
+    expect(notificarPipelineBpmMock).not.toHaveBeenCalled();
+  });
+
+  it("revalida a versão após lock e não sobrescreve uma edição concorrente", async () => {
+    vi.useFakeTimers();
+    prismaMock.bpmCard.findUnique
+      .mockResolvedValueOnce(cardNaEtapaAtual())
+      .mockResolvedValueOnce(cardNaEtapaAtual())
+      .mockResolvedValueOnce(cardNaEtapaAtual(new Date(UPDATED_AT.getTime() + 1)));
+    prismaMock.bpmCard.updateMany.mockRejectedValueOnce(new Error("SQLITE_BUSY: database is locked"));
+    const resultado = AtualizarCardBpm({ cardId: CARD_ID, camposValores: { [CAMPO_ID]: "Novo" }, versaoEsperadaEm: UPDATED_AT });
+    await vi.advanceTimersByTimeAsync(200);
+    expect(await resultado).toEqual({ success: false, error: "O card mudou enquanto era editado. Recarregue e tente novamente." });
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);
+    expect(prismaMock.bpmCard.updateMany).toHaveBeenCalledOnce();
+    expect(prismaMock.bpmCardHistorico.create).not.toHaveBeenCalled();
+    expect(notificarPipelineBpmMock).not.toHaveBeenCalled();
   });
 
   it("salva origem textual e parceiro juntos na transação existente", async () => {
