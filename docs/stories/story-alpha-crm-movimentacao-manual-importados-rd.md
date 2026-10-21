@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — hotfix do identificador RD no evento de movimento aprovado em quatro gates, revisão QA e smoke local; republicação da mesma entrega autorizada. Sem alteração de schema ou mutação de dados reais durante a investigação.
+Done — hotfix publicado e verificado em produção em 2026-10-16 às 17:36 UTC. Commit `52d31f835c1cd2a1398e0cb50c5aa09ea7a9b542`, Vercel READY, health de versão correspondente e quatro gates aprovados. Sem movimento de cards reais na verificação.
 
 ## Executor Assignment
 
@@ -293,3 +293,9 @@ Os testes anteriores simulavam `publicarEventoBpm`, por isso não exercitaram o 
 
 - Typecheck final aprovado (`/tmp/rd-hotfix-typecheck-final.log`), regressões focais repetidas aprovadas (`/tmp/rd-hotfix-integration-final.log`) e lint focal sem erros (`/tmp/rd-hotfix-focal-lint.log`). Build final saída 0 em `/home/ialpha/projetos/alpha-comex/painel-alpha-worktrees/rd-hotfix-build.log`.
 - QA hotfix APPROVED. Smoke local do artefato aprovado (raiz/providers 200 e CRM protegido sem sessão); servidor temporário encerrado. Artefato contém somente o contrato compartilhado, dois testes novos e esta story. Publicação deve preservar rollback anterior, confirmar `/api/health/version` na SHA final e conferir logs contemporâneos.
+
+## Registro local pós-hotfix
+
+Correção publicada em `https://painel.alpha-comex.com`, commit `52d31f835c1cd2a1398e0cb50c5aa09ea7a9b542`, deployment `dpl_F8oiMUHVq18Dj8XcVRbg9hUQfhLq` READY. `/api/health/version` retornou SHA exata e HTTP 200 às 17:36 UTC; raiz/providers 200, CRM protegido para visitante sem sessão, GitHub/Vercel success. Consulta de erros no novo deployment não retornou registros; não equivale a teste autenticado ou movimentação de card real. Cliente deve recarregar a página para usar a versão corrigida. Artefato/rollback anterior preservados; credenciais temporárias removidas e checkout de publicação limpo.
+
+Evidência local: `/home/ialpha/projetos/alpha-comex/painel-alpha-worktrees/rd-hotfix-production-verification.json`. Este registro posterior fica no workspace compartilhado; o commit publicado contém o relatório do candidato e o parecer QA aprovado.

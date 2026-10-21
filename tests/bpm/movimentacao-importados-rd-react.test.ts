@@ -58,10 +58,10 @@ const click = async (label: string) => { expect(button(label)).toBeDefined(); aw
 async function painel(card = detalhe, destino = "Destino") {
   await act(async () => root.render(h(PainelProximaEtapa, { card, etapas: [{ id: "destino", nome: destino, chave: null, ordem: 1, script: null }], podeMoverEtapa: true, accent: "1,2,3", onMovido })));
 }
-async function board(importadoRd = true) {
+async function board(importadoRd = true, podeMoverLivremente = false) {
   await act(async () => root.render(h(PipelineBoardClient, {
     pipeline: { id: "pipeline", nome: "Funil Sintético", etapas: [{ id: "origem", nome: "Origem", ordem: 0 }, { id: "destino", nome: "Destino", ordem: 1 }] },
-    cardsIniciais: [{ ...cardBoard, importadoRd }], visual: { accent: "1,2,3" } as ComponentProps<typeof PipelineBoardClient>["visual"], currentUserId: 1, currentUserRole: "ADMIN",
+    cardsIniciais: [{ ...cardBoard, importadoRd, podeMoverLivremente, podeAgirEtapa: !podeMoverLivremente }], visual: { accent: "1,2,3" } as ComponentProps<typeof PipelineBoardClient>["visual"], currentUserId: 1, currentUserRole: "ADMIN",
   })));
 }
 async function drop() {
@@ -165,5 +165,25 @@ describe("arrastar importados RD", () => {
 
   it("card nativo sem aresta mantém o bloqueio existente", async () => {
     await board(false); await drop(); expect(api.move).not.toHaveBeenCalled(); expect(document.querySelector('[role="dialog"]')).toBeNull(); expect(colunaDoCard()).toContain("Origem");
+  });
+});
+
+describe("movimento livre com autoridade calculada no servidor", () => {
+  it.each([false, true])("modal move diretamente card RD=%s sem formulário ou confirmação", async (importadoRd) => {
+    api.disponibilidade.mockResolvedValue({ success: true, data: [{ etapaId: "destino", oculta: false, pendencias: [] }] });
+    await painel({ ...detalhe, importadoRd, podeMoverLivremente: true });
+    await click("Destino");
+    expect(api.move).toHaveBeenCalledWith(expect.objectContaining({ cardId: "card-rd", etapaDestinoId: "destino", idempotencyKey: expect.any(String) }));
+    expect(api.preflight).not.toHaveBeenCalled();
+    expect(api.saveAndMove).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(onMovido).toHaveBeenCalled();
+  });
+  it("kanban permite salto sem aresta configurada e sem vínculo de edição", async () => {
+    await board(false, true);
+    await drop();
+    expect(api.move).toHaveBeenCalledWith(expect.objectContaining({ cardId: "card-rd", etapaDestinoId: "destino", idempotencyKey: expect.any(String) }));
+    expect(api.preflight).not.toHaveBeenCalled();
+    expect(api.error).not.toHaveBeenCalled();
   });
 });

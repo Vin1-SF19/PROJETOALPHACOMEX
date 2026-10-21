@@ -132,3 +132,8 @@ Não há navegador autenticado disponível: os testes React usam happy-dom e ada
 | `git diff --check` | **PASS**, executado pelo QA sem erros de whitespace. |
 
 Os logs acima ficam em `/home/ialpha/projetos/alpha-comex/painel-alpha-worktrees/`. Smoke do artefato compilado, realizado pelo DevOps, confirmou respostas públicas e redirecionamento do CRM sem sessão. **Não houve inspeção visual autenticada.** CodeRabbit indisponível, conforme registro do executor. Nesta revisão o QA alterou somente esta seção; não executou mutação de banco, commit, push ou deploy.
+
+
+### Publicação verificada
+
+DevOps publicou o commit `40bd0541cfd9572dd7a0c112db5c0462f30c7c2b` em 2026-10-16. Deployment `dpl_C3LDiVAzF7xEh6SSkArJ6Jm4oJNY` READY, alias `https://painel.alpha-comex.com` atualizado e health HTTP 200 com o SHA exato às 18:28:32 UTC. Smoke público aprovado; zero erros de requests encontrados nessa verificação. Nenhuma mutação de negócio executada para o smoke. Evidência operacional privada: `../painel-alpha-worktrees/pipeline-switch-production-verification.json`. Arquivos temporários de ambiente removidos do checkout isolado. O registro pós-publicação foi acrescentado somente ao workspace principal, sem criar novo deploy de documentação.

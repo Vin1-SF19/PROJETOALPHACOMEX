@@ -16,7 +16,7 @@ Como administrador do Painel Alpha, quero que o staging preserve as melhorias j�
 
 Solicitação explícita do usuário: o bloco Anotações, na parte inferior esquerda do card aberto, está desatualizado no staging em comparação à produção; após atualizar o staging, todas as correções desta conversa foram aprovadas para produção. A autorização permanente de commit/push automático em staging continua válida. A publicação em produção está autorizada por esta solicitação, sem necessidade de uma nova confirmação genérica.
 
-Referências de código identificadas pela coordenação: produção real `4ce99fe6` e staging `1ab82aec`. A integração parte de checkout limpo e compara ambas as histórias, preservando o código de produção que não está no staging. O workspace principal contém trabalho paralelo que não integra esta entrega.
+Referências de código identificadas pela coordenação: produção real `4ce99fe6` e staging `1ab82aec`. A integração parte de checkout limpo e compara ambas as histórias, preservando o código de produção que não está no staging. O workspace principal contém trabalho paralelo que não integra esta entrega de produção. Staging já recebeu esse pacote em `2d80e4f0`; sua preservação não autoriza promovê-lo.
 
 O usuário criou uma branch atualizada do banco para staging. A falha de login do deployment com snapshot antigo de ambiente já foi resolvida no redeploy informado pela coordenação; o usuário confirmou “deu certo”. Esse contexto torna obrigatório usar as variáveis atuais de cada ambiente ao gerar seus deployments, sem transportar a conexão de staging para produção.
 
@@ -32,7 +32,7 @@ O usuário criou uma branch atualizada do banco para staging. A falha de login d
 6. Não há alteração de schema, migration, seed, backfill, configuração de autenticação, credencial ou mutação em massa. Bancos de staging/produção permanecem distintos; nenhum segredo, dump ou arquivo `.env` é versionado. A integração não executa workers, jobs ou testes que escrevam dados reais.
 7. Executar e registrar `npm run lint`, `npm run typecheck`, `npm test` e build completo. A revisão independente verifica os comportamentos dos dois lados da integração e registra o gate de QA. Qualquer falha precisa ser investigada, comparada à base quando pertinente e explicitamente registrada; a publicação não pode ser apresentada como totalmente validada se um gate estiver pendente.
 8. Publicar primeiro o staging com o código integrado e as variáveis atuais do ambiente staging, incluindo a conexão da branch de banco recém-atualizada pelo usuário. Verificar o alias `https://staging.alpha-comex.com`, o deployment e sua revisão de fonte; executar smoke somente leitura, incluindo `/api/broadcast` com resposta 200 e acesso ao CRM, sem produzir dados de teste no banco remoto.
-9. Após a validação do staging, publicar o mesmo código aprovado em produção com as variáveis próprias e atuais de produção. Nunca promover um snapshot de deployment de staging que carregue conexão, autenticação ou outras variáveis de staging para produção. Confirmar alias público de produção, deployment, revisão de fonte equivalente e smoke somente leitura.
+9. Após a validação do staging, publicar o código CRM aprovado em produção com as variáveis próprias e atuais de produção. Nunca promover um snapshot de deployment de staging que carregue conexão, autenticação ou outras variáveis de staging para produção. Confirmar alias público de produção, deployment, revisão de fonte equivalente para os caminhos CRM aprovados e smoke somente leitura. O pacote externo Alpha BI/sincronização RD permanece somente no staging, conforme resposta final do usuário.
 10. Antes da troca de aliases, identificar os deployments anteriores corretos de cada ambiente e registrar rollback de código/alias, mantendo o ambiente de banco correspondente. Ao concluir, informar as revisões publicadas e evidências reais, distinguindo push de código, build e disponibilidade pública.
 
 ## Tasks / Subtasks
@@ -122,30 +122,47 @@ Preservação das melhorias nas duas linhas; autorização e identidades RD; con
 - `.bibble/memory/decisions.md`
 - `.bibble/memory/integration-points.md`
 - `.bibble/memory/journal.md`
+- `AGENTS.md`
+- `docs/dev-tools.md`
+- `docs/reports/staging-sincronizacao-20261020.md`
+- `docs/stories/relatorio-alpha-crm-alinhamento-cards-fluxo.md`
 - `docs/stories/relatorio-alpha-crm-historico-autoria-rd.md`
+- `docs/stories/relatorio-vault-crm-alinhamento.md`
 - `docs/stories/relatorio-vault-rd-historico-autoria.md`
 - `docs/stories/story-agenda-alpha-operacional-tarefas-status.md`
 - `docs/stories/story-alpha-crm-acesso-individual-pipeline.md`
+- `docs/stories/story-alpha-crm-alinhamento-cards-fluxo-contrato.md`
 - `docs/stories/story-alpha-crm-anexos-procedimentos-card.md`
 - `docs/stories/story-alpha-crm-anotacao-fixa-formulario-etapa.md`
+- `docs/stories/story-alpha-crm-assessoria-smart-enviar-revisao.md`
 - `docs/stories/story-alpha-crm-cadastro-novo-lead-revisao-radar.md`
 - `docs/stories/story-alpha-crm-edicao-campos-card.md`
 - `docs/stories/story-alpha-crm-integracao-api-painel-alpha.md`
 - `docs/stories/story-alpha-crm-membros-por-card.md`
+- `docs/stories/story-alpha-crm-migracao-historico-rd-station-v1.md`
 - `docs/stories/story-alpha-crm-movimentacao-excepcional-admin-lideres.md`
 - `docs/stories/story-alpha-crm-movimentacao-manual-importados-rd.md`
 - `docs/stories/story-alpha-crm-origem-cliente-parceiro.md`
 - `docs/stories/story-alpha-crm-reconciliacao-historico-autoria-rd.md`
+- `docs/stories/story-alpha-crm-recuperacao-campos-sincronizacao-rd-v1.md`
 - `docs/stories/story-alpha-crm-release-aprovada-staging-producao.md`
 - `docs/stories/story-alpha-crm-revisao-radar-fechado.md`
 - `docs/stories/story-alpha-crm-seletor-pipeline-no-quadro.md`
 - `docs/stories/story-alpha-crm-tarefas-otimistas-notificacoes.md`
 - `docs/stories/story-alpha-crm-tarefas-por-tipo-alerta.md`
 - `docs/stories/story-alpha-crm-visao-equipe-pipeline.md`
+- `docs/stories/story-central-dev-painel-api-radar.md`
 - `docs/stories/story-chamados-multissetorial.md`
 - `docs/stories/story-metas-empresa-em-constituicao.md`
 - `docs/stories/story-rm-2026-b7694f-mover-checklists-anotacoes-card.md`
+- `docs/stories/story-staging-sincronizacao-fluxo-staging-primeiro.md`
+- `package.json`
+- `scripts/configurar-assessoria-smart-revisao.mts`
 - `scripts/configurar-contratacao-em-tratativa.mts`
+- `scripts/lib/rd-field-mapping.mjs`
+- `scripts/lib/rd-sync-engine.mjs`
+- `scripts/lib/rd-sync-plan.mjs`
+- `scripts/sincronizar-rd-alpha.mjs`
 - `src/actions/ContratoComercial.ts`
 - `src/actions/bpm/Cards.ts`
 - `src/actions/bpm/Checklists.ts`
@@ -157,6 +174,7 @@ Preservação das melhorias nas duas linhas; autorização e identidades RD; con
 - `src/actions/bpm/Tarefas.ts`
 - `src/actions/bpm/VisibilidadePipeline.ts`
 - `src/actions/chamados.ts`
+- `src/app/PainelAlpha/AlphaBI/page.tsx`
 - `src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx`
 - `src/app/PainelAlpha/AlphaCRM/CampoBpmInput.tsx`
 - `src/app/PainelAlpha/AlphaCRM/CampoOrigemCliente.tsx`
@@ -222,6 +240,7 @@ Preservação das melhorias nas duas linhas; autorização e identidades RD; con
 - `src/lib/chamados/conclusao.ts`
 - `src/lib/comercial/canais-origem.ts`
 - `src/lib/comercial/origens-lead.ts`
+- `src/lib/modulos-registry.ts`
 - `src/lib/validations/bpm.ts`
 - `src/store/useBpmTarefasNotificacoes.ts`
 - `tests/bpm/acesso-individual-pipeline.test.ts`
@@ -263,6 +282,10 @@ Preservação das melhorias nas duas linhas; autorização e identidades RD; con
 - `tests/bpm/procedimentos-cards-rd.test.ts`
 - `tests/bpm/procedimentos-vazio-react.test.ts`
 - `tests/bpm/quadro-actions.test.ts`
+- `tests/bpm/rd-field-mapping.test.ts`
+- `tests/bpm/rd-sync-collection.test.ts`
+- `tests/bpm/rd-sync-engine.test.ts`
+- `tests/bpm/rd-sync-plan.test.ts`
 - `tests/bpm/relacionamento-ui.test.ts`
 - `tests/bpm/requisitos-etapa-server.test.ts`
 - `tests/bpm/requisitos-transicao-destino-visibilidade.test.ts`
@@ -324,7 +347,7 @@ Perspectiva do desenvolvedor: a story fornece contexto para iniciar a integraç�
 - Cinco arquivos existentes no workspace principal foram usados somente como referência de integração após revisão integral do diff contra produção. Regressões ali presentes (radar obrigatório, guarda de visibilidade de destino e limpeza de substatus administrativo) foram corrigidas no candidato. Nenhuma coleta ampla das alterações sujas foi realizada.
 - Nenhuma modificação em schema, autenticação, dependências, segredos ou configuração de banco. A comparação desses contratos com ambos os pais permanece vazia. Nenhum job, migration ou alteração de dados é necessário.
 
-### Validação concluída do candidato
+### Validação concluída do candidato de produção R
 
 Primeira suíte detectou conflitos de comportamento na integração; foram corrigidos antes da publicação. Rodadas direcionadas confirmaram nomes automáticos, seleção de usuários, cadastro, personalização de canal e indicação de parceiro. Lint aprovado (zero erros, 1193 avisos existentes); typecheck aprovado; suíte completa aprovada (674 arquivos, 5058 testes, quatro skipped e um todo); build aprovado (exit 0, 143,6 segundos). Logs: `/var/tmp/alpha-release-lint-final.log`, `/var/tmp/alpha-release-typecheck-final.log`, `/var/tmp/alpha-release-suite-pass.log`, `/var/tmp/alpha-release-build.log` e `/var/tmp/alpha-release-build-result.json`. Fixtures SQLite usaram diretório privado em `/dev/shm` após confirmar lentidão do volume temporário; nenhuma asserção ou timeout foi relaxado.
 
@@ -344,3 +367,23 @@ Registrar revisão/commit integrado, resultados, deployments e aliases de stagin
 | Data | Versão | Descrição | Autor |
 | --- | --- | --- | --- |
 | 2026-10-20 | 1.0 | Preparação da integração e release explicitamente aprovada; checklist de draft executada. | River / SM |
+
+### Preservação do avanço externo em staging
+
+O usuário solicitou refazer a pergunta sobre o pacote externo e confirmou ao final: **“Publicar somente as correções do CRM desta conversa”**. Essa resposta final substitui a seleção anterior. Produção recebe apenas `R=434443fc82bedd31a666bd55701e15d432626d40`, merge aprovado de `1ab82aec`/`4ce99fe6`. Staging recebe `S`, merge de `2d80e4f0` com R. Nenhum force push. Alpha BI, registro do módulo, scripts RD e seu comando npm permanecem somente em S. A diferença dos caminhos runtime CRM R→S é apenas a limpeza de `cardAbertoPorAlertaRef` ao fechar, já existente em 2d80; todas as correções aprovadas são equivalentes. Os testes adicionais de movimentação RD de 2d80 são preservados em S.
+
+O deployment anterior de staging `dpl_FXxXhhByQ5g4wppqZd4ZTTpQjvo4` (2d80) foi validado READY e `/api/broadcast` 200 em 2026-10-20 às 20:54 UTC; é rollback preferencial de S. Produção anterior permanece `dpl_6w5Pbv2Jw3VM72gmtB7LkpAuq6hz`. R possui seus próprios gates aprovados; S repete os gates no ambiente staging antes de sua publicação. Nunca promover o runtime S para produção.
+
+Evidência operacional pós-publicação será registrada fora do Git em `/var/tmp/alpha-crm-release-publicacao-20261020.json`, sem segredos. O checklist de deployment permanece pendente até a confirmação efetiva dos aliases e smokes.
+
+Avanço adicional `b79a1382` inclui somente três documentos de publicação/configuração de staging; será incorporado após o merge de S, antes de um único push final. Os arquivos runtime/testes não mudam com esse avanço. A File List desta cópia staging inclui os artefatos preservados do pacote externo, que não pertencem ao commit R de produção.
+
+### Gates finais do staging integrado S
+
+- `npm run lint`: aprovado, zero erros e 1193 avisos herdados (`/var/tmp/alpha-stage-release-lint.log`).
+- `npm run typecheck`: aprovado (`/var/tmp/alpha-stage-release-typecheck.log`).
+- `npm test -- --maxWorkers=2`: aprovado, 678 arquivos/5147 testes; quatro skipped e um todo (`/var/tmp/alpha-stage-release-tests.log`). Fixtures locais privadas em tmpfs; nenhuma escrita em banco remoto.
+- Build completo aprovado: exit 0, 166,02 segundos (`/var/tmp/alpha-stage-release-build.log`, `/var/tmp/alpha-stage-release-build-result.json`). Executadas geração do player e build Next webpack com controle de memória; Prisma já gerado, contratos idênticos. A alteração automática de tsconfig foi restaurada e não integra o commit.
+- Diff de schema/auth/lockfile/Prisma/Vercel vazio; sem conflitos ou whitespace inválido. Os artefatos extras de staging não integram R.
+
+QA independente S: **APPROVED**, sem achados bloqueantes; integração staging e isolamento de R confirmados após os quatro gates finais. Fonte R permanece com fingerprint previamente aprovado. Smokes remotos são etapa de publicação pendente, não presumida nesta revisão.

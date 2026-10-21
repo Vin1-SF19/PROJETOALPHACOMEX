@@ -394,3 +394,24 @@ Publicação confirmada do commit [`44e23a4a9f65a3de29271bda28c6add21e374b0e`](h
 Verificação independente do arquiteto confirmou 1.596 tarefas (89 pendentes e 1.507 concluídas), 3.608 anotações e 662 responsáveis/vínculos comerciais corretos: 235 para Giselle, 221 para Sheila e 206 para Thais. Os 129 casos com múltiplos responsáveis preservam todos os nomes na descrição sem escolher arbitrariamente um único responsável. Permanecem 69 outros vínculos sem de/para confirmado, fora das três closers aprovadas; foram reportados e preservados. Nenhum alerta de tarefa foi criado.
 
 A configuração autorizada da conta de teste está na versão 27; a verificação independente confirmou acesso a 763 de 763 cards ativos e nove de nove colunas. Não foram alterados leads para conceder acesso. Contagens e verificação de regras são evidências de leitura do servidor; não representam inspeção visual autenticada da conta na Vercel. Arquivos de ambiente originais foram preservados.
+
+### Auditoria de campos e formulários — 16/10/2026 (somente leitura)
+
+- [x] Consultar a API CRM V1 atual com paginação completa e comparar por identidade de origem: os 1.212 cards importados foram encontrados entre as 1.566 negociações retornadas.
+- [x] Comparar dados canônicos, campos próprios e composição dos formulários. Os cards importados têm zero registros em `BpmCardCampoValor` e zero valores globais personalizados; dados canônicos de empresa/contato/card são fontes distintas e não estão necessariamente vazios.
+- [x] Auditar os 137 cards importados atualmente em **Em tratativa**: 135 com contato/telefone no RD, 100 com e-mail, 116 com Estado, 53 com regime tributário e 49 com valor acordado. Há 128 cards com contato na origem e nenhum contato ativo vinculado à empresa no Alpha; 108 têm Estado na origem com UF vazia no Alpha; 44 têm regime na origem com destino vazio.
+- [x] Rastrear a lacuna: o importador preserva o detalhe original e eventos, mas não popula os campos próprios nem importa os contatos. A listagem RD contém `contacts`; o detalhe consultado não contém esse bloco. O e-mail do formulário depende de contato canônico inequívoco e não de valor próprio duplicado.
+- [x] Separar dados existentes de pendências: dos 50 pagamentos não vazios em Em tratativa, 45 são “à definir”. O mês RD não tem ano/dia, enquanto o destino Alpha é uma data. As faixas de faturamento RD de 15M diferem das opções Alpha de 16M. Endereço estruturado não foi encontrado na listagem/detalhe; anotações/anexos não foram analisados para extração de endereços.
+- [x] Registrar comparação privada por lead e relatório agregado, sem credenciais ou dados pessoais em arquivos versionados. Validar unicidade de 1.212 IDs RD/card, total de 137 no recorte, paginação concluída, permissões 0600 e exclusão pelo Git.
+- [ ] Implementar e executar eventual recuperação de campos em story própria, com de/para explícito, reconciliação de empresas compartilhadas/contatos, preservação de valores existentes e simulação. Esta auditoria não implementa nem autoriza backfill: execução requer relatório Vault, backup completo verificado de até 48 horas e confirmação específica conforme `AGENTS.md`.
+
+**File List desta auditoria:**
+
+- `docs/stories/story-alpha-crm-migracao-historico-rd-station-v1.md` — evidências, checklist e limites da auditoria.
+- `database-backups/pre-change/rd-fields-audit-2026-10-16/relatorio.txt` — diagnóstico e matriz proposta de recuperação; privado, ignorado pelo Git.
+- `database-backups/pre-change/rd-fields-audit-2026-10-16/summary.json` — contagens agregadas privadas.
+- `database-backups/pre-change/rd-fields-audit-2026-10-16/comparacao-em-tratativa.csv` — 137 cards comparados individualmente; dados reais privados.
+- `database-backups/pre-change/rd-fields-audit-2026-10-16/comparacao-todos-leads.csv` — 1.212 cards comparados individualmente; dados reais privados.
+- `database-backups/pre-change/rd-fields-audit-2026-10-16/comparison-private.json` — comparação detalhada e conflitos por identidade; privado.
+
+Nenhum código de aplicação, esquema, configuração de formulário ou dado remoto foi alterado nesta auditoria. As fotografias privadas de leitura não substituem um backup completo. Lint, typecheck e testes de aplicação não foram executados nesta atividade de leitura/documentação; a evidência é a consulta real e a reconciliação dos artefatos acima.
