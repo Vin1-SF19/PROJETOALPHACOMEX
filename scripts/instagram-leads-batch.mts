@@ -16,7 +16,7 @@ const credential = JSON.parse(readFileSync(credentialFile, "utf8"));
 if (credential.api !== "https://staging.alpha-comex.com/api/integrations/instagram/leads" || typeof credential.token !== "string" || credential.token.length < 32) throw new Error("Credencial deve apontar exclusivamente para a API de staging.");
 if (!Array.isArray(snapshot.leads) || snapshot.leads.length > 1000) throw new Error("Snapshot deve conter até 1000 leads.");
 const apply = args.includes("--apply");
-const leads = snapshot.leads.map((lead: unknown) => instagramIngestSchema.parse({ spreadsheetId: snapshot.spreadsheetId, sheetId: snapshot.sheetId, lead, dryRun: !apply }));
+const leads: Array<ReturnType<typeof instagramIngestSchema.parse>> = snapshot.leads.map((lead: unknown) => instagramIngestSchema.parse({ spreadsheetId: snapshot.spreadsheetId, sheetId: snapshot.sheetId, lead, dryRun: !apply }));
 const realCount = leads.filter((input) => !leadInstagramEhTeste(input.lead)).length;
 if (new Set(leads.map((input) => input.lead.id)).size !== leads.length) throw new Error("IDs duplicados no snapshot; revisar antes de enviar.");
 if (apply && (option("snapshot-sha256") !== fingerprint || Number(option("expected-leads")) !== realCount || !option("receipt"))) {
