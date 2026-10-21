@@ -12,6 +12,7 @@ import { cardApareceNoQuadro, etapasComSaidaDoQuadro } from "@/lib/bpm/cards-no-
 import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
 import { pipelineEhRevisaoRadar } from "@/lib/bpm/proximo-contato";
 import { buscarNolossLeadsPendentes } from "@/lib/bpm/noloss-leads";
+import { ordenarCardsMaisRecentesPrimeiro } from "@/lib/bpm/ordem-cards";
 import { ListarCardsPipelineBpm } from "./Cards";
 import { selecionarPaginaQuadro, type ManifestoQuadro, type EntradaManifestoQuadro } from "@/lib/bpm/quadro-paginado";
 
@@ -59,7 +60,7 @@ export async function SincronizarQuadroBpm(pipelineId: string, input: unknown = 
     // Só informações de identidade, busca e acesso. Nunca histórico, tarefas ou campos completos.
     const rows = await db.bpmCard.findMany({
       where: { pipelineId, etapaId: { in: etapas.map((e) => e.id) }, OR: [{ status: "ATIVO" }, { status: "CONCLUIDO", etapa: { ehFinal: true } }], ...escopo.where },
-      select: { id: true, etapaId: true, updatedAt: true, servico: true, status: true,
+      select: { id: true, etapaId: true, createdAt: true, updatedAt: true, servico: true, status: true,
         empresa: { select: { razaoSocial: true, nomeFantasia: true, cnpj: true } },
         responsavel: { select: { id: true, nome: true } },
         membros: { select: { usuario: { select: { id: true, nome: true } } } },
@@ -68,20 +69,21 @@ export async function SincronizarQuadroBpm(pipelineId: string, input: unknown = 
     });
     const saidas = etapasComSaidaDoQuadro(pipeline.etapas);
     const entradas: EntradaManifestoQuadro[] = rows.filter((c) => cardApareceNoQuadro(c, pipeline.etapas, saidas)).map((c) => ({
-      id: c.id, etapaId: c.etapaId, revision: hash([c, pipeline.configVersion]),
+      id: c.id, etapaId: c.etapaId, createdAt: c.createdAt?.toISOString(), revision: hash([c, pipeline.configVersion]),
       nome: `${c.empresa.razaoSocial} ${c.empresa.nomeFantasia ?? ""}`, cnpj: c.empresa.cnpj, servico: c.servico,
       responsaveis: [...new Map([c.responsavel, ...c.membros.map((m) => m.usuario)].map((p) => [p.id, p])).values()],
     }));
     const novos = etapas.find((e) => etapaEhNovosLeads(e.nome));
     if (novos && pipelineEhRevisaoRadar(pipeline.nome)) {
       const leads = await buscarNolossLeadsPendentes();
-      for (const lead of leads) entradas.push({ id: lead.id, etapaId: novos.id, revision: hash(lead), nome: lead.nome || lead.email || "Lead sem nome", cnpj: null, servico: null, responsaveis: [] });
+      for (const lead of leads) entradas.push({ id: lead.id, etapaId: novos.id, createdAt: lead.receivedAt?.toISOString(), revision: hash(lead), nome: lead.nome || lead.email || "Lead sem nome", cnpj: null, servico: null, responsaveis: [] });
     }
-    const manifesto: ManifestoQuadro = { configVersion: pipeline.configVersion, entradas, acesso };
-    const pagina = selecionarPaginaQuadro(entradas, { ...parsed.data, acesso });
+    const ordenadas = ordenarCardsMaisRecentesPrimeiro(entradas);
+    const manifesto: ManifestoQuadro = { configVersion: pipeline.configVersion, entradas: ordenadas, acesso };
+    const pagina = selecionarPaginaQuadro(ordenadas, { ...parsed.data, acesso });
     const conhecidos = new Map(parsed.data.conhecidos.map((c) => [c.id, c.revision]));
     const desejados = new Set(pagina.ids);
-    const buscar = entradas.filter((c) => desejados.has(c.id) && (parsed.data.forcar || conhecidos.get(c.id) !== c.revision)).map((c) => c.id);
+    const buscar = ordenadas.filter((c) => desejados.has(c.id) && (parsed.data.forcar || conhecidos.get(c.id) !== c.revision)).map((c) => c.id);
     const resumos = buscar.length ? await ListarCardsPipelineBpm(pipelineId, buscar) : { success: true, data: [] };
     if (!resumos.success) return { success: false as const, error: "Não foi possível atualizar os cards. Tente novamente.", acessoNegado: false };
     // A hidratação reaplica ACL. Se algum card foi revogado entre leituras, não reutilizar dado antigo.

@@ -6,6 +6,7 @@ export type EntradaManifestoQuadro = {
   id: string;
   etapaId: string;
   revision: string;
+  createdAt?: string;
   nome: string;
   cnpj: string | null;
   servico: string | null;

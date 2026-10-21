@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import PipelineBoardClient from "@/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient";
 import { MoverCardBpm, ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
+import { SincronizarQuadroBpm } from "@/actions/bpm/Quadro";
 
 const drag = vi.hoisted(() => ({ current: null as null | import("react").ComponentProps<typeof import("@dnd-kit/core").DndContext> }));
 vi.mock("@dnd-kit/core", async (original) => {
@@ -128,6 +129,28 @@ it("para o polling ao desmontar o board", async () => {
   container.remove();
   await vi.advanceTimersByTimeAsync(60_000);
   expect(ListarCardsPipelineBpm).not.toHaveBeenCalled();
+});
+
+it("exibe um lead recente no topo após o polling do manifesto sem duplicar o card anterior", async () => {
+  Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
+  vi.useFakeTimers();
+  const { container, root, props } = montarBoard();
+  const novo: ComponentProps<typeof PipelineBoardClient>["cardsIniciais"][number] = {
+    ...card, id: "noloss-novo", origem: "noloss", nolossLeadId: "noloss-novo", createdAt: new Date("2026-10-21T12:00:00Z"),
+    empresa: { ...card.empresa, razaoSocial: "Lead recebido agora" },
+  };
+  const entrada = (item: typeof card | typeof novo) => ({
+    id: item.id, etapaId: item.etapaId, revision: "v1", nome: item.empresa.razaoSocial,
+    createdAt: item.createdAt instanceof Date ? item.createdAt.toISOString() : item.createdAt, cnpj: null, servico: null, responsaveis: [],
+  });
+  props.manifestoInicial = { configVersion: 1, entradas: [entrada(card)] };
+  vi.mocked(SincronizarQuadroBpm).mockResolvedValue({ success: true, manifesto: { configVersion: 1, entradas: [entrada(novo), entrada(card)] }, cards: [novo], ids: [novo.id, card.id] } as never);
+  try {
+    await act(async () => root.render(h(PipelineBoardClient, props)));
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    const nomes = [...container.querySelectorAll<HTMLElement>('[aria-roledescription="sortable"]')].map((elemento) => elemento.getAttribute("aria-label"));
+    expect(nomes).toEqual(["Lead recebido agora. Lead do site, ainda sem card", "Empresa"]);
+  } finally { await act(async () => root.unmount()); container.remove(); }
 });
 
 it("mantém a origem concluída visível com localização atual e aparência atenuada", async () => {
