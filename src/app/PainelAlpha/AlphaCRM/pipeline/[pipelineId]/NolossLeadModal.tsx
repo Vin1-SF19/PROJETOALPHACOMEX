@@ -64,7 +64,7 @@ export default function NolossLeadModal({
   const [erro, setErro] = useState<string | null>(null);
   const nomeLead = lead.nome || lead.email || "Lead sem nome";
   const canalOrigem = lead.utmSource?.trim() || lead.utmMedium?.trim() || "NoLoss";
-  const cnpjInvalido = (instagram || Boolean(cnpj)) && !cnpjEhValido(cnpj);
+  const cnpjInvalido = Boolean(cnpj) && !cnpjEhValido(cnpj);
 
   return (
     <Sheet open onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -173,7 +173,7 @@ export default function NolossLeadModal({
                 </div>
                 <div className="space-y-1.5 pt-1">
                   <label htmlFor="noloss-lead-cnpj" className="block text-[11px] font-medium text-slate-300">
-                    CNPJ <span className="font-normal text-slate-500">{instagram ? "(confira antes de assumir)" : "(opcional para lead do site)"}</span>
+                    CNPJ <span className="font-normal text-slate-500">{instagram ? "(opcional para lead do Instagram)" : "(opcional para lead do site)"}</span>
                   </label>
                   <input
                     id="noloss-lead-cnpj"
@@ -191,7 +191,7 @@ export default function NolossLeadModal({
                   />
                   <p id="noloss-lead-cnpj-ajuda" className={cnpjTocado && cnpjInvalido ? "text-[11px] text-rose-300" : "text-[11px] text-slate-500"}>
                     {cnpjTocado && cnpjInvalido
-                      ? instagram ? "Informe um CNPJ válido para assumir este lead." : "Informe um CNPJ válido ou deixe o campo vazio."
+                      ? "Informe um CNPJ válido ou deixe o campo vazio."
                       : "Se informado, o CNPJ será salvo ao assumir o lead."}
                   </p>
                 </div>
@@ -256,7 +256,7 @@ export default function NolossLeadModal({
             onConfirmar={async (responsavelId, radarEscolhido) => {
               const resultado = await onConfirmarPromocao(
                 responsavelId,
-                cnpj ? normalizarCNPJ(cnpj) : undefined,
+                cnpj ? normalizarCNPJ(cnpj) : instagram ? "" : undefined,
                 radarEscolhido,
                 qualificacao || undefined,
               );

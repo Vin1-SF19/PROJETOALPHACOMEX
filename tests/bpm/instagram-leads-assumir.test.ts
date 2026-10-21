@@ -95,8 +95,14 @@ describe("assunção Instagram", () => {
   it("CNPJ ou Radar sem correspondência exige revisão antes de criar", async () => {
     const pendente = prepararLeadInstagram({ ...dados.linha, [C.cnpj]: "inválido", [C.radar]: "em_constituição" });
     mocks.tx.bpmWebhookEntrada.findFirst.mockResolvedValue({ id: input.leadId, statusRecebimento: "AUTENTICADO", payloadSanitizadoJson: JSON.stringify(pendente) });
-    expect(await AssumirLeadInstagram(input)).toMatchObject({ success: false, error: expect.stringContaining("CNPJ") });
+    expect(await AssumirLeadInstagram({ ...input, cnpj: "123" })).toMatchObject({ success: false, error: expect.stringContaining("CNPJ") });
     expect(await AssumirLeadInstagram({ ...input, cnpj: "11222333000181" })).toMatchObject({ success: false, error: expect.stringContaining("Radar") });
     expect(mocks.tx.bpmCard.create).not.toHaveBeenCalled();
+  });
+  it("sem CNPJ cria empresa provisória sem buscar outra por nome ou documento fictício", async () => {
+    mocks.tx.cliente.create.mockResolvedValue({ id: 13 });
+    expect(await AssumirLeadInstagram({ ...input, cnpj: "" })).toEqual({ success: true, data: { cardId: "card" } });
+    expect(mocks.tx.cliente.findUnique).not.toHaveBeenCalled();
+    expect(mocks.tx.cliente.create).toHaveBeenCalledWith({ data: { cnpj: null, razaoSocial: dados.nome, status: "ATIVO" }, select: { id: true } });
   });
 });

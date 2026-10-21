@@ -90,7 +90,7 @@ Rótulos exatos das três opções do CRM também são aceitos em M. Nomes, acen
 | `lead_status` | Status de origem preservado; não define Qualificação comercial |
 | `status_crm` | Controle do remetente; descartado no recebimento |
 
-E-mail/telefone/CNPJ inválidos não impedem a entrada virtual: a resposta original fica disponível para revisão. Para assumir Instagram, o operador deve conferir CNPJ válido, Radar válido e responsável elegível. Qualificação continua opcional. Nome pessoal não confirma razão social cadastral. Dados de empresa/pessoa existente não são sobrescritos pela importação; contato reapresentado reativa seu vínculo com a empresa.
+E-mail/telefone/CNPJ inválidos não impedem a entrada virtual: a resposta original fica disponível para revisão. Para assumir Instagram, o operador deve conferir Radar válido e responsável elegível. CNPJ e Qualificação continuam opcionais; se o CNPJ estiver preenchido, deve ser válido, ou o operador pode deixar o campo vazio. Empresa em constituição pode permanecer sem CNPJ. Nome pessoal não confirma razão social cadastral. Dados de empresa/pessoa existente não são sobrescritos pela importação; contato reapresentado reativa seu vínculo com a empresa.
 
 ## Respostas e reenvio
 
