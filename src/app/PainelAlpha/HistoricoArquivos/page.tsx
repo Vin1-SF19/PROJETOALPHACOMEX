@@ -22,7 +22,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { uploadDocumento } from "@/actions/UploadDocs";
 import { Switch } from "@/components/ui/switch";
-import { SETOR_LIDER_COMERCIAL } from "@/lib/setores-catalogo";
+import { SETOR_LIDER_COMERCIAL, SETOR_LIDER_OPERACIONAL } from "@/lib/setores-catalogo";
 
 interface HistoricoDoc {
     id: number;
@@ -39,7 +39,7 @@ interface HistoricoDoc {
 
 type DocumentoPasta = { setor?: string; PastaArquivos?: string; tipo?: string };
 
-const SETORES = ["REGRAS GERAIS", "OPERACIONAL", "COMERCIAL", SETOR_LIDER_COMERCIAL.toUpperCase(), "RECURSOS HUMANOS", "FINANCEIRO", "JURÍDICO", "PARCEIRO", "SERVIÇOES GERAIS"];
+const SETORES = ["REGRAS GERAIS", "OPERACIONAL", SETOR_LIDER_OPERACIONAL.toUpperCase(), "COMERCIAL", SETOR_LIDER_COMERCIAL.toUpperCase(), "RECURSOS HUMANOS", "FINANCEIRO", "JURÍDICO", "PARCEIRO", "SERVIÇOES GERAIS"];
 
 const PASTAS_ESTATICAS: Record<string, string[]> = {
     "REGRAS GERAIS": ["MANUAIS", "POLÍTICAS", "CÓDIGO DE CONDUTA"],

@@ -121,9 +121,12 @@ describe("autorização das actions administrativas de usuário", () => {
     expect(mocks.updateUser).not.toHaveBeenCalled();
   });
 
-  it.each(["Lider Comercial", "LÍDER COMERCIAL", "lider comercial"])(
+  it.each([
+    ["Lider Comercial", "Lider Comercial"], ["LÍDER COMERCIAL", "Lider Comercial"], ["lider comercial", "Lider Comercial"],
+    ["Lider Operacional", "Lider Operacional"], ["LÍDER OPERACIONAL", "Lider Operacional"], ["lider operacional", "Lider Operacional"],
+  ])(
     "preserva a identidade de permissões ao editar o setor %s pelo Vault",
-    async (setor) => {
+    async (setor, canonico) => {
       const form = new FormData();
       form.set("id", "7");
       form.set("cargo", "GERENTE");
@@ -132,25 +135,25 @@ describe("autorização das actions administrativas de usuário", () => {
       await expect(atualizarAgenteSistemaAction(form)).resolves.toEqual({ success: true });
       expect(mocks.updateUser).toHaveBeenCalledWith({
         where: { id: 7 },
-        data: expect.objectContaining({ role: "Lider Comercial", authSessionVersion: { increment: 1 } }),
+        data: expect.objectContaining({ role: canonico, authSessionVersion: { increment: 1 } }),
       });
     },
   );
 
-  it("mantém o mesmo setor canônico na adição e edição de colaborador externo", async () => {
+  it.each(["Lider Comercial", "Lider Operacional"])("mantém %s na adição e edição de colaborador externo", async (setor) => {
     const form = new FormData();
     form.set("nome", "Lider Teste");
     form.set("cargo", "GERENTE");
-    form.set("setor", "LÍDER COMERCIAL");
+    form.set("setor", setor.toUpperCase());
     await expect(adicionarColaboradorCoreAction(form)).resolves.toEqual({ success: true });
     expect(mocks.createColaborador).toHaveBeenCalledWith({
-      data: expect.objectContaining({ setor: "Lider Comercial" }),
+      data: expect.objectContaining({ setor }),
     });
     form.set("id", "ext-9");
     form.set("status", "ATIVO");
     await expect(atualizarAgenteSistemaAction(form)).resolves.toEqual({ success: true });
     expect(mocks.updateColaborador).toHaveBeenCalledWith({
-      where: { id: 9 }, data: expect.objectContaining({ setor: "Lider Comercial" }),
+      where: { id: 9 }, data: expect.objectContaining({ setor }),
     });
     expect(mocks.updateUser).not.toHaveBeenCalled();
   });

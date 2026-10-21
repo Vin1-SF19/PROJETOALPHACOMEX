@@ -5,7 +5,7 @@ import { X, User, Shield, Briefcase, Calendar, Check } from "lucide-react";
 import { toast } from "sonner";
 import { adicionarColaboradorCoreAction } from "@/actions/colaboradores";
 import type { TemaAlpha } from "@/lib/temas";
-import { SETOR_LIDER_COMERCIAL } from "@/lib/setores-catalogo";
+import { SETOR_LIDER_COMERCIAL, SETOR_LIDER_OPERACIONAL } from "@/lib/setores-catalogo";
 
 
 interface Props {
@@ -71,6 +71,7 @@ export function ModalAdicionarColaborador({ isOpen, onClose, style }: Props) {
                                 <select name="setor" className="w-full bg-black/40 border border-white/5 rounded-2xl h-14 pl-12 pr-4 text-[10px] font-black uppercase text-white outline-none appearance-none focus:border-white/20">
                                     <option value="ADMIN">ADMIN</option>
                                     <option value="OPERACIONAL">OPERACIONAL</option>
+                                    <option value={SETOR_LIDER_OPERACIONAL}>LÍDER OPERACIONAL</option>
                                     <option value="TI">TI</option>
                                     <option value="COMERCIAL">COMERCIAL</option>
                                     <option value={SETOR_LIDER_COMERCIAL}>LÍDER COMERCIAL</option>

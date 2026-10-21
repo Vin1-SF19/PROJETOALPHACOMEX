@@ -6,6 +6,8 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { cnpjEhValido, formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";
 import AtribuirResponsavelPromocaoModal from "./AtribuirResponsavelPromocaoModal";
+import { InstagramLeadDetalhes } from "./InstagramLeadCard";
+import type { InstagramLeadDados } from "@/lib/bpm/instagram-leads";
 
 interface NolossLead {
   id: string;
@@ -15,6 +17,7 @@ interface NolossLead {
   utmSource?: string | null;
   utmMedium?: string | null;
   receivedAt: Date | string;
+  instagramDados?: InstagramLeadDados;
 }
 
 interface Props {
@@ -23,6 +26,7 @@ interface Props {
   accent: string;
   radarOpcoes: string[];
   currentUserId: number | null;
+  etapaDestinoNome?: string;
   onClose: () => void;
   onPromovido: () => void;
   onConfirmarPromocao: (responsavelId: number, cnpj?: string, radarPretendido?: string, qualificacao?: "Qualificado" | "Sem qualificação") => Promise<{ success: boolean; error?: string }>;
@@ -45,19 +49,22 @@ export default function NolossLeadModal({
   accent,
   radarOpcoes,
   currentUserId,
+  etapaDestinoNome = "Novos leads",
   onClose,
   onPromovido,
   onConfirmarPromocao,
 }: Props) {
   const [promocaoAberta, setPromocaoAberta] = useState(false);
-  const [cnpj, setCnpj] = useState("");
+  const instagram = Boolean(lead.instagramDados);
+  const origemLabel = instagram ? "Instagram" : "site";
+  const [cnpj, setCnpj] = useState(lead.instagramDados?.cnpj ?? lead.instagramDados?.cnpjOriginal ?? "");
   const [cnpjTocado, setCnpjTocado] = useState(false);
-  const [radarPretendido, setRadarPretendido] = useState("");
+  const [radarPretendido, setRadarPretendido] = useState(lead.instagramDados?.radarPretendido ?? "");
   const [qualificacao, setQualificacao] = useState<"Qualificado" | "Sem qualificação" | "">("");
   const [erro, setErro] = useState<string | null>(null);
   const nomeLead = lead.nome || lead.email || "Lead sem nome";
   const canalOrigem = lead.utmSource?.trim() || lead.utmMedium?.trim() || "NoLoss";
-  const cnpjInvalido = Boolean(cnpj) && !cnpjEhValido(cnpj);
+  const cnpjInvalido = (instagram || Boolean(cnpj)) && !cnpjEhValido(cnpj);
 
   return (
     <Sheet open onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -66,7 +73,7 @@ export default function NolossLeadModal({
         className="h-[70vh] max-h-[70vh] rounded-t-[2rem] border-t border-white/10 bg-[radial-gradient(ellipse_120%_60%_at_50%_-10%,rgba(var(--accent-rgb),0.12),transparent_60%)] p-0 overflow-hidden sm:max-w-none"
         style={{ ["--accent-rgb" as string]: accent }}
       >
-        <SheetTitle className="sr-only">Lead do site — {nomeLead}</SheetTitle>
+        <SheetTitle className="sr-only">Lead do {origemLabel} — {nomeLead}</SheetTitle>
 
         <div className="flex flex-col h-full">
           {/* Handle */}
@@ -90,7 +97,7 @@ export default function NolossLeadModal({
                 <div className="min-w-0">
                   <h1 className="text-xl font-black text-white tracking-tight truncate">{nomeLead}</h1>
                   <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
-                    <span>Lead do site</span>
+                    <span>Lead do {origemLabel}</span>
                     <span className="text-slate-700">·</span>
                     <span className="rounded-full border border-sky-400/30 bg-sky-400/10 px-2 py-0.5 text-[10px] font-bold text-sky-200">Origem: {canalOrigem}</span>
                     <span className="text-slate-700">·</span>
@@ -166,7 +173,7 @@ export default function NolossLeadModal({
                 </div>
                 <div className="space-y-1.5 pt-1">
                   <label htmlFor="noloss-lead-cnpj" className="block text-[11px] font-medium text-slate-300">
-                    CNPJ <span className="font-normal text-slate-500">(opcional para lead do site)</span>
+                    CNPJ <span className="font-normal text-slate-500">{instagram ? "(confira antes de assumir)" : "(opcional para lead do site)"}</span>
                   </label>
                   <input
                     id="noloss-lead-cnpj"
@@ -184,7 +191,7 @@ export default function NolossLeadModal({
                   />
                   <p id="noloss-lead-cnpj-ajuda" className={cnpjTocado && cnpjInvalido ? "text-[11px] text-rose-300" : "text-[11px] text-slate-500"}>
                     {cnpjTocado && cnpjInvalido
-                      ? "Informe um CNPJ válido ou deixe o campo vazio."
+                      ? instagram ? "Informe um CNPJ válido para assumir este lead." : "Informe um CNPJ válido ou deixe o campo vazio."
                       : "Se informado, o CNPJ será salvo ao assumir o lead."}
                   </p>
                 </div>
@@ -198,9 +205,10 @@ export default function NolossLeadModal({
               </div>
             </div>
 
+            {lead.instagramDados && <InstagramLeadDetalhes dados={lead.instagramDados} />}
             <div className="rounded-2xl border border-sky-400/20 bg-sky-400/[0.04] p-4">
               <p className="text-xs text-slate-400 leading-relaxed">
-                Este lead veio do site e ainda não foi assumido por nenhum responsável.
+                Este lead veio do {origemLabel} e ainda não foi assumido por nenhum responsável.
                 Ao promover, ele vira uma empresa e um card real na pipeline.
               </p>
             </div>
@@ -239,7 +247,8 @@ export default function NolossLeadModal({
           <AtribuirResponsavelPromocaoModal
             pipelineId={pipelineId}
             nomeLead={nomeLead}
-            etapaDestinoNome="Novos leads"
+            etapaDestinoNome={etapaDestinoNome}
+            origemLabel={origemLabel}
             currentUserId={currentUserId}
             accent={accent}
             radarOpcoes={radarOpcoes}

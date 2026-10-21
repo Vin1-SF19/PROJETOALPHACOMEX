@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import db from "@/lib/prisma";
 import { sanitizarPayloadAutomacao } from "@/lib/bpm/automacoes/eventos";
+import { INSTAGRAM_ENDPOINT_SLUG } from "@/lib/bpm/instagram-leads";
 
 export const runtime = "nodejs";
 const MAX_BODY = 256 * 1024;
@@ -17,6 +18,9 @@ function rateLimitPermitido(chave: string): boolean {
 
 export async function POST(request: NextRequest, context: { params: Promise<{ slug: string }> }) {
   const { slug } = await context.params;
+  // A inbox de leads tem autenticação/estados próprios. A rota genérica não
+  // pode registrar rejeições ou eventos neste endpoint, mesmo com credencial.
+  if (slug === INSTAGRAM_ENDPOINT_SLUG) return NextResponse.json({ error: "Endpoint não encontrado" }, { status: 404 });
   const endpoint = await db.bpmWebhookEndpoint.findUnique({ where: { caminhoSlug: slug }, include: { automacao: true } });
   if (!endpoint?.ativo) return NextResponse.json({ error: "Endpoint não encontrado" }, { status: 404 });
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim().slice(0, 100) ?? null;

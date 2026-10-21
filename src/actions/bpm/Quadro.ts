@@ -12,6 +12,7 @@ import { cardApareceNoQuadro, etapasComSaidaDoQuadro } from "@/lib/bpm/cards-no-
 import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
 import { pipelineEhRevisaoRadar } from "@/lib/bpm/proximo-contato";
 import { buscarNolossLeadsPendentes } from "@/lib/bpm/noloss-leads";
+import { buscarInstagramLeadsPendentes } from "@/lib/bpm/instagram-leads-server";
 import { ordenarCardsMaisRecentesPrimeiro } from "@/lib/bpm/ordem-cards";
 import { ListarCardsPipelineBpm } from "./Cards";
 import { selecionarPaginaQuadro, type ManifestoQuadro, type EntradaManifestoQuadro } from "@/lib/bpm/quadro-paginado";
@@ -77,6 +78,10 @@ export async function SincronizarQuadroBpm(pipelineId: string, input: unknown = 
     if (novos && pipelineEhRevisaoRadar(pipeline.nome)) {
       const leads = await buscarNolossLeadsPendentes();
       for (const lead of leads) entradas.push({ id: lead.id, etapaId: novos.id, createdAt: lead.receivedAt?.toISOString(), revision: hash(lead), nome: lead.nome || lead.email || "Lead sem nome", cnpj: null, servico: null, responsaveis: [] });
+      for (const lead of await buscarInstagramLeadsPendentes(pipelineId)) entradas.push({
+        id: lead.id, etapaId: novos.id, createdAt: lead.recebidoEm.toISOString(), revision: hash(lead),
+        nome: `${lead.dados.nome} Instagram`, cnpj: lead.dados.cnpj, servico: null, responsaveis: [],
+      });
     }
     const ordenadas = ordenarCardsMaisRecentesPrimeiro(entradas);
     const manifesto: ManifestoQuadro = { configVersion: pipeline.configVersion, entradas: ordenadas, acesso };

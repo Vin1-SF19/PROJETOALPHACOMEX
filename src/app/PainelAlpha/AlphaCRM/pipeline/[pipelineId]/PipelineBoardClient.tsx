@@ -41,6 +41,9 @@ import CardFullViewModal from "../../CardModal/CardFullViewModal";
 import { AtribuirLeadAgendarModal } from "../../CardModal/AtribuirLeadAgendarModal";
 import { ConfirmarMovimentoRdModal, type MovimentoRdPendente } from "../../CardModal/ConfirmarMovimentoRdModal";
 import NolossLeadModal from "./NolossLeadModal";
+import { AssumirLeadInstagram } from "@/actions/bpm/InstagramLeads";
+import { InstagramLeadCard } from "./InstagramLeadCard";
+import type { InstagramLeadDados } from "@/lib/bpm/instagram-leads";
 import { GrupoAvataresMembrosCard, type MembroCard } from "../../CardModal/SeletorMembrosCard";
 import { obterStatusPosFechamentoVisivel } from "@/lib/bpm/status-pos-fechamento";
 import { processoOperacionalDeferido } from "@/lib/bpm/resultado-operacional";
@@ -121,7 +124,9 @@ export interface CardBpm {
   servico: string | null;
   origemExterna?: { sourcePipelineName: string; sourceStageName: string; sourceDealName: string } | null;
   status: string;
-  origem: "real" | "noloss";
+  origem: "real" | "noloss" | "instagram";
+  instagramLeadId?: string;
+  instagramDados?: InstagramLeadDados;
   nolossLeadId: string | null;
   nolossEmail?: string | null;
   nolossTelefone?: string | null;
@@ -283,6 +288,14 @@ export function KanbanCard({
         usuario: { id: card.responsavel.id, nome: card.responsavel.nome, imagemUrl: null },
       }];
 
+  if (card.origem === "instagram" && card.instagramDados) return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} role="button" tabIndex={0}
+      aria-label={`${card.empresa.razaoSocial}. Lead do Instagram aguardando responsável`}
+      aria-busy={movendo} className="cursor-pointer rounded-2xl animate-pulse motion-reduce:animate-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300"
+      onClick={() => onAbrir(card.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onAbrir(card.id); } }}>
+      <InstagramLeadCard dados={card.instagramDados} />
+    </div>
+  );
   return (
     <div
       ref={setNodeRef}
@@ -887,7 +900,7 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
     cards.filter(
       (c) =>
         c.etapaId === etapaId &&
-        (usuariosVisao === null || c.origem === "noloss" || usuariosVisao.includes(c.responsavel.id) || c.membros.some((m) => usuariosVisao.includes(m.usuario.id))) &&
+        (usuariosVisao === null || c.origem === "noloss" || c.origem === "instagram" || usuariosVisao.includes(c.responsavel.id) || c.membros.some((m) => usuariosVisao.includes(m.usuario.id))) &&
         (!responsavelFiltro ||
           String(c.responsavel.id) === responsavelFiltro ||
           c.membros.some((m) => String(m.usuario.id) === responsavelFiltro))
@@ -1066,7 +1079,7 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
     setFocoTarefa(null);
     cardAbertoPorAlertaRef.current = null;
     const card = cards.find((c) => c.id === cardId);
-    if (card?.origem === "noloss") {
+    if (card?.origem === "noloss" || card?.origem === "instagram") {
       setNolossLeadAberto(card);
       return;
     }
@@ -1145,6 +1158,11 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
       return;
     }
 
+    if (activeCard.origem === "instagram") {
+      snapshotArrastoRef.current = null;
+      setNolossLeadAberto({ ...activeCard, etapaId: destino.id });
+      return;
+    }
     if (activeCard.origem === "noloss" && activeCard.nolossLeadId) {
       snapshotArrastoRef.current = null;
       setPromocaoLeadPendente({
@@ -1461,23 +1479,29 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
           lead={{
             id: nolossLeadAberto.nolossLeadId ?? nolossLeadAberto.id,
             nome: nolossLeadAberto.empresa.razaoSocial,
-            email: nolossLeadAberto.nolossEmail ?? null,
-            telefone: nolossLeadAberto.nolossTelefone ?? null,
-            utmSource: nolossLeadAberto.nolossUtmSource ?? null,
+            email: nolossLeadAberto.instagramDados?.linha.email ?? nolossLeadAberto.nolossEmail ?? null,
+            telefone: nolossLeadAberto.instagramDados?.telefoneOriginal ?? nolossLeadAberto.nolossTelefone ?? null,
+            utmSource: nolossLeadAberto.origem === "instagram" ? "Instagram" : nolossLeadAberto.nolossUtmSource ?? null,
             utmMedium: nolossLeadAberto.nolossUtmMedium ?? null,
             receivedAt: nolossLeadAberto.createdAt,
+            instagramDados: nolossLeadAberto.instagramDados,
           }}
           pipelineId={pipeline.id}
           accent={accent}
           radarOpcoes={radarOpcoes}
           currentUserId={currentUserId}
           onClose={() => setNolossLeadAberto(null)}
+          etapaDestinoNome={etapasOrdenadas.find((etapa) => etapa.id === nolossLeadAberto.etapaId)?.nome}
           onPromovido={async () => {
             setNolossLeadAberto(null);
             await recarregarCards({ forcar: true });
             router.refresh();
           }}
           onConfirmarPromocao={async (responsavelId, cnpj, radarPretendido, qualificacao) => {
+            if (nolossLeadAberto.origem === "instagram") {
+              return AssumirLeadInstagram({ leadId: nolossLeadAberto.instagramLeadId ?? nolossLeadAberto.id,
+                etapaDestinoId: nolossLeadAberto.etapaId, responsavelId, cnpj, radarPretendido, qualificacao });
+            }
             const res = await PromoverNolossLead({
               nolossLeadId: nolossLeadAberto.nolossLeadId ?? nolossLeadAberto.id,
               etapaDestinoId: nolossLeadAberto.etapaId,

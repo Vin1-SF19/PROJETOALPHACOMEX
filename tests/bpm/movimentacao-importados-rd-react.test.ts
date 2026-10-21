@@ -14,6 +14,7 @@ vi.mock("sonner", () => ({ toast: { error: api.error, success: vi.fn() } }));
 vi.mock("@/lib/pusher", () => ({ pusherClient: null }));
 vi.mock("@/actions/bpm/Quadro", () => ({ SincronizarQuadroBpm: vi.fn() }));
 vi.mock("@/actions/bpm/NolossLeads", () => ({ PromoverNolossLead: vi.fn() }));
+vi.mock("@/actions/bpm/InstagramLeads", () => ({ AssumirLeadInstagram: vi.fn() }));
 vi.mock("@/actions/bpm/Checklists", () => ({ ObterResumoChecklistCardBpm: vi.fn(async () => ({ success: false })) }));
 vi.mock("@/actions/bpm/DisponibilidadeEtapasCard", () => ({ ObterDisponibilidadeEtapasCardBpm: api.disponibilidade }));
 vi.mock("@/actions/bpm/Cards", () => ({

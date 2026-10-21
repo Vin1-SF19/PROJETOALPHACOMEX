@@ -7,6 +7,7 @@ vi.mock("@/lib/pusher", () => ({ pusherClient: null }));
 vi.mock("@/actions/bpm/Quadro", () => ({ SincronizarQuadroBpm: vi.fn() }));
 vi.mock("@/actions/bpm/Cards", () => ({ ListarCardsPipelineBpm: vi.fn(), MoverCardBpm: vi.fn(), CriarCardBpm: vi.fn() }));
 vi.mock("@/actions/bpm/NolossLeads", () => ({ PromoverNolossLead: vi.fn() }));
+vi.mock("@/actions/bpm/InstagramLeads", () => ({ AssumirLeadInstagram: vi.fn() }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal", () => ({
   default: ({ cardId, onClose, realtimeRevision, focoTarefa }: { cardId: string; onClose: () => void; realtimeRevision: number; focoTarefa?: { tarefaId: string } }) => h("button", { "data-card": cardId, "data-tarefa": focoTarefa?.tarefaId, "data-revisao-acl": realtimeRevision, onClick: onClose }, "Fechar card"),
 }));

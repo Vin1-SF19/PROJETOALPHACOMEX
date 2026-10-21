@@ -19,29 +19,29 @@ beforeEach(() => {
 describe("conteúdo Alpha Skills destinado ao Lider Comercial", () => {
   it("inclui o destino e preserva todos os rótulos legados", async () => {
     expect(await listarSetoresDistintos()).toEqual([
-      "T.I", "Comercial", "Lider Comercial", "Operacional", "Financeiro", "Recursos-Humanos", "Serviços Gerais",
+      "T.I", "Comercial", "Lider Comercial", "Operacional", "Lider Operacional", "Financeiro", "Recursos-Humanos", "Serviços Gerais",
     ]);
   });
 
-  it("cria, edita e consulta curso destinado somente ao novo setor", async () => {
-    const payload = { nome: "Formação liderança", setores: ["Lider Comercial"] };
+  it.each(["Lider Comercial", "Lider Operacional"])("cria, edita e consulta curso destinado somente a %s", async (setor) => {
+    const payload = { nome: "Formação liderança", setores: [setor] };
     expect(await criarCurso(payload)).toEqual({ success: true, id: "curso-1" });
     expect(m.criar).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ setores: { create: [{ setor: "Lider Comercial" }] } }),
+      data: expect.objectContaining({ setores: { create: [{ setor }] } }),
     }));
     expect(await editarCurso({ id: "curso-1", ...payload })).toEqual({ success: true });
     expect(m.editar).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ setores: { createMany: { data: [{ setor: "Lider Comercial" }] } } }),
+      data: expect.objectContaining({ setores: { createMany: { data: [{ setor }] } } }),
     }));
-    await getCursosPorSetor("Lider Comercial");
+    await getCursosPorSetor(setor);
     expect(m.cursos).toHaveBeenCalledWith(expect.objectContaining({
-      where: { setores: { some: { setor: "Lider Comercial" } } },
+      where: { setores: { some: { setor } } },
     }));
   });
 
-  it("não concede gerenciamento de cursos ao setor de destino", async () => {
-    m.auth.mockResolvedValue({ user: { id: "7", role: "Lider Comercial" } });
-    const payload = { nome: "Curso", setores: ["Lider Comercial"] };
+  it.each(["Lider Comercial", "Lider Operacional"])("não concede gerenciamento de cursos a %s", async (setor) => {
+    m.auth.mockResolvedValue({ user: { id: "7", role: setor } });
+    const payload = { nome: "Curso", setores: [setor] };
     expect(await criarCurso(payload)).toEqual({ success: false, error: "Sem permissão" });
     expect(await editarCurso({ id: "curso-1", ...payload })).toEqual({ success: false, error: "Sem permissão" });
     expect(m.criar).not.toHaveBeenCalled();
