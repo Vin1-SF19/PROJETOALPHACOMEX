@@ -6,7 +6,7 @@ vi.mock("@/lib/prisma", () => ({ default: { bpmPipeline: { findUnique: m.pipelin
 vi.mock("@/actions/bpm/Cards", () => ({ ListarCardsPipelineBpm: m.resumos }));
 vi.mock("@/lib/bpm/noloss-leads", () => ({ buscarNolossLeadsPendentes: m.leads }));
 import { SincronizarQuadroBpm } from "@/actions/bpm/Quadro";
-const card = { id: "c1", etapaId: "stage", updatedAt: new Date("2026-10-14"), servico: "Radar", status: "ATIVO", empresa: { razaoSocial: "Empresa", nomeFantasia: null, cnpj: null }, responsavel: { id: 7, nome: "Responsável" }, membros: [], vinculosOrigem: [] };
+const card = { id: "c1", etapaId: "stage", createdAt: new Date("2026-10-14"), updatedAt: new Date("2026-10-14"), servico: "Radar", status: "ATIVO", empresa: { razaoSocial: "Empresa", nomeFantasia: null, cnpj: null }, responsavel: { id: 7, nome: "Responsável" }, membros: [], vinculosOrigem: [] };
 beforeEach(() => {
   vi.clearAllMocks(); m.auth.mockResolvedValue({ user: { id: "7" } }); m.acesso.mockResolvedValue(undefined);
   m.usuario.mockResolvedValue({ role: "Comercial" }); m.pipeline.mockResolvedValue({ nome: "Revisão de Radar", configVersion: 1, setores: [{ setor: { id: 3, nome: "Comercial" } }], etapas: [{ id: "stage", nome: "Novo Lead", ehFinal: false, visibilidades: [], automacoes: [] }] });
@@ -14,6 +14,32 @@ beforeEach(() => {
   m.cards.mockResolvedValue([card]); m.leads.mockResolvedValue([]); m.resumos.mockResolvedValue({ success: true, data: [{ id: "c1" }] });
 });
 describe("sincronização do quadro", () => {
+  it("ordena cards e NoLoss juntos antes da página e mantém o novo lead no topo no polling", async () => {
+    m.cards.mockResolvedValue(Array.from({ length: 35 }, (_, i) => ({ ...card, id: `real-${i}`, createdAt: new Date(Date.UTC(2026, 9, 1, 0, i)) })));
+    const leads = [
+      { id: "noloss-antigo", nome: "Antigo", receivedAt: new Date("2026-09-01") },
+      { id: "noloss-novo", nome: "Recente", receivedAt: new Date("2026-10-21") },
+    ];
+    m.leads.mockResolvedValue(leads);
+    m.resumos.mockImplementation(async (_pipeline, ids: string[]) => ({ success: true, data: ids.map((id) => ({ id })) }));
+    const primeira = await SincronizarQuadroBpm("pipeline");
+    if (!primeira.success) throw new Error("fixture");
+    expect(primeira.ids[0]).toBe("noloss-novo");
+    expect(primeira.ids.slice(1)).toEqual(Array.from({ length: 29 }, (_, i) => `real-${34 - i}`));
+    expect(primeira.manifesto.entradas.at(-1)?.id).toBe("noloss-antigo");
+    expect(primeira.manifesto.entradas[0].createdAt).toBe("2026-10-21T00:00:00.000Z");
+    m.leads.mockResolvedValue([...leads, { id: "ainda-mais-novo", nome: "Chegou agora", receivedAt: new Date("2026-10-22") }]);
+    const poll = await SincronizarQuadroBpm("pipeline", { conhecidos: primeira.manifesto.entradas.filter((item) => primeira.ids.includes(item.id)) });
+    expect(poll).toMatchObject({ success: true });
+    if (!poll.success) throw new Error("fixture");
+    expect(poll.ids[0]).toBe("ainda-mais-novo");
+    expect(poll.cards).toEqual([{ id: "ainda-mais-novo" }]);
+    const todas = await SincronizarQuadroBpm("pipeline", { limites: { stage: 60 } });
+    expect(todas).toMatchObject({ success: true });
+    if (!todas.success) throw new Error("fixture");
+    expect(todas.ids).toHaveLength(38); expect(new Set(todas.ids).size).toBe(38);
+    expect(todas.ids.at(-1)).toBe("noloss-antigo");
+  });
   it("nega pipeline revogado antes de consultar cards", async () => {
     m.acesso.mockRejectedValue(new Error("Não autorizado"));
     expect(await SincronizarQuadroBpm("pipeline")).toMatchObject({ success: false, acessoNegado: true }); expect(m.cards).not.toHaveBeenCalled(); expect(m.leads).not.toHaveBeenCalled();
@@ -50,7 +76,7 @@ it("padrão de admin é meus, mas ele pode selecionar todos", async () => {
   m.cards.mockResolvedValue([card, { ...card, id: "c2", responsavel: { id: 9, nome: "Equipe" } }]);
   m.resumos.mockImplementation(async (_pipeline, ids: string[]) => ({ success: true, data: ids.map((id) => ({ id })) }));
   const meus = await SincronizarQuadroBpm("pipeline"); expect(meus).toMatchObject({ success: true, ids: ["c1"] });
-  const todos = await SincronizarQuadroBpm("pipeline", { visao: "TODOS" }); expect(todos).toMatchObject({ success: true, ids: ["c1", "c2"] });
+  const todos = await SincronizarQuadroBpm("pipeline", { visao: "TODOS" }); expect(todos).toMatchObject({ success: true, ids: ["c2", "c1"] });
 });
 it.each(["Comercial", "TI"])("não aceita pessoa fora do catálogo ou setor inválido, perfil %s", async (role) => {
   m.usuario.mockResolvedValue({ role });
@@ -62,7 +88,7 @@ it("usuário comum seleciona colegas sem cards e todos inclui responsáveis lega
   m.cards.mockResolvedValue([card, { ...card, id: "c2", responsavel: { id: 9, nome: "Equipe" } }, { ...card, id: "ti", responsavel: { id: 99, nome: "TI legado" } }]);
   m.usuarios.mockResolvedValue([{ id: 9, nome: "Equipe", role: "Comercial", status: "ATIVO", permissoes: "crm" }, { id: 10, nome: "Sem cards", role: "Comercial", status: "ATIVO", permissoes: "crm" }, { id: 99, nome: "TI legado", role: "TI", status: "ATIVO", permissoes: null }]);
   m.resumos.mockImplementation(async (_pipeline, ids: string[]) => ({ success: true, data: ids.map((id) => ({ id })) }));
-  expect(await SincronizarQuadroBpm("pipeline", { visao: "TODOS" })).toMatchObject({ success: true, ids: ["c1", "c2", "ti"], manifesto: { acesso: { responsaveis: [{ id: 9, nome: "Equipe" }, { id: 10, nome: "Sem cards" }] } } });
+  expect(await SincronizarQuadroBpm("pipeline", { visao: "TODOS" })).toMatchObject({ success: true, ids: ["ti", "c2", "c1"], manifesto: { acesso: { responsaveis: [{ id: 9, nome: "Equipe" }, { id: 10, nome: "Sem cards" }] } } });
   expect(await SincronizarQuadroBpm("pipeline", { visao: "TODOS", responsavelId: 9 })).toMatchObject({ success: true, ids: ["c2"] });
   expect(await SincronizarQuadroBpm("pipeline", { visao: "TODOS", responsavelId: 10 })).toMatchObject({ success: true, ids: [] });
   m.overrides.mockResolvedValue([{ usuarioId: 9, modulo: "crm", acao: "REMOVE" }]);

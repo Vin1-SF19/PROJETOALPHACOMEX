@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { BuscarEmpresasBpm as buscarEmpresas, BuscarEmpresaPorCnpjBpm as buscarEmpresaPorCnpj, ListarUsuariosResponsavelBpm as listarResponsaveis } from "./CardsConsultas";
 import { ExcluirCardBpm as excluirCard } from "./CardsExcluir";
 import db from "@/lib/prisma";
+import { ordenarCardsMaisRecentesPrimeiro } from "@/lib/bpm/ordem-cards";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
 import { PIPELINE_CHAVE, ETAPAS } from "@/lib/bpm/financeiro-config";
@@ -616,7 +617,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
 
     return {
       success: true,
-      data: [...cardsReais, ...cardsVirtuais].filter((card) => !cardIds || cardIds.includes(card.id)),
+      data: ordenarCardsMaisRecentesPrimeiro([...cardsReais, ...cardsVirtuais].filter((card) => !cardIds || cardIds.includes(card.id))),
     };
   } catch (error) {
     console.error("[ListarCardsPipelineBpm]", error);

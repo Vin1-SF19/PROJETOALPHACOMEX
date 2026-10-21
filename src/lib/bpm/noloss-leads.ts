@@ -21,6 +21,6 @@ export async function buscarNolossLeadsPendentes() {
       utmCampaign: true,
       receivedAt: true,
     },
-    orderBy: { receivedAt: "asc" },
+    orderBy: [{ receivedAt: "desc" }, { id: "desc" }],
   });
 }
