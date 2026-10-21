@@ -70,10 +70,37 @@ describe("reparação de histórico sem perda", () => {
     expect(apresentarEventoRd(event("a", null))).toMatchObject({ titulo: "Atividade RD Station", conteudo: "Texto importado", data: "" });
   });
   it("ordena por data corrigida e preserva remoção explícita da data", () => {
-    expect(ordenarHistoricoRd([event("sem", ""), event("b", "2026-02-01"), event("a", "2026-01-01")]).map((e) => e.id)).toEqual(["a", "b", "sem"]);
+    const eventos = [event("sem", ""), event("b", "2026-02-01"), event("a", "2026-01-01")];
+    expect(ordenarHistoricoRd(eventos).map((e) => e.id)).toEqual(["b", "a", "sem"]);
+    expect(eventos.map((e) => e.id)).toEqual(["sem", "b", "a"]);
+  });
+  it("reordena notas corrigidas pela data exibida e deixa datas ausentes ou inválidas no fim", () => {
+    const eventos = [
+      event("sem-data", null),
+      event("mais-antiga", "2026-01-01T15:00:00Z"),
+      event("data-invalida", "inválida"),
+      event("mais-recente", "2026-01-01T13:00:00-03:00"),
+    ];
+    expect(ordenarHistoricoRd(eventos).map((e) => e.id)).toEqual([
+      "mais-recente", "mais-antiga", "data-invalida", "sem-data",
+    ]);
+    eventos[1] = { ...eventos[1], projecao: { ...eventos[1].projecao, date: "2026-02-01" } };
+    expect(ordenarHistoricoRd(eventos)[0].id).toBe("mais-antiga");
+  });
+  it("mantém desempate determinístico entre notas com a mesma data", () => {
+    expect(ordenarHistoricoRd([event("b", "2026-01-01"), event("a", "2026-01-01")]).map((e) => e.id)).toEqual(["a", "b"]);
   });
   it("intercala eventos Alpha e RD na aba Histórico sem perder eventos sem data", () => {
     const merged = combinarHistoricosRd([{ id: "alpha", data: new Date("2026-02-01") }], [event("antigo", "2026-01-01"), event("novo", "2026-03-01"), event("sem", null)]);
     expect(merged.map((e) => e.item.id)).toEqual(["novo", "alpha", "antigo", "sem"]);
+  });
+  it("intercala anotações Alpha e RD da mais recente para a mais antiga após incluir uma nova nota", () => {
+    const alpha = [{ id: "alpha-antiga", data: new Date("2026-01-01") }];
+    const rd = [event("rd-antiga", "2025-12-01"), event("rd-recente", "2026-02-01")];
+    expect(combinarHistoricosRd(alpha, rd).map((e) => e.item.id)).toEqual(["rd-recente", "alpha-antiga", "rd-antiga"]);
+    alpha.push({ id: "alpha-nova", data: new Date("2026-03-01") });
+    expect(combinarHistoricosRd(alpha, rd).map((e) => e.item.id)).toEqual(["alpha-nova", "rd-recente", "alpha-antiga", "rd-antiga"]);
+    expect(alpha.map((e) => e.id)).toEqual(["alpha-antiga", "alpha-nova"]);
+    expect(rd.map((e) => e.id)).toEqual(["rd-antiga", "rd-recente"]);
   });
 });

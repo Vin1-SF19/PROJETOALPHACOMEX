@@ -65,6 +65,14 @@ describe("montarFeedTimelineCard — agregação de múltiplas fontes", () => {
     expect(feed[feed.length - 1].id).toBe("h1");
   });
 
+  it("coloca uma nova anotação Alpha no topo mesmo quando é recebida ao final da lista", () => {
+    const notas = [...anotacoes, { ...anotacoes[0], id: "a2", createdAt: "2026-09-05T10:00:00Z" }];
+    const feed = montarFeedTimelineCard(historico, notas);
+    expect(feed[0]).toMatchObject({ id: "a2", tipo: "anotacao" });
+    expect(feed.filter((item) => item.tipo === "anotacao").map((item) => item.id)).toEqual(["a2", "a1"]);
+    expect(notas.map((item) => item.id)).toEqual(["a1", "a2"]);
+  });
+
   it("preenche autor, origem, valor anterior e valor novo quando existirem", () => {
     const feed = montarFeedTimelineCard(historico, anotacoes);
     const movido = feed.find((i) => i.id === "h2")!;

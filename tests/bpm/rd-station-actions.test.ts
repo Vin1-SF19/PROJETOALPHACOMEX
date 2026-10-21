@@ -31,9 +31,9 @@ describe("histórico RD — acesso e consulta", () => {
     ]);
     const response = await ListarHistoricoExternoRd("card");
     expect(response.success).toBe(true);
-    expect(response.data.map((e) => e.id)).toEqual(["b", "a"]);
-    expect(response.data[1]).not.toHaveProperty("original");
-    expect(response.data[1].projecao.content).toBe("Nota");
+    expect(response.data.map((e) => e.id)).toEqual(["a", "b"]);
+    expect(response.data[0]).not.toHaveProperty("original");
+    expect(response.data[0].projecao.content).toBe("Nota");
     expect(mocks.access).toHaveBeenCalledWith("card", 1, "ADMIN", "visualizarHistorico");
   });
   it("preserva remoção explícita de autoria mesmo quando payload bruto contém nome", async () => {
