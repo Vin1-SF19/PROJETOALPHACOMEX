@@ -73,6 +73,7 @@ vi.mock("@/lib/bpm/regras/contexto", () => ({ montarContextoAvaliacaoDoCard: vi.
 vi.mock("@/lib/bpm/regras/guarda-movimento", () => ({ obterErroRegrasParaMovimento: vi.fn(async () => f.active().erroRegra) }));
 vi.mock("@/lib/bpm/checklists/integracao", () => ({ obterErroChecklistParaMovimento: vi.fn(async () => null), carregarResumoChecklistAplicavelCard: vi.fn(async () => f.active().checklist) }));
 vi.mock("@/lib/bpm/automacoes/eventos", () => ({ publicarEventoBpm: f.publish }));
+vi.mock("@/lib/bpm/automacoes/orquestrador", () => ({ executarMinutaMovimentoLivreAgora: vi.fn(async () => ({})) }));
 vi.mock("@/lib/bpm/automacoes/fila", () => ({ enfileirarAutomacoesMovimentoBpm: vi.fn(async () => ({})) }));
 vi.mock("@/lib/bpm/sla", () => ({ sincronizarSlaMovimentoBpm: vi.fn(async () => ({})) }));
 vi.mock("@/lib/bpm/cadencias/ativacao-automatica", () => ({ ativarCadenciasNaEntradaBpm: vi.fn(async () => ({})) }));
@@ -99,7 +100,9 @@ describe("movimentação livre administrativa e de liderança", () => {
     expect(f.state.card.etapaId).toBe("destino");
     expect(f.state.valores).toEqual([]);
     expect(JSON.parse(f.state.historicos[0].valorNovoJson)).toMatchObject({ movimentoLivre: { tipo: "LIDER_SETOR", setor: "OPERACIONAL" } });
-    expect(JSON.parse(f.state.eventos[0].valorNovoJson)).toMatchObject({ automacoesSuprimidas: true });
+    expect(JSON.parse(f.state.eventos[0].valorNovoJson)).toMatchObject({ automacoesSuprimidas: true, permitirMinutaConfigurada: true });
+    const { executarMinutaMovimentoLivreAgora } = await import("@/lib/bpm/automacoes/orquestrador");
+    expect(executarMinutaMovimentoLivreAgora).toHaveBeenCalledWith("card", "event");
     const { enfileirarAutomacoesMovimentoBpm } = await import("@/lib/bpm/automacoes/fila");
     const { ativarCadenciasNaEntradaBpm } = await import("@/lib/bpm/cadencias/ativacao-automatica");
     expect(enfileirarAutomacoesMovimentoBpm).not.toHaveBeenCalled();
@@ -107,6 +110,7 @@ describe("movimentação livre administrativa e de liderança", () => {
     const retry = await executarTransicaoBpm(input());
     expect(retry).toMatchObject({ success: true, data: { idempotente: true } });
     expect(f.state.eventos).toHaveLength(1);
+    expect(executarMinutaMovimentoLivreAgora).toHaveBeenCalledTimes(1);
   });
 
   it("liderança de movimento não autoriza edição por payload", async () => {
@@ -115,6 +119,15 @@ describe("movimentação livre administrativa e de liderança", () => {
     expect(result.success).toBe(false);
     expect(f.state.card.etapaId).toBe("origem");
     expect(f.state.valores).toEqual([]);
+  });
+
+  it("falha documental pós-commit preserva o sucesso e a auditoria do movimento", async () => {
+    const { executarMinutaMovimentoLivreAgora } = await import("@/lib/bpm/automacoes/orquestrador");
+    vi.mocked(executarMinutaMovimentoLivreAgora).mockRejectedValueOnce(new Error("Gerador indisponível"));
+    expect(await executarTransicaoBpm(input())).toMatchObject({ success: true, data: { movimentoLivre: true } });
+    expect(f.state.card.etapaId).toBe("destino");
+    expect(f.state.eventos).toHaveLength(1);
+    expect(f.state.historicos).toHaveLength(1);
   });
 
   it.each(["destino", "versao", "concorrencia", "auditoria"])("preserva integridade e rollback: %s", async (falha) => {
