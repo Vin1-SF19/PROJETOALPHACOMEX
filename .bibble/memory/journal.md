@@ -7240,3 +7240,31 @@ Consolidar documentação final; produção não autorizada. Usuário comum, par
 ### Refletido também em
 - `decisions.md`: semântica de envio, autoridade, origem e limites de homologação.
 - `codebase-map.md`, `integration-points.md`, `components.md`: actions/helper, painel, dados e feedback.
+
+---
+
+## [2026-10-21 18:27] — Produção alinhada às correções auditadas do CRM
+
+**Tags:** #bugfix #integration #decision #security
+**Agentes envolvidos:** DevOps, Forge, QA, Architect, SM, Kowalski; owner paralelo de ordenação.
+**Arquivos tocados:** `docs/stories/story-promocao-correcoes-auditoria-crm-producao-20261021.md`, `docs/reports/comparacao-staging-producao-2026-10-21.md`, `.bibble/memory/journal.md`.
+
+### Contexto
+Usuário pediu comparar ambientes e publicar o que faltava em produção `31151e2a`: correções CRM `02788143`/`f8ef7312`.
+
+### O que foi feito
+- Merge preservador `5fd0d1c2` publicado com quatro gates reais aprovados e build próprio de produção; READY/SHA/aliases/banco/proteção CRM conferidos.
+- Owner paralelo promoveu ordenação `347c61a4` em `824db63c`, descendente de `5fd0d1c2`; 26.435 entradas não documentais idênticas ao staging combinado com quatro gates/688 arquivos/5.287 testes aprovados, reutilizados explicitamente por equivalência. Novo build e smoke produção aprovados.
+
+### Decisões tomadas
+- Preservar três grafos ativos, ID próprio Smart e responsável central de produção; validação pura e 23 tabelas sem colunas ausentes. Bancos separados; nenhuma alteração ENV/DB/worker.
+- Fechamento documental único após QA final; E2E autenticado permanece evidência staging. Draft histórico alheio preservado.
+
+### Problemas encontrados / resolvidos
+- Staging avançou durante o deploy; aguardou-se o owner concluir promoção descendente, sem duplicar/sobrescrever commits. Rollback de código saudável `5fd0d1c2`/HAM e baseline `31151e2a`/3b5.
+
+### Pendências
+- Limites anteriores de voz externa 503, latência e cobertura remota de usuário comum/Smart/parceiro; sem mutações de teste em produção.
+
+### Refletido também em
+- Story e relatório comparativo acima; evidência sanitizada em `/var/tmp/alpha-comparacao-promocao-20261021/`.
