@@ -1,0 +1,442 @@
+{
+  "auditDate": "2026-10-21",
+  "scope": "staging; Admin; automações de envio; validações profundas adiadas por solicitação do usuário",
+  "sourceRevision": "ab01802531516ada4211e6f3f59578d86b80fca3",
+  "deploymentId": "dpl_9a4CFm1rG9vAwBLDz7NFNzGpq4jQ",
+  "baseUrl": "https://staging.alpha-comex.com",
+  "actor": {
+    "id": 1,
+    "role": "Admin",
+    "authentication": "real login; credentials not exported"
+  },
+  "testScenario": {
+    "cardId": "cmvi5ztja000007l8livtiw1o",
+    "companyId": 3066,
+    "companyLabel": "TESTE AUDITORIA CRM 21-10-2026 13H45",
+    "syntheticCnpj": "99999998000147",
+    "createdAt": "2026-10-21T13:45:23.014+00:00",
+    "creationHistoryAt": "2026-10-21T13:45:23.161+00:00"
+  },
+  "movements": [
+    {
+      "version": 1,
+      "eventId": "cmvi67lh7000107l55f0f8qk2",
+      "persistedAt": "2026-10-21T13:51:25.819+00:00",
+      "from": "Novo Lead",
+      "to": "Agendar Reunião",
+      "interface": "painel lateral do card",
+      "uiConfirmationMs": 2866,
+      "actor": "Admin",
+      "administrativeMove": true,
+      "automationsSuppressed": true,
+      "status": "ATIVO"
+    },
+    {
+      "version": 2,
+      "eventId": "cmvi6c4vg000308kzp714cq9r",
+      "persistedAt": "2026-10-21T13:54:57.580+00:00",
+      "from": "Agendar Reunião",
+      "to": "Reunião Agendada",
+      "interface": "painel lateral do card",
+      "uiConfirmationMs": 12073,
+      "actor": "Admin",
+      "administrativeMove": true,
+      "automationsSuppressed": true,
+      "status": "ATIVO"
+    },
+    {
+      "version": 3,
+      "eventId": "cmvi6d6cp000508kzsxy2suz1",
+      "persistedAt": "2026-10-21T13:55:46.153+00:00",
+      "from": "Reunião Agendada",
+      "to": "Em tratativa",
+      "interface": "painel lateral do card",
+      "uiConfirmationMs": 2260,
+      "actor": "Admin",
+      "administrativeMove": true,
+      "automationsSuppressed": true,
+      "status": "ATIVO"
+    },
+    {
+      "version": 4,
+      "eventId": "cmvi6en5o000307l5wnct5ndo",
+      "persistedAt": "2026-10-21T13:56:54.588+00:00",
+      "from": "Em tratativa",
+      "to": "Contrato fechado",
+      "interface": "painel lateral do card",
+      "uiConfirmationMs": 4278,
+      "actor": "Admin",
+      "administrativeMove": true,
+      "automationsSuppressed": true,
+      "status": "ATIVO"
+    },
+    {
+      "version": 5,
+      "eventId": "cmvi6l9mc000708kz1gc7e39f",
+      "persistedAt": "2026-10-21T14:02:03.636+00:00",
+      "from": "Contrato fechado",
+      "to": "Em tratativa",
+      "interface": "arrastar no Kanban",
+      "uiConfirmationMs": 4562,
+      "actor": "Admin",
+      "administrativeMove": true,
+      "automationsSuppressed": true,
+      "status": "ATIVO"
+    },
+    {
+      "version": 6,
+      "eventId": "cmvi6noob000107jsl7woixxn",
+      "persistedAt": "2026-10-21T14:03:56.459+00:00",
+      "from": "Em tratativa",
+      "to": "Contrato fechado",
+      "interface": "painel lateral do card",
+      "uiConfirmationMs": 2756,
+      "actor": "Admin",
+      "administrativeMove": true,
+      "automationsSuppressed": true,
+      "status": "ATIVO"
+    }
+  ],
+  "finalObservation": {
+    "at": "2026-10-21T14:05:18.429Z",
+    "card": {
+      "id": "cmvi5ztja000007l8livtiw1o",
+      "empresaId": 3066,
+      "pipelineId": "cmuih48la000009gmzw3wwuzf",
+      "etapaId": "draft-stage-2484d2bc-34dd-49b6-baf8-e53d58f07a83",
+      "status": "ATIVO",
+      "versao": 6,
+      "updatedAt": "2026-10-21T14:03:56.428+00:00",
+      "concluidoEm": null,
+      "etapaNome": "Contrato fechado"
+    },
+    "cardCountForTestCompany": 1,
+    "financeCardCount": 0,
+    "operationalCardCount": 0,
+    "executionCount": 0,
+    "linkCount": 0,
+    "annotationCount": 1
+  },
+  "activeAutomationCount": 37,
+  "withoutActiveCentralVersionCount": 37,
+  "schemaChecks": [
+    {
+      "automationId": "c17d0860b8a679fdf3caffac8",
+      "name": "Fechado — criar card no Financeiro",
+      "actionType": "CRIAR_CARD_OUTRO_PIPELINE",
+      "trigger": "ENTRAR_COLUNA",
+      "source": {
+        "pipelineId": "cmuih48la000009gmzw3wwuzf",
+        "pipelineName": "Revisão de Radar",
+        "stageId": "draft-stage-2484d2bc-34dd-49b6-baf8-e53d58f07a83",
+        "stageName": "Contrato fechado",
+        "stageKey": "fechado",
+        "activeStagePresent": true,
+        "stagePipelineMatches": true,
+        "isFinal": 1
+      },
+      "target": {
+        "pipelineId": "cmuih4i54000209gmmyqrg557",
+        "pipelineName": "Financeiro",
+        "pipelineActivePresent": true,
+        "stageId": "draft-stage-92d707af-9b90-4f71-a9be-58ec7fbe98f8",
+        "stageName": "Novo Contrato",
+        "stageKey": "solicitacao_contrato",
+        "activeStagePresent": true,
+        "stagePipelineMatches": true,
+        "isInitial": 1
+      },
+      "parameters": {
+        "pipelineId": "cmuih4i54000209gmmyqrg557",
+        "etapaId": "draft-stage-92d707af-9b90-4f71-a9be-58ec7fbe98f8",
+        "vincularAoOriginal": true,
+        "somenteSeNaoExistirAtivo": true
+      },
+      "activeCentralVersion": null,
+      "routeIdsValid": true,
+      "acceptedByLegacySchema": false,
+      "issues": [
+        {
+          "path": "servicoAlvoId",
+          "code": "invalid_type"
+        },
+        {
+          "path": "condicao",
+          "code": "invalid_type"
+        },
+        {
+          "path": "acao",
+          "code": "invalid_type"
+        },
+        {
+          "path": "",
+          "code": "unrecognized_keys"
+        }
+      ],
+      "evidenceType": "configuration_read_and_pure_function",
+      "executedAgainstRealCard": false
+    },
+    {
+      "automationId": "cc1b81956f9cb47db83229463",
+      "name": "Concluido — criar card no Operacional",
+      "actionType": "CRIAR_CARD_OUTRO_PIPELINE",
+      "trigger": "ENTRAR_COLUNA",
+      "source": {
+        "pipelineId": "cmuih4i54000209gmmyqrg557",
+        "pipelineName": "Financeiro",
+        "stageId": "draft-stage-61b69302-cf10-4be3-a537-93fc253e246e",
+        "stageName": "Concluido",
+        "stageKey": "contratacao_finalizada",
+        "activeStagePresent": true,
+        "stagePipelineMatches": true,
+        "isFinal": 1
+      },
+      "target": {
+        "pipelineId": "cmuih4tnh000409gm5z34jvss",
+        "pipelineName": "Operacional",
+        "pipelineActivePresent": true,
+        "stageId": "draft-stage-802def27-91ae-4231-b3f4-a251951c954a",
+        "stageName": "Boas vindas",
+        "stageKey": null,
+        "activeStagePresent": true,
+        "stagePipelineMatches": true,
+        "isInitial": 1
+      },
+      "parameters": {
+        "pipelineId": "cmuih4tnh000409gm5z34jvss",
+        "etapaId": "draft-stage-802def27-91ae-4231-b3f4-a251951c954a",
+        "vincularAoOriginal": true,
+        "somenteSeNaoExistirAtivo": true
+      },
+      "activeCentralVersion": null,
+      "routeIdsValid": true,
+      "acceptedByLegacySchema": false,
+      "issues": [
+        {
+          "path": "servicoAlvoId",
+          "code": "invalid_type"
+        },
+        {
+          "path": "condicao",
+          "code": "invalid_type"
+        },
+        {
+          "path": "acao",
+          "code": "invalid_type"
+        },
+        {
+          "path": "",
+          "code": "unrecognized_keys"
+        }
+      ],
+      "evidenceType": "configuration_read_and_pure_function",
+      "executedAgainstRealCard": false
+    },
+    {
+      "automationId": "cmvh5pf9a001yg5ihmwgah3mh",
+      "name": "Assessoria Smart — espelhar na Revisão do Operacional",
+      "actionType": "CRIAR_CARD_OUTRO_PIPELINE",
+      "trigger": "ENTRAR_COLUNA",
+      "source": {
+        "pipelineId": "ca6920da81c6e3472ff83fffa",
+        "pipelineName": "REVISÃO DO RADAR - ASSESSORIA SMART",
+        "stageId": "csmartenviarevisao00000001",
+        "stageName": "Enviar para REVISÃO",
+        "stageKey": "enviar_revisao",
+        "activeStagePresent": true,
+        "stagePipelineMatches": true,
+        "isFinal": 1
+      },
+      "target": {
+        "pipelineId": "cmuih4tnh000409gm5z34jvss",
+        "pipelineName": "Operacional",
+        "pipelineActivePresent": true,
+        "stageId": "draft-stage-cb2023f8-7e31-438e-83f9-4bb0fc359f79",
+        "stageName": "Revisão",
+        "stageKey": null,
+        "activeStagePresent": true,
+        "stagePipelineMatches": true,
+        "isInitial": 0
+      },
+      "parameters": {
+        "pipelineId": "cmuih4tnh000409gm5z34jvss",
+        "etapaId": "draft-stage-cb2023f8-7e31-438e-83f9-4bb0fc359f79",
+        "vincularAoOriginal": true,
+        "somenteSeNaoExistirAtivo": false
+      },
+      "activeCentralVersion": null,
+      "routeIdsValid": true,
+      "acceptedByLegacySchema": false,
+      "issues": [
+        {
+          "path": "servicoAlvoId",
+          "code": "invalid_type"
+        },
+        {
+          "path": "condicao",
+          "code": "invalid_type"
+        },
+        {
+          "path": "acao",
+          "code": "invalid_type"
+        },
+        {
+          "path": "",
+          "code": "unrecognized_keys"
+        }
+      ],
+      "evidenceType": "configuration_read_and_pure_function",
+      "executedAgainstRealCard": false
+    }
+  ],
+  "originFields": [
+    {
+      "id": "cmul8ww6j0005l6ihoegkoyrs",
+      "nome": "Canal de origem",
+      "chave": null,
+      "tipo": "texto",
+      "escopo": "CARD",
+      "fonteEntidade": null,
+      "fonteAtributo": null,
+      "entidadeGlobal": null,
+      "valor": "Orgânico"
+    },
+    {
+      "id": "cmulqa366002pmaihxlwwxy0i",
+      "nome": "Origem do cliente",
+      "chave": "alpha.radar.contrato.canal_origem_do_cliente",
+      "tipo": "selecao",
+      "escopo": "CARD",
+      "fonteEntidade": null,
+      "fonteAtributo": null,
+      "entidadeGlobal": null,
+      "valor": null
+    }
+  ],
+  "findings": [
+    {
+      "id": "CRM-01",
+      "severity": "Alta",
+      "evidence": "runtime_confirmed",
+      "title": "Movimento do Admin não dispara encaminhamento",
+      "conclusion": "Seis movimentos persistidos com automacoesSuprimidas=true; nenhum card Financeiro, vínculo ou execução foi criado."
+    },
+    {
+      "id": "CRM-02",
+      "severity": "Alta",
+      "evidence": "configuration_and_pure_function_confirmed",
+      "title": "Encaminhamentos cadastrados incompatíveis com o executor legado",
+      "conclusion": "Três ações CRIAR_CARD_OUTRO_PIPELINE sem versão central ativa são rejeitadas pelo validador usado pelo executor legado. Não houve execução real dessas ações neste teste."
+    },
+    {
+      "id": "CRM-03",
+      "severity": "Média",
+      "evidence": "runtime_and_database_confirmed",
+      "title": "Origem não herdada no formulário de fechamento",
+      "conclusion": "Canal de origem do Novo Lead=Orgânico; Origem do cliente de Contrato fechado=null. O valor original não foi apagado; falta herança entre os campos."
+    },
+    {
+      "id": "CRM-04",
+      "severity": "Média",
+      "evidence": "runtime_observation",
+      "title": "Ausência de feedback explícito sobre envio suprimido",
+      "conclusion": "O card chega a Contrato fechado sem informar claramente que o envio ao Financeiro não foi disparado por ser movimento administrativo."
+    },
+    {
+      "id": "CRM-05",
+      "severity": "Baixa",
+      "evidence": "runtime_observation",
+      "title": "Avisos de atualização repetidos sem edição dos formulários",
+      "conclusion": "Mensagem de valores em edição preservados aparece ao abrir o cenário e repetida em vários blocos, antes de editar esses campos."
+    },
+    {
+      "id": "CRM-06",
+      "severity": "Baixa",
+      "evidence": "runtime_observation",
+      "title": "Abas de pipeline alteram histórico, mas mantêm o formulário comercial",
+      "conclusion": "Selecionar Financeiro ou Operacional mostra que o card não passou por eles, enquanto o formulário central continua Contrato fechado; melhorar a identificação do contexto."
+    },
+    {
+      "id": "CRM-07",
+      "severity": "Média",
+      "evidence": "timing_observation_not_root_cause",
+      "title": "Confirmação visual de um movimento levou cerca de 12 segundos",
+      "conclusion": "Tempos medidos incluem atualização/reabertura do detalhe e captura. Não são latência isolada do backend nem prova de regressão; houve timeouts na conexão de auditoria."
+    },
+    {
+      "id": "CRM-08",
+      "severity": "Baixa",
+      "evidence": "incidental_runtime_observation",
+      "title": "Consulta de voz do Bibble retorna 503 repetidamente",
+      "conclusion": "147 respostas 503 de /api/bibble/voice na janela observada; componente global, não causa comprovada do bloqueio CRM."
+    },
+    {
+      "id": "CRM-09",
+      "severity": "Baixa",
+      "evidence": "runtime_transient_observation",
+      "title": "Contador da coluna não acompanha imediatamente o movimento otimista",
+      "conclusion": "Após o arrasto, o card já estava em Em tratativa enquanto o contador ainda mostrava 0, em amostra aproximadamente 300 ms após soltar. Não foi observado erro permanente de contagem."
+    }
+  ],
+  "gates": {
+    "lint": {
+      "exitCode": 0,
+      "errors": 0,
+      "existingWarnings": 1193
+    },
+    "typecheck": {
+      "exitCode": 0
+    },
+    "tests": {
+      "exitCode": 0,
+      "filesPassed": 678,
+      "testsPassed": 5147,
+      "skipped": 4,
+      "todo": 1
+    },
+    "build": "not rerun; application source unchanged; audit artifacts only"
+  },
+  "uiObservations": {
+    "annotationPersistedInHistory": true,
+    "friendlyEmptyProcedureState": true,
+    "vendorDisplayedName": "ADM",
+    "originSelectDarkColorScheme": true,
+    "uncaughtPageErrors": 0,
+    "incidentalVoice503Responses": 147
+  },
+  "coverage": {
+    "commercialAdminMovements": "executed",
+    "kanbanAdminBackMove": "executed",
+    "commercialToFinanceAutomaticHandoff": "destination not created; no execution enqueued",
+    "financeToOperationalRuntime": "not executed; blocked upstream",
+    "financeToOperationalConfiguration": "read-only plus pure schema validation",
+    "paymentSignatureInvoiceExternalMeet": "not executed",
+    "normalUserValidators": "deferred by user"
+  },
+  "dataSafety": {
+    "productionMutations": false,
+    "customerCardsChanged": false,
+    "configurationChanged": false,
+    "schemaChanged": false,
+    "globalWorkerOrReplayRun": false,
+    "externalInvitationsSent": false,
+    "syntheticTestCardLeftForInspection": true
+  },
+  "versionControl": {
+    "deploymentIdentifiedAtStart": "ab01802531516ada4211e6f3f59578d86b80fca3",
+    "subsequentStagingCommits": [
+      {
+        "sha": "c2c4bc0853",
+        "committedAt": "2026-10-21T13:44:32Z",
+        "scope": "ordem das anotações"
+      },
+      {
+        "sha": "a0b2e28e068b1d11a4e6a4b0e1cd2c093c82a115",
+        "committedAt": "2026-10-21T14:15:54Z",
+        "scope": "navegação de alertas"
+      }
+    ],
+    "coreHandoffMovementOriginAndAutomationCodeUnchanged": true,
+    "visualObservationsApplyToCapturedSession": true
+  }
+}
