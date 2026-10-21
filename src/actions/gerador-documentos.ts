@@ -1,7 +1,6 @@
 "use server";
 
-import { disponibilizarContratoComercial } from "@/lib/bpm/contratacao-comercial-server";
-import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { disponibilizarContratoComercial, notificarContratacaoComercialPosCommit } from "@/lib/bpm/contratacao-comercial-server";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
@@ -495,7 +494,8 @@ export async function GerarDocumento(payload: unknown) {
         data: {
           templateId: template.id,
           titulo: input.titulo,
-          variaveisJson: JSON.stringify(contratoPadrao ? { ...input.variaveis, __modeloContratoPadrao: "docx-v1" } : input.variaveis),
+          variaveisJson: JSON.stringify({ ...Object.fromEntries(Object.entries(input.variaveis).filter(([chave]) => chave !== "__bpmCardId")),
+            ...(contratoPadrao ? { __modeloContratoPadrao: "docx-v1" } : {}) }),
           tokenAcesso,
           criadoPorId: ctx.userId,
           status: "CONFERENCIA",
@@ -1080,6 +1080,8 @@ export async function FinalizarDocumento(documentoId: string) {
       where: { id: documentoId },
       select: {
         templateId: true,
+        status: true,
+        finalizadoEm: true,
         titulo: true,
         pdfUrl: true,
         variaveisJson: true,
@@ -1095,6 +1097,16 @@ export async function FinalizarDocumento(documentoId: string) {
     const faltando = validarVariaveisObrigatorias(variaveisTemplate, valoresSalvos.success ? valoresSalvos.data : {});
     if (faltando.length > 0) {
       return { success: false as const, error: `Variáveis obrigatórias ausentes: ${faltando.join(", ")}` };
+    }
+
+    if (documento.status === "ARQUIVADO") return { success: false as const, error: "Este documento está arquivado." };
+    if (documento.status === "FINALIZADO" && documento.pdfUrl) {
+      const cardId = valoresSalvos.success ? valoresSalvos.data.__bpmCardId : null;
+      if (typeof cardId === "string") {
+        const retorno = await db.$transaction((tx) => disponibilizarContratoComercial(tx, cardId, ctx.userId));
+        if (retorno) await notificarContratacaoComercialPosCommit(retorno);
+      }
+      return { success: true as const, pdfDisponivel: true as const };
     }
 
     // Gera o PDF ANTES de mudar o status — se a geração/upload falhar, a
@@ -1135,17 +1147,18 @@ export async function FinalizarDocumento(documentoId: string) {
 
     const cardId = valoresSalvos.success ? valoresSalvos.data.__bpmCardId : null;
     const conclusao = { status: "FINALIZADO", finalizadoEm: new Date(), pdfUrl: blob.url };
-    if (typeof cardId === "string") {
-      const retornoComercial = await db.$transaction(async (tx) => {
-        await tx.documentoGerado.update({ where: { id: documentoId }, data: conclusao });
-        return disponibilizarContratoComercial(tx, cardId, ctx.userId);
-      });
-      if (retornoComercial) await notificarPipelineBpm({ ...retornoComercial, tipo: "CARD_ATUALIZADO" });
-    } else {
-      await db.documentoGerado.update({ where: { id: documentoId }, data: conclusao });
-    }
+    const retornoComercial = await db.$transaction(async (tx) => {
+      const gravado = await tx.documentoGerado.updateMany({ where: { id: documentoId,
+        status: { in: ["RASCUNHO", "CONFERENCIA"] }, pdfUrl: documento.pdfUrl }, data: conclusao });
+      if (gravado.count !== 1) {
+        const atual = await tx.documentoGerado.findUnique({ where: { id: documentoId }, select: { status: true, pdfUrl: true } });
+        if (atual?.status !== "FINALIZADO" || !atual.pdfUrl) throw new Error("O documento mudou. Recarregue antes de finalizar.");
+      }
+      return typeof cardId === "string" ? disponibilizarContratoComercial(tx, cardId, ctx.userId) : null;
+    });
+    if (retornoComercial) await notificarContratacaoComercialPosCommit(retornoComercial);
 
-    revalidatePath(`${ROTA_BASE}/conferencia`);
+    try { revalidatePath(`${ROTA_BASE}/conferencia`); } catch { /* The finalized document is already committed. */ }
     return { success: true as const, pdfDisponivel: true as const };
   } catch (error) {
     console.error("[GeradorDocumentos] Falha ao finalizar PDF:", error);

@@ -8,8 +8,9 @@ const revalidatePathMock = vi.hoisted(() => vi.fn());
 const camposMock = vi.hoisted(() => vi.fn());
 const automacoesMock = vi.hoisted(() => vi.fn());
 const reciboMock = vi.hoisted(() => vi.fn());
+const posCommitMock = vi.hoisted(() => vi.fn());
 const retornoComercialMock = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/bpm/contratacao-comercial-server", () => ({ disponibilizarContratoComercial: retornoComercialMock }));
+vi.mock("@/lib/bpm/contratacao-comercial-server", () => ({ disponibilizarContratoComercial: retornoComercialMock, notificarContratacaoComercialPosCommit: posCommitMock }));
 vi.mock("@/lib/bpm/requisitos-etapa-server", () => ({ carregarCamposAplicaveisCardEtapa: camposMock }));
 vi.mock("@/lib/bpm/automacoes/orquestrador", () => ({ executarAutomacoesCentraisDoCardAgora: automacoesMock }));
 const prismaMock = vi.hoisted(() => ({
@@ -208,7 +209,7 @@ it("upload como última condição de prontidão disponibiliza contrato na mesma
   expect(await RegistrarAnexoBpm({ cardId: CARD_ID, campoId: CAMPO_ID, recibo: RECIBO })).toMatchObject({ success: true });
   expect(retornoComercialMock).toHaveBeenCalledWith(prismaMock, CARD_ID, 7);
   expect(prismaMock.bpmCardCampoValor.upsert.mock.invocationCallOrder[0]).toBeLessThan(retornoComercialMock.mock.invocationCallOrder[0]);
-  expect(notificarMock).toHaveBeenCalledWith({ cardId: "comercial", pipelineId: "radar", tipo: "CARD_ATUALIZADO" });
+  expect(posCommitMock).toHaveBeenCalledWith({ cardId: "comercial", pipelineId: "radar" });
 });
 
 

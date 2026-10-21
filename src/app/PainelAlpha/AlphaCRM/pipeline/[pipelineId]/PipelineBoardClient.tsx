@@ -948,6 +948,12 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
           return false;
         }
         const mudouConfig = estado.manifesto!.configVersion !== result.manifesto.configVersion;
+        const selecionado = cardSelecionadoIdRef.current;
+        const revisaoAnterior = selecionado ? estado.manifesto?.entradas.find((entrada) => entrada.id === selecionado)?.revision : undefined;
+        const revisaoAtual = selecionado ? result.manifesto.entradas.find((entrada) => entrada.id === selecionado)?.revision : undefined;
+        if (selecionado && revisaoAnterior !== undefined && revisaoAtual !== undefined && revisaoAnterior !== revisaoAtual) {
+          setRealtimeRevision((revision) => revision + 1);
+        }
         estado.manifesto = result.manifesto; estado.ids = result.ids;
         if (forcar) estado.ultimaCompleta = Date.now();
         setManifesto(result.manifesto);

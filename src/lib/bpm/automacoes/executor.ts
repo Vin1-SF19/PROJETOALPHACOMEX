@@ -6,6 +6,7 @@ import { Resend } from "resend";
 import { z } from "zod";
 
 import db from "@/lib/prisma";
+import { disponibilizarContratoComercial, notificarContratacaoComercialPosCommit } from "@/lib/bpm/contratacao-comercial-server";
 import { executarEncaminhamentoBpm } from "./encaminhamento";
 import { gerarFichaServer } from "@/lib/bibble/gerar-ficha-server";
 import { gerarPdfDocumento } from "@/lib/gerador-documentos/pdf";
@@ -211,7 +212,7 @@ async function gerarContrato(
     const existente = token ? await db.documentoGerado.findUnique({ where: { tokenAcesso: token }, select: { id: true, templateId: true, pdfUrl: true } }) : null;
     if (existente?.templateId === template.id) {
       if (parametros.campoIdContrato && (!anexo.campoId || anexo.campoId === parametros.campoIdContrato)) {
-        await db.$transaction(async (tx) => {
+        const retornoComercial = await db.$transaction(async (tx) => {
           if (!anexo.campoId) await tx.bpmCardAnexo.update({ where: { id: anexo.id }, data: { campoId: parametros.campoIdContrato } });
           const valor = await tx.bpmCardCampoValor.findUnique({
             where: { cardId_campoId: { cardId: contexto.card.id, campoId: parametros.campoIdContrato! } },
@@ -222,19 +223,21 @@ async function gerarContrato(
             create: { cardId: contexto.card.id, campoId: parametros.campoIdContrato!, valor: anexo.id },
             update: { valor: anexo.id },
           });
+          return disponibilizarContratoComercial(tx, contexto.card.id, criadoPorId);
         });
+        if (retornoComercial) await notificarContratacaoComercialPosCommit(retornoComercial);
       }
       return { tipo: "CONTRATO", documentoId: existente.id, pdfUrl: existente.pdfUrl,
         urlConferencia: anexo.url, existente: true };
     }
   }
   const tokenAcesso = randomUUID();
-  const documento = await db.$transaction(async (tx) => {
+  const criacao = await db.$transaction(async (tx) => {
     const criado = await tx.documentoGerado.create({
       data: {
         templateId: template.id,
         titulo,
-        variaveisJson: JSON.stringify(padrao ? { ...variaveis, __modeloContratoPadrao: "docx-v1", __bpmCardId: contexto.card.id } : variaveis),
+        variaveisJson: JSON.stringify({ ...variaveis, ...(padrao ? { __modeloContratoPadrao: "docx-v1" } : {}), __bpmCardId: contexto.card.id }),
         tokenAcesso,
         criadoPorId,
         clienteId: contexto.card.empresaId,
@@ -270,8 +273,11 @@ async function gerarContrato(
         update: { valor: anexo.id },
       });
     }
-    return criado;
+    const retornoComercial = parametros.campoIdContrato ? await disponibilizarContratoComercial(tx, contexto.card.id, criadoPorId) : null;
+    return { documento: criado, retornoComercial };
   });
+  const documento = criacao.documento;
+  if (criacao.retornoComercial) await notificarContratacaoComercialPosCommit(criacao.retornoComercial);
 
   let pdfUrl: string | null = null;
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN;

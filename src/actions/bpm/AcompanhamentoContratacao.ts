@@ -19,7 +19,7 @@ export async function ObterAcompanhamentoContratacaoBpm(cardId: string) {
     const tarefa = await db.bpmTarefa.findUnique({ where: { id: idTarefaContratacao("pagamento", cardId, financeiro.id) }, select: { id: true, status: true } });
     return { success: true as const, data: {
       podeAgir, envioJaAcompanhado: contexto.envioJaAcompanhado, versao: comercial.updatedAt.toISOString(), status: comercial.statusPosFechamento,
-      contratoUrl: documento ? `/api/bpm/cards/${encodeURIComponent(cardId)}/contrato` : null,
+      contratoUrl: documento ? `/api/bpm/cards/${encodeURIComponent(cardId)}/contrato?tipo=para_envio` : null,
       contratoNome: documento?.nome ?? null, pagamentoEncaminhado: Boolean(tarefa), conferenciaConcluida: tarefa?.status === "CONCLUIDA", financeiroConcluido: financeiro.status === "CONCLUIDO",
     } };
   } catch (error) {

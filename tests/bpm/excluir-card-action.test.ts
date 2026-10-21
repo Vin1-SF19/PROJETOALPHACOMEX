@@ -13,7 +13,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../../auth", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/prisma", () => ({ default: mocks.db }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidate }));
-vi.mock("@/lib/validations/bpm", () => ({ criarCardSchema: vi.fn(), atualizarCardSchema: vi.fn(), moverCardSchema: vi.fn(), salvarRequisitosEMoverCardSchema: vi.fn(), excluirCardSchema: { safeParse: (v: { cardId: string }) => ({ success: typeof v.cardId === "string" && v.cardId.trim().length > 0, data: v }) } }));
+vi.mock("@/lib/validations/bpm", async (importOriginal) => ({
+ ...await importOriginal<typeof import("@/lib/validations/bpm")>(),
+ criarCardSchema: vi.fn(), atualizarCardSchema: vi.fn(), moverCardSchema: vi.fn(), salvarRequisitosEMoverCardSchema: vi.fn(),
+ excluirCardSchema: { safeParse: (v: { cardId: string }) => ({ success: typeof v.cardId === "string" && v.cardId.trim().length > 0, data: v }) },
+}));
 vi.mock("@/lib/format-cnpj", () => ({ formatCNPJ: vi.fn(), normalizarCNPJ: vi.fn() }));
 vi.mock("@/lib/bpm/automacoes", () => ({ executarAutomacaoFechamentoComercial: vi.fn(), executarAutomacaoTarefaNotaFiscal: vi.fn() }));
 vi.mock("@/lib/bpm/automacoes/fila", () => ({ enfileirarAutomacoesCriacaoCardBpm: vi.fn(), enfileirarAutomacoesMovimentoBpm: vi.fn() }));
@@ -33,7 +37,10 @@ vi.mock("@/lib/validations/cs-nps", () => ({ paraExibicaoTelefone: vi.fn() }));
 vi.mock("@/lib/callix/click-to-call", () => ({ iniciarLigacaoCallix: vi.fn(), normalizarTelefoneCallix: vi.fn() }));
 vi.mock("@/lib/bpm/em-tratativa", () => ({ etapaEhEmTratativa: vi.fn(), obterErroChecklistParaSaidaEmTratativa: vi.fn(), obterErroProximoContatoParaEntrada: vi.fn() }));
 vi.mock("@/lib/bpm/campos-dinamicos", () => ({ validarValoresCamposBpm: vi.fn() }));
-vi.mock("@/lib/bpm/status-pos-fechamento", () => ({ configuracaoEntradaFechadoEhValida: vi.fn(), CONFIGURACAO_FECHADO_INVALIDA_MENSAGEM: vi.fn(), etapaEhFechado: vi.fn(), STATUS_POS_FECHAMENTO_INICIAL: vi.fn() }));
+vi.mock("@/lib/bpm/status-pos-fechamento", async (importOriginal) => ({
+ ...await importOriginal<typeof import("@/lib/bpm/status-pos-fechamento")>(),
+ configuracaoEntradaFechadoEhValida: vi.fn(), CONFIGURACAO_FECHADO_INVALIDA_MENSAGEM: vi.fn(), etapaEhFechado: vi.fn(), STATUS_POS_FECHAMENTO_INICIAL: vi.fn(),
+}));
 vi.mock("@/lib/bpm/lost", () => ({ CONFIGURACAO_LOST_INVALIDA_MENSAGEM: vi.fn(), campoEhMotivoLost: vi.fn(), campoEhMotivoLostOutro: vi.fn(), etapaEhLost: vi.fn(), resolverConfiguracaoLost: vi.fn(), validarMotivoLost: vi.fn() }));
 vi.mock("@/lib/bpm/monitoramento", () => ({ obterErroTransicaoMonitoramento: vi.fn() }));
 vi.mock("@/lib/bpm/regras/guarda-movimento", () => ({ obterErroRegrasParaMovimento: vi.fn() }));

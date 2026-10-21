@@ -4,8 +4,8 @@ import type { ComponentProps } from "react";
 import { createRoot } from "react-dom/client";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import PipelineBoardClient from "@/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient";
-import { MoverCardBpm, ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
 import { SincronizarQuadroBpm } from "@/actions/bpm/Quadro";
+import { MoverCardBpm, ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
 
 const drag = vi.hoisted(() => ({ current: null as null | import("react").ComponentProps<typeof import("@dnd-kit/core").DndContext> }));
 vi.mock("@dnd-kit/core", async (original) => {
@@ -26,8 +26,8 @@ vi.mock("@/actions/bpm/Cards", () => ({
 vi.mock("@/actions/bpm/NolossLeads", () => ({ PromoverNolossLead: vi.fn() }));
 vi.mock("@/actions/bpm/InstagramLeads", () => ({ AssumirLeadInstagram: vi.fn() }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal", () => ({
-  default: ({ cardId, onCardExcluido }: { cardId: string; onCardExcluido: (id: string) => void }) =>
-    h("button", { onClick: () => onCardExcluido(cardId) }, "Confirmar exclusão"),
+  default: ({ cardId, onCardExcluido, realtimeRevision }: { cardId: string; onCardExcluido: (id: string) => void; realtimeRevision?: number }) =>
+    h("button", { "data-modal-revision": realtimeRevision, onClick: () => onCardExcluido(cardId) }, "Confirmar exclusão"),
 }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/NovoCardModal", () => ({ default: () => null }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/NolossLeadModal", () => ({ default: () => null }));
@@ -352,5 +352,26 @@ it("busca fora do lote inicial e descarta resposta antiga após mudar o filtro",
     await act(async () => antiga({ success: true, manifesto, cards: [card], ids: [card.id] } as never));
     expect(container.querySelector('[aria-label="Abrir card de Empréstimo"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Abrir card de Empresa"]')).toBeNull();
+  } finally { await act(async () => root.unmount()); container.remove(); }
+});
+
+
+it("polling atualiza o detalhe aberto uma vez por mudança real de revisão sem remontá-lo", async () => {
+  Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true }); vi.useFakeTimers();
+  const { container, root, props } = montarBoard();
+  const entrada = { id: card.id, etapaId: card.etapaId, revision: "rev-1", nome: "Empresa", cnpj: null, servico: null, responsaveis: [] };
+  props.manifestoInicial = { configVersion: 1, entradas: [entrada] };
+  props.cardInicialId = card.id;
+  vi.mocked(SincronizarQuadroBpm).mockResolvedValue({ success: true, manifesto: { configVersion: 1, entradas: [{ ...entrada, revision: "rev-2" }] }, ids: [card.id], cards: [] });
+  try {
+    await act(async () => root.render(h(PipelineBoardClient, props)));
+    const modal = container.querySelector<HTMLElement>("[data-modal-revision]")!;
+    expect(modal.getAttribute("data-modal-revision")).toBe("0");
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(container.querySelector("[data-modal-revision]")).toBe(modal);
+    expect(modal.getAttribute("data-modal-revision")).toBe("1");
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(modal.getAttribute("data-modal-revision")).toBe("1");
+    expect(SincronizarQuadroBpm).toHaveBeenCalledTimes(2);
   } finally { await act(async () => root.unmount()); container.remove(); }
 });
