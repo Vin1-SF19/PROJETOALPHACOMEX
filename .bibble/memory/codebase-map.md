@@ -1795,3 +1795,14 @@ Atualização de estado Chamados: estrutura e 53 categorias aplicadas no Turso a
 `contratacao-em-tratativa-config.ts` e `scripts/configurar-contratacao-em-tratativa.mts` preparam preview/apply/verify/rollback protegido: duas configurações opcionais 116/117 e dois componentes 16/17 em `dados_financeiro`, pipeline 31→32/formulário 2→3, preservando obrigação de Fechado. Testes de configuração usam banco descartável. Banco real não aplicado; consentimento, publicação, browser, build/revisão finais pendentes no checkpoint. Story: `story-alpha-crm-revisao-radar-fechado.md`, reabertura de 16/10.
 
 - 16/10/2026 — Configuração acima autorizada, aplicada e verificada no Turso: Radar v32/formulário Em tratativa v3; dois campos opcionais na origem, entrada de Fechado preservada. Correção nominal do vendedor ainda depende de publicação do código.
+
+
+### 2026-10-21 — Scribe — CRM: encaminhamento explícito e correções da auditoria
+
+- `src/actions/bpm/Encaminhamentos.ts`: `ObterEncaminhamentosCardBpm`, `SolicitarEncaminhamentoCardBpm` e `RepetirEncaminhamentoCardBpm`; estado de envio, intenção Admin autenticada, snapshot da regra/versão, idempotência e retentativa específica. O reposicionamento livre continua separado e não envia.
+- `src/lib/bpm/automacoes/encaminhamento.ts`: helper compartilhado por central, legado e envio explícito; revalida autoridade persistida, destino/empresa e versão, serializa criação/dedupe/cópia/vínculos/auditoria/outbox na transação. A exceção Admin não confirma assinatura/pagamento/NF nem conclui o card financeiro.
+- `origem-cliente-server.ts`, `requisitos-etapa-server.ts` e `copiar-campos-card-vinculado.ts`, em `src/lib/bpm/`: origem reapresentada da mesma negociação; escolha explícita inclusive vazia e mapeamento têm precedência; parceiro herdado somente por vínculo da mesma empresa, sem clonar indicação/comissão.
+- `CardModal/PainelEncaminhamentos.tsx` dentro de AlphaCRM: painel lateral montado em `CardAbertoLayout`, conectado às actions e ao flush/releitura do card. `card-modal-ui.ts` centraliza merge de rascunho; o board reconcilia cards e manifesto juntos; `medicao-ui.ts` mede fases sem valores de formulário.
+- `src/components/BibbleChatHome/useVoiceStatus.ts`: health checks compartilhados, backoff/cancelamento e recuperação; `BotaoFalarMensagem.tsx` preserva tentativa manual.
+
+Story: `docs/stories/story-alpha-crm-correcoes-auditoria-fluxo-20261021.md`. Gates locais: 686 arquivos/5.278 testes aprovados, lint/typecheck/build e Anubis/Lens/Probe locais PASS. Reteste Admin no staging **PASS** em `02788143` / `dpl_3XqC9y8Z8vuz4oJzYUKf2KwpQxKD`: três cards, dois envios SUCESSO, três vínculos, repetições sem duplicata e origem Orgânico preservada. Financeiro continua ATIVO, sem assinatura/pagamento/NF fabricados. Voz segue 503, com backoff observado de cerca de 60/120/240/300 s. Produção não integra esta entrega.

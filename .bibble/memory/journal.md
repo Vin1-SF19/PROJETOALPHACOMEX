@@ -7209,3 +7209,34 @@ Usuário autorizou especificamente o plano após Vault/backup. Configuração ap
 ### Gate de publicação — Virtus
 
 Usuário solicitou publicar a entrega. Typecheck pós-build final aprovado; runtime compilado com 22/22 checks de assets e rotas protegidas sem sessão, sem mutação no banco. Candidato restrito aos 15 arquivos desta correção sobre origin/main; deploy não reaplica a configuração. Suíte global mantém seis falhas anteriores; navegador autenticado não executado. Rollback de código referencia a versão anterior saudável, preservando o banco.
+
+
+---
+
+## [2026-10-21 15:46 UTC] — CRM: correções da auditoria e encaminhamento explícito
+
+**Tags:** #bugfix #integration #security #nextjs #prisma
+**Agentes envolvidos:** coordenação, Architect, Dev, Sage, Probe, Forge, Anubis, Lens, DevOps, Scribe, Kowalski.
+**Arquivos tocados:** `src/actions/bpm/Encaminhamentos.ts`, `src/lib/bpm/automacoes/encaminhamento.ts`, `src/lib/bpm/origem-cliente-server.ts`, `src/lib/bpm/card-modal-ui.ts`, `CardModal/PainelEncaminhamentos.tsx`, board CRM, cliente de voz e testes correspondentes; lista completa na story.
+
+### Contexto
+O usuário autorizou corrigir todos os nove achados do PDF. O percurso Admin anterior reposicionava o card sem enviar ao Financeiro; a configuração legada também rejeitava o tipo de ação de encaminhamento.
+
+### O que foi feito
+- Envio explícito/Admin auditável com helper transacional comum, ACL, status, retentativa específica, dedupe e preservação do estado financeiro; reposicionamento livre separado.
+- Origem/parceiro da mesma negociação, merge real de rascunhos, contexto/continuidade do detalhe, contadores otimistas, métricas por fase e backoff da voz.
+- Gates locais PASS: 686 arquivos/5.278 testes, quatro skipped/um todo, lint/typecheck/build e revisões locais. Primeira suíte com sete falhas preservada; contratos de teste afetados e fixture Prisma foram corrigidos, sem relaxar as guardas.
+- Staging `02788143` / `dpl_3XqC9y8Z8vuz4oJzYUKf2KwpQxKD` READY: Admin criou um Financeiro e um Operacional, dois envios SUCESSO/três vínculos; replay exato preservou registros/versões. Origem Orgânico nos três cards, status ATIVO e nenhuma evidência financeira fabricada.
+
+### Decisões tomadas
+Envio explícito é intenção distinta de reposicionar; exceção Admin vale por execução e não comprova pagamento/assinatura/NF. Origem não usa dados de outra empresa nem duplica indicação. Código compatível evita migração em massa.
+
+### Problemas encontrados / resolvidos
+As falhas iniciais de regressão refletiam asserts textuais antigos e fixture sem o array de vínculos selecionado pelo Prisma; rodada final passou. E2E Admin passou até Boas vindas com modal/contexto corretos e sem avisos falsos. Serviço externo de voz ainda respondeu 503, mas backoff real respeitou cerca de 60/120/240/300 s.
+
+### Pendências
+Consolidar documentação final; produção não autorizada. Usuário comum, parceiro, Smart e validações financeiras permanecem limites do reteste remoto, com cenários locais cobertos. Não houve convite, cobrança, assinatura ou emissão fiscal.
+
+### Refletido também em
+- `decisions.md`: semântica de envio, autoridade, origem e limites de homologação.
+- `codebase-map.md`, `integration-points.md`, `components.md`: actions/helper, painel, dados e feedback.

@@ -826,3 +826,12 @@ Prop opcional finalidade: padrao (observações, CRM/Bibble) ou pre-analise (dua
 ### 2026-10-15 — Chamados: migração autorizada aplicada
 
 Atualização de estado Chamados: banco migrado e catálogo real validado, 13 destinos/53 categorias/27 responsáveis elegíveis. Ensaios visuais continuam sendo dos componentes reais com actions simuladas, sem equivalência a navegação autenticada completa.
+
+
+### 2026-10-21 — Scribe — PainelEncaminhamentos e continuidade do card
+
+**Componente:** `src/app/PainelAlpha/AlphaCRM/CardModal/PainelEncaminhamentos.tsx`; consumidor: `CardAbertoLayout.tsx`. Props: card, revisão realtime, callback de atualização e abertura de destino. Reutiliza `CardSaveContext`, React Query local e Dialog; consultar status não concede envio. A UI usa somente capacidades retornadas pelo servidor, mostra destino/horários/motivo, confirmação da exceção Admin, trava de repetição, loading e erro. Flush + releitura confirmam versão antes de enviar. O destino já enviado abre seu próprio card autorizado.
+
+**Componentes existentes ajustados:** o contexto de edição permanece explícito em `CardAbertoLayout`; movimento chama atualização sem fechar o detalhe; `FormularioEtapaRenderer`/`CardOpenFormSlot` evitam títulos redundantes; campos/follow-up/status preservam rascunho apenas em conflito real. Contadores do Kanban usam o mesmo manifesto otimista do movimento e revertem com ele.
+
+**Voz:** `useVoiceStatus` compartilha requisições em voo e timers entre consumidores, respeita aba oculta/offline e Retry-After, aplica backoff de falha e cancela trabalho sem consumidores. `BotaoFalarMensagem` mantém retry manual com aviso discreto. Gates locais aprovados; E2E Admin no staging confirmou os dois envios, detalhe aberto, contexto correto e zero avisos falsos. A voz permaneceu indisponível; seu backoff real foi observado.

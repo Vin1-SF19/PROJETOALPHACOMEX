@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress — CRM-01–09 e UX complementar implementados; Forge, Sage/Probe, Anubis e Lens/Flux aprovados no escopo local. Publicação e reteste autenticado no staging pendentes. Produção fora do escopo.
+Done — CRM-01–09 e UX complementar implementados e publicados no staging (`0278814`), gates/revisões locais aprovados e cadeia Admin Comercial → Financeiro → Operacional validada no navegador e por leitura independente. Repetições sem duplicação. Produção não publicada nesta entrega.
 
 ## Executor Assignment
 
@@ -72,9 +72,9 @@ A [story da auditoria](story-alpha-crm-auditoria-fluxo-completo-20261021.md#qa-r
 - [x] Aplicar backoff de voz indisponível, cancelamento e recuperação. (AC 9)
 - [x] Executar testes de domínio/actions/React e regressões, lint, typecheck, suíte completa e build; registrar resultados reais. (AC 1–11, 13)
 - [x] Obter revisão independente de QA, resolver achados bloqueantes e atualizar File List. (AC 13)
-- [ ] Publicar código primeiro no staging por DevOps, conferir deployment/alias e ambiente próprio. (AC 13)
-- [ ] Retestar no navegador autenticado os dois envios e a repetição controlada sem duplicatas; registrar nova matriz de movimentos e evidências sanitizadas. (AC 12–13)
-- [ ] Confirmar cobertura final de CRM-01–09/UX, preservar os artefatos históricos, consolidar checklist e entregar resultado com revisão publicada. (AC 13)
+- [x] Publicar código primeiro no staging por DevOps, conferir deployment/alias e ambiente próprio. (AC 13)
+- [x] Retestar no navegador autenticado os dois envios e a repetição controlada sem duplicatas; registrar nova matriz de movimentos e evidências sanitizadas. (AC 12–13)
+- [x] Confirmar cobertura final de CRM-01–09/UX, preservar os artefatos históricos, consolidar checklist e entregar resultado com revisão publicada. (AC 13)
 
 ## Dev Notes e contexto confirmado
 
@@ -146,20 +146,28 @@ Checklist `.aiox-core/product/checklists/story-draft-checklist.md` aplicado.
 
 ### Execução e conclusão
 
-Implementação concluída e revisada localmente em 21/10/2026; publicação e E2E ainda não foram declarados aprovados nesta etapa.
+Implementação, publicação e reteste concluídos em 21/10/2026. Runtime `027881435e8e296c89519604a37790bd554a3b3f`, deployment `dpl_3XqC9y8Z8vuz4oJzYUKf2KwpQxKD` READY no ambiente próprio de staging. O [relatório de validação](../reports/validacao-correcoes-crm-2026-10-21.md) e seu JSON registram a cobertura real e os limites.
 
 - CRM-01/02/04: envio explícito Admin por regra ativa, execução específica e auditada, helper compartilhado central/legado, validação própria de parâmetros, estado/horário/motivo, retentativa isolada e proteção de configuração. Criação, vínculo, cópia, histórico, CAS e outbox são atômicos. Reposicionamento livre continua suprimindo automações; o envio Admin preserva status financeiro, assinatura, pagamento e NF e não dispara automações amplas no destino.
 - CRM-03: herança no mesmo card, preservação de valor/limpeza explícitos e mapeamento, parceiro somente na mesma empresa sem clonar indicação/comissão. Vínculo entre empresas diferentes não é reaproveitado no envio.
 - CRM-05/06/07/09 e UX: comparação base/local/remoto, contexto de histórico/edição, títulos únicos, detalhe aberto enquanto autorizado, trava síncrona/feedback, métricas por fase e manifesto/contadores otimistas com rollback.
 - CRM-08: backoff de voz 60/120/240/300 segundos, Retry-After, deduplicação e cancelamento de polling oculto/offline/sem assinantes, estado acessível e tentativa manual; microfone nativo preservado.
-- Nenhuma migration, alteração de estrutura, backfill, worker global, mutação remota ou publicação em produção nesta implementação local. Testes de banco usam SQLite privado, com sentinela local e token vazio.
+- Nenhuma migration, alteração de estrutura, backfill, worker global ou publicação em produção. Testes automatizados de banco usam SQLite privado, com sentinela local e token vazio. O reteste remoto usou somente CRUD normal autorizado pela aplicação na empresa fictícia 3066; o leitor independente executou apenas SELECT.
 
 Validação real: `npm run lint` exit 0 (1.193 avisos preexistentes); `npm run typecheck` exit 0; `npm test -- --maxWorkers=2` exit 0, **686 arquivos/5.278 testes aprovados**, 4 skipped e 1 todo. Build equivalente ao script oficial (Prisma generate, player e Next webpack, heap 4 GiB/CPU controlada) exit 0 em **150,62 s**; smoke da aplicação compilada/auth/estáticos/banco de staging aprovado. Fonte permaneceu igual durante build. A primeira suíte apresentou 7 falhas em contratos textuais/mocks antigos; ajustes somente nos testes foram verificados e a execução completa final passou. Evidências privadas separadas preservam ambos os resultados.
 
-Anubis aprovou segurança após 97 testes independentes; Lens/Flux aprovaram sem novos bloqueantes/importantes, com 77 testes focados. CodeRabbit CLI não estava disponível; revisão independente foi o fallback. Flux não afirma melhora percentual, CWV ou latência remota sem baseline comparável. A próxima etapa é comprovar os dois encaminhamentos no navegador real do staging e conferir contagens/estados persistidos.
+Anubis aprovou segurança após 97 testes independentes; Lens/Flux aprovaram sem novos bloqueantes/importantes, com 77 testes focados. CodeRabbit CLI não estava disponível; revisão independente foi o fallback. Flux não afirma melhora percentual, CWV ou latência remota sem baseline comparável. O reteste remoto confirmou os dois encaminhamentos: 3 cards, 2 execuções SUCESSO e 3 vínculos; Orgânico nos três cards; versões finais Comercial 9 / Financeiro 6 / Operacional 0, todos ATIVO e sem aprovações financeiras fabricadas. As duas repetições retornaram o destino existente, sem novos registros/eventos/versões; as comparações profundas independentes passaram. Cinco avanços financeiros mantiveram o detalhe aberto. Contadores otimistas 1/0→0/1 e backoff 60/120/240/300 s foram observados no navegador, com zero erros JS/HTTP fora da voz. A voz continuou respondendo 503, corretamente indicada como indisponível. A leitura posterior ao navegador às 15:46:46.202 UTC reconfirmou a integridade. Não se afirma melhora percentual de latência nem aprovação do negócio financeiro/operacional completo ou jornada remota de usuário comum/Smart/parceiro.
 
 ### File List
 
+- `.bibble/memory/codebase-map.md`
+- `.bibble/memory/components.md`
+- `.bibble/memory/decisions.md`
+- `.bibble/memory/integration-points.md`
+- `.bibble/memory/journal.md`
+- `docs/reports/evidencias/crm-correcoes-2026-10-21/operacional-boas-vindas.png`
+- `docs/reports/validacao-correcoes-crm-2026-10-21.json`
+- `docs/reports/validacao-correcoes-crm-2026-10-21.md`
 - `docs/stories/story-alpha-crm-correcoes-auditoria-fluxo-20261021.md`
 - `src/actions/bpm/Encaminhamentos.ts`
 - `src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx`
@@ -236,9 +244,22 @@ O mock de `tests/bpm/edicao-campos-card.test.ts` recebeu somente `vinculosDestin
 
 **Limites da decisão:** não foi executado E2E remoto por Sage/Probe, nem houve alteração de fonte da aplicação, banco remoto, configurações ou permissões por este agente. Permanecem necessários publicação no staging, revisão independente de código conforme coordenação e reteste autenticado com Admin demonstrando um destino Financeiro e um Operacional, vínculos/autoria, dados herdados e repetição sem duplicata. Não marcar a story como Done antes dessas evidências.
 
+### 2026-10-21 — Reteste autenticado de staging: APPROVED
+
+**Parecer final: APPROVED no escopo da cadeia Admin Comercial → Financeiro → entrada do Operacional.** A pendência remota registrada acima foi encerrada pelo reteste real coordenado, com login Admin ID 1, runtime `027881435e8e296c89519604a37790bd554a3b3f` e deployment `dpl_3XqC9y8Z8vuz4oJzYUKf2KwpQxKD` READY no ambiente staging correto. Alias/banco responderam HTTP 200. Fonte permaneceu idêntica ao runtime aprovado; os gates locais continuam 686 arquivos/5.278 testes PASS, lint/typecheck/build PASS, Anubis/Lens/Probe locais PASS.
+
+**Evidência do fluxo:** empresa fictícia 3066; Comercial `cmvi5ztja000007l8livtiw1o`, Financeiro `cmvi9qcjb000608jpdywhf639` e Operacional `cmvi9yezf000508jtgmijtabd`. Reposicionamento pelo detalhe/clique repetido e Kanban gerou somente dois eventos, versão 6→8 e zero envios. As duas ações explícitas geraram exatamente três cards, duas execuções SUCESSO e três vínculos. A repetição exata de cada requisição real retornou HTTP 200/`existente=true`, sem novos registros/versões; no segundo envio, 13 comparações profundas independentes permaneceram iguais. Snapshot final: 15:38:21.299 UTC.
+
+**UI e dados:** os cinco avanços financeiros mantiveram o detalhe aberto, sem avisos falsos. Operacional abriu pronto em Boas vindas, com contexto em edição e histórico de passagem corretos. Origem Orgânico reapresentada no fechamento e preservada nos três cards; fallback de leitura não foi tratado como gravação de outro campo. Duas intenções administrativas e dois eventos de criação têm ator 1; registro auxiliar legado pode ter usuário nulo. Estados finais ATIVO, versões Comercial 9/Financeiro 6/Operacional 0; nenhuma assinatura, pagamento, NF ou conclusão financeira foi fabricada.
+
+**Limites preservados:** cobrança, assinatura, emissão fiscal, Meet e trabalho operacional além da entrada não foram exercitados. Parceiro, usuário comum, Smart e falhas/isolamento permanecem cobertura local. A voz continuou 503; foi confirmado somente seu backoff real de cerca de 60/120/240/300 s. Até 15:42 UTC houve zero erros JavaScript e zero erros HTTP fora da voz. Tempos de UI incluem atualização/captura, sem atribuição causal ao backend ou percentual de melhora. Nenhuma publicação em produção integra esta aprovação.
+
+Relatório curado e limites: [validação das correções](../reports/validacao-correcoes-crm-2026-10-21.md), [JSON sanitizado](../reports/validacao-correcoes-crm-2026-10-21.json) e captura final do próprio cenário. A auditoria histórica e seu PDF permanecem inalterados. Evidências privadas em `/var/tmp/alpha-crm-correcoes-20261021`: `e2e-observations.private.json`, `independent-db-verification.private.json`, `scenario-operational-repeat.private.json` e checks de replay; não versionar seus dados brutos.
+
 ## Change Log
 
 | Data | Versão | Descrição | Autor |
 | --- | --- | --- | --- |
+| 2026-10-21 | 0.3 | Done: runtime publicado no staging, dois envios reais/repetições sem duplicação, relatório sanitizado e memórias consolidados. | Bibble (coordenação) |
 | 2026-10-21 | 0.2 | Implementação completa e gates/revisões locais aprovados; publicação e E2E staging pendentes. | Bibble (coordenação) |
 | 2026-10-21 | 0.1 | Story pronta para desenvolver CRM-01–09 e UX complementar, com envio explícito, compatibilidade sem batch, reteste Admin e publicação exclusiva em staging. | River (@sm) |
