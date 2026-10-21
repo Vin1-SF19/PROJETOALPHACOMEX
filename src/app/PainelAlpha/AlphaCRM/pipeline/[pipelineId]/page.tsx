@@ -6,6 +6,7 @@ import PipelineBoardClient from "./PipelineBoardClient";
 import { notFound } from "next/navigation";
 
 import { bpmCardIdSchema } from "@/lib/validations/bpm";
+import { intencaoCardBpmSchema } from "@/lib/bpm/notificacoes-tarefas";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +15,12 @@ export default async function PipelineBpmPage({
   searchParams,
 }: {
   params: Promise<{ pipelineId: string }>;
-  searchParams?: Promise<{ cardId?: string | string[] }>;
+  searchParams?: Promise<{ cardId?: string | string[]; tarefaId?: string | string[] }>;
 }) {
   const { pipelineId } = await params;
-  const cardInicial = bpmCardIdSchema.safeParse((await searchParams)?.cardId);
+  const busca = await searchParams;
+  const cardInicial = bpmCardIdSchema.safeParse(busca?.cardId);
+  const intencaoInicial = intencaoCardBpmSchema.safeParse({ pipelineId, cardId: busca?.cardId, tarefaId: busca?.tarefaId });
   const session = await auth();
   const temaNome = (session?.user as { tema_interface?: string })?.tema_interface || "blue";
   const visual = getTema(temaNome);
@@ -35,6 +38,7 @@ export default async function PipelineBpmPage({
       key={pipelineId}
       pipeline={pipelineResult.data}
       cardInicialId={cardInicial.success ? cardInicial.data : null}
+      tarefaInicialId={intencaoInicial.success ? intencaoInicial.data.tarefaId : undefined}
       pipelinesDisponiveis={pipelinesResult.success ? pipelinesResult.data.map(({ id, nome }) => ({ id, nome })) : []}
       cardsIniciais={cardsResult.success ? cardsResult.cards : []}
       manifestoInicial={cardsResult.success ? cardsResult.manifesto : { configVersion: 0, entradas: [] }}

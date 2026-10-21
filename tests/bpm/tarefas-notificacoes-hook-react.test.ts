@@ -23,6 +23,7 @@ describe("recuperação dos alertas CRM no shell", () => {
   let root: Root; let host: HTMLDivElement;
   beforeEach(() => {
     vi.clearAllMocks(); vi.useFakeTimers(); vi.stubGlobal("fetch", mocks.fetch);
+    localStorage.clear();
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     store.getState().iniciarUsuario(0);
     mocks.subscribe.mockReturnValue({ bind: mocks.bind, unbind: mocks.unbind });
@@ -38,12 +39,36 @@ describe("recuperação dos alertas CRM no shell", () => {
     expect(mocks.info).toHaveBeenCalledOnce();
     const options = mocks.info.mock.calls[0][1];
     expect(options.description).toContain("11:00"); expect(options.description).toContain("Green Coast");
-    options.action.onClick(); expect(abrir).toHaveBeenCalledWith("/PainelAlpha/AlphaCRM/pipeline/pipeline?cardId=card", "CRM · Tarefa");
+    options.action.onClick(); expect(abrir).toHaveBeenCalledWith("/PainelAlpha/AlphaCRM/pipeline/pipeline?cardId=card&tarefaId=task", "CRM");
+    expect(store.getState().notificacoes[0].lida).toBe(true);
     await act(async () => { await vi.advanceTimersByTimeAsync(30000); });
     expect(mocks.fetch).toHaveBeenCalledTimes(2); expect(mocks.info).toHaveBeenCalledOnce();
     mocks.fetch.mockResolvedValue(resposta([]));
     await act(async () => window.dispatchEvent(new Event("focus")));
     expect(store.getState().notificacoes).toHaveLength(0); expect(mocks.dismiss).toHaveBeenCalled();
+  });
+  it("não repete o toast após remontar e mantém a leitura do clique", async () => {
+    await render();
+    mocks.info.mock.calls[0][1].action.onClick();
+    await act(async () => root.render(null));
+    await render();
+    expect(mocks.info).toHaveBeenCalledOnce();
+    expect(store.getState().notificacoes[0].lida).toBe(true);
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      await vi.advanceTimersByTimeAsync(30000);
+    });
+    expect(mocks.info).toHaveBeenCalledOnce();
+    mocks.fetch.mockResolvedValue(resposta([{ ...alerta, id: "nova-tarefa", tarefaId: "nova" }]));
+    await act(async () => window.dispatchEvent(new Event("online")));
+    expect(mocks.info).toHaveBeenCalledTimes(2);
+  });
+  it("ignora clique tardio de toast de outra conta", async () => {
+    await render(); const antigo = mocks.info.mock.calls[0][1].action.onClick;
+    await render(8);
+    antigo();
+    expect(abrir).not.toHaveBeenCalled();
+    expect(store.getState().notificacoes[0].lida).toBe(false);
   });
   it("aguarda todas as páginas e ignora respostas de outra sessão após troca de usuário", async () => {
     let resolver!: (value: ReturnType<typeof resposta>) => void;

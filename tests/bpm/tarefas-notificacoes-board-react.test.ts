@@ -8,7 +8,7 @@ vi.mock("@/actions/bpm/Quadro", () => ({ SincronizarQuadroBpm: vi.fn() }));
 vi.mock("@/actions/bpm/Cards", () => ({ ListarCardsPipelineBpm: vi.fn(), MoverCardBpm: vi.fn(), CriarCardBpm: vi.fn() }));
 vi.mock("@/actions/bpm/NolossLeads", () => ({ PromoverNolossLead: vi.fn() }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal", () => ({
-  default: ({ cardId, onClose, realtimeRevision }: { cardId: string; onClose: () => void; realtimeRevision: number }) => h("button", { "data-card": cardId, "data-revisao-acl": realtimeRevision, onClick: onClose }, "Fechar card"),
+  default: ({ cardId, onClose, realtimeRevision, focoTarefa }: { cardId: string; onClose: () => void; realtimeRevision: number; focoTarefa?: { tarefaId: string } }) => h("button", { "data-card": cardId, "data-tarefa": focoTarefa?.tarefaId, "data-revisao-acl": realtimeRevision, onClick: onClose }, "Fechar card"),
 }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/NovoCardModal", () => ({ default: () => null }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/NolossLeadModal", () => ({ default: () => null }));
@@ -53,5 +53,13 @@ it("mantém card do alerta fora do filtro Meus e reabre pela intenção autoriza
     expect(host.querySelector("[data-card]")).toBeNull();
     await act(async () => mensagem(parentWindow));
     expect(host.querySelector("[data-card]")).toBeTruthy();
+    const segundoCard = "cm22345678901234567890123";
+    await act(async () => window.dispatchEvent(new MessageEvent("message", {
+      source: parentWindow, origin: window.location.origin,
+      data: { type: BPM_CARD_ABRIR_EVENT, cardId: segundoCard, pipelineId: "pipeline-1", tarefaId: "task-2" },
+    })));
+    expect(host.querySelectorAll("[data-card]")).toHaveLength(1);
+    expect(host.querySelector("[data-card]")?.getAttribute("data-card")).toBe(segundoCard);
+    expect(host.querySelector("[data-card]")?.getAttribute("data-tarefa")).toBe("task-2");
   } finally { await act(async () => root.unmount()); host.remove(); }
 });

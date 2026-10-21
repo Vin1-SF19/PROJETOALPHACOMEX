@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
 import { toast } from "sonner";
 import {
@@ -66,6 +66,7 @@ interface Props {
   onInteracaoCriada: (interacao: Interacao) => void;
   anotacoes: Interacao[];
   onAbrirCard: (cardId: string) => void;
+  focoTarefa?: { cardId: string; tarefaId: string } | null;
 }
 
 export default function PainelHistorico({
@@ -81,16 +82,38 @@ export default function PainelHistorico({
   onInteracaoCriada,
   anotacoes,
   onAbrirCard,
+  focoTarefa = null,
 }: Props) {
   const historicoRd = useHistoricoRd(card.id, realtimeRevision);
   const [enviandoAnexo, setEnviandoAnexo] = useState(false);
   const [progressoAnexo, setProgressoAnexo] = useState(0);
   const [arrastandoAnexo, setArrastandoAnexo] = useState(false);
-  const [abaEsquerda, setAbaEsquerda] = useState("etapas");
+  const [selecaoAba, setSelecaoAba] = useState<{ valor: string; foco: typeof focoTarefa }>({ valor: "etapas", foco: null });
   const [anexoSelecionado, setAnexoSelecionado] = useState<AnexoParaVisualizar | null>(null);
   const inputAnexoRef = useRef<HTMLInputElement>(null);
   const { tarefas: tarefasDoCard, procedimentos: tarefasDeProcedimento } = separarTarefasCard(card.tarefas);
   const procedimentosLegados = tarefasDeProcedimento.filter((tarefa) => !tarefa.cardChecklistId);
+  const tarefaFocada = focoTarefa?.cardId === card.id ? card.tarefas.find((tarefa) => tarefa.id === focoTarefa.tarefaId) : undefined;
+  const abaTarefa = tarefaFocada?.cardChecklistId || tarefaFocada?.tipo === "CHECKLIST" ? "checklist" : "tarefas";
+  const abaEsquerda = selecaoAba.foco === focoTarefa ? selecaoAba.valor : tarefaFocada ? abaTarefa : "etapas";
+  const setAbaEsquerda = useCallback((valor: string) => setSelecaoAba({ valor, foco: focoTarefa }), [focoTarefa]);
+  const alvoTarefaId = tarefaFocada ? tarefaFocada.cardChecklistId
+    ? `bpm-checklist-${card.id}-${tarefaFocada.cardChecklistId}` : `bpm-tarefa-${card.id}-${tarefaFocada.id}` : null;
+
+  useEffect(() => {
+    if (!alvoTarefaId || abaEsquerda !== abaTarefa) return;
+    function focar(): boolean {
+      const alvo = document.getElementById(alvoTarefaId!);
+      if (!alvo) return false;
+      alvo.scrollIntoView({ behavior: "smooth", block: "center" });
+      alvo.focus({ preventScroll: true });
+      return true;
+    }
+    if (focar()) return;
+    const observer = new MutationObserver(() => { if (focar()) observer.disconnect(); });
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [alvoTarefaId, abaEsquerda, abaTarefa, focoTarefa]);
 
   useEffect(() => {
     function abrirPendencias(event: Event) {
@@ -107,7 +130,7 @@ export default function PainelHistorico({
     }
     window.addEventListener("bpm:abrir-pendencias-checklist", abrirPendencias);
     return () => window.removeEventListener("bpm:abrir-pendencias-checklist", abrirPendencias);
-  }, [card.id]);
+  }, [card.id, setAbaEsquerda]);
 
   const feedHistorico: ItemTimelineCard[] = montarFeedTimelineCard(card.historico, anotacoes);
   const contextoHistorico: ContextoDescricaoHistorico = {

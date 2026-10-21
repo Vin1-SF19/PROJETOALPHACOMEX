@@ -37,7 +37,7 @@ export async function ListarHistoricoExternoRd(cardId: string) {
           autor: { select: { nome: true } },
         }, orderBy: { versao: "asc" } },
       },
-      orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
+      orderBy: [{ occurredAt: "desc" }, { id: "asc" }],
     });
     return {
       success: true as const,

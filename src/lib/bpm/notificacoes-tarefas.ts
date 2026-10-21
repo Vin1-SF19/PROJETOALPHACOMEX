@@ -23,8 +23,8 @@ export const paginaAlertasTarefasBpmSchema = z.object({
   alertas: z.array(alertaTarefaBpmSchema), nextCursor: z.string().nullable(),
 });
 
-export function urlCardAlertaBpm(alerta: Pick<AlertaTarefaBpm, "pipelineId" | "cardId">) {
-  return `/PainelAlpha/AlphaCRM/pipeline/${encodeURIComponent(alerta.pipelineId)}?cardId=${encodeURIComponent(alerta.cardId)}`;
+export function urlCardAlertaBpm(alerta: Pick<AlertaTarefaBpm, "pipelineId" | "cardId" | "tarefaId">) {
+  return `/PainelAlpha/AlphaCRM/pipeline/${encodeURIComponent(alerta.pipelineId)}?cardId=${encodeURIComponent(alerta.cardId)}&tarefaId=${encodeURIComponent(alerta.tarefaId)}`;
 }
 
 function momento(iso: string) {
@@ -48,14 +48,15 @@ export function detalhesAlertaTarefaBpm(alerta: AlertaTarefaBpm) {
 export const BPM_CARD_ABRIR_EVENT = "ALPHA_CRM_ABRIR_CARD";
 export const BPM_CARD_PRONTO_EVENT = "ALPHA_CRM_CARD_PRONTO";
 export const BPM_CARD_ABERTO_EVENT = "ALPHA_CRM_CARD_ABERTO";
-export const intencaoCardBpmSchema = z.object({ cardId: bpmCardIdSchema, pipelineId: z.string().min(1).max(200) });
+export const intencaoCardBpmSchema = z.object({ cardId: bpmCardIdSchema, pipelineId: z.string().min(1).max(200), tarefaId: z.string().min(1).max(200).optional() });
 export type IntencaoCardBpm = z.infer<typeof intencaoCardBpmSchema>;
 export function intencaoCardBpmDaUrl(url: string): IntencaoCardBpm | null {
   try {
     const destino = new URL(url, "https://painel.local");
     const pipeline = /^\/PainelAlpha\/AlphaCRM\/pipeline\/([^/]+)$/.exec(destino.pathname);
     if (destino.origin !== "https://painel.local" || !pipeline) return null;
-    const parsed = intencaoCardBpmSchema.safeParse({ cardId: destino.searchParams.get("cardId"), pipelineId: decodeURIComponent(pipeline[1]) });
+    const parsed = intencaoCardBpmSchema.safeParse({ cardId: destino.searchParams.get("cardId"), pipelineId: decodeURIComponent(pipeline[1]),
+      tarefaId: destino.searchParams.get("tarefaId") ?? undefined });
     return parsed.success ? parsed.data : null;
   } catch { return null; }
 }

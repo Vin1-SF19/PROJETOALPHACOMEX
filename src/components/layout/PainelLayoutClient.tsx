@@ -20,6 +20,7 @@ import { NotaNotificacaoToast } from '@/components/Notas/NotaNotificacaoToast';
 import { useNotasWorkspace } from '@/store/useNotasWorkspace';
 import { useBpmCardNotificacaoNavigation } from '@/hooks/useBpmCardNotificacaoNavigation';
 import { useBpmTarefasNotifications } from '@/hooks/useBpmTarefasNotifications';
+import { intencaoCardBpmDaUrl } from '@/lib/bpm/notificacoes-tarefas';
 import { useNotasNotifications } from '@/hooks/useNotasNotifications';
 import { useNotasLembretesPendentes } from '@/hooks/useNotasLembretesPendentes';
 import { useCalendarioAlphaNotifications } from '@/hooks/useCalendarioAlphaNotifications';
@@ -43,6 +44,7 @@ import { signOut } from 'next-auth/react';
 import { urlRepresentaLoginDoPainel } from '@/lib/auth/navegacao-sessao';
 import {
   ensurePinnedHome,
+  encontrarAbaCrm,
   getTabsStorageKey,
   HOME_LABEL,
   HOME_TAB_ID,
@@ -228,9 +230,15 @@ export default function PainelLayoutClient({
 
   // ── Tab management ────────────────────────────────────────────────────────
 
-  const openTab = useCallback((url: string, label: string) => {
+  const openTab = useCallback((url: string, label: string, reutilizarTabId?: string) => {
     if (!isPainelCanonicalUrl(url)) return;
     setTabs(prev => {
+      const reutilizar = (reutilizarTabId ? prev.find(t => t.id === reutilizarTabId) : undefined)
+        ?? (intencaoCardBpmDaUrl(url) ? encontrarAbaCrm(prev) : undefined);
+      if (reutilizar) {
+        setActiveId(reutilizar.id);
+        return prev.map(t => t.id === reutilizar.id ? { ...t, url, label } : t);
+      }
       const existing = prev.find(t => t.url === url);
       if (existing) {
         setActiveId(existing.id);
@@ -242,7 +250,7 @@ export default function PainelLayoutClient({
     });
   }, []);
 
-  const abrirModuloPorNotificacao = useBpmCardNotificacaoNavigation(tabs, iframesRef, openTab);
+  const abrirModuloPorNotificacao = useBpmCardNotificacaoNavigation(tabs, iframesRef, openTab, userId);
   useBpmTarefasNotifications(isAdminRole(role) || permissoes.includes('crm') ? userId : 0, abrirModuloPorNotificacao);
 
   const entregarIntencaoAgenda = useCallback((intencao: IntencaoAgendaAlpha): boolean => {

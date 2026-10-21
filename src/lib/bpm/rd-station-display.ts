@@ -67,11 +67,12 @@ export function apresentarEventoRd(evento: { tipo: string; data: string | null; 
   return { titulo: textoLegivelRd(titulo), conteudo: typeof p.content === "string" ? textoLegivelRd(p.content) : "", data, tipo: etapa ? "Movimentação de etapa" : anotacao ? "Anotação" : tarefa ? "Tarefa" : "Atividade", autor, situacao: tarefa ? p.status === "CONCLUIDA" ? "Concluída" : "Pendente" : null, prazo: tarefa && typeof p.dueDate === "string" ? p.dueDate : null, etapaIndisponivel: etapa && !p.sourceStageName };
 }
 
+/** Mais recentes primeiro pela data exibida; registros sem data ficam ao final. */
 export function ordenarHistoricoRd<T extends { id: string; tipo: string; data: string | null; projecao: Record<string, unknown> }>(eventos: T[]): T[] {
   return [...eventos].sort((a, b) => {
     const da = Date.parse(apresentarEventoRd(a).data);
     const db = Date.parse(apresentarEventoRd(b).data);
-    return (Number.isFinite(da) ? da : Infinity) - (Number.isFinite(db) ? db : Infinity) || a.id.localeCompare(b.id);
+    return (Number.isFinite(db) ? db : -Infinity) - (Number.isFinite(da) ? da : -Infinity) || a.id.localeCompare(b.id);
   });
 }
 

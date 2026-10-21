@@ -1,18 +1,32 @@
 "use client";
 import { useCallback, useEffect, useRef, type RefObject } from "react";
-import type { PainelTab } from "@/lib/painel-tabs";
+import { encontrarAbaCrm, type PainelTab } from "@/lib/painel-tabs";
 import { BPM_CARD_ABERTO_EVENT, BPM_CARD_ABRIR_EVENT, BPM_CARD_PRONTO_EVENT,
   intencaoCardBpmDaUrl, type IntencaoCardBpm } from "@/lib/bpm/notificacoes-tarefas";
 
-/** A URL abre o primeiro acesso; a intenção reabre o card numa aba já existente. */
+type IntencaoPendente = IntencaoCardBpm & { url: string; navegacao?: string };
+function urlDoFrame(frame?: HTMLIFrameElement): URL | null {
+  try { return frame?.contentWindow ? new URL(frame.contentWindow.location.href) : null; } catch { return null; }
+}
+function documentoCorresponde(atual: URL | null, intencao: IntencaoPendente): boolean {
+  return Boolean(atual && atual.origin === window.location.origin
+    && atual.pathname === `/PainelAlpha/AlphaCRM/pipeline/${encodeURIComponent(intencao.pipelineId)}`
+    && (!intencao.navegacao || atual.searchParams.get("__crmAlerta") === intencao.navegacao));
+}
+
+/** Reutiliza o CRM; a URL navega entre funis e a intenção substitui o card no mesmo funil. */
 export function useBpmCardNotificacaoNavigation(tabs: PainelTab[],
-  iframes: RefObject<Map<string, HTMLIFrameElement>>, openTab: (url: string, label: string) => void) {
-  const pendente = useRef<(IntencaoCardBpm & { url: string }) | null>(null);
+  iframes: RefObject<Map<string, HTMLIFrameElement>>, openTab: (url: string, label: string, reutilizarTabId?: string) => void, usuarioId?: number) {
+  const pendente = useRef<IntencaoPendente | null>(null);
+  const sequencia = useRef(0);
+  useEffect(() => { pendente.current = null; }, [usuarioId]);
   const entregar = useCallback(() => {
     const intencao = pendente.current;
     const aba = intencao ? tabs.find((tab) => tab.url === intencao.url) : undefined;
-    if (aba && intencao) iframes.current.get(aba.id)?.contentWindow?.postMessage({
+    const frame = aba ? iframes.current.get(aba.id) : undefined;
+    if (intencao && documentoCorresponde(urlDoFrame(frame), intencao)) frame?.contentWindow?.postMessage({
       type: BPM_CARD_ABRIR_EVENT, cardId: intencao.cardId, pipelineId: intencao.pipelineId,
+      ...(intencao.tarefaId ? { tarefaId: intencao.tarefaId } : {}),
     }, window.location.origin);
   }, [tabs, iframes]);
   useEffect(() => {
@@ -22,17 +36,35 @@ export function useBpmCardNotificacaoNavigation(tabs: PainelTab[],
       if (!intencao || event.origin !== window.location.origin || !event.data || typeof event.data !== "object") return;
       const aba = tabs.find((tab) => tab.url === intencao.url);
       if (!aba || event.source !== iframes.current.get(aba.id)?.contentWindow) return;
+      if (!documentoCorresponde(urlDoFrame(iframes.current.get(aba.id)), intencao)) return;
       if (event.data.type === BPM_CARD_PRONTO_EVENT) entregar();
       if (event.data.type === BPM_CARD_ABERTO_EVENT && event.data.cardId === intencao.cardId
-        && event.data.pipelineId === intencao.pipelineId) pendente.current = null;
+        && event.data.pipelineId === intencao.pipelineId
+        && event.data.tarefaId === intencao.tarefaId) pendente.current = null;
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
   }, [tabs, iframes, entregar]);
   return useCallback((url: string, label: string) => {
     const intencao = intencaoCardBpmDaUrl(url);
-    if (intencao) pendente.current = { ...intencao, url };
-    openTab(url, label);
-    if (intencao) entregar();
-  }, [openTab, entregar]);
+    if (!intencao) { pendente.current = null; openTab(url, label); return; }
+    const aba = encontrarAbaCrm(tabs);
+    let destino = url;
+    let navegacao: string | undefined;
+    if (aba) {
+      const atual = urlDoFrame(iframes.current.get(aba.id));
+      const navegando = pendente.current && !documentoCorresponde(atual, pendente.current);
+      if (!navegando && documentoCorresponde(atual, { ...intencao, url })) destino = aba.url;
+      else {
+        // Força uma nova navegação mesmo se a aba ainda guarda a URL de um documento antigo.
+        navegacao = `${Date.now()}-${++sequencia.current}`;
+        const nova = new URL(url, window.location.origin);
+        nova.searchParams.set("__crmAlerta", navegacao);
+        destino = `${nova.pathname}${nova.search}`;
+      }
+    }
+    pendente.current = { ...intencao, url: destino, navegacao };
+    openTab(destino, "CRM", aba?.id);
+    entregar();
+  }, [openTab, entregar, tabs, iframes]);
 }

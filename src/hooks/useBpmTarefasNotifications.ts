@@ -51,7 +51,12 @@ export function useBpmTarefasNotifications(usuarioId: number, abrirModulo: (url:
           toastIds.add(toastId);
           toast.info(alerta.titulo, {
             id: toastId, description: detalhesAlertaTarefaBpm(alerta), duration: 10000,
-            action: { label: "Abrir tarefa", onClick: () => abrirRef.current(urlCardAlertaBpm(alerta), "CRM · Tarefa") },
+            action: { label: "Abrir tarefa", onClick: () => {
+              if (controller.signal.aborted || store.getState().usuarioId !== usuarioId) return;
+              store.getState().marcarLida(alerta.id);
+              toast.dismiss(toastId);
+              abrirRef.current(urlCardAlertaBpm(alerta), "CRM");
+            } },
           });
         }
       } catch (error) {
