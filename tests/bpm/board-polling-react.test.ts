@@ -24,6 +24,7 @@ vi.mock("@/actions/bpm/Cards", () => ({
   CriarCardBpm: vi.fn(),
 }));
 vi.mock("@/actions/bpm/NolossLeads", () => ({ PromoverNolossLead: vi.fn() }));
+vi.mock("@/actions/bpm/InstagramLeads", () => ({ AssumirLeadInstagram: vi.fn() }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal", () => ({
   default: ({ cardId, onCardExcluido }: { cardId: string; onCardExcluido: (id: string) => void }) =>
     h("button", { onClick: () => onCardExcluido(cardId) }, "Confirmar exclusão"),

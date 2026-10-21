@@ -68,6 +68,7 @@ import { sincronizarProximoContatoAgenda } from "@/lib/bpm/proximo-contato-agend
 import { etapaEhEmTratativa, etapaEhSemViabilidade, obterErroProximoContatoParaEntrada } from "@/lib/bpm/em-tratativa";
 import { obterErroProximoContatoParaMovimento } from "@/lib/bpm/proximo-contato";
 import { buscarNolossLeadsPendentes } from "@/lib/bpm/noloss-leads";
+import { buscarInstagramLeadsPendentes } from "@/lib/bpm/instagram-leads-server";
 import { cardApareceNoQuadro, etapasComSaidaDoQuadro } from "@/lib/bpm/cards-no-quadro";
 import { paraExibicaoTelefone } from "@/lib/validations/cs-nps";
 import { iniciarLigacaoCallix, normalizarTelefoneCallix } from "@/lib/callix/click-to-call";
@@ -615,9 +616,20 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
         }))
       : [];
 
+    const cardsInstagram = etapaNovosLeads && permissaoNovosLeads?.podeVer && pipelineEhRevisaoRadar(pipelineInfo?.nome)
+      ? (await buscarInstagramLeadsPendentes(pipelineId)).map((lead) => ({
+          id: lead.id, etapaId: etapaNovosLeads.id, servico: null, status: "ATIVO", createdAt: lead.recebidoEm,
+          primeiraVisualizacaoEm: null, proximoContatoEm: null, dataReuniao: null, googleMeetLink: null, statusPosFechamento: null,
+          empresa: { id: 0, razaoSocial: lead.dados.nome, cnpj: lead.dados.cnpj, nomeFantasia: null },
+          responsavel: { id: 0, nome: "Sem responsável" }, membros: [], _count: { tarefas: 0, anexos: 0 }, tarefas: [],
+          campoValores: [], sla: null, origem: "instagram" as const, importadoRd: false, podeMoverLivremente: false,
+          nolossLeadId: null, instagramLeadId: lead.id, instagramDados: lead.dados,
+          ligacoesHoje: 0, metaLigacoesDia: META_LIGACOES_NOVOS_LEADS, diasUteisDecorridos: 0, diaCiclo: 1,
+          podeAgirEtapa: permissaoNovosLeads.podeAgir,
+        })) : [];
     return {
       success: true,
-      data: ordenarCardsMaisRecentesPrimeiro([...cardsReais, ...cardsVirtuais].filter((card) => !cardIds || cardIds.includes(card.id))),
+      data: ordenarCardsMaisRecentesPrimeiro([...cardsReais, ...cardsVirtuais, ...cardsInstagram].filter((card) => !cardIds || cardIds.includes(card.id))),
     };
   } catch (error) {
     console.error("[ListarCardsPipelineBpm]", error);

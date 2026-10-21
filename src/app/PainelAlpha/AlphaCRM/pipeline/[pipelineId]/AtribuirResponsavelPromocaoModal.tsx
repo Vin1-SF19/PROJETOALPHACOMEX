@@ -17,6 +17,7 @@ interface Props {
   accent: string;
   radarOpcoes: string[];
   radarPretendidoInicial?: string;
+  origemLabel?: string;
   onConfirmar: (responsavelId: number, radarPretendido: string) => Promise<{ success: boolean; error?: string }>;
   onCancelar: () => void;
 }
@@ -31,6 +32,7 @@ export default function AtribuirResponsavelPromocaoModal({
   accent,
   radarOpcoes,
   radarPretendidoInicial = "",
+  origemLabel = "site",
   onConfirmar,
   onCancelar,
 }: Props) {
@@ -100,7 +102,7 @@ export default function AtribuirResponsavelPromocaoModal({
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Mover para</p>
                 <p className="text-sm font-semibold text-white">{etapaDestinoNome}</p>
                 <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
-                  Este lead vindo do site vai virar uma empresa e um card real. Quem assume o lead <span className="font-semibold text-slate-200">&ldquo;{nomeLead}&rdquo;</span>?
+                  Este lead vindo do {origemLabel} vai virar uma empresa e um card real. Quem assume o lead <span className="font-semibold text-slate-200">&ldquo;{nomeLead}&rdquo;</span>?
                 </p>
               </div>
             </div>
