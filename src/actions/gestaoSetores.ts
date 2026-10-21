@@ -4,6 +4,7 @@ import db from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-guard";
 import { revalidatePath } from "next/cache";
 import { isSameRole } from "@/lib/roles";
+import { SETOR_LIDER_COMERCIAL } from "@/lib/setores-catalogo";
 import { getCategoriasIniciaisDoSetor } from "@/lib/chamados/categorias-iniciais";
 import { normalizarNomeCategoria } from "@/lib/chamados/catalogo";
 
@@ -15,7 +16,7 @@ const SETORES_PROTEGIDOS = [
   { nome: "DESVINCULADO",     protegido: true,  isBase: true  },
   { nome: "OPERACIONAL",      protegido: false, isBase: false },
   { nome: "COMERCIAL",        protegido: false, isBase: false },
-  { nome: "Lider Comercial",  protegido: false, isBase: false },
+  { nome: SETOR_LIDER_COMERCIAL, protegido: false, isBase: false },
   { nome: "RECURSOS HUMANOS", protegido: false, isBase: false },
   { nome: "FINANCEIRO",       protegido: false, isBase: false },
   { nome: "JURÍDICO",         protegido: false, isBase: false },

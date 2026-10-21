@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   createUser: vi.fn(),
   findSectorPermissions: vi.fn(),
   updateColaborador: vi.fn(),
+  createColaborador: vi.fn(),
   hash: vi.fn(),
 }));
 
@@ -21,11 +22,11 @@ vi.mock("@/lib/prisma", () => ({
       create: mocks.createUser,
     },
     setorPermissao: { findMany: mocks.findSectorPermissions },
-    colaboradores_core: { update: mocks.updateColaborador },
+    colaboradores_core: { update: mocks.updateColaborador, create: mocks.createColaborador },
   },
 }));
 
-import { atualizarAgenteSistemaAction } from "@/actions/colaboradores";
+import { adicionarColaboradorCoreAction, atualizarAgenteSistemaAction } from "@/actions/colaboradores";
 import { updateUser } from "@/actions/manage-user";
 import registerAction from "@/actions/CreateAction";
 
@@ -118,6 +119,52 @@ describe("autorização das actions administrativas de usuário", () => {
 
     await expect(atualizarAgenteSistemaAction(form)).resolves.toMatchObject({ success: false });
     expect(mocks.updateUser).not.toHaveBeenCalled();
+  });
+
+  it.each(["Lider Comercial", "LÍDER COMERCIAL", "lider comercial"])(
+    "preserva a identidade de permissões ao editar o setor %s pelo Vault",
+    async (setor) => {
+      const form = new FormData();
+      form.set("id", "7");
+      form.set("cargo", "GERENTE");
+      form.set("status", "ATIVO");
+      form.set("setor", setor);
+      await expect(atualizarAgenteSistemaAction(form)).resolves.toEqual({ success: true });
+      expect(mocks.updateUser).toHaveBeenCalledWith({
+        where: { id: 7 },
+        data: expect.objectContaining({ role: "Lider Comercial", authSessionVersion: { increment: 1 } }),
+      });
+    },
+  );
+
+  it("mantém o mesmo setor canônico na adição e edição de colaborador externo", async () => {
+    const form = new FormData();
+    form.set("nome", "Lider Teste");
+    form.set("cargo", "GERENTE");
+    form.set("setor", "LÍDER COMERCIAL");
+    await expect(adicionarColaboradorCoreAction(form)).resolves.toEqual({ success: true });
+    expect(mocks.createColaborador).toHaveBeenCalledWith({
+      data: expect.objectContaining({ setor: "Lider Comercial" }),
+    });
+    form.set("id", "ext-9");
+    form.set("status", "ATIVO");
+    await expect(atualizarAgenteSistemaAction(form)).resolves.toEqual({ success: true });
+    expect(mocks.updateColaborador).toHaveBeenCalledWith({
+      where: { id: 9 }, data: expect.objectContaining({ setor: "Lider Comercial" }),
+    });
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+  });
+
+  it("preserva a normalização existente dos demais setores no Vault", async () => {
+    const form = new FormData();
+    form.set("id", "7");
+    form.set("cargo", "AGENTE");
+    form.set("status", "ATIVO");
+    form.set("setor", "comercial");
+    await expect(atualizarAgenteSistemaAction(form)).resolves.toEqual({ success: true });
+    expect(mocks.updateUser).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ role: "COMERCIAL" }),
+    }));
   });
 
   it("aplica a política forte também ao provisionar um usuário", async () => {

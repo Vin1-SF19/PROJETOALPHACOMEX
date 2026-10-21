@@ -9,6 +9,7 @@ import { ModalVincularAcesso } from "./VincularAcesso";
 import { CampoAlpha } from "@/components/CampoAlpha";
 import type { TemaAlpha } from "@/lib/temas";
 import type { ColaboradorVault, RecursoVault, SistemaVault } from "../types";
+import { SETOR_LIDER_COMERCIAL } from "@/lib/setores-catalogo";
 
 interface Props {
     isOpen: boolean;
@@ -109,7 +110,7 @@ export function ModalEditarAgente({ isOpen, onClose, agente, style, sistemas, re
                                     type="select"
                                     icon={ShieldCheck}
                                     defaultValue={agente.role} 
-                                    options={["T.I", "CEO", "OPERACIONAL", "COMERCIAL", "RECURSOS HUMANOS", "FINANCEIRO", "JURÍDICO", "PARCEIRO", "SERVIÇOS GERAIS"]}
+                                    options={["T.I", "CEO", "OPERACIONAL", "COMERCIAL", SETOR_LIDER_COMERCIAL, "RECURSOS HUMANOS", "FINANCEIRO", "JURÍDICO", "PARCEIRO", "SERVIÇOS GERAIS"]}
                                 />
 
                                 <CampoAlpha
