@@ -14,6 +14,7 @@ import { GerarDocumento, BuscarClientesParaContratante } from "@/actions/gerador
 import { ListarEmpresasContratadas } from "@/actions/empresas-contratadas";
 import { ModalNovaEmpresaContratada, type EmpresaContratadaResumo } from "./ModalNovaEmpresaContratada";
 import type { VariavelTemplate } from "@/lib/gerador-documentos/schemas";
+import { campoExtensoAutomatico, sincronizarValoresPorExtenso } from "@/lib/gerador-documentos/valores-extenso";
 import { CONTRATO_PADRAO_ID } from "@/lib/gerador-documentos/contrato-padrao-id";
 
 interface TemplateParaGeracao {
@@ -54,7 +55,7 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
   const router = useRouter();
   const contratoPadrao = template.id === CONTRATO_PADRAO_ID;
   const [titulo, setTitulo] = useState(template.titulo);
-  const [valores, setValores] = useState<Record<string, string | boolean>>(template.valoresIniciais ?? {});
+  const [valores, setValores] = useState<Record<string, string | boolean>>(() => sincronizarValoresPorExtenso(template.variaveis, template.valoresIniciais ?? {}));
   const [isPending, startTransition] = useTransition();
 
   const [buscaCliente, setBuscaCliente] = useState("");
@@ -348,8 +349,12 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
                 id={`var-${variavel.nome}`}
                 type={variavel.tipo === "data" ? "date" : variavel.tipo === "numero" || variavel.tipo === "moeda" ? "number" : "text"}
                 placeholder={variavel.placeholder}
+                step={variavel.tipo === "moeda" ? "0.01" : undefined}
+                inputMode={variavel.tipo === "moeda" || variavel.nome === "desconto_valor" ? "decimal" : undefined}
+                readOnly={campoExtensoAutomatico(variavel.nome, template.variaveis)}
+                title={campoExtensoAutomatico(variavel.nome, template.variaveis) ? "Preenchido automaticamente a partir do valor" : undefined}
                 value={typeof valores[variavel.nome] === "string" ? (valores[variavel.nome] as string) : ""}
-                onChange={(e) => setValores((prev) => ({ ...prev, [variavel.nome]: e.target.value }))}
+                onChange={(e) => setValores((prev) => sincronizarValoresPorExtenso(template.variaveis, { ...prev, [variavel.nome]: e.target.value }, variavel.nome))}
               />
             )}
           </div>

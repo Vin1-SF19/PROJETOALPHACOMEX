@@ -157,6 +157,7 @@
     "docker": "^1.0.0",
     "dotenv": "^17.2.4",
     "exceljs": "^4.4.0",
+    "extenso": "3.0.0",
     "fast-xml-parser": "^5.10.1",
     "file-saver": "^2.0.5",
     "framer-motion": "^12.38.0",

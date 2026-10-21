@@ -32,6 +32,7 @@ import {
   type CriarTemplateInput,
 } from "@/lib/gerador-documentos/schemas";
 import { renderizarConteudo, validarVariaveisObrigatorias } from "@/lib/gerador-documentos/render";
+import { sincronizarValoresPorExtenso } from "@/lib/gerador-documentos/valores-extenso";
 import { clausulasAtualizaveisContrato } from "@/lib/gerador-documentos/contrato-conferencia";
 import { reescreverClasulaViaIA, identificarVariaveisEClasulasViaIA } from "@/lib/gerador-documentos/onyx";
 import { gerarPdfDocumento } from "@/lib/gerador-documentos/pdf";
@@ -484,6 +485,7 @@ export async function GerarDocumento(payload: unknown) {
       : undefined);
     const clausulasFonte = contratoPadrao?.clausulas ?? template.clausulas;
     const variaveisTemplate = contratoPadrao?.variaveis ?? parseVariaveisJson(template.variaveisJson);
+    input.variaveis = sincronizarValoresPorExtenso(variaveisTemplate, input.variaveis);
     if (contratoPadrao && validarVariaveisObrigatorias(variaveisTemplate, input.variaveis).length) {
       return { success: false as const, error: "Preencha todos os campos obrigatórios do contrato padrão" };
     }
@@ -779,7 +781,7 @@ export async function AtualizarVariaveisContratoPadrao(payload: unknown) {
     if (!anteriores.__bpmCardId) {
       return { success: false as const, error: "Somente o rascunho automático pode atualizar variáveis" };
     }
-    const novos = { ...anteriores, ...input.valores };
+    const novos = sincronizarValoresPorExtenso(VARIAVEIS_CONTRATO_PADRAO, { ...anteriores, ...input.valores });
     const clausulas = await db.documentoClasulaGerada.findMany({
       where: { documentoId: documento.id }, orderBy: { ordem: "asc" },
       select: { id: true, ordem: true, titulo: true, conteudo: true, conteudoOriginal: true, reescritoPorIA: true },
