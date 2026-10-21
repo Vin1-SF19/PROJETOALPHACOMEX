@@ -219,7 +219,7 @@ export function PainelStatusPosFechamento({
 
       {rascunho === "CONTRATO_A_ENVIAR" && (
         <p className="rounded-lg border border-blue-400/20 bg-blue-400/5 px-3 py-2 text-[11px] text-blue-100">
-          Inclua a minuta no campo Contrato para envio, na seção Contratação.
+          O Financeiro disponibiliza o contrato no campo Contrato para envio após a conferência e a finalização. A minuta em preparação ainda não está pronta para envio.
         </p>
       )}
       {rascunho === "CONTRATO_ASSINADO" && (

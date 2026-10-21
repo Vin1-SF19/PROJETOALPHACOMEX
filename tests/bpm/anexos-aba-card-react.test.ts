@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import React, { act, createElement as h } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import type { DocumentosContratacaoComercial } from "@/lib/bpm/contratos-comerciais";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const api = vi.hoisted(() => ({ upload: vi.fn(), registrar: vi.fn() }));
 vi.mock("@/actions/bpm/Anexos", () => ({ RegistrarAnexoBpm: api.registrar, ExcluirAnexoBpm: vi.fn() }));
@@ -11,7 +12,7 @@ vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/PainelTimelineCard", () => ({ defa
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/PainelHistoricoPipeline", () => ({ default: () => null }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/EditorAnotacaoCard", () => ({ EditorAnotacaoCard: () => null }));
 vi.mock("@/components/bpm/cadencias/PainelCadenciasCard", () => ({ PainelCadenciasCard: () => null }));
-vi.mock("@/components/bpm/anexos/VisualizadorAnexoCard", () => ({ VisualizadorAnexoCard: ({ anexo }: { anexo: { nome: string } | null }) => anexo ? h("div", { role: "dialog" }, anexo.nome) : null }));
+vi.mock("@/components/bpm/anexos/VisualizadorAnexoCard", () => ({ VisualizadorAnexoCard: ({ anexo, cardId }: { anexo: { nome: string; urlAcesso?: string } | null; cardId?: string }) => anexo ? h("div", { role: "dialog", "data-url-acesso": anexo.urlAcesso, "data-card-id": cardId }, anexo.nome) : null }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/PainelHistoricoRd", () => ({ default: () => null, EstadoHistoricoRd: () => null, EventoHistoricoRdItem: () => null, useHistoricoRd: () => ({ eventos: [], carregando: false, erro: null, recarregar: vi.fn() }) }));
 import PainelHistorico from "@/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico";
 type Card = React.ComponentProps<typeof PainelHistorico>["card"];
@@ -22,9 +23,9 @@ beforeEach(() => {
   host = document.createElement("div"); document.body.append(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
-async function render(anexos: Card["anexos"] = [], onAtualizado = vi.fn()) {
-  const card = { id: "rdcard_0123456789abcdef0123456789ab", pipelineId: "pipeline", pipeline: { nome: "Comercial" }, etapa: { id: "etapa" }, membros: [], tarefas: [], campoValores: [], historico: [], anexos } as unknown as Card;
-  await act(async () => root.render(h(PainelHistorico, { card, accent: "1,2,3", currentUserId: 7, currentUserRole: "COMERCIAL", onAtualizado, etapas: [], podeTrabalharTarefas: false, podeEditar: false, realtimeRevision: 0, onInteracaoCriada: vi.fn(), anotacoes: [], onAbrirCard: vi.fn() })));
+async function render(anexos: Card["anexos"] = [], onAtualizado = vi.fn(), documentosContratacao: DocumentosContratacaoComercial | null = null, admin = false) {
+  const card = { id: "rdcard_0123456789abcdef0123456789ab", pipelineId: "pipeline", pipeline: { nome: "Comercial" }, etapa: { id: "etapa" }, membros: [], tarefas: [], campoValores: [], historico: [], anexos, documentosContratacao } as unknown as Card;
+  await act(async () => root.render(h(PainelHistorico, { card, accent: "1,2,3", currentUserId: 7, currentUserRole: admin ? "ADMIN" : "COMERCIAL", onAtualizado, etapas: [], podeTrabalharTarefas: false, podeEditar: false, realtimeRevision: 0, onInteracaoCriada: vi.fn(), anotacoes: [], onAbrirCard: vi.fn() })));
   const aba = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(t => t.textContent?.includes("Anexos"))!;
   await act(async () => aba.dispatchEvent(new MouseEvent("mousedown", { button: 0, bubbles: true })));
 }
@@ -58,4 +59,22 @@ it("registra upload e atualiza a aba com o arquivo retornado pela nova leitura d
   expect(onAtualizado).toHaveBeenCalledOnce();
   expect(host.textContent).toContain("novo.pdf");
   expect(host.textContent).not.toContain("Nenhum anexo neste card");
+});
+
+
+it("combina contratos projetados e locais com uma contagem única e exclui apenas arquivos próprios", async () => {
+  const cardId = "rdcard_0123456789abcdef0123456789ab";
+  const documento = { id: "contratacao:envio", nome: "Financeiro final.pdf", tipo: "application/pdf", urlAcesso: `/api/bpm/cards/${cardId}/contrato?tipo=para_envio`, origem: "CONTRATACAO" as const, somenteLeitura: true as const };
+  const docs: DocumentosContratacaoComercial = { paraEnvio: { estado: "DISPONIVEL", documento }, assinado: { estado: "DISPONIVEL", documento } };
+  await render([{ id: "local", nome: "Comercial manual.pdf", tamanho: 12, tipo: "application/pdf" }] as Card["anexos"], vi.fn(), docs, true);
+  const aba = [...host.querySelectorAll('[role="tab"]')].find((tab) => tab.textContent?.includes("Anexos"))!;
+  expect(aba.textContent?.replace(/\s/g, "")).toBe("Anexos2");
+  expect([...host.querySelectorAll("button")].filter((button) => button.textContent === documento.nome)).toHaveLength(1);
+  expect(host.textContent).toContain("Financeiro · Somente leitura");
+  expect(host.querySelector('[aria-label="Excluir anexo Financeiro final.pdf"]')).toBeNull();
+  expect(host.querySelector('[aria-label="Excluir anexo Comercial manual.pdf"]')).toBeTruthy();
+  const abrir = [...host.querySelectorAll("button")].find((button) => button.textContent === documento.nome)!;
+  await act(async () => abrir.click());
+  expect(host.querySelector('[role="dialog"]')?.getAttribute("data-url-acesso")).toBe(documento.urlAcesso);
+  expect(host.querySelector('[role="dialog"]')?.getAttribute("data-card-id")).toBe(cardId);
 });

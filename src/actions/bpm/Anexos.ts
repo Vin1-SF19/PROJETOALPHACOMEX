@@ -1,7 +1,7 @@
 "use server";
 import { randomUUID } from "node:crypto";
 import db from "@/lib/prisma";
-import { disponibilizarContratoComercial } from "@/lib/bpm/contratacao-comercial-server";
+import { disponibilizarContratoComercial, notificarContratacaoComercialPosCommit } from "@/lib/bpm/contratacao-comercial-server";
 import { CHAVES_CAMPOS } from "@/lib/bpm/financeiro-config.client";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
@@ -128,11 +128,11 @@ export async function RegistrarAnexoBpm(dados: unknown) {
           causationId: criado.id, idempotencyKey: `contrato-assinado-anexo:${criado.id}`,
         }, tx);
       }
-      const retornoComercial = campoContratoParaEnvio ? await disponibilizarContratoComercial(tx, cardId, userId) : null;
+      const retornoComercial = campoContratoParaEnvio || campoContratoAssinado ? await disponibilizarContratoComercial(tx, cardId, userId) : null;
       return { anexo: criado, criado: true, campoContratoAssinado, retornoComercial };
     });
 
-    if (resultado.retornoComercial) await notificarPipelineBpm({ ...resultado.retornoComercial, tipo: "CARD_ATUALIZADO" });
+    if (resultado.retornoComercial) await notificarContratacaoComercialPosCommit(resultado.retornoComercial);
     if (resultado.criado) {
       try {
         revalidatePath(`${ROTA_BASE}/pipeline`);
@@ -215,12 +215,14 @@ export async function ExcluirAnexoBpm(anexoId: string) {
 
     const pendenteId = await db.$transaction(async (tx) => {
       await exigirAcessoBpmCard(anexo.cardId, userId, session.user.role ?? null, "excluirArquivo", tx);
+      let sincronizarContratacao = false;
       if (anexo.campoId) {
         const [campo, card, valor] = await Promise.all([
           tx.bpmCampo.findUnique({ where: { id: anexo.campoId }, select: { chave: true } }),
           tx.bpmCard.findUnique({ where: { id: anexo.cardId }, select: { pipelineId: true, statusPosFechamento: true } }),
           tx.bpmCardCampoValor.findUnique({ where: { cardId_campoId: { cardId: anexo.cardId, campoId: anexo.campoId } }, select: { valor: true } }),
         ]);
+        sincronizarContratacao = [CHAVES_CAMPOS.LINK_CONTRATO, CHAVES_CAMPOS.ANEXO_ASSINADO].some((chave) => chave === campo?.chave);
         if (campo?.chave === "alpha.radar.fechado.contrato_assinado"
           && card?.statusPosFechamento === "CONTRATO_ASSINADO"
           && valor?.valor === anexoId) throw new Error("CONTRATO_ASSINADO_EM_USO");
@@ -281,7 +283,8 @@ export async function ExcluirAnexoBpm(anexoId: string) {
         },
         tx,
       );
-      if (!extrairPathnamePrivadoAnexoBpm(anexo.url)) return null;
+      const retornoComercial = sincronizarContratacao ? await disponibilizarContratoComercial(tx, anexo.cardId, userId) : null;
+      if (!extrairPathnamePrivadoAnexoBpm(anexo.url)) return { pendenteId: null, retornoComercial };
       const pendente = await tx.bpmCardHistorico.create({
         data: {
           cardId: anexo.cardId,
@@ -291,12 +294,13 @@ export async function ExcluirAnexoBpm(anexoId: string) {
         },
         select: { id: true },
       });
-      return pendente.id;
+      return { pendenteId: pendente.id, retornoComercial };
     });
 
-    if (pendenteId) {
+    if (pendenteId.retornoComercial) await notificarContratacaoComercialPosCommit(pendenteId.retornoComercial);
+    if (pendenteId.pendenteId) {
       try {
-        await limparBlobAnexoPendente(pendenteId);
+        await limparBlobAnexoPendente(pendenteId.pendenteId);
       } catch (error) {
         // A exclusão do metadado já foi commitada. O cron repetirá a limpeza.
         console.error("[ExcluirAnexoBpm] Blob pendente de reconciliação", { pendenteId, error });

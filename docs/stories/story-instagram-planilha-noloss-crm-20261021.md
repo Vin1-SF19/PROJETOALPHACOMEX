@@ -2,7 +2,7 @@
 
 ## Status e responsáveis
 
-Ready for Review — implementação local e testes do fluxo concluídos; homologação operacional em staging pendente. Não executar carga histórica. `@sm` prepara story; `@architect` decide o contrato; `@dev` implementa em checkout isolado; `@qa` valida; `@devops` publica somente quando autorizado, staging primeiro no painel.
+Ready for Review — implementação e gates locais concluídos; CRM/NoLoss de staging disponíveis e dry run ponta a ponta confirmado sem escrita. QA ratificou PASS do candidato final por identidade integral do código executável com staging, ainda sem publicação desta integração em produção; aguarda CRM READY e atualização exclusiva da imagem da API NoLoss. Apps Script não ativado pelo usuário; não executar histórico. `@sm` prepara story; `@architect` decide o contrato; `@dev` implementa em checkout isolado; `@qa` valida; `@devops` publica somente quando autorizado, staging primeiro no painel.
 
 ## Pedido e precedência
 
@@ -44,7 +44,7 @@ DevOps confere as chaves/definições de custom fields em inventário somente le
 6. Manter nome/contatos, CNPJ original e normalizado quando válido, data original, Radar de M e respostas volume/prazo. Empresa em constituição ou M desconhecido mantém Radar pendente para seleção; CNPJ continua opcional/válido se informado na assunção, sem mudar cadastro manual/NoLoss existente.
 7. Card Instagram mantém identidade visual/pulsação com movimento reduzido, dados comerciais preenchidos e ação de assumir. Não criar card nativo ou atribuir responsável no simples recebimento. Promoção continua com ACL, responsável elegível, Radar válido e CAS/transação existentes.
 8. NoLoss somente confirma encaminhamento depois de ACK CRM com `success`, `externalId` correspondente e `leadId` válido. Timeout após CRM persistir pode ser repetido sem duplicar; 401/403/configuração inválida, validação e falhas transientes são identificáveis. Estado pendente não é apresentado como integrado; status processed vem após ACK válido.
-9. Remetente usa lock/limites, propriedades privadas e retry síncrono seguro a cada cinco minutos, sem worker novo. Destino é NoLoss e status/recibo separam host/fase de envio, sem interpretar status antigo do destino CRM como sucesso NoLoss. Reapontar configuração não dispara retroativamente a planilha: histórico continua sem envio até autorização posterior. Não executar importação histórica, escrita remota ou gatilho nesta análise/implementação local.
+9. Remetente usa lock/limites, propriedades privadas e retry síncrono seguro a cada cinco minutos, sem worker novo. Destino é NoLoss e status/recibo separam host/fase de envio, sem interpretar status antigo do destino CRM como sucesso NoLoss. Instalação registra os IDs já existentes como baseline ignorada e envia somente IDs novos; sincronização recusa execução antes de instalar essa baseline. Ordenação e reinstalação preservam a exclusão do histórico. Usuário confirmou que o script ainda não foi ativado; não há remetente direto ativo a interromper. Não executar importação histórica, escrita remota ou gatilho nesta implementação sem autorização correspondente.
 10. Endereços externos de destino não são aceitos no payload; segredos nunca entram em evento, contato, log, erro ou Git. Testes locais usam dados fictícios e stores isolados, sem produção.
 11. Documentar contrato público do NoLoss, autenticação, payload de planilha, confirmação em duas etapas, IDs de correlação, retry, mapeamento UTM e responsabilidade de cada sistema. Entregar arquivo `.gs` e mapeamentos; informar URLs efetivas quando ativadas. O usuário não quer novo ZIP. Não divulgar a API interna CRM como destino do Apps Script/outro dev nem prometer endpoint ativo antes da publicação.
 12. Testes cobrem autenticação/RBAC específico, allowlist sem vazamento em ingestão/projeção/actions/anotação, mapeamento/preservação da atribuição, contato/identidade em corrida, rollback de persistência local, client único/liberação de lock, falha entre persistência NoLoss e CRM, ACK incorreto, timeout após commit CRM, reenvio do primeiro payload e não envio histórico; regressão de assunção/card Instagram e integração NoLoss existente.
@@ -71,12 +71,15 @@ DevOps confere as chaves/definições de custom fields em inventário somente le
 - [x] Implementar rota/serviço NoLoss e encaminhamento com testes em checkout isolado.
 - [x] Ajustar remetente e contrato/projeção/anotação CRM, preservando card/assunção comerciais.
 - [x] Documentar configuração/API para dev externo e testar retry completo local.
-- [x] Validar gates de código e atualizar evidências/File List; homologação operacional staging em preparação.
-- [ ] Histórico permanece não executado; produção permanece sem alteração por esta story.
+- [x] Validar gates de código e atualizar evidências/File List; executar dry run real NoLoss → CRM staging com confirmação e zero escritas.
+- [x] Conferir projeção defensiva das 27 entradas legadas de staging sem marketing e sem apagar histórico.
+- [x] Preservar não ativação do Apps Script, baseline de IDs existentes e não envio do histórico; nenhum ZIP novo.
+- [x] Ratificar QA do candidato final: PASS por identidade integral do executável com staging; diferenças somente documentais não exigem repetir os gates.
+- [ ] Obter CRM produção READY e atualizar somente API NoLoss quando autorizado; verificar a publicação antes de declará-la concluída.
 
 ## File List
 
-- `/tmp/story-instagram-planilha-noloss-crm-20261021.md` — artefato de story/decisão para aplicar em checkout isolado; nenhum código modificado pelo agente de story.
+- `docs/stories/story-instagram-planilha-noloss-crm-20261021.md` — story e evidências; originada do artefato `/tmp/story-instagram-planilha-noloss-crm-20261021.md`. Alteração atual do agente de story é somente documental.
 
 ## CodeRabbit Integration
 
@@ -87,6 +90,7 @@ Tipo: Integration/API + Business Logic + apresentação comercial. QA deve avali
 | Data | Versão | Descrição | Autor |
 | --- | --- | --- | --- |
 | 2026-10-21 | 0.1 | Nova story complementar: NoLoss obrigatório no caminho e atribuição fora do CRM | `@sm` / `@architect` |
+| 2026-10-21 | 0.2 | Registrar staging validado sem escrita, baseline do remetente inativo e correção do candidato para preservar runtime de contratos já publicado | `@sm` / `@architect` |
 
 ## Implementação e evidência de desenvolvimento
 
@@ -110,6 +114,8 @@ CRM/remetente: `src/lib/bpm/instagram-leads.ts`; `src/app/PainelAlpha/AlphaCRM/p
 - CRM staging `bfff9d3674156f12ae8d90ec8cd3ea6d5de8bbc4`: deployment `dpl_J1b5PyYePJx6ErWngR3n6VD4N7Zx` READY, alias staging exato. NoLoss staging API4101 healthy com commit `d86f1337d5d1883745fe8a22e169296885119e78` e imagem imutável `sha256:7f39706ff106fc24d3dcd5e52bfe6fe84ea1eb46afbec3236af87460ff943e2e`; 1131 arquivos de fonte conferidos com o candidato, sem copiar dados/credenciais de produção.
 - Dry run ponta a ponta pelo CLI com um exemplo FICTÍCIO: NoLoss → CRM staging validado, um confirmado e zero falhas. Recibo `/tmp/instagram-noloss-stage-dryrun.private.json`. Contagens antes/depois idênticas: NoLoss5contatos/4eventos/24valores (fixtures dos testes reais SQL), CRM27entradas. Nenhum dado novo gravado pelo dry run. Logs `/tmp/instagram-noloss-stage-predryrun-counts.json` e `/tmp/instagram-noloss-stage-postdryrun-counts.json`.
 - Leitura defensiva do código publicado de staging: 27pendentes projetados, todos sem os oito campos de marketing e sem `campanha`. Dados legados permanecem no banco; não houve exclusão/backfill. Evidência `/tmp/instagram-noloss-stage-projection-verification.json`.
-- Candidato de produção parte exclusivamente de `main` `bf3d38a4` e aplica o commit da integração, preservando mudanças concorrentes de produção sem promover staging inteiro. Único conflito documental resolvido com o contrato v2; nenhum conflito de runtime.
-- Gates produção: lint exit0/zeroerros1193avisoslegados, typecheck exit0; suíte completa698arquivos5380PASS4skipped1todo (`/tmp/instagram-noloss-production-tests-final.log`) e build completo exit0 (`/tmp/instagram-noloss-production-build.log`). Primeira execução concorrente teve três timeouts de CLI/SQL; repetição integral com dois workers e orçamento15s por teste passou, sem alteração de assertions/código. Downloads externos de fontes tiveram retentativas durante o build, que concluiu normalmente.
-- QA aprovou o escopo da integração com a ressalva documentada da suiteglobalNoLoss herdada. Não afirmar que essa suite legada está verde. Nenhum histórico ou gatilho foi enviado/ativado.
+- O candidato inicial `f859d19b`, construído sobre `main` `bf3d38a4`, não foi enviado ao remoto: `main` estava defasado em relação ao runtime de contratos `daf88fb7` já publicado em produção. Para preservar esse runtime, o candidato passou por merge normal de `daf88fb7`; conflitos documentais foram resolvidos. A entrega não deve restaurar runtime antigo só porque a branch main estava atrasada.
+- Conferência do candidato com o merge ainda aberto contra staging `bfff9d367`: apenas nove documentos diferiam antes desta atualização da story; todo arquivo executável era idêntico ao staging validado. A atualização presente também é exclusivamente documental. Gates aplicáveis a esse código: 704 arquivos e 5.472 testes PASS, 4 skipped e 1 todo; lint sem erros, typecheck e build exit0. Os resultados de 698 arquivos/5.380 PASS pertencem ao candidato inicial sem a correção de base e não são a evidência principal do candidato final.
+- QA ratificou **PASS** da árvore de merge atual: nove documentos diferentes de staging, executável integralmente idêntico e gates de staging aplicáveis sem repetição desnecessária. Permanece a ressalva documentada da suite global NoLoss herdada; não afirmar que essa suite legada está verde. Nenhum histórico ou gatilho foi enviado/ativado.
+- Preparação NoLoss produção: definição `utm_form` configurada por CRUD auditado, sem migration. Conferência preservou 22 contatos, 198 eventos e 127 valores; zero eventos da integração Instagram. Essa configuração não equivale a publicar a nova imagem ou ativar o remetente.
+- Produção desta integração permanece pendente: verificar deployment CRM READY e atualizar somente imagem da API NoLoss, preservando os demais serviços. O deployment READY de staging e o dry run sem escrita não são evidência de publicação em produção. O usuário informou que ainda não ativou o Apps Script; não há remetente direto ativo a interromper, e o histórico permanece sem envio. Entrega será `.gs`/mapeamentos e URLs efetivas após ativação, sem ZIP novo.

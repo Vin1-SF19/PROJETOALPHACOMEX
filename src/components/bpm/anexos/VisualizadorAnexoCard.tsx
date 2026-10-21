@@ -1,22 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { VisualizadorContratoComercial } from "./VisualizadorContratoComercial";
 import { FileWarning, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-export type AnexoParaVisualizar = { id: string; nome: string; tipo: string | null };
+export type AnexoParaVisualizar = { id: string; nome: string; tipo: string | null; urlAcesso?: string; origem?: "CONTRATACAO"; somenteLeitura?: boolean };
 
 type Clausula = { id: string; ordem: number; titulo: string; conteudo: string };
 type ContratoPreview = { titulo: string; status: string; pdfDisponivel: boolean; pendencias?: string[]; clausulas: Clausula[] };
 
-export function VisualizadorAnexoCard({ anexo, onClose }: {
+export function VisualizadorAnexoCard({ anexo, onClose, cardId, revisao }: {
   anexo: AnexoParaVisualizar | null;
   onClose: () => void;
+  cardId?: string;
+  revisao?: string;
 }) {
   const [resultado, setResultado] = useState<{ id: string; contrato: ContratoPreview | null; erro: string | null } | null>(null);
   const [visualizacao, setVisualizacao] = useState<{ id: string; pdf: boolean } | null>(null);
   const anexoId = anexo?.id;
-  const gerado = anexo?.tipo === "application/x-painel-alpha-documento";
+  const projetado = Boolean(anexo && (anexo.origem === "CONTRATACAO" || anexo.urlAcesso !== undefined));
+  const gerado = !projetado && anexo?.tipo === "application/x-painel-alpha-documento";
   const arquivoUrl = anexo ? `/api/bpm/anexos/${encodeURIComponent(anexo.id)}` : "";
   const previewUrl = anexo ? `${arquivoUrl}/preview` : "";
   const contrato = resultado && resultado.id === anexoId ? resultado.contrato : null;
@@ -42,6 +46,10 @@ export function VisualizadorAnexoCard({ anexo, onClose }: {
   const tipo = anexo?.tipo ?? "";
   const imagem = tipo.startsWith("image/");
   const documentoInline = tipo === "application/pdf" || tipo === "text/plain";
+
+  if (anexo && projetado) {
+    return <VisualizadorContratoComercial key={anexo.id} anexo={anexo} cardId={cardId} revisao={revisao} onClose={onClose} />;
+  }
 
   return (
     <Dialog open={Boolean(anexo)} onOpenChange={(aberto) => { if (!aberto) onClose(); }}>

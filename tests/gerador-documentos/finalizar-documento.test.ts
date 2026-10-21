@@ -6,16 +6,18 @@ const mocks = vi.hoisted(() => ({
   findUniqueDocumento: vi.fn(),
   findUniqueDocumentoOwnership: vi.fn(),
   updateDocumento: vi.fn(),
+  updateManyDocumento: vi.fn(),
   put: vi.fn(),
   gerarPdfDocumento: vi.fn(),
   renderHtmlParaPdf: vi.fn(),
   queryRaw: vi.fn(),
   carregarContratoPadrao: vi.fn(),
   disponibilizar: vi.fn(),
+  posCommit: vi.fn(),
 }));
 
 vi.mock("../../auth", () => ({ auth: mocks.auth }));
-vi.mock("@/lib/bpm/contratacao-comercial-server", () => ({ disponibilizarContratoComercial: mocks.disponibilizar }));
+vi.mock("@/lib/bpm/contratacao-comercial-server", () => ({ disponibilizarContratoComercial: mocks.disponibilizar, notificarContratacaoComercialPosCommit: mocks.posCommit }));
 vi.mock("@/lib/bpm/realtime-server", () => ({ notificarPipelineBpm: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("server-only", () => ({}));
@@ -34,9 +36,10 @@ vi.mock("@/lib/prisma", () => ({
         return mocks.findUniqueDocumento(...args);
       },
       update: mocks.updateDocumento,
+      updateMany: mocks.updateManyDocumento,
     },
     documentoTemplate: { findUnique: vi.fn() },
-    $transaction: async (fn: (tx: unknown) => unknown) => fn({ documentoGerado: { update: mocks.updateDocumento } }),
+    $transaction: async (fn: (tx: unknown) => unknown) => fn({ documentoGerado: { update: mocks.updateDocumento, updateMany: mocks.updateManyDocumento, findUnique: mocks.findUniqueDocumento } }),
     $queryRaw: (...args: unknown[]) => mocks.queryRaw(...args),
   },
 }));
@@ -72,6 +75,7 @@ const DOCUMENTO_ID = "clx0000000000000000000000";
 describe("FinalizarDocumento", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.updateManyDocumento.mockResolvedValue({ count: 1 });
     mocks.auth.mockResolvedValue({ user: { id: "10", role: "User" } });
     mocks.getPermissoesEfetivas.mockResolvedValue(["geradorDocumentos"]);
     mocks.findUniqueDocumentoOwnership.mockResolvedValue({
@@ -103,8 +107,8 @@ describe("FinalizarDocumento", () => {
       clausulas: [{ titulo: "Objeto", conteudo: "Texto da cláusula." }],
     });
     expect(mocks.put).toHaveBeenCalledTimes(1);
-    expect(mocks.updateDocumento).toHaveBeenCalledWith({
-      where: { id: DOCUMENTO_ID },
+    expect(mocks.updateManyDocumento).toHaveBeenCalledWith({
+      where: expect.objectContaining({ id: DOCUMENTO_ID }),
       data: { status: "FINALIZADO", finalizadoEm: expect.any(Date), pdfUrl: "https://blob.vercel-storage.com/documento-final.pdf" },
     });
   });
@@ -261,7 +265,28 @@ describe("FinalizarDocumento", () => {
   mocks.put.mockResolvedValue({ url: "https://store.public.blob.vercel-storage.com/gerador-documentos/pdfs-gerados/10/contrato.pdf" });
   mocks.disponibilizar.mockResolvedValue(null);
   expect(await FinalizarDocumento(DOCUMENTO_ID)).toMatchObject({ success: true });
-  expect(mocks.disponibilizar).toHaveBeenCalledWith(expect.objectContaining({ documentoGerado: { update: mocks.updateDocumento } }), "financeiro", 10);
+  expect(mocks.disponibilizar).toHaveBeenCalledWith(expect.objectContaining({ documentoGerado: expect.objectContaining({ updateMany: mocks.updateManyDocumento }) }), "financeiro", 10);
 });
+
+  it("repetir documento já finalizado preserva revisão e não faz outro upload", async () => {
+    mocks.findUniqueDocumento.mockResolvedValue({ status: "FINALIZADO", pdfUrl: "https://store.public.blob.vercel-storage.com/gerador-documentos/pdfs-gerados/10/teste.pdf",
+      titulo: "Contrato BPM", variaveisJson: { __bpmCardId: "financeiro" }, template: { variaveisJson: [] }, clausulas: [] });
+    mocks.disponibilizar.mockResolvedValue(null);
+    expect(await FinalizarDocumento(DOCUMENTO_ID)).toMatchObject({ success: true });
+    expect(mocks.put).not.toHaveBeenCalled();
+    expect(mocks.updateManyDocumento).not.toHaveBeenCalled();
+    expect(mocks.posCommit).not.toHaveBeenCalled();
+  });
+  it("finalização concorrente confirmada por outro processo não regrava finalizadoEm", async () => {
+    const base = { titulo: "Contrato", variaveisJson: {}, pdfUrl: null, template: { variaveisJson: [] }, clausulas: [] };
+    mocks.findUniqueDocumento.mockResolvedValueOnce(base).mockResolvedValueOnce({ status: "FINALIZADO", pdfUrl: "https://store.public.blob.vercel-storage.com/gerador-documentos/pdfs-gerados/10/teste.pdf" });
+    mocks.gerarPdfDocumento.mockResolvedValue(Buffer.from("%PDF"));
+    mocks.put.mockResolvedValue({ url: "https://store.public.blob.vercel-storage.com/gerador-documentos/pdfs-gerados/10/teste.pdf" });
+    mocks.updateManyDocumento.mockResolvedValue({ count: 0 });
+    expect(await FinalizarDocumento(DOCUMENTO_ID)).toMatchObject({ success: true });
+    expect(mocks.updateDocumento).not.toHaveBeenCalled();
+    expect(mocks.updateManyDocumento).toHaveBeenCalledOnce();
+    expect(mocks.disponibilizar).not.toHaveBeenCalled();
+  });
 
 });

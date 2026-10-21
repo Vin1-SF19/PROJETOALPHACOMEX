@@ -1,5 +1,6 @@
 "use client";
 
+import { EstadoDocumentoContratacao, type EstadoDocumentoContratacaoProps } from "./CardModal/EstadoDocumentoContratacao";
 import { useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
 import { X } from "lucide-react";
@@ -57,6 +58,7 @@ interface CampoBpmInputProps {
   cardId?: string;
   errorToastOptions?: Pick<ExternalToast, "duration" | "closeButton">;
   arquivoAtual?: { id: string; nome: string; url: string; tipo?: string | null } | null;
+  documentoContratacao?: Omit<EstadoDocumentoContratacaoProps, "cardId" | "label">;
   registerFileSave?: (save: () => Promise<boolean>, fileName: string, getFailureMessage?: () => string) => Promise<boolean>;
   pendingFileName?: string | null;
   onFileRemoved?: () => void;
@@ -109,6 +111,7 @@ export function CampoBpmInput({
   cardId,
   errorToastOptions,
   arquivoAtual,
+  documentoContratacao,
   registerFileSave,
   pendingFileName,
   onFileRemoved,
@@ -254,6 +257,7 @@ export function CampoBpmInput({
     const nomeArquivoPendente = pendingFileName === undefined ? arquivoPendente?.name : pendingFileName;
     return (
       <div className="space-y-1">
+        {documentoContratacao && cardId && <EstadoDocumentoContratacao {...documentoContratacao} cardId={cardId} label={campo.nome} />}
         {campo.tipo === "url_ou_arquivo" && (
           <input
             id={`campo-bpm-${campo.id}`}
@@ -420,7 +424,7 @@ export function CampoBpmInput({
         )}
         {enviandoArquivo && <p role="status" className="text-[11px] text-sky-200">Enviando arquivo... {progressoUpload}%</p>}
         {erroArquivo && <p id={`campo-bpm-${campo.id}-upload-erro`} role="alert" className="text-[11px] text-rose-300">{erroArquivo}</p>}
-        {value.startsWith("https://") ? (
+        {!documentoContratacao && (value.startsWith("https://") ? (
           <a href={value} target="_blank" rel="noopener noreferrer" className="block truncate text-[11px] text-emerald-300 hover:underline">
             Abrir link do contrato
           </a>
@@ -428,8 +432,8 @@ export function CampoBpmInput({
           <button type="button" onClick={() => setAnexoSelecionado({ id: arquivoAtual?.id ?? value, nome: arquivoAtual?.nome ?? "Arquivo vinculado", tipo: arquivoAtual?.tipo ?? null })} className="block max-w-full truncate text-left text-[11px] text-emerald-300 hover:underline">
             {arquivoAtual?.nome ?? "Abrir arquivo vinculado"}
           </button>
-        ) : null}
-        <VisualizadorAnexoCard anexo={anexoSelecionado} onClose={() => setAnexoSelecionado(null)} />
+        ) : null)}
+        <VisualizadorAnexoCard anexo={anexoSelecionado} cardId={cardId} onClose={() => setAnexoSelecionado(null)} />
       </div>
     );
   }

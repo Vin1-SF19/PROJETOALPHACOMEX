@@ -1,4 +1,5 @@
 "use client";
+import type { TipoContratoComercial } from "@/lib/bpm/contratos-comerciais";
 import { criarRastreadorRascunho } from "@/lib/bpm/rascunho-versionado";
 import { nomeUsuarioCampoBpm } from "@/lib/bpm/usuarios-campos";
 import { criarRascunhoOrigem, extrairPayloadOrigem, lerRascunhoOrigem, valorInicialCampo } from "@/lib/bpm/origem-cliente";
@@ -615,6 +616,19 @@ export function PainelCamposEtapaAtual({
               )}
               {camposAtuaisVisiveis.map((campo) => {
             const complementoPendente = campo.id === configuracaoLostUi.campoComplementoId && complementoLostPendente;
+            const tipoContrato: TipoContratoComercial | null = card.documentosContratacao && card.pipeline?.nome === "Revisão de Radar" && card.etapa.chave === BPM_STAGE_KEYS.FECHADO
+              ? campo.chave === "alpha.radar.fechado.contrato_para_envio" ? "para_envio"
+                : campo.chave === "alpha.radar.fechado.contrato_assinado" ? "assinado" : null
+              : null;
+            const arquivoProprio = tipoContrato ? card.anexos.find((anexo) => anexo.id === valoresCamposAtuais[campo.id] && anexo.campoId === campo.id
+              && anexo.url === `/api/bpm/anexos/${encodeURIComponent(anexo.id)}`
+              && ["application/pdf", "image/png", "image/jpeg", "image/webp", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel", "text/csv"].includes(anexo.tipo ?? "")) ?? null : null;
+            const documentoContratacao = tipoContrato && card.documentosContratacao ? {
+              tipo: tipoContrato,
+              revisao: new Date(card.updatedAt).toISOString(),
+              slot: tipoContrato === "para_envio" ? card.documentosContratacao.paraEnvio : card.documentosContratacao.assinado,
+              arquivoLocal: arquivoProprio,
+            } : undefined;
             const somenteLeitura = campo.somenteLeitura === true || campo.editavel === false;
             const estadoCalculado = somenteLeitura
               && (card.pipelineId === "cmuih4i54000209gmmyqrg557" || card.pipeline?.chave === "financeiro")
@@ -666,6 +680,7 @@ export function PainelCamposEtapaAtual({
                   disabled={!podeEditar || progressoSave !== null}
                   readOnly={somenteLeitura}
                   cardId={card.id}
+                  documentoContratacao={documentoContratacao}
                   arquivoAtual={campo.tipo === "arquivo" || campo.tipo === "url_ou_arquivo"
                     ? card.anexos.find((anexo) => anexo.id === valoresCamposAtuais[campo.id]) ?? null
                     : null}

@@ -34,6 +34,7 @@ import { PainelChecklistsCard } from "./PainelChecklistsCard";
 import { EditorAnotacaoCard } from "./EditorAnotacaoCard";
 import { formatarBytes, iconePorAcao } from "./PainelHistoricoShared";
 import { separarTarefasCard } from "@/lib/bpm/tarefas-card";
+import { urlContratoComercialSegura } from "@/components/bpm/anexos/VisualizadorContratoComercial";
 import { VisualizadorAnexoCard, type AnexoParaVisualizar } from "@/components/bpm/anexos/VisualizadorAnexoCard";
 import { nomeSeguroUploadAnexo, obterTipoUploadAnexo, validarUploadAnexo } from "@/lib/validations/bpm";
 
@@ -90,6 +91,16 @@ export default function PainelHistorico({
   const [arrastandoAnexo, setArrastandoAnexo] = useState(false);
   const [selecaoAba, setSelecaoAba] = useState<{ valor: string; foco: typeof focoTarefa }>({ valor: "etapas", foco: null });
   const [anexoSelecionado, setAnexoSelecionado] = useState<AnexoParaVisualizar | null>(null);
+  const documentos = card.documentosContratacao ? [card.documentosContratacao.paraEnvio, card.documentosContratacao.assinado] : [];
+  const anexosPorId = new Map<string, AnexoParaVisualizar & { tamanho: number | null }>(card.anexos.map((anexo) => [anexo.id, anexo]));
+  for (const slot of documentos) {
+    const documento = slot.estado === "DISPONIVEL" ? slot.documento : null;
+    if (documento && urlContratoComercialSegura(documento, card.id) && !anexosPorId.has(documento.id)) {
+      anexosPorId.set(documento.id, { ...documento, tamanho: 0 });
+    }
+  }
+  const anexosExibidos = [...anexosPorId.values()];
+  const anexoAtualSelecionado = anexoSelecionado ? anexosPorId.get(anexoSelecionado.id) ?? null : null;
   const inputAnexoRef = useRef<HTMLInputElement>(null);
   const { tarefas: tarefasDoCard, procedimentos: tarefasDeProcedimento } = separarTarefasCard(card.tarefas);
   const procedimentosLegados = tarefasDeProcedimento.filter((tarefa) => !tarefa.cardChecklistId);
@@ -195,6 +206,7 @@ export default function PainelHistorico({
   }
 
   async function handleExcluirAnexo(anexoId: string) {
+    if (!card.anexos.some((anexo) => anexo.id === anexoId)) return;
     const res = await ExcluirAnexoBpm(anexoId);
     if (res.success) onAtualizado();
     else toast.error(typeof res.error === "string" ? res.error : "Erro ao excluir anexo");
@@ -222,8 +234,8 @@ export default function PainelHistorico({
           <TabsTrigger value="anexos" className="relative flex-none gap-1.5 border border-transparent px-2 text-xs scale-95 transition-[transform,background-color,border-color,color] duration-150 hover:scale-100 focus-visible:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 data-[state=active]:z-10 data-[state=active]:scale-105 data-[state=active]:font-semibold motion-reduce:transition-none motion-reduce:transform-none text-amber-200/65 hover:bg-amber-400/10 hover:text-amber-200 data-[state=active]:border-amber-300/30 data-[state=active]:bg-amber-400/15 data-[state=active]:text-amber-100">
             <Paperclip size={13} />
             Anexos
-            {card.anexos.length > 0 && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300">{card.anexos.length}</span>
+            {anexosExibidos.length > 0 && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300">{anexosExibidos.length}</span>
             )}
           </TabsTrigger>
           <TabsTrigger value="historico" className="relative flex-none gap-1.5 border border-transparent px-2 text-xs scale-95 transition-[transform,background-color,border-color,color] duration-150 hover:scale-100 focus-visible:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 data-[state=active]:z-10 data-[state=active]:scale-105 data-[state=active]:font-semibold motion-reduce:transition-none motion-reduce:transform-none text-rose-200/65 hover:bg-rose-400/10 hover:text-rose-200 data-[state=active]:border-rose-300/30 data-[state=active]:bg-rose-400/15 data-[state=active]:text-rose-100">
@@ -278,19 +290,19 @@ export default function PainelHistorico({
         </TabsContent>
 
         <TabsContent value="anexos" className="min-h-0 flex-1 overflow-y-auto">
-          {card.anexos.length === 0 && <div role="status" className="rounded-xl border border-dashed border-white/10 p-5 text-center">
+          {anexosExibidos.length === 0 && <div role="status" className="rounded-xl border border-dashed border-white/10 p-5 text-center">
             <Paperclip size={20} aria-hidden="true" className="mx-auto mb-2 text-slate-500" />
             <p className="text-sm font-medium text-slate-300">Nenhum anexo neste card</p>
             <p className="mt-1 text-xs leading-relaxed text-slate-400">Os arquivos enviados para este card aparecerão aqui.</p>
           </div>}
           <div className="space-y-1.5">
-            {card.anexos.map((a) => (
+            {anexosExibidos.map((a) => (
               <div key={a.id} className="flex items-center justify-between gap-2 bg-white/[0.03] border border-white/5 rounded-xl px-3 py-2">
-                <button type="button" onClick={() => setAnexoSelecionado({ id: a.id, nome: a.nome, tipo: a.tipo })} className="min-w-0 truncate text-left text-sm text-white hover:underline">{a.nome}</button>
+                <button type="button" onClick={() => setAnexoSelecionado(a)} className="min-w-0 truncate text-left text-sm text-white hover:underline">{a.nome}</button>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[10px] text-slate-500">{formatarBytes(a.tamanho)}</span>
-                  {podeExcluirAnexo && (
-                    <button onClick={() => handleExcluirAnexo(a.id)} className="text-slate-500 hover:text-rose-400">
+                  <span className="text-[10px] text-slate-500">{a.somenteLeitura ? "Financeiro · Somente leitura" : formatarBytes(a.tamanho)}</span>
+                  {podeExcluirAnexo && !a.somenteLeitura && (
+                    <button type="button" aria-label={`Excluir anexo ${a.nome}`} onClick={() => handleExcluirAnexo(a.id)} className="text-slate-500 hover:text-rose-400">
                       <Trash2 size={13} />
                     </button>
                   )}
@@ -376,7 +388,7 @@ export default function PainelHistorico({
         podeEditar={podeEditar}
         onInteracaoCriada={onInteracaoCriada}
       />
-      <VisualizadorAnexoCard anexo={anexoSelecionado} onClose={() => setAnexoSelecionado(null)} />
+      <VisualizadorAnexoCard anexo={anexoAtualSelecionado} cardId={card.id} revisao={card.updatedAt ? new Date(card.updatedAt).toISOString() : undefined} onClose={() => setAnexoSelecionado(null)} />
     </div>
   );
 }

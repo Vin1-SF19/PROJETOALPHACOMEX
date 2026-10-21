@@ -36,7 +36,7 @@ import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { executarAutomacoesCentraisDoCardAgora } from "@/lib/bpm/automacoes/orquestrador";
 import { carregarValoresCanonicosCampos, salvarValoresGlobaisPersonalizadosCampos } from "@/lib/bpm/campos-configuraveis-server";
 import { prepararSalvamentoConfigurado } from "@/lib/bpm/validacao-salvamento-configurado";
-import { disponibilizarContratoComercial } from "@/lib/bpm/contratacao-comercial-server";
+import { disponibilizarContratoComercial, notificarContratacaoComercialPosCommit, resolverDocumentosContratacaoComercial, carregarAcompanhamentoComercial } from "@/lib/bpm/contratacao-comercial-server";
 import { registrarConclusaoContratoFinanceiro } from "@/lib/bpm/financeiro-assinatura-server";
 import { sincronizarNotaFiscalCard } from "@/lib/bpm/financeiro-nota-fiscal-server";
 import { carregarResumoContratacao } from "@/lib/bpm/resumo-contratacao-server";
@@ -879,6 +879,8 @@ export async function ObterCardBpm(cardId: string) {
         podeMoverLivremente: Boolean(acessoCard.autoridadeMovimentoLivre),
         dataPerdaEm,
         resumoContratacao,
+        documentosContratacao: card.pipeline.nome === "Revisão de Radar" && etapaEhFechado(card.etapa.nome, card.etapa.chave)
+          ? await resolverDocumentosContratacaoComercial(card.id) : null,
         emailClienteReuniao,
         anexos: card.anexos.map((anexo) => ({ ...anexo, url: `/api/bpm/anexos/${anexo.id}` })),
         camposEtapa,
@@ -1324,15 +1326,18 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
           },
           select: { id: true },
         });
-        if (!campoAssinado) throw new Error("CONTRATO_ASSINADO_SEM_ARQUIVO");
-        const valorAssinado = await tx.bpmCardCampoValor.findUnique({
-          where: { cardId_campoId: { cardId, campoId: campoAssinado.id } },
-          select: { valor: true },
-        });
-        if (!valorAssinado?.valor || !await tx.bpmCardAnexo.findFirst({
+        const valorAssinado = campoAssinado ? await tx.bpmCardCampoValor.findUnique({
+          where: { cardId_campoId: { cardId, campoId: campoAssinado.id } }, select: { valor: true },
+        }) : null;
+        const localValido = campoAssinado && valorAssinado?.valor ? await tx.bpmCardAnexo.findFirst({
           where: { id: valorAssinado.valor, cardId, campoId: campoAssinado.id, url: { startsWith: "bpm-blob:bpm/" } },
           select: { id: true },
-        })) throw new Error("CONTRATO_ASSINADO_SEM_ARQUIVO");
+        }) : null;
+        if (!localValido) {
+          let assinadoProjetado = null;
+          try { assinadoProjetado = (await carregarAcompanhamentoComercial(cardId, tx))?.assinado ?? null; } catch { /* Fail closed for an ambiguous financial source. */ }
+          if (!assinadoProjetado) throw new Error("CONTRATO_ASSINADO_SEM_ARQUIVO");
+        }
       }
       if (
         campos.responsavelId !== undefined
@@ -1562,7 +1567,7 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
       return { updatedAt: proximaVersao, camposValores: valoresValidados, retornoComercial };
     }, { maxWait: 10_000, timeout: 60_000 }));
 
-    if (confirmacao.retornoComercial) await notificarPipelineBpm({ ...confirmacao.retornoComercial, tipo: "CARD_ATUALIZADO" });
+    if (confirmacao.retornoComercial) await notificarContratacaoComercialPosCommit(confirmacao.retornoComercial);
     if (cardAnterior.pipeline.chave === PIPELINE_CHAVE
       && Object.keys(confirmacao.camposValores).length > 0) {
       try {

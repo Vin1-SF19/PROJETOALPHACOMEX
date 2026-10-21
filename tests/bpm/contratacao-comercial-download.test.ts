@@ -11,8 +11,8 @@ it("nega sessão ausente antes de consultar contrato", async () => { m.auth.mock
 it("nega sem permissão no card Comercial, sem consultar armazenamento", async () => { m.acesso.mockRejectedValue(new Error("Não autorizado")); expect((await chamar()).status).toBe(403); expect(m.get).not.toHaveBeenCalled(); });
 it("não disponibiliza contrato ainda em conferência", async () => { m.contexto.mockResolvedValue({ documento: null }); expect((await chamar()).status).toBe(404); expect(m.get).not.toHaveBeenCalled(); });
 it("transmite somente documento autorizado com cache privado, sem expor token", async () => {
-  m.contexto.mockResolvedValue({ documento: { referencia: "bpm/fin/contrato.pdf", armazenamento: "privado" } });
-  m.get.mockResolvedValue({ statusCode: 200, stream: new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode("%PDF-teste")); c.close(); } }) });
+  m.contexto.mockResolvedValue({ documento: { nome: "Contrato.pdf", tipo: "application/pdf", referencia: "bpm/fin/contrato.pdf", armazenamento: "privado" } });
+  m.get.mockResolvedValue({ statusCode: 200, blob: { contentType: "application/pdf" }, stream: new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode("%PDF-teste")); c.close(); } }) });
   const resposta = await chamar(); expect(resposta.status).toBe(200); expect(resposta.headers.get("cache-control")).toContain("no-store");
   expect(resposta.headers.get("content-type")).toBe("application/pdf"); expect(await resposta.text()).toBe("%PDF-teste");
   expect(m.acesso).toHaveBeenCalledWith("comercial", 7, "Comercial", "visualizar");

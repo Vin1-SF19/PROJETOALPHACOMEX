@@ -7268,3 +7268,41 @@ Usuário pediu comparar ambientes e publicar o que faltava em produção `31151e
 
 ### Refletido também em
 - Story e relatório comparativo acima; evidência sanitizada em `/var/tmp/alpha-comparacao-promocao-20261021/`.
+
+
+---
+
+## [2026-10-21 19:31 UTC] — CRM: contratos pendentes integrados, aguardando staging
+
+**Tags:** #feature #integration #security #nextjs #prisma
+**Agentes envolvidos:** coordenação/Bibble, Architect, Scout, SM, backend/Echo, frontend/Nova, QA, Forge, DevOps, Scribe, Kowalski.
+**Arquivos tocados:** helper e DTO `contratacao-comercial-server.ts`/`contratos-comerciais.ts`, rota comercial de contrato, Cards/Anexos/gerador/executores, campos/preview/Anexos/polling; relação completa na story `story-crm-contratos-pendentes-comercial-20261021.md`. Esta consolidação altera somente as três memórias indicadas abaixo.
+
+### Contexto
+Usuário pediu campos contratuais pendentes no Comercial, disponibilidade dos arquivos e aviso ao closer; escolheu liberar após finalizar no Financeiro, preservando a conferência atual.
+
+### O que foi feito
+- Dois slots projetados readonly, arquivo assinado independente, acesso documental autenticado por vínculo único/mesma empresa, sem duplicar blobs; uploads comerciais preservados.
+- Identidade BPM definida pelo servidor; fingerprint/CAS revisam o Comercial, tarefa/alerta por revisão evitam replay e entrega ocorre após commit. Polling recupera mudança no detalhe aberto.
+- Feature `48ebc3c9`, integrada por merge `5e3d629c` com correções concorrentes. Quatro gates completos sobre `2f4d788b` PASS: lint/typecheck/build e 704 arquivos/5.451 testes. Integrações b71/861 tiveram checagens afetadas, respectivamente 104 e 187 testes; não são novas execuções da suíte completa.
+- Push para staging realizado. Deployment informado com prefixo `dpl_H4JD` ainda BUILDING no checkpoint recebido; nenhum aceite remoto inferido.
+
+### Decisões tomadas
+Projeção em vez de anexos copiados; contrato gerado somente FINALIZADO; assinado não altera status de assinatura/pagamento. Notificação reutiliza tarefa/canal existentes, com responsável elegível, sem efeito externo dentro da transação.
+
+### Problemas encontrados / resolvidos
+Mock inicial de exclusão foi corrigido preservando suas assertions antes dos quatro gates integrados. Avanços concorrentes b71 e 861 foram preservados; retorno comercial após commit permanece fora do retry transacional.
+
+### Pendências
+Conferir READY/SHA/alias e realizar reteste autenticado dos slots, anexos e notificação real no staging. Não declarar entrega concluída enquanto isso estiver pendente. Produção fora do escopo; nenhuma alteração de banco, schema, configuração em lote ou backfill nesta entrega.
+
+### Refletido também em
+- `codebase-map.md`: DTO, helper, rota e UI documental.
+- `integration-points.md`: fluxo de finalização, ACL, projeção, alerta e recuperação por polling.
+
+
+### Fechamento remoto confirmado — contratos pendentes
+- READY/SHA/alias confirmados no staging `5e3d629c` / `dpl_H4JDX3syGmX8mZ3rq2pxn1ZzFwYs`. No reteste Admin real com empresa fictícia, só upload manteve pendência; Elaborado=Sim por CRUD normal liberou o contrato e atualizou o Comercial aberto sem reabertura.
+- PDF autenticado 200/1.173 bytes e preview UI; um anexo somente leitura; um aviso real ao responsável com horário/empresa/documento. Reabrir/refetch manteve o mesmo alerta, tarefa e alertaEm, sem duplicar. Assinado permaneceu pendente/404. Zero novo erro da feature; voz 503 preexistente separada.
+- Limites: geração/finalização automática e signed positivo cobertos localmente, não no remoto. Sem assinatura/pagamento/NF/conclusão ou envio externo fabricados, sem produção, schema, ENV ou worker/global manual. A UI financeira pode executar seu housekeeping existente; não se promete zero efeitos indiretos.
+- Evidências privadas `remote-result.json`/`remote-dedup-proof.json`; relatório sanitizado `docs/reports/validacao-contratos-pendentes-staging-2026-10-21.md`. Histórico anterior deste journal preservado; fechamento documental único após QA final.
