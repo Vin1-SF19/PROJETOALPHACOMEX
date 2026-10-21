@@ -19,8 +19,6 @@ export const instagramLinhaSchema = z.object({
   full_name: z.string().trim().min(1).max(200),
   email: texto,
   platform: z.enum(["ig", "instagram", ""]).nullish(),
-  ad_id: texto, ad_name: texto, adset_id: texto, adset_name: texto,
-  campaign_id: texto, campaign_name: texto, form_id: texto, form_name: texto,
   is_organic: z.union([z.boolean(), z.enum(["true", "false", ""]) ]).nullish(),
   lead_status: texto,
   [INSTAGRAM_COLUNAS.radar]: texto,
@@ -52,7 +50,6 @@ export type InstagramLeadDados = {
   radarPretendido: string | null;
   volume: string | null;
   prazo: string | null;
-  campanha: string | null;
   linha: InstagramLinha;
 };
 
@@ -79,6 +76,9 @@ export function leadInstagramEhTeste(linha: InstagramLinha): boolean {
 }
 
 export function prepararLeadInstagram(linha: InstagramLinha): InstagramLeadDados {
+  // Atribuição de marketing pertence ao NoLoss. Também filtra envelopes legados
+  // antes da projeção no quadro/modal e da criação da anotação comercial.
+  linha = instagramLinhaSchema.parse(linha);
   const telefoneOriginal = linha[INSTAGRAM_COLUNAS.telefone] || null;
   const digitos = telefoneOriginal?.replace(/\D/g, "") ?? "";
   const cnpjOriginal = linha[INSTAGRAM_COLUNAS.cnpj] || null;
@@ -93,7 +93,6 @@ export function prepararLeadInstagram(linha: InstagramLinha): InstagramLeadDados
     radarOriginal, radarPretendido: radarInstagram(radarOriginal),
     volume: textoInstagram(linha[INSTAGRAM_COLUNAS.volume]) || null,
     prazo: textoInstagram(linha[INSTAGRAM_COLUNAS.prazo]) || null,
-    campanha: linha.campaign_name || null,
     linha,
   };
 }
@@ -124,10 +123,6 @@ export function anotacaoLeadInstagram(dados: InstagramLeadDados): string {
     `Radar pretendido (coluna M): ${textoInstagram(dados.radarOriginal) || "Não informado"}`,
     `Volume pretendido em 12 meses: ${dados.volume || "Não informado"}`,
     `Prazo desejado: ${dados.prazo || "Não informado"}`,
-    `Campanha: ${linha.campaign_name || "—"} / ${linha.campaign_id || "—"}`,
-    `Anúncio: ${linha.ad_name || "—"} / ${linha.ad_id || "—"}`,
-    `Conjunto: ${linha.adset_name || "—"} / ${linha.adset_id || "—"}`,
-    `Formulário: ${linha.form_name || "—"} / ${linha.form_id || "—"}`,
     `Orgânico: ${String(linha.is_organic ?? "Não informado")}`,
     `Status na origem: ${linha.lead_status || "Não informado"}`,
   ].join("\n");

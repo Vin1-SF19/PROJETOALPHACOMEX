@@ -1,29 +1,22 @@
-# API de leads Instagram — Painel Alpha
+# Instagram — Planilha → NoLoss → CRM
 
-Contrato v1. Integração da planilha `1vzyEobII90qd6txFhPBu5IwUZ9sISGs-6jYODaVmWsI`, aba de `gid=0`, com **Revisão de Radar → Novo Lead**.
+Contrato v2. A planilha `1vzyEobII90qd6txFhPBu5IwUZ9sISGs-6jYODaVmWsI`, aba `gid=0`, envia ao NoLoss. O servidor NoLoss grava contato/atribuição e encaminha somente os dados comerciais ao Painel Alpha, em **Revisão de Radar → Novo Lead**, como card Instagram pulsante sem responsável.
 
-## Endereço e credencial
+## Endereços e credenciais
 
-Homologação: `POST https://staging.alpha-comex.com/api/integrations/instagram/leads`.
+Entrada da planilha em produção: `POST https://noloss.alpha-comex.com/rocket-api/integrations/instagram/leads`.
 
-Produção: `POST https://painel.alpha-comex.com/api/integrations/instagram/leads`. Usa endpoint administrativo e token próprios de produção, separados de staging. A promoção foi solicitada em 2026-10-21; o resultado operacional deve ser conferido na story e no recibo de publicação, sem inferir ativação somente a partir deste contrato.
+Headers: `Content-Type: application/json` e `Authorization: Bearer <token exclusivo NoLoss>`.
 
-O recebimento só é habilitado quando o código estiver publicado e o endpoint administrativo configurado e ativo no ambiente escolhido. Esta documentação não comprova ativação/deploy; consulte a evidência de entrega na story `story-crm-google-sheets-leads.md`.
+Esse token é diferente da credencial NoLoss → CRM. Não colocar credenciais em células, código público ou Git. O Apps Script conhece somente a URL e o token NoLoss; o servidor NoLoss guarda o token do CRM. O endpoint do CRM `/api/integrations/instagram/leads` permanece como destino do servidor, não do remetente da planilha.
 
-Headers obrigatórios:
-
-```http
-Authorization: Bearer <token exclusivo da integração>
-Content-Type: application/json
-```
-
-Token base64url de pelo menos 32 caracteres, entregue por canal privado. Não colocar o token na URL, planilha, frontend ou Git. O servidor guarda somente o hash bcrypt. A rota genérica `/api/bpm/webhooks/...` não recebe leads Instagram.
+Staging isolado do NoLoss: `http://127.0.0.1:4101/integrations/instagram/leads`, acessível apenas no servidor, com banco/token próprios e encaminhamento exclusivamente ao CRM staging. Documentar um endereço não comprova ativação; o recibo operacional e a story registram o que foi publicado e validado.
 
 ## Payload
 
-Envie **um lead por requisição**, com cabeçalhos originais como chaves dentro de `lead`. IDs são strings, mesmo que pareçam números. `spreadsheetId`, `sheetId`, `lead.id`, `lead.created_time` e `lead.full_name` são obrigatórios. `created_time` é uma data ISO 8601 com horário e timezone, como `2026-10-21T09:00:00-03:00`. Demais valores da planilha podem ser string vazia ou null. `is_organic` também aceita boolean. `platform` aceita `ig`, `instagram`, vazio ou null; outra plataforma é recusada.
+Um lead por requisição; cabeçalhos originais da planilha como chaves de `lead`. IDs são strings. Campos obrigatórios: `spreadsheetId`, `sheetId`, `lead.id`, `lead.created_time` (ISO 8601 com timezone), `lead.full_name`. Fonte fixa no ID/aba acima; plataforma `ig`, `instagram`, vazio ou null. Texto opcional: até 2.000 caracteres; nome: 200; ID: 120; corpo: 32 KiB. Envelope aceita somente `spreadsheetId`, `sheetId`, `lead`, `dryRun`; campos desconhecidos do lead são descartados, inclusive `status_crm` e quaisquer credenciais/atribuição de responsável.
 
-Exemplo fictício:
+Exemplo fictício, sem gravação:
 
 ```json
 {
@@ -40,150 +33,84 @@ Exemplo fictício:
     "em_quanto_tempo_você_precisa_do_novo_limite_de_radar?": "preciso_para_ontem",
     "por_qual_número_de__whastapp_podemos_entrar_em_contato_com_você?_exemplo:__(ddd)_9_xxxx-xxxx": "11999990000",
     "para_fazermos_a_pré-análise_do_radar_da_sua_empresa,_preencha_o_campo_abaixo_com_o_seu_cnpj:": "11222333000181",
-    "campaign_id": "c:exemplo",
-    "campaign_name": "Campanha exemplo",
-    "ad_id": "ag:exemplo",
-    "ad_name": "Anúncio exemplo",
-    "adset_id": "as:exemplo",
-    "adset_name": "Conjunto exemplo",
-    "form_id": "f:exemplo",
-    "form_name": "Formulário exemplo",
-    "is_organic": "false",
-    "lead_status": "CREATED"
+    "campaign_name": "Campanha exemplo", "campaign_id": "c:exemplo",
+    "ad_name": "Anúncio exemplo", "ad_id": "a:exemplo",
+    "adset_name": "Conjunto exemplo", "adset_id": "s:exemplo",
+    "form_name": "Formulário exemplo", "form_id": "f:exemplo",
+    "is_organic": "false", "lead_status": "CREATED"
   },
   "dryRun": true
 }
 ```
 
-`dryRun: true` valida autenticação, fonte, payload, entrada do pipeline e conversão, **sem gravar lead**. Após validar o exemplo, remova `dryRun` ou envie `false` para receber de fato.
+`dryRun:true` valida a entrada NoLoss, as definições de atribuição e a API/etapa do CRM sem gravar contatos, UTMs, eventos ou leads. Para receber de fato, omitir `dryRun` ou enviar `false`. Exemplo de chamada:
 
 ```bash
-curl --request POST \
-  'https://staging.alpha-comex.com/api/integrations/instagram/leads' \
-  --header "Authorization: Bearer ${ALPHA_INSTAGRAM_TOKEN}" \
-  --header 'Content-Type: application/json' \
-  --data-binary @lead-example.json
+curl --request POST 'https://noloss.alpha-comex.com/rocket-api/integrations/instagram/leads' \
+  --header "Authorization: Bearer ${ALPHA_NOLOSS_TOKEN}" \
+  --header 'Content-Type: application/json' --data-binary @lead-example.json
 ```
 
-Limite de corpo: 32 KiB; strings opcionais: 2.000 caracteres; nome: 200; ID: 120. Campos desconhecidos dentro de `lead` são descartados antes de persistir. O envelope externo aceita somente `spreadsheetId`, `sheetId`, `lead` e `dryRun`. Nunca enviar responsável, etapa de destino ou dados de autenticação dentro do lead.
+## Atribuição guardada somente no NoLoss
 
-## De/para aprovado
+| Origem | NoLoss |
+| --- | --- |
+| Instagram | `utm_source=instagram` |
+| `is_organic=true` / `false` | `utm_medium=organic_social` / `paid_social`; vazio não presume pago |
+| `campaign_name` | `utm_campaign` |
+| `ad_name` | `utm_content` |
+| `adset_name` | `utm_term` |
+| `form_name` | `utm_form`, extensão de atribuição, não uma UTM padrão |
+| IDs de campanha, anúncio, conjunto e formulário | `fields.instagram_attribution`, com os valores originais e correlação ao lead |
 
-**A coluna M alimenta Radar pretendido por decisão do usuário. A coluna N não determina Radar.**
+As seis definições UTM devem existir, estar ativas e ter tipo texto; a ingestão não cria definições silenciosamente. `utm_form` é configuração administrativa de um campo personalizado na tabela existente, sem migration. O contato mantém os valores conhecidos atuais; cada lead conserva sua própria atribuição completa no evento imutável `instagram.sheet.received`, mesmo quando o contato recebe outro lead depois.
 
-| M — resposta original | Radar pretendido no CRM |
+Contato é identificado por e-mail/telefone, sem mesclar pessoas por nome; conflito entre identificadores de contatos distintos retorna 409. Dados comerciais existentes não são sobrescritos; outros campos JSON são preservados por merge sob bloqueio da linha. Os metadados de publicidade não são enviados ao CRM, persistidos em novas entradas CRM, projetados ao cliente ou usados em novas anotações. O leitor CRM também filtra envelopes antigos, sem apagar registros ou executar backfill.
+
+## Dados comerciais mantidos no CRM
+
+Nome/e-mail/WhatsApp, CNPJ original e válido quando disponível, data original de captação, coluna M → Radar pretendido, volume e prazo permanecem preenchidos. Canal Instagram, aparência do card, pulsação, permissões e assunção continuam os mesmos; responsável somente ao assumir. CNPJ é opcional e deve ser válido se preenchido, sem alterar o cadastro manual/NoLoss do site.
+
+| M — resposta | Radar pretendido |
 | --- | --- |
 | `limitada_usd_50k_semestrais` | Habilitação de Radar 50k |
 | `limitada_usd_150k_semestrais` | Revisão de Radar Limitado a USD150k |
 | `ilimitado` | Revisão de Radar Ilimitado |
-| Empresa em constituição, vazio ou outra resposta | Pendente de conferência ao assumir; resposta original preservada |
+| Outra resposta/empresa em constituição | Conferir ao assumir; original preservado |
 
-Rótulos exatos das três opções do CRM também são aceitos em M. Nomes, acentos e respostas originais ficam preservados; underscores/caracteres invisíveis são normalizados apenas para apresentação/comparação.
+A coluna N é volume e não determina Radar. Campanha, anúncio, conjunto e formulário não aparecem no card/modal/anotação CRM.
 
-| Origem | Destino |
-| --- | --- |
-| `full_name`, `email`, WhatsApp | Nome e contato do lead; Pessoa/vínculo ao assumir |
-| CNPJ | Preenchido no modal; documento válido é conferido ao assumir e pode vincular empresa existente |
-| Coluna M | Radar pretendido, conforme tabela acima |
-| N e O | Respostas de volume/prazo no card/modal; preservadas em anotação ao assumir |
-| Plataforma | Canal de origem Instagram |
-| Campanha, anúncio, conjunto, formulário e IDs | Dados de origem preservados e anexados como anotação ao assumir |
-| `created_time` | Data original de captação, separada da data de recebimento/importação |
-| `lead_status` | Status de origem preservado; não define Qualificação comercial |
-| `status_crm` | Controle do remetente; descartado no recebimento |
+## Confirmação, persistência e retry
 
-E-mail/telefone/CNPJ inválidos não impedem a entrada virtual: a resposta original fica disponível para revisão. Para assumir Instagram, o operador deve conferir Radar válido e responsável elegível. CNPJ e Qualificação continuam opcionais; se o CNPJ estiver preenchido, deve ser válido, ou o operador pode deixar o campo vazio. Empresa em constituição pode permanecer sem CNPJ. Nome pessoal não confirma razão social cadastral. Dados de empresa/pessoa existente não são sobrescritos pela importação; contato reapresentado reativa seu vínculo com a empresa.
+A transação PostgreSQL NoLoss usa um único client e advisory transaction lock para resolver contato, gravar valores UTM e evento com chave `instagram:<spreadsheetId>:0:<lead.id>`. COMMIT ocorre antes do HTTP ao CRM. Não há transação distribuída: falha no envio deixa o recebimento durável no NoLoss e retorna erro, para o Apps Script repetir. Não há worker autônomo novo.
 
-## Respostas e reenvio
-
-Nova entrada persistida, HTTP 201:
+Só confirmar entrega se HTTP 2xx, `success:true`, `externalId` igual e `leadId` presente. Resposta normal:
 
 ```json
-{"success":true,"externalId":"l:exemplo-001","leadId":"c...","duplicate":false,"status":"pending","cardId":null}
+{"success":true,"via":"noloss","externalId":"l:exemplo-001","leadId":"c...","duplicate":false,"status":"pending","cardId":null}
 ```
 
-Reenvio, HTTP 200:
+Reenvio usa o PRIMEIRO payload aceito por NoLoss e a mesma identidade no CRM. Não atualiza silenciosamente um lead já aceito nem reabre um card assumido. Janela de falha após CRM persistir é resolvida pela deduplicação existente. O evento NoLoss só passa a `processed` depois de um ACK válido; resposta 2xx sem identidade correta, redirect, HTML e dry run não são entrega real.
 
-```json
-{"success":true,"externalId":"l:exemplo-001","leadId":"c...","duplicate":true,"status":"pending","cardId":null}
-```
+Dummy Meta retorna `ignored:true`, `reason:LEAD_DE_TESTE`, sem persistir/encaminhar. Credencial ausente/incorreta retorna 401; corpo/fonte/tipo inválido 400/422; limite excedido 413; contato inconsistente/ambíguo 409; atribuição não configurada, falha de persistência ou CRM temporariamente indisponível/credencial CRM inválida 503; ACK incorreto 502. Erros permanentes CRM 400/422 retornam 422, conflito 409 e limite 413, sem confirmação e permitindo ao cursor avançar para os próximos leads; o evento continua pendente para revisão. Falha nunca marca a linha integrada. Repetir o mesmo ID após timeout/429/5xx; não trocar IDs nem endpoints para forçar reenvio.
 
-Após alguém assumir, um reenvio continua HTTP 200 e retorna `status: "promoted"` com `cardId`. A identidade de deduplicação é planilha + gid + ID externo, dentro do endpoint; linha, nome, telefone e CNPJ não são chaves de lead. O primeiro payload aceito é preservado: reenviar o mesmo ID não atualiza dados, não reabre lead assumido e não cria outro card. Para corrigir dados já aceitos, use a conferência no painel ou combine uma operação administrativa específica.
+## Apps Script — somente novos IDs por padrão
 
-Dry run retorna HTTP 200 com `dryRun:true`, Radar convertido e flags `review.radar`, `review.cnpj`, `review.telefone`; não retorna `leadId` e não confirma recebimento persistido.
+Arquivo `scripts/google-sheets-instagram.gs`:
 
-Linhas dummy do Meta (`<test lead: ...>`/`dummy data for`) retornam HTTP 200 com `ignored:true`, `reason:"LEAD_DE_TESTE"` e o `externalId`, sem criar lead.
+1. Colar em **Extensões → Apps Script** da planilha.
+2. Em **Configurações do projeto → Propriedades do script**, definir `ALPHA_API_URL` com a URL NoLoss e `ALPHA_API_TOKEN` com o token exclusivo NoLoss.
+3. Executar **`instalarSincronizacaoInstagram` primeiro**, concedendo os acessos Google. Essa ativação registra os IDs já existentes como histórico ignorado e instala o gatilho de cinco minutos. Não escreve nas respostas ou nos status históricos.
+4. Aguardar novos leads; opcionalmente executar `sincronizarLeadsInstagram` após a instalação. Antes da ativação, essa função recusa o envio. Reinstalar não redefine a baseline nem faz os novos leads virarem histórico.
 
-| HTTP | Significado | Conduta do remetente |
-| --- | --- | --- |
-| 200/201 | Recebido, duplicado, dry run ou teste ignorado | Conferir `externalId` e distinguir os casos acima |
-| 400 | JSON inválido | Corrigir o corpo |
-| 401 | Token ausente/incorreto | Conferir credencial; não insistir |
-| 409 | ID encontrou entrada inconsistente | Solicitar revisão administrativa; não marcar entregue |
-| 413 | Corpo maior que 32 KiB | Reduzir para um único lead dentro do limite |
-| 422 | Campos/fonte/formato inválidos | Corrigir campos indicados em `fields` |
-| 503 | Integração inativa/configuração indisponível | Aguardar ativação e tentar depois |
-| 500 | Falha temporária | Reenviar o mesmo ID |
+A baseline usa IDs, permanece válida após ordenação e não depende de números de linha/data. A implementação protege o armazenamento de propriedades e recusa ativação automática se o histórico ultrapassar sua margem. Uma carga histórica exige operação separada, revisada e autorizada; não apagar a baseline para improvisar backfill.
 
-Timeout, 429 da infraestrutura e 5xx podem ser reenviados com o **mesmo ID**, usando backoff (ex.: 5s, 15s, 60s). Não substituir IDs em retries. Não considerar redirect, HTML, dry run ou sucesso com outro `externalId` como confirmação. Confirme entrega somente se HTTP 200/201, `success:true`, `externalId` igual e `leadId` presente; teste ignorado é um estado separado.
+Cada execução usa lock, cursor, até 25 tentativas e limite de tempo. Após confirmação das duas etapas, escreve `integrado@<host-NoLoss>:<externalId>` somente na coluna `status_crm`; resolve a linha novamente pelo ID antes da escrita. Timeout/falha deixa pendente; o próximo gatilho repete. O conector disponível nesta sessão não instala projetos/gatilhos Apps Script: a instalação é feita pelo editor da planilha. Nenhum ZIP novo é necessário.
 
-## Comportamento no CRM
+## Configuração operacional do servidor NoLoss
 
-Recebimento cria apenas a entrada virtual do Instagram, pulsante, sem responsável e visível conforme acesso ao pipeline/etapa, como os demais leads não assumidos. O card personalizado mostra contato, CNPJ, Radar, volume, prazo e campanha. A abertura apresenta os dados previamente preenchidos e respostas originais.
+Variáveis apenas na API NoLoss: `INSTAGRAM_SHEETS_TOKEN` (nova credencial planilha → NoLoss), `ALPHA_CRM_INSTAGRAM_URL` (destino exato staging/produção) e `ALPHA_CRM_INSTAGRAM_TOKEN` (credencial CRM desse ambiente). Não reutilizar o mesmo segredo nas duas pontas, não aceitar destino arbitrário no payload e não copiar banco/credenciais de produção para staging.
 
-Ao assumir, o servidor revalida acesso e usa uma única transação para reservar a entrada, criar/vincular empresa e contato, criar card/membro, salvar campos/anotação, histórico, evento, automações, SLA e cadências aplicáveis. O responsável é escolhido nessa hora. A entrada passa a PROCESSADO e mantém o vínculo pelo evento CARD_CRIADO. Reenvio da assunção não duplica efeitos e só devolve o card se o usuário puder acessá-lo.
+Somente `POST /integrations/instagram/leads` dispensa sessão de usuário e exige seu próprio Bearer; demais rotas mantêm autenticação/RBAC. Persistência requer PostgreSQL. Nenhuma alteração de schema é necessária. Publicar primeiro no staging, executar validação sem dados reais e só então promover conforme autorização efetiva. O rollout NoLoss pode substituir somente a API com `--no-deps --no-build`, preservando PG/Redis/web/workers e sem executar o serviço `migrate` do compose. Rollback de imagem/configuração preserva os registros.
 
-## Remetente Google Sheets
-
-Código pronto em `scripts/google-sheets-instagram.gs`. O conector Google Drive desta sessão lê/edita células, mas não instala projetos Apps Script ou gatilhos. A instalação deve ser feita por um editor da planilha:
-
-1. Abrir **Extensões → Apps Script** e colar o arquivo.
-2. Em **Configurações do projeto → Propriedades do script**, configurar `ALPHA_API_URL` e `ALPHA_API_TOKEN`.
-3. Confirmar o ambiente de destino e a autorização aplicável ao histórico antes da primeira sincronização.
-4. Executar `sincronizarLeadsInstagram` e autorizar os acessos Google necessários.
-5. Executar `instalarSincronizacaoInstagram` para instalar um gatilho a cada cinco minutos.
-
-Para produção, usar `ALPHA_API_URL=https://painel.alpha-comex.com/api/integrations/instagram/leads` e o token exclusivo desse ambiente. O script envia para apenas um destino por execução. As marcações `status_crm` incluem o host: mudar o destino de staging para produção torna as linhas históricas novamente elegíveis. Antes da primeira execução em produção, definir e autorizar o escopo do histórico conforme o protocolo de importação do projeto; publicar a API não executa essa carga nem instala o gatilho.
-
-Gatilho por tempo captura também linhas adicionadas por integrações/API, que não disparam `onEdit`. Referência: [gatilhos instaláveis do Google](https://developers.google.com/apps-script/guides/triggers/installable).
-
-Cada execução usa lock, até 25 tentativas e limite de tempo; um cursor de varredura evita que erros antigos bloqueiem todos os novos leads. Somente a coluna existente `status_crm` é escrita. Não cria ou renomeia colunas e não altera respostas.
-
-Sucesso confirmado gera `integrado@<host>:<externalId>`; teste ignorado recebe outra marcação. Isso distingue staging de produção e mantém o ID da linha. O `integrado` legado não é tratado como prova de recebimento por esta API. O script resolve o ID novamente antes de escrever para reduzir risco de apontar status à linha errada após ordenação. Evite ordenar a planilha durante uma sincronização em andamento.
-
-Credencial nunca é escrita em células ou logs. As opções `muteHttpExceptions:true` e `followRedirects:false` permitem examinar respostas sem encaminhar credenciais a redirects: [UrlFetchApp](https://developers.google.com/apps-script/reference/url-fetch/url-fetch-app).
-
-## Configuração administrativa e operação
-
-Nenhuma migration é necessária. O inbox usa os modelos já existentes `BpmWebhookEndpoint` e `BpmWebhookEntrada`. O endpoint é exclusivo, `automacaoId=null`, pipeline fixo e slug `instagram-leads-planilha`.
-
-Prévia somente leitura:
-
-```bash
-node --import tsx scripts/instagram-leads.mts \
-  --env-file=.env.staging.local --admin-id=<administrador-ativo> --preview
-```
-
-Configuração individual, após revisar a prévia:
-
-```bash
-node --import tsx scripts/instagram-leads.mts \
-  --env-file=.env.staging.local --admin-id=<administrador-ativo> \
-  --apply --secret-file=/tmp/alpha-instagram-staging.private.json
-```
-
-O `admin-id` é autoria administrativa da configuração e **não** responsável pelos leads. O segredo é gerado uma única vez em arquivo privado 0600. Registre `INSTAGRAM_LEADS_ENDPOINT_ID=<id retornado>` somente no ambiente customizado staging da Vercel e faça novo deploy para carregar a variável. Não usar ambiente production/preview genérico por suposição.
-
-O configurador não rotaciona segredo, não cria leads e não recria endpoint existente. Não excluir o endpoint ou suas entradas: a relação tem cascade e a exclusão perde o histórico/deduplicação. Para pausar, usar o CRUD administrativo existente e definir `ativo=false`, preservando os registros. Alterações de schema, seeds e importações em massa continuam seguindo a política Vault do repositório; configuração individual não dispensa avaliar o escopo real.
-
-Validação inicial: testes → deploy staging → dry run autenticado → entrada de teste controlada conforme autorização → conferir card e assunção → histórico autorizado. Produção fica para promoção explícita futura.
-
-Para um snapshot privado `{spreadsheetId,sheetId,leads:[...]}`, o CLI `scripts/instagram-leads-batch.mts` valida o lote sequencialmente. Exemplo somente leitura no CRM:
-
-```bash
-node --import tsx scripts/instagram-leads-batch.mts \
-  --snapshot=/tmp/alpha-instagram-historico.private.json \
-  --credential=/tmp/alpha-instagram-staging.private.json
-```
-
-A saída contém contagens, pendências e SHA-256 do snapshot, sem nomes/contatos. Carga real exige também `--apply --snapshot-sha256=<hash revisado> --expected-leads=<total revisado> --receipt=<arquivo privado>` e a confirmação específica aplicável. O CLI não escreve na planilha e não instala gatilho; recibo novo é gravado com permissão 0600 sem sobrescrever arquivo existente.
+O CLI de lote `scripts/instagram-leads-batch.mts` aceita somente a URL loopback do NoLoss staging, retém os cabeçalhos originais para esse servidor e continua dryRun por padrão. `--apply` permanece condicionado a hash, contagem, recibo e autorização própria; não foi executado nesta entrega.

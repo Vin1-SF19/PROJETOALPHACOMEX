@@ -2,7 +2,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { setTimeout as esperar } from "node:timers/promises";
-import { instagramIngestSchema, leadInstagramEhTeste } from "../src/lib/bpm/instagram-leads";
+import { instagramIngestSchema, instagramLinhaSchema, leadInstagramEhTeste } from "../src/lib/bpm/instagram-leads";
 
 const args = process.argv.slice(2);
 const option = (name: string) => args.find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -13,10 +13,13 @@ const raw = readFileSync(snapshotFile);
 const fingerprint = createHash("sha256").update(raw).digest("hex");
 const snapshot = JSON.parse(raw.toString("utf8"));
 const credential = JSON.parse(readFileSync(credentialFile, "utf8"));
-if (credential.api !== "https://staging.alpha-comex.com/api/integrations/instagram/leads" || typeof credential.token !== "string" || credential.token.length < 32) throw new Error("Credencial deve apontar exclusivamente para a API de staging.");
+if (credential.api !== "http://127.0.0.1:4101/integrations/instagram/leads" || typeof credential.token !== "string" || credential.token.length < 32) throw new Error("Credencial deve apontar exclusivamente para o NoLoss de staging isolado. Não enviar a planilha diretamente ao CRM.");
 if (!Array.isArray(snapshot.leads) || snapshot.leads.length > 1000) throw new Error("Snapshot deve conter até 1000 leads.");
 const apply = args.includes("--apply");
-const leads: Array<ReturnType<typeof instagramIngestSchema.parse>> = snapshot.leads.map((lead: unknown) => instagramIngestSchema.parse({ spreadsheetId: snapshot.spreadsheetId, sheetId: snapshot.sheetId, lead, dryRun: !apply }));
+// O NoLoss precisa receber a atribuição original. A allowlist comercial do CRM
+// só é aplicada pelo encaminhador após persistir contato/UTMs no NoLoss.
+const relaySchema = instagramIngestSchema.extend({ lead: instagramLinhaSchema.passthrough() });
+const leads: Array<ReturnType<typeof relaySchema.parse>> = snapshot.leads.map((lead: unknown) => relaySchema.parse({ spreadsheetId: snapshot.spreadsheetId, sheetId: snapshot.sheetId, lead, dryRun: !apply }));
 const realCount = leads.filter((input) => !leadInstagramEhTeste(input.lead)).length;
 if (new Set(leads.map((input) => input.lead.id)).size !== leads.length) throw new Error("IDs duplicados no snapshot; revisar antes de enviar.");
 if (apply && (option("snapshot-sha256") !== fingerprint || Number(option("expected-leads")) !== realCount || !option("receipt"))) {
