@@ -1,0 +1,473 @@
+{
+  "validationDate": "2026-10-21",
+  "result": "PASS_ADMIN_HANDOFF_CHAIN_STAGING",
+  "scope": "Admin real; Comercial → Financeiro → entrada do Operacional. Não é aprovação de validações financeiras nem da execução operacional completa.",
+  "lineage": {
+    "historicalAuditRevision": "ab01802531516ada4211e6f3f59578d86b80fca3",
+    "historicalAuditResult": "blocked; preserved unchanged",
+    "runtimeCommit": "027881435e8e296c89519604a37790bd554a3b3f",
+    "deploymentId": "dpl_3XqC9y8Z8vuz4oJzYUKf2KwpQxKD",
+    "deploymentState": "READY",
+    "environment": "staging",
+    "publicAlias": "https://staging.alpha-comex.com",
+    "deploymentVerifiedAt": "2026-10-21T15:24:35.806420+00:00",
+    "productionPublished": false
+  },
+  "actor": {
+    "id": 1,
+    "role": "Admin",
+    "authentication": "real login; no credentials/session exported"
+  },
+  "scenario": {
+    "companyId": 3066,
+    "commercialCardId": "cmvi5ztja000007l8livtiw1o",
+    "financeCardId": "cmvi9qcjb000608jpdywhf639",
+    "operationalCardId": "cmvi9yezf000508jtgmijtabd",
+    "syntheticData": true
+  },
+  "localGates": {
+    "lint": {
+      "exitCode": 0,
+      "existingWarnings": 1193
+    },
+    "typecheck": {
+      "exitCode": 0
+    },
+    "tests": {
+      "exitCode": 0,
+      "filesPassed": 686,
+      "testsPassed": 5278,
+      "skipped": 4,
+      "todo": 1
+    },
+    "build": {
+      "exitCode": 0,
+      "durationSeconds": 150.62,
+      "sourceFingerprint": "5edd36e9174f89608584c9a7f183772ce4ed57bf0c87941eb27afc305c829e66"
+    },
+    "localReviews": [
+      "Anubis PASS",
+      "Lens PASS",
+      "Probe PASS"
+    ],
+    "initialTestRun": {
+      "filesFailed": 5,
+      "testsFailed": 7,
+      "filesPassed": 681,
+      "testsPassed": 5271,
+      "preservedPrivately": true
+    }
+  },
+  "repositionOnly": {
+    "newMovementEvents": 2,
+    "sourceVersionBefore": 6,
+    "sourceVersionAfter": 8,
+    "newHandoffs": 0,
+    "doubleClickProducedOneMovement": true,
+    "kanbanCounter": {
+      "before": {
+        "source": 1,
+        "target": 0
+      },
+      "after": {
+        "source": 0,
+        "target": 1
+      },
+      "sampleAfterDropApproxMs": 300,
+      "elapsedFromDragStartMs": 684,
+      "match": true
+    }
+  },
+  "handoffs": [
+    {
+      "from": "Revisão de Radar",
+      "to": "Financeiro",
+      "destinationStage": "Novo Contrato",
+      "destinationCardId": "cmvi9qcjb000608jpdywhf639",
+      "observedAt": "2026-10-21T15:30:06.385Z",
+      "uiConfirmationMs": 8463,
+      "adminExceptionExplained": true,
+      "exactRequestReplay": {
+        "httpStatus": 200,
+        "returnedExisting": true,
+        "unchanged": {
+          "sameCardIDs": true,
+          "sameLinkIDs": true,
+          "sameExecutionIDs": true,
+          "sameBusinessVersions": true,
+          "sameHistoryIDs": true,
+          "sameEventIDs": true
+        }
+      }
+    },
+    {
+      "from": "Financeiro",
+      "to": "Operacional",
+      "destinationStage": "Boas vindas",
+      "destinationCardId": "cmvi9yezf000508jtgmijtabd",
+      "observedAt": "2026-10-21T15:36:25.914Z",
+      "uiConfirmationMs": 11175,
+      "adminExceptionExplained": true,
+      "exactRequestReplay": {
+        "httpStatus": 200,
+        "returnedExisting": true,
+        "unchanged": {
+          "sameCardIDs": true,
+          "sameLinkIDs": true,
+          "sameExecutionIDs": true,
+          "sameBusinessVersions": true,
+          "sameHistoryIDs": true,
+          "sameEventIDs": true,
+          "sameExecutionRows": true,
+          "sameLinkRows": true,
+          "sameHistoryRows": true,
+          "sameEventRows": true,
+          "sameFields": true,
+          "sameApprovalStates": true,
+          "sameArtifactCounts": true
+        }
+      }
+    }
+  ],
+  "financeMovements": [
+    {
+      "observedAt": "2026-10-21T15:32:47.067Z",
+      "from": "Novo Contrato",
+      "to": "Elaboração de Contrato",
+      "uiConfirmationMs": 2370,
+      "dialogKeptOpen": true,
+      "falseConflictWarnings": 0,
+      "phaseMs": {
+        "save": 1,
+        "request": 776,
+        "refresh": 1219
+      }
+    },
+    {
+      "observedAt": "2026-10-21T15:33:15.343Z",
+      "from": "Elaboração de Contrato",
+      "to": "Formalização",
+      "uiConfirmationMs": 2853,
+      "dialogKeptOpen": true,
+      "falseConflictWarnings": 0,
+      "phaseMs": {
+        "save": 1,
+        "request": 1336,
+        "refresh": 1077
+      }
+    },
+    {
+      "observedAt": "2026-10-21T15:33:40.101Z",
+      "from": "Formalização",
+      "to": "Confirmação de Pagamento",
+      "uiConfirmationMs": 2856,
+      "dialogKeptOpen": true,
+      "falseConflictWarnings": 0,
+      "phaseMs": {
+        "save": 1,
+        "request": 723,
+        "refresh": 1653
+      }
+    },
+    {
+      "observedAt": "2026-10-21T15:34:06.370Z",
+      "from": "Confirmação de Pagamento",
+      "to": "Emissão de Nota Fiscal",
+      "uiConfirmationMs": 10395,
+      "dialogKeptOpen": true,
+      "falseConflictWarnings": 0,
+      "phaseMs": {
+        "save": 1,
+        "request": 1345,
+        "refresh": 8617
+      }
+    },
+    {
+      "observedAt": "2026-10-21T15:34:32.626Z",
+      "from": "Emissão de Nota Fiscal",
+      "to": "Concluido",
+      "uiConfirmationMs": 7372,
+      "dialogKeptOpen": true,
+      "falseConflictWarnings": 0,
+      "phaseMs": {
+        "save": 1,
+        "request": 909,
+        "refresh": 6276
+      }
+    }
+  ],
+  "finalSnapshotAt": "2026-10-21T15:46:46.202Z",
+  "cards": [
+    {
+      "id": "cmvi5ztja000007l8livtiw1o",
+      "empresaId": 3066,
+      "pipelineId": "cmuih48la000009gmzw3wwuzf",
+      "pipelineNome": "Revisão de Radar",
+      "etapaId": "draft-stage-2484d2bc-34dd-49b6-baf8-e53d58f07a83",
+      "etapaNome": "Contrato fechado",
+      "status": "ATIVO",
+      "versao": 9,
+      "concluidoEm": null,
+      "statusPosFechamento": null
+    },
+    {
+      "id": "cmvi9qcjb000608jpdywhf639",
+      "empresaId": 3066,
+      "pipelineId": "cmuih4i54000209gmmyqrg557",
+      "pipelineNome": "Financeiro",
+      "etapaId": "draft-stage-61b69302-cf10-4be3-a537-93fc253e246e",
+      "etapaNome": "Concluido",
+      "status": "ATIVO",
+      "versao": 6,
+      "concluidoEm": null,
+      "statusPosFechamento": null
+    },
+    {
+      "id": "cmvi9yezf000508jtgmijtabd",
+      "empresaId": 3066,
+      "pipelineId": "cmuih4tnh000409gm5z34jvss",
+      "pipelineNome": "Operacional",
+      "etapaId": "draft-stage-802def27-91ae-4231-b3f4-a251951c954a",
+      "etapaNome": "Boas vindas",
+      "status": "ATIVO",
+      "versao": 0,
+      "concluidoEm": null,
+      "statusPosFechamento": null
+    }
+  ],
+  "links": [
+    {
+      "id": "cmvi9qcjt000808jpu8wdwjul",
+      "cardOrigemId": "cmvi5ztja000007l8livtiw1o",
+      "cardDestinoId": "cmvi9qcjb000608jpdywhf639"
+    },
+    {
+      "id": "cmvi9yezw000708jtugqga8wb",
+      "cardOrigemId": "cmvi9qcjb000608jpdywhf639",
+      "cardDestinoId": "cmvi9yezf000508jtgmijtabd"
+    },
+    {
+      "id": "cmvi9yf56000d08jt8m5np8c7",
+      "cardOrigemId": "cmvi5ztja000007l8livtiw1o",
+      "cardDestinoId": "cmvi9yezf000508jtgmijtabd"
+    }
+  ],
+  "executions": [
+    {
+      "id": "cmvi9qcb2000408jp87raddbl",
+      "cardId": "cmvi5ztja000007l8livtiw1o",
+      "automacaoId": "c17d0860b8a679fdf3caffac8",
+      "acaoTipo": "CRIAR_CARD_OUTRO_PIPELINE",
+      "gatilhoTipo": "ENCAMINHAMENTO_ADMIN",
+      "status": "SUCESSO",
+      "tentativas": 1
+    },
+    {
+      "id": "cmvi9yest000308jt9d8vqcoo",
+      "cardId": "cmvi9qcjb000608jpdywhf639",
+      "automacaoId": "cc1b81956f9cb47db83229463",
+      "acaoTipo": "CRIAR_CARD_OUTRO_PIPELINE",
+      "gatilhoTipo": "ENCAMINHAMENTO_ADMIN",
+      "status": "SUCESSO",
+      "tentativas": 1
+    }
+  ],
+  "counts": {
+    "cards": 3,
+    "byPipeline": {
+      "Revisão de Radar": 1,
+      "Financeiro": 1,
+      "Operacional": 1
+    },
+    "links": 3,
+    "executions": 2,
+    "executionStatus": {
+      "SUCESSO": 2
+    },
+    "adminAuthorizations": 2,
+    "forwardedHistory": 2,
+    "attachments": 0,
+    "cadences": 0,
+    "cadenceExecutions": 0,
+    "concludedCards": 0
+  },
+  "origins": [
+    {
+      "cardId": "cmvi5ztja000007l8livtiw1o",
+      "campoId": "cmul8ww6j0005l6ihoegkoyrs",
+      "nome": "Canal de origem",
+      "chave": null,
+      "valor": "Orgânico"
+    },
+    {
+      "cardId": "cmvi9qcjb000608jpdywhf639",
+      "campoId": "cmulq9vvi000kmaihpj1ayxtc",
+      "nome": "Origem do cliente",
+      "chave": "alpha.canal.origem.do.cliente",
+      "valor": "Orgânico"
+    },
+    {
+      "cardId": "cmvi9yezf000508jtgmijtabd",
+      "campoId": "cmulq9vvi000kmaihpj1ayxtc",
+      "nome": "Origem do cliente",
+      "chave": "alpha.canal.origem.do.cliente",
+      "valor": "Orgânico"
+    }
+  ],
+  "adminIntentHistory": [
+    {
+      "id": "cmvi9qcbm000508jpecpmlwgf",
+      "cardId": "cmvi5ztja000007l8livtiw1o",
+      "acao": "ENCAMINHAMENTO_ADMIN_SOLICITADO",
+      "usuarioId": 1,
+      "createdAt": "2026-10-21T15:29:59.266+00:00"
+    },
+    {
+      "id": "cmvi9yet4000408jtosqjb1e8",
+      "cardId": "cmvi9qcjb000608jpdywhf639",
+      "acao": "ENCAMINHAMENTO_ADMIN_SOLICITADO",
+      "usuarioId": 1,
+      "createdAt": "2026-10-21T15:36:15.736+00:00"
+    }
+  ],
+  "destinationCreationEvents": [
+    {
+      "id": "cmvi9qcrr000h08jpivsa56zo",
+      "cardId": "cmvi9qcjb000608jpdywhf639",
+      "tipo": "CARD_CRIADO",
+      "atorTipo": "USUARIO",
+      "atorUserId": 1,
+      "ocorridoEm": "2026-10-21T15:29:59.847+00:00"
+    },
+    {
+      "id": "cmvi9yfiz000k08jttajeg6sq",
+      "cardId": "cmvi9yezf000508jtgmijtabd",
+      "tipo": "CARD_CRIADO",
+      "atorTipo": "USUARIO",
+      "atorUserId": 1,
+      "ocorridoEm": "2026-10-21T15:36:16.667+00:00"
+    }
+  ],
+  "authorshipLimitation": "Dois históricos de intenção e dois eventos CARD_CRIADO têm ator humano 1. Registro auxiliar legado CARD_CRIADO_POR_AUTOMACAO pode ter usuarioId=null; não atribuir toda a trilha a humanos.",
+  "operationalOpen": {
+    "observedAt": "2026-10-21T15:39:06.896Z",
+    "stage": "Boas vindas",
+    "editingContext": "Formulário em edição: Operacional · Boas vindas",
+    "dialogOpen": true,
+    "historicalContextVisible": true,
+    "falseConflictWarnings": 0,
+    "unhandledJsErrors": 0
+  },
+  "runtimeHealth": {
+    "observedUntil": "2026-10-21T15:42:00Z",
+    "observedSince": "2026-10-21T15:24:57.288Z",
+    "unhandledJsErrorCount": 0,
+    "otherHttpErrorCount": 0,
+    "voiceChecks": [
+      {
+        "at": "2026-10-21T15:25:02.207Z",
+        "httpStatus": 503
+      },
+      {
+        "at": "2026-10-21T15:26:02.428Z",
+        "httpStatus": 503
+      },
+      {
+        "at": "2026-10-21T15:28:02.644Z",
+        "httpStatus": 503
+      },
+      {
+        "at": "2026-10-21T15:32:02.830Z",
+        "httpStatus": 503
+      },
+      {
+        "at": "2026-10-21T15:37:03.232Z",
+        "httpStatus": 503
+      }
+    ],
+    "voiceIntervalsSeconds": [
+      60.221,
+      120.216,
+      240.186,
+      300.402
+    ],
+    "voiceServiceAvailable": false
+  },
+  "financialSafety": {
+    "allCardsRemainActive": true,
+    "allConcludedAtNull": true,
+    "allPostClosingStatusNull": true,
+    "contractApprovalRows": 0,
+    "contractArtifactsCreated": 0,
+    "signaturePaymentInvoiceFlagsCreated": 0,
+    "attachmentsCreated": 0,
+    "cadencesCreated": 0,
+    "cadenceExecutionsCreated": 0
+  },
+  "findingMatrix": [
+    {
+      "id": "CRM-01",
+      "result": "PASS_ADMIN_STAGING",
+      "evidence": "Reposicionamento livre separado; dois envios explícitos criaram os destinos sem fabricar conclusão financeira."
+    },
+    {
+      "id": "CRM-02",
+      "result": "PASS_TWO_HANDOFFS_STAGING",
+      "evidence": "Definições existentes executadas pelo helper compatível; Smart e demais variações somente em testes locais."
+    },
+    {
+      "id": "CRM-03",
+      "result": "PASS_ORGANIC_STAGING",
+      "evidence": "Orgânico reapresentado no fechamento e persistido nos dois destinos; parceiro/customização/limpeza/divergência cobertos localmente."
+    },
+    {
+      "id": "CRM-04",
+      "result": "PASS_STAGING_AND_LOCAL_STATES",
+      "evidence": "UI diferencia Não enviado/Enviado, explica exceção e abre destino; falhas/retentativas específicas exercitadas localmente."
+    },
+    {
+      "id": "CRM-05",
+      "result": "PASS_NO_FALSE_WARNINGS_STAGING",
+      "evidence": "Zero avisos falsos nos movimentos observados; conflitos reais/rascunhos cobertos localmente."
+    },
+    {
+      "id": "CRM-06",
+      "result": "PASS_STAGING",
+      "evidence": "Contexto em edição Operacional · Boas vindas e indicação de histórico de passagem confirmados ao abrir destino."
+    },
+    {
+      "id": "CRM-07",
+      "result": "PASS_INSTRUMENTATION_AND_FEEDBACK",
+      "evidence": "Modal aberto e fases medidas separadamente; não há garantia numérica de melhora de latência."
+    },
+    {
+      "id": "CRM-08",
+      "result": "PASS_BACKOFF_STAGING_SERVICE_STILL_UNAVAILABLE",
+      "evidence": "Respostas 503 espaçadas em cerca de 60/120/240/300 segundos; serviço de voz não voltou a ficar disponível."
+    },
+    {
+      "id": "CRM-09",
+      "result": "PASS_OPTIMISTIC_COUNTER_STAGING",
+      "evidence": "Contagens filtradas 1/0→0/1 na amostra aproximadamente 300 ms após o drop; rollback e filtros também cobertos localmente."
+    },
+    {
+      "id": "UX",
+      "result": "PASS_MODAL_AND_CONTEXT_STAGING",
+      "evidence": "Cinco avanços financeiros mantiveram detalhe aberto; centro e histórico distinguíveis; títulos/composição cobertos localmente."
+    }
+  ],
+  "limits": [
+    "Admin real e origem Orgânico exercitados no staging; não há aceite de usuário comum ou validações financeiras por inferência.",
+    "Parceiro, origem personalizada, falhas, concorrência/cross-cliente e Smart cobertos localmente; não foram jornadas remotas deste reteste.",
+    "Não foram executados cobrança, assinatura, emissão fiscal, convites Meet nem o trabalho operacional após Boas vindas.",
+    "Serviço externo de voz permanece indisponível; backoff foi observado, recuperação real não foi demonstrada.",
+    "Tempos UI incluem leitura/reconciliação e captura; não equivalem a tempo isolado do backend nem a uma melhora percentual."
+  ],
+  "sanitization": {
+    "method": "explicit allowlist of synthetic scenario IDs/counts/status/timings; raw DOM/select options and raw browser request/response omitted",
+    "rawBrowserDataVersioned": false,
+    "credentialsCookiesEnvironmentValuesVersioned": false,
+    "historicalAuditArtifactsChanged": false
+  },
+  "screenshot": "evidencias/crm-correcoes-2026-10-21/operacional-boas-vindas.png"
+}

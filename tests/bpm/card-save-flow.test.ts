@@ -30,7 +30,7 @@ describe("CRM - persistência antes da movimentação", () => {
     const guarda = movimento.indexOf("if (!savesConcluidos)");
     const mover = movimento.indexOf("MoverCardBpm({ cardId: card.id, etapaDestinoId })");
 
-    expect(movimento).toContain("const savesConcluidos = await flushSaves(card.id)");
+    expect(movimento).toMatch(/const savesConcluidos\s*=\s*await medirFaseCrm\("salvamento",\s*\(\) => flushSaves\(card\.id\)\)/);
     expect(guarda).toBeGreaterThan(-1);
     expect(guarda).toBeLessThan(mover);
   });
@@ -38,9 +38,10 @@ describe("CRM - persistência antes da movimentação", () => {
   it("força o blur do campo em edição antes de aguardar a fila de saves", () => {
     const movimento = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa.tsx");
     const blur = movimento.indexOf("document.activeElement.blur()");
-    const flush = movimento.indexOf("const savesConcluidos = await flushSaves(card.id)");
+    const flush = movimento.search(/const savesConcluidos\s*=\s*await medirFaseCrm\("salvamento",\s*\(\) => flushSaves\(card\.id\)\)/);
 
     expect(blur).toBeGreaterThan(-1);
+    expect(flush).toBeGreaterThan(-1);
     expect(blur).toBeLessThan(flush);
   });
 
@@ -48,7 +49,14 @@ describe("CRM - persistência antes da movimentação", () => {
     const movimento = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa.tsx");
 
     expect(movimento).toContain("const [movendoEtapa, setMovendoEtapa] = useState(false)");
-    expect(movimento).toContain("if (etapaDestinoId === card.etapa.id || movendoEtapa || !podeMoverEtapa");
+    expect(movimento).toMatch(/if \(etapaDestinoId === card\.etapa\.id \|\| movimentoEmCursoRef\.current \|\| movendoEtapa \|\| !podeMoverEtapa/);
+    const comando = movimento.slice(movimento.indexOf("async function handleMover("), movimento.indexOf("async function salvarRequisitosEMover("));
+    // A trava síncrona precede o primeiro await e cobre dois cliques no mesmo
+    // frame, antes de React aplicar o disabled. O teste React valida a chamada.
+    const trava = comando.indexOf("movimentoEmCursoRef.current = true");
+    expect(trava).toBeGreaterThan(-1);
+    expect(trava).toBeLessThan(comando.indexOf("await "));
+    expect(comando).toContain("movimentoEmCursoRef.current = false");
     expect(movimento).toContain("disabled={bloqueada || movendoEtapa}");
     expect(movimento).toContain('aria-busy={!estado || movendoEtapa}');
     expect(movimento).toContain('className="shrink-0 animate-spin"');

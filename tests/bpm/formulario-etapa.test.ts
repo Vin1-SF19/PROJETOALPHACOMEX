@@ -137,7 +137,7 @@ describe("CRM - formulário unificado por etapa", () => {
   });
 
   it("mantém avançar como uma ação explícita e compacta no painel direito", () => {
-    expect(proximaEtapa).toContain("await flushSaves(card.id)");
+    expect(proximaEtapa).toMatch(/await medirFaseCrm\("salvamento",\s*\(\) => flushSaves\(card\.id\)\)/);
     expect(proximaEtapa).toContain("MoverCardBpm({ cardId: card.id, etapaDestinoId })");
     expect(proximaEtapa).not.toContain("Salvar e avançar");
     expect(proximaEtapa).toContain("rounded-xl border border-white/[0.06]");

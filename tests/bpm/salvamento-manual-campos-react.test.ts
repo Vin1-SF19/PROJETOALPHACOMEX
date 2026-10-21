@@ -303,3 +303,37 @@ it("falha tardia do lote A não apaga a recuperação mais recente do lote B", a
   expect(AtualizarCardBpm).toHaveBeenCalledTimes(1);
   expect(context.getFailedSaveKeys("card-pagamento")).toEqual([recoveryKey]);
 });
+
+
+async function receberSnapshot(revisao: number, valores: Record<string, string>) {
+  const remoto = { ...card, updatedAt: new Date("2026-09-29T10:03:00Z"), camposEtapa: card.camposEtapa.map((campo) => ({ ...campo, valor: valores[campo.id] ?? campo.valor })) };
+  await act(async () => root.render(h(CardSaveProvider, null, h(Probe), h(PainelCamposEtapaAtual, {
+    card: remoto, campoIds: campos.map((campo) => campo.id), instanceKey: "form", accent: "1,2,3", podeEditar: true, realtimeRevision: revisao, onAtualizado: vi.fn(),
+  }))));
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5)); });
+}
+it("atualização inicial e de campo intacto não mostram conflito nem apagam edição", async () => {
+  await editar("primeiro", "Meu texto");
+  await receberSnapshot(1, { segundo: "Atualizado por outra pessoa" });
+  expect(container.querySelector<HTMLInputElement>("#campo-bpm-primeiro")!.value).toBe("Meu texto");
+  expect(container.querySelector<HTMLInputElement>("#campo-bpm-segundo")!.value).toBe("Atualizado por outra pessoa");
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+  expect(container.textContent).not.toContain("Este card recebeu uma atualização em tempo real");
+  expect(context.getPendingFields("card")).toEqual(["primeiro"]);
+});
+it("confirmação da própria edição remove pendências sem aviso de conflito", async () => {
+  await editar("primeiro", "Meu texto");
+  await receberSnapshot(1, { primeiro: "Meu texto" });
+  expect(context.getPendingFields("card")).toEqual([]);
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+});
+it("conflito real conserva rascunho até aceitar versão remota explicitamente", async () => {
+  await editar("primeiro", "Meu texto");
+  await receberSnapshot(1, { primeiro: "Texto externo" });
+  expect(container.querySelector<HTMLInputElement>("#campo-bpm-primeiro")!.value).toBe("Meu texto");
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain("Seu rascunho e a versão-base foram preservados");
+  const aceitar = [...container.querySelectorAll("button")].find((button) => button.textContent?.includes("Usar dados atualizados"))!;
+  await act(async () => aceitar.click());
+  expect(container.querySelector<HTMLInputElement>("#campo-bpm-primeiro")!.value).toBe("Texto externo");
+  expect(context.getPendingFields("card")).toEqual([]);
+});

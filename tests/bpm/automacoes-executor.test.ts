@@ -12,9 +12,11 @@ const mocks = vi.hoisted(() => ({
   gerarFicha: vi.fn(),
   montarFatoChecklist: vi.fn(),
   materializarChecklists: vi.fn(),
+  encaminhar: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/bpm/automacoes/encaminhamento", () => ({ executarEncaminhamentoBpm: mocks.encaminhar }));
 vi.mock("@vercel/blob", () => ({ put: vi.fn() }));
 vi.mock("resend", () => ({ Resend: vi.fn() }));
 vi.mock("@/lib/bibble/gerar-ficha-server", () => ({
@@ -91,6 +93,18 @@ describe("worker das automações BPM", () => {
     mocks.transaction.mockImplementation((operacoes) => Promise.all(operacoes));
     mocks.montarFatoChecklist.mockResolvedValue({ placeholders: {} });
     mocks.materializarChecklists.mockResolvedValue({ criados: [], checklists: [] });
+  });
+
+  it("executa encaminhamento legado ativo sem versão central pelo mesmo helper transacional", async () => {
+    const base = await mocks.execucaoFindUnique.getMockImplementation()?.();
+    const parametros = { pipelineId: "cmuih4i54000209gmmyqrg557", etapaId: "draft-stage-92d707af-9b90-4f71-a9be-58ec7fbe98f8",
+      vincularAoOriginal: true, somenteSeNaoExistirAtivo: true };
+    mocks.execucaoFindUnique.mockResolvedValue({ ...base, automacao: { ...base.automacao,
+      acaoTipo: "CRIAR_CARD_OUTRO_PIPELINE", parametrosJson: JSON.stringify(parametros) } });
+    mocks.encaminhar.mockResolvedValue({ cardId: "destino", existente: false, versao: 1 });
+    expect(await processarFilaAutomacoesBpm(10)).toMatchObject({ executados: 1, falhos: 0 });
+    expect(mocks.encaminhar).toHaveBeenCalledWith({ cardId: "card-1", execucaoId: "execucao-1", automacaoId: "automacao-1", parametros });
+    expect(mocks.execucaoUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "SUCESSO" }) }));
   });
 
   it("faz claim, gera a ficha, anexa ao card e registra sucesso", async () => {

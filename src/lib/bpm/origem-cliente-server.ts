@@ -18,7 +18,7 @@ export async function resolverParceiroOrigem(
   const campo = origens[0];
   if (!origemEhParceiro(valores[campo.id])) return { campoId: campo.id, parceiroId: null };
   const indicacao = await tx.indicacao.findUnique({ where: { bpmCardId: cardId }, select: { parceiroId: true, status: true } });
-  return { campoId: campo.id, parceiroId: indicacao?.status === "ATIVA" ? indicacao.parceiroId : null };
+  return { campoId: campo.id, parceiroId: indicacao?.status === "ATIVA" ? indicacao.parceiroId : await parceiroDaNegociacaoVinculada(cardId, tx) };
 }
 
 /** Apenas leitura: pode ser usada na prévia de transição. Campos já devem estar autorizados. */
@@ -54,6 +54,11 @@ export async function salvarParceiroOrigem(
   const anterior = await tx.indicacao.findUnique({ where: { bpmCardId: card.id }, select: { id: true, parceiroId: true, status: true } });
   if (!anterior && selecao.parceiroId === null || anterior?.parceiroId === selecao.parceiroId && anterior.status === "ATIVA") return;
   if (selecao.parceiroId !== null && !usuarioId) throw new Error("CAMPO_INVALIDO:Usuário obrigatório para selecionar parceiro.");
+  if (!anterior && selecao.parceiroId !== null) {
+    const herdado = await parceiroDaNegociacaoVinculada(card.id, tx);
+    if (herdado === selecao.parceiroId) return; // No duplicated referral/commission on Finance/Operations cards.
+    if (herdado !== null) throw new Error("CAMPO_INVALIDO:Altere o parceiro no card comercial de origem da negociação.");
+  }
   if (anterior) await tx.indicacao.update({ where: { id: anterior.id }, data: { bpmCardId: null, status: "DESVINCULADA" } });
   if (selecao.parceiroId !== null) {
     await tx.indicacao.create({ data: { bpmCardId: card.id, clienteId: card.empresaId, parceiroId: selecao.parceiroId,
@@ -62,4 +67,27 @@ export async function salvarParceiroOrigem(
   await tx.bpmCardHistorico.create({ data: { cardId: card.id, acao: "CARD_ATUALIZADO", usuarioId,
     valorAnteriorJson: JSON.stringify({ parceiroOrigemId: anterior?.parceiroId ?? null }),
     valorNovoJson: JSON.stringify({ parceiroOrigemId: selecao.parceiroId }) } });
+}
+
+/** Resolve aliases of origin only within this negotiation. Conflicting legacy aliases remain explicit. */
+export async function carregarOrigemMesmoCard(
+  cardId: string,
+  client: Pick<Prisma.TransactionClient, "bpmCardCampoValor">,
+): Promise<string | null> {
+  const valores = await client.bpmCardCampoValor.findMany({ where: { cardId, campo: { ativo: true } },
+    select: { campoId: true, valor: true, campo: { select: { nome: true, chave: true } } } });
+  const origens = [...new Set(valores.filter((item) => item.campo && campoEhOrigemCliente(item.campo))
+    .map((item) => item.valor?.trim()).filter((valor): valor is string => Boolean(valor)))];
+  return origens.length === 1 ? origens[0] : null;
+}
+
+async function parceiroDaNegociacaoVinculada(cardId: string, tx: Prisma.TransactionClient): Promise<number | null> {
+  const card = await tx.bpmCard.findUnique({ where: { id: cardId }, select: { empresaId: true,
+    vinculosDestino: { select: { cardOrigem: { select: { empresaId: true,
+      indicacaoOrigem: { select: { parceiroId: true, status: true } } } } } } } });
+  if (!card) return null;
+  const ids = [...new Set(card.vinculosDestino.filter((vinculo) => vinculo.cardOrigem.empresaId === card.empresaId
+    && vinculo.cardOrigem.indicacaoOrigem?.status === "ATIVA")
+    .flatMap((vinculo) => vinculo.cardOrigem.indicacaoOrigem ? [vinculo.cardOrigem.indicacaoOrigem.parceiroId] : []))];
+  return ids.length === 1 ? ids[0] : null;
 }

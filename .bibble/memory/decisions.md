@@ -1646,3 +1646,13 @@ Pedido confirmado escolhe preencher valor/forma pelo formulário atual de Em tra
 `valorExibicao` separa apresentação nominal do ID efetivo e seus overrides. Referência automática de usuário fica readonly na UI; flags/permissões/backend e edição legada sem fonte são preservados. Consulta em lote apenas dos IDs autorizados, sem catálogo global. Leitura de requisitos também exige visibilidade do destino antes de resolver referências. Código/plano não significam banco aplicado/publicação: consentimento, homologação autenticada e gates finais permanecem explicitamente pendentes na story.
 
 - 16/10/2026 — Configuração acima autorizada, aplicada e verificada no Turso: Radar v32/formulário Em tratativa v3; dois campos opcionais na origem, entrada de Fechado preservada. Correção nominal do vendedor ainda depende de publicação do código.
+
+
+### 2026-10-21 — Decisões da correção CRM-01–09 (Scribe)
+
+- **Intenção separada da posição:** reposicionamento livre de Admin/líder continua sem automações; envio entre setores exige ação explícita e autoria auditável. Não inferir contratação concluída pela coluna final.
+- **Autoridade restrita à execução:** conta Admin ativa/ACL e snapshot persistido autorizam somente aquele envio; jobs/usuários comuns não herdam a exceção. Financeiro → Operacional administrativo não fabrica assinatura, pagamento, NF nem status CONCLUIDO.
+- **Uma semântica de envio:** helper transacional comum a manual/legado/central, parâmetros próprios da ação e dedupe/vínculos/outbox no mesmo commit; repetir envio não repete o grafo inteiro. Mudança de configuração exige novo clique; retentativa de dados reautoriza versão atual. Sem schema, seed, backfill ou conversão em massa.
+- **Origem por negociação:** destino explícito, inclusive branco, prevalece; depois mapeamento, depois aliases concordantes do próprio card. Parceiro herda apenas vínculos da mesma empresa, mantendo uma indicação comercial sem duplicar comissão.
+- **UX fiel à persistência:** conflito depende de base/local/remoto, card e contadores compartilham movimento otimista/rollback, detalhe mantém contexto e abertura; saúde de voz tem backoff/cancelamento e medição contém só fases.
+- **Limite de homologação:** gates locais aprovados não aprovam o E2E remoto. Publicar/testar primeiro staging; produção requer nova autorização específica. Reteste Admin em `02788143` aprovado até a entrada Operacional: três cards/duas execuções/três vínculos e repetições sem duplicata. O relatório histórico foi preservado; detalhes/limites em `docs/reports/validacao-correcoes-crm-2026-10-21.md`.

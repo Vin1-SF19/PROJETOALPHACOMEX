@@ -43,6 +43,15 @@ export const parametrosContratoSchema = z.object({
   ).default({}),
 }).strict();
 
+export const parametrosEncaminhamentoSchema = z.object({
+  pipelineId: z.string().cuid(),
+  etapaId: etapaIdCardSchema,
+  responsavelId: z.number().int().positive().optional(),
+  servico: z.string().trim().max(200).optional(),
+  vincularAoOriginal: z.boolean().default(true),
+  somenteSeNaoExistirAtivo: z.boolean().default(false),
+}).strict();
+
 export const parametrosFichaSchema = z.object({}).strict();
 export const parametrosMaterializarChecklistSchema = z.object({}).strict();
 
@@ -148,6 +157,10 @@ export const salvarAutomacaoBpmSchema = z.discriminatedUnion("acaoTipo", [
     acaoTipo: z.literal("IDENTIFICAR_OPORTUNIDADE"),
     parametros: parametrosOportunidadeSchema,
   }),
+  baseSchema.extend({
+    acaoTipo: z.literal("CRIAR_CARD_OUTRO_PIPELINE"),
+    parametros: parametrosEncaminhamentoSchema,
+  }),
 ]).superRefine((dados, context) => {
   if (dados.gatilhoTipo === "TEMPO_NA_COLUNA" && !dados.tempoMinutos) {
     context.addIssue({
@@ -200,7 +213,7 @@ export const duplicarAutomacaoBpmSchema = z.object({
 }).strict();
 
 export function validarParametrosAutomacaoBpm(
-  acaoTipo: AcaoAutomacaoBpm,
+  acaoTipo: string,
   parametros: unknown,
 ) {
   if (acaoTipo === "ENVIAR_EMAIL") return parametrosEmailSchema.parse(parametros);
@@ -208,7 +221,9 @@ export function validarParametrosAutomacaoBpm(
   if (acaoTipo === "GERAR_FICHA") return parametrosFichaSchema.parse(parametros);
   if (acaoTipo === "MATERIALIZAR_CHECKLIST") return parametrosMaterializarChecklistSchema.parse(parametros);
   if (acaoTipo === "DISTRIBUIR_RESPONSAVEL") return parametrosDistribuicaoSchema.parse(parametros);
-  return parametrosOportunidadeSchema.parse(parametros);
+  if (acaoTipo === "IDENTIFICAR_OPORTUNIDADE") return parametrosOportunidadeSchema.parse(parametros);
+  if (acaoTipo === "CRIAR_CARD_OUTRO_PIPELINE") return parametrosEncaminhamentoSchema.parse(parametros);
+  throw new Error("Tipo de ação não suportado pelo executor legado");
 }
 
 export type SalvarAutomacaoBpmInput = z.infer<typeof salvarAutomacaoBpmSchema>;
@@ -216,3 +231,5 @@ export type ParametrosEmailBpm = z.infer<typeof parametrosEmailSchema>;
 export type ParametrosContratoBpm = z.infer<typeof parametrosContratoSchema>;
 export type ParametrosDistribuicaoBpm = z.infer<typeof parametrosDistribuicaoSchema>;
 export type ParametrosOportunidadeBpm = z.infer<typeof parametrosOportunidadeSchema>;
+
+export type ParametrosEncaminhamentoBpm = z.infer<typeof parametrosEncaminhamentoSchema>;

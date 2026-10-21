@@ -19,6 +19,7 @@ import { avaliarGrupo } from "@/lib/bpm/regras/avaliador";
 import { montarContextoAvaliacaoDoCard } from "@/lib/bpm/regras/contexto";
 import type { ContextoAvaliacao } from "@/lib/bpm/regras/types";
 import { BPM_PIPELINE_KEYS } from "@/lib/bpm/ontology";
+import { carregarOrigemMesmoCard } from "@/lib/bpm/origem-cliente-server";
 import { campoEhOrigemCliente } from "@/lib/bpm/origem-cliente";
 import { carregarUsuariosCamposBpm } from "@/lib/bpm/usuarios-campos-server";
 import { idUsuarioCampoBpm, type OpcaoUsuarioCampoBpm } from "@/lib/bpm/usuarios-campos";
@@ -405,8 +406,11 @@ export async function carregarCamposAplicaveisCardEtapa(
     };
   }
 
+  const origemMesmoCard = campos.some(campoEhOrigemCliente) ? await carregarOrigemMesmoCard(cardId, client) : null;
   const cardOrigem = campos.some(campoEhOrigemCliente)
-    ? await client.bpmCard.findUnique({ where: { id: cardId }, select: { indicacaoOrigem: { select: { parceiroId: true, status: true } } } })
+    ? await client.bpmCard.findUnique({ where: { id: cardId }, select: { empresaId: true, indicacaoOrigem: { select: { parceiroId: true, status: true } },
+      vinculosDestino: { where: { cardOrigem: { indicacaoOrigem: { status: "ATIVA" } } }, take: 2,
+        select: { cardOrigem: { select: { empresaId: true, indicacaoOrigem: { select: { parceiroId: true, status: true } } } } } } } })
     : null;
   const camposComValores = campos.map((campo) => {
     const valorPersistido = valorPorCampo.get(campo.id) ?? null;
@@ -419,15 +423,26 @@ export async function carregarCamposAplicaveisCardEtapa(
         ? valorPersistido
         : (valoresCanonicos[campo.id] || null))
       : (resolvidos.efetivos[campo.id] || valorPersistido || valorPadraoExibivel || null);
+    // A stored empty row is an explicit clearing, not permission to resurrect an old origin.
+    const valorOrigem = campoEhOrigemCliente(campo) && campo.escopo !== "GLOBAL"
+      ? valorPorCampo.has(campo.id) ? valorPersistido
+        : mapeamento && valorPorCampo.has(mapeamento.campoOrigemId) ? valorPorCampo.get(mapeamento.campoOrigemId) ?? null
+          : valorNovoContrato ?? origemMesmoCard
+      : valorNovoContrato;
+    const parceirosHerdados = [...new Set((cardOrigem?.vinculosDestino ?? []).flatMap((vinculo) =>
+      cardOrigem?.empresaId != null && vinculo.cardOrigem.empresaId === cardOrigem.empresaId && vinculo.cardOrigem.indicacaoOrigem?.status === "ATIVA" ? [vinculo.cardOrigem.indicacaoOrigem.parceiroId] : []))];
+    const parceiroOrigemId = cardOrigem?.indicacaoOrigem?.status === "ATIVA"
+      ? cardOrigem.indicacaoOrigem.parceiroId : parceirosHerdados.length === 1 ? parceirosHerdados[0] : null;
     const valor = campo.chave === "alpha.radar.standby.status_follow_up"
       ? (opcoesStatusStandby?.opcoes.find((opcao) => opcao.chave === (estadoStandby?.standbyFollowUpInterrompidoEm ? "interrompido" : "ativo"))?.rotulo ?? (estadoStandby?.standbyFollowUpInterrompidoEm ? "Interrompido" : "Ativo"))
+      : campoEhOrigemCliente(campo) ? valorOrigem
       : precisaDadosMestres && campo.escopo === "CARD" && !mapeamento && !valorPersistido
       ? resolverValorEfetivoCampoBpm({ nomeCampo: campo.nome, valorPersistido: valorNovoContrato, dadosMestres })
-      : valorNovoContrato;
+      : valorOrigem;
     return {
       ...campo,
       valor,
-      ...(campoEhOrigemCliente(campo) ? { parceiroOrigemId: cardOrigem?.indicacaoOrigem?.status === "ATIVA" ? cardOrigem.indicacaoOrigem.parceiroId : null } : {}),
+      ...(campoEhOrigemCliente(campo) ? { parceiroOrigemId } : {}),
       mapeamentoModo: mapeamento?.modo ?? null,
       campoOrigemId: mapeamento?.campoOrigemId ?? null,
       somenteLeitura: campo.somenteLeitura === true || resolvidos.somenteLeitura.has(campo.id),
@@ -473,7 +488,7 @@ export async function carregarSnapshotsCopiaCamposCard(
   client: ClienteRequisitosEtapa = db,
 ): Promise<Record<string, string>> {
   const campos = await carregarCamposAplicaveisCardEtapa(cardId, pipelineId, etapaId, client);
-  const candidatos = campos.filter((campo) => campo.mapeamentoModo === "COPIAR" && campo.valor?.trim());
+  const candidatos = campos.filter((campo) => (campo.mapeamentoModo === "COPIAR" || campoEhOrigemCliente(campo)) && campo.valor?.trim());
   if (!candidatos.length) return {};
   const existentes = await client.bpmCardCampoValor.findMany({
     where: { cardId, campoId: { in: candidatos.map((campo) => campo.id) } },

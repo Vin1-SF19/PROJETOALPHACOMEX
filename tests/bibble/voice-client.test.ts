@@ -15,6 +15,7 @@ class FakeAudio {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   resetBibbleSpeechRequestsForTests();
   resetVoiceStatusCacheForTests();
@@ -65,16 +66,21 @@ describe("Bibble browser voice", () => {
     expect(status.device).toBe("cpu");
   });
 
-  it("uses a shorter controlled retry after status failure", async () => {
+  it("does not retry unavailable voice more often than healthy voice", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
     const fetchStatus = vi.fn(async (input: RequestInfo | URL) => {
       if (String(input).includes("/api/bibble/voice")) throw new Error("offline");
       return Response.json({ stt_enabled: true });
     });
     expect((await refreshBibbleVoiceStatus(fetchStatus, 1_000)).tts_enabled).toBe(false);
-    await refreshBibbleVoiceStatus(fetchStatus, 10_999);
+    await refreshBibbleVoiceStatus(fetchStatus, 60_999);
     expect(fetchStatus).toHaveBeenCalledTimes(2);
-    await refreshBibbleVoiceStatus(fetchStatus, 11_001);
+    await refreshBibbleVoiceStatus(fetchStatus, 61_001);
     expect(fetchStatus).toHaveBeenCalledTimes(4);
+    await refreshBibbleVoiceStatus(fetchStatus, 121_002);
+    expect(fetchStatus).toHaveBeenCalledTimes(4);
+    vi.useRealTimers();
   });
 
   it("stops the previous owner, keeps one playback and revokes object URLs", async () => {

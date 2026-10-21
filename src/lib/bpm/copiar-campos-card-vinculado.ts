@@ -2,6 +2,8 @@ import "server-only";
 
 import type { Prisma } from "@prisma/client";
 
+import { campoEhOrigemCliente } from "@/lib/bpm/origem-cliente";
+import { carregarOrigemMesmoCard } from "@/lib/bpm/origem-cliente-server";
 import { carregarValoresCanonicosCampos } from "@/lib/bpm/campos-configuraveis-server";
 
 /** Copia somente valores disponíveis na origem para os campos publicados no destino. */
@@ -24,7 +26,7 @@ export async function copiarCamposCardVinculado(
       componentesFormulario: { some: { secao: { formulario: { etapaId: etapaDestinoId, ativo: true } } } },
     },
     select: {
-      id: true,
+      id: true, nome: true, chave: true,
       mapeamentoDestino: { select: { campoOrigemId: true, modo: true, ativo: true } },
     },
   });
@@ -47,12 +49,15 @@ export async function copiarCamposCardVinculado(
   ]);
   const canonicos = await carregarValoresCanonicosCampos(origemId, camposOrigem, tx);
   const valoresOrigem = new Map(valores.map((item) => [item.campoId, item.valor]));
+  const origemMesmoCard = camposDestino.some((campo) => typeof campo.nome === "string" && campoEhOrigemCliente(campo)) ? await carregarOrigemMesmoCard(origemId, tx) : null;
   let copiados = 0;
   for (const campo of camposDestino) {
     const origemCampoId = campo.mapeamentoDestino?.ativo && campo.mapeamentoDestino.modo === "COPIAR"
       ? campo.mapeamentoDestino.campoOrigemId
       : campo.id;
-    const valor = valoresOrigem.get(origemCampoId)?.trim() || canonicos[origemCampoId]?.trim();
+    const valor = valoresOrigem.has(origemCampoId)
+      ? valoresOrigem.get(origemCampoId)?.trim()
+      : canonicos[origemCampoId]?.trim() || (typeof campo.nome === "string" && campoEhOrigemCliente(campo) ? origemMesmoCard : null);
     if (!valor) continue;
     await tx.bpmCardCampoValor.upsert({
       where: { cardId_campoId: { cardId: destinoId, campoId: campo.id } },

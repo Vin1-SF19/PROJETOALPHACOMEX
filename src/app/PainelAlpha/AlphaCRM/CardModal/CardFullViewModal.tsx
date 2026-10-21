@@ -8,6 +8,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
+import { medirFaseCrm } from "@/lib/bpm/medicao-ui";
 import { isAdminRole } from "@/lib/roles";
 import { etapaEhBoasVindas, PIPELINE_OPERACIONAL_ATIVO_ID, podeAgirBoasVindasOperacional } from "@/lib/bpm/boas-vindas";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
@@ -82,7 +83,16 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
   const acaoAposConfirmacaoRef = useRef<() => void>(onClose);
   useEffect(() => () => flushScheduled(`${cardId}:`), [cardId, flushScheduled]);
   const [card, setCard] = useState<CardDetalhe | null>(null);
-  useEffect(() => subscribeConfirmation(cardId, (confirmed) => setCard(confirmed)), [cardId, subscribeConfirmation]);
+  const ultimaConsultaRef = useRef(0);
+  const confirmarSnapshot = useCallback((novo: CardDetalhe) => {
+    setCard((atual) => atual?.id === novo.id && (
+      atual.versao > novo.versao || new Date(atual.updatedAt).getTime() > new Date(novo.updatedAt).getTime()
+    ) ? atual : novo);
+  }, []);
+  useEffect(() => subscribeConfirmation(cardId, (confirmed) => {
+    ultimaConsultaRef.current += 1;
+    confirmarSnapshot(confirmed);
+  }), [cardId, subscribeConfirmation, confirmarSnapshot]);
   const [etapas, setEtapas] = useState<EtapaOpcao[]>([]);
   const [interacoes, setInteracoes] = useState<Interacao[]>([]);
   const [erro, setErro] = useState<string | null>(null);
@@ -112,9 +122,11 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
   useEffect(() => {
     let cancelado = false;
 
+    const consulta = ++ultimaConsultaRef.current;
     ObterCardBpm(cardId).then((res) => {
       if (cancelado) return;
       if (!res.success || !res.data) {
+        if (consulta !== ultimaConsultaRef.current) return;
         if (resultadoRevogaAcessoCard(res)) {
           fecharPorAcessoRevogado();
           return;
@@ -122,7 +134,7 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
         setErro(typeof res.error === "string" ? res.error : "Erro ao carregar card");
         return;
       }
-      setCard(res.data);
+      confirmarSnapshot(res.data);
 
       Promise.all([
         ObterPipelineBpm(res.data.pipeline.id),
@@ -132,12 +144,12 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
         if (pipelineRes.success && pipelineRes.data) {
           setEtapas([...pipelineRes.data.etapas].sort((a, b) => a.ordem - b.ordem));
         }
-        setInteracoes(interacoesRes.data ?? []);
+        if (consulta === ultimaConsultaRef.current) setInteracoes(interacoesRes.data ?? []);
       });
     });
 
     return () => { cancelado = true; };
-  }, [cardId, fecharPorAcessoRevogado]);
+  }, [cardId, fecharPorAcessoRevogado, confirmarSnapshot]);
 
   useEffect(() => {
     if (!abrirChecklistInicial || card?.id !== cardId || checklistInicialAbertoRef.current === cardId) return;
@@ -163,26 +175,29 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
   useEffect(() => {
     if (realtimeRevision === 0) return;
     let cancelado = false;
+    const consulta = ++ultimaConsultaRef.current;
     Promise.all([ObterCardBpm(cardId), ListarInteracoesCardBpm(cardId)]).then(([cardRes, interacoesRes]) => {
-      if (cancelado) return;
+      if (cancelado || consulta !== ultimaConsultaRef.current) return;
       if (resultadoRevogaAcessoCard(cardRes)) {
         fecharPorAcessoRevogado();
         return;
       }
-      if (cardRes.success && cardRes.data) setCard(cardRes.data);
+      if (cardRes.success && cardRes.data) confirmarSnapshot(cardRes.data);
       setInteracoes(interacoesRes.data ?? []);
     });
     return () => { cancelado = true; };
-  }, [cardId, fecharPorAcessoRevogado, realtimeRevision]);
+  }, [cardId, fecharPorAcessoRevogado, realtimeRevision, confirmarSnapshot]);
 
   const recarregar = useCallback(async () => {
-    const res = await ObterCardBpm(cardId);
+    const consulta = ++ultimaConsultaRef.current;
+    const res = await medirFaseCrm("atualizacao", () => ObterCardBpm(cardId));
+    if (consulta !== ultimaConsultaRef.current) return;
     if (resultadoRevogaAcessoCard(res)) {
       fecharPorAcessoRevogado();
       return;
     }
-    if (res.success && res.data) setCard(res.data);
-  }, [cardId, fecharPorAcessoRevogado]);
+    if (res.success && res.data) confirmarSnapshot(res.data);
+  }, [cardId, fecharPorAcessoRevogado, confirmarSnapshot]);
 
   const handleAtualizado = useCallback(() => {
     void recarregar();

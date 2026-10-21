@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const listarChecklists = vi.hoisted(() => vi.fn());
+vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/PainelEncaminhamentos", () => ({ PainelEncaminhamentos: () => null }));
 vi.mock("@/actions/bpm/Checklists", () => ({ ListarChecklistsCardBpm: listarChecklists }));
 vi.mock("@/actions/bpm/Cards", () => ({ ObterCardBpm: vi.fn(), ExcluirCardBpm: vi.fn() }));
 vi.mock("@/actions/bpm/Tarefas", () => ({ ConcluirTarefaBpm: vi.fn(), CriarTarefaBpm: vi.fn() }));

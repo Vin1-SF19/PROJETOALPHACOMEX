@@ -53,6 +53,7 @@ export function CardOpenFormSlot({
             campoLabels={campoLabels}
             instanceKey={runKey}
             titulo={secaoTitulo}
+            ocultarTitulo
             accent={accent}
             podeEditar={podeEditar}
             realtimeRevision={realtimeRevision}

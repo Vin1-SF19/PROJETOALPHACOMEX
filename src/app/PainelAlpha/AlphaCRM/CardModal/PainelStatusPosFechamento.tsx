@@ -76,8 +76,10 @@ export function PainelStatusPosFechamento({
       }
 
       if (rascunhoSujoRef.current) {
-        const snapshotRemotoMudou = statusReconhecido !== base || versaoRemota !== versaoBase;
+        const snapshotRemotoMudou = statusReconhecido !== base && statusReconhecido !== getDraft(draftKey)?.valor;
         if (!snapshotRemotoMudou) {
+          setBase(statusReconhecido);
+          setVersaoBase(versaoRemota);
           setConflitoRealtime(false);
           setSnapshotRemotoPendente(null);
           return;

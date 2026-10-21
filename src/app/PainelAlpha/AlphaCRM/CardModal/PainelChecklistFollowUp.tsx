@@ -5,6 +5,7 @@ import { CheckCircle2, ClipboardList, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { ObterUltimoFollowUpBpm, SalvarChecklistFollowUpBpm } from "@/actions/bpm/FollowUp";
 import { useCardSave } from "@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext";
+import { resolverSnapshotCamposRealtime } from "@/lib/bpm/card-modal-ui";
 import { VALORES } from "@/lib/bpm/financeiro-config.client";
 
 type RespostaObterFollowUp = NonNullable<Awaited<ReturnType<typeof ObterUltimoFollowUpBpm>>["data"]>;
@@ -42,10 +43,13 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
   const [erroCarregamento, setErroCarregamento] = useState(false);
   const [tentativa, setTentativa] = useState(0);
   const [conflitoRealtime, setConflitoRealtime] = useState(false);
+  const conflitoRef = useRef(false);
   const respostasRef = useRef<Record<string, Resposta>>({});
   const revisaoRef = useRef(0);
+  const confirmacoesRef = useRef(0);
   const draftSujoRef = useRef(false);
-  const revisaoAnteriorRef = useRef(realtimeRevision);
+  const estadoRef = useRef<EstadoFollowUp | null>(null);
+  const remotoPendenteRef = useRef<EstadoFollowUp | null>(null);
   const { registerSave, scheduleSave, getDraft, setDraft, confirmVersion, subscribeConfirmation, setPendingFields } = useCardSave();
   const draftKey = `${cardId}:followup`;
   useEffect(() => subscribeConfirmation(cardId, (_card, key) => {
@@ -56,29 +60,47 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
 
   useEffect(() => {
     let cancelado = false;
-    if (realtimeRevision !== revisaoAnteriorRef.current && draftSujoRef.current) {
-      revisaoAnteriorRef.current = realtimeRevision;
-      setConflitoRealtime(true);
-      return;
-    }
-    revisaoAnteriorRef.current = realtimeRevision;
     onEstadoChange("CARREGANDO");
+    const confirmacaoConsulta = confirmacoesRef.current;
     ObterUltimoFollowUpBpm(cardId).then((resultado) => {
       if (cancelado) return;
       setCarregando(false);
+      if (confirmacaoConsulta !== confirmacoesRef.current && estadoRef.current) { onEstadoChange(estadoRef.current.estado); return; }
       if (!resultado.success || !resultado.data) {
         setErroCarregamento(true);
         onEstadoChange("ERRO");
         toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível carregar o follow-up");
         return;
       }
-      setEstado(resultado.data);
+      const remoto = resultado.data;
       const recovered = getDraft(draftKey);
-      respostasRef.current = recovered
-        ? Object.fromEntries(Object.entries(recovered).map(([id, value]) => [id, JSON.parse(value) as Resposta]))
-        : resultado.data.checklist?.respostas ?? {};
+      const serializar = (valores: Record<string, Resposta>) => Object.fromEntries(Object.entries(valores).map(([id, valor]) => [id, JSON.stringify(valor)]));
+      const resolucao = resolverSnapshotCamposRealtime({
+        rascunhoSujo: Boolean(recovered),
+        snapshotAtual: { valores: serializar(estadoRef.current?.checklist?.respostas ?? {}), versao: "base" },
+        snapshotRemoto: { valores: serializar(remoto.checklist?.respostas ?? {}), versao: "remota" },
+        valoresLocais: recovered,
+      });
+      if (recovered && estadoRef.current && (!resolucao.aplicarRemoto || estadoRef.current.checklist?.id !== remoto.checklist?.id)) {
+        remotoPendenteRef.current = remoto;
+        conflitoRef.current = true;
+        setConflitoRealtime(true);
+        onEstadoChange(estadoRef.current.estado);
+        return;
+      }
+      estadoRef.current = remoto;
+      setEstado(remoto);
+      respostasRef.current = Object.fromEntries(Object.entries(resolucao.valoresEditados).map(([id, valor]) => [id, JSON.parse(valor) as Resposta]));
       setRespostas(respostasRef.current);
-      draftSujoRef.current = Boolean(getDraft(draftKey));
+      const pendencias = (remoto.checklist?.perguntas ?? []).flatMap((pergunta) => {
+        const antes = remoto.checklist?.respostas[pergunta.id];
+        const depois = respostasRef.current[pergunta.id];
+        return antes === depois ? [] : [{ label: pergunta.pergunta, before: respostaLegivel(antes), after: respostaLegivel(depois) }];
+      });
+      draftSujoRef.current = pendencias.length > 0;
+      setDraft(draftKey, pendencias.length ? serializar(respostasRef.current) : undefined);
+      setPendingFields(draftKey, pendencias);
+      conflitoRef.current = false;
       setConflitoRealtime(false);
       onEstadoChange(resultado.data.estado);
     }).catch(() => {
@@ -89,7 +111,7 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
       toast.error("Nao foi possivel carregar o follow-up");
     });
     return () => { cancelado = true; };
-  }, [cardId, onEstadoChange, tentativa, realtimeRevision, draftKey, getDraft]);
+  }, [cardId, onEstadoChange, tentativa, realtimeRevision, draftKey, getDraft, setDraft, setPendingFields]);
 
   function alterarResposta(id: string, value: Resposta | undefined, delay: number) {
     draftSujoRef.current = true;
@@ -108,13 +130,15 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
   }
 
   async function persistir(concluir: boolean) {
-    if (!concluir && estado?.checklist && !draftSujoRef.current) return;
+    if (conflitoRef.current) return;
+    if (!concluir && estadoRef.current?.checklist && !draftSujoRef.current) return;
     const respostasAtual = { ...respostasRef.current };
     const revisao = revisaoRef.current;
-    const checklistIdAtual = estado?.checklist?.id;
-    const estadoAnterior = estado?.estado;
+    const checklistIdAtual = estadoRef.current?.checklist?.id;
+    const estadoAnterior = estadoRef.current?.estado;
     setSalvando(true);
     await registerSave(async () => {
+      if (conflitoRef.current) return false;
       const resultado = await SalvarChecklistFollowUpBpm({
         cardId,
         checklistId: checklistIdAtual,
@@ -128,13 +152,16 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
       if (resultado.data.cardUpdatedAt) confirmVersion(cardId, new Date(resultado.data.cardUpdatedAt).toISOString());
       const savedDraft = Object.fromEntries(Object.entries(respostasAtual).map(([id, value]) => [id, JSON.stringify(value)]));
       if (JSON.stringify(getDraft(draftKey)) === JSON.stringify(savedDraft)) setDraft(draftKey);
-      setEstado({ estado: resultado.data.estado, checklist: resultado.data.checklist });
+      confirmacoesRef.current += 1;
+      estadoRef.current = { estado: resultado.data.estado, checklist: resultado.data.checklist };
+      setEstado(estadoRef.current);
       if (revisao === revisaoRef.current) {
         respostasRef.current = resultado.data.checklist?.respostas ?? {};
         setRespostas(respostasRef.current);
         draftSujoRef.current = false;
         setPendingFields(draftKey, []);
       }
+      conflitoRef.current = false;
       setConflitoRealtime(false);
       onEstadoChange(resultado.data.estado);
       toast.success(concluir ? "Follow-up concluído" : estadoAnterior === "NAO_INICIADO" ? "Follow-up iniciado" : "Rascunho do follow-up salvo");
@@ -157,8 +184,11 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
       toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível iniciar um novo follow-up");
       return;
     }
-    setEstado({ estado: resultado.data.estado, checklist: resultado.data.checklist });
-    setRespostas(resultado.data.checklist?.respostas ?? {});
+    confirmacoesRef.current += 1;
+    estadoRef.current = { estado: resultado.data.estado, checklist: resultado.data.checklist };
+    setEstado(estadoRef.current);
+    respostasRef.current = resultado.data.checklist?.respostas ?? {};
+    setRespostas(respostasRef.current);
     draftSujoRef.current = false;
     onEstadoChange(resultado.data.estado);
     toast.success("Novo follow-up iniciado");
@@ -200,7 +230,23 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
           {estado?.estado === "CONCLUIDO" ? "Concluído" : estado?.estado === "EM_ANDAMENTO" ? "Em andamento" : "Não iniciado"}
         </span>
       </div>
-      {conflitoRealtime && <p className="rounded-xl border border-sky-500/25 bg-sky-500/[0.07] p-3 text-xs text-sky-200">O follow-up mudou externamente. Suas respostas locais foram preservadas.</p>}
+      {conflitoRealtime && <div role="alert" className="rounded-xl border border-sky-500/25 bg-sky-500/[0.07] p-3 text-xs text-sky-200">
+        <p>Uma resposta que você está editando mudou externamente. Seu rascunho foi preservado.</p>
+        <button type="button" className="mt-2 rounded-lg border border-sky-300/30 px-2 py-1" onClick={() => {
+          const remoto = remotoPendenteRef.current;
+          if (!remoto) return;
+          estadoRef.current = remoto;
+          setEstado(remoto);
+          respostasRef.current = remoto.checklist?.respostas ?? {};
+          setRespostas(respostasRef.current);
+          setDraft(draftKey);
+          setPendingFields(draftKey, []);
+          draftSujoRef.current = false;
+          conflitoRef.current = false;
+          setConflitoRealtime(false);
+          onEstadoChange(remoto.estado);
+        }}>Usar respostas atualizadas</button>
+      </div>}
 
       {!checklist ? (
         <button type="button" onClick={() => void persistir(false)} disabled={!podeEditar || salvando} className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-50" style={{ background: `rgba(${accent},0.85)` }}>

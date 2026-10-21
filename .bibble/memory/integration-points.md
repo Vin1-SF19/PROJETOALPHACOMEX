@@ -3292,3 +3292,30 @@ Atualização Chamados: catálogo persistido ativo no Turso após migração aut
 **Estado:** código/plano preparados, backup verificado; banco não aplicado e nenhuma publicação/browser autenticado. Lint passou; typecheck corrigido passou, repetição final pendente; suíte global conserva seis falhas preexistentes. Build/Lens pendentes.
 
 - 16/10/2026 — Configuração acima autorizada, aplicada e verificada no Turso: Radar v32/formulário Em tratativa v3; dois campos opcionais na origem, entrada de Fechado preservada. Correção nominal do vendedor ainda depende de publicação do código.
+
+
+### CRM — encaminhamento administrativo explícito e diagnóstico (2026-10-21, Scribe)
+
+**Arquivos:** `src/actions/bpm/Encaminhamentos.ts`, `src/lib/bpm/automacoes/{encaminhamento,executor,central-runtime,schemas,central-schemas}.ts`, `src/app/PainelAlpha/AlphaCRM/CardModal/{CardAbertoLayout,PainelEncaminhamentos}.tsx`.
+**Propósito:** encaminhar para o próximo setor sem confundir envio, coluna e conclusão financeira. Não há módulo/menu/rota novo.
+**Editado quando:** mudar intenção de envio, ações permitidas, parâmetros/destino, autoridade, dedupe ou apresentação do resultado.
+
+Exemplo do caminho integrado:
+
+```text
+CardAbertoLayout → PainelEncaminhamentos
+  → flushSaves(card.id) → ObterCardBpm (versão atual)
+  → SolicitarEncaminhamentoCardBpm / RepetirEncaminhamentoCardBpm
+  → execução + intenção auditável (ENCAMINHAMENTO_ADMIN_SOLICITADO) → executarEncaminhamentoBpm
+  → destino/vínculo/outbox persistidos → atualização de status / Abrir card de destino
+```
+
+A execução manual usa `ENCAMINHAMENTO_ADMIN` e histórico `ENCAMINHAMENTO_ADMIN_SOLICITADO`; o helper repete consulta de conta ativa/role/ACL e confere o snapshot da configuração. Nunca aceitar dispensa financeira/ator/destino arbitrário no JSON do cliente ou transferir autoridade pessoal a jobs. A configuração alterada exige nova intenção, não retarget silencioso no retry. Depois de salvar campos, a retentativa captura nova versão autorizada. Falha de cache/realtime posterior ao commit não muda sucesso persistido para FALHA.
+
+`ObterEncaminhamentosCardBpm` expõe não disparado/aguardando/enviado/falhou/indisponível e oculta destinos sem ACL. Falha de automação legada/central pode originar novo envio explícito Admin autorizado, sem replay do grafo; retentativa administrativa reabre somente sua execução falha. Usar o helper também no legado/central para `CRIAR_CARD_OUTRO_PIPELINE`, sem conversão em massa das definições.
+
+### CRM — dados, rascunhos e feedback após a auditoria (2026-10-21, Scribe)
+
+`carregarOrigemMesmoCard` resolve aliases concordantes da própria negociação; valor explícito do destino (inclusive branco) e mapeamento configurado precedem fallback. A leitura não equivale a gravar novo valor. Parceiro herdado pertence à mesma empresa e sua indicação continua no card comercial. Documentos/histórico seguem acessíveis pelos cards vinculados e suas ACLs; não copiar IDs de anexo de outro proprietário como se fossem anexos próprios.
+
+`resolverSnapshotCamposRealtime` compara base/local/remoto; revisões sem conflito real não exibem alerta. `CardAbertoLayout` informa pipeline/etapa em edição e separa abas de histórico; avanço autorizado mantém o detalhe aberto. No board, `aplicarMovimentoOtimista`/`restaurarMovimentoOtimista` atualizam cards e manifesto juntos, preservando contagens/filtros. `medirFaseCrm` registra salvamento/requisição/atualização no Performance API sem identidade/valores. Saúde de voz é compartilhada, com backoff e cancelamento; não gerar áudio para testar disponibilidade nem bloquear o CRM por 503 de voz.
