@@ -8,6 +8,7 @@ import { BuscarEmpresasBpm as buscarEmpresas, BuscarEmpresaPorCnpjBpm as buscarE
 import { ExcluirCardBpm as excluirCard } from "./CardsExcluir";
 import db from "@/lib/prisma";
 import { ordenarCardsMaisRecentesPrimeiro } from "@/lib/bpm/ordem-cards";
+import { erroSqliteBusy, repetirTransacaoOcupada } from "@/lib/bpm/sqlite-busy-retry";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
 import { PIPELINE_CHAVE, ETAPAS } from "@/lib/bpm/financeiro-config";
@@ -1287,7 +1288,7 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
     };
 
     const correlationId = randomUUID();
-    const confirmacao = await db.$transaction(async (tx) => {
+    const confirmacao = await repetirTransacaoOcupada(() => db.$transaction(async (tx) => {
       const acessoCardAtual = await exigirAcessoBpmCard(
         cardId,
         userId,
@@ -1564,7 +1565,7 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
         });
       }
       return { updatedAt: proximaVersao, camposValores: valoresValidados, retornoComercial };
-    }, { maxWait: 10_000, timeout: 60_000 });
+    }, { maxWait: 10_000, timeout: 60_000 }));
 
     if (confirmacao.retornoComercial) await notificarContratacaoComercialPosCommit(confirmacao.retornoComercial);
     if (cardAnterior.pipeline.chave === PIPELINE_CHAVE
@@ -1593,6 +1594,9 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
     return { success: true, data: { updatedAt: confirmacao.updatedAt, camposValores: confirmacao.camposValores } };
   } catch (error) {
     console.error("[AtualizarCardBpm]", error);
+    if (erroSqliteBusy(error)) return {
+      success: false, error: "O banco estava ocupado e não concluiu o salvamento. Tente novamente.",
+    };
     const msg = error instanceof Error && error.message === "Não autorizado"
       ? "Não autorizado"
       : error instanceof Error && error.message === "CONFLITO_ATUALIZACAO_CARD"

@@ -216,3 +216,10 @@ A worktree autoritativa desta entrega passa a ser `crm-contratos-pendentes-integ
 A worktree original, logs e evidência dos gates sobre `87c2e78f` permanecem preservados. A suíte original apresentou mock incompleto de validações no teste de exclusão; o owner corrigiu somente o mock na worktree integrada. Os quatro gates sobre 2f passaram; depois houve FF disjunto b71 com checagens afetadas e ratificação QA, conforme Dev Agent Record. O reteste remoto permanece pendente antes da publicação.
 
 Baseline final de publicação: `b71f2cb9`; FF disjunto autorizado e verificado preservou todos os 32 hashes da feature, sem alteração do seu runtime. Fonte/custódia e validações estão discriminadas no Dev Agent Record.
+
+
+### Integração final de tarefas — pré-push 861
+
+O commit local de contratos `48ebc3c95a4b916d4f93c866f3fac0c34ef0d92f` congelou os 32 arquivos aprovados sobre b71. Novo avanço de staging `861e43d7` foi integrado por merge normal, preservando a correção concorrente de IDs documentais e retry de gravações ocupadas. Os 31 arquivos não sobrepostos da feature ficaram byte a byte idênticos; Cards corresponde exatamente a um merge independente de três vias, sem marcadores ou edição manual, mantendo o retorno comercial pós-commit fora do retry transacional. Nenhum arquivo foi escolhido integralmente como ours/theirs.
+
+QA ratificou GO pré-push final: quatro gates integrados 2f (704 arquivos/5.451 testes), checagens b71 (sete arquivos/104 testes) e novo typecheck combinado, lint Cards/validations e oito focos de edição/tarefas/CAS/contratação/SQLite/pós-commit/documentos/exclusão aprovados sobre o merge 861. Os gates completos anteriores não são descritos como nova execução após cada integração. Provas `merge-861-proof.json` e `delta-861-result.json` no diretório privado integrado. Publicação/READY e reteste autenticado continuam pendentes; somente staging autorizado. Os cinco caminhos concorrentes 861 permanecem no histórico próprio, sem serem apresentados como implementação nova desta feature.
