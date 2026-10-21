@@ -63,8 +63,8 @@ export async function AssumirLeadInstagram(input: unknown) {
       }
       if (!await usuarioElegivelResponsavelBpm(pipelineId, parsed.data.responsavelId, tx)) throw new Error("Responsável inválido para este pipeline.");
       const cnpjInformado = parsed.data.cnpj ?? dados.cnpj;
-      if (!cnpjEhValido(cnpjInformado)) throw new Error("Confira um CNPJ válido para assumir o lead do Instagram.");
-      const cnpj = normalizarCNPJ(cnpjInformado);
+      if (cnpjInformado && !cnpjEhValido(cnpjInformado)) throw new Error("Confira um CNPJ válido ou deixe o campo vazio.");
+      const cnpj = cnpjInformado ? normalizarCNPJ(cnpjInformado) : null;
       const radar = parsed.data.radarPretendido || dados.radarPretendido;
       const campos = await tx.bpmCampo.findMany({
         where: { pipelineId, ativo: true, nome: { in: ["Radar pretendido", "Canal de origem", "Qualificação"] },
@@ -84,7 +84,7 @@ export async function AssumirLeadInstagram(input: unknown) {
       const reservado = await tx.bpmWebhookEntrada.updateMany({ where: { id: entrada.id, endpointId: endpoint.id,
         statusRecebimento: "AUTENTICADO", eventoId: null }, data: { statusRecebimento: "PROCESSADO" } });
       if (reservado.count !== 1) throw new Error("Este lead já foi assumido. Atualize o quadro.");
-      const empresa = await tx.cliente.findUnique({ where: { cnpj }, select: { id: true } })
+      const empresa = (cnpj ? await tx.cliente.findUnique({ where: { cnpj }, select: { id: true } }) : null)
         ?? await tx.cliente.create({ data: { cnpj, razaoSocial: dados.nome, status: "ATIVO" }, select: { id: true } });
       const pessoa = dados.telefone
         ? await tx.pessoa.upsert({ where: { celular: dados.telefone }, create: { celular: dados.telefone, nome: dados.nome, email: dados.email }, update: {}, select: { id: true } })

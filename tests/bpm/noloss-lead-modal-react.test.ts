@@ -101,12 +101,12 @@ it("Instagram abre com CNPJ e Radar da coluna M preenchidos e mostra respostas d
   expect(onConfirmarPromocao).toHaveBeenCalledWith(7, "11222333000181", "Revisão de Radar Ilimitado", undefined);
 });
 
-it("Instagram sem CNPJ mantém pendente e exige conferência antes de assumir", async () => {
+it("Instagram permite assumir sem CNPJ, preservando o contrato externo existente", async () => {
   const { container, root, props, onConfirmarPromocao } = montar();
   props.lead.instagramDados = prepararLeadInstagram({ id: "l:exemplo", full_name: "Contato Exemplo", created_time: "2026-10-21T12:00:00Z", [C.radar]: "ilimitado" });
   props.radarOpcoes = ["Revisão de Radar Ilimitado"];
   await act(async () => root.render(h(NolossLeadModal, props)));
   await act(async () => [...container.querySelectorAll("button")].find((button) => button.textContent === "Assumir lead")?.click());
-  expect(container.textContent).toContain("Informe um CNPJ válido para assumir este lead");
-  expect(onConfirmarPromocao).not.toHaveBeenCalled();
+  await act(async () => [...container.querySelectorAll("button")].find((button) => button.textContent === "Confirmar responsável")?.click());
+  expect(onConfirmarPromocao).toHaveBeenCalledWith(7, "", "Revisão de Radar Ilimitado", undefined);
 });

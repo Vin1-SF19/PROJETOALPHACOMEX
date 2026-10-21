@@ -36,7 +36,7 @@ Inventário somente leitura de staging informado pelo agente principal: pipeline
 | `created_time` | Data original exibida/preservada, distinta de recebimento e criação do card |
 | `full_name` | Nome do contato/lead; não afirmar que é razão social verificada |
 | `email`, `whatsapp` | Contato preenchido no virtual e preservado após assumir |
-| `cnpj` | Valor original preservado; normalizar/validar para vincular empresa ao assumir |
+| `cnpj` | Opcional na assunção externa; preservar valor original e normalizar/validar se informado, sem inventar documento |
 | `platform` | Instagram quando o valor recebido for `ig`; proveniência própria da integração |
 | `campaign_id/name`, `adset_id/name`, `ad_id/name`, `form_id/name`, `is_organic` | Contexto de campanha/formulário no resumo e anotação, sem inventar UTMs |
 | M / `modalidade_atual_radar` | Radar pretendido conforme decisão explícita do usuário e tabela abaixo |
@@ -70,6 +70,7 @@ Usar `BpmWebhookEndpoint` + `BpmWebhookEntrada` como inbox durável dedicada à 
 - Chave determinística de deduplicação: origem + ID fixo da planilha + ID da aba + ID textual do lead. Derivar no servidor; não aceitar chave arbitrária nem número de linha como identidade. Um endpoint não pode ser recriado a cada chamada, pois isso trocaria o namespace e perderia a deduplicação.
 - A projeção do board busca somente entradas desse endpoint/tipo de envelope, autenticadas e ainda pendentes. Origem explícita `instagram` no transporte; não escrever `NolossLead` nem forjar vínculo NoLoss.
 - Na assunção autenticada, validar acesso ao pipeline/etapas e responsável elegível, e fazer CAS `AUTENTICADO → PROCESSADO` na mesma transação de empresa/contato/card/campos/anotação/histórico/outbox/automação/SLA/cadência. `eventoId` aponta para o evento `CARD_CRIADO` dessa promoção; o evento fornece `cardId` para localizar o resultado em repetição. Não reaproveitar esse campo para IDs de objetos estranhos à relação.
+- CNPJ é opcional nesse contrato externo, válido se informado. Sem documento, a promoção pode criar `Cliente.cnpj=null`, inclusive para empresa em constituição; o schema já admite essa situação. Preservar nome do lead como identificação provisória, sem apresentar razão social como verificada. Não transportar a obrigatoriedade do cadastro manual para essa origem nem forjar NoLoss. Complementação futura usa a edição canônica existente de cliente/card; `PreencherCnpjCardNoloss` continua restrita ao NoLoss.
 - Uma entrada `PROCESSADO` nunca volta a pendente por reenvio, mesmo se alguém mover/editar o card. Repetição de promoção retorna o card vinculado quando acessível ou erro seguro de integridade, sem gerar substituto.
 - Não limpar ou deletar endpoint/entradas automaticamente. A relação de endpoint tem delete cascade: desativar o endpoint preserva inbox, deduplicação e auditoria; recriar/deletar perderia essas propriedades.
 
@@ -96,7 +97,7 @@ Credencial, configuração ausente/ambígua, endpoint inativo ou pipeline incomp
 4. Lead aparece na entrada canônica de Revisão de Radar como virtual personalizado Instagram, com pulsação identificável e suporte a movimento reduzido. Não há responsável, empresa ou card nativo criado antes da assunção. Não aplicar visibilidade/autorizações mais amplas que o fluxo virtual existente.
 5. Card/modal mostra nome, contato, CNPJ recebido, Radar de M, campanha, data original e respostas de volume/prazo sem perder dados. Não chamar nome pessoal de razão social confirmada. Proveniência Instagram é distinta de NoLoss/RD.
 6. M é mapeado conforme a tabela; valores desconhecidos e empresa em constituição deixam Radar nulo, com resposta original visível para revisão ao assumir. Modal inicia com os dados recebidos, permite conferência/correção e não transforma volume anual em limite semestral ou qualificação.
-7. Assunção exige sessão e permissões vigentes, responsável elegível e Radar válido. Campo faltante/inválido produz mensagem acionável antes de criar registros. CNPJ bruto da origem é preservado; não inventar documento ou ampliar exceção NoLoss para Instagram. Verificar as regras próprias aplicáveis ao assumir e manter cadastro manual intacto.
+7. Assunção exige sessão e permissões vigentes, responsável elegível e Radar válido. CNPJ é opcional; ausência não bloqueia e permite `Cliente.cnpj=null`, inclusive para empresa em constituição. Se informado, CNPJ inválido é recusado com mensagem acionável antes de criar registros; o valor bruto da origem permanece preservado na proveniência. Não inventar documento nem forjar NoLoss. A regra pertence à action própria Instagram; manter cadastro manual e `PreencherCnpjCardNoloss` intactos. Complementação posterior usa a edição canônica existente de cliente/card.
 8. Promoção é atômica e concorrente: apenas uma requisição consome o estado pendente e cria o agregado. Rollback deixa entrada pendente e nenhum registro órfão; sucesso muda para PROCESSADO e mantém vínculo pelo evento de criação. Repetição não cria card/contato/automação adicionais.
 9. Contato da planilha é preservado em Pessoa/vínculo ao assumir conforme contrato vigente, sem sobrescrever cadastro humano ou mesclar empresas apenas pelo nome. Telefone inválido não vira telefone fictício; utilizar mecanismo interno existente de telefone pendente somente quando necessário e sem exibi-lo como contato real.
 10. Criar campos de Radar/canal/qualificação efetivamente escolhidos, anotação com respostas/metadados, membro responsável, histórico, evento/outbox, automações, SLA e cadências aplicáveis. Notificar board após commit; falha de realtime não invalida uma promoção persistida.
@@ -104,7 +105,7 @@ Credencial, configuração ausente/ambígua, endpoint inativo ou pipeline incomp
 12. Preparar remetente/script de Google Sheets com cabeçalhos reais, IDs como string e propriedades privadas para URL/segredo. Confirmação técnica só após resposta de sucesso correspondente ao ID enviado. Timeout/429/5xx podem ser reenviados; erros permanentes ficam identificáveis. Lock e limite por execução evitam sobreposição; preservar dados/fórmulas originais.
 13. Documentação para outro dev inclui URL de staging, método, autenticação, contrato de campos, de/para M, exemplos fictícios de curl/payload/retorno, duplicatas, validação, retry e diferença entre recebimento virtual e card assumido. Credencial real é fornecida por canal privado no momento autorizado; não prometer endpoint ativo antes do deploy.
 14. Não publicar/configurar produção. Não executar migration, backfill/importação em massa ou escrita na planilha sem os passos aplicáveis de autorização/ambiente da sessão. Preparar código e documentação revisáveis antes de solicitar qualquer aprovação necessária.
-15. Testes cobrem autenticação/configuração, allowlist/ID string, mapeamentos M, inbox idempotente, projeção personalizada, promoção concorrente/rollback, preservação dos contatos/Qs, permissões, retry do remetente e regressão NoLoss. Rodar `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`; atualizar checklist, File List e resultados sem inventar evidência de teste/QA.
+15. Testes cobrem autenticação/configuração, allowlist/ID string, mapeamentos M, inbox idempotente, projeção personalizada, promoção concorrente/rollback, preservação dos contatos/Qs, permissões, retry do remetente e regressão NoLoss. Para CNPJ, cobrir assunção sem documento, normalização/aceitação do válido e recusa do inválido informado, mantendo obrigatoriedade manual intacta. Rodar `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`; atualizar checklist, File List e resultados sem inventar evidência de teste/QA.
 
 ## Tasks / Subtasks
 
@@ -174,6 +175,7 @@ Credencial, configuração ausente/ambígua, endpoint inativo ou pipeline incomp
 | --- | --- | --- | --- |
 | 2026-10-21 | 0.2 | Correção para lead virtual e comparação conjunta antes de implementar | `@sm` / `@architect` |
 | 2026-10-21 | 0.3 | Implementação autorizada; M → Radar, inbox de webhook dedicada e assunção transacional sem migration | `@sm` / `@architect` |
+| 2026-10-21 | 0.4 | Corrigir contrato de assunção externa: CNPJ opcional, válido se informado; preservar fluxo manual/NoLoss e schema existente | `@sm` / `@architect` |
 
 ## QA Results
 
