@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — implementação e quatro gates globais aprovados; integração preservadora da atualização concorrente de staging, QA final, publicação e reteste autenticado ainda pendentes.
+Done — correção validada no staging com gates reais, QA final e reteste Admin autenticado; fechamento documental preserva a atualização concorrente do GeradorDocumentos. Produção fora do escopo.
 
 ## Executor Assignment
 
@@ -53,7 +53,7 @@ Dependências e continuidade:
 - [x] Reutilizar gerador, vínculo, metadados server-side e dedupe; preservar conferência e prontidão comercial (AC 5–6).
 - [x] Cobrir cenários positivos/negativos, concorrência, replay, erro e regressões de movimento/contratação (AC 1–7).
 - [x] Executar lint, typecheck, suíte completa e build; obter QA e revisão arquitetural com evidências (AC 8).
-- [ ] Publicar exclusivamente staging e retestar cenário fictício autenticado; atualizar esta story e sua File List com alcance real (AC 8).
+- [x] Publicar exclusivamente staging e retestar cenário fictício autenticado; atualizar esta story e sua File List com alcance real (AC 8).
 
 ## Dev Notes
 
@@ -167,7 +167,7 @@ O gerador existente permaneceu responsável por template/contratada/campo/variá
 - `npm run lint --` sobre os seis fontes e dois testes de ownership Echo: **exit 0**. Log: `/var/tmp/alpha-crm-contrato-elaboracao-20261021/backend-lint-freeze.log`. O teste de segurança foi validado separadamente pelo QA.
 - Uma rodada anterior teve timeout de 5 segundos na fixture SQLite legada em `/tmp`; o reteste isolado passou e o lote final de 165 passou com timeout explícito de 15 segundos, sem alterar o teste legado.
 
-Fixtures novas usam diretório privado em `/dev/shm`, adapter `file:` e tabelas locais derivadas do schema; não carregam `.env` nem usam tokens remotos. Checklists e emissão de realtime/PDF são periféricos simulados; ACL, materialização, worker/lease/claim, gerador, dedupe e projeção comercial são reais na fixture. Esses resultados não equivalem a E2E remoto. Os quatro gates globais, parecer final QA/arquitetura, publicação e reteste autenticado em staging permanecem com a coordenação/Forge/DevOps; nenhum resultado de produção é presumido.
+Fixtures novas usam diretório privado em `/dev/shm`, adapter `file:` e tabelas locais derivadas do schema; não carregam `.env` nem usam tokens remotos. Checklists e emissão de realtime/PDF são periféricos simulados; ACL, materialização, worker/lease/claim, gerador, dedupe e projeção comercial são reais na fixture. Esses resultados não equivalem a E2E remoto. No checkpoint de implementação, os gates globais, parecer final, publicação e reteste ainda eram pendências da coordenação; os resultados efetivos posteriores estão registrados abaixo. Nenhum resultado de produção é presumido.
 
 **SOURCE FREEZE backend:** seis arquivos de runtime e os dois testes de ownership Echo estáveis para Forge/revisão. Novas mudanças exigem nova verificação dos caminhos afetados.
 
@@ -182,6 +182,24 @@ O preflight encontrou `origin/staging=bfff9d36`, atualização concorrente de In
 A correção foi congelada no commit local `55183c0a`, filho de `daf88fb7`, antes de integrar `bfff9d36` por merge normal sem conflitos. A prova `release/merge-bfff-proof.json` conserva os onze caminhos da feature, os nove arquivos de runtime/testes byte a byte e os dez arquivos remotos de Instagram byte a byte; a story recebe somente metadados e QA posteriores. Nenhum script Google Apps Script ou remetente CLI foi executado.
 
 Checks da árvore combinada: `npm run typecheck` oficial com heap de 8 GiB **exit 0** (18,47 s); lint dos três fontes TS/TSX/MTS e do Apps Script via entrada JavaScript **exit 0**; **11 arquivos e 158 testes aprovados, zero falhas**. A primeira tentativa de typecheck com wrapper limitado a 4 GiB encerrou por OOM (134), sem erro TypeScript; log preservado e repetição com a configuração oficial aprovada. Fixtures em `/dev/shm` e sentinel SQLite locais, sem `.env` remoto. Fingerprint combinado `38bf3c61b6d0aacc00de95e79989286a0aff8584cf94be04825d6fefec7f22a6` idêntico antes/depois. Evidência: `/var/tmp/alpha-crm-contrato-elaboracao-20261021/release/delta-bfff-result.json`. QA ratificou o GO de push da combinação após conferir esses resultados, sem novos bloqueantes. Publicação/READY e reteste autenticado ainda pendem neste checkpoint.
+
+### Reteste remoto concluído — staging
+
+A revisão `71e3f06fed6890ef346ead946711ea37bcdc4fd3` ficou READY em `dpl_2eyf3ifNfvM587DptJ7wacBUGMob`, alias staging e custom environment conferidos. Smoke público/banco/autenticação passou. Admin real criou e percorreu somente a empresa fictícia 3067 pela UI normal. Primeira entrada Financeiro Novo Contrato → Elaboração gerou uma minuta CONFERENCIA e um anexo no campo canônico, com empresa e `__bpmCardId` corretos. Preview autenticado/UI em conferência: dez cláusulas, oito pendências e PDF de prévia 200/99.452 bytes/`%PDF-`. Não se trata de finalização nem PDF final persistido.
+
+Após voltar a Novo Contrato e entrar novamente, o passo documental retornou `existente=true` para o mesmo documento/anexo, sem alterar seus metadados nem o valor canônico. São **dois registros SUCESSO**, um por entrada elegível, e **um IGNORADA** na saída para Novo Contrato (`DESTINO_DOCUMENTAL_DIVERGENTE`, zero tentativas, nenhum passo): três registros totais. Quinze assertivas finais passaram. O primeiro rascunho privado do checker, que exigia incorretamente dois registros totais, foi preservado e corrigido apenas no harness; o runtime não foi alterado.
+
+O Comercial manteve os slots pendentes, rota para envio 404, nenhum aviso correspondente e nenhuma tarefa de envio; seu registro permaneceu inalterado. Elaborado/enviado/assinatura/pagamento/NF não foram confirmados. Os dois cards3066 e seu PDF manual conservaram igualdade profunda e hashes idênticos ao baseline. A empresa real do relato foi somente diagnosticada; não houve reprocessamento de eventos antigos nem movimento nela por esta validação.
+
+Tempos das ações observadas: primeira entrada **22,634 s**, reentrada **18,624 s**; sem teste de carga ou alegação de ganho de latência. Voz503, abortos de navegação e avisos de política geográfica/descrição de diálogo foram separados dos resultados da feature. Líder, finalização e assinatura positiva não foram exercitados remotamente. Nenhuma migration, backfill, configuração/ENV, worker global/CLI manual ou publicação de produção foi realizada.
+
+Relatório sanitizado: `docs/reports/validacao-minuta-movimento-livre-staging-2026-10-21.md`. Evidências privadas: `remote-browser-result.json`, `draft-ui-proof.json`, `commercial-ui-proof.json`, `first-entry-proof.json`, `final-generation-evidence.json`, `after-reentry.json` e `reentry-proof.json`, em `/var/tmp/alpha-crm-contrato-elaboracao-20261021/`. Nenhum log bruto, token, URL de armazenamento ou conteúdo contratual foi versionado.
+
+### Preservação da atualização concorrente no fechamento documental
+
+Antes do commit documental, `origin/staging` avançou para `86858e7e`, filho de `71e3f06f`, por outro fluxo autorizado de valores por extenso no GeradorDocumentos. São onze caminhos externos, incluindo dependência fixa `extenso@3.0.0`, ações/UI/helper/testes e sua story. FF normal preservou esse trabalho e nossos documentos; os nove arquivos de runtime/testes desta correção permaneceram byte a byte iguais a `71e3f06f` (prova privada `release/ff-868-proof.json`). A revisão externa tem gates e QA próprios; sua suíte combinada executada registrou 709 arquivos/5.614 testes aprovados e typecheck exit 0. Não se atribui essa implementação à presente correção nem se descreve o E2E de `71e3` como E2E completo de `868`.
+
+O build remoto padrão de `868` ficou READY em `dpl_BpoNgEB6EYbysR5kxMkamiZXbV4L`, com Node24.x e alias staging corretos. Smoke autenticado Admin somente leitura de `868` passou às 20:51:03 UTC: preview 200/CONFERENCIA, dez cláusulas e oito pendências; PDF de prévia 200/99.451 bytes/`%PDF-`; Comercial para envio 404. Não houve movimento de card. Evidência privada `external-868-authenticated-readonly-smoke.json`. A revisão documental mantém runtime/dependências/testes iguais à base preservada; sua confirmação de READY/alias será registrada somente em evidência privada, sem novo commit recursivo.
 
 ### File List
 
@@ -198,10 +216,14 @@ Arquivos efetivamente criados/alterados pela equipe nesta entrega local:
 - `tests/bpm/movimento-livre-command.test.ts`
 - `tests/bpm/minuta-movimento-livre-sqlite.test.ts`
 - `tests/bpm/minuta-movimento-livre-seguranca.test.ts` (ownership QA)
+- `docs/reports/validacao-minuta-movimento-livre-staging-2026-10-21.md`
+- `.bibble/memory/codebase-map.md`
+- `.bibble/memory/integration-points.md`
+- `.bibble/memory/journal.md`
 
 ## QA Results
 
-Pendente de implementação, execução dos gates e revisão independente. A validação de draft acima não substitui parecer de QA do runtime.
+Revisões por etapa abaixo. O parecer final de staging ao fim desta seção substitui as pendências históricas dos checkpoints anteriores.
 
 ### 2026-10-21 — Quinn / Sage, Probe, Anubis e Lens — GO local, publicação condicionada à integração concorrente
 
@@ -227,6 +249,23 @@ Pendente de implementação, execução dos gates e revisão independente. A val
 **Limites:** o GO é exclusivamente para staging e não declara geração automática remota nem Done. O reteste deve criar nova negociação fictícia vinculada, entrar na etapa pela UI autenticada após READY/SHA/alias conferidos e comprovar minuta CONFERENCIA, reuso e ausência de verde/alerta prematuros, preservando a fixture documental anterior. Admin/líder locais não equivalem a credencial de líder exercitada remotamente. Não mover o card real relatado nem executar geração por CLI/worker global, backfill ou configuração publicada para fabricar evidência. Produção fora do escopo. Flux visual não se aplica: nenhum componente/rota pública ou dependência de UI foi criado; não se alega ganho de latência sem medida remota.
 
 Evidências: `/var/tmp/alpha-crm-contrato-elaboracao-20261021/forge/forge-result.json`, `gate-tests.log`, custódias e `gate-runtime-result.json`; os 55 adversários estão em `/var/tmp/alpha-crm-minuta-movimento-livre-20261021/qa-seguranca.{log,json}`, com primeira rodada separada. CodeRabbit não disponível no caminho configurado; revisão independente foi o fallback. QA atualizou somente esta seção nesta revisão; nenhuma fonte, ambiente, dado remoto, Git ou outro teste foi alterado. Arquivo liberado ao executor para fechamento e integração.
+
+
+### 2026-10-21 — Quinn — APPROVED final em staging
+
+**Parecer: APPROVED no escopo da story; QA recomenda Done.** Integração concorrente e reteste remoto autenticado concluídos. O alias `staging.alpha-comex.com` foi conferido em READY no deployment `dpl_2eyf3ifNfvM587DptJ7wacBUGMob`, custom environment `staging`, runtime `71e3f06fed6890ef346ead946711ea37bcdc4fd3`. Nenhuma publicação em produção integra este parecer.
+
+**Integração ratificada:** a prova de merge preserva os nove arquivos de runtime/testes da minuta byte a byte do commit `55183c0a`, os onze caminhos da feature e os dez caminhos concorrentes de `bfff9d36`, sem conflito. O conjunto integrado passou typecheck oficial, lint dos três fontes e Apps Script via stdin e **158 testes em onze arquivos**, com fingerprint combinado `38bf3c61b6d0aacc00de95e79989286a0aff8584cf94be04825d6fefec7f22a6` inalterado. A tentativa anterior do wrapper de typecheck com 4 GiB terminou por OOM operacional e foi preservada; o comando oficial com 8 GiB passou na mesma fonte. Os quatro gates globais e smoke anteriores permanecem aplicáveis pela custódia conferida; não se apresenta o delta direcionado como nova suíte global.
+
+**Geração real pela UI:** Admin autenticado entrou pela primeira vez em Elaboração de contrato na negociação fictícia da empresa 3067, Financeiro `cmvikcyuc000408lh12sidz07`, vinculada ao Comercial `cmvik1dca000007lbpk109m6s`. Histórico e evento corroboram ator, movimento livre, etapa/versão e marcador servidor. A automação concluiu com uma tentativa, gerou **um documento CONFERENCIA e um anexo** no card/campo financeiro corretos. A prévia autenticada retornou HTTP 200, dez cláusulas e oito pendências; o PDF de conferência retornou HTTP 200, 99.452 bytes e assinatura `%PDF-`. Isso não equivale a PDF final persistido: o documento continuou não finalizado, com `finalizadoEm` nulo.
+
+**Reentrada e isolamento:** a sequência Elaboração → Novo contrato → Elaboração manteve o mesmo documento `cmviktr2x000707l3k2sp5rz9` e anexo `cmviktr3u000i07l3s8l2ie5v`; a ação de reentrada retornou `existente: true`. Há **três registros de execução**: dois SUCESSO, cada um com uma tentativa, e um IGNORADA, com zero tentativas e zero steps, ao sair da etapa documental (`DESTINO_DOCUMENTAL_DIVERGENTE`). Não houve duplicação. A prova final tem quinze asserts verdadeiros; a primeira versão do verificador exigia incorretamente dois registros totais, foi corrigida apenas na evidência e preservada como `reentry-proof-initial-cardinality-draft.json`, sem nova query ou mudança no runtime. A comparação independente confirmou Comercial inalterado, mesmos vínculos e metadados do documento/anexo; as duas fixtures anteriores da empresa 3066 permaneceram iguais em comparação profunda e hash.
+
+**Prontidão preservada:** Comercial exibiu envio pendente, “Sendo preparado pelo Financeiro” e assinatura pendente. A rota Comercial de documento para envio permaneceu HTTP 404 e a consulta autenticada de alertas não encontrou alertas desses dois cards. Não foram preenchidos estados de assinatura, pagamento ou NF; cards permaneceram ATIVO, sem conclusão financeira. Assim, gerar minuta não antecipou a disponibilidade reservada à finalização financeira com conferência.
+
+**Limites e observações:** o teste remoto exerceu Admin, primeira entrada e reentrada; líder, revogação, grafos adversariais e concorrência permanecem cobertos pelos testes locais, sem alegação de exercício remoto. Não houve finalização, assinatura, pagamento, NF, envio externo, backfill ou mudança no card real relatado. A instrumentação SELECT-only não fez writes nem invocou worker; as ações ocorreram pelo CRUD normal da UI, incluindo sua orquestração por card. Não se declara navegador sem erros: houve 503 periférico de voz, bloqueio de geolocalização por policy, aviso Radix de descrição e doze requests `net::ERR_ABORTED` durante navegação/reload. As ações documentais tiveram sucesso, sem nova falha da automação demonstrada. Os tempos observados de entrada/reentrada (22.634/18.624 ms) incluem UI e atualização, sem atribuição exclusiva ao backend ou alegação de ganho percentual.
+
+Evidências privadas conferidas em `/var/tmp/alpha-crm-contrato-elaboracao-20261021/`: `release/merge-bfff-proof.json`, `release/delta-bfff-result.json`, `release/aliases-minuta-ready.json`, `release/smoke-minuta-ready.json`, `first-generation-evidence.json`, `first-entry-proof.json`, `final-generation-evidence.json`, `reentry-proof.json`, `draft-ui-proof.json`, `commercial-ui-proof.json` e `remote-browser-result.json`. Dados brutos não foram copiados para o repositório. Nesta conclusão QA alterou somente QA Results; fonte, testes, ambiente, banco e Git não foram modificados. **Arquivo liberado ao executor para fechamento documental.**
 
 ## Change Log
 

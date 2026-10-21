@@ -7278,3 +7278,42 @@ Conferir READY/SHA/alias e realizar reteste autenticado dos slots, anexos e noti
 - PDF autenticado 200/1.173 bytes e preview UI; um anexo somente leitura; um aviso real ao responsável com horário/empresa/documento. Reabrir/refetch manteve o mesmo alerta, tarefa e alertaEm, sem duplicar. Assinado permaneceu pendente/404. Zero novo erro da feature; voz 503 preexistente separada.
 - Limites: geração/finalização automática e signed positivo cobertos localmente, não no remoto. Sem assinatura/pagamento/NF/conclusão ou envio externo fabricados, sem produção, schema, ENV ou worker/global manual. A UI financeira pode executar seu housekeeping existente; não se promete zero efeitos indiretos.
 - Evidências privadas `remote-result.json`/`remote-dedup-proof.json`; relatório sanitizado `docs/reports/validacao-contratos-pendentes-staging-2026-10-21.md`. Histórico anterior deste journal preservado; fechamento documental único após QA final.
+
+
+---
+
+## [2026-10-21 20:36 UTC] — CRM: minuta seletiva integrada, reteste pendente
+
+**Tags:** #bugfix #integration #security #nextjs #prisma
+**Agentes envolvidos:** coordenação, Scout/Architect, SM, backend/Echo, QA, Forge, DevOps, Scribe, Kowalski.
+**Arquivos tocados:** seis módulos backend de movimento/eventos/fila/minuta listados no codebase-map; story e arquitetura da geração documental. Esta consolidação altera somente três memórias.
+
+### Contexto
+Movimento livre de Admin/líder suprimia também a geração configurada da minuta. Usuário confirmou execução desta correção somente no staging.
+
+### O que foi feito
+- Marcador emitido pelo servidor e comprovado por histórico causal; classificador GERAR_CONTRATO → FIM e gates de autoridade/configuração/etapa/condição antes da materialização e do worker.
+- Flush após commit limitado ao novo card/evento, incluindo fila/resgate/leases; histórico antigo e demais efeitos permanecem suprimidos. Engine normal preserva o comportamento anterior.
+- Quatro gates sobre daf88 PASS: 706 arquivos/5.557 testes, quatro skipped/um todo, tipos/lint/build exit 0, custódia d55d. Integração bfff: 11 arquivos/158 testes PASS, lint 0 e typecheck oficial 8 GiB exit 0 após OOM do wrapper de 4 GiB; OOM operacional não foi diagnóstico de tipos. Fontes preservadas e QA local APPROVED.
+- Feature `55183c0a`, merge `71e3f06f` preserva `bfff9d36`; push staging realizado, deployment informado `dpl_2eyf…` ainda BUILDING no checkpoint.
+
+### Decisões tomadas
+Somente minuta CONFERENCIA; não antecipar verde/alerta Comercial, assinatura, pagamento ou envio. Finalização/documentos da entrega 5e3 permanecem independentes. Sem botão adicional, reativação de eventos antigos ou mudança de configuração.
+
+### Problemas encontrados / resolvidos
+Resgate da fila recebeu escopo exclusivo do novo modo sem alterar chamadas normais. Avanço concorrente Instagram foi preservado. Wrapper de typecheck sem memória suficiente foi substituído por execução oficial com capacidade adequada.
+
+### Pendências
+READY/SHA/alias e reteste real permanecem pendentes. Fixture nova de staging por CRUD normal: empresa fictícia 3067, Comercial `cmvik1dca000007lbpk109m6s` em Fechado e Financeiro `cmvikcyuc000408lh12sidz07` em Novo Contrato, baseline zero documentos. Não se afirma geração, prontidão ou conclusão. Preservar empresa fictícia 3066 e seu PDF manual; produção fora do escopo, sem migration/backfill/configuração em lote ou alteração de ENV.
+
+### Refletido também em
+- `codebase-map.md`: seis módulos e limites da entrega.
+- `integration-points.md`: marcador, prova, gates e flush direcionado.
+
+### Fechamento remoto confirmado — minuta seletiva
+- Staging `71e3f06f` / `dpl_2eyf3ifNfvM587DptJ7wacBUGMob` READY/SHA/alias conferidos. Admin real e empresa fictícia3067: uma minuta CONFERENCIA, um anexo no campo correto e PDF de prévia autenticado; reentrada preservou os IDs, com `existente=true`.
+- Dois SUCESSO de entrada; um registro IGNORADA/zero tentativas na saída para NovoContrato. Quinze assertivas finais PASS; Comercial pendente/zero alerta, estados financeiros vazios e ambos os cards3066 deep/hash idênticos. Checker inicial de cardinalidade foi preservado e corrigido apenas na evidência privada.
+- Tempos observados 22,634s/18,624s, sem teste de carga. Voz503 e avisos de navegador separados. Empresa real somente diagnosticada; não reprocessar eventos antigos. Líder e finalização não foram exercitados remotamente. Sem produção/migration/backfill/ENV ou worker global/CLI manual.
+- Relatório sanitizado `docs/reports/validacao-minuta-movimento-livre-staging-2026-10-21.md`; memórias e story fechadas em um único conjunto documental após QA. Entradas anteriormente versionadas preservadas.
+
+- No fechamento, avanço externo `86858e7e` (GeradorDocumentos/extenso) foi preservado por FF normal, mantendo nossos nove módulos/testes byte a byte. Seus gates próprios combinados e build padrão remoto READY/Node24.x foram conferidos; smoke autenticado readonly manteve a minuta CONFERENCIA, PDF de prévia 200 e Comercial404, sem movimento. E2E completo permanece historicamente em71e3; commit final é só documental e compara runtime/deps/testes à base868.
