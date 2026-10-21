@@ -76,3 +76,26 @@ describe("CRM - snapshot e versao dos campos diante de realtime", () => {
     expect(resultado.snapshotPendente).toBeNull();
   });
 });
+
+describe("CRM-05 mesclagem por campo", () => {
+  const base = { valores: { nome: "Antes", contato: "123" }, versao: "v1" };
+  it("uma revisão de outro campo preserva rascunho e atualiza os campos intactos", () => {
+    const remoto = { valores: { nome: "Antes", contato: "456" }, versao: "v2" };
+    const resultado = resolverSnapshotCamposRealtime({ rascunhoSujo: true, snapshotAtual: base, snapshotRemoto: remoto, valoresLocais: { nome: "Meu texto", contato: "123" } });
+    expect(resultado.aplicarRemoto).toBe(true);
+    expect(resultado.valoresEditados).toEqual({ nome: "Meu texto", contato: "456" });
+    expect(resultado.snapshotAtivo).toBe(remoto);
+  });
+  it("a confirmação da mesma edição não cria conflito", () => {
+    const valores = { nome: "Meu texto", contato: "123" };
+    expect(resolverSnapshotCamposRealtime({ rascunhoSujo: true, snapshotAtual: base, snapshotRemoto: { valores, versao: "v2" }, valoresLocais: valores }).aplicarRemoto).toBe(true);
+  });
+  it("preserva base e rascunho quando o mesmo campo mudou de formas diferentes", () => {
+    const remoto = { valores: { nome: "Outra pessoa", contato: "123" }, versao: "v2" };
+    const resultado = resolverSnapshotCamposRealtime({ rascunhoSujo: true, snapshotAtual: base, snapshotRemoto: remoto, valoresLocais: { nome: "Meu texto", contato: "123" } });
+    expect(resultado.aplicarRemoto).toBe(false);
+    expect(resultado.snapshotAtivo).toBe(base);
+    expect(resultado.valoresEditados.nome).toBe("Meu texto");
+    expect(resultado.snapshotPendente).toBe(remoto);
+  });
+});

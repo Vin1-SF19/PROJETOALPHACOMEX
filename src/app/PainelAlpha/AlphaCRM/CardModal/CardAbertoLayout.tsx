@@ -34,6 +34,7 @@ import {
 import { TelefonesCardButton } from "./TelefonesCardButton";
 import { usePerfilEmpresa } from "@/components/PerfilEmpresaGlobal";
 import { SeletorMembrosCard } from "./SeletorMembrosCard";
+import { PainelEncaminhamentos } from "./PainelEncaminhamentos";
 import { PainelSlaCard } from "./PainelSlaCard";
 import { ChatClienteCard } from "./ChatClienteCard";
 
@@ -260,8 +261,11 @@ export function CardAbertoLayout({
           </div>
         </div>
 
+        <p className="mt-4 text-xs text-slate-300">Em edição: <strong>{card.pipeline.nome}</strong> · {card.etapa.nome}</p>
+        <p className="mt-2 text-[11px] text-slate-400">Histórico de passagem — as abas consultam a jornada; o formulário permanece no card em edição.</p>
+
         {/* Tabs de pipeline (1ª: pipeline atual do card; demais: outros pipelines do sistema) */}
-        <Tabs value={abaAtiva} onValueChange={setAbaAtiva} className="mt-4">
+        <Tabs value={abaAtiva} onValueChange={setAbaAtiva} className="mt-2">
           <TabsList className="flex-wrap h-auto bg-transparent border-none p-0 gap-2 justify-start">
             <TabsTrigger
               value={card.pipeline.id}
@@ -343,7 +347,7 @@ export function CardAbertoLayout({
         {/* Centro: slot do formulário da etapa ativa */}
         <div
           role="region"
-          aria-label="Conteúdo do card"
+          aria-label={`Formulário em edição: ${card.pipeline.nome} · ${card.etapa.nome}`}
           tabIndex={0}
           className="min-h-0 min-w-0 lg:h-full lg:overflow-y-auto lg:overscroll-y-contain"
         >
@@ -352,6 +356,7 @@ export function CardAbertoLayout({
 
         {/* Direita: próxima etapa */}
         <div className="flex flex-col gap-5 min-w-0 min-h-0 overflow-y-auto">
+          <PainelEncaminhamentos card={card} realtimeRevision={realtimeRevision} onAtualizado={onAtualizado} onAbrirCard={onAbrirCard} />
           <PainelSlaCard cardId={card.id} realtimeRevision={realtimeRevision} />
           <PainelProximaEtapa
             card={card}

@@ -32,7 +32,7 @@ vi.mock("@/actions/bpm/TranscricaoMeet", () => ({
   }),
 }));
 vi.mock("@/actions/bpm/FollowUp", () => {
-  const data = () => ({ estado: "EM_ANDAMENTO", checklist: { id: "check", perguntas: [{ id: "q", pergunta: "Notas", tipo: "texto", obrigatoria: false, opcoes: [] }], respostas: backend.answers } });
+  const data = () => ({ estado: "EM_ANDAMENTO", checklist: { id: "check", perguntas: [{ id: "q", pergunta: "Notas", tipo: "texto", obrigatoria: false, opcoes: [] }, { id: "q2", pergunta: "Contexto", tipo: "texto", obrigatoria: false, opcoes: [] }], respostas: backend.answers } });
   return {
     ObterUltimoFollowUpBpm: vi.fn(async () => ({ success: true, data: data() })),
     SalvarChecklistFollowUpBpm: vi.fn(async ({ respostas }: { respostas: Record<string, string> }) => {
@@ -51,7 +51,7 @@ let saves: ReturnType<typeof useCardSave>;
 let root: Root;
 let host: HTMLDivElement;
 const noop = () => {};
-function Harness({ kind, show, initialSummary = "Original" }: { kind: Kind; show: boolean; initialSummary?: string }) {
+function Harness({ kind, show, initialSummary = "Original", revision = 0 }: { kind: Kind; show: boolean; initialSummary?: string; revision?: number }) {
   const context = useCardSave();
   const [card, setCard] = useState({ id: "card", googleEventId: "event", updatedAt: new Date("2026-09-22T10:00:00Z"), proximoContatoEm: backend.contact, transcricaoReuniao: initialSummary } as unknown as Card);
   useEffect(() => { saves = context; return context.subscribeConfirmation("card", setCard); }, [context]);
@@ -59,7 +59,7 @@ function Harness({ kind, show, initialSummary = "Original" }: { kind: Kind; show
   if (kind === "contact") return h(PainelProximoContato, { card, onAtualizado: noop, podeEditar: true, realtimeRevision: 0 });
   if (kind === "summary") return h(PainelReuniao, { card, onAtualizado: noop, podeEditar: true, accent: "1,2,3", mostrarFormulario: false });
   if (kind === "status") return h(PainelStatusPosFechamento, { cardId: "card", statusPersistido: card.statusPosFechamento ?? "AGUARDANDO_CONTRATO", versaoPersistidaEm: card.updatedAt, podeEditar: true, realtimeRevision: 0, accent: "1,2,3", onAtualizado: noop });
-  return h(PainelChecklistFollowUp, { cardId: "card", accent: "1,2,3", podeEditar: true, realtimeRevision: 0, onAtualizado: noop, onEstadoChange: noop });
+  return h(PainelChecklistFollowUp, { cardId: "card", accent: "1,2,3", podeEditar: true, realtimeRevision: revision, onAtualizado: noop, onEstadoChange: noop });
 }
 async function render(kind: Kind, show = true) {
   await act(async () => root.render(h(CardSaveProvider, { children: h(Harness, { kind, show }) })));
@@ -108,4 +108,48 @@ it("permite registrar transcrição manual quando a reunião começa sem texto",
   await act(async () => { await saves.flushSaves(); });
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5)); });
   expect(backend.resumo).toBe("Resumo registrado após a reunião");
+});
+
+
+it("realtime de pergunta intacta mescla respostas sem conflito falso no follow-up", async () => {
+  await render("followup"); await edit("Meu rascunho");
+  backend.answers = { q2: "Contexto remoto" };
+  await act(async () => root.render(h(CardSaveProvider, { children: h(Harness, { kind: "followup", show: true, revision: 1 }) })));
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5)); });
+  expect(input().value).toBe("Meu rascunho");
+  expect(host.querySelector<HTMLTextAreaElement>("#follow-up-q2")!.value).toBe("Contexto remoto");
+  expect(host.textContent).not.toContain("mudou externamente");
+  expect(saves.getPendingChanges("card").map((item) => item.label)).toEqual(["Notas"]);
+});
+it("follow-up conflitante preserva rascunho e impede autosave até resolução explícita", async () => {
+  await render("followup"); await edit("Meu rascunho");
+  backend.answers = { q: "Outra pessoa" };
+  await act(async () => root.render(h(CardSaveProvider, { children: h(Harness, { kind: "followup", show: true, revision: 1 }) })));
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5)); });
+  expect(input().value).toBe("Meu rascunho");
+  expect(host.textContent).toContain("Uma resposta que você está editando mudou externamente");
+  const { SalvarChecklistFollowUpBpm } = await import("@/actions/bpm/FollowUp");
+  await act(async () => { await saves.flushSaves(); });
+  expect(SalvarChecklistFollowUpBpm).not.toHaveBeenCalled();
+  const aceitar = [...host.querySelectorAll("button")].find((button) => button.textContent?.includes("Usar respostas atualizadas"))!;
+  await act(async () => aceitar.click());
+  expect(input().value).toBe("Outra pessoa");
+  expect(saves.getDraft("card:followup")).toBeUndefined();
+});
+
+it("status pós-fechamento ignora revisão de outro campo e sinaliza só mudança concorrente do status", async () => {
+  async function snapshot(statusPersistido: string, hora: string) {
+    await act(async () => root.render(h(CardSaveProvider, { children: h(PainelStatusPosFechamento, {
+      cardId: "card", statusPersistido, versaoPersistidaEm: new Date(hora), podeEditar: true, realtimeRevision: 1, accent: "1,2,3", onAtualizado: noop,
+    }) })));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5)); });
+  }
+  await snapshot("AGUARDANDO_CONTRATO", "2026-09-22T10:00:00Z");
+  await edit("CONTRATO_ENVIADO");
+  await snapshot("AGUARDANDO_CONTRATO", "2026-09-22T10:01:00Z");
+  expect(input().value).toBe("CONTRATO_ENVIADO");
+  expect(host.textContent).not.toContain("O status persistido mudou");
+  await snapshot("CONTRATO_ASSINADO", "2026-09-22T10:02:00Z");
+  expect(input().value).toBe("CONTRATO_ENVIADO");
+  expect(host.textContent).toContain("O status persistido mudou");
 });

@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => {
     bpmPipeline: { findFirst: vi.fn() },
     bpmEtapa: { findFirst: vi.fn() },
     bpmCardVinculo: { findFirst: vi.fn(), upsert: vi.fn(), create: vi.fn() },
-    bpmCard: { findFirst: vi.fn(), create: vi.fn() },
+    bpmCard: { findUnique: vi.fn(), updateMany: vi.fn(), findFirst: vi.fn(), create: vi.fn() },
     bpmCampo: { findMany: vi.fn() },
     bpmCardCampoValor: { findMany: vi.fn(), deleteMany: vi.fn() },
     bpmCardAnexo: { findMany: vi.fn() },
@@ -60,7 +60,7 @@ function execucao() {
 function execucaoRadar() {
   const atual = execucao();
   return {
-    ...atual,
+    ...atual, cardId: comercial,
     card: {
       ...atual.card,
       id: comercial,
@@ -86,6 +86,8 @@ beforeEach(() => {
   mocks.db.bpmCardVinculo.findFirst.mockImplementation(async ({ where }) => where.cardDestinoId
     ? { cardOrigemId: comercial, cardOrigem: { responsavelId: 29, indicacaoOrigem: { parceiroId: 31 } } }
     : null);
+  mocks.db.bpmCard.findUnique.mockResolvedValue({ ...execucao().card, versao: 1 });
+  mocks.db.bpmCard.updateMany.mockResolvedValue({ count: 1 });
   mocks.db.bpmCard.findFirst.mockResolvedValue(null);
   mocks.db.bpmCard.create.mockResolvedValue({ id: operacional, createdAt: new Date() });
   mocks.db.bpmCampo.findMany.mockResolvedValue([]);
@@ -103,7 +105,7 @@ describe("handoff Financeiro → Operacional", () => {
     expect(mocks.copiar).toHaveBeenNthCalledWith(1, mocks.db, origem, operacional, pipelineId, etapaId);
     expect(mocks.copiar).toHaveBeenNthCalledWith(2, mocks.db, comercial, operacional, pipelineId, etapaId);
     expect(mocks.db.bpmCardVinculo.findFirst).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ cardDestinoId: origem, cardOrigem: {
+      where: expect.objectContaining({ cardDestinoId: origem, cardOrigem: { empresaId: 7,
         pipeline: { OR: [{ chave: "comercial" }, { nome: "Revisão de Radar" }] },
       } }),
     }));
@@ -117,7 +119,7 @@ describe("handoff Financeiro → Operacional", () => {
 
   it("falha com pendências nominais e não publica o card quando faltar requisito de entrada", async () => {
     mocks.faltantes.mockResolvedValue([{ id: "contato", nome: "Contato principal" }]);
-    mocks.db.bpmAutomacaoExecucao.findUnique.mockResolvedValueOnce(execucao()).mockResolvedValueOnce({ tentativas: 3 });
+    mocks.db.bpmAutomacaoExecucao.findUnique.mockResolvedValueOnce(execucao()).mockResolvedValueOnce(execucao()).mockResolvedValueOnce({ tentativas: 3 });
     expect(await processarFilaAutomacoesCentraisBpm()).toMatchObject({ falhos: 1 });
     expect(mocks.db.bpmAutomacaoExecucao.update).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ status: "FALHA", mensagemErro: expect.stringContaining("Contato principal") }),
@@ -171,6 +173,7 @@ describe("handoff Financeiro → Operacional", () => {
 describe("handoff Revisão de Radar → Financeiro", () => {
   beforeEach(() => {
     mocks.db.bpmAutomacaoExecucao.findUnique.mockResolvedValue(execucaoRadar());
+    mocks.db.bpmCard.findUnique.mockResolvedValue({ ...execucaoRadar().card, versao: 1 });
     mocks.db.bpmPipeline.findFirst.mockResolvedValue({ chave: "financeiro" });
     mocks.db.bpmCardVinculo.findFirst.mockResolvedValue(null);
   });

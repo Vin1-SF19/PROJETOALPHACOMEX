@@ -18,3 +18,21 @@ it.each(["ENTRAR_COLUNA", "SAIR_COLUNA"])("replay ignora evento de reposicioname
   expect(await materializarExecucoesEventosBpm(10, client as never)).toMatchObject({ criadas: 0 });
   expect(create).toHaveBeenCalledWith({ data: expect.objectContaining({ status: "IGNORADA" }) });
 });
+
+// A manual handoff creates a destination but must not trigger unrelated business actions.
+it("CARD_CRIADO administrativo não materializa automações no destino", async () => {
+  const create = vi.fn().mockResolvedValue({ id: "exec" });
+  const client = {
+    bpmAutomacaoVersao: { findMany: vi.fn().mockResolvedValue([{
+      id: "versao", automacaoId: "email-destino", gatilhoTipo: "CARD_CRIADO",
+      gatilhoConfigJson: '{"escopo":"GLOBAL_PIPELINE"}', automacao: { etapaId: "destino", pipelineId: "pipeline" },
+    }]) },
+    bpmEventoDominio: { findMany: vi.fn().mockResolvedValue([{
+      id: "evento", tipo: "CARD_CRIADO", cardId: "card", correlationId: "corr", profundidade: 1,
+      valorAnteriorJson: null, valorNovoJson: '{"etapaId":"destino","automacoesSuprimidas":true}', card: { etapaId: "destino" },
+    }]) },
+    bpmAutomacaoExecucao: { findFirst: vi.fn().mockResolvedValue(null), create },
+  };
+  expect(await materializarExecucoesEventosBpm(10, client as never)).toMatchObject({ criadas: 0 });
+  expect(create).toHaveBeenCalledWith({ data: expect.objectContaining({ status: "IGNORADA" }) });
+});

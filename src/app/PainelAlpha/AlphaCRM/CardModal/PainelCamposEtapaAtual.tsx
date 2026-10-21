@@ -22,6 +22,7 @@ import { BPM_FIELD_KEYS, BPM_STAGE_KEYS } from "@/lib/bpm/ontology";
 import { FINANCIAL_FIELD_KEYS } from "@/lib/bpm/pipeline-financeiro";
 import { avaliarFormalizacaoFinanceira } from "@/lib/bpm/financeiro-formalizacao";
 import { useCardSave } from "@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext";
+const LABELS_VAZIOS: Record<string, string> = {};
 const erroFormulario = { duration: 5000, closeButton: true };
 // Só a apresentação do CPF é ignorada; outros tipos mantêm comparação literal.
 function valorComparavel(tipo: string, valor = "") {
@@ -35,6 +36,7 @@ interface Props {
   campoLabels?: Record<string, string>;
   instanceKey: string;
   titulo?: string;
+  ocultarTitulo?: boolean;
   accent: string;
   podeEditar: boolean;
   realtimeRevision: number;
@@ -45,9 +47,10 @@ interface Props {
 export function PainelCamposEtapaAtual({
   card,
   campoIds,
-  campoLabels = {},
+  campoLabels = LABELS_VAZIOS,
   instanceKey,
   titulo = "Campos da etapa atual",
+  ocultarTitulo = false,
   accent,
   podeEditar,
   realtimeRevision,
@@ -61,7 +64,6 @@ export function PainelCamposEtapaAtual({
   const camposDoComponente = card.camposEtapa
     .filter((campo) => ordemCampos.has(campo.id))
     .sort((a, b) => (ordemCampos.get(a.id) ?? 0) - (ordemCampos.get(b.id) ?? 0));
-  const [revisaoInicial] = useState(realtimeRevision);
   const [valoresCamposAtuais, setValoresCamposAtuais] = useState<Record<string, string>>(() =>
     getDraft(idInstancia) ?? Object.fromEntries(camposDoComponente.map((campo) => [campo.id, valorInicialCampo(campo)])),
   );
@@ -204,6 +206,7 @@ export function PainelCamposEtapaAtual({
       const resolucao = resolverSnapshotCamposRealtime({
         rascunhoSujo: camposAtuaisSujosRef.current || Boolean(getDraft(idInstancia)),
         snapshotAtual: snapshotAtivoRef.current,
+        valoresLocais: valoresRef.current,
         snapshotRemoto,
       });
       if (!resolucao.aplicarRemoto) {
@@ -213,8 +216,19 @@ export function PainelCamposEtapaAtual({
         return;
       }
       snapshotAtivoRef.current = resolucao.snapshotAtivo;
-      valoresRef.current = resolucao.snapshotAtivo.valores;
-      setValoresCamposAtuais(resolucao.snapshotAtivo.valores);
+      valoresRef.current = resolucao.valoresEditados;
+      setValoresCamposAtuais(resolucao.valoresEditados);
+      const sujo = Object.entries(resolucao.valoresEditados).some(([id, valor]) => valor !== resolucao.snapshotAtivo.valores[id]);
+      camposAtuaisSujosRef.current = sujo;
+      setDraft(idInstancia, sujo ? resolucao.valoresEditados : undefined);
+      setPendingFields(`${card.id}:${idInstancia}`, camposRemotos.flatMap((campo) => {
+        const antes = resolucao.snapshotAtivo.valores[campo.id] ?? "";
+        const depois = resolucao.valoresEditados[campo.id] ?? "";
+        if (valorComparavel(campo.tipo, antes) === valorComparavel(campo.tipo, depois)) return [];
+        return [{ label: campoLabels[campo.id] ?? campo.nome,
+          before: campo.tipo === "usuario" ? nomeUsuarioCampoBpm(antes, campo.usuariosOpcoes ?? []) : lerRascunhoOrigem(antes)?.origem ?? antes,
+          after: campo.tipo === "usuario" ? nomeUsuarioCampoBpm(depois, campo.usuariosOpcoes ?? []) : lerRascunhoOrigem(depois)?.origem ?? depois }];
+      }));
       setBaseCamposAtuais(resolucao.snapshotAtivo.valores);
       setVersaoBaseCampos(resolucao.snapshotAtivo.versao);
       versaoBaseCamposRef.current = resolucao.snapshotAtivo.versao;
@@ -224,7 +238,7 @@ export function PainelCamposEtapaAtual({
       setConflitoCamposAtuais(false);
     }, 0);
     return () => clearTimeout(timer);
-  }, [snapshotCamposEtapa, versaoRemotaCampos, realtimeRevision, getDraft, idInstancia]);
+  }, [snapshotCamposEtapa, versaoRemotaCampos, realtimeRevision, getDraft, setDraft, setPendingFields, campoLabels, card.id, idInstancia]);
   function usarDadosAtualizadosCampos() {
     if (!snapshotRemotoPendente || !camposRemotosPendentes) return;
     limparFalhasCamposDaSecao();
@@ -557,17 +571,12 @@ export function PainelCamposEtapaAtual({
       className="space-y-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 outline-none focus-visible:ring-2 focus-visible:ring-white/30"
       aria-labelledby={`campos-etapa-atual-titulo-${idInstancia}`}
     >
-      {realtimeRevision !== revisaoInicial && (
-        <div className="rounded-xl border border-sky-500/25 bg-sky-500/[0.07] p-3 text-xs text-sky-200">
-          Este card recebeu uma atualização em tempo real. Os valores que você está editando foram preservados; revise-os antes de salvar.
-        </div>
-      )}
       <div className="flex items-start gap-2.5">
         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg" style={{ background: `rgba(${accent},0.15)` }}>
           <SlidersHorizontal size={13} style={{ color: `rgb(${accent})` }} />
         </div>
         <div>
-          <h3 id={`campos-etapa-atual-titulo-${idInstancia}`} className="text-xs font-bold uppercase tracking-wide text-white">{titulo}</h3>
+          <h3 id={`campos-etapa-atual-titulo-${idInstancia}`} className={ocultarTitulo ? "sr-only" : "text-xs font-bold uppercase tracking-wide text-white"}>{titulo}</h3>
           <p className="mt-0.5 text-[11px] text-slate-500">{card.etapa.nome} · campos obrigatórios e opcionais.</p>
         </div>
       </div>

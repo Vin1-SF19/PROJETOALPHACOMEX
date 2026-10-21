@@ -10,6 +10,7 @@ const selecao = { campoId: campo.id, parceiroId: 42 };
 function mockTx() {
   const mocks = { parceiro: { findUnique: vi.fn().mockResolvedValue({ id: 42, nome: "Parceiro Alpha" }) },
     indicacao: { findUnique: vi.fn().mockResolvedValue({ id: 8, parceiroId: 10, status: "ATIVA" }), update: vi.fn(), create: vi.fn() },
+    bpmCard: { findUnique: vi.fn().mockResolvedValue(null) },
     bpmCardHistorico: { create: vi.fn() } };
   return { mocks, tx: mocks as unknown as Prisma.TransactionClient };
 }

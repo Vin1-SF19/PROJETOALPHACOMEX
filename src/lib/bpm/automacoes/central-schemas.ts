@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
 import { bpmCardIdSchema, etapaIdCardSchema } from "@/lib/validations/bpm";
-import { validarParametrosAutomacaoBpm, type AcaoAutomacaoBpm } from "./schemas";
+import { parametrosEncaminhamentoSchema, validarParametrosAutomacaoBpm, type AcaoAutomacaoBpm } from "./schemas";
 
 export const TIPOS_EVENTO_AUTOMACAO = [
   "CARD_CRIADO", "CARD_ATUALIZADO", "CARD_MOVIDO", "ENTRAR_COLUNA", "SAIR_COLUNA",
@@ -76,11 +76,6 @@ const criarTarefaSchema = z.object({
 }).strict();
 const criarSlaSchema = z.object({ slaConfigId: z.string().cuid() }).strict();
 const textoSchema = z.object({ texto: z.string().trim().min(1).max(8_000) }).strict();
-const criarCardSchema = z.object({
-  pipelineId: z.string().cuid(), etapaId: etapaIdCardSchema, responsavelId: z.number().int().positive().optional(),
-  servico: z.string().trim().max(200).optional(), vincularAoOriginal: z.boolean().default(true),
-  somenteSeNaoExistirAtivo: z.boolean().default(false),
-}).strict();
 const atualizarRelacionadoSchema = z.object({
   direcao: z.enum(["ORIGEM", "DESTINO", "TODOS"]).default("TODOS"),
   campoId: z.string().cuid().optional(), valor: z.union([z.string().max(20_000), z.number(), z.boolean(), z.null()]).optional(),
@@ -115,7 +110,7 @@ const parametrosPorAcao = {
   CRIAR_SLA: criarSlaSchema,
   CRIAR_ALERTA: textoSchema,
   ADICIONAR_ANOTACAO: textoSchema,
-  CRIAR_CARD_OUTRO_PIPELINE: criarCardSchema,
+  CRIAR_CARD_OUTRO_PIPELINE: parametrosEncaminhamentoSchema,
   ATUALIZAR_CARD_RELACIONADO: atualizarRelacionadoSchema,
   ATRIBUIR_RESPONSAVEL: responsavelSchema,
   COMUNICACAO_EXISTENTE: comunicacaoSchema,

@@ -195,7 +195,9 @@ describe("Bibble voice proxy boundaries", () => {
 
     expect(button).toContain('disabled={state === "loading"}');
     expect(button).not.toContain('disabled={unavailable || state === "loading"}');
-    expect(button).toContain('? "Tentar voz do Bibble"');
+    expect(button).toContain('? "Voz do Bibble indisponível. Tentar novamente"');
+    expect(button).toContain('unavailable ? "VOZ INDISPONÍVEL · TENTAR"');
+    expect(button).toContain("aria-label={label}");
     expect(button).toMatch(/if \(!autoPlay \|\| !loaded \|\| !tts_enabled \|\| autoPlayAttemptedRef\.current\) return;/);
     expect(button).toContain('onClick={() => void play(false)}');
   });

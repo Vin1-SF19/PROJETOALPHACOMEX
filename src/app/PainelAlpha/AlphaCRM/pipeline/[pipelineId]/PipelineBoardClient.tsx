@@ -784,6 +784,7 @@ interface Props {
 
 interface SnapshotArrasto {
   cards: CardBpm[];
+  manifesto?: ManifestoQuadro;
   generation: number;
 }
 
@@ -900,6 +901,10 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
   }, [setNolossLeadAberto, setPromocaoLeadPendente, setAtribuicaoAgendarPendente, setNovoCardAberto]);
 
   const recarregarCards = useCallback(async (opcoes: OpcoesRecarregarCards = {}) => {
+    if (snapshotArrastoRef.current || movimentoPendenteRef.current) {
+      sincronizacaoRealtimePendenteRef.current = true;
+      return false;
+    }
     consultasEmAndamentoRef.current += 1;
     try {
     const requisicao = ++ultimaRequisicaoRef.current;
@@ -936,13 +941,9 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
         setNolossLeadAberto((aberto) => aberto && !result.manifesto.entradas.some((c) => c.id === aberto.id) ? null : aberto);
         setCards((atuais) => mesclarResumosQuadro(atuais, result.cards as CardBpm[], result.ids));
         if (cardSelecionadoIdRef.current && !result.manifesto.entradas.some((c) => c.id === cardSelecionadoIdRef.current)) {
-          if (cardAbertoPorAlertaRef.current === cardSelecionadoIdRef.current) {
-            // Ausência no filtro não prova perda de acesso. O detalhe revalida
-            // sua ACL e fecha o modal se o acesso foi revogado, mesmo sem realtime.
-            setRealtimeRevision((revision) => revision + 1);
-          } else {
-            cardSelecionadoIdRef.current = null; setCardSelecionadoId(null); setCardAgendamentoId(null);
-          }
+          // Filtrar o quadro não revoga acesso ao detalhe. O modal consulta a
+          // ACL novamente e permanece aberto durante o avanço entre etapas.
+          setRealtimeRevision((revision) => revision + 1);
         }
         if (mudouConfig) router.refresh();
         if (!opcoes.preservarErro) setErro(null);
@@ -1101,11 +1102,27 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
     setCards((prev) => prev.filter((c) => c.id !== cardId));
   }, []);
 
+  function aplicarMovimentoOtimista(cardId: string, etapaDestinoId: string) {
+    setCards((prev) => moverCardOtimistaNoBoard(prev, cardId, etapaDestinoId));
+    const atual = quadroRef.current.manifesto;
+    if (!atual) return;
+    const proximo = { ...atual, entradas: moverCardOtimistaNoBoard(atual.entradas, cardId, etapaDestinoId) };
+    quadroRef.current.manifesto = proximo;
+    setManifesto(proximo);
+  }
+
+  function restaurarMovimentoOtimista(snapshot: SnapshotArrasto) {
+    setCards(restaurarSnapshotBoard(snapshot.cards));
+    quadroRef.current.manifesto = snapshot.manifesto;
+    setManifesto(snapshot.manifesto);
+  }
+
   function onDragStart({ active }: DragStartEvent) {
     if (!podeIniciarArrastoBoard(movimentoPendenteRef.current) || snapshotArrastoRef.current) return;
     const generation = ++generationBoardRef.current;
     snapshotArrastoRef.current = {
       cards: criarSnapshotBoard(cards),
+      manifesto: quadroRef.current.manifesto,
       generation,
     };
     setActiveId(String(active.id));
@@ -1149,7 +1166,7 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
     setMovimentoPendente(true);
     setCardMovendoId(activeCard.id);
     // Importados permanecem na origem até a confirmação efetiva do servidor.
-    if (activeCard.podeMoverLivremente || !activeCard.importadoRd) setCards((prev) => moverCardOtimistaNoBoard(prev, activeCard.id, destino.id));
+    if (activeCard.podeMoverLivremente || !activeCard.importadoRd) aplicarMovimentoOtimista(activeCard.id, destino.id);
     let mensagemErro: string | null = null;
     let aguardandoConfirmacaoRd = false;
     const idempotencyKey = activeCard.importadoRd || activeCard.podeMoverLivremente ? crypto.randomUUID() : undefined;
@@ -1158,21 +1175,21 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
         ...(idempotencyKey ? { idempotencyKey, etapaOrigemEsperadaId: origem.id } : {}) });
       if (!resultado.success && "code" in resultado && resultado.code === "RD_MOVE_CONFIRMATION_REQUIRED"
         && "confirmacao" in resultado && resultado.confirmacao && "avisos" in resultado && resultado.avisos && idempotencyKey) {
-        setCards(restaurarSnapshotBoard(snapshot.cards));
+        restaurarMovimentoOtimista(snapshot);
         setCardMovendoId(null);
         setMovimentoRdPendente({ cardId: activeCard.id, etapaDestinoId: destino.id, etapaDestinoNome: destino.nome,
           idempotencyKey, confirmacao: resultado.confirmacao, avisos: resultado.avisos, snapshot });
         aguardandoConfirmacaoRd = true;
         return;
       }
-      if (resultado.success && activeCard.importadoRd && !activeCard.podeMoverLivremente) setCards((prev) => moverCardOtimistaNoBoard(prev, activeCard.id, destino.id));
+      if (resultado.success && activeCard.importadoRd && !activeCard.podeMoverLivremente) aplicarMovimentoOtimista(activeCard.id, destino.id);
       if (!resultado.success) mensagemErro = typeof resultado.error === "string" ? resultado.error : "Não foi possível mover o card";
     } catch {
       mensagemErro = "Não foi possível mover o card";
     } finally {
       if (snapshotArrastoRef.current !== snapshot || aguardandoConfirmacaoRd) return;
       if (mensagemErro) {
-        setCards(restaurarSnapshotBoard(snapshot.cards));
+        restaurarMovimentoOtimista(snapshot);
         setErro(mensagemErro);
       }
       snapshotArrastoRef.current = null;
@@ -1188,8 +1205,8 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
 
   function encerrarMovimentoRd(intencao: MovimentoRdPendente & { snapshot: SnapshotArrasto }, mensagemErro: string | null, movido = false) {
     if (snapshotArrastoRef.current !== intencao.snapshot) return;
-    setCards(movido ? moverCardOtimistaNoBoard(intencao.snapshot.cards, intencao.cardId, intencao.etapaDestinoId)
-      : restaurarSnapshotBoard(intencao.snapshot.cards));
+    if (movido) aplicarMovimentoOtimista(intencao.cardId, intencao.etapaDestinoId);
+    else restaurarMovimentoOtimista(intencao.snapshot);
     setErro(mensagemErro);
     setMovimentoRdPendente(null);
     snapshotArrastoRef.current = null;

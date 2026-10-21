@@ -3,7 +3,7 @@ import React, { act, createElement as h, type ComponentProps } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const api = vi.hoisted(() => ({ preflight: vi.fn(), move: vi.fn(), saveAndMove: vi.fn(), disponibilidade: vi.fn(), flush: vi.fn(), list: vi.fn(), error: vi.fn() }));
+const api = vi.hoisted(() => ({ preflight: vi.fn(), move: vi.fn(), saveAndMove: vi.fn(), disponibilidade: vi.fn(), flush: vi.fn(), list: vi.fn(), sync: vi.fn(), error: vi.fn() }));
 const drag = vi.hoisted(() => ({ current: null as null | ComponentProps<typeof import("@dnd-kit/core").DndContext> }));
 vi.mock("@dnd-kit/core", async (original) => {
   const actual = await original<typeof import("@dnd-kit/core")>();
@@ -12,7 +12,7 @@ vi.mock("@dnd-kit/core", async (original) => {
 vi.mock("next/navigation", () => { const router = { push: vi.fn(), refresh: vi.fn() }; return { useRouter: () => router }; });
 vi.mock("sonner", () => ({ toast: { error: api.error, success: vi.fn() } }));
 vi.mock("@/lib/pusher", () => ({ pusherClient: null }));
-vi.mock("@/actions/bpm/Quadro", () => ({ SincronizarQuadroBpm: vi.fn() }));
+vi.mock("@/actions/bpm/Quadro", () => ({ SincronizarQuadroBpm: api.sync }));
 vi.mock("@/actions/bpm/NolossLeads", () => ({ PromoverNolossLead: vi.fn() }));
 vi.mock("@/actions/bpm/Checklists", () => ({ ObterResumoChecklistCardBpm: vi.fn(async () => ({ success: false })) }));
 vi.mock("@/actions/bpm/DisponibilidadeEtapasCard", () => ({ ObterDisponibilidadeEtapasCardBpm: api.disponibilidade }));
@@ -54,9 +54,10 @@ const click = async (label: string) => { expect(button(label)).toBeDefined(); aw
 async function painel(card = detalhe, destino = "Destino") {
   await act(async () => root.render(h(PainelProximaEtapa, { card, etapas: [{ id: "destino", nome: destino, chave: null, ordem: 1, script: null }], podeMoverEtapa: true, accent: "1,2,3", onMovido })));
 }
-async function board(podeMoverLivremente = false, contagens = { tarefas: 0, anexos: 0 }) {
+async function board(podeMoverLivremente = false, contagens = { tarefas: 0, anexos: 0 }, paginado = false) {
   await act(async () => root.render(h(PipelineBoardClient, {
     pipeline: { id: "pipeline", nome: "Funil Sintético", etapas: [{ id: "origem", nome: "Origem", ordem: 0 }, { id: "destino", nome: "Destino", ordem: 1 }] },
+    manifestoInicial: paginado ? { configVersion: 1, entradas: [{ id: cardBoard.id, etapaId: "origem", revision: "1", nome: "Empresa Sintética", cnpj: null, servico: null, responsaveis: [] }] } : undefined,
     cardsIniciais: [{ ...cardBoard, _count: contagens, podeMoverLivremente, podeAgirEtapa: !podeMoverLivremente }], visual: { accent: "1,2,3" } as ComponentProps<typeof PipelineBoardClient>["visual"], currentUserId: 1, currentUserRole: "ADMIN",
   })));
 }
@@ -103,4 +104,34 @@ it("identifica contadores de tarefas e anexos por texto no Kanban", async () => 
   await board(false, { tarefas: 2, anexos: 1 });
   expect(host.textContent).toContain("2 tarefas");
   expect(host.textContent).toContain("1 anexo");
+});
+
+it("bloqueia um segundo clique no mesmo frame enquanto salva o movimento", async () => {
+  api.disponibilidade.mockResolvedValue({ success: true, data: [{ etapaId: "destino", oculta: false, pendencias: [] }] });
+  let liberar!: (valor: boolean) => void;
+  api.flush.mockImplementationOnce(() => new Promise<boolean>((resolve) => { liberar = resolve; }));
+  await painel({ ...detalhe, podeMoverLivremente: true });
+  await act(async () => { const destino = button("Destino"); destino.click(); destino.click(); });
+  expect(api.flush).toHaveBeenCalledTimes(1);
+  expect(api.move).not.toHaveBeenCalled();
+  expect(host.textContent).toContain("Salvando e atualizando a etapa");
+  await act(async () => { liberar(true); });
+  expect(api.move).toHaveBeenCalledTimes(1);
+});
+
+
+it.each([true, false])("contador e card mudam juntos e reconciliam sucesso=%s", async (sucesso) => {
+  let liberar!: (valor: { success: boolean; error?: string }) => void;
+  api.move.mockImplementationOnce(() => new Promise((resolve) => { liberar = resolve; }));
+  const entrada = { id: cardBoard.id, etapaId: sucesso ? "destino" : "origem", revision: "2", nome: "Empresa Sintética", cnpj: null, servico: null, responsaveis: [] };
+  api.sync.mockResolvedValue({ success: true, manifesto: { configVersion: 1, entradas: [entrada] }, ids: [cardBoard.id], cards: [{ ...cardBoard, podeMoverLivremente: true, etapaId: entrada.etapaId }] });
+  await board(true, { tarefas: 0, anexos: 0 }, true);
+  const totais = () => [...host.querySelectorAll('.alpha-pipeline-column-header [aria-live="polite"]')].map((item) => item.textContent?.trim());
+  expect(totais()).toEqual(["1", "0"]);
+  await act(async () => drag.current!.onDragStart!({ active: { id: cardBoard.id } } as import("@dnd-kit/core").DragStartEvent));
+  let movimento: void | Promise<void>;
+  await act(async () => { movimento = drag.current!.onDragEnd!({ active: { id: cardBoard.id }, over: { id: "destino" } } as import("@dnd-kit/core").DragEndEvent); });
+  expect(totais()).toEqual(["0", "1"]);
+  await act(async () => { liberar({ success: sucesso, ...(!sucesso ? { error: "Recusado" } : {}) }); await movimento; });
+  expect(totais()).toEqual(sucesso ? ["0", "1"] : ["1", "0"]);
 });

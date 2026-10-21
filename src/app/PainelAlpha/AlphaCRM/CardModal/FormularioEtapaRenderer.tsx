@@ -163,7 +163,7 @@ export function FormularioEtapaRenderer({
                   data-form-component={grupo.componente.rendererId ?? "unknown"}
                   className="space-y-2"
                 >
-                  {label && (
+                  {label && label.trim().toLocaleLowerCase("pt-BR") !== secao.titulo.trim().toLocaleLowerCase("pt-BR") && (
                     <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">
                       {label}
                     </h3>

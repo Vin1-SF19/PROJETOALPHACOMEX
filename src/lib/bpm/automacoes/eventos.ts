@@ -93,7 +93,7 @@ function correspondeAoGatilho(params: {
   etapaAutomacaoId: string;
   etapaAtualCardId: string | null;
 }): boolean {
-  if (params.eventoTipo === "CARD_MOVIDO" && params.eventoNovo.automacoesSuprimidas === true) return false;
+  if (params.eventoNovo.automacoesSuprimidas === true) return false;
   let config: ReturnType<typeof gatilhoConfigSchema.parse>;
   try { config = gatilhoConfigSchema.parse(parseJson(params.configJson)); } catch { return false; }
   const { gatilhoTipo, eventoTipo, eventoNovo, eventoAnterior, etapaAutomacaoId } = params;

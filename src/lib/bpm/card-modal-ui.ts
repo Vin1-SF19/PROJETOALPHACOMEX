@@ -37,22 +37,40 @@ export type SnapshotCamposRealtime = {
   versao: string;
 };
 
+/** Three-way merge: a card revision alone does not prove a field conflict. */
 export function resolverSnapshotCamposRealtime(params: {
   rascunhoSujo: boolean;
   snapshotAtual: SnapshotCamposRealtime;
   snapshotRemoto: SnapshotCamposRealtime;
+  valoresLocais?: Record<string, string>;
 }) {
-  return params.rascunhoSujo
-    ? {
-        aplicarRemoto: false as const,
-        snapshotAtivo: params.snapshotAtual,
-        snapshotPendente: params.snapshotRemoto,
+  const { snapshotAtual: base, snapshotRemoto: remoto, valoresLocais } = params;
+  const idsLocais = new Set([...Object.keys(base.valores), ...Object.keys(valoresLocais ?? {})]);
+  const conflitos = params.rascunhoSujo && (!valoresLocais || [...idsLocais].some((id) =>
+    valoresLocais[id] !== base.valores[id]
+    && remoto.valores[id] !== base.valores[id]
+    && remoto.valores[id] !== valoresLocais[id]));
+  if (conflitos) return {
+    aplicarRemoto: false as const,
+    snapshotAtivo: base,
+    snapshotPendente: remoto,
+    valoresEditados: valoresLocais ?? base.valores,
+  };
+  const valoresEditados = { ...remoto.valores };
+  if (params.rascunhoSujo && valoresLocais) {
+    for (const id of idsLocais) {
+      if (valoresLocais[id] !== base.valores[id]) {
+        if (Object.hasOwn(valoresLocais, id)) valoresEditados[id] = valoresLocais[id];
+        else delete valoresEditados[id];
       }
-    : {
-        aplicarRemoto: true as const,
-        snapshotAtivo: params.snapshotRemoto,
-        snapshotPendente: null,
-      };
+    }
+  }
+  return {
+    aplicarRemoto: true as const,
+    snapshotAtivo: remoto,
+    snapshotPendente: null,
+    valoresEditados,
+  };
 }
 
 export type CampoMotivoLostUi = {

@@ -6,6 +6,7 @@ import { Resend } from "resend";
 import { z } from "zod";
 
 import db from "@/lib/prisma";
+import { executarEncaminhamentoBpm } from "./encaminhamento";
 import { gerarFichaServer } from "@/lib/bibble/gerar-ficha-server";
 import { gerarPdfDocumento } from "@/lib/gerador-documentos/pdf";
 import { carregarContratoPadrao, qualificarContratadaContratoPadrao } from "@/lib/gerador-documentos/contrato-padrao";
@@ -345,7 +346,7 @@ async function gerarFicha(contexto: ContextoExecucao, criadoPorId: number) {
 }
 
 async function executarAcao(params: {
-  acaoTipo: AcaoAutomacaoBpm;
+  acaoTipo: string;
   parametrosJson: string;
   criadoPorId: number;
   automacaoId: string;
@@ -363,6 +364,10 @@ async function executarAcao(params: {
     throw new Error("Parâmetros da automação estão corrompidos");
   }
   const parametros = validarParametrosAutomacaoBpm(params.acaoTipo, bruto);
+  if (params.acaoTipo === "CRIAR_CARD_OUTRO_PIPELINE") {
+    return executarEncaminhamentoBpm({ cardId: params.contexto.card.id, execucaoId: params.execucaoId,
+      automacaoId: params.automacaoId, parametros });
+  }
   if (params.acaoTipo === "ENVIAR_EMAIL") {
     return enviarEmail(parametros as ParametrosEmailBpm, params.contexto);
   }
@@ -445,7 +450,7 @@ export async function executarAcaoLegadaNoMotorCentral(params: {
   cardId: string;
   gatilhoTipo: string;
   automacaoEtapaId: string;
-  acaoTipo: AcaoAutomacaoBpm;
+  acaoTipo: string;
   parametros: unknown;
 }) {
   const card = await db.bpmCard.findUnique({

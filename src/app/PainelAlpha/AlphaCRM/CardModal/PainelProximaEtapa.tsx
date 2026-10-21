@@ -1,10 +1,11 @@
 "use client";
 
+import { medirFaseCrm } from "@/lib/bpm/medicao-ui";
 import { toast } from "sonner";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowRight, Loader2, Settings2 } from "lucide-react";
-import { ObterCardBpm, MoverCardBpm, ObterRequisitosTransicaoBpm, SalvarRequisitosEMoverCardBpm, type CardFilhoCriado } from "@/actions/bpm/Cards";
+import { ObterCardBpm, MoverCardBpm as MoverCardBpmAction, ObterRequisitosTransicaoBpm, SalvarRequisitosEMoverCardBpm, type CardFilhoCriado } from "@/actions/bpm/Cards";
 import { ObterResumoChecklistCardBpm } from "@/actions/bpm/Checklists";
 import { extrairPayloadOrigem, lerRascunhoOrigem, valorInicialCampo, type ParceiroOrigemBpm } from "@/lib/bpm/origem-cliente";
 import { CampoBpmInput } from "@/app/PainelAlpha/AlphaCRM/CampoBpmInput";
@@ -22,6 +23,10 @@ import { AtribuirLeadAgendarModal } from "./AtribuirLeadAgendarModal";
 import { ConfirmarMovimentoRdModal, type MovimentoRdPendente } from "./ConfirmarMovimentoRdModal";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { ObterDisponibilidadeEtapasCardBpm, type DisponibilidadeEtapaCard } from "@/actions/bpm/DisponibilidadeEtapasCard";
+
+function MoverCardBpm(input: Parameters<typeof MoverCardBpmAction>[0]) {
+  return medirFaseCrm("requisicao", () => MoverCardBpmAction(input));
+}
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type EtapaOpcao = { id: string; chave?: string | null; nome: string; ordem: number; script: string | null };
@@ -43,6 +48,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
   const [movendoEtapa, setMovendoEtapa] = useState(false);
   const [movimentoRdPendente, setMovimentoRdPendente] = useState<MovimentoRdPendente | null>(null);
   const movimentoRdEmCursoRef = useRef(false);
+  const movimentoEmCursoRef = useRef(false);
   const [requisitos, setRequisitos] = useState<RequisitosTransicao | null>(null);
   const [atribuicaoPendente, setAtribuicaoPendente] = useState<{ etapaDestinoId: string; camposValores?: Record<string, string>; parceiroOrigem?: ParceiroOrigemBpm } | null>(null);
   const [valoresRequisitos, setValoresRequisitos] = useState<Record<string, string>>({});
@@ -143,7 +149,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
       if (res.success) {
         setRequisitos(null);
         setMovimentoRdPendente(null);
-        toast.success("Card movido");
+        toast.success(card.podeMoverLivremente ? "Card reposicionado. O envio a outro setor é feito em Encaminhamentos." : "Card movido");
         const filhos = (res as { cardsFilhosCriados?: CardFilhoCriado[] }).cardsFilhosCriados;
         if (filhos && filhos.length > 0) {
           for (const filho of filhos) {
@@ -203,13 +209,14 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
   }
 
   async function confirmarMovimentoRd() {
-    if (!movimentoRdPendente || movimentoRdEmCursoRef.current) return;
+    if (!movimentoRdPendente || movimentoRdEmCursoRef.current || movimentoEmCursoRef.current) return;
     const intencao = movimentoRdPendente;
     movimentoRdEmCursoRef.current = true;
+    movimentoEmCursoRef.current = true;
     setMovendoEtapa(true);
     try {
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-      const savesConcluidos = await flushSaves(card.id);
+      const savesConcluidos = await medirFaseCrm("salvamento", () => flushSaves(card.id));
       if (!savesConcluidos) {
         toast.error("Não foi possível salvar os campos. O card não foi movido.");
         return;
@@ -223,6 +230,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
       toast.error("Não foi possível mover o card. Tente novamente.");
     } finally {
       movimentoRdEmCursoRef.current = false;
+      movimentoEmCursoRef.current = false;
       setMovendoEtapa(false);
       setRevisaoDisponibilidade((atual) => atual + 1);
     }
@@ -230,13 +238,14 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
 
   async function handleMover(etapaDestinoId: string) {
     const estado = disponibilidade?.[etapaDestinoId];
-    if (etapaDestinoId === card.etapa.id || movendoEtapa || !podeMoverEtapa || movimentoRdPendente
+    if (etapaDestinoId === card.etapa.id || movimentoEmCursoRef.current || movendoEtapa || !podeMoverEtapa || movimentoRdPendente
       || !estado || estado.oculta || (estado.pendencias.length && !estado.podeConfirmarPendenciasRd)) return;
+    movimentoEmCursoRef.current = true;
     setMovendoEtapa(true);
     try {
       if (card.podeMoverLivremente) {
         if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-        if (!await flushSaves(card.id)) { toast.error("Não foi possível salvar os campos. O card não foi movido."); return; }
+        if (!await medirFaseCrm("salvamento", () => flushSaves(card.id))) { toast.error("Não foi possível salvar os campos. O card não foi movido."); return; }
         confirmarMovimento(await MoverCardBpm({ cardId: card.id, etapaDestinoId,
           etapaOrigemEsperadaId: card.etapa.id, idempotencyKey: crypto.randomUUID() }));
         return;
@@ -247,7 +256,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
         const dados = await buscarRequisitos(etapaDestinoId);
         if (!dados || abrirConfirmacaoRd(dados, etapaDestinoId, idempotencyKey)) return;
         if (dados.faltantes.length || dados.guardas.length) return;
-        if (!await flushSaves(card.id)) {
+        if (!await medirFaseCrm("salvamento", () => flushSaves(card.id))) {
           toast.error("Não foi possível salvar os campos. O card não foi movido.");
           return;
         }
@@ -256,7 +265,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
         return;
       }
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-      const savesConcluidos = await flushSaves(card.id);
+      const savesConcluidos = await medirFaseCrm("salvamento", () => flushSaves(card.id));
       if (!savesConcluidos) {
         toast.error("Não foi possível salvar os campos. O card não foi movido.");
         return;
@@ -273,20 +282,24 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
         return;
       }
       confirmarMovimento(await MoverCardBpm({ cardId: card.id, etapaDestinoId }));
+    } catch {
+      toast.error("Não foi possível mover o card. Tente novamente.");
     } finally {
+      movimentoEmCursoRef.current = false;
       setMovendoEtapa(false);
       setRevisaoDisponibilidade((atual) => atual + 1);
     }
   }
 
   async function salvarRequisitosEMover() {
-    if (!requisitos || movendoEtapa) return;
+    if (!requisitos || movimentoEmCursoRef.current || movendoEtapa) return;
     const dataProximoContato = parseDataHoraLocalBpm(proximoContatoRascunho);
     if (faltantesNoRascunho.length || guardasSemProximoContato.length
       || (requisitos.proximoContatoObrigatorio && !dataProximoContato)) return;
+    movimentoEmCursoRef.current = true;
     setMovendoEtapa(true);
     try {
-      const savesConcluidos = await flushSaves(card.id);
+      const savesConcluidos = await medirFaseCrm("salvamento", () => flushSaves(card.id));
       if (!savesConcluidos) {
         toast.error("Não foi possível salvar os campos. O card não foi movido.");
         return;
@@ -307,6 +320,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível salvar e mover.");
     } finally {
+      movimentoEmCursoRef.current = false;
       setMovendoEtapa(false);
     }
   }
@@ -333,7 +347,9 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
   const proximoContatoInvalido = Boolean(requisitos?.proximoContatoObrigatorio && !parseDataHoraLocalBpm(proximoContatoRascunho));
 
   return (
-    <div className="rounded-xl border border-slate-700/60 bg-slate-900/40 overflow-y-auto p-5 space-y-2">
+    <div aria-busy={movendoEtapa} className="rounded-xl border border-slate-700/60 bg-slate-900/40 overflow-y-auto p-5 space-y-2">
+      {card.podeMoverLivremente && <p className="text-[11px] text-slate-400">Reposicionar altera a etapa sem executar automações de envio. Use Encaminhamentos para enviar ao próximo setor.</p>}
+      {movendoEtapa && <p role="status" className="flex items-center gap-2 text-xs text-slate-200"><Loader2 size={13} className="animate-spin" aria-hidden="true" /> Salvando e atualizando a etapa…</p>}
       <ConfirmarMovimentoRdModal open={Boolean(movimentoRdPendente)} etapaDestinoNome={movimentoRdPendente?.etapaDestinoNome ?? ""}
         avisos={movimentoRdPendente?.avisos ?? []} processando={movendoEtapa}
         onCancelar={() => setMovimentoRdPendente(null)} onConfirmar={() => void confirmarMovimentoRd()} />
@@ -343,7 +359,10 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
         open={Boolean(atribuicaoPendente)}
         onClose={() => setAtribuicaoPendente(null)}
         onConfirmar={async (responsavelId) => {
-          if (!atribuicaoPendente) return { success: false, error: "Movimento não encontrado." };
+          if (!atribuicaoPendente || movimentoEmCursoRef.current) return { success: false, error: "Movimento já está sendo processado." };
+          movimentoEmCursoRef.current = true;
+          setMovendoEtapa(true);
+          try {
           const dados = { cardId: card.id, etapaDestinoId: atribuicaoPendente.etapaDestinoId, responsavelId };
           const resultado = atribuicaoPendente.camposValores
             ? await SalvarRequisitosEMoverCardBpm({ ...dados, camposValores: atribuicaoPendente.camposValores, parceiroOrigem: atribuicaoPendente.parceiroOrigem })
@@ -352,6 +371,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
           setAtribuicaoPendente(null);
           confirmarMovimento(resultado);
           return { success: true };
+          } finally { movimentoEmCursoRef.current = false; setMovendoEtapa(false); }
         }}
       />
       <Dialog open={Boolean(requisitos)} onOpenChange={(aberto) => { if (!aberto && !movendoEtapa) setRequisitos(null); }}>

@@ -234,8 +234,12 @@ describe("CRM - wiring do modal por etapa", () => {
     expect(registrar).not.toContain("EditorAnotacaoCard");
   });
 
-  it("mantem a versao-base suja e permite aceitar o snapshot remoto sem remontar", () => {
-    expect(statusPosFechamento).toContain("const snapshotRemotoMudou = statusReconhecido !== base || versaoRemota !== versaoBase");
+  it("preserva a versão-base somente em conflito do status e permite aceitar o snapshot remoto", () => {
+    // Uma revisão de outro campo não torna o status conflitante. Os cenários
+    // reais (mesmo campo, campo intacto e confirmação própria) são exercitados
+    // também por autosave-fixed-recovery-react.test.ts.
+    expect(statusPosFechamento).toMatch(/const snapshotRemotoMudou\s*=\s*statusReconhecido\s*!==\s*base\s*&&\s*statusReconhecido\s*!==\s*getDraft\(draftKey\)\?\.valor/);
+    expect(statusPosFechamento).not.toMatch(/const snapshotRemotoMudou[^;]*versaoRemota/);
     expect(statusPosFechamento).toMatch(/if \(!snapshotRemotoMudou\) \{[\s\S]*setConflitoRealtime\(false\);[\s\S]*setSnapshotRemotoPendente\(null\);[\s\S]*return;/);
     expect(statusPosFechamento).toContain("setSnapshotRemotoPendente({ status: statusReconhecido, versao: versaoRemota })");
     expect(statusPosFechamento).toContain("setVersaoBase(snapshotRemotoPendente.versao)");

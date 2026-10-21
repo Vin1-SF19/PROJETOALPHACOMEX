@@ -64,14 +64,14 @@ export function BotaoFalarMensagem({
   if (!visible || !loaded) return null;
 
   const unavailable = !tts_enabled;
-  const label = unavailable
-    ? "Tentar voz do Bibble"
-    : state === "loading"
+  const label = state === "loading"
       ? modelLoaded ? "Gerando áudio..." : "Preparando voz do Bibble..."
       : state === "playing"
         ? "Pausar voz"
         : state === "paused"
           ? "Continuar voz"
+          : unavailable
+            ? "Voz do Bibble indisponível. Tentar novamente"
           : state === "error"
             ? "Tentar gerar voz novamente"
             : "Ouvir resposta";
@@ -88,13 +88,14 @@ export function BotaoFalarMensagem({
       style={{ color: !unavailable && state !== "idle" ? `rgba(${accent},1)` : undefined }}
     >
       {state === "loading" ? <Loader2 size={11} className="animate-spin" aria-hidden />
-        : unavailable ? <VolumeX size={11} aria-hidden />
         : state === "playing" ? <Pause size={11} aria-hidden />
         : state === "paused" || state === "ready" ? <Play size={11} aria-hidden />
+        : unavailable ? <VolumeX size={11} aria-hidden />
         : <Volume2 size={11} aria-hidden />}
       {state === "loading" ? (modelLoaded ? "GERANDO" : "PREPARANDO")
         : state === "playing" ? "PAUSAR"
         : state === "paused" ? "CONTINUAR"
+        : unavailable ? "VOZ INDISPONÍVEL · TENTAR"
         : state === "error" ? "TENTAR"
         : "OUVIR"}
     </button>
