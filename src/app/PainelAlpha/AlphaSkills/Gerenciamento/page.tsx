@@ -14,6 +14,7 @@ import ModalCurso from './CriarCurso';
 import ModalModulosDoCurso from './ModalModulosDoCurso';
 import ModalAcessoGerenciamento from './ModalAcessoGerenciamento';
 import { isAdminRole } from '@/lib/roles';
+import { SETORES_ALPHA_SKILLS } from '@/lib/setores-catalogo';
 
 type Video = Awaited<ReturnType<typeof getVideos>>[number];
 type Modulo = Awaited<ReturnType<typeof getModulos>>[number];
@@ -124,7 +125,7 @@ export default function GerenciadorAlphaSkills() {
                                 </div>
                             )}
                             <div className="flex bg-[#1C1C1C] p-1.5 rounded-[1.5rem] border border-white/5 overflow-x-auto no-scrollbar gap-1.5 shadow-inner">
-                                {["Todos", "T.I", "Comercial", "Operacional", "Financeiro", "Recursos-Humanos", "Serviços Gerais"].map((setor) => (
+                                {["Todos", ...SETORES_ALPHA_SKILLS].map((setor) => (
                                     <button
                                         key={setor}
                                         onClick={() => setFiltroSetor(setor)}

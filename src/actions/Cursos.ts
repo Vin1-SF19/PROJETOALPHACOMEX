@@ -4,8 +4,9 @@ import { auth } from '../../auth'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { isAdminRole } from '@/lib/roles'
+import { SETORES_ALPHA_SKILLS } from '@/lib/setores-catalogo'
 
-const SETORES_VALIDOS = ["T.I", "Comercial", "Operacional", "Financeiro", "Recursos-Humanos", "Serviços Gerais"]
+const SETORES_VALIDOS = SETORES_ALPHA_SKILLS
 const mensagemErro = (error: unknown) => error instanceof Error ? error.message : String(error)
 
 export async function getAllCursos() {
@@ -82,7 +83,7 @@ export async function listarCursosParaSelect() {
 }
 
 export async function listarSetoresDistintos() {
-    return SETORES_VALIDOS
+    return [...SETORES_VALIDOS]
 }
 
 const criarCursoSchema = z.object({

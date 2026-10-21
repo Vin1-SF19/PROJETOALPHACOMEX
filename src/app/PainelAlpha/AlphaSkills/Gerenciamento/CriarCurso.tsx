@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
-const SETORES_VALIDOS = ["T.I", "Comercial", "Operacional", "Financeiro", "Recursos-Humanos", "Serviços Gerais"];
+import { SETORES_ALPHA_SKILLS as SETORES_VALIDOS } from "@/lib/setores-catalogo";
 
 interface ModuloItem {
     id: string;

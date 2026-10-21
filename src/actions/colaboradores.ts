@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth-guard";
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { canonicalizarSetorLiderComercial } from "@/lib/setores-catalogo";
 
 const textoCurto = z.string().trim().min(1).max(160);
 const textoOpcional = z.string().trim().max(160).optional();
@@ -32,7 +33,7 @@ export async function adicionarColaboradorCoreAction(formData: FormData) {
     await db.colaboradores_core.create({
       data: {
         nome: input.data.nome,
-        setor: input.data.setor,
+        setor: canonicalizarSetorLiderComercial(input.data.setor),
         cargo: input.data.cargo,
         data_contratacao: input.data.data || null,
         status: "ATIVO",
@@ -79,7 +80,7 @@ export async function atualizarAgenteSistemaAction(formData: FormData) {
           cargo: input.data.cargo,
           data_contratacao: input.data.data || null,
           status: input.data.status,
-          setor: input.data.setor,
+          setor: canonicalizarSetorLiderComercial(input.data.setor),
         },
       });
     } else {
@@ -89,7 +90,7 @@ export async function atualizarAgenteSistemaAction(formData: FormData) {
           cargo: input.data.cargo,
           data_contratacao: input.data.data || null,
           status: input.data.status,
-          role: input.data.setor,
+          role: canonicalizarSetorLiderComercial(input.data.setor),
           authSessionVersion: { increment: 1 },
         },
       });
