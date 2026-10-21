@@ -21,7 +21,6 @@ export function InstagramLeadCard({ dados }: { dados: InstagramLeadDados }) {
         {dados.volume && <p className="text-[11px] text-slate-300"><span className="text-slate-500">Importações/12 meses: </span>{dados.volume}</p>}
         {dados.prazo && <p className="text-[11px] text-slate-300"><span className="text-slate-500">Prazo: </span>{dados.prazo}</p>}
       </div>
-      {dados.campanha && <p className="mt-3 truncate text-[10px] text-slate-500" title={dados.campanha}>{dados.campanha}</p>}
       <div className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold text-pink-200"><UserPlus size={13} aria-hidden="true" />Abrir para assumir o lead</div>
     </article>
   );
@@ -31,8 +30,6 @@ export function InstagramLeadDetalhes({ dados }: { dados: InstagramLeadDados }) 
   const itens = [
     ["Radar informado (coluna M)", textoInstagram(dados.radarOriginal)],
     ["Importações pretendidas / 12 meses", dados.volume], ["Prazo para o novo limite", dados.prazo],
-    ["Campanha", dados.linha.campaign_name], ["Anúncio", dados.linha.ad_name],
-    ["Conjunto de anúncios", dados.linha.adset_name], ["Formulário", dados.linha.form_name],
     ["Captado em", new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(dados.captadoEm))],
   ];
   return <section aria-label="Respostas do formulário do Instagram" className="space-y-3 rounded-2xl border border-pink-400/20 bg-pink-400/[0.04] p-4">

@@ -52,7 +52,7 @@ Dependências e continuidade:
 - [x] Implementar elegibilidade defensiva na materialização e revalidar no worker, sem executar partes de grafo misto (AC 3–4).
 - [x] Reutilizar gerador, vínculo, metadados server-side e dedupe; preservar conferência e prontidão comercial (AC 5–6).
 - [x] Cobrir cenários positivos/negativos, concorrência, replay, erro e regressões de movimento/contratação (AC 1–7).
-- [ ] Executar lint, typecheck, suíte completa e build; obter QA e revisão arquitetural com evidências (AC 8).
+- [x] Executar lint, typecheck, suíte completa e build; obter QA e revisão arquitetural com evidências (AC 8).
 - [ ] Publicar exclusivamente staging e retestar cenário fictício autenticado; atualizar esta story e sua File List com alcance real (AC 8).
 
 ## Dev Notes
@@ -177,6 +177,12 @@ Forge executou os quatro gates sobre a base `daf88fb7` com o runtime desta corre
 
 O preflight encontrou `origin/staging=bfff9d36`, atualização concorrente de Instagram/NoLoss com dez caminhos disjuntos dos onze desta entrega e sem mudanças de schema/dependências/auth. A preservação desses commits por integração normal está autorizada; checks dirigidos e parecer QA da combinação ainda pendem neste checkpoint. Manifesto e scan de segredos não encontraram credenciais; hashes do perfil CLI de staging conferem com o upload validado. Nenhum script remetente, worker, mutação de banco, alteração de ambiente ou publicação de produção foi executado.
 
+### Integração preservadora de staging — checkpoint pré-push
+
+A correção foi congelada no commit local `55183c0a`, filho de `daf88fb7`, antes de integrar `bfff9d36` por merge normal sem conflitos. A prova `release/merge-bfff-proof.json` conserva os onze caminhos da feature, os nove arquivos de runtime/testes byte a byte e os dez arquivos remotos de Instagram byte a byte; a story recebe somente metadados e QA posteriores. Nenhum script Google Apps Script ou remetente CLI foi executado.
+
+Checks da árvore combinada: `npm run typecheck` oficial com heap de 8 GiB **exit 0** (18,47 s); lint dos três fontes TS/TSX/MTS e do Apps Script via entrada JavaScript **exit 0**; **11 arquivos e 158 testes aprovados, zero falhas**. A primeira tentativa de typecheck com wrapper limitado a 4 GiB encerrou por OOM (134), sem erro TypeScript; log preservado e repetição com a configuração oficial aprovada. Fixtures em `/dev/shm` e sentinel SQLite locais, sem `.env` remoto. Fingerprint combinado `38bf3c61b6d0aacc00de95e79989286a0aff8584cf94be04825d6fefec7f22a6` idêntico antes/depois. Evidência: `/var/tmp/alpha-crm-contrato-elaboracao-20261021/release/delta-bfff-result.json`. QA ratificou o GO de push da combinação após conferir esses resultados, sem novos bloqueantes. Publicação/READY e reteste autenticado ainda pendem neste checkpoint.
+
 ### File List
 
 Arquivos efetivamente criados/alterados pela equipe nesta entrega local:
@@ -196,6 +202,31 @@ Arquivos efetivamente criados/alterados pela equipe nesta entrega local:
 ## QA Results
 
 Pendente de implementação, execução dos gates e revisão independente. A validação de draft acima não substitui parecer de QA do runtime.
+
+### 2026-10-21 — Quinn / Sage, Probe, Anubis e Lens — GO local, publicação condicionada à integração concorrente
+
+**Implementação congelada sobre `daf88fb7`: APPROVED.** Lens foi iniciado somente após o Forge completo PASS. Conferidos `forge/forge-result.json`, custódia e smoke do build: typecheck exit 0 (8,10 s), lint exit 0 (50,21 s; zero erros e 1.193 avisos existentes), build completo exit 0 (203,33 s), suíte global com cobertura exit 0 (187,36 s): **706 arquivos e 5.557 testes aprovados**, quatro skipped, um todo, zero falhas. Fingerprint `d55db46c02cecdac7af23f01d035628c15a6fbb0273c9450f8b640657f057080` idêntico antes/depois e após smoke. O smoke local compilado confirmou raiz/JavaScript/providers/sessão e proteção do CRM sem sessão; servidor encerrado. Fixtures SQLite privadas/sentinela local, token vazio, sem ambiente ou banco remoto. A contagem JSON de suites internas não é apresentada como quantidade de arquivos.
+
+**Sage/Anubis:** acrescentados 55 testes independentes em `minuta-movimento-livre-seguranca.test.ts`, com classificador, schemas, gate causal e ownership reais. Cobrem estrutura integral do grafo, nós extras/inacessíveis, referência/ciclo/branch inválidos, parâmetros do gerador, JSON não-objeto, marcador antigo/forjado, histórico ausente ou de outro card/usuário/ação, discordância de origem/destino/versão/autoridade, família da chave causal, conta inativa, CRM/autoridade revogados e card fora do pipeline/etapa/status permitido. A primeira rodada teve somente fixture com alias de role inválido; corrigida para o papel canônico Admin, sem mudar o aplicativo. Logs iniciais preservados; rodada final e ESLint do arquivo passaram. Não foi substituído o ownership por um mock que concede acesso.
+
+**Probe/Lens:** desenho arquitetural confrontado com código e testes; nenhum crítico/importante novo aberto. O comando emite marcador somente no evento novo de movimento livre autorizado, preserva supressão geral e usa IDs retornados pela transação. Após commit chama por import tardio o orquestrador estrito `cardId + eventoId`; falha documental não falseia o movimento confirmado. Materializador e worker repetem o classificador GERAR_CONTRATO→FIM, versão/regra/gatilho/condição, evento/histórico canônico e ator autorizado atual. Não executam nó extraído de grafo misto. A geração permanece no motor existente, com identidade BPM server-side e CONFERENCIA; não habilita card criado, campo alterado, envio/cadências, assinatura, pagamento ou NF. Menu, botões, rotas, permissões e schema não precisam de alteração.
+
+| AC | Evidência local conferida |
+| --- | --- |
+| 1 / 6 | SQLite real Admin/líder gera um documento CONFERENCIA, anexo no card/campo corretos e identidade de empresa/BPM; Comercial continua pendente, sem tarefa prematura. |
+| 2 / 4 | 55 adversários de proveniência/ACL e testes de revogação após enfileirar; marcadores antigos não ganham autoridade por replay. |
+| 3 | Classificador usa schema central completo; fluxo misto, branch, espera, nó extra/inacessível ou parâmetros inválidos bloqueiam o grafo inteiro. |
+| 5 | SQLite real cobre replay/reentrada/convergência concorrente por unicidade/claim/lease e erro do gerador sem minuta falsa. |
+| 7 | Testes do comando preservam movimento livre, supressão e efeitos normais; sentinelas do flush e recuperação de filas preservadas. |
+| 8 | Quatro gates, smoke e revisão locais PASS; integração concorrente, deploy e reteste autenticado de staging ainda necessários. |
+
+**Isolamento da fila e achado resolvido:** os 33 cenários SQLite de backend incluem execução normal, lease ocupado, resgate do alvo e filas sentinela: pendências antigas do mesmo card, outros cards, grafos mistos e execuções legadas ficam intactos no flush documental. Claim e resgate excepcional usam o mesmo card/evento/versões elegíveis. QA identificou que uma primeira implementação também restringia o resgate das chamadas normais por card; o backend separou `escopoResgate` e adicionou caso real que mantém a recuperação global preexistente sem executar o outro card. Esse achado está resolvido na fonte que passou Forge; não se amplia a exceção para corrigir outros fluxos.
+
+**Integração concorrente `bfff9d36`: GO condicionado a checks afetados, sem bloqueante semântico identificado.** Diff integral dos dez caminhos revisado: nenhum sobrepõe os onze desta feature; não altera Cards, transição, ownership, materializador, worker ou contratos. As alterações são projeção comercial de Instagram sem atribuição de marketing, remetentes NoLoss, testes e documentação. Esses scripts não são executados pela integração/publicação. Antes do push, preservar o novo commit remoto, provar os onze hashes da feature inalterados, executar typecheck/lint afetado e regressões direcionadas de Instagram/remetente/NoLoss/polling, movimento livre, minuta e geração de contrato. Gates próprios de bfff não são descritos como execução do novo conjunto; não há justificativa para repetir cegamente quatro gates se o delta permanecer disjunto e os checks passarem. DevOps deve receber ratificação após essas evidências e usar push normal, sem sobrescrever referências concorrentes.
+
+**Limites:** o GO é exclusivamente para staging e não declara geração automática remota nem Done. O reteste deve criar nova negociação fictícia vinculada, entrar na etapa pela UI autenticada após READY/SHA/alias conferidos e comprovar minuta CONFERENCIA, reuso e ausência de verde/alerta prematuros, preservando a fixture documental anterior. Admin/líder locais não equivalem a credencial de líder exercitada remotamente. Não mover o card real relatado nem executar geração por CLI/worker global, backfill ou configuração publicada para fabricar evidência. Produção fora do escopo. Flux visual não se aplica: nenhum componente/rota pública ou dependência de UI foi criado; não se alega ganho de latência sem medida remota.
+
+Evidências: `/var/tmp/alpha-crm-contrato-elaboracao-20261021/forge/forge-result.json`, `gate-tests.log`, custódias e `gate-runtime-result.json`; os 55 adversários estão em `/var/tmp/alpha-crm-minuta-movimento-livre-20261021/qa-seguranca.{log,json}`, com primeira rodada separada. CodeRabbit não disponível no caminho configurado; revisão independente foi o fallback. QA atualizou somente esta seção nesta revisão; nenhuma fonte, ambiente, dado remoto, Git ou outro teste foi alterado. Arquivo liberado ao executor para fechamento e integração.
 
 ## Change Log
 

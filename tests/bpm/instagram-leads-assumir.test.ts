@@ -28,7 +28,7 @@ import { AssumirLeadInstagram } from "@/actions/bpm/InstagramLeads";
 
 const input = { leadId: "clw0000000000000lead", etapaDestinoId: "clw0000000000000etap", responsavelId: 7 };
 const dados = prepararLeadInstagram({ id: "l:example", full_name: "Contato Exemplo", email: "contato@example.com", created_time: "2026-10-21T12:00:00Z",
-  [C.cnpj]: "11.222.333/0001-81", [C.telefone]: "(11) 99999-0000", [C.radar]: "ilimitado", [C.volume]: "até_150_mil_dólares", [C.prazo]: "preciso_para_ontem", campaign_name: "Campanha exemplo" });
+  [C.cnpj]: "11.222.333/0001-81", [C.telefone]: "(11) 99999-0000", [C.radar]: "ilimitado", [C.volume]: "até_150_mil_dólares", [C.prazo]: "preciso_para_ontem" });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -58,7 +58,8 @@ describe("assunção Instagram", () => {
     expect(mocks.tx.cliente.create).not.toHaveBeenCalled();
     expect(mocks.tx.pessoa.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { celular: "11999990000" }, update: {}, create: expect.objectContaining({ nome: dados.nome, email: dados.email }) }));
     expect(mocks.tx.pessoaClienteVinculo.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: { ativo: true } }));
-    expect(mocks.tx.bpmInteracaoCard.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ observacoes: expect.stringContaining("Campanha exemplo") }) }));
+    expect(mocks.tx.bpmInteracaoCard.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ observacoes: expect.stringContaining("Instagram — Google Sheets") }) }));
+    expect(mocks.tx.bpmInteracaoCard.create.mock.calls[0][0].data.observacoes).not.toContain("Campanha:");
     expect(mocks.tx.bpmInteracaoCard.create.mock.calls[0][0].data.observacoes).toContain("até 150 mil dólares");
     expect(mocks.tx.bpmWebhookEntrada.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ statusRecebimento: "AUTENTICADO", eventoId: null }), data: { statusRecebimento: "PROCESSADO" } }));
     expect(mocks.tx.bpmWebhookEntrada.update).toHaveBeenCalledWith({ where: { id: input.leadId }, data: { eventoId: "evento" } });

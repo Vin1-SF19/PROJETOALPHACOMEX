@@ -88,14 +88,15 @@ it("exige CNPJ válido quando preenchido e envia apenas os dígitos", async () =
 it("Instagram abre com CNPJ e Radar da coluna M preenchidos e mostra respostas da planilha", async () => {
   const { container, root, props, onConfirmarPromocao } = montar();
   props.lead.instagramDados = prepararLeadInstagram({ id: "l:exemplo", full_name: "Contato Exemplo", created_time: "2026-10-21T12:00:00Z",
-    [C.cnpj]: "11.222.333/0001-81", [C.radar]: "ilimitado", [C.volume]: "até_150_mil_dólares", [C.prazo]: "preciso_para_ontem", campaign_name: "Campanha exemplo" });
+    [C.cnpj]: "11.222.333/0001-81", [C.radar]: "ilimitado", [C.volume]: "até_150_mil_dólares", [C.prazo]: "preciso_para_ontem" });
   props.radarOpcoes = ["Revisão de Radar Ilimitado"];
   await act(async () => root.render(h(NolossLeadModal, props)));
   expect(container.querySelector<HTMLInputElement>("#noloss-lead-cnpj")?.value).toBe("11222333000181");
   expect(container.querySelector<HTMLSelectElement>("#noloss-lead-radar")?.value).toBe("Revisão de Radar Ilimitado");
   expect(container.textContent).toContain("Respostas do Instagram");
   expect(container.textContent).toContain("até 150 mil dólares");
-  expect(container.textContent).toContain("Campanha exemplo");
+  expect(container.textContent).not.toContain("Campanha exemplo");
+  expect(container.textContent).not.toContain("Conjunto de anúncios");
   await act(async () => [...container.querySelectorAll("button")].find((button) => button.textContent === "Assumir lead")?.click());
   await act(async () => [...container.querySelectorAll("button")].find((button) => button.textContent === "Confirmar responsável")?.click());
   expect(onConfirmarPromocao).toHaveBeenCalledWith(7, "11222333000181", "Revisão de Radar Ilimitado", undefined);

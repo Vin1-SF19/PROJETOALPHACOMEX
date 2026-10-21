@@ -8,8 +8,8 @@ function sincronizarLeadsInstagram() {
     var properties = PropertiesService.getScriptProperties();
     var url = properties.getProperty('ALPHA_API_URL');
     var token = properties.getProperty('ALPHA_API_TOKEN');
-    if (!url || !/^https:\/\/[^/]+\/api\/integrations\/instagram\/leads$/.test(url) || !token || token.length < 32) {
-      throw new Error('Configure ALPHA_API_URL (HTTPS) e ALPHA_API_TOKEN nas Propriedades do script.');
+    if (!url || !/^https:\/\/[^/]+\/rocket-api\/integrations\/instagram\/leads$/.test(url) || !token || token.length < 32) {
+      throw new Error('Configure ALPHA_API_URL do NoLoss (HTTPS /rocket-api/integrations/instagram/leads) e ALPHA_API_TOKEN exclusivo do NoLoss.');
     }
     var spreadsheet = SpreadsheetApp.openById(ALPHA_INSTAGRAM_SHEET);
     var sheet = spreadsheet.getSheets().filter(function (tab) { return tab.getSheetId() === 0; })[0];
@@ -23,6 +23,9 @@ function sincronizarLeadsInstagram() {
     var idColumn = headers.indexOf('id');
     var statusColumn = headers.indexOf('status_crm');
     var host = url.split('/')[2];
+    if (!properties.getProperty('ALPHA_NOLOSS_INICIO_' + host)) {
+      throw new Error('Execute instalarSincronizacaoInstagram primeiro. A ativação preserva o histórico e envia somente novos IDs.');
+    }
     var cursorKey = 'ALPHA_CURSOR_' + host;
     var inicio = Number(properties.getProperty(cursorKey) || 1);
     if (!isFinite(inicio) || inicio < 1 || inicio >= rows.length) inicio = 1;
@@ -34,6 +37,7 @@ function sincronizarLeadsInstagram() {
       var externalId = String(row[idColumn] || '').trim();
       properties.setProperty(cursorKey, String(index + 1));
       if (!externalId) continue;
+      if (properties.getProperty('ALPHA_NOLOSS_IGNORAR_' + host + ':' + externalId) === '1') continue;
       var sucesso = 'integrado@' + host + ':' + externalId;
       var ignorado = 'teste-ignorado@' + host + ':' + externalId;
       if (row[statusColumn] === sucesso || row[statusColumn] === ignorado) continue;
@@ -73,7 +77,35 @@ function sincronizarLeadsInstagram() {
 }
 
 function instalarSincronizacaoInstagram() {
-  // Gatilho por tempo também capta linhas acrescentadas por integrações/API do Meta.
-  var existente = ScriptApp.getProjectTriggers().some(function (trigger) { return trigger.getHandlerFunction() === 'sincronizarLeadsInstagram'; });
-  if (!existente) ScriptApp.newTrigger('sincronizarLeadsInstagram').timeBased().everyMinutes(5).create();
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) throw new Error('Aguarde a sincronização atual terminar.');
+  try {
+    var properties = PropertiesService.getScriptProperties();
+    var url = properties.getProperty('ALPHA_API_URL');
+    var token = properties.getProperty('ALPHA_API_TOKEN');
+    if (!url || !/^https:\/\/[^/]+\/rocket-api\/integrations\/instagram\/leads$/.test(url) || !token || token.length < 32) {
+      throw new Error('Configure a URL e a credencial do NoLoss antes de ativar.');
+    }
+    var host = url.split('/')[2];
+    if (!properties.getProperty('ALPHA_NOLOSS_INICIO_' + host)) {
+      var sheet = SpreadsheetApp.openById(ALPHA_INSTAGRAM_SHEET).getSheets().filter(function (tab) { return tab.getSheetId() === 0; })[0];
+      if (!sheet) throw new Error('Aba de gid=0 não encontrada.');
+      var rows = sheet.getDataRange().getDisplayValues();
+      var headers = rows.length ? rows[0].map(function (value) { return value.trim(); }) : [];
+      var column = headers.indexOf('id');
+      if (column < 0 || column !== headers.lastIndexOf('id') || headers.indexOf('status_crm') < 0) throw new Error('Confira os cabeçalhos id/status_crm.');
+      var initial = {};
+      rows.slice(1).forEach(function (row) {
+        var id = String(row[column] || '').trim();
+        if (id) initial['ALPHA_NOLOSS_IGNORAR_' + host + ':' + id] = '1';
+      });
+      // Falha antes de ativar se o histórico ultrapassar a margem de armazenamento do Apps Script.
+      if (JSON.stringify(initial).length * 2 > 300000) throw new Error('Histórico muito grande para ativação automática; preparar um recorte revisado antes de ativar.');
+      initial['ALPHA_NOLOSS_INICIO_' + host] = new Date().toISOString();
+      properties.setProperties(initial, false);
+    }
+    // Gatilho por tempo também capta linhas acrescentadas por integrações/API do Meta.
+    var existente = ScriptApp.getProjectTriggers().some(function (trigger) { return trigger.getHandlerFunction() === 'sincronizarLeadsInstagram'; });
+    if (!existente) ScriptApp.newTrigger('sincronizarLeadsInstagram').timeBased().everyMinutes(5).create();
+  } finally { lock.releaseLock(); }
 }
