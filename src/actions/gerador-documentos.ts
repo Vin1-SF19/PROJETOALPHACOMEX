@@ -595,7 +595,7 @@ export async function GerarDocumento(payload: unknown) {
       if (!contratoPadrao) {
         try {
           const rows = await db.$queryRaw<Array<{ htmlUrl: string | null }>>`
-            SELECT "htmlUrl" FROM "DocumentoTemplate" WHERE "id" = ${template.id}
+            SELECT "DocumentoTemplate"."htmlUrl" FROM "DocumentoTemplate" WHERE "id" = ${template.id}
           `;
           templateHtmlUrl = rows[0]?.htmlUrl ?? null;
         } catch {
@@ -737,7 +737,7 @@ export async function ObterDocumentoConferencia(tokenAcesso: string) {
     let htmlUrl: string | null = null;
     try {
       const rows = await db.$queryRaw<Array<{ htmlUrl: string | null }>>`
-        SELECT "htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documento.id}
+        SELECT "DocumentoGerado"."htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documento.id}
       `;
       htmlUrl = rows[0]?.htmlUrl ?? null;
     } catch {
@@ -810,7 +810,7 @@ export async function AtualizarVariaveisContratoPadrao(payload: unknown) {
     ]);
     let colunaHtmlDisponivel = false;
     try {
-      await db.$queryRaw`SELECT "htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documento.id}`;
+      await db.$queryRaw`SELECT "DocumentoGerado"."htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documento.id}`;
       colunaHtmlDisponivel = true;
     } catch {
       // Compatibilidade com ambientes sem a coluna opcional.
@@ -878,7 +878,7 @@ export async function EditarClasulaGerada(payload: unknown) {
     let colunaHtmlDisponivel = false;
     try {
       const rows = await db.$queryRaw<Array<{ htmlUrl: string | null }>>`
-        SELECT "htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documento.id}
+        SELECT "DocumentoGerado"."htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documento.id}
       `;
       colunaHtmlDisponivel = true;
       htmlUrlPersistida = rows[0]?.htmlUrl ?? null;
@@ -993,7 +993,7 @@ export async function ReescreverClasulaComIA(payload: unknown) {
     let colunaHtmlDisponivel = false;
     try {
       rows = await db.$queryRaw<Array<{ htmlUrl: string | null }>>`
-        SELECT "htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documento.id}
+        SELECT "DocumentoGerado"."htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documento.id}
       `;
       colunaHtmlDisponivel = true;
     } catch {
@@ -1117,7 +1117,7 @@ export async function FinalizarDocumento(documentoId: string) {
     let htmlUrl: string | null = null;
     try {
       const rows = await db.$queryRaw<Array<{ htmlUrl: string | null }>>`
-        SELECT "htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documentoId}
+        SELECT "DocumentoGerado"."htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documentoId}
       `;
       htmlUrl = rows[0]?.htmlUrl ?? null;
     } catch {
