@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Building2, Trash2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -56,6 +56,7 @@ export interface CardAbertoLayoutProps {
   onInteracaoCriada: (interacao: Interacao) => void;
   /** Slot: formulário da etapa ativa (renderizado pelo CardOpenFormSlot ou equivalente) */
   children: ReactNode;
+  focoTarefa?: { cardId: string; tarefaId: string } | null;
 }
 
 /**
@@ -85,11 +86,20 @@ export function CardAbertoLayout({
   onAbrirCard,
   onInteracaoCriada,
   children,
+  focoTarefa = null,
 }: CardAbertoLayoutProps) {
-  const [abaAtiva, setAbaAtiva] = useState<string>(card.pipeline.id);
+  const [selecaoAba, setSelecaoAba] = useState({ valor: card.pipeline.id, foco: focoTarefa });
+  const abaAtiva = selecaoAba.foco === focoTarefa ? selecaoAba.valor : card.pipeline.id;
+  const setAbaAtiva = (valor: string) => setSelecaoAba({ valor, foco: focoTarefa });
   const [outrosPipelines, setOutrosPipelines] = useState<{ id: string; nome: string }[]>([]);
   const [excluindo, setExcluindo] = useState(false);
   const dadosEmpresaDrawer = useDadosEmpresaDrawer(card.id);
+  const ultimoFocoTarefaRef = useRef(focoTarefa);
+  useEffect(() => {
+    if (ultimoFocoTarefaRef.current === focoTarefa) return;
+    ultimoFocoTarefaRef.current = focoTarefa;
+    if (focoTarefa?.cardId === card.id) dadosEmpresaDrawer.fechar();
+  }, [card.id, focoTarefa, dadosEmpresaDrawer]);
   const { openPerfilEmpresa } = usePerfilEmpresa();
 
 
@@ -301,6 +311,7 @@ export function CardAbertoLayout({
             <TabsContent value={card.pipeline.id} className="min-h-0 m-0 lg:h-full lg:overflow-hidden">
               <PainelHistorico
                 card={card}
+                focoTarefa={focoTarefa}
                 accent={accent}
                 currentUserId={currentUserId}
                 currentUserRole={currentUserRole}

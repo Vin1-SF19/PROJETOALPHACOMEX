@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ensurePinnedHome,
+  encontrarAbaCrm,
   getTabsStorageKey,
   HOME_TAB_ID,
   HOME_URL,
@@ -23,6 +24,13 @@ const chamadosTab: PainelTab = {
 };
 
 describe('persistência das abas do Painel Alpha', () => {
+  it('identifica o mesmo módulo CRM entre hub, funis e tarefas sem confundir outras abas', () => {
+    expect(encontrarAbaCrm([chamadosTab, crmTab])?.id).toBe('tab-crm');
+    const funil = { id: 'funil', url: '/PainelAlpha/AlphaCRM/pipeline/operacional?cardId=outro', label: 'CRM · Tarefa' };
+    expect(encontrarAbaCrm([chamadosTab, funil])).toBe(funil);
+    expect(encontrarAbaCrm([funil, crmTab])).toBe(crmTab);
+    expect(encontrarAbaCrm([chamadosTab, { ...crmTab, url: '/PainelAlpha/AlphaCRMOutro' }])).toBeUndefined();
+  });
   it('isola a chave de armazenamento por usuário', () => {
     expect(getTabsStorageKey(7)).toBe('painel_alpha_tabs_v2_user_7');
     expect(getTabsStorageKey(8)).not.toBe(getTabsStorageKey(7));

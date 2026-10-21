@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
+// @vitest-environment happy-dom
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useBpmTarefasNotificacoes as store } from "@/store/useBpmTarefasNotificacoes";
 import { detalhesAlertaTarefaBpm, extrairUsuarioIdCanalTarefasBpm, urlCardAlertaBpm, type AlertaTarefaBpm } from "@/lib/bpm/notificacoes-tarefas";
 const alerta: AlertaTarefaBpm = {
@@ -8,7 +9,46 @@ const alerta: AlertaTarefaBpm = {
   alertaEm: "2026-10-20T14:00:00Z", prazo: "2026-10-20T15:00:00Z",
 };
 describe("notificações de tarefas por usuário", () => {
-  beforeEach(() => { store.getState().iniciarUsuario(0); store.getState().iniciarUsuario(7); });
+  beforeEach(() => { localStorage.clear(); store.getState().iniciarUsuario(0); store.getState().iniciarUsuario(7); });
+  it("mantém reconhecimento após recarga e separa exibição de leitura individual", () => {
+    store.getState().sincronizar(7, [alerta]);
+    store.getState().iniciarUsuario(0); store.getState().iniciarUsuario(7);
+    expect(store.getState().sincronizar(7, [alerta])).toHaveLength(0);
+    expect(store.getState().notificacoes[0].lida).toBe(false);
+    store.getState().marcarLida(alerta.id);
+    store.getState().iniciarUsuario(0); store.getState().iniciarUsuario(7);
+    expect(store.getState().sincronizar(7, [alerta])).toHaveLength(0);
+    expect(store.getState().notificacoes[0].lida).toBe(true);
+    store.getState().iniciarUsuario(8);
+    expect(store.getState().sincronizar(8, [alerta])).toHaveLength(1);
+    expect(store.getState().notificacoes[0].lida).toBe(false);
+    const salvo = JSON.parse(localStorage.getItem("bpm_alertas_reconhecidos_v1_7")!);
+    expect(salvo).toEqual({ vistas: [alerta.id], lidas: [alerta.id], removidas: [] });
+    expect(JSON.stringify(salvo)).not.toContain(alerta.empresaNome);
+    expect(JSON.stringify(salvo)).not.toContain(alerta.descricao);
+  });
+  it("preserva remoção após recarga e admite um novo horário legítimo", () => {
+    store.getState().sincronizar(7, [alerta]); store.getState().removerNotificacao(alerta.id);
+    store.getState().iniciarUsuario(0); store.getState().iniciarUsuario(7);
+    expect(store.getState().sincronizar(7, [alerta])).toHaveLength(0);
+    expect(store.getState().notificacoes).toEqual([]);
+    expect(store.getState().sincronizar(7, [{ ...alerta, id: "task:novo-horario" }])).toHaveLength(1);
+  });
+  it("reconcilia leitura realizada por outra aba do navegador", () => {
+    store.getState().sincronizar(7, [alerta]);
+    localStorage.setItem("bpm_alertas_reconhecidos_v1_7", JSON.stringify({ vistas: [alerta.id], lidas: [alerta.id] }));
+    expect(store.getState().sincronizar(7, [alerta])).toHaveLength(0);
+    expect(store.getState().notificacoes[0].lida).toBe(true);
+  });
+  it("continua em memória quando o navegador bloqueia armazenamento", () => {
+    const gravar = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("bloqueado"); });
+    try {
+      expect(store.getState().sincronizar(7, [alerta])).toHaveLength(1);
+      store.getState().marcarLida(alerta.id);
+      expect(store.getState().sincronizar(7, [alerta])).toHaveLength(0);
+      expect(store.getState().notificacoes[0].lida).toBe(true);
+    } finally { gravar.mockRestore(); }
+  });
   it("deduplica por tarefa+alerta, preserva lida e removida e elimina concluídas/revogadas", () => {
     expect(store.getState().sincronizar(7, [alerta, alerta])).toHaveLength(1);
     store.getState().marcarTodasLidas();
@@ -30,7 +70,7 @@ describe("notificações de tarefas por usuário", () => {
   it("apresenta horários de Brasília e contexto completo com link do card", () => {
     const detalhes = detalhesAlertaTarefaBpm(alerta);
     for (const texto of ["20/10/2026", "11:00", "12:00", "Brasília", "Green Coast", "Comercial", "Em tratativa", "Vitor", "Documentos pendentes"]) expect(detalhes).toContain(texto);
-    expect(urlCardAlertaBpm(alerta)).toBe("/PainelAlpha/AlphaCRM/pipeline/pipeline?cardId=card");
+    expect(urlCardAlertaBpm(alerta)).toBe("/PainelAlpha/AlphaCRM/pipeline/pipeline?cardId=card&tarefaId=task");
     expect(extrairUsuarioIdCanalTarefasBpm("private-bpm-tarefas-usuario-7")).toBe(7);
     for (const sufixo of ["7-extra", "-7", "7.0", "0", "007", "9007199254740993"])
       expect(extrairUsuarioIdCanalTarefasBpm(`private-bpm-tarefas-usuario-${sufixo}`)).toBeNull();

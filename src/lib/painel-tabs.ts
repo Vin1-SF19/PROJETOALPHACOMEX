@@ -14,6 +14,13 @@ export const HOME_URL = "/PainelAlpha";
 export const HOME_LABEL = "IAlpha";
 export const HOME_TAB_ID = "tab-home";
 
+/** O CRM é um módulo único, mesmo quando seu iframe navega por funis ou tarefas. */
+export function encontrarAbaCrm(tabs: PainelTab[]): PainelTab | undefined {
+  const raiz = "/PainelAlpha/AlphaCRM";
+  return tabs.find((tab) => tab.url === raiz)
+    ?? tabs.find((tab) => tab.url.startsWith(`${raiz}/`) || tab.url.startsWith(`${raiz}?`));
+}
+
 const STORAGE_KEY_PREFIX = "painel_alpha_tabs_v2_user";
 
 function isRecord(value: unknown): value is Record<string, unknown> {

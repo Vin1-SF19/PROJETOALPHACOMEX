@@ -174,6 +174,10 @@ export function CentralNotificacoesPainel({
   const holerite = useHoleriteNotificacoes();
   const csNps = useCsNpsNotificacoes();
   const tarefasCrm = useBpmTarefasNotificacoes();
+  const leituraTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (leituraTimerRef.current) clearTimeout(leituraTimerRef.current);
+  }, [tarefasCrm.usuarioId]);
   const quantidadeSemCs = csNps.pendencias.filter((pendencia) => pendencia.tipo === "SEM_CS").length;
   const quantidadeCsVencido = csNps.pendencias.length - quantidadeSemCs;
   const resumoCsNps = quantidadeSemCs > 0 && quantidadeCsVencido > 0
@@ -189,7 +193,10 @@ export function CentralNotificacoesPainel({
       id: `crm-tarefa-${alerta.id}`, origem: "CRM · Tarefas", titulo: alerta.titulo,
       subtitulo: "Lembrete de tarefa", detalhes: detalhesAlertaTarefaBpm(alerta),
       criadoEm: alerta.alertaEm, cor: "#22d3ee", lida: alerta.lida, Icone: ListTodo,
-      abrir: () => onAbrirModulo(urlCardAlertaBpm(alerta), "CRM · Tarefa"),
+      abrir: () => {
+        tarefasCrm.marcarLida(alerta.id);
+        onAbrirModulo(urlCardAlertaBpm(alerta), "CRM");
+      },
       remover: () => tarefasCrm.removerNotificacao(alerta.id),
     })),
     ...calendario.notificacoes.map((notificacao) => {
@@ -307,7 +314,13 @@ export function CentralNotificacoesPainel({
 
   function handleAbrir() {
     setAberto((valor) => !valor);
-    if (!aberto && naoLidas > 0) window.setTimeout(marcarTodasLidas, 1200);
+    if (leituraTimerRef.current) clearTimeout(leituraTimerRef.current);
+    if (!aberto && naoLidas > 0) {
+      const usuarioId = tarefasCrm.usuarioId;
+      leituraTimerRef.current = setTimeout(() => {
+        if (useBpmTarefasNotificacoes.getState().usuarioId === usuarioId) marcarTodasLidas();
+      }, 1200);
+    }
   }
 
   function abrirItem(item: ItemCentralNotificacoes) {

@@ -152,7 +152,7 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
         const prazoVencido = tarefa.status === "PENDENTE" && prazoValido && prazoData < new Date();
         const gerenciadaPorChecklist = Boolean(tarefa.cardChecklistId);
         return (
-          <div key={tarefa.id} className={`rounded-xl border px-3 py-2.5 ${alertaAtivo ? "border-amber-400/35 bg-amber-400/[0.07]" : "border-white/5 bg-white/[0.03]"}`}>
+          <div key={tarefa.id} id={`bpm-tarefa-${cardId}-${tarefa.id}`} tabIndex={-1} className={`rounded-xl border px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-400 ${alertaAtivo ? "border-amber-400/35 bg-amber-400/[0.07]" : "border-white/5 bg-white/[0.03]"}`}>
             <div className="flex items-start gap-2">
               <button type="button" onClick={() => {
                 if (gerenciadaPorChecklist) {

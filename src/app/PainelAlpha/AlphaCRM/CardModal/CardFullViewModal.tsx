@@ -68,9 +68,10 @@ interface Props {
   onAbrirCard: (cardId: string) => void;
   abrirChecklistInicial?: boolean;
   focarAgendamentoInicial?: boolean;
+  focoTarefa?: { cardId: string; tarefaId: string } | null;
 }
 
-function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, currentUserId, currentUserRole, onClose, onAtualizado, onCardExcluido, onAbrirCard, abrirChecklistInicial = false, focarAgendamentoInicial = false }: Props) {
+function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, currentUserId, currentUserRole, onClose, onAtualizado, onCardExcluido, onAbrirCard, abrirChecklistInicial = false, focarAgendamentoInicial = false, focoTarefa }: Props) {
   const { flushSaves, flushScheduled, getPendingChanges, getFailedSaveKeys, retryFailedSaves, discardPending, subscribeConfirmation } = useCardSave();
   const fechandoRef = useRef(false);
   const [fechando, setFechando] = useState(false);
@@ -307,6 +308,7 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
         ) : (
               <CardAbertoLayout
                 key={card.id}
+                focoTarefa={focoTarefa}
                 card={card} etapas={etapas} interacoes={interacoes}
                 accent={accent} currentUserId={currentUserId} currentUserRole={currentUserRole}
                 realtimeRevision={realtimeRevision} onClose={solicitarFechamento}

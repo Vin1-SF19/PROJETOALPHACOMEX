@@ -775,6 +775,7 @@ interface Props {
   pipelinesDisponiveis?: PipelineDisponivel[];
   cardsIniciais: CardBpm[];
   cardInicialId?: string | null;
+  tarefaInicialId?: string;
   manifestoInicial?: ManifestoQuadro;
   visual: TemaAlpha;
   currentUserId: number | null;
@@ -799,7 +800,7 @@ interface PromocaoLeadPendente {
   etapaDestinoNome: string;
 }
 
-export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [], cardsIniciais, cardInicialId = null, manifestoInicial, visual, currentUserId, currentUserRole }: Props) {
+export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [], cardsIniciais, cardInicialId = null, tarefaInicialId, manifestoInicial, visual, currentUserId, currentUserRole }: Props) {
   const accent = visual.accent;
   const router = useRouter();
   const [cards, setCards] = useState<CardBpm[]>(cardsIniciais);
@@ -815,6 +816,8 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
   useEffect(() => { quadroRef.current.ultimaCompleta = Date.now(); }, []);
   const primeiraFiltragemRef = useRef(true);
   const [cardSelecionadoId, setCardSelecionadoId] = useState<string | null>(cardInicialId);
+  const [focoTarefa, setFocoTarefa] = useState<{ cardId: string; tarefaId: string } | null>(
+    cardInicialId && tarefaInicialId ? { cardId: cardInicialId, tarefaId: tarefaInicialId } : null);
   const [cardAgendamentoId, setCardAgendamentoId] = useState<string | null>(null);
   const [nolossLeadAberto, setNolossLeadAberto] = useState<CardBpm | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -845,6 +848,7 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
       cardSelecionadoIdRef.current = parsed.data.cardId;
       setCardAgendamentoId(null);
       setCardSelecionadoId(parsed.data.cardId);
+      setFocoTarefa(parsed.data.tarefaId ? { cardId: parsed.data.cardId, tarefaId: parsed.data.tarefaId } : null);
       window.parent.postMessage({ type: BPM_CARD_ABERTO_EVENT, ...parsed.data }, window.location.origin);
     };
     window.addEventListener("message", handler);
@@ -1058,6 +1062,7 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
   const paginaManifesto = manifesto ? selecionarPaginaQuadro(manifesto.entradas, { busca, visao, setorId: setorFiltro, acesso: manifesto.acesso, responsavelId: responsavelFiltro ? Number(responsavelFiltro) : null, }) : null;
 
   const abrirCard = useCallback((cardId: string) => {
+    setFocoTarefa(null);
     cardAbertoPorAlertaRef.current = null;
     const card = cards.find((c) => c.id === cardId);
     if (card?.origem === "noloss") {
@@ -1070,6 +1075,7 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
   }, [cards, setNolossLeadAberto, setCardAgendamentoId, setCardSelecionadoId]);
 
   const abrirAgendamento = useCallback((cardId: string) => {
+    setFocoTarefa(null);
     cardAbertoPorAlertaRef.current = null;
     cardSelecionadoIdRef.current = cardId;
     setCardAgendamentoId(cardId);
@@ -1077,6 +1083,7 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
   }, []);
 
   const fecharCard = useCallback(() => {
+    setFocoTarefa(null);
     cardAbertoPorAlertaRef.current = null;
     cardSelecionadoIdRef.current = null;
     setCardAgendamentoId(null);
@@ -1416,6 +1423,7 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
       {cardSelecionadoId && (
         <CardFullViewModal
           cardId={cardSelecionadoId}
+          focoTarefa={focoTarefa?.cardId === cardSelecionadoId ? focoTarefa : null}
           realtimeRevision={realtimeRevision}
           currentUserId={currentUserId}
           currentUserRole={currentUserRole}
