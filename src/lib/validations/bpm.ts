@@ -532,11 +532,24 @@ export const criarTarefaSchema = z.object({
   }
 });
 
+// Identidades do monitor documental; formato válido nunca substitui lookup e ACL.
+const tarefaDocumentalIdSchema = z.string().max(160).refine((id) => {
+  const pendencia = /^docpend:([^:]+):(\d{4}-\d{2}-\d{2})$/.exec(id);
+  if (pendencia) return bpmCardIdSchema.safeParse(pendencia[1]).success
+    && dataHoraIsoBpmSchema.safeParse(`${pendencia[2]}T00:00:00Z`).success;
+  const atualizacao = /^docupdate:([^:]+):(\d{1,16}):([1-9]\d{0,15})$/.exec(id);
+  if (!atualizacao || !bpmCardIdSchema.safeParse(atualizacao[1]).success) return false;
+  const referencia = Number(atualizacao[2]);
+  return Number.isSafeInteger(referencia) && Number.isFinite(new Date(referencia).getTime())
+    && Number.isSafeInteger(Number(atualizacao[3]));
+});
+
 export const concluirTarefaSchema = z.object({
   tarefaId: z.union([
     z.string().cuid(), z.string().regex(/^rdtask_[a-f0-9]{28}$/),
     z.string().refine((id) => id.startsWith("crm-proximo-contato:")
       && bpmCardIdSchema.safeParse(id.slice("crm-proximo-contato:".length)).success),
+    tarefaDocumentalIdSchema,
   ]),
 });
 

@@ -41,6 +41,7 @@ vi.mock("@/lib/bpm/checklists/reconciliacao-tarefa", () => ({
 }));
 
 import { ConcluirTarefaBpm } from "@/actions/bpm/Tarefas";
+import { concluirTarefaSchema } from "@/lib/validations/bpm";
 
 const TAREFA_ID = "cm12345678901234567890123";
 const tarefaBase = {
@@ -116,6 +117,48 @@ describe("conclusão de tarefa derivada de checklist", () => {
     expect(mocks.tarefaUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { id, cardId: "card-1", status: "PENDENTE" },
     }));
+  });
+
+  it.each([
+    `docupdate:rdcard_${"a".repeat(28)}:1791927130000:1`,
+    `docpend:rdcard_${"a".repeat(28)}:2026-10-21`,
+    `docupdate:${TAREFA_ID}:1791927130000:2`,
+    `docpend:${TAREFA_ID}:2026-10-21`,
+  ])("conclui tarefa documental gerada com a identidade %s", async (id) => {
+    mocks.tarefaFindUnique.mockResolvedValue({ ...tarefaBase, id, tipo: "TAREFA", cardChecklistId: null });
+    await expect(ConcluirTarefaBpm({ tarefaId: id })).resolves.toEqual({ success: true });
+    expect(mocks.acesso).toHaveBeenCalledWith("card-1", 7, "Admin", "concluirTarefa");
+    expect(mocks.tarefaUpdateMany).toHaveBeenCalledWith({
+      where: { id, cardId: "card-1", status: "PENDENTE" },
+      data: { status: "CONCLUIDA", concluidaEm: expect.any(Date) },
+    });
+    expect(mocks.historico).toHaveBeenCalledOnce();
+    expect(mocks.evento).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    "docupdate:qualquer:1791927130000:1",
+    `docupdate:${TAREFA_ID}:NaN:1`,
+    `docupdate:${TAREFA_ID}:9007199254740992:1`,
+    `docupdate:${TAREFA_ID}:1791927130000:0`,
+    `docupdate:${TAREFA_ID}:1791927130000:1:extra`,
+    `docpend:${TAREFA_ID}:2026-02-30`,
+    `docpend:${TAREFA_ID}:2026-10-21:extra`,
+    `docoutro:${TAREFA_ID}:2026-10-21`,
+  ])("recusa identidade documental malformada sem consultar ou escrever: %s", async (id) => {
+    expect(concluirTarefaSchema.safeParse({ tarefaId: id }).success).toBe(false);
+    expect((await ConcluirTarefaBpm({ tarefaId: id })).success).toBe(false);
+    expect(mocks.tarefaFindUnique).not.toHaveBeenCalled();
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("ID documental não concede acesso ao card persistido da tarefa", async () => {
+    const id = `docupdate:${TAREFA_ID}:1791927130000:1`;
+    mocks.tarefaFindUnique.mockResolvedValue({ ...tarefaBase, id, cardId: "outro-card", cardChecklistId: null });
+    mocks.acesso.mockRejectedValueOnce(new Error("Não autorizado"));
+    await expect(ConcluirTarefaBpm({ tarefaId: id })).resolves.toEqual({ success: false, error: "Não autorizado" });
+    expect(mocks.acesso).toHaveBeenCalledWith("outro-card", 7, "Admin", "concluirTarefa");
+    expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
   it("não repete histórico, evento ou SLA se outra solicitação já concluiu", async () => {
