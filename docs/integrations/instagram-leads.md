@@ -6,7 +6,9 @@ Contrato v1. Integração da planilha `1vzyEobII90qd6txFhPBu5IwUZ9sISGs-6jYODaVm
 
 Homologação: `POST https://staging.alpha-comex.com/api/integrations/instagram/leads`.
 
-O caminho fica disponível após o deploy. O recebimento só é habilitado quando o endpoint administrativo estiver configurado e ativo. Esta documentação não comprova ativação/deploy; consulte a evidência de entrega na story `story-crm-google-sheets-leads.md`. Produção requer promoção explícita e credencial própria.
+Produção: `POST https://painel.alpha-comex.com/api/integrations/instagram/leads`. Usa endpoint administrativo e token próprios de produção, separados de staging. A promoção foi solicitada em 2026-10-21; o resultado operacional deve ser conferido na story e no recibo de publicação, sem inferir ativação somente a partir deste contrato.
+
+O recebimento só é habilitado quando o código estiver publicado e o endpoint administrativo configurado e ativo no ambiente escolhido. Esta documentação não comprova ativação/deploy; consulte a evidência de entrega na story `story-crm-google-sheets-leads.md`.
 
 Headers obrigatórios:
 
@@ -140,6 +142,8 @@ Código pronto em `scripts/google-sheets-instagram.gs`. O conector Google Drive 
 3. Confirmar o ambiente de destino e a autorização aplicável ao histórico antes da primeira sincronização.
 4. Executar `sincronizarLeadsInstagram` e autorizar os acessos Google necessários.
 5. Executar `instalarSincronizacaoInstagram` para instalar um gatilho a cada cinco minutos.
+
+Para produção, usar `ALPHA_API_URL=https://painel.alpha-comex.com/api/integrations/instagram/leads` e o token exclusivo desse ambiente. O script envia para apenas um destino por execução. As marcações `status_crm` incluem o host: mudar o destino de staging para produção torna as linhas históricas novamente elegíveis. Antes da primeira execução em produção, definir e autorizar o escopo do histórico conforme o protocolo de importação do projeto; publicar a API não executa essa carga nem instala o gatilho.
 
 Gatilho por tempo captura também linhas adicionadas por integrações/API, que não disparam `onEdit`. Referência: [gatilhos instaláveis do Google](https://developers.google.com/apps-script/guides/triggers/installable).
 
