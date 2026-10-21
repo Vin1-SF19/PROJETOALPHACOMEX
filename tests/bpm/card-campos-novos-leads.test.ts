@@ -22,7 +22,8 @@ describe("BPM - restrição de campos do card na etapa Novos leads", () => {
     expect(board).toContain("!novosLeads && nomeFantasiaSecundario");
     // Cards RD precisam distinguir o serviço mesmo em Novos leads.
     expect(board).toContain("(!novosLeads || card.origemExterna) && card.servico");
-    expect(board).toContain("!novosLeads && canalOrigem");
+    // Origem agora fica no topo em todas as etapas; o comportamento é coberto
+    // pelos cenários DOM de kanban-card-origem-agendar-react.test.ts.
     expect(board).toContain("!novosLeads && statusConfig");
     expect(board).toContain("!novosLeads && proximaTarefaComPrazo");
     expect(board).toContain("!novosLeads && card._count.tarefas > 0");

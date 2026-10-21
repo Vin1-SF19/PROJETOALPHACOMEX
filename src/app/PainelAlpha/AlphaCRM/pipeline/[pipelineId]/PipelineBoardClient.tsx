@@ -24,7 +24,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Loader2, AlertTriangle, Bot, Building2, CalendarClock, ClipboardList, Paperclip, Plus, RefreshCw, StickyNote, Users, Video } from "lucide-react";
+import { Loader2, AlertTriangle, Bot, Building2, CalendarClock, ClipboardList, Globe, Instagram, Paperclip, Plus, RefreshCw, StickyNote, Users, Video } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MoverCardBpm, ObterRequisitosTransicaoBpm, CriarCardBpm, ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
 import { PromoverNolossLead } from "@/actions/bpm/NolossLeads";
@@ -261,7 +261,18 @@ export function KanbanCard({
   const naoAcessado = !ehLeadVirtual && !card.primeiraVisualizacaoEm;
   const alertaBoasVindas = !ehLeadVirtual && etapaEhBoasVindas(etapaNome);
   const canalOrigem = card.campoValores?.find((campo) => campo.campo.nome === "Canal de origem")?.valor;
-  const canalNoloss = card.nolossUtmSource?.trim() || card.nolossUtmMedium?.trim() || "NoLoss";
+  // O vínculo NoLoss legado é do formulário do site; Instagram assumido
+  // conserva seu canal persistido, mesmo sendo transportado pela API NoLoss.
+  const canalNormalizado = canalOrigem?.trim().toLocaleLowerCase("pt-BR");
+  const origemLead = ehLeadVirtual || card.veioNoloss ? "Site"
+    : canalNormalizado === "instagram" || canalNormalizado === "ig" ? "Instagram"
+      : canalNormalizado === "site" ? "Site" : canalOrigem?.trim();
+  const identidadeConfigurada = (key: "EMPRESA_NOME" | "CNPJ" | "NOME_FANTASIA" | "SERVICO") =>
+    card.cardViewComposicao === undefined || card.cardViewComposicao.some((item) => item.kind === "NATIVE" && item.key === key);
+  const mostrarIdentidade = card.cardViewComposicao === undefined || agendarReuniao && identidadeConfigurada("EMPRESA_NOME");
+  const composicaoVisivel = agendarReuniao && mostrarIdentidade
+    ? card.cardViewComposicao?.filter((item) => item.kind !== "NATIVE" || !["EMPRESA_NOME", "CNPJ", "NOME_FANTASIA", "SERVICO"].includes(item.key))
+    : card.cardViewComposicao;
   const qualificacao = card.campoValores?.find((campo) => campo.campo.nome === "Qualificação")?.valor?.trim();
   const semCnpjNoloss = novosLeads && (ehLeadVirtual || card.veioNoloss) && !card.empresa.cnpj;
   const radarPretendido = card.campoValores?.find((campo) => campo.campo.nome === "Radar pretendido")?.valor;
@@ -342,6 +353,20 @@ export function KanbanCard({
         )}
       >
         <div className="relative space-y-2.5">
+          {origemLead && (
+            <div className="flex items-center" aria-label="Origem do lead">
+              <span className={cn(
+                "inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-bold",
+                origemLead === "Instagram" ? "border-violet-400/40 bg-violet-500/15 text-violet-200"
+                  : origemLead === "Site" ? "border-sky-300/40 bg-sky-400/15 text-sky-100"
+                    : "border-white/10 bg-white/[0.05] text-slate-300",
+              )} title="Origem do lead">
+                {origemLead === "Instagram" && <Instagram size={12} aria-hidden="true" />}
+                {origemLead === "Site" && <Globe size={12} aria-hidden="true" />}
+                Origem do lead: {origemLead}
+              </span>
+            </div>
+          )}
           {card.encaminhamentoPendente && (
             <div role="status" className="rounded-lg border border-amber-300/30 bg-amber-400/10 px-2 py-1 text-[10px] font-semibold text-amber-100">
               Encaminhamento pendente · confira a automação
@@ -370,7 +395,33 @@ export function KanbanCard({
             <span aria-label={`Origem RD Station. Etapa de origem: ${etapaOrigemRd}`} className="inline-flex max-w-full items-center gap-1 self-start rounded-full border border-sky-400/25 bg-sky-400/10 px-2 py-0.5 text-[10px] font-semibold text-sky-200">RD Station · {etapaOrigemRd}</span>
             {nomeLeadRd && <span title={nomeLeadRd} className="max-w-full truncate text-[10px] text-slate-400">Negócio RD: {nomeLeadRd}</span>}
           </div>}
-          {agendarReuniao && !ehLeadVirtual ? (
+          {mostrarIdentidade && (
+          <div className="flex items-start gap-2.5">
+            <div aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-xs font-black tracking-tight text-white shadow-inner shadow-white/5">
+              {inicialEmpresa}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 text-sm font-semibold leading-tight text-white">
+                {naoAcessado && <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full animate-pulse motion-reduce:animate-none", alertaBoasVindas ? "bg-red-400" : "bg-cyan-400")} title="Nunca acessado" />}
+                <Building2 size={12} className="shrink-0 text-slate-400" aria-hidden="true" />
+                {ehLeadVirtual ? <span className="line-clamp-2 text-left text-white">{nomeEmpresa}</span> : (
+                  <button type="button" onClick={(event) => { event.stopPropagation(); onAbrir(card.id); }} onPointerDown={(event) => event.stopPropagation()}
+                    className="line-clamp-2 text-left decoration-white/40 underline-offset-2 transition-colors hover:text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40" aria-label={`Abrir card de ${nomeEmpresa}`}>
+                    {nomeEmpresa}
+                  </button>
+                )}
+              </div>
+              {!ehLeadVirtual && ((!novosLeads && nomeFantasiaSecundario && identidadeConfigurada("NOME_FANTASIA")) || cnpjFormatado && identidadeConfigurada("CNPJ")) && (
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  {!novosLeads && nomeFantasiaSecundario && identidadeConfigurada("NOME_FANTASIA") && <span className="line-clamp-1 text-[11px] font-medium leading-tight text-slate-400">{nomeFantasiaSecundario}</span>}
+                  {cnpjFormatado && identidadeConfigurada("CNPJ") && <span className="font-mono text-[10px] leading-tight text-slate-500">{cnpjFormatado}</span>}
+                </div>
+              )}
+              {(!novosLeads || card.origemExterna) && card.servico && identidadeConfigurada("SERVICO") && <p className="mt-1 line-clamp-1 text-[11px] font-medium leading-tight text-slate-400">{card.servico}</p>}
+            </div>
+          </div>
+          )}
+          {agendarReuniao && !ehLeadVirtual && (
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-xs text-slate-300">
                 <CalendarClock size={14} className="shrink-0 text-slate-500" aria-hidden="true" />
@@ -408,62 +459,7 @@ export function KanbanCard({
                   Agendar pelo Google Meet
                 </button>
               ) : null}
-              {card.cardViewComposicao !== undefined && (
-                // RM-2026-E1E1F7: o widget de Agendar Reunião substitui o corpo
-                // padrão do card, então a composição configurável precisa ser
-                // renderizada aqui também — senão etapas com esse widget nunca
-                // mostram nenhum campo configurado (bug reportado em produção).
-                <CardKanbanRenderer
-                  composicao={card.cardViewComposicao}
-                  valores={card.cardViewValores ?? { nativos: {}, campos: {}, camposLabel: {} }}
-                />
-              )}
             </div>
-          ) : (
-            <>
-          {card.cardViewComposicao === undefined && (
-          <div className="flex items-start gap-2.5">
-            <div
-              aria-hidden="true"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-xs font-black tracking-tight text-white shadow-inner shadow-white/5"
-            >
-              {inicialEmpresa}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 text-sm font-semibold leading-tight text-white">
-                {naoAcessado && (
-                  <span
-                    className={cn("h-1.5 w-1.5 shrink-0 rounded-full animate-pulse motion-reduce:animate-none", alertaBoasVindas ? "bg-red-400" : "bg-cyan-400")}
-                    title="Nunca acessado"
-                  />
-                )}
-                <Building2 size={12} className="shrink-0 text-slate-400" aria-hidden="true" />
-                {ehLeadVirtual ? (
-                  <span className="line-clamp-2 text-left text-white">{nomeEmpresa}</span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onAbrir(card.id);
-                    }}
-                    onPointerDown={(event) => event.stopPropagation()}
-                    className="line-clamp-2 text-left decoration-white/40 underline-offset-2 transition-colors hover:text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                    aria-label={`Abrir card de ${nomeEmpresa}`}
-                  >
-                    {nomeEmpresa}
-                  </button>
-                )}
-              </div>
-              {!ehLeadVirtual && ((!novosLeads && nomeFantasiaSecundario) || cnpjFormatado) && (
-                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                  {!novosLeads && nomeFantasiaSecundario && <span className="line-clamp-1 text-[11px] font-medium leading-tight text-slate-400">{nomeFantasiaSecundario}</span>}
-                  {cnpjFormatado && <span className="font-mono text-[10px] leading-tight text-slate-500">{cnpjFormatado}</span>}
-                </div>
-              )}
-              {(!novosLeads || card.origemExterna) && card.servico && <p className="mt-1 line-clamp-1 text-[11px] font-medium leading-tight text-slate-400">{card.servico}</p>}
-            </div>
-          </div>
           )}
 
         {!novosLeads && (alertaBoasVindas || alertaAlinhamento) && (
@@ -491,13 +487,8 @@ export function KanbanCard({
           </div>
         )}
 
-        {novosLeads && (
-          <div className="flex flex-wrap gap-1.5" aria-label="Origem e qualificação do lead">
-            {(ehLeadVirtual || canalOrigem) && (
-              <span className="rounded-lg border border-sky-300/40 bg-sky-400/15 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-sky-100" title="Canal de origem">
-                Origem: {ehLeadVirtual ? canalNoloss : canalOrigem}
-              </span>
-            )}
+        {novosLeads && qualificacao && (
+          <div className="flex flex-wrap gap-1.5" aria-label="Qualificação do lead">
             {qualificacao && (
               <span className={cn(
                 "rounded-lg border px-2 py-1 text-[9px] font-extrabold uppercase tracking-wide",
@@ -530,7 +521,7 @@ export function KanbanCard({
           // aplicada ao lead virtual — só os campos com dado disponível para um
           // lead ainda não promovido aparecem (CardKanbanRenderer já filtra "vazio").
           <CardKanbanRenderer
-            composicao={card.cardViewComposicao}
+            composicao={composicaoVisivel ?? []}
             valores={card.cardViewValores ?? { nativos: {}, campos: {}, camposLabel: {} }}
           />
         )}
@@ -546,16 +537,11 @@ export function KanbanCard({
               // RM-2026-E1E1F7: etapa migrada para a composição configurável —
               // nenhuma seleção por nome de etapa a partir daqui.
               <CardKanbanRenderer
-                composicao={card.cardViewComposicao}
+                composicao={composicaoVisivel ?? []}
                 valores={card.cardViewValores ?? { nativos: {}, campos: {}, camposLabel: {} }}
               />
             ) : (
               <>
-                {!novosLeads && canalOrigem && (
-                  <span className="rounded-lg border border-white/10 bg-white/[0.05] px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-slate-300">
-                    {canalOrigem}
-                  </span>
-                )}
                 {novosLeads && radarPretendido && (
                   <span className="rounded-lg border border-white/10 bg-white/[0.05] px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-slate-300">
                     {radarPretendido}
@@ -647,8 +633,6 @@ export function KanbanCard({
             />
           </div>
         )}
-            </>
-          )}
         </div>
       </GradientBlobCard>
     </div>
