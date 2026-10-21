@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — implementação, gates locais integrados e QA pré-push aprovados; publicação e reteste autenticado de staging pendentes. Produção não autorizada nesta entrega.
+Done — staging READY e reteste Admin manual autenticado aprovados, com documentos, atualização ao vivo, anexo readonly e aviso real sem duplicação ao reabrir. Gerador/finalização e assinado positivo permanecem cobertura local; produção fora do escopo.
 
 ## Executor Assignment
 
@@ -46,7 +46,7 @@ A melhoria complementa o retorno existente Comercial ↔ Financeiro; não instal
 - [x] Reutilizar notificação interna no evento confirmado de prontidão, com destinatário e deduplicação consistentes; proteger replay/falha/ausência de closer (AC 5–7).
 - [x] Aplicar pendência/verde independentes, pulsação acessível e atualização sem reabrir ou perder rascunho (AC 1, 3–4, 6).
 - [x] Acrescentar regressões significativas e revisar integração/segurança; executar lint, typecheck, suíte completa e build (AC 8).
-- [ ] Publicar por DevOps no staging; demonstrar cenário fictício com documentos/estado financeiro legítimos, anexos e notificação do closer; concluir relatório/story e File List sem publicar produção (AC 8).
+- [x] Publicar por DevOps no staging; demonstrar cenário fictício com documentos/estado financeiro legítimos, anexos e notificação do closer; concluir relatório/story e File List sem publicar produção (AC 8).
 
 ## Dev Notes
 
@@ -75,7 +75,7 @@ Blueprint Scout recebido pela coordenação; caminhos existentes confirmados na 
 | Histórico/anexos e atualização do detalhe | `src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx`, `CardFullViewModal.tsx` |
 | Estado pós-fechamento e acompanhamento | `src/app/PainelAlpha/AlphaCRM/CardModal/PainelStatusPosFechamento.tsx`, `PainelAcompanhamentoContratacao.tsx` |
 
-O arquiteto prepara `docs/architecture/crm-contratos-pendentes-comercial-20261021.md` para definir projeção versus referência, identidade documental e ciclo de vida de arquivo. A story não impõe duplicação física nem novos registros por leitura; o desenho deve satisfazer os ACs, preferindo compatibilidade sem schema. Não citar essa decisão técnica como concluída antes de o documento existir. [Fonte: blueprint Scout recebido pela coordenação nesta missão; decisão de arquitetura em preparação.]
+A arquitetura aprovada em `docs/architecture/crm-contratos-pendentes-comercial-20261021.md` define projeção versus referência, identidade documental e ciclo de vida do arquivo. A implementação preserva compatibilidade sem schema, sem duplicação física nem registros materializados por leitura. [Fonte: blueprint Scout, arquitetura e revisões locais desta entrega.]
 
 ## Testing
 
@@ -124,13 +124,29 @@ FF disjunto para b71 preservou os hashes dos 32 paths da feature. Conforme parec
 
 Preflight operacional confirma custom environment staging e bancos separados por fingerprints privados; produção permanece fora de escopo. Nenhuma variável, script cadastral, worker global, migration ou escrita de banco foi executada pelo DevOps. Reteste remoto será limitado à empresa fictícia 3066 e à conta Admin real autorizada. Geração automática/finalização e assinatura remota só serão declaradas se efetivamente demonstradas sem fabricar assinatura, pagamento, NF ou conclusão financeira; o cenário assinado pode permanecer limitação com evidência local. A inspeção SELECT-only de configuração não executa automações e não prova fila histórica vazia.
 
-Evidência privada: `/var/tmp/alpha-crm-contratos-pendentes-20261021/integrado/forge-result.json`, logs `gate-*`, `delta-b71-result.json`, `delta-b71-tests.json`, `disjoint-integration-b71.json` e `finance-automation-inventory.json`; transferência em `integration/integration-result.json`. Publicação, SHA/READY, smoke público e reteste autenticado ainda pendentes neste registro pré-push. Nenhuma implementação, mutação ou publicação foi executada pelo SM.
+Evidência privada: `/var/tmp/alpha-crm-contratos-pendentes-20261021/integrado/forge-result.json`, logs `gate-*`, `delta-b71-result.json`, `delta-b71-tests.json`, `disjoint-integration-b71.json` e `finance-automation-inventory.json`; transferência em `integration/integration-result.json`. No checkpoint pré-push descrito acima, publicação, SHA/READY, smoke público e reteste autenticado estavam pendentes; foram concluídos no fechamento remoto registrado abaixo. Nenhuma implementação, mutação ou publicação foi executada pelo SM.
+
+### Fechamento remoto confirmado
+
+Publicação staging por push normal: feature `48ebc3c95a4b916d4f93c866f3fac0c34ef0d92f` e merge preservador `5e3d629c822a78a8e3ec413e6d99f5e87bb420d7`, com pais feature e `861e43d7`. Deployment Git próprio `dpl_H4JDX3syGmX8mZ3rq2pxn1ZzFwYs` READY e alias `https://staging.alpha-comex.com` conferidos no custom environment staging. Produção não recebeu esta feature. Smoke anônimo: raiz/providers/sessão/broadcast/chunks 200, CRM 307 protegido e slots contratuais 401; retry dirigido após um URLError transitório do primeiro GET para envio aprovou em 0,23 s. Metadados críticos de ambiente inalterados e bancos separados confirmados privadamente.
+
+Reteste Admin real no card da empresa fictícia 3066, responsável id1: dois campos pendentes pulsando discretamente (2 s), reduced motion sem animação. PDF fictício manual no Financeiro sozinho manteve pendência; após Elaborado=Sim no fluxo vigente, Contrato para envio ficou verde no Comercial ainda aberto, sem reabrir. PDF autenticado 200/application-pdf/1.173 bytes/%PDF-, private-no-store e nosniff, com preview UI. Badge/lista de anexos iguais a um, somente leitura e sem delete. Assinado permaneceu PENDENTE e ausência retornou 404.
+
+O sino real do responsável mostrou um alerta Enviar contrato com empresa, documento, mensagem de pronto para envio e horário 16:40 Brasília. Reabrir/refetch preservou o mesmo ID de alerta/tarefa/alertaEm e contagem um, comprovado por `remote-result.json` e `remote-dedup-proof.json` privados. Nenhum novo erro da feature; dois 503 de voz preexistentes separados. QA final APPROVED no escopo manual demonstrado.
+
+Limites preservados: gerador/finalização automática e signed positivo possuem cobertura local, não foram exercitados remotamente. Nenhuma assinatura, pagamento, NF, conclusão financeira ou envio externo foi fabricado. CRUD normal financeiro pode acionar o orquestrador/housekeeping existente; não se afirma zero efeito indireto. Nenhum worker/global foi invocado manualmente por CLI; sem migration/schema/ENV ou cópia entre bancos. Fechamento exclusivamente documental (story, relatório e três memórias), mantendo o runtime 5e3 validado; última publicação documental será conferida privadamente, sem novo ciclo de commit para registrar o próprio commit.
+
+Relatório sanitizado: `docs/reports/validacao-contratos-pendentes-staging-2026-10-21.md`. Evidências brutas, recibos, credenciais e PDF permanecem fora do Git. Rollback de código preparado no staging saudável anterior `861e43d7` / `dpl_3L7JtADnbhgqrfFyAf9SBQk8K7WN`, sem rollback de dados do reteste normal.
 
 ### File List
 
-32 arquivos exclusivos desta entrega sobre a base de staging preservada; não inclui alterações de outras worktrees, credenciais, fixtures privadas ou arquivos de ambiente.
+36 arquivos únicos desta entrega: 32 da implementação/arquitetura/story e quatro acréscimos documentais de fechamento (relatório e três memórias). O último commit altera somente cinco documentos, incluindo esta story já existente; caminhos concorrentes preservados mantêm seu histórico próprio.
 
+- `.bibble/memory/codebase-map.md`
+- `.bibble/memory/integration-points.md`
+- `.bibble/memory/journal.md`
 - `docs/architecture/crm-contratos-pendentes-comercial-20261021.md`
+- `docs/reports/validacao-contratos-pendentes-staging-2026-10-21.md`
 - `docs/stories/story-crm-contratos-pendentes-comercial-20261021.md`
 - `src/actions/bpm/AcompanhamentoContratacao.ts`
 - `src/actions/bpm/Anexos.ts`
@@ -202,6 +218,20 @@ Evidências privadas: `/var/tmp/alpha-crm-contratos-pendentes-20261021/qa-segura
 
 DevOps pode preparar commit/push normal exclusivamente para staging, preservando novas referências concorrentes, configurar o build no ambiente próprio de staging e conferir READY/SHA/alias. Publicação e reteste autenticado com documentos fictícios, atualização dos dois slots, anexos e notificação real do responsável permanecem **pendentes**; nenhuma conclusão sobre E2E remoto, assinatura, envio externo ou produção é inferida. Nenhuma fonte, teste, configuração, banco remoto ou operação Git foi alterada nesta ratificação; QA atualizou somente esta seção e encerra a escrita para liberar o fechamento pelo executor.
 
+### 2026-10-21 — Quinn: QA FINAL / APPROVED — staging e reteste delimitado
+
+**Parecer final: APPROVED. Recomendação ao owner: Done, com os limites abaixo registrados.** Publicação efetiva em `5e3d629c822a78a8e3ec413e6d99f5e87bb420d7`, deployment `dpl_H4JDX3syGmX8mZ3rq2pxn1ZzFwYs` READY, ambiente customizado staging e alias `https://staging.alpha-comex.com` conferidos. O merge preserva a feature `48ebc3c9` e a correção concorrente `861e43d7`. A prova independente de três vias confirmou `Cards.ts` e os 31 demais arquivos da feature preservados; o delta861 passou typecheck, lint afetado e oito arquivos/**187 testes**, com fonte inalterada (`763dba63ceb3a303dff3ee1be6ea2da397aae9cf54950ed4c4f438c4e55f5ef9`). Somam-se os quatro gates completos e os checks b71 já registrados, sem descrevê-los como uma suíte completa repetida sobre cada merge.
+
+**Reteste autenticado real de staging:** conta Admin ID 1, responsável pelo cenário fictício da empresa 3066; Comercial `cmvi5ztja000007l8livtiw1o`, Financeiro `cmvi9qcjb000608jpdywhf639`. Evidência consolidada em `remote-result.json` às 19:44:31 UTC. Os dois campos inicialmente pendentes exibiram pulsação de 2 s; reduced motion resultou em animação `none`. O upload isolado no Financeiro permaneceu pendente. Após a confirmação manual vigente de Elaborado=Sim, o contrato para envio ficou disponível/verde no Comercial ainda aberto, sem exigir reabrir; o assinado continuou pendente. A captura final foi inspecionada e mostra nome do PDF e identificação “Disponível pelo Financeiro”.
+
+A aba Anexos apresentou **uma única entrada projetada, somente leitura**. Preview autenticado abriu PDF HTTP 200, MIME application/pdf, 1.173 bytes e assinatura `%PDF-`, com nosniff/cache privado no-store; o slot assinado sem documento retornou 404. O sino real exibiu uma notificação para ADM: “Contrato pronto para envio”, empresa fictícia, nome do documento e horário de Brasília. Ao reabrir/refazer a consulta, a mesma tarefa/identidade e `alertaEm` permaneceram iguais: `remote-dedup-proof.json` compara os dois snapshots, com um alerta e um anexo, sem duplicação por leitura. Isso comprova esse percurso de reabertura; replays de finalização/concorrência são sustentados pelos testes locais, não apresentados como operações remotas que não ocorreram.
+
+**Limites que permanecem explícitos:** o percurso remoto usou PDF fictício enviado manualmente e confirmação manual válida no Financeiro. Geração automática e `FinalizarDocumento` foram exercitados por testes automatizados locais, incluindo integração SQLite, e não constituem E2E remoto nesta entrega. Assinado positivo não foi enviado remotamente; sua independência, UI e acesso foram cobertos localmente, e a ausência foi conferida no staging. Não se fabricaram assinatura real, pagamento, NF, conclusão negocial ou envio externo. A conta remota foi Admin; closer comum sem ACL financeira foi comprovado pela cadeia real de autorização dos testes, não por uma sessão remota adicional.
+
+CRUD normal da aplicação pode executar o orquestrador por card e a manutenção de lease já existentes; não se relata “nenhum worker executado” de modo absoluto. Nenhum CLI/worker global foi invocado manualmente para demonstrar o resultado. Não houve erro de runtime da nova feature nas evidências; duas respostas 503 da voz são limitação conhecida separada, sem aceite de recuperação desse serviço. Nenhuma publicação em produção integra este parecer.
+
+Evidências finais conferidas: `remote-result.json`, `remote-dedup-proof.json`, `comercial-envio-pendente.png`, `comercial-envio-disponivel.png`, `comercial-anexos-projetados.png` e, em `integrado/`, `publication.json`, `aliases-contracts-ready.json`, `smoke-contracts-ready.json`, `smoke-contract-slot-retry.json`, `delta-861-result.json` e `merge-861-proof.json`. O smoke anônimo inicial teve um URLError transitório no slot de envio, cuja repetição direcionada confirmou 401; o preview autenticado posterior confirmou o PDF. Evidências privadas não devem ser versionadas como dumps brutos. QA atualizou exclusivamente esta seção; status/checklist/File List e fechamento documental ficam com o executor. Arquivo liberado para DevOps.
+
 ## Change Log
 
 | Data | Versão | Descrição | Autor |
@@ -213,7 +243,7 @@ DevOps pode preparar commit/push normal exclusivamente para staging, preservando
 
 A worktree autoritativa desta entrega passa a ser `crm-contratos-pendentes-integrado-20261021`, baseada em `2f4d788bd6276dd0e092e6e5c1595151ac0f1bbb`. Foram preservadas a integração Instagram `50e53866` e a consistência de Líder Operacional `2f4d788b`; nenhuma alteração de ambiente, execução de script cadastral, configuração de banco ou publicação de produção foi realizada. Os 31 caminhos da feature desenvolvida sobre `87c2e78f` foram transferidos por patch binário com merge de três vias e cópia apenas dos arquivos novos. Cards, PipelineBoardClient e o teste de polling foram mesclados automaticamente preservando ambos os deltas. O delta adicional de `2f4d788b` não tem sobreposição com estes 31 caminhos.
 
-A worktree original, logs e evidência dos gates sobre `87c2e78f` permanecem preservados. A suíte original apresentou mock incompleto de validações no teste de exclusão; o owner corrigiu somente o mock na worktree integrada. Os quatro gates sobre 2f passaram; depois houve FF disjunto b71 com checagens afetadas e ratificação QA, conforme Dev Agent Record. O reteste remoto permanece pendente antes da publicação.
+A worktree original, logs e evidência dos gates sobre `87c2e78f` permanecem preservados. A suíte original apresentou mock incompleto de validações no teste de exclusão; o owner corrigiu somente o mock na worktree integrada. Os quatro gates sobre 2f passaram; depois houve FF disjunto b71 com checagens afetadas e ratificação QA, conforme Dev Agent Record. Esse checkpoint de integração precedeu a publicação; READY e reteste manual foram posteriormente concluídos conforme fechamento remoto.
 
 Baseline final de publicação: `b71f2cb9`; FF disjunto autorizado e verificado preservou todos os 32 hashes da feature, sem alteração do seu runtime. Fonte/custódia e validações estão discriminadas no Dev Agent Record.
 
@@ -222,4 +252,4 @@ Baseline final de publicação: `b71f2cb9`; FF disjunto autorizado e verificado 
 
 O commit local de contratos `48ebc3c95a4b916d4f93c866f3fac0c34ef0d92f` congelou os 32 arquivos aprovados sobre b71. Novo avanço de staging `861e43d7` foi integrado por merge normal, preservando a correção concorrente de IDs documentais e retry de gravações ocupadas. Os 31 arquivos não sobrepostos da feature ficaram byte a byte idênticos; Cards corresponde exatamente a um merge independente de três vias, sem marcadores ou edição manual, mantendo o retorno comercial pós-commit fora do retry transacional. Nenhum arquivo foi escolhido integralmente como ours/theirs.
 
-QA ratificou GO pré-push final: quatro gates integrados 2f (704 arquivos/5.451 testes), checagens b71 (sete arquivos/104 testes) e novo typecheck combinado, lint Cards/validations e oito focos de edição/tarefas/CAS/contratação/SQLite/pós-commit/documentos/exclusão aprovados sobre o merge 861. Os gates completos anteriores não são descritos como nova execução após cada integração. Provas `merge-861-proof.json` e `delta-861-result.json` no diretório privado integrado. Publicação/READY e reteste autenticado continuam pendentes; somente staging autorizado. Os cinco caminhos concorrentes 861 permanecem no histórico próprio, sem serem apresentados como implementação nova desta feature.
+QA ratificou GO pré-push final: quatro gates integrados 2f (704 arquivos/5.451 testes), checagens b71 (sete arquivos/104 testes) e novo typecheck combinado, lint Cards/validations e oito focos de edição/tarefas/CAS/contratação/SQLite/pós-commit/documentos/exclusão aprovados sobre o merge 861. Os gates completos anteriores não são descritos como nova execução após cada integração. Provas `merge-861-proof.json` e `delta-861-result.json` no diretório privado integrado. No checkpoint pré-push 861, publicação/READY e reteste autenticado ainda estavam pendentes; o fechamento remoto abaixo registra sua conclusão. Somente staging autorizado. Os cinco caminhos concorrentes 861 permanecem no histórico próprio, sem serem apresentados como implementação nova desta feature.
