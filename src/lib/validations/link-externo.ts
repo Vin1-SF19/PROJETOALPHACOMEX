@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SETOR_LIDER_OPERACIONAL } from "@/lib/setores-catalogo";
 
 export const ROLES_CONHECIDOS = [
   "Admin",
@@ -8,6 +9,7 @@ export const ROLES_CONHECIDOS = [
   "RECURSOS HUMANOS",
   "FINANCEIRO",
   "Lider Comercial",
+  SETOR_LIDER_OPERACIONAL,
   "SUPORTE",
 ] as const;
 

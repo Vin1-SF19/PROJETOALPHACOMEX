@@ -18,9 +18,9 @@ import {
   type OnboardingTemplate,
 } from "@/actions/onboarding";
 
-import { SETOR_LIDER_COMERCIAL } from "@/lib/setores-catalogo";
+import { SETOR_LIDER_COMERCIAL, SETOR_LIDER_OPERACIONAL } from "@/lib/setores-catalogo";
 
-const SETORES_OPCOES = ["Geral", "Comercial", SETOR_LIDER_COMERCIAL, "Financeiro", "Recursos Humanos", "TI", "Operacional", "Outro"];
+const SETORES_OPCOES = ["Geral", "Comercial", SETOR_LIDER_COMERCIAL, "Financeiro", "Recursos Humanos", "TI", "Operacional", SETOR_LIDER_OPERACIONAL, "Outro"];
 
 const DEFAULT_MENSAGEM_PARCEIRO = `🤝 Bem-vindo ao Portal de Parceiros Alpha Comex!
 

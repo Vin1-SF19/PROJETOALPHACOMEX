@@ -19,7 +19,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { User, Mail, Lock, KeyRound, ShieldCheck } from "lucide-react";
-import { SETOR_LIDER_COMERCIAL } from "@/lib/setores-catalogo";
+import { SETOR_LIDER_COMERCIAL, SETOR_LIDER_OPERACIONAL } from "@/lib/setores-catalogo";
 
 type EditionUserProps = {
   open: boolean;
@@ -39,6 +39,7 @@ const SETORES_LISTA = [
   { value: "Admin",             label: "TI.ADMINISTRADOR" },
   { value: "CEO",               label: "CEO" },
   { value: "OPERACIONAL",       label: "OPERACIONAL" },
+  { value: SETOR_LIDER_OPERACIONAL, label: "LÍDER OPERACIONAL" },
   { value: "COMERCIAL",         label: "COMERCIAL" },
   { value: SETOR_LIDER_COMERCIAL, label: "LÍDER COMERCIAL" },
   { value: "RECURSOS HUMANOS",  label: "RECURSOS HUMANOS" },

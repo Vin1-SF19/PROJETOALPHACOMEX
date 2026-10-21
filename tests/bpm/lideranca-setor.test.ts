@@ -23,6 +23,12 @@ describe("autoridade de movimento por setor", () => {
     expect(await checarAcessoBpmCard("card", 5, null, "moverEtapa", client("Líder Comercial", 5, setor) as never))
       .toMatchObject({ autorizado: true, autoridadeMovimentoLivre: { tipo: "LIDER_SETOR" } });
   });
+  it.each(["OPERACIONAL", "Lider Operacional"])("líder operacional conserva a regra existente somente no setor %s", async (setor) => {
+    expect(await checarAcessoBpmCard("card", 5, null, "moverEtapa", client("Líder Operacional", 5, setor) as never))
+      .toMatchObject({ autorizado: true, autoridadeMovimentoLivre: { tipo: "LIDER_SETOR" } });
+    expect(await checarAcessoBpmCard("card", 5, null, "editarCard", client("Líder Operacional", 5, setor) as never))
+      .toMatchObject({ autorizado: false });
+  });
   it("Vitor move nos pipelines operacionais e continua sem edição geral", async () => {
     const db = client();
     expect(await checarAcessoBpmCard("card", 10, null, "moverEtapa", db as never)).toMatchObject({ autorizado: true });
@@ -36,6 +42,7 @@ describe("autoridade de movimento por setor", () => {
     ["OPERACIONAL", 10, "OPERACIONAL", "INATIVO", "crm"],
     ["OPERACIONAL", 10, "OPERACIONAL", "ATIVO", ""],
     ["Lider Comercial", 5, "OPERACIONAL", "ATIVO", "crm"],
+    ["Lider Operacional", 5, "COMERCIAL", "ATIVO", "crm"],
   ])("nega outra pessoa/setor/conta inativa/sem CRM: %s %s %s %s", async (role, id, setor, status, permissoes) => {
     expect(await checarAcessoBpmCard("card", Number(id), "Admin", "moverEtapa", client(String(role), Number(id), String(setor), String(status), String(permissoes)) as never)).toMatchObject({ autorizado: false });
   });

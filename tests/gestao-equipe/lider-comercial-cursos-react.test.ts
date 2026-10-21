@@ -31,7 +31,10 @@ afterEach(async () => {
   container.remove();
 });
 
-it.each([false, true])("seleciona Lider Comercial e grava pelo fluxo real de cursos (lote: %s)", async (lote) => {
+it.each([
+  ["Lider Comercial", false], ["Lider Comercial", true],
+  ["Lider Operacional", false], ["Lider Operacional", true],
+] as const)("seleciona %s e grava pelo fluxo real de cursos (lote: %s)", async (setorNome, lote) => {
   await act(async () => root.render(React.createElement(ModalCurso, { isOpen: true, onClose: m.fechar })));
   if (lote) {
     const modo = [...container.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Lote")!;
@@ -42,13 +45,13 @@ it.each([false, true])("seleciona Lider Comercial e grava pelo fluxo real de cur
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "Formação liderança");
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
-  const setor = [...container.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Lider Comercial")!;
+  const setor = [...container.querySelectorAll("button")].find((b) => b.textContent?.trim() === setorNome)!;
   expect(setor).toBeDefined();
   await act(async () => setor.click());
   const salvar = [...container.querySelectorAll("button")].find((b) => lote ? b.textContent?.includes("Criar 1 curso") : b.textContent?.includes("Criar Novo Curso"))!;
   await act(async () => salvar.click());
   expect(m.criar).toHaveBeenCalledWith(expect.objectContaining({
-    data: expect.objectContaining({ nome: "Formação liderança", setores: { create: [{ setor: "Lider Comercial" }] } }),
+    data: expect.objectContaining({ nome: "Formação liderança", setores: { create: [{ setor: setorNome }] } }),
   }));
   expect(m.fechar).toHaveBeenCalledOnce();
 });

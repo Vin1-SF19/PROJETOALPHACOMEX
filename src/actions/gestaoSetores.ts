@@ -5,8 +5,7 @@ import { requireAdmin } from "@/lib/auth-guard";
 import { revalidatePath } from "next/cache";
 import { isSameRole } from "@/lib/roles";
 import { SETOR_LIDER_COMERCIAL } from "@/lib/setores-catalogo";
-import { getCategoriasIniciaisDoSetor } from "@/lib/chamados/categorias-iniciais";
-import { normalizarNomeCategoria } from "@/lib/chamados/catalogo";
+import { cadastrarSetor } from "@/lib/setores/cadastro";
 
 const SETOR_BASE = "DESVINCULADO";
 
@@ -94,23 +93,8 @@ export async function getCargosComContagem() {
 
 export async function criarSetor(nome: string) {
   await requireAdmin();
-
-  const nomeTrim = nome.trim().toUpperCase();
-  if (!nomeTrim) return { success: false, message: "Nome inválido" };
-
-  const existe = await db.setor.findUnique({ where: { nome: nomeTrim } });
-  if (existe) return { success: false, message: "Setor já existe" };
-
-  const criado = await db.$transaction(async (tx) => {
-    const existentes = await tx.setor.findMany({ select: { nome: true } });
-    if (existentes.some((setor) => isSameRole(setor.nome, nomeTrim))) return false;
-    const setor = await tx.setor.create({ data: { nome: nomeTrim } });
-    for (const categoria of getCategoriasIniciaisDoSetor(setor.nome)) {
-      await tx.chamadoCategoria.create({ data: { ...categoria, setorId: setor.id, nomeNormalizado: normalizarNomeCategoria(categoria.nome) } });
-    }
-    return true;
-  }, { isolationLevel: "Serializable" });
-  if (!criado) return { success: false, message: "Já existe um setor com nome equivalente." };
+  const resultado = await cadastrarSetor(nome);
+  if (!resultado.success) return resultado;
   revalidatePath("/PainelAlpha/GestaoSetores");
   revalidatePath("/PainelAlpha/cadastro");
 
