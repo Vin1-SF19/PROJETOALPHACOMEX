@@ -44,7 +44,7 @@ import { AtribuirLeadAgendarModal } from "../../CardModal/AtribuirLeadAgendarMod
 import { ConfirmarMovimentoRdModal, type MovimentoRdPendente } from "../../CardModal/ConfirmarMovimentoRdModal";
 import NolossLeadModal from "./NolossLeadModal";
 import { AssumirLeadInstagram } from "@/actions/bpm/InstagramLeads";
-import { InstagramLeadCard } from "./InstagramLeadCard";
+import { InstagramDataFormulario, InstagramLeadCard } from "./InstagramLeadCard";
 import type { InstagramLeadDados } from "@/lib/bpm/instagram-leads";
 import { GrupoAvataresMembrosCard, type MembroCard } from "../../CardModal/SeletorMembrosCard";
 import { obterStatusPosFechamentoVisivel } from "@/lib/bpm/status-pos-fechamento";
@@ -130,6 +130,7 @@ export interface CardBpm {
   origem: "real" | "noloss" | "instagram";
   instagramLeadId?: string;
   instagramDados?: InstagramLeadDados;
+  instagramCaptadoEm?: string | null;
   nolossLeadId: string | null;
   nolossEmail?: string | null;
   nolossTelefone?: string | null;
@@ -370,6 +371,7 @@ export function KanbanCard({
               </span>
             </div>
           )}
+          <InstagramDataFormulario captadoEm={card.instagramCaptadoEm} />
           {card.encaminhamentoPendente && (
             <div role="status" className="rounded-lg border border-amber-300/30 bg-amber-400/10 px-2 py-1 text-[10px] font-semibold text-amber-100">
               Encaminhamento pendente · confira a automação

@@ -2,7 +2,12 @@
 
 import { Instagram, Phone, Radio, UserPlus } from "lucide-react";
 import { formatCNPJ } from "@/lib/format-cnpj";
-import { textoInstagram, type InstagramLeadDados } from "@/lib/bpm/instagram-leads";
+import { dataFormularioInstagram, textoInstagram, type InstagramLeadDados } from "@/lib/bpm/instagram-leads";
+
+export function InstagramDataFormulario({ captadoEm }: { captadoEm?: string | null }) {
+  const data = dataFormularioInstagram(captadoEm);
+  return data ? <p className="text-[11px] leading-relaxed text-slate-300">Preencheu formulário em: <time dateTime={captadoEm!}>{data}</time></p> : null;
+}
 
 export function InstagramLeadCard({ dados }: { dados: InstagramLeadDados }) {
   return (
@@ -13,6 +18,7 @@ export function InstagramLeadCard({ dados }: { dados: InstagramLeadDados }) {
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-pink-300 motion-reduce:animate-none" />Aguardando responsável
         </span>
       </div>
+      <InstagramDataFormulario captadoEm={dados.captadoEm} />
       <p className="truncate text-sm font-bold text-white" title={dados.nome}>{dados.nome}</p>
       <p className="mt-1 text-[11px] text-slate-400">{formatCNPJ(dados.cnpj) || "CNPJ para conferir"}</p>
       {dados.telefoneOriginal && <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-200"><Phone size={12} aria-hidden="true" />{dados.telefoneOriginal}</p>}

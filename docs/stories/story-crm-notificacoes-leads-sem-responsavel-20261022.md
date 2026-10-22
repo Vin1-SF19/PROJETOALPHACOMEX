@@ -152,7 +152,7 @@ Sucesso: critérios demonstrados por resultados verificáveis, sem pendência re
 ### Quality Gate Tasks
 
 - [x] Pre-Commit (`@dev`): revisão de implementação/contratos, testes, lint, typecheck e build.
-- [ ] Pre-Push (`@devops`): delta isolado, evidências reais, ausência de segredos e destino staging.
+- [x] Pre-Push (`@devops`): delta isolado, evidências reais, ausência de segredos e destino staging.
 - Pre-PR: N/A nesta preparação; revisar se PR for solicitado.
 - Pre-Deployment de produção: N/A, produção não autorizada.
 
@@ -171,6 +171,14 @@ Forge real sobre a base `6659f00c`: typecheck oficial **exit 0** (8,54 s), lint 
 Manifesto e File List concordam nos 54 caminhos desta entrega; scan de segredos sem achados. Staging avançou para `f7ceefdb`, data original do formulário Instagram, com dez caminhos externos e três sobreposições. A integração normal está autorizada; hunk de import em Cards foi ratificado por Echo para unir ambos os helpers de Instagram e preservar integralmente o import de recebimentos. Board e teste têm preview 3-way limpo. Typecheck oficial, lint dos cinco fontes afetados e suíte completa da combinação ainda pendem neste checkpoint; build final remoto/alias e E2E permanecem requisitos separados.
 
 Configuração preexistente de liderança foi completada pelo fluxo administrativo normal já autorizado do usuário: Admin real1 adicionou somente o override `crm/ADD` da conta10 no staging. SELECT independente confirmou linha47/criadoPor1, motivo executado e doze assertivas aprovadas; cinco módulos anteriores, role, status, legado, outro override e regras pertinentes do setor preservados. A política reconstruída passou de zero para um assumidor elegível em Boas-vindas; isso não equivale a login/claim como Vitor. DevOps não executou mutação SQL, worker, alteração de conta, schema ou ambiente. Evidência privada `vitor-crm-after-proof.json`. Nenhuma operação de produção integra esta entrega.
+
+## Integração e liberação pré-push — staging
+
+A entrega foi congelada em `67f14b93` (54 caminhos) antes da integração normal de `f7ceefdb`. Preservados byte a byte os 51 caminhos próprios e sete externos sem sobreposição. Cards, Board e teste Kanban correspondem ao merge 3-way independente; o único conflito textual foi a união mínima de imports ratificada por Echo. Os helpers de data do formulário e os de recebimento foram mantidos integralmente, sem estratégia de substituir arquivos por ours/theirs. Prova privada: `release/merge-f7-proof.json`.
+
+Árvore combinada: typecheck oficial **exit 0** (20,42 s), lint dos cinco fontes afetados **exit 0** (2,32 s) e suíte completa com cobertura **720 arquivos, 5.756 testes aprovados, zero falhas, quatro skipped e um todo**, em 171,67 s. Nenhuma correção adicional de código foi necessária. Custódia `3412c7bb06b0443b2b060b1fb04a1e92c3de467b5f7f2b25f396ee5109f58c10` idêntica antes/depois. QA ratificou GO de push normal staging após conferir os resultados e os hunks. Evidência privada: `/var/tmp/alpha-crm-notificacoes-leads-20261022/release/combined-f7-result.json`.
+
+Build local combinado não foi repetido sem mudança de configuração/dependências: os builds-base aprovados e revisão dos hunks sustentam a integração, mas **build remoto final READY, SHA/alias e smoke autenticado continuam obrigatórios antes de concluir**. API Vercel com token existente responde 403; não houve reautenticação nem mudança de credenciais. A verificação operacional usará status Vercel no GitHub vinculado ao commit e ID de deployment nos assets do endereço canônico de staging; a base `f7ceefdb` já teve essa correspondência confirmada. Publicação e homologação remota ainda pendem neste checkpoint. Produção não autorizada.
 
 ## File List
 

@@ -3,7 +3,7 @@ import { hash } from "bcryptjs";
 import { INSTAGRAM_ENDPOINT_SLUG, prepararLeadInstagram } from "@/lib/bpm/instagram-leads";
 const db = vi.hoisted(() => ({ bpmWebhookEndpoint: { findUnique: vi.fn() }, bpmWebhookEntrada: { findUnique: vi.fn(), create: vi.fn(), findMany: vi.fn() }, bpmEtapa: { findMany: vi.fn() } }));
 vi.mock("@/lib/prisma", () => ({ default: db }));
-import { autenticarInstagram, buscarInstagramLeadsPendentes, receberInstagramLead } from "@/lib/bpm/instagram-leads-server";
+import { autenticarInstagram, buscarDatasFormularioInstagram, buscarInstagramLeadsPendentes, receberInstagramLead } from "@/lib/bpm/instagram-leads-server";
 
 const token = "a".repeat(43);
 const endpoint = { id: "endpoint", ativo: true, caminhoSlug: INSTAGRAM_ENDPOINT_SLUG, automacaoId: null, pipelineId: "canonical",
@@ -13,6 +13,28 @@ beforeEach(() => { vi.clearAllMocks(); vi.stubEnv("INSTAGRAM_LEADS_ENDPOINT_ID",
 afterEach(() => vi.unstubAllEnvs());
 
 describe("inbox Instagram", () => {
+  it("projeta só a captura canônica dos cards autorizados, em lote e pelo vínculo da assunção", async () => {
+    const dados = prepararLeadInstagram(lead);
+    db.bpmWebhookEntrada.findMany.mockResolvedValue([
+      { evento: { cardId: "card" }, payloadSanitizadoJson: JSON.stringify({ ...dados, captadoEm: "2099-01-01T12:00:00Z" }) },
+      { evento: { cardId: "inválido" }, payloadSanitizadoJson: "{}" },
+      { evento: { cardId: "card" }, payloadSanitizadoJson: JSON.stringify(prepararLeadInstagram({ ...lead, created_time: "2026-10-22T12:00:00Z" })) },
+    ]);
+    expect(await buscarDatasFormularioInstagram("canonical", ["card", "inválido"]))
+      .toEqual(new Map([["card", lead.created_time]]));
+    expect(db.bpmWebhookEntrada.findMany).toHaveBeenCalledExactlyOnceWith({
+      where: { endpointId: "endpoint", endpoint: { caminhoSlug: INSTAGRAM_ENDPOINT_SLUG }, statusRecebimento: "PROCESSADO",
+        evento: { cardId: { in: ["card", "inválido"] }, card: { pipelineId: "canonical" } } },
+      select: { payloadSanitizadoJson: true, evento: { select: { cardId: true } } },
+      orderBy: [{ recebidoEm: "asc" }, { id: "asc" }],
+    });
+  });
+  it("não consulta capturas sem cards autorizados ou endpoint configurado", async () => {
+    expect(await buscarDatasFormularioInstagram("canonical", [])).toEqual(new Map());
+    vi.stubEnv("INSTAGRAM_LEADS_ENDPOINT_ID", "");
+    expect(await buscarDatasFormularioInstagram("canonical", ["card"])).toEqual(new Map());
+    expect(db.bpmWebhookEntrada.findMany).not.toHaveBeenCalled();
+  });
   it("autentica por bcrypt e rejeita segredo errado", async () => {
     expect(await autenticarInstagram("Bearer " + token)).toMatchObject({ id: "endpoint" });
     await expect(autenticarInstagram("Bearer " + "b".repeat(43))).rejects.toMatchObject({ status: 401 });
