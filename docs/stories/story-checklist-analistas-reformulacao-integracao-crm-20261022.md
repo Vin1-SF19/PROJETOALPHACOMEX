@@ -519,3 +519,12 @@ Relatório `/tmp/checklist-analistas-20261022-ti-lens.md` contém evidências ar
 - [ ] Publicação/homologação do patch somente staging pendentes; produção sem autorização. Story In Progress.
 
 Parecer `/tmp/checklist-analistas-20261022-ti-lens-merged.md`. File List Lens: append somente nesta matriz QA e story; parecer fora Git. Controle devolvido ao Bibble para DevOps; nenhum agente seguinte acionado.
+
+
+### Forge/DevOps — integração final TI+áudio staging (22/10/2026)
+
+- [x] Merge0918f426 preserva5fontesTI+8incomingCRM/ficha+11áudio. TC/lint/test/build reaisPASS:747files6122PASS+4skip1todo,0erros1183warnings,build49.62s. Fontefingerprint19184596…3167arquivos idêntico antes/depois; TMPDIR/outputRAM sanitizados.
+- [x] Lens/AnubisTI eLensmerge anteriores reutilizados pelosbytesintactos, conformeautorizaçãoBibble. Portal/schema/DB/env preservados.
+- [ ] DevOpspublicaçãoTurboSTAGING/homologação autenticada/hash2 seguemstatusoperacional real, semDone.
+
+HandoffForge `/tmp/checklist-analistas-20261022-ti-forge-merged2.md`+inputJSON; FileList2docsQA/story apenas.
