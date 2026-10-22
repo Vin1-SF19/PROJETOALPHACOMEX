@@ -26,6 +26,7 @@ import { carregarResumoContratacao } from "@/lib/bpm/resumo-contratacao-server";
 import { nomeUsuarioCampoBpm } from "@/lib/bpm/usuarios-campos";
 import { carregarUsuariosCamposBpm } from "@/lib/bpm/usuarios-campos-server";
 import { ObterCardBpm, ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
+import * as cardsActions from "@/actions/bpm/Cards";
 import { SolicitarEncaminhamentoCardBpm } from "@/actions/bpm/Encaminhamentos";
 import { ObterLeadPendenteNotificacaoBpm } from "@/actions/bpm/NotificacoesLeads";
 import { checarAcessoBpmCard } from "@/lib/bpm/ownership";
@@ -97,6 +98,28 @@ async function claim(cardId: string, usuarioId: number) {
   return assumirRecebimentoPipelineBpm({ cardId, recepcaoId: idRecepcaoPipeline(cardId),
     versaoEsperada: (await db.bpmCard.findUniqueOrThrow({ where: { id: cardId } })).versao }, usuarioId, db);
 }
+async function fonteParaClique(origemLead: "instagram" | "noloss") {
+  if (origemLead === "noloss") {
+    const lead = await db.nolossLead.create({ data: { nolossContactId: "clique-site", nome: "Pessoa sintética", utmSource: "site" } });
+    return { tipo: "LEAD_VIRTUAL" as const, pipelineId: comercial, origemLead, leadId: lead.id };
+  }
+  const dados = prepararLeadInstagram({ id: "clique-instagram", full_name: "Pessoa sintética", created_time: "2026-10-21T10:00:00Z" });
+  const lead = await db.bpmWebhookEntrada.create({ data: { endpointId: "fixture-instagram", idempotencyKey: "instagram:clique",
+    statusRecebimento: "AUTENTICADO", payloadSanitizadoJson: JSON.stringify(dados) } });
+  return { tipo: "LEAD_VIRTUAL" as const, pipelineId: comercial, origemLead, leadId: lead.id };
+}
+async function registrarPromocaoFixture(destino: Awaited<ReturnType<typeof fonteParaClique>>) {
+  if (destino.origemLead === "noloss") {
+    await db.nolossLead.update({ where: { id: destino.leadId }, data: {
+      status: "promoted", promotedCardId: origem, promotedClienteId: 100, promotedByUserId: 1, promotedAt: new Date(),
+    } });
+  } else {
+    const evento = await db.bpmEventoDominio.create({ data: { tipo: "CARD_CRIADO", entidadeTipo: "CARD", entidadeId: origem,
+      cardId: origem, pipelineId: comercial, atorTipo: "USUARIO", atorUserId: 1, correlationId: "fixture-clique",
+      idempotencyKey: `instagram-assumido:${destino.leadId}`, valorNovoJson: JSON.stringify({ origem: "INSTAGRAM" }) } });
+    await db.bpmWebhookEntrada.update({ where: { id: destino.leadId }, data: { statusRecebimento: "PROCESSADO", eventoId: evento.id } });
+  }
+}
 beforeEach(async () => {
   estado.falhaEvento = false; estado.userId = 1; vi.clearAllMocks();
   vi.stubEnv("INSTAGRAM_LEADS_ENDPOINT_ID", "fixture-instagram"); vi.stubEnv("NOLOSS_WEBHOOK_SECRET", "segredo-sintetico");
@@ -128,7 +151,7 @@ beforeEach(async () => {
   }
   queries.length = 0;
 });
-afterEach(async () => { await db?.$disconnect(); estado.db = null; if (dir) rmSync(dir, { recursive: true, force: true }); vi.unstubAllEnvs(); });
+afterEach(async () => { vi.restoreAllMocks(); await db?.$disconnect(); estado.db = null; if (dir) rmSync(dir, { recursive: true, force: true }); vi.unstubAllEnvs(); });
 
 describe("pendências compartilhadas com Prisma/SQLite privado", () => {
   it("IG/site/desconhecida usam proveniência canônica; recuperação e API não escrevem", async () => {
@@ -170,8 +193,56 @@ describe("pendências compartilhadas com Prisma/SQLite privado", () => {
     await db.nolossLead.update({ where: { id: destino.leadId }, data: { status: "promoted", promotedCardId: origem, promotedByUserId: 1 } });
     expect(await obterAlertaLeadPendenteBpm(1, destino, db)).toBeNull();
     expect(await todos(1)).toHaveLength(120);
-    expect(await ObterLeadPendenteNotificacaoBpm(destino)).toMatchObject({ success: false });
+    expect(await ObterLeadPendenteNotificacaoBpm(destino)).toEqual({ success: true, tipo: "CARD", destino: { pipelineId: comercial, cardId: origem } });
     expect(await obterAlertaLeadPendenteBpm(1, { ...destino, pipelineId: financeiro }, db)).toBeNull();
+  });
+
+  it.each(["instagram", "noloss"] as const)("clique %s já promovido resolve somente card persistido e pipeline atual sem escrita", async (origemLead) => {
+    const destino = await fonteParaClique(origemLead);
+    await registrarPromocaoFixture(destino);
+    await db.bpmCard.update({ where: { id: origem }, data: { pipelineId: financeiro, etapaId: etapaFin } });
+    const antes = await db.bpmCard.findUniqueOrThrow({ where: { id: origem } });
+    const eventosAntes = await db.bpmEventoDominio.count();
+    estado.userId = 7;
+    queries.length = 0;
+    expect(await ObterLeadPendenteNotificacaoBpm(destino)).toEqual({ success: true, tipo: "CARD", destino: { pipelineId: financeiro, cardId: origem } });
+    expect(queries.filter((query) => /^\s*(INSERT|UPDATE|DELETE|REPLACE)/i.test(query))).toEqual([]);
+    expect(await db.bpmCard.findUniqueOrThrow({ where: { id: origem } })).toEqual(antes);
+    expect(await db.bpmCard.count()).toBe(1);
+    expect(await db.bpmEventoDominio.count()).toBe(eventosAntes);
+    expect(await todos(7)).toEqual([]);
+  });
+
+  it.each(["instagram", "noloss"] as const)("promoção %s entre fonte e quadro é resolvida uma única vez sem nova assunção", async (origemLead) => {
+    const destino = await fonteParaClique(origemLead);
+    const listarReal = cardsActions.ListarCardsPipelineBpm;
+    const projecao = vi.spyOn(cardsActions, "ListarCardsPipelineBpm").mockImplementationOnce(async (...args) => {
+      expect(queries.filter((query) => /^\s*(INSERT|UPDATE|DELETE|REPLACE)/i.test(query))).toEqual([]);
+      // Simula exclusivamente o commit concorrente de outra sessão, antes da projeção real.
+      await registrarPromocaoFixture(destino);
+      queries.length = 0;
+      return listarReal(...args);
+    });
+    estado.userId = 7;
+    queries.length = 0;
+    expect(await ObterLeadPendenteNotificacaoBpm(destino)).toEqual({ success: true, tipo: "CARD", destino: { pipelineId: comercial, cardId: origem } });
+    expect(projecao).toHaveBeenCalledTimes(1);
+    expect(queries.filter((query) => /^\s*(INSERT|UPDATE|DELETE|REPLACE)/i.test(query))).toEqual([]);
+    expect(await db.bpmCard.count()).toBe(1);
+    expect((await db.bpmCard.findUniqueOrThrow({ where: { id: origem } })).responsavelId).toBe(1);
+  });
+
+  it.each(["resposta", "excecao"] as const)("falha técnica de projeção %s mantém fonte pendente e retorna erro honesto", async (falha) => {
+    const destino = await fonteParaClique("instagram");
+    const projecao = vi.spyOn(cardsActions, "ListarCardsPipelineBpm");
+    if (falha === "resposta") projecao.mockResolvedValueOnce({ success: false, data: [], error: "Falha sintética" });
+    else projecao.mockRejectedValueOnce(new Error("Falha técnica sintética"));
+    estado.userId = 7;
+    queries.length = 0;
+    expect(await ObterLeadPendenteNotificacaoBpm(destino)).toMatchObject({ success: false, codigo: "FALHA_CARREGAMENTO" });
+    expect(projecao).toHaveBeenCalledTimes(1);
+    expect(queries.filter((query) => /^\s*(INSERT|UPDATE|DELETE|REPLACE)/i.test(query))).toEqual([]);
+    expect(await db.bpmWebhookEntrada.findUniqueOrThrow({ where: { id: destino.leadId } })).toMatchObject({ statusRecebimento: "AUTENTICADO", eventoId: null });
   });
 
   it("ingresso NoLoss preserva UTM em retry omitido e jamais reabre lead promovido", async () => {

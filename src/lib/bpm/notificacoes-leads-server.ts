@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import db from "@/lib/prisma";
 import { normalizeRole } from "@/lib/roles";
-import { listarUsuariosComAcessoCrmBpm, podeAcessarPipelineBpm } from "@/lib/bpm/ownership";
+import { checarAcessoBpmCard, listarUsuariosComAcessoCrmBpm, podeAcessarPipelineBpm } from "@/lib/bpm/ownership";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { carregarEndpointInstagram, etapaEntradaInstagram, ErroInstagram } from "@/lib/bpm/instagram-leads-server";
 import { lerLeadInstagram } from "@/lib/bpm/instagram-leads";
@@ -190,4 +190,43 @@ export async function obterAlertaLeadPendenteBpm(usuarioId: number,
     origem: ["site", "website"].includes(entrada.utmSource?.trim().toLowerCase() ?? "") ? "SITE" : "OUTRA",
     nome: entrada.nome || entrada.email || "Lead sem nome", email: entrada.email, telefone: entrada.telefone,
     cnpj: null, resumo: null, recebidoEm: entrada.receivedAt.toISOString() } : null;
+}
+
+/** Resolve somente a identidade persistida pela promoção; a origem não concede acesso ao alvo. */
+export async function obterDestinoLeadPromovidoBpm(usuarioId: number,
+  destino: { tipo: "LEAD_VIRTUAL"; pipelineId: string; origemLead: "instagram" | "noloss"; leadId: string },
+  client: ClienteNotificacoesLeads = db): Promise<{ pipelineId: string; cardId: string } | null> {
+  const fila = await filaComercial(destino.origemLead === "instagram" ? "INSTAGRAM" : "NOLOSS", client);
+  if (!fila || fila.pipelineId !== destino.pipelineId
+    || !(await listarDestinatariosFilaLeadsBpm(fila.pipelineId, fila.etapa.id, client)).some((usuario) => usuario.id === usuarioId)) return null;
+  let cardId: string;
+  let empresaOrigemId: number | null = null;
+  if (destino.origemLead === "instagram") {
+    const entrada = await client.bpmWebhookEntrada.findFirst({
+      where: { id: destino.leadId, endpointId: fila.endpointId!, statusRecebimento: "PROCESSADO" },
+      select: { payloadSanitizadoJson: true, evento: { select: { tipo: true, entidadeTipo: true, entidadeId: true,
+        cardId: true, pipelineId: true, idempotencyKey: true, valorNovoJson: true } } },
+    });
+    const evento = entrada?.evento;
+    if (!entrada || !lerLeadInstagram(entrada.payloadSanitizadoJson) || !evento?.cardId
+      || evento.tipo !== "CARD_CRIADO" || evento.entidadeTipo !== "CARD" || evento.entidadeId !== evento.cardId
+      || evento.pipelineId !== fila.pipelineId || evento.idempotencyKey !== `instagram-assumido:${destino.leadId}`) return null;
+    try {
+      if (!z.object({ origem: z.literal("INSTAGRAM") }).safeParse(JSON.parse(evento.valorNovoJson ?? "null")).success) return null;
+    } catch { return null; }
+    cardId = evento.cardId;
+  } else {
+    const entrada = await client.nolossLead.findFirst({ where: { id: destino.leadId, status: "promoted" },
+      select: { promotedCardId: true, promotedClienteId: true } });
+    if (!entrada?.promotedCardId) return null;
+    cardId = entrada.promotedCardId;
+    empresaOrigemId = entrada.promotedClienteId;
+  }
+  const card = await client.bpmCard.findUnique({ where: { id: cardId }, select: {
+    id: true, pipelineId: true, empresaId: true, status: true, pipeline: { select: { ativo: true } }, etapa: { select: { ativo: true } },
+  } });
+  if (!card || !card.pipeline.ativo || !card.etapa.ativo || !["ATIVO", "CONCLUIDO"].includes(card.status)
+    || empresaOrigemId !== null && empresaOrigemId !== card.empresaId
+    || !(await checarAcessoBpmCard(card.id, usuarioId, null, "visualizar", client)).autorizado) return null;
+  return { pipelineId: card.pipelineId, cardId: card.id };
 }

@@ -72,7 +72,7 @@ it("intenção virtual fora dos cards paginados usa modal existente sem abrir Ca
   const lead = { id: "lead-fora-pagina", etapaId: "novo", servico: null, status: "ATIVO", origem: "noloss" as const,
     nolossLeadId: "lead-fora-pagina", createdAt: new Date("2026-10-22T12:00:00Z"), empresa: { id: 0, razaoSocial: "Lead fictício", cnpj: null, nomeFantasia: null },
     responsavel: { id: 0, nome: "Sem responsável" }, membros: [], _count: { tarefas: 0, anexos: 0 }, tarefas: [], podeAgirEtapa: true };
-  vi.mocked(ObterLeadPendenteNotificacaoBpm).mockResolvedValue({ success: true, data: lead } as never);
+  vi.mocked(ObterLeadPendenteNotificacaoBpm).mockResolvedValue({ success: true, tipo: "LEAD_VIRTUAL", data: lead } as never);
   try {
     await act(async () => root.render(h(PipelineBoardClient, {
       pipeline: { id: "pipeline-1", nome: "Comercial", etapas: [{ id: "novo", nome: "Novo lead", ordem: 0 }] }, cardsIniciais: [],

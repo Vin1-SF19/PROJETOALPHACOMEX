@@ -7450,3 +7450,34 @@ Implementação, quatro gates, revisão e smoke da correção em staging; result
 - Forge quatro gates reais PASS: tipos0/47,36s, lint0/52,40s (1.193 warnings existentes), novo build0/216,68s e suíte completa0/193,11s: 720 arquivos/5.784 aprovados, zero falhas, quatro skipped/um todo. Fonte `1fc1f5e59524c39c21890cd031376f8bc949474cfd7217f7d19c830b169600a9` idêntica antes/depois.
 - Client Prisma compartilhado divergente foi isolado em artefato privado compatível com o schema fonte, sem instalar/atualizar pacotes, modificar o client alheio ou alterar schema. Nove SQLite PASS após o ajuste do harness; primeira falha preservada. Aprendizado registrado em `known-errors.md`.
 - QA local APPROVED libera publicação; teste visual autenticado Admin da correção permanece pendente. Este commit será Ready for Review, com evidência remota posterior somente privada; não declarar novo READY antes de acontecer e não criar rodada recursiva de docs. Produção/banco remoto/ENV/worker manual fora do escopo.
+
+
+---
+
+## [2026-10-22 16:36 UTC] — CRM: contrato de abertura de lead sem falsa assunção
+
+**Tags:** #bugfix #decision #security #integration
+**Agentes envolvidos:** coordenação, Scout/Architect, Nova, Echo, DevOps.
+**Arquivos tocados:** story/arquitetura existentes de notificações e três memórias; nenhum runtime por esta análise.
+
+### Contexto
+Usuário relata mensagem de lead já assumido ao clicar em notificação Instagram. Clique deve abrir detalhes; assumir continua explícito.
+
+### O que foi feito
+AC19/adendo definidos antes do código sobre fae70b26 limpa e compartilhados com owners. Scout confirmou que hook transforma qualquer erro de lookup em mensagem de assunção, e lookup só trata fonte pendente; não há claim automático no mount/clique.
+
+### Decisões tomadas
+Resultado discriminado virtual/card/erro; card promovido somente pelo evento IG/ponteiro NoLoss persistido e ACL atual. Abrir pelo detalhe existente, ACK da intenção original, sem fallback por empresa ou nova autoridade de claim.
+
+### Problemas encontrados / resolvidos
+Mensagem atual não prova assunção. Falha específica de leitura pending ainda depende do diagnóstico backend; não atribuir causa presumida nem considerar troca do texto solução completa.
+
+### Pendências
+Implementação, provas de modal real sem claim, gates e smoke staging do delta. Evidências anteriores não validam o novo caso; sem schema/ENV/produção.
+
+### Refletido também em
+- `codebase-map.md` e `integration-points.md`: resolução de leitura e fronteira de identidade/ACL.
+
+
+### Fechamento local AC19 com concorrência preservada — 2026-10-22
+Clique de notificação é leitura: destino pendente canônico ou card promovido com identidade/ACL, erro honesto e nenhum claim automático. Checkpoint fae+04599+AC19 passou os quatro gates e suíte727/5.881PASS, zero falhas/quatro skipped/um todo. Avanço636 preservado por merge normal: lazy editor e Radar confirmado ausente no CSV; quinze arquivos próprios intactos e oito deltas byte-idênticos ao owner. Fonte final9a27c553... teve tipos/lint4/newbuildLITERAL3072pools1CPU4PASS (130s, pico agregado6.762.717.184bytes) e19 arquivos/259testesPASS; não alegar nova suíte global final. Wrapper externo143 preservado separadamente de gates filhos0/JSONPASS. QA local final aprovou; publicação/READY/cliques autenticados ainda pendentes neste commit, resultado posterior somente privado, sem docloop. Nenhuma produção/ENV/migration/worker manual. Provas em `/var/tmp/alpha-crm-notificacao-instagram-abertura-20261022/`.

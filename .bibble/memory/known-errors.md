@@ -807,3 +807,16 @@ Causa corrigida no código: escrita UTC e limites mensais locais misturavam fuso
 **Correção local comprovada:** não alterar fixture/schema para acompanhar client alheio e não regenerar o client compartilhado. Preparar farm privada de dependências com links para os mesmos pacotes e cópia própria de `@prisma/client`; gerar `.prisma/client` próprio usando cópia temporária do schema com apenas `generator.output` local explícito. Apontar somente o `node_modules` da worktree de validação para essa farm fora do Git. Manter a geração do build restrita ao mesmo output privado. Não instalar versões novas.
 
 **Evidência:** hash do schema gerado compartilhado idêntico antes/depois; client privado sem coluna externa, nove SQLite PASS e quatro gates globais PASS. Schema fonte intacto; ambiente sanitizado e banco local descartável, sem conexão remota/migration. Falha inicial do harness preservada separadamente. Diretório privado desta execução: `/var/tmp/alpha-crm-notificacoes-ti-observador-20261022/forge/`.
+
+
+## Prisma generate com schema temporário fora do projeto tenta auto-install — 2026-10-22
+
+Cópia de schema em diretório privado sem resolução de `package.json`/`node_modules` fez o gerador inferir `/` como projeto e tentar instalação automática, que falhou. Não executar instalações para resolver isso: fornecer os links privados para o package.json/dependências da worktree e usar `PRISMA_GENERATE_SKIP_AUTOINSTALL=1`. Regeneração privada passou em 2,25s, sem pacote instalado ou arquivo criado na raiz; hash do client compartilhado permaneceu idêntico. O schema fonte e os bancos não mudam.
+
+## OOM remoto durante compilação Webpack com pools nativos sem limite — 2026-10-22
+
+Vercel standard4cores/8192MB encerrou o worker por SIGKILL na fase Creating an optimized production build de Next16.1.6; API confirmou `errorCode=out_of_memory`, antes de compilação concluída/coleta de páginas. `cpus:1`, `webpackMemoryOptimizations:true` e heap3072 já estavam ativos; não atribuir a quota nem supor que aumentar heap resolve memória total do container.
+
+Tentativa mínima ratificada: limitar `RAYON_NUM_THREADS=1 UV_THREADPOOL_SIZE=1` somente na invocação Next do script build, preservando heap3072, configuração, máquina e custo. Gate local literal `npm run build`, cold output, afinidade4CPU e limite agregado7GiB passou em104,42s, pico agregado6.742.384.640bytes; client privado gerado, compartilhado intacto. É evidência local da mitigação, não garantia remota: exigir novo deployment READY/SHA/alias antes de concluir. Não desativar workers, subir plano/heap ou alterar ENV de produção por inferência.
+
+Revalidação após integrar lazy imports do editor/Radar: build literal3072/pools1/4CPU exit0 em130s e pico agregado6.762.717.184bytes; o mesmo hash do client compartilhado foi preservado. A alteração do owner e a limitação de pools coexistem; não atribuir ganho a uma delas isoladamente nem supor READY remoto antes da verificação.
