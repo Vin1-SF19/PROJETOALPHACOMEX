@@ -27,6 +27,7 @@ import { nomeUsuarioCampoBpm } from "@/lib/bpm/usuarios-campos";
 import { carregarUsuariosCamposBpm } from "@/lib/bpm/usuarios-campos-server";
 import { ObterCardBpm, ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
 import { SolicitarEncaminhamentoCardBpm } from "@/actions/bpm/Encaminhamentos";
+import { ObterLeadPendenteNotificacaoBpm } from "@/actions/bpm/NotificacoesLeads";
 import { checarAcessoBpmCard } from "@/lib/bpm/ownership";
 import { PIPELINE_OPERACIONAL_ID } from "@/lib/bpm/financeiro-config.client";
 import { listarAlertasLeadsBpm, obterAlertaLeadPendenteBpm, notificarPendenciasLeadsBpm } from "@/lib/bpm/notificacoes-leads-server";
@@ -104,7 +105,8 @@ beforeEach(async () => {
   const recorded = new PrismaClient({ adapter: new PrismaLibSQL({ url: `file:${filename}` }), log: [{ emit: "event", level: "query" }] });
   recorded.$on("query", (event) => queries.push(event.query)); db = recorded; estado.db = db;
   for (const [id, nome, role] of [[1, "Closer A", "Comercial"], [2, "Financeiro B", "Financeiro"], [3, "Operacional C", "Operacional"],
-    [4, "Outro Financeiro", "Financeiro"], [5, "Outro Closer", "Comercial"], [6, "Admin fora setor", "Admin"]] as const) {
+    [4, "Outro Financeiro", "Financeiro"], [5, "Outro Closer", "Comercial"], [6, "Admin fora setor", "Admin"],
+    [7, "TI observador", "T.I"], [8, "CEO fora setor", "CEO"]] as const) {
     await db.$executeRaw`INSERT INTO usuarios(id,nome,usuario,email,role,status,permissoes) VALUES(${id},${nome},${`usuario${id}`},${`usuario${id}@example.test`},${role},'ATIVO','crm')`;
   }
   for (const [id, nome, chave, etapaId, etapaNome] of [[comercial, "Revisão de Radar", "comercial", etapaCom, "Novos leads"],
@@ -139,9 +141,18 @@ describe("pendências compartilhadas com Prisma/SQLite privado", () => {
     expect(a).toEqual(b); expect(a).toHaveLength(3);
     expect(a.map((item) => item.origem).sort()).toEqual(["INSTAGRAM", "OUTRA", "SITE"]);
     expect(a.every((item) => item.cnpj === null)).toBe(true);
-    expect(await todos(2)).toEqual([]); expect(await todos(6)).toEqual([]);
-    const response = await GET(new Request("http://localhost/api/bpm/leads/alertas"));
-    expect(response.status).toBe(200); expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(await todos(2)).toEqual([]); expect(await todos(8)).toEqual([]);
+    for (const usuarioId of [6, 7]) {
+      expect(await todos(usuarioId)).toEqual(a);
+      estado.userId = usuarioId;
+      const response = await GET(new Request("http://localhost/api/bpm/leads/alertas"));
+      expect(response.status).toBe(200); expect(response.headers.get("cache-control")).toBe("private, no-store");
+      expect((await response.json()).alertas).toEqual(a.filter((alerta) => alerta.fonte === "INSTAGRAM"));
+      for (const alerta of a) {
+        expect(await ObterLeadPendenteNotificacaoBpm(alerta.destino)).toMatchObject({ success: true,
+          data: { id: alerta.destino.tipo === "LEAD_VIRTUAL" ? alerta.destino.leadId : "", origem: alerta.destino.tipo === "LEAD_VIRTUAL" ? alerta.destino.origemLead : "" } });
+      }
+    }
     expect(queries.filter((query) => /^\s*(INSERT|UPDATE|DELETE|REPLACE)/i.test(query))).toEqual([]);
     expect(JSON.stringify(a)).not.toContain("payloadSanitizadoJson");
   });
@@ -151,9 +162,15 @@ describe("pendências compartilhadas com Prisma/SQLite privado", () => {
     expect(await todos(1)).toHaveLength(121);
     const destino = { tipo: "LEAD_VIRTUAL" as const, pipelineId: comercial, origemLead: "noloss" as const, leadId: `c${String(120).padStart(24, "0")}` };
     expect(await obterAlertaLeadPendenteBpm(1, destino, db)).toMatchObject({ nome: "Lead 120" });
+    expect(await todos(7)).toHaveLength(121);
+    estado.userId = 7;
+    queries.length = 0;
+    expect(await ObterLeadPendenteNotificacaoBpm(destino)).toMatchObject({ success: true, data: { id: destino.leadId, origem: "noloss" } });
+    expect(queries.filter((query) => /^\s*(INSERT|UPDATE|DELETE|REPLACE)/i.test(query))).toEqual([]);
     await db.nolossLead.update({ where: { id: destino.leadId }, data: { status: "promoted", promotedCardId: origem, promotedByUserId: 1 } });
     expect(await obterAlertaLeadPendenteBpm(1, destino, db)).toBeNull();
     expect(await todos(1)).toHaveLength(120);
+    expect(await ObterLeadPendenteNotificacaoBpm(destino)).toMatchObject({ success: false });
     expect(await obterAlertaLeadPendenteBpm(1, { ...destino, pipelineId: financeiro }, db)).toBeNull();
   });
 
@@ -169,14 +186,54 @@ describe("pendências compartilhadas com Prisma/SQLite privado", () => {
     expect((await ingest(request({ id: "grande", utmSource: "x".repeat(201) }))).status).toBe(400);
   });
 
-  it("notifica canais privados dos dois colegas com invalidação mínima e sem Admin/outro setor", async () => {
+  it("notifica colegas e observadores TI/Admin por canal privado mínimo, sem CEO/outro setor", async () => {
     await notificarPendenciasLeadsBpm({ pipelineId: financeiro, etapaId: etapaFin });
-    expect(estado.trigger.mock.calls.map(([canal]) => canal).sort()).toEqual(["private-bpm-tarefas-usuario-2", "private-bpm-tarefas-usuario-4"]);
+    expect(estado.trigger.mock.calls.map(([canal]) => canal).sort()).toEqual(["private-bpm-tarefas-usuario-2", "private-bpm-tarefas-usuario-4",
+      "private-bpm-tarefas-usuario-6", "private-bpm-tarefas-usuario-7"]);
     for (const [, event, payload] of estado.trigger.mock.calls) {
       expect(event).toBe("bpm-leads-atualizados"); expect(Object.keys(payload).sort()).toEqual(["pipelineId", "timestamp"]);
     }
     estado.trigger.mockRejectedValueOnce(new Error("Rede indisponível"));
     await expect(notificarPendenciasLeadsBpm({ pipelineId: financeiro, etapaId: etapaFin })).resolves.toBeUndefined();
+  });
+
+  it.each(["FINANCEIRO", "OPERACIONAL"] as const)("TI/Admin observa e abre recepção %s sem autoridade para claim", async (setor) => {
+    const fin = await handoff(origem);
+    let cardId = fin.cardId;
+    if (setor === "OPERACIONAL") {
+      await claim(fin.cardId, 2);
+      await db.bpmCard.update({ where: { id: fin.cardId }, data: { status: "CONCLUIDO" } });
+      cardId = (await handoff(fin.cardId, operacional, etapaOp, "o")).cardId;
+    }
+    const antes = await db.bpmCard.findUniqueOrThrow({ where: { id: cardId } });
+    const membrosAntes = await db.bpmCardMembro.findMany({ where: { cardId }, orderBy: { id: "asc" } });
+    for (const usuarioId of [6, 7]) {
+      expect(await todos(usuarioId)).toMatchObject([{ destino: { tipo: "CARD", cardId }, fonte: "ENCAMINHAMENTO" }]);
+      expect(await obterRecebimentoPipelineBpm(cardId, usuarioId, db)).toMatchObject({ status: "PENDENTE", podeAssumir: false,
+        motivoImpedimentoAssuncao: expect.any(String) });
+      const historicosAntes = await db.bpmCardHistorico.count();
+      const eventosAntes = await db.bpmEventoDominio.count();
+      queries.length = 0;
+      await expect(claim(cardId, usuarioId)).rejects.toThrow("Não autorizado");
+      expect(queries.filter((query) => /^\s*(INSERT|UPDATE|DELETE|REPLACE)/i.test(query))).toEqual([]);
+      expect(await db.bpmCardHistorico.count()).toBe(historicosAntes);
+      expect(await db.bpmEventoDominio.count()).toBe(eventosAntes);
+      estado.userId = usuarioId;
+      const aberto = await ObterCardBpm(cardId);
+      expect(aberto.success, JSON.stringify(aberto)).toBe(true);
+      if (aberto.success) expect(aberto.data?.recebimentoPipeline).toMatchObject({ status: "PENDENTE", podeAssumir: false });
+    }
+    expect(await db.bpmCard.findUniqueOrThrow({ where: { id: cardId } })).toMatchObject({ responsavelId: antes.responsavelId, versao: antes.versao });
+    expect(await db.bpmCardMembro.findMany({ where: { cardId }, orderBy: { id: "asc" } })).toEqual(membrosAntes);
+    expect(await db.bpmCardHistorico.count({ where: { acao: "RECEPCAO_PIPELINE_ASSUMIDA", cardId } })).toBe(0);
+    await db.usuarios.update({ where: { id: 7 }, data: { status: "INATIVO" } });
+    expect(await todos(7)).toEqual([]);
+    expect(await todos(8)).toEqual([]);
+    await db.usuarios.update({ where: { id: setor === "FINANCEIRO" ? 2 : 3 }, data: { permissoes: "" } });
+    expect(await todos(setor === "FINANCEIRO" ? 2 : 3)).toEqual([]);
+    await db.usuarios.update({ where: { id: setor === "FINANCEIRO" ? 2 : 3 }, data: { permissoes: "crm" } });
+    await claim(cardId, setor === "FINANCEIRO" ? 2 : 3);
+    expect(await todos(6)).toEqual([]);
   });
 
   it("handoff novo cria uma recepção, claim altera somente alvo e projeta vendedor A com financeiro B/operacional C", async () => {
