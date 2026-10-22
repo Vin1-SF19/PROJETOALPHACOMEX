@@ -1871,3 +1871,14 @@ Reconhecimento em fae70b26: lookup pending-only e hook com frase genérica “j�
 
 ### Fechamento local AC19 com concorrência preservada — 2026-10-22
 Clique de notificação é leitura: destino pendente canônico ou card promovido com identidade/ACL, erro honesto e nenhum claim automático. Checkpoint fae+04599+AC19 passou os quatro gates e suíte727/5.881PASS, zero falhas/quatro skipped/um todo. Avanço636 preservado por merge normal: lazy editor e Radar confirmado ausente no CSV; quinze arquivos próprios intactos e oito deltas byte-idênticos ao owner. Fonte final9a27c553... teve tipos/lint4/newbuildLITERAL3072pools1CPU4PASS (130s, pico agregado6.762.717.184bytes) e19 arquivos/259testesPASS; não alegar nova suíte global final. Wrapper externo143 preservado separadamente de gates filhos0/JSONPASS. QA local final aprovou; publicação/READY/cliques autenticados ainda pendentes neste commit, resultado posterior somente privado, sem docloop. Nenhuma produção/ENV/migration/worker manual. Provas em `/var/tmp/alpha-crm-notificacao-instagram-abertura-20261022/`.
+
+
+### 2026-10-22 — Scribe — áudio de leads por origem (checkpoint local)
+
+`src/lib/bpm/notificacoes-leads-audio.ts` concentra origem canônica → derivados estáticos Insta/Site, um áudio por lifecycle, cleanup e falhas de autoplay sem fila/retry. `bpm-leads-notificacoes-client.tsx` usa somente IDs novos de `sincronizar` depois da primeira base completa silenciosa; transporte/store/toasts/ACL permanecem os existentes. Assets `public/sounds/notificacao-lead-{insta,site}.mp3`: três segundos, fade final 150 ms, originais intactos. Owner: nove arquivos/48 testes PASS e lint dirigido 0; gates globais, QA e publicação/smoke staging pendentes neste checkpoint. Story: `story-crm-notificacoes-audio-origem-20261022.md`.
+
+
+**Atualização do checkpoint de áudio CRM:** Forge global confirmou tipos/lint/build/testes PASS; suíte final 746 arquivos/6.114 testes PASS, zero falhas/quatro skipped/um todo. Fonte c07ee602... idêntica; falha inicial exclusiva do wrapper privado Prisma preservada e corrigida fora do repositório. QA final e publicação/smoke staging ainda pendentes; provas remotas posteriores ficarão privadas.
+
+
+**Fechamento local do áudio CRM:** QA Probe/Sage/Lens após Forge aprovou GO staging, zero bloqueantes/importantes; 26 testes diretos (nove áudio/17 cliente) e 48 dirigidos são subconjuntos da suíte global, sem duplicar contagem. Smoke compilado local confirmou MP3 HTTP200/hash, raiz/sessão200 e CRM protegido307; servidor encerrado. Story Ready for Review, File List11. Publicação/READY e smoke remoto ainda pendentes neste checkpoint pré-commit; evidências posteriores privadas. Prova `/var/tmp/alpha-crm-audio-notificacoes-origem-20261022/qa-final-private.json`.

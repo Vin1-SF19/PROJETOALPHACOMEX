@@ -827,3 +827,15 @@ Vercel standard4cores/8192MB encerrou o worker por SIGKILL na fase Creating an o
 Tentativa mínima ratificada: limitar `RAYON_NUM_THREADS=1 UV_THREADPOOL_SIZE=1` somente na invocação Next do script build, preservando heap3072, configuração, máquina e custo. Gate local literal `npm run build`, cold output, afinidade4CPU e limite agregado7GiB passou em104,42s, pico agregado6.742.384.640bytes; client privado gerado, compartilhado intacto. É evidência local da mitigação, não garantia remota: exigir novo deployment READY/SHA/alias antes de concluir. Não desativar workers, subir plano/heap ou alterar ENV de produção por inferência.
 
 Revalidação após integrar lazy imports do editor/Radar: build literal3072/pools1/4CPU exit0 em130s e pico agregado6.762.717.184bytes; o mesmo hash do client compartilhado foi preservado. A alteração do owner e a limitação de pools coexistem; não atribuir ganho a uma delas isoladamente nem supor READY remoto antes da verificação.
+
+
+## Wrapper privado Prisma deve respeitar o comando — 2026-10-22
+
+**Sintoma:** primeira suíte global da entrega de áudio CRM teve uma falha em `schema.contract`: `prisma migrate diff` recusou `--schema`. O wrapper do harness privado anexava a opção a todos os comandos, embora o isolamento de geração exigisse isso apenas para `generate`/`format`.
+
+**Correção:** limitar a anexação aos comandos `generate` e `format`; preservar argumentos de `migrate diff` literalmente. Alteração restrita ao wrapper fora do Git, sem modificar aplicação, testes ou schema e sem alterar client compartilhado. Foco afetado passou em 1,46 s; rerun integral ainda pendente neste checkpoint. Fonte permaneceu `c07ee602...`; tipos/lint/build reais já passaram e não foram repetidos por essa mudança de harness.
+
+**Evidência preservada:** `/var/tmp/alpha-crm-audio-notificacoes-origem-20261022/forge/{forge-result-first.json,gate-tests-first.json,gate-tests-first.log}`. Primeira suíte: 746 arquivos/745 PASS/um FAIL; 6.113 testes PASS/um FAIL/quatro skipped/um todo. Não apagar a primeira falha nem considerá-la defeito comprovado da aplicação.
+
+
+**Confirmação posterior do rerun:** suíte integral exit0/194,07s, 746 arquivos/6.114 testes PASS, zero falhas/quatro skipped/um todo; quatro gates Forge PASS na fonte c07ee602... idêntica. Falha inicial e correção de harness permanecem registradas; QA final/deploy ainda pendentes neste registro.
