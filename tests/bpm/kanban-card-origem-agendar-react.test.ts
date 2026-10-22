@@ -3,6 +3,7 @@ import React, { act, createElement as h } from "react";
 import { createRoot } from "react-dom/client";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import { KanbanCard, type CardBpm } from "@/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient";
+import { prepararLeadInstagram } from "@/lib/bpm/instagram-leads";
 
 const drag = vi.hoisted(() => ({ current: null as null | import("react").ComponentProps<typeof import("@dnd-kit/core").DndContext> }));
 vi.mock("@dnd-kit/core", async (original) => {
@@ -115,4 +116,20 @@ it.each([
 });
 it("não atribui Instagram ou Site a um card sem informação de origem", async () => {
   const { container } = await montar(); expect(container.querySelector('[aria-label="Origem do lead"]')).toBeNull();
+});
+it("a captura original permanece visível no virtual e no nativo nas duas etapas", async () => {
+  const captura = "2026-10-22T01:30:00Z";
+  const instagramDados = prepararLeadInstagram({ id: "instagram-id", full_name: "Contato Instagram", created_time: captura });
+  const virtual = await montar({ origem: "instagram", instagramDados });
+  const agendar = await montar({ instagramCaptadoEm: captura });
+  const agendada = await montar({ instagramCaptadoEm: captura }, "Reunião Agendada");
+  for (const { container } of [virtual, agendar, agendada]) {
+    expect(container.textContent).toContain("Preencheu formulário em: 21/10/2026");
+    expect(container.querySelector("time")?.getAttribute("datetime")).toBe(captura);
+    expect(container.textContent?.match(/Preencheu formulário em:/g)).toHaveLength(1);
+  }
+});
+it.each([undefined, null, "inválida"])("não usa createdAt como captura quando a data original é %s", async (instagramCaptadoEm) => {
+  const { container } = await montar({ instagramCaptadoEm });
+  expect(container.textContent).not.toContain("Preencheu formulário em:");
 });

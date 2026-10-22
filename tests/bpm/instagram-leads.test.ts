@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { InstagramLeadCard, InstagramLeadDetalhes } from "@/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/InstagramLeadCard";
 import { INSTAGRAM_COLUNAS as C, INSTAGRAM_SPREADSHEET_ID, anotacaoLeadInstagram, chaveLeadInstagram, instagramIngestSchema,
-  instagramLinhaSchema, leadInstagramEhTeste, lerLeadInstagram, prepararLeadInstagram, radarInstagram } from "@/lib/bpm/instagram-leads";
+  dataFormularioInstagram, instagramLinhaSchema, leadInstagramEhTeste, lerLeadInstagram, prepararLeadInstagram, radarInstagram } from "@/lib/bpm/instagram-leads";
 
 export const linha = {
   id: "l:00000000000000001", created_time: "2026-10-21T09:00:00-03:00", full_name: "Contato Exemplo",
@@ -13,6 +13,21 @@ export const linha = {
 };
 
 describe("de/para e envelope Instagram", () => {
+  it.each([
+    ["2026-10-22T01:30:00Z", "21/10/2026"],
+    ["2026-09-18T23:30:00-05:00", "19/09/2026"],
+    ["2024-02-29T12:00:00-03:00", "29/02/2024"],
+    [undefined, null], [null, null], ["", null], ["inválida", null], ["2026-02-29T12:00:00Z", null],
+    ["2026-10-22T12:00:00", null],
+  ])("formata a captura %s em São Paulo sem inventar data", (captura, esperado) => {
+    expect(dataFormularioInstagram(captura)).toBe(esperado);
+  });
+  it("card virtual mostra a data original do formulário em vez de uma data de importação", () => {
+    const dados = prepararLeadInstagram({ ...linha, created_time: "2026-09-18T09:54:44-05:00" });
+    const html = renderToStaticMarkup(createElement(InstagramLeadCard, { dados }));
+    expect(html).toContain("Preencheu formulário em:");
+    expect(html).toContain('<time dateTime="2026-09-18T09:54:44-05:00">18/09/2026</time>');
+  });
   it("marketing fica fora da ingestão, da projeção legada, do card, do modal e da anotação", () => {
     const original = { ...linha, campaign_name: 'MARKETING-CAMPANHA', campaign_id: 'MARKETING-CAMPAIGN-ID',
       ad_name: 'MARKETING-ANUNCIO', ad_id: 'MARKETING-AD-ID', adset_name: 'MARKETING-CONJUNTO',

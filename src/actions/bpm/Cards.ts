@@ -69,7 +69,7 @@ import { sincronizarProximoContatoAgenda } from "@/lib/bpm/proximo-contato-agend
 import { etapaEhEmTratativa, etapaEhSemViabilidade, obterErroProximoContatoParaEntrada } from "@/lib/bpm/em-tratativa";
 import { obterErroProximoContatoParaMovimento } from "@/lib/bpm/proximo-contato";
 import { buscarNolossLeadsPendentes } from "@/lib/bpm/noloss-leads";
-import { buscarInstagramLeadsPendentes } from "@/lib/bpm/instagram-leads-server";
+import { buscarDatasFormularioInstagram, buscarInstagramLeadsPendentes } from "@/lib/bpm/instagram-leads-server";
 import { cardApareceNoQuadro, etapasComSaidaDoQuadro } from "@/lib/bpm/cards-no-quadro";
 import { paraExibicaoTelefone } from "@/lib/validations/cs-nps";
 import { iniciarLigacaoCallix, normalizarTelefoneCallix } from "@/lib/callix/click-to-call";
@@ -286,6 +286,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     });
 
+    const datasFormularioInstagram = await buscarDatasFormularioInstagram(pipelineId, cards.map((card) => card.id));
     const idsDestinos = [...new Set(cards.flatMap((card) => card.vinculosOrigem.map((vinculo) => vinculo.cardDestino.id)))];
     const vinculosPosteriores = idsDestinos.length ? await db.bpmCardVinculo.findMany({
       where: { cardOrigemId: { in: idsDestinos }, cardDestino: { pipeline: { ativo: true }, status: { not: "ARQUIVADO" } } },
@@ -517,6 +518,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
         origem: "real" as const,
         nolossLeadId: null as string | null,
         veioNoloss: card.nolossLeadOrigem.length > 0,
+        instagramCaptadoEm: datasFormularioInstagram.get(card.id) ?? null,
         ligacoesHoje: ehNovoLead ? (ligacoesPorCard.get(card.id) ?? 0) : 0,
         metaLigacoesDia: META_LIGACOES_NOVOS_LEADS,
         diasUteisDecorridos: ehNovoLead
