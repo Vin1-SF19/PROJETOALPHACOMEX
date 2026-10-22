@@ -332,3 +332,32 @@ Próxima ação humana: abrir [Vercel Storage](https://vercel.com/dashboard/stor
 Gates Main da árvore584856eb: TC8GiB/lint0erros1183warn/full737arquivos5958PASS+4skip1todo/build62,06s PASS adotados deForge-merged. Portal7d12f74 intacto mantém TC/lint/build57+3tests. Somente documentação editada aqui, sem repetir gates íntegros. Nada publicado/push/PR remoto/main/prod; não háPortalstagingREADY, runtimebinding/TLS/origins nem homologação autenticada comprovados. Resolver credencial privada legítima, preparar rollout SOMENTEstaging, anunciar internamente antes do push; PortalreaderREADY primeiro→PainelhashwriterREADY+cessação comprovada de writers antigos→liberaçãoVault hash2 já consentido→homologação privada/polling. Sem nova pergunta para o mesmo consentimentoDB, salvo mudança material de plano/escopo/validade.
 
 Sem DROP/rebuild/dbpush/migratedeploy/ledger/manualSQL/batch/Teste/ownerbackfill/objeto/timer/Pusher/prod. Polling§14 exclusivo, timer suspenso. Story In Progress. Handoff `/tmp/checklist-analistas-20261022-devops-apply3.md` e JSON seguro correspondente contêm comandos/exits/time/SHAs/logs/preservação e distinção entre aplicado e pendente. Logs CLI `/tmp/checklist-analistas-20261022-devops-apply3-{schema,bootstrap-modelos,habilitar-lider-checklist}.log[.json]`; pós-verificações `...-post-<op>.json`; acesso provider `...-blob-auth.json`. Sem segredos nesses relatórios. Controle devolvido ao Bibble.
+
+## DevOps — Portal PUBLICADO em staging; Main aguarda integração concorrente,22/10/2026
+
+PortalSHA7d12f74d7de2895d49a4ea1b2356cef39427ea64 enviado exclusivamente refs/heads/staging às20:50:55UTC, gitpushexit0. Deploymentdpl_HQ3FpQfbJtCCUJCuuDXBdziYGW8z READY2026-10-22T20:51:51.743000+00:00, customEnvironmentIdenv_qYFh0wPmnBMHkAN0Q3sWKeR7aYHW, gitSource.refstaging/shaexato, targetnull(nãoproduction). BuildrealVercelCompiled9,3s/Completed38s, semerro; build ignora tipos como configuraçãoexistente, TS separado previamenteaprovado. Nenhum gate local íntegro repetido.
+
+Aliasesclientes-staging.alpha-comex.com ealphaclientes-env-staging-alpha-comexs-projects.vercel.app apontamparaesse Portalnovo;domínioverified/custoenvcorreto/TLSv1.3hostnamevalidado/certaté20/01/2027. **Smokes anônimos/login,/redefinir-senha,/checklist,/api/notificacoes retornaram302SSOvercel.com/sso-api**, sem observar aplicação protegida. Não são500app nem prova de app200/callback307/API401; não háNextAuthsessãoforjada/seeds/E2Eautenticado. SSOall_except_custom_domainspreservado.
+
+CLIoficial64 `vercel curl` foiinspecionada: ausência deautomation-bypassexistente fariaautomaticamentePATCHdecredencial porPROJETO. Metadatareadonlycomprovouausência dessebypass noPortal; comando nãoexecutado paraevitaralterarproteção/credencialprojectwide/produção. NenhumSSOglobaldesativado oucookieextraído. Provareader serácompletada peloVault/QA comautenticação legítima; nenhumreader-evidencevalidatedtruefabricado.
+
+ApósREADY+hostTLS, origemMainconfigurada: NEXT_PUBLIC_CHECKLIST_PORTAL_ORIGIN=https://clientes-staging.alpha-comex.com, IDBzqUwB7MEWf6YeMB, encrypted,target[],gitBranchnull,customEnvironmentIds[env_sKT0JOh0HB03g20jmcqN5pTHMjqT], API201às20:54:41UTC. Todosoutrosrecordsremotosintactos. NoarquivoCLIstage dedicado regular0600 somenteCHECKLIST_PORTAL_ORIGIN foiadicionado; demaislinhas/modos preservados. Rootenvfornecidopelousuáriointacto. Blobprivadofornecido store_TMoeHVov3GTce7R5 e2runtimekeysstage configurados anteriormente permanecem; envmetadatafreshconfirma DB/auth/Blob/proofs exclusivamente2customscopes. FontePortalPrisma lêTURSOURL/token;knownstagefingerprint7fdd1607… porlineage/envscopes, não porprocess.envremotoobservado.
+
+**Main NÃOpublicado porDevOps:** prepushdetectouorigin/staging04cc69c0b716dc340ad0a3f63670406bbe631f98,READYdpl_HjFuQU8XuyW414YbVMyA2qasuNb9. Emvezdesobrescrever, pushMain/merge suspensos paraScout/owners. NossaHEADa70449d8/source584856eb preservadas. Deltaab278→04cc43commits/178paths; como16jácompartilhados,nova ancestralidadeMain↔04cc tem2mergebasesab278+d758,5nossos/27remotosúnicos e119pathsremotosúnicos.10overlaps exatos:
+
+- prisma/schema.prisma
+- src/actions/bpm/Cards.ts
+- src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx
+- src/components/layout/CentralNotificacoesPainel.tsx
+- src/components/layout/PainelLayoutClient.tsx
+- src/hooks/useBpmCardNotificacaoNavigation.ts
+- tests/bpm/edicao-campos-card.test.ts
+- tests/bpm/tarefas-alertas-central-react.test.ts
+- tests/bpm/tarefas-alertas-foco-react.test.ts
+- tests/bpm/tarefas-notificacoes-navegacao-react.test.ts
+
+BrevePrismadeltaab→04cc:somenteCliente.perfilCadastralJson Json? novo;nenhummodelonovo/removido. Isso nãoautoriza novaDDL; merge/source/contratoparity/gatesafetados pertencemaosownersseguindoScout. JSONdrift contém27SHAs/títulos/paths/parentsbase; nenhuma análiseprofunda/mergeautomático nestaestação.
+
+3aplicaçõesDB anteriores continuam registradas/APPLIED; nenhum novoDBwrite/backup/hash/owner/Teste/objeto/timer/produção nestaestação. As47versõesantigas NÃOforamprotegidas/excluídas; inventárioprecisarefresh após publicação subsequente. Hash2permanececondicional aoPortalreadercomprovado/MainhashwriterREADY/cessaçãoreal(drain/skew/rotas)/Vault; aliasnãoéprova. Estado: **Portalpublicadoemstaging; Mainpendenteintegração; homologaçãoautenticadae hashcondicionalpendentes**, StoryInProgress. SemDone/promoçãoprod.
+
+FileListDevOps:runbookops,relatórioVault e story porappend; sem app/testes/schema/dependênciasalterados. Handoff `/tmp/checklist-analistas-20261022-staging-published.md`/`.json`, logsPortalpush/build/status/HTTP/origin/drift/protectioncapability foraGit, semsegredos. Fontes/roots/dadosaplicados/memórias4dirtyanteriorespreservados. ControledevolvidoaoBibbleparaScout/ownersMain.

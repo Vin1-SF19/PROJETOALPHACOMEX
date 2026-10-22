@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress — **implementação local PASS / READY_FOR_APPROVAL**, com gates reais dos dois aplicativos e revisões Probe/Flux, Anubis e Lens concluídos; B01, B02, regressões de integração/gates e LENS-01 fechados. **Integração local Radar aprovada pelo Forge:** Main584856ebac7760707baf60853b28eb870515b239, typecheck/lint/test/build PASS,737 arquivos/5958 testes PASS; Portal7d12f74 e fontes da feature intactos. **Vault/DevOps: consentimento específico recebido (“sim”, observado20:16:25UTC); schema aditivo, bootstrap3 e grant5 APLICADOS com guardasCLI e pós-verificação readonly preservando dados/ownersNULL/acessos. Hash2 consentido continua condicionado ao rollout e liberação por provas reais.** Fase hash já corrigida, plano1bd13b1a… vigente. **Publicação/homologação PENDENTE:** credencial privada Blob, Portal staging READY, provas do leitor/escritor/cessação antiga, hashbatch condicionado ao plano vigente e validação autenticada no staging. Não marcar Done antes dessas provas. Os adendos abaixo preservam a cronologia; falhas e pendências já encerradas em rodadas posteriores não são bloqueios locais atuais.
+In Progress — **implementação local PASS / READY_FOR_APPROVAL**, com gates reais dos dois aplicativos e revisões Probe/Flux, Anubis e Lens concluídos; B01, B02, regressões de integração/gates e LENS-01 fechados. **Integração local Radar aprovada pelo Forge:** Main584856ebac7760707baf60853b28eb870515b239, typecheck/lint/test/build PASS,737 arquivos/5958 testes PASS; Portal7d12f74 e fontes da feature intactos. **Vault/DevOps: consentimento específico recebido (“sim”, observado20:16:25UTC); schema aditivo, bootstrap3 e grant5 APLICADOS com guardasCLI e pós-verificação readonly preservando dados/ownersNULL/acessos. Hash2 consentido continua condicionado ao rollout e liberação por provas reais.** Fase hash já corrigida, plano1bd13b1a… vigente. **Portal PUBLICADO em staging (7d12f74/READY/dpl_HQ3FpQfbJtCCUJCuuDXBdziYGW8z/hostTLS válido); Main aguarda integração do novo04cc69c0 sem sobrescrever fonte concorrente. Smokes anônimos Portal limitados por302SSOVercel, sem alegar sessão/appE2E. OrigemMain/CLIstage configurada. Publicação Main/homologação autenticada/hashcondicional PENDENTES:** credencial privada Blob, Portal staging READY, provas do leitor/escritor/cessação antiga, hashbatch condicionado ao plano vigente e validação autenticada no staging. Não marcar Done antes dessas provas. Os adendos abaixo preservam a cronologia; falhas e pendências já encerradas em rodadas posteriores não são bloqueios locais atuais.
 
 ## Executor Assignment
 
@@ -385,3 +385,33 @@ File List desta estação: `docs/vault/checklist-analistas-20261022.md`, esta st
 - [ ]Hash2 já consentido aguarda PortalreaderREADY→PainelhashwriterREADY/cessação antiga→liberaçãoVault real; não executado. PortalREADY/Blob/origins/homologação pendentes. Polling§14 sem timer. Story In Progress, sem publicação/push/prod.
 
 File List desta estação: `docs/ops/checklist-analistas-staging-20261022.md`, `docs/vault/checklist-analistas-20261022.md`, esta story. Demais docs/memória sujos anteriores preservados e não adicionados ao commit seletivo. Handoff seguro `/tmp/checklist-analistas-20261022-devops-apply3.md`/`.json`,3logs e3pósverificações foraGit. Sem app/teste/schema/dependência alterados. Controle devolvido ao Bibble.
+
+
+## DevOps — Portal PUBLICADO em staging; Main aguarda integração concorrente,22/10/2026
+
+PortalSHA7d12f74d7de2895d49a4ea1b2356cef39427ea64 enviado exclusivamente refs/heads/staging às20:50:55UTC, gitpushexit0. Deploymentdpl_HQ3FpQfbJtCCUJCuuDXBdziYGW8z READY2026-10-22T20:51:51.743000+00:00, customEnvironmentIdenv_qYFh0wPmnBMHkAN0Q3sWKeR7aYHW, gitSource.refstaging/shaexato, targetnull(nãoproduction). BuildrealVercelCompiled9,3s/Completed38s, semerro; build ignora tipos como configuraçãoexistente, TS separado previamenteaprovado. Nenhum gate local íntegro repetido.
+
+Aliasesclientes-staging.alpha-comex.com ealphaclientes-env-staging-alpha-comexs-projects.vercel.app apontamparaesse Portalnovo;domínioverified/custoenvcorreto/TLSv1.3hostnamevalidado/certaté20/01/2027. **Smokes anônimos/login,/redefinir-senha,/checklist,/api/notificacoes retornaram302SSOvercel.com/sso-api**, sem observar aplicação protegida. Não são500app nem prova de app200/callback307/API401; não háNextAuthsessãoforjada/seeds/E2Eautenticado. SSOall_except_custom_domainspreservado.
+
+CLIoficial64 `vercel curl` foiinspecionada: ausência deautomation-bypassexistente fariaautomaticamentePATCHdecredencial porPROJETO. Metadatareadonlycomprovouausência dessebypass noPortal; comando nãoexecutado paraevitaralterarproteção/credencialprojectwide/produção. NenhumSSOglobaldesativado oucookieextraído. Provareader serácompletada peloVault/QA comautenticação legítima; nenhumreader-evidencevalidatedtruefabricado.
+
+ApósREADY+hostTLS, origemMainconfigurada: NEXT_PUBLIC_CHECKLIST_PORTAL_ORIGIN=https://clientes-staging.alpha-comex.com, IDBzqUwB7MEWf6YeMB, encrypted,target[],gitBranchnull,customEnvironmentIds[env_sKT0JOh0HB03g20jmcqN5pTHMjqT], API201às20:54:41UTC. Todosoutrosrecordsremotosintactos. NoarquivoCLIstage dedicado regular0600 somenteCHECKLIST_PORTAL_ORIGIN foiadicionado; demaislinhas/modos preservados. Rootenvfornecidopelousuáriointacto. Blobprivadofornecido store_TMoeHVov3GTce7R5 e2runtimekeysstage configurados anteriormente permanecem; envmetadatafreshconfirma DB/auth/Blob/proofs exclusivamente2customscopes. FontePortalPrisma lêTURSOURL/token;knownstagefingerprint7fdd1607… porlineage/envscopes, não porprocess.envremotoobservado.
+
+**Main NÃOpublicado porDevOps:** prepushdetectouorigin/staging04cc69c0b716dc340ad0a3f63670406bbe631f98,READYdpl_HjFuQU8XuyW414YbVMyA2qasuNb9. Emvezdesobrescrever, pushMain/merge suspensos paraScout/owners. NossaHEADa70449d8/source584856eb preservadas. Deltaab278→04cc43commits/178paths; como16jácompartilhados,nova ancestralidadeMain↔04cc tem2mergebasesab278+d758,5nossos/27remotosúnicos e119pathsremotosúnicos.10overlaps exatos:
+
+- prisma/schema.prisma
+- src/actions/bpm/Cards.ts
+- src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx
+- src/components/layout/CentralNotificacoesPainel.tsx
+- src/components/layout/PainelLayoutClient.tsx
+- src/hooks/useBpmCardNotificacaoNavigation.ts
+- tests/bpm/edicao-campos-card.test.ts
+- tests/bpm/tarefas-alertas-central-react.test.ts
+- tests/bpm/tarefas-alertas-foco-react.test.ts
+- tests/bpm/tarefas-notificacoes-navegacao-react.test.ts
+
+BrevePrismadeltaab→04cc:somenteCliente.perfilCadastralJson Json? novo;nenhummodelonovo/removido. Isso nãoautoriza novaDDL; merge/source/contratoparity/gatesafetados pertencemaosownersseguindoScout. JSONdrift contém27SHAs/títulos/paths/parentsbase; nenhuma análiseprofunda/mergeautomático nestaestação.
+
+3aplicaçõesDB anteriores continuam registradas/APPLIED; nenhum novoDBwrite/backup/hash/owner/Teste/objeto/timer/produção nestaestação. As47versõesantigas NÃOforamprotegidas/excluídas; inventárioprecisarefresh após publicação subsequente. Hash2permanececondicional aoPortalreadercomprovado/MainhashwriterREADY/cessaçãoreal(drain/skew/rotas)/Vault; aliasnãoéprova. Estado: **Portalpublicadoemstaging; Mainpendenteintegração; homologaçãoautenticadae hashcondicionalpendentes**, StoryInProgress. SemDone/promoçãoprod.
+
+FileListDevOps:runbookops,relatórioVault e story porappend; sem app/testes/schema/dependênciasalterados. Handoff `/tmp/checklist-analistas-20261022-staging-published.md`/`.json`, logsPortalpush/build/status/HTTP/origin/drift/protectioncapability foraGit, semsegredos. Fontes/roots/dadosaplicados/memórias4dirtyanteriorespreservados. ControledevolvidoaoBibbleparaScout/ownersMain.
