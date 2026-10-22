@@ -264,3 +264,22 @@ File List Probe/Anubis TI: somente append nesta matriz QA e story; relatório em
 - [ ] Publicação e homologação deste patch somente staging continuam pendentes. Story In Progress; produção sem autorização.
 
 Relatório `/tmp/checklist-analistas-20261022-ti-lens.md` contém evidências arquivo:linha e limites. File List Lens TI: somente append em `docs/qa/matriz-checklist-analistas-20261022.md` e `docs/stories/story-checklist-analistas-reformulacao-integracao-crm-20261022.md`; relatório fora Git. Nenhuma fonte/teste/schema/DB/env/cloud/Git mutável alterado. Controle devolvido ao Bibble; nenhum agente seguinte acionado.
+
+
+### Forge — MAIN combinado TI + CRM/reunião, 22/10/2026
+
+- [x] HEAD384bbc3a4363258d6d67913031c5363ba227ec33/treebf20f8296fc8afa95aeebce394ed55022977e7c2: quatro gates MAIN atuais reais PASS. TC11,13s; lint44,32s(0erros1183warnings); fullcoverage35,11s(746arquivos6101PASS+4skip1todo=6106); build final44,87s(Prisma/player/webpack/86páginas). Todos exit0.
+- [x] Tentativas build preservadas: inicial33,36s/exit1 ENOSPC; outputRAM direto32,09s/exit1 MODULE_NOT_FOUND pela perda de ancestral node_modules. Somente .next desteWT preservado/movido para containerRAM privado com siblingnode_modules, require.resolve proofPASS e última repetição literalPASS. Sem fonte/config/pools/heap/timeouts/cobertura alterados; nenhuma limpeza alheia.
+- [x] Fingerprint3163arquivos(src/tests/scripts/prisma/package/config) 89d7dad57128f08f4e2cd13be926f8db72c0678f62b2e244ad833b91559807dd antes/depois idêntico; HEAD/fontes/índice intactos. Artefato gerado `?? .next` é symlinkRAM não coberto pelo ignore de diretório: não versionar. Schema c3c82…/Prisma6.19.3 preservados, wrapper sintético/TMPDIRRAM privado; Portal não repetido.
+- [ ] Revisão focal da integração e publicação/validação somente staging seguem com owners seguintes. Story In Progress; sem segurança/E2E remoto por inferência ou promoção de produção.
+
+**APROVADO Forge combinado.** Relatório `/tmp/checklist-analistas-20261022-ti-forge-merged.md`; inputs/hashes/resultados `/tmp/checklist-analistas-20261022-ti-forge-merged-input.json`; logs `/tmp/checklist-analistas-20261022-forge-main-ti-merged-{typecheck,lint,test,build,build-ram,resolve-proof,build-ram-resolved}.log`+metadata; storage `/tmp/checklist-analistas-20261022-ti-forge-merged-storage.json`. File List Forge: esta story e matrizQA, somente append. Semfonte/testes/config/schema/envreal/DBremoto/cloud/Gitmutável/deploy/produção. Controle ao Bibble; nenhum próximo agente acionado.
+
+
+### Lens — reconciliação final TI + staging, 22/10/2026
+
+- [x] **APROVADO** merge `384bbc3a4363258d6d67913031c5363ba227ec33`: 5 arquivos TI idênticos por bytes ao commit revisado e hashes do manifesto; 8 paths incoming idênticos ao pai staging fixado. Sem overlap de runtime ou alteração manual; parecer TI/Anubis anterior preservado. Zero achados concretos nesta revisão de preservação.
+- [x] Forge final combinado adotado: TC/lint zero erros, full746arquivos/6101PASS+4skip/1todo, build86páginas. Fontes fingerprint89d7dad5 intactas; falhas ENOSPC/resolução e recuperação somente outputsRAM registradas no Forge. `.next` symlink gerado permanece fora do commit. Gates não repetidos.
+- [ ] Publicação/homologação do patch somente staging pendentes; produção sem autorização. Story In Progress.
+
+Parecer `/tmp/checklist-analistas-20261022-ti-lens-merged.md`. File List Lens: append somente nesta matriz QA e story; parecer fora Git. Controle devolvido ao Bibble para DevOps; nenhum agente seguinte acionado.
