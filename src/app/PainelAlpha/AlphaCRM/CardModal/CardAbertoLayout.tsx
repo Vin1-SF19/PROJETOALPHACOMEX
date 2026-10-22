@@ -134,6 +134,12 @@ export function CardAbertoLayout({
   const etapasParaMover = etapas.filter(
     (e) => e.id === card.etapa.id || card.podeMoverLivremente || transicoesDaEtapaAtual.some((t) => t.etapaDestinoId === e.id),
   );
+  const contextoEtapa = (
+    <div aria-label="Etapa em edição" className="min-w-0 rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2.5">
+      <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">Em edição:</p>
+      <p className="mt-1 break-words text-xs text-slate-200"><strong>{card.pipeline.nome}</strong> · {card.etapa.nome}</p>
+    </div>
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -143,7 +149,7 @@ export function CardAbertoLayout({
       </div>
 
       {/* Header */}
-      <div className="px-5 pt-4 pb-6 shrink-0 sm:px-8 lg:px-10">
+      <div className="px-5 pt-4 pb-4 shrink-0 sm:px-8 lg:px-10">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3 min-w-0">
             <div
@@ -262,12 +268,13 @@ export function CardAbertoLayout({
           </div>
         </div>
 
-        <p className="mt-4 text-xs text-slate-300">Em edição: <strong>{card.pipeline.nome}</strong> · {card.etapa.nome}</p>
-        <p className="mt-2 text-[11px] text-slate-400">Histórico de passagem — as abas consultam a jornada; o formulário permanece no card em edição.</p>
+        {card.recebimentoPipeline ? (
+          <PainelRecebimentoCard key={`${card.id}:${card.recebimentoPipeline.recepcaoId}`} cardId={card.id} versao={card.versao}
+            pipelineNome={card.pipeline.nome} recebimento={card.recebimentoPipeline} onAtualizado={onAtualizado}
+            contextoEtapa={contextoEtapa} />
+        ) : <div className="mt-3 max-w-sm">{contextoEtapa}</div>}
 
         {/* Tabs de pipeline (1ª: pipeline atual do card; demais: outros pipelines do sistema) */}
-        {card.recebimentoPipeline && <PainelRecebimentoCard key={`${card.id}:${card.recebimentoPipeline.recepcaoId}`} cardId={card.id} versao={card.versao}
-          pipelineNome={card.pipeline.nome} recebimento={card.recebimentoPipeline} onAtualizado={onAtualizado} />}
         <Tabs value={abaAtiva} onValueChange={setAbaAtiva} className="mt-2">
           <TabsList className="flex-wrap h-auto bg-transparent border-none p-0 gap-2 justify-start">
             <TabsTrigger
