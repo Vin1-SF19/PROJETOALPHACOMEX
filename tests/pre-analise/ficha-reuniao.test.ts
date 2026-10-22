@@ -28,12 +28,12 @@ describe('Ficha impressa do Pré Análise', () => {
     expect(paginas[0].tamanho[3]).toBeCloseTo(841.89, 1);
     const texto = paginas[0].texto;
     expect(texto).toContain('Com a revisão do RADAR, quanto a empresa estima que poderia vender a mais, nos próximos seis meses?');
-    expect(texto).toContain('A cada R$ 100,00 vendidos, qual o valor líquido costuma ficar para a empresa, tirando os custos?');
+    expect(texto).toContain('A cada R$ 100.000,00 vendidos, qual o valor líquido costuma ficar para a empresa, tirando os custos?');
     expect(texto.match(/A CONFIRMAR \( \)/g)).toHaveLength(2);
     expect(texto).not.toContain('OBSERVAÇÕES');
     expect(texto).not.toContain('Observação preservada');
   });
-  it('mantém observações no modelo padrão usado por CRM e Bibble', async () => {
+  it('mantém observações no modelo padrão usado pelo CRM', async () => {
     const paginas = await gerar();
     expect(paginas).toHaveLength(1);
     expect(paginas[0].texto).toContain('OBSERVAÇÕES');

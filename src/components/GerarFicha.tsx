@@ -397,7 +397,7 @@ export const FichaAlphaPDF = ({ dados, userLogado, logoPath, finalidade = "padra
           <View style={{ marginTop: 5 }} wrap={false}>
             {[
               "Com a revisão do RADAR, quanto a empresa estima que poderia vender a mais, nos próximos seis meses?",
-              "A cada R$ 100,00 vendidos, qual o valor líquido costuma ficar para a empresa, tirando os custos?",
+              "A cada R$ 100.000,00 vendidos, qual o valor líquido costuma ficar para a empresa, tirando os custos?",
             ].map((pergunta) => (
               <View key={pergunta} style={{ borderWidth: 1, borderColor: '#000', padding: 6, marginBottom: 4 }} wrap={false}>
                 <Text style={{ fontSize: 9, fontWeight: 'bold', lineHeight: 1.3 }}>{pergunta}</Text>
