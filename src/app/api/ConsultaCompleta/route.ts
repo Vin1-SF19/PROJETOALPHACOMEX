@@ -29,18 +29,31 @@ export async function GET(req: Request) {
     if (!forcar) {
       const existente = await db.consultas_radar.findUnique({ where: { cnpj } });
       if (existente && existente.razao_social && existente.razao_social !== "NÃO ENCONTRADO") {
+        let radarAtualizacao: Awaited<ReturnType<typeof consultarRadar>> | null = null;
+        try {
+          radarAtualizacao = await consultarRadar(cnpj);
+        } catch {
+          // Mantém os dados locais existentes se a API do ialpha estiver temporariamente indisponível.
+        }
         return NextResponse.json({
           ...existente,
           // aliases camelCase para o frontend
           razaoSocial:      existente.razao_social,
           nomeFantasia:     existente.nome_fantasia,
-          situacao:         existente.situacao_radar,
+          situacao:         radarAtualizacao?.situacao ?? "CONSULTA CSV INDISPONÍVEL",
+          situacao_radar:   radarAtualizacao?.situacao ?? "CONSULTA CSV INDISPONÍVEL",
+          submodalidade:    radarAtualizacao?.submodalidade ?? existente.submodalidade,
+          modalidade:       radarAtualizacao?.modalidade ?? existente.submodalidade,
+          contribuinte:     radarAtualizacao?.contribuinte ?? existente.contribuinte,
+          dataAtualizacaoPublicada: radarAtualizacao?.dataAtualizacaoPublicada ?? null,
+          consultadoEm:     radarAtualizacao?.consultadoEm ?? null,
+          radarAviso:       radarAtualizacao?.aviso ?? (radarAtualizacao ? undefined : "Consulta atual à API RADAR indisponível; exibindo registro local."),
           dataSituacao:     existente.data_situacao,
           dataConstituicao: existente.data_constituicao,
           regimeTributario: existente.regime_tributario,
           capitalSocial:    existente.capital_social,
           dataConsulta:     existente.data_consulta,
-          fonte:            "Banco Local",
+          fonte:            radarAtualizacao ? "Banco Local + API RADAR ialpha" : "Banco Local",
         });
       }
     }
@@ -126,18 +139,25 @@ export async function GET(req: Request) {
     const receita = receitaResult.value;
     const [radarResult] = await Promise.allSettled([consultarRadar(cnpj)]);
 
-    // Apenas 404 confirma ausência de habilitação; as demais falhas permanecem erro.
-    let radar = {
-      situacao: "NÃO HABILITADA",
+    let radar: Awaited<ReturnType<typeof consultarRadar>> = {
+      cnpj: cnpj.slice(0, 8),
+      razaoSocial: "",
+      situacao: "NÃO VERIFICADO NA PUBLICAÇÃO CSV",
+      modalidade: "",
       submodalidade: "N/A",
       contribuinte: "",
       dataSituacao: "",
+      dataAtualizacaoPublicada: null,
+      consultadoEm: new Date().toISOString(),
+      baseLegal: "",
+      tipoDesabilitacao: "",
+      operacoesAutorizadas: "",
       raw: "",
     };
     if (radarResult.status === "fulfilled") {
       radar = radarResult.value;
     } else if (radarResult.reason instanceof ErroConsultaRadar && radarResult.reason.status === 404) {
-      // Resposta de negócio do provedor.
+      // A ausência de registro na publicação periódica não confirma desabilitação.
     } else {
       const code = radarResult.reason instanceof ErroConsultaRadar ? radarResult.reason.code : "UPSTREAM_UNAVAILABLE";
       console.error("RADAR falhou:", code);
@@ -180,6 +200,9 @@ export async function GET(req: Request) {
       regimeTributario: salvo.regime_tributario,
       capitalSocial:    salvo.capital_social,
       dataConsulta:     salvo.data_consulta,
+      dataAtualizacaoPublicada: radar.dataAtualizacaoPublicada,
+      consultadoEmRadar: radar.consultadoEm,
+      radarAviso: radar.aviso,
     });
   } catch (error) {
     console.error("ERRO CONSULTACOMPLETA:", error);

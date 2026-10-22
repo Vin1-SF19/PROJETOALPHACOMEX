@@ -99,6 +99,9 @@ export async function consultarEGuardarCnpjLead(cnpjInformado: string) {
   const dadosRadar = radar ? {
     situacao: radar.situacao, modalidade: radar.modalidade,
     submodalidade: radar.submodalidade, dataSituacao: radar.dataSituacao,
+    dataAtualizacaoPublicada: radar.dataAtualizacaoPublicada,
+    consultadoEm: radar.consultadoEm,
+    aviso: radar.aviso,
     baseLegal: radar.baseLegal, tipoDesabilitacao: radar.tipoDesabilitacao,
     operacoesAutorizadas: radar.operacoesAutorizadas,
   } : radarNaoHabilitado ? { situacao: "NÃO HABILITADA" } : null;
