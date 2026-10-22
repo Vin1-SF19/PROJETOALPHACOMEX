@@ -2,6 +2,7 @@
 import { toast } from "sonner";
 import { LeadNotificacaoToast } from "@/components/bpm/notificacoes/LeadNotificacaoToast";
 import { paginaAlertasLeadsBpmSchema, urlLeadAlertaBpm, type AlertaLeadBpm } from "@/lib/bpm/notificacoes-leads";
+import { criarAudioNotificacoesLeadsBpm } from "@/lib/bpm/notificacoes-leads-audio";
 import { useBpmLeadsNotificacoes as store } from "@/store/useBpmLeadsNotificacoes";
 
 /** Compartilha o lifecycle, canal e relógio já existentes para alertas BPM. */
@@ -9,6 +10,10 @@ export function criarNotificacoesLeadsClient(usuarioId: number, signal: AbortSig
   abrir: (url: string, label: string) => void) {
   store.getState().iniciarUsuario(usuarioId);
   const toastIds = new Set<string>();
+  const audio = criarAudioNotificacoesLeadsBpm();
+  const encerrarAudio = () => audio.limpar();
+  signal.addEventListener("abort", encerrarAudio, { once: true });
+  let baseAudioCarregada = false;
   let emCurso = false;
   let revisao = 0;
   const ativo = () => !signal.aborted && store.getState().usuarioId === usuarioId;
@@ -30,7 +35,7 @@ export function criarNotificacoesLeadsClient(usuarioId: number, signal: AbortSig
             { cache: "no-store", signal });
           if (!ativo()) return;
           if (response.status === 401 || response.status === 403) {
-            store.getState().sincronizar(usuarioId, []); limparToasts(); return;
+            store.getState().sincronizar(usuarioId, []); limparToasts(); audio.parar(); return;
           }
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const pagina = paginaAlertasLeadsBpmSchema.parse(await response.json());
@@ -46,7 +51,10 @@ export function criarNotificacoesLeadsClient(usuarioId: number, signal: AbortSig
         if (repetir) continue; // Evento recebido durante a leitura: não aplica snapshot anterior ao evento.
         const idsAtivos = new Set(alertas.map((a) => `bpm-lead:${usuarioId}:${a.id}`));
         for (const id of toastIds) if (!idsAtivos.has(id)) { toast.dismiss(id); toastIds.delete(id); }
-        for (const alerta of store.getState().sincronizar(usuarioId, alertas)) {
+        const novas = store.getState().sincronizar(usuarioId, alertas);
+        const reproduzirAudio = baseAudioCarregada;
+        baseAudioCarregada = true;
+        for (const alerta of novas) {
           const id = `bpm-lead:${usuarioId}:${alerta.id}`;
           toastIds.add(id);
           toast.custom(() => <LeadNotificacaoToast alerta={alerta} onFechar={() => toast.dismiss(id)} onAbrir={() => {
@@ -54,6 +62,7 @@ export function criarNotificacoesLeadsClient(usuarioId: number, signal: AbortSig
             toast.dismiss(id);
             abrir(urlLeadAlertaBpm(alerta), "CRM");
           }} />, { id, duration: 15000 });
+          if (reproduzirAudio) audio.tocar(alerta.origem);
         }
       } while (repetir && ativo());
     } catch (error) {
@@ -61,6 +70,8 @@ export function criarNotificacoesLeadsClient(usuarioId: number, signal: AbortSig
     } finally { emCurso = false; }
   }
   return { atualizar, limpar: () => {
+    signal.removeEventListener("abort", encerrarAudio);
+    audio.limpar();
     limparToasts();
     if (store.getState().usuarioId === usuarioId) store.getState().iniciarUsuario(0);
   } };

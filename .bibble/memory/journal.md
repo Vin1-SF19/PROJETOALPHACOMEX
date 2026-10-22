@@ -7504,3 +7504,37 @@ Implementação, provas de modal real sem claim, gates e smoke staging do delta.
 
 ### Fechamento local AC19 com concorrência preservada — 2026-10-22
 Clique de notificação é leitura: destino pendente canônico ou card promovido com identidade/ACL, erro honesto e nenhum claim automático. Checkpoint fae+04599+AC19 passou os quatro gates e suíte727/5.881PASS, zero falhas/quatro skipped/um todo. Avanço636 preservado por merge normal: lazy editor e Radar confirmado ausente no CSV; quinze arquivos próprios intactos e oito deltas byte-idênticos ao owner. Fonte final9a27c553... teve tipos/lint4/newbuildLITERAL3072pools1CPU4PASS (130s, pico agregado6.762.717.184bytes) e19 arquivos/259testesPASS; não alegar nova suíte global final. Wrapper externo143 preservado separadamente de gates filhos0/JSONPASS. QA local final aprovou; publicação/READY/cliques autenticados ainda pendentes neste commit, resultado posterior somente privado, sem docloop. Nenhuma produção/ENV/migration/worker manual. Provas em `/var/tmp/alpha-crm-notificacao-instagram-abertura-20261022/`.
+
+
+---
+
+## [2026-10-22 21:50 UTC] — Áudio de leads Instagram e site: checkpoint local
+
+**Tags:** #feature #integration #nextjs
+**Agentes envolvidos:** Bibble, River/Scout, Nova, DevOps, QA, Scribe/Kowalski.
+**Arquivos tocados:** `bpm-leads-notificacoes-client.tsx`, `notificacoes-leads-audio.ts`, dois testes, dois MP3, story e mapas de memória.
+
+### Contexto
+Usuário forneceu áudios Insta/Site e autorizou reduzir para três segundos nas respectivas notificações do CRM.
+
+### O que foi feito
+- Controlador local por origem canônica, primeira recuperação silenciosa, reprodução das novas notificações deduplicadas e limpeza por lifecycle.
+- Derivados MP3 de 3.000000 s/48.944 bytes, fade de 150 ms, originais intactos. Owner informou nove arquivos/48 testes PASS e lint dirigido 0.
+
+### Decisões tomadas
+- Áudio físico curto evita depender de temporizador; uma reprodução ativa substitui a anterior sem fila. Outras origens mantêm silêncio.
+
+### Problemas encontrados / resolvidos
+- Autoplay pode ser bloqueado pelo navegador: falha tratada sem interferir em toast/central e sem replay tardio.
+
+### Pendências
+Gates globais, revisão independente, commit/push e publicação/smoke staging. Nenhuma produção, ENV remoto ou operação de banco.
+
+### Refletido também em
+- `codebase-map.md` e `integration-points.md`: controller, arquivos e integração pós-snapshot.
+
+
+**Atualização local do checkpoint de áudio CRM:** quatro gates reais PASS. Tipos 56,26 s; lint 76,50 s/zero erros/1.183 warnings; build literal 111,62 s/heap4096/pools1/4CPU/pico7.304.445.952 bytes abaixo de7GiB; rerun global 194,07 s/746 arquivos/6.114 PASS/zero falhas/quatro skipped/um todo. Primeira falha do wrapper privado Prisma preservada; wrapper corrigido somente para generate/format, sem delta de aplicação/testes/schema. Fonte c07ee602... inalterada. QA final e publicação/smoke pendentes; provas remotas futuras privadas, sem deploy documental recursivo.
+
+
+**Fechamento local do áudio CRM:** QA Probe/Sage/Lens após Forge aprovou GO staging, zero bloqueantes/importantes; 26 testes diretos (nove áudio/17 cliente) e 48 dirigidos são subconjuntos da suíte global, sem duplicar contagem. Smoke compilado local confirmou MP3 HTTP200/hash, raiz/sessão200 e CRM protegido307; servidor encerrado. Story Ready for Review, File List11. Publicação/READY e smoke remoto ainda pendentes neste checkpoint pré-commit; evidências posteriores privadas. Prova `/var/tmp/alpha-crm-audio-notificacoes-origem-20261022/qa-final-private.json`.
