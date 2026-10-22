@@ -1827,3 +1827,16 @@ Minuta continua CONFERENCIA; finalização e projeções de contratos da entrega
 
 ### Fechamento remoto — minuta seletiva
 Staging `71e3f06f` READY e Admin real: primeira entrada gerou CONFERENCIA; reentrada retornou `existente=true` com mesmo documento/anexo/campo, sem alerta de pronto ou verde no Comercial. Foram dois SUCESSO e um IGNORADA/zero tentativas na saída para etapa sem regra aplicável; nenhum efeito financeiro fabricado. Os dois cards3066 permaneceram deep/hash iguais. Conferência/finalização vigentes e casos de líder remotos não são presumidos. Evidências/limites: `docs/reports/validacao-minuta-movimento-livre-staging-2026-10-21.md`.
+
+
+### 2026-10-22 — Scribe — CRM: leads pendentes e recepção por setor (checkpoint local)
+
+- `src/lib/bpm/notificacoes-leads.ts` define DTOs/schemas; `notificacoes-leads-server.ts` resolve pendências Instagram/NoLoss/encaminhamento, audiência, paginação e invalidação mínima. GET readonly `src/app/api/bpm/leads/alertas/route.ts`; lookup virtual em `src/actions/bpm/NotificacoesLeads.ts`.
+- `src/lib/bpm/recebimentos-card-server.ts` + `src/actions/bpm/Recebimentos.ts`: recepção de destino novo no encaminhamento compartilhado, prova de card/vínculo/execução/evento, claim por setor com CAS/histórico/outbox e sem confundir owner técnico com assunção. Operacional reconhece ID canônico mesmo com chave nula; Boas-vindas permanece protegida.
+- Componentes reutilizáveis: `src/components/bpm/notificacoes/LeadNotificacaoToast.tsx` (origem/detalhes/abrir sem assumir) e `src/app/PainelAlpha/AlphaCRM/CardModal/PainelRecebimentoCard.tsx` (responsáveis anteriores, motivo e claim explícito). Central/hook existentes compartilham recuperação e subscription; coleção em `src/store/useBpmLeadsNotificacoes.ts` só persiste IDs vistos por usuário, nunca resolve por leitura.
+- Navegação typed em `notificacoes-navegacao.ts` e `useBpmNotificacaoBoardNavigation.ts`: virtual fora da página abre modal existente; card físico abre detalhe; handshake/URLs de tarefas preservados. `campos-configuraveis-server.ts` preserva vendedor Comercial na mesma negociação, com vazio quando falta prova e fallback inequívoco readonly.
+
+Evidências focadas dos owners: backend 182 testes/12 arquivos (inclui 64 de segurança e sete SQLite); frontend 100/18; lint focado 0 e typecheck backend oficial 8 GiB 0. Tentativa frontend 4 GiB OOM antes de diagnóstico não aprova tipos. Forge integrado e smoke ainda em execução/sem resultado consolidado no checkpoint. Sem afirmar deploy/READY, multicliente remoto, schema/backfill ou produção. Story/File List: `docs/stories/story-crm-notificacoes-leads-sem-responsavel-20261022.md`.
+
+
+**Atualização do checkpoint — 2026-10-22 13:04:52 UTC:** CRM individual do líder operacional habilitado por CRUD canônico na UI de staging com Admin real (200/sucesso), papel e cinco permissões anteriores preservados. Sem exceção de ACL ou sessão forjada; confirmação SELECT posterior do delta pelo DevOps pendente. Isso é uma escrita normal de configuração no aplicativo, não ausência global de escritas. Sem SQL manual/migration/bulk/ENV/produção. Forge informou typecheck e lint integrados exit 0; fechamento dos quatro gates, QA final, publicação e smoke ainda pendentes.

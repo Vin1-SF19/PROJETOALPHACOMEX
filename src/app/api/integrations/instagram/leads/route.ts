@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { instagramIngestSchema, leadInstagramEhTeste, prepararLeadInstagram } from "@/lib/bpm/instagram-leads";
 import { autenticarInstagram, etapaEntradaInstagram, ErroInstagram, receberInstagramLead } from "@/lib/bpm/instagram-leads-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { notificarPendenciasLeadsBpm } from "@/lib/bpm/notificacoes-leads-server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -40,7 +41,10 @@ export async function POST(req: NextRequest) {
         review: { radar: !dados.radarPretendido, cnpj: !dados.cnpj, telefone: !dados.telefone } });
     }
     const resultado = await receberInstagramLead(endpoint.id, lead);
-    if (!resultado.duplicate) await notificarPipelineBpm({ pipelineId: endpoint.pipelineId!, tipo: "CARD_CRIADO" });
+    if (!resultado.duplicate) {
+      await notificarPipelineBpm({ pipelineId: endpoint.pipelineId!, tipo: "CARD_CRIADO" });
+      await notificarPendenciasLeadsBpm({ pipelineId: endpoint.pipelineId! });
+    }
     return responder({ success: true, externalId: lead.id, ...resultado }, resultado.duplicate ? 200 : 201);
   } catch (error) {
     if (error instanceof ErroInstagram) return responder({ success: false, code: error.codigo, error: error.message }, error.status);

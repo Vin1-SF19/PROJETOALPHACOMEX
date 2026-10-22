@@ -7317,3 +7317,42 @@ READY/SHA/alias e reteste real permanecem pendentes. Fixture nova de staging por
 - Relatório sanitizado `docs/reports/validacao-minuta-movimento-livre-staging-2026-10-21.md`; memórias e story fechadas em um único conjunto documental após QA. Entradas anteriormente versionadas preservadas.
 
 - No fechamento, avanço externo `86858e7e` (GeradorDocumentos/extenso) foi preservado por FF normal, mantendo nossos nove módulos/testes byte a byte. Seus gates próprios combinados e build padrão remoto READY/Node24.x foram conferidos; smoke autenticado readonly manteve a minuta CONFERENCIA, PDF de prévia 200 e Comercial404, sem movimento. E2E completo permanece historicamente em71e3; commit final é só documental e compara runtime/deps/testes à base868.
+
+
+---
+
+## [2026-10-22 13:03 UTC] — CRM: notificações e assunção setorial implementadas, gates pendentes
+
+**Tags:** #feature #integration #security #nextjs #prisma
+**Agentes envolvidos:** coordenação, Scout/Architect, SM, Echo, Nova, QA, Forge, Scribe, Kowalski.
+**Arquivos tocados:** libs de notificações/recepção/navegação, actions e ingressos, central/hook/board e dois componentes novos; File List completa na story `story-crm-notificacoes-leads-sem-responsavel-20261022.md`. Esta consolidação altera a story e três memórias.
+
+### Contexto
+Usuário pediu toast por origem e aviso persistente até assunção, incluindo todos os integrantes autorizados do Financeiro/Operacional, preservando responsáveis dos setores anteriores e vendedor comercial.
+
+### O que foi feito
+- Fonte local entregue/congelada pelos owners: projeção readonly, central integrada, recuperação completa, cores por proveniência e navegação virtual/nativa sem assumir no clique.
+- Recepção de encaminhamento novo e claim CAS/histórico/outbox; nominal herdado não conta como assumido. Dois componentes reutilizáveis documentados: LeadNotificacaoToast e PainelRecebimentoCard.
+- Checks focados: backend 182/182 em 12 arquivos, incluindo 64 casos de segurança e sete SQLite; frontend 100/100 em 18. Lint focado 0, typecheck backend oficial 8 GiB 0. Não somar subconjuntos de testes como novas execuções globais.
+
+### Decisões tomadas
+- Audiência de visualização e autorização para assumir são distintas; manter guardas e não criar exceção Admin para testar.
+- Claim Financeiro pendente ATIVO já encaminhado é atribuição específica: mantém trabalho/edição readonly e snapshot Operacional imutável. Vendedor automático continua Comercial; sem prova, vazio/fallback Comercial inequívoco, inclusive legado readonly.
+- Site conectado por proveniência opcional no ingresso existente; sem schema/migration/backfill ou alteração em produção.
+
+### Problemas encontrados / resolvidos
+- Operacional real pode ter chave nula: helper canônico por ID usado; caso coberto nos sete SQLite finais, não atribuído isoladamente aos 64 adversariais.
+- Tentativa frontend de tipos com 4 GiB terminou em OOM antes de diagnósticos; não é erro de tipos nem aprovação. Forge executa a verificação integrada.
+
+### Pendências
+Quatro gates integrados, QA final, commit/push, deploy/alias e smoke staging ainda pendentes neste checkpoint; não se afirma READY remoto ou teste autenticado multicliente. Confirmar CRM efetivo do líder operacional pelo fluxo normal antes do smoke; nenhum override aplicado por esta consolidação. Produção fora do escopo. Evidências privadas em `/var/tmp/alpha-crm-notificacoes-leads-20261022/`, sem dados reais/segredos versionados.
+
+### Refletido também em
+- `codebase-map.md`: módulos, componentes e limites da entrega local.
+- `integration-points.md`: producers, central, navegação e claim por setor; story atualizada sem tocar QA Results.
+
+
+### Atualização posterior — 2026-10-22 13:04:52 UTC
+- Líder operacional recebeu CRM efetivo via override individual CRM ADD pelo CRUD normal da UI de staging, Admin real e 200/sucesso. Papel e cinco outras permissões efetivas preservados; verificação SELECT posterior do DevOps ainda pendente. Operação atende à configuração solicitada do líder; nenhuma exceção de ACL/sessão de teste foi criada.
+- Trata-se de configuração normal do aplicativo: não afirmar zero escritas globais. Sem SQL manual/migration/bulk/ENV/worker manual/produção. Provas privadas em `/var/tmp/alpha-crm-notificacoes-leads-sem-responsavel-20261022/` (arquivos de UI de permissão), não versionadas.
+- Forge: typecheck integrado 8,54 s/exit 0 e lint integrado 52,24 s/exit 0; resultado final dos quatro gates, QA, publicação e smoke ainda aguardam consolidação. Nenhuma prova multicliente remota presumida.

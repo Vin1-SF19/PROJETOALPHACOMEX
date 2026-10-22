@@ -3346,3 +3346,18 @@ O modo `MINUTA_MOVIMENTO_LIVRE` isola também resgate de EM_EXECUCAO e usa claim
 
 ### Fechamento remoto — minuta seletiva
 Staging `71e3f06f` READY e Admin real: primeira entrada gerou CONFERENCIA; reentrada retornou `existente=true` com mesmo documento/anexo/campo, sem alerta de pronto ou verde no Comercial. Foram dois SUCESSO e um IGNORADA/zero tentativas na saída para etapa sem regra aplicável; nenhum efeito financeiro fabricado. Os dois cards3066 permaneceram deep/hash iguais. Conferência/finalização vigentes e casos de líder remotos não são presumidos. Evidências/limites: `docs/reports/validacao-minuta-movimento-livre-staging-2026-10-21.md`.
+
+
+### CRM — central de pendências e assunção por pipeline (2026-10-22, Scribe)
+
+**Arquivos:** `src/lib/bpm/{notificacoes-leads,notificacoes-leads-server,recebimentos-card-server,notificacoes-navegacao}.ts`, actions `NotificacoesLeads.ts`/`Recebimentos.ts`, GET `/api/bpm/leads/alertas`, central e hook `useBpmTarefasNotifications` existentes.
+**Editado quando:** acrescentar fonte com claim canônico, origem visual, audiência setorial, destino virtual/nativo ou recepção de um encaminhamento novo.
+
+Exemplo de conexão: ingresso autenticado novo → invalidação mínima no canal privado por usuário já autorizado → GET readonly completo → central + `LeadNotificacaoToast` → clique abre destino typed; somente ação explícita assume. Snapshot parcial/antigo não troca coleção. IG é roxo; site é azul somente com proveniência comprovada (NoLoss aceita UTMs opcionais sem resetar status nem apagar omitidos); outros seguem padrão. Ler/marcar todas/fechar toast não remove pendência; não criar provider/poller/canal global paralelo.
+
+Financeiro/Operacional: `executarEncaminhamentoBpm` registra recepção somente no novo alvo, na mesma transação; retry/alvo reutilizado não reinicia. Todos do setor autorizados a visualizar recebem, claim exige setor/elegibilidade/podeAgir e Boas-vindas; bypass de Admin fora do setor não confere claim. `PainelRecebimentoCard` é o ponto reutilizável para nomes por setor/motivo/Assumir, montado em `CardAbertoLayout`; não confundir IDs virtuais com card físico nem clicar para assumir.
+
+Financeiro pendente ATIVO já encaminhado pode ser assumido como atribuição, mantendo edição/trabalho readonly e snapshot Operacional imutável. `alpha.vendedor.a` no resolver automático deve continuar Comercial: prova de recepção ou vínculo inequívoco da mesma negociação; falta de prova retorna vazio, sem usar owner Financeiro/Operacional. Operacional com chave nula usa helper de ID canônico. Testar acesso CRM efetivo do ator antes do smoke, sem exceção de teste. Mapa de arquivos e evidências focadas na story; gates integrados, QA final e staging pendentes neste checkpoint, sem migração/backfill ou produção.
+
+
+**Atualização do checkpoint — 2026-10-22 13:04:52 UTC:** CRM individual do líder operacional habilitado por CRUD canônico na UI de staging com Admin real (200/sucesso), papel e cinco permissões anteriores preservados. Sem exceção de ACL ou sessão forjada; confirmação SELECT posterior do delta pelo DevOps pendente. Isso é uma escrita normal de configuração no aplicativo, não ausência global de escritas. Sem SQL manual/migration/bulk/ENV/produção. Forge informou typecheck e lint integrados exit 0; fechamento dos quatro gates, QA final, publicação e smoke ainda pendentes.

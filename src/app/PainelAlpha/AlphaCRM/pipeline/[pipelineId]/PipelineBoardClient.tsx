@@ -1,6 +1,8 @@
 "use client";
 
-import { BPM_CARD_ABERTO_EVENT, BPM_CARD_ABRIR_EVENT, BPM_CARD_PRONTO_EVENT, intencaoCardBpmSchema } from "@/lib/bpm/notificacoes-tarefas";
+import { useBpmNotificacaoBoardNavigation } from "@/hooks/useBpmNotificacaoBoardNavigation";
+import { solicitarReconciliacaoLeadsBpm } from "@/lib/bpm/notificacoes-navegacao";
+import type { IntencaoNotificacaoBpm } from "@/lib/bpm/notificacoes-navegacao";
 import { usuariosDaVisao, type VisaoQuadro } from "@/lib/bpm/visao-equipe";
 import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
 import { textoLegivelRd } from "@/lib/bpm/rd-station-text";
@@ -119,6 +121,7 @@ function opcoesRadarPretendido(pipeline: PipelineBpm): string[] {
 export interface CardBpm {
   id: string;
   podeMoverLivremente?: boolean;
+  recebimentoPendente?: boolean;
   importadoRd?: boolean;
   etapaId: string;
   servico: string | null;
@@ -626,11 +629,13 @@ export function KanbanCard({
                 <span className="text-slate-500">Sem pendências</span>
               )}
             </div>
-            <GrupoAvataresMembrosCard
+            {card.recebimentoPendente ? <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300/30 bg-amber-400/10 px-2 py-1 text-[10px] font-medium text-amber-100">
+              <Users className="size-3" aria-hidden="true" />Aguardando assumir
+            </span> : <GrupoAvataresMembrosCard
               membros={membrosVisiveis}
               limite={3}
               className="[&_[data-slot=avatar]]:shadow-sm [&_[data-slot=avatar]]:shadow-black/30"
-            />
+            />}
           </div>
         )}
         </div>
@@ -772,6 +777,7 @@ interface Props {
   pipelinesDisponiveis?: PipelineDisponivel[];
   cardsIniciais: CardBpm[];
   cardInicialId?: string | null;
+  intencaoNotificacaoInicial?: IntencaoNotificacaoBpm | null;
   tarefaInicialId?: string;
   manifestoInicial?: ManifestoQuadro;
   visual: TemaAlpha;
@@ -798,7 +804,7 @@ interface PromocaoLeadPendente {
   etapaDestinoNome: string;
 }
 
-export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [], cardsIniciais, cardInicialId = null, tarefaInicialId, manifestoInicial, visual, currentUserId, currentUserRole }: Props) {
+export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [], cardsIniciais, cardInicialId = null, intencaoNotificacaoInicial = null, tarefaInicialId, manifestoInicial, visual, currentUserId, currentUserRole }: Props) {
   const accent = visual.accent;
   const router = useRouter();
   const [cards, setCards] = useState<CardBpm[]>(cardsIniciais);
@@ -835,24 +841,28 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
   const realtimeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cardSelecionadoIdRef = useRef<string | null>(cardInicialId);
   const cardAbertoPorAlertaRef = useRef<string | null>(cardInicialId);
-  useEffect(() => {
-    if (window.parent === window) return;
-    const handler = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin || event.source !== window.parent
-        || event.data?.type !== BPM_CARD_ABRIR_EVENT) return;
-      const parsed = intencaoCardBpmSchema.safeParse(event.data);
-      if (!parsed.success || parsed.data.pipelineId !== pipeline.id) return;
-      cardAbertoPorAlertaRef.current = parsed.data.cardId;
-      cardSelecionadoIdRef.current = parsed.data.cardId;
-      setCardAgendamentoId(null);
-      setCardSelecionadoId(parsed.data.cardId);
-      setFocoTarefa(parsed.data.tarefaId ? { cardId: parsed.data.cardId, tarefaId: parsed.data.tarefaId } : null);
-      window.parent.postMessage({ type: BPM_CARD_ABERTO_EVENT, ...parsed.data }, window.location.origin);
-    };
-    window.addEventListener("message", handler);
-    window.parent.postMessage({ type: BPM_CARD_PRONTO_EVENT }, window.location.origin);
-    return () => window.removeEventListener("message", handler);
-  }, [pipeline.id]);
+  const abrirCardNotificacao = useCallback((intencao: IntencaoNotificacaoBpm) => {
+    if (!intencao.cardId) return;
+    setNolossLeadAberto(null);
+    cardAbertoPorAlertaRef.current = intencao.cardId;
+    cardSelecionadoIdRef.current = intencao.cardId;
+    setCardAgendamentoId(null);
+    setCardSelecionadoId(intencao.cardId);
+    setFocoTarefa(intencao.tarefaId ? { cardId: intencao.cardId, tarefaId: intencao.tarefaId } : null);
+  }, [setNolossLeadAberto, setCardAgendamentoId, setCardSelecionadoId, setFocoTarefa]);
+  const abrirLeadNotificacao = useCallback((lead: CardBpm) => {
+    cardAbertoPorAlertaRef.current = null;
+    cardSelecionadoIdRef.current = null;
+    setCardSelecionadoId(null); setCardAgendamentoId(null); setFocoTarefa(null);
+    setNolossLeadAberto(lead);
+  }, [setNolossLeadAberto, setCardAgendamentoId, setCardSelecionadoId, setFocoTarefa]);
+  const erroAoAbrirNotificacao = useCallback((mensagem: string) => {
+    cardAbertoPorAlertaRef.current = null; cardSelecionadoIdRef.current = null;
+    setCardSelecionadoId(null); setCardAgendamentoId(null); setFocoTarefa(null); setNolossLeadAberto(null);
+    setErro(mensagem);
+  }, [setCardSelecionadoId, setCardAgendamentoId, setFocoTarefa, setNolossLeadAberto, setErro]);
+  useBpmNotificacaoBoardNavigation({ pipelineId: pipeline.id, usuarioId: currentUserId,
+    inicial: intencaoNotificacaoInicial, abrirCard: abrirCardNotificacao, abrirLead: abrirLeadNotificacao, onErro: erroAoAbrirNotificacao });
   const snapshotArrastoRef = useRef<SnapshotArrasto | null>(null);
   const generationBoardRef = useRef(0);
   const sincronizacaoRealtimePendenteRef = useRef(false);
@@ -1483,6 +1493,7 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
           onClose={() => setNolossLeadAberto(null)}
           etapaDestinoNome={etapasOrdenadas.find((etapa) => etapa.id === nolossLeadAberto.etapaId)?.nome}
           onPromovido={async () => {
+            solicitarReconciliacaoLeadsBpm();
             setNolossLeadAberto(null);
             await recarregarCards({ forcar: true });
             router.refresh();

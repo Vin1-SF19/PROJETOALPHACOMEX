@@ -8,6 +8,7 @@ import { SincronizarQuadroBpm } from "@/actions/bpm/Quadro";
 import { MoverCardBpm, ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
 
 const drag = vi.hoisted(() => ({ current: null as null | import("react").ComponentProps<typeof import("@dnd-kit/core").DndContext> }));
+vi.mock("@/actions/bpm/NotificacoesLeads", () => ({ ObterLeadPendenteNotificacaoBpm: vi.fn() }));
 vi.mock("@dnd-kit/core", async (original) => {
   const actual = await original<typeof import("@dnd-kit/core")>();
   return { ...actual, DndContext: (props: import("react").ComponentProps<typeof actual.DndContext>) => {

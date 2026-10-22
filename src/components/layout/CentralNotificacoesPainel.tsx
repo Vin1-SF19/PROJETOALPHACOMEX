@@ -6,6 +6,7 @@ import {
   Bell,
   CalendarDays,
   ListTodo,
+  Users,
   CheckCheck,
   FileCheck2,
   Headphones,
@@ -22,6 +23,9 @@ import { useChamadoNotificacoes } from "@/store/useChamadoNotificacoes";
 import { useChecklistNotificacoes } from "@/store/useChecklistNotificacoes";
 import { useHoleriteNotificacoes } from "@/store/useHoleriteNotificacoes";
 import { useNotasNotificacoes } from "@/store/useNotasNotificacoes";
+import { useBpmLeadsNotificacoes } from "@/store/useBpmLeadsNotificacoes";
+import { detalhesAlertaLeadBpm, urlLeadAlertaBpm } from "@/lib/bpm/notificacoes-leads";
+import { corNotificacaoLead } from "@/components/bpm/notificacoes/LeadNotificacaoToast";
 import { useBpmTarefasNotificacoes } from "@/store/useBpmTarefasNotificacoes";
 import { detalhesAlertaTarefaBpm, urlCardAlertaBpm } from "@/lib/bpm/notificacoes-tarefas";
 import { useCsNpsNotificacoes } from "@/store/useCsNpsNotificacoes";
@@ -174,6 +178,7 @@ export function CentralNotificacoesPainel({
   const holerite = useHoleriteNotificacoes();
   const csNps = useCsNpsNotificacoes();
   const tarefasCrm = useBpmTarefasNotificacoes();
+  const leadsCrm = useBpmLeadsNotificacoes();
   const leituraTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => {
     if (leituraTimerRef.current) clearTimeout(leituraTimerRef.current);
@@ -189,6 +194,12 @@ export function CentralNotificacoesPainel({
     ?? "sem-data";
 
   const itens: ItemCentralNotificacoes[] = [
+    ...leadsCrm.notificacoes.map((alerta) => ({
+      id: `crm-lead-${alerta.id}`, origem: "CRM · Leads", titulo: alerta.nome,
+      subtitulo: "Ninguém assumiu ainda", detalhes: detalhesAlertaLeadBpm(alerta),
+      criadoEm: alerta.recebidoEm, cor: corNotificacaoLead(alerta.origem), lida: false, Icone: Users,
+      abrir: () => onAbrirModulo(urlLeadAlertaBpm(alerta), "CRM"),
+    })),
     ...tarefasCrm.notificacoes.map((alerta) => ({
       id: `crm-tarefa-${alerta.id}`, origem: "CRM · Tarefas", titulo: alerta.titulo,
       subtitulo: "Lembrete de tarefa", detalhes: detalhesAlertaTarefaBpm(alerta),

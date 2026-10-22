@@ -1,5 +1,23 @@
 # Instagram — Planilha → NoLoss → CRM
 
+## Origem explícita na entrada NoLoss/site do CRM
+
+A entrada separada `POST /api/bpm/noloss-leads/ingest`, autenticada pelo header existente
+`x-noloss-webhook-secret`, continua aceitando `id`, `email`, `firstName`, `lastName` e
+`phone`. Também aceita `utmSource` e `utmMedium` opcionais de até 200 caracteres e
+`utmCampaign` de até 300 caracteres, usando as colunas já existentes.
+Exemplo sem credenciais: `{"id":"contato-sintetico","firstName":"Contato","utmSource":"site"}`.
+
+Somente `utmSource` explícito igual a `site` ou `website`, ignorando caixa e espaços
+externos, identifica origem Site nas notificações. Origem ausente ou diferente usa
+aparência normal; ser um lead NoLoss não comprova Site. A entrada Instagram acima
+continua identificada exclusivamente pelo seu adapter autenticado. Retry com campos
+UTM omitidos preserva os valores anteriores e não reabre lead já promovido.
+
+Essa extensão descreve o contrato aceito pelo CRM; não altera configuração externa,
+variáveis de ambiente ou dados anteriores. O consumidor precisa enviar a proveniência
+para novos recebimentos em que deseje comprovar origem Site.
+
 Contrato v2. A planilha `1vzyEobII90qd6txFhPBu5IwUZ9sISGs-6jYODaVmWsI`, aba `gid=0`, envia ao NoLoss. O servidor NoLoss grava contato/atribuição e encaminha somente os dados comerciais ao Painel Alpha, em **Revisão de Radar → Novo Lead**, como card Instagram pulsante sem responsável.
 
 ## Endereços e credenciais
