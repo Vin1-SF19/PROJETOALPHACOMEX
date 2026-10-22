@@ -96,7 +96,9 @@ export async function gerarFichaServer(params: GerarFichaParams): Promise<GerarF
     logoSrc = undefined; // componente cai no fallback "/LogoTipo02.png"
   }
 
-  const element = React.createElement(FichaAlphaPDF, { dados, userLogado: userName, logoPath: logoSrc });
+  const element = React.createElement(FichaAlphaPDF, {
+    dados, userLogado: userName, logoPath: logoSrc, finalidade: "pre-analise",
+  });
   const buffer = await renderToBuffer(element as Parameters<typeof renderToBuffer>[0]);
 
   // 6. Upload para Vercel Blob
