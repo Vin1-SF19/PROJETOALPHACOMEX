@@ -15,7 +15,7 @@ vi.mock("@/actions/bpm/Cards", () => ({
   ObterRequisitosTransicaoBpm: api.preflight,
   SalvarRequisitosEMoverCardBpm: api.saveAndMove,
 }));
-vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext", () => ({ useCardSave: () => ({ flushSaves: async () => true }) }));
+vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext", () => ({ useCardLeaveGuard: () => async () => true, useCardSave: () => ({ flushSaves: async () => true }) }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CampoBpmInput", async () => {
   const ReactModule = await import("react");
   return { CampoBpmInput: ({ campo, value, onChange, readOnly }: { campo: { id: string }; value: string; onChange: (value: string) => void; readOnly: boolean }) =>

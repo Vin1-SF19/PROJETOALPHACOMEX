@@ -1,11 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { prepararLeadInstagram } from "@/lib/bpm/instagram-leads";
 
-const m = vi.hoisted(() => ({ auth: vi.fn(), acesso: vi.fn(), pipeline: vi.fn(), usuario: vi.fn(), cards: vi.fn(), leads: vi.fn() }));
+const m = vi.hoisted(() => ({ auth: vi.fn(), acesso: vi.fn(), pipeline: vi.fn(), usuario: vi.fn(), cards: vi.fn(), leads: vi.fn(), entradas: vi.fn() }));
 vi.mock("../../auth", () => ({ auth: m.auth }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ default: {
   bpmPipeline: { findUnique: m.pipeline }, usuarios: { findUnique: m.usuario },
   bpmCard: { findMany: m.cards }, nolossLead: { findMany: m.leads },
+  bpmWebhookEntrada: { findMany: m.entradas }, bpmWebhookEndpoint: { findUnique: async () => null },
   bpmEtapaCardViewConfig: { findMany: async () => [] }, bpmInteracaoCard: { findMany: async () => [] },
 } }));
 vi.mock("@/lib/bpm/visao-equipe-server", () => ({ carregarEscopoLeituraBpm: async () => ({ where: {}, setores: [], responsaveis: [] }) }));
@@ -25,6 +27,7 @@ const antigo = {
   _count: { tarefas: 0, anexos: 0 },
 };
 const lead = (id: string, data: string) => ({ id, nome: id, email: null, telefone: null, receivedAt: new Date(data), utmSource: null, utmMedium: null, utmCampaign: null });
+afterEach(() => vi.unstubAllEnvs());
 beforeEach(() => {
   vi.clearAllMocks(); m.auth.mockResolvedValue({ user: { id: "7", role: "ADMIN" } }); m.acesso.mockResolvedValue(undefined);
   m.usuario.mockResolvedValue({ role: "ADMIN" });
@@ -33,6 +36,22 @@ beforeEach(() => {
   m.leads.mockResolvedValue([lead("noloss-antigo", "2026-10-10T12:00:00Z"), lead("noloss-novo", "2026-10-21T12:00:00Z")]);
 });
 describe("hidratação real dos cards do funil", () => {
+  it("mantém a captura do Instagram após assunção na carga e no refresh parcial, sem expor o envelope", async () => {
+    vi.stubEnv("INSTAGRAM_LEADS_ENDPOINT_ID", "instagram-endpoint");
+    const captura = "2026-09-18T09:54:44-05:00";
+    m.entradas.mockResolvedValue([{ evento: { cardId: antigo.id }, payloadSanitizadoJson: JSON.stringify(prepararLeadInstagram({
+      id: "lead-instagram", full_name: "Contato", created_time: captura,
+    })) }]);
+    for (const ids of [undefined, [antigo.id]]) {
+      const resultado = await ListarCardsPipelineBpm("pipeline", ids);
+      expect(resultado.success).toBe(true);
+      const card = resultado.data.find((item) => item.id === antigo.id)!;
+      expect(card).toHaveProperty("instagramCaptadoEm", captura);
+      expect(card.createdAt).not.toBe(captura);
+      expect(card).not.toHaveProperty("payloadSanitizadoJson");
+      expect(card).not.toHaveProperty("instagramDados");
+    }
+  });
   it("intercala cards e NoLoss pela mesma cronologia na carga inicial", async () => {
     const resultado = await ListarCardsPipelineBpm("pipeline");
     expect(resultado.success).toBe(true);

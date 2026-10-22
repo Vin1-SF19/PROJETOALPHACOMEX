@@ -32,6 +32,7 @@ import {
   type CriarTemplateInput,
 } from "@/lib/gerador-documentos/schemas";
 import { renderizarConteudo, validarVariaveisObrigatorias } from "@/lib/gerador-documentos/render";
+import { sincronizarValoresPorExtenso } from "@/lib/gerador-documentos/valores-extenso";
 import { clausulasAtualizaveisContrato } from "@/lib/gerador-documentos/contrato-conferencia";
 import { reescreverClasulaViaIA, identificarVariaveisEClasulasViaIA } from "@/lib/gerador-documentos/onyx";
 import { gerarPdfDocumento } from "@/lib/gerador-documentos/pdf";
@@ -484,6 +485,7 @@ export async function GerarDocumento(payload: unknown) {
       : undefined);
     const clausulasFonte = contratoPadrao?.clausulas ?? template.clausulas;
     const variaveisTemplate = contratoPadrao?.variaveis ?? parseVariaveisJson(template.variaveisJson);
+    input.variaveis = sincronizarValoresPorExtenso(variaveisTemplate, input.variaveis);
     if (contratoPadrao && validarVariaveisObrigatorias(variaveisTemplate, input.variaveis).length) {
       return { success: false as const, error: "Preencha todos os campos obrigatórios do contrato padrão" };
     }
@@ -593,7 +595,7 @@ export async function GerarDocumento(payload: unknown) {
       if (!contratoPadrao) {
         try {
           const rows = await db.$queryRaw<Array<{ htmlUrl: string | null }>>`
-            SELECT "htmlUrl" FROM "DocumentoTemplate" WHERE "id" = ${template.id}
+            SELECT "DocumentoTemplate"."htmlUrl" FROM "DocumentoTemplate" WHERE "id" = ${template.id}
           `;
           templateHtmlUrl = rows[0]?.htmlUrl ?? null;
         } catch {
@@ -735,7 +737,7 @@ export async function ObterDocumentoConferencia(tokenAcesso: string) {
     let htmlUrl: string | null = null;
     try {
       const rows = await db.$queryRaw<Array<{ htmlUrl: string | null }>>`
-        SELECT "htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documento.id}
+        SELECT "DocumentoGerado"."htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documento.id}
       `;
       htmlUrl = rows[0]?.htmlUrl ?? null;
     } catch {
@@ -779,7 +781,7 @@ export async function AtualizarVariaveisContratoPadrao(payload: unknown) {
     if (!anteriores.__bpmCardId) {
       return { success: false as const, error: "Somente o rascunho automático pode atualizar variáveis" };
     }
-    const novos = { ...anteriores, ...input.valores };
+    const novos = sincronizarValoresPorExtenso(VARIAVEIS_CONTRATO_PADRAO, { ...anteriores, ...input.valores });
     const clausulas = await db.documentoClasulaGerada.findMany({
       where: { documentoId: documento.id }, orderBy: { ordem: "asc" },
       select: { id: true, ordem: true, titulo: true, conteudo: true, conteudoOriginal: true, reescritoPorIA: true },
@@ -808,7 +810,7 @@ export async function AtualizarVariaveisContratoPadrao(payload: unknown) {
     ]);
     let colunaHtmlDisponivel = false;
     try {
-      await db.$queryRaw`SELECT "htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documento.id}`;
+      await db.$queryRaw`SELECT "DocumentoGerado"."htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documento.id}`;
       colunaHtmlDisponivel = true;
     } catch {
       // Compatibilidade com ambientes sem a coluna opcional.
@@ -876,7 +878,7 @@ export async function EditarClasulaGerada(payload: unknown) {
     let colunaHtmlDisponivel = false;
     try {
       const rows = await db.$queryRaw<Array<{ htmlUrl: string | null }>>`
-        SELECT "htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documento.id}
+        SELECT "DocumentoGerado"."htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documento.id}
       `;
       colunaHtmlDisponivel = true;
       htmlUrlPersistida = rows[0]?.htmlUrl ?? null;
@@ -991,7 +993,7 @@ export async function ReescreverClasulaComIA(payload: unknown) {
     let colunaHtmlDisponivel = false;
     try {
       rows = await db.$queryRaw<Array<{ htmlUrl: string | null }>>`
-        SELECT "htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documento.id}
+        SELECT "DocumentoGerado"."htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documento.id}
       `;
       colunaHtmlDisponivel = true;
     } catch {
@@ -1115,7 +1117,7 @@ export async function FinalizarDocumento(documentoId: string) {
     let htmlUrl: string | null = null;
     try {
       const rows = await db.$queryRaw<Array<{ htmlUrl: string | null }>>`
-        SELECT "htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documentoId}
+        SELECT "DocumentoGerado"."htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documentoId}
       `;
       htmlUrl = rows[0]?.htmlUrl ?? null;
     } catch {

@@ -69,7 +69,8 @@ import { sincronizarProximoContatoAgenda } from "@/lib/bpm/proximo-contato-agend
 import { etapaEhEmTratativa, etapaEhSemViabilidade, obterErroProximoContatoParaEntrada } from "@/lib/bpm/em-tratativa";
 import { obterErroProximoContatoParaMovimento } from "@/lib/bpm/proximo-contato";
 import { buscarNolossLeadsPendentes } from "@/lib/bpm/noloss-leads";
-import { buscarInstagramLeadsPendentes } from "@/lib/bpm/instagram-leads-server";
+import { buscarDatasFormularioInstagram, buscarInstagramLeadsPendentes } from "@/lib/bpm/instagram-leads-server";
+import { obterRecebimentoPipelineBpm, carregarRecepcoesPipelineBpm, idRecepcaoPipeline } from "@/lib/bpm/recebimentos-card-server";
 import { cardApareceNoQuadro, etapasComSaidaDoQuadro } from "@/lib/bpm/cards-no-quadro";
 import { paraExibicaoTelefone } from "@/lib/validations/cs-nps";
 import { iniciarLigacaoCallix, normalizarTelefoneCallix } from "@/lib/callix/click-to-call";
@@ -146,6 +147,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
         where: { id: pipelineId },
         select: {
           nome: true,
+          chave: true,
           visualizacaoConfigJson: true,
           setores: { select: { setor: { select: { nome: true, ativo: true } } } },
           etapas: {
@@ -286,6 +288,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     });
 
+    const datasFormularioInstagram = await buscarDatasFormularioInstagram(pipelineId, cards.map((card) => card.id));
     const idsDestinos = [...new Set(cards.flatMap((card) => card.vinculosOrigem.map((vinculo) => vinculo.cardDestino.id)))];
     const vinculosPosteriores = idsDestinos.length ? await db.bpmCardVinculo.findMany({
       where: { cardOrigemId: { in: idsDestinos }, cardDestino: { pipeline: { ativo: true }, status: { not: "ARQUIVADO" } } },
@@ -490,6 +493,9 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
       return { nativos, campos, camposLabel };
     }
 
+    const recepcoesCards = await carregarRecepcoesPipelineBpm((pipelineInfo?.chave === "financeiro"
+      || ehPipelineOperacional({ id: pipelineId, chave: pipelineInfo?.chave ?? null }))
+      ? cards.map((card) => idRecepcaoPipeline(card.id)) : []);
     const cardsReais = cards.filter((card) => cardApareceNoQuadro(card, pipelineInfo?.etapas ?? [], etapasComSaida))
       .map((card) => {
       const { vinculosOrigem, ...cardSemVinculos } = card;
@@ -511,12 +517,14 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
         && card.status === "CONCLUIDO" && encaminhamentos.length === 0;
       return {
         ...cardSemVinculos,
+        recebimentoPendente: Boolean(recepcoesCards.has(card.id) && !recepcoesCards.get(card.id)?.claim),
         importadoRd: possuiOrigemImportadaRd(card.origemExterna),
         podeMoverLivremente: Boolean(movimentoLivre),
         sla,
         origem: "real" as const,
         nolossLeadId: null as string | null,
         veioNoloss: card.nolossLeadOrigem.length > 0,
+        instagramCaptadoEm: datasFormularioInstagram.get(card.id) ?? null,
         ligacoesHoje: ehNovoLead ? (ligacoesPorCard.get(card.id) ?? 0) : 0,
         metaLigacoesDia: META_LIGACOES_NOVOS_LEADS,
         diasUteisDecorridos: ehNovoLead
@@ -590,6 +598,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
           campoValores: [],
           sla: null,
           origem: "noloss" as const,
+          recebimentoPendente: false,
           importadoRd: false,
           podeMoverLivremente: false,
           nolossLeadId: lead.id,
@@ -623,7 +632,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
           primeiraVisualizacaoEm: null, proximoContatoEm: null, dataReuniao: null, googleMeetLink: null, statusPosFechamento: null,
           empresa: { id: 0, razaoSocial: lead.dados.nome, cnpj: lead.dados.cnpj, nomeFantasia: null },
           responsavel: { id: 0, nome: "Sem responsável" }, membros: [], _count: { tarefas: 0, anexos: 0 }, tarefas: [],
-          campoValores: [], sla: null, origem: "instagram" as const, importadoRd: false, podeMoverLivremente: false,
+          campoValores: [], sla: null, origem: "instagram" as const, recebimentoPendente: false, importadoRd: false, podeMoverLivremente: false,
           nolossLeadId: null, instagramLeadId: lead.id, instagramDados: lead.dados,
           ligacoesHoje: 0, metaLigacoesDia: META_LIGACOES_NOVOS_LEADS, diasUteisDecorridos: 0, diaCiclo: 1,
           podeAgirEtapa: permissaoNovosLeads.podeAgir,
@@ -864,13 +873,16 @@ export async function ObterCardBpm(cardId: string) {
       : origemFinanceira ? await carregarResumoContratacao(origemFinanceira.cardOrigemId)
         : financeiroVisivel ? await carregarResumoContratacao(financeiroVisivel) : null;
     const usuariosCampos = await carregarUsuariosCamposBpm(
-      card.campoValores.filter(({ campo }) => campo.tipo === "usuario").map(({ valor }) => valor), false,
+      [...card.campoValores.filter(({ campo }) => campo.tipo === "usuario").map(({ valor }) => valor),
+        ...camposEtapa.filter((campo) => campo.tipo === "usuario").map((campo) => campo.valor)], false,
     );
 
     return {
       success: true,
       data: {
         ...card,
+        recebimentoPipeline: card.pipeline.chave === "financeiro" || ehPipelineOperacional(card.pipeline)
+          ? await obterRecebimentoPipelineBpm(card.id, Number(session.user.id)) : null,
         campoValores: card.campoValores.map((item) => ({
           ...item,
           valorExibicao: item.campo.tipo === "usuario" ? nomeUsuarioCampoBpm(item.valor, usuariosCampos) : item.valor,
@@ -883,7 +895,8 @@ export async function ObterCardBpm(cardId: string) {
           ? await resolverDocumentosContratacaoComercial(card.id) : null,
         emailClienteReuniao,
         anexos: card.anexos.map((anexo) => ({ ...anexo, url: `/api/bpm/anexos/${anexo.id}` })),
-        camposEtapa,
+        camposEtapa: camposEtapa.map((campo) => ({ ...campo,
+          valorExibicao: campo.tipo === "usuario" ? nomeUsuarioCampoBpm(campo.valor, usuariosCampos) : campo.valor })),
         camposCorrigidosFinanceiro: [...camposCorrigidosFinanceiro],
         formularioEtapa,
         encaminhado: acessoCard.bloqueadoPorEncaminhamento === true,

@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import db from "@/lib/prisma";
+import { notificarPendenciasLeadsBpm } from "@/lib/bpm/notificacoes-leads-server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -30,6 +31,9 @@ const ingestSchema = z.object({
   firstName: z.string().optional().nullable(),
   lastName: z.string().optional().nullable(),
   phone: z.string().optional().nullable(),
+  utmSource: z.string().trim().max(200).nullable().optional(),
+  utmMedium: z.string().trim().max(200).nullable().optional(),
+  utmCampaign: z.string().trim().max(300).nullable().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -52,7 +56,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { id, email, firstName, lastName, phone } = parsed.data;
+  const { id, email, firstName, lastName, phone, ...atribuicao } = parsed.data;
   const nome = [firstName, lastName].filter((parte) => parte?.trim()).join(" ").trim() || null;
 
   try {
@@ -66,7 +70,7 @@ export async function POST(req: NextRequest) {
       // de volta para pending, só atualiza os dados de contato.
       await db.nolossLead.update({
         where: { id: existente.id },
-        data: { nome, email: email ?? null, telefone: phone ?? null },
+        data: { nome, email: email ?? null, telefone: phone ?? null, ...atribuicao },
       });
     } else {
       await db.nolossLead.create({
@@ -76,10 +80,17 @@ export async function POST(req: NextRequest) {
           email: email ?? null,
           telefone: phone ?? null,
           status: "pending",
+          ...atribuicao,
         },
       });
     }
 
+    if (!existente) {
+      try {
+        const pipeline = await db.bpmPipeline.findFirst({ where: { nome: "Revisão de Radar", ativo: true }, select: { id: true } });
+        if (pipeline) await notificarPendenciasLeadsBpm({ pipelineId: pipeline.id });
+      } catch { console.error("[NoLoss] Atualização de pendências indisponível após ingresso confirmado"); }
+    }
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     console.error("[POST /api/bpm/noloss-leads/ingest]", error);

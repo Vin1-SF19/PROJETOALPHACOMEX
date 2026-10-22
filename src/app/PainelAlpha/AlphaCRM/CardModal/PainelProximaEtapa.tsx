@@ -10,7 +10,7 @@ import { ObterResumoChecklistCardBpm } from "@/actions/bpm/Checklists";
 import { extrairPayloadOrigem, lerRascunhoOrigem, valorInicialCampo, type ParceiroOrigemBpm } from "@/lib/bpm/origem-cliente";
 import { CampoBpmInput } from "@/app/PainelAlpha/AlphaCRM/CampoBpmInput";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useCardSave } from "./CardSaveContext";
+import { useCardLeaveGuard, useCardSave } from "./CardSaveContext";
 import { BPM_CAPABILITIES, BPM_STAGE_KEYS } from "@/lib/bpm/ontology";
 import { transcricaoRealRegistrada } from "@/lib/bpm/reuniao-agendada";
 import { formularioExigeCapacidade } from "@/lib/bpm/formulario-renderer";
@@ -44,6 +44,7 @@ interface Props {
 
 export default function PainelProximaEtapa({ card, etapas, currentUserId = null, podeMoverEtapa, realtimeRevision = 0, accent, onMovido }: Props) {
   const router = useRouter();
+  const solicitarSaida = useCardLeaveGuard();
   const { flushSaves } = useCardSave();
   const [movendoEtapa, setMovendoEtapa] = useState(false);
   const [movimentoRdPendente, setMovimentoRdPendente] = useState<MovimentoRdPendente | null>(null);
@@ -156,7 +157,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
             toast.success(`Card interligado criado no pipeline ${filho.pipelineNome}.`, {
               action: {
                 label: "Ver card",
-                onClick: () => router.push(`/PainelAlpha/AlphaCRM/pipeline/${filho.pipelineId}`),
+                onClick: () => { void solicitarSaida().then((allowed) => { if (allowed) router.push(`/PainelAlpha/AlphaCRM/pipeline/${filho.pipelineId}`); }); },
               },
             });
           }

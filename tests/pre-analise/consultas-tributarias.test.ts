@@ -146,16 +146,26 @@ describe("composição RadarFiscal", () => {
   });
 });
 
-describe("ConsultaRadar externa", () => {
+describe("ConsultaRadar pela API do ialpha", () => {
   it.each([
-    [{ success: false, data: { situacao: "Habilitada" } }, 502],
+    [{ success: false, data: { situacao: "HABILITADA" } }, 502],
     [{ success: true, data: null }, 502],
     [{ success: true, data: {} }, 502],
-  ])("rejeita erro lógico ou resultado vazio: %j", async (payload, status) => {
+  ])("rejeita erro lógico ou resultado incompleto: %j", async (payload, status) => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => payload }));
     const response = await consultaRadar(request());
     expect(response.status).toBe(status);
     expect(await response.text()).not.toContain("segredo-de-teste");
+  });
+
+  it("mantém o contrato público e envia somente a raiz com autenticação server-side", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ success: true, data: { situacao: "Habilitada", razaoSocial: "EMPRESA TESTE", modalidade: "Ilimitada", dataSituacao: "09/12/2021 10:36:07", dataAtualizacaoPublicada: "08/10/2026 16h13" }, raw: "Resultado" }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await consultaRadar(request());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ cnpj: "33000167", contribuinte: "EMPRESA TESTE", situacao: "Habilitada", modalidade: "Ilimitada", dataAtualizacaoPublicada: "08/10/2026 16h13" });
+    expect(fetchMock.mock.calls[0][0]).toBe("https://consulta-radar.alpha-comex.com/consultar/33000167?fonte=csv");
+    expect(fetchMock.mock.calls[0][1].headers).toEqual({ Authorization: "Bearer segredo-de-teste" });
   });
 
   it("rejeita HTTP externo não 2xx e JSON inválido", async () => {
@@ -168,16 +178,21 @@ describe("ConsultaRadar externa", () => {
   });
 
   it("retorna somente campos públicos após sucesso", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ success: true, data: { situacao: "Habilitada", razaoSocial: "EMPRESA TESTE", modalidade: "Ilimitada", dataSituacao: "09/12/2021 10:36:07", token: "segredo-de-teste" }, raw: "Resultado Siscomex" }) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({
+      success: true,
+      data: {
+        situacao: "HABILITADA",
+        razaoSocial: "EMPRESA TESTE",
+        modalidade: "ILIMITADA",
+        token: "segredo-de-teste",
+      },
+      raw: "Resultado",
+    }) });
     vi.stubGlobal("fetch", fetchMock);
     const response = await consultaRadar(request());
-    expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body).toMatchObject({ cnpj: "33000167", contribuinte: "EMPRESA TESTE", situacao: "Habilitada", modalidade: "Ilimitada", submodalidade: "Ilimitada", dataSituacao: "09/12/2021 10:36:07", raw: "Resultado Siscomex" });
+    expect(body).toMatchObject({ cnpj: "33000167", razaoSocial: "EMPRESA TESTE", modalidade: "ILIMITADA" });
     expect(JSON.stringify(body)).not.toContain("segredo-de-teste");
-    expect(fetchMock.mock.calls[0][0]).toBe("https://consulta-radar.alpha-comex.com/consultar/33000167");
-    expect(fetchMock.mock.calls[0][1].headers).toEqual({ Authorization: "Bearer segredo-de-teste" });
-    expect(fetchMock.mock.calls[0][1].body).toBeUndefined();
   });
 
   it.each([
@@ -185,14 +200,14 @@ describe("ConsultaRadar externa", () => {
     [400, {}, "UPSTREAM_BAD_REQUEST", 502],
     [401, {}, "UPSTREAM_UNAUTHORIZED", 502],
     [502, { code: "BLOCKED_BY_CAPTCHA" }, "BLOCKED_BY_CAPTCHA", 502],
-  ])("mapeia HTTP %s da API externa", async (upstream, payload, code, status) => {
+  ])("mapeia HTTP %s da API do ialpha", async (upstream, payload, code, status) => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: upstream, json: async () => payload }));
     const response = await consultaRadar(request());
     expect(response.status).toBe(status);
     expect(await response.json()).toMatchObject({ code });
   });
 
-  it("trata timeout sem vazar detalhes", async () => {
+  it("não vaza detalhes do erro retornado pela API do ialpha", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("segredo-de-teste")));
     const response = await consultaRadar(request());
     expect(response.status).toBe(502);

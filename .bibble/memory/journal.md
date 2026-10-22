@@ -7306,3 +7306,147 @@ Conferir READY/SHA/alias e realizar reteste autenticado dos slots, anexos e noti
 - PDF autenticado 200/1.173 bytes e preview UI; um anexo somente leitura; um aviso real ao responsável com horário/empresa/documento. Reabrir/refetch manteve o mesmo alerta, tarefa e alertaEm, sem duplicar. Assinado permaneceu pendente/404. Zero novo erro da feature; voz 503 preexistente separada.
 - Limites: geração/finalização automática e signed positivo cobertos localmente, não no remoto. Sem assinatura/pagamento/NF/conclusão ou envio externo fabricados, sem produção, schema, ENV ou worker/global manual. A UI financeira pode executar seu housekeeping existente; não se promete zero efeitos indiretos.
 - Evidências privadas `remote-result.json`/`remote-dedup-proof.json`; relatório sanitizado `docs/reports/validacao-contratos-pendentes-staging-2026-10-21.md`. Histórico anterior deste journal preservado; fechamento documental único após QA final.
+
+
+---
+
+## [2026-10-21 20:36 UTC] — CRM: minuta seletiva integrada, reteste pendente
+
+**Tags:** #bugfix #integration #security #nextjs #prisma
+**Agentes envolvidos:** coordenação, Scout/Architect, SM, backend/Echo, QA, Forge, DevOps, Scribe, Kowalski.
+**Arquivos tocados:** seis módulos backend de movimento/eventos/fila/minuta listados no codebase-map; story e arquitetura da geração documental. Esta consolidação altera somente três memórias.
+
+### Contexto
+Movimento livre de Admin/líder suprimia também a geração configurada da minuta. Usuário confirmou execução desta correção somente no staging.
+
+### O que foi feito
+- Marcador emitido pelo servidor e comprovado por histórico causal; classificador GERAR_CONTRATO → FIM e gates de autoridade/configuração/etapa/condição antes da materialização e do worker.
+- Flush após commit limitado ao novo card/evento, incluindo fila/resgate/leases; histórico antigo e demais efeitos permanecem suprimidos. Engine normal preserva o comportamento anterior.
+- Quatro gates sobre daf88 PASS: 706 arquivos/5.557 testes, quatro skipped/um todo, tipos/lint/build exit 0, custódia d55d. Integração bfff: 11 arquivos/158 testes PASS, lint 0 e typecheck oficial 8 GiB exit 0 após OOM do wrapper de 4 GiB; OOM operacional não foi diagnóstico de tipos. Fontes preservadas e QA local APPROVED.
+- Feature `55183c0a`, merge `71e3f06f` preserva `bfff9d36`; push staging realizado, deployment informado `dpl_2eyf…` ainda BUILDING no checkpoint.
+
+### Decisões tomadas
+Somente minuta CONFERENCIA; não antecipar verde/alerta Comercial, assinatura, pagamento ou envio. Finalização/documentos da entrega 5e3 permanecem independentes. Sem botão adicional, reativação de eventos antigos ou mudança de configuração.
+
+### Problemas encontrados / resolvidos
+Resgate da fila recebeu escopo exclusivo do novo modo sem alterar chamadas normais. Avanço concorrente Instagram foi preservado. Wrapper de typecheck sem memória suficiente foi substituído por execução oficial com capacidade adequada.
+
+### Pendências
+READY/SHA/alias e reteste real permanecem pendentes. Fixture nova de staging por CRUD normal: empresa fictícia 3067, Comercial `cmvik1dca000007lbpk109m6s` em Fechado e Financeiro `cmvikcyuc000408lh12sidz07` em Novo Contrato, baseline zero documentos. Não se afirma geração, prontidão ou conclusão. Preservar empresa fictícia 3066 e seu PDF manual; produção fora do escopo, sem migration/backfill/configuração em lote ou alteração de ENV.
+
+### Refletido também em
+- `codebase-map.md`: seis módulos e limites da entrega.
+- `integration-points.md`: marcador, prova, gates e flush direcionado.
+
+### Fechamento remoto confirmado — minuta seletiva
+- Staging `71e3f06f` / `dpl_2eyf3ifNfvM587DptJ7wacBUGMob` READY/SHA/alias conferidos. Admin real e empresa fictícia3067: uma minuta CONFERENCIA, um anexo no campo correto e PDF de prévia autenticado; reentrada preservou os IDs, com `existente=true`.
+- Dois SUCESSO de entrada; um registro IGNORADA/zero tentativas na saída para NovoContrato. Quinze assertivas finais PASS; Comercial pendente/zero alerta, estados financeiros vazios e ambos os cards3066 deep/hash idênticos. Checker inicial de cardinalidade foi preservado e corrigido apenas na evidência privada.
+- Tempos observados 22,634s/18,624s, sem teste de carga. Voz503 e avisos de navegador separados. Empresa real somente diagnosticada; não reprocessar eventos antigos. Líder e finalização não foram exercitados remotamente. Sem produção/migration/backfill/ENV ou worker global/CLI manual.
+- Relatório sanitizado `docs/reports/validacao-minuta-movimento-livre-staging-2026-10-21.md`; memórias e story fechadas em um único conjunto documental após QA. Entradas anteriormente versionadas preservadas.
+
+- No fechamento, avanço externo `86858e7e` (GeradorDocumentos/extenso) foi preservado por FF normal, mantendo nossos nove módulos/testes byte a byte. Seus gates próprios combinados e build padrão remoto READY/Node24.x foram conferidos; smoke autenticado readonly manteve a minuta CONFERENCIA, PDF de prévia 200 e Comercial404, sem movimento. E2E completo permanece historicamente em71e3; commit final é só documental e compara runtime/deps/testes à base868.
+
+
+---
+
+## [2026-10-22 13:03 UTC] — CRM: notificações e assunção setorial implementadas, gates pendentes
+
+**Tags:** #feature #integration #security #nextjs #prisma
+**Agentes envolvidos:** coordenação, Scout/Architect, SM, Echo, Nova, QA, Forge, Scribe, Kowalski.
+**Arquivos tocados:** libs de notificações/recepção/navegação, actions e ingressos, central/hook/board e dois componentes novos; File List completa na story `story-crm-notificacoes-leads-sem-responsavel-20261022.md`. Esta consolidação altera a story e três memórias.
+
+### Contexto
+Usuário pediu toast por origem e aviso persistente até assunção, incluindo todos os integrantes autorizados do Financeiro/Operacional, preservando responsáveis dos setores anteriores e vendedor comercial.
+
+### O que foi feito
+- Fonte local entregue/congelada pelos owners: projeção readonly, central integrada, recuperação completa, cores por proveniência e navegação virtual/nativa sem assumir no clique.
+- Recepção de encaminhamento novo e claim CAS/histórico/outbox; nominal herdado não conta como assumido. Dois componentes reutilizáveis documentados: LeadNotificacaoToast e PainelRecebimentoCard.
+- Checks focados: backend 182/182 em 12 arquivos, incluindo 64 casos de segurança e sete SQLite; frontend 100/100 em 18. Lint focado 0, typecheck backend oficial 8 GiB 0. Não somar subconjuntos de testes como novas execuções globais.
+
+### Decisões tomadas
+- Audiência de visualização e autorização para assumir são distintas; manter guardas e não criar exceção Admin para testar.
+- Claim Financeiro pendente ATIVO já encaminhado é atribuição específica: mantém trabalho/edição readonly e snapshot Operacional imutável. Vendedor automático continua Comercial; sem prova, vazio/fallback Comercial inequívoco, inclusive legado readonly.
+- Site conectado por proveniência opcional no ingresso existente; sem schema/migration/backfill ou alteração em produção.
+
+### Problemas encontrados / resolvidos
+- Operacional real pode ter chave nula: helper canônico por ID usado; caso coberto nos sete SQLite finais, não atribuído isoladamente aos 64 adversariais.
+- Tentativa frontend de tipos com 4 GiB terminou em OOM antes de diagnósticos; não é erro de tipos nem aprovação. Forge executa a verificação integrada.
+
+### Pendências
+Quatro gates integrados, QA final, commit/push, deploy/alias e smoke staging ainda pendentes neste checkpoint; não se afirma READY remoto ou teste autenticado multicliente. Confirmar CRM efetivo do líder operacional pelo fluxo normal antes do smoke; nenhum override aplicado por esta consolidação. Produção fora do escopo. Evidências privadas em `/var/tmp/alpha-crm-notificacoes-leads-20261022/`, sem dados reais/segredos versionados.
+
+### Refletido também em
+- `codebase-map.md`: módulos, componentes e limites da entrega local.
+- `integration-points.md`: producers, central, navegação e claim por setor; story atualizada sem tocar QA Results.
+
+
+### Atualização posterior — 2026-10-22 13:04:52 UTC
+- Líder operacional recebeu CRM efetivo via override individual CRM ADD pelo CRUD normal da UI de staging, Admin real e 200/sucesso. Papel e cinco outras permissões efetivas preservados; verificação SELECT posterior do DevOps ainda pendente. Operação atende à configuração solicitada do líder; nenhuma exceção de ACL/sessão de teste foi criada.
+- Trata-se de configuração normal do aplicativo: não afirmar zero escritas globais. Sem SQL manual/migration/bulk/ENV/worker manual/produção. Provas privadas em `/var/tmp/alpha-crm-notificacoes-leads-sem-responsavel-20261022/` (arquivos de UI de permissão), não versionadas.
+- Forge: typecheck integrado 8,54 s/exit 0 e lint integrado 52,24 s/exit 0; resultado final dos quatro gates, QA, publicação e smoke ainda aguardam consolidação. Nenhuma prova multicliente remota presumida.
+
+
+---
+
+## [2026-10-22 13:47 UTC] — CRM: notificações e recepção setorial publicadas em staging
+
+**Tags:** #feature #integration #security #nextjs #prisma
+**Agentes envolvidos:** coordenação, Echo, Nova, Forge, QA, DevOps, Scribe/Kowalski.
+**Arquivos tocados:** story da entrega, relatório de validação e três memórias; fontes em `67f14b93`/merge `60ae49ff`.
+
+### Contexto
+Concluir central persistente de leads e recepção/assunção Financeiro/Operacional, preservando Comercial e permissões existentes.
+
+### O que foi feito
+- Quatro gates reais da base PASS (720 arquivos/5.739 testes) e integração preservadora do formulário Instagram com tipos/lint afetado e suíte 720/5.756 PASS. Nenhum teste falhou; quatro skipped/um todo.
+- Staging publicado em `60ae49ff`; conclusão GitHub/Vercel e ID de deployment nos assets canônicos correspondentes. Smoke público e Admin real com encaminhamento de fixture C→F→O PASS.
+- Leitura independente: dois recebimentos pendentes, três cards/três vínculos, vendedor anterior preservado, zero documentos/anexos/assinatura/pagamento/NF fabricados. Helpers reais em Prisma RO confirmaram audiência/capacidade setorial e negação cruzada; 109 leituras/zero writes.
+- CRUD normal UI de CRM da liderança Operacional foi confirmado como um override aditivo; doze checks preservam demais acessos. Nenhuma escrita SQL manual ou alteração estrutural.
+
+### Decisões tomadas
+- Manter Admin fora do setor sem claim e separar diagnóstico de read-model de uma sessão/assunção real. Não inventar responsável Financeiro no snapshot Operacional enquanto pendente.
+- API Vercel 403: usar prova GitHub commit/deployment + assets do domínio sem mudar credenciais. Produção permanece fora do escopo.
+
+### Problemas encontrados / resolvidos
+- Import dinâmico no diagnóstico CLI exigiu loader ESM TypeScript; fonte do app inalterada. Harness de captura após criação falhou; card único confirmado sem repetir criação.
+- Voz503 e avisos de navegador observados separadamente; sem pageerror, sem alegar console integralmente limpo.
+
+### Pendências
+Nenhuma implementação adicional nesta entrega staging. Ingestão IG/site ao vivo, toast multicliente e claim positivo por sessões setoriais não foram testados remotamente; cobertos localmente. Sem produção, migration, backfill, ENV ou worker manual. Fechamento documental acompanha o mesmo runtime, sem novo teste funcional por Markdown.
+
+### Refletido também em
+- `codebase-map.md` e `integration-points.md`: módulos e conclusão factual.
+- `docs/reports/crm-notificacoes-leads-staging-20261022.md`: evidências e limites sanitizados.
+
+
+---
+
+## [2026-10-22 13:59 UTC] — CRM: contrato de observação TI/Admin
+
+**Tags:** #bugfix #decision #security #integration
+**Agentes envolvidos:** coordenação, Scout/Architect, Echo, QA, DevOps.
+**Arquivos tocados:** story e arquitetura existentes de notificações CRM; memórias de mapa/integrações/journal. Nenhum runtime por esta análise.
+
+### Contexto
+Usuário TI não recebeu notificações e pediu recebê-las para testar/ver. A audiência setorial anterior excluía Admin/TI apesar do acesso administrativo de leitura.
+
+### O que foi feito
+AC18 e adendo definidos antes da implementação sobre 69047dee limpa/conferida: mesmo GET/fanout/lookup, observador ADMIN/TI exato, sem incluir CEO. Blueprint liberado a Echo e QA.
+
+### Decisões tomadas
+Recipient observador tem podeAgir=false; claim nativo continua exigindo setor e guardas atuais. Promoção virtual anterior não muda. Abrir nativo pode registrar primeiro acesso/SLA preexistentes; não é claim nem promessa de zero escrita global.
+
+### Problemas encontrados / resolvidos
+isAdminRole também inclui CEO e não serve à exceção solicitada. O mesmo helper de audiência é consumido pelo claim; defesa setorial explícita impede ampliação de autoridade.
+
+### Pendências
+Implementação, quatro gates, revisão e smoke da correção em staging; resultados remotos devem ter evidência própria. Sem migração/configuração/ENV/produção ou revalidação presumida pelos gates anteriores.
+
+### Refletido também em
+- `codebase-map.md` e `integration-points.md`: exceção de observação com fronteira de claim preservada.
+
+
+### Atualização local — correção TI/Admin observador
+- Forge quatro gates reais PASS: tipos0/47,36s, lint0/52,40s (1.193 warnings existentes), novo build0/216,68s e suíte completa0/193,11s: 720 arquivos/5.784 aprovados, zero falhas, quatro skipped/um todo. Fonte `1fc1f5e59524c39c21890cd031376f8bc949474cfd7217f7d19c830b169600a9` idêntica antes/depois.
+- Client Prisma compartilhado divergente foi isolado em artefato privado compatível com o schema fonte, sem instalar/atualizar pacotes, modificar o client alheio ou alterar schema. Nove SQLite PASS após o ajuste do harness; primeira falha preservada. Aprendizado registrado em `known-errors.md`.
+- QA local APPROVED libera publicação; teste visual autenticado Admin da correção permanece pendente. Este commit será Ready for Review, com evidência remota posterior somente privada; não declarar novo READY antes de acontecer e não criar rodada recursiva de docs. Produção/banco remoto/ENV/worker manual fora do escopo.

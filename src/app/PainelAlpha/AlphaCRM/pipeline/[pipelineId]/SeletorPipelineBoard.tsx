@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRightLeft, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useCardLeaveGuard } from "@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext";
 
 export type PipelineDisponivel = { id: string; nome: string };
 
@@ -13,13 +14,14 @@ export function SeletorPipelineBoard({ atual, pipelines, bloqueado = false }: {
   bloqueado?: boolean;
 }) {
   const router = useRouter();
+  const solicitarSaida = useCardLeaveGuard();
   const [trocando, iniciarTroca] = useTransition();
   const opcoes = pipelines.some((pipeline) => pipeline.id === atual.id) ? pipelines : [atual, ...pipelines];
   const desabilitado = bloqueado || trocando || opcoes.length < 2;
 
   function trocar(pipelineId: string) {
     if (desabilitado || pipelineId === atual.id || !opcoes.some((pipeline) => pipeline.id === pipelineId)) return;
-    iniciarTroca(() => router.push(`/PainelAlpha/AlphaCRM/pipeline/${encodeURIComponent(pipelineId)}`));
+    void solicitarSaida().then((allowed) => { if (allowed) iniciarTroca(() => router.push(`/PainelAlpha/AlphaCRM/pipeline/${encodeURIComponent(pipelineId)}`)); });
   }
 
   return (

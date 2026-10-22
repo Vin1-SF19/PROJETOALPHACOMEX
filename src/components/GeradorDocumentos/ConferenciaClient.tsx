@@ -15,6 +15,7 @@ import {
   FinalizarDocumento,
   AtualizarVariaveisContratoPadrao,
 } from "@/actions/gerador-documentos";
+import { campoExtensoAutomatico, sincronizarValoresPorExtenso } from "@/lib/gerador-documentos/valores-extenso";
 import { ReescreverIA } from "./ReescreverIA";
 
 interface ClasulaGerada {
@@ -48,8 +49,11 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
   const [clausulas, setClausulas] = useState(documento.clausulas);
   const definicoes = documento.variaveisDefinicoes ?? [];
   const valoresIniciais = (typeof documento.variaveisJson === "string" ? JSON.parse(documento.variaveisJson) : documento.variaveisJson ?? {}) as Record<string, unknown>;
-  const [variaveis, setVariaveis] = useState<Record<string, string>>(Object.fromEntries(definicoes.map((item) => [item.nome, String(valoresIniciais[item.nome] ?? "")])));
-  const [variaveisSalvas, setVariaveisSalvas] = useState<Record<string, string>>(variaveis);
+  const salvasIniciais = Object.fromEntries(definicoes.map((item) => [item.nome, String(valoresIniciais[item.nome] ?? "")]));
+  const [variaveis, setVariaveis] = useState<Record<string, string>>(() =>
+    documento.status === "FINALIZADO" || documento.status === "ARQUIVADO"
+      ? salvasIniciais : sincronizarValoresPorExtenso(definicoes, salvasIniciais));
+  const [variaveisSalvas, setVariaveisSalvas] = useState<Record<string, string>>(salvasIniciais);
   const [status, setStatus] = useState(documento.status);
   const [pdfDisponivel, setPdfDisponivel] = useState(documento.pdfDisponivel);
   const [pdfStatus, setPdfStatus] = useState<"loading" | "success" | "error">("loading");
@@ -157,7 +161,9 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
         }
         setClausulas(resultado.data.clausulas);
         setConteudosSalvos(Object.fromEntries(resultado.data.clausulas.map((clausula) => [clausula.id, clausula.conteudo])));
-        setVariaveisSalvas({ ...variaveis });
+        const salvas = Object.fromEntries(definicoes.map((item) => [item.nome, String(resultado.data.variaveisJson[item.nome] ?? "")]));
+        setVariaveis(salvas);
+        setVariaveisSalvas(salvas);
         setPdfDisponivel(resultado.data.pdfDisponivel);
         setPdfStatus("loading");
         setPdfRevision((revision) => revision + 1);
@@ -225,8 +231,11 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
               {item.label}{item.obrigatorio ? " *" : ""}
               <Input className="mt-1" type={item.tipo === "data" ? "date" : item.tipo === "moeda" ? "number" : "text"}
                 step={item.tipo === "moeda" ? "0.01" : undefined}
+                inputMode={item.tipo === "moeda" || item.nome === "desconto_valor" ? "decimal" : undefined}
+                readOnly={campoExtensoAutomatico(item.nome, definicoes)}
+                title={campoExtensoAutomatico(item.nome, definicoes) ? "Preenchido automaticamente a partir do valor" : undefined}
                 value={variaveis[item.nome] ?? ""}
-                onChange={(event) => setVariaveis((atual) => ({ ...atual, [item.nome]: event.target.value }))}
+                onChange={(event) => setVariaveis((atual) => sincronizarValoresPorExtenso(definicoes, { ...atual, [item.nome]: event.target.value }, item.nome))}
                 disabled={isPending} />
             </label>)}
           </div>

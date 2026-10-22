@@ -11,6 +11,7 @@ import { headers } from "next/headers";
 import { statusPermiteAcessoPainel } from "@/lib/auth/acesso-painel";
 import { ListarLinksExternosVisiveis, type LinkExternoVisivel } from "@/actions/LinksExternos";
 import { PainelEmbeddedReady } from "@/components/layout/PainelEmbeddedReady";
+import { PainelCardState } from "./AlphaCRM/CardModal/CardModalHost";
 import {
   isValidPainelFrameId,
   PAINEL_EMBED_HEADER,
@@ -76,7 +77,7 @@ export default async function PainelLayout({
   if (isEmbedded) {
     return (
       <div className="min-h-dvh bg-[#020617]" data-alpha-embedded="true">
-        {children}
+        <PainelCardState>{children}</PainelCardState>
         <PainelEmbeddedReady frameId={frameId} />
       </div>
     );
@@ -96,7 +97,7 @@ export default async function PainelLayout({
         onboardingVideo={onboardingVideo}
         linksExternos={linksExternos}
       >
-        {children}
+        <PainelCardState>{children}</PainelCardState>
       </PainelLayoutClient>
     </div>
   );

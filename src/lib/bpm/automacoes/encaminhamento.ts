@@ -10,6 +10,7 @@ import { carregarCamposFaltantesCardEtapa } from "@/lib/bpm/requisitos-etapa-ser
 import { ehPipelineOperacional } from "@/lib/bpm/financeiro-config.client";
 import { publicarEventoBpm } from "./eventos";
 import { parametrosEncaminhamentoSchema } from "./schemas";
+import { registrarRecepcaoPipelineBpm } from "@/lib/bpm/recebimentos-card-server";
 
 function parseObjeto(valor: string | null): Record<string, unknown> {
   try { const parsed: unknown = JSON.parse(valor ?? "{}");
@@ -203,7 +204,16 @@ export async function executarEncaminhamentoBpm(input: {
         pipelineId, valorNovo: { etapaId, cardOrigemId: card.id, ...(administrativo ? { automacoesSuprimidas: true } : {}) }, atorTipo: administrativo ? "USUARIO" : "AUTOMACAO",
         atorUserId: administrativo?.usuarioId, atorExecucaoId: input.execucaoId, correlationId: contexto.correlationId,
         causationId: contexto.causationId, profundidade: contexto.profundidade, idempotencyKey: `automacao:${input.execucaoId}:card-criado:${criado.id}` }, tx);
-      return { cardId: criado.id, existente: false, versao: card.versao + 1 };
+      const recepcao = pipelineDestino.chave === "financeiro" || ehPipelineOperacional(pipelineDestino)
+        ? await registrarRecepcaoPipelineBpm(tx, card.id, criado.id, input.execucaoId) : null;
+      return { cardId: criado.id, existente: false, versao: card.versao + 1,
+        ...(recepcao ? { recepcao: { pipelineId, etapaId } } : {}) };
   };
-  return client ? executar(client) : db.$transaction(executar);
+  if (client) return executar(client);
+  const resultado = await db.$transaction(executar);
+  if ("recepcao" in resultado && resultado.recepcao) {
+    const { notificarPendenciasLeadsBpm } = await import("@/lib/bpm/notificacoes-leads-server");
+    await notificarPendenciasLeadsBpm(resultado.recepcao);
+  }
+  return resultado;
 }

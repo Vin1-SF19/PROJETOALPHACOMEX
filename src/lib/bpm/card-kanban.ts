@@ -42,7 +42,7 @@ export const CARD_KANBAN_NATIVE_REGISTRY = {
   },
   AGENDAMENTO_REUNIAO: {
     label: "Agendamento de reunião (data/hora + Google Meet)",
-    description: "Widget de data/hora da reunião e botão de Google Meet — substitui o corpo padrão do card quando ativo.",
+    description: "Widget de data/hora e Google Meet junto aos dados do card na etapa Agendar reunião.",
   },
 } as const;
 

@@ -8,6 +8,7 @@ vi.mock("@/lib/pusher", () => ({ pusherClient: {
   subscribe: mocks.subscribe, unsubscribe: mocks.unsubscribe,
   connection: { bind: mocks.connected, unbind: mocks.disconnected },
 } }));
+vi.mock("@/hooks/bpm-leads-notificacoes-client", () => ({ criarNotificacoesLeadsClient: () => ({ atualizar: vi.fn(), limpar: vi.fn() }) }));
 import { useBpmTarefasNotifications } from "@/hooks/useBpmTarefasNotifications";
 import { useBpmTarefasNotificacoes as store } from "@/store/useBpmTarefasNotificacoes";
 const alerta = {

@@ -34,6 +34,7 @@ import {
 import { TelefonesCardButton } from "./TelefonesCardButton";
 import { usePerfilEmpresa } from "@/components/PerfilEmpresaGlobal";
 import { SeletorMembrosCard } from "./SeletorMembrosCard";
+import { PainelRecebimentoCard } from "./PainelRecebimentoCard";
 import { PainelEncaminhamentos } from "./PainelEncaminhamentos";
 import { PainelSlaCard } from "./PainelSlaCard";
 import { ChatClienteCard } from "./ChatClienteCard";
@@ -265,6 +266,8 @@ export function CardAbertoLayout({
         <p className="mt-2 text-[11px] text-slate-400">Histórico de passagem — as abas consultam a jornada; o formulário permanece no card em edição.</p>
 
         {/* Tabs de pipeline (1ª: pipeline atual do card; demais: outros pipelines do sistema) */}
+        {card.recebimentoPipeline && <PainelRecebimentoCard key={`${card.id}:${card.recebimentoPipeline.recepcaoId}`} cardId={card.id} versao={card.versao}
+          pipelineNome={card.pipeline.nome} recebimento={card.recebimentoPipeline} onAtualizado={onAtualizado} />}
         <Tabs value={abaAtiva} onValueChange={setAbaAtiva} className="mt-2">
           <TabsList className="flex-wrap h-auto bg-transparent border-none p-0 gap-2 justify-start">
             <TabsTrigger
@@ -303,6 +306,10 @@ export function CardAbertoLayout({
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 overflow-y-auto px-5 pb-8 sm:px-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(240px,0.7fr)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden lg:px-10">
         {dadosEmpresaDrawer.aberto ? (
           <DadosEmpresaDrawer
+            cardId={card.id}
+            podeEditar={podeEditar && !card.encaminhado}
+            registrarGuard={dadosEmpresaDrawer.registrarGuard}
+            onSalvo={(dados) => { dadosEmpresaDrawer.confirmarDados(dados); onAtualizado(); }}
             accent={accent}
             carregando={dadosEmpresaDrawer.carregando}
             dados={dadosEmpresaDrawer.dados}

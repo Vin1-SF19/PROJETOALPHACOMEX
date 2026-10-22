@@ -16,21 +16,6 @@ describe("BPM - card restrito na etapa Agendar reunião", () => {
     expect(cardsAction).toContain("googleMeetLink: null");
   });
 
-  it("renderiza somente Data e hora e a ação Meet no ramo da etapa", () => {
-    const ramoAgendar = board.slice(
-      board.indexOf("{agendarReuniao && !ehLeadVirtual ? ("),
-      board.indexOf("          ) : (\n            <>", board.indexOf("{agendarReuniao && !ehLeadVirtual ? (")),
-    );
-
-    expect(board).toContain("const agendarReuniao = etapaEhAgendarReuniao(etapaNome)");
-    expect(ramoAgendar).toContain("Data e hora");
-    expect(ramoAgendar).toContain("card.dataReuniao");
-    expect(ramoAgendar).toContain("Agendar pelo Google Meet");
-    expect(ramoAgendar).not.toContain("BadgeProximoContato");
-    expect(ramoAgendar).not.toContain("GrupoAvataresMembrosCard");
-    expect(ramoAgendar).not.toContain("anotacaoRapidaPendente");
-  });
-
   it("abre o formulário sem link e abre o Meet existente em nova aba", () => {
     expect(board).toContain("card.googleMeetLink ? (");
     expect(board).toContain("href={card.googleMeetLink}");
@@ -62,8 +47,7 @@ describe("BPM - card restrito na etapa Agendar reunião", () => {
     expect(painelReuniao).toContain("emailsAdicionais,");
   });
 
-  it("mantém a renderização padrão como ramo alternativo", () => {
-    expect(board).toContain("!novosLeads && canalOrigem");
+  it("mantém as informações operacionais do corpo compartilhado", () => {
     expect(board).toContain("!novosLeads && proximaTarefaComPrazo");
     expect(board).toContain("<GrupoAvataresMembrosCard");
   });

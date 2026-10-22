@@ -4,9 +4,11 @@ import type { Prisma } from "@prisma/client";
 
 import db from "@/lib/prisma";
 import { eventoDominioInputSchema, gatilhoConfigSchema, type TipoEventoAutomacao } from "./central-schemas";
+import { motivoBloqueioMinutaMovimentoLivre } from "./minuta-movimento-livre-server";
+import { grafoEhMinutaConfigurada, type FiltroAutomacoesCentrais } from "./minuta-movimento-livre";
 
 type ClientePublicacaoEventos = Pick<Prisma.TransactionClient, "bpmEventoDominio">;
-type ClienteEventos = Pick<Prisma.TransactionClient, "bpmEventoDominio" | "bpmAutomacaoVersao" | "bpmAutomacaoExecucao">;
+type ClienteEventos = Prisma.TransactionClient;
 
 const CHAVES_SENSIVEIS = /authorization|cookie|secret|segredo|token|password|senha|api[-_]?key/i;
 
@@ -93,7 +95,6 @@ function correspondeAoGatilho(params: {
   etapaAutomacaoId: string;
   etapaAtualCardId: string | null;
 }): boolean {
-  if (params.eventoNovo.automacoesSuprimidas === true) return false;
   let config: ReturnType<typeof gatilhoConfigSchema.parse>;
   try { config = gatilhoConfigSchema.parse(parseJson(params.configJson)); } catch { return false; }
   const { gatilhoTipo, eventoTipo, eventoNovo, eventoAnterior, etapaAutomacaoId } = params;
@@ -125,29 +126,40 @@ function correspondeAoGatilho(params: {
   return gatilhoTipo === eventoTipo && escopoCorresponde(eventoNovo.etapaId ?? params.etapaAtualCardId ?? etapaAutomacaoId);
 }
 
-export async function materializarExecucoesEventosBpm(limite = 100, client: ClienteEventos = db, filtro?: { cardId?: string }) {
+export async function materializarExecucoesEventosBpm(limite = 100, client: ClienteEventos = db, filtro?: FiltroAutomacoesCentrais) {
   const versoes = await client.bpmAutomacaoVersao.findMany({
     where: { status: "ATIVA", automacao: { ativa: true } },
-    select: { id: true, automacaoId: true, gatilhoTipo: true, gatilhoConfigJson: true, ativadaEm: true, createdAt: true, automacao: { select: { etapaId: true, pipelineId: true } } },
+    select: { id: true, automacaoId: true, status: true, gatilhoTipo: true, gatilhoConfigJson: true, grafoJson: true, condicaoJson: true, ativadaEm: true, createdAt: true, automacao: { select: { ativa: true, etapaId: true, pipelineId: true } } },
   });
   let criadas = 0;
   let avaliados = 0;
   for (const versao of versoes) {
+    if (filtro?.modo === "MINUTA_MOVIMENTO_LIVRE") {
+      try {
+        if (versao.gatilhoTipo !== "ENTRAR_COLUNA" || !grafoEhMinutaConfigurada(JSON.parse(versao.grafoJson))) continue;
+      } catch { continue; }
+    }
     const tipoEvento = versao.gatilhoTipo === "ENTRAR_COLUNA" || versao.gatilhoTipo === "SAIR_COLUNA"
       ? "CARD_MOVIDO" : versao.gatilhoTipo === "CAMPO_VALOR_ASSUMIDO" ? "CAMPO_ALTERADO" : versao.gatilhoTipo;
     const eventos = await client.bpmEventoDominio.findMany({
       where: {
         tipo: tipoEvento, cardId: filtro?.cardId ?? { not: null }, pipelineId: versao.automacao.pipelineId,
+        ...(filtro?.modo === "MINUTA_MOVIMENTO_LIVRE" ? { id: filtro.eventoId } : {}),
         // Uma versão só reage a eventos ocorridos depois de ativada. Sem este
         // corte, criar/editar/religar reprocessava todo o histórico do pipeline.
         ocorridoEm: { gte: versao.ativadaEm ?? versao.createdAt },
         profundidade: { lt: 10 }, execucoes: { none: { automacaoVersaoId: versao.id } },
       },
       orderBy: { ocorridoEm: "asc" }, take: Math.min(Math.max(limite, 1), 500),
-      select: { id: true, tipo: true, cardId: true, correlationId: true, causationId: true, profundidade: true, valorAnteriorJson: true, valorNovoJson: true, card: { select: { etapaId: true } } },
+      select: { id: true, tipo: true, entidadeTipo: true, entidadeId: true, cardId: true, pipelineId: true,
+        atorTipo: true, atorUserId: true, atorExecucaoId: true, correlationId: true, causationId: true, idempotencyKey: true,
+        profundidade: true, valorAnteriorJson: true, valorNovoJson: true, card: { select: { etapaId: true } } },
     });
     for (const evento of eventos) {
       if (!evento.cardId) continue;
+      // O flush estreito nunca materializa um evento comum por extensão do filtro.
+      if (filtro?.modo === "MINUTA_MOVIMENTO_LIVRE" && (evento.id !== filtro.eventoId || evento.cardId !== filtro.cardId
+        || parseJson(evento.valorNovoJson).automacoesSuprimidas !== true)) continue;
       avaliados++;
       const repetidaNaCadeia = await client.bpmAutomacaoExecucao.findFirst({
         where: {
@@ -157,9 +169,12 @@ export async function materializarExecucoesEventosBpm(limite = 100, client: Clie
         },
         select: { id: true },
       });
-      const corresponde = correspondeAoGatilho({
+      const novo = parseJson(evento.valorNovoJson);
+      const bloqueioMinuta = novo.automacoesSuprimidas === true
+        ? await motivoBloqueioMinutaMovimentoLivre(evento, versao, client) : null;
+      const corresponde = !bloqueioMinuta && correspondeAoGatilho({
         gatilhoTipo: versao.gatilhoTipo, configJson: versao.gatilhoConfigJson, eventoTipo: evento.tipo,
-        eventoNovo: parseJson(evento.valorNovoJson), eventoAnterior: parseJson(evento.valorAnteriorJson), etapaAutomacaoId: versao.automacao.etapaId,
+        eventoNovo: novo, eventoAnterior: parseJson(evento.valorAnteriorJson), etapaAutomacaoId: versao.automacao.etapaId,
         etapaAtualCardId: evento.card?.etapaId ?? null,
       });
       try {
@@ -167,7 +182,7 @@ export async function materializarExecucoesEventosBpm(limite = 100, client: Clie
           automacaoId: versao.automacaoId, automacaoVersaoId: versao.id, eventoId: evento.id,
           cardId: evento.cardId, eventoChave: `central:${versao.id}:${evento.id}`, gatilhoTipo: versao.gatilhoTipo,
           correlationId: evento.correlationId, causationId: evento.causationId ?? evento.id,
-          ...(corresponde && !repetidaNaCadeia ? {} : { status: "IGNORADA", resultadoJson: JSON.stringify({ motivo: repetidaNaCadeia ? "VERSAO_JA_EXECUTADA_NA_CADEIA" : "CONFIGURACAO_GATILHO_NAO_CORRESPONDE" }), executadoEm: new Date() }),
+          ...(corresponde && !repetidaNaCadeia ? {} : { status: "IGNORADA", resultadoJson: JSON.stringify({ motivo: repetidaNaCadeia ? "VERSAO_JA_EXECUTADA_NA_CADEIA" : bloqueioMinuta ?? "CONFIGURACAO_GATILHO_NAO_CORRESPONDE" }), executadoEm: new Date() }),
         } });
         if (corresponde && !repetidaNaCadeia) criadas += 1;
       } catch (error) { if (!erroUnicidade(error)) throw error; }

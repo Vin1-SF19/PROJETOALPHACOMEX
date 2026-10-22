@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({ preflight: vi.fn(), move: vi.fn(), saveAndMove: vi.fn(), disponibilidade: vi.fn(), flush: vi.fn(), list: vi.fn(), error: vi.fn() }));
 const drag = vi.hoisted(() => ({ current: null as null | ComponentProps<typeof import("@dnd-kit/core").DndContext> }));
+vi.mock("@/actions/bpm/NotificacoesLeads", () => ({ ObterLeadPendenteNotificacaoBpm: vi.fn() }));
 vi.mock("@dnd-kit/core", async (original) => {
   const actual = await original<typeof import("@dnd-kit/core")>();
   return { ...actual, DndContext: (props: ComponentProps<typeof actual.DndContext>) => { drag.current = props; return h(actual.DndContext, props); } };
@@ -21,7 +22,7 @@ vi.mock("@/actions/bpm/Cards", () => ({
   ObterCardBpm: vi.fn(), MoverCardBpm: api.move, ObterRequisitosTransicaoBpm: api.preflight,
   SalvarRequisitosEMoverCardBpm: api.saveAndMove, ListarCardsPipelineBpm: api.list, CriarCardBpm: vi.fn(),
 }));
-vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext", () => ({ useCardSave: () => ({ flushSaves: api.flush }) }));
+vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext", () => ({ useCardLeaveGuard: () => async () => true, useCardSave: () => ({ flushSaves: api.flush }) }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CampoBpmInput", () => ({ CampoBpmInput: () => null }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/BpmDateTimeField", () => ({ BpmDateTimeField: () => null }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/AtribuirLeadAgendarModal", () => ({ AtribuirLeadAgendarModal: ({ open }: { open: boolean }) => open ? h("div", null, "Atribuição indevida") : null }));

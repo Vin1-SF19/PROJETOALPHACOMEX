@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { CardAbertoLayout, type CardAbertoLayoutProps } from "@/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout";
 import { ExcluirCardBpm } from "@/actions/bpm/Cards";
 import { toast } from "sonner";
+vi.mock("@/actions/bpm/Recebimentos", () => ({ AssumirRecebimentoPipelineBpm: vi.fn() }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/PainelEncaminhamentos", () => ({ PainelEncaminhamentos: () => null }));
 vi.mock("@/actions/bpm/Cards", () => ({ ExcluirCardBpm: vi.fn() }));
 vi.mock("@/actions/bpm/Pipelines", () => ({ ListarPipelinesBpm: vi.fn().mockResolvedValue({ success: true, data: [] }) }));

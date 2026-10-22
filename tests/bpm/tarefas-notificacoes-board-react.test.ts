@@ -2,6 +2,7 @@
 import React, { act, createElement as h, type ComponentProps } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+vi.mock("@/actions/bpm/NotificacoesLeads", () => ({ ObterLeadPendenteNotificacaoBpm: vi.fn() }));
 vi.mock("next/navigation", () => { const router = { refresh: vi.fn() }; return { useRouter: () => router }; });
 vi.mock("@/lib/pusher", () => ({ pusherClient: null }));
 vi.mock("@/actions/bpm/Quadro", () => ({ SincronizarQuadroBpm: vi.fn() }));
@@ -12,10 +13,11 @@ vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal", () => ({
   default: ({ cardId, onClose, realtimeRevision, focoTarefa }: { cardId: string; onClose: () => void; realtimeRevision: number; focoTarefa?: { tarefaId: string } }) => h("button", { "data-card": cardId, "data-tarefa": focoTarefa?.tarefaId, "data-revisao-acl": realtimeRevision, onClick: onClose }, "Fechar card"),
 }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/NovoCardModal", () => ({ default: () => null }));
-vi.mock("@/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/NolossLeadModal", () => ({ default: () => null }));
+vi.mock("@/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/NolossLeadModal", () => ({ default: ({ lead, onClose }: { lead: { id: string }; onClose: () => void }) => h("button", { "data-lead-virtual": lead.id, onClick: onClose }, "Fechar lead virtual") }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/AtribuirResponsavelPromocaoModal", () => ({ default: () => null }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/SeletorMembrosCard", () => ({ GrupoAvataresMembrosCard: () => null }));
 import PipelineBoardClient from "@/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient";
+import { ObterLeadPendenteNotificacaoBpm } from "@/actions/bpm/NotificacoesLeads";
 import { SincronizarQuadroBpm } from "@/actions/bpm/Quadro";
 import { BPM_CARD_ABRIR_EVENT } from "@/lib/bpm/notificacoes-tarefas";
 const cardId = "cm12345678901234567890123";
@@ -62,5 +64,23 @@ it("mantém card do alerta fora do filtro Meus e reabre pela intenção autoriza
     expect(host.querySelectorAll("[data-card]")).toHaveLength(1);
     expect(host.querySelector("[data-card]")?.getAttribute("data-card")).toBe(segundoCard);
     expect(host.querySelector("[data-card]")?.getAttribute("data-tarefa")).toBe("task-2");
+  } finally { await act(async () => root.unmount()); host.remove(); }
+});
+
+it("intenção virtual fora dos cards paginados usa modal existente sem abrir CardFullView", async () => {
+  const host = document.createElement("div"); document.body.append(host); const root = createRoot(host);
+  const lead = { id: "lead-fora-pagina", etapaId: "novo", servico: null, status: "ATIVO", origem: "noloss" as const,
+    nolossLeadId: "lead-fora-pagina", createdAt: new Date("2026-10-22T12:00:00Z"), empresa: { id: 0, razaoSocial: "Lead fictício", cnpj: null, nomeFantasia: null },
+    responsavel: { id: 0, nome: "Sem responsável" }, membros: [], _count: { tarefas: 0, anexos: 0 }, tarefas: [], podeAgirEtapa: true };
+  vi.mocked(ObterLeadPendenteNotificacaoBpm).mockResolvedValue({ success: true, data: lead } as never);
+  try {
+    await act(async () => root.render(h(PipelineBoardClient, {
+      pipeline: { id: "pipeline-1", nome: "Comercial", etapas: [{ id: "novo", nome: "Novo lead", ordem: 0 }] }, cardsIniciais: [],
+      manifestoInicial: { configVersion: 1, entradas: [] }, visual: { accent: "1,2,3" } as ComponentProps<typeof PipelineBoardClient>["visual"], currentUserId: 7, currentUserRole: "COMERCIAL",
+      intencaoNotificacaoInicial: { pipelineId: "pipeline-1", origemLead: "noloss", leadId: "lead-fora-pagina" },
+    })));
+    expect(host.querySelector("[data-card]")).toBeNull();
+    expect(host.querySelector("[data-lead-virtual]")?.getAttribute("data-lead-virtual")).toBe("lead-fora-pagina");
+    expect(ObterLeadPendenteNotificacaoBpm).toHaveBeenCalledExactlyOnceWith({ tipo: "LEAD_VIRTUAL", pipelineId: "pipeline-1", origemLead: "noloss", leadId: "lead-fora-pagina" });
   } finally { await act(async () => root.unmount()); host.remove(); }
 });

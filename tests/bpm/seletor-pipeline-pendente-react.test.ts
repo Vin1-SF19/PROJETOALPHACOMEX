@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+vi.mock("@/actions/bpm/Cards", () => ({ ObterCardBpm: vi.fn() }));
 import React, { act, createElement as h, Suspense, use, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vitest";

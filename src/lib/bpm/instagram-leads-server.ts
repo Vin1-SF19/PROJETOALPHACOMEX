@@ -56,6 +56,27 @@ export async function buscarInstagramLeadsPendentes(pipelineId: string) {
   });
 }
 
+/** Projeta só a captura original dos cards já autorizados pelo leitor do quadro. */
+export async function buscarDatasFormularioInstagram(pipelineId: string, cardIds: string[]) {
+  const datas = new Map<string, string>();
+  const endpointId = process.env.INSTAGRAM_LEADS_ENDPOINT_ID;
+  if (!endpointId || !cardIds.length) return datas;
+  const entradas = await db.bpmWebhookEntrada.findMany({
+    where: {
+      endpointId, endpoint: { caminhoSlug: INSTAGRAM_ENDPOINT_SLUG }, statusRecebimento: "PROCESSADO",
+      evento: { cardId: { in: cardIds }, card: { pipelineId } },
+    },
+    select: { payloadSanitizadoJson: true, evento: { select: { cardId: true } } },
+    orderBy: [{ recebidoEm: "asc" }, { id: "asc" }],
+  });
+  for (const entrada of entradas) {
+    const cardId = entrada.evento?.cardId;
+    const dados = lerLeadInstagram(entrada.payloadSanitizadoJson);
+    if (cardId && dados && !datas.has(cardId)) datas.set(cardId, dados.captadoEm);
+  }
+  return datas;
+}
+
 export async function receberInstagramLead(endpointId: string, linha: InstagramLinha) {
   const idempotencyKey = chaveLeadInstagram(linha.id);
   const where = { endpointId_idempotencyKey: { endpointId, idempotencyKey } };

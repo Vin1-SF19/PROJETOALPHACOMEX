@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Building2, ChevronDown, Loader2, RefreshCw, X } from "lucide-react";
 
 import { ObterDadosEmpresaCardBpm } from "@/actions/bpm/Empresas";
 
 import { DadosEmpresaConteudo } from "./DadosEmpresaConteudo";
+import { DadosEmpresaEditor, chaveEditorEmpresa } from "./DadosEmpresaEditor";
+import { useCardSave } from "./CardSaveContext";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 type DadosEmpresa = NonNullable<Awaited<ReturnType<typeof ObterDadosEmpresaCardBpm>>["data"]>;
 
@@ -23,9 +26,15 @@ interface DadosEmpresaDrawerProps {
   erro: string | null;
   onFechar: () => void;
   onRecarregar: () => void;
+  cardId?: string;
+  podeEditar?: boolean;
+  onSalvo?: (dados: DadosEmpresa) => void;
+  registrarGuard?: (guard: (() => boolean) | null) => void;
 }
 
 export function useDadosEmpresaDrawer(cardId: string) {
+  const guardRef = useRef<(() => boolean) | null>(null);
+  const registrarGuard = useCallback((guard: (() => boolean) | null) => { guardRef.current = guard; }, []);
   const [cardAberto, setCardAberto] = useState<string | null>(null);
   const [cardCarregado, setCardCarregado] = useState<string | null>(null);
   const [aberto, setAberto] = useState(false);
@@ -34,6 +43,8 @@ export function useDadosEmpresaDrawer(cardId: string) {
   const [dados, setDados] = useState<DadosEmpresa | null>(null);
 
   const abertoNesteCard = aberto && cardAberto === cardId;
+
+  function fechar() { if (!guardRef.current || guardRef.current()) setAberto(false); }
 
   async function carregarDados() {
     setCarregando(true);
@@ -53,7 +64,7 @@ export function useDadosEmpresaDrawer(cardId: string) {
 
   function alternar() {
     if (abertoNesteCard) {
-      setAberto(false);
+      fechar();
       return;
     }
 
@@ -68,7 +79,9 @@ export function useDadosEmpresaDrawer(cardId: string) {
     dados: cardCarregado === cardId ? dados : null,
     erro,
     alternar,
-    fechar: () => setAberto(false),
+    fechar,
+    registrarGuard,
+    confirmarDados: (novos: DadosEmpresa) => { setDados(novos); setCardCarregado(cardId); },
     recarregar: () => void carregarDados(),
   };
 }
@@ -96,7 +109,14 @@ export function DadosEmpresaDrawer({
   erro,
   onFechar,
   onRecarregar,
+  cardId,
+  podeEditar = false,
+  onSalvo,
+  registrarGuard,
 }: DadosEmpresaDrawerProps) {
+  const { getDraft } = useCardSave();
+  const [editando, setEditando] = useState(() => Boolean(cardId && getDraft(chaveEditorEmpresa(cardId))));
+  const [confirmarEdicao, setConfirmarEdicao] = useState(false);
   return (
     <motion.section
       id="gaveta-dados-empresa"
@@ -130,7 +150,9 @@ export function DadosEmpresaDrawer({
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {carregando ? (
+        {editando && cardId && dados ? <DadosEmpresaEditor cardId={cardId} dados={dados}
+          registrarGuard={registrarGuard} onFechar={onFechar} onCancelar={() => setEditando(false)}
+          onSalvo={(novos) => { onSalvo?.(novos); setEditando(false); }} /> : carregando ? (
           <div role="status" className="flex min-h-64 flex-col items-center justify-center gap-3 px-5 text-center text-xs text-slate-400">
             <Loader2 size={24} className="animate-spin" style={{ color: `rgb(${accent})` }} aria-hidden="true" />
             Consolidando dados da empresa...
@@ -147,9 +169,13 @@ export function DadosEmpresaDrawer({
             </button>
           </div>
         ) : dados ? (
-          <DadosEmpresaConteudo dados={dados} accent={accent} />
+          <DadosEmpresaConteudo dados={dados} accent={accent} onEditar={podeEditar && cardId ? () => setConfirmarEdicao(true) : undefined} />
         ) : null}
       </div>
+      <AlertDialog open={confirmarEdicao} onOpenChange={setConfirmarEdicao}><AlertDialogContent>
+        <AlertDialogHeader><AlertDialogTitle>Editar dados da empresa?</AlertDialogTitle><AlertDialogDescription>Você poderá alterar o cadastro, os contatos, os sócios e os dados fiscais e do RADAR. As alterações serão registradas no histórico ao salvar.</AlertDialogDescription></AlertDialogHeader>
+        <AlertDialogFooter><AlertDialogCancel>Voltar</AlertDialogCancel><AlertDialogAction onClick={() => setEditando(true)}>Confirmar edição</AlertDialogAction></AlertDialogFooter>
+      </AlertDialogContent></AlertDialog>
     </motion.section>
   );
 }

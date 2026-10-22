@@ -1069,7 +1069,8 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
         pipelineId: card.pipelineId,
         valorAnterior: { etapaId: card.etapaId, lifecycle: card.status, outcome: card.estadoOntologico?.outcome ?? null, versao: card.versao },
         valorNovo: { etapaId: destino.id, lifecycle, outcome, subStatusId, versao: card.versao + 1, transicaoId: transicao?.id ?? null,
-          ...(prepared.movimentoLivre ? { movimentoLivre: prepared.movimentoLivre, automacoesSuprimidas: true } : {}) },
+          ...(prepared.movimentoLivre ? { movimentoLivre: prepared.movimentoLivre, automacoesSuprimidas: true,
+            ...(input.ator.tipo === "MANUAL" && input.ator.userId ? { permitirMinutaConfigurada: true } : {}) } : {}) },
         atorTipo: input.ator.tipo === "MANUAL" ? "USUARIO" : input.ator.tipo,
         atorUserId: input.ator.tipo === "MANUAL" ? input.ator.userId : undefined,
         atorExecucaoId: input.ator.automacaoExecucaoId,
@@ -1136,6 +1137,14 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
       };
     }, { maxWait: 10_000, timeout: 60_000 }));
 
+    if (!result.idempotente && "movimentoLivre" in result && result.movimentoLivre) {
+      try {
+        const { executarMinutaMovimentoLivreAgora } = await import("@/lib/bpm/automacoes/orquestrador");
+        await executarMinutaMovimentoLivreAgora(result.cardId, result.eventoId);
+      } catch (minutaError) {
+        console.error("[TransitionCommand/minuta-movimento-livre]", minutaError);
+      }
+    }
     if (!result.idempotente && !("movimentoLivre" in result && result.movimentoLivre)) {
       try {
         await enfileirarAutomacoesMovimentoBpm({

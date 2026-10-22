@@ -57,6 +57,14 @@ export function textoInstagram(valor: string | null | undefined): string {
   return (valor ?? "").replace(/[\u200B-\u200D\u2060\uFEFF]/g, "").replace(/_/g, " ").trim();
 }
 
+/** Data original do formulário, no mesmo fuso usado nos detalhes do lead. */
+export function dataFormularioInstagram(captadoEm: string | null | undefined): string | null {
+  if (!captadoEm || !instagramLinhaSchema.shape.created_time.safeParse(captadoEm).success) return null;
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Sao_Paulo",
+  }).format(new Date(captadoEm));
+}
+
 /** Coluna M -> Radar pretendido, conforme decisão do usuário. N não participa. */
 export function radarInstagram(valor: string | null | undefined): string | null {
   const normalizado = textoInstagram(valor).toLocaleLowerCase("pt-BR").replace(/\s+/g, " ");
