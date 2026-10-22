@@ -1,4 +1,6 @@
 "use server";
+
+import { exigirCompatibilidadeMasterDossie } from "@/lib/bpm/checklist-documental";
 import { carregarUsuariosCamposBpm } from "@/lib/bpm/usuarios-campos-server";
 import { nomeUsuarioCampoBpm } from "@/lib/bpm/usuarios-campos";
 import { resolverAutoridadeMovimentoLivre } from "@/lib/bpm/lideranca-setor";
@@ -1463,6 +1465,7 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
       }
 
       const proximaVersao = new Date(Math.max(Date.now(), cardAtual.updatedAt.getTime() + 1));
+      await exigirCompatibilidadeMasterDossie(tx, cardId, cardAtual.empresaId);
       const atualizacao = await tx.bpmCard.updateMany({
         where: {
           id: cardId,

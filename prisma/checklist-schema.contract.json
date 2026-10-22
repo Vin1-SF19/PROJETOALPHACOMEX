@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "canonicalSource": "PainelAlpha prisma/schema.prisma",
+  "basePanel": "69047dee",
+  "basePortal": "edcf2e8e",
+  "schemaSha256": "b407823eda5407077f58ca75c3751386a9e9b544f1022eaa08dd2edb37443220",
+  "statuses": [
+    "PENDENTE",
+    "OK",
+    "IRREGULAR",
+    "PARCIALMENTE_IRREGULAR",
+    "REVISAR",
+    "DESNECESSARIO",
+    "EM_ANALISE",
+    "AGUARDANDO_DOCUMENTOS",
+    "PRIORIDADE",
+    "FALAR_DR_EDVAN",
+    "FALAR_ANDREW"
+  ],
+  "legacyStatuses": [
+    "FALAR_DR_EDVAN",
+    "FALAR_ANDREW"
+  ],
+  "runtimeMapping": {
+    "master": "OperacionalClientes.clienteId Int -> Cliente.id",
+    "account": "OperacionalClientes.clienteOperacionalId String -> ClienteOperacional.id",
+    "owner": "OperacionalClientes.analistaId Int? -> usuarios.id"
+  }
+}

@@ -133,7 +133,7 @@ export default function PainelLayoutClient({
   useChamadosNotifications(role, userId);
   useNotasNotifications(temAcessoNotas ? userId : 0);
   useNotasLembretesPendentes(temAcessoNotas);
-  useChecklistNotifications(role);
+  useChecklistNotifications(userId, isAdminRole(role) || permissoes.includes('checkList'));
   useCalendarioAlphaNotifications(temAcessoCalendarioAlpha ? userId : 0);
   const { autorizado: podeReceberAlertasCs, reconciliar: reconciliarAlertasCs } = useCsNpsNotifications(role);
 
@@ -379,7 +379,11 @@ export default function PainelLayoutClient({
     const handler = (e: MessageEvent) => {
       if (e.origin !== window.location.origin) return;
       if (e.data?.type === 'ALPHA_OPEN_TAB' && e.data.url) {
-        openTab(e.data.url, e.data.label || getLabelForUrl(e.data.url));
+        const url = typeof e.data.url === 'string' ? e.data.url : '';
+        if (url.startsWith('/PainelAlpha/CheckList/') || url === '/PainelAlpha/CheckList') {
+          const existing = tabs.find(tab => tab.url === '/PainelAlpha/CheckList' || tab.url.startsWith('/PainelAlpha/CheckList/'));
+          openTab(url, 'Checklist', existing?.id);
+        } else openTab(url, e.data.label || getLabelForUrl(url));
       }
       const abaAgenda = tabs.find(tab => tab.url === AGENDA_ALPHA_URL);
       const origemEhAgenda = abaAgenda
@@ -420,7 +424,7 @@ export default function PainelLayoutClient({
     <>
       <NotificationToast onAbrirChamados={abrirChamadosPorNotificacao} />
       <ChamadoFinalizadoFeedbackDialog accent={chamadosAccent} />
-      <ChecklistNotificationToast />
+      <ChecklistNotificationToast onAbrir={abrirModuloPorNotificacao} />
       <HoleriteNotificacaoGlobal authenticated />
       <NotaNotificacaoToast onAbrirNota={abrirNotasPorNotificacao} />
       {temAcessoCalendarioAlpha && <CompromissoNotificacaoToast onAbrirAgenda={abrirAgendaPorNotificacao} />}

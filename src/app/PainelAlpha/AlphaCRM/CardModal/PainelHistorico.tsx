@@ -1,4 +1,5 @@
 "use client";
+import { PainelDossieChecklist } from "./PainelDossieChecklist";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
@@ -223,6 +224,7 @@ export default function PainelHistorico({
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300">{tarefasDoCard.length}</span>
             )}
           </TabsTrigger>
+          <TabsTrigger value="dossie" className="text-xs text-slate-300">Dossiê RADAR</TabsTrigger>
           <TabsTrigger value="checklist" className="relative flex-none gap-1.5 border border-transparent px-2 text-xs scale-95 transition-[transform,background-color,border-color,color] duration-150 hover:scale-100 focus-visible:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 data-[state=active]:z-10 data-[state=active]:scale-105 data-[state=active]:font-semibold motion-reduce:transition-none motion-reduce:transform-none text-emerald-200/65 hover:bg-emerald-400/10 hover:text-emerald-200 data-[state=active]:border-emerald-300/30 data-[state=active]:bg-emerald-400/15 data-[state=active]:text-emerald-100">
             <ClipboardCheck size={13} />
             Procedimento
@@ -247,6 +249,7 @@ export default function PainelHistorico({
           </TabsTrigger>
         </TabsList>
 
+        <TabsContent value="dossie" className="min-h-0 flex-1 overflow-y-auto"><PainelDossieChecklist cardId={card.id} podeEditar={podeEditar} onAtualizado={onAtualizado}/></TabsContent>
         <TabsContent value="tarefas" className="min-h-0 flex-1 overflow-y-auto">
           <PainelTarefasPorTipo
             cardId={card.id}

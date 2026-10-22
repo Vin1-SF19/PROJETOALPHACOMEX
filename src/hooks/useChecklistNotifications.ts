@@ -1,66 +1,22 @@
-'use client';
-
-import { useEffect, useRef } from 'react';
-import { pusherClient } from '@/lib/pusher';
-import { useChecklistNotificacoes } from '@/store/useChecklistNotificacoes';
-import { isAdminRole } from '@/lib/roles';
-
-type NovoDocumentoPayload = {
-  documentoId: string;
-  itemId: string;
-  itemDescricao: string;
-  empresaId: string;
-  razaoSocial: string;
-  nomeCliente: string;
-  nomeArquivo: string;
-  criadoEm: string;
-};
-
-const CHECKLIST_ROLES = ['OPERACIONAL'];
-const CHANNEL = 'private-checklist-docs';
-const EVENT = 'novo-documento-cliente';
-
-export function useChecklistNotifications(role: string | undefined) {
-  const adicionarNotificacao = useChecklistNotificacoes((s) => s.adicionarNotificacao);
-  const subscribedRef = useRef(false);
-
+"use client";
+import { useEffect } from "react";
+import { pusherClient } from "@/lib/pusher";
+import { useChecklistNotificacoes } from "@/store/useChecklistNotificacoes";
+/** Única assinatura no shell; a recuperação usa o poller global já existente. */
+export function useChecklistNotifications(usuarioId: number, enabled: boolean) {
   useEffect(() => {
-    if (!role || (!isAdminRole(role) && !CHECKLIST_ROLES.includes(role))) return;
+    if (window !== window.top) return;
+    const store = useChecklistNotificacoes.getState();
+    store.iniciar(enabled ? usuarioId : 0);
+    if (!enabled || !usuarioId) return;
     const client = pusherClient;
-    if (!client) return;
-    if (subscribedRef.current) return;
-
-    subscribedRef.current = true;
-    const channel = client.subscribe(CHANNEL);
-
-    channel.bind(EVENT, (payload: NovoDocumentoPayload) => {
-      adicionarNotificacao({
-        documentoId: payload.documentoId,
-        itemDescricao: payload.itemDescricao,
-        empresaId: payload.empresaId,
-        razaoSocial: payload.razaoSocial,
-        nomeCliente: payload.nomeCliente,
-        nomeArquivo: payload.nomeArquivo,
-        criadoEm: payload.criadoEm,
-      });
-
-      try {
-        const audio = new Audio('/sounds/notification.mp3');
-        audio.volume = 0.5;
-        void audio.play().catch(() => {});
-      } catch {
-        // Audio API not available
-      }
-    });
-
+    const callback = () => window.dispatchEvent(new Event("alpha-checklist-recovery"));
+    const channel = client?.subscribe("private-checklist-docs");
+    channel?.bind("checklist-evento", callback);
+    client?.connection.bind("connected", callback);
     return () => {
-      try {
-        channel.unbind(EVENT);
-        client.unsubscribe(CHANNEL);
-      } catch {
-        // ignore cleanup errors
-      }
-      subscribedRef.current = false;
+      channel?.unbind("checklist-evento", callback);
+      client?.connection.unbind("connected", callback);
     };
-  }, [role, adicionarNotificacao]);
+  }, [usuarioId, enabled]);
 }

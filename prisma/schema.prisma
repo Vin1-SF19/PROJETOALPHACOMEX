@@ -9,6 +9,15 @@ datasource db {
 }
 
 model usuarios {
+  checklistAtendimentos OperacionalClientes[] @relation("ChecklistAnalista")
+  checklistModelos ModeloItemChecklist[] @relation("ChecklistModeloAutor")
+  checklistIdentidades ModeloChecklistIdentidade[] @relation("ChecklistIdentidadeAutor")
+  checklistUploads DocumentoChecklist[] @relation("ChecklistUploadUsuario")
+  checklistRemocoes DocumentoChecklist[] @relation("ChecklistRemocaoUsuario")
+  checklistRecibos ChecklistUploadRecibo[]
+  checklistEventos ChecklistEvento[]
+  checklistEventosLidos ChecklistEventoLeitura[]
+  checklistVinculosCrm ChecklistCrmVinculo[]
   id                  Int                @id @default(autoincrement())
   nome                String
   usuario             String             @unique
@@ -1128,6 +1137,8 @@ model MensagensChamado {
 }
 
 model Auditoria {
+  checklistEventoId String? @unique
+  checklistEvento ChecklistEvento? @relation(fields: [checklistEventoId], references: [id], onDelete: Restrict)
   id        Int      @id @default(autoincrement())
   userId    Int
   acao      String
@@ -2061,6 +2072,14 @@ model ComercialCheckInDiario {
 }
 
 model ClienteOperacional {
+  senhaHash String?
+  authSessionVersion Int @default(0)
+  resetSenhaTokenHash String? @unique
+  resetSenhaExpiraEm DateTime?
+  checklistUploads DocumentoChecklist[] @relation("ChecklistUploadConta")
+  checklistRemocoes DocumentoChecklist[] @relation("ChecklistRemocaoConta")
+  checklistRecibos ChecklistUploadRecibo[]
+  checklistEventos ChecklistEvento[]
   id           String                @id @default(cuid())
   nome         String
   email        String                @unique
@@ -2072,6 +2091,10 @@ model ClienteOperacional {
 }
 
 model NotificacaoCliente {
+  eventoId String?
+  evento ChecklistEvento? @relation(fields: [eventoId], references: [id], onDelete: Restrict)
+
+  @@unique([eventoId, clienteId])
   id        String             @id @default(cuid())
   clienteId String
   cliente   ClienteOperacional @relation(fields: [clienteId], references: [id], onDelete: Cascade)
@@ -2088,6 +2111,16 @@ model NotificacaoCliente {
 }
 
 model OperacionalClientes {
+  analistaId Int?
+  analista usuarios? @relation("ChecklistAnalista", fields: [analistaId], references: [id], onDelete: SetNull)
+  revision Int @default(0)
+  eventos ChecklistEvento[]
+  recibos ChecklistUploadRecibo[]
+  vinculosCrm ChecklistCrmVinculo[]
+
+  @@index([analistaId, createdAt, id])
+  @@index([clienteOperacionalId])
+  @@index([createdAt, id])
   id           String  @id @default(cuid())
   status       String  @default("ATIVO")
   embasamento  String
@@ -2170,9 +2203,14 @@ enum StatusItemChecklist {
   EM_ANALISE
   AGUARDANDO_DOCUMENTOS
   PRIORIDADE
+  // Somente leitura/continuidade de dados legados; não oferecer em novas escolhas.
+  FALAR_DR_EDVAN
+  FALAR_ANDREW
 }
 
 model Checklist {
+  // Manifesto das revisões efetivamente usadas; leitura nunca altera snapshots.
+  modelosSnapshot Json?
   id           String              @id @default(cuid())
   empresaId    String
   empresa      OperacionalClientes @relation(fields: [empresaId], references: [id])
@@ -2185,6 +2223,19 @@ model Checklist {
 }
 
 model ModeloItemChecklist {
+  // NULL identifica versão legada ainda não reconciliada; não fundir por nome.
+  identidadeId String?
+  identidade ModeloChecklistIdentidade? @relation(fields: [identidadeId], references: [id], onDelete: Restrict)
+  versao Int @default(1)
+  ativo Boolean @default(true)
+  ordem Int @default(0)
+  autorId Int?
+  autor usuarios? @relation("ChecklistModeloAutor", fields: [autorId], references: [id], onDelete: SetNull)
+  itensSnapshot ItemChecklist[] @relation("ChecklistItemModeloRevisao")
+
+  @@unique([identidadeId, versao])
+  @@index([autorId])
+  @@index([tipo, ativo, secao, ordem])
   id          String           @id @default(cuid())
   tipo        TipoEmbasamento?
   codigo      String
@@ -2199,6 +2250,14 @@ model ModeloItemChecklist {
 }
 
 model ItemChecklist {
+  // modeloItemId legado fica intacto. FK nova só é preenchida em novas instâncias.
+  modeloRevisaoId String?
+  modeloRevisao ModeloItemChecklist? @relation("ChecklistItemModeloRevisao", fields: [modeloRevisaoId], references: [id], onDelete: Restrict)
+  ordem Int @default(0)
+  recibos ChecklistUploadRecibo[]
+
+  @@index([modeloRevisaoId])
+  @@index([checklistId, secao, ordem, id])
   id           String               @id @default(cuid())
   checklistId  String
   checklist    Checklist            @relation(fields: [checklistId], references: [id])
@@ -2217,6 +2276,26 @@ model ItemChecklist {
 }
 
 model DocumentoChecklist {
+  storageProvider String?
+  storageKey String?
+  storageAccess String?
+  tamanhoBytes Int?
+  mimeType String?
+  sha256 String?
+  uploadedByUsuarioId Int?
+  uploadedByUsuario usuarios? @relation("ChecklistUploadUsuario", fields: [uploadedByUsuarioId], references: [id], onDelete: SetNull)
+  uploadedByContaId String?
+  uploadedByConta ClienteOperacional? @relation("ChecklistUploadConta", fields: [uploadedByContaId], references: [id], onDelete: SetNull)
+  deletadoPorUsuarioId Int?
+  deletadoPorUsuario usuarios? @relation("ChecklistRemocaoUsuario", fields: [deletadoPorUsuarioId], references: [id], onDelete: SetNull)
+  deletadoPorContaId String?
+  deletadoPorConta ClienteOperacional? @relation("ChecklistRemocaoConta", fields: [deletadoPorContaId], references: [id], onDelete: SetNull)
+  recibo ChecklistUploadRecibo?
+
+  @@index([uploadedByUsuarioId])
+  @@index([uploadedByContaId])
+  @@index([deletadoPorUsuarioId])
+  @@index([deletadoPorContaId])
   id                 String        @id @default(cuid())
   itemId             String
   item               ItemChecklist @relation(fields: [itemId], references: [id])
@@ -5172,6 +5251,7 @@ model BpmCampoMapeamento {
 }
 
 model BpmCard {
+  checklistDocumentalVinculo ChecklistCrmVinculo?
   id            String  @id @default(cuid())
   empresaId     Int
   pipelineId    String
@@ -7142,4 +7222,119 @@ model DocumentoClasulaGerada {
 
   @@unique([documentoId, ordem])
   @@index([documentoId])
+}
+
+// Identidade lógica separada das versões imutáveis. escopo = GLOBAL ou TipoEmbasamento.
+model ModeloChecklistIdentidade {
+  id String @id @default(cuid())
+  escopo String
+  codigoNormalizado String
+  revision Int @default(0)
+  autorId Int?
+  autor usuarios? @relation("ChecklistIdentidadeAutor", fields: [autorId], references: [id], onDelete: SetNull)
+  revisoes ModeloItemChecklist[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([escopo, codigoNormalizado])
+  @@index([autorId])
+}
+
+// FK card única: múltiplos cards podem reutilizar o MESMO atendimento.
+model ChecklistCrmVinculo {
+  id String @id @default(cuid())
+  cardId String @unique
+  card BpmCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  empresaOperacionalId String
+  empresaOperacional OperacionalClientes @relation(fields: [empresaOperacionalId], references: [id], onDelete: Restrict)
+  revision Int @default(0)
+  autorId Int?
+  autor usuarios? @relation(fields: [autorId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([empresaOperacionalId])
+  @@index([autorId])
+}
+
+// Journal de comando e outbox próprios; nunca alimenta o motor de automações BPM.
+model ChecklistEvento {
+  id String @id @default(cuid())
+  mutationId String @unique
+  payloadHash String
+  agregadoTipo String
+  agregadoId String
+  revision Int
+  tipo String
+  empresaId String?
+  empresa OperacionalClientes? @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  atorTipo String
+  atorUsuarioId Int?
+  atorUsuario usuarios? @relation(fields: [atorUsuarioId], references: [id], onDelete: SetNull)
+  atorContaId String?
+  atorConta ClienteOperacional? @relation(fields: [atorContaId], references: [id], onDelete: SetNull)
+  dados Json?
+  resultado Json?
+  createdAt DateTime @default(now())
+  publicadoEm DateTime?
+  tentativas Int @default(0)
+  proximaTentativaEm DateTime?
+  claimToken String?
+  claimAte DateTime?
+  ultimoErro String?
+  leituras ChecklistEventoLeitura[]
+  notificacoes NotificacaoCliente[]
+  auditoria Auditoria?
+
+  @@unique([agregadoTipo, agregadoId, revision])
+  @@index([empresaId, createdAt, id])
+  @@index([publicadoEm, proximaTentativaEm, claimAte])
+  @@index([createdAt, id])
+  @@index([atorUsuarioId])
+  @@index([atorContaId])
+}
+
+model ChecklistEventoLeitura {
+  id String @id @default(cuid())
+  eventoId String
+  evento ChecklistEvento @relation(fields: [eventoId], references: [id], onDelete: Restrict)
+  usuarioId Int
+  usuario usuarios @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  lidoEm DateTime @default(now())
+
+  @@unique([eventoId, usuarioId])
+  @@index([usuarioId, lidoEm])
+}
+
+// Recibo privado emitido pelo servidor: token cru nunca é persistido.
+model ChecklistUploadRecibo {
+  id String @id @default(cuid())
+  tokenHash String @unique
+  empresaId String
+  empresa OperacionalClientes @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  itemId String
+  item ItemChecklist @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  usuarioId Int?
+  usuario usuarios? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  clienteOperacionalId String?
+  clienteOperacional ClienteOperacional? @relation(fields: [clienteOperacionalId], references: [id], onDelete: SetNull)
+  storageProvider String
+  storageKey String
+  storageAccess String @default("private")
+  nome String
+  tamanhoBytes Int
+  mimeType String
+  sha256 String?
+  expiresAt DateTime
+  consumidoEm DateTime?
+  documentoId String? @unique
+  documento DocumentoChecklist? @relation(fields: [documentoId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([storageProvider, storageKey])
+  @@index([empresaId, expiresAt])
+  @@index([itemId])
+  @@index([usuarioId])
+  @@index([clienteOperacionalId])
 }

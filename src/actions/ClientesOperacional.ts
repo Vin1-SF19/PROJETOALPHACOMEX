@@ -1,171 +1,130 @@
-"use server"
-
+"use server";
 import db from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { resultado, fail } from "@/lib/checklist/result";
 import {
-  vincularEmpresaOperacionalSchema,
-  cadastrarAcessoOperacionalSchema,
-} from "@/lib/validations/operacional";
-
-export async function cadastrarApenasCliente(data: unknown) {
-  try {
-    const parsed = cadastrarAcessoOperacionalSchema.safeParse(data);
-    if (!parsed.success) {
-      return { success: false, error: "Dados de acesso inválidos." };
-    }
-
-    const emailExiste = await db.clienteOperacional.findUnique({
-      where: { email: parsed.data.email }
-    });
-
-    if (emailExiste) {
-      return { success: false, error: "Este e-mail já está cadastrado em outro acesso." };
-    }
-
-    const novoCliente = await db.clienteOperacional.create({
-      data: {
-        nome: parsed.data.nome,
-        email: parsed.data.email,
-        senha: parsed.data.senha,
-      }
-    });
-
-    return { success: true, id: novoCliente.id };
-  } catch (error) {
-    console.error("Erro ao criar usuário:", error);
-    return { success: false, error: "Erro interno ao criar acesso do cliente." };
-  }
-}
-
-/**
- * Busca uma empresa já cadastrada no CRM (Cliente Master) pelo CNPJ, para
- * pré-visualização antes de vincular ao portal Operacional — Fase 3.5 do
- * Cliente Master. NUNCA consulta a Receita Federal nem cria `Cliente` novo:
- * só lê o que já existe. Se não encontrar, o chamador deve orientar o usuário
- * a cadastrar a empresa no Alpha CRM primeiro.
- */
+  obterAtorChecklist,
+  exigirLiderChecklist,
+  liderOperacional,
+  exigirLeituraChecklist,
+} from "@/lib/checklist/acesso";
+import { z } from "zod";
+import { randomBytes, createHash } from "node:crypto";
+import { criarAtendimento } from "@/lib/checklist/service";
+import { comandoSchema } from "@/lib/checklist/schemas";
+import { executarAtendimento } from "@/lib/checklist/commands";
 export async function buscarClienteParaVincularOperacional(cnpj: string) {
-  try {
-    const cnpjNormalizado = cnpj.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-    if (cnpjNormalizado.length < 11) {
-      return { success: false, error: "CNPJ incompleto." };
-    }
-
+  return resultado(async () => {
+    await obterAtorChecklist();
+    const key = z
+      .string()
+      .trim()
+      .min(11)
+      .max(20)
+      .parse(cnpj)
+      .replace(/[^A-Za-z0-9]/g, "")
+      .toUpperCase();
     const cliente = await db.cliente.findUnique({
-      where: { cnpj: cnpjNormalizado },
-      select: { cnpj: true, razaoSocial: true, nomeFantasia: true },
+      where: { cnpj: key },
+      select: { id: true, cnpj: true, razaoSocial: true, nomeFantasia: true },
     });
-
-    if (!cliente) {
-      return {
-        success: false,
-        error: "Esta empresa ainda não está cadastrada no CRM — cadastre-a primeiro no Alpha CRM antes de vincular ao Operacional.",
-      };
-    }
-
-    return { success: true, data: cliente };
-  } catch (error) {
-    console.error("Erro ao buscar Cliente para vincular ao Operacional:", error);
-    return { success: false, error: "Erro ao consultar o CRM." };
-  }
+    if (!cliente)
+      fail(
+        "NOT_FOUND",
+        "Cadastre a empresa no CRM antes de criar um atendimento.",
+      );
+    return cliente;
+  });
 }
-
-/**
- * Vincula uma empresa já cadastrada no CRM (Cliente Master) a uma conta de
- * acesso do portal Operacional — Fase 3.5 do Cliente Master. NUNCA cria
- * `Cliente` novo (mesma regra dos demais módulos satélite: BPM é a única
- * porta de entrada de Cliente novo no sistema). Se o CNPJ não existir ainda,
- * bloqueia com mensagem orientando a cadastrar a empresa no Alpha CRM primeiro.
- */
-export async function vincularEmpresaAoCliente(dados: unknown) {
-  try {
-    const parsed = vincularEmpresaOperacionalSchema.safeParse(dados);
-    if (!parsed.success) {
-      return { success: false, error: "Dados inválidos para vincular a empresa." };
-    }
-    const cnpjNormalizado = parsed.data.cnpj.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-
-    const cliente = await db.cliente.findUnique({ where: { cnpj: cnpjNormalizado }, select: { id: true } });
-    if (!cliente) {
-      return {
-        success: false,
-        error: "Esta empresa ainda não está cadastrada no CRM — cadastre-a primeiro no Alpha CRM antes de vincular ao Operacional.",
-      };
-    }
-
-    const acesso = await db.clienteOperacional.findUnique({
-      where: { id: parsed.data.clienteOperacionalId },
-      select: { id: true },
-    });
-    if (!acesso) {
-      return { success: false, error: "Acesso de cliente não encontrado." };
-    }
-
-    await db.operacionalClientes.create({
-      data: {
-        clienteId: cliente.id,
-        clienteOperacionalId: parsed.data.clienteOperacionalId,
-        embasamento: "",
-        status: "ATIVO",
-      }
-    });
-
-    revalidatePath("/PainelAlpha/CheckList");
-    return { success: true };
-  } catch (error) {
-    console.error("ERRO NO PRISMA:", error);
-    return {
-      success: false,
-      error: "Erro ao vincular a empresa ao acesso do portal.",
+export async function vincularEmpresaAoCliente(input: unknown) {
+  return resultado(async () =>
+    criarAtendimento(await obterAtorChecklist(), input),
+  );
+}
+export async function listarContasPortalChecklist(input: unknown = {}) {
+  return resultado(async () => {
+    const ator = await obterAtorChecklist();
+    const user = await exigirLeituraChecklist(ator);
+    const c = z
+      .object({
+        busca: z.string().max(180).default(""),
+        page: z.number().int().positive().default(1),
+        pageSize: z.number().int().min(1).max(100).default(25),
+      })
+      .parse(input);
+    const where = {
+      ...(c.busca
+        ? {
+            OR: [
+              { nome: { contains: c.busca } },
+              { email: { contains: c.busca } },
+            ],
+          }
+        : {}),
+      ...(!liderOperacional(user.role)
+        ? {
+            empresas: {
+              some: { analistaId: ator.kind === "INTERNO" ? ator.id : 0 },
+              every: { analistaId: ator.kind === "INTERNO" ? ator.id : 0 },
+            },
+          }
+        : {}),
     };
-  }
+    const [items, totalCount] = await Promise.all([
+      db.clienteOperacional.findMany({
+        where,
+        select: { id: true, nome: true, email: true },
+        skip: (c.page - 1) * c.pageSize,
+        take: c.pageSize,
+        orderBy: { nome: "asc" },
+      }),
+      db.clienteOperacional.count({ where }),
+    ]);
+    return { items, totalCount, page: c.page, pageSize: c.pageSize };
+  });
 }
-
-
-export async function verificarCnpjsOperacional(cnpjs: string[]) {
-  try {
-    const cnpjsLimpos = cnpjs.map((c) => c.replace(/[^A-Za-z0-9]/g, "").toUpperCase());
-
-    const empresasExistentes = await db.operacionalClientes.findMany({
-      where: {
-        cliente: { cnpj: { in: cnpjsLimpos } }
-      },
-      include: {
-        cliente: {
-          select: {
-            cnpj: true,
-            razaoSocial: true,
-            nomeFantasia: true,
-          }
-        },
-        clienteOperacional: {
-          select: {
-            nome: true,
-            email: true
-          }
+export async function emitirResetAcessoPortal(input: unknown) {
+  return resultado(async () => {
+    const c = comandoSchema
+      .extend({ empresaId: z.string().min(1).max(80) })
+      .parse(input);
+    const ator = await obterAtorChecklist();
+    const token = randomBytes(32).toString("base64url");
+    const result = await executarAtendimento(
+      ator,
+      c,
+      c,
+      "CHECKLIST_PORTAL_RESET_EMITIDO",
+      async (tx, e) => {
+        const user = await exigirLeituraChecklist(ator, tx);
+        if (!liderOperacional(user.role)) {
+          const others = await tx.operacionalClientes.count({
+            where: {
+              clienteOperacionalId: e.clienteOperacionalId,
+              OR: [
+                { analistaId: null },
+                { analistaId: { not: ator.kind === "INTERNO" ? ator.id : 0 } },
+              ],
+            },
+          });
+          if (others) await exigirLiderChecklist(ator, tx);
         }
-      }
-    });
-
-    const dataFormatada = empresasExistentes.map((emp) => ({
-      cnpj: emp.cliente.cnpj,
-      razaoSocial: emp.cliente.razaoSocial.toUpperCase(),
-      nomeFantasia: (emp.cliente.nomeFantasia || "").toUpperCase(),
-      status: emp.status,
-      embasamento: emp.embasamento,
-      progresso: emp.progresso,
-      mesProtocolo: emp.mesProtocolo,
-      donoNome: emp.clienteOperacional.nome,
-      donoEmail: emp.clienteOperacional.email
-    }));
-
+        await tx.clienteOperacional.update({
+          where: { id: e.clienteOperacionalId },
+          data: {
+            resetSenhaTokenHash: createHash("sha256")
+              .update(token)
+              .digest("hex"),
+            resetSenhaExpiraEm: new Date(Date.now() + 15 * 60000),
+          },
+        });
+        return { changed: true, dados: { contaAcessoAlterada: true } };
+      },
+    );
     return {
-      success: true,
-      data: dataFormatada,
-      exists: dataFormatada.length > 0
+      ...(!result.replayed ? { token } : {}),
+      expiresInSeconds: 900,
+      revision: result.revision,
+      replayed: result.replayed,
     };
-  } catch (error) {
-    console.error("Erro ao validar CNPJ no operacional:", error);
-    return { success: false, error: "Erro ao consultar banco operacional" };
-  }
+  });
 }

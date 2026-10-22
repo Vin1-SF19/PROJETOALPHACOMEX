@@ -1,41 +1,16 @@
-import { auth } from "../../../../../auth";
-import { redirect } from "next/navigation";
-import { getEmpresaChecklist } from "@/actions/checklist";
-import db from "@/lib/prisma";
+import { obterEmpresaChecklist } from "@/actions/checklist";
 import ChecklistView from "../ChecklistView";
-
+import { Falha } from "@/components/checklist/ChecklistUI";
 export default async function EmpresaChecklistPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ empresaId: string }>;
+  searchParams: Promise<{ checklistId?: string }>;
 }) {
-  const session = await auth();
-  if (!session) redirect("/");
-
   const { empresaId } = await params;
-
-  const [result, userDb] = await Promise.all([
-    getEmpresaChecklist(empresaId),
-    db.usuarios.findUnique({
-      where: { id: Number(session.user.id) },
-      select: { tema_interface: true },
-    }),
-  ]);
-
-  if (result.error || !result.data) {
-    return (
-      <div className="p-10 text-white font-black text-center">
-        {result.error ?? "Empresa não encontrada"}
-      </div>
-    );
-  }
-
-  return (
-    <ChecklistView
-      empresa={result.data}
-      userNome={session.user.nome ?? "Analista"}
-      tema={userDb?.tema_interface ?? "blue"}
-      role={session.user.role ?? ""}
-    />
-  );
+  const { checklistId } = await searchParams;
+  const result = await obterEmpresaChecklist(empresaId, { checklistId });
+  if (!result.ok) return <Falha error={result.error.message} />;
+  return <ChecklistView empresaId={empresaId} initial={result.data} initialView={checklistId} />;
 }

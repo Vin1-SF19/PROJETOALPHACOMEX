@@ -246,13 +246,13 @@ export function CentralNotificacoesPainel({
     ...checklist.notificacoes.map((notificacao) => ({
       id: `checklist-${notificacao.id}`,
       origem: "Checklist",
-      titulo: notificacao.razaoSocial,
-      subtitulo: `${notificacao.nomeArquivo} · ${notificacao.nomeCliente}`,
+      titulo: notificacao.titulo,
+      subtitulo: `Atendimento atualizado · revisão ${notificacao.revision}`,
       criadoEm: notificacao.criadoEm,
       cor: "#60a5fa",
       lida: notificacao.lida,
       Icone: FileCheck2,
-      abrir: () => onAbrirModulo(`/PainelAlpha/CheckList/${notificacao.empresaId}`, "Checklist"),
+      abrir: () => { void checklist.marcarLida(notificacao.id).then(ok => { if (ok) onAbrirModulo(`/PainelAlpha/CheckList/${encodeURIComponent(notificacao.empresaId)}`, "Checklist"); else setAberto(true); }); },
       remover: () => checklist.removerNotificacao(notificacao.id),
     })),
     ...notas.notificacoes.map((notificacao) => ({
@@ -313,11 +313,11 @@ export function CentralNotificacoesPainel({
     return () => document.removeEventListener("mousedown", handleClickFora);
   }, []);
 
-  function marcarTodasLidas() {
+  function marcarTodasLidas(incluirChecklist = true) {
     tarefasCrm.marcarTodasLidas();
     calendario.marcarTodasLidas();
     chamados.marcarTodasLidas();
-    checklist.marcarTodasLidas();
+    if (incluirChecklist) void checklist.marcarTodasLidas();
     notas.marcarTodasLidas();
     holerite.marcarAlertaComoLido();
     csNps.marcarComoLida();
@@ -329,7 +329,7 @@ export function CentralNotificacoesPainel({
     if (!aberto && naoLidas > 0) {
       const usuarioId = tarefasCrm.usuarioId;
       leituraTimerRef.current = setTimeout(() => {
-        if (useBpmTarefasNotificacoes.getState().usuarioId === usuarioId) marcarTodasLidas();
+        if (useBpmTarefasNotificacoes.getState().usuarioId === usuarioId) marcarTodasLidas(false);
       }, 1200);
     }
   }
@@ -397,7 +397,7 @@ export function CentralNotificacoesPainel({
               {itens.length > 0 && (
                 <button
                   type="button"
-                  onClick={marcarTodasLidas}
+                  onClick={() => marcarTodasLidas()}
                   className="flex items-center gap-1 text-[8px] font-black uppercase tracking-wider text-slate-600 transition-colors hover:text-indigo-400"
                 >
                   <CheckCheck className="size-2.5" />
@@ -407,6 +407,7 @@ export function CentralNotificacoesPainel({
             </div>
 
             <div className="max-h-[420px] space-y-2 overflow-y-auto p-3">
+              {checklist.erro && <p role="alert" className="rounded-lg border border-rose-400/20 p-3 text-xs text-rose-300">{checklist.erro}</p>}
               {itens.length === 0 ? (
                 <div className="flex flex-col items-center justify-center gap-2 py-8 text-slate-600">
                   <Inbox className="size-6" />

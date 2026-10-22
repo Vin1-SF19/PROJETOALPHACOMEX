@@ -51,7 +51,12 @@ export function useBpmCardNotificacaoNavigation(tabs: PainelTab[],
   }, [tabs, iframes, entregar]);
   return useCallback((url: string, label: string) => {
     const intencao = intencaoNotificacaoBpmDaUrl(url);
-    if (!intencao) { pendente.current = null; openTab(url, label); return; }
+    if (!intencao) {
+      pendente.current = null;
+      const checklist = url === "/PainelAlpha/CheckList" || url.startsWith("/PainelAlpha/CheckList/");
+      const existing = checklist ? tabs.find(tab => tab.url === "/PainelAlpha/CheckList" || tab.url.startsWith("/PainelAlpha/CheckList/")) : undefined;
+      openTab(url, label, existing?.id); return;
+    }
     const aba = encontrarAbaCrm(tabs);
     let destino = url;
     let navegacao: string | undefined;

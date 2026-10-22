@@ -1,12 +1,7 @@
-import { TipoEmbasamento } from "@prisma/client";
+import type { TipoEmbasamento } from "@prisma/client";
 import { SECOES, TIPO_LABELS } from "@/lib/checklist/items";
 
-export const TIPOS_EMBASAMENTO = [
-  TipoEmbasamento.RECEITA_BRUTA_DAS,
-  TipoEmbasamento.RECEITA_BRUTA_CPRB,
-  TipoEmbasamento.INICIO_RETOMADA,
-  TipoEmbasamento.DISPONIBILIDADE_FINANCEIRA,
-] as const;
+export { tiposChecklist as TIPOS_EMBASAMENTO } from "./schemas";
 
 export const SECOES_MODELO = Object.values(SECOES);
 

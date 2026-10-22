@@ -1,21 +1,11 @@
-import { auth } from "../../../../../../auth";
-import { notFound, redirect } from "next/navigation";
-import { listarModelosEmbasamento } from "@/actions/checklist-modelos";
-import { TIPOS_EMBASAMENTO } from "@/lib/checklist/modelos";
-import ModeloEmbasamentoClient from "./ModeloEmbasamentoClient";
-
-interface ModeloEmbasamentoPageProps {
-  params: Promise<{ tipo: string }>;
-}
-
-export default async function ModeloEmbasamentoPage({ params }: ModeloEmbasamentoPageProps) {
-  const session = await auth();
-  if (!session) redirect("/");
-
-  const { tipo: tipoParam } = await params;
-  const tipo = TIPOS_EMBASAMENTO.find((item) => item === tipoParam);
-  if (!tipo) notFound();
-
-  const resultado = await listarModelosEmbasamento(tipo);
-  return <ModeloEmbasamentoClient tipo={tipo} modelos={resultado.data ?? []} />;
+import { notFound } from "next/navigation";
+import { obterAtorChecklist, obterCapacidadesChecklist } from "@/lib/checklist/acesso";
+import { tiposChecklist } from "@/lib/checklist/schemas";
+import { ModelosWorkspace } from "@/components/checklist/ModelosWorkspace";
+export default async function Page({ params }: { params: Promise<{ tipo: string }> }) {
+  const { tipo } = await params;
+  if (!tiposChecklist.some((t) => t === tipo)) notFound();
+  const ator = await obterAtorChecklist();
+  const caps = await obterCapacidadesChecklist(ator, { analistaId: null });
+  return <ModelosWorkspace canManage={caps.canManageModels} tipoInicial={tipo} />;
 }

@@ -1,3 +1,4 @@
+import { listarEventosChecklist } from "@/actions/checklist/eventos";
 import { NextResponse } from "next/server";
 import db from "@/lib/prisma";
 import { isSameRole } from "@/lib/roles";
@@ -15,11 +16,13 @@ export async function GET() {
   }
 
   const userId = Number(session.user.id);
+  const checklistResult = await listarEventosChecklist({ somenteNaoLidos: true });
+  const checklist = checklistResult.ok ? checklistResult.data : { items: [], nextCursor: null };
 
 
   try {
     const ator = await obterAtorChamados(userId);
-    if (!ator) return NextResponse.json({ notificacoes: [], feedbacksPendentes: [] }, { status: 403 });
+    if (!ator) return NextResponse.json({ notificacoes: [], feedbacksPendentes: [], checklist });
     const destinosDoAtor = ator.setorId === null ? [] : [
       { setorDestinoId: ator.setorId, setorDestino: { ativo: true, isBase: false } },
       ...(isSameRole(ator.setorNome, "TI") ? [{ setorDestinoId: null }] : []),
@@ -77,6 +80,7 @@ export async function GET() {
     ]);
 
     return NextResponse.json({
+      checklist,
       notificacoes: mensagens.map((mensagem) => ({
         mensagemId: mensagem.id,
         chamadoId: mensagem.chamado.id,

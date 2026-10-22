@@ -1,12 +1,7 @@
-import { auth } from "../../../../../auth";
-import { redirect } from "next/navigation";
-import { obterResumoModelosEmbasamento } from "@/actions/checklist-modelos";
-import EmbasamentosClient from "./EmbasamentosClient";
-
-export default async function EmbasamentosPage() {
-  const session = await auth();
-  if (!session) redirect("/");
-
-  const resultado = await obterResumoModelosEmbasamento();
-  return <EmbasamentosClient resumo={resultado.data} />;
+import { obterAtorChecklist, obterCapacidadesChecklist } from "@/lib/checklist/acesso";
+import { ModelosWorkspace } from "@/components/checklist/ModelosWorkspace";
+export default async function Page() {
+  const ator = await obterAtorChecklist();
+  const caps = await obterCapacidadesChecklist(ator, { analistaId: null });
+  return <ModelosWorkspace canManage={caps.canManageModels} />;
 }
