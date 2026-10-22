@@ -131,6 +131,59 @@ export async function atualizarRadar(cnpj: string, radarDados: Record<string, un
     }
 }
 
+/** Busca somente dados RADAR já persistidos, para fallback quando a publicação atual não contém o CNPJ. */
+export async function buscarRadarSalvo(cnpj: string) {
+    if (!await acessoPermitido()) return { error: "Não autorizado", data: null };
+    const cnpjLimpo = cnpj.replace(/\D/g, "");
+    if (!validarCnpj(cnpjLimpo)) return { error: "CNPJ inválido", data: null };
+
+    try {
+        const registro = await db.consultas_radar.findUnique({
+            where: { cnpj: cnpjLimpo },
+            select: {
+                razao_social: true,
+                contribuinte: true,
+                situacao_radar: true,
+                submodalidade: true,
+                fonte: true,
+                data_consulta: true,
+            },
+        });
+        if (!registro) return { data: null };
+
+        const campoUtil = (valor: string | null) => {
+            const normalizado = valor?.trim().toLocaleUpperCase("pt-BR") ?? "";
+            return normalizado !== "" && ![
+                "NÃO INFORMADO",
+                "NÃO ENCONTRADO",
+                "NÃO CONSTA",
+                "NÃO CONSTA NO ARQUIVO CONSULTADO",
+                "NÃO VERIFICADO NA PUBLICAÇÃO CSV",
+                "ERRO NA CONSULTA",
+                "N/A",
+                "N/D",
+            ].includes(normalizado);
+        };
+        const temSituacao = campoUtil(registro.situacao_radar);
+        const temSubmodalidade = campoUtil(registro.submodalidade);
+        if (!temSituacao && !temSubmodalidade) return { data: null };
+
+        return {
+            data: {
+                ...(temSituacao ? { situacao: registro.situacao_radar?.trim() } : {}),
+                ...(temSubmodalidade ? { submodalidade: registro.submodalidade?.trim() } : {}),
+                razaoSocial: registro.razao_social ?? "",
+                contribuinte: registro.contribuinte ?? "",
+                fonteHistorica: registro.fonte,
+                consultadoEmHistorico: registro.data_consulta.toISOString(),
+            },
+        };
+    } catch (error) {
+        console.error("Erro ao buscar RADAR salvo:", error);
+        return { error: "Erro ao consultar RADAR salvo", data: null };
+    }
+}
+
 export async function buscarHistorico() {
     if (!await acessoPermitido()) return { error: "Não autorizado" };
     try {

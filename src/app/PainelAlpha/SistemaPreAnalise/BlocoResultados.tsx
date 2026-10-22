@@ -1,6 +1,6 @@
 "use client";
 
-import { atualizarRadar } from "@/actions/PreAnalise";
+import { atualizarRadar, buscarRadarSalvo } from "@/actions/PreAnalise";
 import { fmtDateTime } from "@/lib/format-date";
 import {
     ShieldCheck, BarChart3, MapPin,
@@ -61,6 +61,10 @@ export default function BlocoResultados({ dados, visual, userName, onRetry }: Pr
     });
 
     const dadosExibicaoRadar = etapas.radar.dados || {};
+    const situacaoRadar = dadosExibicaoRadar.situacao?.trim() || "---";
+    const statusRadarExibicao = situacaoRadar.toLocaleUpperCase("pt-BR") === "NÃO CONSTA NO ARQUIVO CONSULTADO"
+        ? "NÃO CONSTA"
+        : situacaoRadar;
     const historicoBruto = empresaqui.historico_regime || empresaqui.historicoRegime;
     const historico = Array.isArray(historicoBruto) ? historicoBruto : [];
     const consultaParcial = empresaqui.consultaStatus === "parcial" || dados.empresaqui?.status === "error";
@@ -84,9 +88,36 @@ export default function BlocoResultados({ dados, visual, userName, onRetry }: Pr
 
         try {
             const response = await fetch(`/api/ConsultaRadar?cnpj=${cnpjParaConsultar}`);
-            const resRadar = await response.json();
+            let resRadar = await response.json();
             const sucesso = response.ok && !resRadar.error;
             const agora = sucesso ? new Date().toISOString() : null;
+
+            const naoConstaNaPublicacao = typeof resRadar.situacao === "string"
+                && /NÃO CONSTA(?: NO ARQUIVO CONSULTADO)?/i.test(resRadar.situacao);
+            if (sucesso && naoConstaNaPublicacao) {
+                try {
+                    const salvo = await buscarRadarSalvo(cnpjParaConsultar);
+                    if (salvo.data) {
+                        resRadar = {
+                            ...resRadar,
+                            ...salvo.data,
+                            situacao: salvo.data.situacao || resRadar.situacao,
+                            submodalidade: salvo.data.submodalidade || resRadar.submodalidade,
+                            aviso: "CNPJ não consta na publicação CSV atual; exibindo informação RADAR salva anteriormente no banco.",
+                        };
+                    } else if (salvo.error) {
+                        resRadar = {
+                            ...resRadar,
+                            aviso: "Não foi possível consultar o histórico RADAR salvo no banco.",
+                        };
+                    }
+                } catch {
+                    resRadar = {
+                        ...resRadar,
+                        aviso: "Não foi possível consultar o histórico RADAR salvo no banco.",
+                    };
+                }
+            }
 
             setEtapas(prev => ({
                 ...prev,
@@ -343,7 +374,7 @@ export default function BlocoResultados({ dados, visual, userName, onRetry }: Pr
                                         ) : (
                                             <div className={loadingRadar ? "opacity-40 animate-pulse pointer-events-none" : ""}>
                                                 <DataField label="Submodalidade de Atuação" value={dadosExibicaoRadar?.submodalidade || "Não informado"} />
-                                                <DataField label="Status de Habilitação" value={dadosExibicaoRadar?.situacao || "---"} />
+                                                <DataField label="Status de Habilitação" value={statusRadarExibicao} />
                                                 <DataField label="Atualização da base Receita" value={dadosExibicaoRadar?.dataAtualizacaoPublicada || dadosExibicaoRadar?.dataSituacao || "---"} />
                                                 {dadosExibicaoRadar?.aviso && <p className="text-amber-400 text-[10px]">{dadosExibicaoRadar.aviso}</p>}
                                             </div>
