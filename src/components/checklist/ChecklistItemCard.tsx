@@ -1,4 +1,5 @@
 "use client";
+import { useChecklistDraft, useChecklistDrafts } from "./ChecklistDraftGuard";
 import { useState } from "react";
 import { statusChecklist } from "@/lib/checklist/schemas";
 import { STATUS_LABELS } from "@/lib/checklist/items";
@@ -9,15 +10,16 @@ interface Props {
   item: Item;
   empresa: EmpresaDetalhe;
   busy: boolean;
-  draft: string | undefined;
-  onDraft: (value: string) => void;
-  onSave: () => void;
+  onObservation: (value: string) => Promise<boolean>;
+  getRevision: () => number;
   onStatus: (value: (typeof statusChecklist)[number]) => void;
   onReload: () => Promise<void>;
 }
-export function ChecklistItemCard({ item, empresa, busy, draft, onDraft, onSave, onStatus, onReload }: Props) {
+export function ChecklistItemCard({ item, empresa, busy, onObservation, getRevision, onStatus, onReload }: Props) {
   const [documentos, setDocumentos] = useState(false);
   const canEdit = empresa.capabilities.canEdit && !empresa.historical;
+  const guard = useChecklistDrafts(),
+    draft = useChecklistDraft(`item:${item.id}`, { observacao: item.observacao ?? "" }, (patch) => onObservation(patch.observacao ?? ""), canEdit);
   return (
     <article id={`checklist-item-${item.id}`} className="rounded-2xl border border-white/10 bg-slate-950/70 p-5 backdrop-blur-xl">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -56,8 +58,8 @@ export function ChecklistItemCard({ item, empresa, busy, draft, onDraft, onSave,
       <label className="block text-xs text-slate-400">
         Observação técnica
         <textarea
-          value={draft ?? item.observacao ?? ""}
-          onChange={(e) => onDraft(e.target.value)}
+          value={draft.value.observacao}
+          onChange={(e) => draft.change("observacao", e.target.value)}
           readOnly={!canEdit}
           disabled={busy}
           maxLength={5000}
@@ -66,14 +68,16 @@ export function ChecklistItemCard({ item, empresa, busy, draft, onDraft, onSave,
         />
       </label>
       <div className="mt-3 flex flex-wrap justify-between gap-2">
-        {canEdit && draft !== undefined && draft !== (item.observacao ?? "") && (
-          <Acao disabled={busy} onClick={onSave}>
+        {canEdit && draft.dirty && (
+          <Acao disabled={busy} onClick={() => void draft.save()}>
             Salvar observação
           </Acao>
         )}
-        <Acao onClick={() => setDocumentos((v) => !v)}>{documentos ? "Recolher documentos" : "Ver documentos"}</Acao>
+        <Acao disabled={busy} onClick={() => guard.request(() => setDocumentos((v) => !v))}>
+          {documentos ? "Recolher documentos" : "Ver documentos"}
+        </Acao>
       </div>
-      {documentos && <DocumentosItem empresa={empresa} itemId={item.id} busy={busy} onReload={onReload} />}
+      {documentos && <DocumentosItem empresa={empresa} itemId={item.id} busy={busy} onReload={onReload} getRevision={getRevision} />}
     </article>
   );
 }

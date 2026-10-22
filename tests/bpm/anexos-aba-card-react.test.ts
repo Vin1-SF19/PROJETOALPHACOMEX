@@ -4,6 +4,12 @@ import { createRoot, type Root } from "react-dom/client";
 import type { DocumentosContratacaoComercial } from "@/lib/bpm/contratos-comerciais";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const api = vi.hoisted(() => ({ upload: vi.fn(), registrar: vi.fn() }));
+// Keep the real Dossie component; isolate only its server-action boundary.
+vi.mock("@/actions/bpm/ChecklistDocumental", () => ({
+  obterDossieChecklistCard: vi.fn().mockResolvedValue({ ok: true, data: { dossie: null, vinculo: null, revision: 0, cardUpdatedAt: "2026-10-22T12:00:00.000Z" }, requestId: "fixture" }),
+  listarDossiesCandidatosCard: vi.fn(),
+  vincularDossieChecklistCard: vi.fn(),
+}));
 vi.mock("@/actions/bpm/Anexos", () => ({ RegistrarAnexoBpm: api.registrar, ExcluirAnexoBpm: vi.fn() }));
 vi.mock("@vercel/blob/client", () => ({ upload: api.upload }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/PainelChecklistsCard", () => ({ PainelChecklistsCard: () => null }));

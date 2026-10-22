@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
+  checklist: vi.fn(),
   ator: vi.fn(),
   mensagensFindMany: vi.fn(),
   feedbacksFindMany: vi.fn(),
@@ -11,6 +12,7 @@ vi.mock("@/lib/chamados/acesso", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/chamados/acesso")>();
   return { ...original, obterAtorChamados: mocks.ator };
 });
+vi.mock("@/actions/checklist/eventos", () => ({ listarEventosChecklist: mocks.checklist }));
 vi.mock("../../auth", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/prisma", () => ({
   default: {
@@ -25,6 +27,7 @@ describe("GET /api/notificacoes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.feedbacksFindMany.mockResolvedValue([]);
+    mocks.checklist.mockResolvedValue({ ok: true, data: { items: [], nextCursor: null }, requestId: "fixture" });
     mocks.ator.mockResolvedValue({ id: 42, role: "Financeiro", setorId: 3, setorNome: "Financeiro", visaoGlobal: false });
   });
 
@@ -59,7 +62,19 @@ describe("GET /api/notificacoes", () => {
         autorNome: "Carlos",
       })],
       feedbacksPendentes: [],
+      checklist: { items: [], nextCursor: null },
     });
+  });
+
+  it("preserva o envelope anônimo sem consultar módulos protegidos", async () => {
+    mocks.auth.mockResolvedValue(null);
+    const resposta = await GET();
+    expect(resposta.status).toBe(200);
+    await expect(resposta.json()).resolves.toEqual({ notificacoes: [], feedbacksPendentes: [] });
+    expect(mocks.ator).not.toHaveBeenCalled();
+    expect(mocks.checklist).not.toHaveBeenCalled();
+    expect(mocks.mensagensFindMany).not.toHaveBeenCalled();
+    expect(mocks.feedbacksFindMany).not.toHaveBeenCalled();
   });
 
   it("usa a leitura administrativa sem restringir ao solicitante", async () => {
@@ -118,6 +133,9 @@ describe("GET /api/notificacoes", () => {
     mocks.ator.mockResolvedValue(null);
     const resposta = await GET();
     expect(resposta.status).toBe(403);
+    await expect(resposta.json()).resolves.toEqual({ notificacoes: [], feedbacksPendentes: [] });
+    expect(mocks.checklist).not.toHaveBeenCalled();
+    expect(mocks.feedbacksFindMany).not.toHaveBeenCalled();
     expect(mocks.mensagensFindMany).not.toHaveBeenCalled();
   });
 

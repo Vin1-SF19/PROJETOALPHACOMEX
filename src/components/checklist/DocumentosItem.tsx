@@ -1,4 +1,5 @@
 "use client";
+import { useChecklistDraft, useChecklistDrafts } from "./ChecklistDraftGuard";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -18,17 +19,19 @@ interface Props {
   itemId: string;
   busy: boolean;
   onReload: () => Promise<void>;
+  getRevision: () => number;
 }
-export function DocumentosItem({ empresa, itemId, busy, onReload }: Props) {
+export function DocumentosItem({ empresa, itemId, busy, onReload, getRevision }: Props) {
   const [page, setPage] = useState(1),
     [excluidos, setExcluidos] = useState(false),
     [uploadError, setUploadError] = useState(""),
     [uploading, setUploading] = useState(false),
     [receipt, setReceipt] = useState<string | null>(null),
     [confirmarDoc, setConfirmarDoc] = useState<Documento | null>(null);
+  const guard = useChecklistDrafts();
   const command = useChecklistCommand(),
     client = useQueryClient();
-  const key = ["checklist-documentos", empresa.id, itemId, empresa.checklist?.id, excluidos, page, empresa.revision];
+  const key = ["checklist-documentos", empresa.id, itemId, empresa.checklist?.id, excluidos, page];
   const docs = useQuery({
     queryKey: key,
     queryFn: () => confirmar(listarDocumentosChecklist({ empresaId: empresa.id, itemId, checklistId: empresa.checklist?.id, excluidos, page, pageSize: 10 })),
@@ -45,7 +48,7 @@ export function DocumentosItem({ empresa, itemId, busy, onReload }: Props) {
   }
   async function registrar(recibo: string) {
     const data = await command.run(`upload:${recibo}:${empresa.revision}`, (mutationId) =>
-      registrarDocumentoChecklist({ itemId, recibo, expectedRevision: empresa.revision, mutationId }),
+      registrarDocumentoChecklist({ itemId, recibo, expectedRevision: getRevision(), mutationId }),
     );
     if (data) {
       setReceipt(null);
@@ -53,6 +56,7 @@ export function DocumentosItem({ empresa, itemId, busy, onReload }: Props) {
     }
   }
   async function enviar(file: File) {
+    const unlock = guard.lock();
     setUploading(true);
     setUploadError("");
     try {
@@ -62,12 +66,13 @@ export function DocumentosItem({ empresa, itemId, busy, onReload }: Props) {
     } catch (e) {
       setUploadError(e instanceof Error ? e.message : "Falha ao enviar arquivo.");
     } finally {
+      unlock();
       setUploading(false);
     }
   }
   async function remover(doc: Documento) {
     const result = await command.run(`${excluidos ? "restore" : "delete"}:${doc.id}:${empresa.revision}`, (mutationId) =>
-      (excluidos ? restaurarDocumentoChecklist : excluirDocumentoChecklist)({ documentoId: doc.id, expectedRevision: empresa.revision, mutationId }),
+      (excluidos ? restaurarDocumentoChecklist : excluirDocumentoChecklist)({ documentoId: doc.id, expectedRevision: getRevision(), mutationId }),
     );
     if (result) {
       setConfirmarDoc(null);
@@ -75,11 +80,16 @@ export function DocumentosItem({ empresa, itemId, busy, onReload }: Props) {
     }
   }
   async function observar(doc: Documento, obs: string) {
-    if (obs === (doc.observacao ?? "")) return;
-    const result = await command.run(`obs:${doc.id}:${obs}:${empresa.revision}`, (mutationId) =>
-      atualizarObservacaoDocumento({ documentoId: doc.id, observacao: obs || null, expectedRevision: empresa.revision, mutationId }),
+    if (obs === (doc.observacao ?? "")) return true;
+    await onReload();
+    const revision = getRevision();
+    const result = await command.run(`obs:${doc.id}:${obs}:${revision}`, (mutationId) =>
+      atualizarObservacaoDocumento({ documentoId: doc.id, observacao: obs || null, expectedRevision: revision, mutationId }),
     );
-    if (result) await atualizar();
+    if (!result) return false;
+    await onReload();
+    await client.invalidateQueries({ queryKey: ["checklist-documentos", empresa.id] });
+    return true;
   }
   return (
     <div className="mt-4 space-y-3 rounded-2xl border border-white/10 bg-black/15 p-4">
@@ -87,8 +97,10 @@ export function DocumentosItem({ empresa, itemId, busy, onReload }: Props) {
         <div className="flex gap-2">
           <Acao
             onClick={() => {
-              setExcluidos(false);
-              setPage(1);
+              guard.request(() => {
+                setExcluidos(false);
+                setPage(1);
+              });
             }}
             disabled={blocked || !excluidos}
           >
@@ -96,8 +108,10 @@ export function DocumentosItem({ empresa, itemId, busy, onReload }: Props) {
           </Acao>
           <Acao
             onClick={() => {
-              setExcluidos(true);
-              setPage(1);
+              guard.request(() => {
+                setExcluidos(true);
+                setPage(1);
+              });
             }}
             disabled={blocked || excluidos}
           >
@@ -136,16 +150,16 @@ export function DocumentosItem({ empresa, itemId, busy, onReload }: Props) {
           ) : (
             docs.data.items.map((doc) => (
               <DocumentoLinha
-                key={`${doc.id}:${doc.observacao}:${doc.deletadoEm}`}
+                key={doc.id}
                 doc={doc}
                 canEdit={canEdit}
                 busy={blocked}
-                onDelete={() => setConfirmarDoc(doc)}
-                onObservation={(obs) => void observar(doc, obs)}
+                onDelete={() => guard.request(() => setConfirmarDoc(doc))}
+                onObservation={(obs) => observar(doc, obs)}
               />
             ))
           )}
-          <Paginas page={page} pageSize={10} total={docs.data.totalCount} onPage={setPage} />
+          <Paginas page={page} pageSize={10} total={docs.data.totalCount} onPage={(page) => guard.request(() => setPage(page))} />
         </>
       )}
       <Dialog
@@ -184,9 +198,14 @@ function DocumentoLinha({
   canEdit: boolean;
   busy: boolean;
   onDelete: () => void;
-  onObservation: (obs: string) => void;
+  onObservation: (obs: string) => Promise<boolean>;
 }) {
-  const [obs, setObs] = useState(doc.observacao ?? "");
+  const draft = useChecklistDraft(
+    `documento:${doc.id}`,
+    { observacao: doc.observacao ?? "" },
+    (patch) => onObservation(patch.observacao ?? ""),
+    canEdit && !doc.deletadoEm,
+  );
   return (
     <article className="space-y-3 rounded-xl border border-white/10 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -206,16 +225,17 @@ function DocumentoLinha({
       <label className="block text-xs text-slate-400">
         Observação do documento
         <textarea
-          value={obs}
-          onChange={(e) => setObs(e.target.value)}
+          value={draft.value.observacao}
+          onChange={(e) => draft.change("observacao", e.target.value)}
           maxLength={5000}
           readOnly={!canEdit || !!doc.deletadoEm}
           disabled={busy}
           className={campoChecklist + " mt-1"}
         />
       </label>
-      {canEdit && !doc.deletadoEm && obs !== (doc.observacao ?? "") && (
-        <Acao disabled={busy} onClick={() => onObservation(obs)}>
+      {draft.error && <Falha error={draft.error} />}
+      {canEdit && !doc.deletadoEm && draft.dirty && (
+        <Acao disabled={busy} onClick={() => void draft.save()}>
           Salvar observação
         </Acao>
       )}

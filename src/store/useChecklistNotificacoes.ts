@@ -50,7 +50,10 @@ export const useChecklistNotificacoes = create<Store>((set, get) => ({
           revision: e.revision,
         });
         vistos.add(e.eventId);
-        if (fresh && !e.lidoEm) ultimo = e.eventId;
+        // Older recovery pages must not replace the newest toast candidate.
+        const current = ultimo ? map.get(ultimo) : undefined;
+        if (fresh && !e.lidoEm && (!current || e.createdAt > current.criadoEm || (e.createdAt === current.criadoEm && e.eventId > current.id)))
+          ultimo = e.eventId;
       }
       return {
         notificacoes: [...map.values()].sort((a, b) => b.criadoEm.localeCompare(a.criadoEm) || b.id.localeCompare(a.id)).slice(0, 50),

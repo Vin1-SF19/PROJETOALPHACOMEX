@@ -1,7 +1,8 @@
 import db from "@/lib/prisma";
-import { obterAtorChecklist } from "@/lib/checklist/acesso";
+import { canalReservadoChecklist } from "@/lib/checklist/realtime";
 import { obterAtorChamados, podeVerChamado, chamadoAcessoSelect } from "@/lib/chamados/acesso";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { isParceirosAdminRole } from "@/lib/roles";
 import { auth } from "../../../../../auth";
 import { pusherServer } from "@/lib/pusher-server.ts";
@@ -27,7 +28,10 @@ const ADMIN_CHANNELS = ["private-admin-chamados"];
 const PARCEIROS_PRECADASTROS_CHANNEL = "private-parceiros-precadastros";
 const ALL_USER_CHANNELS = ["private-holerite-alerts", "private-metas-alpha"];
 
-const CHECKLIST_CHANNELS = ["private-checklist-docs"];
+const channelAuthSchema = z.object({
+  socketId: z.string().min(1).refine((value) => value.trim().length > 0),
+  channelName: z.string().min(1).refine((value) => value.trim().length > 0),
+});
 
 export async function POST(req: Request) {
   try {
@@ -38,8 +42,18 @@ export async function POST(req: Request) {
     }
 
     const formData = await req.formData();
-    const socketId = formData.get("socket_id") as string;
-    const channelName = formData.get("channel_name") as string;
+    const input = channelAuthSchema.safeParse({
+      socketId: formData.get("socket_id"),
+      channelName: formData.get("channel_name"),
+    });
+    if (!input.success) {
+      return new NextResponse("Dados inválidos", { status: 400 });
+    }
+    const { socketId, channelName } = input.data;
+
+    if (canalReservadoChecklist(channelName)) {
+      return new NextResponse("Proibido", { status: 403 });
+    }
 
     if (channelName?.startsWith(BPM_TAREFA_USUARIO_CHANNEL_PREFIX)) {
       const usuarioId = extrairUsuarioIdCanalTarefasBpm(channelName);
@@ -122,12 +136,6 @@ export async function POST(req: Request) {
     }
 
     if (ALL_USER_CHANNELS.includes(channelName)) {
-      const authResponse = pusherServer.authorizeChannel(socketId, channelName);
-      return NextResponse.json(authResponse);
-    }
-
-    if (CHECKLIST_CHANNELS.includes(channelName)) {
-      try { await obterAtorChecklist(); } catch { return new NextResponse("Proibido", { status: 403 }); }
       const authResponse = pusherServer.authorizeChannel(socketId, channelName);
       return NextResponse.json(authResponse);
     }

@@ -6,7 +6,8 @@ export const checklistEventoSchema = z.object({
   empresaId: z.string().nullable(),
   createdAt: z.string(),
   lidoEm: z.string().nullable(),
-  dados: z.string().nullable(),
+  // Opaque JSON from the HTTP wire; consumers must not parse it as a serialized string.
+  dados: z.json(),
 });
 export const checklistPaginaEventosSchema = z.object({
   items: z.array(checklistEventoSchema),

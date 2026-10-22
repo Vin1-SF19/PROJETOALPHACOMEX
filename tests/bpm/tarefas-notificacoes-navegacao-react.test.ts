@@ -136,7 +136,7 @@ describe("reabertura do card pela mesma notificação", () => {
     postMessage.mockClear(); mensagem(BPM_CARD_PRONTO_EVENT);
     expect(postMessage).not.toHaveBeenCalled();
     abrir("/PainelAlpha/Chamados", "Chamados");
-    expect(openTab).toHaveBeenLastCalledWith("/PainelAlpha/Chamados", "Chamados");
+    expect(openTab).toHaveBeenLastCalledWith("/PainelAlpha/Chamados", "Chamados", undefined);
   });
   it("abre CRM quando ainda não existe e reconhece pipeline navegado dentro do iframe", async () => {
     tabs = [];

@@ -2,6 +2,9 @@ import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { verificarBackupTurso } from "../lib/verificar-backup-turso.mjs";
+import { planLegacyAccounts, prepareLegacyHashes, commitLegacyHashes, planLeaderAccess, commitLeaderAccess, assertPortalReader, operationError } from "./operations.mjs";
+
+const verifiedProofs = new WeakSet();
 
 export const MIGRATION_PATH = fileURLToPath(new URL("../../prisma/migrations/20261022143000_checklist_analistas_crm/migration.sql", import.meta.url));
 export const SCHEMA_PATH = fileURLToPath(new URL("../../prisma/schema.prisma", import.meta.url));
@@ -141,17 +144,21 @@ export async function planStorage(db) {
   return { documents: await count(db, "SELECT count(*) n FROM DocumentoChecklist"), legacyWithoutPrivateMetadata: await count(db, hasStorage ? "SELECT count(*) n FROM DocumentoChecklist WHERE storageAccess IS NULL OR storageAccess <> 'private'" : "SELECT count(*) n FROM DocumentoChecklist"), requiresSeparateVaultPlan: true, copies: 0, objectReads: 0, deletes: 0 };
 }
 
+/** @param {string} operation @param {import("@libsql/client").Client | import("@libsql/client").Transaction} [db] */
 export async function buildPlan(operation, db = undefined) {
   const art = await artifacts();
   const state = db && operation === "bootstrap-modelos" ? phaseState(await schemaMetadata(db), migrationShape(art.migration)) : "APPLIED";
-  const operationPlan = operation === "schema" ? { migrationSha256: art.migrationSha256, schemaSha256: art.schemaSha256, shape: migrationShape(art.migration) } : operation === "bootstrap-modelos" ? await planModelBootstrap(db, state) : operation === "limpar-teste" ? await planTestFolder(db) : operation === "storage-legado" ? await planStorage(db) : null;
+  const operationPlan = operation === "schema" ? { migrationSha256: art.migrationSha256, schemaSha256: art.schemaSha256, shape: migrationShape(art.migration) } : operation === "bootstrap-modelos" ? await planModelBootstrap(db, state) : operation === "limpar-teste" ? await planTestFolder(db) : operation === "storage-legado" ? await planStorage(db) : operation === "hash-contas" ? await planLegacyAccounts(db) : operation === "habilitar-lider-checklist" ? await planLeaderAccess(db) : null;
   if (!operationPlan) throw new Error("OPERACAO_INVALIDA");
   const plan = { version: 1, operation, operationPlan };
   return { ...plan, planSha256: hash(JSON.stringify(plan)) };
 }
 
-/** Verify real evidence, including restoring the full backup to disposable local SQLite. */
-export async function assertApplyGates({ environment, panelOrigin, databaseUrl, stagingFingerprint, operation, planSha256, consentPath, vaultPath, backupPath, manifestPath, now = Date.now() }) {
+/**
+ * Verify evidence, including restoring the full backup to disposable local SQLite.
+ * @param {{environment?: string, panelOrigin?: string, databaseUrl?: string, stagingFingerprint?: string, operation?: string, planSha256?: string, consentPath?: string, vaultPath?: string, backupPath?: string, manifestPath?: string, readerEvidencePath?: string, portalOrigin?: string, now?: number}} options
+ */
+export async function assertApplyGates({ environment, panelOrigin, databaseUrl, stagingFingerprint, operation, planSha256, consentPath, vaultPath, backupPath, manifestPath, readerEvidencePath = undefined, portalOrigin = undefined, now = Date.now() }) {
   if (environment !== "staging" || panelOrigin !== "https://staging.alpha-comex.com") throw new Error("AMBIENTE_STAGING_NAO_COMPROVADO");
   const fingerprint = hash(databaseUrl);
   if (stagingFingerprint !== fingerprint) throw new Error("FINGERPRINT_STAGING_DIVERGENTE");
@@ -166,12 +173,23 @@ export async function assertApplyGates({ environment, panelOrigin, databaseUrl, 
     if (evidence.environment !== "staging" || evidence.databaseFingerprint !== fingerprint || evidence.operation !== operation || evidence.planSha256 !== planSha256 || evidence.backupSha256 !== manifest.sha256) throw new Error("EVIDENCIA_NAO_CORRESPONDE_AO_PLANO");
   }
   const restored = await verificarBackupTurso(backupPath, manifestPath);
-  return { fingerprint, backupSha256: restored.sha256, verified: true };
+  const reader = operation === "hash-contas" ? await assertPortalReader({ readerEvidencePath, portalOrigin, databaseFingerprint: fingerprint, now }) : null;
+  const proof = { fingerprint, backupSha256: restored.sha256, verified: true, operation, planSha256, reader, validUntil: Math.min(generated + 48 * 3600_000, confirmed + 48 * 3600_000, reader ? Date.parse(reader.checkedAt) + 24 * 3600_000 : Infinity) };
+  verifiedProofs.add(proof);
+  return proof;
 }
 
 export async function applyPrepared(db, operation, expectedPlanSha256, gatesVerified) {
-  if (gatesVerified?.verified !== true) throw new Error("GATES_OBRIGATORIOS");
-  if (!["schema", "bootstrap-modelos", "limpar-teste"].includes(operation)) throw new Error("OPERACAO_SOMENTE_PLANEJAMENTO");
+  if (!gatesVerified || !verifiedProofs.has(gatesVerified) || gatesVerified.verified !== true || gatesVerified.operation !== operation || gatesVerified.planSha256 !== expectedPlanSha256 || Date.now() > gatesVerified.validUntil) throw new Error("GATES_OBRIGATORIOS");
+  if (!["schema", "bootstrap-modelos", "limpar-teste", "hash-contas", "habilitar-lider-checklist"].includes(operation)) throw new Error("OPERACAO_SOMENTE_PLANEJAMENTO");
+  let batch;
+  if (operation === "hash-contas") {
+    if (!gatesVerified.reader) throw operationError("LEITOR_PORTAL_NAO_COMPROVADO");
+    const initial = await buildPlan(operation, db);
+    if (initial.planSha256 !== expectedPlanSha256) throw operationError("PLANO_MUDOU_REFAZER_APROVACAO", 1);
+    batch = await prepareLegacyHashes(db, initial.operationPlan);
+  }
+  let operationResult;
   const tx = await db.transaction("write");
   try {
     const plan = await buildPlan(operation, tx);
@@ -187,6 +205,8 @@ export async function applyPrepared(db, operation, expectedPlanSha256, gatesVeri
     } else {
       if (diagnostic.state !== "APPLIED") throw new Error("SCHEMA_NOVO_OBRIGATORIO");
       if (operation === "bootstrap-modelos") await bootstrapModels(tx);
+      else if (operation === "hash-contas") operationResult = await commitLegacyHashes(tx, batch);
+      else if (operation === "habilitar-lider-checklist") operationResult = await commitLeaderAccess(tx, plan.operationPlan);
       else {
         for (const folder of plan.operationPlan.folders) {
           await tx.execute({ sql: "UPDATE operacional_clientes SET pastaChecklistId=NULL WHERE pastaChecklistId=?", args: [folder.id] });
@@ -196,9 +216,15 @@ export async function applyPrepared(db, operation, expectedPlanSha256, gatesVeri
     }
     if ((await tx.execute("PRAGMA foreign_key_check")).rows.length) throw new Error("FK_CHECK_FALHOU");
     await tx.commit();
-    return { applied: true, operation, planSha256: expectedPlanSha256 };
-  } catch (error) { await tx.rollback(); throw error; }
-  finally { tx.close(); }
+    return { applied: true, operation, planSha256: expectedPlanSha256, ...operationResult };
+  } catch (error) {
+    await tx.rollback();
+    if (operation === "hash-contas" && !error?.publicResult) throw operationError("HASH_BATCH_FALHOU");
+    throw error;
+  } finally {
+    tx.close();
+    if (batch) { for (const entry of batch.prepared) { entry.originalPassword = ""; entry.hash = ""; } batch.prepared.length = 0; }
+  }
 }
 
 async function bootstrapModels(tx) {

@@ -7,6 +7,7 @@ import { TabBar } from './TabBar';
 import { arrayMove } from '@dnd-kit/sortable';
 import { useSidebarState } from '@/hooks/useSidebarState';
 import { useChamadosNotifications } from '@/hooks/useAdminChamadosNotifications';
+import { useChecklistFrameGuard } from "@/hooks/useChecklistFrameGuard";
 import { useChecklistNotifications } from '@/hooks/useChecklistNotifications';
 import NotificationToast from '@/components/chamados/NotificationToast';
 import { ChamadoFinalizadoFeedbackDialog } from '@/components/chamados/ChamadoFinalizadoFeedbackDialog';
@@ -228,11 +229,13 @@ export default function PainelLayoutClient({
     }, window.location.origin);
   }, [activeId, tabs]);
 
+  const guardChecklistFrame=useChecklistFrameGuard(iframesRef,userId);
+
   // ── Tab management ────────────────────────────────────────────────────────
 
   const openTab = useCallback((url: string, label: string, reutilizarTabId?: string) => {
     if (!isPainelCanonicalUrl(url)) return;
-    setTabs(prev => {
+    const apply=()=>setTabs(prev => {
       const reutilizar = (reutilizarTabId ? prev.find(t => t.id === reutilizarTabId) : undefined)
         ?? (intencaoCardBpmDaUrl(url) ? encontrarAbaCrm(prev) : undefined);
       if (reutilizar) {
@@ -248,7 +251,8 @@ export default function PainelLayoutClient({
       setActiveId(id);
       return [...prev, { id, url, label }];
     });
-  }, []);
+    if(reutilizarTabId){if(!guardChecklistFrame(reutilizarTabId,apply))setActiveId(reutilizarTabId);}else apply();
+  }, [guardChecklistFrame]);
 
   const abrirModuloPorNotificacao = useBpmCardNotificacaoNavigation(tabs, iframesRef, openTab, userId);
   useBpmTarefasNotifications(isAdminRole(role) || permissoes.includes('crm') ? userId : 0, abrirModuloPorNotificacao);
@@ -284,6 +288,7 @@ export default function PainelLayoutClient({
   }, [activeId, entregarIntencaoAgenda, tabs]);
 
   const closeTab = useCallback((id: string) => {
+    const permitted=guardChecklistFrame(id,()=>{
     setFrameRuntime(prev => removePainelFrameState(prev, id));
     setTabs(prev => {
       const target = prev.find(t => t.id === id);
@@ -304,12 +309,14 @@ export default function PainelLayoutClient({
       });
       return filtered;
     });
-  }, []);
+    });
+    if(!permitted)setActiveId(id);
+  }, [guardChecklistFrame]);
 
   const retryActiveFrame = useCallback(() => {
     if (!activeId) return;
-    setFrameRuntime(prev => retryPainelFrame(prev, activeId));
-  }, [activeId]);
+    guardChecklistFrame(activeId,()=>setFrameRuntime(prev => retryPainelFrame(prev, activeId)));
+  }, [activeId,guardChecklistFrame]);
 
   const activeFrameState = activeId
     ? getPainelFrameRuntimeState(frameRuntime, activeId)

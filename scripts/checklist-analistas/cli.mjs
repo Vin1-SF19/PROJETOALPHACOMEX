@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 import { createClient } from "@libsql/client";
 import { parse } from "dotenv";
-import { readFile } from "node:fs/promises";
+import { open } from "node:fs/promises";
+import { constants } from "node:fs";
 import path from "node:path";
 import { artifacts, assertApplyGates, applyPrepared, buildPlan, diagnose, hash, migrationShape } from "./lib.mjs";
 
 const HELP = `Uso: node scripts/checklist-analistas/cli.mjs [plan|diagnose|validate|rollback] [opções]
-  --operation schema|bootstrap-modelos|limpar-teste|storage-legado (default: schema)
+  --operation schema|bootstrap-modelos|limpar-teste|storage-legado|hash-contas|habilitar-lider-checklist (default: schema)
   --env-file /caminho/.env.staging.local  (única fonte remota permitida, explícita)
   --database-url file:/tmp/fixture.db    (somente leitura de fixture local)
   --apply --consent arquivo.json --vault arquivo.json --backup dump.sql --manifest manifesto.json
+  --reader-evidence arquivo.json (hash-contas: prova real Portal staging READY/validado)
 Sem --apply: somente leitura/planejamento, nunca carrega .env.local automaticamente.
 Aplicar exige staging/fingerprint comprovados, Vault, consentimento específico e restauração de backup válido <=48h.
 storage-legado e rollback não possuem execução automática.`;
@@ -21,7 +23,7 @@ function parseArgs(args) {
     const arg = args[index];
     if (arg === "--help") return { help: true };
     if (arg === "--apply") { result.apply = true; continue; }
-    if (!["--operation", "--env-file", "--database-url", "--consent", "--vault", "--backup", "--manifest"].includes(arg) || !args[index + 1] || args[index + 1].startsWith("--")) throw new Error("ARGUMENTO_INVALIDO");
+    if (!["--operation", "--env-file", "--database-url", "--consent", "--vault", "--backup", "--manifest", "--reader-evidence"].includes(arg) || !args[index + 1] || args[index + 1].startsWith("--")) throw new Error("ARGUMENTO_INVALIDO");
     result[arg.slice(2)] = args[++index];
   }
   if (!["plan", "diagnose", "validate", "rollback"].includes(result.command)) throw new Error("COMANDO_INVALIDO");
@@ -40,8 +42,13 @@ try {
     let env = {};
     let url = options["database-url"];
     if (options["env-file"]) {
-      if (url || path.basename(options["env-file"]) !== ".env.staging.local") throw new Error("FONTE_AMBIENTE_INVALIDA");
-      env = parse(await readFile(path.resolve(options["env-file"])));
+      if (url || !path.isAbsolute(options["env-file"]) || path.basename(options["env-file"]) !== ".env.staging.local") throw new Error("FONTE_AMBIENTE_INVALIDA");
+      const envFile = await open(options["env-file"], constants.O_RDONLY | constants.O_NOFOLLOW);
+      try {
+        const info = await envFile.stat();
+        if (!info.isFile() || (info.mode & 0o777) !== 0o600 || info.size > 65536) throw new Error("ARQUIVO_STAGING_EXIGE_REGULAR_0600");
+        env = parse(await envFile.readFile("utf8"));
+      } finally { await envFile.close(); }
       url = env.TURSO_DATABASE_URL;
       if (env.CHECKLIST_TARGET_ENVIRONMENT !== "staging" || env.CHECKLIST_PANEL_ORIGIN !== "https://staging.alpha-comex.com" || !url || env.CHECKLIST_STAGING_DATABASE_SHA256 !== hash(url)) throw new Error("AMBIENTE_STAGING_NAO_COMPROVADO");
     } else if (url && !/^file:\/tmp\//.test(url)) throw new Error("URL_EXPLICITA_SOMENTE_FIXTURE_TMP");
@@ -61,7 +68,7 @@ try {
         const plan = await buildPlan(options.operation, client);
         if (!options.apply) console.info(JSON.stringify({ ...plan, databaseFingerprint: hash(url), diagnostic, mode: "dry-run", mutations: 0 }, null, 2));
         else {
-          const verified = await assertApplyGates({ environment: env.CHECKLIST_TARGET_ENVIRONMENT, panelOrigin: env.CHECKLIST_PANEL_ORIGIN, databaseUrl: url, stagingFingerprint: env.CHECKLIST_STAGING_DATABASE_SHA256, operation: options.operation, planSha256: plan.planSha256, consentPath: options.consent, vaultPath: options.vault, backupPath: options.backup, manifestPath: options.manifest });
+          const verified = await assertApplyGates({ environment: env.CHECKLIST_TARGET_ENVIRONMENT, panelOrigin: env.CHECKLIST_PANEL_ORIGIN, databaseUrl: url, stagingFingerprint: env.CHECKLIST_STAGING_DATABASE_SHA256, operation: options.operation, planSha256: plan.planSha256, consentPath: options.consent, vaultPath: options.vault, backupPath: options.backup, manifestPath: options.manifest, readerEvidencePath: options["reader-evidence"], portalOrigin: env.CHECKLIST_PORTAL_ORIGIN });
           console.info(JSON.stringify(await applyPrepared(client, options.operation, plan.planSha256, verified), null, 2));
         }
       }
@@ -70,6 +77,8 @@ try {
 } catch (error) {
   // Library errors may embed SQL, credentials or payloads. Only fixed local codes escape.
   const message = error instanceof Error && /^[A-Z][A-Z0-9_]+$/.test(error.message) ? error.message : "OPERACAO_FALHOU_CONSULTE_EVIDENCIA_LOCAL_SEGURA";
-  console.error(JSON.stringify({ ok: false, code: message, mutationsConfirmed: false }));
+  const counts = error?.publicResult;
+  const safeCounts = counts && [counts.converted, counts.skipped, counts.conflicts].every((value) => Number.isSafeInteger(value) && value >= 0) ? { converted: counts.converted, skipped: counts.skipped, conflicts: counts.conflicts } : {};
+  console.error(JSON.stringify({ ok: false, code: message, ...safeCounts, mutationsConfirmed: false }));
   process.exitCode = 1;
 } finally { client?.close(); }

@@ -68,9 +68,12 @@ async function select(el: HTMLSelectElement, value: string) {
   });
   await wait();
 }
-async function type(el: HTMLInputElement, value: string) {
+async function type(el: HTMLInputElement | HTMLTextAreaElement, value: string) {
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(el, value);
+    Object.getOwnPropertyDescriptor(el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, "value")?.set?.call(
+      el,
+      value,
+    );
     el.dispatchEvent(new Event("input", { bubbles: true }));
   });
   await wait();
@@ -184,6 +187,245 @@ describe("Checklist frontend — comportamento causal", () => {
     expect(() => validarArquivoChecklist({ size: 1024, type: "image/png" })).not.toThrow();
   });
 });
+describe("rascunhos integrais e conta retida", () => {
+  async function dialogClick(text: string) {
+    const el = [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === text);
+    if (!el) throw new Error(text);
+    await act(async () => el.click());
+    await wait();
+  }
+  const doc = {
+    id: "doc-fixture",
+    nome: "Contrato.pdf",
+    url: "/api/checklist/documentos/doc-fixture/download",
+    uploadedByCliente: true,
+    observacao: "Observação original",
+    criadoEm: new Date(),
+    deletadoEm: null,
+    deletadoPorCliente: false,
+    uploadedByUsuarioId: null,
+    uploadedByContaId: "conta-fixture",
+    deletadoPorUsuarioId: null,
+    deletadoPorContaId: null,
+  };
+  it("salva item e documento sequencialmente após outro CAS sem perder os dois rascunhos", async () => {
+    let server = structuredClone(empresaUi);
+    const revisions: number[] = [];
+    vi.mocked(api.obterEmpresaChecklist).mockImplementation(async () => ok(structuredClone(server)));
+    vi.mocked(api.listarDocumentosChecklist).mockResolvedValue(ok({ items: [doc], totalCount: 1, page: 1, pageSize: 10 }));
+    vi.mocked(api.atualizarItemChecklist).mockImplementation(async (input) => {
+      const c = (await import("@/lib/checklist/schemas")).patchItemSchema.parse(input);
+      expect(c.expectedRevision).toBe(server.revision);
+      if (c.patch.observacao !== undefined) revisions.push(c.expectedRevision);
+      server = {
+        ...server,
+        revision: server.revision + 1,
+        checklist: { ...server.checklist!, itens: server.checklist!.itens.map((i) => (i.id === c.itemId ? { ...i, ...c.patch } : i)) },
+      };
+      return ok(structuredClone(server));
+    });
+    vi.mocked(api.atualizarObservacaoDocumento).mockImplementation(async (input) => {
+      const c = (await import("@/lib/checklist/schemas")).observacaoDocumentoSchema.parse(input);
+      expect(c.expectedRevision).toBe(server.revision);
+      revisions.push(c.expectedRevision);
+      server = { ...server, revision: server.revision + 1 };
+      return ok({ ...doc, observacao: c.observacao });
+    });
+    vi.mocked(api.selecionarTipoChecklist).mockImplementation(async (input) => {
+      const c = (await import("@/lib/checklist/schemas")).selecionarTipoSchema.parse(input);
+      expect(c.expectedRevision).toBe(4);
+      server = {
+        ...server,
+        revision: 5,
+        tipoAtivo: c.tipo,
+        checklistAtivoId: "tipo-b",
+        checklist: {
+          ...server.checklist!,
+          id: "tipo-b",
+          tipo: c.tipo,
+          itens: [{ ...server.checklist!.itens[0], id: "item-b", descricao: "Novo tipo confirmado" }],
+        },
+      };
+      return ok(server);
+    });
+    await render(<ChecklistView empresaId={empresaUi.id} initial={empresaUi} />);
+    await click("Ver documentos");
+    const texts = host.querySelectorAll("textarea");
+    await type(texts[0], "Rascunho do item");
+    await type(texts[1], "Rascunho documental");
+    await select(host.querySelector('select[aria-label^="Status de"]')!, "OK");
+    expect(host.querySelectorAll("textarea")[0].value).toBe("Rascunho do item");
+    expect(host.querySelectorAll("textarea")[1].value).toBe("Rascunho documental");
+    const tipo = [...host.querySelectorAll("select")].find((e) => e.querySelector('option[value=""]')?.textContent === "Selecione o tipo")!;
+    await select(tipo, "DISPONIBILIDADE_FINANCEIRA");
+    await click("Aplicar");
+    expect(api.selecionarTipoChecklist).not.toHaveBeenCalled();
+    await dialogClick("Salvar e continuar");
+    expect(revisions).toEqual([2, 3]);
+    expect(host.textContent).toContain("Novo tipo confirmado");
+  });
+  it("erro Result e rejected preservam metadados e bloqueiam navegação até descarte explícito", async () => {
+    await render(<ChecklistView empresaId={empresaUi.id} initial={empresaUi} />);
+    await click("Dados e acesso");
+    const mes = [...host.querySelectorAll("label")].find((l) => l.textContent?.trim() === "Mês de protocolo")!.querySelector("input")!;
+    await type(mes, "Janeiro/2027");
+    await click("Histórico real");
+    vi.mocked(api.atualizarEmpresaChecklist).mockResolvedValueOnce(fail).mockRejectedValueOnce(new Error("Rede indisponível"));
+    await dialogClick("Salvar e continuar");
+    expect(document.body.textContent).toContain("Há alterações pendentes");
+    expect(mes.value).toBe("Janeiro/2027");
+    await dialogClick("Salvar e continuar");
+    expect(mes.value).toBe("Janeiro/2027");
+    expect(document.body.textContent).toContain("Rede indisponível");
+    expect(api.obterHistoricoChecklist).not.toHaveBeenCalled();
+    vi.mocked(api.obterHistoricoChecklist).mockResolvedValue(ok({ items: [], totalCount: 0, page: 1, pageSize: 20 }));
+    await dialogClick("Descartar e continuar");
+    expect(host.textContent).toContain("Histórico do atendimento");
+  });
+  it("não navega nem permite descarte enquanto um salvamento está pendente", async () => {
+    let resolve: (value: typeof fail) => void = () => {};
+    vi.mocked(api.atualizarEmpresaChecklist).mockImplementation(
+      () =>
+        new Promise((r) => {
+          resolve = r;
+        }),
+    );
+    await render(<ChecklistView empresaId={empresaUi.id} initial={empresaUi} />);
+    await click("Dados e acesso");
+    const mes = [...host.querySelectorAll("label")].find((l) => l.textContent?.trim() === "Mês de protocolo")!.querySelector("input")!;
+    await type(mes, "Pendente");
+    await click("Histórico real");
+    await dialogClick("Salvar e continuar");
+    const discard = [...document.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent === "Descartar e continuar")!;
+    expect(discard.disabled).toBe(true);
+    expect(mes.disabled).toBe(true);
+    await click("Histórico real");
+    expect(api.obterHistoricoChecklist).not.toHaveBeenCalled();
+    const unload = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(unload);
+    expect(unload.defaultPrevented).toBe(true);
+    await act(async () => resolve(fail));
+    await wait();
+    expect(mes.value).toBe("Pendente");
+    expect(discard.disabled).toBe(false);
+    expect(document.body.textContent).toContain("Há alterações pendentes");
+  });
+  it("documento sujo protege histórico e fechamento da aba/browser; falha mantém texto", async () => {
+    vi.mocked(api.listarDocumentosChecklist).mockResolvedValue(ok({ items: [doc], totalCount: 1, page: 1, pageSize: 10 }));
+    vi.mocked(api.atualizarObservacaoDocumento).mockResolvedValue(fail);
+    await render(<ChecklistView empresaId={empresaUi.id} initial={empresaUi} />);
+    await click("Ver documentos");
+    await type(host.querySelectorAll("textarea")[1], "Documento pendente");
+    const unload = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(unload);
+    expect(unload.defaultPrevented).toBe(true);
+    const post = vi.spyOn(window, "postMessage");
+    await act(async () => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          origin: window.location.origin,
+          source: window,
+          data: { type: "ALPHA_CHECKLIST_REQUEST_LEAVE", requestId: "close-fixture" },
+        }),
+      );
+    });
+    await wait();
+    await dialogClick("Salvar e continuar");
+    expect(host.querySelectorAll("textarea")[1].value).toBe("Documento pendente");
+    expect(post.mock.calls.some(([value]) => typeof value === "object" && value.type === "ALPHA_CHECKLIST_LEAVE_ALLOWED")).toBe(false);
+    await dialogClick("Descartar e continuar");
+    expect(post).toHaveBeenCalledWith({ type: "ALPHA_CHECKLIST_LEAVE_ALLOWED", requestId: "close-fixture" }, window.location.origin);
+    const clean = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(clean);
+    expect(clean.defaultPrevented).toBe(false);
+    post.mockRestore();
+  });
+  it("conta escolhida permanece fora da página/busca e nova montagem reinicia seleção", async () => {
+    vi.mocked(accounts.buscarClienteParaVincularOperacional).mockResolvedValue(
+      ok({ id: 99, cnpj: "00000000000000", razaoSocial: "Fixture", nomeFantasia: null }),
+    );
+    vi.mocked(accounts.listarContasPortalChecklist).mockImplementation(async (input) => {
+      const f = (input ?? {}) as { page?: number; busca?: string };
+      return ok({
+        items:
+          f.page === 2 || f.busca
+            ? [{ id: "conta-b", nome: "Contato B", email: "b@example.invalid" }]
+            : [{ id: "conta-a", nome: "Contato A", email: "a@example.invalid" }],
+        totalCount: 30,
+        page: f.page ?? 1,
+        pageSize: 15,
+      });
+    });
+    vi.mocked(api.criarAtendimentoChecklist).mockResolvedValue(ok({ atendimento: empresaUi, replayed: false }));
+    const props = { onClose: () => {}, analistas: analistasUi, canAssign: false, onCreated: () => {} };
+    await render(<NovoAtendimentoDialog key="primeiro" {...props} />);
+    const cnpj = document.querySelector<HTMLInputElement>('input[name="cnpj"]')!;
+    await type(cnpj, "00000000000000");
+    await dialogClick("Consultar");
+    const conta = document.querySelector<HTMLSelectElement>('select[name="conta"]')!;
+    await select(conta, "conta-a");
+    await dialogClick("Próxima");
+    expect(conta.value).toBe("conta-a");
+    expect(conta.selectedOptions[0].textContent).toContain("Contato A");
+    const busca = [...document.querySelectorAll("label")].find((l) => l.textContent?.trim().startsWith("Buscar conta existente"))!.querySelector("input")!;
+    await type(busca, "Contato B");
+    expect(conta.value).toBe("conta-a");
+    const form = conta.closest("form")!;
+    await act(async () => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    await wait();
+    expect(api.criarAtendimentoChecklist).toHaveBeenCalledWith(expect.objectContaining({ clienteId: 99, clienteOperacionalId: "conta-a" }));
+    expect(api.criarAtendimentoChecklist).toHaveBeenCalledTimes(1);
+    await render(<NovoAtendimentoDialog key="segundo" {...props} />);
+    expect(document.querySelector<HTMLSelectElement>('select[name="conta"]')?.value).toBe("NOVA");
+    expect(document.querySelector<HTMLInputElement>('input[name="cnpj"]')?.value).toBe("");
+    expect([...document.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent === "Confirmar atendimento")?.disabled).toBe(true);
+  });
+});
+
+describe("falhas documentais e respostas invertidas do wizard", () => {
+  it("resposta A atrasada não substitui confirmação B e criação usa somente masterB", async () => {
+    type LookupResult = Awaited<ReturnType<typeof accounts.buscarClienteParaVincularOperacional>>;
+    let finishA!: (result: LookupResult) => void, finishB!: (result: LookupResult) => void;
+    vi.mocked(accounts.buscarClienteParaVincularOperacional)
+      .mockImplementationOnce(() => new Promise((resolve) => { finishA = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { finishB = resolve; }));
+    vi.mocked(api.criarAtendimentoChecklist).mockResolvedValue(ok({ atendimento: empresaUi, replayed: false }));
+    await render(<NovoAtendimentoDialog onClose={() => {}} analistas={analistasUi} canAssign={false} onCreated={() => {}} />);
+    const input = document.querySelector<HTMLInputElement>('input[name="cnpj"]')!;
+    const consult = () => [...document.querySelectorAll("button")].find((b) => b.textContent === "Consultar")!;
+    await type(input, "11111111111111"); await act(async () => consult().click());
+    await type(input, "22222222222222"); await act(async () => consult().click());
+    await act(async () => finishB(ok({ id: 202, cnpj: "22222222222222", razaoSocial: "Master B confirmado", nomeFantasia: null })));
+    await act(async () => finishA(ok({ id: 101, cnpj: "11111111111111", razaoSocial: "Master A atrasado", nomeFantasia: null })));
+    await wait();
+    expect(document.body.textContent).toContain("Master B confirmado");
+    expect(document.body.textContent).not.toContain("Master A atrasado");
+    await type(document.querySelector<HTMLInputElement>('input[name="nome"]')!, "Synthetic account");
+    await type(document.querySelector<HTMLInputElement>('input[name="email"]')!, "synthetic@example.invalid");
+    const form = input.closest("form")!;
+    await act(async () => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    await wait();
+    expect(api.criarAtendimentoChecklist).toHaveBeenCalledOnce();
+    expect(api.criarAtendimentoChecklist).toHaveBeenCalledWith(expect.objectContaining({ clienteId: 202 }));
+    expect(api.criarAtendimentoChecklist).not.toHaveBeenCalledWith(expect.objectContaining({ clienteId: 101 }));
+  });
+  it.each(["Result", "rejected"])("exclusão %s falha conserva documento e permite retry sem novo desaparecimento", async (kind) => {
+    const doc = { id: "failed-delete", nome: "Documento preservado.pdf", url: "/api/checklist/documentos/failed-delete/download", uploadedByCliente: true, observacao: null, criadoEm: new Date(), deletadoEm: null, deletadoPorCliente: false, uploadedByUsuarioId: null, uploadedByContaId: "fixture-account", deletadoPorUsuarioId: null, deletadoPorContaId: null };
+    vi.mocked(api.listarDocumentosChecklist).mockResolvedValue(ok({ items: [doc], totalCount: 1, page: 1, pageSize: 10 }));
+    if (kind === "Result") vi.mocked(api.excluirDocumentoChecklist).mockResolvedValue(fail);
+    else vi.mocked(api.excluirDocumentoChecklist).mockRejectedValue(new Error("Falha de rede sintética"));
+    await render(<ChecklistView empresaId={empresaUi.id} initial={empresaUi} />);
+    await click("Ver documentos"); await click("Remover");
+    const confirm = [...document.querySelectorAll("button")].find((button) => button.textContent === "Confirmar")!;
+    await act(async () => confirm.click()); await wait();
+    expect(host.querySelector('a[href="/api/checklist/documentos/failed-delete/download"]')?.textContent).toBe("Documento preservado.pdf");
+    expect(document.body.textContent).toContain(kind === "Result" ? "Revisão mudou" : "Falha de rede sintética");
+    expect(confirm.disabled).toBe(false);
+    expect(api.excluirDocumentoChecklist).toHaveBeenCalledOnce();
+    expect(api.listarDocumentosChecklist).toHaveBeenCalledOnce();
+  });
+});
+
 describe("alertas duráveis de Checklist", () => {
   const event = (n: number) => ({
     eventId: `evento-${n}`,

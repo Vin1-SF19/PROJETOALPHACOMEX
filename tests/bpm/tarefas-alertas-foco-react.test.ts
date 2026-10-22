@@ -4,6 +4,12 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const listarChecklists = vi.hoisted(() => vi.fn());
+// Keep the real Dossie component; isolate only its server-action boundary.
+vi.mock("@/actions/bpm/ChecklistDocumental", () => ({
+  obterDossieChecklistCard: vi.fn().mockResolvedValue({ ok: true, data: { dossie: null, vinculo: null, revision: 0, cardUpdatedAt: "2026-10-22T12:00:00.000Z" }, requestId: "fixture" }),
+  listarDossiesCandidatosCard: vi.fn(),
+  vincularDossieChecklistCard: vi.fn(),
+}));
 vi.mock("@/actions/bpm/Recebimentos", () => ({ AssumirRecebimentoPipelineBpm: vi.fn() }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/PainelEncaminhamentos", () => ({ PainelEncaminhamentos: () => null }));
 vi.mock("@/actions/bpm/Checklists", () => ({ ListarChecklistsCardBpm: listarChecklists }));

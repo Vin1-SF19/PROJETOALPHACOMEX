@@ -85,3 +85,73 @@ Migration é única do Painel para banco compartilhado; Portal NÃO tem migratio
 - Verificador Portal `--panel-schema <schema Painel>`: PASS, igualdade integral dos schemas. SHA contrato: b407823eda5407077f58ca75c3751386a9e9b544f1022eaa08dd2edb37443220.
 - ESLint dos scripts/testes novos nos dois repositórios: PASS. Dependência local opcional Portal @libsql/linux-x64-gnu0.5.29 estava ausente e foi copiada de instalação independente da MESMA versão já presente no lock; só node_modules, sem package/env/lock alterado.
 - Não executados nesta fase: gates globais de aplicação, auth/actions/UI dos dois apps, E2E autenticado, migração/aplicação real, bootstrap/limpeza/hashes/objetos reais, configuração de staging ou deploy. Echo/Nova/Sage/Forge/Probe/Anubis/Lens e Vault/DevOps seguem obrigatórios. Estes testes de dados não aprovam o sistema completo.
+
+## Estação Dara2 — operações faltantes preparadas, sem aplicação real
+
+Base local a950f33e, preservando merge d7580d07 e fontes Echo/Nova/DevOps. A fotografia operacional recebida é read-only: staging canônico NOT_APPLIED,2 contas legadas,3 modelos sem conflito,0 documentos/fotos/Teste e líder sem checkList. Esta estação não repetiu conexão/diagnóstico remoto, não leu env real, não criou backup real e não aplicou schema/dados/configuração/deploy. O preflight não substitui o diagnóstico imediato anterior à futura execução.
+
+Arquivos: novo `scripts/checklist-analistas/operations.mjs`; extensão de `lib.mjs`/`cli.mjs`; `tests/checklist-analistas/operations.test.ts`, `fixtures/permissions.sql` e declaração mínima `node-sqlite.d.ts` para runtime Node24 com typings Node20 existentes. Schema e contratos de paridade não foram alterados.
+
+### `hash-contas`
+
+```sh
+node scripts/checklist-analistas/cli.mjs plan --operation hash-contas --database-url file:/tmp/fixture.db
+```
+
+O plano exibe somente IDs opacos, estado LEGACY/HASHED/INVALID, contagens, versão de sessão e política; nunca senha, senhaHash, tokens, URLs nem digests individuais de segredo. O hash geral do plano inclui metadados seguros, não o segredo. Antes do DDL o plano é uma **projeção explícita pós-DDL**: coluna futura senhaHash=NULL e authSessionVersion=0. Somente aplicar o DDL mantendo os dados produz o MESMO planSha256; mudanças nos IDs/estados/versões invalidam o plano. Assim Vault pode revisar plano concreto antes da migration, sem aplicar DDL real para obter a projeção. Estado parcial é recusado. Recalcular e conferir o hash após o DDL antes de aplicar contas.
+
+Após gates, captura credenciais originais somente em memória, calcula bcrypt fator12 antes de abrir a transação de escrita e executa CAS por id+senhaHash original+senha original+authSessionVersion. Hash e limpeza senha='' ocorrem no MESMO UPDATE/transação. Hash existente válido com senha vazia é pulado, sem reset ou recálculo. Hash inválido, legado vazio ou >72bytes (truncamento bcrypt) bloqueiam com código seguro. Hash já existente acompanhado de cópia legada não vazia exige revisão explícita (`HASH_COM_COPIA_LEGADA_EXIGE_REVISAO`): não sobrescrever hash atual nem declarar texto eliminado sem ação. Não há nova operação de limpeza implícita.
+
+Login oportunista, reset ou troca de senha entre captura e commit causam conflito; a transação reverte TODAS as conversões desse lote e preserva a alteração concorrente. Falha de um registro também reverte todo o lote. Saída de sucesso: converted/skipped/conflicts/code, sem material de credencial. Falha inesperada é `HASH_BATCH_FALHOU` com converted0; driver/SQL não escapam no CLI. Reexecução com plano atual já convertido retorna converted0/skippedN. A mesma aprovação anterior não autoriza um plano diferente.
+
+**Sessões:** preservar authSessionVersion, pois converter a representação da mesma senha não troca a credencial nem exige logout. CAS inclui a versão para preservar revogações/resets concorrentes. Não incrementar/resetar esse valor, não restaurar senha antiga e não voltar ao leitor exclusivamente plaintext depois da conversão.
+
+**Ordem obrigatória real (arquitetura §14):** schema aditivo/bootstrap3/grant5 → leitor Portal compatível no staging, READY e validado → escritor Painel de hash novo READY e cessação verificável do escritor plaintext antigo → hashbatch legado → validação journal/polling sem timer. A cessação do escritor antigo é gate operacional externo; o CLI continua validando a evidência do leitor, sem automatizar essa cessação. O apply de hash exige `--reader-evidence <arquivo>` e CHECKLIST_PORTAL_ORIGIN explícito, HTTPS de staging. Evidência futura DevOps deve conter environment="staging", origin exato, databaseFingerprint, deploymentId real dpl_..., commitSha real40hex, readyState="READY", validated=true, checkedAt<=24h e checks hashLogin/legacyUpgrade/sessionVersion=true. Host/origin, destino, estado, data ou checks divergentes bloqueiam. Não fabricar aprovação ou prova de deploy; fixtures sintéticas dos testes não são evidência operacional. Portal atual de produção e preview herdando produção são recusados. A prova verificada em memória expira no menor prazo de backup/consentimento48h e leitor24h.
+
+### `habilitar-lider-checklist`
+
+```sh
+node scripts/checklist-analistas/cli.mjs plan --operation habilitar-lider-checklist --database-url file:/tmp/fixture.db
+```
+
+Escopo fixo **todos os membros atuais e futuros da role exata Lider Operacional**, incluindo inativos na análise. Sem flags para outro role/usuário e sem criar setor, role, módulo ou override. Requer uma única entrada cadastral equivalente ativa; divergência cadastral deve ser resolvida explicitamente antes. Regra de escrita owner/líder do CheckList não é alterada por esta operação.
+
+Cria exatamente5 vínculos SetorPermissao: chamados,Documentos,UpDocumentos,Extratos,checkList. **UpDocumentos é token legado ausente do MODULOS_REGISTRY atual:** preservar o token não significa afirmar que existe módulo navegável ativo com esse nome. Os outros quatro vínculos correspondem a permissões do catálogo atual. Não introduzir entry de registry nem descartar o token. O resolver real foi testado antes/depois: os quatro tokens previamente efetivos permanecem e checkList é adicionado; role Comercial permanece intacta.
+
+Snapshot/CAS inclui todos os usuários normalizados desse role, mesmo inativos, com id/role/status/permissoes, todas suas linhas de override (somente em hash do snapshot), cadastro do setor, TODAS suas linhas setoriais e catálogo completo/fontes do registry/resolver/roles. Campos pessoais, senhas e conteúdo de motivo não aparecem no plano. Variante de role que a resolução exata não cobriria, fallbacks diferentes dos4 tokens aprovados, múltiplos fallbacks incompatíveis, override removendo acesso requerido ou estado setorial parcial/diferente bloqueiam. Não fazer união automática de novos módulos nem reescrever overrides.
+
+Na transação, reler snapshot, conferir hash do plano e inserir5 relações; pós-validar preservação de acessos+checkList. Falha em qualquer vínculo reverte todos. Estado já configurado exatamente com5 e acessos válidos é no-op. Mudar role, status, permissões, vínculo setorial, override ou catálogo após aprovação exige novo plano. Não mudar usuarios.role/permissoes, dono, revisão de atendimento, sessão ou override individual.
+
+### Gates e execução futura
+
+As duas operações usam `assertApplyGates`: ambiente staging/fingerprint/origin, Vault, consentimento específico e dump completo<=48h restaurado localmente para conferir SHA/bytes/integridade/FKs/counts. Prova verificada é ligada à operação/planSha256, expira e só vale no processo que realmente verificou os arquivos; `{verified:true}` fabricado não passa. Não existe --force. `--apply` continua exigindo caminho absoluto .env.staging.local, agora arquivo regular0600 sem symlink e<=64KiB, sem fallback para .env.local/process.env. O CLI só entrega códigos públicos e contagens, nunca erro arbitrário do driver.
+
+Para execução remota futura, substituir apenas a opção de fixture por `--env-file /caminho/.env.staging.local` na fase de plano. Apply acrescenta --apply/--consent/--vault/--backup/--manifest e, em hash-contas, --reader-evidence. Vault/DevOps preparam os arquivos reais, ligam hashes e apresentam o plano ao usuário; esta documentação NÃO é consentimento. Não houve criação/configuração desses arquivos operacionais nesta estação.
+
+No staging fotografado não há motivo para copiar/revogar objetos ou apagar Teste. Esses comandos permanecem sem aplicação e não devem entrar na autorização real só porque existem na CLI. Não há backfill automático de owner. Rollback de permissão requer snapshot original, conferência pós-CAS e novo plano para preservar mudanças posteriores; não apagar os5 vínculos indiscriminadamente. Hashbatch não reconstrói plaintext: manter leitor compatível ou recuperação completa Vault considerando writes posteriores.
+
+### Evidência focada Dara2
+
+- `vitest run tests/checklist-analistas/operations.test.ts`:17 PASS; SQLite real descartável em /tmp, bcrypt12, transações/CAS/rollback, replay, gates com backup sintético restaurado, reader-proof e resolver REAL de módulos apoiado em Prisma/SQLite.
+- Executados juntos com contrato anterior:2 arquivos,31 testes PASS. Testes cobrem líder ativo/inativo, preservação de owner/revisão, outros roles, partial/drift/fallback divergente/override/no-op, planos pré/pós-DDL sem mutação e sem segredo.
+- ESLint dos3 scripts e testes/declaração novos:PASS, sem diagnósticos. TypeScript estrito focado via `/tmp/checklist-dara-operations-tsconfig.json`:PASS. Node --check3scripts:PASS. diff-check:PASS.
+- Paridade estática Painel e Portal --panel-schema:PASS, SHA schema inalterado b407823eda5407077f58ca75c3751386a9e9b544f1022eaa08dd2edb37443220.
+- Nenhum gate global, login real, upload, schema/mutação/backup real, alteração de ambiente, commit/push/deploy foi executado. Sage/Forge/Vault e demais revisões permanecem obrigatórios.
+
+
+### Vault — revisão e backup,22/10/2026
+
+Revisão independente e backup staging completo verificado concluídos; relatório normativo operacional `docs/vault/checklist-analistas-20261022.md`. Contagem SQL correta:26ADD COLUMN+5tabelas+36índices explícitos=67statements; Prisma diff automático com7rebuilds/DROP NÃO APLICAR. Dump337tabelas reais/295932linhas/949índices/2triggers,360811599bytes, SHA25630b31bbef7c4e462c49bf22150ec4150f6bcc5d4ee035ec47d0fc67197acdd5e; captura17:51:45UTC e restore íntegro17:54:38UTC,22/10/2026. Per-tablecounts/schema/sequências iguais; arquivos ignored700/600. Nenhuma aplicação real autorizada.
+
+PlanosCLI reais dry-run schema/bootstrap3/grant5sem blockers;2legados válidos,0>72bytes,Teste/docs/fotos0,ledgerausente,owners4NULL. Plano hash-contas deve corrigir rótulo de fase e recalcular hash ANTES aprovação/apply. Ordem vigente arquitetura§14: schema/bootstrap/grant→Portal leitor validado→Painel hashwriter novo+cessação verificável do antigo→hashbatch→polling. CLI valida reader; cessação writer é gate operacional externo, não inventar prova de URLs antigas bloqueadas. Timer NÃO instalar/habilitar no transporte polling.
+
+File List desta estação: `docs/vault/checklist-analistas-20261022.md`, append destes documentos e `docs/ops/checklist-analistas-staging-20261022.md`; backup/manifestos/planos privados ficam fora Git. Status In Progress e gates globais/revisões/consentimento/aplicação pendentes.
+
+
+### Dara — fechamento da fase hash,22/10/2026
+
+Correção de metadado concluída: phase=`AFTER_SCHEMA_BOOTSTRAP_GRANT_AND_VALIDATED_PORTAL_READER_AND_READY_PANEL_HASH_WRITER_AND_LEGACY_WRITER_CESSATION`. Ordem normativa §14: schema/bootstrap3/grant5 → Portal leitor READY validado → Painel escritor hash READY e cessação verificável do plaintext antigo → hashbatch legado → journal/polling sem timer. O CLI mantém apenas o guard reader existente; cessação writer continua gate operacional externo.
+
+Novo planSha256 `hash-contas`: `1bd13b1afa8b4d27abd0745db15619a6583166c5b36bda98622ca5aea806254c`; dry-run real staging às18:06:46UTC de22/10/2026,2conversões projetadas/0inválidas/0bloqueios/0mutações. Plano privado0600: `/tmp/checklist-vault-20261022/plans/hash-contas-phase-corrected.json`; resumo seguro0600: `/tmp/checklist-vault-20261022/hash-contas-phase-summary.json`. Diagnóstico idêntico ao anterior; operationPlan difere somente em phase. Hash antigo3264ef79… continua histórico, NÃO USAR PARA APPLY.
+
+Os registros anteriores de pendência são históricos e ficam superados apenas neste rótulo/planSha; sem alteração de SQL, guards, algoritmo, flags ou schema. ESLint focado PASS; operações existentes17/17 PASS; nenhum teste de espelhamento acrescentado. Backup e demais3planos não foram repetidos. Gates globais/revisões/consentimento/aplicação permanecem pendentes. File List: `scripts/checklist-analistas/operations.mjs`, este documento, `docs/vault/checklist-analistas-20261022.md`, `docs/ops/checklist-analistas-staging-20261022.md` e story correspondente.

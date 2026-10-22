@@ -1,179 +1,53 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "@prisma/client";
+import { randomUUID } from "node:crypto";
+import { criarFixtureChecklist } from "../checklist-analistas/sqlite-fixture";
+const state = vi.hoisted(() => ({ db: undefined as unknown as PrismaClient, auth: vi.fn() }));
+vi.mock("../../auth", () => ({ auth: state.auth }));
+vi.mock("@/lib/prisma", () => ({ get default() { return state.db; } }));
+import { listarEmpresasChecklist, obterEmpresaChecklist, atualizarEmpresaChecklist } from "@/actions/checklist";
+let fixture: Awaited<ReturnType<typeof criarFixtureChecklist>>;
+beforeAll(async () => { fixture = await criarFixtureChecklist(); state.db = fixture.db; }, 30000);
+afterAll(async () => { await fixture?.close(); });
+beforeEach(() => { state.auth.mockResolvedValue({ user: { id: "1", authSessionVersion: 0 } }); });
 
-const authMock = vi.hoisted(() => vi.fn());
-const prismaMock = vi.hoisted(() => ({
-  operacionalClientes: { findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
-  pastaChecklist: { findUnique: vi.fn() },
-  checklist: { findUnique: vi.fn(), create: vi.fn() },
-  $transaction: vi.fn(),
-}));
-
-vi.mock("../../auth", () => ({ auth: authMock }));
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
-
-import { getEmpresasChecklist, getEmpresaChecklist, atualizarEmpresaChecklist } from "@/actions/checklist";
-
-describe("getEmpresasChecklist — achata Cliente master (Fase 3.5)", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    authMock.mockResolvedValue({ user: { id: "7" } });
+describe("Cliente master — projeções públicas e PATCH via actions reais", () => {
+  it("lista os dados do master confirmado, separando identidade e revisão operacionais", async () => {
+    const f = await fixture.atendimento();
+    const result = await listarEmpresasChecklist({ clienteId: f.cliente.id });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.error.message);
+    expect(result.data.totalCount).toBe(1);
+    expect(result.data.items).toEqual([expect.objectContaining({ id: f.empresa.id, clienteId: f.cliente.id, cnpj: f.cliente.cnpj, razaoSocial: f.cliente.razaoSocial, nomeFantasia: "MASTER", revision: 0 })]);
+    expect(JSON.stringify(result)).not.toContain("senhaHash");
   });
-
-  it("achata os campos cadastrais de Cliente no shape esperado pela UI", async () => {
-    prismaMock.operacionalClientes.findMany.mockResolvedValue([
-      {
-        id: "op-1",
-        status: "ATIVO",
-        embasamento: "RECEITA_BRUTA_DAS",
-        tipo: null,
-        progresso: 40,
-        mesProtocolo: "08/2026",
-        linkGrupo: null,
-        cliente: {
-          cnpj: "12345678000190",
-          razaoSocial: "EMPRESA TESTE LTDA",
-          nomeFantasia: "TESTE",
-          municipio: "São Paulo",
-          uf: "SP",
-          regimeTributario: "Simples Nacional",
-          capitalSocial: "10000",
-          dataConstituicao: "2020-01-01",
-        },
-        clienteOperacional: { nome: "Fulano" },
-        pastaChecklist: null,
-        checklists: [],
-      },
-    ]);
-
-    const resultado = await getEmpresasChecklist();
-
-    expect(resultado.data).toEqual([
-      expect.objectContaining({
-        id: "op-1",
-        cnpj: "12345678000190",
-        razaoSocial: "EMPRESA TESTE LTDA",
-        nomeFantasia: "TESTE",
-        municipio: "São Paulo",
-        uf: "SP",
-        regimeTributario: "Simples Nacional",
-        capitalSocial: "10000",
-        dataConstituicao: "2020-01-01",
-        clienteNome: "Fulano",
-      }),
-    ]);
+  it("bloqueia sem sessão autenticada, mesmo com registro existente", async () => {
+    const f = await fixture.atendimento();
+    state.auth.mockResolvedValue(null);
+    expect(await listarEmpresasChecklist({ clienteId: f.cliente.id })).toMatchObject({ ok: false, error: { code: "UNAUTHENTICATED" } });
   });
-
-  it("bloqueia sem sessão autenticada", async () => {
-    authMock.mockResolvedValue(null);
-
-    const resultado = await getEmpresasChecklist();
-
-    expect(resultado.error).toBeDefined();
-    expect(prismaMock.operacionalClientes.findMany).not.toHaveBeenCalled();
+  it("detalhe distingue Cliente master da conta de login do Portal", async () => {
+    const f = await fixture.atendimento();
+    const result = await obterEmpresaChecklist(f.empresa.id);
+    expect(result).toMatchObject({ ok: true, data: { clienteId: f.cliente.id, cliente: { id: f.cliente.id, cnpj: f.cliente.cnpj, razaoSocial: f.cliente.razaoSocial, regimeTributario: "Simples Nacional" }, contaPortal: { id: f.conta.id, nome: "Pessoa da conta", email: f.conta.email } } });
   });
-});
-
-describe("getEmpresaChecklist — achata Cliente e renomeia clienteOperacional (Fase 3.5)", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    authMock.mockResolvedValue({ user: { id: "7" } });
+  it("empresa ausente produz NOT_FOUND público seguro", async () => {
+    expect(await obterEmpresaChecklist("inexistente")).toMatchObject({ ok: false, error: { code: "NOT_FOUND" } });
   });
-
-  it("retorna 'cliente' como a conta de login (clienteOperacional), não o Cliente master", async () => {
-    prismaMock.operacionalClientes.findUnique.mockResolvedValue({
-      id: "op-1",
-      status: "ATIVO",
-      cliente: {
-        cnpj: "12345678000190",
-        razaoSocial: "EMPRESA TESTE LTDA",
-        nomeFantasia: null,
-        municipio: null,
-        uf: null,
-        regimeTributario: null,
-        capitalSocial: null,
-        dataConstituicao: null,
-      },
-      clienteOperacional: { nome: "Fulano", email: "fulano@teste.com" },
-      checklists: [],
-    });
-
-    const resultado = await getEmpresaChecklist("op-1");
-
-    expect(resultado.data).toMatchObject({
-      cnpj: "12345678000190",
-      razaoSocial: "EMPRESA TESTE LTDA",
-      cliente: { nome: "Fulano", email: "fulano@teste.com" },
-    });
+  it("PATCH altera somente negócio, preservando todos os dados cadastrais no master", async () => {
+    const f = await fixture.atendimento();
+    const before = await state.db.cliente.findUniqueOrThrow({ where: { id: f.cliente.id } });
+    const result = await atualizarEmpresaChecklist({ empresaId: f.empresa.id, expectedRevision: 0, mutationId: randomUUID(), patch: { status: "EM_ANALISE", embasamento: "Novo fundamento", mesProtocolo: null, linkGrupo: null } });
+    expect(result).toMatchObject({ ok: true, data: { revision: 1, status: "EM_ANALISE", embasamento: "Novo fundamento", mesProtocolo: null, linkGrupo: null } });
+    expect(await state.db.cliente.findUniqueOrThrow({ where: { id: f.cliente.id } })).toEqual(before);
+    expect(await state.db.operacionalClientes.findUniqueOrThrow({ where: { id: f.empresa.id } })).toMatchObject({ clienteId: f.cliente.id, clienteOperacionalId: f.conta.id, tipo: "RECEITA_BRUTA_DAS" });
   });
-
-  it("retorna erro quando a empresa não existe", async () => {
-    prismaMock.operacionalClientes.findUnique.mockResolvedValue(null);
-
-    const resultado = await getEmpresaChecklist("inexistente");
-
-    expect(resultado.error).toBe("Empresa não encontrada");
-  });
-});
-
-describe("atualizarEmpresaChecklist — não grava mais campos cadastrais (Fase 3.5)", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    authMock.mockResolvedValue({ user: { id: "7" } });
-    prismaMock.$transaction.mockImplementation(async (fn) =>
-      fn({
-        operacionalClientes: prismaMock.operacionalClientes,
-        checklist: prismaMock.checklist,
-      })
-    );
-  });
-
-  it("atualiza apenas os campos de negócio permitidos, sem razaoSocial/cnpj/uf/etc", async () => {
-    prismaMock.operacionalClientes.findUnique.mockResolvedValue({ tipo: null });
-    prismaMock.operacionalClientes.update.mockResolvedValue({});
-
-    const resultado = await atualizarEmpresaChecklist({
-      empresaId: "op-1",
-      status: "ATIVO",
-      embasamento: "RECEITA_BRUTA_DAS",
-      tipo: null,
-      pastaChecklistId: null,
-      mesProtocolo: "08/2026",
-      linkGrupo: null,
-    });
-
-    expect(prismaMock.operacionalClientes.update).toHaveBeenCalledWith({
-      where: { id: "op-1" },
-      data: {
-        status: "ATIVO",
-        embasamento: "RECEITA_BRUTA_DAS",
-        tipo: null,
-        pastaChecklistId: null,
-        mesProtocolo: "08/2026",
-        linkGrupo: null,
-      },
-    });
-    expect(resultado).toEqual({ success: true });
-  });
-
-  it("rejeita payload que ainda tente mandar razaoSocial (schema não aceita mais)", async () => {
-    const resultado = await atualizarEmpresaChecklist({
-      empresaId: "op-1",
-      status: "ATIVO",
-      embasamento: "",
-      tipo: null,
-      pastaChecklistId: null,
-      mesProtocolo: null,
-      linkGrupo: null,
-      // @ts-expect-error — campo removido do schema, não deve mais ser aceito
-      razaoSocial: "TENTATIVA DE BURLAR",
-    });
-
-    expect(prismaMock.operacionalClientes.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.not.objectContaining({ razaoSocial: expect.anything() }),
-      })
-    );
-    expect(resultado.error).toBeUndefined();
+  it("PATCH cadastral forjado é rejeitado sem mutação, evento ou incremento de revisão", async () => {
+    const f = await fixture.atendimento();
+    const result = await atualizarEmpresaChecklist({ empresaId: f.empresa.id, expectedRevision: 0, mutationId: randomUUID(), patch: { status: "ATIVO", razaoSocial: "TENTATIVA DE BURLAR", cnpj: "FORJADO" } });
+    expect(result).toMatchObject({ ok: false, error: { code: "VALIDATION" } });
+    expect((await state.db.cliente.findUniqueOrThrow({ where: { id: f.cliente.id } })).razaoSocial).toBe(f.cliente.razaoSocial);
+    expect((await state.db.operacionalClientes.findUniqueOrThrow({ where: { id: f.empresa.id } })).revision).toBe(0);
+    expect(await state.db.checklistEvento.count({ where: { empresaId: f.empresa.id } })).toBe(0);
   });
 });

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync } from "./node-sqlite";
 import { createClient } from "@libsql/client";
 import { PrismaClient, StatusItemChecklist } from "@prisma/client";
 import { PrismaLibSQL } from "@prisma/adapter-libsql";

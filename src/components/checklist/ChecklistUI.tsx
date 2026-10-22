@@ -4,10 +4,11 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 export const campoChecklist =
   "w-full rounded-xl border border-white/15 bg-slate-950/80 px-3 py-2.5 text-sm text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-[var(--checklist-accent)] disabled:opacity-60";
-export function Acao({ className, ...props }: ComponentProps<"button">) {
+export function Acao({ className, type = "button", ...props }: ComponentProps<"button">) {
   return (
     <button
       {...props}
+      type={type}
       className={cn(
         "inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--checklist-accent)] disabled:cursor-not-allowed disabled:opacity-45",
         className,

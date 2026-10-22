@@ -28,6 +28,14 @@ beforeAll(async () => {
     INSERT INTO "ProdutoEstoque" ("id", "nome", "quantidade", "estoqueMinimo", "unidade", "categoriaId", "createdAt", "updatedAt", "quantidadeTotal")
       VALUES ('item-1', 'Item Teste', 0, 0, 'unidade', 'cat-1', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
   `);
+  // Apply only the additive audit contract to this disposable inventory fixture.
+  // The real event DDL keeps the FK target intact without inventing a second schema.
+  const checklistMigration = readFileSync(resolve(process.cwd(), "prisma/migrations/20261022143000_checklist_analistas_crm/migration.sql"), "utf8");
+  const eventoDdl = checklistMigration.match(/CREATE TABLE "ChecklistEvento" \([\s\S]+?\n\);/)?.[0];
+  if (!eventoDdl) throw new Error("Missing ChecklistEvento fixture DDL");
+  await setup.executeMultiple(eventoDdl);
+  await setup.execute('ALTER TABLE "Auditoria" ADD COLUMN "checklistEventoId" TEXT REFERENCES "ChecklistEvento" ("id") ON DELETE RESTRICT ON UPDATE CASCADE');
+  await setup.execute('CREATE UNIQUE INDEX "Auditoria_checklistEventoId_key" ON "Auditoria"("checklistEventoId")');
   setup.close();
   prisma = new PrismaClient({ adapter: new PrismaLibSql({ url: databaseUrl }) });
 });

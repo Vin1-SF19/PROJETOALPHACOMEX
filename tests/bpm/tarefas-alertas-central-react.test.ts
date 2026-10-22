@@ -2,6 +2,8 @@
 import React, { act, createElement as h } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+// The central uses the real checklist store, whose persistence crosses Server Actions.
+vi.mock("@/actions/checklist/eventos", () => ({ marcarEventoChecklistLido: vi.fn(), listarEventosChecklist: vi.fn() }));
 vi.mock("framer-motion", async () => {
   const { createElement, Fragment } = await import("react");
   const elemento = (tag: string) => ({ children, className }: { children?: React.ReactNode; className?: string }) => createElement(tag, { className }, children);

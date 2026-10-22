@@ -172,3 +172,72 @@ Quality gates dos dois projetos conforme scripts reais (adicionar typecheck/test
 SM transforma este contrato em stories/ACs mantendo todas as dependências visíveis. Dara prepara plano aditivo e diagnóstico de layouts/duplicatas/órfãos; Vault apresenta ambiente, steps, impacto, alternativa, backup válido e rollback para aprovação específica. Antes disso não aplicar migrations nem remover Teste/objetos públicos nem rehash em lote. Backup produção não é seed de staging. Código novo deve ser liberado somente sobre contrato de schema validado; evitar fallback silencioso para layout antigo.
 
 Rollback de código exige compatibilidade dos leitores com colunas aditivas e hash introduzido; não restaurar leitor plaintext após novas contas hash. Snapshot de itens/documentos e novos eventos ficam preservados. Rollback de schema/dados só pelo plano Vault com backup verificado; nunca DROP automático para satisfazer versão antiga. Nenhuma promoção de produção está incluída na autorização de desenvolvimento desta entrega.
+
+
+## 14. Adendo Aria — isolamento CheckList por polling (22/10/2026)
+
+[AUTO-DECISION] Namespace por ambiente no app Pusher compartilhado basta? → **Não na topologia atual.** O endpoint `src/app/api/pusher/auth/route.ts` termina em `authorizeChannel(socketId, channelName, presenceData)` para canais desconhecidos de qualquer sessão autenticada. O mesmo fallback consta no commit de produção observado `28651e7f4c6a3ed1be91f7437eb638638d047f0c`, inspecionado localmente por git show; não foi feita chamada exploratória de autorização em produção. Assim a produção antiga poderia assinar um canal staging novo mesmo que o autorizador novo staging o negasse. Deny apenas no staging não corrige o outro signatário do mesmo app.
+
+**Entrega atual usa exclusivamente journal + polling autenticado para avisos CheckList, sem publicar nem assinar canais CheckList no Pusher compartilhado.** Aprovação arquitetural para implementar este ajuste; não é QA final nem autorização de deploy/DB. Nenhuma obrigação de comprar/provisionar app novo para homologar a funcionalidade. O polling já recupera no shell, sem temporizador em widgets: montagem imediata, retorno de foco, intervalo6s visível/30s oculto, paginação por cursor, eventId/revision/readstate persistidos. Não se promete push instantâneo. Portal continua SSE próprio.
+
+Este adendo prevalece sobre a obrigatoriedade de transporte Pusher/worker em §§7 e11 do contrato anterior. Mantém A16: aviso recuperável, sem duplicação, leitura durável e um único poller. Pusher é aceleração opcional, sem ser fonte da verdade. Os outros módulos permanecem no app compartilhado preexistente; **não se alega isolamento físico de app/keys nem correção dos seus autorizadores**.
+
+## Contrato pequeno implementável
+
+### Configuração pura compartilhada
+
+Echo cria `src/lib/checklist/realtime.ts`, sem server-only, Prisma, Pusher, auth ou segredos. Expõe transporte resolvido e predicado de canal reservado, ambos testáveis por argumentos explícitos. Entrada de transporte `NEXT_PUBLIC_CHECKLIST_REALTIME_MODE`: ausente ou valor exato `polling` → polling; qualquer outro valor, incluindo `pusher`, vazio fornecido, espaços, caixa diferente ou desconhecido → configuração inválida e **nenhum transporte externo**. Não implementar opção Pusher ativável por env nesta entrega. No browser usar referência literal `process.env.NEXT_PUBLIC_CHECKLIST_REALTIME_MODE` para substituição Next; servidor passa a mesma env ao mesmo resolvedor. Não adicionar segredo/env paralelo ou inferir ambiente por NODE_ENV.
+
+Nova deve manter polling e estado de ator funcionando mesmo se configuração for inválida; um valor inválido nunca libera assinatura nem derruba hidratação. Backend pode reportar configuração inválida sanitizada pelo worker; demais endpoints de journal continuam disponíveis. Defaults seguros também valem numa futura promoção explicitamente autorizada: polling nunca muda silenciosamente para Pusher em produção.
+
+Predicado reserva todo nome de string que comece por `private-checklist` (inclui antigo `private-checklist-docs`, nomes futuros stage/prod e variantes malformadas desse prefixo). Não criar nomes por ambiente ativos agora. Essa reserva ampla evita cair no fallback genérico; outros namespaces permanecem intactos.
+
+### Autorização
+
+`src/app/api/pusher/auth/route.ts`: depois da sessão e leitura validada de formData, **antes de quaisquer autorizações e do fallback**, negar403 todo canal CheckList reservado, mesmo Admin/CEO/TI/leader, outro ambiente, canal antigo ou malformado. Não chamar authorizeChannel/ACL de CheckList neste caminho: não há canal CheckList habilitado. Garantir socket_id/channel_name strings não vazias antes de startsWith/signature (entrada inválida400 ou403). Sem sessão continua401. Remover CHECKLIST_CHANNELS e ramo antigo autorizador. Não alterar política de outros módulos.
+
+Isso protege a versão nova e impede que clientes staging usem o autorizador staging para os canais CheckList de produção antiga. **Não bloqueia a produção antiga de assinar novos canais; por isso nenhum evento staging CheckList é publicado.**
+
+### Worker/outbox
+
+`src/app/api/checklist/jobs/eventos/route.ts`: manter validação Bearer constant-time primeiro. Em modo polling retornar200 `{processed:0, transport:"polling"}` **sem importar/instanciar Pusher nessa rota, sem chamar publicarPendentes, sem claim/update/retry de outbox nem trigger**. Configuração inválida retorna503 sanitizado e nenhuma mutação/rede. Segredo ausente/incorreto401, também sem DB/rede.
+
+`publicadoEm` significa publicação externa efetiva, **não leitura nem entrega ao polling**. Portanto não marcar eventos publicados artificialmente. O endpoint de recuperação já não filtra publicadoEm, e readstate por usuário continua sendo comprovação de leitura. Manter serviço publicarPendentes e testes como preparação inativa, sem caller produtivo nesta entrega; não apagar histórico ou backlog. Skip anterior ao claim evita loop de tentativas/backoff por transporte desligado.
+
+**Não instalar/habilitar timer desta entrega em modo polling.** Templates/runner de DevOps podem permanecer preparados e seus testes existentes válidos; a instrução operacional de enable é suspensa por este adendo. Não executar --once remoto para fingir validação de publicação. Se no futuro reativar Pusher, definir corte/backlog com eventId/readstate, sem apagar eventos antigos e sem reabrir lidos.
+
+### Cliente
+
+`src/hooks/useChecklistNotifications.ts`: consumir config pura, manter inicialização/reset de store por ator/permissão e opt-out iframe; **remover dependência/import de pusherClient, subscribe/bind/connected/unbind CheckList**. Não derrubar singleton global nem unsubscribe de outros módulos. Não criar novo intervalo; `src/components/NotificacaoFlutuante.tsx` já é único poller global. Widgets/central/toast consomem store como antes. Mudança de ator ignora respostas antigas, permissão revogada é validada no endpoint e não apaga leitura persistida.
+
+## Ownership serial e testes exigidos
+
+1. **Echo:** helper puro novo, rota auth e rota worker; testes novos `tests/checklist-analistas/realtime-isolation.test.ts` (ou dois arquivos focados auth/worker); adendo doc API. Nenhum Portal/source cloud/schema necessário.
+2. **Nova, após FINAL Echo:** hook cliente e `tests/checklist-analistas/notifications-subscription.test.tsx` adaptado de assinatura única para **zero assinatura CheckList e um poller global**. Usar helper entregue sem criar configuração concorrente; preservar testes/eventos recovery. Nenhuma mudança no singleton `src/lib/pusher.ts`.
+3. Rodar checks focados reais e posteriormente Forge global/Probe/Anubis/Lens/Sage conforme Bibble. Não aprovar por análise estática.
+
+Casos mínimos: config ausente/polling/inválida/pusher; todas retornam zero subscribe/trigger. Auth nega canais antigo, stage, prod, sufixo malformado e Admin; spy authorizeChannel não chamado; semsessão401; formFile/null inválidos; regressão canal conhecido outro módulo. Worker token inválido401; polling200 processed0; config inválida503; DB claim/update e Pusher nunca chamados; rows/readstate preservados. Cliente monta/desmonta widgets sem nova assinatura/timer, ator muda sem dados atrasados; recuperação real journal→JSON→parser→store mantém51ºevento/página2/leitura/replay/falha parcial e áudio/toast único. Testes existentes B02/eventos-recovery e SQLite são evidência reutilizável se fontes não mudarem.
+
+## Trade-offs e futuro
+
+Polling tem latência de aproximadamente6s com aba visível, mais duração da requisição; usa o tráfego de consulta global já existente, sem assinatura externa ou nova fila. Indisponibilidade temporária conserva coleção confirmada e recupera depois. Ausência de push não perde eventos persistidos. Não é promessa de tempo real estrito.
+
+App Pusher dedicado seria necessário para reativar push staging **sem tocar produção antiga**: credenciais legítimas próprias, nenhum outro autorizador com acesso ao seu secret, namespace estrito por ambiente, ACL persistida no mesmo ambiente, worker e singleton específicos e testes cruzados. Alternativa futura: atualizar por promoção explícita todos os autorizadores que compartilham o app para negar namespaces estrangeiros; isso permite isolamento lógico de canais, mas não isola comprometimento do secret, administração ou quotas compartilhadas. Requisito de segurança contra secret comprometido, isolamento de operação/quotas ou terceiros não confiáveis exige app dedicado. Não implementar mecanismo criptográfico alternativo ou mudar todos módulos agora.
+
+## Rollout revisto
+
+A configuração private Blob continua bloqueada por403 challenge_required; manter CHECKLIST_PRIVATE_BLOB_TOKEN, sem alias/fallback global, sem contornar step-up. Host Portal clientes-staging.alpha-comex.com foi associado/verificado, **ainda sem deployment READY/HTTP comprovado**. Nenhum link de reset deve ser enviado agora.
+
+Após código e gates, Vault e consentimento específico:
+1. Backup staging completo restaurado/verificado<=48h + diagnóstico/fingerprint/CAS atualizados.
+2. Aplicar somente schema aditivo, bootstrap de3modelos e grant preservatório5vínculos exatamente aprovados. Revalidar contagens; ownerNULL não inferido. Sem Teste/storagelegado se contagens permanecerem0.
+3. Publicar **Portal leitor compatível primeiro**, custom staging, READY/host/TLS/DB binding/auth/hashlogin/sessãoversion comprovados. Prova reader-evidence honesta, sem inventar E2E nem seeds.
+4. Publicar **Painel escritor de hash novo depois**, somente staging; READY e runtime DB conhecido, validar que criação/alteração/reset novos não gravam plaintext. Cessar/impedir escritor antigo (incluindo requisições/deployments antigos ainda invocáveis) antes da etapa seguinte; não expor novas operações até leitor estar validado.
+5. Só então executar hash-contas legado sob aprovação/backup/prova/CAS, confirmar que2legados esperados ou delta conhecido tornam-se hash, senha vazia, sessão preservada. Rodar reconciliação de contagem para detectar qualquer escritor antigo remanescente; divergência bloqueia encerramento. Rollback nunca volta a leitor plaintext após novos hashes.
+6. Validar avisos pelo polling autenticado sem Pusher; **não habilitar worker timer enquanto transporte polling**. Finalizar homologação staging; promoção produção continua dependendo de pedido explícito posterior.
+
+Esquema/role/hash são operações distintas protegidas; esta decisão documental não autoriza nenhuma delas. Nenhuma modificação real DB/cloud/Git/código foi feita por Aria. Apenas docs e este handoff.
+
+## Validação arquitetural desta rodada
+
+Alinhamento A16/segurança/compatibilidade/dependências/rollout e ownership: contrato definido. Namespace sozinho: REPROVADO na topologia atual por fallback produção legado. Journal+polling sem tráfego Pusher: APROVADO PARA IMPLEMENTAR. Não houve gate global, teste novo, release nem QA final nesta rodada. Persona/task/checklist lidos; .Codex/commands/AIOX/agents/architect.md e .aiox/gotchas.json ausentes no worktree, usado fallback .aiox-core/development/agents/architect.md e skill AIOX architect disponível. Escopo da checklist aplicado apenas à decisão focal, sem alegar revisão geral da feature.

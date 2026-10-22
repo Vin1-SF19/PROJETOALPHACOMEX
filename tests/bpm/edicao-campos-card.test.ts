@@ -17,6 +17,7 @@ const prismaMock = vi.hoisted(() => ({
   bpmCardMembro: { updateMany: vi.fn(), upsert: vi.fn() },
   parceiro: { findUnique: vi.fn() },
   indicacao: { findUnique: vi.fn(), update: vi.fn(), create: vi.fn() },
+  checklistCrmVinculo: { findUnique: vi.fn() },
   $transaction: vi.fn(),
 }));
 
@@ -99,6 +100,7 @@ describe("CRM - edição dos campos definidos da etapa", () => {
     exigirAcessoBpmCardMock.mockResolvedValue({ autorizado: true });
     carregarCamposAplicaveisCardEtapaMock.mockResolvedValue([campoNulo]);
     prismaMock.bpmCard.findUnique.mockResolvedValue(cardNaEtapaAtual());
+    prismaMock.checklistCrmVinculo.findUnique.mockResolvedValue(null);
     prismaMock.bpmCard.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.bpmCardCampoValor.upsert.mockResolvedValue({});
     prismaMock.bpmCardCampoValor.findMany.mockResolvedValue([]);
@@ -421,6 +423,7 @@ describe("CRM - edição dos campos definidos da etapa", () => {
         { ...campoNulo, nome: "CNPJ", tipo: "cnpj" },
       ]);
       prismaMock.bpmCard.findUnique.mockResolvedValue(cardNaEtapaAtual());
+    prismaMock.checklistCrmVinculo.findUnique.mockResolvedValue(null);
 
       const resultado = await AtualizarCardBpm({
         cardId: CARD_ID,

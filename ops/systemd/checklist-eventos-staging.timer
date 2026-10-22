@@ -1,0 +1,11 @@
+[Unit]
+Description=CheckList staging - verificar eventos a cada minuto
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=60s
+AccuracySec=1s
+Unit=checklist-eventos-staging.service
+
+[Install]
+WantedBy=timers.target

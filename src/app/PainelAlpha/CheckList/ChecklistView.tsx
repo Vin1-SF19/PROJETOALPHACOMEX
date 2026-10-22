@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, LockKeyhole, History } from "lucide-react";
@@ -7,7 +7,7 @@ import { obterEmpresaChecklist, selecionarTipoChecklist, atualizarItemChecklist 
 import { confirmar, erroChecklist, type EmpresaDetalhe } from "@/lib/checklist/client/types";
 import { tiposChecklist, statusChecklist } from "@/lib/checklist/schemas";
 import { TIPO_LABELS } from "@/lib/checklist/items";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ChecklistDraftGuard, useChecklistDrafts, useDraftState } from "@/components/checklist/ChecklistDraftGuard";
 import { ChecklistItemCard } from "@/components/checklist/ChecklistItemCard";
 import { AtendimentoSettings } from "@/components/checklist/AtendimentoSettings";
 import { HistoricoAtendimento } from "@/components/checklist/HistoricoAtendimento";
@@ -19,17 +19,23 @@ interface Props {
   initial?: EmpresaDetalhe;
   initialView?: string;
 }
-export default function ChecklistView({ empresaId, initial, initialView }: Props) {
+export default function ChecklistView(props: Props) {
+  return (
+    <ChecklistDraftGuard key={props.empresaId}>
+      <ChecklistViewContent {...props} />
+    </ChecklistDraftGuard>
+  );
+}
+function ChecklistViewContent({ empresaId, initial, initialView }: Props) {
+  const registry = useChecklistDrafts(),
+    draftState = useDraftState();
   const client = useQueryClient(),
     [view, setView] = useState<string | undefined>(initialView),
     [tipo, setTipo] = useState(""),
     [secao, setSecao] = useState(""),
-    [drafts, setDrafts] = useState<Record<string, string>>({}),
     [tab, setTab] = useState("ITENS"),
-    [guard, setGuard] = useState(false),
     [reloadError, setReloadError] = useState("");
-  const pending = useRef<(() => void) | null>(null),
-    command = useChecklistCommand();
+  const command = useChecklistCommand();
   const key = ["checklist-detalhe", empresaId, view];
   const query = useQuery({
     queryKey: key,
@@ -37,7 +43,6 @@ export default function ChecklistView({ empresaId, initial, initialView }: Props
     initialData: view === initialView ? initial : undefined,
   });
   const empresa = query.data;
-  const dirty = empresa?.checklist?.itens.some((i) => drafts[i.id] !== undefined && drafts[i.id] !== (i.observacao ?? "")) ?? false;
   function confirmed(data: EmpresaDetalhe) {
     client.setQueryData(key, data);
     void client.invalidateQueries({ queryKey: ["checklist-empresas"] });
@@ -50,6 +55,7 @@ export default function ChecklistView({ empresaId, initial, initialView }: Props
       setReloadError("");
     } catch (error) {
       setReloadError(erroChecklist(error));
+      throw error;
     }
   }
   function current() {
@@ -57,12 +63,13 @@ export default function ChecklistView({ empresaId, initial, initialView }: Props
     if (!data) throw new Error("Recarregue o atendimento.");
     return data;
   }
-  function change(action: () => void) {
-    if (dirty) {
-      pending.current = action;
-      setGuard(true);
-    } else action();
-  }
+  const change = registry.request;
+  useLayoutEffect(() => {
+    registry.setBeforeSave(reload);
+    return () => {
+      registry.setBeforeSave(undefined);
+    };
+  });
   async function patchItem(itemId: string, patch: { status?: (typeof statusChecklist)[number]; observacao?: string | null }) {
     const data = current();
     const response = await command.run(JSON.stringify({ itemId, patch, revision: data.revision }), (mutationId) =>
@@ -70,22 +77,8 @@ export default function ChecklistView({ empresaId, initial, initialView }: Props
     );
     if (response) {
       confirmed(response);
-      if (patch.observacao !== undefined)
-        setDrafts((d) => {
-          const next = { ...d };
-          delete next[itemId];
-          return next;
-        });
     }
     return !!response;
-  }
-  async function salvarRascunhos() {
-    const data = current();
-    for (const item of data.checklist?.itens ?? []) {
-      const value = drafts[item.id];
-      if (value !== undefined && value !== (item.observacao ?? "") && !(await patchItem(item.id, { observacao: value || null }))) return false;
-    }
-    return true;
   }
   async function trocar() {
     if (!tiposChecklist.some((t) => t === tipo)) return;
@@ -94,7 +87,6 @@ export default function ChecklistView({ empresaId, initial, initialView }: Props
       selecionarTipoChecklist({ empresaId, tipo, expectedRevision: data.revision, mutationId }),
     );
     if (result) {
-      setDrafts({});
       setSecao("");
       setView(undefined);
       client.setQueryData(["checklist-detalhe", empresaId, undefined], result);
@@ -110,7 +102,7 @@ export default function ChecklistView({ empresaId, initial, initialView }: Props
       <Link
         href="/PainelAlpha/CheckList"
         onClick={(e) => {
-          if (dirty) {
+          if (draftState.dirty || draftState.busy) {
             e.preventDefault();
             change(() => {
               window.location.assign("/PainelAlpha/CheckList");
@@ -149,14 +141,14 @@ export default function ChecklistView({ empresaId, initial, initialView }: Props
           Visualizar checklist (sem ativar)
           <select
             value={view ?? empresa.checklistAtivoId ?? ""}
-            disabled={command.busy}
-            onChange={(e) =>
+            disabled={command.busy || draftState.busy}
+            onChange={(e) => {
+              const id = e.target.value;
               change(() => {
-                setDrafts({});
                 setSecao("");
-                setView(e.target.value === empresa.checklistAtivoId ? undefined : e.target.value);
-              })
-            }
+                setView(id === empresa.checklistAtivoId ? undefined : id);
+              });
+            }}
             className={campoChecklist + " mt-1"}
           >
             {!empresa.checklists.length && <option value="">Nenhum checklist criado</option>}
@@ -181,7 +173,7 @@ export default function ChecklistView({ empresaId, initial, initialView }: Props
                     </option>
                   ))}
                 </select>
-                <Acao disabled={!tipo || command.busy || tipo === empresa.tipoAtivo} onClick={() => change(() => void trocar())}>
+                <Acao disabled={!tipo || command.busy || draftState.busy || tipo === empresa.tipoAtivo} onClick={() => change(() => void trocar())}>
                   Aplicar
                 </Acao>
               </div>
@@ -207,7 +199,7 @@ export default function ChecklistView({ empresaId, initial, initialView }: Props
           </Acao>
         ))}
       </nav>
-      {(command.error || reloadError) && <Falha error={command.error || reloadError} retry={() => void reload()} />}
+      {(command.error || reloadError) && <Falha error={command.error || reloadError} retry={() => void reload().catch(() => {})} />}
       {tab === "ITENS" && (
         <>
           {empresa.resumo.estado === "SEM_CHECKLIST" ? (
@@ -221,7 +213,7 @@ export default function ChecklistView({ empresaId, initial, initialView }: Props
             <>
               <nav aria-label="Seções do checklist" className="flex flex-wrap gap-2">
                 {secoes.map((s) => (
-                  <Acao key={s} aria-pressed={active === s} onClick={() => setSecao(s)}>
+                  <Acao key={s} aria-pressed={active === s} onClick={() => change(() => setSecao(s))}>
                     {s}
                   </Acao>
                 ))}
@@ -234,10 +226,9 @@ export default function ChecklistView({ empresaId, initial, initialView }: Props
                       key={item.id}
                       item={item}
                       empresa={empresa}
-                      busy={command.busy}
-                      draft={drafts[item.id]}
-                      onDraft={(value) => setDrafts((d) => ({ ...d, [item.id]: value }))}
-                      onSave={() => void patchItem(item.id, { observacao: drafts[item.id] || null })}
+                      busy={command.busy || draftState.busy}
+                      onObservation={(value) => patchItem(item.id, { observacao: value || null })}
+                      getRevision={() => current().revision}
                       onStatus={(status) => void patchItem(item.id, { status })}
                       onReload={reload}
                     />
@@ -247,45 +238,10 @@ export default function ChecklistView({ empresaId, initial, initialView }: Props
           )}
         </>
       )}
-      {tab === "DADOS" && <AtendimentoSettings key={empresa.id} empresa={empresa} onConfirmed={confirmed} onReload={reload} />}
+      {tab === "DADOS" && (
+        <AtendimentoSettings key={empresa.id} empresa={empresa} onConfirmed={confirmed} onReload={reload} getRevision={() => current().revision} />
+      )}
       {tab === "HISTORICO" && <HistoricoAtendimento empresaId={empresa.id} />}
-      <Dialog open={guard} onOpenChange={setGuard}>
-        <DialogContent className="border-white/10 bg-slate-950 text-white">
-          <DialogHeader>
-            <DialogTitle>Há observações pendentes</DialogTitle>
-            <DialogDescription>Salve os rascunhos ou descarte as alterações antes de continuar.</DialogDescription>
-          </DialogHeader>
-          {command.error && <Falha error={command.error} />}
-          <div className="flex flex-wrap gap-2">
-            <Acao
-              disabled={command.busy}
-              onClick={() =>
-                void salvarRascunhos().then((ok) => {
-                  if (ok) {
-                    setGuard(false);
-                    pending.current?.();
-                    pending.current = null;
-                  }
-                })
-              }
-            >
-              Salvar e continuar
-            </Acao>
-            <Acao
-              disabled={command.busy}
-              onClick={() => {
-                setDrafts({});
-                setGuard(false);
-                pending.current?.();
-                pending.current = null;
-              }}
-            >
-              Descartar e continuar
-            </Acao>
-            <Acao onClick={() => setGuard(false)}>Continuar editando</Acao>
-          </div>
-        </DialogContent>
-      </Dialog>
     </main>
   );
 }

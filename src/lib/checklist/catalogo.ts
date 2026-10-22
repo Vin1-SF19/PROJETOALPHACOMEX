@@ -80,11 +80,49 @@ export async function listarCatalogo(ator: AtorChecklist, input: unknown) {
     pageSize: c.pageSize,
   };
 }
-export async function publicarModelo(ator: AtorChecklist, input: unknown) {
-  const c = publicarModeloSchema.parse(input);
+const revisarModeloSchema = z.object({
+  identidadeId: z.string().min(1),
+  expectedRevision: z.number().int().nonnegative(),
+  mutationId: z.string().uuid(),
+  ordem: z.number().int().nonnegative().optional(),
+});
+type ComandoModelo =
+  | { operation: "PUBLICAR"; input: z.infer<typeof publicarModeloSchema> }
+  | {
+      operation: "DESATIVAR" | "ORDENAR";
+      input: z.infer<typeof revisarModeloSchema>;
+    };
+
+async function hidratarRevisao(
+  tx: Tx,
+  comando: Extract<ComandoModelo, { operation: "DESATIVAR" | "ORDENAR" }>,
+) {
+  const c = comando.input;
+  const i = await tx.modeloChecklistIdentidade.findUnique({
+    where: { id: c.identidadeId },
+    include: { revisoes: { orderBy: { versao: "desc" }, take: 1 } },
+  });
+  if (!i?.revisoes[0]) fail("NOT_FOUND", "Modelo não encontrado.");
+  const r = i.revisoes[0];
+  return publicarModeloSchema.parse({
+    ...c,
+    escopo: i.escopo,
+    codigo: i.codigoNormalizado,
+    nome: r.nome,
+    descricao: r.descricao,
+    secao: r.secao,
+    obrigatorio: r.obrigatorio,
+    ordem: comando.operation === "ORDENAR" ? c.ordem : r.ordem,
+    ativo: comando.operation === "DESATIVAR" ? false : r.ativo,
+  });
+}
+
+async function executarModelo(ator: AtorChecklist, comando: ComandoModelo) {
+  // Bind the journal to caller intent, never fields hydrated from current state.
+  const payload = { operation: comando.operation, ...comando.input };
   return db.$transaction(async (tx) => {
     await exigirLiderChecklist(ator, tx);
-    const prior = await replay(tx, ator, c.mutationId, c);
+    const prior = await replay(tx, ator, comando.input.mutationId, payload);
     if (prior)
       return z
         .object({
@@ -93,6 +131,9 @@ export async function publicarModelo(ator: AtorChecklist, input: unknown) {
           modeloId: z.string(),
         })
         .parse(prior.resultado);
+    const c = comando.operation === "PUBLICAR"
+      ? comando.input
+      : await hidratarRevisao(tx, comando);
     let identity = c.identidadeId
       ? await tx.modeloChecklistIdentidade.findUnique({
           where: { id: c.identidadeId },
@@ -183,7 +224,7 @@ export async function publicarModelo(ator: AtorChecklist, input: unknown) {
     };
     await registrarEvento(tx, ator, {
       mutationId: c.mutationId,
-      payload: c,
+      payload,
       agregadoTipo: "MODELO",
       agregadoId: identity.id,
       revision: identity.revision + 1,
@@ -194,35 +235,19 @@ export async function publicarModelo(ator: AtorChecklist, input: unknown) {
     return result;
   });
 }
+export async function publicarModelo(ator: AtorChecklist, input: unknown) {
+  return executarModelo(ator, {
+    operation: "PUBLICAR",
+    input: publicarModeloSchema.parse(input),
+  });
+}
 export async function revisarModelo(
   ator: AtorChecklist,
   input: unknown,
   operation: "DESATIVAR" | "ORDENAR",
 ) {
-  const c = z
-    .object({
-      identidadeId: z.string().min(1),
-      expectedRevision: z.number().int().nonnegative(),
-      mutationId: z.string().uuid(),
-      ordem: z.number().int().nonnegative().optional(),
-    })
-    .parse(input);
-  await exigirLiderChecklist(ator);
-  const i = await db.modeloChecklistIdentidade.findUnique({
-    where: { id: c.identidadeId },
-    include: { revisoes: { orderBy: { versao: "desc" }, take: 1 } },
-  });
-  if (!i?.revisoes[0]) fail("NOT_FOUND", "Modelo não encontrado.");
-  const r = i.revisoes[0];
-  return publicarModelo(ator, {
-    ...c,
-    escopo: i.escopo,
-    codigo: i.codigoNormalizado,
-    nome: r.nome,
-    descricao: r.descricao,
-    secao: r.secao,
-    obrigatorio: r.obrigatorio,
-    ordem: operation === "ORDENAR" ? c.ordem : r.ordem,
-    ativo: operation === "DESATIVAR" ? false : r.ativo,
+  return executarModelo(ator, {
+    operation,
+    input: revisarModeloSchema.parse(input),
   });
 }

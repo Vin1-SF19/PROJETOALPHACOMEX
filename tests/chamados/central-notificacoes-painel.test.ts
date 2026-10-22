@@ -1,7 +1,11 @@
+// @vitest-environment happy-dom
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+vi.mock("next-auth/react", () => ({ useSession: () => ({ status: "authenticated", data: { user: { id: "7" } } }) }));
+vi.mock("@/actions/checklist/eventos", () => ({ marcarEventoChecklistLido: vi.fn(), listarEventosChecklist: vi.fn() }));
+import { montarPollerChamados } from "../helpers/notificacoes-poller";
 
 const raiz = process.cwd();
 
@@ -50,18 +54,25 @@ describe("central geral de notificações do Painel Alpha", () => {
     expect(hook).toContain("userChannel.unbind(CHAMADO_ASSUMIDO_EVENT, assumidoHandler)");
   });
 
-  it("recupera mensagens não lidas apenas no shell principal e deduplica pelo ID persistido", () => {
-    const polling = ler("src/components/NotificacaoFlutuante.tsx");
+  it("recupera mensagens não lidas apenas no shell principal e deduplica pelo ID persistido", async () => {
     const toastChamados = ler("src/components/chamados/NotificationToast.tsx");
-
-    expect(polling).toContain("adicionarNotificacao({");
-    expect(polling).toContain('urgencia: "MENSAGEM"');
-    expect(polling).toContain("window !== window.top");
-    expect(polling).toContain("idsEntreguesRef.current.has(msg.mensagemId)");
-    expect(polling).toContain("`mensagem-${msg.mensagemId}`");
-    expect(polling).toContain("mensagensDaMaisAntigaParaNova");
-    expect(polling).not.toContain("router.push");
-    expect(toastChamados).toContain("Nova mensagem no chamado");
+    const polling = ler("src/components/NotificacaoFlutuante.tsx");
+    const mensagem = (id: number) => ({ mensagemId: id, chamadoId: 15, titulo: "Acesso", autorId: 8, autorNome: "Carlos", texto: `Mensagem ${id}`, createdAt: `2026-10-22T12:00:0${id}.000Z` });
+    const poller = await montarPollerChamados({ notificacoes: [mensagem(3), mensagem(2), mensagem(1)] });
+    try {
+      expect(poller.store.getState().notificacoes.map((item) => item.id)).toEqual(["mensagem-3", "mensagem-2", "mensagem-1"]);
+      expect(poller.store.getState().notificacoes[0]).toMatchObject({ chamadoId: 15, urgencia: "MENSAGEM", usuario: "Carlos: Mensagem 3" });
+      // Remove from the UI, then replay: dedup must belong to the poller,
+      // rather than incidentally relying on the store's existing IDs.
+      poller.store.getState().removerNotificacao("mensagem-3");
+      await poller.recover();
+      expect(poller.store.getState().notificacoes.map((item) => item.id)).toEqual(["mensagem-2", "mensagem-1"]);
+      await poller.recover({ notificacoes: [mensagem(4), mensagem(3), mensagem(2)] });
+      expect(poller.store.getState().notificacoes.map((item) => item.id)).toEqual(["mensagem-4", "mensagem-2", "mensagem-1"]);
+      expect(polling).toContain("window !== window.top");
+      expect(polling).not.toContain("router.push");
+      expect(toastChamados).toContain("Nova mensagem no chamado");
+    } finally { await poller.close(); }
   });
 
   it("assina mensagens no canal administrativo e no canal privado do usuário", () => {

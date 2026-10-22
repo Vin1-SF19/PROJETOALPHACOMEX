@@ -16,13 +16,17 @@ export async function GET() {
   }
 
   const userId = Number(session.user.id);
-  const checklistResult = await listarEventosChecklist({ somenteNaoLidos: true });
-  const checklist = checklistResult.ok ? checklistResult.data : { items: [], nextCursor: null };
-
 
   try {
     const ator = await obterAtorChamados(userId);
-    if (!ator) return NextResponse.json({ notificacoes: [], feedbacksPendentes: [], checklist });
+    if (!ator) {
+      return NextResponse.json(
+        { notificacoes: [], feedbacksPendentes: [] },
+        { status: 403 },
+      );
+    }
+    const checklistResult = await listarEventosChecklist({ somenteNaoLidos: true });
+    const checklist = checklistResult.ok ? checklistResult.data : { items: [], nextCursor: null };
     const destinosDoAtor = ator.setorId === null ? [] : [
       { setorDestinoId: ator.setorId, setorDestino: { ativo: true, isBase: false } },
       ...(isSameRole(ator.setorNome, "TI") ? [{ setorDestinoId: null }] : []),

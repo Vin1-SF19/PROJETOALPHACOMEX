@@ -1,7 +1,11 @@
+// @vitest-environment happy-dom
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+vi.mock("next-auth/react", () => ({ useSession: () => ({ status: "authenticated", data: { user: { id: "7" } } }) }));
+vi.mock("@/actions/checklist/eventos", () => ({ marcarEventoChecklistLido: vi.fn(), listarEventosChecklist: vi.fn() }));
+import { montarPollerChamados } from "../helpers/notificacoes-poller";
 
 const raiz = process.cwd();
 
@@ -44,14 +48,19 @@ describe("experiência de feedback dos chamados", () => {
     expect(escala).toContain("[0, 1, 2, 3, 4, 5]");
   });
 
-  it("recupera pendências persistidas e recebe novas conclusões em tempo real", () => {
-    const polling = ler("src/components/NotificacaoFlutuante.tsx");
+  it("recupera pendências persistidas e recebe novas conclusões em tempo real", async () => {
     const realtime = ler("src/hooks/useAdminChamadosNotifications.ts");
-
-    expect(polling).toContain("resposta.feedbacksPendentes ?? []");
-    expect(polling).toContain("sincronizarFeedbacksPendentes(resposta.feedbacksPendentes ?? [])");
-    expect(realtime).toContain("adicionarFeedbackPendente({");
-    expect(realtime).toContain("CHAMADO_CONCLUIDO_EVENT");
+    const feedback = { chamadoId: 15, titulo: "Falha no acesso", closedAt: "2026-10-22T12:00:00.000Z" };
+    const poller = await montarPollerChamados({ feedbacksPendentes: [feedback, feedback] });
+    try {
+      expect(poller.store.getState().feedbacksPendentes).toEqual([feedback]);
+      await poller.recover({ feedbacksPendentes: [{ ...feedback, chamadoId: 16 }] });
+      expect(poller.store.getState().feedbacksPendentes).toEqual([{ ...feedback, chamadoId: 16 }]);
+      await poller.recover({ notificacoes: [] });
+      expect(poller.store.getState().feedbacksPendentes).toEqual([]);
+      expect(realtime).toContain("adicionarFeedbackPendente({");
+      expect(realtime).toContain("CHAMADO_CONCLUIDO_EVENT");
+    } finally { await poller.close(); }
   });
 });
 

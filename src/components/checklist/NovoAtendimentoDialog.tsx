@@ -33,7 +33,8 @@ export function NovoAtendimentoDialog({ onClose, analistas, canAssign, onCreated
     [erro, setErro] = useState(""),
     [resultado, setResultado] = useState<{ senha?: string; replayed: boolean } | null>(null),
     [contaBusca, setContaBusca] = useState(""),
-    [contaPage, setContaPage] = useState(1);
+    [contaPage, setContaPage] = useState(1),
+    [contaSnapshot, setContaSnapshot] = useState<{ id: string; nome: string; email: string } | null>(null);
   const consulta = useRef(0),
     command = useChecklistCommand();
   const cnpjField = form.register("cnpj");
@@ -121,6 +122,8 @@ export function NovoAtendimentoDialog({ onClose, analistas, canAssign, onCreated
                     void cnpjField.onChange(event);
                     consulta.current++;
                     setMaster(null);
+                    setContaSnapshot(null);
+                    form.setValue("conta", "NOVA");
                     setConsultando(false);
                   }}
                   className={campoChecklist}
@@ -139,8 +142,24 @@ export function NovoAtendimentoDialog({ onClose, analistas, canAssign, onCreated
             )}
             <label className="block text-sm">
               Acesso ao portal
-              <select {...form.register("conta")} className={campoChecklist + " mt-1"}>
+              <select
+                {...form.register("conta")}
+                value={contaSelecionada}
+                onChange={(event) => {
+                  const id = event.target.value;
+                  form.setValue("conta", id);
+                  const selected = contas.data?.items.find((c) => c.id === id);
+                  if (id === "NOVA") setContaSnapshot(null);
+                  else if (selected) setContaSnapshot({ id: selected.id, nome: selected.nome, email: selected.email });
+                }}
+                className={campoChecklist + " mt-1"}
+              >
                 <option value="NOVA">Criar novo acesso</option>
+                {contaSnapshot && !contas.data?.items.some((c) => c.id === contaSnapshot.id) && (
+                  <option value={contaSnapshot.id}>
+                    {contaSnapshot.nome} · {contaSnapshot.email} (selecionada)
+                  </option>
+                )}
                 {contas.data?.items.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.nome} · {c.email}

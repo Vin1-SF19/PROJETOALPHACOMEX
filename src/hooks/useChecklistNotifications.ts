@@ -1,22 +1,14 @@
 "use client";
 import { useEffect } from "react";
-import { pusherClient } from "@/lib/pusher";
+import { resolverTransporteChecklist } from "@/lib/checklist/realtime";
 import { useChecklistNotificacoes } from "@/store/useChecklistNotificacoes";
-/** Única assinatura no shell; a recuperação usa o poller global já existente. */
+/** Inicializa o ator; a recuperação pertence ao poller global, mesmo com configuração inválida. */
 export function useChecklistNotifications(usuarioId: number, enabled: boolean) {
+  const transporte = resolverTransporteChecklist(process.env.NEXT_PUBLIC_CHECKLIST_REALTIME_MODE);
   useEffect(() => {
     if (window !== window.top) return;
     const store = useChecklistNotificacoes.getState();
     store.iniciar(enabled ? usuarioId : 0);
-    if (!enabled || !usuarioId) return;
-    const client = pusherClient;
-    const callback = () => window.dispatchEvent(new Event("alpha-checklist-recovery"));
-    const channel = client?.subscribe("private-checklist-docs");
-    channel?.bind("checklist-evento", callback);
-    client?.connection.bind("connected", callback);
-    return () => {
-      channel?.unbind("checklist-evento", callback);
-      client?.connection.unbind("connected", callback);
-    };
   }, [usuarioId, enabled]);
+  return transporte;
 }

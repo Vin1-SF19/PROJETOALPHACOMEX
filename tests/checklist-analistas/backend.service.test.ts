@@ -2,7 +2,7 @@ import JSZip from "jszip";
 import { beforeAll, afterAll, describe, it, expect, vi } from "vitest";
 import { PrismaClient } from "@prisma/client";
 import { PrismaLibSQL } from "@prisma/adapter-libsql";
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync } from "./node-sqlite";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
