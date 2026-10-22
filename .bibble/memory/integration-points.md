@@ -3374,3 +3374,8 @@ Pedido posterior amplia somente audiência: roles canônicas normalizadas ADMIN/
 
 ### Correção TI/Admin — gates locais concluídos, publicação ainda pendente
 Em 22/10, Forge aprovou a fonte congelada `1fc1f5e59524c39c21890cd031376f8bc949474cfd7217f7d19c830b169600a9`: tipos oficial8GiB exit0, lint exit0/1.193 avisos existentes, novo build Prisma/player/Nextwebpack exit0 e suíte completa 720 arquivos/5.784 testes PASS (zero falhas, quatro skipped/um todo). Segurança90 e SQLite9 são subconjuntos focados, não somar aos globais. Client Prisma privado isolou divergência de outra worktree sem alterar schema/depversões/client compartilhado. QA local APPROVED; a publicação/homologação Admin do patch observador segue separada; a prova remota posterior será privada, sem novo commit documental. Sem produção, ENV, banco remoto ou worker manual. Aprendizado em `known-errors.md`.
+
+
+### 2026-10-22 — Scout/Architect — clique virtual e destino promovido (AC19, contrato)
+
+Reconhecimento em fae70b26: lookup pending-only e hook com frase genérica “já assumido” não distinguem falta de acesso/falha/promovido; clique/mount não chamam assunção. AC19/adendo liberam correção mínima em NotificacoesLeads/notificacoes-leads-server e hook do board: união virtual pendente / card comprovado autorizado / erro honesto. Promovido resolve exclusivamente evento Instagram ou promotedCardId NoLoss, nunca empresa/nome; detalhe usa callback existente de card vinculado e ACK da intenção virtual original. Diagnóstico específico de falha pending ainda pendente com Echo; contrato não afirma implementação/gates/smoke. Sem ampliação de claim, schema/ENV/produção.

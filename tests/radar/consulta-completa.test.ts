@@ -24,7 +24,7 @@ afterEach(() => {
   delete process.env.CONSULTA_RADAR_TOKEN;
 });
 
-describe("ConsultaCompleta com API Radar Alpha", () => {
+describe("ConsultaCompleta com API RADAR do ialpha", () => {
   it('não consulta nem grava sem autorização', async () => {
     mocks.acesso.mockResolvedValue(new Response(null, { status: 401 }));
     expect((await GET(request())).status).toBe(401);
@@ -33,39 +33,34 @@ describe("ConsultaCompleta com API Radar Alpha", () => {
   it('Radar só começa depois de Receita responder', async () => {
     let liberar!: (value: object) => void;
     mocks.receita.mockImplementationOnce(() => new Promise(resolve => { liberar = resolve; }));
-    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 404 }); vi.stubGlobal('fetch', fetchMock);
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ success: true, data: { situacao: "Habilitada", razaoSocial: "Banco", modalidade: "LIMITADA", dataAtualizacaoPublicada: "08/10/2026 16h13" } }) }); vi.stubGlobal('fetch', fetchMock);
     const job = GET(request()); await Promise.resolve(); await Promise.resolve();
     expect(fetchMock).not.toHaveBeenCalled();
     liberar({ razaoSocial: 'Banco' }); expect((await job).status).toBe(200);
     expect(fetchMock).toHaveBeenCalledOnce();
   });
-  it("grava modalidade, data brasileira e raw sem enviar CNPJ completo ao provedor", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({
-      success: true, cnpj: "33000167", data: { cnpj: "33000167", razaoSocial: "PETROLEO BRASILEIRO", situacao: "Habilitada", modalidade: "Ilimitada", dataSituacao: "09/12/2021 10:36:07" }, raw: "resultado integral",
-    }) });
-    vi.stubGlobal("fetch", fetchMock);
+  it("grava modalidade e data publicada no JSON preservando o shape persistido", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ success: true, data: { situacao: "HABILITADA", razaoSocial: "PETROLEO BRASILEIRO", modalidade: "ILIMITADA", dataAtualizacaoPublicada: "08/10/2026 16h13", consultadoEm: "2026-10-22T12:00:00.000Z" } }) }));
     const response = await GET(request());
     expect(response.status).toBe(200);
     const salvo = mocks.upsert.mock.calls[0][0].create;
-    expect(salvo).toMatchObject({ cnpj, situacao_radar: "HABILITADA", submodalidade: "Ilimitada", contribuinte: "PETROLEO BRASILEIRO" });
-    expect(salvo.data_situacao).toContain("2021-12-09");
-    expect(JSON.parse(salvo.json_completo).radar.raw).toBe("resultado integral");
-    expect(fetchMock.mock.calls[0][0]).toBe("https://consulta-radar.alpha-comex.com/consultar/33000167");
+    expect(salvo).toMatchObject({ cnpj, situacao_radar: "HABILITADA", submodalidade: "ILIMITADA", contribuinte: "PETROLEO BRASILEIRO" });
+    expect(salvo.data_situacao).toBeNull();
+    expect(JSON.parse(salvo.json_completo).radar.dataAtualizacaoPublicada).toBe("08/10/2026 16h13");
   });
 
-  it("interpreta 404 como não habilitada", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+  it("não trata ausência no arquivo como desabilitação definitiva", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ success: true, data: { found: false, situacao: "NÃO CONSTA NO ARQUIVO CONSULTADO", dataAtualizacaoPublicada: "08/10/2026 16h13" } }) }));
     const response = await GET(request());
     expect(response.status).toBe(200);
-    expect(mocks.upsert.mock.calls[0][0].create.situacao_radar).toBe("NÃO HABILITADA");
+    expect(mocks.upsert.mock.calls[0][0].create.situacao_radar).toBe("NÃO CONSTA NO ARQUIVO CONSULTADO");
   });
 
-  it("preserva registro existente quando captcha bloqueia a consulta", async () => {
-    mocks.findUnique.mockResolvedValue({ razao_social: "PETROBRAS" });
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 502, json: async () => ({ code: "BLOCKED_BY_CAPTCHA" }) }));
-    const response = await GET(request());
-    expect(response.status).toBe(502);
-    expect(await response.json()).toMatchObject({ code: "BLOCKED_BY_CAPTCHA" });
-    expect(mocks.upsert).not.toHaveBeenCalled();
+  it("atualiza a leitura CSV mesmo quando a consulta cadastral já está no banco", async () => {
+    mocks.findUnique.mockResolvedValue({ cnpj, razao_social: "PETROBRAS", situacao_radar: "ANTIGA", submodalidade: "ANTIGA", nome_fantasia: "", data_consulta: new Date() });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ success: true, data: { situacao: "HABILITADA", modalidade: "ILIMITADA", dataAtualizacaoPublicada: "08/10/2026 16h13" } }) }));
+    const response = await GET(new Request(`http://localhost/api/ConsultaCompleta?cnpj=${cnpj}`));
+    const body = await response.json();
+    expect(body).toMatchObject({ situacao: "HABILITADA", submodalidade: "ILIMITADA", dataAtualizacaoPublicada: "08/10/2026 16h13", fonte: "Banco Local + API RADAR ialpha" });
   });
 });

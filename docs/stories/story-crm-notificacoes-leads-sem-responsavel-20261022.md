@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — correção TI/Admin observador implementada, quatro gates reais e QA local APPROVED sobre a base `69047dee`; publicação e teste visual autenticado da correção em staging ainda pendentes neste commit. A evidência remota posterior será privada, sem novo commit documental. O E2E de `60ae49ff`/`69047dee` é histórico; produção fora do escopo.
+Ready for Review — contrato da correção de clique Instagram/lead virtual definido sobre `fae70b26`, antes da implementação. Corrigir abertura de leitura e mensagem indevida de “já assumido”; implementação, novos gates e smoke staging pendentes neste checkpoint. Evidências de entregas anteriores, inclusive observação TI/Admin, permanecem históricas e não validam este delta. Produção fora do escopo.
 
 ## Executor Assignment
 
@@ -51,6 +51,8 @@ O usuário confirmou também nova ação Assumir para Financeiro/Operacional, ma
 17. Site azul pode ser comprovado no ingresso NoLoss autenticado pelos opcionais `utmSource`/`utmMedium`/`utmCampaign` guardados nas colunas existentes, sem migration; `utmSource=site|website` identifica site. Payload antigo permanece válido, campos omitidos não apagam proveniência e retries não resetam status de assunção. Origem desconhecida permanece normal, sem classificar todo NoLoss como site.
 
 18. Conforme correção explícita do usuário (“eu (TI) não recebi notificação, preciso receber para testar e ver”), contas ativas com role canônica normalizada exatamente `ADMIN` ou `TI` também recebem como observadoras as pendências existentes Instagram, site/NoLoss e recepções Financeiro/Operacional: consulta completa, central persistente, toast e clique para abrir. `T.I` mantém compatibilidade pela normalização existente; CEO, líderes genéricos, nomes/e-mails/IDs de usuário ou roles parecidas não entram nessa exceção. Reutilizar CRM efetivo e ACL de leitura vigentes do módulo/pipeline/etapa, recursos ativos e os mesmos canais privados. Observador recebe `podeAgir=false`; a nova inscrição não concede assunção nativa, edição ou participação. Tanto `podeAssumir` quanto a mutação de claim nativo exigem explicitamente o setor do alvo, além das guardas atuais. Não modificar a autorização preexistente de promoção Instagram/NoLoss; clique continua sem claim, promoção ou encaminhamento automático. A abertura nativa mantém primeiro acesso/SLA preexistentes de `ObterCardBpm`; não prometer zero escrita global ao abrir. A correção não cria notificações paralelas, schema, configuração, ENV, backfill ou efeitos em produção.
+
+19. Clicar na notificação abre os detalhes do lead/card autorizado, sem assumir, promover ou encaminhar automaticamente. Lead virtual ainda pendente e acessível abre o modal real de detalhes já existente, mesmo fora da página do quadro. Se a fonte foi promovida entre a notificação e a abertura, resolver somente o card nativo comprovadamente vinculado (Instagram pelo evento canônico; NoLoss por `promotedCardId`) e aplicar a ACL atual desse card antes de abri-lo. Não buscar outro card por empresa, nome, contato ou heurística. Fonte ausente/inconsistente, acesso negado e erro de carregamento recebem mensagem honesta de leitura indisponível, sem afirmar que alguém assumiu e sem expor metadados negados. O lookup é leitura; primeiro acesso/SLA preexistentes do detalhe físico não são claim e permanecem separados. TI/Admin observador continua autorizado à leitura, sem ampliação da assunção nativa. Corrida entre leitura pendente e promoção admite uma nova resolução de leitura limitada; não repetir mutações nem criar card. ACK da navegação confirma a intenção original somente após abertura do destino real; respostas antigas não abrem outro lead.
 
 ## Decisões de preparação
 
@@ -141,6 +143,26 @@ Verificar todos os adapters, inclusive origem desconhecida NoLoss, Operacional d
 - [x] Atualizar testes de audiência/segurança/SQLite e navegação afetados; preservar lifecycle, cores e políticas anteriores.
 - [x] Executar os quatro gates sobre o delta congelado e revisão independente local; registrar evidências e limites reais.
 - [ ] Publicar a correção no staging e executar smoke visual TI/Admin autenticado; registrar o resultado privado sem novo commit documental.
+
+### Correção de clique virtual / card promovido (AC 19)
+
+Reconhecimento em `fae70b26`: `useBpmNotificacaoBoardNavigation` troca qualquer `success=false` do lookup pela frase “já foi assumido ou não está mais disponível”, mesmo sem comprovação de assunção. A action atual é restrita a fonte pendente e depois busca a projeção virtual do quadro; não oferece resolução de card já promovido. Não há claim no mount do modal ou no clique da central: a promoção continua no botão Assumir e sua confirmação. O motivo concreto de eventual falha de lookup para um lead ainda pendente deve ser diagnosticado no caminho servidor, sem presumir promoção nem considerar somente trocar a frase uma correção completa.
+
+Contrato: manter a mesma action de leitura com resultado discriminado de lead virtual pendente, destino físico autorizado ou erro de leitura. Echo/Nova alinham o shape mínimo do retorno; sem novo endpoint geral, fallback por empresa ou capacidade adicional de assunção. O detalhe físico pode usar o callback existente de card vinculado no board, carregando o contexto real do alvo; o ACK permanece associado à intenção virtual original para evitar loop de reenvio. O lookup validará origem canônica e vínculo persistido, não aceitará ID de destino fornecido pelo cliente para essa resolução.
+
+- [x] Registrar causa comprovada de mensagem enganosa, limite do resolver atual e contrato antes do código.
+- [ ] Diagnosticar/corrigir a falha real de lookup pendente e resolver destino promovido somente por vínculo canônico autorizado.
+- [ ] Integrar retorno discriminado e mensagens honestas à navegação existente, com ACK/concorrência corretos.
+- [ ] Demonstrar detalhe/modal reais abrindo sem invocar assunção; testar promoção concorrente, ACL negativa, ponteiro inconsistente e erros de leitura.
+- [ ] Executar gates/revisão do delta congelado e smoke de clique autenticado no staging; registrar limites e evidências privadas próprias.
+
+### Validação operacional da correção AC19 — OOM comprovado
+
+DevOps confirmou que o deploy `fae70b26` falhou com `out_of_memory`/worker SIGKILL cerca de 78 s após “Creating an optimized production build”, antes de Compiled/coleta de páginas, em máquina Vercel padrão de quatro cores/8.192 MB. Não é evidência de quota. O alias depois apontou para READY `04599…`, baseado no runtime antigo e sem as rotas desta entrega; READY isolado não comprova atualização funcional. A publicação deve integrar por merge normal os avanços Radar dessa linha e os de `fae70b26` com AC19, preservando deltas e evidência de hashes, sem force/reset/stash.
+
+Ajuste mínimo de build aprovado: acrescentar `RAYON_NUM_THREADS=1 UV_THREADPOOL_SIZE=1` somente à invocação Next no script `build`, mantendo `NODE_OPTIONS=--max-old-space-size=3072`, `next build --webpack`, CPU 1/configurações Next existentes, máquina/custo e ambientes remotos. Next 16.1.6 já usa `webpackMemoryOptimizations=true`, worker de build e compilação/tracing paralelos desativados; não desligar worker nem elevar heap/plano por suposição. Limitar pools nativos é uma tentativa justificada de reduzir concorrência, não garantia de eliminar OOM.
+
+O build local anterior com 4 GiB/afinidade de um CPU não substitui a validação nova: executar os quatro gates no conjunto congelado, com `npm run build` literal usando o script de 3 GiB/pools limitados, afinidade de quatro CPUs quando disponível e limite conservador agregado de memória de 7 GiB; registrar exit, fase, pico e tempo próprios. Depois conferir SHA/alias e funcionamento real das rotas no staging. QA focado informou 118 casos, SQLite 15 e UI 44 PASS para o app AC19; isso não equivale ao novo gate integrado, build remoto ou homologação publicada. Resultado final permanece pendente neste checkpoint. Sem plano pago, ENV remota, alteração de banco ou produção.
 
 ## Testing
 
@@ -384,6 +406,24 @@ Evidências privadas: `/var/tmp/alpha-crm-notificacoes-leads-20261022/release/{c
 
 QA alterou exclusivamente seu arquivo de testes autorizado nesta correção e **somente QA Results nesta revisão final**; fontes e documentos dos demais autores preservados. **Arquivo liberado a DevOps para o commit único e publicação staging.**
 
+### 2026-10-22 — Quinn — AC19 abertura Instagram: APPROVED local; integração atual condicionada
+
+**Parecer: APPROVED para a fonte congelada `cedc4ce9c02571547f6fe34eefa1c0b51af691a872d897dca3f1508f4002dec2`, após Forge e revisão independente Sage/Probe/Anubis/Lens.** Sem bloqueador novo demonstrado nesse conjunto. Libera seu commit local de preservação; **o push staging permanece condicionado à integração do avanço concorrente `63612…`, checks abaixo e GO final**. Não se declara HEAD publicado, alias atualizado, build remoto concluído ou homologação AC19 realizada. Mantém Ready for Review/remoto pendente; pareceres anteriores permanecem históricos.
+
+**Gates reais conferidos:** `/var/tmp/alpha-crm-notificacao-instagram-abertura-20261022/forge/forge-result.json`: typecheck exit 0 (50,55 s), lint exit 0 (49,39 s), suíte completa com cobertura exit 0 (189,41 s), **727 arquivos / 5.881 testes PASS, zero falhas, quatro skipped e um todo**. Fingerprint idêntico antes/depois. O novo **`npm run build` literal** executou Prisma/player/Next webpack com heap de 3 GiB, `RAYON_NUM_THREADS=1`, `UV_THREADPOOL_SIZE=1` e afinidade de quatro CPUs: exit 0 (104,42 s), pico agregado **6.742.384.640 bytes**, abaixo do limite supervisionado de 7 GiB. Client Prisma privado local gerado do schema preservado, sem substituir o client compartilhado. Não se confunde esse resultado com o build anterior de heap/afinidade diferentes ou com READY remoto.
+
+**Segurança e contrato:** action revalida sessão, entrada estrita e audiência canônica; lookup pendente continua virtual e lookup promovido exige prova persistida. Instagram exige endpoint/envelope/evento CARD_CRIADO, identidade, pipeline original, chave idempotente e origem compatíveis; NoLoss exige status/pointer e empresa quando registrada. Destino físico exige pipeline/etapa ativos, status permitido e ACL de visualização atual do ator no banco, devolvendo seu pipeline atual. Não há busca heurística por nome/empresa ou ampliação da exceção TI/Admin para claim nativo. Falhas usam códigos/mensagens controlados, sem atribuir toda recusa a “já assumido” ou expor erro interno. Promoção entre as leituras admite somente uma resolução adicional delimitada, sem loop ou mutação.
+
+**Sage/Probe:** **118 adversários independentes PASS** e **15 cenários Prisma/SQLite PASS**, subconjuntos da suíte global, sem somá-los novamente. Cobrem provas adulteradas/estrangeiras/inativas, ACL/CRM revogados, destino atual, duas fontes promovidas, corrida pendente→promovido e erros de projeção com retorno honesto. Testes React usam o board e modal virtual reais para abrir respostas Instagram com zero chamadas de assunção/promoção/criação/movimento no clique/mount; o botão explícito mantém ação separada. Na resolução física, o detalhe nativo é substituído por uma fixture, verificando ID e ACK da intenção virtual original, com descarte de respostas antigas e guardas de frame preservados. Isso não é homologação remota do detalhe inteiro. GET/lookup permanecem readonly; abrir o card físico pode executar primeira vista/SLA preexistentes, portanto não se promete zero escrita global da navegação nativa.
+
+**Causalidade delimitada:** o Admin real já abriu um Instagram pendente antes da correção, sem assumir. Logo não foi demonstrado defeito universal de abertura pendente nem a causa exata do lead relatado sem sua identificação. São verificáveis o tratamento genérico indevido das falhas e a ausência anterior do caminho de leitura do destino promovido. Após publicação, a conferência autenticada deve validar ambos os caminhos disponíveis, sem claim ou promoção automática, e manter a prova remota privadamente.
+
+**Integração e build:** `merge-radar-proof.json` preserva os 13 caminhos próprios e 11 concorrentes byte a byte; a consulta CNPJ combinada corresponde à integração independente de três vias. O OOM real do deployment `fae70b26` ocorreu no worker webpack por SIGKILL, em máquina padrão quatro cores/8.192 MB; não foi tratado como quota. A mitigação limita somente pools nativos do comando Next no script de build, mantendo heap, dependências, custo/configuração e ENV remota. Seu sucesso local não garante, antecipadamente, sucesso Vercel. O alias antigo com API ausente também não comprova publicação desta correção.
+
+**Condição concorrente atual:** `63612…` contém alterações reais de carregamento lazy em CardFullViewModal/CardModalHost/CardSaveContext e correção CNPJ/Radar, além de testes/docs. Não é avanço apenas documental ou prova de equivalência ao fingerprint aprovado. Preservar ambos por merge normal, sem force/reset/stash; conferir manifest/hunks e executar **typecheck oficial, lint das quatro fontes afetadas, focos conjuntos de CNPJ/editor/frameguards/Radar e lookup/SQLite/segurança/navegação Instagram, mais novo `npm run build` literal com heap 3 GiB/pools limitados**. O build novo se justifica pela mudança dos chunks do modal físico. Os gates do owner concorrente complementam a análise; não substituem esses checks combinados. Não se exige repetição cega da suíte global quando o delta permanecer nesse alcance e os focos passarem; falha ou novo delta semântico exige reavaliação. Push final normal somente após prova do conjunto efetivo e GO; depois exigir deployment/SHA/alias e teste autenticado reais antes de concluir a homologação.
+
+CodeRabbit indisponível no PATH e em `~/.local/bin/coderabbit`: aplicado fallback de revisão independente, sem execução fictícia. QA não alterou fonte, configuração, ambiente, banco ou produção nesta revisão. **Somente QA Results foi atualizado; arquivo liberado a DevOps para preservação local e integração.** Resultado remoto posterior deve ser registrado privadamente, sem novo commit apenas para repeti-lo.
+
 ## Change Log
 
 | Data | Versão | Descrição | Autor |
@@ -398,3 +438,5 @@ QA alterou exclusivamente seu arquivo de testes autorizado nesta correção e **
 | 2026-10-22 | 1.4 | Reabertura pelo usuário: TI/Admin como observadores de notificações; CEO excluído da exceção e claim nativo permanece setorial. Contrato anterior à implementação, gates e staging pendentes. | Scout / Architect |
 
 | 2026-10-22 | 1.5 | Correção observadora implementada; Forge quatro gates e QA local APPROVED; staging/teste visual posteriores em evidência privada, sem novo commit documental. | DevOps / QA |
+
+| 2026-10-22 | 1.4 | Reabertura pelo usuário: clique Instagram com mensagem indevida de assunção; contrato de leitura pendente/card promovido comprovado e erro honesto antes do código. Gates e staging do delta pendentes. | Scout / Architect |

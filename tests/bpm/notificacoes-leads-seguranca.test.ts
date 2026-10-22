@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({ db: {}, auth: vi.fn(), trigger: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ default: state.db }));
@@ -10,6 +10,7 @@ import { GET } from "@/app/api/bpm/leads/alertas/route";
 import { listarDestinatariosFilaLeadsBpm, lerCursorAlertasLeadsBpm,
   listarAlertasLeadsBpm, notificarPendenciasLeadsBpm, obterAlertaLeadPendenteBpm,
   ehObservadorTiAlertasLeadsBpm,
+  obterDestinoLeadPromovidoBpm,
 } from "@/lib/bpm/notificacoes-leads-server";
 import { ACAO_RECEPCAO_PIPELINE, ACAO_ASSUNCAO_PIPELINE, carregarRecepcoesPipelineBpm,
   idRecepcaoPipeline, idAssuncaoPipeline, obterRecebimentoPipelineBpm,
@@ -17,6 +18,7 @@ import { ACAO_RECEPCAO_PIPELINE, ACAO_ASSUNCAO_PIPELINE, carregarRecepcoesPipeli
 } from "@/lib/bpm/recebimentos-card-server";
 import { carregarValoresCanonicosCampos } from "@/lib/bpm/campos-configuraveis-server";
 import { PIPELINE_OPERACIONAL_ID } from "@/lib/bpm/financeiro-config.client";
+import { INSTAGRAM_ENDPOINT_SLUG, prepararLeadInstagram } from "@/lib/bpm/instagram-leads";
 
 const cardId = "c111111111111111111111111";
 const sourceId = "c222222222222222222222222";
@@ -70,20 +72,21 @@ function fixture() {
     setorPermissao: { findMany: vi.fn(async () => setorPermissoes) },
     usuarioPermissaoOverride: { findMany: vi.fn(async () => overrides) },
     bpmPipeline: { findUnique: vi.fn(async () => pipeline), findFirst: vi.fn(async () => ({ id: pipelineId, nome: "Revisão de Radar", etapas: [{ id: stageId, nome: "Novo lead" }] })) },
-    bpmCard: { findMany: vi.fn(async () => cards), findUnique: vi.fn(async () => ({ ...card,
+    bpmCard: { findMany: vi.fn(async () => cards), findUnique: vi.fn(async ({ where }: { where: { id: string } }) => where.id === card.id ? ({ ...card,
       responsavel: { id: card.responsavelId, nome: "Responsável Técnico Atual", cpf: null },
       empresa: { ...card.empresa, pessoas: [] }, indicacaoOrigem: null,
-    })), create: write(), updateMany: write(), delete: write() },
+    }) : null), create: write(), updateMany: write(), delete: write() },
     bpmCampo: { findMany: vi.fn(async (): Promise<{ id: string }[]> => [{ id: "vendedor" }]) },
     bpmCardHistorico: { findMany: vi.fn(async ({ where }: { where: { id?: { in?: string[] }; acao?: string } }) =>
       histories.filter((h) => (!where.id?.in || where.id.in.includes(h.id)) && (!where.acao || h.acao === where.acao))), create: write() },
     bpmCardVinculo: { findMany: vi.fn(async () => links), create: write() },
     bpmAutomacaoExecucao: { findMany: vi.fn(async () => executions), create: write(), updateMany: write() },
     bpmEventoDominio: { findMany: vi.fn(async () => events), create: write() },
-    bpmCardMembro: { updateMany: write(), upsert: write() },
+    bpmCardMembro: { findUnique: vi.fn().mockResolvedValue(null), updateMany: write(), upsert: write() },
     bpmWebhookEntrada: { findMany: vi.fn().mockResolvedValue([]), findFirst: vi.fn().mockResolvedValue(null), updateMany: write() },
     bpmWebhookEndpoint: { findUnique: vi.fn().mockResolvedValue(null) },
-    nolossLead: { findMany: vi.fn(async () => [noloss]), findFirst: vi.fn(async () => noloss), updateMany: write() },
+    bpmEtapa: { findMany: vi.fn(async () => [{ id: stageId, nome: "Novos leads", visibilidades: rules }]) },
+    nolossLead: { findMany: vi.fn(async () => [noloss]), findFirst: vi.fn(async ({ where }: { where: { id: string; status: string } }): Promise<typeof noloss | null> => where.id === noloss.id ? noloss : null), updateMany: write() },
     $transaction: write(), $executeRaw: write(),
   };
   const client = io as unknown as Prisma.TransactionClient;
@@ -98,6 +101,95 @@ function fixture() {
 }
 
 beforeEach(() => { vi.clearAllMocks(); state.auth.mockResolvedValue({ user: { id: "21", role: "Financeiro" } }); state.trigger.mockResolvedValue(undefined); });
+afterEach(() => vi.unstubAllEnvs());
+
+function promovidoFixture(origemLead: "instagram" | "noloss") {
+  const f = fixture(); f.pipeline.chave = "comercial"; f.pipeline.nome = "Revisão de Radar";
+  f.pipeline.setores = [{ setor: { nome: "Comercial", ativo: true } }];
+  f.rules.splice(0, f.rules.length, { perfil: "Comercial", podeVer: true, podeAgir: true });
+  const leadId = "lead-origem-ficticia";
+  const destino = { tipo: "LEAD_VIRTUAL" as const, pipelineId, origemLead, leadId };
+  const target = { ...f.card, pipeline: { ...f.pipeline, setores: [...f.pipeline.setores] },
+    etapa: { ...f.card.etapa, ehFinal: false, visibilidades: [{ perfil: "Comercial", podeVer: true, podeAgir: true }] },
+    vinculosOrigem: [], responsavel: { id: 11, nome: "Closer Fictício", cpf: null },
+    empresa: { ...f.card.empresa, pessoas: [] }, indicacaoOrigem: null };
+  f.io.bpmCard.findUnique.mockImplementation(async ({ where }: { where: { id: string } }) => where.id === target.id ? target : null);
+  const evento = { tipo: "CARD_CRIADO", entidadeTipo: "CARD", entidadeId: cardId, cardId: cardId as string | null,
+    pipelineId, idempotencyKey: `instagram-assumido:${leadId}`, valorNovoJson: JSON.stringify({ origem: "INSTAGRAM" }) };
+  const webhook = { id: leadId, endpointId: "endpoint-fixture", statusRecebimento: "PROCESSADO",
+    payloadSanitizadoJson: JSON.stringify(prepararLeadInstagram({ id: "ig-external-fixture", full_name: "Contato Fictício", created_time: "2026-10-22T12:00:00Z" })),
+    evento: evento as typeof evento | null };
+  const noloss = { ...f.noloss, id: leadId, status: "promoted", promotedCardId: cardId as string | null,
+    promotedClienteId: target.empresaId as number | null };
+  vi.stubEnv("INSTAGRAM_LEADS_ENDPOINT_ID", "endpoint-fixture");
+  f.io.bpmWebhookEndpoint.findUnique.mockResolvedValue({ id: "endpoint-fixture", ativo: true,
+    caminhoSlug: INSTAGRAM_ENDPOINT_SLUG, pipelineId, automacaoId: null, pipeline: { nome: "Revisão de Radar", ativo: true } });
+  f.io.bpmWebhookEntrada.findFirst.mockImplementation(async ({ where }: { where: { id: string; endpointId: string; statusRecebimento: string } }) =>
+    where.id === webhook.id && where.endpointId === webhook.endpointId && where.statusRecebimento === webhook.statusRecebimento ? webhook : null);
+  f.io.nolossLead.findFirst.mockImplementation(async ({ where }: { where: { id: string; status: string } }) =>
+    where.id === noloss.id && where.status === noloss.status ? noloss : null);
+  const resolver = (usuarioId = 30) => obterDestinoLeadPromovidoBpm(usuarioId, destino, f.client);
+  return { ...f, destino, target, evento, webhook, nolossPromovido: noloss, resolver };
+}
+
+describe("AC19 identidade promovida não concede ACL nem procura card substituto", () => {
+  it.each(["instagram", "noloss"] as const)("observador abre somente o destino canônico %s, sem writes", async (origem) => {
+    const f = promovidoFixture(origem);
+    f.target.pipelineId = sourcePipelineId; f.target.pipeline.id = sourcePipelineId;
+    expect(await f.resolver()).toEqual({ pipelineId: sourcePipelineId, cardId });
+    expect(f.io.bpmCard.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: cardId } }));
+    expect(f.io.bpmCard.findMany).not.toHaveBeenCalled();
+    for (const spy of f.writeSpies) expect(spy).not.toHaveBeenCalled();
+  });
+  it.each(["pendente", "endpoint-estrangeiro", "id-estrangeiro", "payload-invalido", "sem-evento", "tipo-evento", "tipo-entidade",
+    "id-entidade", "sem-card", "pipeline-original", "chave-causal", "json-invalido", "outra-origem"])("Instagram recusa prova inconsistente: %s", async (caso) => {
+    const f = promovidoFixture("instagram");
+    if (caso === "pendente") f.webhook.statusRecebimento = "AUTENTICADO";
+    if (caso === "endpoint-estrangeiro") f.webhook.endpointId = "outro-endpoint";
+    if (caso === "id-estrangeiro") f.webhook.id = "outro-lead";
+    if (caso === "payload-invalido") f.webhook.payloadSanitizadoJson = "{}";
+    if (caso === "sem-evento") f.webhook.evento = null;
+    if (caso === "tipo-evento") f.evento.tipo = "RESPONSAVEL_ATRIBUIDO";
+    if (caso === "tipo-entidade") f.evento.entidadeTipo = "CLIENTE";
+    if (caso === "id-entidade") f.evento.entidadeId = sourceId;
+    if (caso === "sem-card") f.evento.cardId = null;
+    if (caso === "pipeline-original") f.evento.pipelineId = sourcePipelineId;
+    if (caso === "chave-causal") f.evento.idempotencyKey = `instagram-assumido:outro-lead`;
+    if (caso === "json-invalido") f.evento.valorNovoJson = "{bad";
+    if (caso === "outra-origem") f.evento.valorNovoJson = JSON.stringify({ origem: "NOLOSS" });
+    expect(await f.resolver()).toBeNull();
+    expect(f.io.bpmCard.findMany).not.toHaveBeenCalled();
+    for (const spy of f.writeSpies) expect(spy).not.toHaveBeenCalled();
+  });
+  it.each(["pendente", "sem-pointer", "pointer-quebrado", "empresa-divergente"])("NoLoss não adivinha destino: %s", async (caso) => {
+    const f = promovidoFixture("noloss");
+    if (caso === "pendente") f.nolossPromovido.status = "pending";
+    if (caso === "sem-pointer") f.nolossPromovido.promotedCardId = null;
+    if (caso === "pointer-quebrado") f.nolossPromovido.promotedCardId = sourceId;
+    if (caso === "empresa-divergente") f.nolossPromovido.promotedClienteId = 999;
+    expect(await f.resolver()).toBeNull();
+    expect(f.io.bpmCard.findMany).not.toHaveBeenCalled();
+    for (const spy of f.writeSpies) expect(spy).not.toHaveBeenCalled();
+  });
+  it.each(["ARQUIVADO", "CANCELADO", "pipeline-inativo", "etapa-inativa", "alvo-removido"])("destino nativo indisponível não é retornado: %s", async (caso) => {
+    const f = promovidoFixture("noloss");
+    if (["ARQUIVADO", "CANCELADO"].includes(caso)) f.target.status = caso;
+    if (caso === "pipeline-inativo") f.target.pipeline.ativo = false;
+    if (caso === "etapa-inativa") f.target.etapa.ativo = false;
+    if (caso === "alvo-removido") f.target.id = sourceId;
+    expect(await f.resolver()).toBeNull();
+    for (const spy of f.writeSpies) expect(spy).not.toHaveBeenCalled();
+  });
+  it.each(["target-setor-negado", "target-etapa-negada", "conta-inativa", "CRM-revogado"])("fonte autorizada não substitui ACL atual do alvo: %s", async (caso) => {
+    const f = promovidoFixture("noloss");
+    if (caso === "target-setor-negado") f.target.pipeline.setores = [{ setor: { nome: "Financeiro", ativo: true } }];
+    if (caso === "target-etapa-negada") f.target.etapa.visibilidades[0].podeVer = false;
+    if (caso === "conta-inativa") f.users.find((u) => u.id === 33)!.status = "INATIVO";
+    if (caso === "CRM-revogado") f.overrides.push({ usuarioId: 33, modulo: "crm", acao: "REMOVE" });
+    expect(await f.resolver(33)).toBeNull();
+    for (const spy of f.writeSpies) expect(spy).not.toHaveBeenCalled();
+  });
+});
 
 describe("AC18 observador TI/Admin não se torna ator do setor", () => {
   it.each(["Admin", " TI ", "T.I", "t.i.", "aDmIn"])("normaliza somente os aliases canônicos positivos: %s", (role) => {

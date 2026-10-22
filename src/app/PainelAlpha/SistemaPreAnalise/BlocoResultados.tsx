@@ -28,7 +28,7 @@ type DadosEmpresaquiExibicao = {
     historico_regime?: HistoricoExibicao[]; historicoRegime?: HistoricoExibicao[];
     consultaStatus?: string; regimeEA?: string;
 };
-type DadosRadarExibicao = { submodalidade?: string; situacao?: string; dataSituacao?: string; error?: string; code?: string };
+type DadosRadarExibicao = { submodalidade?: string; situacao?: string; dataSituacao?: string; dataAtualizacaoPublicada?: string; aviso?: string; error?: string; code?: string };
 type EtapaExibicao = {
     status?: string;
     dados?: Record<string, unknown> | null;
@@ -344,7 +344,8 @@ export default function BlocoResultados({ dados, visual, userName, onRetry }: Pr
                                             <div className={loadingRadar ? "opacity-40 animate-pulse pointer-events-none" : ""}>
                                                 <DataField label="Submodalidade de Atuação" value={dadosExibicaoRadar?.submodalidade || "Não informado"} />
                                                 <DataField label="Status de Habilitação" value={dadosExibicaoRadar?.situacao || "---"} />
-                                                <DataField label="Última Atualização" value={dadosExibicaoRadar?.dataSituacao || "---"} />
+                                                <DataField label="Atualização da base Receita" value={dadosExibicaoRadar?.dataAtualizacaoPublicada || dadosExibicaoRadar?.dataSituacao || "---"} />
+                                                {dadosExibicaoRadar?.aviso && <p className="text-amber-400 text-[10px]">{dadosExibicaoRadar.aviso}</p>}
                                             </div>
                                         )}
                                     </div>
