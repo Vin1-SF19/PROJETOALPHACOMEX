@@ -80,18 +80,35 @@ describe("consultarEGuardarCnpjLead", () => {
     expect(upsertConsulta.mock.calls[0][0].update.dadosBrutos.rfb.dados.razaoSocial).toBe("ANTERIOR");
   });
 
-  it("distingue ausência real no Radar de falha técnica", async () => {
-    radar.mockRejectedValueOnce(new ErroConsultaRadar(404, "NOT_FOUND", "Não encontrado"));
-    let resultado = await consultarEGuardarCnpjLead(cnpj);
-    expect(resultado.falhas).toEqual([]);
-    expect(resultado.radarSituacao).toBe("NÃO HABILITADA");
-    expect(upsertConsulta.mock.calls[0][0].update.dadosBrutos.radar.dados).toEqual({ situacao: "NÃO HABILITADA" });
-
-    radar.mockRejectedValueOnce(new ErroConsultaRadar(502, "UPSTREAM_UNAVAILABLE", "Indisponível"));
-    findConsulta.mockResolvedValue({ razaoSocial: "EMPRESA", dadosBrutos: { radar: { dados: dadosRadar } } });
-    resultado = await consultarEGuardarCnpjLead(cnpj);
+  it.each(["404", "ausência no CSV com 200", "502"])("preserva Radar confirmado quando a consulta devolve %s", async (caso) => {
+    if (caso === "ausência no CSV com 200") radar.mockResolvedValue({ ...dadosRadar, situacao: "NÃO CONSTA NO ARQUIVO CONSULTADO" });
+    else radar.mockRejectedValue(new ErroConsultaRadar(caso === "404" ? 404 : 502, "NOT_FOUND", "Não encontrado"));
+    const previa = await consultarFontesCnpjLead(cnpj);
+    expect(previa.dadosRadar).toBeNull(); expect(previa.falhas).toContain("Radar");
+    expect(findConsulta).not.toHaveBeenCalled(); expect(upsertConsulta).not.toHaveBeenCalled();
+    findConsulta.mockResolvedValue({ razaoSocial: "EMPRESA", submodalidade: "ILIMITADA", dadosBrutos: { radar: { dados: dadosRadar } } });
+    const resultado = await consultarEGuardarCnpjLead(cnpj);
     expect(resultado.falhas).toContain("Radar");
-    expect(upsertConsulta.mock.calls[1][0].update.dadosBrutos.radar.dados).toEqual(dadosRadar);
+    expect(resultado.radarSituacao).toBeNull();
+    expect(upsertConsulta.mock.calls[0][0].update.dadosBrutos.radar.dados).toEqual(dadosRadar);
+    expect(upsertConsulta.mock.calls[0][0].update.submodalidade).toBe("ILIMITADA");
+  });
+
+  it("não grava ausência do CSV quando nenhuma fonte retornou dados", async () => {
+    receita.mockRejectedValue(new Error("indisponível")); empresaAqui.mockRejectedValue(new Error("indisponível"));
+    radar.mockRejectedValue(new ErroConsultaRadar(404, "NOT_FOUND", "Não consta no arquivo"));
+    const resultado = await consultarEGuardarCnpjLead(cnpj);
+    expect(resultado.falhas).toEqual(["Receita Federal", "EmpresaAqui", "Radar"]);
+    expect(upsertConsulta).not.toHaveBeenCalled();
+  });
+
+  it("conserva situação negativa explicitamente fornecida e metadados do Radar", async () => {
+    radar.mockResolvedValue({ ...dadosRadar, situacao: "NÃO HABILITADA", modalidade: "", submodalidade: "",
+      dataAtualizacaoPublicada: "2026-10-21", consultadoEm: "2026-10-22T16:00:00Z", aviso: "Dados do arquivo publicado" });
+    const resultado = await consultarEGuardarCnpjLead(cnpj);
+    expect(resultado.radarSituacao).toBe("NÃO HABILITADA"); expect(resultado.falhas).toEqual([]);
+    expect(upsertConsulta.mock.calls[0][0].update.dadosBrutos.radar.dados).toMatchObject({ situacao: "NÃO HABILITADA",
+      dataAtualizacaoPublicada: "2026-10-21", consultadoEm: "2026-10-22T16:00:00Z", aviso: "Dados do arquivo publicado" });
   });
 
   it("persiste resposta fiscal mesmo se Receita e Radar falharem", async () => {
