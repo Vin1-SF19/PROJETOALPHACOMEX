@@ -330,10 +330,18 @@ describe.sequential(
         }),
       ).toBe(0);
     });
-    it("catálogo somente líder, identidade única e específico substitui global", async () => {
-      await expect(
-        catalog.publicarModelo(owner, model("ONLY_LEADER")),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    it("catálogo somente TI/líder, identidade única e específico substitui global", async () => {
+      for (const id of [1, 2, 4, 5, 7]) {
+        const actor: AtorChecklist = { kind: "INTERNO", id, sessionVersion: 0 };
+        await expect(catalog.publicarModelo(actor, model(`DENIED_${id}`)))
+          .rejects.toMatchObject({ code: "FORBIDDEN" });
+        for (const operation of ["DESATIVAR", "ORDENAR"] as const) {
+          await expect(catalog.revisarModelo(actor, {
+            identidadeId: "not-accessible", expectedRevision: 0,
+            mutationId: randomUUID(), ordem: 2,
+          }, operation)).rejects.toMatchObject({ code: "FORBIDDEN" });
+        }
+      }
       await catalog.publicarModelo(leader, model("OVERRIDE"));
       await catalog.publicarModelo(leader, {
         ...model("OVERRIDE", "RECEITA_BRUTA_DAS"),
@@ -350,6 +358,36 @@ describe.sequential(
       await expect(
         catalog.publicarModelo(leader, model("OVERRIDE")),
       ).rejects.toMatchObject({ code: "MODEL_CODE_CONFLICT" });
+    });
+    it("TI ganha apenas gestão de modelos e não ganha escrita, atribuição ou criação de dossiês", async () => {
+      const ti: AtorChecklist = { kind: "INTERNO", id: 6, sessionVersion: 0 };
+      const f = await atendimento();
+      const readOnly = {
+        canRead: true, canEdit: false, canCreateOwn: false, canAssignOwner: false,
+        canManageModels: true, canManagePortalAccess: false, canLinkCrm: false,
+      };
+      expect(await access.obterCapacidadesChecklist(ti, f.empresa)).toEqual(readOnly);
+      for (const role of ["TI", "T.I", " ti "]) {
+        expect(access.capacidadesParaAtor(ti, role, f.empresa)).toEqual(readOnly);
+        expect(access.capacidadesParaAtor(ti, role, { analistaId: null })).toEqual(readOnly);
+      }
+      for (const [id, role] of [[4, "Admin"], [5, "CEO"], [1, "Operacional"], [2, "Analista Operacional"]] as const) {
+        expect(access.capacidadesParaAtor({ ...ti, id }, role, { analistaId: null }).canManageModels).toBe(false);
+      }
+      const portal: AtorChecklist = { kind: "PORTAL", id: f.conta.id, sessionVersion: 0 };
+      expect(access.capacidadesParaAtor(portal, "TI", f.empresa).canManageModels).toBe(false);
+      await expect(catalog.publicarModelo(portal, model("PORTAL_DENIED")))
+        .rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(service.criarAtendimento(ti, {
+        mutationId: randomUUID(), clienteId: f.cliente.id, clienteOperacionalId: f.conta.id,
+      })).rejects.toMatchObject({ code: "FORBIDDEN" });
+      // Even when existing ownership grants editing, assignment stays leader-only.
+      const owned = await atendimento(ti.id);
+      await expect(service.atribuirAnalista(ti, {
+        empresaId: owned.empresa.id, expectedRevision: 0,
+        mutationId: randomUUID(), analistaId: 2,
+      })).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect((await state.db.operacionalClientes.findUniqueOrThrow({ where: { id: owned.empresa.id } })).analistaId).toBe(ti.id);
     });
     it("instâncias preservam snapshots, A→B→A conserva identidade, histórico não escreve", async () => {
       const f = await atendimento();

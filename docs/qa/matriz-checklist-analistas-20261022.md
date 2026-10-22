@@ -225,3 +225,42 @@ File List desta estação: somente `docs/qa/matriz-checklist-analistas-20261022.
 - [ ] Story In Progress. DevOps pode prosseguir com publicação somente staging Portal87ca→READY antesMaina541→READY conforme autorização vigente; homologação real e hashbatch continuam gates separados(readerproof/cessaçãooldwriters). Produção não autorizada.
 
 File List Lens reconciliado: somente esta matrizQA e story por append; relatório em /tmp. Fonte/testes/schema/env/Git/cloud/DB/objetos/backups/timer/deploy intocados. Controle devolvido ao Bibble/DevOps; nenhum próximo agente acionado.
+
+
+### DevOps — publicada em staging; homologação autenticada/hash condicional pendentes (22/10/2026)
+
+- [x] Portal87ca1656 READY dpl_HwPxcDe4TyJAUZTTtr2cHPhnKubS antesMain37a7048d READY dpl_35EMmv9TsVEZrbBiJD9KwYZm5Tky. Mainfontea54152be inalterada+2docsForge/Lens. Refstaging/customIDs exatos,2aliases porapp/TLS válidos.
+- [x] Main smokes200/307auth/401/200listasvazias; Portal302SSOVercel preservado. MainOOM8GB recuperadoUMAvezTurbo por deployment30cores60GB/ativo182.098s; semconfigglobal. Blobprivado/config2stages eDB3applies anteriores porlineage.
+- [ ] Homologação autenticada/uploadreal/hash2 pendentes;48oldwriters preservados, semprova decessação/drenagem. SemDELETE/proteção/DBwrite/objetos/timer/produção nestaestação. StoryInProgress, nãoDone.
+
+Handoff `/tmp/checklist-analistas-20261022-staging-published-final.md`+JSON; plano48IDs `...-publish-final-oldwriters.json`. FileListDevOps: storyChecklist, docs/ops/checklist-analistas-staging-20261022.md, docs/vault/checklist-analistas-20261022.md, docs/qa/matriz-checklist-analistas-20261022.md; appenddocs local semnovo pushduplicado. ControleaoBibble.
+
+
+### Forge — TI gere modelos, 22/10/2026
+
+- [x] Nova concluída: texto de consulta em `ModelosWorkspace.tsx` alinha publicação/gestão a TI e Líder Operacional; ESLint focal exit0 conforme handoff Nova. File List Nova TI: `src/components/checklist/ModelosWorkspace.tsx`.
+- [x] Quatro gates MAIN reais no HEAD37a7048d + patch TI: `npm run typecheck`20,43s/exit0; `npm run lint`46,39s/exit0,0erros1183warnings; `npm run build`64,92s/exit0,Prisma/player/webpack/pools1/heap4096/86páginas; `npm test` final36,10s/exit0,745arquivos6099PASS+4skip1todo=6104. TC separado8GiB aprovado; build ignora tipos.
+- [x] Transparência das tentativas: fullcoverage inicial exit1/82,74s,17arquivos falhos por timeouts/subprocessos interrompidos; isolamento17arquivos com cobertura exit1/153,88s,152PASS/2falhas remanescentes em rd-playbooks. Sem patch/timeouts maiores. Única repetição fullcoverage preservou configuração padrão, alterando somente TMPDIR para pasta privada0700 em RAM, após memória disponível35,36GB/shm31,63GB e prova Node os.tmpdir. PASS final compatível com pressão de tempo/I/O; tentativas anteriores preservadas.
+- [x] Sourcefingerprint d04f91bb534f5f5889beed2ec522407a014b774a851054241b556bfd8e86b199 antes/depois idêntico; schema c3c82…/Prisma6.19.3 preservados. Wrapper allowlist+SQLite sintético; Portal não repetido.
+- [ ] Anubis/Lens focais da ACL e publicação/validação somente staging seguem pendentes; Story In Progress.
+
+**Forge APROVADO para Anubis/Lens.** Relatório `/tmp/checklist-analistas-20261022-ti-forge.md`; inputs/resultados/hashes `/tmp/checklist-analistas-20261022-ti-forge-input.json`; logs completos `/tmp/checklist-analistas-20261022-forge-main-ti-{typecheck,lint,test,build,test-isolated,test-ram}.log`+metadata. File List Forge: esta story e `docs/qa/matriz-checklist-analistas-20261022.md`, somente append. Fontes/testes/docs alheios preservados; sem env real/DB remoto/cloud/Git mutável/deploy/produção. Controle ao Bibble; nenhum agente seguinte acionado.
+
+
+## Probe + Anubis focal — gestão de modelos por TI,22/10/2026
+
+- [x] Probe focal: páginas Embasamentos calculam caps no servidor, workspace propaga canManageModels aos quatro controles e actions resolvem ator; texto inclui TI e Líder Operacional.
+- [x] Anubis focal: helper exige ator interno e role/status/sessionVersion persistidos dentro da Tx antes de replay; TI ganha somente gestão de modelos. Atribuição continua líder; Admin/CEO/analistas/Portal sem gestão. Zero achados críticos/importantes confirmados; **APROVADO local**.
+- [x] Testes focais53PASS e gates Forge TI (745arquivos/6099PASS+4skip/1todo) adotados com lineage; não repetidos testes/gates intactos. Relatório `/tmp/checklist-analistas-20261022-ti-anubis.md` contém arquivo:linha e limitações.
+- [ ] Lens, publicação/homologação staging permanecem pendentes. Sem E2E remoto ou autorização de produção por este parecer.
+
+File List Probe/Anubis TI: somente append nesta matriz QA e story; relatório em /tmp foraGit. Source/testes/Portal/schema/DB/env/Git/cloud preservados. Controle devolvido ao Bibble para Lens; nenhum agente acionado.
+
+
+## Lens focal — TI gerencia modelos, 22/10/2026
+
+- [x] Revisão causal dos 3 arquivos de produto e 2 testes: **APROVADO**, zero achados bloqueantes/importantes/sugestões concretos. Helper e capability específicos TI/Líder; usuário persistido dentro da Tx antes do replay; atribuição e escrita de dossiês preservadas.
+- [x] Cobertura SQLite inspecionada: TI publica/edita/desativa/ordena, autoria, replay após revisão concorrente, divergências/CAS e revogação. Negativas para Admin/CEO/analistas/Portal e TI sem criação/atribuição de dossiês. Forge quatro gates PASS adotados sem repetir; focal53PASS/global6099PASS+4skip/1todo. Tentativas anteriores do Forge permanecem documentadas.
+- [ ] Publicação e homologação deste patch somente staging continuam pendentes. Story In Progress; produção sem autorização.
+
+Relatório `/tmp/checklist-analistas-20261022-ti-lens.md` contém evidências arquivo:linha e limites. File List Lens TI: somente append em `docs/qa/matriz-checklist-analistas-20261022.md` e `docs/stories/story-checklist-analistas-reformulacao-integracao-crm-20261022.md`; relatório fora Git. Nenhuma fonte/teste/schema/DB/env/cloud/Git mutável alterado. Controle devolvido ao Bibble; nenhum agente seguinte acionado.

@@ -43,7 +43,7 @@ export function ModelosWorkspace({ canManage, tipoInicial = "" }: { canManage: b
       </header>
       {!canManage && (
         <p className="rounded-xl border border-white/10 p-3 text-xs text-slate-400">
-          Consulta do catálogo. Publicação e gestão exclusivas do Líder Operacional.
+          Consulta do catálogo. Publicação e gestão exclusivas de TI e Líder Operacional.
         </p>
       )}
       <label className="block max-w-sm text-xs text-slate-400">

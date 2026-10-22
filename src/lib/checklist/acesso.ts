@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { auth } from "../../../auth";
 import db from "@/lib/prisma";
-import { isAdminRole, normalizeRole } from "@/lib/roles";
+import { isAdminRole, isSameRole, normalizeRole, Roles } from "@/lib/roles";
 import { fail } from "./result";
 import type { AtorChecklist, CapacidadesChecklist } from "./types";
 export type Tx = Prisma.TransactionClient;
@@ -9,6 +9,8 @@ export const operacionalElegivel = (role: string) =>
   ["OPERACIONAL", "ANALISTAOPERACIONAL"].includes(normalizeRole(role));
 export const liderOperacional = (role: string) =>
   normalizeRole(role) === "LIDEROPERACIONAL";
+const gestorModelosChecklist = (role: string) =>
+  liderOperacional(role) || isSameRole(role, Roles.TI);
 export async function obterAtorChecklist(): Promise<AtorChecklist> {
   const session = await auth();
   if (!session?.user?.id) fail("UNAUTHENTICATED", "Entre novamente.");
@@ -82,6 +84,15 @@ export async function exigirLiderChecklist(ator: AtorChecklist, tx: Tx = db) {
     fail("FORBIDDEN", "Apenas Líder Operacional pode realizar esta operação.");
   return user;
 }
+export async function exigirGestorModelosChecklist(
+  ator: AtorChecklist,
+  tx: Tx = db,
+) {
+  const user = await exigirLeituraChecklist(ator, tx);
+  if (ator.kind !== "INTERNO" || !gestorModelosChecklist(user.role))
+    fail("FORBIDDEN", "Apenas TI ou Líder Operacional pode gerir modelos.");
+  return user;
+}
 export async function exigirEmpresaChecklist(
   tx: Tx,
   ator: AtorChecklist,
@@ -134,7 +145,7 @@ export function capacidadesParaAtor(
     canCreateOwn:
       ator.kind === "INTERNO" && (operacionalElegivel(role) || leader),
     canAssignOwner: leader,
-    canManageModels: leader,
+    canManageModels: ator.kind === "INTERNO" && gestorModelosChecklist(role),
     canManagePortalAccess: leader || own,
     canLinkCrm: leader || own,
   };

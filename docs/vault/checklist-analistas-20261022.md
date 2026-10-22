@@ -361,3 +361,12 @@ BrevePrismadeltaab→04cc:somenteCliente.perfilCadastralJson Json? novo;nenhummo
 3aplicaçõesDB anteriores continuam registradas/APPLIED; nenhum novoDBwrite/backup/hash/owner/Teste/objeto/timer/produção nestaestação. As47versõesantigas NÃOforamprotegidas/excluídas; inventárioprecisarefresh após publicação subsequente. Hash2permanececondicional aoPortalreadercomprovado/MainhashwriterREADY/cessaçãoreal(drain/skew/rotas)/Vault; aliasnãoéprova. Estado: **Portalpublicadoemstaging; Mainpendenteintegração; homologaçãoautenticadae hashcondicionalpendentes**, StoryInProgress. SemDone/promoçãoprod.
 
 FileListDevOps:runbookops,relatórioVault e story porappend; sem app/testes/schema/dependênciasalterados. Handoff `/tmp/checklist-analistas-20261022-staging-published.md`/`.json`, logsPortalpush/build/status/HTTP/origin/drift/protectioncapability foraGit, semsegredos. Fontes/roots/dadosaplicados/memórias4dirtyanteriorespreservados. ControledevolvidoaoBibbleparaScout/ownersMain.
+
+
+### DevOps — publicada em staging; homologação autenticada/hash condicional pendentes (22/10/2026)
+
+- [x] Portal87ca1656 READY dpl_HwPxcDe4TyJAUZTTtr2cHPhnKubS antesMain37a7048d READY dpl_35EMmv9TsVEZrbBiJD9KwYZm5Tky. Mainfontea54152be inalterada+2docsForge/Lens. Refstaging/customIDs exatos,2aliases porapp/TLS válidos.
+- [x] Main smokes200/307auth/401/200listasvazias; Portal302SSOVercel preservado. MainOOM8GB recuperadoUMAvezTurbo por deployment30cores60GB/ativo182.098s; semconfigglobal. Blobprivado/config2stages eDB3applies anteriores porlineage.
+- [ ] Homologação autenticada/uploadreal/hash2 pendentes;48oldwriters preservados, semprova decessação/drenagem. SemDELETE/proteção/DBwrite/objetos/timer/produção nestaestação. StoryInProgress, nãoDone.
+
+Handoff `/tmp/checklist-analistas-20261022-staging-published-final.md`+JSON; plano48IDs `...-publish-final-oldwriters.json`. FileListDevOps: storyChecklist, docs/ops/checklist-analistas-staging-20261022.md, docs/vault/checklist-analistas-20261022.md, docs/qa/matriz-checklist-analistas-20261022.md; appenddocs local semnovo pushduplicado. ControleaoBibble.

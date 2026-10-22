@@ -1,7 +1,7 @@
 import { Prisma, TipoEmbasamento } from "@prisma/client";
 import db from "@/lib/prisma";
 import {
-  exigirLiderChecklist,
+  exigirGestorModelosChecklist,
   exigirLeituraChecklist,
   type Tx,
 } from "./acesso";
@@ -121,7 +121,7 @@ async function executarModelo(ator: AtorChecklist, comando: ComandoModelo) {
   // Bind the journal to caller intent, never fields hydrated from current state.
   const payload = { operation: comando.operation, ...comando.input };
   return db.$transaction(async (tx) => {
-    await exigirLiderChecklist(ator, tx);
+    await exigirGestorModelosChecklist(ator, tx);
     const prior = await replay(tx, ator, comando.input.mutationId, payload);
     if (prior)
       return z
