@@ -81,6 +81,14 @@ O editor é montado no [CardModalHost.tsx](../../src/app/PainelAlpha/AlphaCRM/Ca
 - QA final do agente `qa_instagram`: fonte sem achados P1/P2 e aprovação **LOCAL**, condicionada aos gates que agora passaram. Não houve DDL, push ou deploy remoto. Avanço concorrente de staging `d7580d07` integrado localmente por DevOps em `e1bb8086`; os gates finais acima validam essa árvore integrada. Não houve publicação remota.
 - Vault: [relatório de staging](../crm-edicao-dados-empresa-vault-20261022.md) registra coluna ainda ausente e único ALTER preparado, ambiente/banco alvo, impacto, alternativa e rollback. Backup completo revalidado com restauração/integridade, válido até **2026-10-22 20:48:47 UTC**, sujeito a revalidação no instante de execução. Consentimento específico do usuário ainda pendente: **DDL, deploy dependente da coluna e validação runtime staging não executados**. Produção permanece sem autorização.
 
+## Ativação autorizada em staging — 2026-10-22
+
+- Usuário respondeu **sim** à pergunta específica sobre adicionar a coluna opcional e publicar somente no staging. Vault reaplicou a validação completa do backup (restauração, integridade, hash, banco e idade de 43,68 h) antes da operação.
+- Único `ALTER TABLE` aprovado confirmado às 16:29:45 UTC e por nova conexão às 16:30:02 UTC: 2.178 clientes preservados, 14 colunas (antes 13), `perfilCadastralJson JSONB` nullable/sem default, 0 valores não nulos e nenhuma alteração em índices ou outras tabelas. Recibo privado no caminho registrado no relatório Vault; não publicar dumps ou credenciais.
+- Primeiro push de staging em `fae70b26` chegou à Vercel, mas o build `dpl_wyBo2BYnwJQnWDMXeUnyzxERPD4k` falhou por OOM/SIGKILL no container de 8 GB. Alias permaneceu na versão anterior; produção e configuração remota não foram alteradas.
+- Ajuste arquitetural mínimo aprovado: `PerfilEmpresaProvider` acompanha o nó do card, com chave estável, em vez de ser importado pelo host global; leitura de confirmação em `CardSaveContext` usa import dinâmico somente após save confirmado, preservando versão/erros. Contrato do editor, ACL, auditoria e schema não mudam.
+- Após o ajuste: `npm test` exit0, 724 arquivos/5.833 testes PASS, 4 skipped e 1 todo, `/tmp/crm-empresa-editor-tests-build-fix-final.log`; lint exit0/0 erros/1.193 avisos, `/tmp/crm-empresa-editor-lint-build-fix.log`; **script padrão real `npm run build` com heap de 3 GB exit0** em 1:34,97, `/tmp/crm-empresa-editor-build-default-fix.log`. Typecheck sequencial exit0 em `/tmp/crm-empresa-editor-typecheck-build-fix.log`; Chromium às 16:40:50 UTC confirmou mesmo input após Back, save após detach, proteção do shell, 0 erros e largura 558/558 px. O efeito sobre o OOM remoto depende do novo deploy; não alegar causa comprovada ou publicação concluída.
+
 ## File List
 
 - `docs/crm-edicao-dados-empresa-vault-20261022.md`
