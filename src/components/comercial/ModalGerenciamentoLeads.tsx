@@ -495,10 +495,10 @@ function FormNovoContrato({
 
     return (
         <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden"
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.98 }}
+            className="max-h-[calc(92vh-5rem)] overflow-y-auto custom-scrollbar"
         >
             <div className="border-t border-white/5 p-6 space-y-5">
                 <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">
@@ -1513,7 +1513,7 @@ function TabelaFechados({
                                     </td>
                                     <td className="px-3 py-3 text-[10px] font-mono text-slate-400 whitespace-nowrap">{formatCNPJ(c.cnpj)}</td>
                                     <td className="px-3 py-3 max-w-[200px]">
-                                        <button type="button" onClick={() => onEditar(c)} className="flex items-center gap-1.5 text-[11px] font-black text-white truncate hover:underline group">
+                                        <button type="button" onClick={() => onEditar(c)} title="Editar contrato fechado" aria-label={`Editar contrato de ${c.razaoSocial}`} className="flex items-center gap-1.5 text-[11px] font-black text-white truncate hover:underline group">
                                             {c.razaoSocial}
                                             <Pencil size={10} className="shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" />
                                         </button>
@@ -1653,6 +1653,15 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
 
     const isAdmin = isAdminOrCeo(role);
     const podeGlobal = podeVerGlobal(role);
+
+    useEffect(() => {
+        if (!modoEdicao) return;
+        const fecharComEscape = (event: KeyboardEvent) => {
+            if (event.key === "Escape") setModoEdicao(null);
+        };
+        window.addEventListener("keydown", fecharComEscape);
+        return () => window.removeEventListener("keydown", fecharComEscape);
+    }, [modoEdicao]);
 
     const carregarContratos = useCallback(async () => {
         setCarregando(true);
@@ -1868,9 +1877,9 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
 
                         {/* ── Body ── */}
                         <div className="flex-1 overflow-y-auto custom-scrollbar">
-                            {/* Formulário */}
+                            {/* Cadastro de novo contrato */}
                             <AnimatePresence>
-                                {(mostraForm || modoEdicao) && (
+                                {mostraForm && !modoEdicao && (
                                     <FormNovoContrato
                                         mes={mes}
                                         ano={ano}
@@ -1878,8 +1887,6 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
                                         servicos={servicos}
                                         prospeccoesAtivas={prospeccoesAtivas}
                                         nomeUsuario={nomeUsuario}
-                                        initialData={modoEdicao ?? undefined}
-                                        editandoId={modoEdicao?.id}
                                         onServicoNovo={handleServicoNovo}
                                         onProspeccaoSalva={handleProspeccaoSalva}
                                         onSalvo={() => {
@@ -1888,7 +1895,7 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
                                             void carregarContratos();
                                             onDadosAlterados?.();
                                         }}
-                                        onCancelar={() => { setMostraForm(false); setModoEdicao(null); }}
+                                        onCancelar={() => setMostraForm(false)}
                                     />
                                 )}
                             </AnimatePresence>
@@ -1955,12 +1962,65 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
                                             canDelete={isAdmin}
                                             onExcluir={setContratoParaExcluir}
                                             onRecarregar={carregarContratos}
-                                            onEditar={(c) => { setModoEdicao(c); setMostraForm(false); }}
+                                            onEditar={(c) => {
+                                                setMostraForm(false);
+                                                setModoEdicao(c);
+                                            }}
                                         />
                                     </>
                                 )}
                             </div>
                         </div>
+
+                        <AnimatePresence>
+                            {modoEdicao && (
+                                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="presentation">
+                                    <button
+                                        type="button"
+                                        aria-label="Fechar edição do contrato"
+                                        className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+                                        onClick={() => setModoEdicao(null)}
+                                    />
+                                    <motion.div
+                                        role="dialog"
+                                        aria-modal="true"
+                                        aria-labelledby="editar-contrato-titulo"
+                                        initial={{ opacity: 0, y: 16, scale: 0.98 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: 16, scale: 0.98 }}
+                                        className="relative z-10 w-full max-w-4xl max-h-[92vh] overflow-hidden rounded-3xl border border-white/10 bg-[#060d1c] shadow-2xl"
+                                    >
+                                        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/5 bg-[#060d1c]/95 px-6 py-4 backdrop-blur-xl">
+                                            <div>
+                                                <h3 id="editar-contrato-titulo" className="text-sm font-black uppercase tracking-widest text-white">Editar contrato fechado</h3>
+                                                <p className="mt-1 max-w-[70vw] truncate text-[10px] text-slate-500">{modoEdicao.razaoSocial}</p>
+                                            </div>
+                                            <button type="button" onClick={() => setModoEdicao(null)} aria-label="Fechar" className="rounded-xl p-2 text-slate-500 transition-colors hover:bg-white/5 hover:text-white">
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                        <FormNovoContrato
+                                            mes={mes}
+                                            ano={ano}
+                                            colaboradores={colaboradores}
+                                            servicos={servicos}
+                                            prospeccoesAtivas={prospeccoesAtivas}
+                                            nomeUsuario={nomeUsuario}
+                                            initialData={modoEdicao}
+                                            editandoId={modoEdicao.id}
+                                            onServicoNovo={handleServicoNovo}
+                                            onProspeccaoSalva={handleProspeccaoSalva}
+                                            onSalvo={() => {
+                                                setModoEdicao(null);
+                                                void carregarContratos();
+                                                onDadosAlterados?.();
+                                            }}
+                                            onCancelar={() => setModoEdicao(null)}
+                                        />
+                                    </motion.div>
+                                </div>
+                            )}
+                        </AnimatePresence>
 
                         {/* Glow de fundo */}
                         <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl">
