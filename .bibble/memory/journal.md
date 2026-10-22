@@ -7449,3 +7449,7 @@ Implementação, provas de modal real sem claim, gates e smoke staging do delta.
 
 ### Refletido também em
 - `codebase-map.md` e `integration-points.md`: resolução de leitura e fronteira de identidade/ACL.
+
+
+### Fechamento local AC19 com concorrência preservada — 2026-10-22
+Clique de notificação é leitura: destino pendente canônico ou card promovido com identidade/ACL, erro honesto e nenhum claim automático. Checkpoint fae+04599+AC19 passou os quatro gates e suíte727/5.881PASS, zero falhas/quatro skipped/um todo. Avanço636 preservado por merge normal: lazy editor e Radar confirmado ausente no CSV; quinze arquivos próprios intactos e oito deltas byte-idênticos ao owner. Fonte final9a27c553... teve tipos/lint4/newbuildLITERAL3072pools1CPU4PASS (130s, pico agregado6.762.717.184bytes) e19 arquivos/259testesPASS; não alegar nova suíte global final. Wrapper externo143 preservado separadamente de gates filhos0/JSONPASS. QA local final aprovou; publicação/READY/cliques autenticados ainda pendentes neste commit, resultado posterior somente privado, sem docloop. Nenhuma produção/ENV/migration/worker manual. Provas em `/var/tmp/alpha-crm-notificacao-instagram-abertura-20261022/`.

@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, Fragment, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
-import { PerfilEmpresaProvider } from "@/components/PerfilEmpresaGlobal";
 import { CardSaveProvider, useCardSave } from "./CardSaveContext";
 
 type Entry = { owner: string; cardId: string; node: ReactNode };
@@ -88,8 +87,8 @@ export function CardModalHostProvider({ children }: { children: ReactNode }) {
   }), [publish, detach, close, replaceDetached]);
   return <CardModalHostContext.Provider value={host}>
     {children}
-    <div className="crm-scope"><PerfilEmpresaProvider>
+    <div className="crm-scope">
       {entry && <Fragment key={entry.owner}>{entry.node}</Fragment>}
-    </PerfilEmpresaProvider></div>
+    </div>
   </CardModalHostContext.Provider>;
 }

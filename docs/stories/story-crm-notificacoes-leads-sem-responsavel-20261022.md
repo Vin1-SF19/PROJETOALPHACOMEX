@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — contrato da correção de clique Instagram/lead virtual definido sobre `fae70b26`, antes da implementação. Corrigir abertura de leitura e mensagem indevida de “já assumido”; implementação, novos gates e smoke staging pendentes neste checkpoint. Evidências de entregas anteriores, inclusive observação TI/Admin, permanecem históricas e não validam este delta. Produção fora do escopo.
+Ready for Review — AC19 implementado e validado localmente; integração preservadora final de Radar/editor `63612d76` aprovada por QA, com tipos/lint/build literal e testes proporcionais reais. Publicação e cliques autenticados pending/processado em staging ainda pendentes neste commit, com evidências posteriores somente privadas. Produção fora do escopo; nenhuma migration ou alteração ENV remota faz parte desta correção.
 
 ## Executor Assignment
 
@@ -142,7 +142,7 @@ Verificar todos os adapters, inclusive origem desconhecida NoLoss, Operacional d
 - [x] Implementar observação no ponto compartilhado GET/fanout/lookup e defesa setorial explícita do claim, sem ampliar os demais bypasses.
 - [x] Atualizar testes de audiência/segurança/SQLite e navegação afetados; preservar lifecycle, cores e políticas anteriores.
 - [x] Executar os quatro gates sobre o delta congelado e revisão independente local; registrar evidências e limites reais.
-- [ ] Publicar a correção no staging e executar smoke visual TI/Admin autenticado; registrar o resultado privado sem novo commit documental.
+- [x] Publicar a correção TI/Admin no staging e executar smoke visual autenticado; conclusão histórica `d7580d07` conferida em evidência privada, sem commit documental posterior.
 
 ### Correção de clique virtual / card promovido (AC 19)
 
@@ -151,10 +151,11 @@ Reconhecimento em `fae70b26`: `useBpmNotificacaoBoardNavigation` troca qualquer 
 Contrato: manter a mesma action de leitura com resultado discriminado de lead virtual pendente, destino físico autorizado ou erro de leitura. Echo/Nova alinham o shape mínimo do retorno; sem novo endpoint geral, fallback por empresa ou capacidade adicional de assunção. O detalhe físico pode usar o callback existente de card vinculado no board, carregando o contexto real do alvo; o ACK permanece associado à intenção virtual original para evitar loop de reenvio. O lookup validará origem canônica e vínculo persistido, não aceitará ID de destino fornecido pelo cliente para essa resolução.
 
 - [x] Registrar causa comprovada de mensagem enganosa, limite do resolver atual e contrato antes do código.
-- [ ] Diagnosticar/corrigir a falha real de lookup pendente e resolver destino promovido somente por vínculo canônico autorizado.
-- [ ] Integrar retorno discriminado e mensagens honestas à navegação existente, com ACK/concorrência corretos.
-- [ ] Demonstrar detalhe/modal reais abrindo sem invocar assunção; testar promoção concorrente, ACL negativa, ponteiro inconsistente e erros de leitura.
-- [ ] Executar gates/revisão do delta congelado e smoke de clique autenticado no staging; registrar limites e evidências privadas próprias.
+- [x] Diagnosticar/corrigir a falha real de lookup pendente e resolver destino promovido somente por vínculo canônico autorizado.
+- [x] Integrar retorno discriminado e mensagens honestas à navegação existente, com ACK/concorrência corretos.
+- [x] Demonstrar detalhe/modal reais abrindo sem invocar assunção; testar promoção concorrente, ACL negativa, ponteiro inconsistente e erros de leitura.
+- [x] Executar gates/revisão local do delta congelado e da integração final, com resultados reais.
+- [ ] Publicar e conferir clique autenticado pending/processado no staging; salvar somente evidências privadas após este commit, sem nova rodada documental.
 
 ### Validação operacional da correção AC19 — OOM comprovado
 
@@ -162,7 +163,7 @@ DevOps confirmou que o deploy `fae70b26` falhou com `out_of_memory`/worker SIGKI
 
 Ajuste mínimo de build aprovado: acrescentar `RAYON_NUM_THREADS=1 UV_THREADPOOL_SIZE=1` somente à invocação Next no script `build`, mantendo `NODE_OPTIONS=--max-old-space-size=3072`, `next build --webpack`, CPU 1/configurações Next existentes, máquina/custo e ambientes remotos. Next 16.1.6 já usa `webpackMemoryOptimizations=true`, worker de build e compilação/tracing paralelos desativados; não desligar worker nem elevar heap/plano por suposição. Limitar pools nativos é uma tentativa justificada de reduzir concorrência, não garantia de eliminar OOM.
 
-O build local anterior com 4 GiB/afinidade de um CPU não substitui a validação nova: executar os quatro gates no conjunto congelado, com `npm run build` literal usando o script de 3 GiB/pools limitados, afinidade de quatro CPUs quando disponível e limite conservador agregado de memória de 7 GiB; registrar exit, fase, pico e tempo próprios. Depois conferir SHA/alias e funcionamento real das rotas no staging. QA focado informou 118 casos, SQLite 15 e UI 44 PASS para o app AC19; isso não equivale ao novo gate integrado, build remoto ou homologação publicada. Resultado final permanece pendente neste checkpoint. Sem plano pago, ENV remota, alteração de banco ou produção.
+O build local anterior com 4 GiB/afinidade de um CPU não substitui a validação nova: executar os quatro gates no conjunto congelado, com `npm run build` literal usando o script de 3 GiB/pools limitados, afinidade de quatro CPUs quando disponível e limite conservador agregado de memória de 7 GiB; registrar exit, fase, pico e tempo próprios. Depois conferir SHA/alias e funcionamento real das rotas no staging. QA focado informou 118 casos, SQLite 15 e UI 44 PASS para o app AC19; isso não equivale ao novo gate integrado, build remoto ou homologação publicada. O resultado permanecia pendente nesse checkpoint de plano; os resultados executados estão na seção seguinte. Sem plano pago, ENV remota, alteração de banco ou produção.
 
 ## Testing
 
@@ -240,9 +241,21 @@ Prisma compartilhado de outra worktree tinha coluna incompatível com a fixture.
 
 QA/Lens/Probe/Anubis aprovaram o patch local após Forge; CodeRabbit indisponível usa o fallback de revisão independente, sem alegar execução. Build remoto/alias e teste visual Admin da nova audiência permanecem pendentes neste checkpoint pré-push, com resultado posterior somente privado. Não foi repetido smoke loopback amplo: a homologação autenticada real é a próxima verificação. Evidências em `/var/tmp/alpha-crm-notificacoes-ti-observador-20261022/forge/forge-result.json`, `focused-sqlite-result.json` e `private-client-generate-result.json`. Não há migration, ENV, SQLDML/worker manual ou ação de produção.
 
+## Execução AC19 e integração final — DevOps
+
+Lookup de leitura agora retorna destino discriminado: projeção virtual canônica quando pendente, ou card físico somente com ponteiro/identidade de origem comprovados e ACL vigente; erro de leitura tem mensagem honesta e não prova assunção. O cliente preserva ACK e última intenção, abre o destino apropriado e não invoca claim/ingresso/encaminhamento no clique. Testes focados: segurança118, SQLite15 e UI44 (subconjuntos, não somar ao global).
+
+Os quatro gates reais do candidato `cedc4ce9c02571547f6fe34eefa1c0b51af691a872d897dca3f1508f4002dec2` passaram: typecheck0, lint0, novo `npm run build` literal com heap3072/pools1/afinidade4CPU/capRSSagregado7GiB **exit0/104,42s**, suíte completa **727 arquivos/5.881 PASS, zero falhas, quatro skipped e um todo**. Fonte idêntica antes/depois. Esse checkpoint contém fae+Radar04599+AC19, anterior às mudanças finais `63612d76`; não é uma nova suíte completa da árvore final.
+
+Concorrência preservada: merge local `6bc0d081` mantém pais fae/04599 e a fonte aprovada; merge normal posterior de `63612d76` preserva lazy imports do editor nativo e correção de Radar confirmado ausente no CSV. Quinze caminhos próprios ficaram byte a byte iguais; os oito deltas adicionais (quatro runtime/dois testes/dois docs) coincidem byte a byte com `63612d76`. Radar04599 e todos os ancestrais são mantidos, sem force/reset/stash, com um único push final depois da revisão. Nenhuma migration existente foi executada por essa integração.
+
+Árvore final `9a27c55346f07c8bf6031b5d7eb1d52e27ab2f4e3784b20f8cfd00a185f1be9d`: typecheck oficial **exit0/50,68s**, lint dos quatro fontes **exit0/1,70s** (oito warnings, zero erros), **novo build literal exit0/130,00s** com heap3072/pools1/quatro CPUs e pico agregado **6.762.717.184bytes**, abaixo do limite7GiB; client compartilhado intacto. Dezenove arquivos de testes de navegação/IG/segurança/SQLite/editor/guards/CNPJ/Radar: **259 PASS, zero falhas** em10,21s. Fonte final idêntica antes/depois. Não foi repetida outra suíte global: impacto e checks proporcionais foram ratificados por QA. A sessão externa da ferramenta informou143 apesar de stdout/JSON final PASS e todos os gates filhos exit0; anomalia de harness preservada e artefatos verificados independentemente, sem afirmar exit0 do wrapper.
+
+QA ratificou GO final local. Build remoto READY/SHA/alias e cliques Admin real em pending e Instagram já processado continuam pendentes neste registro pré-publicação; serão comprovados privadamente, sem segundo commit de relatório/status. A seleção read-only do processado usa identidade canônica e card ativo já visualizado, sem claim/ingresso. Evidências privadas: `/var/tmp/alpha-crm-notificacao-instagram-abertura-20261022/{forge/forge-result.json,merge-radar-proof.json,merge-636-proof.json,combined-636/result.json}`. Sem nova ENV, produção, migração ou worker manual.
+
 ## File List
 
-Consolidada dos manifests de backend/frontend e do teste de QA: 54 caminhos próprios da entrega funcional mais relatório e known-errors, total cumulativo de 56 caminhos únicos. O patch TI/Admin sobre `69047dee` altera 11 caminhos: dois runtime, dois testes, arquitetura/story/relatório e quatro memórias; não adiciona dependência ou schema. Não inclui os dez caminhos externos de `f7ceefdb` como autoria desta feature, logs privados ou dados reais.
+Cumulativo de autoria desta entrega: 58 caminhos (56 anteriores, mais o teste de abertura Instagram e `package.json`). O delta AC19/build/docs próprio contém 15 caminhos; preservação externa Radar/editor está discriminada separadamente abaixo. O conjunto final, comparado à base fae, altera 34 caminhos únicos, preservando os demais arquivos/ancestrais. Não inclui logs, credenciais, dados reais ou artefatos privados. Edições empresariais/migration preexistentes foram preservadas e não executadas por esta correção.
 
 - `src/lib/bpm/notificacoes-leads.ts` — DTOs, schemas e apresentação neutros de alertas/recepções.
 - `src/lib/bpm/notificacoes-leads-server.ts` — projeção autorizada, audiência, paginação e invalidação por usuário.
@@ -301,6 +314,33 @@ Consolidada dos manifests de backend/frontend e do teste de QA: 54 caminhos pró
 
 - `docs/reports/crm-notificacoes-leads-staging-20261022.md` — validação histórica e adendo TI/Admin com evidências sanitizadas e limites reais.
 - `.bibble/memory/known-errors.md` — isolamento do client Prisma divergente entre worktrees, sem mudar schema ou client alheio.
+
+- `tests/bpm/instagram-notificacao-abertura-react.test.ts` — abertura real por intenção, destino tipado, falhas honestas e ausência de claim no clique.
+- `package.json` — pools nativos limitados somente na invocação Next, mantendo heap3072 e dependências.
+
+## File List da integração preservada
+
+Dezenove caminhos externos de Radar/editor, preservados sem atribuir sua autoria ao AC19; não representam execução de migration ou alteração de configuração remota:
+
+- `docs/crm-edicao-dados-empresa-vault-20261022.md` — avanço concorrente preservado.
+- `docs/radar-csv.md` — avanço concorrente preservado.
+- `docs/stories/story-alpha-crm-consulta-radar-csv.md` — avanço concorrente preservado.
+- `docs/stories/story-crm-edicao-dados-empresa-historico-20261022.md` — avanço concorrente preservado.
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal.tsx` — avanço concorrente preservado.
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardModalHost.tsx` — avanço concorrente preservado.
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext.tsx` — avanço concorrente preservado.
+- `src/app/PainelAlpha/SistemaPreAnalise/BlocoResultados.tsx` — avanço concorrente preservado.
+- `src/app/api/ConsultaCompleta/route.ts` — avanço concorrente preservado.
+- `src/app/api/ConsultaRadarCsv/route.ts` — avanço concorrente preservado.
+- `src/components/ComponentesRadar/HabilitacaoRadarClient.tsx` — avanço concorrente preservado.
+- `src/lib/bpm/consulta-cnpj-lead.ts` — avanço concorrente preservado.
+- `src/lib/radar/consulta.ts` — avanço concorrente preservado.
+- `tests/bpm/consulta-cnpj-lead.test.ts` — avanço concorrente preservado.
+- `tests/bpm/empresa-cadastro-editor-react.test.ts` — avanço concorrente preservado.
+- `tests/pre-analise/consultas-tributarias.test.ts` — avanço concorrente preservado.
+- `tests/radar/consulta-client.test.ts` — avanço concorrente preservado.
+- `tests/radar/consulta-completa.test.ts` — avanço concorrente preservado.
+- `tests/radar/consulta-csv.test.ts` — avanço concorrente preservado.
 
 ## Story Draft Checklist
 
@@ -439,4 +479,6 @@ CodeRabbit indisponível no PATH e em `~/.local/bin/coderabbit`: aplicado fallba
 
 | 2026-10-22 | 1.5 | Correção observadora implementada; Forge quatro gates e QA local APPROVED; staging/teste visual posteriores em evidência privada, sem novo commit documental. | DevOps / QA |
 
-| 2026-10-22 | 1.4 | Reabertura pelo usuário: clique Instagram com mensagem indevida de assunção; contrato de leitura pendente/card promovido comprovado e erro honesto antes do código. Gates e staging do delta pendentes. | Scout / Architect |
+| 2026-10-22 | 1.6 | Reabertura pelo usuário: clique Instagram com mensagem indevida de assunção; contrato de leitura pendente/card promovido comprovado e erro honesto antes do código. Gates e staging do delta pendentes. | Scout / Architect |
+
+| 2026-10-22 | 1.7 | AC19/merge concorrente e build pools validados localmente; um push final após QA, staging/cliques reais posteriores somente em evidência privada. | DevOps / QA |

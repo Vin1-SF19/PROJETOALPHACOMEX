@@ -4,7 +4,7 @@ Data da revisão: 2026-10-22. Story: `docs/stories/story-crm-edicao-dados-empres
 
 ## Escopo e situação
 
-Preparação somente leitura. Nenhuma alteração estrutural, migration, backfill, push ou publicação foi executada. A execução continua condicionada ao consentimento explícito do usuário, conforme `AGENTS.md`, seção “Database Safety and Backup Policy”. A autorização para desenvolver e validar a interface no staging não substitui a autorização específica do banco.
+A preparação inicial foi somente leitura. Posteriormente, o usuário respondeu **“SIM”** à pergunta explícita que autorizava adicionar `Cliente.perfilCadastralJson` exclusivamente no banco de staging e publicar exclusivamente no staging; o consentimento foi comunicado pelo agente principal ao Vault às 16:28 UTC de 2026-10-22. O único `ALTER TABLE` aprovado foi aplicado e verificado às 16:29–16:30 UTC, conforme evidência ao final. Nenhum backfill, CRUD de cadastros, push, alteração de produção ou publicação foi executado pelo Vault. A autorização foi tratada conforme `AGENTS.md`, seção “Database Safety and Backup Policy”.
 
 Banco conferido em `.env.staging.local` do checkout principal, sem carregar `.env.local`: `painel-alpha-staging-alphacomex`, Turso/libSQL, endpoint `libsql://painel-alpha-staging-alphacomex.aws-us-east-1.turso.io`. Identificador SHA-256 da URL: `7fdd160737ba6f9cf84d0ac2fb1c3cf1084311e7fccea454f7bac368f9e4d42b`. Nenhuma leitura, cópia ou alteração de produção faz parte desta operação.
 
@@ -14,7 +14,7 @@ Consulta remota somente leitura às 13:25 UTC: 337 tabelas; 2.177 registros em `
 
 A nova coluna guarda os dados complementares editáveis que ainda não cabem no cadastro atual. Modelo Prisma proposto: `perfilCadastralJson Json?`. O provider é SQLite. As migrations existentes e as tabelas reais do staging utilizam `JSONB` para Prisma `Json` — exemplo: `prisma/migrations/20260828171445_add_gerador_documentos/migration.sql`.
 
-Único comando estrutural proposto, ainda não executado remotamente:
+Único comando estrutural proposto e posteriormente executado no staging após consentimento:
 
 ```sql
 ALTER TABLE "Cliente" ADD COLUMN "perfilCadastralJson" JSONB;
@@ -61,3 +61,27 @@ Rollback preferencial: voltar ao código anterior, que ignora a coluna adicional
 ## Rotina diária
 
 Não foi encontrada pasta `database-backups/daily` nem rotina diária de backup no crontab deste usuário durante esta revisão. A regra do projeto solicita execução às 02:00 de `America/Sao_Paulo`, retenção de sete dias e limpeza somente após novo backup verificado. Nenhuma rotina foi instalada ou alterada nesta entrega; a ausência não foi tratada como autorização para administrar serviços fora do escopo.
+
+## Execução autorizada e verificada — 2026-10-22
+
+Consentimento: resposta explícita **“SIM”** do usuário à autorização específica de adicionar `Cliente.perfilCadastralJson` no banco de staging e publicar somente no staging. O agente principal transmitiu esse consentimento ao Vault antes da execução. A autorização não foi ampliada para produção, outros comandos estruturais ou operações em massa.
+
+Antes da execução, o dump completo acima foi **novamente restaurado** em SQLite local isolado pelo verificador do projeto: SHA-256, tamanho, 337 tabelas, 295.171 linhas, `integrity_check=ok` e zero violações de chaves estrangeiras. Imediatamente antes do DDL, foram confirmados o hash exato do banco de staging, a correspondência do manifesto, os 308.225.012 bytes, o SHA-256 do arquivo e a idade de **43,6821 horas**, inferior ao limite de 48 horas. Somente `.env.staging.local` foi lido; `.env.local` não foi carregado.
+
+Foi executada uma única transação curta contendo o `ALTER TABLE` documentado acima, com verificações antes do commit e sem outros comandos de alteração. Commit concluído às **2026-10-22T16:29:45.751Z**. Uma **nova conexão independente** confirmou o estado persistido às **2026-10-22T16:30:02.685Z**.
+
+| Verificação | Antes | Após commit |
+| --- | --- | --- |
+| Registros em `Cliente` | 2.178 | 2.178 |
+| Colunas em `Cliente` | 13 | 14 |
+| `perfilCadastralJson` | Ausente | `JSONB`, nullable, sem default |
+| Valores não nulos na nova coluna | Não aplicável | 0 |
+| Índices de `Cliente` | Inventariados | Idênticos |
+| Quantidade de tabelas | Inventariada | Idêntica |
+
+A diferença entre os 2.177 clientes do inventário inicial e os 2.178 imediatamente antes do DDL decorre do intervalo entre as verificações; o DDL preservou exatamente os 2.178 registros que existiam no início da sua transação.
+
+Recibo operacional privado, modo 600, sem tokens ou dados pessoais:
+`/home/ialpha/projetos/alpha-comex/painel-alpha/database-backups/pre-change/crm-empresa-editor-staging-20261022/ddl-applied.private.json`.
+
+**Resultado Vault: PASS para a etapa estrutural de staging.** O banco está preparado para o deploy do código novo no staging. A publicação permanece com DevOps e não foi executada pelo Vault. O rollback preferencial continua sendo voltar ao código anterior e manter a coluna adicional, sem `DROP` e sem descartar dados.

@@ -24,7 +24,7 @@ vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/PainelAlinhamentoEstrategico", () 
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout", () => ({ CardAbertoLayout: ({ onAbrirCard }: { onAbrirCard: (id: string) => void }) => h(React.Fragment, null,
   h(Host), h("button", { onClick: () => onAbrirCard("card-vinculado") }, "Abrir card vinculado")) }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn(), dismiss: vi.fn() } }));
-vi.mock("@/components/PerfilEmpresaGlobal", () => ({ PerfilEmpresaProvider: ({ children }: { children: React.ReactNode }) => children }));
+vi.mock("@/components/PerfilEmpresaGlobal/PerfilEmpresaProvider", () => ({ PerfilEmpresaProvider: ({ children }: { children: React.ReactNode }) => children }));
 // A animação é verificada no Chromium; happy-dom rejeita promises de animações canceladas.
 vi.mock("framer-motion", () => ({ motion: { section: ({ children, id, className, "aria-label": label }: React.ComponentProps<"section">) => h("section", { id, className, "aria-label": label }, children) } }));
 const dadosBase = normalizarDadosEmpresaBpm({ empresaPrincipal: { id: 1, cnpj: "", razaoSocial: "Empresa teste", status: "ATIVO", socios: [] },

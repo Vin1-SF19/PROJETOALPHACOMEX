@@ -1,6 +1,6 @@
 "use client";
 
-import { ObterCardBpm } from "@/actions/bpm/Cards";
+import type { ObterCardBpm } from "@/actions/bpm/Cards";
 import { toast, type ExternalToast } from "sonner";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -140,6 +140,7 @@ function CardSaveProviderState({ children }: { children: ReactNode }) {
         // A leitura atualiza a tela e a versão compartilhada; uma falha nela
         // não desfaz a gravação já confirmada pela action.
         try {
+          const { ObterCardBpm } = await import("@/actions/bpm/Cards");
           const result = await ObterCardBpm(cardId);
           if (result.success && result.data) {
             confirmVersion(cardId, new Date(result.data.updatedAt).toISOString());
