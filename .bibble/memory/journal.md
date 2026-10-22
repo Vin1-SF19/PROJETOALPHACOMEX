@@ -7241,6 +7241,34 @@ Consolidar documentação final; produção não autorizada. Usuário comum, par
 - `decisions.md`: semântica de envio, autoridade, origem e limites de homologação.
 - `codebase-map.md`, `integration-points.md`, `components.md`: actions/helper, painel, dados e feedback.
 
+---
+
+## [2026-10-21 18:27] — Produção alinhada às correções auditadas do CRM
+
+**Tags:** #bugfix #integration #decision #security
+**Agentes envolvidos:** DevOps, Forge, QA, Architect, SM, Kowalski; owner paralelo de ordenação.
+**Arquivos tocados:** `docs/stories/story-promocao-correcoes-auditoria-crm-producao-20261021.md`, `docs/reports/comparacao-staging-producao-2026-10-21.md`, `.bibble/memory/journal.md`.
+
+### Contexto
+Usuário pediu comparar ambientes e publicar o que faltava em produção `31151e2a`: correções CRM `02788143`/`f8ef7312`.
+
+### O que foi feito
+- Merge preservador `5fd0d1c2` publicado com quatro gates reais aprovados e build próprio de produção; READY/SHA/aliases/banco/proteção CRM conferidos.
+- Owner paralelo promoveu ordenação `347c61a4` em `824db63c`, descendente de `5fd0d1c2`; 26.435 entradas não documentais idênticas ao staging combinado com quatro gates/688 arquivos/5.287 testes aprovados, reutilizados explicitamente por equivalência. Novo build e smoke produção aprovados.
+
+### Decisões tomadas
+- Preservar três grafos ativos, ID próprio Smart e responsável central de produção; validação pura e 23 tabelas sem colunas ausentes. Bancos separados; nenhuma alteração ENV/DB/worker.
+- Fechamento documental único após QA final; E2E autenticado permanece evidência staging. Draft histórico alheio preservado.
+
+### Problemas encontrados / resolvidos
+- Staging avançou durante o deploy; aguardou-se o owner concluir promoção descendente, sem duplicar/sobrescrever commits. Rollback de código saudável `5fd0d1c2`/HAM e baseline `31151e2a`/3b5.
+
+### Pendências
+- Limites anteriores de voz externa 503, latência e cobertura remota de usuário comum/Smart/parceiro; sem mutações de teste em produção.
+
+### Refletido também em
+- Story e relatório comparativo acima; evidência sanitizada em `/var/tmp/alpha-comparacao-promocao-20261021/`.
+
 
 ---
 
@@ -7448,3 +7476,31 @@ Reformular CheckList por analista e integrar dossiê explícito CRM B, preservan
 - Backup completo staging22/10 17:51:45UTC (14:51:45SãoPaulo), SQL360811599bytes; restore17:54:38UTC verificou337tabelas/295932linhas, integridade/FK/contagens/schema/sequências. Ignorado no Git; válido somente íntegro e≤48h até24/10 17:51:45UTC, conferir antes de cada apply. Não repetir backup agora sem necessidade; nenhuma restauração remota autorizada.
 ### Refletido também em
 - `codebase-map.md` e `integration-points.md`: marcadores Scribe desta entrega; story: File List documental. Draft anterior de outra entrega preservado integralmente, sem consolidação alheia.
+
+## [2026-10-22 16:36 UTC] — CRM: contrato de abertura de lead sem falsa assunção
+
+**Tags:** #bugfix #decision #security #integration
+**Agentes envolvidos:** coordenação, Scout/Architect, Nova, Echo, DevOps.
+**Arquivos tocados:** story/arquitetura existentes de notificações e três memórias; nenhum runtime por esta análise.
+
+### Contexto
+Usuário relata mensagem de lead já assumido ao clicar em notificação Instagram. Clique deve abrir detalhes; assumir continua explícito.
+
+### O que foi feito
+AC19/adendo definidos antes do código sobre fae70b26 limpa e compartilhados com owners. Scout confirmou que hook transforma qualquer erro de lookup em mensagem de assunção, e lookup só trata fonte pendente; não há claim automático no mount/clique.
+
+### Decisões tomadas
+Resultado discriminado virtual/card/erro; card promovido somente pelo evento IG/ponteiro NoLoss persistido e ACL atual. Abrir pelo detalhe existente, ACK da intenção original, sem fallback por empresa ou nova autoridade de claim.
+
+### Problemas encontrados / resolvidos
+Mensagem atual não prova assunção. Falha específica de leitura pending ainda depende do diagnóstico backend; não atribuir causa presumida nem considerar troca do texto solução completa.
+
+### Pendências
+Implementação, provas de modal real sem claim, gates e smoke staging do delta. Evidências anteriores não validam o novo caso; sem schema/ENV/produção.
+
+### Refletido também em
+- `codebase-map.md` e `integration-points.md`: resolução de leitura e fronteira de identidade/ACL.
+
+
+### Fechamento local AC19 com concorrência preservada — 2026-10-22
+Clique de notificação é leitura: destino pendente canônico ou card promovido com identidade/ACL, erro honesto e nenhum claim automático. Checkpoint fae+04599+AC19 passou os quatro gates e suíte727/5.881PASS, zero falhas/quatro skipped/um todo. Avanço636 preservado por merge normal: lazy editor e Radar confirmado ausente no CSV; quinze arquivos próprios intactos e oito deltas byte-idênticos ao owner. Fonte final9a27c553... teve tipos/lint4/newbuildLITERAL3072pools1CPU4PASS (130s, pico agregado6.762.717.184bytes) e19 arquivos/259testesPASS; não alegar nova suíte global final. Wrapper externo143 preservado separadamente de gates filhos0/JSONPASS. QA local final aprovou; publicação/READY/cliques autenticados ainda pendentes neste commit, resultado posterior somente privado, sem docloop. Nenhuma produção/ENV/migration/worker manual. Provas em `/var/tmp/alpha-crm-notificacao-instagram-abertura-20261022/`.

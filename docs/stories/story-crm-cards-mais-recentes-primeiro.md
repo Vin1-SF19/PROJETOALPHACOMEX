@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — código e integração aprovados por QA; quatro gates de staging aprovados. Publicações remotas e gates próprios de main serão confirmados pelas evidências DevOps.
+Ready for Review — staging publicado e verificado READY. Integração main e gates aprovados; produção aguardando publicação remota.
 
 ## Executor Assignment
 
@@ -44,7 +44,7 @@ Origem: pedido direto do usuário; hoje novos cards chegam abaixo dos antigos. O
 - [x] Reproduzir ordenação no fluxo inicial/manifesto e confirmar combinação de cards/NoLoss (AC 1–2).
 - [x] Aplicar correção mínima de ordem antes da paginação e coerente com hidratação/reconciliação (AC 1–4).
 - [x] Testar cards novos/antigos, fontes misturadas, empate, paginação, realtime e drag/rollback pertinentes (AC 1–4).
-- [x] Executar quatro gates completos de staging e revisão QA (AC 5); main exige validação própria antes da produção.
+- [x] Executar quatro gates completos nos candidatos e revisão QA (AC 5); integração atualizada ratificada por equivalência integral de código ao staging aprovado.
 - [ ] DevOps publicar/validar staging; depois integrar/publicar somente o patch autorizado em produção (AC 5–6).
 - [ ] Registrar releases, smoke, limitações e atualizar status, checklist e File List (AC 6).
 
@@ -83,7 +83,7 @@ Preflight de publicação: staging remoto f8ef731232920a29a2339f416b402e30d99afb
 
 ## QA Results
 
-**PASS / APPROVED** — revisão independente final dos dez caminhos ratificada. Ordenação cronológica, empate por ID DESC, datas ausentes, paginação, polling, ACL e drag/rollback aprovados. Integração main também PASS: somente dez caminhos e hunks estritos; nenhum dos 55 caminhos concorrentes foi incluído. Gates próprios de main em execução por DevOps.
+**PASS / APPROVED** — revisão independente final dos dez caminhos ratificada. Ordenação cronológica, empate por ID DESC, datas ausentes, paginação, polling, ACL e drag/rollback aprovados. Integração main também PASS: somente dez caminhos e hunks estritos; nenhum dos 55 caminhos concorrentes foi incluído. Gates próprios do candidato main original aprovados; integração atualizada validada por equivalência integral ao staging READY.
 
 ## Change Log
 
@@ -98,5 +98,13 @@ Preflight de publicação: staging remoto f8ef731232920a29a2339f416b402e30d99afb
 - Lint: exit 0, zero erros e 1.193 avisos preexistentes. Build padrão: exit 0. Typecheck após build: exit 0.
 - Primeira suíte completa: seis falhas em quatro arquivos CLI antigos por timeouts/subprocesso, enquanto havia build e typecheck concorrentes. Nenhuma alteração de fonte/teste foi feita. Repetição do mesmo `npm test`, sem concorrência: **688 arquivos e 5.287 testes aprovados**, 4 ignorados, 1 todo, exit 0.
 - Logs: `/tmp/crm-cards-novos-staging-20261021-{lint,build,typecheck,tests,tests-retry}.log`. QA independente da implementação e da integração main: PASS / APPROVED. CodeRabbit indisponível.
-- Somente URLs SQLite locais sintéticas nos gates; sem credenciais, dados reais, schema ou configurações alterados. Staging/produção READY e smoke ainda pendentes nesta revisão.
+- Somente URLs SQLite locais sintéticas nos gates; sem credenciais, dados reais, schema ou configurações alterados. Estado naquela revisão pré-publicação: staging/produção READY e smoke ainda pendentes. Staging posteriormente confirmado READY conforme seção de promoção abaixo.
 - Limite: não foi executado teste visual autenticado nem mutação de cards reais.
+
+## Evidências DevOps — promoção restrita para main
+
+- Staging `347c61a4f54365715f50bc3a5a82375d938ebd3d` publicado e verificado **READY**, alias `https://staging.alpha-comex.com`, deployment `dpl_Gb3owd49fCsza2MfEHFKXW2AcPbp`. Smoke: `/` 200, CRM/Automações 307, API CRM 401.
+- Candidato main original sobre `31151e2a`: lint/typecheck aprovados; 682 arquivos e 5.181 testes aprovados, 4 ignorados e 1 todo. Build padrão atingiu heap local de 3 GB; equivalente webpack 6 GB passou sem alterar configurações/fontes.
+- Antes do push, outra sessão avançou main para `5fd0d1c230858800e337a79c3202ead84c13d73e`. Esse trabalho foi integralmente preservado e somente o mesmo patch foi reaplicado, sem conflito. Nenhum commit concorrente foi introduzido por esta promoção.
+- A árvore resultante possui **todo código, testes, configurações e dependências byte-idênticos** ao staging `347c61a4` aprovado (688 arquivos/5.287 testes e build padrão). As únicas diferenças são esta story e a story de promoção já pertencente à nova base main. Gates do staging permanecem válidos por equivalência integral; nenhuma repetição sem nova mudança comportamental.
+- Artefatos: `/tmp/crm-cards-novos-staging-20261021-deployment-evidence.json` e `/tmp/crm-cards-novos-{staging,main}-20261021-gates.json`. Produção READY/SHA/alias/smoke pendente nesta revisão; fechamento local após verificação, sem novo commit documental.

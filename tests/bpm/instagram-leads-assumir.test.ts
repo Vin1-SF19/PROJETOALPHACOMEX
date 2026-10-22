@@ -58,9 +58,8 @@ describe("assunção Instagram", () => {
     expect(mocks.tx.cliente.create).not.toHaveBeenCalled();
     expect(mocks.tx.pessoa.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { celular: "11999990000" }, update: {}, create: expect.objectContaining({ nome: dados.nome, email: dados.email }) }));
     expect(mocks.tx.pessoaClienteVinculo.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: { ativo: true } }));
-    expect(mocks.tx.bpmInteracaoCard.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ observacoes: expect.stringContaining("Instagram — Google Sheets") }) }));
-    expect(mocks.tx.bpmInteracaoCard.create.mock.calls[0][0].data.observacoes).not.toContain("Campanha:");
-    expect(mocks.tx.bpmInteracaoCard.create.mock.calls[0][0].data.observacoes).toContain("até 150 mil dólares");
+    expect(mocks.tx.bpmInteracaoCard.create).not.toHaveBeenCalled();
+    expect(mocks.tx.bpmCardHistorico.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ acao: "CARD_CRIADO" }) }));
     expect(mocks.tx.bpmWebhookEntrada.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ statusRecebimento: "AUTENTICADO", eventoId: null }), data: { statusRecebimento: "PROCESSADO" } }));
     expect(mocks.tx.bpmWebhookEntrada.update).toHaveBeenCalledWith({ where: { id: input.leadId }, data: { eventoId: "evento" } });
     expect(mocks.tx.bpmCardMembro.create).toHaveBeenCalled();

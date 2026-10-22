@@ -12,6 +12,9 @@ import type { Prisma } from "@prisma/client";
 import db from "@/lib/prisma";
 import type { TimelineEvent } from "@/lib/timeline/types";
 import { apresentarEventoRd, apresentarAjusteServicoRd } from "@/lib/bpm/rd-station-display";
+import { ehAnotacaoTecnicaInstagram } from "@/lib/bpm/instagram-anotacao-tecnica";
+import { autorEventoHistorico } from "@/lib/bpm/timeline";
+import { descreverEventoHistorico } from "@/lib/bpm/historico-descricao";
 
 type ClienteDb = Prisma.TransactionClient | typeof db;
 
@@ -102,14 +105,16 @@ export async function extractCardTimelineEvents(
       timestamp: h.createdAt.toISOString(),
       module: "historico",
       moduleLabel: "Histórico",
-      title: h.acao,
-      description: anterior || novo ? `${anterior ?? "—"} → ${novo ?? "—"}` : undefined,
-      actor: h.usuario?.nome ?? (h.automacaoOrigem ? `Automação: ${h.automacaoOrigem}` : undefined),
+      title: h.acao === "DADOS_EMPRESA_ATUALIZADOS" ? "Dados da empresa alterados" : h.acao,
+      description: h.acao === "DADOS_EMPRESA_ATUALIZADOS" ? descreverEventoHistorico({ ...h, contexto: { etapas: [], campos: [], usuarios: [] } })
+        : anterior || novo ? `${anterior ?? "—"} → ${novo ?? "—"}` : undefined,
+      actor: autorEventoHistorico(h) ?? (h.automacaoOrigem ? `Automação: ${h.automacaoOrigem}` : undefined),
       metadata: { valorAnterior: h.valorAnteriorJson, valorNovo: h.valorNovoJson, origem: h.automacaoOrigem ? "automacao" : "manual" },
     });
   }
 
   for (const interacao of interacoes) {
+    if (ehAnotacaoTecnicaInstagram(interacao)) continue;
     events.push({
       id: `interacao-${interacao.id}`,
       timestamp: interacao.createdAt.toISOString(),

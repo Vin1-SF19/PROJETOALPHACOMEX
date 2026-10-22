@@ -944,6 +944,7 @@ model Cliente {
   regimeTributario  String?
   capitalSocial     String?
   situacaoCadastral String?
+  perfilCadastralJson Json? // Cadastro complementar empresarial; gravação explícita e auditada no CRM.
   status            String  @default("ATIVO") // ATIVO | ARQUIVADO — status da EMPRESA, não de um serviço
 
   createdAt DateTime @default(now())

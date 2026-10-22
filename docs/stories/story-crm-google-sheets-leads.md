@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — implementação concluída e aprovada pelo QA local; configuração e validação do endpoint em staging em andamento. Histórico aguarda confirmação específica do lote. Produção não autorizada.
+Ready for Review — implementação aprovada pelo QA; API homologada em staging e 27 leads históricos importados após consentimento específico. Promoção e configuração unitária de produção autorizadas em 2026-10-21; candidato isolado com gates locais aprovados. Publicação final e smoke de produção serão registrados pelo executor. Remetente Google Sheets ainda não instalado.
 
 ## Executor Assignment
 
@@ -24,7 +24,7 @@ Fonte: planilha Google Sheets `1vzyEobII90qd6txFhPBu5IwUZ9sISGs-6jYODaVmWsI`, ab
 
 O usuário confirmou **Revisão de Radar / Novos leads**, histórico e novos leads, e corrigiu a entrada para **lead virtual pulsante para alguém assumir**, como a função existente. Depois da comparação solicitada, autorizou: “O M vai para Radar pretendido - crie o card personalizado para os leads no isnta (planilha) faça o integração e depois me fale sobre a api para eu disponibilizar ela para outro dev”.
 
-Esse pedido autoriza implementação local do fluxo completo, incluindo API e integração preparada. Não criar card nativo/empresa/responsável na ingestão. Responsável somente na assunção. Não publicar/configurar produção; staging primeiro. Instalação de gatilho, escrita na planilha e execução da carga histórica devem respeitar autorização efetiva e o protocolo de operações em massa do projeto.
+Esse pedido autorizou implementação local do fluxo completo, incluindo API e integração preparada. Não criar card nativo/empresa/responsável na ingestão. Responsável somente na assunção. Staging primeiro; em 2026-10-21 o usuário também autorizou expressamente promover estas modificações e gerar URL/token próprios de produção. Instalação de gatilho, escrita na planilha e execução da carga histórica em cada ambiente devem respeitar autorização efetiva e o protocolo de operações em massa do projeto.
 
 ## Inventário e de/para
 
@@ -104,7 +104,7 @@ Credencial, configuração ausente/ambígua, endpoint inativo ou pipeline incomp
 11. O fluxo NoLoss existente e cadastro manual continuam operando sem alteração de seus contratos. Criar action própria Instagram. Despacho da origem virtual, abertura, drag/modal e assunção diferenciam IDs Instagram de IDs NoLoss; ID adulterado não promove outra origem nem acessa outra pipeline.
 12. Preparar remetente/script de Google Sheets com cabeçalhos reais, IDs como string e propriedades privadas para URL/segredo. Confirmação técnica só após resposta de sucesso correspondente ao ID enviado. Timeout/429/5xx podem ser reenviados; erros permanentes ficam identificáveis. Lock e limite por execução evitam sobreposição; preservar dados/fórmulas originais.
 13. Documentação para outro dev inclui URL de staging, método, autenticação, contrato de campos, de/para M, exemplos fictícios de curl/payload/retorno, duplicatas, validação, retry e diferença entre recebimento virtual e card assumido. Credencial real é fornecida por canal privado no momento autorizado; não prometer endpoint ativo antes do deploy.
-14. Não publicar/configurar produção. Não executar migration, backfill/importação em massa ou escrita na planilha sem os passos aplicáveis de autorização/ambiente da sessão. Preparar código e documentação revisáveis antes de solicitar qualquer aprovação necessária.
+14. Publicar/configurar produção somente após homologação staging e pedido explícito de promoção, recebido em 2026-10-21. Não executar migration, backfill/importação em massa ou escrita na planilha sem os passos aplicáveis de autorização/ambiente da sessão. Preparar código e documentação revisáveis antes de solicitar qualquer aprovação necessária.
 15. Testes cobrem autenticação/configuração, allowlist/ID string, mapeamentos M, inbox idempotente, projeção personalizada, promoção concorrente/rollback, preservação dos contatos/Qs, permissões, retry do remetente e regressão NoLoss. Para CNPJ, cobrir assunção sem documento, normalização/aceitação do válido e recusa do inválido informado, mantendo obrigatoriedade manual intacta. Rodar `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`; atualizar checklist, File List e resultados sem inventar evidência de teste/QA.
 
 ## Tasks / Subtasks
@@ -118,7 +118,7 @@ Credencial, configuração ausente/ambígua, endpoint inativo ou pipeline incomp
 - [x] Implementar assunção transacional, contatos, anotação, campos e efeitos de domínio.
 - [x] Preparar script remetente de histórico/novos e documentação para outro desenvolvedor.
 - [x] Cobrir testes significativos, executar quality gates e obter revisão `@qa`.
-- [ ] Registrar resultado de configuração/homologação de staging se autorizadas e executadas; manter produção pendente.
+- [x] Registrar resultado de configuração/homologação de staging se autorizadas e executadas; manter produção pendente.
 
 ## Dev Notes e evidências
 
@@ -192,3 +192,40 @@ Revisão `@qa` em 2026-10-21: **PASS para a implementação revisada e seus gate
 - Configuração CRUD unitária de staging feita pelo DevOps: endpoint cmvih1b4z0000sdihxike3y0d, pipeline cmuih48la000009gmzw3wwuzf, autor administrativo id1; sem leads e sem atribuição comercial. Variável limitada ao custom environment staging da Vercel.
 - Script do lote é dryRun por padrão e exige hash/contagem/recibo em modo apply; snapshot real, credencial e backups ficam privados e fora do Git.
 - Sem migration/schema change. Backup staging em preparação para eventual lote; carga histórica e instalação/ativação do gatilho ainda não executadas.
+
+## Publicação e homologação final — 2026-10-21
+
+- Versão final: `b71f2cb9f3c830ed415237ac75555543783aa100`, contendo CNPJ opcional na assunção Instagram e preservando os avanços concorrentes de setores `87c2e78f` e `2f4d788b`. Push fast-forward somente para `staging`, sem force.
+- Vercel: deployment `dpl_9hz7HVdNx5X4bQeLY7Js1KAinLpS` **READY**, ambiente customizado `staging` (`env_sKT0JOh0HB03g20jmcqN5pTHMjqT`), `target` diferente de produção. Alias `https://staging.alpha-comex.com` confirmado no deployment e SHA exatos. URL imutável: `https://painel-alpha-projeto-38hiiyza7-alpha-comexs-projects.vercel.app`.
+- Gates da árvore integrada final: `npm run typecheck` exit 0 (`/tmp/instagram-cnpj-rebase-typecheck.log`); `npm run lint` exit 0, zero erros e 1.193 avisos legados (`/tmp/instagram-cnpj-integrated-final-lint.log`); `npm test` exit 0, 698 arquivos e 5.360 testes aprovados, 4 skipped e 1 todo (`/tmp/instagram-cnpj-integrated-final-tests.log`). Suites focadas: 18 arquivos/136 testes aprovados. Build final local do delta aprovado (`/tmp/instagram-cnpj-build.log`) e build da árvore integrada aprovado na Vercel.
+- Smokes publicados: token ausente 401; token incorreto 401; slug Instagram na rota genérica 404; JSON inválido autenticado 400; exemplo fictício autenticado com `dryRun=true` 200 e coluna M convertida para Habilitação de Radar 50k. Evidência: `/tmp/alpha-instagram-smoke.json`.
+- Dry run do snapshot privado: 28 linhas enviadas, 27 leads reais validados, 1 teste ignorado, zero falhas e zero duplicatas. Uma resposta de Radar exige conferência ao assumir; um CNPJ exige revisão, permanecendo opcional. Recibo privado 0600: `/tmp/alpha-instagram-dryrun-final.private.json`. Nenhum dado pessoal ou segredo foi versionado.
+- Consulta após todos os smokes e dry runs confirmou **zero entradas** na inbox do endpoint. Os 200 metadados de variáveis Vercel permanecem iguais à baseline pré-deploy; `INSTAGRAM_LEADS_ENDPOINT_ID` continua restrita ao ambiente customizado staging.
+- Rollback imediatamente anterior: deployment READY `dpl_FR2Q148wsAkoke2aMATURNWJKeus`, SHA `2f4d788bd6276dd0e092e6e5c1595151ac0f1bbb`. Preservar endpoint e suas entradas; pausar por `ativo=false`, sem exclusão.
+- Sem importação histórica, lead real de teste, assunção real, validação visual autenticada, escrita na planilha, instalação de gatilho ou configuração/publicação em produção. Próximo passo de histórico continua sujeito ao relatório Vault, backup verificado e confirmação específica do lote.
+- Evidência operacional consolidada, sem segredos: `/tmp/alpha-instagram-staging-release-final-evidence.json`. Este registro final de homologação é mantido localmente após o deploy para evitar uma nova publicação motivada somente pela documentação.
+
+## Importação histórica autorizada — 2026-10-21
+
+- Após a pergunta específica sobre importar os 27 leads reais no staging, pendentes e sem responsável, o usuário respondeu **“sim, confirmo”**. Vault registrou o consentimento e liberou exclusivamente o lote descrito em `/tmp/alpha-instagram-vault-report.md`.
+- Antes da execução, rechecados SHA do snapshot e dump, backup completo com menos de 48 horas (aproximadamente 22 minutos), vínculo ao banco staging distinto de produção, arquivos privados 0600, recibos inexistentes, endpoint ativo no pipeline correto e inbox inicialmente vazia. Restauração isolada do backup novamente aprovada: integridade, chaves estrangeiras, 337 tabelas e 295.327 linhas. Evidências: `/tmp/alpha-instagram-preimport-checks.json`, `/tmp/instagram-backup-preimport-verify.log` e `/tmp/alpha-instagram-preimport-inbox.json`.
+- DevOps confirmou novamente o alias staging no deployment READY e SHA exatos publicados, sem mutações: `/tmp/alpha-instagram-preimport-runtime-check.json`.
+- Comando `instagram-leads-batch.mts --apply` executado com hash e contagem aprovados. Resultado: 28 linhas enviadas, **27 leads reais criados**, 1 teste ignorado, zero duplicatas iniciais e zero falhas. Recibo privado: `/tmp/alpha-instagram-import-receipt.private.json`.
+- Consulta posterior confirmou 27 entradas `AUTENTICADO`, todas sem `eventoId`/card vinculado, e payloads exatamente iguais à preparação do snapshot aprovado. Radar pela coluna M: 21 de 50k, 2 de 150k, 3 ilimitados e 1 para conferência; 1 CNPJ exige conferência, permanecendo opcional ao assumir. Nenhum responsável foi atribuído. Evidência agregada: `/tmp/alpha-instagram-import-first-verification.json`.
+- Reenvio integral dos mesmos IDs, conforme plano aprovado: 27 duplicados reconhecidos, 1 teste ignorado e zero falhas. Consulta posterior manteve exatamente 27 entradas e o mesmo SHA agregado dos IDs/estados/payloads, comprovando ausência de inclusões ou alterações no reenvio. Recibo privado `/tmp/alpha-instagram-import-retry.private.json`; verificação `/tmp/alpha-instagram-import-final-verification.json`; evidência operacional consolidada sem dados pessoais `/tmp/alpha-instagram-import-evidence.json`.
+- A execução não escreveu na planilha, instalou gatilho, assumiu leads ou alterou produção. O envio automático de novos leads depende da instalação/configuração pelo desenvolvedor do Apps Script entregue em `/home/ialpha/projetos/entregas/api-instagram-alpha-staging.zip`.
+
+## Promoção da integração para produção — 2026-10-21
+
+- Pedido explícito do usuário: “consegue gerar a url e token para mandar para o painel em produção tambem? - pode commitar essas modificaçoes para produção tambem”. Autoriza promoção e configuração individual; não é execução de carga histórica em produção nem instalação de Apps Script.
+- A produção já contém os commits iniciais `a3ae721c` e `50e53866`. Candidato isolado parte da `origin/main` `3e8800f8` e aplica somente o ajuste homologado `b71f2cb9`, além desta documentação. Não promover integralmente staging, que contém outras entregas concorrentes.
+- Sem alteração de schema ou migrations. Parecer `/tmp/alpha-instagram-vault-production-report.md`: endpoint individual é CRUD normal, dispensado de backup por operação; credencial exclusiva, banco efetivo distinto de staging, pipeline/admin verificados, testes publicados somente dry run e rollback preservando endpoint/história.
+- Baseline DevOps: `painel.alpha-comex.com` e `painel-alpha-projeto.vercel.app` no deployment `dpl_DLbfSMy2f4WUb9PYmnqyvMaM7QDc`, READY, SHA `3e8800f8`, target `production`, sem custom environment. Banco de produção possui pipeline/entrada corretos e nenhum endpoint Instagram antes da configuração. Evidência sem segredos `/tmp/alpha-instagram-production-readonly-baseline.json`.
+- Pasta de entregas movida a pedido do usuário para `/home/ialpha/projetos/entregas`; credenciais seguem privadas e fora dos pacotes/Git.
+- Configuração unitária de produção concluída por DevOps: endpoint `cmviikplh0000r7ihy9ubup21`, ativo, pipeline correto, autor administrativo id1, sem automação nem responsável, inbox vazia. Credencial própria em arquivo privado 0600, distinta de staging. Comparação privada de hashes confirmou URL e token do banco local de produção iguais aos valores efetivos da Vercel e diferentes de staging. Evidência sem segredos: `/tmp/alpha-instagram-production-endpoint-configuration.json`.
+- `INSTAGRAM_LEADS_ENDPOINT_ID` configurada somente no target Vercel `production`; os 200 registros anteriores foram preservados, total 201. Evidência: `/tmp/alpha-instagram-production-env-configuration.json`. Staging preservado.
+- Gates do candidato de produção: lint exit 0, zero erros e 1.193 avisos legados (`/tmp/instagram-production-lint.log`); typecheck exit 0 após geração do player requerido no checkout novo (`/tmp/instagram-production-typecheck-final.log`); suíte completa exit 0, 698 arquivos, 5.360 testes aprovados, 4 skipped e 1 todo (`/tmp/instagram-production-tests-serial.log`); build completo exit 0 (`/tmp/instagram-production-build.log`). A primeira rodada concorrente teve três timeouts de 5s em testes de SQLite/CLI; a suíte integral repetida com dois workers passou sem alterações de código. Não houve falha funcional reproduzida.
+- Revisão QA do delta de produção: PASS de código, restrito ao CNPJ opcional já homologado e documentação, sem regressão identificada de NoLoss/manual e sem mudança estrutural. A evidência de CAS/rollback continua baseada em mocks/revisão estrutural; não se afirma teste transacional real em produção.
+- Pacote do desenvolvedor para produção: `/home/ialpha/projetos/entregas/api-instagram-alpha-producao.zip`, com contrato, exemplo fictício dry run e Apps Script; sem token ou dados pessoais. A troca de host no script torna o histórico novamente elegível e requer definir/autorizar o escopo antes de executá-lo. Esta promoção não importa histórico ou instala gatilho em produção.
+- Durante os gates, `main` recebeu a correção concorrente `eb2901a9` de tarefas/documentais. Candidato reaplicado sobre essa revisão sem conflitos e sem perda de arquivos, mantendo o delta exclusivo de seis arquivos da integração/documentação. QA confirmou runtime/testes Instagram idênticos ao candidato anterior e preservação da correção concorrente.
+- Gates repetidos na árvore integrada: lint exit 0, zero erros e 1.193 avisos legados (`/tmp/instagram-production-integrated-lint.log`); typecheck exit 0 (`/tmp/instagram-production-integrated-typecheck.log`); suíte completa com dois workers exit 0, 698 arquivos, **5.376 testes aprovados**, 4 skipped e 1 todo (`/tmp/instagram-production-integrated-tests.log`); build completo exit 0 (`/tmp/instagram-production-integrated-build.log`). Nenhuma alteração de runtime após esses gates; apenas este fechamento documental.

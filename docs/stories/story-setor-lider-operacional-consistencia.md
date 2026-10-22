@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — QA/Anubis, gates completos e cadastro pontual de staging aprovados. Release staging e gates próprios de main/produção em acompanhamento.
+Ready for Review — staging validado, CRUD pontual confirmado nos dois bancos e produção servindo o runtime 2f. Alinhamento preservador de main aprovado por QA; READY do SHA final em acompanhamento.
 
 ## Executor Assignment
 
@@ -48,9 +48,9 @@ Correção explícita do usuário: **“cara e lider operaciona, o lider comerci
 - [x] Mapear consumidores e adaptar catálogos/validações pertinentes para Lider Operacional, preservando Comercial e outras regras (AC 2–4).
 - [x] Registrar enquadramento Vault: cadastro único solicitado pelo CRUD comum é exceção expressa, sem seed automático (AC 5).
 - [x] Extrair serviço CRUD compartilhado preservando `requireAdmin`; preparar CLI idempotente com SELECT/alias e sem renomear/reativar (AC 5).
-- [ ] Se ausente, cadastrar somente o setor/categoria padrão explicitamente primeiro em staging e depois produção; registrar leitura de confirmação sem permissões/vínculos/reatribuições (AC 5, 7–8).
+- [x] Se ausente, cadastrar somente o setor/categoria padrão explicitamente primeiro em staging e depois produção; registrar leitura de confirmação sem permissões/vínculos/reatribuições (AC 5, 7–8).
 - [x] Acrescentar regressões de identidade, listas, ACL/negações e preservação dos demais setores (AC 6).
-- [x] Executar quatro gates completos e revisão QA em staging (AC 6); main receberá gates próprios antes de produção.
+- [x] Executar quatro gates completos em ambos os contextos e revisão QA (AC 6); alinhamento final herda os gates do runtime 2f byte-idêntico.
 - [ ] DevOps publicar/validar staging e depois somente o patch autorizado em main/produção, atendidas dependências de banco (AC 7).
 - [ ] Atualizar inventário, File List, checklist, status, evidências e pendências (AC 8).
 
@@ -112,7 +112,7 @@ Checklist `story-draft-checklist.md` aplicado: objetivo/contexto PASS; orientaç
 
 ## QA Results
 
-**PASS / APPROVED** — QA/Anubis dos 17 caminhos e integração dos dois candidatos; mesmo patch, nenhuma transferência de Instagram para main, sem alteração de schema/config/env/deps ou grants. Smoke CLI SQLite real aprovou preview sem escrita, cadastro de um setor/categoria e repetição idempotente. Gates de staging reais aprovados; gates de main e releases serão verificados por DevOps.
+**PASS / APPROVED** — QA/Anubis dos 17 caminhos e integração dos dois candidatos; mesmo patch, nenhuma transferência de Instagram para main, sem alteração de schema/config/env/deps ou grants. Smoke CLI SQLite real aprovou preview sem escrita, cadastro de um setor/categoria e repetição idempotente. Gates de staging reais aprovados; gates próprios de main aprovados; alinhamento final ratificado por identidade integral com o runtime 2f aprovado.
 
 ## Change Log
 
@@ -124,9 +124,18 @@ Checklist `story-draft-checklist.md` aplicado: objetivo/contexto PASS; orientaç
 ## Evidências DevOps — staging
 
 - Staging avançou por outra sessão para `50e53866335255ff3ed560f3c46b75e35083e315` (Instagram/Sheets, 29 caminhos sem sobreposição). Essa base foi preservada; o delta desta entrega é exatamente os 17 caminhos da File List. Main permanece baseado em `3031da04`, sem transportar Instagram.
-- Gates serializados de staging PASS: lint zero erros/1.193 avisos preexistentes; **build padrão exit 0**, sem retry; typecheck após build exit 0; suíte completa **698 arquivos/5.359 testes PASS**, 4 ignorados e 1 todo. Como os runtimes divergem por Instagram, main terá seus quatro gates próprios.
+- Gates serializados de staging PASS: lint zero erros/1.193 avisos preexistentes; **build padrão exit 0**, sem retry; typecheck após build exit 0; suíte completa **698 arquivos/5.359 testes PASS**, 4 ignorados e 1 todo. O candidato main original recebeu também quatro gates próprios antes do alinhamento preservador descrito abaixo.
 - CLI real em SQLite efêmero com DDL derivado do Prisma: preview sem escrita → aplicar com hash cria somente 1 setor/1 categoria padrão → repetir não altera registros. Prova: `/tmp/setor-lider-operacional-20261021-local-smoke.json`.
 - Após QA e gates PASS, aplicado somente CRUD normal autorizado em staging, conforme classificação Vault: setor `Lider Operacional` ID15 ativo, não base/não protegido; categoria `Outros do setor` ID54 ativa. Repetição idempotente sem mudanças. Hash do preview vinculado ao host e catálogo explícitos de staging, banco distinto de produção. Comercial ID6 preservado.
 - Zero módulos, pipelines, cursos ou usuários atribuídos ao setor; nenhum trigger nas duas tabelas, ensureSetorBase, grant, UPDATE/DELETE/ALTER, migration ou seed automático executado. Prova: `/tmp/setor-lider-operacional-staging-20261021-crud-applied.json`.
-- Gates/comandos reais: `/tmp/setor-lider-operacional-staging-20261021-gates-progress.json`. Produção ainda não recebeu o cadastro Operacional nesta revisão; aguardará seus gates e staging READY antes da promoção.
+- Gates/comandos reais: `/tmp/setor-lider-operacional-staging-20261021-gates-progress.json`. Naquela revisão inicial produção ainda aguardava staging READY e seus gates; cadastro pontual e publicação concorrente posteriores estão registrados abaixo.
 - Nenhum arquivo de ambiente/credencial foi versionado. Diagnóstico Maria está separado e não integra os 17 caminhos. Limite: sem UI autenticada nem alteração de cards/tarefas/permissões reais.
+
+## Produção e alinhamento preservador de main
+
+- Staging `2f4d788bd6276dd0e092e6e5c1595151ac0f1bbb` confirmado READY e smoke aprovado; produção recebeu de outra sessão um redeploy **do mesmo 2f**, deployment `dpl_6ErHR4WWmy9hpLT56En1f22b6zae`, READY e efetivamente associado a `painel.alpha-comex.com`. Esse runtime já inclui Instagram.
+- O candidato main restrito original sobre `3031da04` passou lint/build padrão/typecheck e **692 arquivos/5.320 testes**, 4 ignorados e 1 todo. Publicá-lo depois do redeploy concorrente removeria Instagram; por isso foi substituído pelo alinhamento preservador.
+- O merge final preserva main `3031da04` e incorpora exatamente a árvore executável **já publicada e validada em produção 2f**, mantendo cinco registros docs/memória exclusivos de main byte a byte. Conflitos foram resolvidos com código/scripts/testes/config/deps exatos de 2f e documentos exatos de main. Não entram b71 (correção posterior Instagram ainda fora da produção) nem o patch Maria.
+- QA/Anubis ratificou PASS / APPROVED e herança dos gates de 2f: **698 arquivos/5.359 testes**, lint, typecheck e build padrão PASS, além do build padrão remoto READY. Somente esta story recebe metadados adicionais. Inventário completo de 46 caminhos contra main (17 desta entrega +29 já presentes no runtime de produção): `/tmp/setor-lider-operacional-main-preservado-20261021-candidate.json`.
+- Depois de staging READY e gates, cadastro CRUD pontual executado em produção com hash/host/catálogo confirmados: setor Lider Operacional ID15 ativo + categoria Outros do setor ID54. Repetição sem alteração; Comercial ID6 preservado; zero módulos/pipelines/cursos/usuários associados. Não houve seed automático, migration, grant ou escrita em card/tarefa. Prova: `/tmp/setor-lider-operacional-main-20261021-crud-applied.json`.
+- O SHA final de main e alias/READY/smoke serão verificados após push. Root segue na branch staging, com trabalho Maria preservado; eventual alinhamento local exige integração segura, sem reset/stash/clean. Nenhum arquivo de ambiente ou credencial foi copiado para o release.

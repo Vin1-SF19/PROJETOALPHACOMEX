@@ -34,6 +34,7 @@ export const ACOES_HISTORICO_CATALOGADAS = [
   "CADENCIA_PASSO_EXECUTADO",
   "CADENCIA_REATIVADA",
   "CARD_ATUALIZADO",
+  "DADOS_EMPRESA_ATUALIZADOS",
   "CARD_CRIADO",
   "CARD_CRIADO_POR_AUTOMACAO",
   "CARD_CRIADO_POR_OPORTUNIDADE",
@@ -296,6 +297,7 @@ function descreverCatalogado(
     case "CADENCIA_PASSO_EXECUTADO": return `Passo ${nome("passoTitulo", "configurado")} da cadência ${nome("nomeCadencia", "configurada")} executado`;
     case "CADENCIA_REATIVADA": return "Cadência reativada";
     case "CARD_ATUALIZADO": return descricaoCardAtualizado(anterior, novo, contexto);
+    case "DADOS_EMPRESA_ATUALIZADOS": return `${texto(novo, "rotulo") || "Dados da empresa"}: antes ${texto(anterior, "valor") || "Não informado"} → depois ${texto(novo, "valor") || "Não informado"}`;
     case "CARD_CRIADO": {
       const etapa = nomeEtapa(novo, contexto);
       const responsavelId = numero(novo, "responsavelId");

@@ -1,8 +1,10 @@
 "use client";
 
-import { ObterCardBpm } from "@/actions/bpm/Cards";
+import type { ObterCardBpm } from "@/actions/bpm/Cards";
 import { toast, type ExternalToast } from "sonner";
-import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { ALPHA_GUARD_STATE, ALPHA_LEAVE_REQUEST, ALPHA_LEAVE_RESULT, frameIdDoDocumento, isPainelLeaveMessage, type BrowserNavigationGuard, type NavigationGuardEvent } from "@/lib/painel-leave-guard";
 
 type ConfirmedCard = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type ConfirmationListener = (card: ConfirmedCard, key?: string) => void;
@@ -14,6 +16,7 @@ type SaveErrorOptions = Pick<ExternalToast, "duration" | "closeButton"> & {
 type PendingUpload = { save: () => Promise<boolean>; nome: string };
 
 interface CardSaveContextValue {
+  requestLeave: () => Promise<boolean>;
   subscribeConfirmation: (cardId: string, listener: ConfirmationListener) => () => void;
   scheduleSave: (key: string, save: () => void, delay?: number) => void;
   flushScheduled: (prefix?: string) => void;
@@ -40,6 +43,12 @@ interface CardSaveContextValue {
 const CardSaveContext = createContext<CardSaveContextValue | null>(null);
 
 export function CardSaveProvider({ children }: { children: ReactNode }) {
+  const parent = useContext(CardSaveContext);
+  return parent ? <>{children}</> : <CardSaveProviderState>{children}</CardSaveProviderState>;
+}
+
+function CardSaveProviderState({ children }: { children: ReactNode }) {
+  const publicarEstadoGuardRef = useRef<() => void>(() => {});
   const listeners = useRef(new Map<string, Set<ConfirmationListener>>());
   const subscribeConfirmation = useCallback((cardId: string, listener: ConfirmationListener) => {
     const subscribers = listeners.current.get(cardId) ?? new Set<ConfirmationListener>();
@@ -86,11 +95,20 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
   const setPendingFields = useCallback((instance: string, fields: Array<string | PendingCardChange>) => {
     if (fields.length) pendingRef.current.set(instance, fields.map((field) => typeof field === "string" ? { label: field } : field));
     else pendingRef.current.delete(instance);
+    publicarEstadoGuardRef.current();
   }, []);
   const getPendingChanges = useCallback((cardId?: string) => [...pendingRef.current]
     .filter(([key]) => !cardId || key.startsWith(`${cardId}:`))
     .flatMap(([, fields]) => fields), []);
   const getPendingFields = useCallback((cardId?: string) => [...new Set(getPendingChanges(cardId).map((field) => field.label))], [getPendingChanges]);
+  useEffect(() => {
+    function protegerSaida(event: BeforeUnloadEvent) {
+      if (!getPendingFields().length) return;
+      event.preventDefault(); event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", protegerSaida);
+    return () => window.removeEventListener("beforeunload", protegerSaida);
+  }, [getPendingFields]);
   const savePromiseRef = useRef(new Map<string, Promise<boolean>>());
   const manualSaves = useRef(new Map<string, Map<string, () => Promise<boolean>>>());
   const pendingUploads = useRef(new Map<string, PendingUpload>());
@@ -122,6 +140,7 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
         // A leitura atualiza a tela e a versão compartilhada; uma falha nela
         // não desfaz a gravação já confirmada pela action.
         try {
+          const { ObterCardBpm } = await import("@/actions/bpm/Cards");
           const result = await ObterCardBpm(cardId);
           if (result.success && result.data) {
             confirmVersion(cardId, new Date(result.data.updatedAt).toISOString());
@@ -222,12 +241,101 @@ export function CardSaveProvider({ children }: { children: ReactNode }) {
     for (const key of recovery.current.keys()) if (key.startsWith(`${cardId}:`)) recovery.current.delete(key);
     for (const key of pendingUploads.current.keys()) if (key.startsWith(`${cardId}:`)) pendingUploads.current.delete(key);
     manualSaves.current.delete(cardId);
+    publicarEstadoGuardRef.current();
     toast.dismiss?.(`card-save:${cardId}`);
   }, []);
 
+  const [saidaPendente, setSaidaPendente] = useState(false);
+  const [salvandoSaida, setSalvandoSaida] = useState(false);
+  const [erroSaida, setErroSaida] = useState(false);
+  const resolverSaidaRef = useRef<((allowed: boolean) => void) | null>(null);
+  const requestLeave = useCallback(async (): Promise<boolean> => {
+    if (!getPendingFields().length && await flushSaves()) return true;
+    if (resolverSaidaRef.current) return Promise.resolve(false);
+    setErroSaida(false); setSaidaPendente(true);
+    return new Promise((resolve) => { resolverSaidaRef.current = resolve; });
+  }, [getPendingFields, flushSaves]);
+  function concluirSaida(allowed: boolean) {
+    const resolver = resolverSaidaRef.current; resolverSaidaRef.current = null;
+    setSaidaPendente(false); setErroSaida(false); resolver?.(allowed);
+  }
+  useEffect(() => () => { resolverSaidaRef.current?.(false); }, []);
+  useEffect(() => {
+    const frameId = frameIdDoDocumento();
+    const publicar = () => {
+      if (frameId && window.parent !== window) window.parent.postMessage({ type: ALPHA_GUARD_STATE, version: 1, frameId, pending: getPendingFields().length > 0 }, window.location.origin);
+    };
+    publicarEstadoGuardRef.current = publicar; publicar();
+    async function receber(event: MessageEvent) {
+      if (event.source !== window.parent || event.origin !== window.location.origin || !isPainelLeaveMessage(event.data)) return;
+      const m = event.data;
+      if (m.type !== ALPHA_LEAVE_REQUEST || m.frameId !== frameId) return;
+      const allowed = await requestLeave();
+      window.parent.postMessage({ type: ALPHA_LEAVE_RESULT, version: 1, frameId, requestId: m.requestId, allowed }, window.location.origin);
+    }
+    function clicar(event: MouseEvent) {
+      if (!getPendingFields().length || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      const a = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href]") : null;
+      if (!a || a.hasAttribute("download") || a.target && a.target !== "_self") return;
+      const destino = new URL(a.href, window.location.href); const atual = new URL(window.location.href);
+      if (!["http:", "https:"].includes(destino.protocol) || destino.pathname === atual.pathname && destino.search === atual.search && destino.hash) return;
+      event.preventDefault(); event.stopPropagation();
+      void requestLeave().then((allowed) => { if (allowed) window.location.assign(destino.href); });
+    }
+    const navigation = (window as unknown as { navigation?: BrowserNavigationGuard }).navigation;
+    function navegar(event: NavigationGuardEvent) {
+      if (!getPendingFields().length || !event.cancelable) return;
+      const destino = new URL(event.destination.url); const atual = new URL(window.location.href);
+      if (event.navigationType !== "reload" && destino.pathname === atual.pathname && destino.search === atual.search && destino.hash !== atual.hash) return;
+      event.preventDefault();
+      void requestLeave().then((allowed) => {
+        if (!allowed) return;
+        if (event.navigationType === "traverse" && navigation) navigation.traverseTo(event.destination.key);
+        else if (event.navigationType === "replace") window.location.replace(destino.href);
+        else window.location.assign(destino.href);
+      });
+    }
+    window.addEventListener("message", receber); document.addEventListener("click", clicar, true); navigation?.addEventListener("navigate", navegar);
+    return () => {
+      window.removeEventListener("message", receber); document.removeEventListener("click", clicar, true); navigation?.removeEventListener("navigate", navegar);
+      publicarEstadoGuardRef.current = () => {};
+    };
+  }, [getPendingFields, requestLeave]);
+
   return (
-    <CardSaveContext.Provider value={{ subscribeConfirmation, scheduleSave, flushScheduled, getVersion, confirmVersion, getDraft, setDraft, registerSave, registerManualSave, getPendingUpload, setPendingUpload, flushSaves, setPendingFields, getPendingFields, getPendingChanges, getFailedSaveKeys, clearFailedSave, retryFailedSaves, discardPending }}>
+    <CardSaveContext.Provider value={{ requestLeave, subscribeConfirmation, scheduleSave, flushScheduled, getVersion, confirmVersion, getDraft, setDraft, registerSave, registerManualSave, getPendingUpload, setPendingUpload, flushSaves, setPendingFields, getPendingFields, getPendingChanges, getFailedSaveKeys, clearFailedSave, retryFailedSaves, discardPending }}>
       {children}
+      <AlertDialog open={saidaPendente} onOpenChange={(open) => { if (!open && !salvandoSaida) concluirSaida(false); }}><AlertDialogContent>
+        <AlertDialogHeader><AlertDialogTitle>Salvar alterações antes de sair?</AlertDialogTitle><AlertDialogDescription>Existem dados não salvos no CRM. Escolha salvar, descartar ou continuar editando.</AlertDialogDescription></AlertDialogHeader>
+        {erroSaida && <p role="alert" className="text-sm text-destructive">Não foi possível salvar tudo. Suas alterações continuam disponíveis.</p>}
+        <AlertDialogFooter><AlertDialogCancel disabled={salvandoSaida}>Continuar editando</AlertDialogCancel>
+          <button type="button" disabled={salvandoSaida} className="rounded-lg bg-violet-600 px-4 py-2 text-sm text-white" onClick={async () => {
+            setSalvandoSaida(true); setErroSaida(false);
+            try {
+              const ids = [...new Set([...pendingRef.current.keys()].map((key) => key.split(":")[0]))];
+              let salvo = true; for (const id of ids) if (!await retryFailedSaves(id)) salvo = false;
+              if (salvo && await flushSaves()) concluirSaida(true); else setErroSaida(true);
+            } catch { setErroSaida(true); } finally { setSalvandoSaida(false); }
+          }}>{salvandoSaida ? "Salvando…" : "Salvar e sair"}</button>
+          <button type="button" disabled={salvandoSaida} className="rounded-lg bg-rose-600 px-4 py-2 text-sm text-white" onClick={async () => {
+            setSalvandoSaida(true);
+            try {
+              // Uma gravação já iniciada termina antes do descarte dos rascunhos restantes.
+              for (const [key, job] of scheduled.current) { clearTimeout(job.timer); scheduled.current.delete(key); }
+              while (savePromiseRef.current.size) {
+                const lotes = [...savePromiseRef.current];
+                for (const [id, promessa] of lotes) {
+                  await promessa;
+                  if (savePromiseRef.current.get(id) === promessa) savePromiseRef.current.delete(id);
+                }
+              }
+              const ids = [...new Set([...pendingRef.current.keys()].map((key) => key.split(":")[0]))];
+              for (const id of ids) discardPending(id);
+              concluirSaida(true);
+            } finally { setSalvandoSaida(false); }
+          }}>Descartar e sair</button>
+        </AlertDialogFooter>
+      </AlertDialogContent></AlertDialog>
     </CardSaveContext.Provider>
   );
 }
@@ -238,4 +346,9 @@ export function useCardSave(): CardSaveContextValue {
     throw new Error("useCardSave deve ser usado dentro de CardSaveProvider");
   }
   return ctx;
+}
+
+export function useCardLeaveGuard() {
+  const ctx = useContext(CardSaveContext);
+  return ctx?.requestLeave ?? (() => Promise.resolve(true));
 }

@@ -415,3 +415,19 @@ BrevePrismadeltaab→04cc:somenteCliente.perfilCadastralJson Json? novo;nenhummo
 3aplicaçõesDB anteriores continuam registradas/APPLIED; nenhum novoDBwrite/backup/hash/owner/Teste/objeto/timer/produção nestaestação. As47versõesantigas NÃOforamprotegidas/excluídas; inventárioprecisarefresh após publicação subsequente. Hash2permanececondicional aoPortalreadercomprovado/MainhashwriterREADY/cessaçãoreal(drain/skew/rotas)/Vault; aliasnãoéprova. Estado: **Portalpublicadoemstaging; Mainpendenteintegração; homologaçãoautenticadae hashcondicionalpendentes**, StoryInProgress. SemDone/promoçãoprod.
 
 FileListDevOps:runbookops,relatórioVault e story porappend; sem app/testes/schema/dependênciasalterados. Handoff `/tmp/checklist-analistas-20261022-staging-published.md`/`.json`, logsPortalpush/build/status/HTTP/origin/drift/protectioncapability foraGit, semsegredos. Fontes/roots/dadosaplicados/memórias4dirtyanteriorespreservados. ControledevolvidoaoBibbleparaScout/ownersMain.
+
+### Nova — composição dos guards no merge staging04cc,22/10/2026
+
+- [x] Conciliar os2hunks de `PainelLayoutClient.tsx`: manter `closeTabConfirmada` como mutador puro e serializar CRM→CheckList antes de fechar/recarregar; preservar pinned/home/frame cleanup e ativação da aba bloqueada. Reuso/mesmaURL e integração `ALPHA_OPEN_TAB` existentes preservados.
+- [x] Adicionar regressão causal no shell real com ambos os hooks reais: close/retry/reuse aguardam CRM e CheckList; recusaCRM não chega aoCheckList, cancelamento/timeout mantêm iframe e rascunho, aprovação dupla muta1vez mesmo com repetição, pinnedhome preservada e outros módulos sem opt-in.
+- [x] Testes focais reais:5arquivos/40PASS, exit0; lint dos2arquivos fonte/teste exit0; diffcheckPASS. Protocolos/IDs/timeouts/hooks existentes intactos. Handoff `/tmp/checklist-analistas-20261022-nova-merge-guard.md`; gates globais finais pertencem aoForge após paridadeDara.
+
+File List desta estação: `src/components/layout/PainelLayoutClient.tsx`, `tests/layout/painel-frame-guards-composition.test.tsx`, esta story. Nenhum componente novo. Story In Progress; workingfile sem marcadores, Git index continuaU deliberadamente paraDevOps. Sem index/commit/push/schema/DB/env/cloud/produção. Controle devolvido aoBibble.
+
+### Dara — reconciliação da fonte Prisma Main/Portal após merge staging04cc, 22/10/2026
+
+- [x] Preservar o schema Main do merge e copiar seus bytes exatos ao Portal, incluindo `Cliente.perfilCadastralJson Json?`; atualizar somente `schemaSha256` nos dois contratos para `c3c82fe9d6afa771c67a8bcb25eba7f58c58521a607bd3433288f588943f99df`. Demais propriedades, 11 status e scripts de paridade preservados.
+- [x] Prisma validate/generate privados nas duas worktrees e paridade estática bidirecional PASS; Main schema.contract/operations 31PASS, Portal schema-parity 3PASS + backend/DTO/password-byte-boundary 19PASS; lint focal e diffcheck PASS. URLs de fixture SQLite locais explícitas; nenhuma conexão com banco real nesta estação.
+- [x] Migration CheckList inalterada (`5c9affa7859fe9ea95ccc3e2fa995487ef6ee2c95e35d0063cdc64c01f41948d`); planos leem o novo hash da fonte automaticamente, sem modificar hashes de consentimentos operacionais. Nenhuma nova migration, DDL real, seed real, hashbatch real, Git stage/commit/push ou cloud. Gates globais após congelamento pertencem ao Forge; Portal exige nova publicação por ter schema alterado. Story In Progress.
+
+File List Dara: Main `prisma/checklist-schema.contract.json` e esta story; Portal `prisma/schema.prisma`, `prisma/checklist-schema.contract.json`. Fonte Main `prisma/schema.prisma` somente lida, sem alteração manual. Handoff `/tmp/checklist-analistas-20261022-dara-schema-reconcile.md`; controle devolvido ao Bibble.

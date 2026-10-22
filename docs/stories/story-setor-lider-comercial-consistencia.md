@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — inventário, implementação, QA/Anubis e quatro gates completos aprovados. Publicação e verificação remota somente staging pendentes.
+Ready for Review — staging publicado e verificado; autorização posterior do usuário cobre a promoção dos mesmos 16 caminhos para main/produção. QA/Anubis e gates aprovados; produção READY pendente.
 
 ## Executor Assignment
 
@@ -14,7 +14,7 @@ quality_gate_tools: ["inventário de setores e permissões", "npm run lint", "np
 
 Como gestor do Painel Alpha, quero que o setor **Lider comercial** esteja disponível de forma consistente nas listas de setores e nos pontos que configuram permissões por setor, para administrar esse grupo pelos fluxos existentes em todo o painel.
 
-Origem: pedido direto do usuário. Reutilizar o papel/setor canônico existente **`Lider Comercial`**, sem criar outra identidade por diferença de caixa ou acento. Esta solicitação autoriza desenvolvimento e publicação primeiro em staging; **produção não autorizada**. Não implica conceder acesso administrativo global nem copiar privilégios de outro setor.
+Origem: pedido direto do usuário. Reutilizar o papel/setor canônico existente **`Lider Comercial`**, sem criar outra identidade por diferença de caixa ou acento. A autorização inicial cobriu staging; depois da validação, o usuário pediu explicitamente **“mande para a main tambem”**, autorizando a promoção deste mesmo patch de 16 caminhos para main/produção, preservando a base existente. Não implica conceder acesso administrativo global nem copiar privilégios de outro setor.
 
 ## Acceptance Criteria
 
@@ -23,7 +23,7 @@ Origem: pedido direto do usuário. Reutilizar o papel/setor canônico existente 
 3. As configurações de permissão por setor aceitam e representam `Lider Comercial` de forma coerente entre UI, validação, consulta e autorização backend. O usuário recebe somente as permissões efetivas já configuradas, overrides e exceções específicas existentes. O papel não vira Admin/CEO/TI nem obtém bypass global, supervisão CRM irrestrita ou privilégios novos por seu nome.
 4. Cadastros e filtros por setor identificam corretamente usuários já vinculados a `Lider Comercial`, respeitando as regras de acesso de cada módulo. Preservam-se os demais setores, associações, permissões existentes e limites de gestão de quem pode configurar acessos; não há reatribuição automática de usuários nem concessão em lote.
 5. A entrega prioriza correções de código sobre o modelo existente, sem migration, alteração estrutural, seed/backfill ou mutação em massa por padrão. Se o inventário revelar necessidade de operação abrangida pela política de banco, a execução aguarda Vault, explicação do impacto/rollback, backup completo verificado de até 48 horas e confirmação explícita específica. Não se criam duplicatas para contornar inconsistências de catálogo.
-6. São executados lint, typecheck, suíte completa de testes e build, com resultados reais registrados; QA revisa consistência e ausência de ampliação indevida de permissões. Após validação, DevOps publica e verifica somente staging, registrando commit/release, READY/SHA/alias e smoke pertinente. Nenhuma alteração ou publicação em produção é incluída nesta entrega.
+6. São executados lint, typecheck, suíte completa de testes e build, com resultados reais registrados; QA revisa consistência e ausência de ampliação indevida de permissões. Após validação, DevOps publica e verifica staging; atendendo à autorização posterior explícita, promove somente o mesmo patch para main/produção, registrando commit/release, READY/SHA/alias e smoke pertinente. Nenhum pacote alheio ao patch é promovido por esta operação.
 7. Checklist, File List e inventário são atualizados com os pontos efetivamente auditados/alterados e as limitações reais. Alterações concorrentes locais são preservadas; arquivos de ambiente, credenciais, dumps e artefatos não integram o pacote.
 
 ## Dev Notes e referências
@@ -49,7 +49,7 @@ Não há orientação genérica específica disponível em `docs/architecture/in
 - [x] Conferir necessidade real de dados/schema e aplicar gate Vault somente se necessário antes de executar (AC 5).
 - [x] Testar presença do setor, seleção/persistência autorizada, filtros e permissões efetivas; cobrir negações e regressão dos demais setores (AC 2–4).
 - [x] Executar quatro gates completos e revisão QA, registrando resultados reais (AC 6).
-- [ ] DevOps publicar/validar somente staging, com release/alias/SHA e smoke (AC 6).
+- [x] DevOps publicar/validar staging, com release/alias/SHA e smoke (AC 6); promoção posterior autorizada para main/produção em acompanhamento.
 - [ ] Atualizar inventário, checklist, File List, status e limitações (AC 7).
 
 ## Testing
@@ -59,8 +59,8 @@ Reutilizar testes pertinentes de setores, permissões e componentes com fixtures
 ## CodeRabbit Integration
 
 - **Story Type Analysis:** integração frontend/backend de catálogos e permissões; secundário Security; complexidade média pelo alcance entre módulos.
-- **Specialized Agent Assignment:** @dev implementação/Pre-Commit; @qa regressões; @architect se surgir mudança de contrato de autorização; @devops publicação staging; Vault quando aplicável à política de banco.
-- **Quality Gate Tasks:** Pre-Commit: inventário, diff, quatro gates e CodeRabbit se disponível; registrar ausência/revisão alternativa. Pre-PR por DevOps se houver PR. Conferir ambiente, escopo e rollback de código antes do deploy staging; produção fora do escopo.
+- **Specialized Agent Assignment:** @dev implementação/Pre-Commit; @qa regressões; @architect se surgir mudança de contrato de autorização; @devops publicação staging e promoção posterior explicitamente autorizada; Vault quando aplicável à política de banco.
+- **Quality Gate Tasks:** Pre-Commit: inventário, diff, quatro gates e CodeRabbit se disponível; registrar ausência/revisão alternativa. Pre-PR por DevOps se houver PR. Conferir ambiente, escopo e rollback de código antes dos deploys; produção depende do pedido explícito posterior registrado nesta revisão.
 - **Self-Healing Configuration:** @dev light, 2 iterações/15 minutos para CRITICAL e HIGH documentado; @qa full, 3 iterações/30 minutos para CRITICAL/HIGH, MEDIUM como dívida; @devops check, somente reporte.
 - **Focus Areas:** identidade canônica, omissões de catálogo, consistência UI/backend, ACL e overrides, preservação de setores/permissões e efeitos colaterais de leituras que fazem upsert.
 
@@ -124,8 +124,8 @@ Checklist `.aiox-core/product/checklists/story-draft-checklist.md` aplicado em m
 - Regressão focada: **8 arquivos / 72 testes PASS**, incluindo componente real de cursos → action real com IO mockado (individual e lote), persistência canônica no Vault (usuário/Core), ACL/overrides, liderança CRM e POP/Parceiros existentes.
 - Primeira execução do teste React de lote falhou por procurar o rótulo incorreto “Em Lote”; seletor do teste corrigido para o rótulo real “Lote”, sem alteração do produto para adequar teste.
 - Nenhum banco/schema/card/usuário/permissão real foi alterado. Consulta de existência: `/tmp/setor-lider-comercial-20261021-catalogo-readonly.json`. Sem migration, seed, backfill ou necessidade de gate Vault.
-- Publicação prevista somente staging; produção não autorizada nesta solicitação. Sem novas dependências/configurações/variáveis de ambiente. CodeRabbit indisponível nesta sessão; revisão independente QA/Anubis como alternativa.
-- Checklist de draft já aplicado por SM. Gates completos e revisão final aprovados; evidências de deploy staging pendentes nesta revisão.
+- Staging publicado e verificado. Autorização posterior direta do usuário cobre main/produção para este mesmo patch, sem ampliação de privilégios ou escopo. Sem novas dependências/configurações/variáveis de ambiente. CodeRabbit indisponível nesta sessão; revisão independente QA/Anubis como alternativa.
+- Checklist de draft já aplicado por SM. Gates completos e revisão final aprovados; evidências do deploy staging confirmadas; verificação de produção pendente nesta revisão.
 
 ## QA Results
 
@@ -140,9 +140,19 @@ Checklist `.aiox-core/product/checklists/story-draft-checklist.md` aplicado em m
 
 ## Evidências DevOps antes da publicação
 
-- Base staging congelada: `347c61a4f54365715f50bc3a5a82375d938ebd3d`. Escopo seletivo: exatamente os 16 caminhos da File List, sem alterações locais alheias. Produção/main permanecem fora desta autorização.
+- Base staging congelada: `347c61a4f54365715f50bc3a5a82375d938ebd3d`. Escopo seletivo: exatamente os 16 caminhos da File List, sem alterações locais alheias. Na autorização inicial, produção/main ficaram fora; o pedido posterior explícito está documentado abaixo.
 - Gates serializados, sem alteração de fonte/configuração: lint exit 0 (zero erros e 1.193 avisos preexistentes); **build padrão exit 0**, sem OOM/retry; typecheck após build exit 0; `npm test` exit 0, **691 arquivos e 5.302 testes aprovados**, 4 ignorados e 1 todo.
 - Logs e comandos reais: `/tmp/setor-lider-comercial-20261021-gates-progress.json` e `/tmp/setor-lider-comercial-20261021-{lint,build,typecheck,tests}.log`. Revisão independente QA/Anubis: PASS / APPROVED.
 - Consulta SQL direta e somente leitura do catálogo staging comprovou `Lider Comercial`, ID 6, ativo, sem chamar ensureSetorBase, consultar usuários ou executar escrita. Evidência: `/tmp/setor-lider-comercial-20261021-catalogo-readonly.json`.
-- Validação local utilizou somente URLs SQLite sintéticas. Nenhum banco/schema/seed/permissão, credencial, dependência ou ambiente foi alterado. Produção não recebeu publicação.
-- READY/SHA/alias/smoke staging serão confirmados após o push; fechamento documental local sem outro commit/deploy. Limite: não foi executado fluxo visual autenticado nem salvamento de usuários/permissões reais.
+- Validação local utilizou somente URLs SQLite sintéticas. Nenhum banco/schema/seed/permissão, credencial, dependência ou ambiente foi alterado. Na etapa inicial de staging, produção não recebeu publicação.
+- READY/SHA/alias/smoke staging foram confirmados após o push; fechamento documental local após produção, sem outro commit/deploy documental. Limite: não foi executado fluxo visual autenticado nem salvamento de usuários/permissões reais.
+
+## Promoção autorizada para main/produção
+
+- Pedido posterior do usuário: **“mande para a main tambem”**, referente exclusivamente ao patch Lider Comercial aprovado no staging.
+- Base main preservada: `3b7ce8d01811619c227a7ca5ce9eecbfb58ecbba`. Cherry-pick seletivo de `87c2e78f1849494825cd7bbe01b61f38f53c3683` sem conflito; delta exato de 16 caminhos. Quatro registros documentais já exclusivos de main foram preservados.
+- Todo código, testes, configuração e dependências resultantes são **byte-idênticos ao staging validado**. Herança dos quatro gates reais válida: lint sem erros, build padrão, typecheck e 691 arquivos/5.302 testes PASS (4 ignorados, 1 todo). Nenhum novo comportamento exige repetir gates.
+- QA/Anubis incremental da integração: **PASS / APPROVED**, com preservação de concorrentes e ausência de grants, bypass, alterações de schema, dependências ou ambientes. Somente esta story recebeu metadados adicionais.
+- Staging confirmado READY em `staging.alpha-comex.com`, deployment `dpl_CCCDHye3DDfWDJsQLfuBr3jEqGun`, SHA `87c2e78f`; smoke de disponibilidade/autorização aprovado.
+- Catálogo de produção verificado por SQL direto somente leitura: um setor `Lider Comercial`, ID 6, ativo. Sem ensureSetorBase, acesso a usuários ou escrita. Evidência: `/tmp/setor-lider-comercial-main-20261021-catalogo-readonly.json`.
+- Evidências de equivalência/gates: `/tmp/setor-lider-comercial-main-20261021-candidate.json` e `/tmp/setor-lider-comercial-20261021-gates.json`. Deploy de produção usará GitSource main no target production, sem copiar ambiente de staging. READY/SHA/alias/smoke serão confirmados após a publicação; root permanece na branch staging.

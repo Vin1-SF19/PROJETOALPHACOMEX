@@ -6,6 +6,7 @@ import GlobalSidebar, { SidebarMobileToggle } from './GlobalSidebar';
 import { TabBar } from './TabBar';
 import { arrayMove } from '@dnd-kit/sortable';
 import { useSidebarState } from '@/hooks/useSidebarState';
+import { usePainelFrameLeaveGuard } from '@/hooks/usePainelFrameLeaveGuard';
 import { useChamadosNotifications } from '@/hooks/useAdminChamadosNotifications';
 import { useChecklistFrameGuard } from "@/hooks/useChecklistFrameGuard";
 import { useChecklistNotifications } from '@/hooks/useChecklistNotifications';
@@ -169,6 +170,9 @@ export default function PainelLayoutClient({
   const [frameRuntime, setFrameRuntime] = useState<PainelFrameRuntimeByTab>({});
   const encerrandoSessaoRef = useRef(false);
   const iframesRef = useRef(new Map<string, HTMLIFrameElement>());
+  const tabsAtuaisRef = useRef(tabs);
+  useEffect(() => { tabsAtuaisRef.current = tabs; }, [tabs]);
+  const solicitarSaidaFrame = usePainelFrameLeaveGuard(iframesRef, setActiveId);
   const lastOperationalUrlRef = useRef<string | null>(null);
   const intencaoAgendaPendenteRef = useRef<IntencaoAgendaAlpha | null>(null);
   const tabsStorageKey = getTabsStorageKey(userId);
@@ -233,7 +237,7 @@ export default function PainelLayoutClient({
 
   // ── Tab management ────────────────────────────────────────────────────────
 
-  const openTab = useCallback((url: string, label: string, reutilizarTabId?: string) => {
+  const openTabConfirmada = useCallback((url: string, label: string, reutilizarTabId?: string) => {
     if (!isPainelCanonicalUrl(url)) return;
     const apply=()=>setTabs(prev => {
       const reutilizar = (reutilizarTabId ? prev.find(t => t.id === reutilizarTabId) : undefined)
@@ -253,6 +257,15 @@ export default function PainelLayoutClient({
     });
     if(reutilizarTabId){if(!guardChecklistFrame(reutilizarTabId,apply))setActiveId(reutilizarTabId);}else apply();
   }, [guardChecklistFrame]);
+
+  const openTab = useCallback((url: string, label: string, reutilizarTabId?: string) => {
+    if (!isPainelCanonicalUrl(url)) return;
+    const reutilizar = (reutilizarTabId ? tabsAtuaisRef.current.find(t => t.id === reutilizarTabId) : undefined)
+      ?? (intencaoCardBpmDaUrl(url) ? encontrarAbaCrm(tabsAtuaisRef.current) : undefined);
+    if (reutilizar && reutilizar.url !== url) {
+      void solicitarSaidaFrame(reutilizar.id, () => openTabConfirmada(url, label, reutilizar.id));
+    } else openTabConfirmada(url, label, reutilizarTabId);
+  }, [openTabConfirmada, solicitarSaidaFrame]);
 
   const abrirModuloPorNotificacao = useBpmCardNotificacaoNavigation(tabs, iframesRef, openTab, userId);
   useBpmTarefasNotifications(isAdminRole(role) || permissoes.includes('crm') ? userId : 0, abrirModuloPorNotificacao);
@@ -287,8 +300,7 @@ export default function PainelLayoutClient({
     if (pendente) entregarIntencaoAgenda(pendente);
   }, [activeId, entregarIntencaoAgenda, tabs]);
 
-  const closeTab = useCallback((id: string) => {
-    const permitted=guardChecklistFrame(id,()=>{
+  const closeTabConfirmada = useCallback((id: string) => {
     setFrameRuntime(prev => removePainelFrameState(prev, id));
     setTabs(prev => {
       const target = prev.find(t => t.id === id);
@@ -309,14 +321,21 @@ export default function PainelLayoutClient({
       });
       return filtered;
     });
+  }, []);
+
+  const closeTab = useCallback((id: string) => {
+    if (tabsAtuaisRef.current.find(t => t.id === id)?.pinned) return;
+    void solicitarSaidaFrame(id, () => {
+      if (!guardChecklistFrame(id, () => closeTabConfirmada(id))) setActiveId(id);
     });
-    if(!permitted)setActiveId(id);
-  }, [guardChecklistFrame]);
+  }, [closeTabConfirmada, guardChecklistFrame, solicitarSaidaFrame]);
 
   const retryActiveFrame = useCallback(() => {
     if (!activeId) return;
-    guardChecklistFrame(activeId,()=>setFrameRuntime(prev => retryPainelFrame(prev, activeId)));
-  }, [activeId,guardChecklistFrame]);
+    void solicitarSaidaFrame(activeId, () => {
+      guardChecklistFrame(activeId, () => setFrameRuntime(prev => retryPainelFrame(prev, activeId)));
+    });
+  }, [activeId, guardChecklistFrame, solicitarSaidaFrame]);
 
   const activeFrameState = activeId
     ? getPainelFrameRuntimeState(frameRuntime, activeId)

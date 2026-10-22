@@ -1,6 +1,8 @@
 "use client";
 
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useCardModalHost } from "./CardModalHost";
+import { PerfilEmpresaProvider } from "@/components/PerfilEmpresaGlobal/PerfilEmpresaProvider";
 import { Loader2, XIcon } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 
@@ -416,5 +418,29 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
 }
 
 export default function CardFullViewModal(props: Props) {
+  const host = useCardModalHost();
+  const owner = useId();
+  useLayoutEffect(() => {
+    if (!host) return;
+    host.attach(owner);
+    return () => host.detach(owner);
+  }, [host, owner]);
+  useLayoutEffect(() => {
+    if (!host) return;
+    const content = (active: Props) => <PerfilEmpresaProvider key={active.cardId}><CardFullViewModalContent key={active.cardId} {...active}
+      onClose={() => { const notify = host.close(owner, active.cardId); if (notify && host.isAttached(owner)) active.onClose(); }}
+      onAtualizado={() => { if (host.isAttached(owner)) active.onAtualizado(); }}
+      onCardExcluido={(id) => { if (host.isAttached(owner)) active.onCardExcluido?.(id); else host.close(owner, active.cardId); }}
+      onAbrirCard={(id) => {
+        if (host.isAttached(owner)) active.onAbrirCard(id);
+        else {
+          const next = { ...active, cardId: id, focoTarefa: null, abrirChecklistInicial: false, focarAgendamentoInicial: false };
+          host.replaceDetached({ owner, cardId: id, node: content(next) });
+        }
+      }}
+    /></PerfilEmpresaProvider>;
+    host.publish({ owner, cardId: props.cardId, node: content(props) });
+  }, [host, owner, props]);
+  if (host) return null;
   return <CardFullViewModalContent key={props.cardId} {...props} />;
 }

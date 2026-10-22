@@ -9,6 +9,7 @@ import {
 import { useState } from "react";
 import { ModalPDF } from "@/components/ModalPdf";
 import type { TemaAlpha } from "@/lib/temas";
+import { radarAusenteNaPublicacao, radarConfirmado } from "@/lib/radar/resultado";
 
 type CnaeExibicao = { code?: string; codigo?: string; text?: string; descricao?: string };
 type SocioExibicao = { nome?: string; qual?: string };
@@ -90,50 +91,51 @@ export default function BlocoResultados({ dados, visual, userName, onRetry }: Pr
             const response = await fetch(`/api/ConsultaRadar?cnpj=${cnpjParaConsultar}`);
             let resRadar = await response.json();
             const sucesso = response.ok && !resRadar.error;
-            const agora = sucesso ? new Date().toISOString() : null;
+            const ausente = radarAusenteNaPublicacao(resRadar);
+            let consultadoEm = sucesso && !ausente ? new Date().toISOString() : etapas.radar.consultadoEm;
+            let historico = radarConfirmado(etapas.radar.dados) ? etapas.radar.dados : null;
 
-            const naoConstaNaPublicacao = typeof resRadar.situacao === "string"
-                && /NÃO CONSTA(?: NO ARQUIVO CONSULTADO)?/i.test(resRadar.situacao);
-            if (sucesso && naoConstaNaPublicacao) {
+            if (ausente) {
+                let falhaHistorico = false;
                 try {
                     const salvo = await buscarRadarSalvo(cnpjParaConsultar);
                     if (salvo.data) {
-                        resRadar = {
-                            ...resRadar,
-                            ...salvo.data,
-                            situacao: salvo.data.situacao || resRadar.situacao,
-                            submodalidade: salvo.data.submodalidade || resRadar.submodalidade,
-                            aviso: "CNPJ não consta na publicação CSV atual; exibindo informação RADAR salva anteriormente no banco.",
-                        };
-                    } else if (salvo.error) {
-                        resRadar = {
-                            ...resRadar,
-                            aviso: "Não foi possível consultar o histórico RADAR salvo no banco.",
-                        };
-                    }
+                        historico = { ...historico, ...salvo.data };
+                        consultadoEm = salvo.data.consultadoEmHistorico;
+                    } else falhaHistorico = !!salvo.error;
                 } catch {
-                    resRadar = {
-                        ...resRadar,
-                        aviso: "Não foi possível consultar o histórico RADAR salvo no banco.",
-                    };
+                    falhaHistorico = true;
                 }
+                resRadar = historico ? {
+                    ...historico,
+                    aviso: "CNPJ não consta na publicação CSV atual; exibindo informação RADAR salva anteriormente no banco."
+                        + (falhaHistorico ? " Não foi possível consultar o histórico adicional." : ""),
+                } : {
+                    situacao: "NÃO CONSTA NO ARQUIVO CONSULTADO",
+                    aviso: falhaHistorico ? "Não foi possível consultar o histórico RADAR salvo no banco." : "A ausência na publicação não confirma a situação RADAR da empresa.",
+                };
+            } else if (!sucesso && historico) {
+                resRadar = { ...historico, aviso: "Consulta indisponível; os dados salvos foram preservados." };
             }
 
             setEtapas(prev => ({
                 ...prev,
                 radar: {
-                    status: sucesso ? "success" : "error",
+                    status: sucesso || ausente || radarConfirmado(resRadar) ? "success" : "error",
                     dados: resRadar,
-                    consultadoEm: agora ?? prev.radar.consultadoEm,
+                    consultadoEm,
                 }
             }));
 
-            if (sucesso) {
+            if (sucesso && !ausente && radarConfirmado(resRadar)) {
                 const saveResult = await atualizarRadar(cnpjParaConsultar, resRadar);
                 if (saveResult.error) console.error("Radar não salvo:", saveResult.error);
             }
         } catch {
-            setEtapas(prev => ({ ...prev, radar: { ...prev.radar, status: "error", dados: null } }));
+            setEtapas(prev => ({ ...prev, radar: { ...prev.radar,
+                status: radarConfirmado(prev.radar.dados) ? "success" : "error",
+                dados: { ...prev.radar.dados, aviso: "Consulta indisponível; os dados salvos foram preservados." },
+            } }));
         } finally {
             setLoadingRadar(false);
         }

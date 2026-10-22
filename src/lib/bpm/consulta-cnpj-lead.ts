@@ -5,7 +5,7 @@ import db from "@/lib/prisma";
 import { cnpjEhValido, normalizarCNPJ } from "@/lib/format-cnpj";
 import { getReceitaData } from "@/lib/cnpj/receita-federal";
 import { getEmpresaAquiData } from "@/lib/cnpj/empresa-aqui";
-import { consultarRadar, ErroConsultaRadar } from "@/lib/radar/consulta";
+import { consultarRadar } from "@/lib/radar/consulta";
 
 type Registro = Record<string, unknown>;
 
@@ -63,8 +63,8 @@ function qualificacaoFiscal(regime: string | null, rfb: {
   return null;
 }
 
-/** Consulta independente por fonte. Nenhum erro externo remove um snapshot anterior. */
-export async function consultarEGuardarCnpjLead(cnpjInformado: string) {
+/** Consulta pura: nenhuma fonte altera o cadastro antes da confirmação do usuário. */
+export async function consultarFontesCnpjLead(cnpjInformado: string) {
   const cnpj = normalizarCNPJ(cnpjInformado);
   if (!cnpjEhValido(cnpj)) throw new Error("CNPJ inválido");
 
@@ -73,19 +73,10 @@ export async function consultarEGuardarCnpjLead(cnpjInformado: string) {
   ]);
   const receita = receitaResultado.status === "fulfilled" ? receitaResultado.value : null;
   const empresaAquiRaw = empresaAquiResultado.status === "fulfilled" ? empresaAquiResultado.value : null;
-  const radar = radarResultado.status === "fulfilled" ? radarResultado.value : null;
-  const radarNaoHabilitado = radarResultado.status === "rejected"
-    && radarResultado.reason instanceof ErroConsultaRadar && radarResultado.reason.status === 404;
-  const atual = await db.consultaPreAnalise.findUnique({
-    where: { cnpj },
-    select: { razaoSocial: true, nomeFantasia: true, situacao: true, uf: true, municipio: true,
-      regimeEA: true, qualificacao: true, submodalidade: true, capitalSocial: true,
-      dadosBrutos: true, clienteId: true },
-  });
-  const empresa = await db.cliente.findUnique({
-    where: { cnpj }, select: { id: true, razaoSocial: true, nomeFantasia: true, uf: true, municipio: true },
-  });
-  const anterior = objeto(atual?.dadosBrutos);
+  const radarRetornado = radarResultado.status === "fulfilled" ? radarResultado.value : null;
+  // Ausência no CSV não comprova desabilitação e não substitui um dado anterior.
+  const radar = radarRetornado && !/^N[ÃA]O CONSTA NO ARQUIVO CONSULTADO$/i.test(radarRetornado.situacao.trim())
+    ? radarRetornado : null;
   const agora = new Date().toISOString();
   const regimeEA = empresaAquiRaw ? regimeEmpresaAqui(empresaAquiRaw) : null;
   const empresaAqui = empresaAquiRaw ? {
@@ -104,12 +95,28 @@ export async function consultarEGuardarCnpjLead(cnpjInformado: string) {
     aviso: radar.aviso,
     baseLegal: radar.baseLegal, tipoDesabilitacao: radar.tipoDesabilitacao,
     operacoesAutorizadas: radar.operacoesAutorizadas,
-  } : radarNaoHabilitado ? { situacao: "NÃO HABILITADA" } : null;
+  } : null;
   const falhas = [
     receitaResultado.status === "rejected" ? "Receita Federal" : null,
     empresaAquiResultado.status === "rejected" ? "EmpresaAqui" : null,
-    radarResultado.status === "rejected" && !radarNaoHabilitado ? "Radar" : null,
+    !radar ? "Radar" : null,
   ].filter((nome): nome is string => Boolean(nome));
+
+  return { cnpj, receita, empresaAquiRaw, empresaAqui, dadosRadar, radar, regimeEA, falhas, agora };
+}
+
+/** Fluxo legado de Novo Lead: mantém sua persistência após a consulta pura. */
+export async function consultarEGuardarCnpjLead(cnpjInformado: string) {
+  const { cnpj, receita, empresaAquiRaw, empresaAqui, dadosRadar, radar, regimeEA, falhas, agora } = await consultarFontesCnpjLead(cnpjInformado);
+  const atual = await db.consultaPreAnalise.findUnique({
+    where: { cnpj },
+    select: { razaoSocial: true, nomeFantasia: true, situacao: true, uf: true, municipio: true,
+      regimeEA: true, qualificacao: true, submodalidade: true, capitalSocial: true, dadosBrutos: true, clienteId: true },
+  });
+  const empresa = await db.cliente.findUnique({
+    where: { cnpj }, select: { id: true, razaoSocial: true, nomeFantasia: true, uf: true, municipio: true },
+  });
+  const anterior = objeto(atual?.dadosBrutos);
 
   if (receita || empresaAqui || dadosRadar) {
     const dadosBrutos = {
@@ -130,7 +137,7 @@ export async function consultarEGuardarCnpjLead(cnpjInformado: string) {
         municipio: receita?.municipio || atual?.municipio || empresa?.municipio || null,
         regimeEA: regimeEA || atual?.regimeEA || null,
         qualificacao: empresaAqui?.qualificacao || atual?.qualificacao || null,
-        submodalidade: radarNaoHabilitado ? null : radar?.submodalidade || atual?.submodalidade || null,
+        submodalidade: radar?.submodalidade || atual?.submodalidade || null,
         capitalSocial: numeroMonetario(receita?.capitalSocial) ?? atual?.capitalSocial ?? null,
         dadosBrutos,
         clienteId: atual?.clienteId || empresa?.id || null,

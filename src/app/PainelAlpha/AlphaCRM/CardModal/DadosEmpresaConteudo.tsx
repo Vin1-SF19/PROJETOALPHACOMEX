@@ -12,6 +12,7 @@ import {
   Phone,
   ShieldCheck,
   Users,
+  Pencil,
 } from "lucide-react";
 import { VALORES } from "@/lib/bpm/financeiro-config.client";
 import type { LucideIcon } from "lucide-react";
@@ -22,6 +23,7 @@ import { formatCNPJ } from "@/lib/format-cnpj";
 interface DadosEmpresaConteudoProps {
   dados: DadosEmpresaConsolidado;
   accent: string;
+  onEditar?: () => void;
 }
 
 interface SecaoProps {
@@ -69,7 +71,7 @@ function SimNao({ valor }: { valor: boolean | null }) {
   return <>{valor === null ? "Não informado" : valor ? VALORES.SIM : VALORES.NAO}</>;
 }
 
-export function DadosEmpresaConteudo({ dados, accent }: DadosEmpresaConteudoProps) {
+export function DadosEmpresaConteudo({ dados, accent, onEditar }: DadosEmpresaConteudoProps) {
   const endereco = [dados.empresa.endereco.logradouro, dados.empresa.endereco.numero, dados.empresa.endereco.bairro]
     .filter(Boolean)
     .join(", ");
@@ -95,6 +97,9 @@ export function DadosEmpresaConteudo({ dados, accent }: DadosEmpresaConteudoProp
                   {dados.empresa.situacao}
                 </span>
               )}
+              {onEditar && <button type="button" onClick={onEditar} className="inline-flex items-center gap-1.5 rounded-xl border border-violet-300/40 bg-violet-500 px-3 py-2 text-xs font-bold text-white shadow-md shadow-violet-950/30 hover:bg-violet-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-200">
+                <Pencil size={14} aria-hidden="true" />Editar dados
+              </button>}
             </div>
             <h1 className="mt-4 text-2xl font-black tracking-tight text-white">{dados.empresa.razaoSocial}</h1>
             <p className="mt-1 text-sm text-slate-400">{dados.empresa.nomeFantasia || "Sem nome fantasia"}</p>

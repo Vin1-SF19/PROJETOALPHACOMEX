@@ -13,6 +13,25 @@ export const linha = {
 };
 
 describe("de/para e envelope Instagram", () => {
+  it("marketing fica fora da ingestão, da projeção legada, do card, do modal e da anotação", () => {
+    const original = { ...linha, campaign_name: 'MARKETING-CAMPANHA', campaign_id: 'MARKETING-CAMPAIGN-ID',
+      ad_name: 'MARKETING-ANUNCIO', ad_id: 'MARKETING-AD-ID', adset_name: 'MARKETING-CONJUNTO',
+      adset_id: 'MARKETING-ADSET-ID', form_name: 'MARKETING-FORMULARIO', form_id: 'MARKETING-FORM-ID' };
+    const received = instagramIngestSchema.parse({ spreadsheetId: INSTAGRAM_SPREADSHEET_ID, sheetId: 0, lead: original });
+    const projected = lerLeadInstagram(JSON.stringify({ versao: 1, campanha: original.campaign_name, linha: original }));
+    expect(projected).not.toBeNull();
+    expect(projected).not.toHaveProperty('campanha');
+    const output = JSON.stringify({ received, projected }) + anotacaoLeadInstagram(projected!)
+      + renderToStaticMarkup(createElement(InstagramLeadCard, { dados: projected! }))
+      + renderToStaticMarkup(createElement(InstagramLeadDetalhes, { dados: projected! }));
+    expect(output).not.toContain('MARKETING-');
+    expect(output).not.toContain('campaign_id');
+    expect(output).not.toContain('form_id');
+    expect(output).toContain('Instagram');
+    expect(output).toContain('animate-pulse');
+    expect(output).toContain('Habilitação de Radar 50k');
+    expect(projected?.linha[C.prazo]).toBe(original[C.prazo]);
+  });
   it.each([
     ["2026-10-22T01:30:00Z", "21/10/2026"],
     ["2026-09-18T23:30:00-05:00", "19/09/2026"],
