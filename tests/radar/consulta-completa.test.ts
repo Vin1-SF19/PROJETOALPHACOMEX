@@ -63,4 +63,22 @@ describe("ConsultaCompleta com API RADAR do ialpha", () => {
     const body = await response.json();
     expect(body).toMatchObject({ situacao: "HABILITADA", submodalidade: "ILIMITADA", dataAtualizacaoPublicada: "08/10/2026 16h13", fonte: "Banco Local + API RADAR ialpha" });
   });
+
+  it.each([200, 404])("reconsulta forçada com ausência %s preserva histórico e não grava", async status => {
+    const dataOriginal = "2026-10-01T12:00:00Z";
+    mocks.findUnique.mockResolvedValue({ cnpj, razao_social: "EMPRESA SALVA", situacao_radar: "HABILITADA", submodalidade: "ILIMITADA", data_consulta: dataOriginal });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: status === 200, status,
+      json: async () => ({ success: true, data: { found: false } }) }));
+    const response = await GET(request()); expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ situacao: "HABILITADA", submodalidade: "ILIMITADA", dataConsulta: dataOriginal, fonte: "Banco Local", radarAviso: expect.stringContaining("sem alterar") });
+    expect(mocks.upsert).not.toHaveBeenCalled();
+  });
+  it.each([200, 404])("leitura de cadastro salvo com ausência %s mantém situação e submodalidade", async status => {
+    mocks.findUnique.mockResolvedValue({ cnpj, razao_social: "EMPRESA SALVA", situacao_radar: "HABILITADA", submodalidade: "ILIMITADA", data_consulta: "2026-10-01T12:00:00Z" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: status === 200, status,
+      json: async () => ({ success: true, data: { found: false } }) }));
+    const response = await GET(new Request(`http://localhost/api/ConsultaCompleta?cnpj=${cnpj}`));
+    expect(await response.json()).toMatchObject({ situacao: "HABILITADA", submodalidade: "ILIMITADA", fonte: "Banco Local", radarAviso: expect.stringContaining("registro local anterior") });
+    expect(mocks.upsert).not.toHaveBeenCalled();
+  });
 });

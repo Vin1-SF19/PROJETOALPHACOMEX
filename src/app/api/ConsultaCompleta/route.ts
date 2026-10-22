@@ -6,6 +6,7 @@ import { getReceitaData } from "@/lib/cnpj/receita-federal";
 import { parseDateBR } from "@/lib/cnpj/parse-date-br";
 import { consultarRadar, ErroConsultaRadar } from "@/lib/radar/consulta";
 import { validarCnpj } from "@/lib/gerador-documentos/cnpj";
+import { radarConfirmado } from "@/lib/radar/resultado";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -35,19 +36,20 @@ export async function GET(req: Request) {
         } catch {
           // Mantém os dados locais existentes se a API do ialpha estiver temporariamente indisponível.
         }
+        if (radarAtualizacao && !radarConfirmado(radarAtualizacao)) radarAtualizacao = null;
         return NextResponse.json({
           ...existente,
           // aliases camelCase para o frontend
           razaoSocial:      existente.razao_social,
           nomeFantasia:     existente.nome_fantasia,
-          situacao:         radarAtualizacao?.situacao ?? "CONSULTA CSV INDISPONÍVEL",
-          situacao_radar:   radarAtualizacao?.situacao ?? "CONSULTA CSV INDISPONÍVEL",
+          situacao:         radarAtualizacao?.situacao ?? existente.situacao_radar,
+          situacao_radar:   radarAtualizacao?.situacao ?? existente.situacao_radar,
           submodalidade:    radarAtualizacao?.submodalidade ?? existente.submodalidade,
           modalidade:       radarAtualizacao?.modalidade ?? existente.submodalidade,
           contribuinte:     radarAtualizacao?.contribuinte ?? existente.contribuinte,
           dataAtualizacaoPublicada: radarAtualizacao?.dataAtualizacaoPublicada ?? null,
           consultadoEm:     radarAtualizacao?.consultadoEm ?? null,
-          radarAviso:       radarAtualizacao?.aviso ?? (radarAtualizacao ? undefined : "Consulta atual à API RADAR indisponível; exibindo registro local."),
+          radarAviso:       radarAtualizacao?.aviso ?? (radarAtualizacao ? undefined : "Publicação CSV sem confirmação atual; exibindo registro local anterior."),
           dataSituacao:     existente.data_situacao,
           dataConstituicao: existente.data_constituicao,
           regimeTributario: existente.regime_tributario,
@@ -162,6 +164,24 @@ export async function GET(req: Request) {
       const code = radarResult.reason instanceof ErroConsultaRadar ? radarResult.reason.code : "UPSTREAM_UNAVAILABLE";
       console.error("RADAR falhou:", code);
       return NextResponse.json({ error: "Consulta Radar indisponível; dados anteriores preservados", code }, { status: 502 });
+    }
+
+    if (!radarConfirmado(radar)) {
+      const anterior = await db.consultas_radar.findUnique({ where: { cnpj } });
+      if (anterior && radarConfirmado({ situacao: anterior.situacao_radar })) {
+        // Reconsulta inconclusiva não substitui nem renova o histórico persistido.
+        return NextResponse.json({
+          ...anterior,
+          razaoSocial: anterior.razao_social, nomeFantasia: anterior.nome_fantasia,
+          situacao: anterior.situacao_radar, submodalidade: anterior.submodalidade,
+          dataSituacao: anterior.data_situacao, dataConstituicao: anterior.data_constituicao,
+          regimeTributario: anterior.regime_tributario, capitalSocial: anterior.capital_social,
+          dataConsulta: anterior.data_consulta, fonte: "Banco Local",
+          dataAtualizacaoPublicada: radar.dataAtualizacaoPublicada,
+          consultadoEmRadar: null,
+          radarAviso: "Publicação CSV sem confirmação atual; exibindo registro local anterior, sem alterar os dados salvos.",
+        });
+      }
     }
 
     const payload = {

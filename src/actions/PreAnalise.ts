@@ -5,6 +5,7 @@ import { auth } from "../../auth";
 import { canAccessPreAnalise } from "@/lib/pre-analise/access";
 import { validarCnpj } from "@/lib/gerador-documentos/cnpj";
 import type { Prisma } from "@prisma/client";
+import { radarConfirmado } from "@/lib/radar/resultado";
 
 type CadastroConsulta = {
     cnpj: string;
@@ -97,6 +98,11 @@ export async function atualizarRadar(cnpj: string, radarDados: Record<string, un
     if (!await acessoPermitido()) return { error: "Não autorizado" };
     const cnpjLimpo = cnpj.replace(/\D/g, "");
     if (!validarCnpj(cnpjLimpo)) return { error: "CNPJ inválido" };
+
+    // Fallback é apenas leitura: não substitui o snapshot nem renova sua data.
+    if (!radarConfirmado(radarDados) || radarDados.fonteHistorica || radarDados.consultadoEmHistorico) {
+        return { success: true, preservado: true };
+    }
 
     try {
         const existing = await db.consultaPreAnalise.findUnique({
