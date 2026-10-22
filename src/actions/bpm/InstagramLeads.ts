@@ -10,7 +10,7 @@ import { gerarTelefonePendente } from "@/lib/validations/cs-nps";
 import { exigirAcessoBpmCard, exigirAcessoBpmPipeline, usuarioElegivelResponsavelBpm } from "@/lib/bpm/ownership";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { carregarSnapshotsCopiaCamposCard, verificarTransicaoPermitidaBpm } from "@/lib/bpm/requisitos-etapa-server";
-import { anotacaoLeadInstagram, lerLeadInstagram } from "@/lib/bpm/instagram-leads";
+import { lerLeadInstagram } from "@/lib/bpm/instagram-leads";
 import { carregarEndpointInstagram, etapaEntradaInstagram } from "@/lib/bpm/instagram-leads-server";
 import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { enfileirarAutomacoesCriacaoCardBpm } from "@/lib/bpm/automacoes/fila";
@@ -101,8 +101,6 @@ export async function AssumirLeadInstagram(input: unknown) {
       const snapshots = await carregarSnapshotsCopiaCamposCard(card.id, pipelineId, destino.id, tx);
       for (const [campoId, valor] of Object.entries(snapshots)) await tx.bpmCardCampoValor.upsert({
         where: { cardId_campoId: { cardId: card.id, campoId } }, create: { cardId: card.id, campoId, valor }, update: {} });
-      await tx.bpmInteracaoCard.create({ data: { cardId: card.id, tipo: "ANOTACAO", registradoPorId: userId,
-        resumo: "Dados recebidos do Instagram", observacoes: anotacaoLeadInstagram(dados) } });
       await tx.bpmCardHistorico.create({ data: { cardId: card.id, acao: "CARD_CRIADO", usuarioId: userId,
         valorNovoJson: JSON.stringify({ empresaId: empresa.id, pipelineId, etapaId: destino.id, responsavelId: parsed.data.responsavelId, origem: "INSTAGRAM", leadId: entrada.id }) } });
       const evento = await publicarEventoBpm({ tipo: "CARD_CRIADO", entidadeTipo: "CARD", entidadeId: card.id,

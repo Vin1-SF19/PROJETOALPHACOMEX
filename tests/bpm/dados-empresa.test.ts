@@ -215,7 +215,7 @@ describe("ObterDadosEmpresaCardBpm", () => {
     prismaMock.bpmCard.findUnique.mockResolvedValue({
       empresa: { id: 9, status: "Lead", cnpj: "11.222.333/0001-81", razaoSocial: "Empresa Nova",
         nomeFantasia: null, dataConstituicao: null, uf: "SP", municipio: "São Paulo",
-        regimeTributario: null, servicos: [] },
+        regimeTributario: null, servicos: [], updatedAt: new Date("2026-10-22T12:00:00Z"), perfilCadastralJson: null, capitalSocial: "25000", situacaoCadastral: "ATIVA" },
       responsavel: { nome: "Responsável" }, membros: [],
     });
     prismaMock.pessoaClienteVinculo.findMany.mockResolvedValue([]);
@@ -234,7 +234,7 @@ describe("ObterDadosEmpresaCardBpm", () => {
       where: { cnpj: "11222333000181" },
     }));
     expect(resultado).toMatchObject({ success: true, data: {
-      empresa: { razaoSocial: "EMPRESA NOVA" },
+      empresa: { razaoSocial: "Empresa Nova", capitalSocial: 25000, situacao: "ATIVA" },
       radar: { situacao: "HABILITADA", modalidade: "ILIMITADA" },
       analiseFiscal: { faturamento: "5000000" },
     } });

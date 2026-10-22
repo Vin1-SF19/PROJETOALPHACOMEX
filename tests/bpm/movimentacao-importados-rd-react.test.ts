@@ -21,7 +21,7 @@ vi.mock("@/actions/bpm/Cards", () => ({
   ObterCardBpm: vi.fn(), MoverCardBpm: api.move, ObterRequisitosTransicaoBpm: api.preflight,
   SalvarRequisitosEMoverCardBpm: api.saveAndMove, ListarCardsPipelineBpm: api.list, CriarCardBpm: vi.fn(),
 }));
-vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext", () => ({ useCardSave: () => ({ flushSaves: api.flush }) }));
+vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext", () => ({ useCardLeaveGuard: () => async () => true, useCardSave: () => ({ flushSaves: api.flush }) }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CampoBpmInput", () => ({ CampoBpmInput: () => null }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/BpmDateTimeField", () => ({ BpmDateTimeField: () => null }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/AtribuirLeadAgendarModal", () => ({ AtribuirLeadAgendarModal: ({ open }: { open: boolean }) => open ? h("div", null, "Atribuição indevida") : null }));

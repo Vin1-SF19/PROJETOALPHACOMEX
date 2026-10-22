@@ -4,6 +4,7 @@ export interface PessoaEmpresaFonte {
   id?: number;
   nome: string;
   telefone?: string | null;
+  email?: string | null;
   obs?: string | null;
   dataNascimento?: string | null;
   vinculo?: string | null;
@@ -351,7 +352,7 @@ export function normalizarDadosEmpresaBpm(fontes: DadosEmpresaFontes): DadosEmpr
       nome: pessoa.nome,
       funcao: stringValue(pessoa.vinculo),
       telefone: stringValue(pessoa.telefone),
-      email: null,
+      email: stringValue(pessoa.email),
       dataNascimento: stringValue(pessoa.dataNascimento),
       observacoes: stringValue(pessoa.obs),
       fontes: ["CS&NPS/BPM"],

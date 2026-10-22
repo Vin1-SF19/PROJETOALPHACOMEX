@@ -1,3 +1,5 @@
+import { ehAnotacaoTecnicaInstagram } from "@/lib/bpm/instagram-anotacao-tecnica";
+
 export type OrigemEventoTimeline = "usuario" | "automacao" | "sistema";
 
 export interface EventoHistoricoBruto {
@@ -11,6 +13,8 @@ export interface EventoHistoricoBruto {
 }
 
 export interface AnotacaoBruta {
+  tipo?: string;
+  resumo?: string | null;
   id: string;
   createdAt: string | Date;
   observacoes?: string | null;
@@ -40,6 +44,7 @@ const LABELS_EVENTO_TIMELINE: Record<string, string> = {
   RD_COMPLEMENTO_IMPORTADO: "Dados do RD Station recuperados",
   RD_COMPLEMENTO_REVERTIDO: "Recuperação do RD Station desfeita",
   CARD_ATUALIZADO: "Campo atualizado",
+  DADOS_EMPRESA_ATUALIZADOS: "Dados da empresa alterados",
   CONTRATO_DISPONIBILIZADO: "Contrato disponível para envio",
   CONTRATO_ENVIO_REGISTRADO: "Envio do contrato registrado",
   PAGAMENTO_ENCAMINHADO_CONFERENCIA: "Pagamento encaminhado para conferência",
@@ -116,6 +121,15 @@ function origemDoEvento(
   return "sistema";
 }
 
+/** Nome registrado no momento da edição, mesmo se o usuário mudar de nome depois. */
+export function autorEventoHistorico(evento: Pick<EventoHistoricoBruto, "acao" | "valorNovoJson" | "usuario">): string | null {
+  if (evento.acao === "DADOS_EMPRESA_ATUALIZADOS") try {
+    const autor = (JSON.parse(evento.valorNovoJson ?? "{}") as { autor?: unknown }).autor;
+    if (typeof autor === "string" && autor.trim()) return autor;
+  } catch { /* Eventos legados usam o relacionamento do usuário. */ }
+  return evento.usuario?.nome ?? null;
+}
+
 /** Agrega histórico + anotações já carregados (sem nova leitura ao banco) em um feed cronológico único. */
 export function montarFeedTimelineCard(
   historico: EventoHistoricoBruto[],
@@ -128,7 +142,7 @@ export function montarFeedTimelineCard(
       id: h.id,
       tipo: "evento",
       data: new Date(h.createdAt),
-      autor: h.usuario?.nome ?? (h.automacaoOrigem && !["RD_STATION_SERVICE_RECOVERY", "RD_STATION_SERVICE_ROLLBACK"].includes(h.automacaoOrigem) ? `Automação (${h.automacaoOrigem})` : "Sistema"),
+      autor: autorEventoHistorico(h) ?? (h.automacaoOrigem && !["RD_STATION_SERVICE_RECOVERY", "RD_STATION_SERVICE_ROLLBACK"].includes(h.automacaoOrigem) ? `Automação (${h.automacaoOrigem})` : "Sistema"),
       origem: origemDoEvento(h.automacaoOrigem, h.usuario),
       acao: h.acao,
       label: rotuloEventoTimeline(h.acao),
@@ -136,7 +150,7 @@ export function montarFeedTimelineCard(
       valorNovo: h.valorNovoJson ?? null,
     }));
 
-  const notas: ItemTimelineCard[] = anotacoes.map((a) => ({
+  const notas: ItemTimelineCard[] = anotacoes.filter((a) => !ehAnotacaoTecnicaInstagram(a)).map((a) => ({
     id: a.id,
     tipo: "anotacao",
     data: new Date(a.createdAt),

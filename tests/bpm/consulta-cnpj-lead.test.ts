@@ -19,7 +19,7 @@ vi.mock("@/lib/prisma", () => ({ default: {
   cliente: { findUnique: findCliente },
 } }));
 
-import { consultarEGuardarCnpjLead } from "@/lib/bpm/consulta-cnpj-lead";
+import { consultarEGuardarCnpjLead, consultarFontesCnpjLead } from "@/lib/bpm/consulta-cnpj-lead";
 import { ErroConsultaRadar } from "@/lib/radar/consulta";
 
 const cnpj = "11222333000181";
@@ -41,6 +41,12 @@ beforeEach(() => {
 });
 
 describe("consultarEGuardarCnpjLead", () => {
+  it("lupa de edição usa as mesmas APIs sem ler ou gravar cadastro/snapshot", async () => {
+    const r = await consultarFontesCnpjLead(cnpj);
+    expect(r.receita).toEqual(dadosReceita); expect(r.dadosRadar?.situacao).toBe("HABILITADA");
+    expect(receita).toHaveBeenCalledWith(cnpj); expect(empresaAqui).toHaveBeenCalledWith(cnpj); expect(radar).toHaveBeenCalledWith(cnpj, 15000);
+    expect(findConsulta).not.toHaveBeenCalled(); expect(findCliente).not.toHaveBeenCalled(); expect(upsertConsulta).not.toHaveBeenCalled();
+  });
   it("não chama fornecedores nem banco para CNPJ inválido", async () => {
     await expect(consultarEGuardarCnpjLead("123")).rejects.toThrow("CNPJ inválido");
     expect(receita).not.toHaveBeenCalled();

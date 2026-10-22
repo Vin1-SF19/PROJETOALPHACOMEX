@@ -63,8 +63,8 @@ function qualificacaoFiscal(regime: string | null, rfb: {
   return null;
 }
 
-/** Consulta independente por fonte. Nenhum erro externo remove um snapshot anterior. */
-export async function consultarEGuardarCnpjLead(cnpjInformado: string) {
+/** Consulta pura: nenhuma fonte altera o cadastro antes da confirmação do usuário. */
+export async function consultarFontesCnpjLead(cnpjInformado: string) {
   const cnpj = normalizarCNPJ(cnpjInformado);
   if (!cnpjEhValido(cnpj)) throw new Error("CNPJ inválido");
 
@@ -76,16 +76,6 @@ export async function consultarEGuardarCnpjLead(cnpjInformado: string) {
   const radar = radarResultado.status === "fulfilled" ? radarResultado.value : null;
   const radarNaoHabilitado = radarResultado.status === "rejected"
     && radarResultado.reason instanceof ErroConsultaRadar && radarResultado.reason.status === 404;
-  const atual = await db.consultaPreAnalise.findUnique({
-    where: { cnpj },
-    select: { razaoSocial: true, nomeFantasia: true, situacao: true, uf: true, municipio: true,
-      regimeEA: true, qualificacao: true, submodalidade: true, capitalSocial: true,
-      dadosBrutos: true, clienteId: true },
-  });
-  const empresa = await db.cliente.findUnique({
-    where: { cnpj }, select: { id: true, razaoSocial: true, nomeFantasia: true, uf: true, municipio: true },
-  });
-  const anterior = objeto(atual?.dadosBrutos);
   const agora = new Date().toISOString();
   const regimeEA = empresaAquiRaw ? regimeEmpresaAqui(empresaAquiRaw) : null;
   const empresaAqui = empresaAquiRaw ? {
@@ -107,6 +97,22 @@ export async function consultarEGuardarCnpjLead(cnpjInformado: string) {
     empresaAquiResultado.status === "rejected" ? "EmpresaAqui" : null,
     radarResultado.status === "rejected" && !radarNaoHabilitado ? "Radar" : null,
   ].filter((nome): nome is string => Boolean(nome));
+
+  return { cnpj, receita, empresaAquiRaw, empresaAqui, dadosRadar, radar, radarNaoHabilitado, regimeEA, falhas, agora };
+}
+
+/** Fluxo legado de Novo Lead: mantém sua persistência após a consulta pura. */
+export async function consultarEGuardarCnpjLead(cnpjInformado: string) {
+  const { cnpj, receita, empresaAquiRaw, empresaAqui, dadosRadar, radar, radarNaoHabilitado, regimeEA, falhas, agora } = await consultarFontesCnpjLead(cnpjInformado);
+  const atual = await db.consultaPreAnalise.findUnique({
+    where: { cnpj },
+    select: { razaoSocial: true, nomeFantasia: true, situacao: true, uf: true, municipio: true,
+      regimeEA: true, qualificacao: true, submodalidade: true, capitalSocial: true, dadosBrutos: true, clienteId: true },
+  });
+  const empresa = await db.cliente.findUnique({
+    where: { cnpj }, select: { id: true, razaoSocial: true, nomeFantasia: true, uf: true, municipio: true },
+  });
+  const anterior = objeto(atual?.dadosBrutos);
 
   if (receita || empresaAqui || dadosRadar) {
     const dadosBrutos = {

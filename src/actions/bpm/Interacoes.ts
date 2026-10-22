@@ -6,6 +6,7 @@ import { criarInteracaoCardSchema } from "@/lib/validations/bpm";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { ehAnotacaoTecnicaInstagram } from "@/lib/bpm/instagram-anotacao-tecnica";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -77,7 +78,7 @@ export async function ListarInteracoesCardBpm(cardId: string) {
       orderBy: { createdAt: "desc" },
     });
 
-    return { success: true, data: interacoes };
+    return { success: true, data: interacoes.filter((item) => !ehAnotacaoTecnicaInstagram(item)) };
   } catch (error) {
     console.error("[ListarInteracoesCardBpm]", error);
     const msg = error instanceof Error && error.message === "Não autorizado" ? "Não autorizado" : "Erro ao buscar interações";
