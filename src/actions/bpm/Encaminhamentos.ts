@@ -10,6 +10,7 @@ import { exigirAcessoBpmCard, exigirAcessoBpmPipeline, isAdminRole } from "@/lib
 import { parametrosEncaminhamentoSchema } from "@/lib/bpm/automacoes/schemas";
 import { executarEncaminhamentoBpm } from "@/lib/bpm/automacoes/encaminhamento";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { notificarPendenciasLeadsBpm } from "@/lib/bpm/notificacoes-leads-server";
 
 export type EncaminhamentoCardBpm = {
   automacaoId: string; nome: string;
@@ -132,6 +133,7 @@ async function executarSelecionado(cardId: string, execucaoId: string) {
       Promise.resolve().then(() => revalidatePath("/PainelAlpha/AlphaCRM")),
       notificarPipelineBpm({ cardId, tipo: "CARD_ATUALIZADO" }),
       notificarPipelineBpm({ cardId: resultado.cardId, tipo: "CARD_CRIADO" }),
+      ...( "recepcao" in resultado && resultado.recepcao ? [notificarPendenciasLeadsBpm(resultado.recepcao)] : []),
     ]);
     return { success: true as const, data: { execucaoId, cardDestinoId: resultado.cardId, existente: resultado.existente, versao: resultado.versao } };
   } catch (error) {

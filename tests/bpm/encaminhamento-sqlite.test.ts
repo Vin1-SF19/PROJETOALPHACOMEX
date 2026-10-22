@@ -39,7 +39,7 @@ const execucaoId = "c666666666666666666666666";
 /** Build a private SQLite fixture from scalar model fields, never from a remote database. */
 function criarTabelas(sqlite: InstanceType<typeof DatabaseSync>) {
   const schema = readFileSync(join(process.cwd(), "prisma/schema.prisma"), "utf8");
-  for (const modelo of ["BpmCard", "BpmPipeline", "BpmEtapa", "BpmCardMembro", "BpmCardVinculo", "BpmCardHistorico", "BpmAutomacaoExecucao", "BpmAutomacao", "BpmCampo", "BpmEventoDominio"]) {
+  for (const modelo of ["usuarios", "BpmCard", "BpmPipeline", "BpmEtapa", "BpmCardMembro", "BpmCardVinculo", "BpmCardHistorico", "BpmAutomacaoExecucao", "BpmAutomacao", "BpmCampo", "BpmEventoDominio"]) {
     const corpo = schema.match(new RegExp(`model ${modelo} \\{([\\s\\S]*?)\\n\\}`))?.[1];
     if (!corpo) throw new Error(`Missing model ${modelo}`);
     const colunas = corpo.split("\n").flatMap((linha) => {
@@ -55,6 +55,7 @@ function criarTabelas(sqlite: InstanceType<typeof DatabaseSync>) {
     if (modelo === "BpmEventoDominio") colunas.push("UNIQUE(idempotencyKey)");
     sqlite.exec(`CREATE TABLE "${modelo}" (${colunas.join(",")});`);
   }
+  sqlite.exec("INSERT INTO usuarios(id,nome,usuario,email,senha) VALUES(9,'Responsável fictício','fixture','fixture@example.test','sem-credencial')");
   sqlite.prepare("INSERT INTO BpmPipeline(id,nome,chave,createdAt,updatedAt) VALUES(?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)").run(pipeline, "Revisão de Radar", "comercial");
   sqlite.prepare("INSERT INTO BpmPipeline(id,nome,chave,createdAt,updatedAt) VALUES(?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)").run(destino, "Financeiro", "financeiro");
   sqlite.prepare("INSERT INTO BpmEtapa(id,pipelineId,nome,ordem,createdAt,updatedAt) VALUES(?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)").run(etapa, destino, "Novo contrato", 0);
@@ -93,7 +94,7 @@ describe("encaminhamento atômico em Prisma/SQLite privado", () => {
     expect(repetido).toMatchObject({ cardId: primeiro.cardId, existente: true, versao: 1 });
     expect(await db.bpmCard.count()).toBe(2);
     expect(await db.bpmCardVinculo.count()).toBe(1);
-    expect(await db.bpmCardHistorico.count()).toBe(1);
+    expect(await db.bpmCardHistorico.count()).toBe(2);
     expect(await db.bpmEventoDominio.count()).toBe(1);
   }));
   it("vínculo manual com card de outro cliente não é reutilizado nem recebe cópias", async () => fixture(async (db) => {

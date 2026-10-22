@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/lib/bpm/recebimentos-card-server", () => ({ registrarRecepcaoPipelineBpm: vi.fn().mockResolvedValue(null) }));
 
 const mocks = vi.hoisted(() => {
   const db = {

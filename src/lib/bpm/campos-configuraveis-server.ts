@@ -3,6 +3,7 @@ import "server-only";
 import db from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { fonteCampoPermitida, type EntidadeFonteCampo } from "@/lib/bpm/campos-configuraveis";
+import { ehPipelineOperacional } from "@/lib/bpm/financeiro-config.client";
 
 type ClienteCamposCanonicos = typeof db | Prisma.TransactionClient;
 
@@ -44,6 +45,7 @@ export async function carregarValoresCanonicosCampos(
       dataReuniao: true,
       responsavelId: true,
       responsavel: { select: { id: true, nome: true, cpf: true } },
+      pipeline: { select: { id: true, chave: true } },
       createdAt: true,
       empresa: {
         select: {
@@ -129,7 +131,43 @@ export async function carregarValoresCanonicosCampos(
     CARD: { ...card, responsavelNome: card.responsavel?.nome, responsavelCpf: card.responsavel?.cpf },
   };
 
+  const valoresVendedor = new Map<string, string>();
+  const camposResponsavel = globais.filter((campo) => campo.fonteEntidade === "CARD"
+    && ["responsavelId", "responsavelNome", "responsavelCpf"].includes(campo.fonteAtributo ?? ""));
+  if (camposResponsavel.length && (card.pipeline?.chave === "financeiro" || Boolean(card.pipeline && ehPipelineOperacional(card.pipeline)))) {
+    // A identidade do campo vem do catálogo, nunca de uma chave enviada pelo chamador.
+    const vendedores = await client.bpmCampo.findMany({
+      where: { id: { in: camposResponsavel.map((campo) => campo.id) }, chave: "alpha.vendedor.a" }, select: { id: true },
+    });
+    if (vendedores.length) {
+      for (const vendedor of vendedores) valoresVendedor.set(vendedor.id, "");
+      const { carregarRecepcoesPipelineBpm, idRecepcaoPipeline } = await import("@/lib/bpm/recebimentos-card-server");
+      const recepcao = (await carregarRecepcoesPipelineBpm([idRecepcaoPipeline(card.id)], client)).get(card.id);
+      let comercial = recepcao?.marker.responsaveisAnteriores.find((responsavel) => responsavel.setor === "COMERCIAL");
+      if (!comercial) {
+        const vinculos = await client.bpmCardVinculo.findMany({ where: { cardDestinoId: card.id,
+          cardOrigem: { empresaId: card.empresaId, pipeline: { OR: [{ chave: "comercial" }, { nome: "Revisão de Radar" }] } } },
+          take: 2, select: { cardOrigem: { select: { pipelineId: true, responsavelId: true,
+            pipeline: { select: { nome: true } }, responsavel: { select: { nome: true } } } } } });
+        if (vinculos.length === 1) {
+          const origem = vinculos[0].cardOrigem;
+          comercial = { setor: "COMERCIAL", pipelineId: origem.pipelineId, pipelineNome: origem.pipeline.nome,
+            usuarioId: origem.responsavelId, nome: origem.responsavel.nome };
+        }
+      }
+      if (comercial) {
+        const usuario = await client.usuarios.findUnique({ where: { id: comercial.usuarioId }, select: { cpf: true } });
+        for (const vendedor of vendedores) {
+          const atributo = camposResponsavel.find((campo) => campo.id === vendedor.id)?.fonteAtributo;
+          valoresVendedor.set(vendedor.id, atributo === "responsavelId" ? String(comercial.usuarioId)
+            : atributo === "responsavelNome" ? comercial.nome : usuario?.cpf ?? "");
+        }
+      }
+    }
+  }
+
   return Object.fromEntries(globais.map((campo) => {
+    if (valoresVendedor.has(campo.id)) return [campo.id, valoresVendedor.get(campo.id)!];
     if (!campo.fonteEntidade) return [campo.id, personalizadoPorCampo.get(campo.id) ?? ""];
     const entidade = campo.fonteEntidade as EntidadeFonteCampo;
     const atributo = campo.fonteAtributo as string;

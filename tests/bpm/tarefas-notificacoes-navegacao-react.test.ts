@@ -32,6 +32,19 @@ describe("reabertura do card pela mesma notificação", () => {
   const mensagem = (type: string, source = frameWindow, origin = window.location.origin) => window.dispatchEvent(new MessageEvent("message", {
     source, origin, data: { type, cardId, pipelineId: "pipeline-1" },
   }));
+  it("abre lead virtual no mesmo funil sem tratá-lo como card nativo", () => {
+    const virtual = "/PainelAlpha/AlphaCRM/pipeline/pipeline-1?origemLead=instagram&leadId=ig-nao-cuid";
+    abrir(virtual, "CRM");
+    expect(openTab).toHaveBeenLastCalledWith(url, "CRM", "tab-1");
+    expect(postMessage).toHaveBeenLastCalledWith({ type: BPM_CARD_ABRIR_EVENT, pipelineId: "pipeline-1", leadId: "ig-nao-cuid", origemLead: "instagram" }, window.location.origin);
+    window.dispatchEvent(new MessageEvent("message", { source: frameWindow, origin: window.location.origin,
+      data: { type: BPM_CARD_ABERTO_EVENT, pipelineId: "pipeline-1", leadId: "ig-nao-cuid", origemLead: "noloss" } }));
+    postMessage.mockClear(); mensagem(BPM_CARD_PRONTO_EVENT);
+    expect(postMessage).toHaveBeenCalledOnce();
+    window.dispatchEvent(new MessageEvent("message", { source: frameWindow, origin: window.location.origin,
+      data: { type: BPM_CARD_ABERTO_EVENT, pipelineId: "pipeline-1", leadId: "ig-nao-cuid", origemLead: "instagram" } }));
+    postMessage.mockClear(); mensagem(BPM_CARD_PRONTO_EVENT); expect(postMessage).not.toHaveBeenCalled();
+  });
   it("envia nova intenção mesmo quando a aba já existe e o modal foi fechado", () => {
     abrir(url, "CRM"); mensagem(BPM_CARD_ABERTO_EVENT);
     abrir(url, "CRM");

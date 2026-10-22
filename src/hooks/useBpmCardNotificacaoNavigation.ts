@@ -2,9 +2,11 @@
 import { useCallback, useEffect, useRef, type RefObject } from "react";
 import { encontrarAbaCrm, type PainelTab } from "@/lib/painel-tabs";
 import { BPM_CARD_ABERTO_EVENT, BPM_CARD_ABRIR_EVENT, BPM_CARD_PRONTO_EVENT,
-  intencaoCardBpmDaUrl, type IntencaoCardBpm } from "@/lib/bpm/notificacoes-tarefas";
+} from "@/lib/bpm/notificacoes-tarefas";
 
-type IntencaoPendente = IntencaoCardBpm & { url: string; navegacao?: string };
+import { intencaoNotificacaoBpmDaUrl, intencaoNotificacaoBpmSchema, mesmaIntencaoNotificacaoBpm, type IntencaoNotificacaoBpm } from "@/lib/bpm/notificacoes-navegacao";
+
+type IntencaoPendente = IntencaoNotificacaoBpm & { url: string; navegacao?: string };
 function urlDoFrame(frame?: HTMLIFrameElement): URL | null {
   try { return frame?.contentWindow ? new URL(frame.contentWindow.location.href) : null; } catch { return null; }
 }
@@ -25,8 +27,10 @@ export function useBpmCardNotificacaoNavigation(tabs: PainelTab[],
     const aba = intencao ? tabs.find((tab) => tab.url === intencao.url) : undefined;
     const frame = aba ? iframes.current.get(aba.id) : undefined;
     if (intencao && documentoCorresponde(urlDoFrame(frame), intencao)) frame?.contentWindow?.postMessage({
-      type: BPM_CARD_ABRIR_EVENT, cardId: intencao.cardId, pipelineId: intencao.pipelineId,
+      type: BPM_CARD_ABRIR_EVENT, ...(intencao.cardId ? { cardId: intencao.cardId } : {}), pipelineId: intencao.pipelineId,
       ...(intencao.tarefaId ? { tarefaId: intencao.tarefaId } : {}),
+      ...(intencao.recepcaoId ? { recepcaoId: intencao.recepcaoId } : {}),
+      ...(intencao.leadId ? { leadId: intencao.leadId, origemLead: intencao.origemLead } : {}),
     }, window.location.origin);
   }, [tabs, iframes]);
   useEffect(() => {
@@ -38,15 +42,15 @@ export function useBpmCardNotificacaoNavigation(tabs: PainelTab[],
       if (!aba || event.source !== iframes.current.get(aba.id)?.contentWindow) return;
       if (!documentoCorresponde(urlDoFrame(iframes.current.get(aba.id)), intencao)) return;
       if (event.data.type === BPM_CARD_PRONTO_EVENT) entregar();
-      if (event.data.type === BPM_CARD_ABERTO_EVENT && event.data.cardId === intencao.cardId
-        && event.data.pipelineId === intencao.pipelineId
-        && event.data.tarefaId === intencao.tarefaId) pendente.current = null;
+      const confirmacao = intencaoNotificacaoBpmSchema.safeParse(event.data);
+      if (event.data.type === BPM_CARD_ABERTO_EVENT && confirmacao.success
+        && mesmaIntencaoNotificacaoBpm(confirmacao.data, intencao)) pendente.current = null;
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
   }, [tabs, iframes, entregar]);
   return useCallback((url: string, label: string) => {
-    const intencao = intencaoCardBpmDaUrl(url);
+    const intencao = intencaoNotificacaoBpmDaUrl(url);
     if (!intencao) { pendente.current = null; openTab(url, label); return; }
     const aba = encontrarAbaCrm(tabs);
     let destino = url;

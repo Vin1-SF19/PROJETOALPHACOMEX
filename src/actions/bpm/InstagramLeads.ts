@@ -18,6 +18,7 @@ import { criarSlaInstancia } from "@/lib/bpm/sla";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { processarCadenciasImediatasDoCardBpm } from "@/lib/bpm/cadencias/executor";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { notificarPendenciasLeadsBpm } from "@/lib/bpm/notificacoes-leads-server";
 
 const schema = z.object({
   leadId: z.string().cuid(), etapaDestinoId: etapaIdCardSchema, responsavelId: z.number().int().positive(),
@@ -116,6 +117,7 @@ export async function AssumirLeadInstagram(input: unknown) {
       return { cardId: card.id, pipelineId, duplicate: false };
     });
     if (!resultado.duplicate) {
+      await notificarPendenciasLeadsBpm({ pipelineId: resultado.pipelineId });
       await notificarPipelineBpm({ pipelineId: resultado.pipelineId, cardId: resultado.cardId, tipo: "CARD_CRIADO" });
       try { await processarCadenciasImediatasDoCardBpm(resultado.cardId); }
       catch { console.error("[InstagramLeads] Cadência imediata pendente de processamento"); }

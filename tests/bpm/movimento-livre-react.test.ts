@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({ preflight: vi.fn(), move: vi.fn(), saveAndMove: vi.fn(), disponibilidade: vi.fn(), flush: vi.fn(), list: vi.fn(), sync: vi.fn(), error: vi.fn() }));
 const drag = vi.hoisted(() => ({ current: null as null | ComponentProps<typeof import("@dnd-kit/core").DndContext> }));
+vi.mock("@/actions/bpm/NotificacoesLeads", () => ({ ObterLeadPendenteNotificacaoBpm: vi.fn() }));
 vi.mock("@dnd-kit/core", async (original) => {
   const actual = await original<typeof import("@dnd-kit/core")>();
   return { ...actual, DndContext: (props: ComponentProps<typeof actual.DndContext>) => { drag.current = props; return h(actual.DndContext, props); } };
@@ -29,7 +30,7 @@ vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal", () => ({ defau
 vi.mock("@/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/NovoCardModal", () => ({ default: () => null }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/NolossLeadModal", () => ({ default: () => null }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/AtribuirResponsavelPromocaoModal", () => ({ default: () => null }));
-vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/SeletorMembrosCard", () => ({ GrupoAvataresMembrosCard: () => null }));
+vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/SeletorMembrosCard", () => ({ GrupoAvataresMembrosCard: ({ membros }: { membros: { usuario: { nome: string } }[] }) => h("span", { "data-membros": true }, membros.map((membro) => membro.usuario.nome).join(", ")) }));
 vi.mock("@/hooks/useLazyColumn", () => ({ useLazyColumn: () => [React.createRef(), true] }));
 
 import PainelProximaEtapa from "@/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa";
@@ -55,11 +56,11 @@ const click = async (label: string) => { expect(button(label)).toBeDefined(); aw
 async function painel(card = detalhe, destino = "Destino") {
   await act(async () => root.render(h(PainelProximaEtapa, { card, etapas: [{ id: "destino", nome: destino, chave: null, ordem: 1, script: null }], podeMoverEtapa: true, accent: "1,2,3", onMovido })));
 }
-async function board(podeMoverLivremente = false, contagens = { tarefas: 0, anexos: 0 }, paginado = false) {
+async function board(podeMoverLivremente = false, contagens = { tarefas: 0, anexos: 0 }, paginado = false, recebimentoPendente = false) {
   await act(async () => root.render(h(PipelineBoardClient, {
     pipeline: { id: "pipeline", nome: "Funil Sintético", etapas: [{ id: "origem", nome: "Origem", ordem: 0 }, { id: "destino", nome: "Destino", ordem: 1 }] },
     manifestoInicial: paginado ? { configVersion: 1, entradas: [{ id: cardBoard.id, etapaId: "origem", revision: "1", nome: "Empresa Sintética", cnpj: null, servico: null, responsaveis: [] }] } : undefined,
-    cardsIniciais: [{ ...cardBoard, _count: contagens, podeMoverLivremente, podeAgirEtapa: !podeMoverLivremente }], visual: { accent: "1,2,3" } as ComponentProps<typeof PipelineBoardClient>["visual"], currentUserId: 1, currentUserRole: "ADMIN",
+    cardsIniciais: [{ ...cardBoard, recebimentoPendente, _count: contagens, podeMoverLivremente, podeAgirEtapa: !podeMoverLivremente }], visual: { accent: "1,2,3" } as ComponentProps<typeof PipelineBoardClient>["visual"], currentUserId: 1, currentUserRole: "ADMIN",
   })));
 }
 async function drop() {
@@ -135,4 +136,15 @@ it.each([true, false])("contador e card mudam juntos e reconciliam sucesso=%s", 
   expect(totais()).toEqual(["0", "1"]);
   await act(async () => { liberar({ success: sucesso, ...(!sucesso ? { error: "Recusado" } : {}) }); await movimento; });
   expect(totais()).toEqual(sucesso ? ["0", "1"] : ["1", "0"]);
+});
+
+it("recepção pendente no Kanban não apresenta o responsável herdado como dono do novo setor", async () => {
+  await board(false, { tarefas: 0, anexos: 0 }, false, true);
+  expect(host.textContent).toContain("Aguardando assumir");
+  expect(host.querySelector("[data-membros]")).toBeNull();
+  expect(host.textContent).not.toContain("Responsável Sintético");
+  await act(async () => root.render(null));
+  await board();
+  expect(host.textContent).not.toContain("Aguardando assumir");
+  expect(host.querySelector("[data-membros]")?.textContent).toContain("Responsável Sintético");
 });

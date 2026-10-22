@@ -5,8 +5,7 @@ import { SincronizarQuadroBpm } from "@/actions/bpm/Quadro";
 import PipelineBoardClient from "./PipelineBoardClient";
 import { notFound } from "next/navigation";
 
-import { bpmCardIdSchema } from "@/lib/validations/bpm";
-import { intencaoCardBpmSchema } from "@/lib/bpm/notificacoes-tarefas";
+import { intencaoNotificacaoBpmSchema } from "@/lib/bpm/notificacoes-navegacao";
 
 export const dynamic = "force-dynamic";
 
@@ -15,12 +14,12 @@ export default async function PipelineBpmPage({
   searchParams,
 }: {
   params: Promise<{ pipelineId: string }>;
-  searchParams?: Promise<{ cardId?: string | string[]; tarefaId?: string | string[] }>;
+  searchParams?: Promise<{ cardId?: string | string[]; tarefaId?: string | string[]; origemLead?: string | string[]; leadId?: string | string[]; recepcaoId?: string | string[] }>;
 }) {
   const { pipelineId } = await params;
   const busca = await searchParams;
-  const cardInicial = bpmCardIdSchema.safeParse(busca?.cardId);
-  const intencaoInicial = intencaoCardBpmSchema.safeParse({ pipelineId, cardId: busca?.cardId, tarefaId: busca?.tarefaId });
+  const intencaoInicial = intencaoNotificacaoBpmSchema.safeParse({ pipelineId, cardId: busca?.cardId, tarefaId: busca?.tarefaId,
+    origemLead: busca?.origemLead, leadId: busca?.leadId, recepcaoId: busca?.recepcaoId });
   const session = await auth();
   const temaNome = (session?.user as { tema_interface?: string })?.tema_interface || "blue";
   const visual = getTema(temaNome);
@@ -37,7 +36,8 @@ export default async function PipelineBpmPage({
     <PipelineBoardClient
       key={pipelineId}
       pipeline={pipelineResult.data}
-      cardInicialId={cardInicial.success ? cardInicial.data : null}
+      cardInicialId={intencaoInicial.success ? intencaoInicial.data.cardId ?? null : null}
+      intencaoNotificacaoInicial={intencaoInicial.success ? intencaoInicial.data : null}
       tarefaInicialId={intencaoInicial.success ? intencaoInicial.data.tarefaId : undefined}
       pipelinesDisponiveis={pipelinesResult.success ? pipelinesResult.data.map(({ id, nome }) => ({ id, nome })) : []}
       cardsIniciais={cardsResult.success ? cardsResult.cards : []}

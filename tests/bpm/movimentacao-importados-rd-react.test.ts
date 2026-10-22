@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({ preflight: vi.fn(), move: vi.fn(), saveAndMove: vi.fn(), disponibilidade: vi.fn(), flush: vi.fn(), list: vi.fn(), error: vi.fn() }));
 const drag = vi.hoisted(() => ({ current: null as null | ComponentProps<typeof import("@dnd-kit/core").DndContext> }));
+vi.mock("@/actions/bpm/NotificacoesLeads", () => ({ ObterLeadPendenteNotificacaoBpm: vi.fn() }));
 vi.mock("@dnd-kit/core", async (original) => {
   const actual = await original<typeof import("@dnd-kit/core")>();
   return { ...actual, DndContext: (props: ComponentProps<typeof actual.DndContext>) => { drag.current = props; return h(actual.DndContext, props); } };

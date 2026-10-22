@@ -9,6 +9,7 @@ import {
   usuarioElegivelResponsavelBpm,
 } from "@/lib/bpm/ownership";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { notificarPendenciasLeadsBpm } from "@/lib/bpm/notificacoes-leads-server";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { cnpjEhValido, normalizarCNPJ } from "@/lib/format-cnpj";
@@ -192,6 +193,7 @@ export async function PromoverNolossLead(dados: unknown) {
       return { success: false, error: "Lead não encontrado ou já processado" };
     }
 
+    await notificarPendenciasLeadsBpm({ pipelineId: pipeline.id });
     await notificarPipelineBpm({
       pipelineId: pipeline.id,
       cardId: resultado.cardId,

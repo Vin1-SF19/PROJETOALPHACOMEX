@@ -2,6 +2,10 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { pusherClient } from "@/lib/pusher";
+import { BPM_LEADS_RECONCILIAR_EVENT } from "@/lib/bpm/notificacoes-navegacao";
+import { BPM_LEAD_ALERTA_EVENT } from "@/lib/bpm/notificacoes-leads";
+import { criarNotificacoesLeadsClient } from "@/hooks/bpm-leads-notificacoes-client";
+import { useBpmLeadsNotificacoes } from "@/store/useBpmLeadsNotificacoes";
 import { useBpmTarefasNotificacoes } from "@/store/useBpmTarefasNotificacoes";
 import {
   BPM_TAREFA_ALERTA_EVENT, canalTarefasBpmDoUsuario, detalhesAlertaTarefaBpm,
@@ -15,8 +19,10 @@ export function useBpmTarefasNotifications(usuarioId: number, abrirModulo: (url:
     try { if (window !== window.top) return; } catch { return; }
     const store = useBpmTarefasNotificacoes;
     store.getState().iniciarUsuario(usuarioId);
+    useBpmLeadsNotificacoes.getState().iniciarUsuario(usuarioId);
     if (!Number.isSafeInteger(usuarioId) || usuarioId <= 0) return;
     const controller = new AbortController();
+    const leads = criarNotificacoesLeadsClient(usuarioId, controller.signal, (url, label) => abrirRef.current(url, label));
     const toastIds = new Set<string>();
     const limparToasts = () => { for (const id of toastIds) toast.dismiss(id); toastIds.clear(); };
     let carregando = false;
@@ -66,10 +72,19 @@ export function useBpmTarefasNotifications(usuarioId: number, abrirModulo: (url:
         if (atualizarDepois && !controller.signal.aborted) { atualizarDepois = false; void atualizar(); }
       }
     }
-    const reconciliar = () => { if (document.visibilityState !== "hidden") void atualizar(); };
+    const reconciliar = () => { if (document.visibilityState !== "hidden") { void atualizar(); void leads.atualizar(); } };
+    const reconciliarLeads = () => { if (document.visibilityState !== "hidden") void leads.atualizar(); };
+    const receberReconciliacao = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.data?.type !== BPM_LEADS_RECONCILIAR_EVENT) return;
+      const frameConhecido = [...document.querySelectorAll("iframe")].some((frame) => frame.contentWindow === event.source);
+      if (frameConhecido) reconciliarLeads();
+    };
+    window.addEventListener(BPM_LEADS_RECONCILIAR_EVENT, reconciliarLeads);
+    window.addEventListener("message", receberReconciliacao);
     const canalNome = canalTarefasBpmDoUsuario(usuarioId);
     const canal = pusherClient?.subscribe(canalNome);
     canal?.bind(BPM_TAREFA_ALERTA_EVENT, reconciliar);
+    canal?.bind(BPM_LEAD_ALERTA_EVENT, reconciliarLeads);
     canal?.bind("pusher:subscription_succeeded", reconciliar);
     pusherClient?.connection.bind("connected", reconciliar);
     window.addEventListener("focus", reconciliar);
@@ -77,14 +92,19 @@ export function useBpmTarefasNotifications(usuarioId: number, abrirModulo: (url:
     document.addEventListener("visibilitychange", reconciliar);
     const timer = window.setInterval(reconciliar, 30000);
     void atualizar();
+    void leads.atualizar();
     return () => {
       controller.abort();
+      leads.limpar();
       limparToasts();
       window.clearInterval(timer);
+      window.removeEventListener(BPM_LEADS_RECONCILIAR_EVENT, reconciliarLeads);
+      window.removeEventListener("message", receberReconciliacao);
       window.removeEventListener("focus", reconciliar);
       window.removeEventListener("online", reconciliar);
       document.removeEventListener("visibilitychange", reconciliar);
       canal?.unbind(BPM_TAREFA_ALERTA_EVENT, reconciliar);
+      canal?.unbind(BPM_LEAD_ALERTA_EVENT, reconciliarLeads);
       canal?.unbind("pusher:subscription_succeeded", reconciliar);
       pusherClient?.connection.unbind("connected", reconciliar);
       if (canal) pusherClient?.unsubscribe(canalNome);
