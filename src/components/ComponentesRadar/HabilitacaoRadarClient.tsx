@@ -29,6 +29,8 @@ type EmpresaRadar = {
   contribuinte: string;
   situacao: string;
   dataSituacao: string;
+  dataAtualizacaoPublicada?: string | null;
+  radarAviso?: string;
   submodalidade: string;
   razaoSocial: string;
   nomeFantasia: string;
@@ -242,7 +244,7 @@ export function HabilitacaoRadarClient() {
       CNPJ: e.cnpj,
       Contribuinte: e.contribuinte || "",
       "Situação": e.situacao || "",
-      "Data Situação": fmtDisplay(e.dataSituacao),
+      "Atualização Base Receita": e.dataAtualizacaoPublicada || fmtDisplay(e.dataSituacao),
       Submodalidade: e.submodalidade || "",
       "Razão Social": e.razaoSocial || "",
       "Nome Fantasia": e.nomeFantasia || "",
@@ -326,6 +328,8 @@ export function HabilitacaoRadarClient() {
         contribuinte:     empresa.contribuinte || dadosOriginais?.contribuinte || "",
         situacao:         empresa.situacao      || empresa.situacao_radar      || dadosOriginais?.situacao || "ATIVO",
         dataSituacao:     fmt(empresa.dataSituacao     || empresa.data_situacao     || dadosOriginais?.dataSituacao),
+        dataAtualizacaoPublicada: empresa.dataAtualizacaoPublicada || dadosOriginais?.dataAtualizacaoPublicada || null,
+        radarAviso:       empresa.radarAviso || undefined,
         submodalidade:    empresa.submodalidade  || dadosOriginais?.submodalidade || "",
         razaoSocial:      empresa.razaoSocial    || empresa.razao_social         || dadosOriginais?.razaoSocial || "NÃO ENCONTRADO",
         nomeFantasia:     empresa.nomeFantasia   || empresa.nome_fantasia         || dadosOriginais?.nomeFantasia || "",
@@ -718,6 +722,8 @@ export function HabilitacaoRadarClient() {
   // ── Status badge helper ──────────────────────────────────────────────────────
   const statusBadge = (situacao: string) => {
     const s = (situacao || "").toUpperCase();
+    if (s.includes("NÃO CONSTA") || s.includes("INDISPONÍVEL") || s.includes("NÃO VERIFICADO"))
+      return "text-amber-300 bg-amber-500/10 border border-amber-500/20";
     if (["DEFERIDA", "HABILITADA", "ATIVO"].includes(s))
       return "text-emerald-400 bg-emerald-500/10 border border-emerald-500/20";
     if (s === "NÃO HABILITADA" || s === "SUSPENSA")
@@ -1079,7 +1085,7 @@ export function HabilitacaoRadarClient() {
                 </th>
                 {[
                   "N°", "Consulta", "CNPJ", "Contribuinte", "Situação",
-                  "Data Sit.", "Submodal.", "Razão Social", "Fantasia",
+                  "Atual. Base", "Submodal.", "Razão Social", "Fantasia",
                   "Município", "UF", "Const.", "Regime", "Dt. Opção", "Capital",
                 ].map((col) => (
                   <th key={col} className="p-2 font-black text-slate-500">
@@ -1170,7 +1176,7 @@ export function HabilitacaoRadarClient() {
                                 {empresa.situacao || "SEM STATUS"}
                               </span>
                             </td>
-                            <td className="p-2 text-slate-400">{fmtDisplay(empresa.dataSituacao)}</td>
+                            <td className="p-2 text-slate-400" title={empresa.radarAviso || "Data publicada pela Receita Federal"}>{empresa.dataAtualizacaoPublicada || fmtDisplay(empresa.dataSituacao)}</td>
                             <td className="p-2 text-slate-300 truncate max-w-[100px]">
                               {empresa.submodalidade}
                             </td>
