@@ -36,7 +36,12 @@ export function setorUsuarioFilaBpm(role: string): "COMERCIAL" | "FINANCEIRO" | 
   return setor === "COMERCIAL" || setor === "FINANCEIRO" || setor === "OPERACIONAL" ? setor : null;
 }
 
-/** A audiência usa permissões efetivas atuais; bypass administrativo não é inscrição. */
+export function ehObservadorTiAlertasLeadsBpm(role: string): boolean {
+  const perfil = normalizeRole(role);
+  return perfil === "ADMIN" || perfil === "TI";
+}
+
+/** A audiência usa permissões efetivas atuais; TI/Admin observa sem autoridade de assunção. */
 export async function listarDestinatariosFilaLeadsBpm(pipelineId: string, etapaId: string, client: ClienteNotificacoesLeads = db) {
   const [usuarios, pipeline] = await Promise.all([
     listarUsuariosComAcessoCrmBpm(client),
@@ -50,13 +55,14 @@ export async function listarDestinatariosFilaLeadsBpm(pipelineId: string, etapaI
     : ehPipelineOperacional(pipeline) ? "OPERACIONAL" : null;
   if (!setor) return [];
   return usuarios.flatMap((usuario) => {
-    if (setorUsuarioFilaBpm(usuario.role) !== setor) return [];
+    const observador = ehObservadorTiAlertasLeadsBpm(usuario.role);
+    if (!observador && setorUsuarioFilaBpm(usuario.role) !== setor) return [];
     const visibilidade = resolverVisibilidadeEtapa(usuario.role, pipeline.etapas[0].visibilidades);
-    const permitido = visibilidade.podeVer && (setor !== "COMERCIAL" || visibilidade.podeAgir) && podeAcessarPipelineBpm({
+    const permitido = visibilidade.podeVer && (observador || setor !== "COMERCIAL" || visibilidade.podeAgir) && podeAcessarPipelineBpm({
       role: usuario.role, permissoes: ["crm"], usuarioId: usuario.id, visualizacaoConfigJson: pipeline.visualizacaoConfigJson,
       setoresPipeline: pipeline.setores.filter(({ setor }) => setor.ativo).map(({ setor }) => setor.nome), ehMembroPipeline: false,
     });
-    return permitido ? [{ ...usuario, podeAgir: visibilidade.podeAgir }] : [];
+    return permitido ? [{ ...usuario, podeAgir: !observador && visibilidade.podeAgir }] : [];
   });
 }
 

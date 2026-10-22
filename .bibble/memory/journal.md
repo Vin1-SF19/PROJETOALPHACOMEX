@@ -7389,3 +7389,36 @@ Nenhuma implementação adicional nesta entrega staging. Ingestão IG/site ao vi
 ### Refletido também em
 - `codebase-map.md` e `integration-points.md`: módulos e conclusão factual.
 - `docs/reports/crm-notificacoes-leads-staging-20261022.md`: evidências e limites sanitizados.
+
+
+---
+
+## [2026-10-22 13:59 UTC] — CRM: contrato de observação TI/Admin
+
+**Tags:** #bugfix #decision #security #integration
+**Agentes envolvidos:** coordenação, Scout/Architect, Echo, QA, DevOps.
+**Arquivos tocados:** story e arquitetura existentes de notificações CRM; memórias de mapa/integrações/journal. Nenhum runtime por esta análise.
+
+### Contexto
+Usuário TI não recebeu notificações e pediu recebê-las para testar/ver. A audiência setorial anterior excluía Admin/TI apesar do acesso administrativo de leitura.
+
+### O que foi feito
+AC18 e adendo definidos antes da implementação sobre 69047dee limpa/conferida: mesmo GET/fanout/lookup, observador ADMIN/TI exato, sem incluir CEO. Blueprint liberado a Echo e QA.
+
+### Decisões tomadas
+Recipient observador tem podeAgir=false; claim nativo continua exigindo setor e guardas atuais. Promoção virtual anterior não muda. Abrir nativo pode registrar primeiro acesso/SLA preexistentes; não é claim nem promessa de zero escrita global.
+
+### Problemas encontrados / resolvidos
+isAdminRole também inclui CEO e não serve à exceção solicitada. O mesmo helper de audiência é consumido pelo claim; defesa setorial explícita impede ampliação de autoridade.
+
+### Pendências
+Implementação, quatro gates, revisão e smoke da correção em staging; resultados remotos devem ter evidência própria. Sem migração/configuração/ENV/produção ou revalidação presumida pelos gates anteriores.
+
+### Refletido também em
+- `codebase-map.md` e `integration-points.md`: exceção de observação com fronteira de claim preservada.
+
+
+### Atualização local — correção TI/Admin observador
+- Forge quatro gates reais PASS: tipos0/47,36s, lint0/52,40s (1.193 warnings existentes), novo build0/216,68s e suíte completa0/193,11s: 720 arquivos/5.784 aprovados, zero falhas, quatro skipped/um todo. Fonte `1fc1f5e59524c39c21890cd031376f8bc949474cfd7217f7d19c830b169600a9` idêntica antes/depois.
+- Client Prisma compartilhado divergente foi isolado em artefato privado compatível com o schema fonte, sem instalar/atualizar pacotes, modificar o client alheio ou alterar schema. Nove SQLite PASS após o ajuste do harness; primeira falha preservada. Aprendizado registrado em `known-errors.md`.
+- QA local APPROVED libera publicação; teste visual autenticado Admin da correção permanece pendente. Este commit será Ready for Review, com evidência remota posterior somente privada; não declarar novo READY antes de acontecer e não criar rodada recursiva de docs. Produção/banco remoto/ENV/worker manual fora do escopo.
