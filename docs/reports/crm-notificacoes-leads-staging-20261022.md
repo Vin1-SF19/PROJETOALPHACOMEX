@@ -43,3 +43,16 @@ O acesso CRM da liderança Operacional foi habilitado pelo CRUD administrativo n
 - Evidências brutas, credenciais, dados pessoais e arquivos privados permanecem fora do Git. Rollback de código disponível na revisão anterior `f7ceefdb`; nenhuma operação de rollback de banco foi necessária.
 
 [Story e parecer final de QA](../stories/story-crm-notificacoes-leads-sem-responsavel-20261022.md).
+
+
+## Adendo — observação TI/Admin solicitada posteriormente
+
+Após o fechamento em `60ae49ff`/`69047dee`, o usuário informou que TI não recebeu notificações e pediu a visualização. A audiência setorial anterior explica o resultado: a consulta Admin sem entradas registrada acima é **baseline histórico**, não a regra de leitura pretendida após esta correção.
+
+TI e Admin passam a receber as pendências autorizadas de Instagram/site e recepções Financeiro/Operacional como observadores. Essa inscrição usa papel persistido e acesso vigente; não transforma observação em permissão de assumir. Claims nativos continuam exigindo setor, elegibilidade e as guardas existentes, inclusive Boas-vindas. CEO não entra automaticamente nessa nova exceção. Lookup é somente leitura; o clique não promove lead, assume card ou envia automaticamente. Primeira visualização/SLA preexistentes do detalhe permanecem preservados.
+
+A correção local passou pelos quatro gates reais: typecheck oficial e lint exit0 (1.193 avisos existentes), novo build Prisma/player/Nextwebpack exit0 e suíte completa **720 arquivos/5.784 testes aprovados, zero falhas, quatro skipped e um todo**. Fonte congelada idêntica antes/depois. Segurança90 e SQLite9 são coberturas focadas incluídas no conjunto, não totais adicionais.
+
+Um client Prisma compartilhado de outra worktree estava incompatível com a fixture; foi substituído apenas no ambiente de validação por client privado gerado do schema fonte, com output local explícito. Nenhuma dependência/versão, schema ou client compartilhado foi alterado; nenhum banco remoto foi conectado pelos gates.
+
+Este registro antecede a publicação da correção e permanece **Ready for Review**, com o teste visual autenticado TI/Admin remoto ainda pendente. A conclusão do deploy, alias e teste visual será guardada em evidências privadas após execução, sem outro commit apenas para registrar o próprio SHA. Evidências locais: `/var/tmp/alpha-crm-notificacoes-ti-observador-20261022/forge/`. Produção permanece fora do escopo.

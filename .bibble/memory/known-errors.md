@@ -798,3 +798,12 @@ Comparação literal e onChange marcavam pontuação como edição. PainelCampos
 
 ### 2026-10-01 — Scribe — RM-2026-AD3EA4: fronteira mensal da venda
 Causa corrigida no código: escrita UTC e limites mensais locais misturavam fusos e deslocavam vendas entre meses. Helper data-comercial compartilhado alinha escrita, consulta e exibição em UTC; data ausente ou impossível é rejeitada. Testes de actions usam mocks, sem comprovar dados históricos reais. Na execução de encerramento, npm test falhou por EBUSY ao remover coverage; preservar o diretório e registrar a limitação, sem limpeza destrutiva. Evidências: tmp/rm-ad3ea4/closure/.
+
+
+## Prisma compartilhado entre worktrees pode divergir do schema da fixture — 2026-10-22
+
+**Sintoma:** SQLite de teste criado a partir do `prisma/schema.prisma` da worktree falha com `no such column: perfilCadastralJson`, embora o código da entrega não use essa coluna. O `node_modules` era symlink para outra worktree; o client gerado compartilhado tinha sido atualizado para outro schema.
+
+**Correção local comprovada:** não alterar fixture/schema para acompanhar client alheio e não regenerar o client compartilhado. Preparar farm privada de dependências com links para os mesmos pacotes e cópia própria de `@prisma/client`; gerar `.prisma/client` próprio usando cópia temporária do schema com apenas `generator.output` local explícito. Apontar somente o `node_modules` da worktree de validação para essa farm fora do Git. Manter a geração do build restrita ao mesmo output privado. Não instalar versões novas.
+
+**Evidência:** hash do schema gerado compartilhado idêntico antes/depois; client privado sem coluna externa, nove SQLite PASS e quatro gates globais PASS. Schema fonte intacto; ambiente sanitizado e banco local descartável, sem conexão remota/migration. Falha inicial do harness preservada separadamente. Diretório privado desta execução: `/var/tmp/alpha-crm-notificacoes-ti-observador-20261022/forge/`.

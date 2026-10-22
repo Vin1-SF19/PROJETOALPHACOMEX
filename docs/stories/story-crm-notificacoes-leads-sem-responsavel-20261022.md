@@ -2,7 +2,7 @@
 
 ## Status
 
-Done — publicado em staging `60ae49ff`, integrado com `f7ceefdb`, gates e QA finais aprovados; homologação Admin real e diagnóstico canônico readonly concluídos com os limites remotos explícitos abaixo. Produção fora do escopo.
+Ready for Review — correção TI/Admin observador implementada, quatro gates reais e QA local APPROVED sobre a base `69047dee`; publicação e teste visual autenticado da correção em staging ainda pendentes neste commit. A evidência remota posterior será privada, sem novo commit documental. O E2E de `60ae49ff`/`69047dee` é histórico; produção fora do escopo.
 
 ## Executor Assignment
 
@@ -49,6 +49,8 @@ O usuário confirmou também nova ação Assumir para Financeiro/Operacional, ma
 15. Comercial mantém seu responsável original; Financeiro e Operacional apresentam nomes claros dos responsáveis por setor e a assunção atual. “Vendedor responsável” continua sendo o vendedor comercial, nunca o usuário que assumiu Financeiro/Operacional. A garantia inclui o resolver de fonte automática e a projeção real `ObterCardBpm`, não apenas o valor persistido ou snapshot. No Financeiro/Operacional, ausência de prova Comercial retorna vazio/indisponível, com fallback somente por vínculo Comercial inequívoco da mesma negociação, inclusive em legado sem escrita: Closer A → Financeiro B → Operacional C mantém vendedor A. Assumir não altera cards de origem, vínculo da negociação, parceiro/origem, contrato, finalização, pagamento, NF ou documentos. Setor atual pendente mostra aguardando assunção, sem apresentar uma atribuição técnica como claim concluído.
 16. A projeção é completa, com ordenação estável e coleta de todas as páginas antes da conciliação. Falha parcial ou resposta antiga não remove pendências nem ressuscita resolvidas. Arquivado/excluído, pipeline inativo ou perda de autorização retiram recursos indisponíveis da projeção sem manter órfãos. Realtime envia somente invalidação mínima no canal privado já autorizado, nunca os dados do lead.
 17. Site azul pode ser comprovado no ingresso NoLoss autenticado pelos opcionais `utmSource`/`utmMedium`/`utmCampaign` guardados nas colunas existentes, sem migration; `utmSource=site|website` identifica site. Payload antigo permanece válido, campos omitidos não apagam proveniência e retries não resetam status de assunção. Origem desconhecida permanece normal, sem classificar todo NoLoss como site.
+
+18. Conforme correção explícita do usuário (“eu (TI) não recebi notificação, preciso receber para testar e ver”), contas ativas com role canônica normalizada exatamente `ADMIN` ou `TI` também recebem como observadoras as pendências existentes Instagram, site/NoLoss e recepções Financeiro/Operacional: consulta completa, central persistente, toast e clique para abrir. `T.I` mantém compatibilidade pela normalização existente; CEO, líderes genéricos, nomes/e-mails/IDs de usuário ou roles parecidas não entram nessa exceção. Reutilizar CRM efetivo e ACL de leitura vigentes do módulo/pipeline/etapa, recursos ativos e os mesmos canais privados. Observador recebe `podeAgir=false`; a nova inscrição não concede assunção nativa, edição ou participação. Tanto `podeAssumir` quanto a mutação de claim nativo exigem explicitamente o setor do alvo, além das guardas atuais. Não modificar a autorização preexistente de promoção Instagram/NoLoss; clique continua sem claim, promoção ou encaminhamento automático. A abertura nativa mantém primeiro acesso/SLA preexistentes de `ObterCardBpm`; não prometer zero escrita global ao abrir. A correção não cria notificações paralelas, schema, configuração, ENV, backfill ou efeitos em produção.
 
 ## Decisões de preparação
 
@@ -109,6 +111,14 @@ Permissão operacional em staging: coordenação realizou CRUD canônico pela UI
 
 Worktree isolada da base `6659f00c`, preservando alterações não relacionadas do workspace principal. Implementação local congelada pelos owners; esta consolidação Scribe/Kowalski altera somente a story e três memórias. Rollback da implementação será de código/artefatos da entrega, sem presumir exclusão ou regravação de dados.
 
+### Correção TI/Admin observador — 2026-10-22
+
+A ausência de alertas na sessão TI/Admin decorre do filtro setorial em `listarDestinatariosFilaLeadsBpm`, compartilhado por GET, fanout e lookup virtual. O bypass administrativo de visualização não era inscrição na audiência. O pedido posterior autoriza acrescentar observadores TI/Admin, sem converter CEO em observador ou alterar a política de assunção setorial. As negativas de audiência Admin registradas na homologação anterior são históricas e deixam de ser o comportamento esperado para leitura após a correção; as negativas de claim nativo permanecem esperadas.
+
+Contrato e blueprint no adendo da arquitetura: helper `ehObservadorTiAlertasLeadsBpm` normaliza somente `Admin`/`TI`, usando papel carregado do banco, nunca sessão/client input como autoridade. O recipient observador tem `podeAgir=false`. GET paginado, fanout privado e `ObterLeadPendenteNotificacaoBpm` compartilham essa audiência. `obterRecebimentoPipelineBpm` e `assumirRecebimentoPipelineBpm` reafirmam o setor do ator para que audiência ampliada não vire autorização de mutação. Não há mudança de DTO/rota, UI extra, modal readonly novo ou exceção para testes; promoção virtual mantém suas permissões anteriores.
+
+Verificar todos os adapters, inclusive origem desconhecida NoLoss, Operacional de chave nula/ID canônico, inatividade/revogação e destinos já assumidos. Testes devem provar leitura/central/fanout/abertura para Admin/TI, exclusão do CEO apenas da nova exceção, negação de claim nativo sem writes e clique sem claim/promoção/encaminhamento. Lookup virtual é readonly; primeiro acesso/SLA preexistentes do detalhe nativo não mudam. Novos resultados ficam separados das evidências históricas; logs/relatório remoto privados são referenciados após sua execução, sem exigir novo commit apenas para atualizar status remoto.
+
 ## Tasks / Subtasks
 
 - [x] Registrar pedido, esclarecimentos explícitos, escopo por setor e checklist de draft (AC 1–17).
@@ -123,6 +133,14 @@ Worktree isolada da base `6659f00c`, preservando alterações não relacionadas 
 - [x] Registrar confirmação explícita do usuário sobre audiência e novo fluxo Financeiro/Operacional (AC 13–15).
 - [x] Implementar recepção/claim nativo transacional, responsáveis por setor e preservação de vendedor/campos de origem (AC 13–15).
 - [x] Conectar proveniência site opcional no ingresso real e recuperação completa/realtime mínimo (AC 16–17).
+
+### Checklist do delta TI/Admin (AC 18)
+
+- [x] Mapear causa, definir exceção TI/Admin exclusiva e registrar contrato antes do código.
+- [x] Implementar observação no ponto compartilhado GET/fanout/lookup e defesa setorial explícita do claim, sem ampliar os demais bypasses.
+- [x] Atualizar testes de audiência/segurança/SQLite e navegação afetados; preservar lifecycle, cores e políticas anteriores.
+- [x] Executar os quatro gates sobre o delta congelado e revisão independente local; registrar evidências e limites reais.
+- [ ] Publicar a correção no staging e executar smoke visual TI/Admin autenticado; registrar o resultado privado sem novo commit documental.
 
 ## Testing
 
@@ -190,9 +208,19 @@ Read-model canônico privado com atores Financeiro e liderança Operacional efet
 
 A homologação observou zero pageerrors JavaScript, cinco respostas 503 de voz Bibble e avisos de geolocalização/allowfullscreen/descrição de diálogo; não se declara console/rede inteiramente limpos. Falhas do harness de captura após criar a fixture e do loader CJS inicial foram preservadas como problemas da automação, sem duplicar criação nem alterar o app. Perfil CLI de staging verificado por fingerprints; produção/estrutura/backfill/worker manual fora do escopo. Relatório sanitizado: [CRM notificações — staging](../reports/crm-notificacoes-leads-staging-20261022.md).
 
+## Gates da correção TI/Admin — liberação local pré-push
+
+Fonte backend limitada a `notificacoes-leads-server.ts` e `recebimentos-card-server.ts`; testes de segurança/SQLite atualizados. Observador Admin/TI é definido por papel persistido normalizado, com `podeAgir=false`; audiência ampliada não concede claim nativo fora do setor. Lookup é readonly; o clique não promove/assume/encaminha automaticamente e preserva primeira visualização/SLA preexistentes do detalhe.
+
+Forge executou uma rodada completa real: typecheck oficial8GiB **exit0/47,36s**, lint **exit0/52,40s** (1.193 warnings existentes, zero erros), novo build equivalente Prisma/player/Nextwebpack **exit0/216,68s** (heap4GiB/CPU1, capRSSpróprio7GiB; pico6.474.780.672bytes), `npm test` com cobertura **exit0/193,11s: 720 arquivos, 5.784 PASS, zero falhas, quatro skipped e um todo**. Custódia `1fc1f5e59524c39c21890cd031376f8bc949474cfd7217f7d19c830b169600a9` igual antes/depois. Segurança90 e SQLite9 são checks focados incluídos na suíte, não contagem adicional. Todos os gates usaram env sanitizado e SQLite local privado, sem `.env` remoto.
+
+Prisma compartilhado de outra worktree tinha coluna incompatível com a fixture. O harness foi corrigido com farm de dependências/client próprios e geração de output privado a partir de cópia do schema, sem alterar schema fonte, versões ou client compartilhado (hash antes/depois idêntico). Falha inicial preservada; nove SQLite passaram após isolar o artefato. Aprendizado em `.bibble/memory/known-errors.md`.
+
+QA/Lens/Probe/Anubis aprovaram o patch local após Forge; CodeRabbit indisponível usa o fallback de revisão independente, sem alegar execução. Build remoto/alias e teste visual Admin da nova audiência permanecem pendentes neste checkpoint pré-push, com resultado posterior somente privado. Não foi repetido smoke loopback amplo: a homologação autenticada real é a próxima verificação. Evidências em `/var/tmp/alpha-crm-notificacoes-ti-observador-20261022/forge/forge-result.json`, `focused-sqlite-result.json` e `private-client-generate-result.json`. Não há migration, ENV, SQLDML/worker manual ou ação de produção.
+
 ## File List
 
-Consolidada dos manifests de backend/frontend e do teste de QA: 54 caminhos próprios da entrega funcional mais um relatório novo, total de 55 caminhos únicos; o fechamento documental altera somente cinco Markdown. Não inclui os dez caminhos externos de `f7ceefdb` como autoria desta feature, logs privados ou dados reais.
+Consolidada dos manifests de backend/frontend e do teste de QA: 54 caminhos próprios da entrega funcional mais relatório e known-errors, total cumulativo de 56 caminhos únicos. O patch TI/Admin sobre `69047dee` altera 11 caminhos: dois runtime, dois testes, arquitetura/story/relatório e quatro memórias; não adiciona dependência ou schema. Não inclui os dez caminhos externos de `f7ceefdb` como autoria desta feature, logs privados ou dados reais.
 
 - `src/lib/bpm/notificacoes-leads.ts` — DTOs, schemas e apresentação neutros de alertas/recepções.
 - `src/lib/bpm/notificacoes-leads-server.ts` — projeção autorizada, audiência, paginação e invalidação por usuário.
@@ -249,7 +277,8 @@ Consolidada dos manifests de backend/frontend e do teste de QA: 54 caminhos pró
 - `.bibble/memory/integration-points.md` — checkpoint histórico e fechamento factual Scribe/Kowalski/DevOps.
 - `.bibble/memory/journal.md` — checkpoint histórico e fechamento factual Scribe/Kowalski/DevOps.
 
-- `docs/reports/crm-notificacoes-leads-staging-20261022.md` — validação de staging, evidências sanitizadas e limites reais.
+- `docs/reports/crm-notificacoes-leads-staging-20261022.md` — validação histórica e adendo TI/Admin com evidências sanitizadas e limites reais.
+- `.bibble/memory/known-errors.md` — isolamento do client Prisma divergente entre worktrees, sem mudar schema ou client alheio.
 
 ## Story Draft Checklist
 
@@ -336,6 +365,25 @@ Os 100 testes frontend em 18 arquivos incluem componentes reais com I/O simulado
 
 Evidências privadas: `/var/tmp/alpha-crm-notificacoes-leads-20261022/release/{combined-f7-result,merge-f7-proof,publication,public-http-smoke,fixture-operational-final,read-model-operational-final}.json`; UI em `/var/tmp/alpha-crm-notificacoes-leads-sem-responsavel-20261022/{finance-panel,operational-panel,remote-browser-result,fixture}.json`, imagem do painel Operacional conferida. Nenhum JSON bruto de navegador, conteúdo de outros clientes ou credencial foi versionado por QA. **Somente QA Results foi atualizado nesta conclusão; arquivo liberado para o commit documental de DevOps.**
 
+
+### 2026-10-22 — Quinn — AC18 TI/Admin observador: APPROVED local / GO staging
+
+**Parecer: APPROVED para a correção local sobre `69047dee`; GO para commit/push normal exclusivamente staging, com teste visual remoto pendente.** Os pareceres anteriores descrevem o contrato e os runtimes anteriores. O AC18 posterior substitui a exclusão de Admin/TI apenas na audiência de leitura; a negação de assunção nativa permanece válida. Recomenda-se **Ready for Review / validação remota pendente**, sem novo Done ou alegação de publicação nesta revisão.
+
+**Forge novo conferido, não herdado da entrega anterior:** `forge/forge-result.json` em `/var/tmp/alpha-crm-notificacoes-ti-observador-20261022/`: typecheck exit 0 (47,36 s), lint exit 0 (52,40 s; zero erros e 1.193 avisos existentes), novo pipeline Prisma/player/Next exit 0 (216,68 s, pico RSS 6.474.780.672 bytes), suíte completa com cobertura exit 0 (193,11 s): **720 arquivos / 5.784 testes PASS, quatro skipped, um todo, zero falhas**. As 1.669 suites internas não são apresentadas como arquivos. Fingerprint `1fc1f5e59524c39c21890cd031376f8bc949474cfd7217f7d19c830b169600a9` inalterado antes/depois. Prisma privado foi gerado localmente do schema fonte preservado para isolar a fixture do client compartilhado; não houve migration, mudança de schema ou banco remoto nos gates.
+
+**Lens/Anubis:** diff dos dois módulos de runtime e dos dois arquivos de teste confrontado com AC18/adendo; nenhum bloqueante crítico/importante novo. `ehObservadorTiAlertasLeadsBpm` usa `normalizeRole` e compara exatamente ADMIN/TI, incluindo T.I, sem usar o bypass que inclui CEO. Conta e papel vêm da leitura canônica de usuários ativos/CRM efetivo. Pipeline/etapa ativos e ACL de leitura continuam exigidos; não se inventa revogação contrária à política de bypass administrativo existente. O ramo observador sempre retorna `podeAgir=false`. Tanto o CTA quanto a mutação nativa exigem explicitamente setor compatível, além de elegibilidade/visibilidade/guardas atuais; a audiência ampliada não vira autorização para assumir. Boas-vindas e Operacional por ID canônico/chave NULL permanecem cobertos. Não foram alteradas as permissões administrativas preexistentes de promoção virtual.
+
+**Sage:** arquivo independente passou de 64 para **90 casos**, com 26 novos adversários e expectativas antigas atualizadas somente quanto à audiência Admin/TI. Helper positivo/aliases, CEO e papéis parecidos negativos, inatividade, pipeline/etapa/tipo de fila, papel do banco versus role forjada da sessão, lookup virtual readonly e recusa de claim Financeiro/Operacional legado preservando owner, membros, versão, histórico e outbox. ESLint próprio sem erros/avisos. Evidências separadas em `/var/tmp/alpha-crm-notificacoes-leads-20261022/ti-observador-qa-security.{log,json}`; os resultados antigos não foram sobrescritos nem reapresentados como validação deste delta.
+
+**Probe/integração real local:** **nove cenários Prisma/SQLite privados PASS** (`focused-sqlite-result.json`) exercitam GET paginado e a action de lookup reais para Instagram/site/NoLoss desconhecido, inclusive fora da primeira página; mesmos resultados para Admin/TI observadores, CEO excluído. Fanout continua mínimo em canais privados individuais; autenticação Pusher existente exige a própria identidade de sessão e CRM efetivo. Em F/O, observadores abrem o card real mas não assumem: tentativa recusada sem SQL de escrita de claim ou mudança de owner/membros/versão/recepção; inativação retira acesso, perda de CRM do ator setorial retira sua pendência, e claim setorial legítimo resolve o alerta também para o observador. Os testes de ABC, reuso/CAS e snapshot continuam passando. Sem novo DTO, route, provider, poller, frontend ou canal; GET/fanout/lookup compartilham o mesmo ponto de audiência, e hook/central/handshake existentes continuam conectados.
+
+**Limites corretos do clique:** GET e lookup virtual permanecem readonly; clicar não chama promoção, claim ou encaminhamento. Abrir detalhe nativo via `ObterCardBpm` pode registrar primeira visualização/SLA pela política anterior, portanto a aprovação não promete zero escrita global ao abrir um card. Essa distinção está no contrato e foi respeitada na revisão dos testes. CodeRabbit continua indisponível no PATH nesta sessão; revisão independente é o fallback, sem varredura externa ou execução fictícia.
+
+**Próxima verificação, após deploy:** conferir SHA/alias/ambiente e usar a sessão Admin legítima contra as duas recepções existentes da fixture 3069. Demonstrar GET completo, toast/central, clique para o card certo, permanência da pendência e zero assunções, sem novas fixtures/credenciais forjadas/worker ou republicação de eventos antigos. O baseline autenticado anterior retornou zero alertas e não valida o comportamento corrigido. Este commit único deve conservar o estado Ready for Review e a pendência remota explícita; a evidência posterior pode ser registrada privadamente pelo executor sem inventar segundo commit documental. Nenhuma configuração ENV, backfill ou publicação em produção é autorizada por este GO.
+
+QA alterou exclusivamente seu arquivo de testes autorizado nesta correção e **somente QA Results nesta revisão final**; fontes e documentos dos demais autores preservados. **Arquivo liberado a DevOps para o commit único e publicação staging.**
+
 ## Change Log
 
 | Data | Versão | Descrição | Autor |
@@ -346,3 +394,7 @@ Evidências privadas: `/var/tmp/alpha-crm-notificacoes-leads-20261022/release/{c
 | 2026-10-22 | 1.2 | Checkpoint da implementação congelada: escopo/AC 1–17, evidências focadas, File List e memórias; Forge, QA final e staging ainda pendentes. | Scribe / Kowalski |
 
 | 2026-10-22 | 1.3 | Done: gates combinados, staging60ae e homologação Admin/diagnóstico readonly aprovados; relatório e memórias finais com limites explícitos. | DevOps / QA |
+
+| 2026-10-22 | 1.4 | Reabertura pelo usuário: TI/Admin como observadores de notificações; CEO excluído da exceção e claim nativo permanece setorial. Contrato anterior à implementação, gates e staging pendentes. | Scout / Architect |
+
+| 2026-10-22 | 1.5 | Correção observadora implementada; Forge quatro gates e QA local APPROVED; staging/teste visual posteriores em evidência privada, sem novo commit documental. | DevOps / QA |

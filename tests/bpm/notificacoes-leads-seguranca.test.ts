@@ -9,11 +9,14 @@ vi.mock("@/lib/pusher-server.ts", () => ({ pusherServer: { trigger: state.trigge
 import { GET } from "@/app/api/bpm/leads/alertas/route";
 import { listarDestinatariosFilaLeadsBpm, lerCursorAlertasLeadsBpm,
   listarAlertasLeadsBpm, notificarPendenciasLeadsBpm, obterAlertaLeadPendenteBpm,
+  ehObservadorTiAlertasLeadsBpm,
 } from "@/lib/bpm/notificacoes-leads-server";
 import { ACAO_RECEPCAO_PIPELINE, ACAO_ASSUNCAO_PIPELINE, carregarRecepcoesPipelineBpm,
   idRecepcaoPipeline, idAssuncaoPipeline, obterRecebimentoPipelineBpm,
+  assumirRecebimentoPipelineBpm,
 } from "@/lib/bpm/recebimentos-card-server";
 import { carregarValoresCanonicosCampos } from "@/lib/bpm/campos-configuraveis-server";
+import { PIPELINE_OPERACIONAL_ID } from "@/lib/bpm/financeiro-config.client";
 
 const cardId = "c111111111111111111111111";
 const sourceId = "c222222222222222222222222";
@@ -40,7 +43,7 @@ function fixture() {
     { perfil: "Financeiro", podeVer: true, podeAgir: false },
     { perfil: "Lider Financeiro", podeVer: true, podeAgir: true },
   ];
-  const pipeline = { id: pipelineId, chave: "financeiro", nome: "Financeiro", ativo: true,
+  const pipeline = { id: pipelineId, chave: "financeiro" as string | null, nome: "Financeiro", ativo: true,
     visualizacaoConfigJson: null as string | null, setores: [{ setor: { nome: "Financeiro", ativo: true } }],
     etapas: [{ visibilidades: rules }] };
   const marker = { versao: 1, cardDestinoId: cardId, pipelineDestinoId: pipelineId,
@@ -96,29 +99,84 @@ function fixture() {
 
 beforeEach(() => { vi.clearAllMocks(); state.auth.mockResolvedValue({ user: { id: "21", role: "Financeiro" } }); state.trigger.mockResolvedValue(undefined); });
 
+describe("AC18 observador TI/Admin não se torna ator do setor", () => {
+  it.each(["Admin", " TI ", "T.I", "t.i.", "aDmIn"])("normaliza somente os aliases canônicos positivos: %s", (role) => {
+    expect(ehObservadorTiAlertasLeadsBpm(role)).toBe(true);
+  });
+  it.each(["CEO", "Líder Comercial", "Lider Operacional", "Administrador", "Admin TI", "TI Supervisor", "Comercial", ""])("não amplia a exceção para %s", (role) => {
+    expect(ehObservadorTiAlertasLeadsBpm(role)).toBe(false);
+  });
+  it.each(["inativo", "pipeline-inativo", "etapa-inativa", "tipo-pipeline-nao-suportado"])("observador não ressuscita recurso indisponível: %s", async (caso) => {
+    const f = fixture();
+    if (caso === "inativo") f.users.filter((u) => [30, 32].includes(u.id)).forEach((u) => { u.status = "INATIVO"; });
+    if (caso === "pipeline-inativo") f.pipeline.ativo = false;
+    if (caso === "etapa-inativa") f.pipeline.etapas = [];
+    if (caso === "tipo-pipeline-nao-suportado") { f.pipeline.chave = "outro"; f.pipeline.nome = "Outro processo"; }
+    expect((await listarDestinatariosFilaLeadsBpm(pipelineId, stageId, f.client)).filter((u) => [30, 32].includes(u.id))).toEqual([]);
+    for (const spy of f.writeSpies) expect(spy).not.toHaveBeenCalled();
+  });
+  it.each([30, 32])("observador %s usa lookup virtual readonly, inclusive NoLoss desconhecido", async (userId) => {
+    const f = fixture(); f.pipeline.chave = "comercial"; f.pipeline.nome = "Revisão de Radar";
+    f.pipeline.setores = [{ setor: { nome: "Comercial", ativo: true } }];
+    expect(await obterAlertaLeadPendenteBpm(userId, { tipo: "LEAD_VIRTUAL", pipelineId, origemLead: "noloss", leadId: f.noloss.id }, f.client))
+      .toMatchObject({ fonte: "NOLOSS", origem: "OUTRA", nome: "Contato Fictício" });
+    expect((await listarDestinatariosFilaLeadsBpm(pipelineId, stageId, f.client)).find((u) => u.id === userId)?.podeAgir).toBe(false);
+    for (const spy of f.writeSpies) expect(spy).not.toHaveBeenCalled();
+  });
+  it.each([
+    [30, "financeiro"], [32, "financeiro"], [30, "operacional-legado"], [32, "operacional-legado"],
+  ])("observador %s vê %s, mas não assume nem altera owner/membros/histórico/outbox", async (userId, destino) => {
+    const f = fixture();
+    if (destino === "operacional-legado") {
+      f.pipeline.id = PIPELINE_OPERACIONAL_ID; f.pipeline.chave = null; f.pipeline.nome = "Operacional";
+      f.card.pipelineId = PIPELINE_OPERACIONAL_ID; f.card.etapa.nome = "Boas vindas";
+      f.marker.pipelineDestinoId = PIPELINE_OPERACIONAL_ID; f.receipt.valorNovoJson = JSON.stringify(f.marker);
+      f.events[0].pipelineId = PIPELINE_OPERACIONAL_ID;
+    }
+    const antes = structuredClone({ card: f.card, histories: f.histories, links: f.links });
+    expect(await obterRecebimentoPipelineBpm(cardId, Number(userId), f.client)).toMatchObject({ status: "PENDENTE", podeAssumir: false });
+    const transaction = vi.fn(async (callback: (tx: Prisma.TransactionClient) => Promise<unknown>) => callback(f.client));
+    const client = { ...f.io, $transaction: transaction } as unknown as Parameters<typeof assumirRecebimentoPipelineBpm>[2];
+    await expect(assumirRecebimentoPipelineBpm({ cardId, recepcaoId: f.receipt.id, versaoEsperada: f.card.versao }, Number(userId), client))
+      .rejects.toThrow("Não autorizado");
+    expect(transaction).toHaveBeenCalledOnce();
+    expect({ card: f.card, histories: f.histories, links: f.links }).toEqual(antes);
+    for (const spy of f.writeSpies) expect(spy).not.toHaveBeenCalled();
+  });
+  it.each([[30, "CEO", 1], [31, "Admin", 0], [32, "Financeiro", 1]])("GET usa papel do banco %s, não role de sessão %s", async (userId, role, count) => {
+    const f = fixture(); state.auth.mockResolvedValue({ user: { id: String(userId), role } });
+    const response = await GET(new Request(`http://localhost/api/bpm/leads/alertas?cursor=${cursor(Number(userId))}`));
+    expect(response.status).toBe(200);
+    expect((await response.json()).alertas).toHaveLength(Number(count));
+    for (const spy of f.writeSpies) expect(spy).not.toHaveBeenCalled();
+  });
+});
+
 describe("audiência independente usa ownership e visibilidade reais", () => {
-  it("inclui visualizador e liderança do setor, sem inscrever bypass administrativo ou outros setores", async () => {
+  it("inclui visualizador e liderança do setor e Admin/TI observadores sem inscrever CEO/outros setores", async () => {
     const f = fixture();
     expect(await listarDestinatariosFilaLeadsBpm(pipelineId, stageId, f.client)).toEqual([
       expect.objectContaining({ id: 21, podeAgir: false }), expect.objectContaining({ id: 22, podeAgir: true }),
+      expect.objectContaining({ id: 30, podeAgir: false }), expect.objectContaining({ id: 32, podeAgir: false }),
     ]);
     expect(f.io.usuarios.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { status: "ATIVO" } }));
   });
   it("REMOVE individual de CRM prevalece mesmo em integrante com permissão legada", async () => {
     const f = fixture(); f.overrides.push({ usuarioId: 21, modulo: "crm", acao: "REMOVE" });
-    expect((await listarDestinatariosFilaLeadsBpm(pipelineId, stageId, f.client)).map((u) => u.id)).toEqual([22]);
+    expect((await listarDestinatariosFilaLeadsBpm(pipelineId, stageId, f.client)).map((u) => u.id)).toEqual([22, 30, 32]);
   });
   it("ADD individual concede módulo somente ao próprio setor, não a outro setor", async () => {
     const f = fixture(); f.users[0].permissoes = "";
     f.overrides.push({ usuarioId: 21, modulo: "crm", acao: "ADD" });
-    expect((await listarDestinatariosFilaLeadsBpm(pipelineId, stageId, f.client)).map((u) => u.id)).toEqual([21, 22]);
+    expect((await listarDestinatariosFilaLeadsBpm(pipelineId, stageId, f.client)).map((u) => u.id)).toEqual([21, 22, 30, 32]);
   });
   it("catálogo setorial efetivo substitui permissão legada", async () => {
     const f = fixture(); f.setorPermissoes.push({ setor: "Financeiro", modulo: "metas" });
-    expect((await listarDestinatariosFilaLeadsBpm(pipelineId, stageId, f.client)).map((u) => u.id)).toEqual([22]);
+    expect((await listarDestinatariosFilaLeadsBpm(pipelineId, stageId, f.client)).map((u) => u.id)).toEqual([22, 30, 32]);
   });
   it.each(["pipeline-inativo", "etapa-inativa", "podeVer-false", "semCRM", "pipeline-setor-alheio"])("não entrega ao recurso não autorizado: %s", async (caso) => {
     const f = fixture();
+    f.users.filter((u) => [30, 32].includes(u.id)).forEach((u) => { u.status = "INATIVO"; });
     if (caso === "pipeline-inativo") f.pipeline.ativo = false;
     if (caso === "etapa-inativa") f.pipeline.etapas = [];
     if (caso === "podeVer-false") f.rules.forEach((r) => { r.podeVer = false; });
@@ -126,17 +184,17 @@ describe("audiência independente usa ownership e visibilidade reais", () => {
     if (caso === "pipeline-setor-alheio") f.pipeline.setores = [{ setor: { nome: "Jurídico", ativo: true } }];
     expect(await listarDestinatariosFilaLeadsBpm(pipelineId, stageId, f.client)).toEqual([]);
   });
-  it("exceção individual de pipeline não inscreve Admin fora do setor", async () => {
+  it("exceção individual de pipeline mantém Admin/TI como observadores, sem ação setorial", async () => {
     const f = fixture(); f.pipeline.setores = [{ setor: { nome: "Jurídico", ativo: true } }];
     f.pipeline.visualizacaoConfigJson = JSON.stringify({ version: 1, usuariosAutorizados: [21, 30] });
-    expect((await listarDestinatariosFilaLeadsBpm(pipelineId, stageId, f.client)).map((u) => u.id)).toEqual([21]);
+    expect((await listarDestinatariosFilaLeadsBpm(pipelineId, stageId, f.client)).map((u) => u.id)).toEqual([21, 30, 32]);
   });
   it("Operacional recebe inclusive Boas-vindas sem ganhar autorização de assumir", async () => {
     const f = fixture(); f.pipeline.chave = "operacional"; f.pipeline.nome = "Operacional";
     f.pipeline.setores = [{ setor: { nome: "Operacional", ativo: true } }];
     f.card.etapa.nome = "Boas-vindas";
     f.rules.splice(0, f.rules.length, { perfil: "Operacional", podeVer: true, podeAgir: true });
-    expect((await listarDestinatariosFilaLeadsBpm(pipelineId, stageId, f.client)).map((u) => u.id)).toEqual([34]);
+    expect((await listarDestinatariosFilaLeadsBpm(pipelineId, stageId, f.client)).map((u) => u.id)).toEqual([30, 32, 34]);
     expect(await obterRecebimentoPipelineBpm(cardId, 34, f.client)).toMatchObject({ status: "PENDENTE", podeAssumir: false,
       motivoImpedimentoAssuncao: expect.any(String) });
   });
@@ -144,7 +202,7 @@ describe("audiência independente usa ownership e visibilidade reais", () => {
     ["comercial", "Comercial", "Comercial", "Líder Comercial"],
     ["financeiro", "Financeiro", "Financeiro", "Lider Financeiro"],
     ["operacional", "Operacional", "Operacional", "Líder Operacional"],
-  ])("famílias reais %s incluem liderança sem converter Admin global em membro", async (chave, nome, role, lider) => {
+  ])("famílias reais %s incluem liderança sem converter observador Admin em ator setorial", async (chave, nome, role, lider) => {
     const f = fixture(); f.pipeline.chave = chave; f.pipeline.nome = nome;
     f.pipeline.setores = [{ setor: { nome: role, ativo: true } }];
     f.users.splice(0, f.users.length,
@@ -152,10 +210,13 @@ describe("audiência independente usa ownership e visibilidade reais", () => {
       { id: 72, nome: "Liderança Fictícia", role: lider, status: "ATIVO", permissoes: "crm", imagemUrl: null },
       { id: 73, nome: "Admin Fora do Setor", role: "Admin", status: "ATIVO", permissoes: "crm", imagemUrl: null });
     f.rules.splice(0, f.rules.length, { perfil: role, podeVer: true, podeAgir: true }, { perfil: lider, podeVer: true, podeAgir: true });
-    expect((await listarDestinatariosFilaLeadsBpm(pipelineId, stageId, f.client)).map((u) => u.id)).toEqual([71, 72]);
+    const audiencia = await listarDestinatariosFilaLeadsBpm(pipelineId, stageId, f.client);
+    expect(audiencia.map((u) => u.id)).toEqual([71, 72, 73]);
+    expect(audiencia.find((u) => u.id === 73)?.podeAgir).toBe(false);
   });
   it("Comercial sem capacidade de assumir não entra na audiência virtual do AC1", async () => {
     const f = fixture(); f.pipeline.chave = "comercial"; f.pipeline.nome = "Revisão de Radar";
+    f.users.filter((u) => [30, 32].includes(u.id)).forEach((u) => { u.status = "INATIVO"; });
     f.pipeline.setores = [{ setor: { nome: "Comercial", ativo: true } }];
     f.rules.splice(0, f.rules.length, { perfil: "Comercial", podeVer: true, podeAgir: false });
     expect(await listarDestinatariosFilaLeadsBpm(pipelineId, stageId, f.client)).toEqual([]);
@@ -266,9 +327,9 @@ describe("consulta e transporte não transferem autoridade nem conteúdo privado
   it("fanout privado envia só invalidação e isola falha de Pusher", async () => {
     const f = fixture(); state.trigger.mockRejectedValue(new Error("transporte indisponível"));
     await expect(notificarPendenciasLeadsBpm({ pipelineId, etapaId: stageId })).resolves.toBeUndefined();
-    expect(state.trigger).toHaveBeenCalledTimes(2);
+    expect(state.trigger).toHaveBeenCalledTimes(4);
     for (const [channel, event, payload] of state.trigger.mock.calls) {
-      expect(channel).toMatch(/^private-bpm-tarefas-usuario-(21|22)$/);
+      expect(channel).toMatch(/^private-bpm-tarefas-usuario-(21|22|30|32)$/);
       expect(event).toBe("bpm-leads-atualizados");
       expect(Object.keys(payload).sort()).toEqual(["pipelineId", "timestamp"]);
       expect(payload.pipelineId).toBe(pipelineId);
