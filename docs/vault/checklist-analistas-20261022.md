@@ -1,6 +1,6 @@
 # Vault — CheckList Analistas, 22/10/2026
 
-**Artefatos revisados; backup completo VERIFICADO; execução NÃO AUTORIZADA.** O rótulo de fase do plano hash-contas precisa correção pela Dara e novo dry-run antes de qualquer autorização. Os outros3planos não precisam ser refeitos por essa correção textual de fase. Não se emite consentimento sintético nem arquivo Vault approved=true nesta estação. Forge e revisões locais devem seguir antes da pergunta final ao usuário. Story permanece In Progress.
+**STATUS ATUAL — consentimento específico recebido (resposta literal “sim”, observado20:16:25UTC22/10/2026).** Preflight staging somente leitura sem drift, quatro planosSHA idênticos e backup completo válido. Vault libera SOMENTE schema/bootstrap3/grant5 sob guardasCLI e ordem validada; hash2 já consentido, mas aguarda provas reais de leitorPortalREADY/escritorPainelREADY/cessação antiga e não tem aprovação emitida. Nenhuma escrita aplicada nesta estação. Story In Progress; produção fora do escopo. Registros anteriores de aguardar consentimento são históricos, superados pelo adendo final; pendências operacionais continuam reais.
 
 ## Ambiente, escopo e fontes
 
@@ -177,3 +177,158 @@ Evidências seguras: `/tmp/checklist-vault-20261022/{plan-summary.json,current-a
 A pendência textual de fase acima foi resolvida sem reescrever a evidência histórica do Vault. Novo planSha256 `hash-contas`: `1bd13b1afa8b4d27abd0745db15619a6583166c5b36bda98622ca5aea806254c`; dry-run real staging às18:06:46UTC de22/10/2026,2conversões projetadas/0inválidas/0bloqueios/0mutações. Plano privado0600: `/tmp/checklist-vault-20261022/plans/hash-contas-phase-corrected.json`; resumo seguro0600: `/tmp/checklist-vault-20261022/hash-contas-phase-summary.json`. Diagnóstico idêntico ao anterior; operationPlan difere somente em phase. Hash antigo3264ef79… continua histórico, NÃO USAR PARA APPLY.
 
 Phase vigente: `AFTER_SCHEMA_BOOTSTRAP_GRANT_AND_VALIDATED_PORTAL_READER_AND_READY_PANEL_HASH_WRITER_AND_LEGACY_WRITER_CESSATION`. Ordem §14 preservada: schema/bootstrap3/grant5 → Portal leitor READY validado → Painel escritor hash READY/cessação antiga comprovada operacionalmente → hashbatch → polling sem timer. Nenhum novo guard/proof automatiza cessação do escritor; faltam as provas operacionais reais. ESLint focado e17testes existentes de operações PASS. Backup verificado e3outrosplanos permanecem os anteriores, sem recaptura/reexecução. Execução continua NÃO AUTORIZADA; Forge/revisões e consentimento específico ainda pendentes. Nenhum approved=true emitido.
+
+## Vault — plano final específico de staging, 22/10/2026
+
+**ARTEFATOS REVISADOS / BACKUP VÁLIDO / AGUARDA CONSENTIMENTO.** Plano documental pronto para apresentação pelo Bibble. Nenhuma operação descrita abaixo foi aplicada; nenhum consentimento ou arquivo de aprovação foi fabricado. Esta consolidação encerra as pendências documentais anteriores de fase hash e gates locais. A story continua In Progress.
+
+### Ambiente e entrega revisável
+
+Alvo exclusivo: banco Turso de **staging**, usado por `https://staging.alpha-comex.com` e pelo futuro Portal `https://clientes-staging.alpha-comex.com`. Fingerprint SHA256 da URL: `7fdd160737ba6f9cf84d0ac2fb1c3cf1084311e7fccea454f7bac368f9e4d42b`, distinto de produção. CLI deve usar somente `/home/ialpha/.config/painel-alpha/checklist-staging-20261022/database/.env.staging.local` (arquivo regular0600). O hostname do Portal está associado/verificado, porém ainda não tem deployment READY comprovado. Produção não integra esta autorização.
+
+Código Main revisável: commit `584856ebac7760707baf60853b28eb870515b239`, árvore `dcd4530fb8dddb9e72d80a2fceaf897a3b525bf4`; Portal `7d12f74d7de2895d49a4ea1b2356cef39427ea64`, árvore `56dbb7a7c947e0cb1e265a0d25612c9714646508`. A01–A17/AC1–12 implementados localmente, sem achado local aberto. Forge Main combinado: typecheck/lint/test/build exit0,737 arquivos/5958PASS (+4skip/1todo preexistentes); lint0erros/1183warnings preexistentes. Portal: typecheck/lint/build PASS,57testes+3nativos de paridade; revisões Probe/Flux, Anubis, Lens e QA adotadas pelas114sources Main e69Portal intactas. Isso comprova implementação local, não homologação remota. Evidências: `/tmp/checklist-analistas-20261022-{forge-merged,devops-readiness,qa-readiness}.md`.
+
+### Quatro operações propostas, com limites exatos
+
+| Ordem | Operação CLI | Mudança e impacto |
+|---|---|---|
+| 1 | `schema` | Aplicar somente o SQL custom revisado:26colunas nullable/com default,5tabelas novas e36índices (24normais/12únicos),67statements. Estruturas para owner/revisão, modelos, CRM, eventos, credenciais e documentos privados. Sem DROP, rename, reconstrução ou backfill; dados existentes preservados e4owners futuros NULL. Índices/DDL podem bloquear escritas temporariamente; duração não medida, sem promessa de indisponibilidade zero. Unicidade exige préestado exato, sem aplicação parcial/colisões. |
+| 2 | `bootstrap-modelos` | Associar os3modelos legados elegíveis às identidades/revisões do catálogo. Itens, snapshots e checklists já existentes preservados; catálogo novo vale para instâncias futuras. Transação e conferência do conjunto exato impedem fusão/escolha automática em colisões. |
+| 3 | `habilitar-lider-checklist` | Inserir5vínculos setoriais no cadastro existente da role exata `Lider Operacional`: `chamados`, `Documentos`, `UpDocumentos`, `Extratos`, `checkList`. Os4acessos efetivos anteriores permanecem; acrescenta apenas CheckList efetivo. Abrange1membro atual e futuros membros dessa role; não troca role, overrides, dono, sessão ou bypass Admin. `UpDocumentos` é token legado preservado, sem criar módulo. |
+| 4, condicionada ao rollout | `hash-contas` | Converter as2contas legadas válidas para bcrypt fator12 e limpar `senha=''` na mesma transação. Preserva a senha usada pelo cliente e `authSessionVersion`. Remove a cópia em texto claro; hash não permite reconstruí-la. CAS compara estado/segredo/hash/versão; mudança concorrente, conta inválida/vazia/>72bytes ou divergência reverte/bloqueia o lote. Só após leitor Portal READY validado, escritor Painel hash READY e cessação comprovada dos escritores antigos. |
+
+SQL exclusivo: `prisma/migrations/20261022143000_checklist_analistas_crm/migration.sql`, SHA256 `5c9affa7859fe9ea95ccc3e2fa995487ef6ee2c95e35d0063cdc64c01f41948d`. Os67statements já foram classificados individualmente neste relatório:55baixo risco/12unicidade condicional. Equivalência local das323tabelas modeladas PASS; o banco real/backup tem337tabelas. **Prisma diff automático com7DROP/rebuild foi reprovado e não será usado.** Não executar `db push`, `migrate deploy`, baseline ou gravação no ledger ausente.
+
+| Operação | planSha256 autorizado somente após confirmação real |
+|---|---|
+| schema | `d05371e72b6b6ad54079429c6f52eb60ea01df7f9f066efe794e8f72e50e564f` |
+| bootstrap-modelos | `69b3c4bcf5b727879e6ac7991ac7c1cb12a6a8c367ef43a63f42b9049551c136` |
+| habilitar-lider-checklist | `a7b25eff2ac9966fc6df6f54c01a36d9e49158c99c821ae15b66f37d7f1bda4d` |
+| hash-contas | `1bd13b1afa8b4d27abd0745db15619a6583166c5b36bda98622ca5aea806254c` |
+
+O hash-contas3264ef79… é obsoleto. O plano vigente foi corrigido pela Dara e planejado sem mutação às18:06:46UTC. Todos os quatro planos são dry-run. A fotografia read-only de17:54UTC era4atendimentos/6checklists/10itens/3modelos/2contas legadas válidas,0docs/0fotos/0Teste/FK0 e ledger ausente. Antes de aplicar, conferir novamente fingerprint, préestado, plano e CAS; após cada fase, validar estrutura/contagens/FKs/preservações e reconciliar resultados. Não existe DELETE Teste, migração/revogação de arquivos ou atribuição automática de dono neste plano. Divergência do conjunto ou escopo exige novo plano e nova confirmação.
+
+### Comandos preparados para execução futura, não executados
+
+Diretório de trabalho obrigatório: `/home/ialpha/projetos/alpha-comex/painel-alpha-worktrees/checklist-analistas-20261022`. Os comandos abaixo são modelos com os quatro nomes de operação fechados. Os caminhos entre `<...>` somente podem ser substituídos por evidências reais depois da resposta inequívoca do usuário e do cumprimento dos gates; esses arquivos de aprovação/consentimento/leitor ainda não existem.
+
+```bash
+# Argumentos comuns: apenas o ambiente staging e o backup já verificado.
+checklist_stage_args=(
+  --env-file /home/ialpha/.config/painel-alpha/checklist-staging-20261022/database/.env.staging.local
+  --backup /home/ialpha/projetos/alpha-comex/painel-alpha-worktrees/checklist-analistas-20261022/database-backups/pre-change/checklist-staging-2026-10-22T17-51-45-044Z.sql
+  --manifest /home/ialpha/projetos/alpha-comex/painel-alpha-worktrees/checklist-analistas-20261022/database-backups/pre-change/checklist-staging-2026-10-22T17-51-45-044Z.manifest.json
+)
+node scripts/checklist-analistas/cli.mjs plan --operation schema "${checklist_stage_args[@]}" --apply --consent <consent-schema-real.json> --vault <vault-schema-real.json>
+node scripts/checklist-analistas/cli.mjs plan --operation bootstrap-modelos "${checklist_stage_args[@]}" --apply --consent <consent-bootstrap-real.json> --vault <vault-bootstrap-real.json>
+node scripts/checklist-analistas/cli.mjs plan --operation habilitar-lider-checklist "${checklist_stage_args[@]}" --apply --consent <consent-grant-real.json> --vault <vault-grant-real.json>
+# Só depois dos deploys/provas reais abaixo:
+node scripts/checklist-analistas/cli.mjs plan --operation hash-contas "${checklist_stage_args[@]}" --apply --consent <consent-hash-real.json> --vault <vault-hash-real.json> --reader-evidence <portal-reader-real.json>
+```
+
+As evidências futuras vinculam ambiente, fingerprint, operação, planSha e backupSha, com identidade/data da confirmação verdadeira; nenhum `confirmed=true` ou `approved=true` será inventado. O processo guardado verifica backup/restauração e prazos no apply. Não é necessário repetir agora dump/restauração/gates já aprovados para apresentar o plano.
+
+### Backup completo e validade
+
+Arquivo: `database-backups/pre-change/checklist-staging-2026-10-22T17-51-45-044Z.sql`, acompanhado de `.manifest.json` e snapshot nativo `.sqlite` no mesmo worktree. Captura consistente em **22/10/2026 às14:51:45 America/Sao_Paulo (17:51:45UTC)**; manifesto17:52:22UTC; restauração local integral verificada às14:54:38local/17:54:38UTC. SQL **360.811.599bytes (360,8MB)**, SHA256 `30b31bbef7c4e462c49bf22150ec4150f6bcc5d4ee035ec47d0fc67197acdd5e`.
+
+Cobertura:337tabelas reais,295.932linhas,949índices,2triggers,0views,mais sqlite_sequence. Restore independente confirmou integridade,0violações FK, contagem de cada tabela, schema de todos os objetos e sequências iguais. Snapshot nativo adicional também verificado. Evidências seguras: `/tmp/checklist-vault-20261022/backup-verification.json` e `backup-artifacts.json`. Manifesto lido apenas por campos seguros; stat600 e tamanhos conferidos nesta estação; diretório700/arquivos600, ignorados no Git. Nenhum dump ou segredo foi lido/recalculado nesta estação.
+
+Às **19:36:36UTC** a idade era **1,748h (cerca de1h45)**. Completa48h em **24/10/2026 às14:51:45local/17:51:45UTC**. Deve continuar íntegro e≤48h em cada aplicação; expirado/inválido bloqueia e exige novo backup completo verificado. Não houve mutação de banco por esta equipe desde a captura. Esse registro não presume ausência de gravações externas posteriores; préestado será conferido antes da operação.
+
+### Sequência operacional e pendências reais
+
+Com consentimento específico válido e backup/préestado conferidos: schema → bootstrap3 → grant5 → publicar/validar **Portal leitor** no custom staging → publicar/validar **Painel escritor de hashes** → comprovar cessação dos escritores plaintext antigos → hashbatch2 → homologação autenticada staging.
+
+A prova real do leitor precisa commit/deployment READY/host/TLS/origin, binding ao banco staging e validações legítimas de login hash, upgrade legado e versão de sessão; `CHECKLIST_PORTAL_ORIGIN` deve corresponder ao host comprovado e a evidência deve respeitar a validade exigida pelo CLI. Essa prova ainda não existe. O gate do escritor exige READY/commit/configuração e cessação real de URLs/actions/requisições antigas: mudar apenas o alias não cessa deployments antigos. O CLI não automatiza essa cessação. Sem prova, hashbatch fica pendente, mesmo com consentimento. Proteger/desativar/excluir deployments, se necessário, exige plano próprio de alcance exato, sem afetar produção; esta autorização de banco não inclui essas ações.
+
+Uploads de PDFs/imagens dependem da credencial do novo store privado staging; obtenção legítima ainda retorna403challenge_required. Não há autenticação concluída comprovada: o código temporário apresentado expirou às19:31UTC, sem resposta do usuário, e a sessão de execução já não está disponível. Não há garantia de liberação automática. Falta de Blob não impede apresentar o plano de banco, mas impede concluir a homologação dos uploads. Consentir banco não autentica Vercel. Não pedir nem imprimir segredos. Transporte CheckList continua journal/polling6/30s e SSE Portal; sem instalar/ativar timer, cron, worker ou app Pusher.
+
+### Riscos, alternativa e rollback
+
+Perda esperada de registros/documentos/checklists: **nenhuma** no plano aditivo/preservatório. DDL, criação de índices e transações podem reter locks e afetar escritas concorrentes; não foi medido tempo de execução. Uniques/FKs passam a restringir futuras gravações. Falha transacional ou CAS impede commit da operação correspondente; as quatro fases não constituem uma única transação global. Não prometer disponibilidade contínua. Hash remove irreversivelmente a cópia em texto claro, embora preserve a senha de login; leitor hash compatível deve permanecer disponível para evitar falha de acesso.
+
+Alternativa não destrutiva: manter staging na versão atual enquanto se concluem acessos/provas e se decide a autorização; código/planos permanecem revisáveis. Adiar o batch mantém os dois legados até upgrade oportunista ou lote aprovado, sem inferir donos nem alterar arquivos.
+
+Rollback preferido: interromper a fase seguinte, manter schema aditivo e leitor compatível com hash/snapshots/eventos e reverter somente código compatível. Sem DROP, reconstrução de plaintext ou remoção indiscriminada dos5vínculos; reversão de permissão exige snapshot/pós-CAS e plano próprio que preserve alterações posteriores. Restauração completa do banco remoto é último recurso, fora desta autorização: exige novo plano Vault, backup e consentimento, janela operacional e análise explícita dos dados escritos depois das17:51:45UTC, que seriam perdidos em retorno direto a esse snapshot. A restauração já comprovada foi somente local.
+
+### Texto de consentimento para o Bibble apresentar ao usuário
+
+O código do CheckList e do Portal passou nos testes e revisões locais, incluindo a integração Radar. Para seguir no **staging**, falta sua autorização específica para quatro mudanças no banco: adicionar26colunas/5tabelas/36índices preservando os dados; preparar os3modelos para usos futuros; habilitar CheckList para o Líder Operacional mantendo os4acessos atuais; e converter as2senhas legadas para hash, mantendo a mesma senha de login e sessão. A conversão só será feita após o Portal leitor e o Painel escritor estarem READY, validados no banco staging e sem escritores antigos ativos.
+
+O backup completo de22/10 às14:51:45 deSãoPaulo tem360,8MB e foi restaurado/verificado; continua válido apenas até24/10 às14:51:45, com nova conferência antes de aplicar. Não esperamos perder registros; pode haver bloqueio temporário de escritas durante índices/transações, sem duração medida. A senha em texto claro será removida e não poderá ser reconstruída a partir do hash. Se for necessário recuar, manteremos a estrutura aditiva e um leitor compatível; uma restauração remota do backup teria plano e autorização separados por poder perder dados posteriores. A alternativa é manter staging como está até você aprovar. Produção permanece fora do escopo.
+
+**Você autoriza exatamente essas quatro operações no banco de staging, nos planos acima, condicionadas ao backup válido, préestado/CAS sem divergências e às provas reais de leitor, escritor e cessação antiga antes de converter as senhas?**
+
+A confirmação é exigência expressa do [AGENTS.md](../../AGENTS.md), política de banco: “Sempre solicite confirmacao explicita do usuario antes da alteracao. Silencio, contexto anterior ou aprovacao generica nao contam como consentimento.” A skill [Vault](../../.agents/skills/bibble-squad/vault/SKILL.md), protocolo passo5, exige: “Pergunte se o usuário autoriza exatamente a alteração descrita e aguarde confirmação inequívoca.” O pedido geral de implementação e a pergunta sobre armazenamento não atendem essa confirmação do plano específico. Nenhum bloqueio automático de aprovação foi recebido nesta estação; a pendência vem dessas regras do projeto.
+
+### Relatório de conclusão e File List
+
+✅ Revisão/consolidação documental concluída; backup existente válido na conferência. ⛔ Aplicação aguarda consentimento e pré-condições operacionais; não declarar APROVADO PARA APLICAR, Done ou publicado. Sem novos testes/backup/reconexão SQL, schema/migração/seed/grant/hash, arquivos cloud, Git mutável ou ação em produção nesta estação.
+
+Alterados somente `docs/vault/checklist-analistas-20261022.md` e status/checklist/File List da story `docs/stories/story-checklist-analistas-reformulacao-integracao-crm-20261022.md`; relatório `/tmp/checklist-analistas-20261022-vault-final-plan.md` foraGit. Preservados edits anteriores de Forge na story e matriz QA, roots compartilhados e todo conteúdo histórico. **Controle devolvido ao Bibble; estação Vault encerrada.**
+
+## Vault — consentimento recebido e liberação específica de3operações staging
+
+**Consentimento real recebido: resposta literal “sim” à pergunta “Você autoriza essas quatro operações no banco de staging, conforme esse plano?”.** Captura/primeira observação nesta estação em22/10/2026 **20:16:25UTC**; não é timestamp exato da mensagem nem ID inventado. Transcrição da pergunta/bullets e contexto de riscos fornecidos pelo coordenador, vinculados à cópia integral do plano, backupSHA e planos exatos em `/tmp/checklist-vault-20261022/authorization-20261022/user-consent-record.json`.
+
+**LIBERADAS SOMENTE schema → bootstrap3 → grant5, se os guardas CLI confirmarem o préestado na aplicação. Hash2 consentido, mas NÃO LIBERADO enquanto faltarem provas reais do rollout.** Nenhuma operação de escrita foi executada pelo Vault.
+
+## Revalidação objetiva
+
+- Alvo: exclusivamente banco staging, fingerprint `7fdd160737ba6f9cf84d0ac2fb1c3cf1084311e7fccea454f7bac368f9e4d42b`; env regular0600 explícito `/home/ialpha/.config/painel-alpha/checklist-staging-20261022/database/.env.staging.local`. Nenhum default/root .env.local, produção ou provedor consultado.
+- Preflight em transação read-only, somente SELECT/PRAGMA e rollback ao final, em `2026-10-22T20:18:21.690Z`: diagnóstico integral idêntico, NOT_APPLIED/canônico,0bloqueios/FK,4atendimentos/6checklists/10itens/3modelos/2legados válidos,0docs/fotos/Teste e ledger ausente;4owners futurosNULL. Quatro planSHA idênticos ao consentido, sem mudança material.
+- SQLSHA `5c9affa7859fe9ea95ccc3e2fa995487ef6ee2c95e35d0063cdc64c01f41948d`,67statements26ADD+5tabelas+36índices. Código MainHEAD584856ebac7760707baf60853b28eb870515b239; gates5958PASS/Portal7d12f74/revisões locais intactos adotados sem repetição.
+- Backup existente22/10/2026 17:51:45UTC,360811599bytes/SHA `30b31bbef7c4e462c49bf22150ec4150f6bcc5d4ee035ec47d0fc67197acdd5e`;337tabelas/295932linhas,restore completo íntegro17:54:38UTC,FK0/counts por tabela/schema/seq iguais. Stat/metadata/lineage conferidos, arquivos regulares0600/tamanhos corretos; idade **2.4434h** em `2026-10-22T20:18:21.645861+00:00`. Validade conservadora até24/10/2026 17:51:45UTC. Sem releitura do dump, novo hash360MB, restore ou backup nesta estação. O CLI de apply executará a verificação obrigatória do próprio guard, sem contorno.
+- Uma primeira consulta agregada de fotos no harness temporário usou nome de coluna incorreto e falhou sem mutação; corrigida para imagemUrl conforme schema e revalidação concluída. Não representa drift de dados.
+
+## Evidências e comandos exatos prontos para DevOps
+
+Diretório privado0700 `/tmp/checklist-vault-20261022/authorization-20261022`; arquivos0600 foraGit. Somente3pares consent/vault foram emitidos, legitimamente derivados da resposta real e revisão atual; não há aprovação hash nem reader-evidence fabricado. Consentimento geral registra as4operações e condições, preservando a possibilidade de liberar hash após provas reais e prazos ainda válidos, sem pedir novamente o mesmo consentimento.
+
+- `schema`: planSHA `d05371e72b6b6ad54079429c6f52eb60ea01df7f9f066efe794e8f72e50e564f`; consent `/tmp/checklist-vault-20261022/authorization-20261022/consent-schema.json`; Vault `/tmp/checklist-vault-20261022/authorization-20261022/vault-schema.json`.
+- `bootstrap-modelos`: planSHA `69b3c4bcf5b727879e6ac7991ac7c1cb12a6a8c367ef43a63f42b9049551c136`; consent `/tmp/checklist-vault-20261022/authorization-20261022/consent-bootstrap-modelos.json`; Vault `/tmp/checklist-vault-20261022/authorization-20261022/vault-bootstrap-modelos.json`.
+- `habilitar-lider-checklist`: planSHA `a7b25eff2ac9966fc6df6f54c01a36d9e49158c99c821ae15b66f37d7f1bda4d`; consent `/tmp/checklist-vault-20261022/authorization-20261022/consent-habilitar-lider-checklist.json`; Vault `/tmp/checklist-vault-20261022/authorization-20261022/vault-habilitar-lider-checklist.json`.
+
+Comandos abaixo são destinados à próxima estação DevOps e **não foram executados**:
+
+```bash
+cd /home/ialpha/projetos/alpha-comex/painel-alpha-worktrees/checklist-analistas-20261022
+node scripts/checklist-analistas/cli.mjs plan --operation schema --env-file /home/ialpha/.config/painel-alpha/checklist-staging-20261022/database/.env.staging.local --apply --consent /tmp/checklist-vault-20261022/authorization-20261022/consent-schema.json --vault /tmp/checklist-vault-20261022/authorization-20261022/vault-schema.json --backup /home/ialpha/projetos/alpha-comex/painel-alpha-worktrees/checklist-analistas-20261022/database-backups/pre-change/checklist-staging-2026-10-22T17-51-45-044Z.sql --manifest /home/ialpha/projetos/alpha-comex/painel-alpha-worktrees/checklist-analistas-20261022/database-backups/pre-change/checklist-staging-2026-10-22T17-51-45-044Z.manifest.json
+node scripts/checklist-analistas/cli.mjs plan --operation bootstrap-modelos --env-file /home/ialpha/.config/painel-alpha/checklist-staging-20261022/database/.env.staging.local --apply --consent /tmp/checklist-vault-20261022/authorization-20261022/consent-bootstrap-modelos.json --vault /tmp/checklist-vault-20261022/authorization-20261022/vault-bootstrap-modelos.json --backup /home/ialpha/projetos/alpha-comex/painel-alpha-worktrees/checklist-analistas-20261022/database-backups/pre-change/checklist-staging-2026-10-22T17-51-45-044Z.sql --manifest /home/ialpha/projetos/alpha-comex/painel-alpha-worktrees/checklist-analistas-20261022/database-backups/pre-change/checklist-staging-2026-10-22T17-51-45-044Z.manifest.json
+node scripts/checklist-analistas/cli.mjs plan --operation habilitar-lider-checklist --env-file /home/ialpha/.config/painel-alpha/checklist-staging-20261022/database/.env.staging.local --apply --consent /tmp/checklist-vault-20261022/authorization-20261022/consent-habilitar-lider-checklist.json --vault /tmp/checklist-vault-20261022/authorization-20261022/vault-habilitar-lider-checklist.json --backup /home/ialpha/projetos/alpha-comex/painel-alpha-worktrees/checklist-analistas-20261022/database-backups/pre-change/checklist-staging-2026-10-22T17-51-45-044Z.sql --manifest /home/ialpha/projetos/alpha-comex/painel-alpha-worktrees/checklist-analistas-20261022/database-backups/pre-change/checklist-staging-2026-10-22T17-51-45-044Z.manifest.json
+```
+
+Depois de schema validar APPLIED/contagens/FKs/preservações, aplicar bootstrap e grant um a um, conferindo o mesmo plano antes e depois. São transações separadas; CAS/drift/erro bloqueia o avanço. Bootstrap preserva itens/snapshots antigos; grant insere5relações do Líder Operacional preservando4tokens anteriores e demais acessos efetivos. Não atribuir donos ou adicionar novos registros ao escopo. Hash posterior exige Portal leitorREADY+testes legítimos/DBproof, PainelhashwriterREADY e cessação operacional de writers antigos; alias sozinho não basta. Sem prova, batch segue bloqueado mesmo com consentimento.
+
+Os riscos, alternativa e rollback continuam os apresentados: locks temporários de duração não medida; nenhum registro deve ser perdido pelo plano aditivo/preservatório; manter schema e leitor hash compatível; restauração remota completa requer plano/consentimento próprios por potencial perda de writes posteriores. Nenhum DROP/rebuild/ledger/dbpush/migratedeploy/Teste/objeto/ownerbackfill/timer/produção integra a liberação. A resposta “sim” não autentica Vercel nem concede promoção de produção.
+
+Saída JSON segura: `/tmp/checklist-vault-20261022/authorization-20261022/authorization-summary.json`; preflight/backup-readiness/planos/evidências citados no JSON. Docs alterados: relatório Vault e status/checklist/File List da story; somente documentação. Edits anteriores de Forge/memória/root preservados. **Controle devolvido ao Bibble para DevOps APPLY3 staging e continuidade do acesso Blob legítimo; estação Vault encerrada.**
+
+## DevOps — aplicação real3 staging concluída,22/10/2026
+
+Consentimento específico real “sim” ao plano de4operações, observado20:16:25UTC, e3liberações Vault em `/tmp/checklist-analistas-20261022-vault-authorized.md` foram usados sem nova solicitação. Executados exatamente os3comandos CLI guardados do authorization-summary, em sequência schema→bootstrap-modelos→habilitar-lider-checklist, cwd explícito MainWT e único env regular0600 `/home/ialpha/.config/painel-alpha/checklist-staging-20261022/database/.env.staging.local`, fingerprint7fdd160737ba6f9cf84d0ac2fb1c3cf1084311e7fccea454f7bac368f9e4d42b. Nenhum default/root env carregado.
+
+| Operação | Resultado real | Início/fimUTC | Duração | PlanoSHA |
+| --- | --- | --- | --- | --- |
+| schema | applied=true/exit0 | 20:24:30→20:25:15 | 45.378s | d05371e72b6b6ad54079429c6f52eb60ea01df7f9f066efe794e8f72e50e564f |
+| bootstrap-modelos | applied=true/exit0 | 20:26:46→20:27:08 | 21.721s | 69b3c4bcf5b727879e6ac7991ac7c1cb12a6a8c367ef43a63f42b9049551c136 |
+| habilitar-lider-checklist | applied=true/exit0 | 20:28:17→20:28:40 | 22.709s | a7b25eff2ac9966fc6df6f54c01a36d9e49158c99c821ae15b66f37d7f1bda4d |
+
+Schema aplicou somenteSQLSHA5c9affa7859fe9ea95ccc3e2fa995487ef6ee2c95e35d0063cdc64c01f41948d:67statements26colunas5tabelas36índices aditivos. Bootstrap criou3identidades e vinculou3modelos existentes/versão1. Grant inseriu5relações do role Lider Operacional para1membro atual: chamados/Documentos/UpDocumentos/Extratos/checkList. Quatro módulos preservados e acessos adicionais basecrm/calendarioAlpha continuam presentes; comparação dos conjuntos efetivos antes/depois sem perda. Nenhum role/override/owner alterado.
+
+Cada CLI executou o guard completo ORIGINAL: consentimento/Vault/plano/fingerprint/idade/SHAbytes do dump e restore descartável local/integrity/FKs/contagens. Isso não é novo backup nem restauração remota; não houve otimização/contorno/patch deCLI. Backup original22/10/2026 17:51:45UTC,360811599bytes/SHA30b31bbef7c4e462c49bf22150ec4150f6bcc5d4ee035ec47d0fc67197acdd5e, válido até24/10/2026 17:51:45UTC. Nenhum backup antigo removido.
+
+Pós-verificação READONLY após CADA operação: schemaAPPLIED/canônico/blockers0/FK0; contagens4atendimentos/6checklists/10itens/3modelos/2contas,4ownersNULL,0documentos/fotos/Teste; ledger continua ausente. Campos originais de operacional_clientes/Checklist/ItemChecklist/ModeloItemChecklist comparados em memória contra backup SQLite nativo verificado aberto READONLY: todos iguais nas3fases, sem impressão de linhas/dados privados. Itens/snapshots antigos preservados; novas colunas são única diferença esperada do schema. Plano bootstrap após schema permaneceu69b3c4bc…; plano grant após bootstrap permaneceu a7b25eff…; CAS/approval não foram recalculados para contornar diferença. Final20:28:57UTC, schemaFingerprintda7d0fa7e224b201b24cae15b5d0cc510e01015976807d64c9839f02b0807035;3identidades/3vínculos e5permissões exatas. Hash2 NÃOexecutado;2legados continuam aguardando rollout leitor/escritor/cessação antiga e liberação correspondente.
+
+### Blob após autenticação real: step-up ainda exigido
+
+Usuário confirmou novo loginoficial device NNBF-QNBR; CLI64.0.2isolada terminouexit0 e gravou auth600 no diretório0700 já separado. Identidadeesperada e equipe team_Ct0FhLD6LFla3xec3SWlW7QC conferidas legitimamente viaAPI antes do uso. GETsecrets do store privado novo store_IZKjlrpAjL248Ofn apósloginreal,20:27:38UTC, continua403challenge_required. Nenhum segredo recebido/configurado, nenhuma conexão genérica/default/production/preview ou exportação por logs/functions/env. CHECKLIST_PRIVATE_BLOB_TOKEN continua ausente nos2customstagings. Nenhuma tentativa repetida nem troca de globalBlob. OAuth concluído NÃOequivale a step-up liberado.
+
+Próxima ação humana: abrir [Vercel Storage](https://vercel.com/dashboard/stores), selecionar CHECKLIST-STAGING-20261022 e concluir confirmação de identidade solicitada para acesso à credencial privada; não enviar token pelo chat. Provedor é autoridade sobre a liberação. Isolatedconfig `/home/ialpha/.config/painel-alpha/checklist-staging-20261022/vercel-login`, sessão98091 já concluída; código expirável não precisa ser reutilizado. Não repetir login como substituto presumido de step-up.
+
+### Estado e próximos passos
+
+Gates Main da árvore584856eb: TC8GiB/lint0erros1183warn/full737arquivos5958PASS+4skip1todo/build62,06s PASS adotados deForge-merged. Portal7d12f74 intacto mantém TC/lint/build57+3tests. Somente documentação editada aqui, sem repetir gates íntegros. Nada publicado/push/PR remoto/main/prod; não háPortalstagingREADY, runtimebinding/TLS/origins nem homologação autenticada comprovados. Resolver credencial privada legítima, preparar rollout SOMENTEstaging, anunciar internamente antes do push; PortalreaderREADY primeiro→PainelhashwriterREADY+cessação comprovada de writers antigos→liberaçãoVault hash2 já consentido→homologação privada/polling. Sem nova pergunta para o mesmo consentimentoDB, salvo mudança material de plano/escopo/validade.
+
+Sem DROP/rebuild/dbpush/migratedeploy/ledger/manualSQL/batch/Teste/ownerbackfill/objeto/timer/Pusher/prod. Polling§14 exclusivo, timer suspenso. Story In Progress. Handoff `/tmp/checklist-analistas-20261022-devops-apply3.md` e JSON seguro correspondente contêm comandos/exits/time/SHAs/logs/preservação e distinção entre aplicado e pendente. Logs CLI `/tmp/checklist-analistas-20261022-devops-apply3-{schema,bootstrap-modelos,habilitar-lider-checklist}.log[.json]`; pós-verificações `...-post-<op>.json`; acesso provider `...-blob-auth.json`. Sem segredos nesses relatórios. Controle devolvido ao Bibble.

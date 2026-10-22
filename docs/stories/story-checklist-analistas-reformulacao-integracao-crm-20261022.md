@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress — **implementação local PASS / READY_FOR_APPROVAL**, com gates reais dos dois aplicativos e revisões Probe/Flux, Anubis e Lens concluídos; B01, B02, regressões de integração/gates e LENS-01 fechados. **Nova integração local Radar:** merge mecânico preserva d7580d07 e ab278f13; Forge Main afetado ainda pendente, sem invalidar evidências da feature pré-merge. **Publicação/homologação PENDENTE:** credencial privada Blob, Portal staging READY, aplicação sob Vault/backup vigente/consentimento específico e validação autenticada no staging. Não marcar Done antes dessas provas. Os adendos abaixo preservam a cronologia; falhas e pendências já encerradas em rodadas posteriores não são bloqueios locais atuais.
+In Progress — **implementação local PASS / READY_FOR_APPROVAL**, com gates reais dos dois aplicativos e revisões Probe/Flux, Anubis e Lens concluídos; B01, B02, regressões de integração/gates e LENS-01 fechados. **Integração local Radar aprovada pelo Forge:** Main584856ebac7760707baf60853b28eb870515b239, typecheck/lint/test/build PASS,737 arquivos/5958 testes PASS; Portal7d12f74 e fontes da feature intactos. **Vault/DevOps: consentimento específico recebido (“sim”, observado20:16:25UTC); schema aditivo, bootstrap3 e grant5 APLICADOS com guardasCLI e pós-verificação readonly preservando dados/ownersNULL/acessos. Hash2 consentido continua condicionado ao rollout e liberação por provas reais.** Fase hash já corrigida, plano1bd13b1a… vigente. **Publicação/homologação PENDENTE:** credencial privada Blob, Portal staging READY, provas do leitor/escritor/cessação antiga, hashbatch condicionado ao plano vigente e validação autenticada no staging. Não marcar Done antes dessas provas. Os adendos abaixo preservam a cronologia; falhas e pendências já encerradas em rodadas posteriores não são bloqueios locais atuais.
 
 ## Executor Assignment
 
@@ -70,11 +70,14 @@ Bases preparadas: Painel `69047dee` em `/home/ialpha/projetos/alpha-comex/painel
 - [x] **Sage:** suíte causal/regressão integral pela matriz, fixtures/SQLite/streams; evidência executada e lacunas explícitas (AC12).
 - [x] **Forge:** lint/typecheck/test/build reais Painel e equivalentes Portal PASS, incluindo build Main independente pós-LENS-01; lineage adotada explicitamente sem repetir gates intactos.
 - [x] **Probe → Anubis → Lens:** integração em fixtures, custo dos builds, segurança/auth/storage/ZIP e revisão de código concluídos. B01/B02/LENS-01 e regressões dos gates fechados;0 achados locais abertos. Não equivale a E2E autenticado remoto.
-- [ ] **Vault:** apresentar plano concreto de aplicação schema/legado/Teste/objetos por ambiente, backup completo verificado≤48h, alternativa/rollback e solicitar consentimento específico; aguardar resposta antes de aplicar.
+- [x] **Vault documental:** plano concreto das quatro operações staging, backup completo verificado≤48h, impactos/alternativa/rollback e pedido de consentimento preparados no adendo final de `docs/vault/checklist-analistas-20261022.md`; Teste/objetos excluídos pelo préestado0.
+- [x] **Vault consentimento:** usuário respondeu literalmente “sim” ao plano específico das4operações staging; evidência real registrada foraGit, preflight sem drift/backup válido e3pares consent/Vault emitidos.
+- [ ] **DevOps aplicação3:** executar schema/bootstrap3/grant5 somente com guardasCLI/backup/CAS/préestado confirmados. Hash consentido ainda bloqueado até provas reais de leitor/escritorREADY e cessação antiga; nenhuma aprovação hash emitida.
 - [x] **DevOps local:** inventário seletivo/commits feature Main62d1c154 e Portal7d12f74; scanner sem segredo real, exclusões/escopos verificados. Merge mecânico local ab278f13 preserva ambos os históricos; File List consolidada abaixo.
-- [ ] **Forge após integração/Main:** validar gates afetados pelos13paths Radar integrados; evidências pré-merge permanecem identificadas, Portal intacto não exige repetição.
+- [x] **Forge após integração/Main:** quatro gates reais PASS na árvore integrada,737arquivos/5958testesPASS; evidências pré-merge preservadas, Portal intacto adotado sem repetição.
 - [ ] **DevOps operacional:** Blob403 exige ação humana/login legítimo e resposta efetiva; PortalREADY/origens/runtime efetivo ainda pendentes antes de push/preview autorizado.2overridesDBMain somente custom staging agora usam alvo staging conhecido verificado; originais production/preview preservados. CheckList usa polling§14, sem novo Pusher nem timer.
-- [ ] **DevOps após gates/consentimento:** aplicar somente operações explicitamente autorizadas e validar schema/objetos; deploy leitor Portal compatível antes de escrita hash Painel, somente staging; conferir SHA/READY/alias/smoke dos dois apps.
+- [x] **DevOps DB3:** schema67statements/bootstrap3/grant5 aplicados exclusivamente staging, exatos planos/guardas/Vault/consentimento/backup; preservação de dados/4ownersNULL/acessos comprovada após cada operação.
+- [ ] **DevOps rollout/hash:** PortalreaderREADY antes PainelhashwriterREADY/cessação antiga, depois hash2 consentido sob liberação/provas reais; Blobstep-up/origins/homologação continuam pendentes.
 - [x] **QA readiness independente:** confrontar AC1–12/A01–17 e evidências atuais; implementação local PASS/READY_FOR_APPROVAL, nenhum critério de código sem entrega demonstrado. Ver consolidação final e matriz.
 - [ ] **QA homologação:** conferir aplicação autorizada/compatibilidade real, SHA/READY/aliases/sessões legítimas e round-trip privado no staging. A10 legado staging N/A provisório por0docs/0fotos, revalidar; nenhuma afirmação de revogação/fechamento em produção. Sem Done antes da homologação.
 - [ ] **Scribe/Kowalski:** atualizar mapas/memória/journal após entrega comprovada; fechar checklist/File List/evidências e manter produção sem promoção.
@@ -336,3 +339,49 @@ File List desta estação: somente `docs/qa/matriz-checklist-analistas-20261022.
 - [ ]ForgeMain valida nova árvore integrada antes de publicação; Portal efeature pré-merge mantêm lineage já aprovada. Única nova GETBlob403, loginoficialisolado aguarda ação humana; não presume step-up concluído. PortalREADY/Blob/origens/homologação econsentimentoDB específico continuam pendentes. Story In Progress, sem push/deploy/prod.
 
 **File List real consolidada:** [manifesto por repo](../ops/checklist-analistas-files-20261022.json) enumera132paths featureMain(incluieste novo manifesto),69Portal e13paths da integração Radar separadamente. Artefatos DevOps desta estação: `docs/ops/checklist-analistas-staging-20261022.md`, novo `docs/ops/checklist-analistas-files-20261022.json`, esta story e ajuste somenteEOF `docs/qa/matriz-checklist-analistas-20261022.md`. Código/testes/schema novos não foram escritos porDevOps; commits congelam entregas revisadas dos owners e merge integra source remoto mecanicamente. Handoff `/tmp/checklist-analistas-20261022-devops-readiness.md`/`.json` contém SHAs finais/pais/tree e próximos gates. Sem banco/objetos/timer/produção. Controle devolvido ao Bibble após emissão.
+
+
+### Forge MAIN pós-merge Radar — 22/10/2026
+
+- [x] HEAD584856ebac7760707baf60853b28eb870515b239/tree dcd4530fb8dddb9e72d80a2fceaf897a3b525bf4 gateados;13pathsRadar justificam nova execuçãoMain.114sourcesfeature e69Portal revalidados0mismatches.
+- [x] Quatro comandos Main reais, uma vez cada: `npm run typecheck`8GiB exit0/20,86s; `npm run lint` exit0/44,74s,0erros1183warnings; `npm test`coverage exit0/34,53s,737arquivos/5958PASS+4skip+1todo preexistentes; `npm run build` exit0/62,06s,Prisma/player/webpack3GiB86páginas. BuildSKIPtipos, TCseparadoPASS.
+- [x] Semerro novo da integração. Portal/reviewsfeature Probe13Chrome+Anubis+Lens+QA adotados comlineage ehashesintactos; não repetidos nem alegadoscomoE2Eremoto.
+- [ ] Operação/homologaçãostaging/PortalREADY/Blob/VaultconsentimentoDB pendentes. StoryInProgress; nenhuma publicação/DBreal/produção autorizada porgates.
+
+**APROVADOForgeMAINcombinado**, controleaoBibble. Relatório `/tmp/checklist-analistas-20261022-forge-merged.md`; inputs `/tmp/checklist-analistas-20261022-forge-merged-input.json`; logs `/tmp/checklist-analistas-20261022-forge-main-merged-{typecheck,lint,test,build}.log`+`.log.json`. FileListForge: estaStory e `docs/qa/matriz-checklist-analistas-20261022.md`; somenteappenddocs, semfonte/teste/schema/config/env/Gitmutável/cloud/DB/backup/timer/deploy.
+
+### Vault final — plano específico pronto para consentimento,22/10/2026
+
+- [x] Consolidar fase hash corrigida1bd13b1a… e gates Forge pós-merge Main737arquivos/5958PASS; Portal/revisões locais adotados sem repetição por fontes intactas. Pendências históricas de fase/gates não são bloqueios locais atuais.
+- [x] Preparar apresentação autocontida de quatro operações staging: schema67statements (26colunas/5tabelas/36índices), bootstrap3, grant5 preservando4acessos, hash2 condicionado ao leitor/escritorREADY e cessação antiga real. ComandosCLI,planShas,impactos/locks,alternativa/rollback e pergunta específica em `docs/vault/checklist-analistas-20261022.md`, adendo final.
+- [x] Adotar backup completo verificado sem reler dump/rebackup/restore: snapshot22/10/2026 17:51:45UTC (14:51:45SãoPaulo),360811599bytes,337tabelas/295932linhas/949índices/2triggers,restore17:54:38UTC. Idade1,748h às19:36:36UTC;≤48h somente até24/10/2026 17:51:45UTC, revalidar em cada apply. Stat e metadata segura conferidos; nenhum segredo/dado de linha lido.
+- [ ] Bibble apresentar e colher consentimento inequívoco antes de aplicar; nenhum consentimento/approved=true sintético. Préestado/CAS/fingerprint/backup devem continuar válidos. Alteração de conjunto/escopo exige novo plano/consentimento.
+- [ ] Portal leitorREADY/host/TLS/DBproof/autenticação real, PainelhashwriterREADY/cessação de writers antigos e Blob privado continuam pendentes; sem prova não executar hash nem declarar homologação. Sem Teste/delete/objetos/backfill de owners/ledger/timer/cron/Pusher/produção no plano.
+
+**Veredito: ARTEFATOS REVISADOS / BACKUP VÁLIDO / AGUARDA CONSENTIMENTO.** Story In Progress, sem publicação. File List desta estação: `docs/vault/checklist-analistas-20261022.md`, esta story; relatório `/tmp/checklist-analistas-20261022-vault-final-plan.md` foraGit. Somente documentação, preservando edits anteriores/roots compartilhados; nenhum gate ou backup repetido, SQL remoto ou mutação de banco/cloud/Git. Controle devolvido ao Bibble; estação encerrada.
+
+
+### Scribe/Kowalski — continuidade documental,22/10/2026
+
+- [x] Mapa real e pontos de integração registrados; §14/polling prevalece sobre Pusher antigo. Entrega local PASS/zero achados, pré-condições operacionais e backup/consentimento distintos de publicação.
+- [x] Journal consolidado sem apagar draft alheio; apenas estes novos blocos identificáveis foram apendados às memórias do root compartilhado, preservando entradas concorrentes. Sem fontes/testes/env/DB/cloud/Git/build/backup nesta estação.
+**File List documental:** `.bibble/memory/{codebase-map,integration-points,journal}.md`, esta story. Story In Progress; staging não aplicado/publicado nesta entrega, produção fora do escopo. Handoff `/tmp/checklist-analistas-20261022-memory-consolidation.md`; controle devolvido ao Bibble.
+
+### Vault — consentimento real e liberação3 staging,22/10/2026
+
+- [x] Registrar resposta literal do usuário “sim”, pergunta exata e escopo4operações/plano integral/backupSHA, primeira observação20:16:25UTC; sem inventar ID ou timestamp exato de mensagem. Não pedir novamente a mesma autorização.
+- [x] Revalidar staging readonly com env0600 explícito: diagnóstico idêntico/NOT_APPLIED, quatro planosSHA iguais,4atendimentos/6checklists/10itens/3modelos/2legados válidos,0docs/fotos/Teste/FK/ledger,owners futuros4NULL. Backup existente verificado adotado/stat e metadata conferidos,sem ler dump/refazer hash360MB/restore/backup/gates.
+- [x] Emitir somente3pares reais consent/Vault aprovando schema→bootstrap3→grant5 sob guardasCLI e precondições exatas; diretório0700/arquivos0600 foraGit. Relatório `/tmp/checklist-analistas-20261022-vault-authorized.md`; JSON `/tmp/checklist-vault-20261022/authorization-20261022/authorization-summary.json` contém paths e comandos exatos.
+- [ ] DevOps aplicar3operações e validar cada fase; Vault não executou escrita. Hash2 consentido mas sem aprovação/leitor fictícios, aguardando PortalreaderREADY legítimo→PainelhashwriterREADY→cessação comprovada de writers antigos, mais backup/CAS/plano vigente. Blob requer autenticação legítima separada; produção fora.
+
+File List desta estação: `docs/vault/checklist-analistas-20261022.md`, esta story; relatório/evidências acima foraGit. Nenhum source/teste/schema/env/DBwrite/cloud/Gitmutável/objeto/timer/produção alterado. Story In Progress. Controle devolvido ao Bibble para DevOps APPLY3 staging; estação encerrada.
+
+
+### DevOps APPLY3 real — 22/10/2026
+
+- [x]Schema applied=true/exit0 às20:25:15UTC/45,378s; bootstrap3 às20:27:08UTC/21,721s; grant5 às20:28:40UTC/22,709s. Comandos exatos liberados peloVault, sem bypass/ediçãoCLI, guardrestore completo local executado por cada operação; nenhum backup novo/restore remoto.
+- [x]Readonly após cadafase APPLIED/FK0/blockers0/4dossiês6checklists10itens3modelos2contas;4ownersNULL e campos originais de4tabelas iguais ao backupnativo verificado, itens/snapshots intactos.3identidades/3modelos vinculados e5permissões confirmados;4módulos anteriores+crm/calendarioAlpha preservados, sem owner/role/override alteração. CASplanos seguintes iguais.
+- [x]NovoOAuth oficial isolado realmente concluído e identity/team confirmados; GETBlob20:27:38UTC continua403challenge_required. Login não resolveu step-up, nenhumtokenconfigurado/extraídoporsidechannel. Usuário deve concluir desafio legítimo no dashboardStorage do storeCHECKLIST-STAGING-20261022; sem tokens no chat.
+- [ ]Hash2 já consentido aguarda PortalreaderREADY→PainelhashwriterREADY/cessação antiga→liberaçãoVault real; não executado. PortalREADY/Blob/origins/homologação pendentes. Polling§14 sem timer. Story In Progress, sem publicação/push/prod.
+
+File List desta estação: `docs/ops/checklist-analistas-staging-20261022.md`, `docs/vault/checklist-analistas-20261022.md`, esta story. Demais docs/memória sujos anteriores preservados e não adicionados ao commit seletivo. Handoff seguro `/tmp/checklist-analistas-20261022-devops-apply3.md`/`.json`,3logs e3pósverificações foraGit. Sem app/teste/schema/dependência alterados. Controle devolvido ao Bibble.
