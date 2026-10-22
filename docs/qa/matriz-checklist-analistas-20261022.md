@@ -197,3 +197,13 @@ File List Lens final: somente esta matriz QA e story por append, relatório/repr
 Evidências atuais: `/tmp/checklist-analistas-20261022-{forge-catalog,forge-round2,echo-catalog-replay,probe-flux,anubis,lens-final}.md`, matriz/story e `docs/vault/checklist-analistas-20261022.md` com adendo Dara. Relatórios antigos NEEDS_FIX e auditoria original preservados como história, sem tratá-los como defeitos locais atuais.
 
 File List desta estação: somente `docs/qa/matriz-checklist-analistas-20261022.md` (estado/consolidação), `docs/stories/story-checklist-analistas-reformulacao-integracao-crm-20261022.md` (status/AC10 vigente/checklist/QA Results/consolidação), relatório `/tmp/checklist-analistas-20261022-qa-readiness.md` foraGit. Nenhuma alteração de appsource/testes/schema/env/Git mutável/cloud/DB/objetos/backup/timer/seed/deploy; roots e edits alheios preservados. **Controle devolvido ao Bibble para DevOps readiness; estação encerrada.**
+
+
+### Forge MAIN pós-merge Radar — 22/10/2026
+
+- [x] HEAD584856ebac7760707baf60853b28eb870515b239/tree dcd4530fb8dddb9e72d80a2fceaf897a3b525bf4 gateados;13pathsRadar justificam nova execuçãoMain.114sourcesfeature e69Portal revalidados0mismatches.
+- [x] Quatro comandos Main reais, uma vez cada: `npm run typecheck`8GiB exit0/20,86s; `npm run lint` exit0/44,74s,0erros1183warnings; `npm test`coverage exit0/34,53s,737arquivos/5958PASS+4skip+1todo preexistentes; `npm run build` exit0/62,06s,Prisma/player/webpack3GiB86páginas. BuildSKIPtipos, TCseparadoPASS.
+- [x] Semerro novo da integração. Portal/reviewsfeature Probe13Chrome+Anubis+Lens+QA adotados comlineage ehashesintactos; não repetidos nem alegadoscomoE2Eremoto.
+- [ ] Operação/homologaçãostaging/PortalREADY/Blob/VaultconsentimentoDB pendentes. StoryInProgress; nenhuma publicação/DBreal/produção autorizada porgates.
+
+**APROVADOForgeMAINcombinado**, controleaoBibble. Relatório `/tmp/checklist-analistas-20261022-forge-merged.md`; inputs `/tmp/checklist-analistas-20261022-forge-merged-input.json`; logs `/tmp/checklist-analistas-20261022-forge-main-merged-{typecheck,lint,test,build}.log`+`.log.json`. FileListForge: estaStory e `docs/qa/matriz-checklist-analistas-20261022.md`; somenteappenddocs, semfonte/teste/schema/config/env/Gitmutável/cloud/DB/backup/timer/deploy.

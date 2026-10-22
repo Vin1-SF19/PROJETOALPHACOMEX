@@ -7422,3 +7422,29 @@ Implementação, quatro gates, revisão e smoke da correção em staging; result
 - Forge quatro gates reais PASS: tipos0/47,36s, lint0/52,40s (1.193 warnings existentes), novo build0/216,68s e suíte completa0/193,11s: 720 arquivos/5.784 aprovados, zero falhas, quatro skipped/um todo. Fonte `1fc1f5e59524c39c21890cd031376f8bc949474cfd7217f7d19c830b169600a9` idêntica antes/depois.
 - Client Prisma compartilhado divergente foi isolado em artefato privado compatível com o schema fonte, sem instalar/atualizar pacotes, modificar o client alheio ou alterar schema. Nove SQLite PASS após o ajuste do harness; primeira falha preservada. Aprendizado registrado em `known-errors.md`.
 - QA local APPROVED libera publicação; teste visual autenticado Admin da correção permanece pendente. Este commit será Ready for Review, com evidência remota posterior somente privada; não declarar novo READY antes de acontecer e não criar rodada recursiva de docs. Produção/banco remoto/ENV/worker manual fora do escopo.
+
+
+---
+<!-- checklist-analistas-20261022-kowalski-close -->
+## [2026-10-22 19:40 UTC] — CheckList Analistas: entrega local aprovada; staging pendente
+
+**Tags:** #feature #integration #security #auth #nextjs #prisma
+**Agentes envolvidos:** Bibble, Aria, Dara, Echo, Nova/Iris, Sage, Forge, Probe/Flux, Anubis, Lens, DevOps, Vault, Scribe/Kowalski.
+**Arquivos tocados:** mapas de codebase/integrações e este journal; File List na story CheckList. Fontes completas em `docs/ops/checklist-analistas-files-20261022.json` (Main132/Portal69 + Radar13 separados).
+
+### Contexto
+Reformular CheckList por analista e integrar dossiê explícito CRM B, preservando BPM/Excel, legado e isolamento staging/produção.
+### O que foi feito
+- Implementação/revisões locais PASS, zero achados locais abertos. Main `584856ebac7760707baf60853b28eb870515b239`, tree `dcd4530fb8dddb9e72d80a2fceaf897a3b525bf4`; freeze `62d1c154`; Portal `7d12f74d7de2895d49a4ea1b2356cef39427ea64`. Merge local preservou CRM/docs d758 (16commits) e staging Radar ab278 (2), divergentes desde861e43d7;13paths Radar sem overlap direto feature.
+- Forge pós-merge: typecheck8GiB20,86s, lint44,74s (0erros/1183avisos), suíte34,53s (737arquivos/5958PASS+4skip/1todo), build62,06s PASS. Portal TC/lint/build e57+3nativos, Probe13asserts Chrome, Flux/Anubis/Lens/QA adotados com114fontes Main/69Portal intactas; não são E2E remoto autenticado. Evidências `/tmp/checklist-analistas-20261022-{forge-merged,devops-readiness,qa-readiness,vault-final-plan}.md`.
+### Decisões tomadas
+- §14 normativo: journal/polling6/30s e SSE Portal8s; sem Pusher CheckList/timer. ACL interna global para leitura; escrita owner/líder exato, sem bypass administrativo; legado ownerNULL preservado.
+- Quatro operações DB staging propostas, **não aplicadas**: schema67statements (26colunas/5tabelas/36índices), bootstrap3 futuro, grant5 preservando4acessos, hash2 só após leitor/escritorREADY e cessação antiga real. Vault pronto, AGUARDA CONSENTIMENTO específico; não foi solicitado/recebido nem fabricado approved=true.
+### Problemas encontrados / resolvidos
+- B01: bcrypt limita72bytes UTF-8, não72caracteres; B02: parser de evento recebe objeto JSON; LENS-01: replay precisa intenção estável do caller, não snapshot atual. Poluição SQLite por env ambiente e BOM3bytes Portal corrigidos em seus gates; não reutilizar ambiente real nos testes.
+### Pendências
+- Story In Progress; migration NOT_APPLIED, nenhum deploy desta entrega nem produção autorizada. Banco staging distinto (URLSHA7fdd1607…); preflight preserva4ownersNULL/3modelos/2contas,0docs/fotos/Teste, sem inferir dono nem DELETE. Portal custom staging/host associado e verificado ainda sem READY comprovado.
+- Store Blob privado novo vazio; obtenção legítima segue403challenge_required, sem upload/cópia/delete. OAuth expirou19:31UTC sem resposta; autenticação não presumida. Falta consentimento específico DB, Blob legítimo, reader/writer/cessação antiga e homologação com sessões reais.
+- Backup completo staging22/10 17:51:45UTC (14:51:45SãoPaulo), SQL360811599bytes; restore17:54:38UTC verificou337tabelas/295932linhas, integridade/FK/contagens/schema/sequências. Ignorado no Git; válido somente íntegro e≤48h até24/10 17:51:45UTC, conferir antes de cada apply. Não repetir backup agora sem necessidade; nenhuma restauração remota autorizada.
+### Refletido também em
+- `codebase-map.md` e `integration-points.md`: marcadores Scribe desta entrega; story: File List documental. Draft anterior de outra entrega preservado integralmente, sem consolidação alheia.
