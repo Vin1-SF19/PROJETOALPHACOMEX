@@ -43,6 +43,11 @@ interface CardSaveContextValue {
 const CardSaveContext = createContext<CardSaveContextValue | null>(null);
 
 export function CardSaveProvider({ children }: { children: ReactNode }) {
+  const parent = useContext(CardSaveContext);
+  return parent ? <>{children}</> : <CardSaveProviderState>{children}</CardSaveProviderState>;
+}
+
+function CardSaveProviderState({ children }: { children: ReactNode }) {
   const publicarEstadoGuardRef = useRef<() => void>(() => {});
   const listeners = useRef(new Map<string, Set<ConfirmationListener>>());
   const subscribeConfirmation = useCallback((cardId: string, listener: ConfirmationListener) => {

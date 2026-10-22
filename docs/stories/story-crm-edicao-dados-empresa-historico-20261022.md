@@ -2,7 +2,7 @@
 
 ## Status e responsáveis
 
-Ready for Development — usuário delimitou explicitamente cadastro completo, contatos, QSA e RADAR/fiscal; contratos, pagamentos e equipe ficam fora da edição. Código e artefato de schema podem ser preparados; migração e validação do runtime em staging ficam pendentes de consentimento específico, após resultado concreto, relatório Vault e backup verificado. Produção continua sem autorização. `@sm` prepara story; `@architect` define persistência; `@dev` implementa; `@qa` valida; `@devops` publica dentro da autorização vigente.
+Ready for Review local — editor/host e artefatos de schema preparados; testes, lint, typecheck e build finais aprovados. QA final de fonte sem P1/P2 e aprovação local com gates agora concluídos. Migração, publicação dependente da coluna e homologação do runtime em staging permanecem pendentes de consentimento específico, após resultado concreto, relatório Vault e backup verificado. Escopo confirmado: cadastro completo, contatos, QSA e RADAR/fiscal; exclui contratos, pagamentos e equipe. Produção continua sem autorização. `@sm` prepara story; `@architect` define persistência; `@dev` implementa; `@qa` valida; `@devops` publica dentro da autorização vigente.
 
 ## Story
 
@@ -20,7 +20,7 @@ Quero também retirar do histórico visível a anotação técnica inteira criad
 
 ## Evidência e limites
 
-- `DadosEmpresaConteudo.tsx` contém Fonte/situação no topo e apresenta informações consolidadas de empresa, contatos, sócios, CNAEs, regime/fiscal, Radar e relacionamento; `DadosEmpresaDrawer.tsx` controla abertura/carregamento e hoje só lê.
+- Diagnóstico inicial: `DadosEmpresaConteudo.tsx` apresentava Fonte/situação e informações consolidadas somente para leitura; `DadosEmpresaDrawer.tsx` controlava abertura/carregamento. A entrega adiciona editor explícito aos grupos autorizados, preservando contratos/pagamentos/equipe fora da edição.
 - `ObterDadosEmpresaCardBpm` em `src/actions/bpm/Empresas.ts` verifica acesso ao card e consolida `Cliente`, `ClienteServico`, `Pessoa`/vínculos, `ConsultaPreAnalise` e `radar_fiscal`. Trata-se de múltiplas fontes; somente os grupos autorizados entram na nova edição. Não gravar contratos/pagamentos/equipe ou usar dados consolidados de negócio como se fossem cadastrais.
 - Decisão explícita de `@architect`: preparar `Cliente.perfilCadastralJson Json?` para extras cadastrais/contatos/QSA/RADAR/fiscal que precisam sobreviver inclusive sem CNPJ, mantendo os atributos básicos já canônicos em `Cliente`. DTO/allowlist e snapshot fortes definem o contrato; não aceitar JSON arbitrário nem usar o novo perfil para guardar contratos, pagamentos, equipe, segredos ou marketing. Auditoria mantém campos legíveis, em vez de expor um dump bruto do JSON.
 - Concorrência definida por `@architect`: CAS em `Cliente.updatedAt` contra o snapshot carregado, com alteração de atributos/perfil e auditoria existente na mesma transação. Falha de pré-condição é conflito explícito; não sobrescrever edição concorrente. Não persistir o rascunho por CNPJ como chave quando ele ainda não existe.
@@ -28,7 +28,7 @@ Quero também retirar do histórico visível a anotação técnica inteira criad
 - `salvarAlteracoesCliente` atual é referência parcial: requer sessão, mas não aplica ACL específica de card, não aceita CNPJ e faz atualização/auditoria separadas. Não reutilizar esse caminho como se satisfizesse autorização/transação desta story.
 - Clients existentes: `getReceitaData`, `getEmpresaAquiData`, `consultarRadar` e agregador `src/lib/bpm/consulta-cnpj-lead.ts`. `ConsultarCnpjNovoContrato` é restrita à etapa financeira; não remover essa restrição para usar a lupa desta gaveta. Criar/adaptar somente a camada autorizada necessária com os clients existentes, sem nova API externa.
 - `CardFullViewModal.tsx` já tem revisão de pendências com salvar, continuar editando e sair sem salvar; integrar o rascunho da gaveta ao controle existente, sem fluxo paralelo que permita fechamento indevido.
-- `AssumirLeadInstagram` cria `BpmInteracaoCard` técnica com resumo `Dados recebidos do Instagram`; `src/lib/bpm/timeline.ts` monta o feed. Ocultar o item técnico inteiro com identificação estreita da origem, preservar anotações humanas e eventos reais. Não apagar registros existentes nem fazer limpeza/backfill em massa.
+- Diagnóstico inicial: `AssumirLeadInstagram` criava anotação técnica `Dados recebidos do Instagram`. A entrega deixa de criá-la nas novas assunções e filtra o legado pela assinatura técnica estreita em três projeções, preservando anotações humanas/eventos reais. Não apaga registros existentes nem faz limpeza/backfill em massa.
 - Nesta fase só preparar código/artefatos de schema: **não executar DDL/migration em staging ainda**. Aplicação da coluna exige plano concreto, relatório Vault, backup verificado e consentimento específico posterior do usuário conforme AGENTS. Vault prepara o backup por operações de leitura, sem DDL. Runtime/deploy dependente da coluna e sua homologação em staging ficam pendentes até esse gate; não publicar código que consulte a coluna num banco que ainda não a possui.
 - Sem backfill, carga histórica, importação, alteração NoLoss/Apps Script, env ou escrita remota nesta inspeção. Preservar as duas stories anteriores com alterações locais. Marketing/UTMs privados no NoLoss continuam fora do CRM; produção permanece fora desta autorização.
 
@@ -43,7 +43,7 @@ Quero também retirar do histórico visível a anotação técnica inteira criad
 7. Alterações canônicas/perfil, vínculos pertinentes e auditoria são gravados atomicamente na mesma transação. Usar snapshot/DTO e CAS em `Cliente.updatedAt` para detectar edição concorrente; autor/data do servidor. Conflito, falha de validação ou erro SQL preserva rascunho e não deixa persistência/auditoria parcial; comunicar conflito sem sobrescrever a mudança de outra pessoa.
 8. Cada campo efetivamente alterado registra antes/depois, autor real da sessão e dia/hora, agrupado no mesmo lote de Salvar usando os históricos existentes. Mostrar valores legíveis no histórico do card, com formatação do projeto `pt-BR`/`America/Sao_Paulo`. Não criar linha por campo inalterado nem permitir que o payload forje autor/data. Mudanças compartilhadas de empresa preservam o vínculo correto e não exigem acesso a outros cards restritos.
 9. Salvar com sucesso sai da edição e atualiza gaveta/card/histórico a partir do persistido. Duplo clique/repetição não duplica auditoria. Falha mantém edição e pendências; não fechar nem exibir sucesso antes de commit confirmado.
-10. **Cancelar** restaura o snapshot salvo e descarta prévias de consulta, sem escrita/auditoria de alteração. Ao tentar fechar gaveta/card, clicar fora, usar Escape, trocar card ou navegar com pendências, usar o guard existente com escolhas de salvar, descartar ou continuar. Rascunho não pode sumir silenciosamente; falha ao salvar conserva a edição. Proteção de saída do navegador usa o mecanismo aplicável, sem prometer impedir encerramento forçado do processo.
+10. **Cancelar** restaura o snapshot salvo e descarta prévias de consulta, sem escrita/auditoria de alteração. Ao tentar fechar gaveta/card, clicar fora, usar Escape, trocar card ou navegar com pendências, usar o guard existente com escolhas de salvar, descartar ou continuar. Rascunho não pode sumir silenciosamente; falha ao salvar conserva a edição. Back/Forward do iframe pode concluir a navegação e desmontar o dono da rota: o MESMO editor permanece no host estável do layout até a escolha, sem fingir cancelar traversal. A preservação da instância limita-se à permanência do layout `PainelAlpha`; saída desse layout, remoção do iframe e recarga/fechamento total dependem do guard/aviso aplicável, sem prometer sobreviver ao encerramento forçado do processo.
 11. A anotação técnica inteira de importação Instagram deixa de aparecer no histórico visível, inclusive entradas legadas identificáveis, sem apagar registros/banco. Não remover anotações humanas pelo simples texto parecido nem ocultar eventos de criação/assunção ou a nova auditoria. Dados comerciais necessários continuam acessíveis nos locais próprios, sem reexpor envelope/marketing.
 12. Testes cobrem confirmação, ACL/IDs adulterados, rascunho, todos os grupos autorizados e exclusão de contratos/pagamentos/equipe, perfil extra sem CNPJ, lupa/validação e corrida, consulta sem escrita, cancelamento/fechamento com pendências, transação/rollback, conflito CAS, auditoria por campo/autor/horário, repetição e filtro estreito da anotação técnica. Gates de código: lint, typecheck, testes e build; registrar resultados reais e atualizar File List/checklist. Testes de schema usam ambiente isolado autorizado, sem contornar o gate do banco staging.
 13. Entrega concreta deve apresentar schema/migração preparados, ambiente/banco staging, impacto, alternativa e rollback para revisão. **Aplicação da migração e homologação runtime staging permanecem bloqueadas até consentimento específico após relatório Vault/backup verificado**; não executar DDL/backfill como parte dos gates de código. Após autorização, aplicar pelo fluxo aprovado e homologar; produção exige autorização própria posterior.
@@ -53,22 +53,79 @@ Quero também retirar do histórico visível a anotação técnica inteira criad
 - [x] Inspecionar gaveta, fontes consolidadas, anotação técnica, histórico existente e guard de pendências.
 - [x] Registrar delimitação explícita: cadastro completo/contatos/QSA/RADAR-fiscal; excluir contratos/pagamentos/equipe.
 - [x] Registrar arquitetura: básicos em Cliente, extras em perfilCadastralJson, DTO/snapshot forte e CAS updatedAt com auditoria transacional.
-- [ ] Preparar código e artefato schema/migração sem aplicar DDL ou acessar coluna ausente no runtime staging.
-- [ ] Implementar filtro de histórico, confirmação e editor com rascunho/Salvar/Cancelar no topo.
-- [ ] Integrar lupa preview com clients existentes e controle de respostas antigas.
-- [ ] Implementar salvamento transacional, detecção de conflito e auditoria existente legível.
-- [ ] Integrar guard de pendências da gaveta a todos os caminhos de saída pertinentes.
-- [ ] Executar testes/gates de código e obter QA com resultado concreto revisável; não executar migração staging implicitamente.
-- [ ] Receber relatório Vault/backup verificado e consentimento específico para migração staging; aplicar/homologar somente depois do gate.
+- [x] Preparar código e artefato schema/migração sem aplicar DDL ou acessar coluna ausente no runtime staging.
+- [x] Implementar filtro estreito de histórico em três projeções, confirmação e editor com rascunho/Salvar/Cancelar no topo.
+- [x] Integrar lupa preview pura com clients existentes e controle de respostas antigas, sem persistência na consulta.
+- [x] Implementar salvamento transacional, CAS e auditoria existente legível.
+- [x] Integrar guard único e host estável no layout, preservando a instância após Back/desmontagem do dono da rota.
+- [x] Verificar em Chromium real: mesmo input após Back, salvar após detach, guard do shell, sem overflow/erros JavaScript.
+- [x] Executar testes/gates finais de código e obter aprovação QA local com resultado concreto revisável; nenhuma migração staging executada implicitamente.
+- [x] Receber relatório Vault/backup staging revalidado, válido até 2026-10-22 20:48:47 UTC; revalidar idade/integridade na eventual execução.
+- [ ] Receber consentimento específico para migração staging; aplicar/publicar/homologar somente após o gate e backup válido.
 - [ ] Produção permanece pendente de autorização específica.
+
+## Arquitetura do host e limite de navegação
+
+O editor é montado no [CardModalHost.tsx](../../src/app/PainelAlpha/AlphaCRM/CardModal/CardModalHost.tsx), instalado pelo [layout PainelAlpha](../../src/app/PainelAlpha/layout.tsx). O wrapper da rota/board publica o modal no host; ao desmontar por Back dentro do iframe, o conteúdo do editor e seu rascunho continuam na mesma instância até salvar, descartar ou continuar. Não há cancelamento fictício de traversal nem criação de um segundo formulário para mascarar perda do primeiro.
+
+`PainelCardState` mantém `CardSaveProvider` no layout, e provider aninhado reutiliza o contexto existente (no-op), evitando dividir pendências. Essa preservação depende do layout `PainelAlpha` permanecer montado. Guard do shell e aviso de saída tratam remoção do iframe/saída completa conforme mecanismo aplicável; não se promete persistência após fechamento forçado do navegador.
+
+## Implementação e evidência local
+
+- Checkpoint `bf9a634b`: 37 arquivos; merge `43adebac` integra staging `69047dee`. Editor completo no escopo autorizado, consulta pura, DTO/snapshot, transação com CAS/auditoria e filtro estreito da anotação técnica em três projeções. Host/layout e seus ajustes posteriores ainda integram o delta local.
+- Gates integrados ANTES da estabilização final do host: **724 arquivos/5.798 testes PASS, 4 skipped e 1 todo**, lint 0 erros/1.193 avisos legados, typecheck e build aprovados. Esses resultados não são apresentados como conclusão do delta posterior do host.
+- Delta final do host: **3 arquivos de testes/23 testes PASS**; após corrigir pureza da fixture React, rechecagem focada com **17 testes PASS**. Chromium real final em `/tmp/crm-empresa-editor-preview/verification.json`, às **2026-10-22 14:29:46 UTC**: mesmo input após Back, dono da rota desmontado, salvamento após detach, guard de fechamento do shell, continuar preserva rascunho, descarte fecha iframe, sem diálogos sobrepostos, zero erros JavaScript e sem overflow (largura/scrollWidth 558 px). Fonte/CSS reais e APIs fictícias: prévia local, sem DDL/homologação remota.
+- **Gates finais validados:** `npm test` exit0, **724 arquivos/5.805 testes PASS, 4 skipped e 1 todo (5.810 total)**, duração 35,86 s, concluído às 14:28:28 UTC, `/tmp/crm-empresa-editor-tests-validated.log`. Lint exit0/0 erros e 1.193 avisos legados às 14:32 UTC, `/tmp/crm-empresa-editor-lint-validated.log`; typecheck exit0, `/tmp/crm-empresa-editor-typecheck-validated.log`; build exit0 com Prisma generate, player e CLI Next webpack com heap de 8 GB, `/tmp/crm-empresa-editor-build-validated.log`. Foram executadas as três fases equivalentes do build; o script padrão limitado a 3 GB não foi usado nem é declarado aprovado.
+- Incidentes de validação: execução de testes com processos paralelos concorrentes sofreu três timeouts por contenção; a execução limpa posterior de `npm test` passou conforme o log validated. Achado de pureza da fixture React foi corrigido, seguido de lint e testes focados aprovados. Logs anteriores com falhas não são contados como sucesso nem usados como recibo final.
+- QA final do agente `qa_instagram`: fonte sem achados P1/P2 e aprovação **LOCAL**, condicionada aos gates que agora passaram. Não houve DDL, push ou deploy remoto. Avanço concorrente de staging `d7580d` está sob inspeção somente leitura por DevOps, ainda sem merge; os gates acima validam a árvore local, não uma integração futura desse avanço.
+- Vault: [relatório de staging](../crm-edicao-dados-empresa-vault-20261022.md) registra coluna ainda ausente e único ALTER preparado, ambiente/banco alvo, impacto, alternativa e rollback. Backup completo revalidado com restauração/integridade, válido até **2026-10-22 20:48:47 UTC**, sujeito a revalidação no instante de execução. Consentimento específico do usuário ainda pendente: **DDL, deploy dependente da coluna e validação runtime staging não executados**. Produção permanece sem autorização.
 
 ## File List
 
-- `docs/stories/story-crm-edicao-dados-empresa-historico-20261022.md` — story inicial; atualizar com arquivos efetivamente implementados.
+- `docs/crm-edicao-dados-empresa-vault-20261022.md`
+- `docs/stories/story-crm-edicao-dados-empresa-historico-20261022.md`
+- `prisma/migrations/20261022140000_cliente_perfil_cadastral/migration.sql`
+- `prisma/schema.prisma`
+- `src/actions/bpm/EmpresaCadastro.ts`
+- `src/actions/bpm/Empresas.ts`
+- `src/actions/bpm/InstagramLeads.ts`
+- `src/actions/bpm/Interacoes.ts`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/DadosEmpresaConteudo.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/DadosEmpresaDrawer.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/DadosEmpresaEditor.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa.tsx`
+- `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/SeletorPipelineBoard.tsx`
+- `src/components/layout/PainelLayoutClient.tsx`
+- `src/hooks/usePainelFrameLeaveGuard.ts`
+- `src/lib/bpm/consulta-cnpj-lead.ts`
+- `src/lib/bpm/dados-empresa-edicao.ts`
+- `src/lib/bpm/dados-empresa-server.ts`
+- `src/lib/bpm/dados-empresa.ts`
+- `src/lib/bpm/historico-descricao.ts`
+- `src/lib/bpm/instagram-anotacao-tecnica.ts`
+- `src/lib/bpm/timeline.ts`
+- `src/lib/painel-leave-guard.ts`
+- `src/lib/timeline/extractors/card.ts`
+- `tests/bpm/consulta-cnpj-lead.test.ts`
+- `tests/bpm/dados-empresa.test.ts`
+- `tests/bpm/empresa-cadastro-editor-react.test.ts`
+- `tests/bpm/empresa-cadastro-frame-guard-react.test.ts`
+- `tests/bpm/empresa-cadastro-sqlite.test.ts`
+- `tests/bpm/empresa-cadastro.test.ts`
+- `tests/bpm/instagram-leads-assumir.test.ts`
+- `tests/bpm/movimentacao-importados-rd-react.test.ts`
+- `tests/bpm/movimento-livre-react.test.ts`
+- `tests/bpm/seletor-pipeline-pendente-react.test.ts`
+- `tests/bpm/transicao-requisitos-card-react.test.ts`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardModalHost.tsx`
+- `src/app/PainelAlpha/layout.tsx`
 
 ## CodeRabbit Integration
 
-Tipo: UI + Business Logic + dados canônicos/auditoria. QA revisa ACL, fontes consolidadas, rascunho/consulta sem escrita, atomicidade, conflitos, guard de saída e filtro preciso do item técnico. Nenhum teste de código ou parecer QA foi produzido nesta inspeção documental.
+Tipo: UI + Business Logic + dados canônicos/auditoria. QA revisou ACL, fontes consolidadas, rascunho/consulta sem escrita, atomicidade, conflitos, host/guard de saída e filtro preciso do item técnico. Fonte final sem P1/P2; aprovação local e gates finais concluídos conforme logs validated. Isso não autoriza DDL nem declara runtime staging homologado: consentimento específico, backup válido e posterior validação remota permanecem pendentes.
 
 ## Change Log
 
@@ -76,3 +133,5 @@ Tipo: UI + Business Logic + dados canônicos/auditoria. QA revisa ACL, fontes co
 | --- | --- | --- | --- |
 | 2026-10-22 | 0.1 | Editor completo com consulta em prévia, salvamento auditado e retirada visual da anotação técnica Instagram | `@sm` |
 | 2026-10-22 | 0.2 | Escopo explícito do usuário e arquitetura de perfil JSON; código/schema preparados, DDL/runtime staging pendentes de consentimento específico | `@sm` / `@architect` |
+| 2026-10-22 | 0.3 | Editor e host implementados/prévia verificada; revisão local e gates finais em curso, DDL/runtime staging pendentes de consentimento | `@sm` |
+| 2026-10-22 | 0.4 | Gates validated e QA local aprovados; migração/runtime staging continuam pendentes de consentimento específico e revalidação Vault/backup | `@sm` |

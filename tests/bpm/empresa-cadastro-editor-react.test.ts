@@ -9,6 +9,7 @@ import { ConsultarCnpjEdicaoEmpresaCardBpm, SalvarCadastroEmpresaCardBpm } from 
 import { normalizarDadosEmpresaBpm } from "@/lib/bpm/dados-empresa";
 import { cadastroDosDadosEmpresa, aplicarPerfilCadastral } from "@/lib/bpm/dados-empresa-edicao";
 import CardFullViewModal from "@/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal";
+import { PainelCardState } from "@/app/PainelAlpha/AlphaCRM/CardModal/CardModalHost";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 
 vi.mock("@/actions/bpm/Empresas", () => ({ ObterDadosEmpresaCardBpm: vi.fn() }));
@@ -20,8 +21,10 @@ vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/PainelRegistrar", () => ({ default
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/PainelNotaFiscalConcluida", () => ({ PainelNotaFiscalConcluida: () => null }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/PainelBoasVindasOperacional", () => ({ PainelBoasVindasOperacional: () => null }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/PainelAlinhamentoEstrategico", () => ({ PainelAlinhamentoEstrategico: () => null }));
-vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout", () => ({ CardAbertoLayout: () => h(Host) }));
+vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout", () => ({ CardAbertoLayout: ({ onAbrirCard }: { onAbrirCard: (id: string) => void }) => h(React.Fragment, null,
+  h(Host), h("button", { onClick: () => onAbrirCard("card-vinculado") }, "Abrir card vinculado")) }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn(), dismiss: vi.fn() } }));
+vi.mock("@/components/PerfilEmpresaGlobal", () => ({ PerfilEmpresaProvider: ({ children }: { children: React.ReactNode }) => children }));
 // A animação é verificada no Chromium; happy-dom rejeita promises de animações canceladas.
 vi.mock("framer-motion", () => ({ motion: { section: ({ children, id, className, "aria-label": label }: React.ComponentProps<"section">) => h("section", { id, className, "aria-label": label }, children) } }));
 const dadosBase = normalizarDadosEmpresaBpm({ empresaPrincipal: { id: 1, cnpj: "", razaoSocial: "Empresa teste", status: "ATIVO", socios: [] },
@@ -134,4 +137,95 @@ it("descartar cancela debounces ainda não iniciados e aguarda a gravação que 
   await click("Descartar e sair"); await new Promise((r) => setTimeout(r, 70)); expect(outro).not.toHaveBeenCalled();
   let saiu = false; void sair.then(() => { saiu = true; }); expect(saiu).toBe(false);
   await act(async () => { resolver(true); await first; }); expect(await sair).toBe(true); expect(context.getPendingFields()).toEqual([]);
+});
+
+it.each(["Salvar e sair", "Descartar e sair"])("host persistente conserva o mesmo editor após saída da rota, até %s", async (choice) => {
+  const onClose = vi.fn(), onAtualizado = vi.fn();
+  const modal = h(CardFullViewModal, { cardId: "card", accent: "1,2,3", currentUserId: 1, currentUserRole: "Admin", onClose, onAtualizado, onAbrirCard: vi.fn() });
+  const render = (child: React.ReactNode) => h(React.StrictMode, null, h(PainelCardState, null, child));
+  await act(async () => root.render(render(modal)));
+  await abrirEdicao(); await editar("Nome fantasia", "Rascunho após Voltar");
+  const original = document.querySelector<HTMLInputElement>('input[aria-label="Nome fantasia"]')!;
+  await act(async () => root.render(render(h("p", null, "Nova rota"))));
+  expect(document.body.textContent).toContain("Nova rota");
+  expect(document.querySelector('input[aria-label="Nome fantasia"]')).toBe(original);
+  expect(original.value).toBe("Rascunho após Voltar");
+  expect(document.querySelectorAll('[role="alertdialog"]')).toHaveLength(1);
+  await click("Continuar editando");
+  expect(document.querySelector('input[aria-label="Nome fantasia"]')).toBe(original);
+  await editar("Nome fantasia", "Rascunho após continuar");
+  const cadastro = structuredClone(dados.edicao.cadastro); cadastro.empresa.nomeFantasia = "Rascunho após continuar";
+  vi.mocked(SalvarCadastroEmpresaCardBpm).mockResolvedValue({ success: true, data: { ...aplicarPerfilCadastral(dados, { versao: 1, cadastro }), edicao: { ...dados.edicao, cadastro } } });
+  // O card retido pode ser fechado e salvo, mesmo sem o Board que o abriu.
+  await act(async () => document.querySelector<HTMLButtonElement>('button[aria-label="Fechar"]')!.click());
+  if (choice === "Salvar e sair") await click("Salvar alterações"); else await click("Sair sem salvar");
+  expect(document.querySelector('input[aria-label="Nome fantasia"]')).toBeNull();
+  expect(onClose).not.toHaveBeenCalled(); expect(onAtualizado).not.toHaveBeenCalled();
+  expect(SalvarCadastroEmpresaCardBpm).toHaveBeenCalledTimes(choice === "Salvar e sair" ? 1 : 0);
+});
+
+it.each(["Salvar e sair", "Descartar e sair"])("host libera card destacado somente após a confirmação de %s", async (choice) => {
+  const props = { cardId: "card", accent: "1,2,3", currentUserId: 1, currentUserRole: "Admin", onClose: vi.fn(), onAtualizado: vi.fn(), onAbrirCard: vi.fn() };
+  await act(async () => root.render(h(PainelCardState, null, h(CardFullViewModal, props))));
+  await abrirEdicao(); await editar("Nome fantasia", "Pendente no Voltar");
+  const cadastro = structuredClone(dados.edicao.cadastro); cadastro.empresa.nomeFantasia = "Pendente no Voltar";
+  vi.mocked(SalvarCadastroEmpresaCardBpm).mockResolvedValue({ success: true, data: { ...aplicarPerfilCadastral(dados, { versao: 1, cadastro }), edicao: { ...dados.edicao, cadastro } } });
+  await act(async () => root.render(h(PainelCardState, null, h("p", null, "Nova rota"))));
+  expect(document.querySelector('input[aria-label="Nome fantasia"]')).not.toBeNull();
+  await click(choice);
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+  expect(props.onClose).not.toHaveBeenCalled(); expect(props.onAtualizado).not.toHaveBeenCalled();
+  expect(SalvarCadastroEmpresaCardBpm).toHaveBeenCalledTimes(choice === "Salvar e sair" ? 1 : 0);
+});
+
+it("troca de proprietário da rota não substitui um card com dados pendentes", async () => {
+  const props = { cardId: "card", accent: "1,2,3", currentUserId: 1, currentUserRole: "Admin", onClose: vi.fn(), onAtualizado: vi.fn(), onAbrirCard: vi.fn() };
+  const render = (key: string) => h(PainelCardState, null, h(CardFullViewModal, { ...props, key }));
+  await act(async () => root.render(render("primeiro"))); await abrirEdicao(); await editar("Nome fantasia", "Não substituir");
+  const original = document.querySelector('input[aria-label="Nome fantasia"]');
+  await act(async () => root.render(render("segundo")));
+  expect(document.querySelector('input[aria-label="Nome fantasia"]')).toBe(original);
+  expect(document.querySelectorAll('[role="alertdialog"]')).toHaveLength(1);
+  await click("Continuar editando"); expect(document.querySelector('input[aria-label="Nome fantasia"]')).toBe(original);
+  expect(SalvarCadastroEmpresaCardBpm).not.toHaveBeenCalled();
+  await click("Cancelar");
+  const readsBefore = vi.mocked(ObterCardBpm).mock.calls.length;
+  await act(async () => document.querySelector<HTMLButtonElement>('button[aria-label="Fechar"]')!.click());
+  expect(vi.mocked(ObterCardBpm).mock.calls.length).toBeGreaterThan(readsBefore);
+  expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+  expect(btn("Alternar dados")).toBeDefined(); // o candidato ainda selecionado ganhou o slot
+});
+
+it("card retido abre um card vinculado sem chamar o Board já desmontado", async () => {
+  const props = { cardId: "card", accent: "1,2,3", currentUserId: 1, currentUserRole: "Admin", onClose: vi.fn(), onAtualizado: vi.fn(), onAbrirCard: vi.fn() };
+  await act(async () => root.render(h(PainelCardState, null, h(CardFullViewModal, props))));
+  await abrirEdicao(); await editar("Nome fantasia", "Rascunho");
+  await act(async () => root.render(h(PainelCardState, null, h("p", null, "Nova rota"))));
+  await click("Continuar editando"); await click("Cancelar"); await click("Abrir card vinculado");
+  expect(ObterCardBpm).toHaveBeenLastCalledWith("card-vinculado");
+  expect(props.onAbrirCard).not.toHaveBeenCalled(); expect(props.onClose).not.toHaveBeenCalled();
+  expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+});
+
+it("troca de card por notificação no mesmo Board preserva o candidato ao fechar o antigo", async () => {
+  let change!: (cardId: string) => void;
+  const closed = vi.fn();
+  function Board() {
+    const [id, setId] = React.useState<string | null>("card");
+    React.useEffect(() => { change = setId; }, []);
+    return id && h(CardFullViewModal, { cardId: id, accent: "1,2,3", currentUserId: 1, currentUserRole: "Admin",
+      onClose: () => { closed(); setId(null); }, onAtualizado: vi.fn(), onAbrirCard: setId });
+  }
+  await act(async () => root.render(h(PainelCardState, null, h(Board))));
+  await abrirEdicao(); await editar("Nome fantasia", "Protegido");
+  const original = document.querySelector('input[aria-label="Nome fantasia"]');
+  await act(async () => change("card-notificacao"));
+  expect(document.querySelector('input[aria-label="Nome fantasia"]')).toBe(original);
+  await click("Continuar editando"); await click("Cancelar");
+  await act(async () => document.querySelector<HTMLButtonElement>('button[aria-label="Fechar"]')!.click());
+  expect(ObterCardBpm).toHaveBeenLastCalledWith("card-notificacao");
+  expect(closed).not.toHaveBeenCalled(); expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+  await act(async () => document.querySelector<HTMLButtonElement>('button[aria-label="Fechar"]')!.click());
+  expect(closed).toHaveBeenCalledOnce(); expect(document.querySelector('[role="dialog"]')).toBeNull();
 });
