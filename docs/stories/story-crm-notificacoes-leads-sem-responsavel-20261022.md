@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — implementação e gates globais aprovados sobre a base `6659f00c`; integração preservadora de staging, checks combinados e validação remota ainda pendentes.
+Done — publicado em staging `60ae49ff`, integrado com `f7ceefdb`, gates e QA finais aprovados; homologação Admin real e diagnóstico canônico readonly concluídos com os limites remotos explícitos abaixo. Produção fora do escopo.
 
 ## Executor Assignment
 
@@ -119,7 +119,7 @@ Worktree isolada da base `6659f00c`, preservando alterações não relacionadas 
 - [x] Conciliar assunção, revogação, troca de conta e respostas atrasadas; deduplicar entradas/toasts sem esconder pendências (AC 4–9).
 - [x] Cobrir cenários focados unitários, API/integração SQLite, segurança e React do plano de testes (AC 1–11, 13–17); smoke autenticado remoto e gates gerais seguem separados.
 - [x] Executar quatro gates, revisão de QA e CodeRabbit/fallback documentado (AC 12).
-- [ ] DevOps publicar e verificar somente staging; atualizar checklist, File List, evidências e limitações (AC 12).
+- [x] DevOps publicar e verificar somente staging; atualizar checklist, File List, evidências e limitações (AC 12).
 - [x] Registrar confirmação explícita do usuário sobre audiência e novo fluxo Financeiro/Operacional (AC 13–15).
 - [x] Implementar recepção/claim nativo transacional, responsáveis por setor e preservação de vendedor/campos de origem (AC 13–15).
 - [x] Conectar proveniência site opcional no ingresso real e recuperação completa/realtime mínimo (AC 16–17).
@@ -168,7 +168,7 @@ Autorização de audiência e destino no servidor; separação entre leitura e r
 
 Forge real sobre a base `6659f00c`: typecheck oficial **exit 0** (8,54 s), lint **exit 0** (52,24 s; zero erros e 1.193 avisos existentes), build equivalente supervisionado Prisma/player/Next **exit 0** (158,36 s), suíte completa com cobertura **720 arquivos e 5.739 testes aprovados, zero falhas, quatro skipped e um todo** (179,42 s). Sentinel SQLite privado/local e variáveis sanitizadas; nenhum `.env` remoto carregado. Smoke compilado anônimo confirmou raiz, asset, providers, sessão e proteção do CRM; servidor encerrado. Custódia `c0e061779b0b1ebac93989268b3b1d60d9e25f2cbdd6408677b7afab527f7c59` idêntica antes/depois e após o smoke. Evidência privada: `/var/tmp/alpha-crm-notificacoes-leads-20261022/forge/forge-result.json`.
 
-Manifesto e File List concordam nos 54 caminhos desta entrega; scan de segredos sem achados. Staging avançou para `f7ceefdb`, data original do formulário Instagram, com dez caminhos externos e três sobreposições. A integração normal está autorizada; hunk de import em Cards foi ratificado por Echo para unir ambos os helpers de Instagram e preservar integralmente o import de recebimentos. Board e teste têm preview 3-way limpo. Typecheck oficial, lint dos cinco fontes afetados e suíte completa da combinação ainda pendem neste checkpoint; build final remoto/alias e E2E permanecem requisitos separados.
+Manifesto e File List concordam nos 54 caminhos desta entrega; scan de segredos sem achados. Staging avançou para `f7ceefdb`, data original do formulário Instagram, com dez caminhos externos e três sobreposições. A integração normal está autorizada; hunk de import em Cards foi ratificado por Echo para unir ambos os helpers de Instagram e preservar integralmente o import de recebimentos. Board e teste têm preview 3-way limpo. Nesse checkpoint histórico, os checks combinados e a validação remota ainda pendiam; foram concluídos nas seções seguintes.
 
 Configuração preexistente de liderança foi completada pelo fluxo administrativo normal já autorizado do usuário: Admin real1 adicionou somente o override `crm/ADD` da conta10 no staging. SELECT independente confirmou linha47/criadoPor1, motivo executado e doze assertivas aprovadas; cinco módulos anteriores, role, status, legado, outro override e regras pertinentes do setor preservados. A política reconstruída passou de zero para um assumidor elegível em Boas-vindas; isso não equivale a login/claim como Vitor. DevOps não executou mutação SQL, worker, alteração de conta, schema ou ambiente. Evidência privada `vitor-crm-after-proof.json`. Nenhuma operação de produção integra esta entrega.
 
@@ -178,11 +178,21 @@ A entrega foi congelada em `67f14b93` (54 caminhos) antes da integração normal
 
 Árvore combinada: typecheck oficial **exit 0** (20,42 s), lint dos cinco fontes afetados **exit 0** (2,32 s) e suíte completa com cobertura **720 arquivos, 5.756 testes aprovados, zero falhas, quatro skipped e um todo**, em 171,67 s. Nenhuma correção adicional de código foi necessária. Custódia `3412c7bb06b0443b2b060b1fb04a1e92c3de467b5f7f2b25f396ee5109f58c10` idêntica antes/depois. QA ratificou GO de push normal staging após conferir os resultados e os hunks. Evidência privada: `/var/tmp/alpha-crm-notificacoes-leads-20261022/release/combined-f7-result.json`.
 
-Build local combinado não foi repetido sem mudança de configuração/dependências: os builds-base aprovados e revisão dos hunks sustentam a integração, mas **build remoto final READY, SHA/alias e smoke autenticado continuam obrigatórios antes de concluir**. API Vercel com token existente responde 403; não houve reautenticação nem mudança de credenciais. A verificação operacional usará status Vercel no GitHub vinculado ao commit e ID de deployment nos assets do endereço canônico de staging; a base `f7ceefdb` já teve essa correspondência confirmada. Publicação e homologação remota ainda pendem neste checkpoint. Produção não autorizada.
+Build local combinado não foi repetido sem mudança de configuração/dependências: os builds-base aprovados e revisão dos hunks sustentam a integração, mas **build remoto final READY, SHA/alias e smoke autenticado continuam obrigatórios antes de concluir**. API Vercel com token existente responde 403; não houve reautenticação nem mudança de credenciais. A verificação operacional usará status Vercel no GitHub vinculado ao commit e ID de deployment nos assets do endereço canônico de staging; a base `f7ceefdb` já teve essa correspondência confirmada. Publicação e homologação remota pendiam nesse checkpoint pré-push; a conclusão factual está registrada a seguir. Produção não autorizada.
+
+## Publicação e homologação concluídas — staging
+
+Merge normal `60ae49ff` publicado, preservando a feature `67f14b93` e o formulário Instagram `f7ceefdb`. GitHub/Vercel registrou Deployment has completed para o SHA e `dpl_x5PS1gz68aTR611tBtH3dBD2hSMa`; o HTML de staging referenciou o mesmo deployment em duas leituras. Smoke público: raiz/providers/sessão anônima/broadcast 200, banco acessível e CRM protegido. A API Vercel continua 403, portanto não se alega releitura de ENV/customEnvironment pela API; nenhuma credencial ou ENV foi alterada.
+
+Admin real criou uma negociação fictícia pela UI e executou os dois encaminhamentos normais, chegando a três cards/três vínculos/duas recepções PENDENTE, sem claim. Os quadros/painéis exibiram aguardando assunção e a negação correta para Admin fora do setor; vendedor apresentado nominalmente e preservado. Etapa Financeiro Concluido com lifecycle ATIVO não resolveu sua recepção. Nenhum responsável Financeiro foi inventado no snapshot Operacional. Elaboração/envio/assinatura/pagamento/NF vazios, zero documentos e anexos.
+
+Read-model canônico privado com atores Financeiro e liderança Operacional efetivamente persistidos: três páginas completas por ator, 109 leituras guardadas, zero writes/raw/transações. Cada um recebeu somente a pendência fictícia de seu setor e capacidade de assumir no próprio card; cruzamento negado. Prisma default e cliente passado em todas as páginas foram guardados no processo diagnóstico. Isso não equivale a login/claim positivo dessas contas. Não houve sessão forjada, ingestão IG/site ao vivo ou toast multicliente remoto; esses caminhos e a concorrência positiva têm cobertura local.
+
+A homologação observou zero pageerrors JavaScript, cinco respostas 503 de voz Bibble e avisos de geolocalização/allowfullscreen/descrição de diálogo; não se declara console/rede inteiramente limpos. Falhas do harness de captura após criar a fixture e do loader CJS inicial foram preservadas como problemas da automação, sem duplicar criação nem alterar o app. Perfil CLI de staging verificado por fingerprints; produção/estrutura/backfill/worker manual fora do escopo. Relatório sanitizado: [CRM notificações — staging](../reports/crm-notificacoes-leads-staging-20261022.md).
 
 ## File List
 
-Consolidada dos manifests de backend/frontend e do teste de QA; descreve arquivos efetivos, sem logs privados ou dados reais versionados.
+Consolidada dos manifests de backend/frontend e do teste de QA: 54 caminhos próprios da entrega funcional mais um relatório novo, total de 55 caminhos únicos; o fechamento documental altera somente cinco Markdown. Não inclui os dez caminhos externos de `f7ceefdb` como autoria desta feature, logs privados ou dados reais.
 
 - `src/lib/bpm/notificacoes-leads.ts` — DTOs, schemas e apresentação neutros de alertas/recepções.
 - `src/lib/bpm/notificacoes-leads-server.ts` — projeção autorizada, audiência, paginação e invalidação por usuário.
@@ -235,9 +245,11 @@ Consolidada dos manifests de backend/frontend e do teste de QA; descreve arquivo
 - `tests/bpm/notificacoes-leads-seguranca.test.ts` — cobertura focada ou adaptação do harness de regressão da integração.
 - `docs/architecture/crm-notificacoes-leads-sem-responsavel-20261022.md` — contrato, escopo e evidências da entrega.
 - `docs/stories/story-crm-notificacoes-leads-sem-responsavel-20261022.md` — contrato, escopo e evidências da entrega.
-- `.bibble/memory/codebase-map.md` — checkpoint documental Scribe/Kowalski, sem encerramento remoto.
-- `.bibble/memory/integration-points.md` — checkpoint documental Scribe/Kowalski, sem encerramento remoto.
-- `.bibble/memory/journal.md` — checkpoint documental Scribe/Kowalski, sem encerramento remoto.
+- `.bibble/memory/codebase-map.md` — checkpoint histórico e fechamento factual Scribe/Kowalski/DevOps.
+- `.bibble/memory/integration-points.md` — checkpoint histórico e fechamento factual Scribe/Kowalski/DevOps.
+- `.bibble/memory/journal.md` — checkpoint histórico e fechamento factual Scribe/Kowalski/DevOps.
+
+- `docs/reports/crm-notificacoes-leads-staging-20261022.md` — validação de staging, evidências sanitizadas e limites reais.
 
 ## Story Draft Checklist
 
@@ -250,32 +262,34 @@ Consolidada dos manifests de backend/frontend e do teste de QA; descreve arquivo
 | Testes | PASS | Cenários mensuráveis por camada e quatro gates definidos. |
 | CodeRabbit | PASS | Tipos, agentes, checkpoints, self-healing e foco presentes. |
 
-**Resultado do draft preservado:** havia clareza para implementar Comercial e Financeiro/Operacional conforme confirmação do usuário. O código local foi entregue; os checks focados acima não constituem aceite final de QA, resultado dos quatro gates ou validação remota.
+**Resultado do draft preservado:** havia clareza para implementar Comercial e Financeiro/Operacional conforme confirmação do usuário. O draft precedeu a implementação; checks focados isolados não constituem gates globais nem homologação. As seções de fechamento e QA registram os resultados efetivamente concluídos.
 
 ## Dev Agent Record
 
 ### Agent Model Used
 
-Echo — backend; Nova — frontend; QA — testes adversariais; Scout/Architect e Scribe/Kowalski — arquitetura e consolidação. Modelos herdados da sessão. Forge executa a verificação integrada, ainda pendente neste checkpoint.
+Echo — backend; Nova — frontend; Scout/Architect — contratos; Forge — gates reais; QA — revisão independente; Scribe/Kowalski e DevOps — consolidação, integração e publicação. Modelos herdados da sessão.
 
 ### Debug Log References
 
-Frontend: `/var/tmp/alpha-crm-notificacoes-leads-20261022/frontend-tests.json` e `frontend-tests.log` (18 arquivos, 100 testes PASS); `frontend-lint.log` (0 erros, 1 warning preexistente do TanStack Virtual). Tentativa de typecheck com heap de 4 GiB terminou em OOM/134 antes de diagnósticos; não constitui aprovação. O typecheck focado oficial de backend com 8 GiB passou, conforme evidência do owner; isso não substitui os quatro gates integrados em execução pelo Forge. O Forge já informou typecheck e lint integrados exit 0; confirmação final de build, suíte global, revisão final e validação remota permanece pendente neste checkpoint. Nenhuma operação remota ou banco real feita pelo frontend. Backend: `backend-tests-freeze.log` (182 testes/12 arquivos), `backend-sqlite-v7.log` (sete casos SQLite, incluídos no total), `backend-typecheck-freeze.log`, `backend-lint-freeze.log`; manifests `backend-files.txt`/`frontend-files.txt` e `frontend-result.json` na mesma pasta privada. O resultado geral de Forge não é presumido a partir desses checks focados.
+Evidências privadas em `/var/tmp/alpha-crm-notificacoes-leads-20261022/`: `forge/forge-result.json` e `forge/gate-runtime-result.json`; `release/combined-f7-result.json`, `merge-f7-proof.json`, `publication.json`, `github-stage-ready-stable.json`, `public-http-smoke.json`, `fixture-operational-final.json` e `read-model-operational-final.json`. Owners: frontend 100/18, backend 182/12 (incluindo 64 adversariais e sete SQLite), sem somar subconjuntos. OOM frontend com heap4 GiB foi anterior ao gate oficial aprovado. Harness CLI CJS precisou loader ESM; tentativa original registrada sem mudança runtime.
+
+UI real em diretório privado distinto `/var/tmp/alpha-crm-notificacoes-leads-sem-responsavel-20261022/`: `remote-browser-result.json`, `operational-panel.json`, `operational-board.json` e prova do CRUD individual de permissão. Conteúdo bruto, imagens, credenciais e dados pessoais não são versionados.
 
 ### Completion Notes
 
-Backend e frontend entregues e congelados para verificação integrada: projeção/recepção/claim, central/toasts, navegação e proveniência site conectados. Evidências focadas de segurança, SQLite e React registradas; nenhuma aceitação remota ou resultado global inferido. Entrega geral ainda depende dos quatro gates, QA final e validação/publicação no staging. Produção, schema e backfill fora do escopo.
+Entrega funcional `60ae49ff` em staging, build remoto concluído e domínio correspondente, smoke público e Admin real aprovados, QA FINAL APPROVED. Audiência/capacidade setorial confirmada pelo helper real com DB staging somente leitura; não se afirma login ou claim positivo de sessões Financeiro/Operacional nem ingestão IG/site ou toast multicliente remoto. Um override aditivo pelo CRUD UI autorizado completou o CRM da liderança Operacional, preservando outros acessos. Nenhuma alteração de produção, ENV, schema, backfill ou execução manual de worker/global. Fechamento documental acompanha runtime idêntico à revisão funcional, sem repetir gates por Markdown.
 
 ## QA Results
 
-Pendente de implementação e revisão independente.
+Checkpoints históricos abaixo; a revisão final de staging ao fim desta seção substitui as pendências anteriores.
 
 
 ### 2026-10-22 — Quinn / Sage, Anubis, Probe e Lens — APPROVED local
 
 **Parecer: APPROVED para a implementação local sobre `6659f00c`, fingerprint `c0e061779b0b1ebac93989268b3b1d60d9e25f2cbdd6408677b7afab527f7c59`.** Revisão de código e integração independente após quatro gates Forge PASS; sem bloqueador crítico/importante novo aberto. Este checkpoint libera integração/publicação em staging dentro das condições abaixo, sem declarar deploy, E2E setorial remoto ou Done já concluídos.
 
-**Evidência objetiva:** `forge/forge-result.json` e `gate-runtime-result.json` conferidos: typecheck oficial exit 0 (8,54 s); lint exit 0 (52,24 s, zero erros e 1.193 avisos preexistentes); pipeline Prisma + player + Next completo exit 0 (158,36 s, pico 6,21 GiB, execução supervisionada); `npm test` com cobertura exit 0 (179,42 s): **720 arquivos, 5.739 testes PASS, quatro skipped, um todo, zero falhas**. As 1.668 suites internas do JSON não são contadas como arquivos. Custódia idêntica antes/depois dos gates e smoke. Build compilado testado em loopback com SQLite sentinela local: raiz/JavaScript/providers/sessão 200 e CRM anônimo protegido por redirecionamento; servidor encerrado. Nenhuma credencial remota carregada nesses gates. A tentativa focada anterior de tipos com 4 GiB/OOM não substitui o typecheck oficial aprovado.
+**Evidência objetiva:** `forge/forge-result.json` e `forge/gate-runtime-result.json` conferidos: typecheck oficial exit 0 (8,54 s); lint exit 0 (52,24 s, zero erros e 1.193 avisos preexistentes); pipeline Prisma + player + Next completo exit 0 (158,36 s, pico 6,21 GiB, execução supervisionada); `npm test` com cobertura exit 0 (179,42 s): **720 arquivos, 5.739 testes PASS, quatro skipped, um todo, zero falhas**. As 1.668 suites internas do JSON não são contadas como arquivos. Custódia idêntica antes/depois dos gates e smoke. Build compilado testado em loopback com SQLite sentinela local: raiz/JavaScript/providers/sessão 200 e CRM anônimo protegido por redirecionamento; servidor encerrado. Nenhuma credencial remota carregada nesses gates. A tentativa focada anterior de tipos com 4 GiB/OOM não substitui o typecheck oficial aprovado.
 
 **Sage/Anubis:** 64 adversários independentes em `tests/bpm/notificacoes-leads-seguranca.test.ts` usam ownership, normalização de role, visibilidade, parser de recepção, resolver canônico e GET reais; apenas I/O/sessão/transporte são substituídos. Cobrem visualizadores F/O versus Comercial capaz de agir, lideranças reais dos três setores, Admin/CEO/TI fora do setor, CRM efetivo/REMOVE/inatividade, pipeline/etapa sem acesso, recibo forjado e inconsistências de card/empresa/vínculo/execução/evento/histórico/claim/setor, cursor vinculado à conta, entrada adulterada e GET sem writes. Pusher envia somente pipeline/timestamp ao canal privado existente e sua falha não altera persistência. As primeiras falhas Comercial/podeAgir e vendedor sem prova foram preservadas e corrigidas pelo owner; hardening do setor do claim também passou. Nenhuma fonte foi alterada por QA.
 
@@ -303,6 +317,25 @@ Os 100 testes frontend em 18 arquivos incluem componentes reais com I/O simulado
 
 **Recomendação:** manter Ready for Review/publicação staging condicionada aos checks combinados e à validação remota; não marcar Done antes deles. Evidências privadas sob `/var/tmp/alpha-crm-notificacoes-leads-20261022/`: `forge/`, `qa-plan.md`, `qa-preliminary.md`, `qa-security.{log,json}`, primeiras rodadas separadas, resultados dos owners e prova de configuração. Dados brutos/credenciais não foram copiados para o Git. QA editou somente esta seção nesta revisão final; o arquivo de testes independente já consta na File List do owner. **Seção liberada ao executor após este checkpoint.**
 
+
+### 2026-10-22 — Quinn — APPROVED final de staging, com alcance remoto delimitado
+
+**Parecer: APPROVED; QA recomenda Done para a entrega publicada em staging, com os limites abaixo preservados.** Integração concorrente, compilação remota e homologação Admin concluídas; não se declara E2E autenticado multicliente nem autorização de produção.
+
+**Combinado e publicação:** conferidos `release/combined-f7-result.json` e `merge-f7-proof.json`: typecheck oficial exit 0 (20,42 s), lint dos cinco runtime afetados exit 0 (2,32 s), suíte completa com cobertura exit 0 (171,67 s), **720 arquivos / 5.756 testes PASS, quatro skipped, um todo, zero falhas**. Fingerprint `3412c7bb06b0443b2b060b1fb04a1e92c3de467b5f7f2b25f396ee5109f58c10` idêntico antes/depois. Cinquenta e um caminhos próprios e sete concorrentes fora das sobreposições permaneceram byte a byte; três sobreposições conferem com a integração independente de três vias, incluindo apenas união de imports ratificada pelo backend em Cards. Sem marcadores/conflitos, descarte de arquivos ou push forçado. O runtime publicado é `60ae49ffeb3711592337b63225934ccb88119543`, pais `67f14b93` e `f7ceefdb`; deployment `dpl_x5PS1gz68aTR611tBtH3dBD2hSMa`, com sucesso Vercel observado pelo GitHub e identificação do mesmo deployment nos assets do alias `staging.alpha-comex.com`. Smoke público confirmou raiz/providers/sessão/broadcast e proteção do CRM anônimo. A API Vercel retornou 403 para o token disponível; não se afirma releitura independente de `customEnvironment` ou valores ENV por essa API. Nenhuma configuração de deploy/ENV foi alterada para publicar.
+
+**UI autenticada real:** Admin1 criou somente a negociação fictícia da empresa 3069, Comercial `cmvjl1fjy000008ia6hxom5x3`, e usou os envios administrativos explícitos para Financeiro `cmvjl9san000408kuihagcc29` e Operacional `cmvjlcpfr000l08kuhl0tajx0`. Não houve assunção. Financeiro e Operacional mostraram “Responsável no Comercial: ADM”, o setor atual ainda não assumido, motivo de impedimento e **zero botões Assumir para Admin fora do setor**. Os dois quadros exibiram “Aguardando assumir”. No Operacional → Boas vindas, o seletor Vendedor responsável exibiu **ADM**, mantendo `value=1` como referência interna. A consulta real de alertas desse Admin percorreu três páginas HTTP 200 e retornou zero entradas; o bypass administrativo não o inscreveu como destinatário do setor. O diálogo de envio esclareceu que não confirma assinatura, pagamento, NF ou conclusão financeira.
+
+**Persistência independente:** `fixture-operational-final.json` confirmou três cards ATIVO com owner técnico 1, três vínculos e duas recepções PENDENTE, sem assunção; nenhuma foi inferida do owner ou do movimento de etapa. Comercial v2, Financeiro v2 e Operacional v0; `concluidoEm/statusPosFechamento` nulos. Financeiro estar na coluna “Concluido” não foi apresentado como status financeiro concluído. Vendedor persistido 1 e origem Orgânico; elaborado/enviado/assinatura/pagamento/NF permanecem nulos, sem documentos ou anexos criados. Operacional real tem chave NULL e ID canônico, portanto a compatibilidade legada foi observada também na UI/recepção remotas. Como Financeiro não foi assumido, o snapshot anterior do Operacional contém somente Comercial, sem inventar responsável financeiro.
+
+**Diagnóstico de audiência com dados atuais, separado de login:** `read-model-operational-final.json` executou a projeção canônica do runtime publicado com Prisma limitado a reads; 109 operações de leitura, zero writes, raw SQL ou transações, nenhum bloqueio acionado. Cada ator percorreu as três páginas completas. O usuário Financeiro 7 recebe somente a recepção Financeiro e tem `podeAssumir=true`; o líder Operacional 10 recebe somente a recepção Operacional e tem `podeAssumir=true` em Boas vindas; os destinos cruzados são negados. Essas são chamadas diagnósticas server-side com IDs e ACL persistidas, **não sessões autenticadas, JWTs ou claims desses usuários**. Complementam a prova local e a UI Admin, sem substituí-las por um teste remoto positivo de assunção.
+
+**Limites e observações:** assunção positiva com Financeiro/Vitor, dois clientes reais recebendo/resolvendo toast e ingresso Instagram/site autenticado não foram exercitados remotamente; não havia credenciais dessas contas nem segredos de ingestão disponíveis no perfil de staging. ABC, concorrência, replay, rollback, proveniência, cores/toast, snapshots e navegação permanecem demonstrados por Prisma/SQLite/React locais e revisão dos contratos. A sessão de navegador registrou zero `pageerror`, mas não console/rede limpos: cinco HTTP 503 de `/api/bibble/voice`, abortos em navegação/prefetch e avisos de geolocalização/policy, precedência de fullscreen e descrição Radix. Nenhuma nova exceção JavaScript da entrega foi demonstrada; esses eventos não foram convertidos em correções de outros módulos. Browser e processo de teste foram encerrados. Não se alega latência instantânea ou ganho percentual.
+
+**Fechamento:** a configuração individual CRM do líder continua documentada como CRUD autorizado de staging e verificada em doze asserts, sem alegar login do alvo. QA não fez mutações remotas, worker manual, mudança de ambiente, schema, backfill ou ação de produção. Leituras de conferência não devem ser confundidas com as ações UI legítimas que criaram a fixture e com essa configuração. O último commit documental pode fechar status/checklist/File List preservando o runtime/dependências/testes publicados; sua identidade de deploy será verificação mecânica de DevOps, sem repetir gates por mudança só documental.
+
+Evidências privadas: `/var/tmp/alpha-crm-notificacoes-leads-20261022/release/{combined-f7-result,merge-f7-proof,publication,public-http-smoke,fixture-operational-final,read-model-operational-final}.json`; UI em `/var/tmp/alpha-crm-notificacoes-leads-sem-responsavel-20261022/{finance-panel,operational-panel,remote-browser-result,fixture}.json`, imagem do painel Operacional conferida. Nenhum JSON bruto de navegador, conteúdo de outros clientes ou credencial foi versionado por QA. **Somente QA Results foi atualizado nesta conclusão; arquivo liberado para o commit documental de DevOps.**
+
 ## Change Log
 
 | Data | Versão | Descrição | Autor |
@@ -311,3 +344,5 @@ Os 100 testes frontend em 18 arquivos incluem componentes reais com I/O simulado
 | 2026-10-22 | 1.1 | Esclarecimento do usuário: todos do setor, recepção/Assumir Financeiro e Operacional, responsáveis anteriores e vendedor preservados; contrato de arquitetura definido. | Aria / Architect (atualização autorizada) |
 
 | 2026-10-22 | 1.2 | Checkpoint da implementação congelada: escopo/AC 1–17, evidências focadas, File List e memórias; Forge, QA final e staging ainda pendentes. | Scribe / Kowalski |
+
+| 2026-10-22 | 1.3 | Done: gates combinados, staging60ae e homologação Admin/diagnóstico readonly aprovados; relatório e memórias finais com limites explícitos. | DevOps / QA |

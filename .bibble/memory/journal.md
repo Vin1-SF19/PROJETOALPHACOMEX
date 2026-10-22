@@ -7356,3 +7356,36 @@ Quatro gates integrados, QA final, commit/push, deploy/alias e smoke staging ain
 - Líder operacional recebeu CRM efetivo via override individual CRM ADD pelo CRUD normal da UI de staging, Admin real e 200/sucesso. Papel e cinco outras permissões efetivas preservados; verificação SELECT posterior do DevOps ainda pendente. Operação atende à configuração solicitada do líder; nenhuma exceção de ACL/sessão de teste foi criada.
 - Trata-se de configuração normal do aplicativo: não afirmar zero escritas globais. Sem SQL manual/migration/bulk/ENV/worker manual/produção. Provas privadas em `/var/tmp/alpha-crm-notificacoes-leads-sem-responsavel-20261022/` (arquivos de UI de permissão), não versionadas.
 - Forge: typecheck integrado 8,54 s/exit 0 e lint integrado 52,24 s/exit 0; resultado final dos quatro gates, QA, publicação e smoke ainda aguardam consolidação. Nenhuma prova multicliente remota presumida.
+
+
+---
+
+## [2026-10-22 13:47 UTC] — CRM: notificações e recepção setorial publicadas em staging
+
+**Tags:** #feature #integration #security #nextjs #prisma
+**Agentes envolvidos:** coordenação, Echo, Nova, Forge, QA, DevOps, Scribe/Kowalski.
+**Arquivos tocados:** story da entrega, relatório de validação e três memórias; fontes em `67f14b93`/merge `60ae49ff`.
+
+### Contexto
+Concluir central persistente de leads e recepção/assunção Financeiro/Operacional, preservando Comercial e permissões existentes.
+
+### O que foi feito
+- Quatro gates reais da base PASS (720 arquivos/5.739 testes) e integração preservadora do formulário Instagram com tipos/lint afetado e suíte 720/5.756 PASS. Nenhum teste falhou; quatro skipped/um todo.
+- Staging publicado em `60ae49ff`; conclusão GitHub/Vercel e ID de deployment nos assets canônicos correspondentes. Smoke público e Admin real com encaminhamento de fixture C→F→O PASS.
+- Leitura independente: dois recebimentos pendentes, três cards/três vínculos, vendedor anterior preservado, zero documentos/anexos/assinatura/pagamento/NF fabricados. Helpers reais em Prisma RO confirmaram audiência/capacidade setorial e negação cruzada; 109 leituras/zero writes.
+- CRUD normal UI de CRM da liderança Operacional foi confirmado como um override aditivo; doze checks preservam demais acessos. Nenhuma escrita SQL manual ou alteração estrutural.
+
+### Decisões tomadas
+- Manter Admin fora do setor sem claim e separar diagnóstico de read-model de uma sessão/assunção real. Não inventar responsável Financeiro no snapshot Operacional enquanto pendente.
+- API Vercel 403: usar prova GitHub commit/deployment + assets do domínio sem mudar credenciais. Produção permanece fora do escopo.
+
+### Problemas encontrados / resolvidos
+- Import dinâmico no diagnóstico CLI exigiu loader ESM TypeScript; fonte do app inalterada. Harness de captura após criação falhou; card único confirmado sem repetir criação.
+- Voz503 e avisos de navegador observados separadamente; sem pageerror, sem alegar console integralmente limpo.
+
+### Pendências
+Nenhuma implementação adicional nesta entrega staging. Ingestão IG/site ao vivo, toast multicliente e claim positivo por sessões setoriais não foram testados remotamente; cobertos localmente. Sem produção, migration, backfill, ENV ou worker manual. Fechamento documental acompanha o mesmo runtime, sem novo teste funcional por Markdown.
+
+### Refletido também em
+- `codebase-map.md` e `integration-points.md`: módulos e conclusão factual.
+- `docs/reports/crm-notificacoes-leads-staging-20261022.md`: evidências e limites sanitizados.
