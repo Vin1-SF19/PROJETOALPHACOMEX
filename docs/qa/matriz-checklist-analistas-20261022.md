@@ -207,3 +207,21 @@ File List desta estação: somente `docs/qa/matriz-checklist-analistas-20261022.
 - [ ] Operação/homologaçãostaging/PortalREADY/Blob/VaultconsentimentoDB pendentes. StoryInProgress; nenhuma publicação/DBreal/produção autorizada porgates.
 
 **APROVADOForgeMAINcombinado**, controleaoBibble. Relatório `/tmp/checklist-analistas-20261022-forge-merged.md`; inputs `/tmp/checklist-analistas-20261022-forge-merged-input.json`; logs `/tmp/checklist-analistas-20261022-forge-main-merged-{typecheck,lint,test,build}.log`+`.log.json`. FileListForge: estaStory e `docs/qa/matriz-checklist-analistas-20261022.md`; somenteappenddocs, semfonte/teste/schema/config/env/Gitmutável/cloud/DB/backup/timer/deploy.
+
+
+### Forge reconciliado — shell/schema novos,22/10/2026
+
+- [x] MAINa54152be/tree0ac6c461 ePortal87ca1656/tree8cebdb24: oito gates reais sequenciais PASS. MAIN TC58,23s/lint46,43s(0erros1183warn)/fullcoverage35,34s(745files6093PASS+4skip1todo)/build70,16s. Portal TC8,73s/lint2,03s/test2,51s(57+3PASS)/build4,63s.
+- [x] Schemascanônicosc3c82…/migration5c9affa… preservados; clientes privadosnovos. MAIN build manteve scriptremotoRAYON/UV1/heap4096; ambosbuildsSKIPtipos, TCsseparadosPASS. Semerro novo/sourcefix.
+- [ ] Lensfocalshell/schema eposterioresgatesoperacionais/READY/readerwriter/homologação legítima seguempendentes; storyInProgress, semE2Eremotooupublicação porForge.
+
+**APROVADOForge paraLensfocal.** Relatório `/tmp/checklist-analistas-20261022-forge-reconciled.md`; inputs/resultados `/tmp/checklist-analistas-20261022-forge-reconciled-input.json`; logs `/tmp/checklist-analistas-20261022-forge-{main,portal}-reconciled-{typecheck,lint,test,build}.log`+`.log.json`. FileListForge: estaStory e `docs/qa/matriz-checklist-analistas-20261022.md`; somenteappenddocs. Semsource/teste/schema/env/config/cloud/DBreal/Gitmutável/backup/hash/deploy/timer. ControleaoBibble.
+
+
+### Lens focal — reconciliação aprovada (22/10/2026)
+
+- [x] Maina54152be/Portal87ca1656 gateados pelo Forge reconciliado: revisão somente dos2hunks shell, teste causal e adição nullable/schema+contratos. GuardsCRM→CheckList→mutador preservados em close/retry/reuse; cancel/timeout/duplicidade não fornecem autorização alternativa. Paridade byte a byte Main/Portal c3c82fe9… confirmada. **APROVADO focal, zero achados novos abertos; LENS-01 continua fechado.**
+- [x] Oito gates atuais reais do Forge adotados sem repetição, Main6093PASS/Portal57+3PASS; Nova40PASS/Dara53PASS conforme lineage. Relatório `/tmp/checklist-analistas-20261022-lens-reconciled.md`; nenhum repro novo necessário. Núcleo inalterado mantém aprovação Lensfinal; remotos não relacionados fora do escopo.
+- [ ] Story In Progress. DevOps pode prosseguir com publicação somente staging Portal87ca→READY antesMaina541→READY conforme autorização vigente; homologação real e hashbatch continuam gates separados(readerproof/cessaçãooldwriters). Produção não autorizada.
+
+File List Lens reconciliado: somente esta matrizQA e story por append; relatório em /tmp. Fonte/testes/schema/env/Git/cloud/DB/objetos/backups/timer/deploy intocados. Controle devolvido ao Bibble/DevOps; nenhum próximo agente acionado.
