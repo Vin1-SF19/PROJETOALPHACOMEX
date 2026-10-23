@@ -1,0 +1,12 @@
+import { route, methodNotAllowed } from '@/lib/portal-api/http';
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
+export const GET = route('documents', 'P', async (...args) => (await import('@/lib/portal-api/checklist-handlers')).documents(...args));
+export const POST = route('registerDocument', 'P', async (...args) => (await import('@/lib/portal-api/checklist-handlers')).registerDocument(...args));
+const disallowed = methodNotAllowed('GET, POST');
+export const PUT = disallowed;
+export const PATCH = disallowed;
+export const DELETE = disallowed;
+export const HEAD = disallowed;
+export const OPTIONS = disallowed;

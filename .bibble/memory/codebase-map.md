@@ -1886,3 +1886,13 @@ Clique de notificação é leitura: destino pendente canônico ou card promovido
 
 ## CheckList TI modelos publicado — 2026-10-22 22:21 UTC
 Gestão de modelos usa predicate TI normalizado ou Líder Operacional em src/lib/checklist/acesso.ts (canManageModels/exigirGestorModelosChecklist). src/lib/checklist/catalogo.ts exige autorização persistida dentro da transação antes do replay. UI ModelosWorkspace e páginas existentes consomem capabilities. Não amplia dossiês/atribuição.
+
+
+<!-- portal-api-20261023-scribe-map -->
+### 2026-10-23 — Scribe — API canônica do Portal (validada localmente)
+
+- `src/app/api/portal/v1/`: 24 operações permitidas em 21 paths de identidade externa, perfil/avatar, atendimentos, documentos/uploads e notificações/SSE. `src/lib/portal-api/` contém configuração lazy, guard app+principal, HTTP, projeções e handlers; regras persistentes permanecem no backend canônico `src/lib/checklist/` e owners externos. Actions internas continuam chamadas diretas, sem HTTP para o próprio servidor.
+- Fonte editável do wire/SDK: `contracts/portal-api/{v1.ts,sdk.server.ts}`. `scripts/portal-api/generate-contract.mjs` gera `artifacts/portal-api/v1/`; o Portal recebe os mesmos artefatos em `lib/portal-api/generated/`. Major do contrato controla compatibilidade; hashes verificam integridade, sem paridade global com schema Prisma.
+- No repo Portal, `auth.ts` e `lib/portal-api/{auth-options,session,server,http,config}.ts` conectam Auth.js/JWE privado, actions e BFF ao Main. Apenas cookies alimentam a leitura privada de sessão; a projeção pública não contém principal/app key. As antigas cópias persistentes de Checklist/credenciais/avatar e Prisma/SQL do Portal foram retiradas; os módulos restantes `lib/checklist/` são tipos/adapters/upload de UI.
+- `tests/portal-api/` reúne fronteira, contrato, owner e streams. `http-integration.test.ts` preserva SDK→HTTP→exports reais→SQLite efêmera, com login, ownership404 e revogação401. Forge dos dois apps, Probe, Anubis, Lens e Sage aprovaram localmente; documentação normativa em `docs/architecture/portal-api-canonica-20261023.md` e story homônima.
+- **Estado deste registro:** publicação/homologação staging pendente; banco físico continua o atual. Não houve migração operacional nesta fase; produção não autorizada. Este bloco substitui a descrição anterior de acesso SQL direto do Portal para a nova versão local, sem reescrever o histórico.

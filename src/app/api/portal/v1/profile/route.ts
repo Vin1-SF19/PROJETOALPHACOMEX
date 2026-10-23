@@ -1,0 +1,12 @@
+import { route, methodNotAllowed } from '@/lib/portal-api/http';
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
+export const GET = route('profile', 'P', async (...args) => (await import('@/lib/portal-api/identity-handlers')).profile(...args));
+export const PATCH = route('updateProfile', 'P', async (...args) => (await import('@/lib/portal-api/identity-handlers')).updateProfile(...args));
+const disallowed = methodNotAllowed('GET, PATCH');
+export const POST = disallowed;
+export const PUT = disallowed;
+export const DELETE = disallowed;
+export const HEAD = disallowed;
+export const OPTIONS = disallowed;

@@ -1,0 +1,11 @@
+import * as c from '../../../contracts/portal-api/v1';
+import { jsonInput, queryInput, success, type PortalHandler } from './http';
+import * as identity from './identity';
+import * as perfil from './profile';
+export const login: PortalHandler = async (req, _p, rid) => { queryInput(req, c.emptySchema); return success(c.loginPrivateSchema.parse(await identity.login(req, await jsonInput(req, c.loginSchema))), rid); };
+export const recovery: PortalHandler = async (req, _p, rid) => { queryInput(req, c.emptySchema); return success(await identity.recovery(req, await jsonInput(req, c.recoverySchema)), rid); };
+export const reset: PortalHandler = async (req, _p, rid) => { queryInput(req, c.emptySchema); return success(await identity.reset(req, await jsonInput(req, c.resetSchema)), rid); };
+export const me: PortalHandler = async (req, p, rid) => { queryInput(req, c.emptySchema); return success(c.identitySchema.parse(await identity.me(p!)), rid); };
+export const password: PortalHandler = async (req, p, rid) => { queryInput(req, c.emptySchema); return success(await identity.password(p!, await jsonInput(req, c.passwordSchema)), rid); };
+export const profile: PortalHandler = async (req, p, rid) => { queryInput(req, c.emptySchema); return success(c.profileSchema.parse(await perfil.profile(p!.actor)), rid); };
+export const updateProfile: PortalHandler = async (req, p, rid) => { queryInput(req, c.emptySchema); return success(await perfil.updateProfile(p!.actor, await jsonInput(req, c.profileInputSchema)), rid); };

@@ -7542,3 +7542,31 @@ Gates globais, revisão independente, commit/push e publicação/smoke staging. 
 
 ## CheckList TI modelos publicado — 2026-10-22 22:21 UTC
 Pedido explícito do usuário: liberar TI para templates. Echo→Nova→Forge→Probe/Anubis→Lens→DevOps concluídos em série; integrações preservatórias dos commits concorrentes CRM/ficha/áudio. Staging publicado commit d6bb591823636c3f4fc9957c943c559b1c1ba8fe, deployment dpl_5B9CXWHxMSdFUVMWdLRmrhcfq6yQ READY22:21:39.511UTC, dois aliases/TLS/smokes PASS. Gates reais: TC/lint/build e747arquivos6122testes PASS+4skip1todo. Turbo explícito152.731s após cancelar build padrão; sem novo plano/config global. Portal/produção/DB/env/SSO intactos nesta entrega. Login TI real não realizado. Duas senhas legadas continuam condicionadas à cessação verificável dos writers antigos/Vault. Relatório /tmp/checklist-analistas-20261022-ti-published.md.
+
+
+---
+
+## [2026-10-23 16:10 UTC] — Portal desacoplado por API canônica, validado localmente
+
+**Tags:** #refactor #integration #security #nextauth
+**Agentes envolvidos:** Bibble, Scout, Aria, PO, Echo, Vault, Forge, Probe, Anubis, Lens, Sage, Scribe, Kowalski.
+**Arquivos tocados:** contrato/SDK Main `contracts/portal-api/`; backend Main `src/lib/portal-api/` e rotas v1; Portal `lib/portal-api/`, actions/Auth/BFF; testes e story `story-portal-api-canonica-20261023.md`.
+
+### Contexto
+Usuário autorizou reduzir o acoplamento do Portal ao banco/schema do Painel; todas as contas atuais são de teste e o sistema ainda não foi aberto aos clientes.
+
+### O que foi feito
+- API Main com24 operações; Portal migrou login/perfil/notificações/documentos e retirou Prisma/SQL/backend persistente duplicado, preservando UI. Principal Main fica no JWE HttpOnly privado; app+principal e ACL/version são revalidados pelo owner.
+- Fonte única do contrato/SDK gera artefatos versionados; compatibilidade por major e integridade por hash. Oito gates globais+três verificadores PASS; Probe31HTTP+16Chrome, Anubis/Lens PASS; Sage acrescentou3 testes portáteis SDK→HTTP→Main→SQLite, com typecheck/lint PASS.
+
+### Decisões tomadas
+Banco físico permanece o atual; esta fase centraliza acesso/regras, sem DDL nem nova base. Staging vem primeiro e produção exige pedido específico posterior.
+
+### Problemas encontrados / resolvidos
+Lens reproduziu upstream abandonado e intervalo criado após preabort no SDK; Echo corrigiu, Forge revalidou ambos apps e Lens confirmou cancelamento/zero intervalo. Regressões permanentes preservadas.
+
+### Pendências
+DevOps ainda precisa configurar/publicar/homologar staging Main antes do Portal e retirar segredos efetivos Portal sem herdar Preview. Login/Blob/RSC remotos ainda não certificados; nenhuma publicação, produção ou separação física executada por este registro.
+
+### Refletido também em
+`codebase-map.md`, `integration-points.md`, desenho Main `docs/architecture/portal-api-canonica-20261023.md` e stories dos dois repos. Drafts/históricos alheios preservados.

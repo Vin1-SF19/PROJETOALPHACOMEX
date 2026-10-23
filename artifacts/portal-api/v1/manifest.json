@@ -1,0 +1,155 @@
+{
+  "contractVersion": "1.0.0",
+  "major": 1,
+  "sourceRevision": "portal-api-canonica-20261023-aria-v1.0",
+  "files": {
+    "v1.ts": "33f822287122e5c643643abad6b0ff6a3628d86648934b6540ab69a6d2961b75",
+    "sdk.server.ts": "5399cce8c8bc272e058386aef5c5bed0708c2e06db82b29b4a3ff290650be8ae"
+  },
+  "operations": [
+    {
+      "id": "login",
+      "method": "POST",
+      "path": "/identity/login",
+      "authMode": "A"
+    },
+    {
+      "id": "me",
+      "method": "GET",
+      "path": "/identity/me",
+      "authMode": "P"
+    },
+    {
+      "id": "recovery",
+      "method": "POST",
+      "path": "/identity/recovery",
+      "authMode": "A"
+    },
+    {
+      "id": "reset",
+      "method": "POST",
+      "path": "/identity/reset",
+      "authMode": "A"
+    },
+    {
+      "id": "password",
+      "method": "POST",
+      "path": "/identity/password",
+      "authMode": "P"
+    },
+    {
+      "id": "profile",
+      "method": "GET",
+      "path": "/profile",
+      "authMode": "P"
+    },
+    {
+      "id": "updateProfile",
+      "method": "PATCH",
+      "path": "/profile",
+      "authMode": "P"
+    },
+    {
+      "id": "uploadAvatar",
+      "method": "POST",
+      "path": "/profile/avatar",
+      "authMode": "P"
+    },
+    {
+      "id": "avatar",
+      "method": "GET",
+      "path": "/profile/avatar",
+      "authMode": "P"
+    },
+    {
+      "id": "notifications",
+      "method": "GET",
+      "path": "/notifications",
+      "authMode": "P"
+    },
+    {
+      "id": "readNotification",
+      "method": "POST",
+      "path": "/notifications/[id]/read",
+      "authMode": "P"
+    },
+    {
+      "id": "readAllNotifications",
+      "method": "POST",
+      "path": "/notifications/read-all",
+      "authMode": "P"
+    },
+    {
+      "id": "incremental",
+      "method": "GET",
+      "path": "/notifications/incremental",
+      "authMode": "P"
+    },
+    {
+      "id": "notificationStream",
+      "method": "GET",
+      "path": "/notifications/stream",
+      "authMode": "P"
+    },
+    {
+      "id": "atendimentos",
+      "method": "GET",
+      "path": "/atendimentos",
+      "authMode": "P"
+    },
+    {
+      "id": "atendimento",
+      "method": "GET",
+      "path": "/atendimentos/[id]",
+      "authMode": "P"
+    },
+    {
+      "id": "progress",
+      "method": "GET",
+      "path": "/checklists/[id]/progress",
+      "authMode": "P"
+    },
+    {
+      "id": "documents",
+      "method": "GET",
+      "path": "/documents",
+      "authMode": "P"
+    },
+    {
+      "id": "initiateUpload",
+      "method": "POST",
+      "path": "/uploads/initiate",
+      "authMode": "P"
+    },
+    {
+      "id": "finalizeUpload",
+      "method": "POST",
+      "path": "/uploads/finalize",
+      "authMode": "P"
+    },
+    {
+      "id": "registerDocument",
+      "method": "POST",
+      "path": "/documents",
+      "authMode": "P"
+    },
+    {
+      "id": "observeDocument",
+      "method": "PATCH",
+      "path": "/documents/[id]/observation",
+      "authMode": "P"
+    },
+    {
+      "id": "removeDocument",
+      "method": "POST",
+      "path": "/documents/[id]/remove",
+      "authMode": "P"
+    },
+    {
+      "id": "downloadDocument",
+      "method": "GET",
+      "path": "/documents/[id]/download",
+      "authMode": "P"
+    }
+  ]
+}

@@ -3410,3 +3410,15 @@ Clique de notificação é leitura: destino pendente canônico ou card promovido
 
 ## CheckList TI modelos publicado — 2026-10-22 22:21 UTC
 CheckList → Modelos → Novo documento do modelo. TI pode publicar/revisar/desativar/ordenar; exigirLiderChecklist e políticas owner/leader permanecem. Status/sessionVersion/role são revalidados antes de replay. Regressão backend.service/catalogo-replay; homologação com sessão TI real pendente.
+
+
+<!-- portal-api-20261023-scribe-integrations -->
+### Portal API v1 — fronteira e distribuição (2026-10-23, Scribe)
+
+**Arquivos:** `contracts/portal-api/{v1.ts,sdk.server.ts}`, `scripts/portal-api/generate-contract.mjs`, `src/lib/portal-api/`, `src/app/api/portal/v1/` e `tests/portal-api/`.
+**Editado quando:** alterar operação permitida, DTO, identidade externa, política de transporte ou capabilities do Portal. Fonte normativa: `docs/architecture/portal-api-canonica-20261023.md`.
+- Acrescentar operação ao contrato e ao handler explícito; requests estritos e responses projetadas/tolerantes a adição compatível. Exemplo de distribuição: `node scripts/portal-api/generate-contract.mjs --out <Portal>/lib/portal-api/generated`; verificar com `--check` no Main e `npm run contract:check` no Portal. Não editar cópia gerada nem condicionar runtime ao hash do schema.
+- API exige app autorizado e principal Main assinado, revalidando conta/version/ACL; app key, cookie de staff ou userId recebido não substituem identidade. Ator externo permanece PORTAL. Mutação documental preserva recibo/CAS/replay/journal na transação canônica; chamadas staff não devem migrar para self-HTTP.
+- Portal usa `lib/portal-api/session.ts` para getToken cookie-only e `server.ts`/`http.ts` para adapters/CSRF. Principal fica apenas no JWE HttpOnly; não o adicionar a Session/RSC/browser. Exemplo de caller existente: `authenticatedCall('atendimentos', {query})` no adapter servidor. Não recriar Prisma/SQL no consumidor.
+- Arquivos: iniciar capacidade curta→put privado direto→finalizar/verificar→registrar; somente Main guarda credencial permanente. Avatar/download/SSE mantêm contagem/limites, abort, backpressure e cleanup; revisar `tests/portal-api/streams.test.ts` ao alterar transporte. `http-integration.test.ts` verifica a ponte real fornecedor/SDK em CI sem checkout irmão.
+- Configuração nova e rollout desta entrega são exclusivos do custom staging: Main API validada antes do BFF; assinatura só Main, app key somente servidores, origens HTTPS fixas. Ao retirar segredos Portal, conferir herança de env para não expor Preview/produção. `npm run boundary:check` do Portal assegura ausência de dependências persistentes. Banco físico atual e produção permanecem fora de uma separação/migração por este registro.
