@@ -15,6 +15,7 @@ import { toast } from "sonner";
 
 vi.mock("@/actions/bpm/Empresas", () => ({ ObterDadosEmpresaCardBpm: vi.fn() }));
 vi.mock("@/actions/bpm/EmpresaCadastro", () => ({ ConsultarCnpjEdicaoEmpresaCardBpm: vi.fn(), SalvarCadastroEmpresaCardBpm: vi.fn() }));
+vi.mock("@/actions/bpm/CnpjEmpresaVinculo", () => ({ ConfirmarVinculoEmpresaCardBpm: vi.fn() }));
 vi.mock("@/actions/bpm/Cards", () => ({ ObterCardBpm: vi.fn(async () => ({ success: false })) }));
 vi.mock("@/actions/bpm/Pipelines", () => ({ ObterPipelineBpm: vi.fn(async () => ({ success: true, data: { etapas: [] } })) }));
 vi.mock("@/actions/bpm/Interacoes", () => ({ ListarInteracoesCardBpm: vi.fn(async () => ({ data: [] })) }));

@@ -13,6 +13,9 @@ import { notificarPendenciasLeadsBpm } from "@/lib/bpm/notificacoes-leads-server
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { cnpjEhValido, normalizarCNPJ } from "@/lib/format-cnpj";
+import { erroEhCnpjDuplicado } from "@/lib/cnpj/erro-unicidade";
+import { proporVinculoEmpresaPorCnpj, ErroVinculoEmpresa } from "@/lib/bpm/cnpj-empresa-vinculo-server";
+import { CODIGO_CNPJ_EXISTENTE, MENSAGEM_CNPJ_EXISTENTE } from "@/lib/bpm/cnpj-empresa-vinculo";
 import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
 import { normalizarNomeEtapa } from "@/lib/bpm/novos-leads";
 import { verificarTransicaoPermitidaBpm } from "@/lib/bpm/requisitos-etapa-server";
@@ -220,17 +223,20 @@ export async function PromoverNolossLead(dados: unknown) {
 
 /** Completa opcionalmente o CNPJ de um card comprovadamente originado no NoLoss. */
 export async function PreencherCnpjCardNoloss(cardId: string, cnpjInformado: string) {
+  let usuario: { id: number; role: string | null } | null = null;
+  const cnpj = normalizarCNPJ(cnpjInformado);
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
-    const cnpj = normalizarCNPJ(cnpjInformado);
+    usuario = { id: Number(session.user.id), role: session.user.role ?? null };
     if (cnpjInformado.replace(/\D/g, "").length !== 14 || !cnpjEhValido(cnpj)) {
       return { success: false, error: "Informe um CNPJ válido." };
     }
     await exigirAcessoBpmCard(cardId, Number(session.user.id), session.user.role ?? null, "editarCard");
     const card = await db.bpmCard.findUnique({
       where: { id: cardId },
-      select: { empresaId: true, pipelineId: true, empresa: { select: { cnpj: true } },
+      select: { empresaId: true, pipelineId: true, versao: true, updatedAt: true,
+        empresa: { select: { cnpj: true, updatedAt: true } },
         pipeline: { select: { nome: true } }, nolossLeadOrigem: { select: { id: true }, take: 1 } },
     });
     if (!card || card.pipeline.nome !== "Revisão de Radar" || card.nolossLeadOrigem.length === 0) {
@@ -238,7 +244,22 @@ export async function PreencherCnpjCardNoloss(cardId: string, cnpjInformado: str
     }
     if (card.empresa.cnpj) return { success: false, error: "Este cliente já possui CNPJ." };
     const atualizado = await db.$transaction(async (tx) => {
-      const resultado = await tx.cliente.updateMany({ where: { id: card.empresaId, cnpj: null }, data: { cnpj } });
+      await exigirAcessoBpmCard(cardId, usuario!.id, usuario!.role, "editarCard", tx);
+      const atual = await tx.bpmCard.findUnique({ where: { id: cardId }, select: {
+        empresaId: true, pipelineId: true, versao: true, updatedAt: true,
+        empresa: { select: { cnpj: true, updatedAt: true } },
+        pipeline: { select: { nome: true } }, nolossLeadOrigem: { select: { id: true }, take: 1 },
+      } });
+      if (!atual || atual.empresaId !== card.empresaId || atual.pipelineId !== card.pipelineId
+        || atual.versao !== card.versao || atual.updatedAt.getTime() !== card.updatedAt.getTime()
+        || atual.pipeline.nome !== "Revisão de Radar" || !atual.nolossLeadOrigem.length) {
+        throw new ErroVinculoEmpresa("O card mudou durante a edição. Recarregue e tente novamente.", "VINCULO_EMPRESA_CONFLITO");
+      }
+      if (atual.empresa.cnpj) return false;
+      const propostaVinculo = await proporVinculoEmpresaPorCnpj({ cardId, cnpj, modo: "NOLOSS" }, usuario!, tx);
+      if (propostaVinculo) return { propostaVinculo };
+      const resultado = await tx.cliente.updateMany({ where: { id: atual.empresaId, cnpj: atual.empresa.cnpj,
+        updatedAt: atual.empresa.updatedAt }, data: { cnpj } });
       if (resultado.count !== 1) return false;
       await tx.bpmCardHistorico.create({ data: {
         cardId, acao: "CNPJ_PREENCHIDO_NOLOSS", usuarioId: Number(session.user.id),
@@ -246,12 +267,21 @@ export async function PreencherCnpjCardNoloss(cardId: string, cnpjInformado: str
       } });
       return true;
     });
+    if (typeof atualizado === "object") return { success: false as const, error: MENSAGEM_CNPJ_EXISTENTE,
+      code: CODIGO_CNPJ_EXISTENTE, propostaVinculo: atualizado.propostaVinculo };
     if (!atualizado) return { success: false, error: "O CNPJ já foi preenchido. Recarregue o card." };
-    await notificarPipelineBpm({ pipelineId: card.pipelineId, cardId, tipo: "CARD_ATUALIZADO" });
+    await Promise.allSettled([notificarPipelineBpm({ pipelineId: card.pipelineId, cardId, tipo: "CARD_ATUALIZADO" })]);
     return { success: true };
   } catch (error) {
-    if (error instanceof Error && error.message.includes("Unique constraint")) {
-      return { success: false, error: "Já existe uma empresa cadastrada com este CNPJ." };
+    if (error instanceof ErroVinculoEmpresa) return { success: false as const, error: error.message, code: error.code };
+    if (erroEhCnpjDuplicado(error) && usuario) {
+      try {
+        const propostaVinculo = await proporVinculoEmpresaPorCnpj({ cardId, cnpj, modo: "NOLOSS" }, usuario);
+        if (propostaVinculo) return { success: false as const, error: MENSAGEM_CNPJ_EXISTENTE, code: CODIGO_CNPJ_EXISTENTE, propostaVinculo };
+      } catch (conflito) {
+        if (conflito instanceof ErroVinculoEmpresa) return { success: false as const, error: conflito.message, code: conflito.code };
+      }
+      return { success: false, error: "Este CNPJ já pertence a outra empresa. Recarregue o card antes de confirmar o vínculo." };
     }
     console.error("[PreencherCnpjCardNoloss]", error);
     return { success: false, error: "Não foi possível salvar o CNPJ." };

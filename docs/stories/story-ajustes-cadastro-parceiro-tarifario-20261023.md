@@ -63,7 +63,7 @@ Como usuário do CRM, quero salvar os dados após consultar CNPJ, vê-los nos fo
 - Cadastro salvo alimenta os aliases publicados de endereço e contatos inequívocos. Substituições locais e limpezas explícitas prevalecem; dados de equipe, indicação e mapeamentos protegidos permanecem canônicos. Eventos usam o mesmo valor anterior efetivo exibido ao usuário.
 - Popover do parceiro usa o container do Sheet quando existe, mantendo foco e scroll dentro do modal; seleção por mouse e Enter e wheel real validados em Chrome 1280 e 390 px. Fixture local usa somente parceiros sintéticos; não equivale a teste remoto autenticado.
 - Tarifário reutiliza campo publicado existente. Catálogo de edição antecipa somente a dependência exata da condição negociada; servidor valida a seleção submetida antes da condição, com ACL e CAS preservados. Formulário precisa da publicação metadatária descrita no relatório Vault.
-- A configuração remota do tarifário foi aprovada especificamente pelo usuário; aplicação aguarda backup completo atual verificado e publicação do código. Nenhuma configuração, lead ou produção foi alterado nesta preparação.
+- A configuração do tarifário da entrega anterior já foi aplicada e verificada; esta reabertura não altera configuração remota ou schema. Nenhuma configuração, lead ou produção foi alterado nesta preparação.
 
 ## Evidências
 
@@ -77,3 +77,51 @@ Como usuário do CRM, quero salvar os dados após consultar CNPJ, vê-los nos fo
 - Browser: PASS em Chrome real com Sheet modal e componente de produção, 1280/390 px; wheel avança 470 px, seleção por mouse e pesquisa+Enter funcionam, sem overflow horizontal nem erros de JavaScript.
 - Consulta externa paga e navegação remota autenticada não foram simuladas como execução real: consulta→salvar e autorização/auditoria foram testadas com fixtures sintéticas e SQLite descartável.
 - Consentimento do usuário: “Sim, aplicar no staging após validar o backup”, pergunta `call_b744da133e7441cea0e0aae8a684c6f5`. Limitado às 18 operações metadatárias do relatório Vault.
+
+## Reabertura — salvar CNPJ com e sem máscara, 23/10/2026
+
+O usuário reproduziu falha após o primeiro deploy no editor cadastral e no aviso laranja de CNPJ pendente do card Luana trafego. Logs do runtime confirmam DriverAdapterError/SQLITE_CONSTRAINT por UNIQUE Cliente.cnpj; não se trata de timeout. O tratamento P2002/substring case-sensitive anterior não reconhece o erro real do adapter HTTP.
+
+Critérios complementares:
+
+- Reconhecer a unicidade específica de Cliente.cnpj tanto no Prisma quanto no erro real do driver web, sem mascarar outras constraints ou falhas.
+- Ambos os inputs aceitam CNPJ completo com máscara e somente 14 dígitos, com requests normalizados e validação por dígitos verificadores. Cobrir interação real de colagem/digitação nos dois componentes.
+- Usuário escolheu expressamente: “Oferecer vincular à empresa existente, pedindo confirmação antes de alterar o vínculo”. Os dois fluxos oferecem a empresa existente e exigem confirmação antes do vínculo. Cancelar preserva vínculo/rascunho.
+- A confirmação altera apenas o vínculo deste card e referências diretas necessárias, com autorização atual, verificação de concorrência e auditoria. Não mesclar cadastros, não sobrescrever empresa de destino com a consulta/rascunho e não alterar outros cards ou produção.
+- Reproduzir o formato real de erro do adapter HTTP em teste de integração/protocolo, além de SQLite; não considerar mocks de sucesso como prova do caso real.
+- [x] Corrigir os dois caminhos, tratar conflito e confirmação de vínculo.
+- [x] Validar ambos os formatos com interação real e cobertura da falha observada.
+- [ ] Executar gates/QA e publicar primeiro em staging. Nenhuma nova migração/configuração em massa necessária.
+
+### Evidência conclusiva da reabertura
+
+- Origem do erro: DriverAdapterError HTTP sem code P2002; `SQLITE_CONSTRAINT: UNIQUE constraint failed: Cliente.cnpj`. Logs sanitizados correlacionados por requestID em diretório privado; máscaras já chegavam como 14 dígitos no servidor.
+- Duplicidade agora oferece proposta de vínculo sem escrita; confirmação revalida acesso, empresa ativa, versões e vínculos. Altera só o card e referências NoLoss diretamente associadas, na mesma transação da auditoria e outbox suprimido. Não mescla nem sobrescreve Cliente/Pessoa ou outros cards.
+- Teste do adapter HTTP web Prisma real decodifica resposta Hrana simulada equivalente aos logs, sem rede real; testes SQLite descartável demonstram commit, CAS, rollback e replay. Os componentes reais foram exercitados em DOM com CNPJ cru/mascarado, oferta, cancelamento, confirmação, clique duplo, loading e conflito. Não equivale a teste autenticado no Turso remoto.
+- Full suite: PASS 768 arquivos, 6415 testes, 4 skipped, 1 todo, saída0. Build86 páginas PASS; typecheck PASS; lint zero erros/1183 avisos legados. Mudança final de callback/reexportação tem focused31PASS e lint zero erros.
+- A captura adicional Chrome não chegou às asserções: timeout do protocolo CDP em Page.navigate. Nenhum PASS visual/remoto é alegado.
+- Consulta delimitada read-only confirmou o card NoLoss da Luana com CNPJ NULL, status ATIVO e sem dossiê, serviço, indicação ou cadeia de encaminhamento vinculados. Nenhum CNPJ real foi impresso, nenhum lead foi vinculado ou editado por CLI.
+- Ambiente-base de publicação: staging 6abaaf9b. Produção/main f51 preservados; metadados221env preservados.
+
+### Arquivos desta reabertura
+
+- `docs/stories/story-ajustes-cadastro-parceiro-tarifario-20261023.md`
+- `src/actions/bpm/CnpjEmpresaVinculo.ts`
+- `src/actions/bpm/EmpresaCadastro.ts`
+- `src/actions/bpm/NolossLeads.ts`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/DadosEmpresaEditor.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PreencherCnpjNoloss.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/VincularEmpresaCnpjDialog.tsx`
+- `src/lib/bpm/cnpj-empresa-vinculo-server.ts`
+- `src/lib/bpm/cnpj-empresa-vinculo.ts`
+- `src/lib/bpm/dados-empresa-edicao.ts`
+- `src/lib/cnpj/erro-unicidade.ts`
+- `tests/bpm/cnpj-salvamento-http.test.ts`
+- `tests/bpm/cnpj-salvamento-interacao.test.ts`
+- `tests/bpm/cnpj-salvamento-unicidade.test.ts`
+- `tests/bpm/cnpj-vinculo-sqlite.test.ts`
+- `tests/bpm/empresa-cadastro-editor-react.test.ts`
+- `tests/bpm/empresa-cadastro-sqlite.test.ts`
+- `tests/bpm/promover-noloss-lead.test.ts`

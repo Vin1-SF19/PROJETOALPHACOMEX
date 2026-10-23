@@ -12,6 +12,9 @@ import { consultarFontesCnpjLead } from "@/lib/bpm/consulta-cnpj-lead";
 import { cnpjEhValido, normalizarCNPJ } from "@/lib/format-cnpj";
 import { normalizarDadosEmpresaBpm } from "@/lib/bpm/dados-empresa";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { erroEhCnpjDuplicado } from "@/lib/cnpj/erro-unicidade";
+import { proporVinculoEmpresaPorCnpj, ErroVinculoEmpresa } from "@/lib/bpm/cnpj-empresa-vinculo-server";
+import { CODIGO_CNPJ_EXISTENTE, MENSAGEM_CNPJ_EXISTENTE } from "@/lib/bpm/cnpj-empresa-vinculo";
 
 const CONFLITO = "Os dados da empresa foram alterados durante a edição. Recarregue os dados antes de salvar novamente.";
 
@@ -29,6 +32,11 @@ export async function SalvarCadastroEmpresaCardBpm(input: unknown) {
       const atual = await carregarDadosEmpresaCard(p.cardId, tx);
       if (!atual || atual.edicao.empresaId !== p.empresaId) throw Error("Empresa não encontrada neste card.");
       if (atual.edicao.versaoEsperada !== p.versaoEsperada || atual.edicao.snapshotEsperado !== p.snapshotEsperado) throw Error(CONFLITO);
+      if (p.cadastro.empresa.cnpj && p.cadastro.empresa.cnpj !== atual.edicao.cadastro.empresa.cnpj) {
+        const propostaVinculo = await proporVinculoEmpresaPorCnpj({ cardId: p.cardId, cnpj: p.cadastro.empresa.cnpj, modo: "EDITOR" },
+          { id: userId, role: session.user.role ?? null }, tx);
+        if (propostaVinculo) return { propostaVinculo };
+      }
       const alteracoes = diferencasCadastroEmpresa(atual.edicao.cadastro, p.cadastro);
       if (!alteracoes.length) return atual;
       const empresa = p.cadastro.empresa;
@@ -63,6 +71,8 @@ export async function SalvarCadastroEmpresaCardBpm(input: unknown) {
       })) });
       return (await carregarDadosEmpresaCard(p.cardId, tx))!;
     }, { maxWait: 10000, timeout: 60000 });
+    if ("propostaVinculo" in data) return { success: false as const, error: MENSAGEM_CNPJ_EXISTENTE,
+      code: CODIGO_CNPJ_EXISTENTE, propostaVinculo: data.propostaVinculo };
     // Falhas de cache/transporte após o commit não transformam um cadastro salvo em falha.
     const efeitos = await Promise.allSettled([
       Promise.resolve().then(() => revalidatePath("/PainelAlpha/AlphaCRM")),
@@ -71,10 +81,20 @@ export async function SalvarCadastroEmpresaCardBpm(input: unknown) {
     if (efeitos.some((efeito) => efeito.status === "rejected")) console.error("[SalvarCadastroEmpresaCardBpm] Atualização visual pendente de recarga.");
     return { success: true as const, data };
   } catch (error) {
+    if (error instanceof ErroVinculoEmpresa) return { success: false as const, error: error.message, code: error.code };
+    if (erroEhCnpjDuplicado(error)) {
+      try {
+        const propostaVinculo = await proporVinculoEmpresaPorCnpj({ cardId: p.cardId, cnpj: p.cadastro.empresa.cnpj, modo: "EDITOR" },
+          { id: userId, role: session.user.role ?? null });
+        if (propostaVinculo) return { success: false as const, error: MENSAGEM_CNPJ_EXISTENTE, code: CODIGO_CNPJ_EXISTENTE, propostaVinculo };
+      } catch (conflito) {
+        if (conflito instanceof ErroVinculoEmpresa) return { success: false as const, error: conflito.message, code: conflito.code };
+      }
+      return { success: false as const, error: "Este CNPJ já pertence a outra empresa. Recarregue os dados antes de confirmar o vínculo." };
+    }
     const e = error as { message?: string; code?: string };
     console.error("[SalvarCadastroEmpresaCardBpm] Falha transacional", { codigo: e.code ?? "SEM_CODIGO", conflito: e.message === CONFLITO });
-    const errorText = e.code === "P2002" ? "Este CNPJ já pertence a outra empresa. O cadastro não foi alterado."
-      : [CONFLITO, "Empresa não encontrada neste card.", "Não autorizado"].includes(e.message ?? "") ? e.message!
+    const errorText = [CONFLITO, "Empresa não encontrada neste card.", "Não autorizado"].includes(e.message ?? "") ? e.message!
         : "Não foi possível salvar os dados. Suas alterações continuam disponíveis para tentar novamente.";
     return { success: false as const, error: errorText };
   }

@@ -2,6 +2,8 @@ import { z } from "zod";
 import { cnpjEhValido, normalizarCNPJ } from "@/lib/format-cnpj";
 import type { DadosEmpresaConsolidado } from "@/lib/bpm/dados-empresa";
 
+export const chaveEditorEmpresa = (cardId: string) => `${cardId}:dados-empresa`;
+
 const texto = z.string().trim().max(2000).nullable().transform((v) => v || null);
 const nome = z.string().trim().min(1).max(200);
 const dinheiro = z.number().finite().nonnegative().max(1e15).nullable();

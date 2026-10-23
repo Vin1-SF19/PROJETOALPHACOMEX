@@ -345,11 +345,13 @@ describe("PreencherCnpjCardNoloss", () => {
     prismaMock.bpmCard.findUnique.mockResolvedValue({
       empresaId: 501,
       pipelineId: PIPELINE_ID,
-      empresa: { cnpj: null },
+      versao: 0, updatedAt: new Date("2026-10-23T12:00:00Z"),
+      empresa: { cnpj: null, updatedAt: new Date("2026-10-23T12:00:00Z") },
       pipeline: { nome: "Revisão de Radar" },
       nolossLeadOrigem: [{ id: NOLOSS_LEAD_ID }],
     });
     prismaMock.cliente.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.cliente.findUnique.mockResolvedValue(null);
     prismaMock.bpmCardHistorico.create.mockResolvedValue({});
   });
 
@@ -373,7 +375,7 @@ describe("PreencherCnpjCardNoloss", () => {
     expect(await PreencherCnpjCardNoloss("card-1", "11.222.333/0001-81"))
       .toEqual({ success: true });
     expect(prismaMock.cliente.updateMany).toHaveBeenCalledWith({
-      where: { id: 501, cnpj: null }, data: { cnpj: "11222333000181" },
+      where: { id: 501, cnpj: null, updatedAt: new Date("2026-10-23T12:00:00Z") }, data: { cnpj: "11222333000181" },
     });
     expect(prismaMock.bpmCardHistorico.create).toHaveBeenCalledWith({ data: {
       cardId: "card-1", acao: "CNPJ_PREENCHIDO_NOLOSS", usuarioId: 7,

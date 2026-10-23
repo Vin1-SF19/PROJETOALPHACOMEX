@@ -313,6 +313,7 @@ export function CardAbertoLayout({
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 overflow-y-auto px-5 pb-8 sm:px-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(240px,0.7fr)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden lg:px-10">
         {dadosEmpresaDrawer.aberto ? (
           <DadosEmpresaDrawer
+            key={`${card.id}:${dadosEmpresaDrawer.dados?.edicao?.empresaId ?? card.empresa.id}`}
             cardId={card.id}
             podeEditar={podeEditar && !card.encaminhado}
             registrarGuard={dadosEmpresaDrawer.registrarGuard}

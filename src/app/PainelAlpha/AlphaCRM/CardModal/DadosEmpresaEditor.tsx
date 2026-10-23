@@ -5,13 +5,15 @@ import { Loader2, Plus, Save, Search, Trash2, X } from "lucide-react";
 import { SalvarCadastroEmpresaCardBpm, ConsultarCnpjEdicaoEmpresaCardBpm } from "@/actions/bpm/EmpresaCadastro";
 import { ObterDadosEmpresaCardBpm } from "@/actions/bpm/Empresas";
 import { useCardSave } from "./CardSaveContext";
-import { cadastroEmpresaSchema, diferencasCadastroEmpresa, editarValorCadastro, LISTAS_CADASTRO_EMPRESA,
+import { cadastroEmpresaSchema, chaveEditorEmpresa, diferencasCadastroEmpresa, editarValorCadastro, LISTAS_CADASTRO_EMPRESA,
   preencherCadastroComConsulta, SECOES_CADASTRO_EMPRESA, valorCadastro, type CadastroEmpresa } from "@/lib/bpm/dados-empresa-edicao";
-import { cnpjEhValido, formatCNPJ, normalizarCNPJ } from "@/lib/format-cnpj";
+import { cnpjEhValido, formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";
+import type { PropostaVinculoEmpresa } from "@/lib/bpm/cnpj-empresa-vinculo";
+import { VincularEmpresaCnpjDialog } from "./VincularEmpresaCnpjDialog";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 type DadosEmpresa = NonNullable<Awaited<ReturnType<typeof ObterDadosEmpresaCardBpm>>["data"]>;
-export const chaveEditorEmpresa = (cardId: string) => `${cardId}:dados-empresa`;
+export { chaveEditorEmpresa } from "@/lib/bpm/dados-empresa-edicao";
 type Rascunho = { base: DadosEmpresa["edicao"]; cadastro: CadastroEmpresa; tocados?: string[] };
 
 function recuperarRascunho(json: string | undefined, dados: DadosEmpresa): Rascunho {
@@ -32,6 +34,7 @@ export function DadosEmpresaEditor({ cardId, dados, onSalvo, onCancelar, registr
   const cnpjConsultadoRef = useRef(estado.base.cadastro.empresa.cnpj);
   const [erro, setErro] = useState<string | null>(null); const [aviso, setAviso] = useState<string | null>(null);
   const [confirmarSaida, setConfirmarSaida] = useState(false);
+  const [propostaVinculo, setPropostaVinculo] = useState<PropostaVinculoEmpresa | null>(null);
   const ativoRef = useRef(true);
   useEffect(() => { ativoRef.current = true; return () => { ativoRef.current = false; consultaRef.current += 1; }; }, []);
 
@@ -60,7 +63,17 @@ export function DadosEmpresaEditor({ cardId, dados, onSalvo, onCancelar, registr
         let res;
         try { res = await SalvarCadastroEmpresaCardBpm({ cardId, ...atual.base, cadastro: parsed.data }); }
         catch { if (ativoRef.current) setErro(mensagemFalha); return false; }
-        if (!res.success) { mensagemFalha = res.error; if (ativoRef.current) setErro(res.error); return false; }
+        if (!res.success) {
+          mensagemFalha = res.error;
+          if (ativoRef.current) {
+            setErro(res.error);
+            if ("propostaVinculo" in res && res.propostaVinculo) {
+              setConfirmarSaida(false);
+              setPropostaVinculo(res.propostaVinculo);
+            }
+          }
+          return false;
+        }
         limpar();
         if (ativoRef.current) onSalvo(res.data);
         return true;
@@ -105,7 +118,7 @@ export function DadosEmpresaEditor({ cardId, dados, onSalvo, onCancelar, registr
         {options.map((v) => <option key={v} value={v}>{tipo === "booleano" ? v === "true" ? "Sim" : v === "false" ? "Não" : "Não informado" : v}</option>)}
       </select> : <div className="flex items-end gap-2">
         <input aria-label={label} className={inputClass} type={tipo === "numero" ? "number" : "text"} step={tipo === "numero" ? "0.01" : undefined} min={tipo === "numero" ? 0 : undefined}
-          maxLength={tipo === "numero" ? undefined : 2000} value={value === null || value === undefined ? "" : path === "empresa.cnpj" ? formatCNPJ(String(value)) || String(value) : String(value)}
+          maxLength={tipo === "numero" ? undefined : path === "empresa.cnpj" ? 18 : 2000} value={value === null || value === undefined ? "" : path === "empresa.cnpj" ? formatarCNPJProgressivo(String(value)) : String(value)}
           onChange={(e) => atualizar(editarValorCadastro(estadoRef.current.cadastro, path, tipo === "numero" ? e.target.value === "" ? null : Number(e.target.value) : path === "empresa.cnpj" ? normalizarCNPJ(e.target.value) : e.target.value || null), path)} />
         {path === "empresa.cnpj" && normalizarCNPJ(String(value ?? "")).length === 14 && <button type="button" onClick={() => void consultar()} disabled={consultando || !cnpjEhValido(String(value))}
           title="Consultar CNPJ" aria-label="Consultar CNPJ" className="flex h-10 shrink-0 items-center gap-1 rounded-xl bg-violet-500 px-3 text-xs font-bold text-white disabled:opacity-40">
@@ -150,5 +163,9 @@ export function DadosEmpresaEditor({ cardId, dados, onSalvo, onCancelar, registr
         <button type="button" disabled={salvando} onClick={() => { limpar(); onFechar(); }} className="rounded-lg bg-rose-600 px-4 py-2 text-sm text-white">Descartar alterações</button>
       </AlertDialogFooter>
     </AlertDialogContent></AlertDialog>
+    {propostaVinculo && <VincularEmpresaCnpjDialog proposta={propostaVinculo}
+      onCancelar={() => setPropostaVinculo(null)}
+      onConfirmando={(confirmando) => { salvandoRef.current = confirmando; setSalvando(confirmando); }}
+      onVinculado={(novos) => { limpar(); setPropostaVinculo(null); onSalvo(novos); }} />}
   </div>;
 }

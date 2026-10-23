@@ -113,7 +113,8 @@ describe("salvamento empresarial em SQLite real isolado", () => {
   it("CNPJ de outra empresa não mescla nem modifica qualquer cadastro/auditoria", async () => {
     await m.db.cliente.create({ data: { cnpj: "11222333000181", razaoSocial: "Outra empresa" } });
     const p = await comando(); p.cadastro.empresa.cnpj = "11222333000181";
-    expect(await SalvarCadastroEmpresaCardBpm(p)).toMatchObject({ success: false, error: expect.stringContaining("outra empresa") });
+    expect(await SalvarCadastroEmpresaCardBpm(p)).toMatchObject({ success: false, code: "CNPJ_EMPRESA_EXISTENTE",
+      propostaVinculo: { empresaOrigemId: empresaId, cnpj: "11222333000181" } });
     expect((await m.db.cliente.findUniqueOrThrow({ where: { id: empresaId } })).cnpj).toBeNull(); expect(await m.db.historicoAlteracaoCliente.count()).toBe(0);
   });
   it("falha na auditoria desfaz também o cadastro e o perfil", async () => {

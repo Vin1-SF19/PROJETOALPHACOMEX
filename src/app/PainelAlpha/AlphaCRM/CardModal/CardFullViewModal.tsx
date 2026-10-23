@@ -40,6 +40,7 @@ import { PainelEnvioChecklistOperacional } from "./PainelEnvioChecklistOperacion
 import { CAMPO_CHECKLIST_EXCEL, ETAPA_ENVIO_CHECKLIST_ID, TITULO_TAREFA_CHECKLIST } from "@/lib/bpm/checklist-envio-operacional";
 import { etapaEhAlinhamentoEstrategico } from "@/lib/bpm/alinhamento-estrategico";
 import { useCardSave, type PendingCardChange } from "./CardSaveContext";
+import { chaveEditorEmpresa } from "@/lib/bpm/dados-empresa-edicao";
 const PreencherCnpjNoloss = lazy(() => import("./PreencherCnpjNoloss").then((modulo) => ({ default: modulo.PreencherCnpjNoloss })));
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
@@ -75,7 +76,8 @@ interface Props {
 }
 
 function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, currentUserId, currentUserRole, onClose, onAtualizado, onCardExcluido, onAbrirCard, abrirChecklistInicial = false, focarAgendamentoInicial = false, focoTarefa }: Props) {
-  const { flushSaves, flushScheduled, getPendingChanges, getFailedSaveKeys, retryFailedSaves, discardPending, subscribeConfirmation } = useCardSave();
+  const { flushSaves, flushScheduled, getPendingChanges, getFailedSaveKeys, retryFailedSaves, discardPending, subscribeConfirmation,
+    setDraft, setPendingFields, clearFailedSave } = useCardSave();
   const fechandoRef = useRef(false);
   const [fechando, setFechando] = useState(false);
   const focoAnteriorRef = useRef<HTMLElement | null>(null);
@@ -336,7 +338,15 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
               >
                 {card.pipeline.nome === "Revisão de Radar" && card.nolossLeadOrigem.length > 0
                   && !card.empresa.cnpj && podeEditar
-                  && <Suspense fallback={null}><PreencherCnpjNoloss cardId={card.id} onAtualizado={handleAtualizado} /></Suspense>}
+                  && <Suspense fallback={null}><PreencherCnpjNoloss cardId={card.id} onAtualizado={() => {
+                    handleAtualizado();
+                    if (dadosEmpresaDrawer.aberto || dadosEmpresaDrawer.dados) dadosEmpresaDrawer.recarregar();
+                  }}
+                    onVinculado={(dados) => {
+                      const chave = chaveEditorEmpresa(card.id);
+                      setDraft(chave); setPendingFields(chave, []); clearFailedSave(chave);
+                      dadosEmpresaDrawer.confirmarDados(dados);
+                    }} /></Suspense>}
                 {restritoBoasVindas &&
                   <PainelBoasVindasOperacional cardId={card.id}
                     emailInicial={card.emailClienteReuniao ?? null}
