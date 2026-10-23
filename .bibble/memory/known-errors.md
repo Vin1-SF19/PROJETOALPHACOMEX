@@ -844,3 +844,8 @@ Revalidação após integrar lazy imports do editor/Radar: build literal3072/poo
 ## ENOSPC durante build local com outputs acumulados — 2026-10-23
 
 Na validação do hotfix de um único X sobre `04cc69c0`, o primeiro build falhou por falta de espaço do host, sem defeito do app. Preservar logs/evidências antes de limpar; conferir autoria, ausência de processos e caráter regenerável dos outputs. A coordenação removeu somente três outputs antigos próprios de validação Audio/Instagram, nenhum arquivo versionado, liberando 10,3 GB (`cleanup-own-builds.json`). Repetido apenas o gate afetado: build literal PASS em 92,23 s; fonte `2c72…` idêntica antes/retry/depois, sem alteração de app/package/ENV ou limpeza de terceiros. Depois, a produção avançou externamente para `274d6d6f`; herdar o resultado como checkpoint histórico e verificar proporcionalmente a integração, sem confundir troca de base com correção da falha de disco.
+
+
+## Testes do filtro de origem: unknown e asserção por string — 2026-10-23
+
+Typecheck inicial encontrou TS2698 em três spreads de valores unknown do harness; corrigir com guard real antes do spread, sem coerção cega nem patch de aplicação. A primeira suíte também revelou teste legado preso à string `cards.length === 0`; substituir por cenários DOM de erro, vazio, exclusão e filtro em `tests/bpm/board-exclusao-local.test.ts`. Essas falhas eram dos testes, não bugs runtime comprovados. Preservar tentativas em `/var/tmp/alpha-crm-filtro-origem-20261023/forge/`; rerun global final: 751 arquivos/6.156 PASS/zero falhas/quatro skipped/um todo, quatro gates PASS. Registro River a partir da evidência QA, sem alteração de fonte runtime por essas correções.

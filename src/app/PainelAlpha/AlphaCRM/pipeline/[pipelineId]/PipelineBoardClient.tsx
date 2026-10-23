@@ -11,6 +11,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { SincronizarQuadroBpm } from "@/actions/bpm/Quadro";
 import { mesclarResumosQuadro, selecionarPaginaQuadro, TAMANHO_PAGINA_QUADRO, REVALIDACAO_RESUMOS_MS, type ManifestoQuadro } from "@/lib/bpm/quadro-paginado";
+import { origemCorrespondeFiltro, origemNativaQuadro, origemNolossQuadro, origensDisponiveisQuadro, type FiltroOrigemQuadro } from "@/lib/bpm/origem-quadro";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -26,7 +27,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Loader2, AlertTriangle, Bot, Building2, CalendarClock, ClipboardList, Globe, Instagram, Paperclip, Plus, RefreshCw, StickyNote, Users, Video } from "lucide-react";
+import { Loader2, AlertTriangle, Bot, Building2, CalendarClock, ClipboardList, Globe, Instagram, Paperclip, Plus, RefreshCw, Search, StickyNote, Users, Video } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MoverCardBpm, ObterRequisitosTransicaoBpm, CriarCardBpm, ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
 import { PromoverNolossLead } from "@/actions/bpm/NolossLeads";
@@ -68,6 +69,7 @@ import type { CardKanbanComposicao } from "@/lib/bpm/card-kanban";
 
 import { SkeletonColumn } from "./PipelineBoardSkeleton";
 import { SeletorPipelineBoard, type PipelineDisponivel } from "./SeletorPipelineBoard";
+import { FiltroOrigemBoard } from "./FiltroOrigemBoard";
 import { useLazyColumn } from "@/hooks/useLazyColumn";
 
 interface AutomacaoBoard {
@@ -170,6 +172,17 @@ export interface CardBpm {
   checklistProgress?: { total: number; completed: number } | null;
   cadenciaProximaExecucaoEm?: Date | string | null;
   pendenciasObrigatorias?: number | null;
+}
+
+function entradaFallbackOrigem(card: CardBpm) {
+  return {
+    id: card.id, etapaId: card.etapaId, revision: card.id,
+    nome: card.empresa.razaoSocial, cnpj: card.empresa.cnpj, servico: card.servico,
+    origem: card.origem === "instagram" ? "Instagram" : card.origem === "noloss"
+      ? origemNolossQuadro({ utmSource: card.nolossUtmSource, utmMedium: card.nolossUtmMedium })
+      : origemNativaQuadro({ empresaId: card.empresa.id, campoValores: card.campoValores }),
+    responsaveis: card.origem === "real" ? [card.responsavel, ...card.membros.map((membro) => membro.usuario)] : [],
+  };
 }
 
 const CORES_ETAPA = ["94,234,212", "147,197,253", "196,181,253", "253,224,71", "251,191,36", "52,211,153", "248,113,113"];
@@ -812,13 +825,15 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
   const [cards, setCards] = useState<CardBpm[]>(cardsIniciais);
   const [manifesto, setManifesto] = useState(manifestoInicial);
   const [busca, setBusca] = useState("");
+  const [filtroOrigem, setFiltroOrigem] = useState<FiltroOrigemQuadro>(undefined);
   const [filtroResponsaveis, setFiltroResponsaveis] = useState("MEUS");
   const visao: VisaoQuadro = filtroResponsaveis === "MEUS" ? "MEUS" : "TODOS";
   const setorFiltro = null;
   const responsavelFiltro = /^\d+$/.test(filtroResponsaveis) ? filtroResponsaveis : null;
   const usuariosVisao = manifesto?.acesso ? usuariosDaVisao(manifesto.acesso, visao, setorFiltro) : null;
   const [carregandoPagina, setCarregandoPagina] = useState(false);
-  const quadroRef = useRef({ manifesto: manifestoInicial, ids: cardsIniciais.map((c) => c.id), limites: {} as Record<string, number>, busca: "", responsavelId: null as number | null, visao: "MEUS" as VisaoQuadro, setorId: null as number | null, ultimaCompleta: 0 });
+  const [limitesVisiveis, setLimitesVisiveis] = useState<Record<string, number>>({});
+  const quadroRef = useRef({ manifesto: manifestoInicial, ids: cardsIniciais.map((c) => c.id), limites: {} as Record<string, number>, busca: "", origem: undefined as FiltroOrigemQuadro, responsavelId: null as number | null, visao: "MEUS" as VisaoQuadro, setorId: null as number | null, ultimaCompleta: 0 });
   useEffect(() => { quadroRef.current.ultimaCompleta = Date.now(); }, []);
   const primeiraFiltragemRef = useRef(true);
   const [cardSelecionadoId, setCardSelecionadoId] = useState<string | null>(cardInicialId);
@@ -892,10 +907,22 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
   const responsaveisDisponiveis = useMemo(() => [...(manifesto?.acesso?.responsaveis ?? [])]
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")), [manifesto?.acesso?.responsaveis]);
 
+  const entradasFallback = useMemo(() => cards.map(entradaFallbackOrigem), [cards]);
+  const origensDisponiveis = useMemo(() => origensDisponiveisQuadro(manifesto?.entradas ?? entradasFallback), [manifesto?.entradas, entradasFallback]);
+  const paginaManifesto = manifesto ? selecionarPaginaQuadro(manifesto.entradas, {
+    busca, origem: filtroOrigem, visao, setorId: setorFiltro, acesso: manifesto.acesso,
+    responsavelId: responsavelFiltro ? Number(responsavelFiltro) : null, limites: limitesVisiveis,
+  }) : null;
+  const idsVisiveis = new Set((paginaManifesto ?? selecionarPaginaQuadro(entradasFallback, {
+    busca, origem: filtroOrigem, responsavelId: responsavelFiltro ? Number(responsavelFiltro) : null,
+    limites: Object.fromEntries(etapasOrdenadas.map((etapa) => [etapa.id, Number.MAX_SAFE_INTEGER])),
+  })).ids);
+
   const getByEtapa = (etapaId: string) =>
     cards.filter(
       (c) =>
         c.etapaId === etapaId &&
+        idsVisiveis.has(c.id) &&
         (usuariosVisao === null || c.origem === "noloss" || c.origem === "instagram" || usuariosVisao.includes(c.responsavel.id) || c.membros.some((m) => usuariosVisao.includes(m.usuario.id))) &&
         (!responsavelFiltro ||
           String(c.responsavel.id) === responsavelFiltro ||
@@ -909,7 +936,7 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
     setPromocaoLeadPendente(null); setAtribuicaoAgendarPendente(null); setNovoCardAberto(false);
   }, [setNolossLeadAberto, setPromocaoLeadPendente, setAtribuicaoAgendarPendente, setNovoCardAberto]);
 
-  const recarregarCards = useCallback(async (opcoes: OpcoesRecarregarCards = {}) => {
+  const recarregarCards = useCallback(async (opcoes: OpcoesRecarregarCards = {}): Promise<boolean> => {
     if (snapshotArrastoRef.current || movimentoPendenteRef.current) {
       sincronizacaoRealtimePendenteRef.current = true;
       return false;
@@ -925,13 +952,16 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
         const idsCarregados = new Set(estado.ids);
         const result = await SincronizarQuadroBpm(pipeline.id, {
           conhecidos: estado.manifesto!.entradas.filter((c) => idsCarregados.has(c.id)).map(({ id, revision }) => ({ id, revision })),
-          limites: estado.limites, busca: estado.busca, responsavelId: estado.responsavelId, visao: estado.visao, setorId: estado.setorId, forcar,
+          limites: estado.limites, busca: estado.busca, origem: estado.origem, responsavelId: estado.responsavelId, visao: estado.visao, setorId: estado.setorId, forcar,
         });
         if (requisicao !== ultimaRequisicaoRef.current || generation !== generationBoardRef.current) return false;
         const limparVisao = (novoManifesto: ManifestoQuadro) => {
           setCards([]); setManifesto(novoManifesto);
           estado.ids = []; estado.manifesto = novoManifesto;
+          estado.origem = undefined; estado.limites = {};
+          setLimitesVisiveis({});
           fecharDetalhes();
+          setFiltroOrigem(undefined);
           setFiltroResponsaveis("MEUS");
         };
         if (!result.success) {
@@ -942,6 +972,21 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
         if (estado.responsavelId && !result.manifesto.acesso?.responsaveis?.some((pessoa) => pessoa.id === estado.responsavelId)) {
           limparVisao(result.manifesto);
           return false;
+        }
+        if (estado.origem !== undefined) {
+          const origens = origensDisponiveisQuadro(result.manifesto.entradas);
+          const indice = origens.findIndex((origem) => origemCorrespondeFiltro(origem, estado.origem));
+          if (indice === -1) {
+            ultimaRequisicaoRef.current += 1;
+            estado.manifesto = result.manifesto; estado.ids = []; estado.origem = undefined; estado.limites = {};
+            setLimitesVisiveis({});
+            setManifesto(result.manifesto); setCards([]); setFiltroOrigem(undefined); fecharDetalhes();
+            return await recarregarCards({ ...opcoes, generation, forcar: true });
+          }
+          if (estado.origem !== origens[indice]) {
+            estado.origem = origens[indice];
+            setFiltroOrigem(origens[indice]);
+          }
         }
         const mudouConfig = estado.manifesto!.configVersion !== result.manifesto.configVersion;
         const selecionado = cardSelecionadoIdRef.current;
@@ -984,6 +1029,12 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
     }
 
     setCards(res.data);
+    if (quadroRef.current.origem !== undefined && !origensDisponiveisQuadro(res.data.map(entradaFallbackOrigem))
+      .some((origem) => origemCorrespondeFiltro(origem, quadroRef.current.origem))) {
+      quadroRef.current.origem = undefined; quadroRef.current.limites = {};
+      setLimitesVisiveis({});
+      setFiltroOrigem(undefined); fecharDetalhes();
+    }
     if (!opcoes.preservarErro) setErro(null);
     return true;
     } finally { consultasEmAndamentoRef.current -= 1; }
@@ -1057,25 +1108,26 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
   }, [recarregarCards]);
 
   useEffect(() => {
-    if (!quadroRef.current.manifesto) return;
     if (primeiraFiltragemRef.current) { primeiraFiltragemRef.current = false; return; }
-    if (quadroRef.current.busca === busca && quadroRef.current.responsavelId === (responsavelFiltro ? Number(responsavelFiltro) : null) && quadroRef.current.visao === visao && quadroRef.current.setorId === setorFiltro) return;
+    if (quadroRef.current.busca === busca && quadroRef.current.origem === filtroOrigem && quadroRef.current.responsavelId === (responsavelFiltro ? Number(responsavelFiltro) : null) && quadroRef.current.visao === visao && quadroRef.current.setorId === setorFiltro) return;
     quadroRef.current.visao = visao; quadroRef.current.setorId = setorFiltro;
     quadroRef.current.busca = busca;
+    quadroRef.current.origem = filtroOrigem;
     quadroRef.current.responsavelId = responsavelFiltro ? Number(responsavelFiltro) : null;
     quadroRef.current.limites = {};
     ultimaRequisicaoRef.current += 1;
+    if (!quadroRef.current.manifesto) return;
     const timer = setTimeout(() => { void recarregarCards(); }, 300);
     return () => clearTimeout(timer);
-  }, [busca, responsavelFiltro, visao, setorFiltro, recarregarCards]);
+  }, [busca, filtroOrigem, responsavelFiltro, visao, setorFiltro, recarregarCards]);
 
   async function carregarMais(etapaId: string) {
     if (carregandoPagina || movimentoPendenteRef.current || snapshotArrastoRef.current) return;
     quadroRef.current.limites[etapaId] = (quadroRef.current.limites[etapaId] ?? TAMANHO_PAGINA_QUADRO) + TAMANHO_PAGINA_QUADRO;
+    setLimitesVisiveis({ ...quadroRef.current.limites });
     setCarregandoPagina(true);
     try { await recarregarCards(); } finally { setCarregandoPagina(false); }
   }
-  const paginaManifesto = manifesto ? selecionarPaginaQuadro(manifesto.entradas, { busca, visao, setorId: setorFiltro, acesso: manifesto.acesso, responsavelId: responsavelFiltro ? Number(responsavelFiltro) : null, }) : null;
 
   const abrirCard = useCallback((cardId: string) => {
     setFocoTarefa(null);
@@ -1295,12 +1347,19 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
             </p>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {manifesto && <input type="search" value={busca} maxLength={200} onChange={(event) => setBusca(event.target.value)} aria-label="Buscar em todos os cards do pipeline" placeholder="Buscar empresa, CNPJ ou serviço" className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white" />}
-          <Select value={filtroResponsaveis} onValueChange={(value) => { ultimaRequisicaoRef.current += 1; fecharDetalhes(); setFiltroResponsaveis(value); }}>
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-3 xl:w-auto">
+          <div className="relative w-full shrink-0 sm:w-[320px] lg:w-[360px]">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <input type="search" value={busca} maxLength={200} onChange={(event) => { setBusca(event.target.value); setLimitesVisiveis({}); }} aria-label="Buscar em todos os cards do pipeline" placeholder="Buscar empresa, CNPJ ou serviço"
+              className="h-11 w-full min-w-0 rounded-xl border border-white/20 bg-white/[0.07] py-2.5 pl-10 pr-3 text-sm text-white shadow-sm outline-none placeholder:text-slate-400 focus-visible:border-sky-400/70 focus-visible:ring-2 focus-visible:ring-sky-400/20" />
+          </div>
+          <FiltroOrigemBoard origens={origensDisponiveis} value={filtroOrigem} onChange={(origem) => {
+            ultimaRequisicaoRef.current += 1; fecharDetalhes(); setLimitesVisiveis({}); setFiltroOrigem(origem);
+          }} />
+          <Select value={filtroResponsaveis} onValueChange={(value) => { ultimaRequisicaoRef.current += 1; fecharDetalhes(); setLimitesVisiveis({}); setFiltroResponsaveis(value); }}>
             <SelectTrigger
               aria-label="Filtrar cards por responsável"
-              className="w-[230px] shrink-0 border-white/10 bg-white/[0.04] text-xs text-slate-200"
+              className="h-11 w-full shrink-0 rounded-xl border-white/10 bg-white/[0.04] text-sm text-slate-200 data-[size=default]:h-11 sm:w-[230px]"
             >
               <Users className="h-4 w-4" aria-hidden="true" />
               <SelectValue placeholder="Meus e sem vínculos" />
@@ -1361,13 +1420,15 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
         </div>
       )}
 
-      {!erro && etapasOrdenadas.length > 0 && cards.length === 0 && (
+      {!erro && etapasOrdenadas.length > 0 && idsVisiveis.size === 0 && (
         <div
           role="status"
           className="mx-6 mb-3 flex shrink-0 items-center gap-2 px-4 py-3 rounded-xl bg-white/[0.03] border border-white/10 text-slate-400 text-sm"
         >
           <ClipboardList size={16} aria-hidden="true" className="shrink-0 text-slate-500" />
-          <span>Nenhum card neste pipeline. Crie um card na etapa inicial para começar.</span>
+          <span>{(manifesto ? manifesto.entradas.length === 0 : cards.length === 0)
+            ? "Nenhum card neste pipeline. Crie um card na etapa inicial para começar."
+            : "Nenhum card corresponde aos filtros selecionados."}</span>
         </div>
       )}
 

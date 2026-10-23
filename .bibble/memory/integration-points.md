@@ -3410,3 +3410,16 @@ Clique de notificação é leitura: destino pendente canônico ou card promovido
 
 ## CheckList TI modelos publicado — 2026-10-22 22:21 UTC
 CheckList → Modelos → Novo documento do modelo. TI pode publicar/revisar/desativar/ordenar; exigirLiderChecklist e políticas owner/leader permanecem. Status/sessionVersion/role são revalidados antes de replay. Regressão backend.service/catalogo-replay; homologação com sessão TI real pendente.
+
+
+### CRM — origem compartilhada no manifesto e toolbar (2026-10-23, Scribe/River)
+
+**Arquivos:** `src/lib/bpm/origem-quadro.ts`, `src/lib/bpm/quadro-paginado.ts`, `src/actions/bpm/Quadro.ts` e `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/{PipelineBoardClient,FiltroOrigemBoard}.tsx`.
+**Propósito / editado quando:** alterar projeção, comparação, opções ou apresentação do filtro de origem do Kanban.
+- Exemplo de contrato: `origem: undefined` consulta Todas; `origem: null` consulta Sem origem; `origem: "Instagram"` filtra Instagram. UI codifica valores com prefixo e sentinels próprios; customizações não podem colidir com Todas/Sem origem.
+- Derivar opções do manifesto inteiro autorizado, antes de paginar e sem restringi-las pela busca, responsável ou origem selecionada. Aplicar o filtro junto dos existentes antes dos totais/lotes. Alterações da origem precisam compor a revisão para renovar os resumos.
+- Projetar em lote; SERVICO/CONTRATO exige contexto explícito do card e empresa coerente. Não consultar último contrato da empresa, classificar NoLoss sem UTM como Site, nem usar catálogo global para inventar opções. Comparação/exibição não reescrevem fontes persistidas.
+- Reutilizar polling e proteção de respostas antigas do quadro; manter ACL de pipeline/coluna/card e assunção existentes. Nenhuma rota, menu, perfil, formulário ou poller novo.
+**Estado:** implementado e validado em testes dirigidos; quatro gates globais, QA final, integração e deploy staging pendentes. Produção fora desta autorização.
+
+**Fechamento local (2026-10-23, River):** contrato aprovado por QA/Lens/Anubis após quatro gates e Probe local dos componentes reais. Integração financeira `f51b753b` sem conflito/alteração dos caminhos próprios, QA proporcional PASS. Browser local teve zero API/erros; não comprova sessão Admin nem fluxo remoto. Commit/push, READY/alias e smoke staging permanecem pendentes neste checkpoint.

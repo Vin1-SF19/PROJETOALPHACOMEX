@@ -95,8 +95,18 @@ function manifestoBoard(admin = false) {
     entradas: [card, colega, historico].map((c) => ({ id: c.id, etapaId: c.etapaId, revision: "1", nome: c.empresa.razaoSocial, cnpj: null, servico: null, responsaveis: [c.responsavel] })),
   };
 }
+function seletorResponsaveis(container: HTMLElement) {
+  const select = [...container.querySelectorAll("select")].find((item) => [...item.options].some((opcao) => opcao.value === "MEUS"));
+  if (!select) throw new Error("Filtro de responsáveis ausente");
+  return select;
+}
+function seletorFunis(container: HTMLElement) {
+  const select = [...container.querySelectorAll("select")].find((item) => [...item.options].some((opcao) => opcao.value === "pipeline-1"));
+  if (!select) throw new Error("Seletor de pipeline ausente");
+  return select;
+}
 async function selecionar(container: HTMLElement, valor: string) {
-  await act(async () => { const select = container.querySelector("select")!; select.value = valor; select.dispatchEvent(new Event("change", { bubbles: true })); });
+  await act(async () => { const select = seletorResponsaveis(container); select.value = valor; select.dispatchEvent(new Event("change", { bubbles: true })); });
   await act(async () => { await vi.advanceTimersByTimeAsync(300); });
 }
 async function atualizar(container: HTMLElement) {
@@ -110,7 +120,7 @@ it("troca pelo segundo select sem alterar o filtro; arrasto e detalhes impedem n
   props.pipelinesDisponiveis = [{ id: "pipeline-1", nome: "Pipeline" }, { id: "outro-funil", nome: "Outro funil" }];
   try {
     await act(async () => root.render(h(PipelineBoardClient, props)));
-    const [responsaveis, funis] = container.querySelectorAll("select");
+    const responsaveis = seletorResponsaveis(container), funis = seletorFunis(container);
     expect(funis).toBeDefined();
     expect(funis.value).toBe("pipeline-1");
     expect([...funis.options].map((o) => o.textContent)).toEqual(["Pipeline", "Outro funil"]);
@@ -140,7 +150,7 @@ it("sem lista de funis mantém apenas o atual e não permite navegar", async () 
   const { container, root, props } = montarBoard();
   try {
     await act(async () => root.render(h(PipelineBoardClient, props)));
-    const funis = container.querySelectorAll("select")[1];
+    const funis = seletorFunis(container);
     expect(funis.disabled).toBe(true);
     expect([...funis.options].map((o) => o.value)).toEqual(["pipeline-1"]);
     expect(router.push).not.toHaveBeenCalled();
@@ -155,8 +165,8 @@ it.each(["TI", "OPERACIONAL"])("%s usa a mesma lista setorial, inclui pessoa sem
   vi.mocked(SincronizarQuadroBpm).mockResolvedValue({ success: true, manifesto, cards: [card, colega, historico], ids: [card.id, colega.id, historico.id] } as never);
   try {
     await act(async () => root.render(h(PipelineBoardClient, props)));
-    const select = container.querySelector("select")!;
-    expect(container.querySelectorAll("select")).toHaveLength(2);
+    const select = seletorResponsaveis(container);
+    expect(container.querySelectorAll("select")).toHaveLength(3);
     expect(select.value).toBe("MEUS");
     expect([...select.options].map((o) => [o.value, o.textContent])).toEqual([
       ["MEUS", "Meus e sem vínculos"], ["9", "Ana Operacional"], ["1", "Responsável"], ["7", "Usuária sem cards"], ["todos", "Todos"],
@@ -198,8 +208,8 @@ it("opção removida na reconciliação fecha detalhes, limpa cards e retorna à
     vi.mocked(SincronizarQuadroBpm).mockResolvedValueOnce({ success: true, manifesto: revogado, cards: [colega], ids: [colega.id] } as never);
     vi.mocked(SincronizarQuadroBpm).mockResolvedValue({ success: true, manifesto: revogado, cards: [card], ids: [card.id] } as never);
     await atualizar(container);
-    expect(container.querySelector("select")?.value).toBe("MEUS");
-    expect([...container.querySelector("select")!.options].map((o) => o.value)).not.toContain("9");
+    expect(seletorResponsaveis(container).value).toBe("MEUS");
+    expect([...seletorResponsaveis(container).options].map((o) => o.value)).not.toContain("9");
     expect(container.querySelector(cardColega)).toBeNull();
     expect(container.textContent).not.toContain("Confirmar exclusão");
     await act(async () => { await vi.advanceTimersByTimeAsync(300); });
@@ -218,8 +228,8 @@ it("revogação de acesso remove cards, opções e detalhes antes de reconsultar
     await act(async () => { container.querySelector<HTMLButtonElement>(cardColega)!.click(); });
     vi.mocked(SincronizarQuadroBpm).mockResolvedValue({ success: false, acessoNegado: true, visaoRevogada: true, error: "Acesso revogado" });
     await atualizar(container);
-    expect(container.querySelector("select")?.value).toBe("MEUS");
-    expect([...container.querySelector("select")!.options].map((o) => o.value)).toEqual(["MEUS", "todos"]);
+    expect(seletorResponsaveis(container).value).toBe("MEUS");
+    expect([...seletorResponsaveis(container).options].map((o) => o.value)).toEqual(["MEUS", "todos"]);
     expect(container.querySelector(cardColega)).toBeNull(); expect(container.textContent).not.toContain("Confirmar exclusão");
     expect(container.textContent).toContain("Acesso revogado");
     await act(async () => { await vi.advanceTimersByTimeAsync(300); });
@@ -240,7 +250,7 @@ it("ignora resposta de pessoa anterior após voltar ao padrão", async () => {
     await selecionar(container, "9");
     await selecionar(container, "MEUS");
     await act(async () => { concluir?.({ success: true, manifesto, cards: [colega], ids: [colega.id] } as never); });
-    expect(container.querySelector("select")?.value).toBe("MEUS");
+    expect(seletorResponsaveis(container).value).toBe("MEUS");
     expect(container.querySelector('[aria-label="Abrir card de Empresa"]')).not.toBeNull();
     expect(container.querySelector(cardColega)).toBeNull();
   } finally { await act(async () => root.unmount()); container.remove(); }
