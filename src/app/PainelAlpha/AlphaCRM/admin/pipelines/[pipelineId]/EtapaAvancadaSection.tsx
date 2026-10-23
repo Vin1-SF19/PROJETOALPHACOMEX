@@ -320,7 +320,7 @@ export function EtapaAvancadaSection({
             disabled={
               publicationBlocked || Boolean(operacao) || criandoSubStatus || !novoSubStatusNome.trim()
             }
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-50"
+            className="crm-tema-fixo flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-50"
             style={{ background: `rgba(${accent},0.85)` }}
           >
             {criandoSubStatus ? (

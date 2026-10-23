@@ -7549,3 +7549,35 @@ Pedido explícito do usuário: liberar TI para templates. Echo→Nova→Forge→
 Usuário autorizou publicar direto em produção somente a retirada do X duplicado. `SheetContent` recebe `showCloseButton` opcional/default true, desligado apenas em `NolossLeadModal`, mantendo o X do cabeçalho e o fechamento Radix. Candidato inicial isolado em `04cc69c0` para não promover vinte commits latentes; outro fluxo depois publicou `274d6d6f` e o alias ficou READY nessa nova base. O candidato atual acompanha a produção realmente publicada e preserva byte a byte os dois patches aprovados. Push normal para `main` somente com fresh-ref/alias correspondentes, sem alterar staging nem forçar histórico.
 
 Checkpoint histórico `04cc69c0`: quatro gates PASS, 729 arquivos/5.909 testes PASS, zero falhas/quatro skipped/um todo; Lens sem bloqueantes/importantes e Chrome nos componentes reais confirmou um X Instagram/site, default de outro Sheet e fechamento existente, sem API/cliente real. Primeiro ENOSPC preservado; só build repetido após limpeza comprovada de outputs próprios, fonte `2c72…` intacta. QA final integrada `274d6d6f` APPROVED/GO: tipos 0/48,63 s, lint dois arquivos 0/1,33 s, oito arquivos/59 testes PASS/zero falhas/1,60 s, hash `59660d46…` imutável. Dois arquivos runtime byte-idênticos e grafo/caller/React/lock/Next/config inalterados sustentam herdar Probe e gates históricos, sem declarar novo rerun global/build local. Publicação/READY/alias/smoke deste ajuste ainda pendentes; evidências posteriores privadas. Story e File List de cinco caminhos: `docs/stories/story-crm-lead-fechar-unico-20261023.md`.
+
+
+---
+
+## [2026-10-23 14:26 UTC] — CRM: origem no Kanban, checkpoint de implementação
+
+**Tags:** #feature #integration #nextjs
+**Agentes envolvidos:** coordenação, Scout/Architect, backend, UI, DevOps, QA, River/Scribe/Kowalski.
+**Arquivos tocados:** nove caminhos de implementação/testes e story `story-crm-filtro-origem-20261023.md`; três memórias. File List completa na story.
+
+### Contexto
+Usuário pediu filtro de origem entre busca e visão/responsável, opções apenas de origens com leads e busca mais visível.
+
+### O que foi feito
+- Manifesto projeta origens em lote, filtra antes da paginação/contagem e mantém facetas do escopo autorizado completo; toolbar usa cores estáveis e busca ampliada.
+- Backend informou 47 PASS/seis arquivos; UI, 25 PASS/três arquivos. Execuções dirigidas separadas, lint dirigido sem erros e um aviso TanStack preexistente na UI; não equivalem à suíte global.
+
+### Decisões tomadas
+- Todas=undefined, Sem origem=null, string=seleção; valores do select codificados para evitar colisões. UTM ausente não vira Site; legado permanece sem reescrita e contexto comercial exige vínculo explícito do card.
+- Staging primeiro. A autorização anterior de produção era específica do X duplicado; nenhuma promoção desta feature foi autorizada.
+
+### Problemas encontrados / resolvidos
+- Origem pode mudar sem atualizar a data do card: os dados projetados participam da revisão para forçar reidratação. Guardas existentes de pipeline/coluna/card permanecem.
+- DevOps detectou avanço remoto `f51b753b` em 17 caminhos financeiros disjuntos dos nove caminhos da feature; integração após os quatro gates, com QA proporcional.
+
+### Pendências
+Gates globais, QA final, smoke de navegador, integração remota e publicação/READY/smoke staging. Sem banco/schema/migration/ENV ou cadastro de origens alterados.
+
+### Refletido também em
+- `codebase-map.md` e `integration-points.md`: arquivos reais e contrato de consulta/toolbar.
+
+**Fechamento local do filtro de origem (2026-10-23, River):** QA APPROVED/GO STAGING; typecheck oficial 0/9,596 s, lint 0/50,58 s (1.183 avisos), build 0/99,4 s (pico 7.354.613.760 bytes <7 GiB), suíte global 0/58,95 s: 751 arquivos/6.156 PASS/zero falhas/quatro skipped/um todo. Primeiras falhas exclusivas dos testes preservadas e corrigidas: spreads unknown com guard real e contrato legado por string substituído por cenários DOM, sem patch runtime por essas falhas; conhecidas em known-errors. `f51b753b` integrado sem conflito, 14 caminhos próprios byte-idênticos; typecheck 0/23,44 s, lint 17 fontes 0/2,65 s e 18 arquivos/235 PASS/2,89 s, fonte 52678… estável. Probe real Radix/helper/CSS aprovou cores/teclado/mobile (342×44 em 390 px), zero API/erros; Lens/Anubis zero bloqueantes/importantes. Story Ready for Review, File List 15. Publicação/READY/alias e smoke Admin staging pendentes; provas posteriores privadas em `/var/tmp/alpha-crm-filtro-origem-20261023/`, sem commit documental recursivo ou produção.

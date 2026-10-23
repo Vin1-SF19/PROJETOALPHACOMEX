@@ -16,14 +16,8 @@ describe("PipelineBoardClient — remoção local sem Pusher", () => {
     expect(board).toContain("onCardExcluido={removerCardLocal}");
   });
 
-  it("distingue erro de carregamento de estado vazio", () => {
-    const board = source("src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx");
-    // Banner de erro
-    expect(board).toContain('role="alert"');
-    // Banner de estado vazio (só quando !erro)
-    expect(board).toContain("!erro && etapasOrdenadas.length > 0 && cards.length === 0");
-    expect(board).toContain("!erro && etapasOrdenadas.length === 0");
-  });
+  // Estados vazios, erro e exclusão do último card são exercitados no DOM
+  // em board-origem-react.test.ts, sem depender da expressão JSX usada.
 });
 
 describe("ExcluirCardBpm — resiliência Pusher", () => {
