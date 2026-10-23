@@ -49,9 +49,14 @@ export function useBpmNotificacaoBoardNavigation({ pipelineId, usuarioId, inicia
       const parsed = intencaoNotificacaoBpmSchema.safeParse(event.data);
       if (parsed.success && parsed.data.pipelineId === pipelineId) void executar(parsed.data);
     };
+    const receberLocal = (event: Event) => {
+      const parsed = intencaoNotificacaoBpmSchema.safeParse((event as CustomEvent<unknown>).detail);
+      if (parsed.success && parsed.data.pipelineId === pipelineId) void executar(parsed.data);
+    };
     window.addEventListener("message", receber);
+    window.addEventListener(BPM_CARD_ABRIR_EVENT, receberLocal);
     if (window.parent !== window) window.parent.postMessage({ type: BPM_CARD_PRONTO_EVENT }, window.location.origin);
-    return () => { sequencia.current += 1; window.removeEventListener("message", receber); };
+    return () => { sequencia.current += 1; window.removeEventListener("message", receber); window.removeEventListener(BPM_CARD_ABRIR_EVENT, receberLocal); };
   }, [pipelineId, usuarioId, executar]);
   useEffect(() => {
     if (inicialRef.current) { void executar(inicialRef.current); inicialRef.current = null; }

@@ -137,7 +137,8 @@ export function montarFeedTimelineCard(
 ): ItemTimelineCard[] {
   const eventos: ItemTimelineCard[] = historico
     // Anotações já entram no feed com o texto completo via `anotacoes`; duplicaria o mesmo evento.
-    .filter((h) => h.acao !== "ANOTACAO_REGISTRADA")
+    .filter((h) => !["ANOTACAO_REGISTRADA", "FICHA_VIABILIDADE_PENDENTE", "FICHA_VIABILIDADE_PROCESSADA",
+      "FICHA_VIABILIDADE_FALHA", "FICHA_VIABILIDADE_ESTADO", "ANEXO_UPLOAD_REGISTRADO"].includes(h.acao))
     .map((h) => ({
       id: h.id,
       tipo: "evento",

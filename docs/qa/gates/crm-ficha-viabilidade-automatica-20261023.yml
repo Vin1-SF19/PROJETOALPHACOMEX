@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "story": "crm-ficha-viabilidade-automatica-20261023",
+  "story_title": "Ficha de análise de viabilidade automática no CRM",
+  "gate": "PASS",
+  "verdict": "APPROVED",
+  "status_reason": "AC implementados e revisão independente local aprovada para staging. Testes aprovados por composição explícita de fonte estável; build real aprovado. Publicação e homologação remota seguem com DevOps.",
+  "reviewer": "Quinn (Guardian)",
+  "updated": "2026-10-23T18:51:45.984638+00:00",
+  "top_issues": [],
+  "waiver": {
+    "active": false
+  },
+  "quality_score": 100,
+  "evidence": {
+    "tests_reviewed": 6399,
+    "files_covered": 769,
+    "skipped": 4,
+    "todo": 1,
+    "single_full_run_exit_0": false,
+    "test_method": "Full serial: 768 files/6384 tests PASS + isolated unchanged Portal retry: 1 file/15 tests PASS; original beforeAll30s timeout preserved, no assertion/timeout/config relaxation.",
+    "build": {
+      "exit_code": 0,
+      "seconds": 118.8
+    },
+    "typecheck": "Actual final combined typecheck PASS, validated by source hashes.",
+    "lint": "Own and incoming global lint PASS adopted by unchanged hashes; final two changed paths actual focal ESLint PASS.",
+    "trace": {
+      "ac_covered": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "ac_gaps": []
+    }
+  },
+  "nfr_validation": {
+    "security": {
+      "status": "PASS",
+      "notes": "Session/Zod/canonical card ACL, same-company snapshot, private attachment and parameterized SQL."
+    },
+    "performance": {
+      "status": "PASS",
+      "notes": "Bounded queue, lease, no duplicate uploads; batch synthetic fixture, no production latency claim."
+    },
+    "reliability": {
+      "status": "PASS",
+      "notes": "CAS/fencing, atomic intent/head/anexo, rollback/orphan recovery and preserved last valid PDF."
+    },
+    "maintainability": {
+      "status": "PASS",
+      "notes": "Shared PDF/modal/viewer; scoped modules and future-only intents; no schema/backfill."
+    }
+  },
+  "limitations": [
+    "Local SQLite/PDF/React validation; external auth/Blob/Pusher simulated.",
+    "No authenticated live Google/Blob E2E performed by QA.",
+    "CodeRabbit unavailable; configured graceful fallback and independent manual review applied.",
+    "Deployment/alias validation pending DevOps; production not authorized."
+  ],
+  "recommendations": {
+    "immediate": [],
+    "future": []
+  }
+}

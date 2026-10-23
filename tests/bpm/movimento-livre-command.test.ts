@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const f = vi.hoisted(() => {
   const card = {
-    id: "card", pipelineId: "pipeline", etapaId: "origem", versao: 3, status: "ATIVO", concluidoEm: null,
+    id: "card", empresaId: 51, pipelineId: "pipeline", etapaId: "origem", versao: 3, status: "ATIVO", concluidoEm: null,
     responsavelId: 7, proximoContatoEm: null, dataReuniao: null, transcricaoReuniao: null, statusPosFechamento: null,
     pipeline: { id: "pipeline", nome: "Funil arbitrário", chave: "custom", configVersion: 2, ativo: true },
     etapa: { id: "origem", pipelineId: "pipeline", nome: "Etapa arbitrária", chave: "origem", ativo: true, ordem: 0, capabilitiesJson: null },
@@ -62,6 +62,8 @@ const f = vi.hoisted(() => {
   };
 });
 
+const ficha = vi.hoisted(() => ({ registrar: vi.fn(), resolverAtor: vi.fn(), processar: vi.fn() }));
+
 vi.mock("@/lib/prisma", () => ({ default: { $transaction: f.transaction } }));
 vi.mock("@/lib/bpm/ownership", () => ({ exigirAcessoBpmCard: vi.fn(async (_card, _user, _role, acao) => {
   if (!f.active().acesso || (acao === "editarCard" && !f.active().podeEditar)) throw Error("Sem acesso");
@@ -82,14 +84,63 @@ vi.mock("@/lib/bpm/financeiro-assinatura-server", () => ({ registrarConclusaoCon
 vi.mock("@/lib/bpm/financeiro-nota-fiscal-server", () => ({ sincronizarNotaFiscalCard: vi.fn() }));
 vi.mock("@/lib/bpm/proximo-contato-agenda", () => ({ sincronizarProximoContatoAgenda: vi.fn() }));
 vi.mock("@/lib/bpm/validacao-salvamento-configurado", () => ({ prepararSalvamentoConfigurado: vi.fn() }));
+vi.mock("@/lib/bpm/ficha-viabilidade-automatica-server", () => ({
+  registrarIntencaoFichaViabilidade: ficha.registrar,
+  resolverAtorFichaViabilidade: ficha.resolverAtor,
+  processarIntencaoFichaViabilidade: ficha.processar,
+}));
 
 import { avaliarTransicaoBpm, executarTransicaoBpm, type ComandoTransicaoBpm } from "@/lib/bpm/transicao-command";
 const input = (): ComandoTransicaoBpm => ({ cardId: "card", etapaOrigemEsperadaId: "origem", etapaDestinoId: "destino", versaoEsperada: 3,
   idempotencyKey: "solicitacao-unica", ator: { tipo: "MANUAL", userId: 7, userRole: "ADMINISTRADOR" } });
-beforeEach(() => { vi.clearAllMocks(); Object.assign(f.state, structuredClone(f.base)); });
+beforeEach(() => {
+  vi.clearAllMocks(); Object.assign(f.state, structuredClone(f.base));
+  ficha.resolverAtor.mockResolvedValue(7);
+  ficha.registrar.mockImplementation(async (_tx, dados) => {
+    f.active().historicos.push({ id: "intencao-ficha", valorNovoJson: JSON.stringify(dados) });
+    return "intencao-ficha";
+  });
+  ficha.processar.mockImplementation(async () => {
+    expect(f.state.card.etapaId).toBe("destino"); // O efeito só começa depois do commit.
+    return { estado: "PRONTA", data: { anexoId: "ficha-pdf", empresaId: 51, empresaNome: "Empresa sintética", revision: 1, dados: {}, userLogado: "Admin" }, gerada: true, solicitacaoId: "intencao-ficha" };
+  });
+});
 
 describe("movimentação livre administrativa e de liderança", () => {
   beforeEach(() => { f.state.autoridade = { tipo: "LIDER_SETOR", setor: "OPERACIONAL" }; });
+
+  it("entrada Admin em Reunião Agendada registra intenção atômica e gera após commit sem ligar outras automações", async () => {
+    f.state.card.pipeline.nome = "Revisão de Radar";
+    f.state.card.pipeline.chave = "comercial";
+    f.state.destino.nome = "Reunião Agendada";
+    f.state.destino.chave = "reuniao_agendada";
+    const result = await executarTransicaoBpm(input());
+    expect(result).toMatchObject({ success: true, data: { movimentoLivre: true, fichaViabilidadeGerada: true, fichaViabilidade: { anexoId: "ficha-pdf" } } });
+    expect(ficha.registrar).toHaveBeenCalledWith(f.tx, expect.objectContaining({ cardId: "card", empresaId: 51, actorUserId: 7, idempotencyKey: "solicitacao-unica" }));
+    expect(ficha.processar).toHaveBeenCalledOnce();
+    const fila = await import("@/lib/bpm/automacoes/fila");
+    expect(fila.enfileirarAutomacoesMovimentoBpm).not.toHaveBeenCalled();
+    expect((await executarTransicaoBpm(input()))).toMatchObject({ success: true, data: { idempotente: true } });
+    expect(ficha.registrar).toHaveBeenCalledOnce();
+    expect(ficha.processar).toHaveBeenCalledOnce();
+  });
+
+  it("falha ao persistir intenção desfaz entrada e não executa upload; outro destino não solicita ficha", async () => {
+    f.state.card.pipeline.nome = "Revisão de Radar";
+    f.state.card.pipeline.chave = "comercial";
+    f.state.destino.nome = "Reunião Agendada";
+    f.state.destino.chave = "reuniao_agendada";
+    ficha.registrar.mockRejectedValueOnce(new Error("Intenção indisponível"));
+    expect(await executarTransicaoBpm(input())).toMatchObject({ success: false });
+    expect(f.state.card.etapaId).toBe("origem");
+    expect(f.state.historicos).toEqual([]);
+    expect(ficha.processar).not.toHaveBeenCalled();
+    f.state.destino.nome = "Outro destino";
+    f.state.destino.chave = "outra_etapa";
+    ficha.registrar.mockClear();
+    expect(await executarTransicaoBpm(input())).toMatchObject({ success: true });
+    expect(ficha.registrar).not.toHaveBeenCalled();
+  });
 
   it.each([null, { id: "origem-rd", sourceDealId: "rd-deal", provider: "RD_STATION_CRM_V1" }])("move card nativo/RD sem preencher pendências nem confirmar: %j", async (origem) => {
     f.state.card.origemExterna = origem;

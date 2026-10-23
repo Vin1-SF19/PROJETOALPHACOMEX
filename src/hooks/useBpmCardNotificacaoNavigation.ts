@@ -29,6 +29,7 @@ export function useBpmCardNotificacaoNavigation(tabs: PainelTab[],
     if (intencao && documentoCorresponde(urlDoFrame(frame), intencao)) frame?.contentWindow?.postMessage({
       type: BPM_CARD_ABRIR_EVENT, ...(intencao.cardId ? { cardId: intencao.cardId } : {}), pipelineId: intencao.pipelineId,
       ...(intencao.tarefaId ? { tarefaId: intencao.tarefaId } : {}),
+      ...(intencao.abaInicial ? { abaInicial: intencao.abaInicial } : {}),
       ...(intencao.recepcaoId ? { recepcaoId: intencao.recepcaoId } : {}),
       ...(intencao.leadId ? { leadId: intencao.leadId, origemLead: intencao.origemLead } : {}),
     }, window.location.origin);

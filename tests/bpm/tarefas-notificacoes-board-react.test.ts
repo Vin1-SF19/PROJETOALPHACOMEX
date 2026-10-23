@@ -10,7 +10,7 @@ vi.mock("@/actions/bpm/Cards", () => ({ ListarCardsPipelineBpm: vi.fn(), MoverCa
 vi.mock("@/actions/bpm/NolossLeads", () => ({ PromoverNolossLead: vi.fn() }));
 vi.mock("@/actions/bpm/InstagramLeads", () => ({ AssumirLeadInstagram: vi.fn() }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal", () => ({
-  default: ({ cardId, onClose, realtimeRevision, focoTarefa }: { cardId: string; onClose: () => void; realtimeRevision: number; focoTarefa?: { tarefaId: string } }) => h("button", { "data-card": cardId, "data-tarefa": focoTarefa?.tarefaId, "data-revisao-acl": realtimeRevision, onClick: onClose }, "Fechar card"),
+  default: ({ cardId, onClose, realtimeRevision, focoTarefa, focoAnexos }: { cardId: string; onClose: () => void; realtimeRevision: number; focoTarefa?: { tarefaId: string }; focoAnexos?: { cardId: string } | null }) => h("button", { "data-card": cardId, "data-tarefa": focoTarefa?.tarefaId, "data-anexos": focoAnexos?.cardId, "data-revisao-acl": realtimeRevision, onClick: onClose }, "Fechar card"),
 }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/NovoCardModal", () => ({ default: () => null }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/NolossLeadModal", () => ({ default: ({ lead, onClose }: { lead: { id: string }; onClose: () => void }) => h("button", { "data-lead-virtual": lead.id, onClick: onClose }, "Fechar lead virtual") }));
@@ -64,6 +64,14 @@ it("mantém card do alerta fora do filtro Meus e reabre pela intenção autoriza
     expect(host.querySelectorAll("[data-card]")).toHaveLength(1);
     expect(host.querySelector("[data-card]")?.getAttribute("data-card")).toBe(segundoCard);
     expect(host.querySelector("[data-card]")?.getAttribute("data-tarefa")).toBe("task-2");
+    await act(async () => host.querySelector<HTMLButtonElement>("[data-card]")!.click());
+    expect(host.querySelector("[data-card]")).toBeNull();
+    // A intenção da ficha continua válida depois de o card ter sido fechado.
+    await act(async () => window.dispatchEvent(new MessageEvent("message", { source: parentWindow, origin: window.location.origin,
+      data: { type: BPM_CARD_ABRIR_EVENT, cardId, pipelineId: "pipeline-1", abaInicial: "anexos" } })));
+    expect(host.querySelector("[data-card]")?.getAttribute("data-card")).toBe(cardId);
+    expect(host.querySelector("[data-card]")?.getAttribute("data-anexos")).toBe(cardId);
+    expect(host.querySelector("[data-card]")?.getAttribute("data-tarefa")).toBeNull();
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
 

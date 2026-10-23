@@ -48,7 +48,7 @@ export function detalhesAlertaTarefaBpm(alerta: AlertaTarefaBpm) {
 export const BPM_CARD_ABRIR_EVENT = "ALPHA_CRM_ABRIR_CARD";
 export const BPM_CARD_PRONTO_EVENT = "ALPHA_CRM_CARD_PRONTO";
 export const BPM_CARD_ABERTO_EVENT = "ALPHA_CRM_CARD_ABERTO";
-export const intencaoCardBpmSchema = z.object({ cardId: bpmCardIdSchema, pipelineId: z.string().min(1).max(200), tarefaId: z.string().min(1).max(200).optional() });
+export const intencaoCardBpmSchema = z.object({ cardId: bpmCardIdSchema, pipelineId: z.string().min(1).max(200), tarefaId: z.string().min(1).max(200).optional(), abaInicial: z.literal("anexos").optional() });
 export type IntencaoCardBpm = z.infer<typeof intencaoCardBpmSchema>;
 export function intencaoCardBpmDaUrl(url: string): IntencaoCardBpm | null {
   try {
@@ -56,7 +56,7 @@ export function intencaoCardBpmDaUrl(url: string): IntencaoCardBpm | null {
     const pipeline = /^\/PainelAlpha\/AlphaCRM\/pipeline\/([^/]+)$/.exec(destino.pathname);
     if (destino.origin !== "https://painel.local" || !pipeline) return null;
     const parsed = intencaoCardBpmSchema.safeParse({ cardId: destino.searchParams.get("cardId"), pipelineId: decodeURIComponent(pipeline[1]),
-      tarefaId: destino.searchParams.get("tarefaId") ?? undefined });
+      tarefaId: destino.searchParams.get("tarefaId") ?? undefined, abaInicial: destino.searchParams.get("abaInicial") ?? undefined });
     return parsed.success ? parsed.data : null;
   } catch { return null; }
 }

@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import {
   Loader2,
   Upload,
-  Trash2,
   History,
   CheckCircle2,
   Paperclip,
@@ -32,10 +31,12 @@ import PainelHistoricoRd, { useHistoricoRd, EstadoHistoricoRd, EventoHistoricoRd
 import { PainelTarefasPorTipo } from "./PainelTarefasPorTipo";
 import { PainelChecklistsCard } from "./PainelChecklistsCard";
 import { EditorAnotacaoCard } from "./EditorAnotacaoCard";
-import { formatarBytes, iconePorAcao } from "./PainelHistoricoShared";
+import { iconePorAcao } from "./PainelHistoricoShared";
 import { separarTarefasCard } from "@/lib/bpm/tarefas-card";
 import { urlContratoComercialSegura } from "@/components/bpm/anexos/VisualizadorContratoComercial";
 import { VisualizadorAnexoCard, type AnexoParaVisualizar } from "@/components/bpm/anexos/VisualizadorAnexoCard";
+import { AnexosComFichaCard } from "@/components/bpm/anexos/AnexosComFichaCard";
+import { pipelinePossuiFichaViabilidade } from "@/lib/bpm/ficha-viabilidade-documento";
 import { nomeSeguroUploadAnexo, obterTipoUploadAnexo, validarUploadAnexo } from "@/lib/validations/bpm";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
@@ -68,6 +69,7 @@ interface Props {
   anotacoes: Interacao[];
   onAbrirCard: (cardId: string) => void;
   focoTarefa?: { cardId: string; tarefaId: string } | null;
+  focoAnexos?: { cardId: string } | null;
 }
 
 export default function PainelHistorico({
@@ -84,12 +86,13 @@ export default function PainelHistorico({
   anotacoes,
   onAbrirCard,
   focoTarefa = null,
+  focoAnexos = null,
 }: Props) {
   const historicoRd = useHistoricoRd(card.id, realtimeRevision);
   const [enviandoAnexo, setEnviandoAnexo] = useState(false);
   const [progressoAnexo, setProgressoAnexo] = useState(0);
   const [arrastandoAnexo, setArrastandoAnexo] = useState(false);
-  const [selecaoAba, setSelecaoAba] = useState<{ valor: string; foco: typeof focoTarefa }>({ valor: "etapas", foco: null });
+  const [selecaoAba, setSelecaoAba] = useState<{ valor: string; foco: typeof focoTarefa; focoAnexos: typeof focoAnexos }>({ valor: focoAnexos?.cardId === card.id ? "anexos" : "etapas", foco: null, focoAnexos });
   const [anexoSelecionado, setAnexoSelecionado] = useState<AnexoParaVisualizar | null>(null);
   const documentos = card.documentosContratacao ? [card.documentosContratacao.paraEnvio, card.documentosContratacao.assinado] : [];
   const anexosPorId = new Map<string, AnexoParaVisualizar & { tamanho: number | null }>(card.anexos.map((anexo) => [anexo.id, anexo]));
@@ -106,8 +109,8 @@ export default function PainelHistorico({
   const procedimentosLegados = tarefasDeProcedimento.filter((tarefa) => !tarefa.cardChecklistId);
   const tarefaFocada = focoTarefa?.cardId === card.id ? card.tarefas.find((tarefa) => tarefa.id === focoTarefa.tarefaId) : undefined;
   const abaTarefa = tarefaFocada?.cardChecklistId || tarefaFocada?.tipo === "CHECKLIST" ? "checklist" : "tarefas";
-  const abaEsquerda = selecaoAba.foco === focoTarefa ? selecaoAba.valor : tarefaFocada ? abaTarefa : "etapas";
-  const setAbaEsquerda = useCallback((valor: string) => setSelecaoAba({ valor, foco: focoTarefa }), [focoTarefa]);
+  const abaEsquerda = selecaoAba.foco === focoTarefa && selecaoAba.focoAnexos === focoAnexos ? selecaoAba.valor : focoAnexos?.cardId === card.id ? "anexos" : tarefaFocada ? abaTarefa : "etapas";
+  const setAbaEsquerda = useCallback((valor: string) => setSelecaoAba({ valor, foco: focoTarefa, focoAnexos }), [focoTarefa, focoAnexos]);
   const alvoTarefaId = tarefaFocada ? tarefaFocada.cardChecklistId
     ? `bpm-checklist-${card.id}-${tarefaFocada.cardChecklistId}` : `bpm-tarefa-${card.id}-${tarefaFocada.id}` : null;
 
@@ -295,21 +298,7 @@ export default function PainelHistorico({
             <p className="text-sm font-medium text-slate-300">Nenhum anexo neste card</p>
             <p className="mt-1 text-xs leading-relaxed text-slate-400">Os arquivos enviados para este card aparecerão aqui.</p>
           </div>}
-          <div className="space-y-1.5">
-            {anexosExibidos.map((a) => (
-              <div key={a.id} className="flex items-center justify-between gap-2 bg-white/[0.03] border border-white/5 rounded-xl px-3 py-2">
-                <button type="button" onClick={() => setAnexoSelecionado(a)} className="min-w-0 truncate text-left text-sm text-white hover:underline">{a.nome}</button>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[10px] text-slate-500">{a.somenteLeitura ? "Financeiro · Somente leitura" : formatarBytes(a.tamanho)}</span>
-                  {podeExcluirAnexo && !a.somenteLeitura && (
-                    <button type="button" aria-label={`Excluir anexo ${a.nome}`} onClick={() => handleExcluirAnexo(a.id)} className="text-slate-500 hover:text-rose-400">
-                      <Trash2 size={13} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+          <AnexosComFichaCard cardId={card.id} anexos={anexosExibidos} consultarFicha={pipelinePossuiFichaViabilidade({ chave: card.pipeline.chave ?? null, nome: card.pipeline.nome })} podeEditar={podeEditar} podeExcluir={podeExcluirAnexo} realtimeRevision={realtimeRevision} onAbrir={setAnexoSelecionado} onExcluir={handleExcluirAnexo} onAtualizado={onAtualizado} />
           <div
             onDragOver={(e) => { e.preventDefault(); setArrastandoAnexo(true); }}
             onDragLeave={() => setArrastandoAnexo(false)}

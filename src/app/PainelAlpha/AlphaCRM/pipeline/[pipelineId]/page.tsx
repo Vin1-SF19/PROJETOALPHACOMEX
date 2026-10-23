@@ -14,12 +14,12 @@ export default async function PipelineBpmPage({
   searchParams,
 }: {
   params: Promise<{ pipelineId: string }>;
-  searchParams?: Promise<{ cardId?: string | string[]; tarefaId?: string | string[]; origemLead?: string | string[]; leadId?: string | string[]; recepcaoId?: string | string[] }>;
+  searchParams?: Promise<{ cardId?: string | string[]; tarefaId?: string | string[]; origemLead?: string | string[]; leadId?: string | string[]; recepcaoId?: string | string[]; abaInicial?: string | string[] }>;
 }) {
   const { pipelineId } = await params;
   const busca = await searchParams;
   const intencaoInicial = intencaoNotificacaoBpmSchema.safeParse({ pipelineId, cardId: busca?.cardId, tarefaId: busca?.tarefaId,
-    origemLead: busca?.origemLead, leadId: busca?.leadId, recepcaoId: busca?.recepcaoId });
+    origemLead: busca?.origemLead, leadId: busca?.leadId, recepcaoId: busca?.recepcaoId, abaInicial: busca?.abaInicial });
   const session = await auth();
   const temaNome = (session?.user as { tema_interface?: string })?.tema_interface || "blue";
   const visual = getTema(temaNome);

@@ -2,9 +2,14 @@
 
 import { pdf } from "@react-pdf/renderer";
 import { FichaAlphaPDF, type FichaAlphaDados } from "./GerarFicha";
-import { useEffect, useState } from "react";
+import { useRef, useState, type FormEvent } from "react";
+import { useForm, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { fichaViabilidadeExtrasSchema, type FichaViabilidadeExtras } from "@/lib/bpm/ficha-viabilidade-documento";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { DetalhesEmpresaFicha } from "@/components/DetalhesEmpresaFicha";
 import { upsertConsulta } from "@/actions/PreAnalise";
-import { ChevronDown, ChevronUp, X, FileText } from "lucide-react";
+import { X, FileText, Loader2 } from "lucide-react";
 
 interface Props {
     dados: unknown;
@@ -12,6 +17,9 @@ interface Props {
     user: string;
     isOpen: boolean;
     onClose: () => void;
+    modo?: "gerar" | "complementar";
+    dadosManuaisIniciais?: NonNullable<FichaAlphaDados["extra"]>;
+    onSalvar?: (extras: NonNullable<FichaAlphaDados["extra"]>) => Promise<void>;
 }
 
 const objeto = (valor: unknown): Record<string, unknown> =>
@@ -42,22 +50,21 @@ function normalizarFichaDados(entrada: unknown): FichaAlphaDados {
     };
 }
 
-export const ModalPDF = ({ dados: dadosEntrada, radarDados: radarEntrada, user, isOpen, onClose }: Props) => {
+export const ModalPDF = (props: Props) => props.isOpen ? <ModalPDFConteudo {...props} /> : null;
+
+function ModalPDFConteudo({ dados: dadosEntrada, radarDados: radarEntrada, user, isOpen, onClose, modo = "gerar", dadosManuaisIniciais, onSalvar }: Props) {
     const dados = normalizarFichaDados(dadosEntrada);
     const radarObjeto = objeto(radarEntrada);
     const radarDados = objeto(radarObjeto.dados ?? radarEntrada);
-    const [dadosManuais, setDadosManuais] = useState({
-        dataSituacao: "",
-        horaSituacao: "",
-        mesProtocolo: "",
-        telefone: "",
-        email: "",
-        nomeResponsavel: "",
-        observacoes: "",
-        origemLead: "",
-        origemLeadDetalhe: ""
+    const { register, control, setValue, handleSubmit, formState: { errors } } = useForm<FichaViabilidadeExtras>({
+        resolver: zodResolver(fichaViabilidadeExtrasSchema),
+        defaultValues: { dataSituacao: "", horaSituacao: "", mesProtocolo: "", telefone: "", email: "", nomeResponsavel: "", observacoes: "", origemLead: "", origemLeadDetalhe: "", ...dadosManuaisIniciais },
     });
-    const [showDetails, setShowDetails] = useState(false);
+    const dadosManuais = useWatch({ control });
+    const operacaoRef = useRef(false);
+    const [salvando, setSalvando] = useState(false);
+    const [erro, setErro] = useState<string | null>(null);
+    const complementar = modo === "complementar";
 
     const ORIGENS = [
         { value: "instagram", label: "Instagram", detalhe: false },
@@ -68,59 +75,56 @@ export const ModalPDF = ({ dados: dadosEntrada, radarDados: radarEntrada, user, 
         { value: "outros", label: "Outros", detalhe: true, placeholder: "Especificar origem" },
     ];
 
-    const origemSelecionada = ORIGENS.find(o => o.value === dadosManuais.origemLead);
+    const chaveOrigem = (valor: string | undefined) => (valor ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const origemSelecionada = ORIGENS.find(o => o.value === chaveOrigem(dadosManuais.origemLead));
+    const origemAdicional = Boolean(dadosManuais.origemLead && !origemSelecionada);
 
-    useEffect(() => {
-        if (isOpen) document.body.style.overflow = "hidden";
-        return () => { document.body.style.overflow = "unset"; };
-    }, [isOpen]);
-
-    if (!isOpen) return null;
-
-    const gerarEVisualizar = async () => {
-        const radarReal = radarDados;
-        const payload = {
-            ...objeto(dadosEntrada),
-            radar: radarReal,
-            extra: { ...dadosManuais }
-        };
-        await upsertConsulta(payload);
-        const doc = <FichaAlphaPDF dados={{ ...normalizarFichaDados(payload), extra: dadosManuais }} userLogado={user} finalidade="pre-analise" />;
-        const blob = await pdf(doc).toBlob();
-        window.open(URL.createObjectURL(blob), "_blank");
-    };
-
-    const dataAbertura = dados?.rfb?.dados?.dataConstituicao || "";
-    let maisDe5Anos = false;
-
-    if (dataAbertura?.includes("/")) {
-        const [dia, mes, ano] = dataAbertura.split("/").map(Number);
-        const dataAberturaDoc = new Date(ano, mes - 1, dia);
-        const agora = new Date();
-        let idade = agora.getFullYear() - dataAberturaDoc.getFullYear();
-        const m = agora.getMonth() - dataAberturaDoc.getMonth();
-        if (m < 0 || (m === 0 && agora.getDate() < dataAberturaDoc.getDate())) idade--;
-        maisDe5Anos = idade >= 5;
+    async function executar(event: FormEvent<HTMLFormElement>) {
+      await handleSubmit(async (extras) => {
+        if (operacaoRef.current) return;
+        operacaoRef.current = true;
+        setSalvando(true);
+        setErro(null);
+        try {
+            if (complementar) {
+                if (!onSalvar) throw new Error("Não foi possível salvar esta ficha.");
+                await onSalvar(extras);
+                onClose();
+            } else {
+                const payload = { ...objeto(dadosEntrada), radar: radarDados, extra: extras };
+                await upsertConsulta(payload);
+                const doc = <FichaAlphaPDF dados={{ ...normalizarFichaDados(payload), extra: extras }} userLogado={user} finalidade="pre-analise" />;
+                const blob = await pdf(doc).toBlob();
+                window.open(URL.createObjectURL(blob), "_blank");
+            }
+        } catch (error) {
+            setErro(error instanceof Error ? error.message : "Não foi possível salvar a ficha. Tente novamente.");
+        } finally {
+            operacaoRef.current = false;
+            setSalvando(false);
+        }
+      })(event);
     }
 
     const campoClass = "w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:border-white/20 focus:outline-none transition-all placeholder:text-slate-700";
     const labelClass = "block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5";
 
     return (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
-            <div className="bg-[#0A0A0A] border border-white/10 rounded-[2.5rem] max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+        <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !operacaoRef.current) onClose(); }}>
+            <DialogContent showCloseButton={false} onEscapeKeyDown={(event) => { if (operacaoRef.current) event.preventDefault(); }} onPointerDownOutside={(event) => event.preventDefault()} className="crm-scope border-white/10 rounded-[2.5rem] sm:max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden p-0 gap-0 bg-[var(--crm-painel-card,var(--color-slate-950))]">
+            <form onSubmit={executar} className="flex min-h-0 flex-col" aria-busy={salvando}>
 
                 {/* HEADER */}
                 <div className="px-8 py-6 border-b border-white/5 flex items-center justify-between">
                     <div>
-                        <h2 className="text-xl font-black italic uppercase tracking-tighter text-white">
-                            Gerar <span className="text-orange-500">Ficha</span>
-                        </h2>
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">
+                        <DialogTitle className="text-xl font-black italic uppercase tracking-tighter text-white">
+                            {complementar ? "Complementar" : "Gerar"} <span className="text-orange-500">Ficha</span>
+                        </DialogTitle>
+                        <DialogDescription className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">
                             Campos opcionais — preencha se necessário
-                        </p>
+                        </DialogDescription>
                     </div>
-                    <button onClick={onClose} className="cursor-pointer p-2.5 hover:bg-white/5 rounded-full text-slate-500 hover:text-white transition-all">
+                    <button type="button" aria-label="Fechar ficha" disabled={salvando} onClick={onClose} className="cursor-pointer p-2.5 hover:bg-white/5 rounded-full text-slate-500 hover:text-white transition-all">
                         <X size={22} />
                     </button>
                 </div>
@@ -129,7 +133,7 @@ export const ModalPDF = ({ dados: dadosEntrada, radarDados: radarEntrada, user, 
                 <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-6">
 
                     {/* DADOS MANUAIS */}
-                    <div className="space-y-5 p-6 rounded-2xl bg-white/[0.02] border border-white/5">
+                    <fieldset disabled={salvando} className="space-y-5 p-6 rounded-2xl bg-white/[0.02] border border-white/5">
                         <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Preenchimento Manual</p>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -138,8 +142,8 @@ export const ModalPDF = ({ dados: dadosEntrada, radarDados: radarEntrada, user, 
                                 <input
                                     type="text"
                                     placeholder="Nome completo"
-                                    value={dadosManuais.nomeResponsavel}
-                                    onChange={(e) => setDadosManuais({ ...dadosManuais, nomeResponsavel: e.target.value })}
+                                    {...register("nomeResponsavel")}
+                                    aria-label="Nome do Responsável"
                                     className={campoClass}
                                 />
                             </div>
@@ -149,8 +153,8 @@ export const ModalPDF = ({ dados: dadosEntrada, radarDados: radarEntrada, user, 
                                 <input
                                     type="text"
                                     placeholder="(00) 00000-0000"
-                                    value={dadosManuais.telefone}
-                                    onChange={(e) => setDadosManuais({ ...dadosManuais, telefone: e.target.value })}
+                                    {...register("telefone")}
+                                    aria-label="Telefone"
                                     className={campoClass}
                                 />
                             </div>
@@ -160,8 +164,8 @@ export const ModalPDF = ({ dados: dadosEntrada, radarDados: radarEntrada, user, 
                                 <input
                                     type="email"
                                     placeholder="nome@gmail.com"
-                                    value={dadosManuais.email}
-                                    onChange={(e) => setDadosManuais({ ...dadosManuais, email: e.target.value })}
+                                    {...register("email")}
+                                    aria-label="E-mail"
                                     className={campoClass}
                                 />
                             </div>
@@ -171,8 +175,8 @@ export const ModalPDF = ({ dados: dadosEntrada, radarDados: radarEntrada, user, 
                                 <input
                                     type="text"
                                     placeholder="DD/MM/AAAA"
-                                    value={dadosManuais.dataSituacao}
-                                    onChange={(e) => setDadosManuais({ ...dadosManuais, dataSituacao: e.target.value })}
+                                    {...register("dataSituacao")}
+                                    aria-label="Data da Reunião"
                                     className={campoClass}
                                 />
                             </div>
@@ -182,8 +186,8 @@ export const ModalPDF = ({ dados: dadosEntrada, radarDados: radarEntrada, user, 
                                 <input
                                     type="text"
                                     placeholder="HH:MM"
-                                    value={dadosManuais.horaSituacao}
-                                    onChange={(e) => setDadosManuais({ ...dadosManuais, horaSituacao: e.target.value })}
+                                    {...register("horaSituacao")}
+                                    aria-label="Hora da Reunião"
                                     className={campoClass}
                                 />
                             </div>
@@ -193,8 +197,8 @@ export const ModalPDF = ({ dados: dadosEntrada, radarDados: radarEntrada, user, 
                                 <input
                                     type="text"
                                     placeholder="Ex: Maio"
-                                    value={dadosManuais.mesProtocolo}
-                                    onChange={(e) => setDadosManuais({ ...dadosManuais, mesProtocolo: e.target.value })}
+                                    {...register("mesProtocolo")}
+                                    aria-label="Mês de Protocolo"
                                     className={campoClass}
                                 />
                             </div>
@@ -205,8 +209,8 @@ export const ModalPDF = ({ dados: dadosEntrada, radarDados: radarEntrada, user, 
                             <textarea
                                 rows={3}
                                 placeholder="Detalhes relevantes sobre a situação da empresa..."
-                                value={dadosManuais.observacoes}
-                                onChange={(e) => setDadosManuais({ ...dadosManuais, observacoes: e.target.value })}
+                                    {...register("observacoes")}
+                                    aria-label="Observações"
                                 className={`${campoClass} resize-none`}
                             />
                         </div>
@@ -219,13 +223,10 @@ export const ModalPDF = ({ dados: dadosEntrada, radarDados: radarEntrada, user, 
                                     <button
                                         key={origem.value}
                                         type="button"
-                                        onClick={() => setDadosManuais({
-                                            ...dadosManuais,
-                                            origemLead: dadosManuais.origemLead === origem.value ? "" : origem.value,
-                                            origemLeadDetalhe: ""
-                                        })}
+                                        aria-pressed={chaveOrigem(dadosManuais.origemLead) === origem.value}
+                                        onClick={() => { setValue("origemLead", chaveOrigem(dadosManuais.origemLead) === origem.value ? "" : origem.value, { shouldDirty: true }); setValue("origemLeadDetalhe", "", { shouldDirty: true }); }}
                                         className={`cursor-pointer px-3 py-2.5 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-all ${
-                                            dadosManuais.origemLead === origem.value
+                                            chaveOrigem(dadosManuais.origemLead) === origem.value
                                                 ? "bg-orange-500/20 border-orange-500/40 text-orange-300"
                                                 : "bg-white/[0.03] border-white/10 text-slate-500 hover:border-white/20 hover:text-slate-300"
                                         }`}
@@ -233,131 +234,45 @@ export const ModalPDF = ({ dados: dadosEntrada, radarDados: radarEntrada, user, 
                                         {origem.label}
                                     </button>
                                 ))}
+                                {origemAdicional && <button type="button" aria-pressed="true" className="rounded-xl border border-orange-500/40 bg-orange-500/20 px-3 py-2.5 text-xs text-orange-300">{dadosManuais.origemLead}</button>}
                             </div>
 
-                            {origemSelecionada?.detalhe && (
+                            {(origemSelecionada?.detalhe || origemAdicional) && (
                                 <input
                                     type="text"
-                                    placeholder={origemSelecionada.placeholder}
-                                    value={dadosManuais.origemLeadDetalhe}
-                                    onChange={(e) => setDadosManuais({ ...dadosManuais, origemLeadDetalhe: e.target.value })}
+                                    placeholder={origemSelecionada?.placeholder ?? "Complemento da origem"}
+                                    {...register("origemLeadDetalhe")}
+                                    aria-label="Complemento da origem"
                                     className={`${campoClass} mt-3`}
                                     autoFocus
                                 />
                             )}
                         </div>
-                    </div>
+                    </fieldset>
 
-                    {/* DETALHES DA EMPRESA — colapsável */}
-                    <div className="rounded-2xl border border-white/10 overflow-hidden">
-                        <button
-                            onClick={() => setShowDetails(v => !v)}
-                            className="cursor-pointer w-full flex items-center justify-between px-6 py-4 bg-white/[0.03] hover:bg-white/[0.06] transition-all"
-                        >
-                            <span className="text-[11px] font-black uppercase tracking-widest text-slate-300">
-                                Detalhes da Empresa
-                            </span>
-                            {showDetails
-                                ? <ChevronUp size={18} className="text-slate-400" />
-                                : <ChevronDown size={18} className="text-slate-400" />
-                            }
-                        </button>
-
-                        {showDetails && (
-                            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 bg-white/[0.01]">
-                                <DetalheCard
-                                    tag="Receita Federal"
-                                    tagColor="text-blue-400"
-                                    title={dados?.rfb?.dados?.razaoSocial || "Empresa não identificada"}
-                                    lines={[
-                                        `Fantasia: ${dados?.rfb?.dados?.nomeFantasia || "---"}`,
-                                        `CNPJ: ${dados?.rfb?.dados?.cnpj || "---"}`,
-                                        `UF: ${dados?.rfb?.dados?.uf || "---"}`,
-                                    ]}
-                                />
-
-                                <DetalheCard
-                                    tag="Tempo de Constituição"
-                                    tagColor="text-slate-400"
-                                    title={maisDe5Anos ? "Mais de 5 Anos" : "Menos de 5 Anos"}
-                                    lines={[`Abertura: ${dados?.rfb?.dados?.dataConstituicao || "---"}`]}
-                                    highlight={maisDe5Anos ? "emerald" : "blue"}
-                                />
-
-                                <DetalheCard
-                                    tag="Capital Social"
-                                    tagColor="text-emerald-400"
-                                    title={dados?.rfb?.dados?.capitalSocial
-                                        ? Number(dados.rfb.dados.capitalSocial).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
-                                        : "Não informado"}
-                                    lines={["Valor declarado na Receita Federal"]}
-                                />
-
-                                <DetalheCard
-                                    tag="Consulta Siscomex"
-                                    tagColor="text-orange-400"
-                                    title={texto(radarDados.submodalidade) || "Não Identificado"}
-                                    lines={[
-                                        `Situação: ${texto(radarDados.situacao) || "---"}`,
-                                        `Data: ${texto(radarDados.dataSituacao) || "---"}`,
-                                    ]}
-                                />
-
-                                <DetalheCard
-                                    tag="Empresa Aqui"
-                                    tagColor="text-purple-400"
-                                    title={dados?.empresaqui?.dados?.regimeEA || "Regime não informado"}
-                                    lines={[`Natureza: ${dados?.rfb?.dados?.natureza_juridica || "---"}`]}
-                                />
-
-                                <DetalheCard
-                                    tag="Emitido por"
-                                    tagColor="text-slate-400"
-                                    title={user}
-                                    lines={[`Data de Emissão: ${new Date().toLocaleDateString("pt-BR")}`]}
-                                />
-                            </div>
-                        )}
-                    </div>
+                    <DetalhesEmpresaFicha dados={dados} radarDados={radarDados} user={user} />
                 </div>
 
+                {(erro || Object.keys(errors).length > 0) && <p role="alert" className="px-8 py-3 text-sm text-rose-300">{erro ?? Object.values(errors).find((error) => error?.message)?.message}</p>}
                 {/* FOOTER */}
                 <div className="px-8 py-6 border-t border-white/5 flex flex-col sm:flex-row gap-3 justify-end">
                     <button
-                        onClick={onClose}
+                        type="button" disabled={salvando} onClick={onClose}
                         className="cursor-pointer px-6 py-3 text-slate-400 text-[10px] font-black uppercase tracking-widest hover:text-white hover:bg-white/5 rounded-xl transition-all"
                     >
-                        Cancelar
+                        {complementar ? "Fechar" : "Cancelar"}
                     </button>
                     <button
-                        onClick={gerarEVisualizar}
+                        type="submit" disabled={salvando}
                         className="cursor-pointer flex items-center justify-center gap-2 px-8 py-3 bg-orange-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-orange-400 shadow-lg transition-all active:scale-95"
                     >
-                        <FileText size={16} />
-                        Gerar Documento PDF
+                        {salvando ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+                        {salvando ? "Salvando…" : complementar ? "Salvar" : "Gerar Documento PDF"}
                     </button>
                 </div>
-            </div>
-        </div>
-    );
-};
-
-function DetalheCard({ tag, tagColor, title, lines, highlight }: {
-    tag: string;
-    tagColor: string;
-    title: string;
-    lines: string[];
-    highlight?: string;
-}) {
-    const borderClass = highlight === "emerald" ? "border-emerald-500/20" : "border-white/5";
-    return (
-        <div className={`p-4 rounded-xl border ${borderClass} bg-white/[0.03]`}>
-            <span className={`text-[10px] font-black uppercase tracking-widest ${tagColor}`}>{tag}</span>
-            <h3 className="font-black text-white mt-1.5 text-sm uppercase italic leading-tight truncate">{title}</h3>
-            {lines.map((line, i) => (
-                <p key={i} className="text-[10px] text-slate-500 mt-1 font-bold">{line}</p>
-            ))}
-        </div>
+            </form>
+            </DialogContent>
+        </Dialog>
     );
 }
 

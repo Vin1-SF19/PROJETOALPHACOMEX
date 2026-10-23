@@ -10,6 +10,7 @@ import { processarFilaAutomacoesCentraisBpm } from "@/lib/bpm/automacoes/central
 import { reconciliarBlobsAnexosBpm } from "@/lib/bpm/anexos-lifecycle";
 import { reconciliarCompensacoesGoogleBpm } from "@/lib/bpm/google-meet-compensacao";
 import { monitorarDocumentacaoEmAnalise } from "@/lib/bpm/documentacao-analise-monitor";
+import { reconciliarFichasViabilidade } from "@/lib/bpm/ficha-viabilidade-automatica-server";
 
 export const dynamic = "force-dynamic";
 let jobEmAndamento = false;
@@ -43,6 +44,7 @@ export async function GET(request: Request) {
     const fila = await processarFilaAutomacoesBpm();
     const cadencias = await processarCadenciasBpm();
     const documentacao = await monitorarDocumentacaoEmAnalise();
+    const fichasViabilidade = await reconciliarFichasViabilidade().catch(() => ({ examinadas: 0, concluidas: 0, falhas: 1 }));
     const anexos = await reconciliarBlobsAnexosBpm().catch((error) => {
       console.error("[AutomacoesBpmRoute] Reconciliação de anexos", error);
       return { examinados: 0, concluidos: 0, falhas: 1 };
@@ -51,7 +53,7 @@ export async function GET(request: Request) {
       console.error("[AutomacoesBpmRoute] Reconciliação de reuniões", error);
       return { examinados: 0, concluidos: 0, falhas: 1 };
     });
-    return NextResponse.json({ success: true, data: { agendasSincronizadas, agendasCentrais, gatilhosTemporais, eventosCentrais, filaCentral, tempo, fila, cadencias, documentacao, anexos, reunioes } });
+    return NextResponse.json({ success: true, data: { agendasSincronizadas, agendasCentrais, gatilhosTemporais, eventosCentrais, filaCentral, tempo, fila, cadencias, documentacao, fichasViabilidade, anexos, reunioes } });
   } catch (error) {
     console.error("[AutomacoesBpmRoute] Falha no lote", error);
     return NextResponse.json(

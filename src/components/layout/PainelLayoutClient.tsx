@@ -406,7 +406,9 @@ export default function PainelLayoutClient({
       if (e.origin !== window.location.origin) return;
       if (e.data?.type === 'ALPHA_OPEN_TAB' && e.data.url) {
         const url = typeof e.data.url === 'string' ? e.data.url : '';
-        if (url.startsWith('/PainelAlpha/CheckList/') || url === '/PainelAlpha/CheckList') {
+        if (intencaoCardBpmDaUrl(url)) {
+          abrirModuloPorNotificacao(url, 'CRM');
+        } else if (url.startsWith('/PainelAlpha/CheckList/') || url === '/PainelAlpha/CheckList') {
           const existing = tabs.find(tab => tab.url === '/PainelAlpha/CheckList' || tab.url.startsWith('/PainelAlpha/CheckList/'));
           openTab(url, 'Checklist', existing?.id);
         } else openTab(url, e.data.label || getLabelForUrl(url));
@@ -425,7 +427,7 @@ export default function PainelLayoutClient({
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, [entregarIntencaoAgenda, openTab, tabs]);
+  }, [entregarIntencaoAgenda, openTab, tabs, abrirModuloPorNotificacao]);
 
   // ── Embedded: render children only, no sidebar/tabs ──────────────────────
 
