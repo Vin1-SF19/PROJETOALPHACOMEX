@@ -839,3 +839,8 @@ Revalidação após integrar lazy imports do editor/Radar: build literal3072/poo
 
 
 **Confirmação posterior do rerun:** suíte integral exit0/194,07s, 746 arquivos/6.114 testes PASS, zero falhas/quatro skipped/um todo; quatro gates Forge PASS na fonte c07ee602... idêntica. Falha inicial e correção de harness permanecem registradas; QA final/deploy ainda pendentes neste registro.
+
+
+## ENOSPC durante build local com outputs acumulados — 2026-10-23
+
+Na validação do hotfix de um único X sobre `04cc69c0`, o primeiro build falhou por falta de espaço do host, sem defeito do app. Preservar logs/evidências antes de limpar; conferir autoria, ausência de processos e caráter regenerável dos outputs. A coordenação removeu somente três outputs antigos próprios de validação Audio/Instagram, nenhum arquivo versionado, liberando 10,3 GB (`cleanup-own-builds.json`). Repetido apenas o gate afetado: build literal PASS em 92,23 s; fonte `2c72…` idêntica antes/retry/depois, sem alteração de app/package/ENV ou limpeza de terceiros. Depois, a produção avançou externamente para `274d6d6f`; herdar o resultado como checkpoint histórico e verificar proporcionalmente a integração, sem confundir troca de base com correção da falha de disco.
