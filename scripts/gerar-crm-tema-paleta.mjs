@@ -6,16 +6,28 @@ const v = {};
 for (const m of theme.matchAll(/--color-([a-z]+(?:-\d+)?):\s*([^;]+);/g)) v[m[1]] = m[2].trim();
 const neutros = ['slate', 'gray', 'zinc', 'neutral', 'stone'];
 const cromaticas = ['red','orange','amber','yellow','lime','green','emerald','teal','cyan','sky','blue','indigo','violet','purple','fuchsia','pink','rose'];
-// Superfícies (700–950) param em 100–300, não no branco puro: o claro fica suave, sem ofuscar.
-const inverso = { 50: 950, 100: 900, 200: 800, 300: 700, 400: 600, 500: 500, 600: 500, 700: 300, 800: 300, 900: 200, 950: 100 };
+// Textos (50–400) invertem para os degraus escuros do Tailwind. Superfícies e tons
+// médios (500–950) recebem luminosidade própria, numa faixa cinza-azulada média-clara:
+// camadas empilhadas (página → card → seção → input) não chegam ao branco estourado.
+const inverso = { 50: 950, 100: 900, 200: 800, 300: 700, 400: 600 };
+const luminosidadeClara = { 500: 47, 600: 55, 700: 79, 800: 82.5, 900: 86, 950: 88.5 };
+const BRANCO_DO_PRETO = 93; // bg-black/xx (inputs) vira véu claro, não branco puro
+function tom(familia, l) {
+  const [, c, h] = v[`${familia}-200`].match(/oklch\(\S+\s+(\S+)\s+(\S+)\)/);
+  return `oklch(${l}% ${(Number(c) * 1.4).toFixed(3)} ${h})`;
+}
 const escurecer = { 50: 900, 100: 800, 200: 800, 300: 700, 400: 600 };
 const claro = [], restaurar = [];
-claro.push(`  --color-white: ${v['slate-900']};`, `  --color-black: ${v['white']};`);
+claro.push(`  --color-white: ${v['slate-900']};`, `  --color-black: ${tom('slate', BRANCO_DO_PRETO)};`);
 restaurar.push(`  --color-white: ${v['white']};`, `  --color-black: ${v['black']};`);
 for (const n of neutros) {
   claro.push(`  /* ${n} */`);
   for (const [de, para] of Object.entries(inverso)) {
     claro.push(`  --color-${n}-${de}: ${v[`${n}-${para}`]};`);
+    restaurar.push(`  --color-${n}-${de}: ${v[`${n}-${de}`]};`);
+  }
+  for (const [de, l] of Object.entries(luminosidadeClara)) {
+    claro.push(`  --color-${n}-${de}: ${tom(n, l)};`);
     restaurar.push(`  --color-${n}-${de}: ${v[`${n}-${de}`]};`);
   }
 }

@@ -9,32 +9,33 @@
   --crm-color-scheme: dark;
 }
 
-/* Superfícies do card aberto (Sheet em portal): escuro original como fallback. */
+/* Superfícies do card aberto (Sheet em portal): escuro original como fallback.
+ * Mesma faixa cinza-azulada da paleta clara (L 79–89%), sem branco estourado. */
 :is(html, .crm-scope)[data-crm-tema="claro"] {
-  --crm-painel-card: #e8edf3;
-  --crm-painel-elevado: #dde4ec;
+  --crm-painel-card: oklch(87% 0.018 255.508);
+  --crm-painel-elevado: oklch(84% 0.018 255.508);
 }
 
 :is(html, .crm-scope)[data-crm-tema="claro"] {
   color-scheme: light;
   --crm-color-scheme: light;
-  --background: oklch(0.929 0.013 255.508);
+  --background: oklch(0.865 0.018 255.508);
   --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(0.968 0.007 247.896);
+  --card: oklch(0.895 0.018 255.508);
   --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(0.968 0.007 247.896);
+  --popover: oklch(0.905 0.018 255.508);
   --popover-foreground: oklch(0.129 0.042 264.695);
   --primary: oklch(0.208 0.042 265.755);
   --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
+  --secondary: oklch(0.84 0.018 255.508);
   --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
+  --muted: oklch(0.84 0.018 255.508);
   --muted-foreground: oklch(0.446 0.043 257.281);
-  --accent: oklch(0.968 0.007 247.896);
+  --accent: oklch(0.84 0.018 255.508);
   --accent-foreground: oklch(0.208 0.042 265.755);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.129 0.042 264.695 / 10%);
-  --input: oklch(0.129 0.042 264.695 / 16%);
+  --border: oklch(0.129 0.042 264.695 / 14%);
+  --input: oklch(0.129 0.042 264.695 / 20%);
   --ring: oklch(0.554 0.046 257.417);
 }
 
@@ -42,7 +43,7 @@
  * Também em .crm-scope aninhados (o host do card aberto vive no layout do painel,
  * fora do CRM, e redefine os tokens escuros via :where(.crm-scope)). */
 :is(.crm-scope[data-crm-tema="claro"], html[data-crm-tema="claro"] .crm-scope) {
-  --crm-fundo-base: linear-gradient(180deg, #e2e8f0, #cbd5e1);
+  --crm-fundo-base: linear-gradient(180deg, oklch(86% 0.018 255.508), oklch(80% 0.018 255.508));
 
   --crm-cyan: #0d9488;
   --crm-cyan-2: #0f766e;
@@ -56,13 +57,13 @@
   --crm-muted: #475569;
   --crm-muted-2: #64748b;
 
-  --crm-glass-bg: rgba(241, 245, 249, 0.7);
-  --crm-glass-bg-strong: rgba(241, 245, 249, 0.86);
-  --crm-border: rgba(15, 23, 42, 0.1);
+  --crm-glass-bg: rgba(212, 219, 228, 0.72);
+  --crm-glass-bg-strong: rgba(212, 219, 228, 0.88);
+  --crm-border: rgba(15, 23, 42, 0.13);
   --crm-border-hover: rgba(37, 99, 235, 0.28);
-  --crm-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.7) inset,
+  --crm-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.35) inset,
     0 10px 30px -14px rgba(15, 23, 42, 0.18), 0 2px 8px -2px rgba(15, 23, 42, 0.08);
-  --crm-shadow-lift: 0 1px 0 0 rgba(255, 255, 255, 0.8) inset,
+  --crm-shadow-lift: 0 1px 0 0 rgba(255, 255, 255, 0.4) inset,
     0 22px 48px -20px rgba(15, 23, 42, 0.26), 0 8px 16px -8px rgba(15, 23, 42, 0.12);
 
   /* Cores dinâmicas (etapas do pipeline, SLA): texto escurecido e tinta mais presente */
@@ -101,10 +102,10 @@
 /* ── Superfícies com cor fixa no CSS do CRM ───────────────────── */
 :is(html, .crm-scope)[data-crm-tema="claro"] .crm-iconchip {
   border-color: rgba(15, 23, 42, 0.08);
-  box-shadow: 0 6px 14px -8px rgba(15, 23, 42, 0.25), 0 1px 0 0 rgba(255, 255, 255, 0.9) inset;
+  box-shadow: 0 6px 14px -8px rgba(15, 23, 42, 0.25), 0 1px 0 0 rgba(255, 255, 255, 0.45) inset;
   background:
-    linear-gradient(160deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 42%),
-    rgba(241, 245, 249, 0.9);
+    linear-gradient(160deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0) 42%),
+    rgba(212, 219, 228, 0.9);
 }
 :is(html, .crm-scope)[data-crm-tema="claro"] .crm-inner-light::before {
   background: radial-gradient(120% 80% at 50% 0%, rgba(37, 99, 235, 0.05), transparent 60%);
@@ -141,7 +142,7 @@
 /* Colunas do Kanban (estilos base em globals.css) */
 :is(html, .crm-scope)[data-crm-tema="claro"] .alpha-pipeline-column-shell {
   border-color: rgba(15, 23, 42, 0.1);
-  background: rgba(226, 232, 240, 0.5);
+  background: rgba(203, 213, 225, 0.42);
 }
 :is(html, .crm-scope)[data-crm-tema="claro"] .alpha-pipeline-column-shell:hover,
 :is(html, .crm-scope)[data-crm-tema="claro"] .alpha-pipeline-column-shell:focus-within {

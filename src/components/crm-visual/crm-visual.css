@@ -116,9 +116,9 @@
   /* véu cinza-azulado: tira o brilho do branco da imagem sem apagar os detalhes */
   background: linear-gradient(
     180deg,
-    rgba(100, 116, 139, 0.12) 0%,
-    rgba(100, 116, 139, 0.18) 45%,
-    rgba(71, 85, 105, 0.24) 100%
+    rgba(100, 116, 139, 0.2) 0%,
+    rgba(100, 116, 139, 0.26) 45%,
+    rgba(71, 85, 105, 0.32) 100%
   );
 }
 
