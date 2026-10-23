@@ -44,7 +44,28 @@ const estadoId = (cardId: string, empresaId: number) => id("estado", `${cardId}:
 function parse<T>(schema: z.ZodType<T>, value: string | null): T | null {
   try { const result = schema.safeParse(JSON.parse(value ?? "null")); return result.success ? result.data : null; } catch { return null; }
 }
-function unicidade(error: unknown) { return typeof error === "object" && error !== null && "code" in error && error.code === "P2002"; }
+function objeto(error: unknown): object | null { return error && typeof error === "object" ? error : null; }
+export function conflitoRecursoLease(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  if ("code" in error && error.code === "P2002") {
+    const meta = objeto("meta" in error ? error.meta : null);
+    if (!meta || ("modelName" in meta && meta.modelName !== "BpmAutomacaoLease")) return false;
+    const target = "target" in meta ? meta.target : null;
+    if (Array.isArray(target) && target.length === 1 && target[0] === "recurso") return true;
+    const adapter = objeto("driverAdapterError" in meta ? meta.driverAdapterError : null);
+    const causa = objeto(adapter && "cause" in adapter ? adapter.cause : null);
+    const constraint = objeto(causa && "kind" in causa && causa.kind === "UniqueConstraintViolation" && "constraint" in causa ? causa.constraint : null);
+    const fields = constraint && "fields" in constraint ? constraint.fields : null;
+    return Array.isArray(fields) && fields.length === 1 && fields[0] === "recurso";
+  }
+  if (!("name" in error) || error.name !== "DriverAdapterError" || !("cause" in error)
+    || !error.cause || typeof error.cause !== "object") return false;
+  const causa = error.cause;
+  return "kind" in causa && causa.kind === "sqlite" && "extendedCode" in causa
+    && [1, 19, 2067].includes(Number(causa.extendedCode))
+    && "message" in causa && typeof causa.message === "string"
+    && /UNIQUE constraint failed:\s*BpmAutomacaoLease\.recurso\s*$/.test(causa.message);
+}
 
 /** Resolve apenas a cadeia causal do próprio card; o configurador não é o autor. */
 export async function resolverAtorFichaViabilidade(tx: Tx, input: {
@@ -120,15 +141,19 @@ export async function obterFichaDoAgendamento(cardId: string, actorUserId: numbe
 type Lease = { recurso: string; titular: string; fencingToken: number };
 async function adquirirLease(cardId: string): Promise<Lease | null> {
   const recurso = `ficha-viabilidade:${cardId}`, titular = randomUUID(), agora = new Date();
+  // Reutilizar o recurso expirado por CAS evita depender da tradução de UNIQUE
+  // em P2002, que o adapter HTTP do Turso nem sempre faz.
+  const update = await db.bpmAutomacaoLease.updateMany({ where: { recurso, expiraEm: { lte: agora } },
+    data: { titular, fencingToken: { increment: 1 }, expiraEm: new Date(agora.getTime() + LEASE_MS) } });
+  if (update.count) {
+    const lease = await db.bpmAutomacaoLease.findUnique({ where: { recurso }, select: { titular: true, fencingToken: true } });
+    return lease?.titular === titular ? { recurso, titular, fencingToken: lease.fencingToken } : null;
+  }
   try {
     const criado = await db.bpmAutomacaoLease.create({ data: { recurso, titular, fencingToken: 1, expiraEm: new Date(agora.getTime() + LEASE_MS) } });
     return { recurso, titular, fencingToken: criado.fencingToken };
-  } catch (error) { if (!unicidade(error)) throw error; }
-  const update = await db.bpmAutomacaoLease.updateMany({ where: { recurso, expiraEm: { lte: agora } },
-    data: { titular, fencingToken: { increment: 1 }, expiraEm: new Date(agora.getTime() + LEASE_MS) } });
-  if (!update.count) return null;
-  const lease = await db.bpmAutomacaoLease.findUnique({ where: { recurso }, select: { titular: true, fencingToken: true } });
-  return lease?.titular === titular ? { recurso, titular, fencingToken: lease.fencingToken } : null;
+  } catch (error) { if (!conflitoRecursoLease(error)) throw error; }
+  return null;
 }
 async function validarLease(tx: Tx, lease: Lease) {
   const renovado = await tx.bpmAutomacaoLease.updateMany({

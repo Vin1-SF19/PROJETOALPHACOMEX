@@ -22,7 +22,11 @@ export async function GerarFichaViabilidadeBpm(dados: unknown) {
   }
 }
 
-function falhaFicha(error: unknown) {
+function falhaFicha(error: unknown, operacao: "ler" | "gerar" | "salvar") {
+  const errorName = error instanceof Error ? error.name : "UnknownError";
+  const errorCode = error instanceof FichaViabilidadeError ? error.code
+    : error && typeof error === "object" && "code" in error && typeof error.code === "string" && /^[A-Z0-9_]{1,40}$/.test(error.code) ? error.code : null;
+  console.error("[FichaViabilidade] Falha na operação", { operacao, errorName, errorCode });
   return { success: false as const, error: error instanceof FichaViabilidadeError ? error.message
     : error instanceof Error && error.message === "Não autorizado" ? "Não autorizado" : "Não foi possível atualizar a ficha de análise de viabilidade.",
   code: error instanceof FichaViabilidadeError ? error.code : "FAILED" };
@@ -37,7 +41,7 @@ export async function ObterFichaViabilidadeBpm(dados: unknown) {
     const userId = Number(session.user.id);
     await exigirAcessoBpmCard(parsed.data.cardId, userId, session.user.role ?? null, "visualizar");
     return { success: true as const, ...await obterFichaViabilidadePersistida(parsed.data.cardId, parsed.data.solicitacaoId, userId) };
-  } catch (error) { return falhaFicha(error); }
+  } catch (error) { return falhaFicha(error, "ler"); }
 }
 
 export async function GarantirFichaViabilidadeBpm(dados: unknown) {
@@ -51,7 +55,7 @@ export async function GarantirFichaViabilidadeBpm(dados: unknown) {
     const resultado = await garantirFichaViabilidade(parsed.data.cardId, userId);
     revalidatePath("/PainelAlpha/AlphaCRM");
     return { success: true as const, ...resultado };
-  } catch (error) { return falhaFicha(error); }
+  } catch (error) { return falhaFicha(error, "gerar"); }
 }
 
 export async function SalvarComplementoFichaViabilidadeBpm(dados: unknown) {
@@ -65,5 +69,5 @@ export async function SalvarComplementoFichaViabilidadeBpm(dados: unknown) {
     const data = await salvarComplementoFichaViabilidade(parsed.data, userId, session.user.role ?? null);
     revalidatePath("/PainelAlpha/AlphaCRM");
     return { success: true as const, data };
-  } catch (error) { return falhaFicha(error); }
+  } catch (error) { return falhaFicha(error, "salvar"); }
 }

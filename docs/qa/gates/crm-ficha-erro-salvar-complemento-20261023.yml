@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "story": "crm-ficha-erro-salvar-complemento-20261023",
+  "story_title": "Corrigir erro ao salvar complemento da ficha",
+  "gate": "PASS",
+  "verdict": "APPROVED",
+  "scope": "local-ready-for-staging-only",
+  "status_reason": "Causa remota comprovada, correção mínima e regressão HTTP/SQLite/PDF/React; todos gates locais reais PASS. Aceite live pósdeploy obrigatório ainda pendente.",
+  "reviewer": "Quinn / QA",
+  "updated": "2026-10-23T19:22:28.232577+00:00",
+  "top_issues": [],
+  "waiver": {
+    "active": false
+  },
+  "evidence": {
+    "tests_files": 29,
+    "tests_passed": 349,
+    "tests_failures": 0,
+    "full_repository_rerun": false,
+    "scope": "npm test -- --coverage.enabled=false --maxWorkers=1 + 29 suites afetadas (lista privada plan-final.json)",
+    "typecheck": "global PASS",
+    "lint": "global PASS",
+    "build": "npm run build literal webpack PASS",
+    "source_guard_files": 3083,
+    "source_guard_unchanged": true,
+    "private_report": "/var/tmp/alpha-crm-ficha-salvar-erro-20261023/qa/qa-local-final.json",
+    "coderabbit": "indisponível; fallback manual configurado executado"
+  },
+  "nfr_validation": {
+    "security": {
+      "status": "PASS",
+      "notes": "ACL/Zod/sessão/fencing/CAS/commit atômico preservados; logs sem valores do formulário/mensagem/stack."
+    },
+    "reliability": {
+      "status": "PASS",
+      "notes": "Lease liberado reutilizado; duas versões salvas, um anexo, PDF/reabertura e concorrência cobertos."
+    }
+  },
+  "ac_trace": {
+    "AC1": "PASS: reprodução remota causa UNIQUE adapter HTTP + diagnóstico sanitizado",
+    "AC2": "PASS local; LIVE pósdeploy pendente",
+    "AC3": "PASS: testes React rascunho/busy/conflito e backend rollback preservados",
+    "AC4": "PASS: guardas canônicas e atomicidade inalteradas",
+    "AC5": "PASS local; LIVE Admin Save/reopen/PDF/restore obrigatório pendente",
+    "AC6": "staging somente; publicação/alias por DevOps pendentes"
+  },
+  "remote_acceptance": "PENDING: salvar/reabrir/PDF/anexo único/restaurar original no caso controlado após deployment READY",
+  "recommendations": {
+    "immediate": [],
+    "follow_up": [
+      "Executar e registrar aceite live no staging antes de concluir o bug."
+    ]
+  }
+}

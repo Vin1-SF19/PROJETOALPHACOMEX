@@ -140,6 +140,61 @@ describe("ficha automática persistida em SQLite privado", () => {
     expect(await db.bpmCardAnexo.count({ where: { cardId } })).toBe(2);
   });
 
+  it("salva e reabre duas alterações de e-mail reutilizando o lease liberado e incrementando fencing", async () => {
+    const initial = await processarIntencaoFichaViabilidade(await intencao());
+    if (!initial.data) throw new Error("Ficha ausente");
+    const message = "SQLITE_CONSTRAINT: SQLite error: UNIQUE constraint failed: BpmAutomacaoLease.recurso";
+    const createLease = vi.spyOn(db.bpmAutomacaoLease, "create").mockImplementation(() => {
+      throw Object.assign(new Error(message), { name: "DriverAdapterError", cause: { kind: "sqlite", extendedCode: 1, message } });
+    });
+    try {
+      const first = await SalvarComplementoFichaViabilidadeBpm({ cardId, expectedRevision: 1, extras: { email: "primeiro@example.test" } });
+      expect(first).toMatchObject({ success: true, data: { anexoId: initial.data.anexoId, revision: 2, dados: { extra: { email: "primeiro@example.test" } } } });
+      expect((await db.bpmAutomacaoLease.findUniqueOrThrow({ where: { recurso: `ficha-viabilidade:${cardId}` } })).fencingToken).toBe(2);
+      const second = await SalvarComplementoFichaViabilidadeBpm({ cardId, expectedRevision: 2, extras: { email: "segundo@example.test" } });
+      expect(second).toMatchObject({ success: true, data: { anexoId: initial.data.anexoId, revision: 3 } });
+      expect(await ObterFichaViabilidadeBpm({ cardId })).toMatchObject({ success: true, data: { anexoId: initial.data.anexoId, revision: 3, dados: { extra: { email: "segundo@example.test" } } } });
+      const lease = await db.bpmAutomacaoLease.findUniqueOrThrow({ where: { recurso: `ficha-viabilidade:${cardId}` } });
+      expect(lease.fencingToken).toBe(3);
+      expect(lease.expiraEm.getTime()).toBe(0);
+      expect(createLease).not.toHaveBeenCalled();
+      expect(await db.bpmCardAnexo.count()).toBe(1);
+      const bytes: unknown = m.put.mock.calls.at(-1)?.[1];
+      if (!Buffer.isBuffer(bytes)) throw new Error("PDF real esperado");
+      expect((await lerPdf(bytes))[0].text.toLowerCase()).toContain("segundo@example.test");
+    } finally { createLease.mockRestore(); }
+  });
+
+  it("uma criação concorrente com o erro HTTP real de UNIQUE mantém lease ocupado e não gera upload", async () => {
+    await processarIntencaoFichaViabilidade(await intencao());
+    await db.bpmAutomacaoLease.update({ where: { recurso: `ficha-viabilidade:${cardId}` }, data: { expiraEm: new Date(Date.now() + 60_000) } });
+    const message = "SQLITE_CONSTRAINT: SQLite error: UNIQUE constraint failed: BpmAutomacaoLease.recurso";
+    const error = Object.assign(new Error(message), { name: "DriverAdapterError", cause: { kind: "sqlite", extendedCode: 1, message, originalMessage: message } });
+    const createLease = vi.spyOn(db.bpmAutomacaoLease, "create").mockImplementationOnce(() => { throw error; });
+    try {
+      await expect(salvarComplementoFichaViabilidade({ cardId, expectedRevision: 1, extras: { email: "concorrente@example.test" } }, 7, "Admin")).rejects.toMatchObject({ code: "BUSY" });
+      expect(m.put).toHaveBeenCalledOnce();
+      expect((await obterFichaViabilidadePersistida(cardId)).data?.revision).toBe(1);
+      expect((await db.bpmAutomacaoLease.findUniqueOrThrow({ where: { recurso: `ficha-viabilidade:${cardId}` } })).fencingToken).toBe(1);
+    } finally { createLease.mockRestore(); }
+  });
+
+  it("falhas diferentes da UNIQUE do recurso permanecem erros e recebem diagnóstico sanitizado", async () => {
+    await processarIntencaoFichaViabilidade(await intencao());
+    await db.bpmAutomacaoLease.update({ where: { recurso: `ficha-viabilidade:${cardId}` }, data: { expiraEm: new Date(Date.now() + 60_000) } });
+    const error = Object.assign(new Error("Informação privada não deve ir para o log"), { code: "TEST_DB_UNAVAILABLE" });
+    const createLease = vi.spyOn(db.bpmAutomacaoLease, "create").mockImplementationOnce(() => { throw error; });
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result = await SalvarComplementoFichaViabilidadeBpm({ cardId, expectedRevision: 1, extras: { email: "privado@example.test" } });
+      expect(result).toMatchObject({ success: false, code: "FAILED" });
+      expect(log).toHaveBeenCalledWith("[FichaViabilidade] Falha na operação", { operacao: "salvar", errorName: "Error", errorCode: "TEST_DB_UNAVAILABLE" });
+      expect(JSON.stringify(log.mock.calls)).not.toContain("privado@example.test");
+      expect(JSON.stringify(log.mock.calls)).not.toContain(error.message);
+      expect(m.put).toHaveBeenCalledOnce();
+    } finally { createLease.mockRestore(); log.mockRestore(); }
+  });
+
   it("duas gerações concorrentes e replay convergem para um anexo e um upload", async () => {
     let liberar: (() => void) | undefined;
     const started = Promise.withResolvers<void>();
