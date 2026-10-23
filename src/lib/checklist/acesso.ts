@@ -10,7 +10,7 @@ export const operacionalElegivel = (role: string) =>
 export const liderOperacional = (role: string) =>
   normalizeRole(role) === "LIDEROPERACIONAL";
 const gestorModelosChecklist = (role: string) =>
-  liderOperacional(role) || isSameRole(role, Roles.TI);
+  liderOperacional(role) || isSameRole(role, Roles.TI) || isSameRole(role, Roles.ADMIN);
 export async function obterAtorChecklist(): Promise<AtorChecklist> {
   const session = await auth();
   if (!session?.user?.id) fail("UNAUTHENTICATED", "Entre novamente.");
@@ -90,7 +90,7 @@ export async function exigirGestorModelosChecklist(
 ) {
   const user = await exigirLeituraChecklist(ator, tx);
   if (ator.kind !== "INTERNO" || !gestorModelosChecklist(user.role))
-    fail("FORBIDDEN", "Apenas TI ou Líder Operacional pode gerir modelos.");
+    fail("FORBIDDEN", "Apenas Admin, TI ou Líder Operacional pode gerir modelos.");
   return user;
 }
 export async function exigirEmpresaChecklist(

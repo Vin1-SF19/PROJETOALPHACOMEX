@@ -111,10 +111,8 @@ export function normalizarCodigoModelo(v: string) {
 export const publicarModeloSchema = comandoSchema.extend({
   identidadeId: idSchema.optional(),
   escopo: z.enum(["GLOBAL", ...tiposChecklist]),
-  codigo: z
-    .string()
-    .transform(normalizarCodigoModelo)
-    .pipe(z.string().min(1).max(80)),
+  chaveInterna: z.string().regex(/^[A-Z0-9_]{1,80}$/).optional(),
+  codigo: z.string().trim().min(1).max(80),
   nome: z.string().trim().min(1).max(180),
   descricao: z.string().trim().max(1000).nullable(),
   secao: z.enum([

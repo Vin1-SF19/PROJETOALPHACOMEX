@@ -29,14 +29,21 @@ export function ModelosDocumentoForm({ modelo, escopoInicial, disabled = false, 
     [obrigatorio, setObrigatorio] = useState(modelo?.modelo?.obrigatorio ?? true),
     [ordem, setOrdem] = useState(modelo?.modelo?.ordem ?? 0),
     [ativo, setAtivo] = useState(modelo?.modelo?.ativo ?? true),
+    [repetirCodigo, setRepetirCodigo] = useState(false),
     command = useChecklistCommand(),
     drafts = useOptionalChecklistDrafts(),
     id = useId();
   const input = { identidadeId: modelo?.id, expectedRevision: modelo?.revision ?? 0, escopo, codigo, nome, descricao: descricao || null, secao, obrigatorio, ordem, ativo };
-  const serialized = JSON.stringify(input);
+  const serialized = JSON.stringify({ ...input, repetirCodigo });
   const [initial] = useState(serialized);
   async function salvar() {
-    const data = await command.run(serialized, (mutationId) => publicarModeloChecklist({ ...input, mutationId }));
+    const data = await command.run(serialized, (mutationId) => publicarModeloChecklist({
+      ...input,
+      mutationId,
+      ...(modelo?.chaveInterna !== undefined
+        ? { chaveInterna: modelo.chaveInterna }
+        : !modelo && repetirCodigo ? { chaveInterna: `REQ_${mutationId.replaceAll("-", "").toUpperCase()}` } : {}),
+    }));
     if (!data) return false;
     onSaved();
     return true;
@@ -66,7 +73,8 @@ export function ModelosDocumentoForm({ modelo, escopoInicial, disabled = false, 
         <fieldset disabled={disabled || command.busy} aria-busy={command.busy} className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
           <label htmlFor={`${id}-codigo`}>
             <span className={labelClass}>Código do documento</span>
-            <input id={`${id}-codigo`} required maxLength={80} disabled={!!modelo} value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="Ex.: CAP_FIN_001" className={inputClass} />
+            <textarea id={`${id}-codigo`} required maxLength={80} rows={2} disabled={!!modelo} value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="Ex.: 1100" aria-describedby={`${id}-codigo-ajuda`} className={inputClass + " resize-y"} />
+            <span id={`${id}-codigo-ajuda`} className="mt-1 block text-[10px] text-slate-500">Mantenha o código original, inclusive letras, separadores e quebras de linha.</span>
           </label>
           <label htmlFor={`${id}-nome`}>
             <span className={labelClass}>Nome do documento</span>
@@ -101,6 +109,10 @@ export function ModelosDocumentoForm({ modelo, escopoInicial, disabled = false, 
             <input type="checkbox" checked={obrigatorio} onChange={(e) => setObrigatorio(e.target.checked)} className="size-4 accent-blue-500" />
             Documento obrigatório
           </label>
+          {!modelo && <label className="flex items-start gap-3 text-xs text-slate-400 md:col-span-2">
+            <input type="checkbox" checked={repetirCodigo} onChange={(e) => setRepetirCodigo(e.target.checked)} className="mt-0.5 size-4 accent-blue-500" aria-describedby={`${id}-repetir-ajuda`} />
+            <span>Usar este código em outro requisito<span id={`${id}-repetir-ajuda`} className="mt-1 block text-[10px] text-slate-500">Marque somente para criar um requisito distinto com o mesmo código, mesmo na mesma seção.</span></span>
+          </label>}
           {command.error && <div className="md:col-span-2"><Falha error={command.error} /></div>}
           <div className="flex flex-wrap gap-3 md:col-span-2">
             <Acao type="submit" disabled={disabled || command.busy} className="border-blue-500/30 bg-blue-600 px-5 py-3 text-[10px] font-black uppercase tracking-widest hover:bg-blue-500">

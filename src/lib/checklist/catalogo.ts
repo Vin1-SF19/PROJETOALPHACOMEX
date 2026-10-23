@@ -1,4 +1,4 @@
-import { Prisma, TipoEmbasamento } from "@prisma/client";
+import { Prisma, TipoEmbasamento, type ModeloItemChecklist } from "@prisma/client";
 import db from "@/lib/prisma";
 import {
   exigirGestorModelosChecklist,
@@ -11,7 +11,7 @@ import {
   tiposChecklist,
   normalizarCodigoModelo,
 } from "./schemas";
-import { fail } from "./result";
+import { fail, hashPayload } from "./result";
 import { registrarEvento, replay } from "./commands";
 import type { AtorChecklist } from "./types";
 import { z } from "zod";
@@ -22,6 +22,7 @@ export async function modelosAplicaveis(tx: Tx, tipo: TipoEmbasamento) {
       identidadeId: { not: null },
       OR: [{ tipo }, { tipo: null }],
     },
+    include: { identidade: { select: { codigoNormalizado: true } } },
     orderBy: [
       { secao: "asc" },
       { ordem: "asc" },
@@ -31,7 +32,8 @@ export async function modelosAplicaveis(tx: Tx, tipo: TipoEmbasamento) {
   });
   const m = new Map<string, (typeof rows)[number]>();
   for (const r of rows) {
-    const key = normalizarCodigoModelo(r.codigo);
+    if (!r.identidade) continue;
+    const key = r.identidade.codigoNormalizado;
     const prev = m.get(key);
     if (!prev || r.tipo === tipo) m.set(key, r);
   }
@@ -43,6 +45,14 @@ export async function modelosAplicaveis(tx: Tx, tipo: TipoEmbasamento) {
       a.id.localeCompare(b.id),
   );
 }
+export type ItemCatalogoChecklist = {
+  id: string;
+  escopo: string;
+  codigo: string;
+  chaveInterna?: string;
+  revision: number;
+  modelo: ModeloItemChecklist | null;
+};
 export async function listarCatalogo(ator: AtorChecklist, input: unknown) {
   await exigirLeituraChecklist(ator);
   const c = paginaSchema
@@ -68,10 +78,11 @@ export async function listarCatalogo(ator: AtorChecklist, input: unknown) {
     db.modeloChecklistIdentidade.count({ where }),
   ]);
   return {
-    items: identidades.map((i) => ({
+    items: identidades.map<ItemCatalogoChecklist>((i) => ({
       id: i.id,
       escopo: i.escopo,
-      codigo: i.codigoNormalizado,
+      codigo: i.revisoes[0]?.codigo ?? i.codigoNormalizado,
+      chaveInterna: i.codigoNormalizado,
       revision: i.revision,
       modelo: i.revisoes[0] ?? null,
     })),
@@ -107,7 +118,8 @@ async function hidratarRevisao(
   return publicarModeloSchema.parse({
     ...c,
     escopo: i.escopo,
-    codigo: i.codigoNormalizado,
+    codigo: r.codigo,
+    chaveInterna: i.codigoNormalizado,
     nome: r.nome,
     descricao: r.descricao,
     secao: r.secao,
@@ -119,10 +131,31 @@ async function hidratarRevisao(
 
 async function executarModelo(ator: AtorChecklist, comando: ComandoModelo) {
   // Bind the journal to caller intent, never fields hydrated from current state.
-  const payload = { operation: comando.operation, ...comando.input };
+  const payload = comando.operation === "PUBLICAR"
+    ? { operation: comando.operation, ...comando.input, contratoCodigo: 2 }
+    : { operation: comando.operation, ...comando.input };
   return db.$transaction(async (tx) => {
     await exigirGestorModelosChecklist(ator, tx);
-    const prior = await replay(tx, ator, comando.input.mutationId, payload);
+    // Only historical PUBLICAR events may use the old parser/hash contract.
+    // Persist the marker in event data too: the journal stores a hash, not payload.
+    let replayPayload: unknown = payload;
+    if (comando.operation === "PUBLICAR" && comando.input.chaveInterna === undefined) {
+      const event = await tx.checklistEvento.findUnique({
+        where: { mutationId: comando.input.mutationId },
+      });
+      const marker = z.object({ contratoCodigo: z.unknown().optional() })
+        .safeParse(event?.dados);
+      const legacy = {
+        operation: comando.operation,
+        ...comando.input,
+        codigo: normalizarCodigoModelo(comando.input.codigo),
+      };
+      if (event && event.tipo === "CHECKLIST_MODELO_PUBLICADO" &&
+        event.agregadoTipo === "MODELO" &&
+        (!marker.success || marker.data.contratoCodigo === undefined) &&
+        event.payloadHash === hashPayload(legacy)) replayPayload = legacy;
+    }
+    const prior = await replay(tx, ator, comando.input.mutationId, replayPayload);
     if (prior)
       return z
         .object({
@@ -141,34 +174,23 @@ async function executarModelo(ator: AtorChecklist, comando: ComandoModelo) {
       : null;
     if (c.identidadeId && !identity)
       fail("NOT_FOUND", "Modelo não encontrado.");
-    if (
-      identity &&
-      (identity.escopo !== c.escopo || identity.codigoNormalizado !== c.codigo)
-    )
-      fail(
-        "MODEL_CODE_CONFLICT",
-        "Escopo e código da identidade são imutáveis.",
-      );
+    if (identity && (identity.escopo !== c.escopo ||
+      (c.chaveInterna !== undefined && identity.codigoNormalizado !== c.chaveInterna)))
+      fail("MODEL_CODE_CONFLICT", "Escopo e chave da identidade são imutáveis.");
+    const key = identity?.codigoNormalizado ?? c.chaveInterna ?? normalizarCodigoModelo(c.codigo);
+    if (!key) fail("VALIDATION", "Informe uma chave interna para este código.");
     const collision = await tx.modeloChecklistIdentidade.findUnique({
-      where: {
-        escopo_codigoNormalizado: {
-          escopo: c.escopo,
-          codigoNormalizado: c.codigo,
-        },
-      },
+      where: { escopo_codigoNormalizado: { escopo: c.escopo, codigoNormalizado: key } },
     });
     if (!identity && collision)
-      fail(
-        "MODEL_CODE_CONFLICT",
-        "Este código já existe neste escopo. Edite sua revisão.",
-      );
+      fail("MODEL_CODE_CONFLICT", "Este código já existe neste escopo. Edite sua revisão.");
     if (!identity) {
       if (c.expectedRevision !== 0)
         fail("CONFLICT", "Revisão de modelo inválida.");
       identity = await tx.modeloChecklistIdentidade.create({
         data: {
           escopo: c.escopo,
-          codigoNormalizado: c.codigo,
+          codigoNormalizado: key,
           autorId: ator.kind === "INTERNO" ? ator.id : null,
         },
       });
@@ -179,8 +201,11 @@ async function executarModelo(ator: AtorChecklist, comando: ComandoModelo) {
       where: { identidadeId: identity.id },
       orderBy: { versao: "desc" },
     });
+    if (last && normalizarCodigoModelo(last.codigo) !== normalizarCodigoModelo(c.codigo))
+      fail("MODEL_CODE_CONFLICT", "O código lógico do modelo é imutável.");
     if (
       last &&
+      last.codigo === c.codigo &&
       last.nome === c.nome &&
       last.descricao === c.descricao &&
       last.secao === c.secao &&
@@ -229,7 +254,10 @@ async function executarModelo(ator: AtorChecklist, comando: ComandoModelo) {
       agregadoId: identity.id,
       revision: identity.revision + 1,
       tipo: "CHECKLIST_MODELO_PUBLICADO",
-      dados: { modeloId: novo.id, versao: novo.versao, ativo: novo.ativo },
+      dados: {
+        modeloId: novo.id, versao: novo.versao, ativo: novo.ativo,
+        ...(comando.operation === "PUBLICAR" ? { contratoCodigo: 2 } : {}),
+      },
       resultado: result,
     });
     return result;

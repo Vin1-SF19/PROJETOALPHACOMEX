@@ -7615,3 +7615,31 @@ DevOps ainda precisa configurar/publicar/homologar staging Main antes do Portal 
 
 ### Refletido também em
 `codebase-map.md`, `integration-points.md`, desenho Main `docs/architecture/portal-api-canonica-20261023.md` e stories dos dois repos. Drafts/históricos alheios preservados.
+
+
+---
+
+## [2026-10-23 18:19 UTC] — CheckList: catálogo Excel com código e identidade separados
+
+**Tags:** #feature #integration #decision #security
+**Agentes envolvidos:** Bibble, Scout, Aria, PO, Echo, Nova, Vault, Forge, Probe, Anubis, Lens, Sage, Scribe, Kowalski.
+**Arquivos tocados:** cinco fontes `src/lib/checklist/{schemas,catalogo,acesso}.ts` e `src/components/checklist/{ModelosDocumentoForm,ModelosWorkspace}.tsx`; testes, arquitetura e File List na story `story-checklist-templates-excel-20261023.md`.
+
+### Contexto
+Usuário pediu representar 59 documentos de três Excel (25 Financeira/17 Início/17 DAS), incluindo oito repetições legítimas e código composto. Confirmou Mutuante 2130 (5140 continua Guia IOF) e Admin apenas na gestão dos modelos.
+
+### O que foi feito
+- Código de negócio preservado separadamente da chave interna existente; resolução mantém GLOBAL/override e repetidos, PUBLICAR v2 aceita replay legado estrito, materialização preserva snapshots sem efeito retroativo. UI azul inline/duas colunas/quatro cards mantida, com textarea e repetição intencional por intenção estável; sem DDL, mudança de Portal/wire/auth ou dependências.
+- Forge quatro gates reais e contrato PASS: 761 arquivos/6.327 PASS, quatro skipped/um todo; Probe com dois testes de actions/SQLite reais locais e Anubis/Lens/Sage PASS. CodeRabbit SKIPPED conforme política; não há homologação remota certificada.
+
+### Decisões tomadas
+- Chave identifica requisito; código visível não identifica sozinho uma exigência. Capability Admin é granular do catálogo, sem bypass de owner; sessão/status/módulo persistidos são conferidos antes de replay.
+
+### Problemas encontrados / resolvidos
+- Backup de 22/10 com 337 tabelas não cobre duas tabelas novas; quatro tentativas de transporte nativo/HTTP falharam. `BACKUP_NOT_READY`: caminho oficial GET/dump ainda precisa de execução/verificação pelo owner operacional, sem importar dados.
+
+### Pendências
+Publicar/homologar código primeiro em staging; preparar job canônico/dry-run e obter Vault, backup completo verificado <=48h e consentimento específico antes do lote de 59. Manifesto privado prevê 59 CREATE + 3 antigos preservados = 62; os três atuais seguem intactos, nenhuma publicação documental executada. Produção não autorizada. Rollback de dados eventual exige autorização, desativar só novos IDs via código novo/CAS antes de versão compatível, preservando antigos/instâncias.
+
+### Refletido também em
+`codebase-map.md`, `integration-points.md`, arquitetura e story da entrega; fonte/manifesto privados não versionados. Draft/históricos alheios preservados.

@@ -63,7 +63,6 @@ describe.sequential("catálogo — replay da intenção original em SQLite real"
     for (const { data, code } of [
       { data: { authSessionVersion: 1 }, code: "UNAUTHENTICATED" },
       { data: { status: "INATIVO" }, code: "UNAUTHENTICATED" },
-      { data: { role: "Admin" }, code: "FORBIDDEN" },
       { data: { role: "CEO" }, code: "FORBIDDEN" },
       { data: { role: "Operacional" }, code: "FORBIDDEN" },
     ]) {
@@ -90,6 +89,7 @@ describe.sequential("catálogo — replay da intenção original em SQLite real"
   for (const [actorName, actor, originalRole] of [
     ["líder", leader, "Líder Operacional"],
     ["TI", { ...leader, id: 6 }, "TI"],
+    ["Admin", { ...leader, id: 4 }, "Admin"],
   ] as const) {
     for (const operation of ["DESATIVAR", "ORDENAR"] as const) {
       it(`${actorName} ${operation}: recupera rev2 após outro líder publicar rev3 sem escrever novamente`, async () => {
@@ -168,7 +168,6 @@ describe.sequential("catálogo — replay da intenção original em SQLite real"
         for (const { data, code } of [
           { data: { authSessionVersion: 1 }, code: "UNAUTHENTICATED" },
           { data: { status: "INATIVO" }, code: "UNAUTHENTICATED" },
-          { data: { role: "Admin" }, code: "FORBIDDEN" },
           { data: { role: "CEO" }, code: "FORBIDDEN" },
           { data: { role: "Analista Operacional" }, code: "FORBIDDEN" },
           // TI retains the existing administrative read bypass; module loss is

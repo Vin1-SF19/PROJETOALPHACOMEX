@@ -330,8 +330,8 @@ describe.sequential(
         }),
       ).toBe(0);
     });
-    it("catálogo somente TI/líder, identidade única e específico substitui global", async () => {
-      for (const id of [1, 2, 4, 5, 7]) {
+    it("catálogo somente Admin/TI/líder, identidade única e específico substitui global", async () => {
+      for (const id of [1, 2, 5, 7]) {
         const actor: AtorChecklist = { kind: "INTERNO", id, sessionVersion: 0 };
         await expect(catalog.publicarModelo(actor, model(`DENIED_${id}`)))
           .rejects.toMatchObject({ code: "FORBIDDEN" });
@@ -371,7 +371,8 @@ describe.sequential(
         expect(access.capacidadesParaAtor(ti, role, f.empresa)).toEqual(readOnly);
         expect(access.capacidadesParaAtor(ti, role, { analistaId: null })).toEqual(readOnly);
       }
-      for (const [id, role] of [[4, "Admin"], [5, "CEO"], [1, "Operacional"], [2, "Analista Operacional"]] as const) {
+      expect(access.capacidadesParaAtor({ ...ti, id: 4 }, "Admin", { analistaId: null })).toEqual(readOnly);
+      for (const [id, role] of [[5, "CEO"], [1, "Operacional"], [2, "Analista Operacional"]] as const) {
         expect(access.capacidadesParaAtor({ ...ti, id }, role, { analistaId: null }).canManageModels).toBe(false);
       }
       const portal: AtorChecklist = { kind: "PORTAL", id: f.conta.id, sessionVersion: 0 };

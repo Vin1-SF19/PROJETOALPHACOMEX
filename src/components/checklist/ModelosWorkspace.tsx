@@ -102,7 +102,7 @@ function ModelosWorkspaceContent({ canManage, tipoInicial = "" }: ModelosWorkspa
       )}
       {!canManage && (
         <p className="rounded-xl border border-white/10 p-3 text-xs text-slate-400">
-          Consulta do catálogo. Publicação e gestão exclusivas de TI e Líder Operacional.
+          Consulta do catálogo. Publicação e gestão exclusivas de Admin, TI e Líder Operacional.
         </p>
       )}
       <section aria-label="Documentos do modelo" className="space-y-5">
@@ -132,7 +132,7 @@ function ModelosWorkspaceContent({ canManage, tipoInicial = "" }: ModelosWorkspa
               {query.data.items.map((m) => (
                 <article key={m.id} className="rounded-[1.75rem] border border-white/10 bg-slate-950/60 p-5">
                   <div className="mb-4 flex items-start justify-between gap-3">
-                    <span className="rounded-lg bg-white/[0.05] px-2.5 py-1 text-[10px] font-black tracking-widest text-blue-200">{m.codigo}</span>
+                    <span className="whitespace-pre-wrap break-words rounded-lg bg-white/[0.05] px-2.5 py-1 text-[10px] font-black tracking-widest text-blue-200">{m.codigo}</span>
                     <span className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-widest",
                       m.escopo === "GLOBAL" ? "bg-violet-500/15 text-violet-200" : "bg-blue-500/15 text-blue-200")}
                       title={m.escopo === "GLOBAL" ? "Global para todos" : Object.entries(TIPO_LABELS).find(([value]) => value === m.escopo)?.[1]}
