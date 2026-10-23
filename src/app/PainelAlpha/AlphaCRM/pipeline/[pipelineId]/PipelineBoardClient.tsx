@@ -10,8 +10,8 @@ import { textoLegivelRd } from "@/lib/bpm/rd-station-text";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { SincronizarQuadroBpm } from "@/actions/bpm/Quadro";
-import { mesclarResumosQuadro, selecionarPaginaQuadro, TAMANHO_PAGINA_QUADRO, REVALIDACAO_RESUMOS_MS, type ManifestoQuadro } from "@/lib/bpm/quadro-paginado";
-import { origemCorrespondeFiltro, origemNativaQuadro, origemNolossQuadro, origensDisponiveisQuadro, type FiltroOrigemQuadro } from "@/lib/bpm/origem-quadro";
+import { mesclarResumosQuadro, selecionarPaginaQuadro, origensDisponiveisNaVisaoQuadro, TAMANHO_PAGINA_QUADRO, REVALIDACAO_RESUMOS_MS, type ManifestoQuadro } from "@/lib/bpm/quadro-paginado";
+import { normalizarOrigemQuadro, origemCorrespondeFiltro, origemNativaQuadro, origemNolossQuadro, type FiltroOrigemQuadro } from "@/lib/bpm/origem-quadro";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -282,8 +282,7 @@ export function KanbanCard({
   // conserva seu canal persistido, mesmo sendo transportado pela API NoLoss.
   const canalNormalizado = canalOrigem?.trim().toLocaleLowerCase("pt-BR");
   const origemLead = ehLeadVirtual || card.veioNoloss ? "Site"
-    : canalNormalizado === "instagram" || canalNormalizado === "ig" ? "Instagram"
-      : canalNormalizado === "site" ? "Site" : canalOrigem?.trim();
+    : canalNormalizado === "instagram" || canalNormalizado === "ig" ? "Instagram" : normalizarOrigemQuadro(canalOrigem);
   const identidadeConfigurada = (key: "EMPRESA_NOME" | "CNPJ" | "NOME_FANTASIA" | "SERVICO") =>
     card.cardViewComposicao === undefined || card.cardViewComposicao.some((item) => item.kind === "NATIVE" && item.key === key);
   const mostrarIdentidade = card.cardViewComposicao === undefined || agendarReuniao && identidadeConfigurada("EMPRESA_NOME");
@@ -909,7 +908,18 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")), [manifesto?.acesso?.responsaveis]);
 
   const entradasFallback = useMemo(() => cards.map(entradaFallbackOrigem), [cards]);
-  const origensDisponiveis = useMemo(() => origensDisponiveisQuadro(manifesto?.entradas ?? entradasFallback), [manifesto?.entradas, entradasFallback]);
+  const origensDisponiveis = useMemo(() => origensDisponiveisNaVisaoQuadro(manifesto?.entradas ?? entradasFallback, {
+    busca, visao, setorId: setorFiltro, acesso: manifesto?.acesso,
+    responsavelId: responsavelFiltro ? Number(responsavelFiltro) : null,
+  }), [manifesto?.entradas, manifesto?.acesso, entradasFallback, busca, visao, setorFiltro, responsavelFiltro]);
+  const origemNoRecorte = (novaBusca: string, novoResponsavel: string): FiltroOrigemQuadro => {
+    if (filtroOrigem === undefined) return undefined;
+    const origens = origensDisponiveisNaVisaoQuadro(manifesto?.entradas ?? entradasFallback, {
+      busca: novaBusca, visao: novoResponsavel === "MEUS" ? "MEUS" : "TODOS", setorId: setorFiltro,
+      acesso: manifesto?.acesso, responsavelId: /^\d+$/.test(novoResponsavel) ? Number(novoResponsavel) : null,
+    });
+    return origens.find((origem) => origemCorrespondeFiltro(origem, filtroOrigem));
+  };
   const paginaManifesto = manifesto ? selecionarPaginaQuadro(manifesto.entradas, {
     busca, origem: filtroOrigem, visao, setorId: setorFiltro, acesso: manifesto.acesso,
     responsavelId: responsavelFiltro ? Number(responsavelFiltro) : null, limites: limitesVisiveis,
@@ -975,7 +985,10 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
           return false;
         }
         if (estado.origem !== undefined) {
-          const origens = origensDisponiveisQuadro(result.manifesto.entradas);
+          const origens = origensDisponiveisNaVisaoQuadro(result.manifesto.entradas, {
+            busca: estado.busca, visao: estado.visao, setorId: estado.setorId,
+            acesso: result.manifesto.acesso, responsavelId: estado.responsavelId,
+          });
           const indice = origens.findIndex((origem) => origemCorrespondeFiltro(origem, estado.origem));
           if (indice === -1) {
             ultimaRequisicaoRef.current += 1;
@@ -1030,7 +1043,10 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
     }
 
     setCards(res.data);
-    if (quadroRef.current.origem !== undefined && !origensDisponiveisQuadro(res.data.map(entradaFallbackOrigem))
+    if (quadroRef.current.origem !== undefined && !origensDisponiveisNaVisaoQuadro(res.data.map(entradaFallbackOrigem), {
+      busca: quadroRef.current.busca, visao: quadroRef.current.visao, setorId: quadroRef.current.setorId,
+      responsavelId: quadroRef.current.responsavelId,
+    })
       .some((origem) => origemCorrespondeFiltro(origem, quadroRef.current.origem))) {
       quadroRef.current.origem = undefined; quadroRef.current.limites = {};
       setLimitesVisiveis({});
@@ -1351,13 +1367,20 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
         <div className="flex w-full min-w-0 flex-wrap items-center gap-3 xl:w-auto">
           <div className="relative w-full shrink-0 sm:w-[320px] lg:w-[360px]">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-            <input type="search" value={busca} maxLength={200} onChange={(event) => { setBusca(event.target.value); setLimitesVisiveis({}); }} aria-label="Buscar em todos os cards do pipeline" placeholder="Buscar empresa, CNPJ ou serviço"
+            <input type="search" value={busca} maxLength={200} onChange={(event) => {
+              const novaBusca = event.target.value;
+              ultimaRequisicaoRef.current += 1; setBusca(novaBusca);
+              setFiltroOrigem(origemNoRecorte(novaBusca, filtroResponsaveis)); setLimitesVisiveis({});
+            }} aria-label="Buscar em todos os cards do pipeline" placeholder="Buscar empresa, CNPJ ou serviço"
               className="h-11 w-full min-w-0 rounded-xl border border-white/20 bg-white/[0.07] py-2.5 pl-10 pr-3 text-sm text-white shadow-sm outline-none placeholder:text-slate-400 focus-visible:border-sky-400/70 focus-visible:ring-2 focus-visible:ring-sky-400/20" />
           </div>
           <FiltroOrigemBoard origens={origensDisponiveis} value={filtroOrigem} onChange={(origem) => {
             ultimaRequisicaoRef.current += 1; fecharDetalhes(); setLimitesVisiveis({}); setFiltroOrigem(origem);
           }} />
-          <Select value={filtroResponsaveis} onValueChange={(value) => { ultimaRequisicaoRef.current += 1; fecharDetalhes(); setLimitesVisiveis({}); setFiltroResponsaveis(value); }}>
+          <Select value={filtroResponsaveis} onValueChange={(value) => {
+            ultimaRequisicaoRef.current += 1; fecharDetalhes(); setLimitesVisiveis({});
+            setFiltroOrigem(origemNoRecorte(busca, value)); setFiltroResponsaveis(value);
+          }}>
             <SelectTrigger
               aria-label="Filtrar cards por responsável"
               className="h-11 w-full shrink-0 rounded-xl border-white/10 bg-white/[0.04] text-sm text-slate-200 data-[size=default]:h-11 sm:w-[230px]"

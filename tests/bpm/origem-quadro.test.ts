@@ -4,7 +4,7 @@ import {
   origemNativaQuadro, origemNolossQuadro, origensDisponiveisQuadro, valorSelectOrigemQuadro,
   SEM_ORIGEM_QUADRO, TODAS_ORIGENS_QUADRO,
 } from "@/lib/bpm/origem-quadro";
-import { selecionarPaginaQuadro, type EntradaManifestoQuadro } from "@/lib/bpm/quadro-paginado";
+import { origensDisponiveisNaVisaoQuadro, selecionarPaginaQuadro, type EntradaManifestoQuadro } from "@/lib/bpm/quadro-paginado";
 
 describe("origem do quadro", () => {
   it("obtém opções do manifesto inteiro e não inclui canais do catálogo sem cards", () => {
@@ -14,6 +14,7 @@ describe("origem do quadro", () => {
     expect(selecionarPaginaQuadro(entradas, { origem: "Callix", responsavelId: 2, busca: "especial" })).toEqual({ ids: ["card-380"], totais: { entrada: 1 } });
     expect(origensDisponiveisQuadro(entradas)).not.toContain("China");
     expect(origensDisponiveisQuadro(entradas)).not.toContain(null);
+    expect(origensDisponiveisNaVisaoQuadro(entradas, { responsavelId: 2, busca: "especial", origem: "Instagram", limites: { entrada: 1 } })).toEqual(["Callix"]);
   });
 
   it("distingue Todas, Sem origem e origens personalizadas parecidas com sentinelas", () => {
@@ -47,13 +48,17 @@ describe("origem do quadro", () => {
     expect(selecionarPaginaQuadro(entradas, { origem: null }).totais).toEqual({ primeira: 20, segunda: 3 });
   });
 
-  it("combina origem com Meus e sem vínculos sem retirar opções de colegas autorizados", () => {
+  it("oferece somente origens com leads na busca e visão atuais antes da paginação", () => {
     const base = { etapaId: "entrada", revision: "1", nome: "Empresa", cnpj: null, servico: null };
-    const entradas = [{ ...base, id: "meu", origem: "Instagram", responsaveis: [{ id: 1, nome: "Eu" }] }, { ...base, id: "colega", origem: "Callix", responsaveis: [{ id: 2, nome: "Colega" }] }, { ...base, id: "livre", origem: "Callix", responsaveis: [] }];
+    const entradas = [{ ...base, id: "meu", nome: "Empresa própria", origem: "Instagram", responsaveis: [{ id: 1, nome: "Eu" }] }, { ...base, id: "colega", nome: "Empresa colega", origem: "Callix", responsaveis: [{ id: 2, nome: "Colega" }] }, { ...base, id: "livre", origem: "Site", responsaveis: [] }, { ...base, id: "sem", origem: null, responsaveis: [{ id: 2, nome: "Colega" }] }];
     const acesso = { userId: 1, admin: false, setores: [], responsaveis: [{ id: 2, nome: "Colega" }] };
-    expect(origensDisponiveisQuadro(entradas)).toEqual(["Callix", "Instagram"]);
-    expect(selecionarPaginaQuadro(entradas, { acesso, origem: "Callix" }).ids).toEqual(["livre"]);
-    expect(selecionarPaginaQuadro(entradas, { acesso, visao: "TODOS", origem: "Callix" }).ids).toEqual(["colega", "livre"]);
+    expect(origensDisponiveisNaVisaoQuadro(entradas, { acesso })).toEqual(["Instagram", "Site"]);
+    expect(origensDisponiveisNaVisaoQuadro(entradas, { acesso, visao: "TODOS" })).toEqual(["Callix", "Instagram", "Site", null]);
+    expect(origensDisponiveisNaVisaoQuadro(entradas, { acesso, visao: "TODOS", responsavelId: 2, origem: "Instagram" })).toEqual(["Callix", null]);
+    expect(origensDisponiveisNaVisaoQuadro(entradas, { acesso, visao: "TODOS", busca: "colega", origem: "Site" })).toEqual(["Callix"]);
+    expect(origensDisponiveisNaVisaoQuadro(entradas, { acesso, visao: "TODOS", busca: "inexistente" })).toEqual([]);
+    expect(selecionarPaginaQuadro(entradas, { acesso, origem: "Callix" }).ids).toEqual([]);
+    expect(selecionarPaginaQuadro(entradas, { acesso, visao: "TODOS", origem: "Callix" }).ids).toEqual(["colega"]);
   });
 
   it("usa origem unívoca do próprio card, sem substituir pela origem de outro contexto", () => {
@@ -71,19 +76,28 @@ describe("origem do quadro", () => {
     expect(origemNativaQuadro({ empresaId: 7 })).toBeNull();
   });
 
-  it("classifica NoLoss somente pelos dados conhecidos, sem transformar UTM ausente em Site", () => {
+  it("apresenta NoLoss como Site sem reclassificar Instagram nem alterar a origem persistida", () => {
     expect(origemNolossQuadro({ utmSource: "website", utmMedium: "Pago" })).toBe("Site");
     expect(origemNolossQuadro({ utmSource: "", utmMedium: "Instagram" })).toBe("Instagram");
-    expect(origemNolossQuadro({ utmSource: null, utmMedium: null })).toBe("NoLoss");
+    expect(origemNolossQuadro({ utmSource: null, utmMedium: null })).toBe("Site");
+    const entradas = [{ origem: "NoLoss" }, { origem: "NOLOSS" }, { origem: "No loss" }, { origem: "Site" }, { origem: "website" }, { origem: "Instagram" }];
+    expect(origensDisponiveisQuadro(entradas)).toEqual(["Instagram", "Site"]);
+    expect(entradas[0].origem).toBe("NoLoss");
+    expect(origemCorrespondeFiltro("NoLoss", "Site")).toBe(true);
+    expect(origemCorrespondeFiltro("Site", "NoLoss")).toBe(true);
+    expect(origemCorrespondeFiltro("Instagram", "Site")).toBe(false);
+    expect(filtroDoSelectOrigemQuadro(valorSelectOrigemQuadro("NoLoss"))).toBe("Site");
+    expect(origemNativaQuadro({ empresaId: 7, campoValores: [{ valor: "NoLoss", campo: { nome: "Canal de origem" } }] })).toBe("Site");
   });
 
   it("mantém as cores por origem independentemente da ordem e cria tons próprios para legados", () => {
     const origens = ["Instagram", "Site", "Callix", "Discadora", "Feiras e Eventos", "Evento", "China", "WhatsApp", "Orgânico", "Indicação Parceiro", "Indicação Cliente", "Outro", "Prospecção ativa", "Tráfego Pago (Meta - Instagram)", "Tráfego Pago (Google)", "NoLoss", "Redes Sociais", "Contato por Telefone", "Google e Outros Buscadores", "teste"];
     const cores = origens.map(corOrigemQuadro);
-    expect(new Set(cores.map((cor) => cor.fundo)).size).toBe(origens.length);
+    expect(new Set(cores.map((cor) => cor.fundo)).size).toBe(new Set(origens.map(normalizarOrigemQuadro)).size);
     for (const origem of [...origens].reverse()) expect(corOrigemQuadro(origem)).toEqual(cores[origens.indexOf(origem)]);
     expect(corOrigemQuadro("Instagram").fundo).toContain("270");
     expect(corOrigemQuadro("Site").fundo).toContain("217");
     expect(corOrigemQuadro(" instagram ")).toEqual(corOrigemQuadro("Instagram"));
+    expect(corOrigemQuadro("NoLoss")).toEqual(corOrigemQuadro("Site"));
   });
 });

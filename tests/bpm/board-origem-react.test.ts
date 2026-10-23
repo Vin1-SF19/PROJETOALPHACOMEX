@@ -135,7 +135,7 @@ it("mostra origens fora da página carregada e transporta a seleção para hidra
   } finally { await act(async () => root.unmount()); container.remove(); }
 });
 
-it("combina origem com busca e responsável sem diminuir o catálogo ao filtro atual", async () => {
+it("restringe as opções à busca e ao responsável sem aplicar a própria origem à faceta", async () => {
   const cards = [card("meu", "Instagram", 1, "Alvo próprio"), card("colega", "Instagram", 9, "Alvo colega"), card("site", "Site", 9, "Alvo site")];
   const snapshot = manifesto(cards);
   vi.mocked(SincronizarQuadroBpm).mockImplementation(async (_id, filtros) => {
@@ -153,9 +153,45 @@ it("combina origem com busca e responsável sem diminuir o catálogo ao filtro a
     expect(container.querySelector('[aria-label="Abrir card de Alvo colega"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Abrir card de Alvo site"]')).toBeNull();
     expect(container.querySelector('[aria-label="Abrir card de Alvo próprio"]')).toBeNull();
-    expect([...origemSelect(container).options].map((item) => item.textContent)).toEqual(["Todas as origens", "Instagram", "Site"]);
+    expect([...origemSelect(container).options].map((item) => item.textContent)).toEqual(["Todas as origens", "Instagram"]);
     await escolher(origemSelect(container), TODAS_ORIGENS_QUADRO);
     expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ origem: undefined, responsavelId: 9, busca: "colega" }));
+  } finally { await act(async () => root.unmount()); container.remove(); }
+});
+
+it("oculta origens de colegas em Meus e sem vínculos e mostra Site uma única vez para NoLoss", async () => {
+  const cards = [card("noloss", "NoLoss", 1, "Contato NoLoss"), card("site", "Site", 1, "Contato Site"),
+    card("callix-colega", "Callix", 9, "Contato Callix"), card("instagram-colega", "Instagram", 9, "Contato Instagram")];
+  const snapshot = manifesto(cards);
+  vi.mocked(SincronizarQuadroBpm).mockImplementation(async (_id, filtros) => {
+    if (typeof filtros !== "object" || filtros === null || Array.isArray(filtros)) throw new Error("Filtros do quadro devem ser um objeto");
+    const ids = selecionarPaginaQuadro(snapshot.entradas, { ...filtros, acesso: snapshot.acesso }).ids;
+    return { success: true, manifesto: snapshot, ids, cards: cards.filter((item) => ids.includes(item.id)) } as never;
+  });
+  const { container, root, props } = montar(cards.slice(0, 2), snapshot);
+  const opcoes = () => [...origemSelect(container).options].map((item) => item.textContent);
+  try {
+    await act(async () => root.render(h(PipelineBoardClient, props)));
+    expect(opcoes()).toEqual(["Todas as origens", "Site"]);
+    expect(opcoes()).not.toContain("Callix");
+    expect(opcoes()).not.toContain("NoLoss");
+    expect([...container.querySelectorAll('[aria-label="Origem do lead"]')].map((item) => item.textContent)).toEqual(["Origem do lead: Site", "Origem do lead: Site"]);
+    await escolher(origemSelect(container), valorSelectOrigemQuadro("Site"));
+    expect(container.querySelector('[aria-label="Abrir card de Contato NoLoss"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Abrir card de Contato Site"]')).not.toBeNull();
+
+    await escolher(responsavelSelect(container), "9");
+    expect(opcoes()).toEqual(["Todas as origens", "Callix", "Instagram"]);
+    expect(origemSelect(container).value).toBe(TODAS_ORIGENS_QUADRO);
+    expect(SincronizarQuadroBpm).toHaveBeenLastCalledWith("pipeline-1", expect.objectContaining({ origem: undefined, responsavelId: 9, limites: {} }));
+    await escolher(origemSelect(container), valorSelectOrigemQuadro("Callix"));
+    await buscar(container, "Instagram");
+    expect(opcoes()).toEqual(["Todas as origens", "Instagram"]);
+    expect(origemSelect(container).value).toBe(TODAS_ORIGENS_QUADRO);
+    expect(container.querySelector('[aria-label="Abrir card de Contato Instagram"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Abrir card de Contato Callix"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Origem do lead"]')?.textContent).toBe("Origem do lead: Instagram");
+    expect(cards[0].campoValores?.[0].valor).toBe("NoLoss");
   } finally { await act(async () => root.unmount()); container.remove(); }
 });
 

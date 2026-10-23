@@ -150,7 +150,7 @@ describe("origem no manifesto autorizado", () => {
     expect(m.cards).not.toHaveBeenCalled();
   });
 
-  it("projeta Instagram, NoLoss e origem contextual sem inventar canal a partir do provedor RD", async () => {
+  it("projeta Instagram, Site via NoLoss e origem contextual sem inventar canal a partir do provedor RD", async () => {
     m.cards.mockResolvedValue([
       { ...card, id: "contexto", empresaId: 7, servicoContexto: { clienteServico: { clienteId: 7, origemLead: "Evento", canalAquisicao: null } } },
       { ...card, id: "rd-sem-canal", empresaId: 7, origemExterna: { provider: "RD_STATION_CRM_V1" } },
@@ -160,7 +160,7 @@ describe("origem no manifesto autorizado", () => {
     m.resumos.mockImplementation(async (_pipeline, ids: string[]) => ({ success: true, data: ids.map((id) => ({ id })) }));
     const r = await SincronizarQuadroBpm("pipeline", { visao: "TODOS" });
     if (!r.success) throw new Error("fixture");
-    expect(Object.fromEntries(r.manifesto.entradas.map((e) => [e.id, e.origem]))).toEqual({ contexto: "Evento", "rd-sem-canal": null, site: "Site", "sem-utm": "NoLoss", ig: "Instagram" });
+    expect(Object.fromEntries(r.manifesto.entradas.map((e) => [e.id, e.origem]))).toEqual({ contexto: "Evento", "rd-sem-canal": null, site: "Site", "sem-utm": "Site", ig: "Instagram" });
     expect(m.cards).toHaveBeenCalledOnce();
     expect(m.cards.mock.calls[0][0].select.servicoContexto.select).toEqual({ clienteServico: { select: { clienteId: true, origemLead: true, canalAquisicao: true } }, contratoComercial: { select: { clienteId: true, canalAquisicao: true } } });
   });

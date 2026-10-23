@@ -15,7 +15,7 @@ export function normalizarOrigemQuadro(valor: string | null | undefined): string
   if (!texto) return null;
   const chave = chaveTexto(texto);
   if (chave === "instagram") return "Instagram";
-  if (chave === "site" || chave === "website") return "Site";
+  if (chave === "site" || chave === "website" || chave === "noloss" || chave === "no loss") return "Site";
   return rotulosPadrao.get(chave) ?? texto;
 }
 
@@ -41,7 +41,8 @@ export function origensDisponiveisQuadro(entradas: readonly { origem?: string | 
 }
 
 export function valorSelectOrigemQuadro(origem: FiltroOrigemQuadro): string {
-  return origem === undefined ? TODAS_ORIGENS_QUADRO : origem === null ? SEM_ORIGEM_QUADRO : PREFIXO_ORIGEM + encodeURIComponent(origem);
+  const normalizada = normalizarOrigemQuadro(origem);
+  return origem === undefined ? TODAS_ORIGENS_QUADRO : normalizada === null ? SEM_ORIGEM_QUADRO : PREFIXO_ORIGEM + encodeURIComponent(normalizada);
 }
 
 export function filtroDoSelectOrigemQuadro(valor: string): FiltroOrigemQuadro {
@@ -52,7 +53,7 @@ export function filtroDoSelectOrigemQuadro(valor: string): FiltroOrigemQuadro {
 }
 
 export function corOrigemQuadro(origem: string | null): { fundo: string; borda: string; texto: string; ponto: string } {
-  const chave = chaveTexto(origem ?? "Sem origem");
+  const chave = chaveTexto(normalizarOrigemQuadro(origem) ?? "Sem origem");
   let hue = chave === "instagram" ? 270 : chave === "site" || chave === "website" ? 217 : 0;
   if (chave !== "instagram" && chave !== "site" && chave !== "website") {
     let hash = 2166136261;
@@ -85,5 +86,5 @@ export function origemNativaQuadro(card: CardComOrigemQuadro): string | null {
 }
 
 export function origemNolossQuadro(lead: { utmSource?: string | null; utmMedium?: string | null }): string {
-  return normalizarOrigemQuadro(lead.utmSource?.trim() || lead.utmMedium?.trim() || "NoLoss")!;
+  return normalizarOrigemQuadro(lead.utmSource?.trim() || lead.utmMedium?.trim() || "Site")!;
 }
