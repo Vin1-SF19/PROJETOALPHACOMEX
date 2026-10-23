@@ -267,3 +267,12 @@ FileListDevOps:runbookops,relatórioVault e story porappend; sem app/testes/sche
 - [ ] Homologação autenticada/uploadreal/hash2 pendentes;48oldwriters preservados, semprova decessação/drenagem. SemDELETE/proteção/DBwrite/objetos/timer/produção nestaestação. StoryInProgress, nãoDone.
 
 Handoff `/tmp/checklist-analistas-20261022-staging-published-final.md`+JSON; plano48IDs `...-publish-final-oldwriters.json`. FileListDevOps: storyChecklist, docs/ops/checklist-analistas-staging-20261022.md, docs/vault/checklist-analistas-20261022.md, docs/qa/matriz-checklist-analistas-20261022.md; appenddocs local semnovo pushduplicado. ControleaoBibble.
+
+
+### DevOps — TI modelos publicada em staging (22/10/2026)
+
+- [x] Commit`d6bb591823636c3f4fc9957c943c559b1c1ba8fe`/fonte0918f426, deployment`dpl_5B9CXWHxMSdFUVMWdLRmrhcfq6yQ` READY22:21:39.511UTC/customsKT/refstaging,2aliases/TLS/smokes200/307/307/401/200listasvazias. TI5hashes eentregasCRM/ficha/áudio preservados.
+- [x] Forge4gatesPASS747files6122testes; Turboexplícito30cores60GB/ativo152.731s. MarkerGitignoradogeroubuild8GBcanceladoantesdeerro; nenhumaOOMalegada. Semconfigglobal.
+- [ ] HomologaçãoTIautenticada/hash2pendentes; semDB/produção/Portal/env/SSO/storage/timer/olddelete. StoryInProgress,nãoDone.
+
+Handoff `/tmp/checklist-analistas-20261022-ti-published.md`+JSON. FileListpóspublicação: docs/ops/checklist-analistas-staging-20261022.md eestaStory, appendlocal sempushduplicado. OutputRAM.nextforadoGit. ControleaoBibble.

@@ -1882,3 +1882,7 @@ Clique de notificação é leitura: destino pendente canônico ou card promovido
 
 
 **Fechamento local do áudio CRM:** QA Probe/Sage/Lens após Forge aprovou GO staging, zero bloqueantes/importantes; 26 testes diretos (nove áudio/17 cliente) e 48 dirigidos são subconjuntos da suíte global, sem duplicar contagem. Smoke compilado local confirmou MP3 HTTP200/hash, raiz/sessão200 e CRM protegido307; servidor encerrado. Story Ready for Review, File List11. Publicação/READY e smoke remoto ainda pendentes neste checkpoint pré-commit; evidências posteriores privadas. Prova `/var/tmp/alpha-crm-audio-notificacoes-origem-20261022/qa-final-private.json`.
+
+
+## CheckList TI modelos publicado — 2026-10-22 22:21 UTC
+Gestão de modelos usa predicate TI normalizado ou Líder Operacional em src/lib/checklist/acesso.ts (canManageModels/exigirGestorModelosChecklist). src/lib/checklist/catalogo.ts exige autorização persistida dentro da transação antes do replay. UI ModelosWorkspace e páginas existentes consomem capabilities. Não amplia dossiês/atribuição.

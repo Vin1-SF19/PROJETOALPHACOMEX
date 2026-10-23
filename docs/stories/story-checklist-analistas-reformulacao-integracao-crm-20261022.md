@@ -528,3 +528,82 @@ Parecer `/tmp/checklist-analistas-20261022-ti-lens-merged.md`. File List Lens: a
 - [ ] DevOpspublicaçãoTurboSTAGING/homologação autenticada/hash2 seguemstatusoperacional real, semDone.
 
 HandoffForge `/tmp/checklist-analistas-20261022-ti-forge-merged2.md`+inputJSON; FileList2docsQA/story apenas.
+
+
+### DevOps — TI modelos publicada em staging (22/10/2026)
+
+- [x] Commit`d6bb591823636c3f4fc9957c943c559b1c1ba8fe`/fonte0918f426, deployment`dpl_5B9CXWHxMSdFUVMWdLRmrhcfq6yQ` READY22:21:39.511UTC/customsKT/refstaging,2aliases/TLS/smokes200/307/307/401/200listasvazias. TI5hashes eentregasCRM/ficha/áudio preservados.
+- [x] Forge4gatesPASS747files6122testes; Turboexplícito30cores60GB/ativo152.731s. MarkerGitignoradogeroubuild8GBcanceladoantesdeerro; nenhumaOOMalegada. Semconfigglobal.
+- [ ] HomologaçãoTIautenticada/hash2pendentes; semDB/produção/Portal/env/SSO/storage/timer/olddelete. StoryInProgress,nãoDone.
+
+Handoff `/tmp/checklist-analistas-20261022-ti-published.md`+JSON. FileListpóspublicação: docs/ops/checklist-analistas-staging-20261022.md eestaStory, appendlocal sempushduplicado. OutputRAM.nextforadoGit. ControleaoBibble.
+
+
+### Adendo visual — criação de documentos/templates, 23/10/2026 (Nova)
+
+Origem: pedido explícito do usuário “eu prefiro o visual que estava anteriormente na criação de documentos (templates)”. Referência confirmada pelo Scout: `add03a89^` (`69047dee`), clients antigos de `CheckList/Embasamentos`, idênticos a `60ae49ff`. Escopo de apresentação do catálogo atual; execução e validação primeiro em staging.
+
+Critérios de aceitação definidos antes do código:
+
+- [x] AV1: home recupera os quatro cards de embasamento e tipografia anterior; catálogo paginado Todos/Global e criação Global permanecem acessíveis, sem contagens inventadas.
+- [x] AV2: detalhe mostra o nome do embasamento, cards documentais e formulário azul inline responsivo (uma coluna mobile, duas em md), descrição textarea e labels anteriores; nova criação inicia no tipo do detalhe e permite Global explícito.
+- [x] AV3: preservar código/nome/descrição/seção (cinco valores atuais), escopo, ordem 0–100000, obrigatório/ativo, revisões/CAS/retry mutationId, refetch, ordenação e desativação. Código/escopo/identidade de revisão permanecem imutáveis, erro conserva o formulário preenchido e comando pendente continua protegido pelo draft guard.
+- [x] AV4: gestão continua derivada de `canManage` do servidor para TI/Líder e consulta para analistas; não alterar ACL/actions/API/schema/banco/Portal/GeradorDocumentos.
+- [x] AV5: teste causal de criação inline com erro/retry/sucesso, edição com identidade/revisão/payload e permissão de consulta; ESLint focal antes do handoff. Gates globais e homologação staging seguem com Forge/Probe.
+
+Checklist da implementação:
+
+- [x] Referência histórica, blueprint Scout e regras Nova consultados; worktree exclusivo e dirty preexistente preservados.
+- [x] Implementação e verificações focais concluídas: 25/25 testes PASS (5 novos + 20 existentes), ESLint focal zero erros/warnings e `git diff --check` PASS. Logs sanitizados em `/tmp/checklist-analistas-20261022-forge-nova-templates-{focused-final,eslint-final}.log`; globals seguem pendentes.
+- [ ] Gates globais, revisão e homologação somente staging concluídos pelos owners seguintes; este adendo não autoriza produção.
+
+File List efetiva desta implementação:
+
+- `src/components/checklist/ModelosWorkspace.tsx` — composição home/detalhe/cards e integração do formulário inline.
+- `src/components/checklist/ModelosDocumentoForm.tsx` — apresentação/estado do formulário atual extraídos para respeitar limite de 300 linhas; mesmos comandos e contrato.
+- `tests/operacional/checklist-modelos-frontend.test.tsx` — comportamento causal com ações mockadas e fixtures sintéticas.
+- `docs/stories/story-checklist-analistas-reformulacao-integracao-crm-20261022.md` — este adendo/checklist/file list.
+
+Novo componente: `ModelosDocumentoForm` (client, 116 linhas); workspace 181 linhas. A apresentação inline conserva o comando existente e registra seus valores no draft guard já disponível, bloqueando troca de revisão sem salvar/descartar e preservando o texto no erro. Helper usa estado inicial para comparar alterações, após correção do primeiro ESLint (`react-hooks/refs`); nenhuma supressão adicionada. Novo formulário permanece visível após sucesso com campos limpos e escopo inicial restaurado. Não houve execução de banco, build/global, deploy ou produção por Nova.
+
+
+### Forge — restauração visual de templates CheckList, 23/10/2026
+
+- [x] Quatro gates MAIN reais sobre HEADd6bb5918 + patch Nova, uma vez cada: typecheck10,10s/exit0; lint43,52s/exit0(0erros1183warnings anteriores); npmtest fullcoverage35,53s/exit0(**748arquivos6127PASS+4skip1todo=6132**, +1arquivo/+5casos); build87,58s/exit0(Prisma/player/webpack/86páginas). TC8GiB separadoPASS; buildpools1/heap4096 preservado.
+- [x] Fingerprint3167arquivos e1a7e0433f54485fb3398765132b0beb7d8896c3c251fb4d81dae1499d4dc695 antes/depois idêntico, INCLUINDO helper/testeUNTRACKED. Schema c3c82… intacto; wrapper sintético/TMPDIRRAM/.nextRAM existentes preservados. `.next` continua artefato gerado não versionável. Sem fonte/config/gatesPortal/envreal/DB/cloud/Gitmutável alterados.
+- [ ] Probe desktop/mobile e Lens focais, publicação/validação somente staging seguem pendentes; story In Progress.
+
+**APROVADO Forge para Probe/Lens.** Relatório `/tmp/checklist-templates-visual-20261023-forge.md`; hashes/resultados `/tmp/checklist-templates-visual-20261023-forge-input.json`; logs `/tmp/checklist-analistas-20261022-forge-templates-visual-{typecheck,lint,test,build}.log`+metadata. File List Forge: esta story e matrizQA, somente append factual; memórias/docs/fontes dirty alheios preservados. Controle ao Bibble; nenhum próximo agente acionado.
+
+
+### Correção Nova após Probe — provider de rascunho nas rotas Modelos, 23/10/2026
+
+Achado causal `/tmp/checklist-templates-visual-20261023-review.md`: o guard não era ancestral das rotas reais; o teste adicionava artificialmente o provider e mascarava a integração ausente. Os PASS anteriores do cenário de rascunho/busy não comprovavam o wiring de produção.
+
+Critérios desta correção, registrados antes do código:
+
+- [x] CF1: export público `ModelosWorkspace` monta `ChecklistDraftGuard` envolvendo componente interno com todos os hooks, sem alterar páginas/layout/backend.
+- [x] CF2: teste renderiza o export real somente com QueryClientProvider, sem injetar guard; rascunho cancela beforeunload, publicação pendente bloqueia editar/gestão e não desmonta nem substitui os valores; troca posterior exige confirmação.
+- [x] CF3: repetir apenas ESLint focal e os 25 testes causais existentes; gates globais e browser real seguem Forge/Probe.
+
+File List desta correção: `src/components/checklist/ModelosWorkspace.tsx`, `tests/operacional/checklist-modelos-frontend.test.tsx` e esta story. Helper `ModelosDocumentoForm.tsx` permanece no patch visual, sem alteração nesta correção. Nenhuma edição fora do escopo visual/conectividade autorizado.
+
+Evidência da correção: 25/25 testes focais PASS (5 Modelos + 20 CheckList), exit0/1,81s; ESLint focal zero erros/warnings, exit0/1,09s; `git diff --check` PASS. Logs sanitizados `/tmp/checklist-analistas-20261022-forge-nova-templates-fix-{focused,eslint}.log` (+metadados JSON). Relatório `/tmp/checklist-templates-visual-20261023-nova-fix.md`. Gates globais e reprodução Chrome pós-correção continuam pendentes com Forge/Probe; nenhuma aprovação remota por inferência.
+
+
+### Forge — correção do guard real em Modelos, 23/10/2026
+
+- [x] Após fixNova/achadoProbe: quatro MAINgates atuais reais PASS, uma vez cada. Typecheck10,04s/exit0; lint43,60s/exit0(0erros1183warnings); npmtest fullcoverage35,82s/exit0(748arquivos6127PASS+4skip1todo=6132); build50,71s/exit0(Prisma/player/webpack/86páginas). TC8GiB separadoPASS; buildRAYON1/UV1/heap4096 preservado.
+- [x] Fingerprint3167arquivos fe566fdef794cf4bc3f22be7329a1134e94adb9ab0f3ff39767bf321508b4d61 antes/depois idêntico, incluindo helper/testeUNTRACKED; workspacec01f3ef9…/test7c4414e1…/helper759dfe9b… capturados. Wrapper sintético/TMPDIRRAM/.nextRAM resolvidos; schema/backend/ACL/Portal preservados. Sem fonte/config/timeouts/cobertura alterados pelo Forge.
+- [ ] Probe refazer browser sem provider artificial e Lens focal; publicação/validação staging seguem pendentes. Story In Progress.
+
+**APROVADO Forge para Probe/Lens.** Relatório `/tmp/checklist-templates-visual-20261023-forge-fix.md`; manifesto/resultados `/tmp/checklist-templates-visual-20261023-forge-fix-input.json`; logs `/tmp/checklist-analistas-20261022-forge-templates-visual-fix-{typecheck,lint,test,build}.log`+metadata. File List Forge: esta story e matrizQA, somente append; dirtyalheios/.nextRAM preservados. Sem DB/envreal/cloud/Gitmutável/deploy/produção; controle ao Bibble, nenhum próximo agente acionado.
+
+
+### Probe → Lens — visual e guard real de Modelos, 23/10/2026
+
+- [x] Chrome próprio, componentes reais reconstruídos do patch corrigido, CSS/media do build Forge e apenas ChecklistProvider na entrada: **20/20 asserts PASS**, zero Runtime.exceptionThrown. Desktop 1440 e mobile 390 sem overflow; quatro links; formulário azul inline em 2/1 colunas, textarea/labels, escopo Global/detalhe e consulta sem gestão confirmados.
+- [x] Achado anterior corrigido e reproduzido: dirty cancela unload, publicação pendente bloqueia editar/gestão e duplicação, valores e formulário preservados. Teste atual não injeta provider artificial. Lens focal nos 2 runtimes + 1 teste: **zero achados; APROVADO**. Hashes coincidem com Forge-fix; contratos/payload/identidade/CAS/retry/capability preservados.
+- [ ] Publicação e homologação autenticada em staging seguem com DevOps; story In Progress. Sem mudança de banco/backend/ACL/schema/Portal nem publicação em produção.
+
+Evidência: `/tmp/checklist-templates-visual-20261023-review-final.md`; browser JSON e capturas atuais em `/tmp/checklist-templates-visual-20261023-preview/`. File List desta estação: esta story e `docs/qa/matriz-checklist-analistas-20261022.md`, somente append factual. Fonte/testes/memórias dirty preservados; controle devolvido ao Bibble.

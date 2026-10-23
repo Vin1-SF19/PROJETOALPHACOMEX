@@ -7538,3 +7538,7 @@ Gates globais, revisão independente, commit/push e publicação/smoke staging. 
 
 
 **Fechamento local do áudio CRM:** QA Probe/Sage/Lens após Forge aprovou GO staging, zero bloqueantes/importantes; 26 testes diretos (nove áudio/17 cliente) e 48 dirigidos são subconjuntos da suíte global, sem duplicar contagem. Smoke compilado local confirmou MP3 HTTP200/hash, raiz/sessão200 e CRM protegido307; servidor encerrado. Story Ready for Review, File List11. Publicação/READY e smoke remoto ainda pendentes neste checkpoint pré-commit; evidências posteriores privadas. Prova `/var/tmp/alpha-crm-audio-notificacoes-origem-20261022/qa-final-private.json`.
+
+
+## CheckList TI modelos publicado — 2026-10-22 22:21 UTC
+Pedido explícito do usuário: liberar TI para templates. Echo→Nova→Forge→Probe/Anubis→Lens→DevOps concluídos em série; integrações preservatórias dos commits concorrentes CRM/ficha/áudio. Staging publicado commit d6bb591823636c3f4fc9957c943c559b1c1ba8fe, deployment dpl_5B9CXWHxMSdFUVMWdLRmrhcfq6yQ READY22:21:39.511UTC, dois aliases/TLS/smokes PASS. Gates reais: TC/lint/build e747arquivos6122testes PASS+4skip1todo. Turbo explícito152.731s após cancelar build padrão; sem novo plano/config global. Portal/produção/DB/env/SSO intactos nesta entrega. Login TI real não realizado. Duas senhas legadas continuam condicionadas à cessação verificável dos writers antigos/Vault. Relatório /tmp/checklist-analistas-20261022-ti-published.md.

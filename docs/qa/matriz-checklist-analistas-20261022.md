@@ -292,3 +292,30 @@ Parecer `/tmp/checklist-analistas-20261022-ti-lens-merged.md`. File List Lens: a
 - [ ] DevOpspublicaçãoTurboSTAGING/homologação autenticada/hash2 seguemstatusoperacional real, semDone.
 
 HandoffForge `/tmp/checklist-analistas-20261022-ti-forge-merged2.md`+inputJSON; FileList2docsQA/story apenas.
+
+
+### Forge — restauração visual de templates CheckList, 23/10/2026
+
+- [x] Quatro gates MAIN reais sobre HEADd6bb5918 + patch Nova, uma vez cada: typecheck10,10s/exit0; lint43,52s/exit0(0erros1183warnings anteriores); npmtest fullcoverage35,53s/exit0(**748arquivos6127PASS+4skip1todo=6132**, +1arquivo/+5casos); build87,58s/exit0(Prisma/player/webpack/86páginas). TC8GiB separadoPASS; buildpools1/heap4096 preservado.
+- [x] Fingerprint3167arquivos e1a7e0433f54485fb3398765132b0beb7d8896c3c251fb4d81dae1499d4dc695 antes/depois idêntico, INCLUINDO helper/testeUNTRACKED. Schema c3c82… intacto; wrapper sintético/TMPDIRRAM/.nextRAM existentes preservados. `.next` continua artefato gerado não versionável. Sem fonte/config/gatesPortal/envreal/DB/cloud/Gitmutável alterados.
+- [ ] Probe desktop/mobile e Lens focais, publicação/validação somente staging seguem pendentes; story In Progress.
+
+**APROVADO Forge para Probe/Lens.** Relatório `/tmp/checklist-templates-visual-20261023-forge.md`; hashes/resultados `/tmp/checklist-templates-visual-20261023-forge-input.json`; logs `/tmp/checklist-analistas-20261022-forge-templates-visual-{typecheck,lint,test,build}.log`+metadata. File List Forge: esta story e matrizQA, somente append factual; memórias/docs/fontes dirty alheios preservados. Controle ao Bibble; nenhum próximo agente acionado.
+
+
+### Forge — correção do guard real em Modelos, 23/10/2026
+
+- [x] Após fixNova/achadoProbe: quatro MAINgates atuais reais PASS, uma vez cada. Typecheck10,04s/exit0; lint43,60s/exit0(0erros1183warnings); npmtest fullcoverage35,82s/exit0(748arquivos6127PASS+4skip1todo=6132); build50,71s/exit0(Prisma/player/webpack/86páginas). TC8GiB separadoPASS; buildRAYON1/UV1/heap4096 preservado.
+- [x] Fingerprint3167arquivos fe566fdef794cf4bc3f22be7329a1134e94adb9ab0f3ff39767bf321508b4d61 antes/depois idêntico, incluindo helper/testeUNTRACKED; workspacec01f3ef9…/test7c4414e1…/helper759dfe9b… capturados. Wrapper sintético/TMPDIRRAM/.nextRAM resolvidos; schema/backend/ACL/Portal preservados. Sem fonte/config/timeouts/cobertura alterados pelo Forge.
+- [ ] Probe refazer browser sem provider artificial e Lens focal; publicação/validação staging seguem pendentes. Story In Progress.
+
+**APROVADO Forge para Probe/Lens.** Relatório `/tmp/checklist-templates-visual-20261023-forge-fix.md`; manifesto/resultados `/tmp/checklist-templates-visual-20261023-forge-fix-input.json`; logs `/tmp/checklist-analistas-20261022-forge-templates-visual-fix-{typecheck,lint,test,build}.log`+metadata. File List Forge: esta story e matrizQA, somente append; dirtyalheios/.nextRAM preservados. Sem DB/envreal/cloud/Gitmutável/deploy/produção; controle ao Bibble, nenhum próximo agente acionado.
+
+
+### Probe → Lens — visual e guard real de Modelos, 23/10/2026
+
+- [x] Chrome próprio, componentes reais reconstruídos do patch corrigido, CSS/media do build Forge e apenas ChecklistProvider na entrada: **20/20 asserts PASS**, zero Runtime.exceptionThrown. Desktop 1440 e mobile 390 sem overflow; quatro links; formulário azul inline em 2/1 colunas, textarea/labels, escopo Global/detalhe e consulta sem gestão confirmados.
+- [x] Achado anterior corrigido e reproduzido: dirty cancela unload, publicação pendente bloqueia editar/gestão e duplicação, valores e formulário preservados. Teste atual não injeta provider artificial. Lens focal nos 2 runtimes + 1 teste: **zero achados; APROVADO**. Hashes coincidem com Forge-fix; contratos/payload/identidade/CAS/retry/capability preservados.
+- [ ] Publicação e homologação autenticada em staging seguem com DevOps; story In Progress. Sem mudança de banco/backend/ACL/schema/Portal nem publicação em produção.
+
+Evidência: `/tmp/checklist-templates-visual-20261023-review-final.md`; browser JSON e capturas atuais em `/tmp/checklist-templates-visual-20261023-preview/`. File List desta estação: esta story e `docs/qa/matriz-checklist-analistas-20261022.md`, somente append factual. Fonte/testes/memórias dirty preservados; controle devolvido ao Bibble.
