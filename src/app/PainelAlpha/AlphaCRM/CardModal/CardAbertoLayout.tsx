@@ -59,6 +59,7 @@ export interface CardAbertoLayoutProps {
   /** Slot: formulário da etapa ativa (renderizado pelo CardOpenFormSlot ou equivalente) */
   children: ReactNode;
   focoTarefa?: { cardId: string; tarefaId: string } | null;
+  focoAnexos?: { cardId: string } | null;
 }
 
 /**
@@ -89,19 +90,22 @@ export function CardAbertoLayout({
   onInteracaoCriada,
   children,
   focoTarefa = null,
+  focoAnexos = null,
 }: CardAbertoLayoutProps) {
-  const [selecaoAba, setSelecaoAba] = useState({ valor: card.pipeline.id, foco: focoTarefa });
-  const abaAtiva = selecaoAba.foco === focoTarefa ? selecaoAba.valor : card.pipeline.id;
-  const setAbaAtiva = (valor: string) => setSelecaoAba({ valor, foco: focoTarefa });
+  const [selecaoAba, setSelecaoAba] = useState({ valor: card.pipeline.id, foco: focoTarefa, focoAnexos });
+  const abaAtiva = selecaoAba.foco === focoTarefa && selecaoAba.focoAnexos === focoAnexos ? selecaoAba.valor : card.pipeline.id;
+  const setAbaAtiva = (valor: string) => setSelecaoAba({ valor, foco: focoTarefa, focoAnexos });
   const [outrosPipelines, setOutrosPipelines] = useState<{ id: string; nome: string }[]>([]);
   const [excluindo, setExcluindo] = useState(false);
   const dadosEmpresaDrawer = useDadosEmpresaDrawer(card.id);
   const ultimoFocoTarefaRef = useRef(focoTarefa);
+  const ultimoFocoAnexosRef = useRef(focoAnexos);
   useEffect(() => {
-    if (ultimoFocoTarefaRef.current === focoTarefa) return;
+    if (ultimoFocoTarefaRef.current === focoTarefa && ultimoFocoAnexosRef.current === focoAnexos) return;
+    ultimoFocoAnexosRef.current = focoAnexos;
     ultimoFocoTarefaRef.current = focoTarefa;
-    if (focoTarefa?.cardId === card.id) dadosEmpresaDrawer.fechar();
-  }, [card.id, focoTarefa, dadosEmpresaDrawer]);
+    if (focoTarefa?.cardId === card.id || focoAnexos?.cardId === card.id) dadosEmpresaDrawer.fechar();
+  }, [card.id, focoTarefa, focoAnexos, dadosEmpresaDrawer]);
   const { openPerfilEmpresa } = usePerfilEmpresa();
 
 
@@ -331,6 +335,7 @@ export function CardAbertoLayout({
               <PainelHistorico
                 card={card}
                 focoTarefa={focoTarefa}
+                focoAnexos={focoAnexos}
                 accent={accent}
                 currentUserId={currentUserId}
                 currentUserRole={currentUserRole}

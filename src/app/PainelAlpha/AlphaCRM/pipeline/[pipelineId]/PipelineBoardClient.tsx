@@ -1,4 +1,5 @@
 "use client";
+import { avisarFichaViabilidadeDoRetorno } from "@/components/bpm/anexos/ficha-viabilidade-toast";
 
 import { useBpmNotificacaoBoardNavigation } from "@/hooks/useBpmNotificacaoBoardNavigation";
 import { solicitarReconciliacaoLeadsBpm } from "@/lib/bpm/notificacoes-navegacao";
@@ -839,6 +840,7 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
   const [cardSelecionadoId, setCardSelecionadoId] = useState<string | null>(cardInicialId);
   const [focoTarefa, setFocoTarefa] = useState<{ cardId: string; tarefaId: string } | null>(
     cardInicialId && tarefaInicialId ? { cardId: cardInicialId, tarefaId: tarefaInicialId } : null);
+  const [focoAnexos, setFocoAnexos] = useState<{ cardId: string } | null>(intencaoNotificacaoInicial?.cardId && intencaoNotificacaoInicial.abaInicial === "anexos" ? { cardId: intencaoNotificacaoInicial.cardId } : null);
   const [cardAgendamentoId, setCardAgendamentoId] = useState<string | null>(null);
   const [nolossLeadAberto, setNolossLeadAberto] = useState<CardBpm | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -866,16 +868,17 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
     setCardAgendamentoId(null);
     setCardSelecionadoId(intencao.cardId);
     setFocoTarefa(intencao.tarefaId ? { cardId: intencao.cardId, tarefaId: intencao.tarefaId } : null);
+    setFocoAnexos(intencao.abaInicial === "anexos" ? { cardId: intencao.cardId } : null);
   }, [setNolossLeadAberto, setCardAgendamentoId, setCardSelecionadoId, setFocoTarefa]);
   const abrirLeadNotificacao = useCallback((lead: CardBpm) => {
     cardAbertoPorAlertaRef.current = null;
     cardSelecionadoIdRef.current = null;
-    setCardSelecionadoId(null); setCardAgendamentoId(null); setFocoTarefa(null);
+    setCardSelecionadoId(null); setCardAgendamentoId(null); setFocoTarefa(null); setFocoAnexos(null);
     setNolossLeadAberto(lead);
   }, [setNolossLeadAberto, setCardAgendamentoId, setCardSelecionadoId, setFocoTarefa]);
   const erroAoAbrirNotificacao = useCallback((mensagem: string) => {
     cardAbertoPorAlertaRef.current = null; cardSelecionadoIdRef.current = null;
-    setCardSelecionadoId(null); setCardAgendamentoId(null); setFocoTarefa(null); setNolossLeadAberto(null);
+    setCardSelecionadoId(null); setCardAgendamentoId(null); setFocoTarefa(null); setFocoAnexos(null); setNolossLeadAberto(null);
     setErro(mensagem);
   }, [setCardSelecionadoId, setCardAgendamentoId, setFocoTarefa, setNolossLeadAberto, setErro]);
   useBpmNotificacaoBoardNavigation({ pipelineId: pipeline.id, usuarioId: currentUserId,
@@ -1148,6 +1151,7 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
 
   const abrirCard = useCallback((cardId: string) => {
     setFocoTarefa(null);
+    setFocoAnexos(null);
     cardAbertoPorAlertaRef.current = null;
     const card = cards.find((c) => c.id === cardId);
     if (card?.origem === "noloss" || card?.origem === "instagram") {
@@ -1161,6 +1165,7 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
 
   const abrirAgendamento = useCallback((cardId: string) => {
     setFocoTarefa(null);
+    setFocoAnexos(null);
     cardAbertoPorAlertaRef.current = null;
     cardSelecionadoIdRef.current = cardId;
     setCardAgendamentoId(cardId);
@@ -1169,6 +1174,7 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
 
   const fecharCard = useCallback(() => {
     setFocoTarefa(null);
+    setFocoAnexos(null);
     cardAbertoPorAlertaRef.current = null;
     cardSelecionadoIdRef.current = null;
     setCardAgendamentoId(null);
@@ -1271,6 +1277,7 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
         aguardandoConfirmacaoRd = true;
         return;
       }
+      if (resultado.success) avisarFichaViabilidadeDoRetorno(resultado, { cardId: activeCard.id, pipelineId: pipeline.id });
       if (resultado.success && activeCard.importadoRd && !activeCard.podeMoverLivremente) aplicarMovimentoOtimista(activeCard.id, destino.id);
       if (!resultado.success) mensagemErro = typeof resultado.error === "string" ? resultado.error : "Não foi possível mover o card";
     } catch {
@@ -1333,6 +1340,7 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
         encerrarMovimentoRd(intencao, mensagemErro);
         return;
       }
+      avisarFichaViabilidadeDoRetorno(resultado, { cardId: intencao.cardId, pipelineId: pipeline.id });
       encerrarMovimentoRd(intencao, null, true);
     } catch {
       setErro("Não foi possível mover o card. Tente novamente.");
@@ -1535,6 +1543,7 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
           if (!atribuicaoAgendarPendente) return { success: false, error: "Movimento não encontrado." };
           const resultado = await MoverCardBpm({ ...atribuicaoAgendarPendente, responsavelId });
           if (!resultado.success) return { success: false, error: typeof resultado.error === "string" ? resultado.error : "Não foi possível mover o lead." };
+          avisarFichaViabilidadeDoRetorno(resultado, { cardId: atribuicaoAgendarPendente.cardId, pipelineId: pipeline.id });
           setAtribuicaoAgendarPendente(null);
           await recarregarCards({ forcar: true });
           router.refresh();
@@ -1546,6 +1555,7 @@ export default function PipelineBoardClient({ pipeline, pipelinesDisponiveis = [
         <CardFullViewModal
           cardId={cardSelecionadoId}
           focoTarefa={focoTarefa?.cardId === cardSelecionadoId ? focoTarefa : null}
+          focoAnexos={focoAnexos?.cardId === cardSelecionadoId ? focoAnexos : null}
           realtimeRevision={realtimeRevision}
           currentUserId={currentUserId}
           currentUserRole={currentUserRole}

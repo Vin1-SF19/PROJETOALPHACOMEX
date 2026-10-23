@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Video, CalendarClock, FileText, RefreshCw, CircleCheck, Download } from "lucide-react";
+import { Video, CalendarClock, FileText, RefreshCw, CircleCheck } from "lucide-react";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { AgendarReuniaoGoogleMeetBpm, ListarConvidadosReuniaoGoogleMeetBpm, ReagendarReuniaoBpm } from "@/actions/bpm/GoogleMeet";
 import {
@@ -15,7 +15,9 @@ import { BpmDateTimeField } from "./BpmDateTimeField";
 import { fmtDateTime, formatarDataHoraLocalBpm, parseDataHoraLocalBpm } from "@/lib/format-date";
 import { criarRastreadorRascunho } from "@/lib/bpm/rascunho-versionado";
 import { emailClienteReuniaoSchema, emailsConvidadosReuniaoSchema } from "@/lib/bpm/email-reuniao";
+import { pipelinePossuiFichaViabilidade } from "@/lib/bpm/ficha-viabilidade-documento";
 import { transcricaoRealRegistrada } from "@/lib/bpm/reuniao-agendada";
+import { avisarFichaViabilidadeDoRetorno, avisarResultadoFichaViabilidade } from "@/components/bpm/anexos/ficha-viabilidade-toast";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 
@@ -47,6 +49,7 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
   const [gravacoesMeet, setGravacoesMeet] = useState<Array<{ nome: string; url: string }>>([]);
   const [buscandoResumos, setBuscandoResumos] = useState(false);
   const [gerandoFicha, setGerandoFicha] = useState(false);
+  const gerandoFichaRef = useRef(false);
   const [erroResumos, setErroResumos] = useState<string | null>(null);
   const [agora, setAgora] = useState(() => Date.now());
   const [conflitoDataHora, setConflitoDataHora] = useState(false);
@@ -61,6 +64,7 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
   const resumoRascunhoRef = useRef(criarRastreadorRascunho(resumo));
 
   const jaAgendada = Boolean(card.googleEventId);
+  const fichaAutomatica = pipelinePossuiFichaViabilidade({ chave: card.pipeline?.chave ?? null, nome: card.pipeline?.nome ?? "" });
   const transcricaoRecebida = transcricaoRealRegistrada(card.transcricaoReuniao);
   const reuniaoJaOcorreu = Boolean(card.dataReuniao && new Date(card.dataReuniao).getTime() <= agora);
   const reagendamentoBloqueado = jaAgendada && (transcricaoRecebida || reuniaoJaOcorreu);
@@ -218,6 +222,7 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
         && "avancoConcluido" in res.data && !res.data.avancoConcluido) {
         toast.info("Reunião criada; a mudança para Reunião Agendada está pendente.");
       }
+      if ("data" in res) avisarFichaViabilidadeDoRetorno(res.data, { cardId: card.id, pipelineId: card.pipelineId });
       onAtualizado();
     } else {
       toast.error(typeof res.error === "string" ? res.error : "Não foi possível salvar a reunião");
@@ -257,18 +262,34 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
   }
 
   async function handleGerarFicha() {
+    if (gerandoFichaRef.current || fichaAutomatica && !podeEditar) return;
+    gerandoFichaRef.current = true;
     setGerandoFicha(true);
-    const { GerarFichaViabilidadeBpm } = await import("@/actions/bpm/FichaViabilidade");
-    const resultado = await GerarFichaViabilidadeBpm({ cardId: card.id });
-    setGerandoFicha(false);
-    if (!resultado.success) { toast.error(resultado.error); return; }
-    const bytes = Uint8Array.from(atob(resultado.data.base64), (caractere) => caractere.charCodeAt(0));
-    const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = resultado.data.nome;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    try {
+      const { GarantirFichaViabilidadeBpm, GerarFichaViabilidadeBpm } = await import("@/actions/bpm/FichaViabilidade");
+      if (!fichaAutomatica) {
+        const download = await GerarFichaViabilidadeBpm({ cardId: card.id });
+        if (!download.success) throw new Error(download.error);
+        const bytes = Uint8Array.from(atob(download.data.base64), (caractere) => caractere.charCodeAt(0));
+        const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+        const link = document.createElement("a"); link.href = url; link.download = download.data.nome; link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        return;
+      }
+      const resultado = await GarantirFichaViabilidadeBpm({ cardId: card.id });
+      if (!resultado.success) throw new Error(resultado.error);
+      if (resultado.estado === "FALHA") throw new Error(resultado.mensagem ?? "Não foi possível gerar a ficha. Tente novamente.");
+      if (resultado.estado === "AUSENTE" || resultado.estado === "PRONTA" && !resultado.data) throw new Error("A ficha ainda não está disponível para este card.");
+      avisarResultadoFichaViabilidade(resultado, { cardId: card.id, pipelineId: card.pipelineId });
+      if (resultado.estado === "PENDENTE") toast.info("A ficha está sendo gerada. Acompanhe o resultado nos anexos da empresa.");
+      else if (!resultado.gerada) toast.info("A ficha já está disponível nos anexos da empresa.");
+      onAtualizado();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível gerar a ficha.");
+    } finally {
+      gerandoFichaRef.current = false;
+      setGerandoFicha(false);
+    }
   }
 
   async function persistirResumo(): Promise<boolean> {
@@ -300,6 +321,11 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
       return true;
     }, card.id, draftKey, undefined, false);
   }
+
+  const botaoFicha = (<button type="button" onClick={() => void handleGerarFicha()} disabled={gerandoFicha || fichaAutomatica && !podeEditar}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-200 disabled:opacity-50">
+            <FileText size={13} /> {gerandoFicha ? "Gerando ficha…" : "Gerar ficha de viabilidade"}
+          </button>);
 
   return (
     <div className="rounded-3xl border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent p-4 space-y-3">
@@ -431,12 +457,10 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
         </p>
       )}
 
+      {!mostrarFormulario && !jaAgendada && fichaAutomatica && botaoFicha}
       {!mostrarFormulario && jaAgendada && (
         <div className="rounded-2xl border border-white/[0.07] bg-black/10 p-3 space-y-2">
-          <button type="button" onClick={() => void handleGerarFicha()} disabled={gerandoFicha}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-200 disabled:opacity-50">
-            <Download size={13} /> {gerandoFicha ? "Gerando ficha…" : "Gerar ficha de viabilidade"}
-          </button>
+          {botaoFicha}
           <div className="space-y-2">
             <button type="button" onClick={() => void handleBuscarResumos()} disabled={buscandoResumos}
               className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-200 disabled:opacity-50">

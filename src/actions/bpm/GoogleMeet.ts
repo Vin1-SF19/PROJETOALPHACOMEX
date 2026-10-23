@@ -486,6 +486,7 @@ async function resolverCalendarioPrincipal(userId: number) {
 
 export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
   let eventoCriado: EventoCriadoSemVinculo | null = null;
+  const iniciadaEm = new Date();
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
@@ -681,7 +682,15 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
         tipo: error instanceof Error ? error.name : "Erro desconhecido",
       });
     }
-    return { success: true, data: { googleEventId: resultado.data.googleEventId, avancoConcluido } };
+    let ficha = null;
+    try {
+      const { obterFichaDoAgendamento } = await import("@/lib/bpm/ficha-viabilidade-automatica-server");
+      ficha = await obterFichaDoAgendamento(cardId, userId, iniciadaEm);
+    } catch (error) { console.error("[AgendarReuniaoGoogleMeetBpm/ficha]", { tipo: error instanceof Error ? error.name : "Erro" }); }
+    return { success: true, data: { googleEventId: resultado.data.googleEventId, avancoConcluido,
+      ...(ficha ? { ...(ficha.data ? { fichaViabilidade: ficha.data } : {}), fichaViabilidadeGerada: ficha.gerada,
+        fichaViabilidadeEstado: ficha.estado, ...(ficha.solicitacaoId ? { fichaViabilidadeSolicitacaoId: ficha.solicitacaoId } : {}) } : {}),
+    } };
   } catch (error) {
     if (eventoCriado) await compensarCriacaoComRegistro(eventoCriado);
     console.error("[AgendarReuniaoGoogleMeetBpm]", error instanceof GoogleCalendarError

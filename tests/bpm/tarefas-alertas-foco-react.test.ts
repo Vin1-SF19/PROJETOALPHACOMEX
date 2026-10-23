@@ -82,6 +82,17 @@ describe("destino visível de uma tarefa no card real", () => {
     expect(document.activeElement?.id).toBe("bpm-tarefa-card-1-task-1");
     expect(host.querySelector('[role="tab"][data-state="active"]')?.textContent).toBe("Comercial");
   });
+  it("a intenção Anexos abre a aba real e retorna dos dados da empresa sem perder o foco", async () => {
+    const abrirAnexos = async () => { await act(async () => root.render(h(CardAbertoLayout, { ...props, focoAnexos: { cardId: card.id } }))); };
+    await abrirAnexos();
+    expect(host.querySelector('[role="tab"][data-state="active"][id*="anexos"]')).toBeTruthy();
+    expect(host.textContent).toContain("Nenhum anexo neste card");
+    const toggle = () => [...host.querySelectorAll<HTMLButtonElement>("button")].find((el) => el.textContent === "Dados da empresa")!;
+    await act(async () => toggle().click()); expect(host.querySelector("[data-dados-empresa]")).toBeTruthy();
+    await abrirAnexos();
+    expect(host.querySelector("[data-dados-empresa]")).toBeNull();
+    expect(host.querySelector('[role="tab"][data-state="active"][id*="anexos"]')).toBeTruthy();
+  });
   it("espera o procedimento carregar e foca o checklist vinculado à tarefa", async () => {
     let resolver!: (value: unknown) => void;
     listarChecklists.mockReturnValue(new Promise((resolve) => { resolver = resolve; }));

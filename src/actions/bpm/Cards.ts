@@ -81,6 +81,7 @@ import { resolverParceiroOrigem, validarParceiroOrigem, salvarParceiroOrigem } f
 import type { ParceiroOrigemBpm } from "@/lib/bpm/origem-cliente";
 import { avaliarTransicaoBpm, executarTransicaoBpm } from "@/lib/bpm/transicao-command";
 import { possuiOrigemImportadaRd, type AvisoMovimentoRd, type ConfirmacaoPendenciasRd } from "@/lib/bpm/movimento-importado-rd";
+import type { FichaViabilidadeDTO, ResultadoFichaViabilidade } from "@/lib/bpm/ficha-viabilidade-documento";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { processarCadenciasImediatasDoCardBpm } from "@/lib/bpm/cadencias/executor";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
@@ -1902,6 +1903,13 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
   }
 }
 
+type RetornoMovimentoComFicha =
+  | { success: false; error: string; code?: string; confirmacao?: ConfirmacaoPendenciasRd; avisos?: AvisoMovimentoRd[] }
+  | { success: true; error?: undefined; code?: undefined; confirmacao?: undefined; avisos?: undefined;
+      cardsFilhosCriados?: Array<{ cardId: string; pipelineId: string; pipelineNome: string }>;
+      fichaViabilidade?: FichaViabilidadeDTO; fichaViabilidadeGerada?: boolean;
+      fichaViabilidadeEstado?: ResultadoFichaViabilidade["estado"]; fichaViabilidadeSolicitacaoId?: string };
+
 async function executarMovimentoCanonico(
   dados: DadosMovimentoComRequisitos & {
     etapaOrigemEsperadaId?: string;
@@ -1910,7 +1918,7 @@ async function executarMovimentoCanonico(
   },
   userId: number,
   userRole: string | null,
-) {
+): Promise<RetornoMovimentoComFicha> {
   const atual = await db.bpmCard.findUnique({
     where: { id: dados.cardId },
     select: { etapaId: true, versao: true, pipelineId: true },
@@ -1963,11 +1971,17 @@ async function executarMovimentoCanonico(
   revalidatePath(`${ROTA_BASE}/pipeline/${atual.pipelineId}`);
   revalidatePath(ROTA_BASE);
   revalidatePath(`${ROTA_BASE}/tarefas`);
-  return cardsFilhosCriados.length ? { success: true, cardsFilhosCriados } : { success: true };
+  const ficha = {
+    ...(resultado.data.fichaViabilidade ? { fichaViabilidade: resultado.data.fichaViabilidade } : {}),
+    ...(resultado.data.fichaViabilidadeEstado ? { fichaViabilidadeEstado: resultado.data.fichaViabilidadeEstado } : {}),
+    ...(resultado.data.fichaViabilidadeSolicitacaoId ? { fichaViabilidadeSolicitacaoId: resultado.data.fichaViabilidadeSolicitacaoId } : {}),
+    ...(resultado.data.fichaViabilidadeGerada !== undefined ? { fichaViabilidadeGerada: resultado.data.fichaViabilidadeGerada } : {}),
+  };
+  return cardsFilhosCriados.length ? { success: true as const, cardsFilhosCriados, ...ficha } : { success: true as const, ...ficha };
 }
 
 
-export async function SalvarRequisitosEMoverCardBpm(dados: unknown) {
+export async function SalvarRequisitosEMoverCardBpm(dados: unknown): Promise<RetornoMovimentoComFicha> {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
@@ -1991,7 +2005,7 @@ export async function SalvarRequisitosEMoverCardBpm(dados: unknown) {
   }
 }
 
-export async function MoverCardBpm(dados: unknown) {
+export async function MoverCardBpm(dados: unknown): Promise<RetornoMovimentoComFicha> {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };

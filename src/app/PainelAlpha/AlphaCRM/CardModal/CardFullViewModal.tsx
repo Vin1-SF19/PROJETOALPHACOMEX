@@ -73,9 +73,10 @@ interface Props {
   abrirChecklistInicial?: boolean;
   focarAgendamentoInicial?: boolean;
   focoTarefa?: { cardId: string; tarefaId: string } | null;
+  focoAnexos?: { cardId: string } | null;
 }
 
-function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, currentUserId, currentUserRole, onClose, onAtualizado, onCardExcluido, onAbrirCard, abrirChecklistInicial = false, focarAgendamentoInicial = false, focoTarefa }: Props) {
+function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, currentUserId, currentUserRole, onClose, onAtualizado, onCardExcluido, onAbrirCard, abrirChecklistInicial = false, focarAgendamentoInicial = false, focoTarefa, focoAnexos }: Props) {
   const { flushSaves, flushScheduled, getPendingChanges, getFailedSaveKeys, retryFailedSaves, discardPending, subscribeConfirmation,
     setDraft, setPendingFields, clearFailedSave } = useCardSave();
   const fechandoRef = useRef(false);
@@ -328,6 +329,7 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
               <CardAbertoLayout
                 key={card.id}
                 focoTarefa={focoTarefa}
+                focoAnexos={focoAnexos}
                 card={card} etapas={etapas} interacoes={interacoes}
                 accent={accent} currentUserId={currentUserId} currentUserRole={currentUserRole}
                 realtimeRevision={realtimeRevision} onClose={solicitarFechamento}
@@ -444,7 +446,7 @@ export default function CardFullViewModal(props: Props) {
       onAbrirCard={(id) => {
         if (host.isAttached(owner)) active.onAbrirCard(id);
         else {
-          const next = { ...active, cardId: id, focoTarefa: null, abrirChecklistInicial: false, focarAgendamentoInicial: false };
+          const next = { ...active, cardId: id, focoTarefa: null, focoAnexos: null, abrirChecklistInicial: false, focarAgendamentoInicial: false };
           host.replaceDetached({ owner, cardId: id, node: content(next) });
         }
       }}

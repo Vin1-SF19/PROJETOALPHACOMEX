@@ -45,6 +45,15 @@ describe("reabertura do card pela mesma notificação", () => {
       data: { type: BPM_CARD_ABERTO_EVENT, pipelineId: "pipeline-1", leadId: "ig-nao-cuid", origemLead: "instagram" } }));
     postMessage.mockClear(); mensagem(BPM_CARD_PRONTO_EVENT); expect(postMessage).not.toHaveBeenCalled();
   });
+  it("transporta Anexos e não aceita confirmação antiga sem o foco solicitado", () => {
+    abrir(`${url}&abaInicial=anexos`, "CRM");
+    expect(postMessage).toHaveBeenLastCalledWith({ type: BPM_CARD_ABRIR_EVENT, cardId, pipelineId: "pipeline-1", abaInicial: "anexos" }, window.location.origin);
+    mensagem(BPM_CARD_ABERTO_EVENT); postMessage.mockClear(); mensagem(BPM_CARD_PRONTO_EVENT);
+    expect(postMessage).toHaveBeenCalledOnce();
+    window.dispatchEvent(new MessageEvent("message", { source: frameWindow, origin: window.location.origin,
+      data: { type: BPM_CARD_ABERTO_EVENT, cardId, pipelineId: "pipeline-1", abaInicial: "anexos" } }));
+    postMessage.mockClear(); mensagem(BPM_CARD_PRONTO_EVENT); expect(postMessage).not.toHaveBeenCalled();
+  });
   it("envia nova intenção mesmo quando a aba já existe e o modal foi fechado", () => {
     abrir(url, "CRM"); mensagem(BPM_CARD_ABERTO_EVENT);
     abrir(url, "CRM");

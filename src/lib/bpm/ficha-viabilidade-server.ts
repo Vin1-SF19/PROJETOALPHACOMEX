@@ -10,12 +10,12 @@ import { FichaAlphaPDF } from "@/components/GerarFicha";
 import { etapaEhReuniaoAgendada } from "@/lib/bpm/reuniao-agendada";
 import { montarFichaAlphaDoCard } from "@/lib/bpm/ficha-viabilidade-dados";
 
-export async function gerarFichaViabilidadeCardBpm(cardId: string): Promise<{ nome: string; base64: string }> {
+export async function carregarDadosFichaViabilidadeCard(cardId: string, exigirEtapa = false) {
   const card = await db.bpmCard.findUnique({
     where: { id: cardId },
     select: {
-      id: true, pipelineId: true, pipeline: { select: { nome: true } },
-      etapa: { select: { nome: true } },
+      id: true, empresaId: true, pipelineId: true, responsavelId: true, pipeline: { select: { nome: true, chave: true } },
+      etapa: { select: { nome: true, chave: true } },
       responsavel: { select: { nome: true } },
       empresa: { select: {
         razaoSocial: true, nomeFantasia: true, cnpj: true, uf: true,
@@ -28,7 +28,7 @@ export async function gerarFichaViabilidadeCardBpm(cardId: string): Promise<{ no
       campoValores: { select: { campoId: true, valor: true } },
     },
   });
-  if (!card || card.pipeline.nome !== "Revisão de Radar" || !etapaEhReuniaoAgendada(card.etapa.nome)) {
+  if (!card || (exigirEtapa && (card.pipeline.nome !== "Revisão de Radar" || !etapaEhReuniaoAgendada(card.etapa.nome)))) {
     throw new Error("Card não está em Reunião Agendada no pipeline Revisão de Radar.");
   }
   const cnpj = card.empresa.cnpj?.replace(/\D/g, "") ?? "";
@@ -41,6 +41,11 @@ export async function gerarFichaViabilidadeCardBpm(cardId: string): Promise<{ no
     } }) : null,
   ]);
   const ficha = montarFichaAlphaDoCard({ card, campos, consulta });
+  return { card, ficha, cnpj };
+}
+
+export async function gerarFichaViabilidadeCardBpm(cardId: string): Promise<{ nome: string; base64: string }> {
+  const { card, ficha, cnpj } = await carregarDadosFichaViabilidadeCard(cardId, true);
   const logo = await readFile(path.join(process.cwd(), "public", "LogoTipo02.png"));
   const elemento = React.createElement(FichaAlphaPDF, {
     ...ficha, logoPath: `data:image/png;base64,${logo.toString("base64")}`,

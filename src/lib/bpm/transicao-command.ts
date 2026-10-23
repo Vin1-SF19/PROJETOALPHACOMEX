@@ -48,6 +48,7 @@ import { etapaEhLost } from "@/lib/bpm/lost";
 import { sincronizarProximoContatoAgenda } from "@/lib/bpm/proximo-contato-agenda";
 import { destinoPermitidoEmTratativa, etapaEhEmTratativa, etapaEhSemViabilidade, obterErroChecklistParaSaidaEmTratativa, obterErroProximoContatoParaEntrada } from "@/lib/bpm/em-tratativa";
 import { etapaEhAgendarReuniao, destinoEhReuniaoAgendada, obterErroDataReuniaoParaMovimento } from "@/lib/bpm/agendar-reuniao";
+import { entradaSolicitaFichaViabilidade, type FichaViabilidadeDTO, type ResultadoFichaViabilidade } from "@/lib/bpm/ficha-viabilidade-documento";
 import { destinoPermitidoReuniaoAgendada, etapaEhReuniaoAgendada, obterErroTranscricaoParaMovimento } from "@/lib/bpm/reuniao-agendada";
 import { ehFechamentoComercialLivre } from "@/lib/bpm/automacoes/financeiro-movimento-livre";
 import { etapaEhFechado, statusInicialAoEntrarFechado } from "@/lib/bpm/status-pos-fechamento";
@@ -105,6 +106,10 @@ export type ResultadoTransicaoBpm =
         eventoId: string;
         idempotente: boolean;
         movimentoLivre?: boolean;
+        fichaViabilidade?: FichaViabilidadeDTO;
+        fichaViabilidadeGerada?: boolean;
+        fichaViabilidadeEstado?: ResultadoFichaViabilidade["estado"];
+        fichaViabilidadeSolicitacaoId?: string;
       };
     }
   | { success: false; error: string; code: string; pendencias?: string[]; avisos?: AvisoMovimentoRd[]; confirmacao?: ConfirmacaoPendenciasRd };
@@ -1083,6 +1088,15 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
       }, tx);
       if (!evento) erro("OUTBOX_UNAVAILABLE", "Não foi possível registrar o evento da transição.");
 
+      let solicitacaoFichaId: string | undefined;
+      if (entradaSolicitaFichaViabilidade(card.pipeline, destino)) {
+        const { registrarIntencaoFichaViabilidade, resolverAtorFichaViabilidade } = await import("@/lib/bpm/ficha-viabilidade-automatica-server");
+        const actorUserId = await resolverAtorFichaViabilidade(tx, { cardId: card.id, ...input.ator, causationId: input.causationId });
+        solicitacaoFichaId = await registrarIntencaoFichaViabilidade(tx, {
+          cardId: card.id, empresaId: card.empresaId, eventoId: evento.id, idempotencyKey: input.idempotencyKey, actorUserId,
+        });
+      }
+
       await sincronizarSlaMovimentoBpm({
         cardId: card.id,
         etapaOrigemId: card.etapaId,
@@ -1137,6 +1151,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
         idempotente: false,
         movimentoLivre: Boolean(prepared.movimentoLivre),
         pipelineId: card.pipelineId,
+        solicitacaoFichaId,
       };
     }, { maxWait: 10_000, timeout: 60_000 }));
 
@@ -1174,9 +1189,19 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
         console.error("[TransitionCommand/cadencia-imediata]", cadenciaError);
       }
     }
+    let ficha: ResultadoFichaViabilidade | null = null;
+    if (!result.idempotente && "solicitacaoFichaId" in result && result.solicitacaoFichaId) {
+      try {
+        const { processarIntencaoFichaViabilidade } = await import("@/lib/bpm/ficha-viabilidade-automatica-server");
+        ficha = await processarIntencaoFichaViabilidade(result.solicitacaoFichaId);
+      } catch (error) { console.error("[TransitionCommand/ficha]", { tipo: error instanceof Error ? error.name : "Erro" }); }
+    }
     const { pipelineId: _pipelineId, ...publicData } = result;
     void _pipelineId;
-    return { success: true, data: publicData };
+    return { success: true, data: { ...publicData, ...(ficha ? {
+      ...(ficha.data ? { fichaViabilidade: ficha.data } : {}), fichaViabilidadeGerada: ficha.gerada,
+      fichaViabilidadeEstado: ficha.estado, ...(ficha.solicitacaoId ? { fichaViabilidadeSolicitacaoId: ficha.solicitacaoId } : {}),
+    } : {}) } };
   } catch (errorValue) {
     return mensagemErroDesconhecido(errorValue);
   }

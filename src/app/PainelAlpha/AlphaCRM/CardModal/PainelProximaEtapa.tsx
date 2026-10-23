@@ -1,4 +1,5 @@
 "use client";
+import { avisarFichaViabilidadeDoRetorno } from "@/components/bpm/anexos/ficha-viabilidade-toast";
 
 import { medirFaseCrm } from "@/lib/bpm/medicao-ui";
 import { toast } from "sonner";
@@ -148,6 +149,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
 
   function confirmarMovimento(res: Awaited<ReturnType<typeof MoverCardBpm>>) {
       if (res.success) {
+        avisarFichaViabilidadeDoRetorno(res, { cardId: card.id, pipelineId: card.pipelineId });
         setRequisitos(null);
         setMovimentoRdPendente(null);
         toast.success("Card movido");

@@ -20,6 +20,8 @@ export const ACOES_HISTORICO_CATALOGADAS = [
   "ALERTA_AUTOMACAO",
   "ANEXO_ADICIONADO",
   "ANEXO_EXCLUIDO",
+  "FICHA_VIABILIDADE_GERADA",
+  "FICHA_VIABILIDADE_COMPLEMENTADA",
   "ANOTACAO_AUTOMACAO",
   "ANOTACAO_REGISTRADA",
   "AUTOMACAO_CENTRAL_EXECUTADA",
@@ -280,6 +282,8 @@ function descreverCatalogado(
     case "ALERTA_AUTOMACAO": return `Alerta da automação${texto(novo, "texto") ? `: ${textoPublico(texto(novo, "texto"), "mensagem registrada")}` : " registrado"}`;
     case "ANEXO_ADICIONADO": return `Anexo adicionado: ${nome("nome", "arquivo")}`;
     case "ANEXO_EXCLUIDO": return `Anexo excluído: ${nome("nome", "arquivo")}`;
+    case "FICHA_VIABILIDADE_GERADA": return "Ficha de análise de viabilidade gerada e anexada";
+    case "FICHA_VIABILIDADE_COMPLEMENTADA": return "Ficha de análise de viabilidade complementada";
     case "ANOTACAO_AUTOMACAO": return `Anotação da automação${texto(novo, "texto") ? `: ${textoPublico(texto(novo, "texto"), "conteúdo registrado")}` : " registrada"}`;
     case "ANOTACAO_REGISTRADA": return "Anotação registrada";
     case "AUTOMACAO_CENTRAL_EXECUTADA": return "Automação central executada com sucesso";
