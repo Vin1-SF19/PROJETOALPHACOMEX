@@ -46,7 +46,7 @@ beforeAll(async () => {
             for await (const chunk of incoming) chunks.push(Buffer.from(chunk));
             const request = new Request(`http://localhost${incoming.url}`, {
                 method: incoming.method,
-                headers: new Headers(Object.entries(incoming.headers).flatMap(([key, value]) =>
+                headers: new Headers(Object.entries(incoming.headers).flatMap<[string, string]>(([key, value]) =>
                     value === undefined ? [] : [[key, Array.isArray(value) ? value.join(', ') : value]])),
                 body: incoming.method === 'POST' ? Buffer.concat(chunks) : undefined,
             });

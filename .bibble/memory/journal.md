@@ -7615,3 +7615,9 @@ DevOps ainda precisa configurar/publicar/homologar staging Main antes do Portal 
 
 ### Refletido também em
 `codebase-map.md`, `integration-points.md`, desenho Main `docs/architecture/portal-api-canonica-20261023.md` e stories dos dois repos. Drafts/históricos alheios preservados.
+
+
+### 2026-10-23 — CRM: remover aba Dossiê RADAR por decisão do usuário
+Após explicação do resumo/atalho para CheckList, usuário pediu “remova, nao faz sentido”. Worker retirou três linhas de `PainelHistorico.tsx`; sem alteração de dados, CheckList ou backend. QA encontrou inferência TS preexistente no teste Portal da base65c3b50b: generic `flatMap<[string, string]>` explicitado sem mudar runtime/expectativas; `build:player` gerou bundle ignorado local. Gates/revisão final/publicação staging pendentes. River atualizou somente story e três memórias; produção não autorizada.
+
+**Fechamento local da remoção (2026-10-23, River):** QA APPROVED/GO STAGING; typecheck/lint/build literal PASS e suíte existente 760 arquivos/6.310 PASS, zero falhas/quatro skipped/um todo. Probe/Lens/Sage sem bloqueantes; CodeRabbit ausente com fallback manual. File List final seis caminhos (três deleções de UI, generic de teste preexistente, story/três memórias); sem CheckList/backend/dados alterados. READY/alias e smoke remoto pendentes para DevOps, sem E2E autenticado ou produção.
