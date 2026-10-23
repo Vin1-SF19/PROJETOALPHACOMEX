@@ -11,7 +11,6 @@ import { cadastroDosDadosEmpresa, diferencasCadastroEmpresa, salvarCadastroEmpre
 import { consultarFontesCnpjLead } from "@/lib/bpm/consulta-cnpj-lead";
 import { cnpjEhValido, normalizarCNPJ } from "@/lib/format-cnpj";
 import { normalizarDadosEmpresaBpm } from "@/lib/bpm/dados-empresa";
-import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 
 const CONFLITO = "Os dados da empresa foram alterados durante a edição. Recarregue os dados antes de salvar novamente.";
@@ -56,19 +55,24 @@ export async function SalvarCadastroEmpresaCardBpm(input: unknown) {
         loteId, clienteId: p.empresaId, campo: a.campo, valorAnterior: a.antes, valorNovo: a.depois,
         userId, nomeUsuarioNaEpoca: usuario.nome, acao: "EDICAO", criadoEm: agora,
       })) });
-      for (const a of alteracoes) await registrarHistoricoCard({
+      await tx.bpmCardHistorico.createMany({ data: alteracoes.map((a) => ({
         cardId: p.cardId, acao: "DADOS_EMPRESA_ATUALIZADOS", usuarioId: userId,
         valorAnteriorJson: JSON.stringify({ campo: a.campo, rotulo: a.rotulo, valor: a.antes }),
         valorNovoJson: JSON.stringify({ campo: a.campo, rotulo: a.rotulo, valor: a.depois, autor: usuario.nome, loteId }),
-      }, tx);
+        createdAt: agora,
+      })) });
       return (await carregarDadosEmpresaCard(p.cardId, tx))!;
-    });
-    revalidatePath("/PainelAlpha/AlphaCRM");
-    try { await notificarPipelineBpm({ cardId: p.cardId, tipo: "CARD_ATUALIZADO" }); }
-    catch { console.error("[SalvarCadastroEmpresaCardBpm] Atualização visual pendente de recarga."); }
+    }, { maxWait: 10000, timeout: 60000 });
+    // Falhas de cache/transporte após o commit não transformam um cadastro salvo em falha.
+    const efeitos = await Promise.allSettled([
+      Promise.resolve().then(() => revalidatePath("/PainelAlpha/AlphaCRM")),
+      notificarPipelineBpm({ cardId: p.cardId, tipo: "CARD_ATUALIZADO" }),
+    ]);
+    if (efeitos.some((efeito) => efeito.status === "rejected")) console.error("[SalvarCadastroEmpresaCardBpm] Atualização visual pendente de recarga.");
     return { success: true as const, data };
   } catch (error) {
     const e = error as { message?: string; code?: string };
+    console.error("[SalvarCadastroEmpresaCardBpm] Falha transacional", { codigo: e.code ?? "SEM_CODIGO", conflito: e.message === CONFLITO });
     const errorText = e.code === "P2002" ? "Este CNPJ já pertence a outra empresa. O cadastro não foi alterado."
       : [CONFLITO, "Empresa não encontrada neste card.", "Não autorizado"].includes(e.message ?? "") ? e.message!
         : "Não foi possível salvar os dados. Suas alterações continuam disponíveis para tentar novamente.";

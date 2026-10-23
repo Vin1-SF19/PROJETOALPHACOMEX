@@ -638,9 +638,9 @@ describe("campos obrigatórios por etapa (validação de transição)", () => {
 
 describe("RM-2026-6F4E3F: override local GLOBAL", () => {
   it.each([
-    [null, false, true, "11222333000181"],
-    ["", false, true, "11222333000181"],
-    ["  ", false, true, "11222333000181"],
+    [null, false, true, null],
+    ["", false, true, ""],
+    ["  ", false, true, "  "],
     ["04252011000110", false, true, "04252011000110"],
     ["04252011000110", true, true, "11222333000181"],
     ["04252011000110", false, false, "11222333000181"],

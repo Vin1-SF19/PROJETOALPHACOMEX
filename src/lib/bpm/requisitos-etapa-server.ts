@@ -24,6 +24,8 @@ import { campoEhOrigemCliente } from "@/lib/bpm/origem-cliente";
 import { carregarUsuariosCamposBpm } from "@/lib/bpm/usuarios-campos-server";
 import { idUsuarioCampoBpm, type OpcaoUsuarioCampoBpm } from "@/lib/bpm/usuarios-campos";
 import { campoEhReferenciaAutomaticaUsuarioBpm, idUsuarioReferenciaCampoBpm } from "@/lib/bpm/referencia-usuario-campo";
+import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
+import { controladorTarifarioNegociado } from "@/lib/bpm/card-modal-ui";
 
 type ClienteRequisitosEtapa = Pick<
   typeof db,
@@ -258,6 +260,7 @@ export async function carregarCamposAplicaveisCardEtapa(
   client: ClienteRequisitosEtapa = db,
   perfilAcesso?: PerfilAcessoCampoBpm,
   camposBase?: Array<Omit<CampoAplicavelEtapaBpm, "valor">>,
+  opcoes: { incluirCondicionaisEdicao?: boolean; valoresSubmetidos?: Readonly<Record<string, string>> } = {},
 ): Promise<CampoAplicavelEtapaBpm[]> {
   let campos = camposBase
     ? [...camposBase]
@@ -279,20 +282,35 @@ export async function carregarCamposAplicaveisCardEtapa(
     const contexto = card
       ? await montarContextoAvaliacaoDoCard(card, client as typeof db)
       : ({ card: {}, camposDinamicos: {} } satisfies ContextoAvaliacao);
-    const avaliar = (json: string | null | undefined, fallback: boolean) => {
+    const condicionaisTarifario = new Map(campos.flatMap((campo) => {
+      const controlador = controladorTarifarioNegociado(campo, campos);
+      return controlador ? [[campo.id, controlador] as const] : [];
+    }));
+    let contextoTarifario = contexto;
+    for (const id of new Set(condicionaisTarifario.values())) {
+      if (!opcoes.valoresSubmetidos || !Object.hasOwn(opcoes.valoresSubmetidos, id)) continue;
+      const campo = campos.find((item) => item.id === id)!;
+      const validacao = validarValoresCamposBpm([campo], { [id]: opcoes.valoresSubmetidos[id] });
+      if (!validacao.success) throw new Error(`CAMPO_INVALIDO:${validacao.error}`);
+      contextoTarifario = { ...contextoTarifario, camposDinamicos: { ...contextoTarifario.camposDinamicos, ...validacao.valores } };
+    }
+    const avaliar = (json: string | null | undefined, fallback: boolean, atual = contexto) => {
       if (!json?.trim()) return fallback;
       try {
         const parsed = grupoCondicaoSchema.safeParse(JSON.parse(json));
-        return parsed.success ? avaliarGrupo(parsed.data, contexto) : false;
+        return parsed.success ? avaliarGrupo(parsed.data, atual) : false;
       } catch {
         return false;
       }
     };
     campos = campos
-      .filter((campo) => avaliar(campo.condicaoVisibilidadeJson, true))
+      .filter((campo) => avaliar(campo.condicaoVisibilidadeJson, true,
+        condicionaisTarifario.has(campo.id) ? contextoTarifario : contexto)
+        || Boolean(opcoes.incluirCondicionaisEdicao && condicionaisTarifario.has(campo.id)))
       .map((campo) => ({
         ...campo,
-        obrigatorio: campo.obrigatorio || avaliar(campo.condicaoObrigatoriedadeJson, false),
+        obrigatorio: campo.obrigatorio || avaliar(campo.condicaoObrigatoriedadeJson, false,
+          condicionaisTarifario.has(campo.id) ? contextoTarifario : contexto),
       }));
     if (campos.length === 0) return [];
   }
@@ -306,7 +324,7 @@ export async function carregarCamposAplicaveisCardEtapa(
           campoDestinoId: true,
           modo: true,
           ativo: true,
-          campoOrigem: { select: { id: true, escopo: true, fonteEntidade: true, fonteAtributo: true, entidadeGlobal: true } },
+          campoOrigem: { select: { id: true, chave: true, escopo: true, fonteEntidade: true, fonteAtributo: true, entidadeGlobal: true } },
         },
       })
     : [];
@@ -333,6 +351,7 @@ export async function carregarCamposAplicaveisCardEtapa(
   const fontesCanonicas = [
     ...campos.map((campo) => ({
       id: campo.id,
+      chave: campo.chave,
       escopo: campo.escopo ?? "CARD",
       fonteEntidade: campo.fonteEntidade ?? null,
       fonteAtributo: campo.fonteAtributo ?? null,
@@ -419,10 +438,12 @@ export async function carregarCamposAplicaveisCardEtapa(
       ? null
       : campo.valorPadrao;
     const valorNovoContrato = campo.escopo === "GLOBAL"
-      ? (campo.fonteEntidade && !campo.somenteLeitura && campo.editavel !== false && !mapeamento && valorPersistido?.trim()
+      ? (campo.fonteEntidade && !campo.somenteLeitura && campo.editavel !== false && !mapeamento && valorPorCampo.has(campo.id)
         ? valorPersistido
         : (valoresCanonicos[campo.id] || null))
-      : (resolvidos.efetivos[campo.id] || valorPersistido || valorPadraoExibivel || null);
+      : (!mapeamento && Object.hasOwn(valoresCanonicos, campo.id)
+        ? valorPorCampo.has(campo.id) ? valorPersistido : valoresCanonicos[campo.id] || null
+        : (resolvidos.efetivos[campo.id] || valorPersistido || valorPadraoExibivel || null));
     // A stored empty row is an explicit clearing, not permission to resurrect an old origin.
     const valorOrigem = campoEhOrigemCliente(campo) && campo.escopo !== "GLOBAL"
       ? valorPorCampo.has(campo.id) ? valorPersistido
@@ -436,7 +457,7 @@ export async function carregarCamposAplicaveisCardEtapa(
     const valor = campo.chave === "alpha.radar.standby.status_follow_up"
       ? (opcoesStatusStandby?.opcoes.find((opcao) => opcao.chave === (estadoStandby?.standbyFollowUpInterrompidoEm ? "interrompido" : "ativo"))?.rotulo ?? (estadoStandby?.standbyFollowUpInterrompidoEm ? "Interrompido" : "Ativo"))
       : campoEhOrigemCliente(campo) ? valorOrigem
-      : precisaDadosMestres && campo.escopo === "CARD" && !mapeamento && !valorPersistido
+      : precisaDadosMestres && campo.escopo === "CARD" && !mapeamento && !valorPorCampo.has(campo.id)
       ? resolverValorEfetivoCampoBpm({ nomeCampo: campo.nome, valorPersistido: valorNovoContrato, dadosMestres })
       : valorOrigem;
     return {

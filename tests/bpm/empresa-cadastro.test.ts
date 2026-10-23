@@ -14,6 +14,15 @@ export function cadastroVazio() {
   }));
 }
 describe("cadastro empresarial estruturado", () => {
+  it.each(["01.001-000", "01001-000", "01001000"])("normaliza CEP válido %s para oito dígitos no DTO salvo", (cep) => {
+    const cadastro = editarValorCadastro(cadastroVazio(), "empresa.endereco.cep", cep);
+    expect(cadastroEmpresaSchema.parse(cadastro).empresa.endereco.cep).toBe("01001000");
+  });
+  it.each(["abc01001000", "01001abc000", "0100100", "010010000"])("não transforma CEP inválido %s em um CEP aceito", (cep) => {
+    const resultado = cadastroEmpresaSchema.safeParse(editarValorCadastro(cadastroVazio(), "empresa.endereco.cep", cep));
+    expect(resultado.success).toBe(false);
+    if (!resultado.success) expect(resultado.error.issues).toContainEqual(expect.objectContaining({ message: "CEP inválido." }));
+  });
   it("aceita empresa sem CNPJ, rejeita chave não permitida e não permite alterar a data comprovada de consulta", () => {
     const c = cadastroVazio(); expect(cadastroEmpresaSchema.safeParse(c).success).toBe(true);
     expect(cadastroEmpresaSchema.safeParse({ ...c, responsavelId: 99 }).success).toBe(false);

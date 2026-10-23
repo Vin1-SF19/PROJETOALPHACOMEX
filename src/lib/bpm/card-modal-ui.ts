@@ -5,6 +5,53 @@ import {
   motivoLostExigeComplemento,
 } from "@/lib/bpm/lost";
 import { BPM_FIELD_KEYS, BPM_STAGE_KEYS } from "@/lib/bpm/ontology";
+import { campoEhOrigemCliente } from "@/lib/bpm/origem-cliente";
+
+export const CHAVE_TARIFARIO_PADRAO = "alpha.radar.fechado.tarifario_padrao";
+export const CHAVE_CONDICAO_NEGOCIADA = "alpha.radar.contrato.condicao_negociada";
+const CHAVE_PARCEIRO_RESPONSAVEL = "alpha.radar.contrato.parceiro_responsavel";
+
+type CampoCondicionalComercial = {
+  id: string;
+  nome?: string;
+  chave?: string | null;
+  condicaoVisibilidadeJson?: string | null;
+};
+
+/** Apenas a dependência publicada e simples do tarifário pode antecipar a UI.
+ * Condições de outros campos continuam sendo resolvidas exclusivamente no servidor. */
+export function controladorTarifarioNegociado(
+  campo: CampoCondicionalComercial,
+  campos: readonly CampoCondicionalComercial[],
+): string | null {
+  if (campo.chave !== CHAVE_CONDICAO_NEGOCIADA || !campo.condicaoVisibilidadeJson) return null;
+  const tarifarios = campos.filter((item) => item.chave === CHAVE_TARIFARIO_PADRAO);
+  if (tarifarios.length !== 1) return null;
+  try {
+    const grupo = JSON.parse(campo.condicaoVisibilidadeJson);
+    const condicao = grupo?.condicoes?.[0];
+    return grupo?.operador === "AND" && Array.isArray(grupo.condicoes) && grupo.condicoes.length === 1
+      && condicao?.tipo === "condicao" && condicao.operador === "igual"
+      && condicao.campo?.fonte === "campo_dinamico" && condicao.campo.campo === tarifarios[0].id
+      && condicao.valor === "Não" && !condicao.valorCampo
+      && (!condicao.tipoEsperado || condicao.tipoEsperado === "texto")
+      ? tarifarios[0].id : null;
+  } catch { return null; }
+}
+
+/** Filtra apresentação, sem apagar o rascunho nem alterar a autorização do campo. */
+export function filtrarCamposComerciaisUi<T extends CampoCondicionalComercial>(
+  campos: readonly T[],
+  valores: Readonly<Record<string, string>>,
+  catalogo: readonly CampoCondicionalComercial[] = campos,
+): T[] {
+  const possuiOrigem = catalogo.some((campo) => campoEhOrigemCliente({ nome: campo.nome ?? "", chave: campo.chave }));
+  return campos.filter((campo) => {
+    if (possuiOrigem && campo.chave === CHAVE_PARCEIRO_RESPONSAVEL) return false;
+    const controlador = controladorTarifarioNegociado(campo, catalogo);
+    return !controlador || valores[controlador] === "Não";
+  });
+}
 
 export type EstadoFollowUpModal = "CARREGANDO" | "ERRO" | "NAO_INICIADO" | "EM_ANDAMENTO" | "CONCLUIDO";
 

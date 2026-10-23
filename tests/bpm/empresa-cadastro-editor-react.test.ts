@@ -11,6 +11,7 @@ import { cadastroDosDadosEmpresa, aplicarPerfilCadastral } from "@/lib/bpm/dados
 import CardFullViewModal from "@/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal";
 import { PainelCardState } from "@/app/PainelAlpha/AlphaCRM/CardModal/CardModalHost";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
+import { toast } from "sonner";
 
 vi.mock("@/actions/bpm/Empresas", () => ({ ObterDadosEmpresaCardBpm: vi.fn() }));
 vi.mock("@/actions/bpm/EmpresaCadastro", () => ({ ConsultarCnpjEdicaoEmpresaCardBpm: vi.fn(), SalvarCadastroEmpresaCardBpm: vi.fn() }));
@@ -98,6 +99,60 @@ it("falha ao salvar mantém os dados e o comando de saída consegue salvar na te
   await act(async () => { expect(await context.retryFailedSaves("card")).toBe(true); });
   expect(context.getPendingFields("card")).toEqual([]); expect(SalvarCadastroEmpresaCardBpm).toHaveBeenCalledTimes(2);
   expect(document.querySelector('[aria-label="Edição dos dados da empresa"]')).toBeNull();
+});
+it("consulta com CEP ReceitaWS formatado permite salvar DTO normalizado sem nova consulta", async () => {
+  await abrirEdicao(); await editar("CNPJ", "11222333000181");
+  const consulta = structuredClone(dados.edicao.cadastro);
+  consulta.empresa.cnpj = "11222333000181"; consulta.empresa.endereco.cep = "01.001-000";
+  vi.mocked(ConsultarCnpjEdicaoEmpresaCardBpm).mockResolvedValueOnce({ success: true, cadastro: consulta, falhas: [], fontes: { receita: true, fiscal: false, radar: false } });
+  await click("Consultar"); expect(SalvarCadastroEmpresaCardBpm).not.toHaveBeenCalled();
+  const cadastro = structuredClone(consulta); cadastro.empresa.endereco.cep = "01001000";
+  vi.mocked(SalvarCadastroEmpresaCardBpm).mockResolvedValueOnce({ success: true, data: { ...aplicarPerfilCadastral(dados, { versao: 1, cadastro }), edicao: { ...dados.edicao, cadastro } } });
+  await click("Salvar");
+  expect(SalvarCadastroEmpresaCardBpm).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ cadastro: expect.objectContaining({ empresa: expect.objectContaining({ endereco: expect.objectContaining({ cep: "01001000" }) }) }) }));
+  expect(ConsultarCnpjEdicaoEmpresaCardBpm).toHaveBeenCalledTimes(1); expect(context.getPendingFields("card")).toEqual([]);
+});
+it("CEP inválido permanece editável e não inicia salvamento", async () => {
+  await abrirEdicao(); await editar("CEP", "abc01001000"); await click("Salvar");
+  expect(document.querySelector('[role="alert"]')?.textContent).toBe("CEP inválido.");
+  expect(document.querySelector<HTMLInputElement>('input[aria-label="CEP"]')?.value).toBe("abc01001000");
+  expect(context.getDraft("card:dados-empresa")).toBeDefined(); expect(SalvarCadastroEmpresaCardBpm).not.toHaveBeenCalled();
+});
+it("registerSave preserva a mensagem do servidor em cada tentativa sem descartar o rascunho", async () => {
+  await abrirEdicao(); await editar("Nome fantasia", "Nome ainda não salvo");
+  for (const mensagem of ["Os dados da empresa foram alterados durante a edição. Recarregue os dados antes de salvar novamente.", "Este CNPJ já pertence a outra empresa. O cadastro não foi alterado."]) {
+    vi.mocked(SalvarCadastroEmpresaCardBpm).mockResolvedValueOnce({ success: false, error: mensagem });
+    await click("Salvar");
+    expect(document.querySelector('[role="alert"]')?.textContent).toBe(mensagem);
+    expect(toast.error).toHaveBeenLastCalledWith(mensagem, expect.objectContaining({ id: "card-save:card" }));
+    expect(document.querySelector<HTMLInputElement>('input[aria-label="Nome fantasia"]')?.value).toBe("Nome ainda não salvo");
+    expect(context.getDraft("card:dados-empresa")).toBeDefined();
+  }
+  expect(SalvarCadastroEmpresaCardBpm).toHaveBeenCalledTimes(2);
+});
+it("retry do Provider usa a falha de transporte atual sem repetir a mensagem anterior do servidor", async () => {
+  await abrirEdicao(); await editar("Nome fantasia", "Rascunho preservado");
+  const conflito = "Os dados da empresa foram alterados durante a edição. Recarregue os dados antes de salvar novamente.";
+  vi.mocked(SalvarCadastroEmpresaCardBpm).mockResolvedValueOnce({ success: false, error: conflito });
+  await click("Salvar"); expect(toast.error).toHaveBeenLastCalledWith(conflito, expect.any(Object));
+  vi.mocked(SalvarCadastroEmpresaCardBpm).mockRejectedValueOnce(new Error("Falha de transporte simulada"));
+  await act(async () => { expect(await context.retryFailedSaves("card")).toBe(false); });
+  const mensagem = "Não foi possível salvar os dados. Suas alterações continuam disponíveis para tentar novamente.";
+  expect(toast.error).toHaveBeenLastCalledWith(mensagem, expect.objectContaining({ id: "card-save:card" }));
+  expect(document.querySelector('[role="alert"]')?.textContent).toBe(mensagem);
+  expect(context.getDraft("card:dados-empresa")).toBeDefined(); expect(SalvarCadastroEmpresaCardBpm).toHaveBeenCalledTimes(2);
+});
+it("Salvar expõe carregamento e bloqueia duplo envio até a resposta confirmar o commit", async () => {
+  await abrirEdicao(); await editar("Nome fantasia", "Nome novo");
+  let resolver!: (value: Awaited<ReturnType<typeof SalvarCadastroEmpresaCardBpm>>) => void;
+  vi.mocked(SalvarCadastroEmpresaCardBpm).mockImplementationOnce(() => new Promise((resolve) => { resolver = resolve; }));
+  await act(async () => { const salvar = btn("Salvar"); salvar.click(); salvar.click(); });
+  expect(SalvarCadastroEmpresaCardBpm).toHaveBeenCalledTimes(1);
+  expect(btn("Salvando…").disabled).toBe(true); expect(btn("Salvando…").getAttribute("aria-busy")).toBe("true");
+  expect(btn("Cancelar").disabled).toBe(true); expect(context.getDraft("card:dados-empresa")).toBeDefined();
+  const cadastro = structuredClone(dados.edicao.cadastro); cadastro.empresa.nomeFantasia = "Nome novo";
+  await act(async () => resolver({ success: true, data: { ...aplicarPerfilCadastral(dados, { versao: 1, cadastro }), edicao: { ...dados.edicao, cadastro } } }));
+  expect(SalvarCadastroEmpresaCardBpm).toHaveBeenCalledTimes(1); expect(context.getDraft("card:dados-empresa")).toBeUndefined();
 });
 it("navegação protegida mantém rascunho ao continuar e só descarta por escolha explícita", async () => {
   await abrirEdicao(); await editar("Nome fantasia", "Nome novo");

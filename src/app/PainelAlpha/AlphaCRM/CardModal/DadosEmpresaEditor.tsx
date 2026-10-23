@@ -53,14 +53,18 @@ export function DadosEmpresaEditor({ cardId, dados, onSalvo, onCancelar, registr
     const parsed = cadastroEmpresaSchema.safeParse(atual.cadastro);
     if (!parsed.success) { setErro(parsed.error.issues[0]?.message || "Confira os dados preenchidos."); return false; }
     salvandoRef.current = true; setSalvando(true); setErro(null);
+    let mensagemFalha = "Não foi possível salvar os dados. Suas alterações continuam disponíveis para tentar novamente.";
     try {
       return await registerSave(async () => {
-        const res = await SalvarCadastroEmpresaCardBpm({ cardId, ...atual.base, cadastro: parsed.data });
-        if (!res.success) { if (ativoRef.current) setErro(res.error); return false; }
+        mensagemFalha = "Não foi possível salvar os dados. Suas alterações continuam disponíveis para tentar novamente.";
+        let res;
+        try { res = await SalvarCadastroEmpresaCardBpm({ cardId, ...atual.base, cadastro: parsed.data }); }
+        catch { if (ativoRef.current) setErro(mensagemFalha); return false; }
+        if (!res.success) { mensagemFalha = res.error; if (ativoRef.current) setErro(res.error); return false; }
         limpar();
         if (ativoRef.current) onSalvo(res.data);
         return true;
-      }, cardId, chave, { failureMessage: () => "Os dados da empresa ainda não foram salvos. Revise o formulário e tente novamente." });
+      }, cardId, chave, { failureMessage: () => mensagemFalha });
     } finally { salvandoRef.current = false; if (ativoRef.current) setSalvando(false); }
   }
   useEffect(() => { salvarRef.current = salvar; });
@@ -112,7 +116,7 @@ export function DadosEmpresaEditor({ cardId, dados, onSalvo, onCancelar, registr
   return <div className="relative" aria-label="Edição dos dados da empresa">
     <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 border-b border-violet-300/20 bg-[var(--crm-painel-elevado,#1b2130)] p-3">
       <strong className="text-xs text-violet-200">Editando dados da empresa</strong>
-      <div className="flex gap-2"><button type="button" disabled={salvando || consultando} onClick={() => void salvar()}
+      <div className="flex gap-2"><button type="button" aria-busy={salvando} disabled={salvando || consultando} onClick={() => void salvar()}
         className="inline-flex items-center gap-1.5 rounded-xl bg-violet-500 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
         {salvando ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}{salvando ? "Salvando…" : "Salvar"}</button>
         <button type="button" disabled={salvando} onClick={cancelar} className="inline-flex items-center gap-1 rounded-xl border border-white/20 px-3 py-2 text-xs font-bold text-slate-200 disabled:opacity-50"><X size={14} />Cancelar</button></div>
@@ -141,7 +145,8 @@ export function DadosEmpresaEditor({ cardId, dados, onSalvo, onCancelar, registr
     <AlertDialog open={confirmarSaida} onOpenChange={setConfirmarSaida}><AlertDialogContent>
       <AlertDialogHeader><AlertDialogTitle>Dados da empresa não salvos</AlertDialogTitle><AlertDialogDescription>Salve as alterações ou descarte a edição antes de fechar os dados da empresa.</AlertDialogDescription></AlertDialogHeader>
       <AlertDialogFooter><AlertDialogCancel disabled={salvando}>Continuar editando</AlertDialogCancel>
-        <button type="button" disabled={salvando || consultando} onClick={async () => { if (await salvarRef.current()) onFechar(); }} className="rounded-lg bg-violet-600 px-4 py-2 text-sm text-white">Salvar alterações</button>
+        <button type="button" aria-busy={salvando} disabled={salvando || consultando} onClick={async () => { if (await salvarRef.current()) onFechar(); }} className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm text-white">
+          {salvando && <Loader2 size={14} className="animate-spin" />}{salvando ? "Salvando…" : "Salvar alterações"}</button>
         <button type="button" disabled={salvando} onClick={() => { limpar(); onFechar(); }} className="rounded-lg bg-rose-600 px-4 py-2 text-sm text-white">Descartar alterações</button>
       </AlertDialogFooter>
     </AlertDialogContent></AlertDialog>
