@@ -67,7 +67,7 @@ export function PendenciasWorkspace({ itens, erro, accent }: { itens: ItemPenden
             style={
               filtro === item.value
                 ? { background: `rgba(${accent},0.18)`, borderColor: `rgba(${accent},0.4)`, color: `rgb(${accent})` }
-                : { borderColor: "rgba(255,255,255,0.1)", color: "rgb(148,163,184)" }
+                : { borderColor: "color-mix(in oklab, var(--color-white) 10%, transparent)", color: "var(--color-slate-400)" }
             }
           >
             {item.label}

@@ -84,6 +84,8 @@ No CRM **não** use `dark:` para o tema: escreva no estilo escuro de sempre (`te
 - Cor vinda do banco usada como **texto** → `color-mix(in oklab, <cor> var(--crm-cor-texto, 100%), black)`.
 - Hex/rgba fixos em CSS próprio → criar override em `src/components/crm-visual/crm-tema.css`.
 - Nunca editar `crm-tema-paleta.css` à mão (é gerado).
+- Nada de cor fixa em classe arbitrária (`bg-[#141b24]`) nem em `style` inline (`"#94a3b8"`, `"rgba(255,255,255,.05)"`): use `bg-[var(--token,#hex)]` com o token em `crm-tema.css`, ou `var(--color-slate-400)` / `color-mix(in oklab, var(--color-white) 5%, transparent)` no inline.
+- O card aberto vive no `CardModalHost` (layout do painel, fora do CRM): regras do tema devem usar `:is(html, .crm-scope)[data-crm-tema="claro"]`, nunca só `.crm-scope[data-crm-tema=...]`.
 
 ---
 

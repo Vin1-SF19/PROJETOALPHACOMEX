@@ -65,7 +65,7 @@ export default function TarefasCentralClient({ tarefas, visual, currentUserId, c
               style={
                 filtroStatus === f.valor
                   ? { background: `rgba(${accent},0.2)`, color: `rgb(${accent})` }
-                  : { color: "#94a3b8" }
+                  : { color: "var(--color-slate-400)" }
               }
             >
               {f.label}

@@ -283,7 +283,7 @@ export function CardAbertoLayout({
               style={
                 abaAtiva === card.pipeline.id
                   ? { background: `rgba(${accent},0.18)`, color: `rgb(${accent})`, borderColor: `rgba(${accent},0.35)` }
-                  : { background: "rgba(255,255,255,0.03)", color: "#64748b", borderColor: "rgba(255,255,255,0.08)" }
+                  : { background: "color-mix(in oklab, var(--color-white) 3%, transparent)", color: "var(--color-slate-500)", borderColor: "color-mix(in oklab, var(--color-white) 8%, transparent)" }
               }
             >
               {card.pipeline.nome}
@@ -298,7 +298,7 @@ export function CardAbertoLayout({
                   style={
                     ativo
                       ? { background: `rgba(${accent},0.18)`, color: `rgb(${accent})`, borderColor: `rgba(${accent},0.35)` }
-                      : { background: "rgba(255,255,255,0.03)", color: "#64748b", borderColor: "rgba(255,255,255,0.08)" }
+                      : { background: "color-mix(in oklab, var(--color-white) 3%, transparent)", color: "var(--color-slate-500)", borderColor: "color-mix(in oklab, var(--color-white) 8%, transparent)" }
                   }
                 >
                   {pipeline.nome}

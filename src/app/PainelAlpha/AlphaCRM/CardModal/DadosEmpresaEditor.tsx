@@ -110,7 +110,7 @@ export function DadosEmpresaEditor({ cardId, dados, onSalvo, onCancelar, registr
     </label>;
   }
   return <div className="relative" aria-label="Edição dos dados da empresa">
-    <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 border-b border-violet-300/20 bg-[#1b2130] p-3">
+    <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 border-b border-violet-300/20 bg-[var(--crm-painel-elevado,#1b2130)] p-3">
       <strong className="text-xs text-violet-200">Editando dados da empresa</strong>
       <div className="flex gap-2"><button type="button" disabled={salvando || consultando} onClick={() => void salvar()}
         className="inline-flex items-center gap-1.5 rounded-xl bg-violet-500 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">

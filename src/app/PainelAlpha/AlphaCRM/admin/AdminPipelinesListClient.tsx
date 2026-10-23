@@ -209,7 +209,7 @@ export default function AdminPipelinesListClient({ pipelines: pipelinesIniciais,
                   style={
                     setorIds.includes(s.id)
                       ? { background: `rgba(${accent},0.2)`, color: `rgb(${accent})` }
-                      : { background: "rgba(255,255,255,0.05)", color: "#94a3b8" }
+                      : { background: "color-mix(in oklab, var(--color-white) 5%, transparent)", color: "var(--color-slate-400)" }
                   }
                 >
                   {s.nome}
@@ -361,7 +361,7 @@ export default function AdminPipelinesListClient({ pipelines: pipelinesIniciais,
                     style={
                       editSetorIds.includes(s.id)
                         ? { background: `rgba(${accent},0.2)`, color: `rgb(${accent})` }
-                        : { background: "rgba(255,255,255,0.05)", color: "#94a3b8" }
+                        : { background: "color-mix(in oklab, var(--color-white) 5%, transparent)", color: "var(--color-slate-400)" }
                     }
                   >
                     {s.nome}

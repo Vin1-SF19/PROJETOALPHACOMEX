@@ -9,6 +9,12 @@
   --crm-color-scheme: dark;
 }
 
+/* Superfícies do card aberto (Sheet em portal): escuro original como fallback. */
+:is(html, .crm-scope)[data-crm-tema="claro"] {
+  --crm-painel-card: #e8edf3;
+  --crm-painel-elevado: #dde4ec;
+}
+
 :is(html, .crm-scope)[data-crm-tema="claro"] {
   color-scheme: light;
   --crm-color-scheme: light;
@@ -32,8 +38,10 @@
   --ring: oklch(0.554 0.046 257.417);
 }
 
-/* ── Tokens visuais do CRM no claro ───────────────────────────── */
-.crm-scope[data-crm-tema="claro"] {
+/* ── Tokens visuais do CRM no claro ───────────────────────────── *
+ * Também em .crm-scope aninhados (o host do card aberto vive no layout do painel,
+ * fora do CRM, e redefine os tokens escuros via :where(.crm-scope)). */
+:is(.crm-scope[data-crm-tema="claro"], html[data-crm-tema="claro"] .crm-scope) {
   --crm-fundo-base: linear-gradient(180deg, #e2e8f0, #cbd5e1);
 
   --crm-cyan: #0d9488;
@@ -63,26 +71,26 @@
 }
 
 /* ── Fundo: crossfade com "foco" (a imagem que entra sai do desfoque) ── */
-.crm-scope[data-crm-tema="claro"] .crm-bg-media--escuro,
+:is(html, .crm-scope)[data-crm-tema="claro"] .crm-bg-media--escuro,
 .crm-scope[data-crm-tema="escuro"] .crm-bg-media--claro {
   opacity: 0;
   filter: blur(10px) saturate(1.4);
   scale: 1.06;
 }
-.crm-scope[data-crm-tema="claro"] .crm-bg-media--claro {
+:is(html, .crm-scope)[data-crm-tema="claro"] .crm-bg-media--claro {
   opacity: 1;
 }
 
 .crm-particulas {
   transition: opacity 900ms var(--crm-ease), filter 900ms var(--crm-ease);
 }
-.crm-scope[data-crm-tema="claro"] .crm-particulas {
+:is(html, .crm-scope)[data-crm-tema="claro"] .crm-particulas {
   /* poeira clara vira grafite azulado para aparecer no fundo claro */
   filter: invert(1) hue-rotate(180deg) saturate(0.6);
   opacity: 0.7;
 }
 
-.crm-scope[data-crm-tema="claro"] .crm-bg-ambient::after {
+:is(html, .crm-scope)[data-crm-tema="claro"] .crm-bg-ambient::after {
   mix-blend-mode: multiply;
   background:
     radial-gradient(60% 42% at 18% 16%, rgba(239, 68, 68, 0.05), transparent 70%),
@@ -91,24 +99,24 @@
 }
 
 /* ── Superfícies com cor fixa no CSS do CRM ───────────────────── */
-.crm-scope[data-crm-tema="claro"] .crm-iconchip {
+:is(html, .crm-scope)[data-crm-tema="claro"] .crm-iconchip {
   border-color: rgba(15, 23, 42, 0.08);
   box-shadow: 0 6px 14px -8px rgba(15, 23, 42, 0.25), 0 1px 0 0 rgba(255, 255, 255, 0.9) inset;
   background:
     linear-gradient(160deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 42%),
     rgba(241, 245, 249, 0.9);
 }
-.crm-scope[data-crm-tema="claro"] .crm-inner-light::before {
+:is(html, .crm-scope)[data-crm-tema="claro"] .crm-inner-light::before {
   background: radial-gradient(120% 80% at 50% 0%, rgba(37, 99, 235, 0.05), transparent 60%);
 }
-.crm-scope[data-crm-tema="claro"] .crm-spotlight::after {
+:is(html, .crm-scope)[data-crm-tema="claro"] .crm-spotlight::after {
   background: radial-gradient(
     260px circle at var(--spot-x, 50%) var(--spot-y, 50%),
     rgba(37, 99, 235, 0.07),
     transparent 62%
   );
 }
-.crm-scope[data-crm-tema="claro"] .crm-timeline::before {
+:is(html, .crm-scope)[data-crm-tema="claro"] .crm-timeline::before {
   background: linear-gradient(
     180deg,
     rgba(37, 99, 235, 0),
@@ -119,27 +127,27 @@
 }
 
 /* Scrollbar */
-.crm-scope[data-crm-tema="claro"] .crm-scroll,
+:is(html, .crm-scope)[data-crm-tema="claro"] .crm-scroll,
 .crm-scope[data-crm-tema="claro"].crm-scroll {
   scrollbar-color: rgba(100, 116, 139, 0.45) transparent;
 }
-.crm-scope[data-crm-tema="claro"] *::-webkit-scrollbar-thumb {
+:is(html, .crm-scope)[data-crm-tema="claro"] *::-webkit-scrollbar-thumb {
   background: rgba(100, 116, 139, 0.4);
 }
-.crm-scope[data-crm-tema="claro"] *::-webkit-scrollbar-thumb:hover {
+:is(html, .crm-scope)[data-crm-tema="claro"] *::-webkit-scrollbar-thumb:hover {
   background: rgba(37, 99, 235, 0.55);
 }
 
 /* Colunas do Kanban (estilos base em globals.css) */
-.crm-scope[data-crm-tema="claro"] .alpha-pipeline-column-shell {
+:is(html, .crm-scope)[data-crm-tema="claro"] .alpha-pipeline-column-shell {
   border-color: rgba(15, 23, 42, 0.1);
   background: rgba(226, 232, 240, 0.5);
 }
-.crm-scope[data-crm-tema="claro"] .alpha-pipeline-column-shell:hover,
-.crm-scope[data-crm-tema="claro"] .alpha-pipeline-column-shell:focus-within {
+:is(html, .crm-scope)[data-crm-tema="claro"] .alpha-pipeline-column-shell:hover,
+:is(html, .crm-scope)[data-crm-tema="claro"] .alpha-pipeline-column-shell:focus-within {
   border-color: rgba(37, 99, 235, 0.25);
 }
-.crm-scope[data-crm-tema="claro"] .alpha-pipeline-column-shell:hover .alpha-pipeline-column-header {
+:is(html, .crm-scope)[data-crm-tema="claro"] .alpha-pipeline-column-shell:hover .alpha-pipeline-column-header {
   background-color: rgba(15, 23, 42, 0.04);
 }
 
