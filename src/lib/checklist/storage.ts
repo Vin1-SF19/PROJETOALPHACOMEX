@@ -8,7 +8,12 @@ export interface ChecklistStorage {
   ): Promise<{ body: ReadableStream<Uint8Array>; mime: string; size: number }>;
 }
 export function storageConfig() {
-  const token = process.env.CHECKLIST_PRIVATE_BLOB_TOKEN;
+  // A ligação nativa do provedor fornece a credencial sem exportá-la.
+  const producao = process.env.CHECKLIST_TARGET_ENVIRONMENT === "production"
+    && (!process.env.VERCEL_ENV || process.env.VERCEL_ENV === "production")
+    && (!process.env.VERCEL_TARGET_ENV || process.env.VERCEL_TARGET_ENV === "production");
+  const token = process.env.CHECKLIST_PRIVATE_BLOB_TOKEN
+    ?? (producao ? process.env.CHECKLIST_PRODUCTION_READ_WRITE_TOKEN : undefined);
   const prefix = process.env.CHECKLIST_STORAGE_PREFIX;
   if (
     !token ||
