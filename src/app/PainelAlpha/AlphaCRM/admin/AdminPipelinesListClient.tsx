@@ -165,7 +165,7 @@ export default function AdminPipelinesListClient({ pipelines: pipelinesIniciais,
         </div>
         <button
           onClick={() => setMostrarForm((prev) => !prev)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white"
+          className="crm-tema-fixo flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white"
           style={{ background: `rgba(${accent},0.85)` }}
         >
           <Plus size={15} /> Novo Pipeline
@@ -221,7 +221,7 @@ export default function AdminPipelinesListClient({ pipelines: pipelinesIniciais,
           <button
             onClick={handleCriar}
             disabled={salvando}
-            className="px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+            className="crm-tema-fixo px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
             style={{ background: `rgba(${accent},0.85)` }}
           >
             {salvando ? "Criando..." : "Criar pipeline"}
@@ -380,7 +380,7 @@ export default function AdminPipelinesListClient({ pipelines: pipelinesIniciais,
             <button
               onClick={() => void salvarEdicao()}
               disabled={salvandoEdicao}
-              className="px-4 py-1.5 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
+              className="crm-tema-fixo px-4 py-1.5 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
               style={{ background: `rgba(${accent},0.85)` }}
             >
               {salvandoEdicao ? "Salvando..." : "Salvar"}

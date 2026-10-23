@@ -77,6 +77,14 @@ export function cn(...inputs: ClassValue[]) {
 <div className="bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100">
 ```
 
+### Exceção: Alpha CRM (tema claro/escuro próprio — 2026-10-23)
+
+No CRM **não** use `dark:` para o tema: escreva no estilo escuro de sempre (`text-white`, `text-slate-400`, `bg-white/5`, status `text-amber-200`…) — o tema claro remapeia a paleta sozinho (ver `decisions.md` 2026-10-23). Regras:
+- Fundo sólido via `style` inline (accent do usuário) com texto claro → adicionar `crm-tema-fixo` ao `className`.
+- Cor vinda do banco usada como **texto** → `color-mix(in oklab, <cor> var(--crm-cor-texto, 100%), black)`.
+- Hex/rgba fixos em CSS próprio → criar override em `src/components/crm-visual/crm-tema.css`.
+- Nunca editar `crm-tema-paleta.css` à mão (é gerado).
+
 ---
 
 ## ANIMAÇÕES

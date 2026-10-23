@@ -92,7 +92,8 @@ export function SlaStatusBadge({ sla, className }: { sla: SlaVisual; className?:
       role="status"
       title={`${sla.nome}: ${rotulo}`}
       className={cn("inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[9px] font-bold uppercase tracking-wide", className)}
-      style={{ borderColor: cores.borda, backgroundColor: cores.fundo, color: cores.texto }}
+      // --crm-cor-texto escurece o texto pastel no tema claro do CRM (100% = cor original).
+      style={{ borderColor: cores.borda, backgroundColor: cores.fundo, color: `color-mix(in oklab, ${cores.texto} var(--crm-cor-texto, 100%), black)` }}
       data-sla-status={sla.status}
       data-sla-cor={sla.cor}
     >

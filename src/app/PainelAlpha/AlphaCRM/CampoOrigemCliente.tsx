@@ -44,7 +44,7 @@ export function CampoOrigemCliente({ id, value, onChange, onBlur, className, dis
   return <div className="space-y-3">
     {nativo ? <select id={id} value={origem} disabled={disabled} required={required} onBlur={onBlur}
       aria-label="Origem do cliente" aria-invalid={invalid || undefined} aria-describedby={describedBy}
-      onChange={(event) => escolherOrigem(event.target.value)} style={{ colorScheme: "dark" }}
+      onChange={(event) => escolherOrigem(event.target.value)} style={{ colorScheme: "var(--crm-color-scheme, dark)" }}
       className={cn(className, "min-h-11 w-full rounded-xl border-slate-700 bg-slate-950 text-slate-100 focus-visible:ring-2 focus-visible:ring-sky-400/20")}>
       <option value="" className="bg-slate-950 text-slate-400">Selecione...</option>
       {CANAIS_AQUISICAO.map((item) => <option key={item.value} value={item.value} className="bg-slate-950 text-slate-100">{item.label}</option>)}

@@ -242,7 +242,7 @@ export function VisibilidadeEtapasSection({
                       type="button"
                       onClick={() => void salvar(etapa.id)}
                       disabled={publicationBlocked || Boolean(salvandoEtapa)}
-                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                      className="crm-tema-fixo flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
                       style={{ background: `rgba(${accent},0.85)` }}
                     >
                       {salvando ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}

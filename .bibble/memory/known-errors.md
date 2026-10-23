@@ -798,3 +798,15 @@ Comparação literal e onChange marcavam pontuação como edição. PainelCampos
 
 ### 2026-10-01 — Scribe — RM-2026-AD3EA4: fronteira mensal da venda
 Causa corrigida no código: escrita UTC e limites mensais locais misturavam fusos e deslocavam vendas entre meses. Helper data-comercial compartilhado alinha escrita, consulta e exibição em UTC; data ausente ou impossível é rejeitada. Testes de actions usam mocks, sem comprovar dados históricos reais. Na execução de encerramento, npm test falhou por EBUSY ao remover coverage; preservar o diretório e registrar a limitação, sem limpeza destrutiva. Evidências: tmp/rm-ad3ea4/closure/.
+
+## `npm run build` falha em `prisma generate` com EPERM no `copyfile` (Linux)
+**Sintoma:** `EPERM: operation not permitted, copyfile '.../node_modules/@prisma/client/runtime/query_compiler_bg.sqlite.js' -> '.../node_modules/.prisma/client/query_compiler_bg.js'`. O generate já reescreveu parte de `node_modules/.prisma/client` antes de falhar, deixando o client **incompleto** (sem `query_compiler_bg.js`), o que pode derrubar o dev server em execução.
+**Causa:** intermitente, com `next dev` ativo na mesma árvore (arquivo de runtime com muitos hardlinks no diretório setgid compartilhado). Não é erro do código.
+**Fix:** rodar `npx prisma generate` de novo (passou na segunda tentativa) e conferir `ls node_modules/.prisma/client | grep query_compiler`; depois repetir o build. Nunca deixar o client pela metade.
+**Adicionado em:** 2026-10-23 (Forge, tema claro/escuro do Alpha CRM)
+
+## `next build` morre com "Next.js build worker exited with code: null and signal: SIGTERM"
+**Sintoma:** compila o servidor (`Compiled with warnings`), imprime vários `Retrying 1/3...` e o worker morre com SIGTERM, sem erro de código. Não aparece "Sending SIGTERM ... due to timeout" (não é travamento do Next).
+**Causa:** o `earlyoom` da máquina (`/usr/bin/earlyoom`) mata o worker de webpack quando a memória disponível cai abaixo de 10% e o swap está 0% livre — confirmar com `journalctl --since "15 min ago" | grep earlyoom` (worker com VmRSS ~28 GB). Pressão vem de swap cheio + `/tmp` tmpfs (RAM) cheio + dev servers. Os `Retrying 1/3...` são do `next/font/google` (gstatic com timeout IPv4/ENETUNREACH IPv6 na primeira tentativa) e são só ruído: passam na retentativa. Já houve `ENOSPC` em `/tmp` (tmpfs 16 GB) no mesmo cenário.
+**Fix:** não é erro de código. Liberar memória (fechar dev servers ociosos, limpar artefatos próprios em `/tmp`, `.next-*` isolados) e rodar o build quando `free -g` mostrar swap livre. Builds isolados: `NEXT_DIST_DIR=.next-<nome>` (o `.next/cache/webpack` e `.next/dev` compartilhados apontam para symlinks quebrados em `/tmp` de outro usuário). Apagar o `.next-<nome>` ao final (≈2,5 GB).
+**Adicionado em:** 2026-10-23 (Forge, tema claro/escuro do Alpha CRM)

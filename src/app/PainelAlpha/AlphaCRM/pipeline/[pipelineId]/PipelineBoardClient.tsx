@@ -679,7 +679,7 @@ function KanbanColumn({
           <span
             aria-live="polite"
             className="text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center"
-            style={{ background: `rgba(${cor},0.2)`, color: `rgb(${cor})` }}
+            style={{ background: `rgba(${cor},0.2)`, color: `color-mix(in oklab, rgb(${cor}) var(--crm-cor-texto, 100%), black)` }}
           >
             {total ?? cards.length}
           </span>
@@ -719,7 +719,8 @@ function KanbanColumn({
           ref={scrollRef}
           className={cn("alpha-pipeline-column flex-1 min-h-0 overflow-y-auto overscroll-y-contain rounded-2xl p-2 space-y-2 border border-dashed border-white/5", isOver && "is-over")}
           style={{
-            background: isOver ? `rgba(${cor},0.1)` : `rgba(${cor},0.03)`,
+            // --crm-tinta-coluna: tinta da etapa mais presente no tema claro do CRM.
+            background: isOver ? `rgba(${cor},0.1)` : `rgba(${cor},var(--crm-tinta-coluna, 0.03))`,
             borderColor: isOver ? `rgba(${cor},0.5)` : undefined,
           }}
         >

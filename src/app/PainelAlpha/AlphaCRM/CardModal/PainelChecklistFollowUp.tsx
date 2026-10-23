@@ -249,7 +249,7 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
       </div>}
 
       {!checklist ? (
-        <button type="button" onClick={() => void persistir(false)} disabled={!podeEditar || salvando} className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-50" style={{ background: `rgba(${accent},0.85)` }}>
+        <button type="button" onClick={() => void persistir(false)} disabled={!podeEditar || salvando} className="crm-tema-fixo flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-50" style={{ background: `rgba(${accent},0.85)` }}>
           {salvando && <Loader2 size={14} className="animate-spin" />} Iniciar follow-up
         </button>
       ) : (
@@ -289,7 +289,7 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-2">
-              <button type="button" onClick={() => void persistir(true)} disabled={!podeEditar || salvando} className="flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold text-white disabled:opacity-50" style={{ background: `rgba(${accent},0.85)` }}>{salvando && <Loader2 size={13} className="animate-spin" />} Concluir follow-up</button>
+              <button type="button" onClick={() => void persistir(true)} disabled={!podeEditar || salvando} className="crm-tema-fixo flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold text-white disabled:opacity-50" style={{ background: `rgba(${accent},0.85)` }}>{salvando && <Loader2 size={13} className="animate-spin" />} Concluir follow-up</button>
             </div>
           )}
         </div>

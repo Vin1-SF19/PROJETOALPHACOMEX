@@ -235,7 +235,7 @@ export default function NolossLeadModal({
                 setErro(null);
                 setPromocaoAberta(true);
               }}
-              className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              className="crm-tema-fixo flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
               style={{ background: `rgba(${accent},0.85)` }}
             >
               Assumir lead
