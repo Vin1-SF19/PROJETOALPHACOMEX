@@ -25,7 +25,7 @@ Como Admin, TI ou líder de setor autorizado, quero um botão bem visível em **
 - [x] Diagnosticar autoridade de origem, comandos de movimento/encaminhamento, vínculos e regras de destino existentes.
 - [x] Implementar botão/modal e validação de seleção/responsável, sem alterar automação.
 - [x] Integrar comandos canônicos, CAS/idempotência, transação e auditoria.
-- [ ] Executar testes/gates e obter QA com validação de staging.
+- [x] Executar os quatro gates locais da feature e da união; QA remoto de staging permanece pendente.
 - [ ] Registrar entrega, evidências e File List; preservar arquivos dirty alheios.
 
 ## Implementação e evidências
@@ -48,3 +48,14 @@ Como Admin, TI ou líder de setor autorizado, quero um botão bem visível em **
 - `tests/bpm/encaminhamento-manual-react.test.ts`
 - `tests/bpm/encaminhamento-manual-sqlite.test.ts`
 - `tests/bpm/encaminhamentos-painel-react.test.ts`
+
+
+## Integração com o staging concorrente
+
+- Feature isolada no checkpoint `1b88e3af`; união normal `dce3178e` preservou integralmente os 42 arquivos de `de46e48a` (filtro de origem/busca e tema do CRM) e os nove arquivos da feature. Não houve force push, alteração de schema, dependências ou configuração.
+- Build real da união: 86 páginas, exit 0; lint zero erros/1.184 avisos legados; typecheck sequencial aprovado. Suíte completa final da união: 755 arquivos e 6.271 testes PASS, quatro ignorados e um todo; exit 0, registrada em `union-tests-final.log`.
+- A integração revelou uma asserção antiga que exigia `colorScheme=dark` fixo no teste de indicação/parceiro. O tema concorrente usa variável CSS com fallback escuro e opção clara. Foi removida somente essa asserção de apresentação obsoleta e ajustado o nome do teste; todas as verificações de seleção e payload do parceiro foram preservadas. Nenhum código do tema foi revertido.
+- Prévia da união com componentes e CSS reais, APIs fictícias: desktop/mobile nos temas claro e escuro, sem overflow horizontal ou erros de execução. Não representa login ou envio em ambiente remoto.
+- Arquivo adicional de compatibilidade de teste: `tests/bpm/novo-card-modal-react.test.ts`.
+
+- QA local integrado PASS ratificado para a união e os quatro gates finais; publicação e smoke remoto somente staging permanecem pendentes. Produção não autorizada nesta entrega.
