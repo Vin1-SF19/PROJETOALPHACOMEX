@@ -482,7 +482,7 @@ export default function AdminPipelineClient({
             type="button"
             disabled={!alteracoesPendentes || Boolean(operacao)}
             onClick={publicarAlteracoes}
-            className="inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-xs font-bold text-white disabled:opacity-35"
+            className="crm-tema-fixo inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-xs font-bold text-white disabled:opacity-35"
             style={{ background: `rgba(${accent},0.85)` }}
           >
             <Save size={14} /> Publicar rascunho principal
@@ -697,7 +697,7 @@ export default function AdminPipelineClient({
             <button
               onClick={handleCriarEtapa}
               disabled={Boolean(operacao) || !novaEtapaNome.trim()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-white disabled:opacity-40"
+              className="crm-tema-fixo flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-white disabled:opacity-40"
               style={{ background: `rgba(${accent},0.85)` }}
             >
               {operacao === "criar-etapa" ? (

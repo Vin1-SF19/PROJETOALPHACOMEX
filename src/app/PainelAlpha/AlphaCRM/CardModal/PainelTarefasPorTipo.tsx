@@ -213,7 +213,7 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
             <BpmDateTimeField id={`tarefa-alerta-${cardId}`} label="Alerta" value={alertaEm} onChange={(valor) => { setAlertaEm(valor); limparErro("alertaEm"); }} required disabled={salvando || !podeTrabalharTarefas} error={erros.alertaEm} />
           </div>
           {mensagemErro && <div role="alert" className="rounded-xl border border-rose-400/30 bg-rose-400/10 p-3 text-xs text-rose-200"><p className="font-semibold">{mensagemErro}</p>{errosNoResumo.length > 0 && <ul className="mt-1 list-disc space-y-0.5 pl-4">{errosNoResumo.map(([campo, mensagem]) => <li key={campo}>{mensagem}</li>)}</ul>}</div>}
-          <button type="button" onClick={() => void salvar()} disabled={salvando || !podeTrabalharTarefas} aria-busy={salvando} className="w-full rounded-xl py-2.5 text-sm font-bold text-white disabled:opacity-50" style={{ background: `rgb(${accent})` }}>{salvando ? "Criando..." : `Criar ${obterConfigTipoTarefa(tipo).label}`}</button>
+          <button type="button" onClick={() => void salvar()} disabled={salvando || !podeTrabalharTarefas} aria-busy={salvando} className="crm-tema-fixo w-full rounded-xl py-2.5 text-sm font-bold text-white disabled:opacity-50" style={{ background: `rgb(${accent})` }}>{salvando ? "Criando..." : `Criar ${obterConfigTipoTarefa(tipo).label}`}</button>
         </div>
       ))}
     </div>

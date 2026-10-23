@@ -39,9 +39,11 @@ function SheetContent({
   className,
   children,
   side = "bottom",
+  showCloseButton = true,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "bottom" | "left" | "right"
+  showCloseButton?: boolean
 }) {
   return (
     <SheetPortal>
@@ -63,10 +65,12 @@ function SheetContent({
         {...props}
       >
         {children}
-        <SheetPrimitive.Close className="absolute top-4 right-4 rounded-full p-1.5 text-slate-400 opacity-80 transition-opacity hover:opacity-100 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20">
-          <XIcon className="size-4" />
-          <span className="sr-only">Fechar</span>
-        </SheetPrimitive.Close>
+        {showCloseButton && (
+          <SheetPrimitive.Close className="absolute top-4 right-4 rounded-full p-1.5 text-slate-400 opacity-80 transition-opacity hover:opacity-100 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20">
+            <XIcon className="size-4" />
+            <span className="sr-only">Fechar</span>
+          </SheetPrimitive.Close>
+        )}
       </SheetPrimitive.Content>
     </SheetPortal>
   )

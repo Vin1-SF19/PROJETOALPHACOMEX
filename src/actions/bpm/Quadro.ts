@@ -16,12 +16,14 @@ import { buscarInstagramLeadsPendentes } from "@/lib/bpm/instagram-leads-server"
 import { ordenarCardsMaisRecentesPrimeiro } from "@/lib/bpm/ordem-cards";
 import { ListarCardsPipelineBpm } from "./Cards";
 import { selecionarPaginaQuadro, type ManifestoQuadro, type EntradaManifestoQuadro } from "@/lib/bpm/quadro-paginado";
+import { origemNativaQuadro, origemNolossQuadro } from "@/lib/bpm/origem-quadro";
 
 const id = z.string().min(1).max(150);
 const entrada = z.object({
   conhecidos: z.array(z.object({ id, revision: z.string().max(100) })).max(5000).default([]),
   limites: z.record(z.string().max(150), z.number().int().min(1).max(5000)).default({}),
   busca: z.string().max(200).default(""), responsavelId: z.number().int().positive().nullable().optional(),
+  origem: z.string().trim().min(1).max(200).nullable().optional(),
   forcar: z.boolean().default(false),
   visao: z.enum(["MEUS", "EQUIPE", "SETOR", "TODOS"]).default("MEUS"),
   setorId: z.number().int().positive().nullable().optional(),
@@ -58,10 +60,16 @@ export async function SincronizarQuadroBpm(pipelineId: string, input: unknown = 
     if ((parsed.data.visao === "SETOR" && !escopo.setores.some((s) => s.id === parsed.data.setorId)) || (parsed.data.visao === "EQUIPE" && !escopo.setores.length) || (parsed.data.responsavelId != null && !escopo.responsaveis.some((pessoa) => pessoa.id === parsed.data.responsavelId))) {
       return { success: false as const, error: "Esta visualização não está mais disponível. Selecione Meus e sem vínculos.", acessoNegado: false, visaoRevogada: true };
     }
-    // Só informações de identidade, busca e acesso. Nunca histórico, tarefas ou campos completos.
+    // Só identidade, busca, origem e acesso. Nunca histórico, tarefas ou campos completos.
     const rows = await db.bpmCard.findMany({
       where: { pipelineId, etapaId: { in: etapas.map((e) => e.id) }, OR: [{ status: "ATIVO" }, { status: "CONCLUIDO", etapa: { ehFinal: true } }], ...escopo.where },
-      select: { id: true, etapaId: true, createdAt: true, updatedAt: true, servico: true, status: true,
+      select: { id: true, empresaId: true, etapaId: true, createdAt: true, updatedAt: true, servico: true, status: true,
+        campoValores: { where: { campo: { ativo: true, OR: [{ chave: "alpha.canal.origem.do.cliente" }, { nome: { contains: "origem" } }] } },
+          select: { valor: true, campo: { select: { nome: true, chave: true, ativo: true } } } },
+        servicoContexto: { select: {
+          clienteServico: { select: { clienteId: true, origemLead: true, canalAquisicao: true } },
+          contratoComercial: { select: { clienteId: true, canalAquisicao: true } },
+        } },
         empresa: { select: { razaoSocial: true, nomeFantasia: true, cnpj: true } },
         responsavel: { select: { id: true, nome: true } },
         membros: { select: { usuario: { select: { id: true, nome: true } } } },
@@ -72,15 +80,16 @@ export async function SincronizarQuadroBpm(pipelineId: string, input: unknown = 
     const entradas: EntradaManifestoQuadro[] = rows.filter((c) => cardApareceNoQuadro(c, pipeline.etapas, saidas)).map((c) => ({
       id: c.id, etapaId: c.etapaId, createdAt: c.createdAt?.toISOString(), revision: hash([c, pipeline.configVersion]),
       nome: `${c.empresa.razaoSocial} ${c.empresa.nomeFantasia ?? ""}`, cnpj: c.empresa.cnpj, servico: c.servico,
+      origem: origemNativaQuadro(c),
       responsaveis: [...new Map([c.responsavel, ...c.membros.map((m) => m.usuario)].map((p) => [p.id, p])).values()],
     }));
     const novos = etapas.find((e) => etapaEhNovosLeads(e.nome));
     if (novos && pipelineEhRevisaoRadar(pipeline.nome)) {
       const leads = await buscarNolossLeadsPendentes();
-      for (const lead of leads) entradas.push({ id: lead.id, etapaId: novos.id, createdAt: lead.receivedAt?.toISOString(), revision: hash(lead), nome: lead.nome || lead.email || "Lead sem nome", cnpj: null, servico: null, responsaveis: [] });
+      for (const lead of leads) entradas.push({ id: lead.id, etapaId: novos.id, createdAt: lead.receivedAt?.toISOString(), revision: hash(lead), nome: lead.nome || lead.email || "Lead sem nome", cnpj: null, servico: null, origem: origemNolossQuadro(lead), responsaveis: [] });
       for (const lead of await buscarInstagramLeadsPendentes(pipelineId)) entradas.push({
         id: lead.id, etapaId: novos.id, createdAt: lead.recebidoEm.toISOString(), revision: hash(lead),
-        nome: `${lead.dados.nome} Instagram`, cnpj: lead.dados.cnpj, servico: null, responsaveis: [],
+        nome: `${lead.dados.nome} Instagram`, cnpj: lead.dados.cnpj, servico: null, origem: "Instagram", responsaveis: [],
       });
     }
     const ordenadas = ordenarCardsMaisRecentesPrimeiro(entradas);

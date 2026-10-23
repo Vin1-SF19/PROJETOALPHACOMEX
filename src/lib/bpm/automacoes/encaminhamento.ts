@@ -9,6 +9,9 @@ import { copiarCamposCardVinculado } from "@/lib/bpm/copiar-campos-card-vinculad
 import { carregarCamposFaltantesCardEtapa } from "@/lib/bpm/requisitos-etapa-server";
 import { ehPipelineOperacional } from "@/lib/bpm/financeiro-config.client";
 import { publicarEventoBpm } from "./eventos";
+import { parametrosFinanceiroMovimentoLivre } from "./financeiro-movimento-livre";
+import { validarRecuperacaoFinanceiraAtual } from "./recuperacao-financeiro-server";
+import { motivoBloqueioFinanceiroMovimentoLivre } from "./financeiro-movimento-livre-server";
 import { parametrosEncaminhamentoSchema } from "./schemas";
 import { registrarRecepcaoPipelineBpm } from "@/lib/bpm/recebimentos-card-server";
 
@@ -21,11 +24,23 @@ function parseObjeto(valor: string | null): Record<string, unknown> {
 /** Authority comes from an authenticated request's persisted audit record, never action JSON. */
 async function autorizacaoAdministrativa(tx: Prisma.TransactionClient, execucaoId: string, cardId: string, automacaoId: string, parametros: ReturnType<typeof parametrosEncaminhamentoSchema.parse>) {
   const execucao = await tx.bpmAutomacaoExecucao.findUnique({ where: { id: execucaoId },
-    select: { cardId: true, automacaoId: true, gatilhoTipo: true, correlationId: true, eventoId: true, evento: { select: { profundidade: true } }, automacao: { select: { ativa: true, etapaId: true, pipelineId: true, acaoTipo: true } } } });
+    select: { cardId: true, automacaoId: true, gatilhoTipo: true, correlationId: true, eventoId: true, evento: true, automacaoVersaoId: true, automacao: { select: { ativa: true, etapaId: true, pipelineId: true, acaoTipo: true } } } });
   if (!execucao || execucao.cardId !== cardId || execucao.automacaoId !== automacaoId) throw new Error("Execução incompatível com o encaminhamento");
   const contexto = { correlationId: execucao.correlationId ?? execucaoId, causationId: execucao.eventoId ?? execucaoId,
     profundidade: (execucao.evento?.profundidade ?? 0) + 1 };
-  if (execucao.gatilhoTipo !== "ENCAMINHAMENTO_ADMIN") return { ...contexto, administrativo: null };
+  if (execucao.gatilhoTipo !== "ENCAMINHAMENTO_ADMIN") {
+    const financeiroLivre = parseObjeto(execucao.evento?.valorNovoJson ?? null).permitirEncaminhamentoFinanceiroConfigurado === true;
+    if (financeiroLivre) {
+      const versao = execucao.automacaoVersaoId ? await tx.bpmAutomacaoVersao.findUnique({ where: { id: execucao.automacaoVersaoId } }) : null;
+      if (!execucao.evento || !versao || versao.automacaoId !== automacaoId) throw new Error("Encaminhamento financeiro sem evento e versão");
+      const bloqueio = await motivoBloqueioFinanceiroMovimentoLivre(execucao.evento,
+        { ...versao, automacao: execucao.automacao }, tx);
+      if (bloqueio) throw new Error(bloqueio);
+      const configurados = parametrosFinanceiroMovimentoLivre(JSON.parse(versao.grafoJson));
+      if (JSON.stringify(configurados) !== JSON.stringify(parametros)) throw new Error("Parâmetros do encaminhamento financeiro divergentes");
+    }
+    return { ...contexto, administrativo: null, financeiroLivre };
+  }
   const autorizacao = await tx.bpmCardHistorico.findFirst({ where: { cardId, acao: "ENCAMINHAMENTO_ADMIN_SOLICITADO",
     valorNovoJson: { contains: execucaoId } }, orderBy: { createdAt: "desc" }, select: { usuarioId: true, valorNovoJson: true } });
   const dados = parseObjeto(autorizacao?.valorNovoJson ?? null);
@@ -36,6 +51,7 @@ async function autorizacaoAdministrativa(tx: Prisma.TransactionClient, execucaoI
   if (!ator || ator.status !== "ATIVO" || !isAdminRole(ator.role)) throw new Error("Autorização administrativa indisponível");
   await exigirAcessoBpmCard(cardId, ator.id, ator.role, "visualizar", tx);
   await exigirAcessoBpmPipeline(parametros.pipelineId, ator.id, tx);
+  if (dados.recuperacaoAutomaticaFinanceiro === true) await validarRecuperacaoFinanceiraAtual(tx, cardId, automacaoId, parametros);
   return { ...contexto, administrativo: { usuarioId: ator.id, versaoEsperada: dados.versaoEsperada,
     etapaAutorizadaId: dados.etapaOrigemId, etapaOrigemId: execucao.automacao.etapaId, pipelineOrigemId: execucao.automacao.pipelineId } };
 }
@@ -53,6 +69,7 @@ export async function executarEncaminhamentoBpm(input: {
     if (!card || card.status === "ARQUIVADO") throw new Error("Card indisponível para encaminhamento");
     const contexto = await autorizacaoAdministrativa(tx, input.execucaoId, card.id, input.automacaoId, parametros);
     const administrativo = contexto.administrativo;
+    const suprimirAutomacoesDestino = Boolean(administrativo || ("financeiroLivre" in contexto && contexto.financeiroLivre));
     if (administrativo && (administrativo.etapaOrigemId !== card.etapaId || administrativo.etapaAutorizadaId !== card.etapaId || administrativo.pipelineOrigemId !== card.pipelineId)) {
       throw new Error("O card mudou de etapa. Atualize antes de encaminhar.");
     }
@@ -186,7 +203,7 @@ export async function executarEncaminhamentoBpm(input: {
         } });
       }
       await criarSlaInstancia({ cardId: criado.id }, "ENTRADA_ETAPA", tx, criado.createdAt);
-      if (!administrativo) await ativarCadenciasNaEntradaBpm({
+      if (!suprimirAutomacoesDestino) await ativarCadenciasNaEntradaBpm({
         cardId: criado.id,
         pipelineAnteriorId: null,
         etapaAnteriorId: null,
@@ -201,7 +218,7 @@ export async function executarEncaminhamentoBpm(input: {
         valorNovoJson: JSON.stringify({ execucaoId: input.execucaoId, cardDestinoId: criado.id, pipelineDestinoId: pipelineId,
           etapaDestinoId: etapaId, excecaoAdministrativa: Boolean(administrativo), statusOrigemPreservado: card.status }) } });
       await publicarEventoBpm({ tipo: "CARD_CRIADO", entidadeTipo: "CARD", entidadeId: criado.id, cardId: criado.id,
-        pipelineId, valorNovo: { etapaId, cardOrigemId: card.id, ...(administrativo ? { automacoesSuprimidas: true } : {}) }, atorTipo: administrativo ? "USUARIO" : "AUTOMACAO",
+        pipelineId, valorNovo: { etapaId, cardOrigemId: card.id, ...(suprimirAutomacoesDestino ? { automacoesSuprimidas: true } : {}) }, atorTipo: administrativo ? "USUARIO" : "AUTOMACAO",
         atorUserId: administrativo?.usuarioId, atorExecucaoId: input.execucaoId, correlationId: contexto.correlationId,
         causationId: contexto.causationId, profundidade: contexto.profundidade, idempotencyKey: `automacao:${input.execucaoId}:card-criado:${criado.id}` }, tx);
       const recepcao = pipelineDestino.chave === "financeiro" || ehPipelineOperacional(pipelineDestino)

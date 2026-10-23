@@ -15,6 +15,14 @@ export async function executarAutomacoesCentraisDoCardAgora(cardId: string) {
   return { materializacao, fila };
 }
 
+/** Somente a regra financeira do movimento recém-confirmado. */
+export async function executarFinanceiroMovimentoLivreAgora(cardId: string, eventoId: string) {
+  const escopo = { modo: "FINANCEIRO_MOVIMENTO_LIVRE", cardId, eventoId } as const;
+  const materializacao = await materializarExecucoesEventosBpm(100, db, escopo);
+  const fila = await processarFilaAutomacoesCentraisBpm(50, escopo);
+  return { materializacao, fila };
+}
+
 /** Somente a minuta do movimento recém-confirmado, inclusive no resgate da fila. */
 export async function executarMinutaMovimentoLivreAgora(cardId: string, eventoId: string) {
   const escopo = { modo: "MINUTA_MOVIMENTO_LIVRE", cardId, eventoId } as const;

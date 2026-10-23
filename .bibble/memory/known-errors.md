@@ -839,3 +839,24 @@ Revalidação após integrar lazy imports do editor/Radar: build literal3072/poo
 
 
 **Confirmação posterior do rerun:** suíte integral exit0/194,07s, 746 arquivos/6.114 testes PASS, zero falhas/quatro skipped/um todo; quatro gates Forge PASS na fonte c07ee602... idêntica. Falha inicial e correção de harness permanecem registradas; QA final/deploy ainda pendentes neste registro.
+
+
+## ENOSPC durante build local com outputs acumulados — 2026-10-23
+
+Na validação do hotfix de um único X sobre `04cc69c0`, o primeiro build falhou por falta de espaço do host, sem defeito do app. Preservar logs/evidências antes de limpar; conferir autoria, ausência de processos e caráter regenerável dos outputs. A coordenação removeu somente três outputs antigos próprios de validação Audio/Instagram, nenhum arquivo versionado, liberando 10,3 GB (`cleanup-own-builds.json`). Repetido apenas o gate afetado: build literal PASS em 92,23 s; fonte `2c72…` idêntica antes/retry/depois, sem alteração de app/package/ENV ou limpeza de terceiros. Depois, a produção avançou externamente para `274d6d6f`; herdar o resultado como checkpoint histórico e verificar proporcionalmente a integração, sem confundir troca de base com correção da falha de disco.
+
+
+## Testes do filtro de origem: unknown e asserção por string — 2026-10-23
+
+Typecheck inicial encontrou TS2698 em três spreads de valores unknown do harness; corrigir com guard real antes do spread, sem coerção cega nem patch de aplicação. A primeira suíte também revelou teste legado preso à string `cards.length === 0`; substituir por cenários DOM de erro, vazio, exclusão e filtro em `tests/bpm/board-exclusao-local.test.ts`. Essas falhas eram dos testes, não bugs runtime comprovados. Preservar tentativas em `/var/tmp/alpha-crm-filtro-origem-20261023/forge/`; rerun global final: 751 arquivos/6.156 PASS/zero falhas/quatro skipped/um todo, quatro gates PASS. Registro River a partir da evidência QA, sem alteração de fonte runtime por essas correções.
+## `npm run build` falha em `prisma generate` com EPERM no `copyfile` (Linux)
+**Sintoma:** `EPERM: operation not permitted, copyfile '.../node_modules/@prisma/client/runtime/query_compiler_bg.sqlite.js' -> '.../node_modules/.prisma/client/query_compiler_bg.js'`. O generate já reescreveu parte de `node_modules/.prisma/client` antes de falhar, deixando o client **incompleto** (sem `query_compiler_bg.js`), o que pode derrubar o dev server em execução.
+**Causa:** intermitente, com `next dev` ativo na mesma árvore (arquivo de runtime com muitos hardlinks no diretório setgid compartilhado). Não é erro do código.
+**Fix:** rodar `npx prisma generate` de novo (passou na segunda tentativa) e conferir `ls node_modules/.prisma/client | grep query_compiler`; depois repetir o build. Nunca deixar o client pela metade.
+**Adicionado em:** 2026-10-23 (Forge, tema claro/escuro do Alpha CRM)
+
+## `next build` morre com "Next.js build worker exited with code: null and signal: SIGTERM"
+**Sintoma:** compila o servidor (`Compiled with warnings`), imprime vários `Retrying 1/3...` e o worker morre com SIGTERM, sem erro de código. Não aparece "Sending SIGTERM ... due to timeout" (não é travamento do Next).
+**Causa:** o `earlyoom` da máquina (`/usr/bin/earlyoom`) mata o worker de webpack quando a memória disponível cai abaixo de 10% e o swap está 0% livre — confirmar com `journalctl --since "15 min ago" | grep earlyoom` (worker com VmRSS ~28 GB). Pressão vem de swap cheio + `/tmp` tmpfs (RAM) cheio + dev servers. Os `Retrying 1/3...` são do `next/font/google` (gstatic com timeout IPv4/ENETUNREACH IPv6 na primeira tentativa) e são só ruído: passam na retentativa. Já houve `ENOSPC` em `/tmp` (tmpfs 16 GB) no mesmo cenário.
+**Fix:** não é erro de código. Liberar memória (fechar dev servers ociosos, limpar artefatos próprios em `/tmp`, `.next-*` isolados) e rodar o build quando `free -g` mostrar swap livre. Builds isolados: `NEXT_DIST_DIR=.next-<nome>` (o `.next/cache/webpack` e `.next/dev` compartilhados apontam para symlinks quebrados em `/tmp` de outro usuário). Apagar o `.next-<nome>` ao final (≈2,5 GB).
+**Adicionado em:** 2026-10-23 (Forge, tema claro/escuro do Alpha CRM)

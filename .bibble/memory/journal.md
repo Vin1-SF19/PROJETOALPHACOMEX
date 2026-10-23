@@ -7544,6 +7544,51 @@ Gates globais, revisão independente, commit/push e publicação/smoke staging. 
 Pedido explícito do usuário: liberar TI para templates. Echo→Nova→Forge→Probe/Anubis→Lens→DevOps concluídos em série; integrações preservatórias dos commits concorrentes CRM/ficha/áudio. Staging publicado commit d6bb591823636c3f4fc9957c943c559b1c1ba8fe, deployment dpl_5B9CXWHxMSdFUVMWdLRmrhcfq6yQ READY22:21:39.511UTC, dois aliases/TLS/smokes PASS. Gates reais: TC/lint/build e747arquivos6122testes PASS+4skip1todo. Turbo explícito152.731s após cancelar build padrão; sem novo plano/config global. Portal/produção/DB/env/SSO intactos nesta entrega. Login TI real não realizado. Duas senhas legadas continuam condicionadas à cessação verificável dos writers antigos/Vault. Relatório /tmp/checklist-analistas-20261022-ti-published.md.
 
 
+## [2026-10-23] — CRM: um X no detalhe do lead, ajuste isolado
+
+Usuário autorizou publicar direto em produção somente a retirada do X duplicado. `SheetContent` recebe `showCloseButton` opcional/default true, desligado apenas em `NolossLeadModal`, mantendo o X do cabeçalho e o fechamento Radix. Candidato inicial isolado em `04cc69c0` para não promover vinte commits latentes; outro fluxo depois publicou `274d6d6f` e o alias ficou READY nessa nova base. O candidato atual acompanha a produção realmente publicada e preserva byte a byte os dois patches aprovados. Push normal para `main` somente com fresh-ref/alias correspondentes, sem alterar staging nem forçar histórico.
+
+Checkpoint histórico `04cc69c0`: quatro gates PASS, 729 arquivos/5.909 testes PASS, zero falhas/quatro skipped/um todo; Lens sem bloqueantes/importantes e Chrome nos componentes reais confirmou um X Instagram/site, default de outro Sheet e fechamento existente, sem API/cliente real. Primeiro ENOSPC preservado; só build repetido após limpeza comprovada de outputs próprios, fonte `2c72…` intacta. QA final integrada `274d6d6f` APPROVED/GO: tipos 0/48,63 s, lint dois arquivos 0/1,33 s, oito arquivos/59 testes PASS/zero falhas/1,60 s, hash `59660d46…` imutável. Dois arquivos runtime byte-idênticos e grafo/caller/React/lock/Next/config inalterados sustentam herdar Probe e gates históricos, sem declarar novo rerun global/build local. Publicação/READY/alias/smoke deste ajuste ainda pendentes; evidências posteriores privadas. Story e File List de cinco caminhos: `docs/stories/story-crm-lead-fechar-unico-20261023.md`.
+
+
+---
+
+## [2026-10-23 14:26 UTC] — CRM: origem no Kanban, checkpoint de implementação
+
+**Tags:** #feature #integration #nextjs
+**Agentes envolvidos:** coordenação, Scout/Architect, backend, UI, DevOps, QA, River/Scribe/Kowalski.
+**Arquivos tocados:** nove caminhos de implementação/testes e story `story-crm-filtro-origem-20261023.md`; três memórias. File List completa na story.
+
+### Contexto
+Usuário pediu filtro de origem entre busca e visão/responsável, opções apenas de origens com leads e busca mais visível.
+
+### O que foi feito
+- Manifesto projeta origens em lote, filtra antes da paginação/contagem e mantém facetas do escopo autorizado completo; toolbar usa cores estáveis e busca ampliada.
+- Backend informou 47 PASS/seis arquivos; UI, 25 PASS/três arquivos. Execuções dirigidas separadas, lint dirigido sem erros e um aviso TanStack preexistente na UI; não equivalem à suíte global.
+
+### Decisões tomadas
+- Todas=undefined, Sem origem=null, string=seleção; valores do select codificados para evitar colisões. UTM ausente não vira Site; legado permanece sem reescrita e contexto comercial exige vínculo explícito do card.
+- Staging primeiro. A autorização anterior de produção era específica do X duplicado; nenhuma promoção desta feature foi autorizada.
+
+### Problemas encontrados / resolvidos
+- Origem pode mudar sem atualizar a data do card: os dados projetados participam da revisão para forçar reidratação. Guardas existentes de pipeline/coluna/card permanecem.
+- DevOps detectou avanço remoto `f51b753b` em 17 caminhos financeiros disjuntos dos nove caminhos da feature; integração após os quatro gates, com QA proporcional.
+
+### Pendências
+Gates globais, QA final, smoke de navegador, integração remota e publicação/READY/smoke staging. Sem banco/schema/migration/ENV ou cadastro de origens alterados.
+
+### Refletido também em
+- `codebase-map.md` e `integration-points.md`: arquivos reais e contrato de consulta/toolbar.
+
+**Fechamento local do filtro de origem (2026-10-23, River):** QA APPROVED/GO STAGING; typecheck oficial 0/9,596 s, lint 0/50,58 s (1.183 avisos), build 0/99,4 s (pico 7.354.613.760 bytes <7 GiB), suíte global 0/58,95 s: 751 arquivos/6.156 PASS/zero falhas/quatro skipped/um todo. Primeiras falhas exclusivas dos testes preservadas e corrigidas: spreads unknown com guard real e contrato legado por string substituído por cenários DOM, sem patch runtime por essas falhas; conhecidas em known-errors. `f51b753b` integrado sem conflito, 14 caminhos próprios byte-idênticos; typecheck 0/23,44 s, lint 17 fontes 0/2,65 s e 18 arquivos/235 PASS/2,89 s, fonte 52678… estável. Probe real Radix/helper/CSS aprovou cores/teclado/mobile (342×44 em 390 px), zero API/erros; Lens/Anubis zero bloqueantes/importantes. Story Ready for Review, File List 15. Publicação/READY/alias e smoke Admin staging pendentes; provas posteriores privadas em `/var/tmp/alpha-crm-filtro-origem-20261023/`, sem commit documental recursivo ou produção.
+
+**2026-10-23 15:06 UTC — reabertura do filtro de origem:** versão inicial `1f599b9f` foi publicada no staging. Usuário corrigiu a suposição anterior: opções precisam refletir busca+Meus/Sem vínculos/responsável+ACL/etapas do resultado atual, antes de paginar, ignorando só o filtro de origem. Pediu também unificar NoLoss com Site na leitura/rótulo/comparação, sem mudar ingestão, dados persistidos ou Instagram. Story existente reaberta e contrato anterior substituído; worker assume código/testes. Novos gates/QA/deploy staging pendentes; 6.156/235 anteriores são históricos. River atualizou somente story e três memórias, sem novo known-error, banco, ENV ou produção.
+
+**2026-10-23 15:22 UTC — checkpoint implementado do ajuste:** seis caminhos de código/testes congelados sobre `de46e48a`, tema preservado; worker aprovou sete arquivos/76 testes, typecheck 0/8,684 s e lint dirigido 0/1,576 s com aviso TanStack preexistente, hash `30a13fc3…` estável. Novos typecheck global 0/7,33 s e lint global 0/44,07 s; build/testes globais, QA e publicação staging pendentes. Remoto `0a0eebe0` tem três commits/dez caminhos de encaminhamento disjuntos, ainda não integrado; integrar após quatro gates e revisar proporcionalmente. File List atual dez caminhos (seis código/testes, story/três memórias), sem known-error novo ou writes/ingestão/ENV/produção.
+
+**2026-10-23 15:31 UTC — fechamento local do ajuste:** QA APPROVED/GO STAGING, sem herdar aprovação inicial. Tipos de46+ajuste 0/7,33 s, lint global 0/44,07 s/1.184 avisos, build literal 0/131,75 s/pico7.490.568.192 bytes <7 GiB. Fast-forward `0a0eebe0` preservou dez caminhos próprios; tipos combinados 0/15,29 s, lint dez fontes 0/2,09 s, suíte integral final 0/58,50 s: 755 arquivos/6.272 PASS/zero falhas/quatro skipped/um todo, fonte46be2e0d… estável. Primeira falha de teste exigindo dark no tema de46 preservada e resolvida pelo teste upstream0a0, sem appfix desta entrega. Probe Board React real/I/O controlado PASS, não Chrome/CSS/E2E; Lens/Anubis zero bloqueantes/importantes, CodeRabbit ausente/fallback independente. Story Ready for Review/File List10; compilação Vercel combinada, READY/alias e smoke Admin staging pendentes. Provas em ajuste-resultado-site/{qa-final-private,probe-board-react}.json; provas posteriores privadas, sem commitloop, novos arquivos/known-errors ou produção.
+
+
 ---
 
 ## [2026-10-23 16:10 UTC] — Portal desacoplado por API canônica, validado localmente

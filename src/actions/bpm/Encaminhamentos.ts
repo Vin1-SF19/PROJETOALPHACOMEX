@@ -5,6 +5,8 @@ import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
 import db from "@/lib/prisma";
+import { ehFechamentoComercialLivre } from "@/lib/bpm/automacoes/financeiro-movimento-livre";
+import { validarRecuperacaoFinanceiraAtual } from "@/lib/bpm/automacoes/recuperacao-financeiro-server";
 import { bpmCardIdSchema, etapaIdCardSchema } from "@/lib/validations/bpm";
 import { exigirAcessoBpmCard, exigirAcessoBpmPipeline, isAdminRole } from "@/lib/bpm/ownership";
 import { parametrosEncaminhamentoSchema } from "@/lib/bpm/automacoes/schemas";
@@ -18,7 +20,7 @@ export type EncaminhamentoCardBpm = {
   estado: "NAO_DISPARADO" | "AGUARDANDO" | "ENVIADO" | "FALHOU" | "INDISPONIVEL";
   motivo: string | null; solicitadoEm: string | null; enviadoEm: string | null;
   execucaoId: string | null; cardDestinoId: string | null;
-  podeEnviar: boolean; podeRepetir: boolean; excecaoAdministrativa: boolean;
+  podeEnviar: boolean; podeRepetir: boolean; excecaoAdministrativa: boolean; automaticoFinanceiro?: boolean;
 };
 
 const solicitarSchema = z.object({ cardId: bpmCardIdSchema, automacaoId: z.string().cuid(),
@@ -40,7 +42,7 @@ async function identidade(cardId: string, admin = false) {
 
 function erroPublico(error: unknown) {
   if (error instanceof z.ZodError) return "Revise os dados do encaminhamento.";
-  if (error instanceof Error && ["Não autorizado", "Card indisponível para encaminhamento", "Automação indisponível para esta etapa.",
+  if (error instanceof Error && ["Não autorizado", "Recuperação disponível somente no fechamento comercial.", "Regra automática de envio ao Financeiro indisponível.", "As condições do envio automático ao Financeiro não foram atendidas.", "Card indisponível para encaminhamento", "Automação indisponível para esta etapa.",
     "O card mudou de etapa ou foi atualizado. Recarregue antes de encaminhar.", "Encaminhamento não encontrado.",
     "O encaminhamento já está em andamento.", "Somente encaminhamentos administrativos com falha podem ser repetidos aqui.",
     "Pipeline de destino inativo", "Pipeline/etapa de destino inválidos", "O card foi atualizado. Recarregue e tente novamente.",
@@ -54,7 +56,7 @@ export async function ObterEncaminhamentosCardBpm(cardIdInput: string) {
   try {
     const cardId = bpmCardIdSchema.parse(cardIdInput);
     const usuario = await identidade(cardId);
-    const card = await db.bpmCard.findUnique({ where: { id: cardId }, select: selectCard });
+    const card = await db.bpmCard.findUnique({ where: { id: cardId }, select: { ...selectCard, pipeline: { select: { nome: true, chave: true } }, etapa: { select: { nome: true, chave: true } } } });
     if (!card) throw new Error("Card indisponível para encaminhamento");
     const automacoes = await db.bpmAutomacao.findMany({ where: { pipelineId: card.pipelineId,
       acaoTipo: "CRIAR_CARD_OUTRO_PIPELINE", OR: [{ etapaId: card.etapaId, ativa: true }, { execucoes: { some: { cardId } } }] },
@@ -70,7 +72,7 @@ export async function ObterEncaminhamentosCardBpm(cardIdInput: string) {
       if (!parsed.success) continue;
       try { await exigirAcessoBpmPipeline(parsed.data.pipelineId, usuario.id); } catch { continue; }
       const etapa = await db.bpmEtapa.findFirst({ where: { id: parsed.data.etapaId, pipelineId: parsed.data.pipelineId },
-        select: { id: true, nome: true, ativo: true, pipeline: { select: { id: true, nome: true, ativo: true } } } });
+        select: { id: true, nome: true, ativo: true, pipeline: { select: { id: true, nome: true, chave: true, ativo: true } } } });
       if (!etapa) continue;
       const vinculo = await db.bpmCardVinculo.findFirst({ where: { cardOrigemId: card.id,
         cardDestino: { pipelineId: etapa.pipeline.id, empresaId: card.empresaId, status: { not: "ARQUIVADO" } } },
@@ -95,9 +97,10 @@ export async function ObterEncaminhamentosCardBpm(cardIdInput: string) {
       const falhou = execucao?.status === "FALHA";
       const estado: EncaminhamentoCardBpm["estado"] = vinculo ? "ENVIADO" : aguardando ? "AGUARDANDO" : falhou ? "FALHOU" : disponivel ? "NAO_DISPARADO" : "INDISPONIVEL";
       const admin = isAdminRole(usuario.role);
+      const automaticoFinanceiro = admin && disponivel && Boolean(card.pipeline && card.etapa) && ehFechamentoComercialLivre(card.pipeline, card.etapa) && etapa.pipeline.chave === "financeiro";
       regras.push({ automacaoId: automacao.id, nome: automacao.nome, destinoPipeline: etapa.pipeline,
         destinoEtapa: { id: etapa.id, nome: etapa.nome }, estado,
-        motivo: estado === "NAO_DISPARADO" ? configuracaoAlterada
+        motivo: estado === "NAO_DISPARADO" ? automaticoFinanceiro ? "O envio ao Financeiro será realizado automaticamente." : configuracaoAlterada
           ? "A regra de envio mudou. Confira o destino atualizado e use Encaminhar para solicitar o novo envio."
           : "Reposicionar o card não executa o envio. Use Encaminhar para enviar ao próximo setor."
           : estado === "AGUARDANDO" ? "O encaminhamento está sendo processado."
@@ -110,7 +113,7 @@ export async function ObterEncaminhamentosCardBpm(cardIdInput: string) {
         execucaoId: execucao?.id ?? null, cardDestinoId: vinculo?.cardDestinoId ?? null,
         podeEnviar: admin && disponivel && !vinculo && !aguardando && (!falhou || execucao?.gatilhoTipo !== "ENCAMINHAMENTO_ADMIN"),
         podeRepetir: admin && disponivel && !vinculo && falhou && execucao?.gatilhoTipo === "ENCAMINHAMENTO_ADMIN",
-        excecaoAdministrativa: admin });
+        excecaoAdministrativa: admin, automaticoFinanceiro });
     }
     return { success: true as const, data: { regras } };
   } catch (error) { return { success: false as const, error: erroPublico(error) }; }
@@ -143,7 +146,7 @@ async function executarSelecionado(cardId: string, execucaoId: string) {
   }
 }
 
-export async function SolicitarEncaminhamentoCardBpm(input: z.input<typeof solicitarSchema>) {
+async function solicitarEncaminhamento(input: z.input<typeof solicitarSchema>, automaticoFinanceiro = false) {
   try {
     const dados = solicitarSchema.parse(input);
     const usuario = await identidade(dados.cardId, true);
@@ -155,6 +158,7 @@ export async function SolicitarEncaminhamentoCardBpm(input: z.input<typeof solic
     const configuracaoHash = createHash("sha256").update(JSON.stringify(parametros)).digest("hex").slice(0, 16);
     const eventoChave = `ENCAMINHAMENTO_ADMIN:${dados.cardId}:${parametros.pipelineId}:${configuracaoHash}`;
     const preparada = await db.$transaction(async (tx) => {
+      if (automaticoFinanceiro) await validarRecuperacaoFinanceiraAtual(tx, dados.cardId, automacao.id, parametros);
       const existente = await tx.bpmAutomacaoExecucao.findUnique({ where: { automacaoId_eventoChave: { automacaoId: automacao.id, eventoChave } },
         select: { id: true, status: true } });
       if (existente) return existente;
@@ -168,7 +172,8 @@ export async function SolicitarEncaminhamentoCardBpm(input: z.input<typeof solic
         acao: "ENCAMINHAMENTO_ADMIN_SOLICITADO", automacaoOrigem: automacao.id,
         valorNovoJson: JSON.stringify({ execucaoId: execucao.id, pipelineDestinoId: parametros.pipelineId,
           etapaOrigemId: card.etapaId, etapaDestinoId: parametros.etapaId, versaoEsperada: card.versao, parametros, idempotencyKey: dados.idempotencyKey,
-          excecaoAdministrativa: true, statusOrigemPreservado: card.status }) } });
+          excecaoAdministrativa: true, statusOrigemPreservado: card.status,
+          ...(automaticoFinanceiro ? { recuperacaoAutomaticaFinanceiro: true } : {}) }) } });
       return { ...execucao, criada: true };
     });
     if (!("criada" in preparada)) {
@@ -182,6 +187,15 @@ export async function SolicitarEncaminhamentoCardBpm(input: z.input<typeof solic
     }
     return await executarSelecionado(dados.cardId, preparada.id);
   } catch (error) { return { success: false as const, error: erroPublico(error) }; }
+}
+
+export async function SolicitarEncaminhamentoCardBpm(input: z.input<typeof solicitarSchema>) {
+  return solicitarEncaminhamento(input);
+}
+
+/** Abertura autenticada recupera somente o Financeiro pendente deste card. */
+export async function RecuperarEncaminhamentoFinanceiroCardBpm(input: z.input<typeof solicitarSchema>) {
+  return solicitarEncaminhamento(input, true);
 }
 
 export async function RepetirEncaminhamentoCardBpm(input: z.input<typeof repetirSchema>) {
@@ -202,12 +216,18 @@ export async function RepetirEncaminhamentoCardBpm(input: z.input<typeof repetir
         acao: "ENCAMINHAMENTO_ADMIN_SOLICITADO", valorNovoJson: { contains: dados.execucaoId } },
         orderBy: { createdAt: "desc" }, select: { valorNovoJson: true } });
       let parametrosAnteriores: unknown;
-      try { parametrosAnteriores = JSON.parse(autorizacaoAnterior?.valorNovoJson ?? "{}").parametros; } catch { parametrosAnteriores = null; }
+      let recuperacaoAutomaticaFinanceiro = false;
+      try {
+        const registro = JSON.parse(autorizacaoAnterior?.valorNovoJson ?? "{}");
+        parametrosAnteriores = registro.parametros;
+        recuperacaoAutomaticaFinanceiro = registro.recuperacaoAutomaticaFinanceiro === true;
+      } catch { parametrosAnteriores = null; }
       const anterior = parametrosEncaminhamentoSchema.safeParse(parametrosAnteriores);
       if (!anterior.success || JSON.stringify(anterior.data) !== JSON.stringify(parametros)) {
         throw new Error("A configuração do envio mudou. Atualize o card e solicite um novo encaminhamento.");
       }
       await exigirAcessoBpmPipeline(parametros.pipelineId, usuario.id, tx);
+      if (recuperacaoAutomaticaFinanceiro) await validarRecuperacaoFinanceiraAtual(tx, dados.cardId, execucao.automacaoId, parametros);
       const claim = await tx.bpmAutomacaoExecucao.updateMany({ where: { id: dados.execucaoId, status: "FALHA" },
         data: { status: "EM_EXECUCAO", iniciadoEm: new Date(), tentativas: { increment: 1 } } });
       if (claim.count !== 1) throw new Error("O encaminhamento já está em andamento.");
@@ -215,7 +235,8 @@ export async function RepetirEncaminhamentoCardBpm(input: z.input<typeof repetir
         acao: "ENCAMINHAMENTO_ADMIN_SOLICITADO", automacaoOrigem: execucao.automacaoId,
         valorNovoJson: JSON.stringify({ execucaoId: execucao.id, pipelineDestinoId: parametros.pipelineId,
           etapaOrigemId: card.etapaId, etapaDestinoId: parametros.etapaId, versaoEsperada: card.versao, parametros,
-          retentativa: true, excecaoAdministrativa: true, statusOrigemPreservado: card.status }) } });
+          retentativa: true, excecaoAdministrativa: true, statusOrigemPreservado: card.status,
+          ...(recuperacaoAutomaticaFinanceiro ? { recuperacaoAutomaticaFinanceiro: true } : {}) }) } });
     });
     return await executarSelecionado(dados.cardId, dados.execucaoId);
   } catch (error) { return { success: false as const, error: erroPublico(error) }; }

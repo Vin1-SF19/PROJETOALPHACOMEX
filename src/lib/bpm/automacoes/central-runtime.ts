@@ -33,6 +33,8 @@ import { validarGrafoAutomacao, validarParametrosAcaoCentral, type GrafoAutomaca
 import { executarAcaoLegadaNoMotorCentral } from "./executor";
 import { renderizarPlaceholdersAutomacaoBpm } from "./placeholders";
 import type { AcaoAutomacaoBpm } from "./schemas";
+import { parametrosFinanceiroMovimentoLivre } from "./financeiro-movimento-livre";
+import { motivoBloqueioFinanceiroMovimentoLivre } from "./financeiro-movimento-livre-server";
 import { motivoBloqueioMinutaMovimentoLivre } from "./minuta-movimento-livre-server";
 import { grafoEhMinutaConfigurada, type FiltroAutomacoesCentrais } from "./minuta-movimento-livre";
 
@@ -535,7 +537,7 @@ async function executarGrafo(execucao: ExecucaoCentral, grafo: GrafoAutomacao, c
 async function processarUma(id: string, filtro?: FiltroAutomacoesCentrais) {
   const token = randomUUID();
   const claim = await db.bpmAutomacaoExecucao.updateMany({ where: { id, automacaoVersaoId: { not: null },
-    ...(filtro?.modo === "MINUTA_MOVIMENTO_LIVRE" ? { cardId: filtro.cardId, eventoId: filtro.eventoId } : {}),
+    ...(filtro?.modo ? { cardId: filtro.cardId, eventoId: filtro.eventoId } : {}),
     status: "PENDENTE", disponivelEm: { lte: new Date() } }, data: { status: "EM_EXECUCAO", claimToken: token, iniciadoEm: new Date(), tentativas: { increment: 1 } } });
   if (claim.count !== 1) return "ignorada" as const;
   const execucao = await carregarExecucao(id);
@@ -559,11 +561,12 @@ async function processarUma(id: string, filtro?: FiltroAutomacoesCentrais) {
       await db.bpmAutomacaoExecucao.update({ where: { id }, data: { status: "IGNORADA", resultadoJson: JSON.stringify({ motivo }), executadoEm: new Date(), claimToken: null } });
       return "ignorada" as const;
     }
-    if (filtro?.modo === "MINUTA_MOVIMENTO_LIVRE" || (execucao.evento && parseObjeto(execucao.evento.valorNovoJson).automacoesSuprimidas === true)) {
+    if (filtro?.modo || (execucao.evento && parseObjeto(execucao.evento.valorNovoJson).automacoesSuprimidas === true)) {
       const motivo = !execucao.evento || execucao.evento.cardId !== execucao.cardId
-        || (filtro?.modo === "MINUTA_MOVIMENTO_LIVRE" && (execucao.cardId !== filtro.cardId || execucao.eventoId !== filtro.eventoId)) ? "CARD_EVENTO_DIVERGENTE"
-        : await motivoBloqueioMinutaMovimentoLivre(execucao.evento,
-          { ...execucao.automacaoVersao, automacao: execucao.automacao }, db);
+        || (filtro?.modo && (execucao.cardId !== filtro.cardId || execucao.eventoId !== filtro.eventoId)) ? "CARD_EVENTO_DIVERGENTE"
+        : parseObjeto(execucao.evento.valorNovoJson).permitirEncaminhamentoFinanceiroConfigurado === true && parametrosFinanceiroMovimentoLivre(parseObjeto(execucao.automacaoVersao.grafoJson))
+          ? await motivoBloqueioFinanceiroMovimentoLivre(execucao.evento, { ...execucao.automacaoVersao, automacao: execucao.automacao }, db)
+          : await motivoBloqueioMinutaMovimentoLivre(execucao.evento, { ...execucao.automacaoVersao, automacao: execucao.automacao }, db);
       if (motivo) {
         await db.bpmAutomacaoExecucao.update({ where: { id }, data: { status: "IGNORADA", resultadoJson: JSON.stringify({ motivo }), executadoEm: new Date(), claimToken: null } });
         return "ignorada" as const;
@@ -596,18 +599,19 @@ async function processarUma(id: string, filtro?: FiltroAutomacoesCentrais) {
 export async function processarFilaAutomacoesCentraisBpm(limite = 20, filtro?: FiltroAutomacoesCentrais) {
   const agora = new Date();
   let escopo: Prisma.BpmAutomacaoExecucaoWhereInput = filtro?.cardId ? { cardId: filtro.cardId } : {};
-  if (filtro?.modo === "MINUTA_MOVIMENTO_LIVRE") {
+  if (filtro?.modo) {
     const versoes = await db.bpmAutomacaoVersao.findMany({
       where: { status: "ATIVA", gatilhoTipo: "ENTRAR_COLUNA", automacao: { ativa: true } },
       select: { id: true, grafoJson: true },
     });
     const ids = versoes.filter((versao) => {
-      try { return grafoEhMinutaConfigurada(JSON.parse(versao.grafoJson)); } catch { return false; }
+      try { return filtro.modo === "MINUTA_MOVIMENTO_LIVRE"
+        ? grafoEhMinutaConfigurada(JSON.parse(versao.grafoJson)) : Boolean(parametrosFinanceiroMovimentoLivre(JSON.parse(versao.grafoJson))); } catch { return false; }
     }).map((versao) => versao.id);
     escopo = { cardId: filtro.cardId, eventoId: filtro.eventoId, automacaoVersaoId: { in: ids },
       evento: { tipo: "CARD_MOVIDO", cardId: filtro.cardId } };
   }
-  const escopoResgate = filtro?.modo === "MINUTA_MOVIMENTO_LIVRE" ? escopo : {};
+  const escopoResgate = filtro?.modo ? escopo : {};
   await db.bpmAutomacaoExecucao.updateMany({ where: { automacaoVersaoId: { not: null }, ...escopoResgate, status: "EM_EXECUCAO", iniciadoEm: { lte: new Date(agora.getTime() - LEASE_MS) }, tentativas: { lt: LIMITE_TENTATIVAS } }, data: { status: "PENDENTE", claimToken: null, disponivelEm: agora } });
   const pendentes = await db.bpmAutomacaoExecucao.findMany({ where: { automacaoVersaoId: { not: null }, ...escopo, status: "PENDENTE", disponivelEm: { lte: agora }, tentativas: { lt: LIMITE_TENTATIVAS } }, select: { id: true }, orderBy: { createdAt: "asc" }, take: Math.min(Math.max(limite, 1), 50) });
   const total = { encontrados: pendentes.length, executados: 0, falhos: 0, adiados: 0, ignorados: 0 };

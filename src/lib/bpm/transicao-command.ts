@@ -49,6 +49,7 @@ import { sincronizarProximoContatoAgenda } from "@/lib/bpm/proximo-contato-agend
 import { destinoPermitidoEmTratativa, etapaEhEmTratativa, etapaEhSemViabilidade, obterErroChecklistParaSaidaEmTratativa, obterErroProximoContatoParaEntrada } from "@/lib/bpm/em-tratativa";
 import { etapaEhAgendarReuniao, destinoEhReuniaoAgendada, obterErroDataReuniaoParaMovimento } from "@/lib/bpm/agendar-reuniao";
 import { destinoPermitidoReuniaoAgendada, etapaEhReuniaoAgendada, obterErroTranscricaoParaMovimento } from "@/lib/bpm/reuniao-agendada";
+import { ehFechamentoComercialLivre } from "@/lib/bpm/automacoes/financeiro-movimento-livre";
 import { etapaEhFechado, statusInicialAoEntrarFechado } from "@/lib/bpm/status-pos-fechamento";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
@@ -1057,7 +1058,8 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
           automacaoOrigem: input.ator.automacaoId,
           valorAnteriorJson: JSON.stringify({ etapaId: card.etapaId, lifecycle: card.status, outcome: card.estadoOntologico?.outcome ?? null, versao: card.versao }),
           valorNovoJson: JSON.stringify({ etapaId: destino.id, lifecycle, outcome, subStatusId, statusPosFechamento: statusPosFechamentoInicial ?? card.statusPosFechamento, versao: card.versao + 1, responsavelId: prepared.responsavelId ?? card.responsavelId, camposPreenchidos: Object.keys(prepared.valoresValidados),
-            ...(prepared.movimentoLivre ? { movimentoLivre: prepared.movimentoLivre, obrigatoriedadesDispensadas: true } : {}),
+            ...(prepared.movimentoLivre ? { movimentoLivre: prepared.movimentoLivre, obrigatoriedadesDispensadas: true,
+              ...(ehFechamentoComercialLivre(card.pipeline, destino) ? { permitirEncaminhamentoFinanceiroConfigurado: true } : {}) } : {}),
             ...(prepared.confirmacaoRd ? { confirmacaoPendenciasRd: prepared.confirmacaoRd, pendenciasConfirmadas: prepared.avisosRd } : {}) }),
         },
       });
@@ -1070,7 +1072,8 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
         valorAnterior: { etapaId: card.etapaId, lifecycle: card.status, outcome: card.estadoOntologico?.outcome ?? null, versao: card.versao },
         valorNovo: { etapaId: destino.id, lifecycle, outcome, subStatusId, versao: card.versao + 1, transicaoId: transicao?.id ?? null,
           ...(prepared.movimentoLivre ? { movimentoLivre: prepared.movimentoLivre, automacoesSuprimidas: true,
-            ...(input.ator.tipo === "MANUAL" && input.ator.userId ? { permitirMinutaConfigurada: true } : {}) } : {}) },
+            ...(input.ator.tipo === "MANUAL" && input.ator.userId ? { permitirMinutaConfigurada: true,
+              ...(ehFechamentoComercialLivre(card.pipeline, destino) ? { permitirEncaminhamentoFinanceiroConfigurado: true } : {}) } : {}) } : {}) },
         atorTipo: input.ator.tipo === "MANUAL" ? "USUARIO" : input.ator.tipo,
         atorUserId: input.ator.tipo === "MANUAL" ? input.ator.userId : undefined,
         atorExecucaoId: input.ator.automacaoExecucaoId,
@@ -1143,6 +1146,14 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
         await executarMinutaMovimentoLivreAgora(result.cardId, result.eventoId);
       } catch (minutaError) {
         console.error("[TransitionCommand/minuta-movimento-livre]", minutaError);
+      }
+    }
+    if (!result.idempotente && "movimentoLivre" in result && result.movimentoLivre) {
+      try {
+        const { executarFinanceiroMovimentoLivreAgora } = await import("@/lib/bpm/automacoes/orquestrador");
+        await executarFinanceiroMovimentoLivreAgora(result.cardId, result.eventoId);
+      } catch (encaminhamentoError) {
+        console.error("[TransitionCommand/financeiro-movimento-livre]", encaminhamentoError);
       }
     }
     if (!result.idempotente && !("movimentoLivre" in result && result.movimentoLivre)) {

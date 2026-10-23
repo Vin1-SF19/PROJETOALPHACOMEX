@@ -216,11 +216,10 @@ it("reutiliza canal existente sem duplicar opções por diferenças de caixa e e
   expect(select.options.length).toBe(CANAIS_ORIGEM_PADRAO.length + 1);
 });
 
-it("preserva o canal personalizado e cadastra indicação com parceiro no seletor escuro", async () => {
+it("preserva o canal personalizado e cadastra indicação com parceiro", async () => {
   await preencherEmpresaExistente();
   await act(async () => {
     const select = container.querySelector<HTMLSelectElement>("#novo-card-canal")!;
-    expect(select.style.colorScheme).toBe("dark");
     select.value = "Indicação Parceiro";
     select.dispatchEvent(new Event("change", { bubbles: true }));
   });

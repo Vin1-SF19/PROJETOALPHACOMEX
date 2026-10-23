@@ -1888,6 +1888,24 @@ Clique de notificação é leitura: destino pendente canônico ou card promovido
 Gestão de modelos usa predicate TI normalizado ou Líder Operacional em src/lib/checklist/acesso.ts (canManageModels/exigirGestorModelosChecklist). src/lib/checklist/catalogo.ts exige autorização persistida dentro da transação antes do replay. UI ModelosWorkspace e páginas existentes consomem capabilities. Não amplia dossiês/atribuição.
 
 
+### 2026-10-23 — Scribe/River — CRM: filtro de origem no Kanban
+
+- `src/lib/bpm/origem-quadro.ts`: projeção nativa pelo próprio card/contexto explícito, Instagram/NoLoss, normalização apenas de exibição/comparação, opções do manifesto autorizado completo, sentinels sem colisão e cores determinísticas. Ausência de UTM NoLoss não implica Site.
+- `src/actions/bpm/Quadro.ts` e `src/lib/bpm/quadro-paginado.ts`: origem projetada em lote e incluída na revisão; combinação com busca/responsável antes da contagem/paginação. Mantêm as guardas existentes de pipeline, coluna e card.
+- `PipelineBoardClient.tsx` e `FiltroOrigemBoard.tsx`, em `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/`: select entre busca ampliada e visão/responsável; opções independentes dos filtros correntes, polling e recuperação de seleção desaparecida no caminho já existente. Instagram roxo, Site azul, demais tons estáveis; busca 320/360 px no desktop, controles de 44 px e largura disponível no mobile.
+- Testes: `tests/bpm/{origem-quadro,quadro-actions,board-origem-react,board-visao-equipe-react}.test.ts`. Story: `docs/stories/story-crm-filtro-origem-20261023.md`.
+
+Checkpoint de implementação: backend 47 PASS/seis arquivos e UI 25 PASS/três arquivos, execuções dirigidas separadas; lint dirigido sem erros. Gates globais, QA, integração do avanço remoto e publicação staging pendentes. Sem mudança de banco/ENV, cadastro de origens ou produção.
+
+**Fechamento local (2026-10-23, River):** quatro gates PASS, 751 arquivos/6.156 testes PASS, zero falhas/quatro skipped/um todo. Probe real Radix/helper/CSS aprovou cores, teclado e mobile, sem API; Lens/Anubis sem bloqueantes/importantes. Integração `f51b753b` preservou os 14 caminhos próprios existentes e passou typecheck/lint dirigido/18 arquivos com 235 PASS, sem declarar nova suíte global. Story Ready for Review, File List final 15 com known-errors de testes. READY remoto e smoke Admin staging pendentes; produção não autorizada.
+
+**Reabertura após `1f599b9f` publicado no staging (2026-10-23, River):** usuário rejeitou opções independentes de busca/responsável. Contrato atual exige facetas do resultado corrente com busca, visão/responsável, ACL e etapas aplicados, antes da paginação, ignorando apenas a própria origem. NoLoss/Site passam a uma opção Site azul somente na leitura/comparação/rótulo; Instagram permanece roxo, persistência/ingestão intactas. Implementação e novos gates/QA/deploy pendentes; o fechamento acima é histórico.
+
+**Checkpoint do ajuste (2026-10-23, River):** implementado em origem-quadro/quadro-paginado/PipelineBoardClient e três testes, base de tema `de46e48a` preservada; File List do ajuste dez caminhos com story/três memórias. Worker aprovou 76 testes/sete arquivos e tipos/lint dirigido, fonte `30a13fc3…` estável. Novos tipos/lint globais PASS, build/testes globais e QA pendentes; `0a0eebe0` ainda não integrado. Site é somente rótulo/projeção/comparação de NoLoss, sem escrita/ingestão/produção.
+
+**Fechamento QA do ajuste (2026-10-23, River):** APPROVED/GO STAGING com novos tipos/lint/build sobre de46+ajuste e suíte final combinada `0a0eebe0`: 755 arquivos/6.272 PASS/zero falhas/quatro skipped/um todo. Fast-forward preservou os dez caminhos próprios; fonte `46be2e0d…` estável, tipos/lint combinados PASS. Probe foi Board React real com I/O controlado, sem novo Chrome/CSS/E2E; Lens/Anubis sem bloqueantes/importantes. Build combinado Vercel, READY/alias e smoke Admin staging pendentes. File List dez, sem novos arquivos ou known-errors/produção.
+
+
 <!-- portal-api-20261023-scribe-map -->
 ### 2026-10-23 — Scribe — API canônica do Portal (validada localmente)
 

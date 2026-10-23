@@ -70,6 +70,7 @@ export default function NolossLeadModal({
     <Sheet open onOpenChange={(open) => { if (!open) onClose(); }}>
       <SheetContent
         side="bottom"
+        showCloseButton={false}
         className="h-[70vh] max-h-[70vh] rounded-t-[2rem] border-t border-white/10 bg-[radial-gradient(ellipse_120%_60%_at_50%_-10%,rgba(var(--accent-rgb),0.12),transparent_60%)] p-0 overflow-hidden sm:max-w-none"
         style={{ ["--accent-rgb" as string]: accent }}
       >
@@ -235,7 +236,7 @@ export default function NolossLeadModal({
                 setErro(null);
                 setPromocaoAberta(true);
               }}
-              className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              className="crm-tema-fixo flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
               style={{ background: `rgba(${accent},0.85)` }}
             >
               Assumir lead

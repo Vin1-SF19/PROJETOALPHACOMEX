@@ -150,7 +150,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
       if (res.success) {
         setRequisitos(null);
         setMovimentoRdPendente(null);
-        toast.success(card.podeMoverLivremente ? "Card reposicionado. O envio a outro setor é feito em Encaminhamentos." : "Card movido");
+        toast.success("Card movido");
         const filhos = (res as { cardsFilhosCriados?: CardFilhoCriado[] }).cardsFilhosCriados;
         if (filhos && filhos.length > 0) {
           for (const filho of filhos) {
@@ -349,7 +349,7 @@ export default function PainelProximaEtapa({ card, etapas, currentUserId = null,
 
   return (
     <div aria-busy={movendoEtapa} className="rounded-xl border border-slate-700/60 bg-slate-900/40 overflow-y-auto p-5 space-y-2">
-      {card.podeMoverLivremente && <p className="text-[11px] text-slate-400">Reposicionar altera a etapa sem executar automações de envio. Use Encaminhamentos para enviar ao próximo setor.</p>}
+      {card.podeMoverLivremente && <p className="text-[11px] text-slate-400">A movimentação livre dispensa os requisitos da etapa. O fechamento comercial envia automaticamente ao Financeiro quando há uma regra ativa.</p>}
       {movendoEtapa && <p role="status" className="flex items-center gap-2 text-xs text-slate-200"><Loader2 size={13} className="animate-spin" aria-hidden="true" /> Salvando e atualizando a etapa…</p>}
       <ConfirmarMovimentoRdModal open={Boolean(movimentoRdPendente)} etapaDestinoNome={movimentoRdPendente?.etapaDestinoNome ?? ""}
         avisos={movimentoRdPendente?.avisos ?? []} processando={movendoEtapa}
