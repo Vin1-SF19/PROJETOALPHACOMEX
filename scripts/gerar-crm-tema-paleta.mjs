@@ -6,7 +6,8 @@ const v = {};
 for (const m of theme.matchAll(/--color-([a-z]+(?:-\d+)?):\s*([^;]+);/g)) v[m[1]] = m[2].trim();
 const neutros = ['slate', 'gray', 'zinc', 'neutral', 'stone'];
 const cromaticas = ['red','orange','amber','yellow','lime','green','emerald','teal','cyan','sky','blue','indigo','violet','purple','fuchsia','pink','rose'];
-const inverso = { 50: 950, 100: 900, 200: 800, 300: 700, 400: 600, 500: 500, 600: 500, 700: 300, 800: 200, 900: 100, 950: 50 };
+// Superfícies (700–950) param em 100–300, não no branco puro: o claro fica suave, sem ofuscar.
+const inverso = { 50: 950, 100: 900, 200: 800, 300: 700, 400: 600, 500: 500, 600: 500, 700: 300, 800: 300, 900: 200, 950: 100 };
 const escurecer = { 50: 900, 100: 800, 200: 800, 300: 700, 400: 600 };
 const claro = [], restaurar = [];
 claro.push(`  --color-white: ${v['slate-900']};`, `  --color-black: ${v['white']};`);

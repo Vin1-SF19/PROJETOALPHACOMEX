@@ -12,11 +12,11 @@
 :is(html, .crm-scope)[data-crm-tema="claro"] {
   color-scheme: light;
   --crm-color-scheme: light;
-  --background: oklch(0.984 0.003 247.858);
+  --background: oklch(0.929 0.013 255.508);
   --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
+  --card: oklch(0.968 0.007 247.896);
   --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
+  --popover: oklch(0.968 0.007 247.896);
   --popover-foreground: oklch(0.129 0.042 264.695);
   --primary: oklch(0.208 0.042 265.755);
   --primary-foreground: oklch(0.984 0.003 247.858);
@@ -34,7 +34,7 @@
 
 /* ── Tokens visuais do CRM no claro ───────────────────────────── */
 .crm-scope[data-crm-tema="claro"] {
-  --crm-fundo-base: linear-gradient(180deg, #f5f8fc, #e8eef6);
+  --crm-fundo-base: linear-gradient(180deg, #e2e8f0, #cbd5e1);
 
   --crm-cyan: #0d9488;
   --crm-cyan-2: #0f766e;
@@ -48,9 +48,9 @@
   --crm-muted: #475569;
   --crm-muted-2: #64748b;
 
-  --crm-glass-bg: rgba(255, 255, 255, 0.72);
-  --crm-glass-bg-strong: rgba(255, 255, 255, 0.88);
-  --crm-border: rgba(15, 23, 42, 0.08);
+  --crm-glass-bg: rgba(241, 245, 249, 0.7);
+  --crm-glass-bg-strong: rgba(241, 245, 249, 0.86);
+  --crm-border: rgba(15, 23, 42, 0.1);
   --crm-border-hover: rgba(37, 99, 235, 0.28);
   --crm-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.7) inset,
     0 10px 30px -14px rgba(15, 23, 42, 0.18), 0 2px 8px -2px rgba(15, 23, 42, 0.08);
@@ -132,8 +132,8 @@
 
 /* Colunas do Kanban (estilos base em globals.css) */
 .crm-scope[data-crm-tema="claro"] .alpha-pipeline-column-shell {
-  border-color: rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.45);
+  border-color: rgba(15, 23, 42, 0.1);
+  background: rgba(226, 232, 240, 0.5);
 }
 .crm-scope[data-crm-tema="claro"] .alpha-pipeline-column-shell:hover,
 .crm-scope[data-crm-tema="claro"] .alpha-pipeline-column-shell:focus-within {
@@ -245,7 +245,7 @@ html.crm-tema-animando *::after {
 }
 .crm-tema-toggle[data-tema="claro"] {
   border-color: rgba(15, 23, 42, 0.12);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(226, 232, 240, 0.92));
+  background: linear-gradient(135deg, rgba(241, 245, 249, 0.95), rgba(203, 213, 225, 0.92));
   box-shadow: inset 0 1px 0 #fff, 0 6px 18px -10px rgba(15, 23, 42, 0.35);
 }
 .crm-tema-toggle[data-tema="claro"]:hover {

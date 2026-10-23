@@ -38,13 +38,16 @@
 /* ── Fundo ambiental: imagem do tema + overlay para legibilidade ──
  * As duas camadas ficam montadas; o tema ativo (crm-tema.css) define qual aparece.
  * O overlay de cada tema mora no ::after da própria camada, assim faz crossfade junto
- * (gradientes não interpolam por transition). */
+ * (gradientes não interpolam por transition).
+ *
+ * Dimensionamento: o container é fixo na viewport (CRMBackground). A imagem (16:9)
+ * ocupa a altura inteira, sem corte; em telas mais largas (21:9/32:9) as laterais
+ * são preenchidas pela mesma imagem desfocada e a borda da nítida é esfumada. Evita
+ * o zoom extremo do `cover` em monitores ultrawide. */
 .crm-bg-media {
   position: absolute;
   inset: 0;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  overflow: hidden;
   transform: translate3d(
     calc(var(--mouse-x, 0) * 1px),
     calc(var(--mouse-y, 0) * 1px),
@@ -55,11 +58,46 @@
   will-change: transform, opacity;
 }
 .crm-bg-media--escuro {
-  background-image: url("/backgroundEscuroCRM.png");
+  --crm-bg-img: url("/backgroundEscuroCRM.png");
 }
 .crm-bg-media--claro {
-  background-image: url("/backgroundClaroCRM.png");
+  --crm-bg-img: url("/backgroundClaroCRM.png");
   opacity: 0;
+}
+.crm-bg-preenchimento,
+.crm-bg-imagem {
+  position: absolute;
+  background-image: var(--crm-bg-img);
+  background-repeat: no-repeat;
+  background-position: center;
+}
+.crm-bg-preenchimento {
+  inset: -48px;
+  background-size: cover;
+  filter: blur(32px) saturate(1.1);
+}
+.crm-bg-imagem {
+  inset: 0;
+  background-size: auto 100%;
+}
+@media (min-aspect-ratio: 17/9) {
+  .crm-bg-imagem {
+    /* largura da imagem = altura × 16/9; esfuma 6% de cada lado dela */
+    -webkit-mask-image: linear-gradient(
+      90deg,
+      transparent calc(50% - 50vh * 16 / 9),
+      #000 calc(50% - 50vh * 16 / 9 * 0.88),
+      #000 calc(50% + 50vh * 16 / 9 * 0.88),
+      transparent calc(50% + 50vh * 16 / 9)
+    );
+    mask-image: linear-gradient(
+      90deg,
+      transparent calc(50% - 50vh * 16 / 9),
+      #000 calc(50% - 50vh * 16 / 9 * 0.88),
+      #000 calc(50% + 50vh * 16 / 9 * 0.88),
+      transparent calc(50% + 50vh * 16 / 9)
+    );
+  }
 }
 .crm-bg-media::after {
   content: "";
@@ -75,11 +113,12 @@
   );
 }
 .crm-bg-media--claro::after {
+  /* véu cinza-azulado: tira o brilho do branco da imagem sem apagar os detalhes */
   background: linear-gradient(
     180deg,
-    rgba(248, 250, 252, 0.3) 0%,
-    rgba(248, 250, 252, 0.48) 45%,
-    rgba(241, 245, 249, 0.62) 100%
+    rgba(100, 116, 139, 0.12) 0%,
+    rgba(100, 116, 139, 0.18) 45%,
+    rgba(71, 85, 105, 0.24) 100%
   );
 }
 
