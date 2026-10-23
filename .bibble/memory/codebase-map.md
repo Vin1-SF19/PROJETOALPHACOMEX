@@ -1,5 +1,12 @@
 # CODEBASE MAP — Mapa Estrutural do Projeto
 
+<!-- release-stagings-20261023-scribe-map -->
+## Portal API v1.1.0 — production explícito (2026-10-23, Scribe)
+
+- Fonte: `contracts/portal-api/v1.ts` (`environmentSchema`/`PortalEnvironment`) e `sdk.server.ts`; geração determinística em `scripts/portal-api/generate-contract.mjs` → `artifacts/portal-api/v1/` → Portal `lib/portal-api/generated/`.
+- Main `src/lib/portal-api/config.ts` e Portal `lib/portal-api/config.ts` validam local/staging/production; guard/owner Main, BFF/Auth.js privado e major1/TTL7d permanecem existentes. Sem nova UI/dep/schema.
+- Provas locais: Main40/Portal20 focais e Forge completo PASS; QA focal PASS. Rollout novo staging/produção e READY remoto ainda pendentes na story `docs/stories/story-release-stagings-main-producao-20261023.md`; dados59 fora desta promoção e eventual lote produção exige Vault.
+
 ## Alpha Catcher (2026-10-05)
 
 Captura BI: scripts/alpha-catcher-bi.mjs valida domínio, conta e resposta HTTP

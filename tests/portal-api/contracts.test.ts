@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import fixture from './fixtures/consumer-v1.json';
 import { identitySchema, profileSchema, notificacaoSchema, loginSchema, observationSchema, operations, statusLeitura } from '../../contracts/portal-api/v1';
-import { createPortalClient, readBounded, safeStreamHeaders } from '../../contracts/portal-api/sdk.server';
+import { createPortalClient, readBounded, safeStreamHeaders, validateOrigin } from '../../contracts/portal-api/sdk.server';
 const config = { origin: 'http://localhost:4391', environment: 'local' as const, appId: 'painelclientes' as const, keyId: 'test-app', key: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' };
 it('provider retains frozen consumer baseline and consumer strips additive fields recursively', () => {
     expect(identitySchema.parse({ ...fixture.identity, newOptional: 'extra' })).toEqual(fixture.identity);
@@ -82,4 +82,16 @@ it('transport preserves status/retry metadata without changing the wire error en
  const client=createPortalClient({...config,fetch:async()=>new Response(JSON.stringify(error),{status:429,headers:{'Content-Type':'application/json','X-Portal-Contract-Version':'1.0.0','Retry-After':'120'}})});
  const result=await client.call('me',{token:'opaque'});expect(result).toEqual(error);expect(responseMetadata(result)).toEqual({status:429,retryAfterSeconds:120});expect(JSON.stringify(result)).not.toContain('retryAfter');
  const timeout=createPortalClient({...config,fetch:async()=>new Response(JSON.stringify({...error,error:{code:'RETRYABLE',message:'Tempo limite.'}}),{status:504,headers:{'Content-Type':'application/json','X-Portal-Contract-Version':'1.0.0'}})});const response=await timeout.call('me',{token:'opaque'});expect(responseMetadata(response)?.status).toBe(504);
+});
+
+it('all supported environments enforce canonical origins, with HTTP only on local loopback', () => {
+    for (const environment of ['local', 'staging', 'production'] as const) {
+        expect(validateOrigin('https://main.example.invalid', environment)).toBe('https://main.example.invalid');
+        for (const origin of ['http://example.invalid', 'https://user:pass@example.invalid', 'https://example.invalid/path', 'https://example.invalid?query=1', 'https://example.invalid#hash'])
+            expect(() => validateOrigin(origin, environment)).toThrow();
+        for (const origin of ['http://localhost:4391', 'http://127.0.0.1:4391', 'http://[::1]:4391']) {
+            if (environment === 'local') expect(validateOrigin(origin, environment)).toBe(origin);
+            else expect(() => validateOrigin(origin, environment)).toThrow();
+        }
+    }
 });

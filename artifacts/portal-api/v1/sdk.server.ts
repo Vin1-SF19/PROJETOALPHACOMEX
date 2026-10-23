@@ -1,6 +1,6 @@
 import 'server-only';
 import { z } from 'zod/v3';
-import { CONTRACT_MAJOR, JSON_REQUEST_BYTES, JSON_RESPONSE_BYTES, errorSchema, operations, responseSchemas, successOf, idSchema, type JsonOperationId, type OperationData, type Result, type ErrorCode } from './v1';
+import { environmentSchema, type PortalEnvironment, CONTRACT_MAJOR, JSON_REQUEST_BYTES, JSON_RESPONSE_BYTES, errorSchema, operations, responseSchemas, successOf, idSchema, type JsonOperationId, type OperationData, type Result, type ErrorCode } from './v1';
 export type ResponseMetadata = {
     status: number;
     retryAfterSeconds?: number;
@@ -16,7 +16,8 @@ export class PortalTransportError extends Error {
     readonly requestId: string;
     constructor(public code: ErrorCode, message: string, public status: number, public retryAfterSeconds?: number, requestId?: string) { super(message); this.requestId = requestId ?? crypto.randomUUID(); }
 }
-export function validateOrigin(value: string, environment: 'local' | 'staging'): string {
+export function validateOrigin(value: string, environment: PortalEnvironment): string {
+    environmentSchema.parse(environment);
     const url = new URL(value);
     if (url.origin !== value || url.username || url.password || url.search || url.hash || (url.protocol !== 'https:' && !(environment === 'local' && url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))))
         throw new Error('Invalid fixed Portal origin');
@@ -24,7 +25,7 @@ export function validateOrigin(value: string, environment: 'local' | 'staging'):
 }
 export type PortalClientConfig = {
     origin: string;
-    environment: 'local' | 'staging';
+    environment: PortalEnvironment;
     appId: 'painelclientes';
     keyId: string;
     key: string;

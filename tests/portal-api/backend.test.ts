@@ -2,7 +2,7 @@ import { beforeAll, afterAll, it, expect, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { createHash, randomUUID } from 'node:crypto';
 import { hash, compare } from 'bcryptjs';
-import { SignJWT } from 'jose';
+import { SignJWT, decodeJwt, decodeProtectedHeader } from 'jose';
 import { criarFixtureChecklist } from '../checklist-analistas/sqlite-fixture';
 import { PRINCIPAL_TTL_SECONDS, novaSenhaPortalSchema } from '../../contracts/portal-api/v1';
 const state = vi.hoisted(() => ({ db: undefined as unknown as PrismaClient, failCas: false, objects: new Map<string, {
@@ -338,4 +338,38 @@ it('reset/password reject UTF8 oversize without consuming capability; exact72 by
   expect(await state.db.clienteOperacional.findUniqueOrThrow({where:{id:row.id}})).toMatchObject({senha:row.senha,senhaHash:null,authSessionVersion:0,resetSenhaTokenHash:tokenHash});
   await identity.reset(request('/identity/reset'),{token,novaSenha:password});const changed=await state.db.clienteOperacional.findUniqueOrThrow({where:{id:row.id}});expect(changed.senha).toBe('');expect(changed.authSessionVersion).toBe(1);expect(await compare(password,changed.senhaHash!)).toBe(true);expect(await credentials.verificarSenha(changed,password+'Z')).toBe(false);
  }
+});
+
+it('production issues scoped principals and rejects staging keys, claims and signing keys through the real guard', async () => {
+    const names = ['PORTAL_API_ENVIRONMENT', 'PORTAL_WEB_ORIGIN', 'PORTAL_API_APP_KEYS_JSON', 'PORTAL_API_PRINCIPAL_KEYS_JSON'];
+    const previous = names.map(name => process.env[name]);
+    const productionAppKey = Buffer.alloc(32, 2).toString('base64url');
+    const productionSignKey = Buffer.alloc(32, 3).toString('base64url');
+    const row = await account();
+    const stagingToken = await forged(row.id, { iss: 'urn:alpha-comex:portal-api:staging', aud: 'urn:alpha-comex:portal:staging', env: 'staging' });
+    try {
+        vi.stubEnv('PORTAL_API_ENVIRONMENT', 'production');
+        vi.stubEnv('PORTAL_WEB_ORIGIN', 'https://portal-production.example.invalid');
+        vi.stubEnv('PORTAL_API_APP_KEYS_JSON', JSON.stringify([{ kid: 'prod-app', appId: 'painelclientes', environment: 'production', key: productionAppKey }]));
+        vi.stubEnv('PORTAL_API_PRINCIPAL_KEYS_JSON', JSON.stringify({ activeKid: 'prod-sign', keys: [{ kid: 'prod-sign', secret: productionSignKey }] }));
+        const productionRequest = (token: string, headers: Record<string, string> = {}) => request('/identity/me', token, undefined, 'GET', { 'X-Portal-App-Key-Id': 'prod-app', 'X-Portal-App-Key': productionAppKey, ...headers });
+        const token = await principal(row);
+        const claims = decodeJwt(token);
+        expect(claims).toMatchObject({ iss: 'urn:alpha-comex:portal-api:production', aud: 'urn:alpha-comex:portal:production', env: 'production', azp: 'painelclientes' });
+        expect(decodeProtectedHeader(token).kid).toBe('prod-sign');
+        expect(Number(claims.exp) - Number(claims.iat)).toBe(PRINCIPAL_TTL_SECONDS);
+        expect((await auth.verifyPrincipal(productionRequest(token))).actor.id).toBe(row.id);
+        await expect(auth.verifyPrincipal(productionRequest(token, { 'X-Portal-App-Key': appKey }))).rejects.toMatchObject({ status: 401 });
+        await expect(auth.verifyPrincipal(productionRequest(stagingToken))).rejects.toMatchObject({ status: 401 });
+        for (const overrides of [{ iss: 'urn:alpha-comex:portal-api:staging' }, { aud: 'urn:alpha-comex:portal:staging' }, { env: 'staging' }, { azp: 'staff' }]) {
+            const mixed = await new SignJWT({ ...claims, ...overrides }).setProtectedHeader({ alg: 'HS256', typ: 'portal-principal+jwt', kid: 'prod-sign' }).sign(Buffer.from(productionSignKey, 'base64url'));
+            await expect(auth.verifyPrincipal(productionRequest(mixed))).rejects.toMatchObject({ status: 401 });
+        }
+        const wrongSignature = await new SignJWT(claims).setProtectedHeader({ alg: 'HS256', typ: 'portal-principal+jwt', kid: 'prod-sign' }).sign(Buffer.from(signKey, 'base64url'));
+        await expect(auth.verifyPrincipal(productionRequest(wrongSignature))).rejects.toMatchObject({ status: 401 });
+        vi.stubEnv('PORTAL_API_APP_KEYS_JSON', JSON.stringify([{ kid: 'prod-app', appId: 'painelclientes', environment: 'staging', key: productionAppKey }]));
+        await expect(auth.verifyPrincipal(productionRequest(token))).rejects.toMatchObject({ status: 503 });
+    } finally {
+        names.forEach((name, index) => vi.stubEnv(name, previous[index]));
+    }
 });

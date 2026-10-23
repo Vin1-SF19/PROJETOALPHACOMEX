@@ -1,10 +1,10 @@
 {
-  "contractVersion": "1.0.0",
+  "contractVersion": "1.1.0",
   "major": 1,
-  "sourceRevision": "portal-api-canonica-20261023-aria-v1.0",
+  "sourceRevision": "portal-api-canonica-20261023-aria-v1.1",
   "files": {
-    "v1.ts": "33f822287122e5c643643abad6b0ff6a3628d86648934b6540ab69a6d2961b75",
-    "sdk.server.ts": "5399cce8c8bc272e058386aef5c5bed0708c2e06db82b29b4a3ff290650be8ae"
+    "v1.ts": "d13f6a186723e65d9e6aa440635293f7d0f9fede4182481c3341eb19bac156cf",
+    "sdk.server.ts": "560fef569a1c2467a964eb704aed5491ad8c53e6154015bf534173316e4f51da"
   },
   "operations": [
     {

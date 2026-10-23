@@ -1,5 +1,24 @@
 # JOURNAL — Histórico Cronológico de Sessões
 
+<!-- release-stagings-20261023-kowalski -->
+---
+## [2026-10-23 21:37 UTC] — Portal API v1.1.0: QA local da promoção integral
+**Tags:** #portal-api #release #qa
+**Agentes envolvidos:** Echo, Forge, Probe, Anubis, Sage, Lens, Scribe, Kowalski; DevOps pendente.
+**Arquivos tocados:** `contracts/portal-api/`, configs/artefatos/testes Main+Portal (Echo); story release dos dois candidatos e três memórias Main (QA/Scribe/Kowalski).
+### Contexto
+Promoção dos20+1 commits staging autorizada; validadores anteriores recusavam production.
+### O que foi feito
+Contrato1.1.0 canônico aceita production, mantendo HTTPS/major1/TTL7d/claims/owner; artefatos consumidores byteiguais. Forge completo PASS Main6464/7skip/1todo e Portal42Vitest+2Node; Probe→Anubis→Sage→Lens PASS source/local.
+### Decisões tomadas
+Reutilizar gates atuais após hashes fonte iguais, sem novo teste espelho; CodeRabbit SKIPPED por CLI ausente. Sem app patch adicional/DB remoto/commit/deploy nesta estação.
+### Problemas encontrados / resolvidos
+Forge corrigiu apenas pai ignorado `.cache` ausente no clean checkout e repetiu suíte inteira PASS; tentativas preservadas no relatório privado.
+### Pendências
+Validar novo ajuste primeiro nos dois stagings, preparar rollback/config PROD independente e provar Main READY antes do Portal; smoke legítimo remoto pendente. Dados59 e3antigos fora do código, lote PROD exige Vault/backup/consentimento específico.
+### Refletido também em
+`codebase-map.md`, `integration-points.md` e `docs/stories/story-release-stagings-main-producao-20261023.md`; `/tmp/release-stagings-20261023-qa.md` contém os limites.
+
 ## 2026-10-15 — Chamados — prévia efetivamente corrigida, v0.3
 
 Usuário apontou que o link da prévia continuava exibindo o desenho antigo após a correção apenas documental. Nova substituiu `docs/previews/chamados-multissetorial.html`, copiando a estrutura/classes reais da página, FiltroChamado e NovoChamadoForm e incorporando Tailwind compilado/Geist offline. Preservados cabeçalho CHAMADOS INTERNOS, quatro cards, tabela com Chat/Gestão e formulário centralizado. Somente os novos elementos de destino/categorias/responsável/gestor TI foram incorporados. Criada cópia `chamados-multissetorial-v3.html` e quatro screenshots `chamados-v3-*.png`; aliases anteriores também atualizados. Chromium confirmou identidade do título, cards/colunas, centralização, CRUD/arquivamento, permissões visuais e mobile de 390 px; zero erros JS e zero requisições externas. Evidência `docs/previews/chamados-v3-validacao.json`. Fonte/style atuais aguardam revisão do usuário. Nenhuma alteração em src/, prisma/ ou banco. Story/checklist/file list atualizadas para v0.3; testes do aplicativo não reexecutados nesta alteração isolada do protótipo.

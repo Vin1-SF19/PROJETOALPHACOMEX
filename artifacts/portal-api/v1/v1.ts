@@ -1,7 +1,9 @@
 /** Canonical wire contract. Edit here; generated copies are immutable artifacts. */
 import { z } from 'zod/v3';
-export const CONTRACT_VERSION = '1.0.0';
+export const CONTRACT_VERSION = '1.1.0';
 export const CONTRACT_MAJOR = 1;
+export const environmentSchema = z.enum(['local', 'staging', 'production']);
+export type PortalEnvironment = z.infer<typeof environmentSchema>;
 export const JSON_REQUEST_BYTES = 32768;
 export const JSON_RESPONSE_BYTES = 2097152;
 export const PRINCIPAL_TTL_SECONDS = 604800;

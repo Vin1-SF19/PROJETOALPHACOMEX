@@ -20,7 +20,7 @@ const major = Number(source.match(/export const CONTRACT_MAJOR = (\d+);/)?.[1]);
 if(!contractVersion || !major || Number(contractVersion.split('.')[0])!==major) throw new Error('Invalid contract version');
 const operations = [...source.matchAll(/\{\s*id:\s*'([^']+)',\s*method:\s*'([^']+)',\s*path:\s*'([^']+)',\s*authMode:\s*'([^']+)'\s*\}/g)].map(([,id,method,path,authMode])=>({id,method,path,authMode}));
 if(operations.length!==24) throw new Error('Expected 24 explicit remote operations (30 flows including 6 local/inactive)');
-bytes['manifest.json'] = Buffer.from(JSON.stringify({contractVersion,major,sourceRevision:'portal-api-canonica-20261023-aria-v1.0',files,operations},null,2)+'\n');
+bytes['manifest.json'] = Buffer.from(JSON.stringify({contractVersion,major,sourceRevision:'portal-api-canonica-20261023-aria-v1.1',files,operations},null,2)+'\n');
 if(!args.includes('--check')) await mkdir(out,{recursive:true});
 for(const [name,content] of Object.entries(bytes)) {
  if(args.includes('--check')) {if(!(await readFile(path.join(out,name))).equals(content)) throw new Error('Contract drift: '+name);}

@@ -3432,6 +3432,15 @@ CheckList → Modelos → Novo documento do modelo. TI pode publicar/revisar/des
 
 
 <!-- portal-api-20261023-scribe-integrations -->
+<!-- release-stagings-20261023-scribe-integrations -->
+### Portal API v1.1.0 — ambiente production explícito (2026-10-23, Scribe)
+
+- `contracts/portal-api/v1.ts` fornece `environmentSchema`/`PortalEnvironment` (local/staging/production); Main `src/lib/portal-api/config.ts`, SDK e Portal `lib/portal-api/config.ts` consomem a fonte canônica gerada.
+- Distribuir pelo gerador Main, por exemplo `node scripts/portal-api/generate-contract.mjs --out <Portal>/lib/portal-api/generated`; manter manifesto íntegro e major1 compatível sem handshake de schema.
+- HTTPS obrigatório em staging/production; chaves por ambiente independentes, assinatura somente Main, app key somente servidores e sessão pública sem principal. TTL7d/ACL/cookies/protocolo preservados.
+- Forge completo e QA focal locais PASS. Novo rollout staging→produção e READY remoto ainda pendentes; seguir `docs/stories/story-release-stagings-main-producao-20261023.md`, Main owner antes do Portal e rollback privado de versão/config.
+- Os59 modelos são dados fora da promoção de código; nenhum DDL/lote executado. Eventual lote produção permanece com Vault/backup/consentimento específico.
+
 ### Portal API v1 — fronteira e distribuição (2026-10-23, Scribe)
 
 **Arquivos:** `contracts/portal-api/{v1.ts,sdk.server.ts}`, `scripts/portal-api/generate-contract.mjs`, `src/lib/portal-api/`, `src/app/api/portal/v1/` e `tests/portal-api/`.
