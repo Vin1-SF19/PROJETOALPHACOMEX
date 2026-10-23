@@ -38,6 +38,8 @@ interface CardSaveContextValue {
   registerSave: (save: () => Promise<boolean>, cardId?: string, recoveryKey?: string, errorOptions?: SaveErrorOptions, refreshAfterSave?: boolean) => Promise<boolean>;
   /** Aguarda todos os saves e informa se a persistência foi concluída. */
   flushSaves: (cardId?: string) => Promise<boolean>;
+  /** Fecha a visualização sem suspender autosaves já elegíveis; rascunhos continuam no provider. */
+  flushSavesInBackground: (cardId: string) => void;
 }
 
 const CardSaveContext = createContext<CardSaveContextValue | null>(null);
@@ -204,6 +206,16 @@ function CardSaveProviderState({ children }: { children: ReactNode }) {
     }
   }, [getPendingFields, flushScheduled]);
 
+  const flushSavesInBackground = useCallback((cardId: string) => {
+    // Não transformar pendência manual/validação em erro: apenas a rejeição real
+    // da fila merece feedback. registerSave já mantém o retry de gravações falhas.
+    void Promise.resolve().then(() => flushSaves(cardId)).catch(() => {
+      toast.error("Não foi possível salvar uma alteração. O rascunho foi preservado nesta sessão.", {
+        id: `card-save:${cardId}`, duration: Infinity,
+      });
+    });
+  }, [flushSaves]);
+
   const getFailedSaveKeys = useCallback((cardId: string) => [...failures.current]
     .filter(([, id]) => id === cardId).map(([key]) => key), []);
   const clearFailedSave = useCallback((key: string) => {
@@ -303,7 +315,7 @@ function CardSaveProviderState({ children }: { children: ReactNode }) {
   }, [getPendingFields, requestLeave]);
 
   return (
-    <CardSaveContext.Provider value={{ requestLeave, subscribeConfirmation, scheduleSave, flushScheduled, getVersion, confirmVersion, getDraft, setDraft, registerSave, registerManualSave, getPendingUpload, setPendingUpload, flushSaves, setPendingFields, getPendingFields, getPendingChanges, getFailedSaveKeys, clearFailedSave, retryFailedSaves, discardPending }}>
+    <CardSaveContext.Provider value={{ requestLeave, subscribeConfirmation, scheduleSave, flushScheduled, getVersion, confirmVersion, getDraft, setDraft, registerSave, registerManualSave, getPendingUpload, setPendingUpload, flushSaves, flushSavesInBackground, setPendingFields, getPendingFields, getPendingChanges, getFailedSaveKeys, clearFailedSave, retryFailedSaves, discardPending }}>
       {children}
       <AlertDialog open={saidaPendente} onOpenChange={(open) => { if (!open && !salvandoSaida) concluirSaida(false); }}><AlertDialogContent>
         <AlertDialogHeader><AlertDialogTitle>Salvar alterações antes de sair?</AlertDialogTitle><AlertDialogDescription>Existem dados não salvos no CRM. Escolha salvar, descartar ou continuar editando.</AlertDialogDescription></AlertDialogHeader>

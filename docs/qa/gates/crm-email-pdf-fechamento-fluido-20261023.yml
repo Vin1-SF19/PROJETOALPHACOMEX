@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "story": "crm-email-pdf-fechamento-fluido-20261023",
+  "story_title": "E-mail completo na ficha PDF e fechamento fluido do card",
+  "gate": "PASS",
+  "verdict": "APPROVED",
+  "scope": "local-ready-for-staging-only",
+  "status_reason": "PDF estrito sem omissão/hífen artificial e fechamento imediato com draft/recovery cobertos. Gates reais PASS; aceite LIVE obrigatório pendente após deploy.",
+  "reviewer": "Quinn / QA",
+  "updated": "2026-10-23T20:58:58.868249+00:00",
+  "top_issues": [],
+  "waiver": {
+    "active": false
+  },
+  "evidence": {
+    "tests_files": 52,
+    "tests_passed": 417,
+    "tests_failures": 0,
+    "full_repository_rerun": false,
+    "scope": "npm test -- --coverage.enabled=false --maxWorkers=1 + suites afetadas listadas no plan-final.json privado",
+    "typecheck": "global PASS8GB",
+    "lint": "global PASS0errors/1183warnings",
+    "build": "npm run build literal webpack PASS115.96s",
+    "source_guard_files": 3085,
+    "source_guard_unchanged": true,
+    "private_report": "/var/tmp/alpha-crm-ficha-email-fechar-fluido-20261023/qa/qa-local-final.json",
+    "coderabbit": "indisponível; fallback manual configurado executado"
+  },
+  "nfr_validation": {
+    "security": {
+      "status": "PASS",
+      "notes": "Backend/ACL/schema inalterados; drafts/retry isolados por card; fechamento não dispara forms manuais/agenda."
+    },
+    "reliability": {
+      "status": "PASS",
+      "notes": "Rejeições tardias tratadas, save background e troca explícita sem perder rascunho ou fechar outro card."
+    }
+  },
+  "ac_trace": {
+    "AC1": "PASS local: curto/72/254/320 caracteres estritos, sem hífen/ZW artificiais",
+    "AC2": "PASS local: compartilhado, A4, fonte10, conteúdo e consumidores preservados;72 uma página/320 amplo duas",
+    "AC3": "PASS local: X/Escape/onOpenChange/externo/troca direta antes promises",
+    "AC4": "PASS: guardas de movimento comercial/servidor e navegação global preservadas",
+    "AC5": "PASS local: save/draft/retry após unmount; manual não submetido e card isolado",
+    "AC6": "PASS: integração React e regressão backend/SQLite/PDF reais no escopo",
+    "AC7": "Gates locais PASS; LIVE root obrigatório pendente",
+    "AC8": "Staging somente; publicação/alias por DevOps pendentes"
+  },
+  "remote_acceptance": "PENDING: email72 estrito no PDF regenerado e fechamento real durante leitura de follow-up atrasada/erro tratado após READY"
+}

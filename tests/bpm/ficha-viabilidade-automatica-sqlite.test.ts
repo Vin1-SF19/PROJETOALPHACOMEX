@@ -161,7 +161,7 @@ describe("ficha automática persistida em SQLite privado", () => {
       expect(await db.bpmCardAnexo.count()).toBe(1);
       const bytes: unknown = m.put.mock.calls.at(-1)?.[1];
       if (!Buffer.isBuffer(bytes)) throw new Error("PDF real esperado");
-      expect((await lerPdf(bytes))[0].text.toLowerCase()).toContain("segundo@example.test");
+      expect((await lerPdf(bytes))[0].text.toLowerCase().replace(/\s+/g, "")).toContain("segundo@example.test");
     } finally { createLease.mockRestore(); }
   });
 

@@ -9,6 +9,7 @@ type Host = {
   publish: (entry: Entry) => void;
   detach: (owner: string) => void;
   close: (owner: string, cardId: string) => boolean;
+  releaseForNavigation: (owner: string, cardId: string) => boolean;
   replaceDetached: (entry: Entry) => void;
   isAttached: (owner: string) => boolean;
 };
@@ -76,15 +77,22 @@ export function CardModalHostProvider({ children }: { children: ReactNode }) {
     // Se o mesmo Board já selecionou outro card, seu callback antigo não pode zerá-lo.
     return promoted?.owner !== owner;
   }, [replace]);
+  const releaseForNavigation = useCallback((owner: string, cardId: string) => {
+    if (current.current?.owner !== owner || current.current.cardId !== cardId) return false;
+    candidate.current = null;
+    replace(null);
+    return true;
+  }, [replace]);
   const replaceDetached = useCallback((next: Entry) => {
-    if (current.current?.owner === next.owner && !attached.current.has(next.owner)
-      && !getPendingFields(current.current.cardId).length) replace(next);
-  }, [getPendingFields, replace]);
+    // Este caminho vem de uma troca expressa no card já retido. O rascunho do
+    // anterior permanece no provider; a guarda de navegação geral é separada.
+    if (current.current?.owner === next.owner && !attached.current.has(next.owner)) replace(next);
+  }, [replace]);
   const host = useMemo<Host>(() => ({
     attach: (owner) => { attached.current.add(owner); },
     isAttached: (owner) => attached.current.has(owner),
-    publish, detach, close, replaceDetached,
-  }), [publish, detach, close, replaceDetached]);
+    publish, detach, close, releaseForNavigation, replaceDetached,
+  }), [publish, detach, close, releaseForNavigation, replaceDetached]);
   return <CardModalHostContext.Provider value={host}>
     {children}
     <div className="crm-scope">

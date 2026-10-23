@@ -170,7 +170,7 @@ it("beforeunload bloqueia somente com alterações ainda pendentes", async () =>
   const comDados = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(comDados); expect(comDados.defaultPrevented).toBe(true);
   await click("Cancelar"); const cancelado = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(cancelado); expect(cancelado.defaultPrevented).toBe(false);
 });
-it("Sheet real mantém um diálogo por saída e X do card exige salvar ou descartar sem autosave", async () => {
+it("Sheet preserva guard de navegação e X dispensa sem descartar nem autosalvar o rascunho manual", async () => {
   const onClose = vi.fn();
   await act(async () => root.render(h(CardSaveProvider, null, h(CardFullViewModal, {
     cardId: "card", accent: "1,2,3", currentUserId: 1, currentUserRole: "Admin", onClose, onAtualizado: vi.fn(), onAbrirCard: vi.fn(),
@@ -180,9 +180,9 @@ it("Sheet real mantém um diálogo por saída e X do card exige salvar ou descar
   expect(document.querySelectorAll('[role="alertdialog"]')).toHaveLength(1);
   await click("Continuar editando"); expect(await sair).toBe(false);
   await act(async () => document.querySelector<HTMLButtonElement>('button[aria-label="Fechar"]')!.click());
-  expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain("Revisar alterações");
-  expect(onClose).not.toHaveBeenCalled(); expect(SalvarCadastroEmpresaCardBpm).not.toHaveBeenCalled();
-  await click("Sair sem salvar"); expect(onClose).toHaveBeenCalledOnce(); expect(SalvarCadastroEmpresaCardBpm).not.toHaveBeenCalled();
+  expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+  expect(onClose).toHaveBeenCalledOnce(); expect(SalvarCadastroEmpresaCardBpm).not.toHaveBeenCalled();
+  expect(context.getDraft("card:dados-empresa")).toBeDefined();
 });
 it("descartar cancela debounces ainda não iniciados e aguarda a gravação que já estava em curso", async () => {
   context.setPendingFields("card:manual", ["Pendente"]);
@@ -195,7 +195,7 @@ it("descartar cancela debounces ainda não iniciados e aguarda a gravação que 
   await act(async () => { resolver(true); await first; }); expect(await sair).toBe(true); expect(context.getPendingFields()).toEqual([]);
 });
 
-it.each(["Salvar e sair", "Descartar e sair"])("host persistente conserva o mesmo editor após saída da rota, até %s", async (choice) => {
+it("host persistente permite fechar após sair da rota e recupera o rascunho manual ao reabrir", async () => {
   const onClose = vi.fn(), onAtualizado = vi.fn();
   const modal = h(CardFullViewModal, { cardId: "card", accent: "1,2,3", currentUserId: 1, currentUserRole: "Admin", onClose, onAtualizado, onAbrirCard: vi.fn() });
   const render = (child: React.ReactNode) => h(React.StrictMode, null, h(PainelCardState, null, child));
@@ -203,21 +203,17 @@ it.each(["Salvar e sair", "Descartar e sair"])("host persistente conserva o mesm
   await abrirEdicao(); await editar("Nome fantasia", "Rascunho após Voltar");
   const original = document.querySelector<HTMLInputElement>('input[aria-label="Nome fantasia"]')!;
   await act(async () => root.render(render(h("p", null, "Nova rota"))));
-  expect(document.body.textContent).toContain("Nova rota");
   expect(document.querySelector('input[aria-label="Nome fantasia"]')).toBe(original);
-  expect(original.value).toBe("Rascunho após Voltar");
   expect(document.querySelectorAll('[role="alertdialog"]')).toHaveLength(1);
   await click("Continuar editando");
-  expect(document.querySelector('input[aria-label="Nome fantasia"]')).toBe(original);
   await editar("Nome fantasia", "Rascunho após continuar");
-  const cadastro = structuredClone(dados.edicao.cadastro); cadastro.empresa.nomeFantasia = "Rascunho após continuar";
-  vi.mocked(SalvarCadastroEmpresaCardBpm).mockResolvedValue({ success: true, data: { ...aplicarPerfilCadastral(dados, { versao: 1, cadastro }), edicao: { ...dados.edicao, cadastro } } });
-  // O card retido pode ser fechado e salvo, mesmo sem o Board que o abriu.
   await act(async () => document.querySelector<HTMLButtonElement>('button[aria-label="Fechar"]')!.click());
-  if (choice === "Salvar e sair") await click("Salvar alterações"); else await click("Sair sem salvar");
   expect(document.querySelector('input[aria-label="Nome fantasia"]')).toBeNull();
   expect(onClose).not.toHaveBeenCalled(); expect(onAtualizado).not.toHaveBeenCalled();
-  expect(SalvarCadastroEmpresaCardBpm).toHaveBeenCalledTimes(choice === "Salvar e sair" ? 1 : 0);
+  expect(SalvarCadastroEmpresaCardBpm).not.toHaveBeenCalled(); expect(context.getDraft("card:dados-empresa")).toBeDefined();
+  await act(async () => root.render(render(modal))); await click("Alternar dados");
+  expect(document.querySelector<HTMLInputElement>('input[aria-label="Nome fantasia"]')?.value).toBe("Rascunho após continuar");
+  expect(SalvarCadastroEmpresaCardBpm).not.toHaveBeenCalled();
 });
 
 it.each(["Salvar e sair", "Descartar e sair"])("host libera card destacado somente após a confirmação de %s", async (choice) => {

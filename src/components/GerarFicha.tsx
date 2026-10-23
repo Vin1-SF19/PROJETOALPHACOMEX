@@ -48,6 +48,7 @@ const styles = StyleSheet.create({
   },
   label: { fontSize: 14, fontWeight: 'bold', textTransform: 'uppercase' },
   value: { fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase', marginTop: 1 },
+  emailValue: { textTransform: 'none' },
   optionRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
   circle: { width: 7, height: 7, borderRadius: 3.5, borderWidth: 1, borderColor: '#000' },
   circleFilled: { width: 10, height: 10, borderRadius: 3.5, backgroundColor: '#000' },
@@ -111,6 +112,12 @@ export type FichaAlphaViabilidade = {
   complexidade?: string; historicoTentativas?: string; embasamento?: string;
   resumoReuniao?: string; transcricaoRegistrada?: boolean;
 };
+
+// A hifenização automática pode omitir partes do endereço na coluna estreita.
+// Linhas curtas cabem com a fonte original, inclusive usando glifos largos.
+function quebrarEmailFicha(email: string) {
+  return email.match(/.{1,16}/gu)?.join("\n") ?? email;
+}
 
 export const FichaAlphaPDF = ({ dados, userLogado, logoPath, finalidade = "padrao" }: { dados: FichaAlphaDados, userLogado: string, logoPath?: string, finalidade?: "padrao" | "pre-analise" }) => {
   const rfb = dados?.rfb?.dados || dados?.rfb || {};
@@ -184,8 +191,8 @@ export const FichaAlphaPDF = ({ dados, userLogado, logoPath, finalidade = "padra
             </View>
             <View style={[styles.cell, { flex: 2 }]}>
               <Text style={styles.label}>E-MAIL</Text>
-              <Text style={styles.value}>
-                {dados.extra?.email || "____________________________"}
+              <Text style={[styles.value, styles.emailValue]} hyphenationCallback={(palavra) => [palavra]}>
+                {dados.extra?.email ? quebrarEmailFicha(dados.extra.email) : "____________________________"}
               </Text>
             </View>
           </View>
