@@ -3,6 +3,7 @@ import React, { act, createElement as h, type ComponentProps } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const api = vi.hoisted(() => ({ obter: vi.fn(), recuperar: vi.fn(), enviar: vi.fn(), repetir: vi.fn(), card: vi.fn(), flush: vi.fn(), success: vi.fn(), error: vi.fn() }));
+vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/EncaminhamentoManualDialog", () => ({ EncaminhamentoManualDialog: () => null }));
 vi.mock("@/actions/bpm/Encaminhamentos", () => ({ ObterEncaminhamentosCardBpm: api.obter, RecuperarEncaminhamentoFinanceiroCardBpm: api.recuperar, SolicitarEncaminhamentoCardBpm: api.enviar, RepetirEncaminhamentoCardBpm: api.repetir }));
 vi.mock("@/actions/bpm/Cards", () => ({ ObterCardBpm: api.card }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext", () => ({ useCardSave: () => ({ flushSaves: api.flush }) }));

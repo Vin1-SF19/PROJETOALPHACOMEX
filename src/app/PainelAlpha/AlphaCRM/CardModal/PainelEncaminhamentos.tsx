@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { ObterEncaminhamentosCardBpm, RecuperarEncaminhamentoFinanceiroCardBpm, SolicitarEncaminhamentoCardBpm, RepetirEncaminhamentoCardBpm, type EncaminhamentoCardBpm } from "@/actions/bpm/Encaminhamentos";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { EncaminhamentoManualDialog } from "./EncaminhamentoManualDialog";
 import { useCardSave } from "./CardSaveContext";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
@@ -90,6 +91,7 @@ function EncaminhamentosConteudo({ card, realtimeRevision, onAtualizado, onAbrir
 
   return <section aria-label="Encaminhamentos entre setores" aria-busy={processando} className="space-y-3 rounded-xl border border-slate-700/60 bg-slate-900/40 p-4">
     <h2 className="text-xs font-bold uppercase tracking-wide text-slate-200">Encaminhamentos</h2>
+    <EncaminhamentoManualDialog card={card} realtimeRevision={realtimeRevision} bloqueado={processando} onAtualizado={onAtualizado} />
     <p className="text-[11px] text-slate-400">{consulta.data?.some(regra => regra.automaticoFinanceiro) ? "O fechamento comercial encaminha automaticamente o card ao Financeiro. Acompanhe o envio aqui." : "O envio ao próximo setor é acompanhado aqui."}</p>
     {consulta.isPending && <p role="status" className="flex items-center gap-2 text-xs text-slate-400"><Loader2 size={13} className="animate-spin" /> Consultando encaminhamentos…</p>}
     {consulta.isError && <div role="alert" className="text-xs text-amber-200"><p>Não foi possível consultar os encaminhamentos.</p><button type="button" className="mt-2 underline" onClick={() => void consulta.refetch()}>Tentar novamente</button></div>}
