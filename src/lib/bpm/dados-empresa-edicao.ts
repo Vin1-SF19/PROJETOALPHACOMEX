@@ -5,6 +5,10 @@ import type { DadosEmpresaConsolidado } from "@/lib/bpm/dados-empresa";
 const texto = z.string().trim().max(2000).nullable().transform((v) => v || null);
 const nome = z.string().trim().min(1).max(200);
 const dinheiro = z.number().finite().nonnegative().max(1e15).nullable();
+/** Aceita a pontuação de CEP devolvida pelas fontes sem aceitar letras ou truncar dados. */
+export function normalizarCepCadastro(valor: string | null): string | null {
+  return valor?.replace(/[.\s-]/g, "") || null;
+}
 const data = texto.refine((v) => {
   if (!v) return true;
   if (z.iso.datetime({ offset: true }).safeParse(v).success) return true;
@@ -25,10 +29,11 @@ export const cadastroEmpresaSchema = z.object({
     cnpj: z.string().max(30).transform(normalizarCNPJ).refine((v) => !v || cnpjEhValido(v), "CNPJ inválido."),
     razaoSocial: nome, nomeFantasia: texto, situacao: texto, dataConstituicao: data, porte: texto,
     naturezaJuridica: texto, capitalSocial: dinheiro,
-    endereco: z.object({ logradouro: texto, numero: texto, bairro: texto, municipio: texto,
+    endereco: z.object({ logradouro: texto, numero: texto, complemento: texto.optional(), bairro: texto, municipio: texto,
       uf: z.string().trim().max(2).nullable().transform((v) => v?.toUpperCase() || null)
         .refine((v) => !v || ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"].includes(v), "UF inválida."),
-      cep: z.string().trim().max(10).nullable().refine((v) => !v || /^\d{5}-?\d{3}$/.test(v), "CEP inválido.") }).strict(),
+      cep: z.string().trim().max(30).nullable().transform(normalizarCepCadastro)
+        .refine((v) => !v || /^\d{8}$/.test(v), "CEP inválido.") }).strict(),
   }).strict(),
   contatos: z.array(contato).max(100),
   pessoas: z.array(pessoa).max(100),
@@ -53,7 +58,8 @@ export const salvarCadastroEmpresaSchema = z.object({
 export function cadastroDosDadosEmpresa(dados: DadosEmpresaConsolidado): CadastroEmpresa {
   const e = dados.empresa;
   const empresa = { cnpj: e.cnpj, razaoSocial: e.razaoSocial, nomeFantasia: e.nomeFantasia, situacao: e.situacao,
-    dataConstituicao: e.dataConstituicao, porte: e.porte, naturezaJuridica: e.naturezaJuridica, capitalSocial: e.capitalSocial, endereco: e.endereco };
+    dataConstituicao: e.dataConstituicao, porte: e.porte, naturezaJuridica: e.naturezaJuridica, capitalSocial: e.capitalSocial,
+    endereco: { ...e.endereco, complemento: e.endereco.complemento ?? null, cep: normalizarCepCadastro(e.endereco.cep) } };
   return {
     empresa,
     contatos: dados.contatos.map(({ tipo, valor, titular }) => ({ tipo, valor, titular })),
@@ -83,6 +89,7 @@ export const SECOES_CADASTRO_EMPRESA = [
     ["empresa.situacao", "Situação cadastral"], ["empresa.capitalSocial", "Capital social", "numero"],
     ["empresa.dataConstituicao", "Data de abertura"], ["empresa.porte", "Porte"], ["empresa.naturezaJuridica", "Natureza jurídica"],
     ["empresa.endereco.cep", "CEP"], ["empresa.endereco.logradouro", "Logradouro"], ["empresa.endereco.numero", "Número"],
+    ["empresa.endereco.complemento", "Complemento"],
     ["empresa.endereco.bairro", "Bairro"], ["empresa.endereco.municipio", "Município"], ["empresa.endereco.uf", "UF"],
   ] },
   { titulo: "Regime tributário", campos: [

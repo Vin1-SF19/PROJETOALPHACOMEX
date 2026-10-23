@@ -12,6 +12,7 @@ import { formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";
 import { RegistrarAnexoBpm } from "@/actions/bpm/Anexos";
 import { VisualizadorAnexoCard, type AnexoParaVisualizar } from "@/components/bpm/anexos/VisualizadorAnexoCard";
 import { VALORES } from "@/lib/bpm/financeiro-config.client";
+import { campoCadastralTextoLivre } from "@/lib/bpm/cadastro-campos";
 import { nomeSeguroUploadAnexo, obterTipoUploadAnexo, validarUploadAnexo } from "@/lib/validations/bpm";
 import { CAMPO_CHECKLIST_EXCEL, planilhaChecklistValida } from "@/lib/bpm/checklist-envio-operacional";
 import { campoEhOrigemCliente } from "@/lib/bpm/origem-cliente";
@@ -160,6 +161,13 @@ export function CampoBpmInput({
       required={campo.obrigatorio} invalid={invalid} describedBy={describedBy} />;
   }
 
+  if (campoCadastralTextoLivre(campo)) {
+    return <input id={`campo-bpm-${campo.id}`} className={className} type="text" value={value}
+      disabled={disabled} readOnly={readOnly} required={campo.obrigatorio}
+      aria-invalid={invalid || undefined} aria-describedby={describedBy}
+      onChange={(event) => onChange(event.target.value)} onBlur={onBlur} />;
+  }
+
   if ((campo.tipo === "selecao" || campo.tipo === "multiselecao") && campo.fonteEntidade) {
     return (
       <input
@@ -194,7 +202,7 @@ export function CampoBpmInput({
         onBlur={onBlur}
       >
         <option value="" className="bg-slate-900 text-slate-100">
-          Selecione...
+          {campo.chave === "alpha.radar.fechado.tarifario_padrao" ? "Não informado..." : "Selecione..."}
         </option>
         {opcoes.map((opcao) => (
           <option key={opcao} value={opcao} className="bg-slate-900 text-slate-100">

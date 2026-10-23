@@ -126,6 +126,7 @@ export interface DadosEmpresaConsolidado {
     endereco: {
       logradouro: string | null;
       numero: string | null;
+      complemento?: string | null;
       bairro: string | null;
       municipio: string | null;
       uf: string | null;
@@ -442,6 +443,7 @@ export function normalizarDadosEmpresaBpm(fontes: DadosEmpresaFontes): DadosEmpr
       endereco: {
         logradouro: stringValue(rfb.logradouro),
         numero: stringValue(rfb.numero),
+        complemento: stringValue(rfb.complemento),
         bairro: stringValue(rfb.bairro),
         municipio: stringValue(rfb.municipio, cliente.municipio),
         uf: stringValue(rfb.uf, cliente.uf),

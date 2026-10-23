@@ -3443,6 +3443,12 @@ CheckList → Modelos → Novo documento do modelo. TI pode publicar/revisar/des
 - Configuração nova e rollout desta entrega são exclusivos do custom staging: Main API validada antes do BFF; assinatura só Main, app key somente servidores, origens HTTPS fixas. Ao retirar segredos Portal, conferir herança de env para não expor Preview/produção. `npm run boundary:check` do Portal assegura ausência de dependências persistentes. Banco físico atual e produção permanecem fora de uma separação/migração por este registro.
 
 
+### 2026-10-23 — Dossiê RADAR fora do card CRM
+Decisão do usuário: remover a aba do card. Retirada restrita aos três pontos de `PainelHistorico.tsx` (import/trigger/conteúdo); não recriar a montagem por iniciativa própria. Atendimentos, documentos, vínculos e serviços CheckList permanecem. Gates finais/publicação staging pendentes; produção não autorizada.
+
+**Fechamento local da remoção (2026-10-23, River):** QA APPROVED/GO STAGING; typecheck/lint/build literal PASS e suíte existente 760 arquivos/6.310 PASS, zero falhas/quatro skipped/um todo. Probe/Lens/Sage sem bloqueantes; CodeRabbit ausente com fallback manual. File List final seis caminhos (três deleções de UI, generic de teste preexistente, story/três memórias); sem CheckList/backend/dados alterados. READY/alias e smoke remoto pendentes para DevOps, sem E2E autenticado ou produção.
+
+
 <!-- checklist-templates-excel-20261023-scribe-integrations -->
 ### CheckList — código público, identidade e gestão dos modelos (2026-10-23, Scribe)
 

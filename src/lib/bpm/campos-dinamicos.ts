@@ -1,5 +1,6 @@
 import { cnpjEhValido, normalizarCNPJ } from "@/lib/format-cnpj";
 import { campoEhOrigemCliente, origemClienteValida } from "@/lib/bpm/origem-cliente";
+import { campoCadastralTextoLivre } from "@/lib/bpm/cadastro-campos";
 
 export type CampoDinamicoBpm = {
   id: string;
@@ -142,6 +143,11 @@ export function validarValoresCamposBpm(
       continue;
     }
     if (campo.tipo === "selecao") {
+      if (campoCadastralTextoLivre(campo)) {
+        if (valor.length > 2000) return { success: false, error: `O campo "${campo.nome}" deve conter até 2000 caracteres.` };
+        validados[campoId] = valor;
+        continue;
+      }
       const opcoes = lerOpcoesSeguras(campo);
       if (!opcoes || !opcoes.includes(valor)) {
         return { success: false, error: `O campo "${campo.nome}" possui uma opção inválida.` };

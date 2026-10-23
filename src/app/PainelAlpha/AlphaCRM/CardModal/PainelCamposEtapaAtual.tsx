@@ -16,6 +16,9 @@ import {
   montarPayloadCamposDestino,
   prepararCamposMotivoLostUiCanonico,
   resolverSnapshotCamposRealtime,
+  filtrarCamposComerciaisUi,
+  CHAVE_TARIFARIO_PADRAO,
+  CHAVE_CONDICAO_NEGOCIADA,
   type SnapshotCamposRealtime,
 } from "@/lib/bpm/card-modal-ui";
 import { TEMPLATE_RESUMO_ALINHAMENTO } from "@/lib/bpm/alinhamento-estrategico";
@@ -175,11 +178,12 @@ export function PainelCamposEtapaAtual({
     atualizarPendencias();
     setValoresCamposAtuais(valoresRef.current);
   }
-  const configuracaoLostUi = prepararCamposMotivoLostUiCanonico(
-    card.etapa.chave,
-    camposEtapaBase,
-    valoresCamposAtuais,
-  );
+  function prepararCamposUi(atuais: Readonly<Record<string, string>>) {
+    const valores = { ...Object.fromEntries(card.camposEtapa.map((campo) => [campo.id, valorInicialCampo(campo)])), ...atuais };
+    return prepararCamposMotivoLostUiCanonico(card.etapa.chave,
+      filtrarCamposComerciaisUi(camposEtapaBase, valores, card.camposEtapa), valores);
+  }
+  const configuracaoLostUi = prepararCamposUi(valoresCamposAtuais);
   const camposAtuaisVisiveis = configuracaoLostUi.camposVisiveis;
   const totalCamposAlterados = camposAtuaisVisiveis.filter((campo) => Object.hasOwn(arquivosPendentes, campo.id)
     || (!campo.somenteLeitura && campo.editavel !== false
@@ -203,7 +207,9 @@ export function PainelCamposEtapaAtual({
       if (snapshotRemoto.versao < snapshotAtivoRef.current.versao) return;
       // A própria confirmação pode chegar pelo realtime após uma nova edição.
       // A mesma versão já confirmada não representa conflito externo.
-      if ((camposAtuaisSujosRef.current || getDraft(idInstancia)) && snapshotRemoto.versao === snapshotAtivoRef.current.versao) return;
+      if ((camposAtuaisSujosRef.current || getDraft(idInstancia)) && snapshotRemoto.versao === snapshotAtivoRef.current.versao
+        && Object.keys({ ...snapshotRemoto.valores, ...snapshotAtivoRef.current.valores })
+          .every((id) => snapshotRemoto.valores[id] === snapshotAtivoRef.current.valores[id])) return;
       const resolucao = resolverSnapshotCamposRealtime({
         rascunhoSujo: camposAtuaisSujosRef.current || Boolean(getDraft(idInstancia)),
         snapshotAtual: snapshotAtivoRef.current,
@@ -261,7 +267,7 @@ export function PainelCamposEtapaAtual({
   async function salvarCamposAtuais(campoIds: string[]): Promise<boolean> {
     if (!podeEditar || conflitoCamposAtuais) return false;
     const valoresAtuais = getDraft(idInstancia) ?? valoresRef.current;
-    const configuracaoAtual = prepararCamposMotivoLostUiCanonico(card.etapa.chave, camposEtapaBase, valoresAtuais);
+    const configuracaoAtual = prepararCamposUi(valoresAtuais);
     if (configuracaoAtual.exigeComplemento && configuracaoAtual.campoComplementoId
       && !valoresAtuais[configuracaoAtual.campoComplementoId]?.trim()) {
       toast.error(MOTIVO_LOST_OUTRO_OBRIGATORIO_MENSAGEM, erroFormulario);
@@ -418,7 +424,7 @@ export function PainelCamposEtapaAtual({
   }
   function idsPendentes() {
     const atuais = getDraft(idInstancia) ?? valoresRef.current;
-    return prepararCamposMotivoLostUiCanonico(card.etapa.chave, camposEtapaBase, atuais).camposVisiveis
+    return prepararCamposUi(atuais).camposVisiveis
       .filter((campo) => !campo.somenteLeitura && campo.editavel !== false
         && !arquivosPendentesRef.current.has(campo.id)
         && valorComparavel(campo.tipo, atuais[campo.id]) !== valorComparavel(campo.tipo, snapshotAtivoRef.current.valores[campo.id]))
@@ -452,7 +458,8 @@ export function PainelCamposEtapaAtual({
           .map((campo) => campo.id));
         return ids.filter((id) => idsDoGrupo.has(id) && !arquivosPendentesRef.current.has(id));
       };
-      const grupos = [grupoPendente(chavesPagamento), grupoPendente(chavesNotaFiscal)].filter((grupo) => grupo.length);
+      const grupos = [grupoPendente(new Set([CHAVE_TARIFARIO_PADRAO, CHAVE_CONDICAO_NEGOCIADA])),
+        grupoPendente(chavesPagamento), grupoPendente(chavesNotaFiscal)].filter((grupo) => grupo.length);
       const idsAgrupados = new Set(grupos.flat());
       // Anexos e campos independentes são salvos antes dos grupos que o servidor valida juntos.
       const idsOrdenados = [
@@ -633,7 +640,8 @@ export function PainelCamposEtapaAtual({
             const estadoCalculado = somenteLeitura
               && (card.pipelineId === "cmuih4i54000209gmmyqrg557" || card.pipeline?.chave === "financeiro")
               && (campo.chave === CHAVES_CAMPOS.STATUS_FINANCEIRO || campo.chave === CHAVES_CAMPOS.STATUS_CONTRATACAO);
-            const fonteAutomatica = campo.escopo === "GLOBAL" && Boolean(campo.fonteEntidade);
+            const fonteAutomatica = campo.escopo === "GLOBAL" && Boolean(campo.fonteEntidade)
+              && (somenteLeitura || !["CLIENTE", "CONTATO"].includes(campo.fonteEntidade ?? ""));
             const origemFinanceiro = card.pipeline?.chave === "financeiro" && card.etapa.chave === "solicitacao_contrato"
               ? chavesCalculadasFinanceiro.has(campo.chave ?? "") ? "Calculado automaticamente"
                 : campo.mapeamentoModo === "COPIAR"

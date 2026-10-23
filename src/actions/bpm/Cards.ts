@@ -782,6 +782,7 @@ export async function ObterCardBpm(cardId: string) {
       db,
       resolverPerfilAcessoCampo(acessoCard),
       camposConfiguradosEtapa,
+      { incluirCondicionaisEdicao: true },
     );
     const formularioEtapa = resolverFormularioEtapa({
       formulario: card.etapa.formulario,
@@ -1383,6 +1384,8 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
           cardAtual.etapaId,
           tx,
           resolverPerfilAcessoCampo(acessoCardAtual),
+          undefined,
+          { valoresSubmetidos: camposValores },
         );
         const validacao = validarValoresCamposBpm(
           camposAplicaveis,
@@ -1434,6 +1437,11 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
             ...Object.fromEntries(valoresPersistidos.map((item) => [item.campoId, item.valor])),
             ...globais,
           };
+          // Auditar o mesmo valor efetivo entregue ao editor, inclusive substituições
+          // locais e limpeza explícita; o fallback cadastral não pode sobrescrevê-los.
+          for (const campo of camposAplicaveis) {
+            if (Object.hasOwn(valoresValidados, campo.id)) valoresAnteriores[campo.id] = campo.valor;
+          }
         }
       }
 

@@ -16,6 +16,7 @@ vi.mock("@/lib/prisma", () => ({ default: new Proxy({}, { get: (_target, key) =>
 } }) }));
 import { carregarDadosEmpresaCard } from "@/lib/bpm/dados-empresa-server";
 import { SalvarCadastroEmpresaCardBpm } from "@/actions/bpm/EmpresaCadastro";
+import { revalidatePath } from "next/cache";
 
 let folder: string;
 let cardId: string;
@@ -49,6 +50,36 @@ async function comando(id = cardId) {
 }
 
 describe("salvamento empresarial em SQLite real isolado", () => {
+  it("falhas visuais após commit não reportam falha nem desfazem cadastro e auditorias", async () => {
+    const p = await comando(); p.cadastro.empresa.nomeFantasia = "Gravação confirmada";
+    vi.mocked(revalidatePath).mockImplementationOnce(() => { throw new Error("Cache indisponível (fixture)"); });
+    m.notificar.mockRejectedValueOnce(new Error("Notificação indisponível (fixture)"));
+    expect(await SalvarCadastroEmpresaCardBpm(p)).toMatchObject({ success: true });
+    expect((await m.db.cliente.findUniqueOrThrow({ where: { id: empresaId } })).nomeFantasia).toBe("Gravação confirmada");
+    expect(await m.db.historicoAlteracaoCliente.count()).toBe(1); expect(await m.db.bpmCardHistorico.count()).toBe(1);
+    expect((await carregarDadosEmpresaCard(cardId))?.edicao.cadastro.empresa.nomeFantasia).toBe("Gravação confirmada");
+  });
+  it("salva CEP formatado da consulta, recarrega oito dígitos e espelha o valor normalizado nas auditorias", async () => {
+    const p = await comando(); p.cadastro.empresa.endereco.cep = "01.001-000";
+    const resposta = await SalvarCadastroEmpresaCardBpm(p);
+    expect(resposta).toMatchObject({ success: true, data: { empresa: { endereco: { cep: "01001000" } } } });
+    const recarregado = await carregarDadosEmpresaCard(cardId);
+    expect(recarregado?.edicao.cadastro.empresa.endereco.cep).toBe("01001000");
+    expect(await m.db.historicoAlteracaoCliente.findMany()).toMatchObject([
+      { campo: "empresa.endereco.cep", valorAnterior: null, valorNovo: "01001000", userId: 1, nomeUsuarioNaEpoca: "Autora original" },
+    ]);
+    const historicos = await m.db.bpmCardHistorico.findMany({ where: { acao: "DADOS_EMPRESA_ATUALIZADOS" } });
+    expect(historicos).toHaveLength(1);
+    expect(JSON.parse(historicos[0].valorNovoJson!)).toMatchObject({ campo: "empresa.endereco.cep", valor: "01001000", autor: "Autora original" });
+  });
+  it("recusa texto inválido no CEP sem modificar cadastro, versão ou auditorias", async () => {
+    const p = await comando(); p.cadastro.empresa.endereco.cep = "abc01001000";
+    const antes = await m.db.cliente.findUniqueOrThrow({ where: { id: empresaId } });
+    expect(await SalvarCadastroEmpresaCardBpm(p)).toMatchObject({ success: false, error: "CEP inválido." });
+    const depois = await m.db.cliente.findUniqueOrThrow({ where: { id: empresaId } });
+    expect(depois.updatedAt).toEqual(antes.updatedAt); expect(depois.perfilCadastralJson).toEqual(antes.perfilCadastralJson);
+    expect(await m.db.historicoAlteracaoCliente.count()).toBe(0); expect(await m.db.bpmCardHistorico.count()).toBe(0);
+  });
   it("primeiro save de contato sem CNPJ preserva capital/situação canônicos e audita cada campo", async () => {
     const p = await comando(); p.cadastro.contatos.push({ tipo: "E-mail", valor: "novo@example.invalid", titular: "Empresa" });
     const res = await SalvarCadastroEmpresaCardBpm(p);

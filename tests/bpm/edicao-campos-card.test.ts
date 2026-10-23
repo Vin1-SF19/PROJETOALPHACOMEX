@@ -14,6 +14,7 @@ const prismaMock = vi.hoisted(() => ({
   bpmCampo: { findMany: vi.fn() },
   bpmCardAnexo: { findMany: vi.fn() },
   bpmCardHistorico: { create: vi.fn() },
+  bpmEventoDominio: { create: vi.fn(), findUnique: vi.fn() },
   bpmCardMembro: { updateMany: vi.fn(), upsert: vi.fn() },
   parceiro: { findUnique: vi.fn() },
   indicacao: { findUnique: vi.fn(), update: vi.fn(), create: vi.fn() },
@@ -32,7 +33,6 @@ vi.mock("@/lib/bpm/campos-configuraveis-server", () => ({
   carregarValoresCanonicosCampos: vi.fn().mockResolvedValue({}),
   salvarValoresGlobaisPersonalizadosCampos: vi.fn().mockResolvedValue(new Set()),
 }));
-vi.mock("@/lib/bpm/automacoes/eventos", () => ({ publicarEventoBpm: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/bpm/realtime-server", () => ({
   notificarPipelineBpm: notificarPipelineBpmMock,
 }));
@@ -54,6 +54,7 @@ vi.mock("@/lib/bpm/requisitos-etapa-server", () => ({
 }));
 
 import { AtualizarCardBpm } from "@/actions/bpm/Cards";
+import { carregarValoresCanonicosCampos } from "@/lib/bpm/campos-configuraveis-server";
 import { revalidatePath } from "next/cache";
 
 const CARD_ID = "clw0000000000000card";
@@ -99,6 +100,7 @@ describe("CRM - edição dos campos definidos da etapa", () => {
     authMock.mockResolvedValue({ user: { id: "7", role: "COMERCIAL" } });
     exigirAcessoBpmCardMock.mockResolvedValue({ autorizado: true });
     carregarCamposAplicaveisCardEtapaMock.mockResolvedValue([campoNulo]);
+    vi.mocked(carregarValoresCanonicosCampos).mockResolvedValue({});
     prismaMock.bpmCard.findUnique.mockResolvedValue(cardNaEtapaAtual());
     prismaMock.checklistCrmVinculo.findUnique.mockResolvedValue(null);
     prismaMock.bpmCard.updateMany.mockResolvedValue({ count: 1 });
@@ -107,6 +109,7 @@ describe("CRM - edição dos campos definidos da etapa", () => {
     prismaMock.bpmCampo.findMany.mockResolvedValue([]);
     prismaMock.bpmCardAnexo.findMany.mockResolvedValue([{ id: "clw0000000000000anex", campoId: CAMPO_ID }]);
     prismaMock.bpmCardHistorico.create.mockResolvedValue({});
+    prismaMock.bpmEventoDominio.create.mockResolvedValue({ id: "evento-fixture" });
     notificarPipelineBpmMock.mockResolvedValue(undefined);
     prismaMock.$transaction.mockImplementation(async (callback) => callback(prismaMock));
   });
@@ -202,6 +205,25 @@ describe("CRM - edição dos campos definidos da etapa", () => {
     });
     expect(prismaMock.bpmCardCampoValor.upsert).toHaveBeenCalledOnce();
     expect(notificarPipelineBpmMock).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { escopo: "CARD", fonteEntidade: null, fonteAtributo: null, chave: "alpha.radar.contrato.rua", anterior: "Rua manual", canonico: "Rua cadastral" },
+    { escopo: "GLOBAL", fonteEntidade: "CLIENTE", fonteAtributo: "nomeFantasia", chave: "alpha.nome.fantasia", anterior: "", canonico: "Nome cadastral" },
+  ])("publica mudança real com o antes efetivo $escopo, preservando override ou limpeza manual", async (caso) => {
+    const campo = { ...campoNulo, ...caso, nome: "Campo cadastral", valor: caso.anterior, obrigatorio: false, editavel: true, somenteLeitura: false };
+    carregarCamposAplicaveisCardEtapaMock.mockResolvedValue([campo]);
+    prismaMock.bpmCampo.findMany.mockResolvedValue([campo]);
+    prismaMock.bpmCardCampoValor.findMany.mockResolvedValue([{ campoId: CAMPO_ID, valor: caso.anterior }]);
+    vi.mocked(carregarValoresCanonicosCampos).mockResolvedValue({ [CAMPO_ID]: caso.canonico });
+    expect(await AtualizarCardBpm({ cardId: CARD_ID, camposValores: { [CAMPO_ID]: caso.canonico }, versaoEsperadaEm: UPDATED_AT })).toMatchObject({ success: true });
+    const eventos = prismaMock.bpmEventoDominio.create.mock.calls
+      .map(([input]) => input.data).filter((evento) => evento.tipo === "CAMPO_ALTERADO");
+    expect(eventos).toHaveLength(1);
+    expect(eventos[0]).toMatchObject({ entidadeId: CAMPO_ID, cardId: CARD_ID, atorTipo: "USUARIO", atorUserId: 7 });
+    expect(JSON.parse(eventos[0].valorAnteriorJson)).toEqual({ campoId: CAMPO_ID, valor: caso.anterior });
+    expect(JSON.parse(eventos[0].valorNovoJson)).toEqual({ campoId: CAMPO_ID, valor: caso.canonico });
+    expect(prismaMock.bpmCardCampoValor.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: { valor: caso.canonico } }));
   });
 
   it("avança a versão do card mesmo quando dois saves acontecem no mesmo milissegundo", async () => {

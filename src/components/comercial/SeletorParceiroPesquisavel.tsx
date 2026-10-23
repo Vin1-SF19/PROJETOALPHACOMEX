@@ -53,6 +53,8 @@ export function SeletorParceiroPesquisavel({
     const [aberto, setAberto] = useState(false);
     const [busca, setBusca] = useState("");
     const inputRef = useRef<HTMLInputElement>(null);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const [portalContainer, setPortalContainer] = useState<HTMLElement | undefined>();
     const listboxId = useId();
     const parceiroSelecionado = parceiros.find((parceiro) => parceiro.id === value);
     const parceirosFiltrados = useMemo(
@@ -70,12 +72,14 @@ export function SeletorParceiroPesquisavel({
         <Popover
             open={aberto}
             onOpenChange={(novoEstado) => {
+                if (novoEstado) setPortalContainer(triggerRef.current?.closest<HTMLElement>('[role="dialog"]') ?? undefined);
                 setAberto(novoEstado);
                 if (!novoEstado) setBusca("");
             }}
         >
             <PopoverTrigger asChild>
                 <button
+                    ref={triggerRef}
                     type="button"
                     role="combobox"
                     aria-expanded={aberto}
@@ -105,15 +109,16 @@ export function SeletorParceiroPesquisavel({
             </PopoverTrigger>
 
             <PopoverContent
+                portalContainer={portalContainer}
                 align="start"
                 sideOffset={6}
                 onOpenAutoFocus={(event) => {
                     event.preventDefault();
                     inputRef.current?.focus();
                 }}
-                className="w-[var(--radix-popover-trigger-width)] min-w-[280px] overflow-hidden rounded-xl border-blue-400/20 bg-[#07111f]/[0.98] shadow-[0_24px_70px_rgba(2,6,23,0.7),0_0_32px_rgba(59,130,246,0.08)]"
+                className="flex max-h-[var(--radix-popover-content-available-height)] w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-xl border-blue-400/20 bg-[#07111f]/[0.98] shadow-[0_24px_70px_rgba(2,6,23,0.7),0_0_32px_rgba(59,130,246,0.08)]"
             >
-                <div className="border-b border-white/10 bg-white/[0.025] p-2.5">
+                <div className="shrink-0 border-b border-white/10 bg-white/[0.025] p-2.5">
                     <div className="flex h-10 items-center gap-2.5 rounded-lg border border-white/10 bg-slate-950/80 px-3 transition-colors focus-within:border-blue-400/50 focus-within:ring-2 focus-within:ring-blue-500/10">
                         <Search size={15} className="shrink-0 text-blue-300" />
                         <input
@@ -151,7 +156,7 @@ export function SeletorParceiroPesquisavel({
                     </p>
                 </div>
 
-                <div id={listboxId} role="listbox" aria-label="Parceiros cadastrados" className="max-h-64 overflow-y-auto p-1.5">
+                <div id={listboxId} role="listbox" aria-label="Parceiros cadastrados" className="max-h-64 min-h-0 overflow-y-auto overscroll-contain p-1.5">
                     {carregando ? (
                         <div role="status" className="flex items-center justify-center gap-2 px-3 py-8 text-xs font-semibold text-slate-500">
                             <Loader2 size={15} className="animate-spin text-blue-300" />

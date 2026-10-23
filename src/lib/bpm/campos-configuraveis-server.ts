@@ -4,11 +4,14 @@ import db from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { fonteCampoPermitida, type EntidadeFonteCampo } from "@/lib/bpm/campos-configuraveis";
 import { ehPipelineOperacional } from "@/lib/bpm/financeiro-config.client";
+import { perfilCadastralSchema } from "@/lib/bpm/dados-empresa-edicao";
+import { ENDERECOS_CADASTRAIS } from "@/lib/bpm/cadastro-campos";
 
 type ClienteCamposCanonicos = typeof db | Prisma.TransactionClient;
 
 export type CampoFonteCanonica = {
   id: string;
+  chave?: string | null;
   escopo: string;
   fonteEntidade: string | null;
   fonteAtributo: string | null;
@@ -31,7 +34,13 @@ export async function carregarValoresCanonicosCampos(
     fonteCampoPermitida(campo.fonteEntidade, campo.fonteAtributo)
     || (!campo.fonteEntidade && (campo.entidadeGlobal ?? "CLIENTE") === "CLIENTE")
   ));
-  if (!globais.length) return {};
+  // O catálogo resolve a identidade dos aliases CARD; nenhum rótulo ou payload define a fonte.
+  const idsEnderecos = campos.filter((campo) => campo.escopo === "CARD" && !campo.fonteEntidade).map((campo) => campo.id);
+  const enderecos = idsEnderecos.length && client.bpmCampo ? await client.bpmCampo.findMany({
+    where: { id: { in: idsEnderecos }, chave: { in: Object.keys(ENDERECOS_CADASTRAIS) } },
+    select: { id: true, chave: true },
+  }) : [];
+  if (!globais.length && !enderecos.length) return {};
 
   const card = await client.bpmCard.findUnique({
     where: { id: cardId },
@@ -58,6 +67,7 @@ export async function carregarValoresCanonicosCampos(
           regimeTributario: true,
           dataConstituicao: true,
           status: true,
+          perfilCadastralJson: true,
           pessoas: {
             where: { ativo: true },
             orderBy: [{ principal: "desc" }, { criadoEm: "asc" }, { id: "asc" }],
@@ -114,6 +124,8 @@ export async function carregarValoresCanonicosCampos(
       : [],
   ]);
   const personalizadoPorCampo = new Map(valoresPersonalizados.map((item) => [item.campoId, item.valor]));
+  const parsedPerfil = perfilCadastralSchema.safeParse(card.empresa.perfilCadastralJson);
+  const cadastro = parsedPerfil.success ? parsedPerfil.data.cadastro : null;
 
   const principais = card.empresa.pessoas.filter((item) => item.principal);
   const contato = principais.length === 1
@@ -130,6 +142,15 @@ export async function carregarValoresCanonicosCampos(
     PROCESSO: processo,
     CARD: { ...card, responsavelNome: card.responsavel?.nome, responsavelCpf: card.responsavel?.cpf },
   };
+  if (cadastro) {
+    // O perfil salvo é explícito: vazio continua vazio. Não escolhemos contatos ambíguos.
+    const emails = [...new Set(cadastro.contatos.filter((c) => c.tipo === "E-mail").map((c) => c.valor))];
+    const telefones = [...new Set(cadastro.contatos.filter((c) => c.tipo === "Telefone").map((c) => c.valor))];
+    contexto.CONTATO = { ...contexto.CONTATO,
+      ...(emails.length <= 1 ? { email: emails[0] ?? null } : {}),
+      ...(telefones.length <= 1 ? { celular: telefones[0] ?? null, telefoneExtra: null } : {}),
+    };
+  }
 
   const valoresVendedor = new Map<string, string>();
   const camposResponsavel = globais.filter((campo) => campo.fonteEntidade === "CARD"
@@ -166,13 +187,18 @@ export async function carregarValoresCanonicosCampos(
     }
   }
 
-  return Object.fromEntries(globais.map((campo) => {
+  const resultado = Object.fromEntries(globais.map((campo) => {
     if (valoresVendedor.has(campo.id)) return [campo.id, valoresVendedor.get(campo.id)!];
     if (!campo.fonteEntidade) return [campo.id, personalizadoPorCampo.get(campo.id) ?? ""];
     const entidade = campo.fonteEntidade as EntidadeFonteCampo;
     const atributo = campo.fonteAtributo as string;
     return [campo.id, serializarCanonico(contexto[entidade]?.[atributo])];
   }));
+  if (cadastro) for (const campo of enderecos) {
+    const atributo = ENDERECOS_CADASTRAIS[campo.chave ?? ""];
+    if (atributo) resultado[campo.id] = cadastro.empresa.endereco[atributo] ?? "";
+  }
+  return resultado;
 }
 
 /** Persiste somente valores globais personalizados. Fontes canônicas continuam

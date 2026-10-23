@@ -1916,6 +1916,12 @@ Checkpoint de implementação: backend 47 PASS/seis arquivos e UI 25 PASS/três 
 - **Estado deste registro:** publicação/homologação staging pendente; banco físico continua o atual. Não houve migração operacional nesta fase; produção não autorizada. Este bloco substitui a descrição anterior de acesso SQL direto do Portal para a nova versão local, sem reescrever o histórico.
 
 
+### 2026-10-23 — CRM: retirada da aba Dossiê RADAR
+Pedido explícito do usuário após avaliação da função: `CardModal/PainelHistorico.tsx` deixa de importar e montar `PainelDossieChecklist` e seu trigger. Demais abas, módulo CheckList, backend e dados preservados. Implementado; gates/revisão final e publicação staging pendentes. Story: `story-crm-remover-aba-dossie-radar-20261023.md`.
+
+**Fechamento local da remoção (2026-10-23, River):** QA APPROVED/GO STAGING; typecheck/lint/build literal PASS e suíte existente 760 arquivos/6.310 PASS, zero falhas/quatro skipped/um todo. Probe/Lens/Sage sem bloqueantes; CodeRabbit ausente com fallback manual. File List final seis caminhos (três deleções de UI, generic de teste preexistente, story/três memórias); sem CheckList/backend/dados alterados. READY/alias e smoke remoto pendentes para DevOps, sem E2E autenticado ou produção.
+
+
 <!-- checklist-templates-excel-20261023-scribe-map -->
 ### 2026-10-23 — Scribe — modelos CheckList com código literal (checkpoint local)
 
