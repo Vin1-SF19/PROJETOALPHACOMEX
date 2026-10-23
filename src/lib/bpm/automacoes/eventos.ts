@@ -4,6 +4,8 @@ import type { Prisma } from "@prisma/client";
 
 import db from "@/lib/prisma";
 import { eventoDominioInputSchema, gatilhoConfigSchema, type TipoEventoAutomacao } from "./central-schemas";
+import { parametrosFinanceiroMovimentoLivre } from "./financeiro-movimento-livre";
+import { motivoBloqueioFinanceiroMovimentoLivre } from "./financeiro-movimento-livre-server";
 import { motivoBloqueioMinutaMovimentoLivre } from "./minuta-movimento-livre-server";
 import { grafoEhMinutaConfigurada, type FiltroAutomacoesCentrais } from "./minuta-movimento-livre";
 
@@ -139,12 +141,17 @@ export async function materializarExecucoesEventosBpm(limite = 100, client: Clie
         if (versao.gatilhoTipo !== "ENTRAR_COLUNA" || !grafoEhMinutaConfigurada(JSON.parse(versao.grafoJson))) continue;
       } catch { continue; }
     }
+    if (filtro?.modo === "FINANCEIRO_MOVIMENTO_LIVRE") {
+      try {
+        if (versao.gatilhoTipo !== "ENTRAR_COLUNA" || !parametrosFinanceiroMovimentoLivre(JSON.parse(versao.grafoJson))) continue;
+      } catch { continue; }
+    }
     const tipoEvento = versao.gatilhoTipo === "ENTRAR_COLUNA" || versao.gatilhoTipo === "SAIR_COLUNA"
       ? "CARD_MOVIDO" : versao.gatilhoTipo === "CAMPO_VALOR_ASSUMIDO" ? "CAMPO_ALTERADO" : versao.gatilhoTipo;
     const eventos = await client.bpmEventoDominio.findMany({
       where: {
         tipo: tipoEvento, cardId: filtro?.cardId ?? { not: null }, pipelineId: versao.automacao.pipelineId,
-        ...(filtro?.modo === "MINUTA_MOVIMENTO_LIVRE" ? { id: filtro.eventoId } : {}),
+        ...(filtro?.modo ? { id: filtro.eventoId } : {}),
         // Uma versão só reage a eventos ocorridos depois de ativada. Sem este
         // corte, criar/editar/religar reprocessava todo o histórico do pipeline.
         ocorridoEm: { gte: versao.ativadaEm ?? versao.createdAt },
@@ -158,7 +165,7 @@ export async function materializarExecucoesEventosBpm(limite = 100, client: Clie
     for (const evento of eventos) {
       if (!evento.cardId) continue;
       // O flush estreito nunca materializa um evento comum por extensão do filtro.
-      if (filtro?.modo === "MINUTA_MOVIMENTO_LIVRE" && (evento.id !== filtro.eventoId || evento.cardId !== filtro.cardId
+      if (filtro?.modo && (evento.id !== filtro.eventoId || evento.cardId !== filtro.cardId
         || parseJson(evento.valorNovoJson).automacoesSuprimidas !== true)) continue;
       avaliados++;
       const repetidaNaCadeia = await client.bpmAutomacaoExecucao.findFirst({
@@ -171,7 +178,9 @@ export async function materializarExecucoesEventosBpm(limite = 100, client: Clie
       });
       const novo = parseJson(evento.valorNovoJson);
       const bloqueioMinuta = novo.automacoesSuprimidas === true
-        ? await motivoBloqueioMinutaMovimentoLivre(evento, versao, client) : null;
+        ? novo.permitirEncaminhamentoFinanceiroConfigurado === true && parametrosFinanceiroMovimentoLivre(parseJson(versao.grafoJson))
+          ? await motivoBloqueioFinanceiroMovimentoLivre(evento, versao, client)
+          : await motivoBloqueioMinutaMovimentoLivre(evento, versao, client) : null;
       const corresponde = !bloqueioMinuta && correspondeAoGatilho({
         gatilhoTipo: versao.gatilhoTipo, configJson: versao.gatilhoConfigJson, eventoTipo: evento.tipo,
         eventoNovo: novo, eventoAnterior: parseJson(evento.valorAnteriorJson), etapaAutomacaoId: versao.automacao.etapaId,

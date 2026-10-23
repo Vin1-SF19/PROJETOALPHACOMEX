@@ -2,8 +2,8 @@
 import React, { act, createElement as h, type ComponentProps } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-const api = vi.hoisted(() => ({ obter: vi.fn(), enviar: vi.fn(), repetir: vi.fn(), card: vi.fn(), flush: vi.fn(), success: vi.fn(), error: vi.fn() }));
-vi.mock("@/actions/bpm/Encaminhamentos", () => ({ ObterEncaminhamentosCardBpm: api.obter, SolicitarEncaminhamentoCardBpm: api.enviar, RepetirEncaminhamentoCardBpm: api.repetir }));
+const api = vi.hoisted(() => ({ obter: vi.fn(), recuperar: vi.fn(), enviar: vi.fn(), repetir: vi.fn(), card: vi.fn(), flush: vi.fn(), success: vi.fn(), error: vi.fn() }));
+vi.mock("@/actions/bpm/Encaminhamentos", () => ({ ObterEncaminhamentosCardBpm: api.obter, RecuperarEncaminhamentoFinanceiroCardBpm: api.recuperar, SolicitarEncaminhamentoCardBpm: api.enviar, RepetirEncaminhamentoCardBpm: api.repetir }));
 vi.mock("@/actions/bpm/Cards", () => ({ ObterCardBpm: api.card }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext", () => ({ useCardSave: () => ({ flushSaves: api.flush }) }));
 vi.mock("sonner", () => ({ toast: { success: api.success, error: api.error } }));
@@ -51,4 +51,36 @@ it("retentativa aponta só para a execução falha; destino já enviado só abre
   await act(async () => botao("Tentar este envio novamente").click());
   await act(async () => botao("Confirmar encaminhamento").click());
   expect(api.repetir).toHaveBeenCalledExactlyOnceWith({ cardId: "origem", execucaoId: "execucao-1" }); expect(api.enviar).not.toHaveBeenCalled();
+});
+
+it("recupera Financeiro automaticamente sem clique, confirmação ou repetição em loop", async () => {
+  const automatica = { ...regra, automaticoFinanceiro: true, destinoPipeline: { id: "fin", nome: "Financeiro" } };
+  api.obter.mockResolvedValue({ success: true, data: { regras: [automatica] } });
+  api.recuperar.mockResolvedValue({ success: true, data: { existente: false, cardDestinoId: "destino" } });
+  await montar();
+  expect(api.recuperar).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ cardId: "origem", versaoEsperada: 7 }));
+  expect(api.enviar).not.toHaveBeenCalled(); expect(api.success).toHaveBeenCalledTimes(1);
+  expect(document.body.textContent).not.toContain("Confirmar encaminhamento");
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
+  expect(api.recuperar).toHaveBeenCalledTimes(1);
+});
+it("falha automática fica visível sem ciclo de reenvio nem sucesso falso", async () => {
+  api.obter.mockResolvedValue({ success: true, data: { regras: [{ ...regra, automaticoFinanceiro: true }] } });
+  api.recuperar.mockResolvedValue({ success: false, error: "Condição não atendida" });
+  await montar();
+  expect(api.recuperar).toHaveBeenCalledTimes(1); expect(api.success).not.toHaveBeenCalled();
+  expect(host.textContent).toContain("Condição não atendida");
+});
+
+it("erro automático seguido de retry conserva a ação restrita", async () => {
+  api.obter.mockResolvedValue({ success: true, data: { regras: [{ ...regra, automaticoFinanceiro: true }] } });
+  api.recuperar.mockResolvedValue({ success: false, error: "Condição não atendida" }); await montar();
+  await act(async () => botao("Encaminhar para Operacional").click());
+  await act(async () => botao("Confirmar encaminhamento").click());
+  expect(api.recuperar).toHaveBeenCalledTimes(2); expect(api.enviar).not.toHaveBeenCalled();
+});
+it("falha automática persistida mantém recuperação disponível após reabrir", async () => {
+  api.obter.mockResolvedValue({ success: true, data: { regras: [{ ...regra, automaticoFinanceiro: true, estado: "FALHOU", podeEnviar: false, podeRepetir: true, execucaoId: "execucao" }] } });
+  await montar(); expect(botao("Tentar este envio novamente")).toBeDefined();
+  expect(api.recuperar).not.toHaveBeenCalled(); expect(api.repetir).not.toHaveBeenCalled();
 });

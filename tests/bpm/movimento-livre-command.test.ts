@@ -73,7 +73,7 @@ vi.mock("@/lib/bpm/regras/contexto", () => ({ montarContextoAvaliacaoDoCard: vi.
 vi.mock("@/lib/bpm/regras/guarda-movimento", () => ({ obterErroRegrasParaMovimento: vi.fn(async () => f.active().erroRegra) }));
 vi.mock("@/lib/bpm/checklists/integracao", () => ({ obterErroChecklistParaMovimento: vi.fn(async () => null), carregarResumoChecklistAplicavelCard: vi.fn(async () => f.active().checklist) }));
 vi.mock("@/lib/bpm/automacoes/eventos", () => ({ publicarEventoBpm: f.publish }));
-vi.mock("@/lib/bpm/automacoes/orquestrador", () => ({ executarMinutaMovimentoLivreAgora: vi.fn(async () => ({})) }));
+vi.mock("@/lib/bpm/automacoes/orquestrador", () => ({ executarMinutaMovimentoLivreAgora: vi.fn(async () => ({})), executarFinanceiroMovimentoLivreAgora: vi.fn(async () => ({})) }));
 vi.mock("@/lib/bpm/automacoes/fila", () => ({ enfileirarAutomacoesMovimentoBpm: vi.fn(async () => ({})) }));
 vi.mock("@/lib/bpm/sla", () => ({ sincronizarSlaMovimentoBpm: vi.fn(async () => ({})) }));
 vi.mock("@/lib/bpm/cadencias/ativacao-automatica", () => ({ ativarCadenciasNaEntradaBpm: vi.fn(async () => ({})) }));
@@ -201,4 +201,16 @@ describe("movimentação livre administrativa e de liderança", () => {
     expect(processarCadenciasImediatasDoCardBpm).not.toHaveBeenCalled();
   });
 
+});
+
+
+it("marca no evento e histórico somente fechamento comercial livre e chama flush restrito", async () => {
+  f.state.autoridade = { tipo: "ADMIN", setor: null };
+  f.state.card.pipeline.nome = "Revisão de Radar";
+  f.state.destino.nome = "Contrato fechado"; f.state.destino.chave = "fechado";
+  expect(await executarTransicaoBpm(input())).toMatchObject({ success: true });
+  expect(JSON.parse(f.state.eventos[0].valorNovoJson)).toMatchObject({ permitirEncaminhamentoFinanceiroConfigurado: true, automacoesSuprimidas: true });
+  expect(JSON.parse(f.state.historicos[0].valorNovoJson)).toMatchObject({ permitirEncaminhamentoFinanceiroConfigurado: true });
+  const { executarFinanceiroMovimentoLivreAgora } = await import("@/lib/bpm/automacoes/orquestrador");
+  expect(executarFinanceiroMovimentoLivreAgora).toHaveBeenCalledWith("card", "event");
 });

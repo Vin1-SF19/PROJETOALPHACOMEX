@@ -1,7 +1,8 @@
 import { validarGrafoAutomacao } from "./central-schemas";
 
 export type EscopoMinutaMovimentoLivre = { modo: "MINUTA_MOVIMENTO_LIVRE"; cardId: string; eventoId: string };
-export type FiltroAutomacoesCentrais = { cardId?: string; modo?: never } | EscopoMinutaMovimentoLivre;
+export type EscopoFinanceiroMovimentoLivre = { modo: "FINANCEIRO_MOVIMENTO_LIVRE"; cardId: string; eventoId: string };
+export type FiltroAutomacoesCentrais = { cardId?: string; modo?: never } | EscopoMinutaMovimentoLivre | EscopoFinanceiroMovimentoLivre;
 
 /** A exceção autoriza o fluxo inteiro, nunca um nó extraído de outro fluxo. */
 export function grafoEhMinutaConfigurada(valor: unknown): boolean {
