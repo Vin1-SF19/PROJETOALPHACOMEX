@@ -15,3 +15,5 @@ export {
 } from './primitives';
 
 import './crm-visual.css';
+import './crm-tema-paleta.css';
+import './crm-tema.css';

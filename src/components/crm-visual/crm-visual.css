@@ -27,13 +27,21 @@
   --crm-shadow-lift: 0 1px 0 0 rgba(255, 255, 255, 0.05) inset,
     0 22px 48px -18px rgba(0, 0, 0, 0.65), 0 8px 16px -6px rgba(0, 0, 0, 0.45);
   --crm-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --crm-fundo-base: linear-gradient(180deg, #050b16, #020617);
 }
 
-/* ── Fundo ambiental: backgroundCRM + overlay escuro para legibilidade ── */
+.crm-scope.crm-fundo-base {
+  background: var(--crm-fundo-base);
+}
+
+/* ── Fundo ambiental: imagem do tema + overlay para legibilidade ──
+ * As duas camadas ficam montadas; o tema ativo (crm-tema.css) define qual aparece.
+ * O overlay de cada tema mora no ::after da própria camada, assim faz crossfade junto
+ * (gradientes não interpolam por transition). */
 .crm-bg-media {
   position: absolute;
   inset: 0;
-  background-image: url("/backgroundCRM.png");
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -42,18 +50,36 @@
     calc(var(--mouse-y, 0) * 1px),
     0
   ) scale(1.04);
-  transition: transform 600ms var(--crm-ease);
-  will-change: transform;
+  transition: transform 600ms var(--crm-ease), opacity 900ms var(--crm-ease),
+    filter 900ms var(--crm-ease), scale 900ms var(--crm-ease);
+  will-change: transform, opacity;
 }
-
-.crm-bg-overlay {
+.crm-bg-media--escuro {
+  background-image: url("/backgroundEscuroCRM.png");
+}
+.crm-bg-media--claro {
+  background-image: url("/backgroundClaroCRM.png");
+  opacity: 0;
+}
+.crm-bg-media::after {
+  content: "";
   position: absolute;
   inset: 0;
+}
+.crm-bg-media--escuro::after {
   background: linear-gradient(
     180deg,
-    rgba(3, 9, 20, 0.55) 0%,
-    rgba(3, 9, 20, 0.72) 45%,
-    rgba(3, 9, 20, 0.82) 100%
+    rgba(3, 9, 20, 0.45) 0%,
+    rgba(3, 9, 20, 0.62) 45%,
+    rgba(3, 9, 20, 0.76) 100%
+  );
+}
+.crm-bg-media--claro::after {
+  background: linear-gradient(
+    180deg,
+    rgba(248, 250, 252, 0.3) 0%,
+    rgba(248, 250, 252, 0.48) 45%,
+    rgba(241, 245, 249, 0.62) 100%
   );
 }
 

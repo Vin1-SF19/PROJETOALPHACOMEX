@@ -127,7 +127,7 @@ export default function AtribuirResponsavelPromocaoModal({
 
         <div className="flex gap-2 p-5 border-t border-white/5">
           <button type="button" onClick={onCancelar} disabled={confirmando} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm text-slate-400 hover:text-white disabled:opacity-50">Cancelar</button>
-          <button type="button" onClick={handleConfirmar} disabled={confirmando} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50" style={{ background: `rgba(${accent},0.85)` }}>
+          <button type="button" onClick={handleConfirmar} disabled={confirmando} className="crm-tema-fixo flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50" style={{ background: `rgba(${accent},0.85)` }}>
             {confirmando ? "Promovendo..." : "Assumir e mover"}
           </button>
         </div>

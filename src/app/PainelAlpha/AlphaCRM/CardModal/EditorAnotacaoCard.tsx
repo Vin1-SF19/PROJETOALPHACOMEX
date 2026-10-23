@@ -89,7 +89,7 @@ export function EditorAnotacaoCard({
             type="button"
             onClick={() => void salvarAnotacao()}
             disabled={!podeEditar || salvandoAnotacao || !anotacao.trim()}
-            className="rounded-lg px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+            className="crm-tema-fixo rounded-lg px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
             style={{ background: `rgb(${accent})` }}
           >
             Salvar

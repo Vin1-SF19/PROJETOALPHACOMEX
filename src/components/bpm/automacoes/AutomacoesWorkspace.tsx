@@ -286,7 +286,7 @@ export function AutomacoesWorkspace({ pipelines, catalogos, templates, erro, acc
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={15} />
             <Input value={busca} onChange={(event) => setBusca(event.target.value)} placeholder="Buscar pipeline, coluna ou automação" className="pl-9" />
           </div>
-          <Button onClick={() => setEditor({ mode: "create" })} disabled={pipelines.length === 0} style={{ background: `rgb(${accent})` }}>
+          <Button onClick={() => setEditor({ mode: "create" })} disabled={pipelines.length === 0} className="crm-tema-fixo" style={{ background: `rgb(${accent})` }}>
             <Plus size={16} /> Nova automação
           </Button>
         </div>
