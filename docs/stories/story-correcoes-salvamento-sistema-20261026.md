@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — conjunto final Tarefas/Notas/anotação com quatro gates aprovados e revisão de código concluída. Publicação conjunta e três retestes dirigidos pendentes.
+Ready for Review — árvore integrada com staging vigente e quatro gates aprovados; publicação conjunta e três retestes dirigidos pendentes.
 
 ## Executor Assignment
 
@@ -178,6 +178,7 @@ Relatório de tratamento por achado: [correções de salvamento](../reports/corr
 - `docs/qa/evidencias/auditoria-salvamento-20261026/typecheck.log.gz`
 - `docs/qa/evidencias/auditoria-salvamento-20261026/vitest.config.ts`
 - `docs/qa/evidencias/correcoes-salvamento-20261026/gates-conjunto-final.json`
+- `docs/qa/evidencias/correcoes-salvamento-20261026/gates-integracao-staging.json`
 - `docs/qa/evidencias/correcoes-salvamento-20261026/gates-pos-homologacao-tarefas.json`
 - `docs/qa/evidencias/correcoes-salvamento-20261026/gates.json`
 - `docs/qa/homologacao-c01-20261026/survey.json`
@@ -261,6 +262,7 @@ Relatório de tratamento por achado: [correções de salvamento](../reports/corr
 - `tests/notas/salvamento-actions.test.ts`
 - `tests/notas/salvamento-concorrente.test.ts`
 - `tests/notas/salvamento-realm-rascunhos.test.ts`
+- `tests/operacional/vincular-empresa.test.ts`
 - `tests/salvamento-legados/actions.test.ts`
 - `tests/salvamento-legados/sqlite.test.ts`
 - `tests/salvamento-legados/ui.test.ts`
@@ -269,7 +271,7 @@ Relatório de tratamento por achado: [correções de salvamento](../reports/corr
 
 ### Revisão independente do candidato — Quinn, 26/10/2026
 
-**APPROVED — código e gates conjuntos para publicação em staging.** Os sete arquivos congelados das correções de Tarefas, identidade de Notas e intenção de anotação CRM foram revistos e passaram em lint, typecheck, suíte completa, build e typecheck pós-build. QA conferiu todos os hashes do ledger sem divergência. Os três achados permanecem aguardando os retestes dirigidos no novo READY/alias; não se infere essa homologação dos percursos antigos. Produção permanece fora do escopo.
+**APPROVED — código e gates da árvore integrada para publicação em staging; fechamento de UI pendente.** A revisão dos contratos de integração e dos oito arquivos congelados não encontrou bloqueadores; lint, suíte completa, build staging e tipos pós-build passaram. A homologação final dos três achados conhecidos depende do novo READY e dos retestes dirigidos. Esta aprovação não autoriza produção nem afirma homologação de todos os perfis/etapas pela UI.
 
 - **P1 — CRM, isolamento entre instâncias — corrigido:** `persistDrafts`/`setDraft` regravava o mapa local inteiro na chave do usuário. Reproduzido com dois providers da mesma conta: A mantém um envio antigo, B grava um rascunho novo na mesma chave, a confirmação de A removia também o rascunho de B. Evidência inicial: `/tmp/alpha-qa-cross-provider-repro.log`. Executor adicionou token por edição, merge por chave, remoção por ownership e modo `sync` para confirmações/metadados. Regressão permanente em `tests/bpm/rascunhos-crm-abas-react.test.ts`; revisão independente com dois outros arquivos de CRM: **3 arquivos/27 casos aprovados**, `/tmp/alpha-qa-s07-independent.log`. Correção verificada também no provider integrado do candidato.
 - **P1 — Blueprint, resposta antiga regravava rascunho de outra instância:** corrigido pelo executor com token por edição e comparação de token/revisão/conteúdo/identidade/base antes de regravar metadados ou remover a cópia local. Regressões incluem A → A2 → B, sucesso de A e conflito de A2, além de colisões de conteúdo/revisão com token ou versão distintos. Correção revisada na raiz e confirmada no código e nos testes do candidato integrado.
@@ -368,6 +370,38 @@ Correção revisada: toda mudança real `textoRef.current !== texto` cria uma no
 | Typecheck final depois do build/restauração | Exit 0 | `final-combined-typecheck-final.log` |
 
 Esta aprovação de código/gates permite publicar o pacote no staging autorizado. O fechamento funcional dos três achados ainda depende do novo READY e dos retestes dirigidos: mesma tarefa fictícia, smoke de Nota com UUID/limpeza de rascunho e cenário de anotação A pausada → fechar/reabrir → editar B → liberar A → salvar B → nova leitura. Nenhum browser/teste de QA será iniciado antes da liberação do novo release.
+
+### Integração do avanço remoto de auth/DB
+
+O pré-push detectou `origin/staging` em `4d949d4c4a6644303885e907b1af86b88a4c4284`, descendente do release `fb0e8546...`, com 158 caminhos de infraestrutura de sessão/DB. O push foi bloqueado corretamente; não houve force-push nem substituição do trabalho remoto. O merge normal resultou na árvore integrada `8e7a0cbb`, sobre checkpoint seletivo, com os sete hashes dos fixes invariantes e sem delta de schema, migrations, dependências ou configuração de compilação frente ao novo remoto.
+
+**Revisão de integração concluída, limitada aos contratos que cruzam esta entrega:** os quatro overlaps estão idênticos ao remoto. `Anexos.ts` propaga indisponibilidade de autenticação antes do catch genérico; a fila captura rejeição, mantém o upload/rascunho e só limpa pendências depois da confirmação. TarefaC/SG adicionam null-guards nos rótulos de sessão, sem mudar handlers/validação. O layout distingue sessão indisponível de acesso negado antes de montar o painel; mantém validação de ID/status e `PainelCardState key={userId} userId={userId}` nas duas variantes embedded/main, preservando o namespace de recuperação. O guard C01 permanece. Nenhum novo bloqueador foi encontrado nesses contratos; não se apresenta esta revisão limitada como auditoria integral da infraestrutura remota.
+
+Novos gates sequenciais da árvore integrada são obrigatórios (`remote-integrated-gates-status.json`, logs `remote-integrated-*`). Os resultados anteriores continuam rastreados ao snapshot que aprovaram; não são atribuídos automaticamente ao código remoto recém-integrado. Nenhum navegador ou escritor ficou ativo durante esta rodada. Após os gates e READY exatos, permanecem somente os retestes dirigidos dos três achados conhecidos, sem expansão de escopo.
+
+
+A primeira suíte integrada terminou com nove falhas na fixture remota de autenticação: o runner sem segredos deixou `AUTH_SECRET` ausente e a geração de JWT falhou em HKDF. Os outros 803 arquivos/6.691 casos passaram; essa rodada permanece **FAIL**, preservada em `remote-integrated-test.log` e `remote-integrated-gates-status.json`. A fixture isolada passou 17/17 com um segredo exclusivamente sintético no processo Vitest, sem credenciais remotas, alteração de fonte/configuração/asserts ou uso desse valor no build/deploy. A nova suíte com esse ambiente eliminou as falhas de autenticação, porém terminou com um único `beforeAll` de `tests/operacional/vincular-empresa.test.ts` excedendo 30 s na criação da fixture Checklist. Foram 803 arquivos/6.689 casos aprovados, 15 skipped (11 não executados por esse hook + 4 preexistentes) e 1 todo; **FAIL** preservado em `remote-integrated-final-test.log`. Nenhum assert falhou nesse arquivo, mas isso não conta como execução dos onze casos. O mesmo arquivo isolado, com o hook original de 30 s, passou 11/11 em 5,22 s. A inspeção confirmou setup exclusivamente local: diretório temporário, DDL gerado pelo Prisma a partir do schema, SQLite sintético e seed de oito usuários fictícios, sem dotenv/URL remota. O limite era argumento explícito do `beforeAll`; a CLI não o substituiria. Por decisão registrada do responsável, somente esse limite de setup será alterado de 30 para 60 s e documentado como oitavo arquivo de infraestrutura de testes; asserts, casos, seed e deadlines do produto permanecem. A QA revisará esse delta e ainda exige uma rodada completa aprovada, preservando as duas falhas anteriores.
+
+
+QA revisou o commit local `fd603144caa660eb8fdf9ab1216a781acf08603e`: o delta desse oitavo arquivo é exclusivamente comentário e argumento explícito do `beforeAll` de 30.000 para 60.000 ms. Asserts/casos/seed e todos os limites do produto continuam iguais. Os oito SHA-256 foram comparados com `integrated-final-freeze-eight.json`, sem divergência; os sete fixes anteriores permanecem invariantes. **Ajuste de infraestrutura aprovado**, condicionado aos novos gates completos da árvore integrada; isso não fecha os retestes de UI pendentes.
+
+
+### Parecer pré-publicação da árvore integrada
+
+**APPROVED para publicar em staging o snapshot `fd603144caa660eb8fdf9ab1216a781acf08603e`**, árvore `015d88e6ef8878d6157ac4ba70a20b40e27aab29`, integrada ao remoto `4d949d4c4a6644303885e907b1af86b88a4c4284`. Ledger final `remote-integrated-ready-gates-status.json`, `result: PASS`, sem processo ativo. QA conferiu os oito hashes do freeze, preservação dos contratos revisados e ausência de delta de schema/migrations/dependências/arquivos de compilação frente ao novo remoto. Os resultados conjuntos anteriores não substituíram esta rodada integrada.
+
+| Gate integrado final | Resultado | Evidência |
+| --- | --- | --- |
+| `npm run lint` | Exit 0; 0 erros, 1.172 avisos | `remote-integrated-ready-lint.log` |
+| `npm test -- --maxWorkers=1 --testTimeout=15000` | Exit 0; **804 arquivos/6.700 aprovados**, 4 skipped e 1 todo; 333,79 s | `remote-integrated-ready-test.log` |
+| Build staging por loader conferido | Exit 0; 86 páginas; arquivos gerados restaurados | `remote-integrated-ready-build.log` |
+| `npm run typecheck` pós-build | Exit 0 | `remote-integrated-ready-typecheck-final.log` |
+
+Os logs e ledger privados ficam em `/tmp/alpha-salvamento-stage-20261026/`; o resumo versionado está em [gates da integração](../qa/evidencias/correcoes-salvamento-20261026/gates-integracao-staging.json). O ambiente Vitest usa somente segredo de autenticação sintético para a fixture remota nova; banco/credenciais reais foram removidos do job, e o build usa ambiente distinto sem esse valor sintético. A alteração explícita do único setup SQLite de 30 para 60 s, a CLI de caso em 15 s, os dois FAIL anteriores e os diagnósticos isolados continuam registrados acima; não são apresentados como testes aprovados com os limites originais.
+
+O manifesto curado agora contém **103 caminhos**. Na conferência anterior a esta edição documental, os outros 102 hashes coincidiam; apenas a story divergia devido à seção QA, devendo o executor regenerar seu hash depois deste parecer. A varredura delimitada não encontrou caminhos de ambiente/banco/backups/sessões privadas, chaves privadas nem JWTs no pacote. Os contadores anteriores de 89/90 caminhos descrevem snapshots históricos e não o pacote integrado atual. A classificação dos 114 achados de dependências permanece débito preexistente, pois o grafo não mudou; não há `npm audit PASS` nem aprovação de segurança por essa ausência de delta.
+
+Continuam **pendentes de confirmação funcional no novo release**: edição/releitura da mesma tarefa fictícia; smoke da Nota confirmando UUID e limpeza da revisão própria; anotação A pausada → fechar/reabrir → editar B → liberar A → salvar B → nova leitura. Os scripts estão preparados e só serão executados após READY/alias do novo SHA e validação da sessão normal. Nenhum browser/escritor de QA competiu com estes gates. Não se encerra P1/P2 apenas com esta aprovação de código.
 
 ## Change Log
 
