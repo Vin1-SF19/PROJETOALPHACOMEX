@@ -12,6 +12,16 @@ import {
   paginaAlertasTarefasBpmSchema, urlCardAlertaBpm, type AlertaTarefaBpm,
 } from "@/lib/bpm/notificacoes-tarefas";
 
+class ErroTemporarioAlertas extends Error {
+  constructor(readonly esperaMs = 0) { super("Alertas temporariamente indisponíveis"); }
+}
+
+function esperaRetryAfter(valor: string | null): number {
+  if (!valor?.trim()) return 0;
+  const espera = /^\d+$/.test(valor.trim()) ? Number(valor) * 1000 : Date.parse(valor) - Date.now();
+  return Number.isFinite(espera) ? Math.max(0, Math.min(300000, espera)) : 0;
+}
+
 export function useBpmTarefasNotifications(usuarioId: number, abrirModulo: (url: string, label: string) => void) {
   const abrirRef = useRef(abrirModulo);
   useEffect(() => { abrirRef.current = abrirModulo; }, [abrirModulo]);
@@ -27,8 +37,10 @@ export function useBpmTarefasNotifications(usuarioId: number, abrirModulo: (url:
     const limparToasts = () => { for (const id of toastIds) toast.dismiss(id); toastIds.clear(); };
     let carregando = false;
     let atualizarDepois = false;
+    let falhasTemporarias = 0;
+    let proximaTentativaEm = 0;
     async function atualizar() {
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || Date.now() < proximaTentativaEm) return;
       if (carregando) { atualizarDepois = true; return; }
       carregando = true;
       try {
@@ -36,11 +48,22 @@ export function useBpmTarefasNotifications(usuarioId: number, abrirModulo: (url:
         let cursor: string | null = null;
         const cursores = new Set<string>();
         do {
-          const response = await fetch(`/api/bpm/tarefas/alertas${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
-            { cache: "no-store", signal: controller.signal });
+          let response: Response;
+          try {
+            response = await fetch(`/api/bpm/tarefas/alertas${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+              { cache: "no-store", signal: controller.signal });
+          } catch (error) {
+            if (controller.signal.aborted) throw error;
+            throw new ErroTemporarioAlertas();
+          }
           if (response.status === 401 || response.status === 403) {
+            falhasTemporarias = 0;
+            proximaTentativaEm = 0;
             if (!controller.signal.aborted) { store.getState().sincronizar(usuarioId, []); limparToasts(); }
             return;
+          }
+          if ([408, 429, 500, 502, 503, 504].includes(response.status)) {
+            throw new ErroTemporarioAlertas(esperaRetryAfter(response.headers?.get("Retry-After") ?? null));
           }
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const pagina = paginaAlertasTarefasBpmSchema.parse(await response.json());
@@ -50,6 +73,8 @@ export function useBpmTarefasNotifications(usuarioId: number, abrirModulo: (url:
           if (cursor) cursores.add(cursor);
         } while (cursor && !controller.signal.aborted);
         if (controller.signal.aborted) return;
+        falhasTemporarias = 0;
+        proximaTentativaEm = 0;
         const idsAtivos = new Set(alertas.map((alerta) => `bpm-alerta:${usuarioId}:${alerta.id}`));
         for (const id of toastIds) if (!idsAtivos.has(id)) { toast.dismiss(id); toastIds.delete(id); }
         for (const alerta of store.getState().sincronizar(usuarioId, alertas)) {
@@ -66,7 +91,13 @@ export function useBpmTarefasNotifications(usuarioId: number, abrirModulo: (url:
           });
         }
       } catch (error) {
-        if (!controller.signal.aborted) console.error("[BpmTarefas/notificacoes]", error);
+        if (!controller.signal.aborted) {
+          if (error instanceof ErroTemporarioAlertas) {
+            falhasTemporarias = Math.min(falhasTemporarias + 1, 5);
+            proximaTentativaEm = Date.now() + Math.max(error.esperaMs, Math.min(300000, 30000 * 2 ** (falhasTemporarias - 1)));
+            if (falhasTemporarias === 1) console.warn("[BpmTarefas/notificacoes] Alertas temporariamente indisponíveis; nova tentativa automática.");
+          } else console.error("[BpmTarefas/notificacoes]", error);
+        }
       } finally {
         carregando = false;
         if (atualizarDepois && !controller.signal.aborted) { atualizarDepois = false; void atualizar(); }
