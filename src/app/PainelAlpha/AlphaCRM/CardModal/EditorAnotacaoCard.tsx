@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, MessageSquareText } from "lucide-react";
 import { toast } from "sonner";
 
 import { CriarInteracaoCardBpm, type ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
+import { useCardSave } from "./CardSaveContext";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
@@ -25,32 +26,68 @@ export function EditorAnotacaoCard({
   podeEditar,
   onInteracaoCriada,
 }: EditorAnotacaoCardProps) {
-  const [anotacao, setAnotacao] = useState("");
+  const { getDraft, setDraft, setPendingFields, registerSave, registerManualSave } = useCardSave();
+  const draftKey = `${card.id}:anotacao`;
+  const [anotacao, setAnotacao] = useState(() => getDraft(draftKey)?.texto ?? "");
+  const textoRef = useRef(anotacao);
+  const requestId = useRef(getDraft(draftKey)?.requestId ?? crypto.randomUUID());
+  const ultimoEnvio = useRef<{ texto: string; requestId: string } | null>(null);
+  const enviandoRef = useRef<Promise<boolean> | null>(null);
   const [salvandoAnotacao, setSalvandoAnotacao] = useState(false);
 
-  async function salvarAnotacao() {
-    if (!podeEditar || salvandoAnotacao || !anotacao.trim()) return;
-    setSalvandoAnotacao(true);
-    try {
-      const res = await CriarInteracaoCardBpm({
-        cardId: card.id,
-        tipo: "ANOTACAO",
-        observacoes: anotacao.trim(),
-      });
-
-      if (res.success && res.data) {
-        toast.success("Anotação salva");
-        onInteracaoCriada(res.data as unknown as Interacao);
-        setAnotacao("");
-      } else {
-        toast.error(typeof res.error === "string" ? res.error : "Erro ao salvar anotação");
-      }
-    } catch {
-      toast.error("Erro ao salvar anotação");
-    } finally {
-      setSalvandoAnotacao(false);
+  function alterarAnotacao(texto: string) {
+    if (ultimoEnvio.current && ultimoEnvio.current.texto !== texto && !enviandoRef.current) {
+      requestId.current = crypto.randomUUID();
+      ultimoEnvio.current = null;
     }
+    textoRef.current = texto;
+    setAnotacao(texto);
+    setDraft(draftKey, texto.trim() ? { texto, requestId: requestId.current } : undefined);
+    setPendingFields(draftKey, texto.trim() ? [{ label: "Anotação", after: texto }] : []);
   }
+  function salvarAnotacao(): Promise<boolean> {
+    if (enviandoRef.current) return enviandoRef.current;
+    if (!textoRef.current.trim()) return Promise.resolve(true);
+    if (!podeEditar) return Promise.resolve(false);
+    const texto = textoRef.current;
+    const intencao = requestId.current;
+    ultimoEnvio.current = { texto, requestId: intencao };
+    setSalvandoAnotacao(true);
+    const promise = registerSave(async () => {
+      try {
+        const res = await CriarInteracaoCardBpm({ cardId: card.id, tipo: "ANOTACAO", observacoes: texto.trim(), idempotencyKey: intencao });
+        if (!res.success || !res.data) {
+          toast.error(typeof res.error === "string" ? res.error : "Erro ao salvar anotação");
+          return false;
+        }
+        const rascunhoAtual = getDraft(draftKey);
+        if (textoRef.current === texto && rascunhoAtual?.texto === texto && rascunhoAtual.requestId === intencao) {
+          textoRef.current = "";
+          requestId.current = crypto.randomUUID();
+          setAnotacao("");
+          setDraft(draftKey);
+          setPendingFields(draftKey, []);
+        }
+        onInteracaoCriada(res.data as unknown as Interacao);
+        toast.success("Anotação salva");
+        return true;
+      } catch {
+        toast.error("Não foi possível salvar a anotação. Seu rascunho foi preservado.");
+        return false;
+      }
+    }, card.id, draftKey).finally(() => {
+      enviandoRef.current = null;
+      setSalvandoAnotacao(false);
+    });
+    enviandoRef.current = promise;
+    return promise;
+  }
+  const salvarRef = useRef(salvarAnotacao);
+  useEffect(() => { salvarRef.current = salvarAnotacao; });
+  useEffect(() => registerManualSave(card.id, draftKey, () => salvarRef.current()), [card.id, draftKey, registerManualSave]);
+  useEffect(() => {
+    setPendingFields(draftKey, textoRef.current.trim() ? [{ label: "Anotação", after: textoRef.current }] : []);
+  }, [draftKey, setPendingFields]);
 
   return (
     <details
@@ -76,7 +113,7 @@ export function EditorAnotacaoCard({
           className={`${inputCls} min-h-24 resize-none`}
           placeholder="Registre uma anotação sobre este contato..."
           value={anotacao}
-          onChange={(event) => setAnotacao(event.target.value)}
+          onChange={(event) => alterarAnotacao(event.target.value)}
           disabled={!podeEditar || salvandoAnotacao}
         />
         <div className="mt-3 flex items-center justify-end gap-3">

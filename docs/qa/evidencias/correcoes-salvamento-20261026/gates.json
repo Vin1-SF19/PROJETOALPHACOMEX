@@ -1,0 +1,76 @@
+{
+  "at": "2026-10-26T17:34:46.518861+00:00",
+  "initialBase": "aca95ddb402da03a5d58b7833a04bd99b018e537",
+  "currentBase": "b115dd3802485e9b0a049f2a45a5010db77338b5",
+  "branch": "auto-claude/correcoes-salvamento-sistema-20261026",
+  "environment": "staging",
+  "origin": "https://staging.alpha-comex.com",
+  "customEnvironmentId": "env_sKT0JOh0HB03g20jmcqN5pTHMjqT",
+  "databaseFingerprint": "7fdd160737ba",
+  "gates": {
+    "lint": {
+      "command": "npm run lint",
+      "exit": 0,
+      "errors": 0,
+      "warnings": 1172
+    },
+    "typecheck": {
+      "command": "npm run typecheck",
+      "exit": 0
+    },
+    "test": {
+      "command": "npm test -- --maxWorkers=1 --testTimeout=15000",
+      "exit": 0,
+      "files": 795,
+      "passed": 6631,
+      "skipped": 4,
+      "todo": 1,
+      "durationSeconds": 374.71,
+      "coverage": {
+        "statements": 70.93,
+        "branches": 64.53,
+        "functions": 78.48,
+        "lines": 74.47
+      },
+      "runnerNote": "Dedicated temporary directory and npm cache; 15s test budget justified by repeated synthetic backup restores. Explicit hook30s limits and every assertion/case unchanged."
+    },
+    "build": {
+      "command": "npm run build via loader with verified staging environment",
+      "exit": 0,
+      "pages": 86,
+      "generatedConfigRestored": true,
+      "outputResolution": "Isolated dependency snapshot for compiler and prerender"
+    }
+  },
+  "audit": {
+    "status": "preexisting-debt",
+    "total": 114,
+    "critical": 10,
+    "high": 45,
+    "moderate": 58,
+    "low": 1,
+    "dependencyManifestAndLockChanged": false
+  },
+  "review": {
+    "openCodeFindings": 0,
+    "codeRabbit": "not installed; independent manual review performed"
+  },
+  "priorAttempts": {
+    "legacyGoogleMeetMocks": "Added missing provider APIs only; original assertions kept",
+    "testWatchdogAndStorage": "Default test attempt failed at 5s; 298 suites also failed when inherited /var/tmp filesystem filled. Exact isolated test passed at default5s in974ms; final full run used dedicated temporary storage and approved15s runner budget.",
+    "externalBuild": "First prerender loaded another Next/React tree; output container now resolves the same isolated dependencies. No runtime source workaround."
+  },
+  "operationLimits": {
+    "productionChanged": false,
+    "databaseSchemaChanged": false,
+    "remoteDatabaseWritesDuringGates": false,
+    "authenticatedUiCrudPerformed": false
+  },
+  "publication": "Pending coordinator release signal; authenticated UI checks follow READY of the new immutable SHA",
+  "rawLogSha256": {
+    "final-lint-current-staging.log": "77164e0f73e5575811cdf7b23151f252dd53ef8613656215e6662665f29ed3fd",
+    "final-typecheck-current-staging.log": "7412387dd2026ca5a87bc3b44ef93640c4d058883d004c507cb43e13c63a7c5c",
+    "final-test-budgeted.log": "d166682288c3ce6c773b46b7ebef3ee1047d6489e5bb93284e128c757916067e",
+    "build.log": "f39e94e55b2704d512f38ed5dd21bf8a0bf54d4b73629045434623e1ed6f7044"
+  }
+}

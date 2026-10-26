@@ -9,5 +9,5 @@ export default async function AlphaCRMLayout({ children }: { children: React.Rea
   const session = await auth();
   if (!session) redirect("/");
   const temaInicial = normalizarCrmTema((await cookies()).get(CRM_TEMA_COOKIE)?.value);
-  return <CRMLayout session={session} temaInicial={temaInicial}><CardSaveProvider>{children}</CardSaveProvider></CRMLayout>;
+  return <CRMLayout session={session} temaInicial={temaInicial}><CardSaveProvider key={session.user?.id} userId={session.user?.id}>{children}</CardSaveProvider></CRMLayout>;
 }

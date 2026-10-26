@@ -32,14 +32,14 @@ export function PainelStatusPosFechamento({
   accent,
   onAtualizado,
 }: PainelStatusPosFechamentoProps) {
-  const { registerSave, getVersion, confirmVersion, getDraft, setDraft, setPendingFields } = useCardSave();
+  const { registerSave, getVersion, confirmVersion, getDraft, getDraftBase, setDraft, registerManualSave, setPendingFields } = useCardSave();
   const draftKey = `${cardId}:status`;
   const recovered = getDraft(draftKey)?.valor;
   const statusReconhecido = statusPosFechamentoEhValido(statusPersistido)
     ? statusPersistido
     : null;
   const [rascunho, setRascunho] = useState<StatusPosFechamento | null>(statusPosFechamentoEhValido(recovered) ? recovered : statusReconhecido);
-  const [base, setBase] = useState<StatusPosFechamento | null>(statusReconhecido);
+  const [base, setBase] = useState<StatusPosFechamento | null>(() => { const anterior = getDraftBase(draftKey)?.valores.valor; return statusPosFechamentoEhValido(anterior) ? anterior : statusReconhecido; });
   const versaoRemota = new Date(versaoPersistidaEm).toISOString();
   const [versaoBase, setVersaoBase] = useState(versaoRemota);
   const [snapshotRemotoPendente, setSnapshotRemotoPendente] = useState<{
@@ -100,7 +100,7 @@ export function PainelStatusPosFechamento({
   const configAtual = obterStatusPosFechamentoConfig(rascunho);
 
   async function salvar(status: StatusPosFechamento) {
-    if (!podeEditar) return;
+    if (!podeEditar || conflitoRealtime) return false;
     const versaoBaseAtual = versaoBase;
     setSalvando(true);
     const sucesso = await registerSave(async () => {
@@ -148,7 +148,16 @@ export function PainelStatusPosFechamento({
     setVersaoBase(snapshotRemotoPendente.versao);
     setSnapshotRemotoPendente(null);
     setConflitoRealtime(false);
+    setDraft(draftKey);
+    setPendingFields(draftKey, []);
   }
+
+  const salvarStatusRef = useRef(async () => true);
+  useEffect(() => { salvarStatusRef.current = async () => {
+    if (!getDraft(draftKey)) return true;
+    return rascunho ? Boolean(await salvar(rascunho)) : false;
+  }; });
+  useEffect(() => registerManualSave(cardId, draftKey, () => salvarStatusRef.current()), [cardId, draftKey, registerManualSave]);
 
   return (
     <section
@@ -180,6 +189,11 @@ export function PainelStatusPosFechamento({
           >
             Usar status atualizado
           </button>
+          <button type="button" className="block underline" onClick={() => {
+            setBase(snapshotRemotoPendente.status); setVersaoBase(snapshotRemotoPendente.versao);
+            setDraft(draftKey, { valor: rascunho ?? "" }, { versao: snapshotRemotoPendente.versao, valores: { valor: snapshotRemotoPendente.status ?? "" } });
+            setSnapshotRemotoPendente(null); setConflitoRealtime(false);
+          }}>Manter meu status para revisão</button>
         </div>
       )}
 
@@ -191,7 +205,7 @@ export function PainelStatusPosFechamento({
           onChange={(event) => {
             if (!statusPosFechamentoEhValido(event.target.value)) return;
             rascunhoSujoRef.current = event.target.value !== base;
-            setDraft(draftKey, { valor: event.target.value });
+            setDraft(draftKey, { valor: event.target.value }, { versao: versaoBase, valores: { valor: base ?? "" } });
             setPendingFields(draftKey, event.target.value !== base
               ? [{ label: "Status pós-fechamento", before: base ?? "", after: event.target.value }] : []);
             setRascunho(event.target.value);

@@ -285,6 +285,7 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
   const notaSelecionada = notas.find((nota) => nota.id === notaSelecionadaId) ?? null;
   const abrirAbaNaBarra = useNotasWorkspace((state) => state.abrirAba);
   const lixeira = useLixeiraNotas({
+    usuarioAtualId,
     notas,
     onRecarregar: () => setRecarregarToken((token) => token + 1),
     onLimparNotaAberta: () => {
@@ -482,7 +483,8 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
             <div className="h-full overflow-hidden rounded-3xl border border-white/5 bg-slate-950/40 shadow-2xl backdrop-blur-2xl transition-shadow duration-300 group-hover:border-white/10 group-hover:shadow-[0_20px_50px_-10px_rgba(0,0,0,0.6)]">
               {notaSelecionada && notaCarregada && notaCarregada.id === notaSelecionada.id ? (
                 <NoteEditor
-                  key={notaCarregada.id}
+                  key={`${notaCarregada.id}:${usuarioAtualId}`}
+                  usuarioAtualId={usuarioAtualId}
                   noteId={notaCarregada.id}
                   initialTitle={notaCarregada.title}
                   initialContentJson={notaCarregada.contentJson}

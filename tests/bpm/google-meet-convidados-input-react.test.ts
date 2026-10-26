@@ -19,7 +19,8 @@ vi.mock("@/actions/bpm/TranscricaoMeet", () => ({
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext", () => ({
   useCardSave: () => ({
     registerSave: vi.fn(), scheduleSave: vi.fn(), getVersion: vi.fn(),
-    confirmVersion: vi.fn(), getDraft: vi.fn(), setDraft: vi.fn(),
+    confirmVersion: vi.fn(), getDraft: vi.fn(), getDraftBase: vi.fn(), setDraft: vi.fn(),
+    setPendingFields: vi.fn(), registerManualSave: vi.fn(() => () => {}),
   }),
 }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/BpmDateTimeField", () => ({

@@ -32,7 +32,7 @@ interface Props {
 }
 
 export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarFormulario = true, permitirReagendar = false }: Props) {
-  const { registerSave, scheduleSave, getVersion, confirmVersion, getDraft, setDraft, setPendingFields } = useCardSave();
+  const { registerSave, scheduleSave, getVersion, confirmVersion, getDraft, getDraftBase, setDraft, registerManualSave, setPendingFields } = useCardSave();
   const [dataHora, setDataHora] = useState(() => formatarDataHoraLocalBpm(card.dataReuniao));
   const [erroDataHora, setErroDataHora] = useState<string | null>(null);
   const [emailCliente, setEmailCliente] = useState(card.emailClienteReuniao ?? "");
@@ -59,7 +59,7 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
   const emailClienteSujoRef = useRef(false);
   const resumoSujoRef = useRef(Boolean(getDraft(draftKey)));
   const dataHoraPersistidaRef = useRef(formatarDataHoraLocalBpm(card.dataReuniao));
-  const resumoPersistidoRef = useRef(card.transcricaoReuniao ?? "");
+  const resumoPersistidoRef = useRef(getDraftBase(draftKey)?.valores.valor ?? card.transcricaoReuniao ?? "");
   const dataHoraRascunhoRef = useRef(criarRastreadorRascunho(formatarDataHoraLocalBpm(card.dataReuniao)));
   const resumoRascunhoRef = useRef(criarRastreadorRascunho(resumo));
 
@@ -293,6 +293,8 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
   }
 
   async function persistirResumo(): Promise<boolean> {
+    if (!getDraft(draftKey)) return true;
+    if (!podeEditar || conflitoResumo) return false;
     const snapshot = resumoRascunhoRef.current.capturar();
     return registerSave(async () => {
       setSalvandoResumo(true);
@@ -327,6 +329,15 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
             <FileText size={13} /> {gerandoFicha ? "Gerando ficha…" : "Gerar ficha de viabilidade"}
           </button>);
 
+  const salvarResumoRef = useRef(persistirResumo);
+  useEffect(() => { salvarResumoRef.current = persistirResumo; });
+  useEffect(() => registerManualSave(card.id, draftKey, () => salvarResumoRef.current()), [card.id, draftKey, registerManualSave]);
+  function resolverResumo(manter: boolean) {
+    resumoPersistidoRef.current = card.transcricaoReuniao ?? "";
+    setConflitoResumo(false);
+    if (manter) setDraft(draftKey, { valor: resumo }, { versao: new Date(card.updatedAt).toISOString(), valores: { valor: resumoPersistidoRef.current } });
+    else { resumoSujoRef.current = false; resumoRascunhoRef.current.sincronizar(resumoPersistidoRef.current); setResumo(resumoPersistidoRef.current); setDraft(draftKey); setPendingFields(draftKey, []); }
+  }
   return (
     <div className="rounded-3xl border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent p-4 space-y-3">
       <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
@@ -504,7 +515,7 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
                   resumoSujoRef.current = true;
                   resumoRascunhoRef.current.alterar(event.target.value);
                   setResumo(event.target.value);
-                  setDraft(draftKey, { valor: event.target.value });
+                  setDraft(draftKey, { valor: event.target.value }, { versao: new Date(card.updatedAt).toISOString(), valores: { valor: resumoPersistidoRef.current } });
                   setPendingFields(draftKey, event.target.value !== resumoPersistidoRef.current
                     ? [{ label: "Transcrição da reunião", before: resumoPersistidoRef.current, after: event.target.value }] : []);
                   scheduleSave(`${card.id}:resumo`, () => void persistirResumo());
@@ -521,7 +532,7 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
               </p>
               {conflitoResumo && (
                 <p className="rounded-xl border border-sky-500/25 bg-sky-500/[0.07] p-3 text-xs text-sky-200" role="status">
-                  O resumo mudou externamente. Seu rascunho foi preservado.
+                  O resumo mudou externamente. Seu rascunho foi preservado.<button type="button" className="ml-2 underline" onClick={() => resolverResumo(false)}>Usar resumo atualizado</button><button type="button" className="ml-2 underline" onClick={() => resolverResumo(true)}>Manter meu resumo para revisão</button>
                 </p>
               )}
           </div>

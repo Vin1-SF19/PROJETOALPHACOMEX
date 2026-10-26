@@ -7,6 +7,8 @@ import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import { ehAnotacaoTecnicaInstagram } from "@/lib/bpm/instagram-anotacao-tecnica";
+import { createHash } from "node:crypto";
+import { repetirTransacaoOcupada } from "@/lib/bpm/sqlite-busy-retry";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -23,14 +25,33 @@ export async function CriarInteracaoCardBpm(dados: unknown) {
 
     const parsed = criarInteracaoCardSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
-    const { cardId, tipo, agendadoEm, agendaLink, observacoes, resumo } = parsed.data;
+    const { cardId, tipo, agendadoEm, agendaLink, observacoes, resumo, idempotencyKey } = parsed.data;
+    const interactionId = idempotencyKey
+      ? `c${createHash("sha256").update(JSON.stringify([cardId, userId, idempotencyKey])).digest("hex").slice(0, 24)}`
+      : undefined;
 
     await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
 
-    const interacao = await db.$transaction(async (tx) => {
+    const interacao = await repetirTransacaoOcupada(() => db.$transaction(async (tx) => {
       await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard", tx);
+      if (interactionId) {
+        const existente = await tx.bpmInteracaoCard.findUnique({
+          where: { id: interactionId }, include: { registradoPor: { select: { id: true, nome: true } } },
+        });
+        if (existente) {
+          if (existente.cardId !== cardId || existente.registradoPorId !== userId || existente.tipo !== tipo
+            || (existente.observacoes ?? "") !== (observacoes ?? "")
+            || (existente.resumo ?? "") !== (resumo ?? "")
+            || (existente.agendaLink ?? "") !== (agendaLink ?? "")
+            || (existente.agendadoEm?.getTime() ?? null) !== (agendadoEm?.getTime() ?? null)) {
+            throw new Error("A intenção de registro mudou. Revise a anotação antes de tentar novamente.");
+          }
+          return existente;
+        }
+      }
       const criada = await tx.bpmInteracaoCard.create({
         data: {
+          ...(interactionId ? { id: interactionId } : {}),
           cardId,
           tipo,
           agendadoEm,
@@ -51,10 +72,12 @@ export async function CriarInteracaoCardBpm(dados: unknown) {
         tx,
       );
       return criada;
-    });
+    }));
 
-    revalidatePath(`${ROTA_BASE}/card/${cardId}`);
-    await notificarPipelineBpm({ cardId, tipo: "INTERACAO_CRIADA" });
+    try { revalidatePath(`${ROTA_BASE}/card/${cardId}`); }
+    catch (error) { console.error("[CriarInteracaoCardBpm/cache]", error); }
+    try { await notificarPipelineBpm({ cardId, tipo: "INTERACAO_CRIADA" }); }
+    catch (error) { console.error("[CriarInteracaoCardBpm/realtime]", error); }
     return { success: true, data: interacao };
   } catch (error) {
     console.error("[CriarInteracaoCardBpm]", error);

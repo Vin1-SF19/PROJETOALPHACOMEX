@@ -1,0 +1,140 @@
+// @vitest-environment happy-dom
+// Evidências de auditoria: os testes confirmam defeitos atuais, não aprovam o produto.
+import React, { act, createElement as h } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { NoteEditor } from '@/components/Notas/NoteEditor/NoteEditor';
+import { AtualizarNota, ArquivarNota, MoverNotaParaLixeira } from '@/actions/Notas';
+import { PainelPropriedades } from '@/components/Notas/Central/PainelPropriedades';
+import { toast } from 'sonner';
+import ModalEditarPreCadastro from '@/components/Parceiros/ModalEditarPreCadastro';
+import { atualizarPreCadastro } from '@/actions/convites-parceiro';
+import { getNotaRascunhoStorageKey } from '@/lib/notas-tabs';
+import { CardSaveProvider, useCardSave } from '@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext';
+import { EditorAnotacaoCard } from '@/app/PainelAlpha/AlphaCRM/CardModal/EditorAnotacaoCard';
+import { PainelChecklistsCard } from '@/app/PainelAlpha/AlphaCRM/CardModal/PainelChecklistsCard';
+import { AtualizarItemChecklistCardBpm, ListarChecklistsCardBpm } from '@/actions/bpm/Checklists';
+
+const tiptap = vi.hoisted(() => {
+  const state = { text: 'original', update: undefined as undefined | ((event: {editor: unknown}) => void) };
+  const editor = { getJSON: () => ({type: 'doc', text: state.text}), getText: () => state.text, setEditable: vi.fn(), commands: {setContent: vi.fn()} };
+  return { state, editor };
+});
+vi.mock('@tiptap/react', () => ({ useEditor: (options: {onUpdate: typeof tiptap.state.update}) => { tiptap.state.update = options.onUpdate; return tiptap.editor; } }));
+vi.mock('@/components/Notas/NoteEditor/NoteEditorPrimitives', () => ({ criarExtensoesEditorNote: () => [], NoteEditorContent: () => null, NoteEditorToolbar: ({status}: {status: React.ReactNode}) => h('div', {'data-status': true}, status) }));
+vi.mock('@/actions/Notas', () => ({ AtualizarNota: vi.fn(), ArquivarNota: vi.fn(), MoverNotaParaLixeira: vi.fn(), ExcluirNotaDefinitivamente: vi.fn() }));
+vi.mock('@/actions/convites-parceiro', () => ({atualizarPreCadastro:vi.fn()}));
+vi.mock('@/actions/NotasBusca', () => ({ FixarNota: vi.fn(), FavoritarNota: vi.fn() }));
+vi.mock('@/actions/NotasWorkspace', () => ({ FecharAbaNota: vi.fn() }));
+vi.mock('@/components/ui/dock', () => ({ Dock: ({children}: {children: React.ReactNode}) => h('div',null,children), DockItem: ({children}: {children: React.ReactNode}) => h('div',null,children), DockIcon: ({children}: {children: React.ReactNode}) => h('span',null,children), DockLabel: ({children}: {children: React.ReactNode}) => h('span',null,children) }));
+vi.mock('@/components/Notas/Colaboracao/NoteShareDialog', () => ({NoteShareDialog:()=>null}));
+vi.mock('@/components/Notas/Colaboracao/NoteHistoryDialog', () => ({NoteHistoryDialog:()=>null}));
+vi.mock('@/components/Notas/Colaboracao/NoteCommentsPanel', () => ({NoteCommentsPanel:()=>null}));
+vi.mock('@/components/Notas/Anexos/ListaAnexos', () => ({ListaAnexos:()=>null}));
+vi.mock('@/components/Notas/Lembretes/CriarLembreteDialog', () => ({CriarLembreteDialog:()=>null}));
+vi.mock('@/actions/bpm/Cards', () => ({ ObterCardBpm: vi.fn() }));
+vi.mock('@/actions/bpm/Interacoes', () => ({ CriarInteracaoCardBpm: vi.fn() }));
+vi.mock('@/actions/bpm/Checklists', () => ({ AtualizarItemChecklistCardBpm: vi.fn(), ListarChecklistsCardBpm: vi.fn(), AdicionarItemExclusivoChecklistCardBpm: vi.fn(), CriarChecklistDocumentalAvulsoBpm: vi.fn() }));
+vi.mock('sonner', () => ({ toast: {success: vi.fn(), error: vi.fn(), dismiss: vi.fn()} }));
+let root: Root;
+let host: HTMLDivElement;
+let saveContext: ReturnType<typeof useCardSave>;
+function Probe() { const context = useCardSave(); React.useEffect(() => { saveContext = context; }, [context]); return null; }
+const annotationCard = { id: 'audit-card' } as React.ComponentProps<typeof EditorAnotacaoCard>['card'];
+const procedureCard = {id:'audit-card',pipelineId:'audit-pipeline',etapaId:'audit-stage',responsavel:{id:1,nome:'Pessoa fictícia'},membros:[]} as unknown as React.ComponentProps<typeof PainelChecklistsCard>['card'];
+beforeEach(() => {
+  vi.clearAllMocks(); vi.useFakeTimers(); localStorage.clear();
+  Object.assign(globalThis, {React, IS_REACT_ACT_ENVIRONMENT:true});
+  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+  host=document.createElement('div');document.body.append(host);root=createRoot(host);
+  tiptap.state.text='original';
+});
+afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.clearAllTimers(); vi.useRealTimers(); vi.restoreAllMocks(); });
+async function mountNote(initialVersion = 1) { await act(async () => root.render(h(NoteEditor, {noteId:'audit-note',initialTitle:'Nota fictícia',initialContentJson:{type:'doc'},initialVersion}))); }
+async function typeBody(text: string) {await act(async () => {tiptap.state.text=text;tiptap.state.update?.({editor:tiptap.editor});});}
+async function input(element: HTMLInputElement | HTMLTextAreaElement, value: string) {await act(async () => {const prototype=element.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(prototype,'value')!.set!.call(element,value);element.dispatchEvent(new Event('input',{bubbles:true}));});}
+
+it('N01: resposta de A remove o rascunho B e mostra Salvo antes de B ser enviado', async () => {
+  let release!: (value: Awaited<ReturnType<typeof AtualizarNota>>) => void;
+  vi.mocked(AtualizarNota).mockImplementationOnce(() => new Promise(resolve => { release=resolve; }));
+  await mountNote(); await typeBody('A'); await act(async () => {await vi.advanceTimersByTimeAsync(1500);});
+  expect(AtualizarNota).toHaveBeenCalledWith(expect.objectContaining({plainText:'A'}));
+  await typeBody('B mais recente');
+  expect(localStorage.getItem(getNotaRascunhoStorageKey('audit-note'))).toContain('B mais recente');
+  await act(async () => {release({success:true,data:{id:'audit-note',title:'Nota fictícia',currentVersion:2,updatedAt:new Date()}});});
+  expect(AtualizarNota).toHaveBeenCalledTimes(1);
+  expect(host.querySelector('[data-status]')?.textContent).toBe('Salvo');
+  expect(localStorage.getItem(getNotaRascunhoStorageKey('audit-note'))).toBeNull();
+});
+
+it('N02: voltar online não retoma a gravação de uma nota offline', async () => {
+  vi.spyOn(navigator,'onLine','get').mockReturnValue(false);
+  await mountNote(); await typeBody('Rascunho offline'); await act(async () => {await vi.advanceTimersByTimeAsync(1500);});
+  expect(host.textContent).toContain('Sem conexão');
+  vi.spyOn(navigator,'onLine','get').mockReturnValue(true);
+  await act(async () => {window.dispatchEvent(new Event('online'));await vi.advanceTimersByTimeAsync(10000);});
+  expect(AtualizarNota).not.toHaveBeenCalled();
+  expect(host.textContent).toContain('Sem conexão');
+});
+
+it('N03: rascunho recuperado fica pendente sem agendar persistência', async () => {
+  localStorage.setItem(getNotaRascunhoStorageKey('audit-note'), JSON.stringify({title:'Recuperada',contentJson:{type:'doc'},baseVersion:1}));
+  await mountNote();await act(async () => {await vi.advanceTimersByTimeAsync(10000);});
+  expect(host.textContent).toContain('Alterações pendentes');expect(AtualizarNota).not.toHaveBeenCalled();
+});
+
+it('N04: rascunho com versão anterior não é exibido nem oferece resolução', async () => {
+  localStorage.setItem(getNotaRascunhoStorageKey('audit-note'),JSON.stringify({title:'Texto ainda não enviado',contentJson:{type:'doc'},baseVersion:1}));
+  await mountNote(2);
+  expect(host.querySelector('input')?.value).toBe('Nota fictícia');
+  expect(host.textContent).toContain('Salvo');expect(host.textContent).not.toContain('Conflito');
+  expect(localStorage.getItem(getNotaRascunhoStorageKey('audit-note'))).toContain('Texto ainda não enviado');
+});
+
+it('C01: anotação digitada fica fora das pendências e desaparece ao remontar', async () => {
+  const mount=() => h(CardSaveProvider,null,h(Probe),h(EditorAnotacaoCard,{card:annotationCard,accent:'1,2,3',podeEditar:true,onInteracaoCriada:vi.fn()}));
+  await act(async () => root.render(mount()));
+  await input(host.querySelector('textarea')!, 'Anotação ainda não salva');
+  expect(host.querySelector('textarea')?.value).toBe('Anotação ainda não salva');
+  expect(saveContext.getPendingFields('audit-card')).toEqual([]);expect(await saveContext.flushSaves('audit-card')).toBe(true);
+  await act(async () => root.render(null));await act(async () => root.render(mount()));
+  expect(host.querySelector('textarea')?.value).toBe('');
+});
+
+it('C02: salvar outro item do procedimento apaga a observação digitada no item A', async () => {
+  const items=[{id:'a',nome:'Documento A',status:'PENDENTE',observacao:'',responsavelId:null,obrigatorio:false,exclusivoCard:false},{id:'b',nome:'Documento B',status:'PENDENTE',observacao:'',responsavelId:null,obrigatorio:false,exclusivoCard:false}];
+  const result={success:true,data:[{id:'checklist',templateNome:'Procedimento fictício',itens:items}]} as unknown as Awaited<ReturnType<typeof ListarChecklistsCardBpm>>;
+  vi.mocked(ListarChecklistsCardBpm).mockResolvedValue(result);
+  vi.mocked(AtualizarItemChecklistCardBpm).mockResolvedValue({success:true,data:{id:'b'}} as Awaited<ReturnType<typeof AtualizarItemChecklistCardBpm>>);
+  await act(async () => root.render(h(PainelChecklistsCard,{card:procedureCard,accent:'1,2,3',podeEditar:true,realtimeRevision:0,onAtualizado:vi.fn()})));
+  await act(async () => {await vi.advanceTimersByTimeAsync(0);});
+  await input(host.querySelector<HTMLInputElement>('[aria-label="Observação de Documento A"]')!, 'Rascunho local do documento A');
+  expect(host.querySelector<HTMLInputElement>('[aria-label="Observação de Documento A"]')?.value).toContain('Rascunho local');
+  await act(async () => {const select=host.querySelectorAll('select')[1];select.value='1';select.dispatchEvent(new Event('change',{bubbles:true}));});
+  expect(AtualizarItemChecklistCardBpm).toHaveBeenCalledWith({itemId:'b',responsavelId:1});
+  expect(host.querySelector<HTMLInputElement>('[aria-label="Observação de Documento A"]')?.value).toBe('');
+});
+
+
+it.each([['arquivar', 'Nota arquivada'], ['lixeira', 'Nota movida para a lixeira']])('N06: %s negado ainda mostra sucesso e remove o rascunho local', async (action, message) => {
+  vi.mocked(ArquivarNota).mockResolvedValue({success:false,error:'Sem permissão'});
+  vi.mocked(MoverNotaParaLixeira).mockResolvedValue({success:false,error:'Sem permissão'});
+  const nota={id:'audit-note',title:'Nota fictícia',status:'ATIVA',isFavorite:false,isPinned:false,contexts:[],tags:[],visibility:'PRIVADA',owner:{id:1,nome:'Pessoa fictícia'},color:null,icon:null,_count:{attachments:0,comments:0},createdAt:'2026-10-26',updatedAt:'2026-10-26'} as React.ComponentProps<typeof PainelPropriedades>['nota'];
+  localStorage.setItem(getNotaRascunhoStorageKey('audit-note'),'rascunho ainda não enviado');
+  await act(async()=>root.render(h(PainelPropriedades,{nota,usuarioAtualId:1,onAtualizado:vi.fn(),accent:'1,2,3'})));
+  await act(async()=>host.querySelector<HTMLButtonElement>(`[data-guia-notas="acao-${action}"]`)!.click());
+  expect(action==='arquivar'?ArquivarNota:MoverNotaParaLixeira).toHaveBeenCalledWith('audit-note');
+  expect(toast.success).toHaveBeenCalledWith(message);expect(toast.error).not.toHaveBeenCalled();
+  expect(localStorage.getItem(getNotaRascunhoStorageKey('audit-note'))).toBeNull();
+});
+
+
+it('P01: apagar Complemento no pré-cadastro envia undefined e não uma limpeza explícita', async()=>{
+  vi.mocked(atualizarPreCadastro).mockResolvedValue({success:true});
+  const preCadastro={id:1,nomeCompleto:'Pessoa fictícia',tipoRecebimento:'PF',cpf:'12345678900',dataNascimento:'1990-01-01',whatsapp:'11999999999',complemento:'Sala antiga',souRepresentante:false} as React.ComponentProps<typeof ModalEditarPreCadastro>['preCadastro'];
+  await act(async()=>root.render(h(ModalEditarPreCadastro,{preCadastro,onClose:vi.fn(),onSalvo:vi.fn()})));
+  const field=[...host.querySelectorAll('label')].find(e=>e.textContent==='Complemento')!.parentElement!.querySelector('input')!;
+  await input(field,'');
+  await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent?.trim()==='Salvar')!.click());
+  expect(atualizarPreCadastro).toHaveBeenCalledWith(1,expect.objectContaining({complemento:undefined}));
+});

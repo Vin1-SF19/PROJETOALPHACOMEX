@@ -65,7 +65,7 @@ interface Props {
 }
 
 function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, currentUserId, currentUserRole, onClose, onAtualizado, onCardExcluido, onAbrirCard, abrirChecklistInicial = false, focarAgendamentoInicial = false, focoTarefa, focoAnexos }: Props) {
-  const { flushSavesInBackground, subscribeConfirmation, setDraft, setPendingFields, clearFailedSave } = useCardSave();
+  const { flushSavesInBackground, subscribeConfirmation, setDraft, setPendingFields, clearFailedSave, discardPending, getRecoveredDraftKeys, acknowledgeRecoveredDrafts } = useCardSave();
   const fechandoRef = useRef(false);
   useEffect(() => () => flushSavesInBackground(cardId), [cardId, flushSavesInBackground]);
   const [card, setCard] = useState<CardDetalhe | null>(null);
@@ -268,8 +268,15 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
                 onAtualizado={handleAtualizado}
                 onCardExcluido={onCardExcluido}
                 onAbrirCard={(id) => { void solicitarFechamento(() => onAbrirCard(id)); }}
-                onInteracaoCriada={(nova) => setInteracoes((prev) => [nova, ...prev])}
+                onInteracaoCriada={(nova) => setInteracoes((prev) => [nova, ...prev.filter((item) => item.id !== nova.id)])}
               >
+                {getRecoveredDraftKeys(cardId).length > 0 && <div role="alert" className="space-y-2 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100">
+                  <p>Há um rascunho recuperado deste navegador. Os valores do servidor podem ter mudado. Compare os campos antes de confirmar o uso do rascunho.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" disabled={!podeEditar} className="rounded-lg border border-amber-300/40 px-3 py-1.5 disabled:opacity-40" onClick={() => acknowledgeRecoveredDrafts(cardId)}>Revisei e quero usar meu rascunho</button>
+                    <button type="button" className="rounded-lg border border-white/20 px-3 py-1.5" onClick={() => { discardPending(cardId); onClose(); }}>Descartar rascunho e fechar</button>
+                  </div>
+                </div>}
                 {card.pipeline.nome === "Revisão de Radar" && card.nolossLeadOrigem.length > 0
                   && !card.empresa.cnpj && podeEditar
                   && <Suspense fallback={null}><PreencherCnpjNoloss cardId={card.id} onAtualizado={() => {

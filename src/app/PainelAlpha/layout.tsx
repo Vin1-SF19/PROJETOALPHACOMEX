@@ -77,7 +77,7 @@ export default async function PainelLayout({
   if (isEmbedded) {
     return (
       <div className="min-h-dvh bg-[#020617]" data-alpha-embedded="true">
-        <PainelCardState>{children}</PainelCardState>
+        <PainelCardState key={userId} userId={userId}>{children}</PainelCardState>
         <PainelEmbeddedReady frameId={frameId} />
       </div>
     );
@@ -97,7 +97,7 @@ export default async function PainelLayout({
         onboardingVideo={onboardingVideo}
         linksExternos={linksExternos}
       >
-        <PainelCardState>{children}</PainelCardState>
+        <PainelCardState key={userId} userId={userId}>{children}</PainelCardState>
       </PainelLayoutClient>
     </div>
   );

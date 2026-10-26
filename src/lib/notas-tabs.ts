@@ -40,7 +40,8 @@ export function getNotasTabsStorageKey(userId: number): string {
   return `${STORAGE_KEY_PREFIX}_${userId}`;
 }
 
-export function getNotaRascunhoStorageKey(noteId: string): string {
+export function getNotaRascunhoStorageKey(noteId: string, userId?: number): string {
+  if (userId !== undefined && Number.isSafeInteger(userId) && userId > 0) return `${RASCUNHO_STORAGE_PREFIX}_user_${userId}_${noteId}`;
   return `${RASCUNHO_STORAGE_PREFIX}_${noteId}`;
 }
 
@@ -49,9 +50,9 @@ export function getNotaRascunhoStorageKey(noteId: string): string {
  * localStorage apontando para uma nota que não existe mais (ou foi movida para a lixeira), e
  * seria reaplicado por engano se um ID de nota fosse reutilizado.
  */
-export function limparRascunhoLocalDaNota(noteId: string): void {
+export function limparRascunhoLocalDaNota(noteId: string, userId?: number): void {
   try {
-    localStorage.removeItem(getNotaRascunhoStorageKey(noteId));
+    localStorage.removeItem(getNotaRascunhoStorageKey(noteId, userId));
   } catch {
     /* localStorage indisponível — best-effort */
   }

@@ -21,14 +21,14 @@ interface PainelProximoContatoProps {
 }
 
 export function PainelProximoContato({ card, onAtualizado, podeEditar, realtimeRevision }: PainelProximoContatoProps) {
-  const { registerSave, scheduleSave, getDraft, setDraft, getVersion, confirmVersion, setPendingFields } = useCardSave();
+  const { registerSave, scheduleSave, getDraft, getDraftBase, setDraft, registerManualSave, getVersion, confirmVersion, setPendingFields } = useCardSave();
   const draftKey = `${card.id}:proximoContato`;
   const [valor, setValor] = useState(() => getDraft(draftKey)?.valor ?? formatarDataHoraLocalBpm(card.proximoContatoEm));
   const [salvando, setSalvando] = useState(false);
   const [conflitoRealtime, setConflitoRealtime] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const sujoRef = useRef(Boolean(getDraft(draftKey)));
-  const valorPersistidoRef = useRef(formatarDataHoraLocalBpm(card.proximoContatoEm));
+  const valorPersistidoRef = useRef(getDraftBase(draftKey)?.valores.valor ?? formatarDataHoraLocalBpm(card.proximoContatoEm));
   const rascunhoRef = useRef(criarRastreadorRascunho(valor));
   const savesPendentesRef = useRef(0);
 
@@ -50,7 +50,7 @@ export function PainelProximoContato({ card, onAtualizado, podeEditar, realtimeR
   }, [card.proximoContatoEm, realtimeRevision, draftKey, getDraft]);
 
   async function persistir(proximoContatoEm: string | null) {
-    if (!podeEditar) return;
+    if (!podeEditar || conflitoRealtime) return;
     const dataPersistida = proximoContatoEm
       ? parseDataHoraLocalBpm(proximoContatoEm)
       : null;
@@ -100,6 +100,19 @@ export function PainelProximoContato({ card, onAtualizado, podeEditar, realtimeR
     }
   }
 
+  const salvarManualRef = useRef(async () => true);
+  useEffect(() => { salvarManualRef.current = async () => {
+    if (!getDraft(draftKey)) return true;
+    await persistir(valor || null);
+    return !getDraft(draftKey);
+  }; });
+  useEffect(() => registerManualSave(card.id, draftKey, () => salvarManualRef.current()), [card.id, draftKey, registerManualSave]);
+  function resolverConflito(manter: boolean) {
+    valorPersistidoRef.current = formatarDataHoraLocalBpm(card.proximoContatoEm);
+    setConflitoRealtime(false);
+    if (manter) setDraft(draftKey, { valor }, { versao: new Date(card.updatedAt).toISOString(), valores: { valor: valorPersistidoRef.current } });
+    else { sujoRef.current = false; setValor(valorPersistidoRef.current); rascunhoRef.current.sincronizar(valorPersistidoRef.current); setDraft(draftKey); setPendingFields(draftKey, []); }
+  }
   return (
     <section className="space-y-3 rounded-3xl border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent p-4">
       <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
@@ -119,7 +132,7 @@ export function PainelProximoContato({ card, onAtualizado, podeEditar, realtimeR
             sujoRef.current = true;
             rascunhoRef.current.alterar(novoValor);
             setValor(novoValor);
-            setDraft(draftKey, { valor: novoValor });
+            setDraft(draftKey, { valor: novoValor }, { versao: new Date(card.updatedAt).toISOString(), valores: { valor: valorPersistidoRef.current } });
             setPendingFields(draftKey, novoValor !== valorPersistidoRef.current
               ? [{ label: "Próximo contato", before: valorPersistidoRef.current, after: novoValor }] : []);
             setErro(null);
@@ -128,7 +141,7 @@ export function PainelProximoContato({ card, onAtualizado, podeEditar, realtimeR
           onCommit={(novoValor) => void persistir(novoValor || null)}
         />
       </div>
-      {conflitoRealtime && <p className="rounded-xl border border-sky-500/25 bg-sky-500/[0.07] p-3 text-xs text-sky-200">O próximo contato mudou externamente. Seu rascunho foi preservado.</p>}
+      {conflitoRealtime && <p className="rounded-xl border border-sky-500/25 bg-sky-500/[0.07] p-3 text-xs text-sky-200">O próximo contato mudou externamente. Seu rascunho foi preservado.<button type="button" className="ml-2 underline" onClick={() => resolverConflito(false)}>Usar data atualizada</button><button type="button" className="ml-2 underline" onClick={() => resolverConflito(true)}>Manter minha data para revisão</button></p>}
 
       <div className="flex items-center gap-2">
         <button

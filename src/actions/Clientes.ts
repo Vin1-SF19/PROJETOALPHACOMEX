@@ -786,27 +786,18 @@ export async function salvarAlteracoesCliente(clienteId: number, dadosNovos: unk
     if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
 
     const { userId, nome } = await getUsuarioSessao();
-    const estadoAnterior = await db.cliente.findUnique({ where: { id: clienteId } });
-    if (!estadoAnterior) return { success: false, error: "Cliente não encontrado" };
-
-    await db.cliente.update({ where: { id: clienteId }, data: parsed.data });
-
-    const loteId = crypto.randomUUID();
-    const linhasHistorico = montarLinhasHistoricoCliente({
-      clienteId,
-      loteId,
-      estadoAnterior,
-      dadosNovos: parsed.data,
-      userId,
-      nomeUsuarioNaEpoca: nome,
-      campos: [...CAMPOS_HISTORICO_CLIENTE],
+    await db.$transaction(async (tx) => {
+      const estadoAnterior = await tx.cliente.findUnique({ where: { id: clienteId } });
+      if (!estadoAnterior) throw new Error("Cliente não encontrado");
+      const linhasHistorico = montarLinhasHistoricoCliente({
+        clienteId, loteId: crypto.randomUUID(), estadoAnterior, dadosNovos: parsed.data,
+        userId, nomeUsuarioNaEpoca: nome, campos: [...CAMPOS_HISTORICO_CLIENTE],
+      });
+      await tx.cliente.update({ where: { id: clienteId }, data: parsed.data });
+      if (linhasHistorico.length > 0) await tx.historicoAlteracaoCliente.createMany({ data: linhasHistorico });
     });
 
-    if (linhasHistorico.length > 0) {
-      await db.historicoAlteracaoCliente.createMany({ data: linhasHistorico });
-    }
-
-    revalidatePath("/PainelAlpha/CadastroClientes");
+    try { revalidatePath("/PainelAlpha/CadastroClientes"); } catch (error) { console.error("[salvarAlteracoesCliente/cache]", error); }
     return { success: true };
   } catch (error) {
     console.error("ERRO salvarAlteracoesCliente:", error);

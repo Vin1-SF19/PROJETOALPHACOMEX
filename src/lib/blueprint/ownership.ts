@@ -1,4 +1,5 @@
 import db from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 
 import { isAdminRole } from "@/lib/roles";
 
@@ -45,6 +46,8 @@ export interface AcessoBlueprint {
   role: string | null;
 }
 
+type ClienteAcessoBlueprint = Pick<Prisma.TransactionClient, "blueprintMember">;
+
 /**
  * Fonte única de ownership do módulo Alpha Blueprint. Nunca confia em role/permissão
  * vinda do cliente — sempre resolve do banco a partir de userId + projectId.
@@ -55,12 +58,13 @@ export async function checarAcessoBlueprint(
   userId: number,
   userRoleGlobal: string | null,
   acao: BlueprintAcao,
+  client: ClienteAcessoBlueprint = db,
 ): Promise<AcessoBlueprint> {
   if (isAdminRole(userRoleGlobal)) {
     return { autorizado: true, isAdminGlobal: true, role: "ADMINISTRADOR" };
   }
 
-  const membro = await db.blueprintMember.findUnique({
+  const membro = await client.blueprintMember.findUnique({
     where: { projectId_userId: { projectId, userId } },
     select: { role: true },
   });
@@ -77,8 +81,9 @@ export async function exigirAcessoBlueprint(
   userId: number,
   userRoleGlobal: string | null,
   acao: BlueprintAcao,
+  client: ClienteAcessoBlueprint = db,
 ): Promise<AcessoBlueprint> {
-  const acesso = await checarAcessoBlueprint(projectId, userId, userRoleGlobal, acao);
+  const acesso = await checarAcessoBlueprint(projectId, userId, userRoleGlobal, acao, client);
   if (!acesso.autorizado) {
     throw new Error("Não autorizado");
   }

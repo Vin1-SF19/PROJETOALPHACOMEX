@@ -17,6 +17,8 @@ const eslintConfig = defineConfig([
     ".next-*/**",
     "out/**",
     "build/**",
+    // Caches contêm snapshots/bundles gerados, não fontes de projeto editáveis.
+    ".cache/**",
     // Database backups and generated build candidates are not application source.
     // Some candidates are deliberately private to the process that created them;
     // lint must not descend into them and fail with EACCES.

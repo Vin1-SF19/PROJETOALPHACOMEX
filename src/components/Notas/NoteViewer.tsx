@@ -14,6 +14,7 @@ const ALTURA_MAX_RATIO = 0.85;
 
 interface NoteViewerProps {
   noteId: string;
+  usuarioAtualId?: number;
   initialTitle: string;
   initialContentJson: JSONContent;
   initialVersion: number;
@@ -21,7 +22,7 @@ interface NoteViewerProps {
   onFechar: () => void;
 }
 
-export function NoteViewer({ noteId, initialTitle, initialContentJson, initialVersion, somenteLeitura, onFechar }: NoteViewerProps) {
+export function NoteViewer({ noteId, usuarioAtualId, initialTitle, initialContentJson, initialVersion, somenteLeitura, onFechar }: NoteViewerProps) {
   const viewerMode = useNotasWorkspace((state) => state.viewerMode);
   const viewerHeight = useNotasWorkspace((state) => state.viewerHeight);
   const setViewerMode = useNotasWorkspace((state) => state.setViewerMode);
@@ -135,7 +136,8 @@ export function NoteViewer({ noteId, initialTitle, initialContentJson, initialVe
 
       <div className="min-h-0 flex-1">
         <NoteEditor
-          key={noteId}
+          key={`${noteId}:${usuarioAtualId}`}
+          usuarioAtualId={usuarioAtualId}
           noteId={noteId}
           initialTitle={initialTitle}
           initialContentJson={initialContentJson}

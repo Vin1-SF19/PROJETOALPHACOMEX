@@ -50,7 +50,7 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
   const draftSujoRef = useRef(false);
   const estadoRef = useRef<EstadoFollowUp | null>(null);
   const remotoPendenteRef = useRef<EstadoFollowUp | null>(null);
-  const { registerSave, scheduleSave, getDraft, setDraft, confirmVersion, subscribeConfirmation, setPendingFields } = useCardSave();
+  const { registerSave, scheduleSave, getDraft, setDraft, confirmVersion, subscribeConfirmation, registerManualSave, setPendingFields } = useCardSave();
   const draftKey = `${cardId}:followup`;
   useEffect(() => subscribeConfirmation(cardId, (_card, key) => {
     if (key !== draftKey || getDraft(draftKey)) return;
@@ -98,7 +98,7 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
         return antes === depois ? [] : [{ label: pergunta.pergunta, before: respostaLegivel(antes), after: respostaLegivel(depois) }];
       });
       draftSujoRef.current = pendencias.length > 0;
-      setDraft(draftKey, pendencias.length ? serializar(respostasRef.current) : undefined);
+      setDraft(draftKey, pendencias.length ? serializar(respostasRef.current) : undefined, undefined, "sync");
       setPendingFields(draftKey, pendencias);
       conflitoRef.current = false;
       setConflitoRealtime(false);
@@ -194,6 +194,14 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
     toast.success("Novo follow-up iniciado");
     onAtualizado();
   }
+
+  const salvarManualRef = useRef(async () => true);
+  useEffect(() => { salvarManualRef.current = async () => {
+    if (!getDraft(draftKey)) return true;
+    await persistir(false);
+    return !getDraft(draftKey);
+  }; });
+  useEffect(() => registerManualSave(cardId, draftKey, () => salvarManualRef.current()), [cardId, draftKey, registerManualSave]);
 
   if (carregando) {
     return <div id={`follow-up-${cardId}`} tabIndex={-1} className="flex items-center gap-2 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 text-xs text-slate-400 outline-none"><Loader2 size={14} className="animate-spin" /> Carregando follow-up...</div>;

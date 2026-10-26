@@ -1,0 +1,43 @@
+{
+  "globalTotals": {
+    "errors": 23365,
+    "warnings": 129738
+  },
+  "byPathPrefix": {
+    ".agents": {
+      "errors": 0,
+      "warnings": 1,
+      "files": 1
+    },
+    ".aiox-core": {
+      "errors": 0,
+      "warnings": 929,
+      "files": 237
+    },
+    ".cache": {
+      "errors": 23365,
+      "warnings": 128544,
+      "files": 1387
+    },
+    ".codex": {
+      "errors": 0,
+      "warnings": 1,
+      "files": 1
+    },
+    "scripts": {
+      "errors": 0,
+      "warnings": 2,
+      "files": 2
+    },
+    "src": {
+      "errors": 0,
+      "warnings": 259,
+      "files": 97
+    },
+    "tests": {
+      "errors": 0,
+      "warnings": 2,
+      "files": 2
+    }
+  }
+}

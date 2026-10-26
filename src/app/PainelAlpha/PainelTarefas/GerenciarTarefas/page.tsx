@@ -271,28 +271,36 @@ export default function AdminTarefas() {
 
         if (!userIdUrl || (!isEventoUnico && !temFrequenciaRecorrente)) {
             toast.error("Defina a frequência ou dias da semana!");
+            setIsPending(false);
             return;
         }
 
         try {
-            if (novaTarefa.intervaloDias) {
-                await CriarTarefa({ ...novaTarefa, diaSemana: null, userId: String(userIdUrl) });
-            } else if (!novaTarefa.fixa) {
-                await CriarTarefa({ ...novaTarefa, diaSemana: null, intervaloDias: null, userId: String(userIdUrl) });
-            } else {
-                const promessas = novaTarefa.diasSemana.map(dia =>
-                    CriarTarefa({ ...novaTarefa, diaSemana: dia, intervaloDias: null, userId: String(userIdUrl) })
-                );
-                await Promise.all(promessas);
+            const dias = novaTarefa.intervaloDias || !novaTarefa.fixa ? [null] : novaTarefa.diasSemana;
+            // Cada dia é confirmado antes de prosseguir. Em falha parcial só os
+            // dias ainda pendentes permanecem no formulário para uma nova tentativa.
+            const pendentes = [...dias];
+            for (const dia of dias) {
+                const resultado = await CriarTarefa({ ...novaTarefa, diaSemana: dia,
+                    intervaloDias: novaTarefa.intervaloDias || null, userId: String(userIdUrl) });
+                if (!resultado.success) {
+                    if (novaTarefa.fixa && !novaTarefa.intervaloDias) setNovaTarefa((atual) => ({ ...atual, diasSemana: pendentes.filter((valor): valor is number => valor !== null) }));
+                    toast.error(resultado.error || "Não foi possível criar a tarefa. Os dias pendentes foram mantidos.");
+                    await carregarDados();
+                    return;
+                }
+                pendentes.shift();
+                if (novaTarefa.fixa && !novaTarefa.intervaloDias) setNovaTarefa((atual) => ({ ...atual, diasSemana: pendentes.filter((valor): valor is number => valor !== null) }));
+                if (resultado.warning) toast.warning(resultado.warning);
             }
             toast.success("Diretriz lançada!");
             setShowModalAdd(false);
-            setIsPending(false);
             setNovaTarefa({ texto: "", descricao: "", fixa: false, diasSemana: [], intervaloDias: null, dataInicio: new Date(), prioridade: "baixa", horario: "", alerta: "1H_ANTES" });
-            carregarDados();
-        } catch (error) {
-            toast.error("Falha ao comunicar com o servidor.");
-        }
+            await carregarDados();
+        } catch {
+            toast.error("Falha de conexão. Confira a lista antes de repetir; as alterações do formulário foram mantidas.");
+        } finally { setIsPending(false); }
+
     };
 
     const handleDeletar = async (id: string) => {
@@ -301,7 +309,7 @@ export default function AdminTarefas() {
         if (res.success) {
             toast.success("Removida");
             carregarDados();
-        }
+        } else { toast.error(res.error || "Não foi possível remover a tarefa."); }
     };
 
     useEffect(() => {
@@ -321,13 +329,16 @@ export default function AdminTarefas() {
 
     const handleSalvarDiretriz = async () => {
         setIsPending(true);
+        try {
         const res = await SalvarDiretrizSala(configSala.sala, configSala.descricao);
         if (res.success) {
             toast.success("Diretriz atualizada com sucesso!");
             setShowModalRotina(false);
             carregarDados();
         }
-        setIsPending(false);
+        else { toast.error(res.error || "Não foi possível salvar a diretriz."); }
+        } catch { toast.error("Falha de conexão. A diretriz foi mantida no formulário."); }
+        finally { setIsPending(false); }
     };
 
     const handleAbrirEdicao = (tarefa: TarefaDaTela) => {

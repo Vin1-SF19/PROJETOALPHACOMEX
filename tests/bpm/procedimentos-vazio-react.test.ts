@@ -3,6 +3,7 @@ import React, { act, createElement as h } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const api = vi.hoisted(() => ({ listar: vi.fn() }));
+vi.mock("@/actions/bpm/Cards", () => ({ ObterCardBpm: vi.fn() }));
 vi.mock("@/actions/bpm/Checklists", () => ({ ListarChecklistsCardBpm: api.listar, AdicionarItemExclusivoChecklistCardBpm: vi.fn(), AtualizarItemChecklistCardBpm: vi.fn(), CriarChecklistDocumentalAvulsoBpm: vi.fn() }));
 import { CardKanbanRenderer } from "@/components/bpm/kanban/CardKanbanRenderer";
 import { PainelChecklistsCard } from "@/app/PainelAlpha/AlphaCRM/CardModal/PainelChecklistsCard";

@@ -1,0 +1,60 @@
+// Evidências isoladas: nenhuma conexão a banco; apenas actions reais com adaptadores simulados.
+import { beforeEach, expect, it, vi } from 'vitest';
+const mocks = vi.hoisted(() => ({auth:vi.fn(),itemUpdate:vi.fn(),progressUpdate:vi.fn(),raw:vi.fn(),taskCreate:vi.fn(),reservationCreate:vi.fn(),reservationUpdate:vi.fn(),reservationFind:vi.fn(),noteFind:vi.fn(),noteUpdate:vi.fn(),versionCreate:vi.fn(),transaction:vi.fn(),blueprintCreate:vi.fn(),blueprintActivity:vi.fn()}));
+vi.mock('../../../../auth', () => ({auth:mocks.auth}));
+vi.mock('next/cache', () => ({revalidatePath:vi.fn()}));
+vi.mock('@/lib/prisma', () => ({default:{$executeRawUnsafe:mocks.raw,tarefa:{create:mocks.taskCreate},itemChecklist:{update:mocks.itemUpdate},operacionalClientes:{update:mocks.progressUpdate},reservas:{create:mocks.reservationCreate,update:mocks.reservationUpdate,findFirst:mocks.reservationFind},note:{findUnique:mocks.noteFind,update:mocks.noteUpdate},noteVersion:{create:mocks.versionCreate},blueprintDocument:{create:mocks.blueprintCreate},blueprintActivity:{create:mocks.blueprintActivity},$transaction:mocks.transaction}}));
+vi.mock('@/lib/notas/permissoes', () => ({podeEditarNota:vi.fn(async()=>true),podeVisualizarNota:vi.fn(),podeArquivarNota:vi.fn(),podeRestaurarNota:vi.fn(),podeExcluirNota:vi.fn(),podeExcluirDefinitivamenteNota:vi.fn(),temAcessoAoModuloNotas:vi.fn()}));
+vi.mock('@/lib/blueprint/ownership',()=>({exigirAcessoBlueprint:vi.fn()}));
+import { SalvarDocumentoBlueprint } from '@/actions/BlueprintDocuments';
+import { atualizarItemChecklist } from '@/actions/checklist';
+import { AlternarStatusTarefa, CriarTarefa, EditarTarefa } from '@/actions/Tarefas';
+import { agendarSala, editarReserva } from '@/actions/Reservas';
+import { AtualizarNota } from '@/actions/Notas';
+beforeEach(() => {vi.resetAllMocks();mocks.auth.mockResolvedValue({user:{id:'1',nome:'Usuário fictício'}});mocks.itemUpdate.mockResolvedValue({id:'item',descricao:'Documento fictício',observacao:null,checklist:{empresaId:1,itens:[{status:'OK',obrigatorio:true}],empresa:{clienteOperacional:null}}});mocks.progressUpdate.mockResolvedValue({});mocks.raw.mockResolvedValue(0);mocks.reservationFind.mockResolvedValue(null);mocks.reservationCreate.mockResolvedValue({});mocks.reservationUpdate.mockResolvedValue({});});
+
+it('CK01: mudar somente o status envia observacao null ao banco',async()=>{
+  const result=await atualizarItemChecklist('item',{status:'OK'});
+  expect(result).toHaveProperty('data');
+  expect(mocks.itemUpdate).toHaveBeenCalledWith(expect.objectContaining({data:expect.objectContaining({observacao:null})}));
+});
+it('CK02: falha no progresso devolve erro normal após o item já ter sido gravado',async()=>{
+  mocks.progressUpdate.mockRejectedValue(new Error('falha de progresso simulada'));
+  const result=await atualizarItemChecklist('item',{status:'OK',observacao:'Texto novo'});
+  expect(mocks.itemUpdate).toHaveBeenCalledOnce();expect(result).toEqual({error:'falha de progresso simulada'});
+});
+it('TK01: concluir tarefa inexistente responde sucesso com zero linhas afetadas',async()=>{
+  expect(await AlternarStatusTarefa('inexistente',true)).toEqual({success:true});
+  expect(mocks.raw).toHaveBeenCalledOnce();expect(mocks.auth).not.toHaveBeenCalled();
+});
+it('TK02: criar tarefa usa userId enviado sem consultar a sessão',async()=>{
+  mocks.auth.mockResolvedValue(null);mocks.taskCreate.mockResolvedValue({id:55});
+  expect(await CriarTarefa({texto:'Tarefa fictícia',userId:999,fixa:false,diaSemana:null,prioridade:'baixa'})).toEqual({success:true});
+  expect(mocks.auth).not.toHaveBeenCalled();expect(mocks.taskCreate).toHaveBeenCalledWith(expect.objectContaining({data:expect.objectContaining({userId:999})}));
+});
+it('TK03: parâmetros opcionais ausentes de EditarTarefa geram undefined no SQL',async()=>{
+  await EditarTarefa('123',{texto:'Revisão fictícia',fixa:false,prioridade:'baixa'});
+  expect(mocks.raw.mock.calls[0][0]).toContain('"intervaloDias" = undefined');
+  expect(mocks.raw.mock.calls[0][0]).toContain('"dataInicio" = \'undefined\'');
+});
+it('RV01: agendar sala aceita horário de fim anterior ao início',async()=>{
+  const result=await agendarSala({sala:'Sala fictícia',data:'2026-10-30',inicio:'15:00',fim:'14:00',tipo:'Reunião',paoDeQueijo:false,motivo:'Teste isolado'});
+  expect(result).toEqual({success:true});expect(mocks.reservationCreate).toHaveBeenCalledOnce();
+});
+it('RV02: editar reserva chega à gravação sem consultar sessão',async()=>{
+  mocks.auth.mockResolvedValue(null);
+  expect(await editarReserva(77,{sala:'Sala fictícia',data:'2026-10-30',inicio:'10:00',fim:'11:00'})).toEqual({success:true});
+  expect(mocks.auth).not.toHaveBeenCalled();expect(mocks.reservationUpdate).toHaveBeenCalledOnce();
+});
+it('N05: erro de persistência da nota rejeita a action em vez de retornar erro estruturado',async()=>{
+  mocks.noteFind.mockResolvedValue({currentVersion:1,title:'Nota fictícia',contentJson:{},plainText:''});
+  mocks.noteUpdate.mockReturnValue({});mocks.versionCreate.mockReturnValue({});mocks.transaction.mockRejectedValue(new Error('falha de persistência simulada'));
+  await expect(AtualizarNota({id:'nota-ficticia',baseVersion:1,plainText:'Edição pendente'})).rejects.toThrow('falha de persistência simulada');
+});
+
+
+it('B01: documento Blueprint já gravado retorna fracasso se apenas o histórico falha',async()=>{
+  mocks.blueprintCreate.mockResolvedValue({id:'doc-ficticio'});mocks.blueprintActivity.mockRejectedValue(new Error('histórico indisponível simulado'));
+  const result=await SalvarDocumentoBlueprint({projectId:'c000000000000000000000001',title:'Especificação',contentJson:'{}',contentText:'Texto fictício'});
+  expect(mocks.blueprintCreate).toHaveBeenCalledOnce();expect(result).toEqual({success:false,error:'Erro ao salvar documento'});
+});

@@ -83,71 +83,59 @@ export async function CriarNota(input: CriarNotaInput) {
 }
 
 export async function AtualizarNota(input: AtualizarNotaInput) {
-  const usuario = await sessaoUsuario();
-  if (!usuario) return { success: false as const, error: "Não autorizado" };
-
-  const parsed = atualizarNotaSchema.safeParse(input);
-  if (!parsed.success) return { success: false as const, error: "Dados inválidos" };
-  const dados = parsed.data;
-
-  if (!(await podeEditarNota(usuario, dados.id))) {
-    return { success: false as const, error: "Sem permissão para editar esta nota" };
+  try {
+    const usuario = await sessaoUsuario();
+    if (!usuario) return { success: false as const, error: "Não autorizado" };
+    const parsed = atualizarNotaSchema.safeParse(input);
+    if (!parsed.success) return { success: false as const, error: "Dados inválidos" };
+    const dados = parsed.data;
+    if (!(await podeEditarNota(usuario, dados.id))) {
+      return { success: false as const, error: "Sem permissão para editar esta nota" };
+    }
+    // Remove proxies da travessia RSC antes de persistir Json pelo adapter LibSQL.
+    const contentJsonLimpo = dados.contentJson !== undefined
+      ? JSON.parse(JSON.stringify(dados.contentJson)) as typeof dados.contentJson : undefined;
+    return await db.$transaction(async (tx) => {
+      const notaAtual = await tx.note.findUnique({
+        where: { id: dados.id },
+        select: { currentVersion: true, title: true, contentJson: true, plainText: true, deletedAt: true },
+      });
+      if (!notaAtual || notaAtual.deletedAt) return { success: false as const, error: "Nota não encontrada" };
+      if (notaAtual.currentVersion !== dados.baseVersion) {
+        return { success: false as const, error: "CONFLITO_VERSAO", versaoAtual: notaAtual.currentVersion };
+      }
+      const novaVersao = dados.baseVersion + 1;
+      const tituloFinal = dados.title !== undefined ? dados.title.trim() || "Sem título" : notaAtual.title;
+      const gravacao = await tx.note.updateMany({
+        where: { id: dados.id, currentVersion: dados.baseVersion, deletedAt: null },
+        data: {
+          title: tituloFinal,
+          contentJson: contentJsonLimpo ?? undefined,
+          plainText: dados.plainText ?? undefined,
+          color: dados.color === undefined ? undefined : dados.color,
+          icon: dados.icon === undefined ? undefined : dados.icon,
+          isFavorite: dados.isFavorite ?? undefined,
+          currentVersion: novaVersao,
+          updatedById: usuario.id,
+        },
+      });
+      if (gravacao.count !== 1) return { success: false as const, error: "CONFLITO_VERSAO" };
+      await tx.noteVersion.create({
+        data: { noteId: dados.id, version: novaVersao, title: tituloFinal,
+          contentJson: contentJsonLimpo ?? notaAtual.contentJson ?? {},
+          plainText: dados.plainText ?? notaAtual.plainText, changedById: usuario.id },
+      });
+      const notaAtualizada = await tx.note.findUniqueOrThrow({
+        where: { id: dados.id }, select: { id: true, title: true, currentVersion: true, updatedAt: true },
+      });
+      return { success: true as const, data: notaAtualizada };
+    });
+  } catch (error) {
+    const code = error && typeof error === "object" && "code" in error ? error.code : undefined;
+    if (code === "P2002" || code === "P2034") return { success: false as const, error: "CONFLITO_VERSAO" };
+    console.error("[AtualizarNota]", error);
+    return { success: false as const, error: "Não foi possível salvar a nota. Tente novamente." };
   }
-
-  const notaAtual = await db.note.findUnique({
-    where: { id: dados.id },
-    select: { currentVersion: true, title: true, contentJson: true, plainText: true },
-  });
-  if (!notaAtual) return { success: false as const, error: "Nota não encontrada" };
-
-  if (notaAtual.currentVersion !== dados.baseVersion) {
-    return {
-      success: false as const,
-      error: "CONFLITO_VERSAO",
-      versaoAtual: notaAtual.currentVersion,
-    };
-  }
-
-  const novaVersao = notaAtual.currentVersion + 1;
-  const tituloFinal = dados.title !== undefined ? dados.title.trim() || "Sem título" : notaAtual.title;
-
-  // Round-trip via JSON.parse/stringify antes de entregar ao Prisma — o valor de `contentJson`
-  // que chega da Server Action, quando contém estruturas aninhadas mais complexas (ex: nós de
-  // tabela do Tiptap: tableRow → tableCell/tableHeader → paragraph), disparava
-  // "Cannot access toStringTag on the server" no driver adapter LibSQL ao gravar o campo Json
-  // — mesmo sendo um objeto plano e válido (confirmado por JSON.stringify bem-sucedido antes
-  // desta chamada). O round-trip descarta qualquer proxy/referência não-plana remanescente da
-  // travessia RSC sem exigir mudança de schema nem de versão de dependência.
-  const contentJsonLimpo = dados.contentJson !== undefined ? (JSON.parse(JSON.stringify(dados.contentJson)) as typeof dados.contentJson) : undefined;
-
-  const [notaAtualizada] = await db.$transaction([
-    db.note.update({
-      where: { id: dados.id },
-      data: {
-        title: tituloFinal,
-        contentJson: contentJsonLimpo ?? undefined,
-        plainText: dados.plainText ?? undefined,
-        color: dados.color === undefined ? undefined : dados.color,
-        icon: dados.icon === undefined ? undefined : dados.icon,
-        isFavorite: dados.isFavorite ?? undefined,
-        currentVersion: novaVersao,
-        updatedById: usuario.id,
-      },
-      select: { id: true, title: true, currentVersion: true, updatedAt: true },
-    }),
-    db.noteVersion.create({
-      data: {
-        noteId: dados.id,
-        version: novaVersao,
-        title: tituloFinal,
-        contentJson: contentJsonLimpo ?? notaAtual.contentJson ?? {},
-        plainText: dados.plainText ?? notaAtual.plainText,
-        changedById: usuario.id,
-      },
-    }),
-  ]);
-
-  return { success: true as const, data: notaAtualizada };
 }
 
 export async function ObterNota(noteId: string) {

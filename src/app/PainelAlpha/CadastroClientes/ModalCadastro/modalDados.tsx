@@ -757,6 +757,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
         setConfirmacaoTrocaServico(null);
         setSalvandoTudo(true);
 
+        try {
         const falhas: string[] = [];
 
         // 1) Dados CADASTRAIS do Cliente master (razão social, nome fantasia, UF, município,
@@ -847,8 +848,6 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
             }
         }
 
-        setSalvandoTudo(false);
-
         if (falhas.length === 0) {
             toast.success("Todas as alterações foram salvas!");
             setEditandoDados(false);
@@ -857,6 +856,12 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
         } else {
             toast.error(`Não foi possível salvar: ${falhas.join(", ")}. O restante foi salvo — corrija e clique em Salvar Alterações novamente.`);
         }
+        } catch {
+            toast.error("A conexão foi interrompida. Alguns grupos podem ter sido salvos; os rascunhos foram mantidos. Confira os dados antes de tentar novamente.");
+        } finally {
+            setSalvandoTudo(false);
+        }
+
     };
 
     const handleOcultarCliente = async (id: number) => {

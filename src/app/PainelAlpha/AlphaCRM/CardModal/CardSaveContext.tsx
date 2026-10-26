@@ -5,6 +5,7 @@ import { toast, type ExternalToast } from "sonner";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ALPHA_GUARD_STATE, ALPHA_LEAVE_REQUEST, ALPHA_LEAVE_RESULT, frameIdDoDocumento, isPainelLeaveMessage, type BrowserNavigationGuard, type NavigationGuardEvent } from "@/lib/painel-leave-guard";
+import { chaveRascunhosCrm, chavePendenciaRascunho, chavePertenceAoCard, lerRascunhosCrm, type BaseRascunhoCard } from "@/lib/bpm/rascunhos-locais";
 
 type ConfirmedCard = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type ConfirmationListener = (card: ConfirmedCard, key?: string) => void;
@@ -23,7 +24,11 @@ interface CardSaveContextValue {
   getVersion: (cardId: string, fallback: string) => string;
   confirmVersion: (cardId: string, version: string) => void;
   getDraft: (key: string) => Record<string, string> | undefined;
-  setDraft: (key: string, value?: Record<string, string>) => void;
+  setDraft: (key: string, value?: Record<string, string>, base?: BaseRascunhoCard, intent?: "edit" | "sync") => void;
+  getDraftBase: (key: string) => BaseRascunhoCard | undefined;
+  getRecoveredDraftKeys: (cardId: string) => string[];
+  acknowledgeRecoveredDrafts: (cardId: string) => void;
+  recoveryRevision: number;
   setPendingFields: (instance: string, fields: Array<string | PendingCardChange>) => void;
   getPendingFields: (cardId?: string) => string[];
   getPendingChanges: (cardId?: string) => PendingCardChange[];
@@ -44,13 +49,22 @@ interface CardSaveContextValue {
 
 const CardSaveContext = createContext<CardSaveContextValue | null>(null);
 
-export function CardSaveProvider({ children }: { children: ReactNode }) {
+export function CardSaveProvider({ children, userId }: { children: ReactNode; userId?: string | number | null }) {
   const parent = useContext(CardSaveContext);
-  return parent ? <>{children}</> : <CardSaveProviderState>{children}</CardSaveProviderState>;
+  return parent ? <>{children}</> : <CardSaveProviderState key={userId ?? "anonymous"} userId={userId}>{children}</CardSaveProviderState>;
 }
 
-function CardSaveProviderState({ children }: { children: ReactNode }) {
+function CardSaveProviderState({ children, userId }: { children: ReactNode; userId?: string | number | null }) {
   const publicarEstadoGuardRef = useRef<() => void>(() => {});
+  const storageKey = chaveRascunhosCrm(userId ?? undefined);
+  const [loadedDrafts] = useState(() => lerRascunhosCrm(storageKey));
+  const tokens = useRef(new Map([...loadedDrafts].map(([key, entry]) => [key, entry.token])));
+  const claimedKeys = useRef(new Set<string>());
+  const deletions = useRef(new Map<string, string | undefined>());
+  const recoveredKeys = useRef(new Set(loadedDrafts.keys()));
+  const [recoveryRevision, setRecoveryRevision] = useState(0);
+  const bases = useRef(new Map([...loadedDrafts].flatMap(([key, entry]) => entry.base ? [[key, entry.base] as const] : [])));
+  const pendingRef = useRef(new Map([...loadedDrafts].map(([key, entry]) => [chavePendenciaRascunho(key, entry.pendingKey), entry.pendencias?.length ? entry.pendencias : [{ label: "Rascunho recuperado" }]])));
   const listeners = useRef(new Map<string, Set<ConfirmationListener>>());
   const subscribeConfirmation = useCallback((cardId: string, listener: ConfirmationListener) => {
     const subscribers = listeners.current.get(cardId) ?? new Set<ConfirmationListener>();
@@ -63,11 +77,60 @@ function CardSaveProviderState({ children }: { children: ReactNode }) {
   }, []);
   const scheduled = useRef(new Map<string, { timer: ReturnType<typeof setTimeout>; save: () => void }>());
   const versions = useRef(new Map<string, string>());
-  const drafts = useRef(new Map<string, Record<string, string>>());
+  const drafts = useRef(new Map([...loadedDrafts].map(([key, entry]) => [key, entry.valores])));
+  const storageWarning = useRef(false);
+  const persistDrafts = useCallback(() => {
+    if (!storageKey || typeof window === "undefined") return;
+    try {
+      // Outra aba pode ter escrito desde a última edição deste provider.
+      // Confirmações e mudanças de metadados só podem tocar a revisão que possuem.
+      const merged = lerRascunhosCrm(storageKey);
+      for (const [key, valores] of drafts.current) {
+        const remote = merged.get(key);
+        if (claimedKeys.current.has(key) || remote && remote.token === tokens.current.get(key)) {
+          const pendingKey = [...pendingRef.current.keys()].find((candidate) => candidate === key || candidate.endsWith(`:${key}`));
+          merged.set(key, { valores, token: tokens.current.get(key), base: bases.current.get(key), pendingKey, pendencias: pendingKey ? pendingRef.current.get(pendingKey) : undefined });
+        }
+      }
+      for (const [key, token] of deletions.current) if (merged.get(key)?.token === token) merged.delete(key);
+      const serialized = Object.fromEntries(merged);
+      if (merged.size) window.localStorage.setItem(storageKey, JSON.stringify(serialized));
+      else window.localStorage.removeItem(storageKey);
+      claimedKeys.current.clear();
+      deletions.current.clear();
+    } catch {
+      if (!storageWarning.current) {
+        storageWarning.current = true;
+        toast.error("O navegador não permitiu guardar o rascunho local. Salve antes de sair desta página.");
+      }
+    }
+  }, [storageKey]);
   const getDraft = useCallback((key: string) => drafts.current.get(key), []);
-  const setDraft = useCallback((key: string, value?: Record<string, string>) => {
-    if (value) drafts.current.set(key, value); else drafts.current.delete(key);
+  const getDraftBase = useCallback((key: string) => bases.current.get(key), []);
+  const getRecoveredDraftKeys = useCallback((cardId: string) => [...recoveredKeys.current].filter((key) => chavePertenceAoCard(key, cardId)), []);
+  const acknowledgeRecoveredDrafts = useCallback((cardId: string) => {
+    for (const key of recoveredKeys.current) if (chavePertenceAoCard(key, cardId)) recoveredKeys.current.delete(key);
+    setRecoveryRevision((revision) => revision + 1);
   }, []);
+  const setDraft = useCallback((key: string, value?: Record<string, string>, base?: BaseRascunhoCard, intent: "edit" | "sync" = "edit") => {
+    if (value) {
+      if (intent === "edit") {
+        tokens.current.set(key, crypto.randomUUID());
+        claimedKeys.current.add(key);
+      }
+      deletions.current.delete(key);
+      drafts.current.set(key, value);
+      if (base) bases.current.set(key, base);
+    } else {
+      deletions.current.set(key, tokens.current.get(key));
+      claimedKeys.current.delete(key);
+      drafts.current.delete(key);
+      bases.current.delete(key);
+      for (const pendingKey of pendingRef.current.keys()) if (pendingKey === key || pendingKey.endsWith(`:${key}`)) pendingRef.current.delete(pendingKey);
+      if (recoveredKeys.current.delete(key)) setRecoveryRevision((revision) => revision + 1);
+    }
+    persistDrafts();
+  }, [persistDrafts]);
   const getVersion = useCallback((id: string, fallback: string) => {
     const known = versions.current.get(id);
     return known && known > fallback ? known : fallback;
@@ -93,14 +156,14 @@ function CardSaveProviderState({ children }: { children: ReactNode }) {
     scheduled.current.set(key, { timer, save });
   }, []);
   useEffect(() => () => flushScheduled(), [flushScheduled]);
-  const pendingRef = useRef(new Map<string, PendingCardChange[]>());
   const setPendingFields = useCallback((instance: string, fields: Array<string | PendingCardChange>) => {
     if (fields.length) pendingRef.current.set(instance, fields.map((field) => typeof field === "string" ? { label: field } : field));
     else pendingRef.current.delete(instance);
     publicarEstadoGuardRef.current();
-  }, []);
+    persistDrafts();
+  }, [persistDrafts]);
   const getPendingChanges = useCallback((cardId?: string) => [...pendingRef.current]
-    .filter(([key]) => !cardId || key.startsWith(`${cardId}:`))
+    .filter(([key]) => !cardId || chavePertenceAoCard(key, cardId))
     .flatMap(([, fields]) => fields), []);
   const getPendingFields = useCallback((cardId?: string) => [...new Set(getPendingChanges(cardId).map((field) => field.label))], [getPendingChanges]);
   useEffect(() => {
@@ -120,6 +183,14 @@ function CardSaveProviderState({ children }: { children: ReactNode }) {
     else pendingUploads.current.delete(key);
   }, []);
   const registerManualSave = useCallback((cardId: string, instance: string, save: () => Promise<boolean>) => {
+    // Formulários antigos usam cardId-instance no rascunho e cardId:instance
+    // na lista de pendências. A recuperação precisa da mesma identidade de saída.
+    if (!instance.startsWith(`${cardId}:`) && pendingRef.current.has(instance)) {
+      const fields = pendingRef.current.get(instance)!;
+      pendingRef.current.delete(instance);
+      pendingRef.current.set(`${cardId}:${instance}`, fields);
+      persistDrafts();
+    }
     const handlers = manualSaves.current.get(cardId) ?? new Map<string, () => Promise<boolean>>();
     handlers.set(instance, save);
     manualSaves.current.set(cardId, handlers);
@@ -128,7 +199,7 @@ function CardSaveProviderState({ children }: { children: ReactNode }) {
         && ![...pendingRef.current.keys()].some((key) => key.startsWith(`${cardId}:arquivo:`))) handlers.delete(instance);
       if (!handlers.size) manualSaves.current.delete(cardId);
     };
-  }, []);
+  }, [persistDrafts]);
 
   const recovery = useRef(new Map<string, { save: () => Promise<boolean>; errorOptions?: SaveErrorOptions; refreshAfterSave: boolean }>());
   const failures = useRef(new Map<string, string | undefined>());
@@ -137,6 +208,10 @@ function CardSaveProviderState({ children }: { children: ReactNode }) {
     const scope = cardId ?? "";
     const anteriores = savePromiseRef.current.get(scope) ?? Promise.resolve(true);
     const tentativa = anteriores.then(async () => {
+      if (cardId && [...recoveredKeys.current].some((key) => chavePertenceAoCard(key, cardId))) {
+        toast.error("Revise o rascunho recuperado e confirme seu uso antes de salvar.");
+        return false;
+      }
       const success = await save();
       if (success && cardId && refreshAfterSave) {
         // A leitura atualiza a tela e a versão compartilhada; uma falha nela
@@ -246,16 +321,18 @@ function CardSaveProviderState({ children }: { children: ReactNode }) {
       scheduled.current.delete(key);
     }
     for (const key of drafts.current.keys()) {
-      if (key.startsWith(`${cardId}:`) || key.startsWith(`${cardId}-`)) drafts.current.delete(key);
+      if (chavePertenceAoCard(key, cardId)) { deletions.current.set(key, tokens.current.get(key)); drafts.current.delete(key); bases.current.delete(key); recoveredKeys.current.delete(key); claimedKeys.current.delete(key); }
     }
-    for (const key of pendingRef.current.keys()) if (key.startsWith(`${cardId}:`)) pendingRef.current.delete(key);
+    for (const key of pendingRef.current.keys()) if (chavePertenceAoCard(key, cardId)) pendingRef.current.delete(key);
     for (const [key, id] of failures.current) if (id === cardId) failures.current.delete(key);
     for (const key of recovery.current.keys()) if (key.startsWith(`${cardId}:`)) recovery.current.delete(key);
     for (const key of pendingUploads.current.keys()) if (key.startsWith(`${cardId}:`)) pendingUploads.current.delete(key);
     manualSaves.current.delete(cardId);
     publicarEstadoGuardRef.current();
+    persistDrafts();
+    setRecoveryRevision((revision) => revision + 1);
     toast.dismiss?.(`card-save:${cardId}`);
-  }, []);
+  }, [persistDrafts]);
 
   const [saidaPendente, setSaidaPendente] = useState(false);
   const [salvandoSaida, setSalvandoSaida] = useState(false);
@@ -315,7 +392,7 @@ function CardSaveProviderState({ children }: { children: ReactNode }) {
   }, [getPendingFields, requestLeave]);
 
   return (
-    <CardSaveContext.Provider value={{ requestLeave, subscribeConfirmation, scheduleSave, flushScheduled, getVersion, confirmVersion, getDraft, setDraft, registerSave, registerManualSave, getPendingUpload, setPendingUpload, flushSaves, flushSavesInBackground, setPendingFields, getPendingFields, getPendingChanges, getFailedSaveKeys, clearFailedSave, retryFailedSaves, discardPending }}>
+    <CardSaveContext.Provider value={{ requestLeave, subscribeConfirmation, scheduleSave, flushScheduled, getVersion, confirmVersion, getDraft, getDraftBase, setDraft, getRecoveredDraftKeys, acknowledgeRecoveredDrafts, recoveryRevision, registerSave, registerManualSave, getPendingUpload, setPendingUpload, flushSaves, flushSavesInBackground, setPendingFields, getPendingFields, getPendingChanges, getFailedSaveKeys, clearFailedSave, retryFailedSaves, discardPending }}>
       {children}
       <AlertDialog open={saidaPendente} onOpenChange={(open) => { if (!open && !salvandoSaida) concluirSaida(false); }}><AlertDialogContent>
         <AlertDialogHeader><AlertDialogTitle>Salvar alterações antes de sair?</AlertDialogTitle><AlertDialogDescription>Existem dados não salvos no CRM. Escolha salvar, descartar ou continuar editando.</AlertDialogDescription></AlertDialogHeader>
@@ -363,4 +440,8 @@ export function useCardSave(): CardSaveContextValue {
 export function useCardLeaveGuard() {
   const ctx = useContext(CardSaveContext);
   return ctx?.requestLeave ?? (() => Promise.resolve(true));
+}
+
+export function useOptionalCardSave(): CardSaveContextValue | null {
+  return useContext(CardSaveContext);
 }
