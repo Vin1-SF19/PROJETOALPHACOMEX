@@ -1,3 +1,5 @@
+import { sessaoEstaIndisponivel } from "@/lib/auth/estado-acesso";
+import { respostaAcessoIndisponivel } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from "next/server";
 import db from "@/lib/prisma";
 import { authComEstadoAcesso } from "../../../../auth";
@@ -5,6 +7,8 @@ import { STATUS_USUARIO_ATIVO } from "@/lib/auth/acesso-painel";
 
 export async function POST() {
   const session = await authComEstadoAcesso();
+
+  if (sessaoEstaIndisponivel(session)) return respostaAcessoIndisponivel();
 
   if (session?.acessoBloqueado) {
     return NextResponse.json({ error: "Acesso bloqueado" }, { status: 403 });

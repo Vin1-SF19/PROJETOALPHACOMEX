@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../../../auth";
 import db from "@/lib/prisma";
@@ -15,6 +16,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -36,9 +38,16 @@ export async function POST(
       db.bibbleSession.update({ where: { id }, data: { updatedAt: new Date() } }),
     ]);
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     console.error("[bibble/messages] transaction-failed", { error: err instanceof Error ? err.name : "unknown" });
     return NextResponse.json({ error: "Failed to save messages" }, { status: 500 });
   }
 
   return new NextResponse(null, { status: 204 });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

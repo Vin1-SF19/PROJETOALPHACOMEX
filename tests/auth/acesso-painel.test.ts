@@ -58,11 +58,11 @@ describe("política de acesso ao Painel Alpha", () => {
     await expect(usuarioPodeAcessarPainel(7)).resolves.toBe(false);
   });
 
-  it("falha de forma segura quando o banco não pode validar o status", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  it("nega temporariamente sem revogar quando o banco não pode validar o status", async () => {
+    const consoleError = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     prismaMock.usuarios.findUnique.mockRejectedValue(new Error("database unavailable"));
 
-    await expect(usuarioPodeAcessarPainel(7)).resolves.toBe(false);
+    await expect(usuarioPodeAcessarPainel(7)).rejects.toMatchObject({ code: "AUTH_UNAVAILABLE" });
     expect(consoleError).toHaveBeenCalledOnce();
 
     consoleError.mockRestore();

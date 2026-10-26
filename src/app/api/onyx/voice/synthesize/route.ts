@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "../../../../../../auth";
@@ -17,6 +18,7 @@ const Schema = z.object({
 // Repassa o áudio do Onyx ao browser. Suporta resposta binária (audio/*) OU
 // JSON com base64/url (depende de como o Omni Voice devolve).
 export async function POST(req: NextRequest) {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -66,7 +68,14 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: "Formato de áudio não reconhecido" }, { status: 502 });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     const code = err instanceof OnyxError ? err.status : 500;
     return NextResponse.json({ error: (err as Error).message }, { status: code });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

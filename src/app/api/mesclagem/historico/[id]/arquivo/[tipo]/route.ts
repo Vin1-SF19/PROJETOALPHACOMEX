@@ -1,3 +1,4 @@
+import { mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from "next/server";
 
 import { MESCLAGEM_NO_STORE_HEADERS, verificarAcessoMesclagem } from "@/lib/mesclagem/autorizacao";
@@ -32,6 +33,7 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string; tipo: string }> },
 ) {
+  try {
   const acesso = await verificarAcessoMesclagem();
   if (!acesso.autorizado) {
     return NextResponse.json(
@@ -58,4 +60,10 @@ export async function GET(
       "X-Robots-Tag": "noindex, nofollow, noarchive",
     },
   });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

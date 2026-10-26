@@ -1,3 +1,4 @@
+import { mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from "next/server";
 import { auth } from "../../../../../../auth";
 import db from "@/lib/prisma";
@@ -61,6 +62,8 @@ export async function GET(request: Request) {
         nextCursor: tarefas.length > 50 ? pagina.at(-1)!.id : null }, { headers });
     }, request.signal);
   } catch (error) {
+    const authUnavailableResponse = mapearIndisponibilidadeAuth(error);
+    if (authUnavailableResponse) return authUnavailableResponse;
     if (erroTimeoutConexaoAlertas(error)) {
       console.warn("[BpmTarefas/alertas] Conexão temporariamente indisponível", { code: "UND_ERR_CONNECT_TIMEOUT" });
       return NextResponse.json({ error: "Alertas temporariamente indisponíveis. Tente novamente em instantes." },

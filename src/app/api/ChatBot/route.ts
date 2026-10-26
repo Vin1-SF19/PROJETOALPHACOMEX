@@ -1,3 +1,4 @@
+import { mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from 'next/server';
 import { auth } from '../../../../auth';
 import db from '@/lib/prisma';
@@ -92,6 +93,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ text: textoResposta });
 
   } catch (error) {
+    const authUnavailableResponse = mapearIndisponibilidadeAuth(error);
+    if (authUnavailableResponse) return authUnavailableResponse;
     console.error("ERRO BIBBLE ROUTE:", error);
     return NextResponse.json({ text: "Deu erro no motor do Bibble." });
   }

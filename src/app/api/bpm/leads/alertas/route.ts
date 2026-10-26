@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from "next/server";
 import { auth } from "../../../../../../auth";
 import { checarAcessoModuloBpm } from "@/lib/bpm/ownership";
@@ -20,9 +21,12 @@ export async function GET(request: Request) {
     }
     const cursor = parametros.get("cursor");
     try { lerCursorAlertasLeadsBpm(cursor, usuarioId); }
-    catch { return NextResponse.json({ error: "Cursor inválido" }, { status: 400, headers }); }
+    catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError; return NextResponse.json({ error: "Cursor inválido" }, { status: 400, headers }); }
     return NextResponse.json(await listarAlertasLeadsBpm(usuarioId, cursor), { headers });
-  } catch {
+  } catch (authError) {
+    const authUnavailableResponse = mapearIndisponibilidadeAuth(authError);
+    if (authUnavailableResponse) return authUnavailableResponse;
     console.error("[AlphaCRM/leads] Não foi possível carregar as pendências");
     return NextResponse.json({ error: "Não foi possível carregar as pendências" }, { status: 500, headers });
   }

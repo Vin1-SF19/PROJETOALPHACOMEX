@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../../auth";
 import { organizarPagina } from "@/lib/onyx/extrato-agents";
@@ -19,6 +20,7 @@ export const maxDuration = 300;
  * (paginasComErro na resposta contém só as que ainda falharam nesta tentativa)
  */
 export async function POST(req: NextRequest) {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ success: false, error: "Não autorizado" }, { status: 401 });
@@ -27,7 +29,8 @@ export async function POST(req: NextRequest) {
   let body: { paginas?: PaginaComErro[] };
   try {
     body = await req.json();
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return NextResponse.json({ success: false, error: "Corpo inválido (JSON esperado)." }, { status: 400 });
   }
 
@@ -47,6 +50,7 @@ export async function POST(req: NextRequest) {
       console.log(`[POST /api/onyx/extrato/reprocessar] página ${p.pagina}: ${doTexto.length} transação(ões)`);
       transacoes.push(...doTexto);
     } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
       const motivo = err instanceof Error ? err.message : String(err);
       console.warn(`[POST /api/onyx/extrato/reprocessar] página ${p.pagina} falhou novamente: ${motivo}`);
       paginasComErro.push({ pagina: p.pagina, texto: p.texto, motivo });
@@ -54,4 +58,10 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ success: true, data: transacoes, paginasComErro });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

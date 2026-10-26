@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 
 import {
@@ -22,6 +23,7 @@ function jsonError(error: string, status: number, code: string) {
 }
 
 export async function GET(request: NextRequest) {
+  try {
   let userId: number | null = null;
   try {
     const acesso = await verificarAcessoAdministrativoCsNps();
@@ -66,6 +68,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     if (error instanceof ErroImportacao) {
       return jsonError(error.message, error.status, error.code);
     }
@@ -77,5 +80,11 @@ export async function GET(request: NextRequest) {
       );
     }
     return jsonError("Não foi possível gerar o modelo", 500, "MODEL_FAILED");
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

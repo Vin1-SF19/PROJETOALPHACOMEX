@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { get } from "@vercel/blob";
 import { z } from "zod";
 
@@ -13,6 +14,7 @@ export async function GET(
   _request: Request,
   context: { params: Promise<{ contratoId: string }> },
 ) {
+  try {
   const session = await auth();
   if (!session?.user?.id) return new Response("Não autorizado", { status: 401 });
   const { contratoId } = await context.params;
@@ -56,7 +58,14 @@ export async function GET(
         "X-Content-Type-Options": "nosniff",
       },
     });
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return new Response("Não foi possível obter o arquivo", { status: 502 });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

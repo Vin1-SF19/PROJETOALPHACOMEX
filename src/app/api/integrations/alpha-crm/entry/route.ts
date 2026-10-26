@@ -1,3 +1,4 @@
+import { mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { SignJWT } from "jose";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../../auth";
@@ -8,6 +9,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     const response = NextResponse.redirect(new URL("/", request.url));
@@ -33,4 +35,10 @@ export async function GET(request: NextRequest) {
   response.headers.set("Cache-Control", "no-store");
   response.headers.set("Referrer-Policy", "no-referrer");
   return response;
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

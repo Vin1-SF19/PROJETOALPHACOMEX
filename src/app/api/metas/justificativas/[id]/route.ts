@@ -1,3 +1,4 @@
+import { mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { auth } from "../../../../../../auth";
 import db from "@/lib/prisma";
 import { podeGerenciarMetas } from "@/lib/metas-permissoes";
@@ -9,6 +10,7 @@ export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  try {
   const session = await auth();
   if (!session?.user?.id) return new Response("Não autenticado", { status: 401 });
 
@@ -43,4 +45,10 @@ export async function GET(
     "X-Content-Type-Options": "nosniff",
   };
   return new Response(respostaBlob.body, { status: 200, headers });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

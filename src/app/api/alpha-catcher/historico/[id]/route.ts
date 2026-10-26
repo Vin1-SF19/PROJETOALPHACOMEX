@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { encaminharWorkerCatcher } from '@/lib/alpha-catcher/worker-client';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -6,6 +7,7 @@ import { historicoCatcher } from '@/lib/alpha-catcher/historico';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  try {
   const acesso = await acessoCatcher();
   if (acesso.status !== 200) return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: acesso.status });
   const { id } = await ctx.params;
@@ -16,5 +18,12 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   try {
     const detalhe = await historicoCatcher.detalharCompartilhado(referencia, acesso.userId!);
     return detalhe ? NextResponse.json(detalhe, { headers: { 'Cache-Control': 'no-store' } }) : NextResponse.json({ error: 'Importação não encontrada.' }, { status: 404 });
-  } catch { return NextResponse.json({ error: 'Não foi possível carregar a lista desta importação.' }, { status: 503 }); }
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError; return NextResponse.json({ error: 'Não foi possível carregar a lista desta importação.' }, { status: 503 }); }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

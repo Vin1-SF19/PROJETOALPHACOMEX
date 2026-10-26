@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from "next/server";
 import db from "@/lib/prisma";
 import { requirePreAnaliseAccess } from "@/lib/pre-analise/access";
@@ -13,6 +14,7 @@ export const revalidate = 0;
 export const maxDuration = 180;
 
 export async function GET(req: Request) {
+  try {
   const denied = await requirePreAnaliseAccess("tributario");
   if (denied) return denied;
   try {
@@ -33,7 +35,8 @@ export async function GET(req: Request) {
         let radarAtualizacao: Awaited<ReturnType<typeof consultarRadar>> | null = null;
         try {
           radarAtualizacao = await consultarRadar(cnpj);
-        } catch {
+        } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
           // Mantém os dados locais existentes se a API do ialpha estiver temporariamente indisponível.
         }
         if (radarAtualizacao && !radarConfirmado(radarAtualizacao)) radarAtualizacao = null;
@@ -225,7 +228,14 @@ export async function GET(req: Request) {
       radarAviso: radar.aviso,
     });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     console.error("ERRO CONSULTACOMPLETA:", error);
     return NextResponse.json({ error: "Falha interna" }, { status: 500 });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

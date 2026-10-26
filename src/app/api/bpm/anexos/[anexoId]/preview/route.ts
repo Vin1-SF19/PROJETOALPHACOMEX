@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { get } from "@vercel/blob";
 
 import { auth } from "../../../../../../../auth";
@@ -12,6 +13,7 @@ export const dynamic = "force-dynamic";
 const ROTA_CONFERENCIA = /^\/PainelAlpha\/GeradorDocumentos\/conferencia\/([0-9a-f-]{36})$/;
 
 export async function GET(request: Request, context: { params: Promise<{ anexoId: string }> }) {
+  try {
   const session = await auth();
   if (!session?.user?.id) return new Response("Não autorizado", { status: 401 });
 
@@ -24,7 +26,8 @@ export async function GET(request: Request, context: { params: Promise<{ anexoId
 
   try {
     await exigirAcessoBpmCard(anexo.cardId, Number(session.user.id), session.user.role ?? null, "visualizar");
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return new Response("Sem permissão", { status: 403 });
   }
 
@@ -51,7 +54,8 @@ export async function GET(request: Request, context: { params: Promise<{ anexoId
       return new Response("Contrato não encontrado", { status: 404 });
     }
     variaveis = dados as Record<string, unknown>;
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return new Response("Contrato não encontrado", { status: 404 });
   }
 
@@ -91,7 +95,8 @@ export async function GET(request: Request, context: { params: Promise<{ anexoId
           "X-Content-Type-Options": "nosniff",
         },
       });
-    } catch {
+    } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
       return new Response("Não foi possível abrir o PDF", { status: 502 });
     }
   }
@@ -103,4 +108,10 @@ export async function GET(request: Request, context: { params: Promise<{ anexoId
     pendencias,
     clausulas: documento.clausulas,
   }, { headers: { "Cache-Control": "private, no-store, max-age=0" } });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

@@ -1,4 +1,6 @@
 "use server"
+import { acessoEstaIndisponivel } from "@/lib/auth/indisponibilidade";
+
 
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
@@ -50,7 +52,8 @@ export async function listarTemplates(categoria?: string): Promise<ProtocoloTemp
       orderBy: [{ categoria: "asc" }, { nome: "asc" }],
     });
     return templates as ProtocoloTemplate[];
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return [];
   }
 }
@@ -62,7 +65,8 @@ export async function listarTodosTemplates(): Promise<ProtocoloTemplate[]> {
       orderBy: [{ categoria: "asc" }, { nome: "asc" }],
     });
     return templates as ProtocoloTemplate[];
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return [];
   }
 }

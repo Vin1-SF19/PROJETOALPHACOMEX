@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { SessionProvider } from "next-auth/react";
+import { SessionProvider } from "@/components/auth/SessaoResilienteProvider";
+import { SessaoProtegida } from "@/components/auth/SessaoIndisponivel";
 import { Toaster } from "sonner";
 import { StatusConexao } from "@/components/StatusConexao";
 import { ThemeProviderAlpha } from "@/components/ThemeProviderAlpha";
-import { auth } from "../../auth";
+import { authComEstadoAcesso } from "../../auth";
 import BroadcastBanner from "@/components/BroadcastBanner";
 import { NotificacaoFlutuante } from "@/components/NotificacaoFlutuante";
 import { Heartbeat } from "@/components/Heartbeat";
@@ -28,7 +29,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = await auth();
+  const session = await authComEstadoAcesso();
   
   const rgbPadrao = "59, 130, 246";
 
@@ -52,7 +53,7 @@ export default async function RootLayout({
               <NotificacaoFlutuante />
               <Heartbeat />
               <PusherGlobal />
-              {children}
+              <SessaoProtegida>{children}</SessaoProtegida>
             </ThemeProviderAlpha>
           </LoginTransitionProvider>
         </SessionProvider>

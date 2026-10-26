@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import db from "@/lib/prisma";
@@ -8,6 +9,7 @@ const MAX_FIXADOS = 3;
 
 // GET /api/onyx/agentes-fixados — lista os agentes fixados do usuário (máx. 3)
 export async function GET() {
+  try {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   const userId = Number(session.user.id);
@@ -19,11 +21,18 @@ export async function GET() {
   });
 
   return NextResponse.json({ fixados });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }
 
 // POST /api/onyx/agentes-fixados — fixa ou desfixa um agente
 // body: { onyxAgentId: number, agentName?: string, acao: "fixar" | "desfixar" }
 export async function POST(req: NextRequest) {
+  try {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   const userId = Number(session.user.id);
@@ -31,7 +40,8 @@ export async function POST(req: NextRequest) {
   let body: { onyxAgentId?: number; agentName?: string; acao?: string };
   try {
     body = await req.json();
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return NextResponse.json({ error: "Body inválido" }, { status: 400 });
   }
 
@@ -64,7 +74,14 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ fixados });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     console.error("[agentes-fixados] erro:", err);
     return NextResponse.json({ error: "Erro ao atualizar fixados" }, { status: 500 });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

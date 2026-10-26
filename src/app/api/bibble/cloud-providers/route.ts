@@ -1,3 +1,4 @@
+import { mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import { isAdminRole } from "@/lib/roles";
@@ -23,13 +24,21 @@ function configuredProviders(): CloudProviderPublic[] {
 
 // GET — público (sem API keys)
 export async function GET() {
+  try {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   return NextResponse.json(configuredProviders());
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }
 
 // POST — admin only
 export async function POST() {
+  try {
   const session = await auth();
   const userTyped = session?.user as { role?: string } | undefined;
   if (!session?.user || !isAdminRole(userTyped?.role)) {
@@ -37,10 +46,17 @@ export async function POST() {
   }
 
   return NextResponse.json({ error: "Chaves devem ser configuradas exclusivamente por variáveis de ambiente no servidor." }, { status: 410 });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }
 
 // DELETE — admin only
 export async function DELETE() {
+  try {
   const session = await auth();
   const userTyped = session?.user as { role?: string } | undefined;
   if (!session?.user || !isAdminRole(userTyped?.role)) {
@@ -48,4 +64,10 @@ export async function DELETE() {
   }
 
   return NextResponse.json({ error: "Providers server-side são gerenciados por variáveis de ambiente." }, { status: 410 });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

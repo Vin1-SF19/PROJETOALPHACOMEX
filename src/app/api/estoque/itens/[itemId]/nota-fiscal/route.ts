@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { createHash } from "node:crypto";
 import { del, put } from "@vercel/blob";
 import { NextResponse } from "next/server";
@@ -27,6 +28,7 @@ async function deleteIfUnreferenced(url: string) {
 }
 
 export async function POST(request: Request, { params }: RouteContext) {
+  try {
   const actor = await getInventoryActor();
   if (!actor?.canManage) return responseError("Sem permissão para alterar anexos do estoque.", 403);
   const { itemId } = await params;
@@ -44,7 +46,8 @@ export async function POST(request: Request, { params }: RouteContext) {
     const encodedFilename = request.headers.get("x-file-name");
     if (!encodedFilename) return responseError("Informe o nome original do arquivo.", 400);
     let filename = "";
-    try { filename = decodeURIComponent(encodedFilename); } catch { return responseError("Nome de arquivo inválido.", 400); }
+    try { filename = decodeURIComponent(encodedFilename); } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError; return responseError("Nome de arquivo inválido.", 400); }
     const body = await request.blob();
     const metadataError = validateInventoryInvoiceMetadata({ name: filename, type: body.type || contentType, size: body.size });
     if (metadataError) return responseError(metadataError, body.size > DEFAULT_INVENTORY_INVOICE_MAX_BYTES ? 413 : 400);
@@ -71,13 +74,21 @@ export async function POST(request: Request, { params }: RouteContext) {
     for (const previousUrl of previousUrls) await deleteIfUnreferenced(previousUrl).catch(() => undefined);
     return NextResponse.json({ success: true, url: uploaded.url });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     if (uploadedUrl) await del(uploadedUrl, { token: blobToken() }).catch(() => undefined);
     console.error("[POST_ESTOQUE_NOTA_FISCAL]", error instanceof Error ? error.message : "Falha desconhecida");
     return responseError("Não foi possível salvar a nota fiscal. O cadastro anterior foi preservado.", 500);
   }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }
 
 export async function DELETE(_request: Request, { params }: RouteContext) {
+  try {
   const actor = await getInventoryActor();
   if (!actor?.canManage) return responseError("Sem permissão para alterar anexos do estoque.", 403);
   const { itemId } = await params;
@@ -90,4 +101,10 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
   });
   await deleteIfUnreferenced(existing.url).catch(() => undefined);
   return NextResponse.json({ success: true });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

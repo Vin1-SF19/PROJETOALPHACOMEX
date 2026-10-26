@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "node:crypto";
@@ -68,6 +69,7 @@ async function podeEditar(apresentacaoId: string, userId: number, role?: string)
  * resposta para renderizar os slides de verdade antes do usuário confirmar.
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
   const urlsTemporarias: string[] = [];
   try {
     const { id: apresentacaoId } = await params;
@@ -95,6 +97,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     try {
       extraido = await extrairApresentacaoPptx(buffer, canvas);
     } catch (erro) {
+    if (acessoEstaIndisponivel(erro)) throw erro;
       console.error("[pptx-preview] Falha ao interpretar o arquivo", erro);
       return NextResponse.json({ success: false, error: "Não foi possível interpretar este .pptx — verifique se o arquivo não está corrompido." }, { status: 422 });
     }
@@ -204,11 +207,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       },
     });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     if (urlsTemporarias.length > 0) await excluirBlobMotion(urlsTemporarias).catch(() => undefined);
     if (error instanceof ErroEntradaPptx) {
       return NextResponse.json({ success: false, error: error.message }, { status: error.status });
     }
     console.error("[POST /api/apresentacoes/[id]/pptx-preview]", error);
     return NextResponse.json({ success: false, error: "Erro ao gerar a prévia do PowerPoint." }, { status: 500 });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 
 import {
@@ -65,6 +66,7 @@ function validarRequisicaoUpload(request: NextRequest): void {
 }
 
 export async function POST(request: NextRequest) {
+  try {
   let userId: number | null = null;
   let liberarLimite: (() => void) | null = null;
   try {
@@ -108,7 +110,8 @@ export async function POST(request: NextRequest) {
     let tiposJson: unknown;
     try {
       tiposJson = JSON.parse(tiposBrutos);
-    } catch {
+    } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
       throw new ErroImportacao("Seleção de tipos inválida", "INVALID_TYPES");
     }
     const tipos = validarTiposImportacao(tiposJson);
@@ -125,6 +128,7 @@ export async function POST(request: NextRequest) {
       { status: 200, headers: CS_NPS_NO_STORE_HEADERS },
     );
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     if (error instanceof ErroImportacao) {
       return jsonError(error.message, error.status, error.code);
     }
@@ -138,5 +142,11 @@ export async function POST(request: NextRequest) {
     return jsonError("Não foi possível analisar a planilha", 500, "PREVIEW_FAILED");
   } finally {
     liberarLimite?.();
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

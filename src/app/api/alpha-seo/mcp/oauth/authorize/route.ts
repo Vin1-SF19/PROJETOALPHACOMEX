@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { requireAlphaSeoProjectAccess } from "@/lib/alpha-seo/project-access";
 import { createMcpAuthorizationCode, oauthAuthorizeSchema } from "@/lib/alpha-seo/mcp/oauth";
 
@@ -21,14 +22,22 @@ function consentPage(params: URLSearchParams): Response {
 }
 
 export async function GET(request: Request) {
+  try {
   const url = new URL(request.url);
   const parsed = oauthAuthorizeSchema.safeParse(objectFromParams(url.searchParams));
   if (!parsed.success) return Response.json({ error: "invalid_request", error_description: "Parâmetros OAuth inválidos." }, { status: 400 });
   try {
     await requireAlphaSeoProjectAccess({ projectId: parsed.data.project_id, action: "project:read" });
     return consentPage(url.searchParams);
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return Response.json({ error: "access_denied", error_description: "Entre no Painel Alpha e confirme o acesso a este projeto." }, { status: 403 });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }
 
@@ -41,7 +50,9 @@ export async function POST(request: Request) {
     const access = await requireAlphaSeoProjectAccess({ projectId: parsed.project_id, action: "project:read" });
     const result = await createMcpAuthorizationCode({ payload: parsed, userId: access.userId });
     return Response.redirect(result.redirect, 303);
-  } catch {
+  } catch (authError) {
+    const authUnavailableResponse = mapearIndisponibilidadeAuth(authError);
+    if (authUnavailableResponse) return authUnavailableResponse;
     return Response.json({ error: "access_denied", error_description: "Não foi possível conceder acesso ao projeto." }, { status: 403 });
   }
 }

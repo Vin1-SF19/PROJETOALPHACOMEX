@@ -1,8 +1,10 @@
+import { AUTH_RETRY_AFTER_SECONDS } from "@/lib/auth/estado-acesso";
 import type { Result } from "./types";
 export function resultHttp<T>(result: Result<T>) {
   const status = result.ok
     ? 200
     : {
+        AUTH_UNAVAILABLE: 503,
         UNAUTHENTICATED: 401,
         FORBIDDEN: 403,
         NOT_FOUND: 404,
@@ -17,6 +19,6 @@ export function resultHttp<T>(result: Result<T>) {
       }[result.error.code];
   return Response.json(result, {
     status,
-    headers: { "Cache-Control": "no-store" },
+    headers: { "Cache-Control": "no-store", ...(!result.ok && result.error.code === "AUTH_UNAVAILABLE" ? { "Retry-After": String(AUTH_RETRY_AFTER_SECONDS) } : {}) },
   });
 }

@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../../auth";
 import { getChatSession, OnyxError } from "@/lib/onyx/client";
@@ -24,6 +25,7 @@ export const dynamic = "force-dynamic";
  * BibbleMessage local salva (ex.: criadas antes deste fix).
  */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -54,7 +56,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const userToken = await getUserOnyxToken(session.user.id);
     if (!userToken) return NextResponse.json({ error: "Onyx requer credencial individual" }, { status: 403 });
     onyxData = await getChatSession(bibbleSession.onyxSessionId, userToken);
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return NextResponse.json({ error: "Não foi possível validar a identidade do agente Onyx" }, { status: 409 });
   }
   const agentId = Number(onyxData.persona_id ?? onyxData.persona?.id);
@@ -114,7 +117,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
     return NextResponse.json({ onyx: true, agentId, messages });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     const status = err instanceof OnyxError ? err.status : 500;
     return NextResponse.json({ error: "Não foi possível carregar a sessão Onyx" }, { status });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

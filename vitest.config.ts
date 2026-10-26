@@ -10,6 +10,9 @@ export default defineConfig({
     },
   },
   test: {
+    // Resolve Auth.js extensionless Next imports as Next's bundler does; tests
+    // exercise the real session handlers instead of mocking their cookie logic.
+    server: { deps: { inline: ["next-auth"] } },
     environment: "node",
     include: ["tests/**/*.test.{ts,tsx}"],
     coverage: {

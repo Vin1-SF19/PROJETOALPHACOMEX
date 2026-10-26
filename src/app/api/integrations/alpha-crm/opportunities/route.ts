@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "../../../../../../auth";
@@ -16,6 +17,7 @@ async function authorizedUserId() {
 }
 
 export async function GET(request: NextRequest) {
+  try {
   const userId = await authorizedUserId();
   if (!userId) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   const clienteId = Number(request.nextUrl.searchParams.get("clienteId"));
@@ -26,18 +28,27 @@ export async function GET(request: NextRequest) {
     const result = await callStandaloneCrm(`/api/integrations/painel-alpha/opportunities?panelCompanyId=${clienteId}`);
     return NextResponse.json(result.payload, { status: result.status, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     console.error("[alpha-crm/opportunities:GET]", error);
     return NextResponse.json({ error: "CRM independente indisponível" }, { status: 502 });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }
 
 export async function POST(request: NextRequest) {
+  try {
   const userId = await authorizedUserId();
   if (!userId) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   const parsed = z.object({ cardId: z.string().min(1).max(100) }).safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "cardId inválido" }, { status: 400 });
   try { await exigirAcessoBpmCard(parsed.data.cardId, userId.id, userId.role, "editarCard"); }
-  catch { return NextResponse.json({ error: "Acesso negado ao card" }, { status: 403 }); }
+  catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError; return NextResponse.json({ error: "Acesso negado ao card" }, { status: 403 }); }
   const card = await db.bpmCard.findUnique({ where: { id: parsed.data.cardId }, select: { id: true, empresaId: true, servico: true, tipoProcesso: true,
     empresa: { select: { razaoSocial: true, nomeFantasia: true, cnpj: true } } } });
   if (!card) return NextResponse.json({ error: "Card não encontrado" }, { status: 404 });
@@ -49,7 +60,14 @@ export async function POST(request: NextRequest) {
     } });
     return NextResponse.json(result.payload, { status: result.status });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     console.error("[alpha-crm/opportunities:POST]", error);
     return NextResponse.json({ error: "CRM independente indisponível" }, { status: 502 });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

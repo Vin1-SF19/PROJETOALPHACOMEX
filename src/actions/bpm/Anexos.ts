@@ -1,4 +1,6 @@
 "use server";
+import { acessoEstaIndisponivel } from "@/lib/auth/indisponibilidade";
+
 import { randomUUID } from "node:crypto";
 import db from "@/lib/prisma";
 import { disponibilizarContratoComercial, notificarContratacaoComercialPosCommit } from "@/lib/bpm/contratacao-comercial-server";
@@ -150,6 +152,7 @@ export async function RegistrarAnexoBpm(dados: unknown) {
       data: { ...resultado.anexo, url: `/api/bpm/anexos/${resultado.anexo.id}` },
     };
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     // A consulta antes do create evita retries comuns. Ainda assim, duas
     // requisições concorrentes podem chegar ao create juntas. A restrição
     // composta resolve a corrida; a perdedora devolve o mesmo anexo de modo

@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import { revalidatePath } from "next/cache";
@@ -6,13 +7,15 @@ import { criarChamadoSchema, primeiraMensagemZod } from "@/lib/chamados/schemas"
 import { criarChamadoMultissetorial, ErroCriacaoChamado } from "@/lib/chamados/criacao";
 
 export async function POST(req: Request) {
+  try {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Sessão expirada" }, { status: 401 });
 
   let payload: unknown;
   try {
     payload = await req.json();
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return NextResponse.json({ error: "Dados do chamado inválidos" }, { status: 400 });
   }
   const parsed = criarChamadoSchema.strict().safeParse(payload);
@@ -29,14 +32,22 @@ export async function POST(req: Request) {
         tecnicoSolicitadoId: chamado.tecnicoSolicitadoId, urgencia: chamado.prioridade,
         createdAt: chamado.createdAt.toISOString(),
       });
-    } catch {
+    } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
       console.warn("[AbrirChamado] Falha ao entregar notificação do chamado persistido");
     }
     revalidatePath("/PainelAlpha/Chamados");
     return NextResponse.json({ success: true, id: chamado.id });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     if (error instanceof ErroCriacaoChamado) return NextResponse.json({ error: error.message }, { status: 400 });
     console.error("[AbrirChamado] Falha ao criar chamado");
     return NextResponse.json({ error: "Erro ao criar via Bibble" }, { status: 500 });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

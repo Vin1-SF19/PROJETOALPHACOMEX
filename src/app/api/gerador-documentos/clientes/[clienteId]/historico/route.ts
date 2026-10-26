@@ -1,3 +1,4 @@
+import { mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../../../auth";
 import db from "@/lib/prisma";
@@ -14,6 +15,7 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ clienteId: string }> },
 ) {
+  try {
   const { clienteId } = await params;
   const id = parseInt(clienteId, 10);
   if (isNaN(id)) {
@@ -52,4 +54,10 @@ export async function GET(
       downloadUrl: doc.pdfUrl ? `/api/gerador-documentos/${doc.id}/download` : null,
     })),
   });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

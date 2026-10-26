@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { auth } from "../../../../../auth";
@@ -7,6 +8,7 @@ import { BLUEPRINT_ALLOWED_MIME_TYPES, BLUEPRINT_MAX_FILE_SIZE } from "@/lib/val
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -23,7 +25,8 @@ export async function POST(request: NextRequest) {
 
   try {
     await exigirAcessoBlueprint(projectId, userId, session.user.role ?? null, "enviarArquivo");
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
   }
 
@@ -59,4 +62,10 @@ export async function POST(request: NextRequest) {
       url: blob.url,
     },
   });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

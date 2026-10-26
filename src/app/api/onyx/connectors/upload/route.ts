@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import { uploadConnectorFiles, OnyxError } from "@/lib/onyx/client";
 import { authorizeConnectors } from "@/lib/onyx/connectors-guard";
@@ -8,13 +9,15 @@ export const dynamic = "force-dynamic";
 // POST /api/onyx/connectors/upload (multipart) — sobe arquivos para um conector
 // "file" e devolve os file_paths que vão em connector_specific_config.file_locations.
 export async function POST(req: NextRequest) {
+  try {
   const authz = await authorizeConnectors();
   if (!authz.ok) return NextResponse.json({ error: authz.error }, { status: authz.status });
 
   let form: FormData;
   try {
     form = await req.formData();
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return NextResponse.json({ error: "Envio inválido (multipart esperado)." }, { status: 400 });
   }
 
@@ -32,7 +35,14 @@ export async function POST(req: NextRequest) {
     );
     return NextResponse.json({ success: true, ...result });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     const status = err instanceof OnyxError ? err.status : 500;
     return NextResponse.json({ error: (err as Error).message }, { status });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

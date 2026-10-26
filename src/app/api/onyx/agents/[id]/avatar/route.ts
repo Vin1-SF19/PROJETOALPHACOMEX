@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../../../auth";
 import { getAgentAvatar, OnyxError } from "@/lib/onyx/client";
@@ -7,6 +8,7 @@ export const dynamic = "force-dynamic";
 
 // GET /api/onyx/agents/[id]/avatar — serve a imagem do agente (proxy autenticado)
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -33,7 +35,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       },
     });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     const status = err instanceof OnyxError ? err.status : 500;
     return NextResponse.json({ error: (err as Error).message }, { status });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

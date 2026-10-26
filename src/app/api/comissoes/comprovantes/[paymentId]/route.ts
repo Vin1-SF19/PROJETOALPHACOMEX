@@ -1,3 +1,4 @@
+import { mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { get } from "@vercel/blob";
 import { auth } from "../../../../../../auth";
 import db from "@/lib/prisma";
@@ -9,6 +10,7 @@ export async function GET(
   _request: Request,
   context: { params: Promise<{ paymentId: string }> },
 ) {
+  try {
   const session = await auth();
   if (!session?.user?.id) return new Response("Não autenticado", { status: 401 });
 
@@ -41,4 +43,10 @@ export async function GET(
   headers["Content-Disposition"] = 'attachment; filename="comprovante"';
   headers["X-Content-Type-Options"] = "nosniff";
   return new Response(result.stream, { status: 200, headers });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

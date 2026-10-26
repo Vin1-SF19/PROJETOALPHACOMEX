@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { get } from "@vercel/blob";
 
 import { auth } from "../../../../../../auth";
@@ -19,6 +20,7 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ anexoId: string }> },
 ) {
+  try {
   const session = await auth();
   if (!session?.user?.id) return new Response("Não autorizado", { status: 401 });
 
@@ -43,7 +45,8 @@ export async function GET(
       "visualizar",
     );
     autorizado = true;
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     // A entrega Financeiro → Operacional concede acesso aos documentos da
     // contratação a quem pode visualizar o card operacional vinculado.
     if (["financeiro", "comercial"].includes(anexo.card.pipeline.chave ?? "")) {
@@ -67,7 +70,8 @@ export async function GET(
           await exigirAcessoBpmCard(destinoId, Number(session.user.id), session.user.role ?? null, "visualizar");
           autorizado = true;
           break;
-        } catch { /* verificar os demais vínculos */ }
+        } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError; /* verificar os demais vínculos */ }
       }
     }
   }
@@ -109,7 +113,14 @@ export async function GET(
       },
     });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     console.error("[GET /api/bpm/anexos]", { anexoId, error: error instanceof Error ? error.name : "unknown" });
     return new Response("Não foi possível obter o anexo", { status: 502 });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

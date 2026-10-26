@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -27,6 +28,7 @@ function caminhoDoCard(pathname: string, cardId: string): boolean {
 
 /** Autoriza um upload direto ao store privado; nenhum binário passa pela Function. */
 export async function POST(request: NextRequest) {
+  try {
   const token = obterTokenBlobPrivadoAnexoBpm();
   if (!token || !recibosAnexoBpmConfigurados()) {
     return NextResponse.json({ success: false, error: "Armazenamento privado indisponível" }, { status: 503 });
@@ -39,7 +41,8 @@ export async function POST(request: NextRequest) {
     // O SDK assina/verifica JSON.stringify(body) no callback. Usar parsed.data
     // removeria propriedades do blob pelo Zod e invalidaria a assinatura real.
     body = recebido as HandleUploadBody;
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return NextResponse.json({ success: false, error: "Solicitação de upload inválida" }, { status: 400 });
   }
 
@@ -50,14 +53,16 @@ export async function POST(request: NextRequest) {
     const session = await auth();
     if (!session?.user?.id) return NextResponse.json({ success: false, error: "Não autorizado" }, { status: 401 });
     let payload: unknown;
-    try { payload = JSON.parse(body.payload.clientPayload || "null"); } catch { payload = null; }
+    try { payload = JSON.parse(body.payload.clientPayload || "null"); } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError; payload = null; }
     const parsed = payloadSchema.safeParse(payload);
     if (!parsed.success || !caminhoDoCard(body.payload.pathname, parsed.data.cardId)) {
       return NextResponse.json({ success: false, error: "Caminho de anexo inválido" }, { status: 400 });
     }
     const userId = Number(session.user.id);
     try { await exigirAcessoBpmCard(parsed.data.cardId, userId, session.user.role ?? null, "enviarArquivo"); }
-    catch { return NextResponse.json({ success: false, error: "Não autorizado" }, { status: 403 }); }
+    catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError; return NextResponse.json({ success: false, error: "Não autorizado" }, { status: 403 }); }
     tokenPayload = JSON.stringify({ cardId: parsed.data.cardId, userId, pathname: body.payload.pathname });
   }
 
@@ -100,7 +105,14 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json(response);
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     console.error("[POST /api/bpm/upload/direct]", { error: error instanceof Error ? error.name : "unknown" });
     return NextResponse.json({ success: false, error: "Não foi possível autorizar ou concluir o upload privado" }, { status: 400 });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

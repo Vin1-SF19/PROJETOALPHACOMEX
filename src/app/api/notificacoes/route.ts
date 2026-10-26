@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { listarEventosChecklist } from "@/actions/checklist/eventos";
 import { NextResponse } from "next/server";
 import db from "@/lib/prisma";
@@ -9,6 +10,7 @@ import { resumirMensagemChamado } from "@/lib/chamados/notificacoes";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  try {
   const session = await auth();
   
   if (!session?.user?.id) {
@@ -105,6 +107,7 @@ export async function GET() {
       ),
     });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     console.error("[notificacoes] Falha ao recuperar notificações e feedbacks pendentes", {
       message: error instanceof Error ? error.message : "erro desconhecido",
     });
@@ -112,5 +115,11 @@ export async function GET() {
       { notificacoes: [], feedbacksPendentes: [] },
       { status: 500 },
     );
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

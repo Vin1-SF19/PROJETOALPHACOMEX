@@ -1,8 +1,10 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from "next/server"
 import { auth } from "../../../../auth"
 import db from "@/lib/prisma"
 
 export async function GET() {
+  try {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
 
@@ -20,12 +22,20 @@ export async function GET() {
       protecao: doc.protecao ?? "ATIVO",
     })))
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     console.error("Erro ao buscar documentos:", error)
     return NextResponse.json({ error: "Erro ao buscar dados" }, { status: 500 })
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }
 
 export async function PATCH(request: Request) {
+  try {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
 
@@ -46,12 +56,20 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     console.error("Erro no PATCH:", error)
     return NextResponse.json({ error: "Erro ao atualizar documento" }, { status: 500 })
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }
 
 export async function DELETE(request: Request) {
+  try {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
 
@@ -63,7 +81,14 @@ export async function DELETE(request: Request) {
     await db.documentos.delete({ where: { id: parseInt(id) } })
     return NextResponse.json({ success: true })
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     console.error("Erro ao deletar:", error)
     return NextResponse.json({ error: "Erro ao excluir do banco" }, { status: 500 })
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

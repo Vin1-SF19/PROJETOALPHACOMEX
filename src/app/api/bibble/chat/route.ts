@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest } from "next/server";
 import { auth } from "../../../../../auth";
 import { modelSupportsVision, getModelLabel, BIBBLE_MODEL } from "@/lib/bibble/client";
@@ -241,6 +242,7 @@ export const maxDuration = 120;
 // ─── Route handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  try {
   const requestStartedAt = Date.now();
   const requestId = randomUUID();
   const deadlineAt = requestStartedAt + BIBBLE_REQUEST_DEADLINE_MS;
@@ -278,7 +280,8 @@ export async function POST(req: NextRequest) {
   const rejectEarly = (response: Response) => { lease.release(); clearTimeout(deadlineTimer); return response; };
   let rawInput: string;
   try { rawInput = await readRequestTextWithLimit(req); }
-  catch { return rejectEarly(new Response(JSON.stringify({ error: "Payload do chat excede o limite permitido" }), { status: 413, headers: { "Content-Type": "application/json" } })); }
+  catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError; return rejectEarly(new Response(JSON.stringify({ error: "Payload do chat excede o limite permitido" }), { status: 413, headers: { "Content-Type": "application/json" } })); }
   const parsedInput = bibbleChatInputSchema.safeParse((() => { try { return JSON.parse(rawInput) as unknown; } catch { return null; } })());
   if (!parsedInput.success) return rejectEarly(new Response(JSON.stringify({ error: "Entrada de chat inválida" }), { status: 400, headers: { "Content-Type": "application/json" } }));
   const input: BibbleChatInput = parsedInput.data;
@@ -566,4 +569,10 @@ export async function POST(req: NextRequest) {
       "Server-Timing": `queue;dur=${metrics.queueMs}`,
     },
   });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

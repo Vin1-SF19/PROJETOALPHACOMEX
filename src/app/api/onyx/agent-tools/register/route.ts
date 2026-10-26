@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from "next/server";
 import { auth } from "../../../../../../auth";
 import { createCustomTool, OnyxError } from "@/lib/onyx/client";
@@ -53,6 +54,7 @@ function buildSchema(title: string, baseUrl: string, toolNames: string[]): Recor
 
 // POST /api/onyx/agent-tools/register — (admin) registra as skills do PainelAlpha no Onyx.
 export async function POST() {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -97,7 +99,14 @@ export async function POST() {
 
     return NextResponse.json({ success: true, created });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     const status = err instanceof OnyxError ? err.status : 500;
     return NextResponse.json({ error: (err as Error).message }, { status });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

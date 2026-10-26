@@ -1,3 +1,4 @@
+import { mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import db from "@/lib/prisma";
 import { canalReservadoChecklist } from "@/lib/checklist/realtime";
 import { obterAtorChamados, podeVerChamado, chamadoAcessoSelect } from "@/lib/chamados/acesso";
@@ -152,6 +153,8 @@ export async function POST(req: Request) {
     const authResponse = pusherServer.authorizeChannel(socketId, channelName, presenceData);
     return NextResponse.json(authResponse);
   } catch (error) {
+    const authUnavailableResponse = mapearIndisponibilidadeAuth(error);
+    if (authUnavailableResponse) return authUnavailableResponse;
     console.error("Erro no Pusher Auth:", error);
     return new NextResponse("Internal Error", { status: 500 });
   }

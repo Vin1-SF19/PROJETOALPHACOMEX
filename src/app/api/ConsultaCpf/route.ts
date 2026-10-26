@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../auth";
 
@@ -15,6 +16,7 @@ function paraFormatoInfoSimples(data: string): string | null {
 }
 
 export async function POST(req: NextRequest) {
+  try {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -103,8 +105,15 @@ export async function POST(req: NextRequest) {
       dadosBrutos: data,
     });
   } catch (err: unknown) {
+    if (acessoEstaIndisponivel(err)) throw err;
     console.error("[ConsultaCpf] erro inesperado →", err);
     const message = err instanceof Error ? err.message : "Erro ao consultar CPF";
     return NextResponse.json({ error: message }, { status: 500 });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

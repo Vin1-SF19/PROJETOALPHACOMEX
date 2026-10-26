@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { put } from "@vercel/blob";
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
@@ -67,6 +68,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     try {
       extraido = await extrairApresentacaoPptx(buffer, canvas);
     } catch (erro) {
+    if (acessoEstaIndisponivel(erro)) throw erro;
       console.error("[importar-pptx] Falha ao interpretar o arquivo", erro);
       return NextResponse.json({ success: false, error: "Não foi possível interpretar este .pptx — verifique se o arquivo não está corrompido." }, { status: 422 });
     }
@@ -79,6 +81,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     try {
       fontesEmbutidas = await garantirFontesEmbutidasGlobais(extraido.fontesEmbutidas);
     } catch (erro) {
+    if (acessoEstaIndisponivel(erro)) throw erro;
       // A fonte melhora a fidelidade, mas uma indisponibilidade do store nao deve descartar
       // todo o trabalho de importacao. O fallback tipografico continua sendo diagnosticado.
       console.error("[importar-pptx] Falha ao publicar fontes incorporadas", erro);
@@ -108,6 +111,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         },
       });
     } catch (erro) {
+    if (acessoEstaIndisponivel(erro)) throw erro;
       console.error("[importar-pptx] Falha ao preservar o arquivo original", erro);
       return NextResponse.json({ success: false, error: "Não foi possível preservar o PowerPoint original; a importação foi cancelada sem criar slides." }, { status: 502 });
     }
@@ -239,6 +243,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       },
     });
   } catch (error) {
+    const authUnavailableResponse = mapearIndisponibilidadeAuth(error);
+    if (authUnavailableResponse) return authUnavailableResponse;
     if (error instanceof ErroEntradaPptx) {
       return NextResponse.json({ success: false, error: error.message }, { status: error.status });
     }

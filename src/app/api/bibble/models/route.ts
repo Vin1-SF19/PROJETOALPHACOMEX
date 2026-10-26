@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import { getOllamaHeaders } from "@/lib/bibble/client";
@@ -11,6 +12,7 @@ interface OpenAICompatModel {
 }
 
 export async function GET() {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -19,7 +21,8 @@ export async function GET() {
   let ollamaUrl: string;
   try {
     ollamaUrl = getBibbleRuntimeConfig().endpoint.toString().replace(/\/$/, "");
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return NextResponse.json({ models: [], error: "Configuração do servidor local inválida" }, { status: 503 });
   }
 
@@ -49,7 +52,14 @@ export async function GET() {
       configured: true,
       capabilities: { contextWindow: runtime.contextWindow, outputTokenLimit: runtime.outputTokenLimit },
     });
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return NextResponse.json({ models: [], error: "Servidor local indisponível" });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

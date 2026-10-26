@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import { listImageModels, setDefaultImageModel, OnyxError } from "@/lib/onyx/client";
@@ -8,6 +9,7 @@ export const dynamic = "force-dynamic";
 // GET /api/onyx/image-models — lista os modelos de geração de imagem (admin).
 // ATENÇÃO: o modelo é um DEFAULT GLOBAL no Onyx (afeta todos os usuários).
 export async function GET() {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -20,13 +22,21 @@ export async function GET() {
     const models = await listImageModels();
     return NextResponse.json({ models });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     const status = err instanceof OnyxError ? err.status : 500;
     return NextResponse.json({ error: (err as Error).message }, { status });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }
 
 // POST /api/onyx/image-models — define o modelo padrão (global). Admin only.
 export async function POST(req: NextRequest) {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -45,7 +55,14 @@ export async function POST(req: NextRequest) {
     await setDefaultImageModel(body.imageProviderId);
     return NextResponse.json({ success: true });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     const status = err instanceof OnyxError ? err.status : 500;
     return NextResponse.json({ error: (err as Error).message }, { status });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import db from "@/lib/prisma";
@@ -10,10 +11,12 @@ import {
 } from "@/lib/alpha-seo/sam/service";
 
 export async function POST(request: Request) {
+  try {
   let data: z.infer<typeof samMessageSchema>;
   try {
     data = samMessageSchema.parse(await request.json());
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     return NextResponse.json(
       {
         success: false,
@@ -116,6 +119,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     return NextResponse.json(
       {
         success: false,
@@ -125,5 +129,11 @@ export async function POST(request: Request) {
       },
       { status: 403 },
     );
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

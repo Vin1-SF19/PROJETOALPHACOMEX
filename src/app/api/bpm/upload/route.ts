@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { z } from "zod";
 import { conteudoUploadCompativel } from "@/lib/bpm/upload-conteudo";
 import { NextRequest, NextResponse } from "next/server";
@@ -12,6 +13,7 @@ import { ACAO_UPLOAD_ANEXO_SEM_REGISTRO } from "@/lib/bpm/anexos-lifecycle";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
+  try {
   if (!recibosAnexoBpmConfigurados()) {
     console.error("[POST /api/bpm/upload] CRM_ANEXO_RECEIPT_SECRET ausente");
     return NextResponse.json({ success: false, error: "Envio de anexos indisponível. Avise o administrador para configurar a segurança dos anexos." }, { status: 503 });
@@ -28,7 +30,8 @@ export async function POST(request: NextRequest) {
   const userId = Number(session.user.id);
 
   let formData: FormData;
-  try { formData = await request.formData(); } catch {
+  try { formData = await request.formData(); } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return NextResponse.json({ success: false, error: "Multipart inválido" }, { status: 400 });
   }
   const parsed = z.object({ file: z.instanceof(File), cardId: z.string().cuid() }).safeParse({
@@ -46,7 +49,8 @@ export async function POST(request: NextRequest) {
 
   try {
     await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "enviarArquivo");
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return NextResponse.json({ success: false, error: "Não autorizado" }, { status: 403 });
   }
 
@@ -75,6 +79,7 @@ export async function POST(request: NextRequest) {
       token: tokenPrivado,
     });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     console.error("[POST /api/bpm/upload] Falha no Blob privado", { error: error instanceof Error ? error.name : "unknown" });
     return NextResponse.json({ success: false, error: "Falha no armazenamento do anexo. Tente novamente." }, { status: 502 });
   }
@@ -88,6 +93,7 @@ export async function POST(request: NextRequest) {
         valorAnteriorJson: criarReferenciaAnexoBpm(blob.pathname),
       } });
     } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
       await del(blob.pathname, { token: tokenPrivado }).catch((cleanupError) =>
         console.error("[POST /api/bpm/upload] Blob sem registro de limpeza", {
           pathname: blob.pathname,
@@ -114,7 +120,14 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     console.error("[POST /api/bpm/upload] Falha ao registrar anexo", { error: error instanceof Error ? error.name : "unknown" });
     return NextResponse.json({ success: false, error: "Não foi possível registrar o anexo. Tente novamente." }, { status: 500 });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

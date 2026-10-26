@@ -52,7 +52,7 @@ export default function AlphaCommPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  if (session && !isAdminRole(session.user?.role) && session.user.usuario !== "Weslei") {
+  if (session?.user && !isAdminRole(session.user.role) && session.user.usuario !== "Weslei") {
     toast.error("Acesso restrito ao núcleo Alpha.");
     redirect("/PainelAlpha");
   }

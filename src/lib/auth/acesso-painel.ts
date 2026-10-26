@@ -1,11 +1,19 @@
 import db from "@/lib/prisma";
 import { cache } from "react";
+import { AcessoTemporariamenteIndisponivel } from "./indisponibilidade";
+import type { EstadoAcessoSessao } from "./estado-acesso";
 
 export const STATUS_USUARIO_ATIVO = "ATIVO";
-
+// Transport and authorization observation are separate deadlines. An expired
+// observer never releases its pending-query slot until the SDK actually settles.
+export const AUTH_VALIDATION_BUDGET_MS = 5_000;
+export const AUTH_PENDING_READ_LIMIT = 8;
+export const AUTH_READ_RETRY_DELAY_MS = 50;
+let pendingReads = 0;
 export type TokenAcessoPainel = Record<string, unknown> & {
   id?: unknown;
   acessoBloqueado?: boolean;
+  estadoAcesso?: EstadoAcessoSessao;
   statusUsuario?: string;
   authSessionVersion?: unknown;
 };
@@ -14,36 +22,79 @@ export function statusPermiteAcessoPainel(status: unknown): boolean {
   return status === STATUS_USUARIO_ATIVO;
 }
 
-type EstadoAcessoPainel = {
-  status: string;
-  authSessionVersion: number;
-};
+type EstadoAcessoPainel =
+  | { estado: "PERMITIDO"; authSessionVersion: number }
+  | { estado: "NEGADO" }
+  | { estado: "INDISPONIVEL" };
 
-// Compartilha a leitura entre auth() do root, layout e página somente durante
-// a renderização atual. Uma nova requisição sempre revalida o token no banco.
-const obterEstadoAcessoPainel = cache(async (userId: unknown): Promise<EstadoAcessoPainel | null> => {
-  const id = Number(userId);
+function idValido(value: unknown): boolean {
+  return (typeof value === "number" || typeof value === "string" && /^[1-9]\d*$/.test(value)) &&
+    Number.isSafeInteger(Number(value)) && Number(value) > 0;
+}
 
-  if (!Number.isSafeInteger(id) || id <= 0) {
-    return null;
-  }
+function erroDeTransporte(error: unknown): boolean {
+  if (error instanceof TypeError && error.message === "fetch failed") return true;
+  if (!error || typeof error !== "object") return false;
+  const code = "code" in error ? String(error.code) : "";
+  if (/^(UND_ERR_(SOCKET|CONNECT_TIMEOUT|HEADERS_TIMEOUT|BODY_TIMEOUT)|ECONNRESET|ETIMEDOUT)$/.test(code)) return true;
+  return "name" in error && error.name === "TimeoutError";
+}
 
-  try {
-    const usuario = await db.usuarios.findUnique({
-      where: { id },
-      select: { status: true, authSessionVersion: true },
-    });
-
-    return usuario;
-  } catch (error) {
-    console.error("Falha ao validar o status de acesso do usuário:", error);
-    return null;
-  }
+// React cache shares only the current render, never a stale authorization decision.
+const obterEstadoAcessoPainel = cache(async (userId: unknown): Promise<EstadoAcessoPainel> => {
+  if (!idValido(userId)) return { estado: "NEGADO" };
+  if (pendingReads >= AUTH_PENDING_READ_LIMIT) return { estado: "INDISPONIVEL" };
+  pendingReads++;
+  let expired = false;
+  const expiresAt = Date.now() + AUTH_VALIDATION_BUDGET_MS;
+  const budgetExpired = () => expired || Date.now() >= expiresAt;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<EstadoAcessoPainel>((resolve) => {
+    timer = setTimeout(() => {
+      expired = true;
+      resolve({ estado: "INDISPONIVEL" });
+    }, AUTH_VALIDATION_BUDGET_MS);
+  });
+  const query = (async (): Promise<EstadoAcessoPainel> => {
+    try {
+      for (let attempt = 0; attempt < 2 && !budgetExpired(); attempt++) {
+        try {
+          const usuario = await db.usuarios.findUnique({
+            where: { id: Number(userId) },
+            select: { status: true, authSessionVersion: true },
+          });
+          if (budgetExpired()) return { estado: "INDISPONIVEL" };
+          if (!usuario || !statusPermiteAcessoPainel(usuario.status) ||
+              !Number.isSafeInteger(usuario.authSessionVersion) || usuario.authSessionVersion < 0) {
+            return { estado: "NEGADO" };
+          }
+          return { estado: "PERMITIDO", authSessionVersion: usuario.authSessionVersion };
+        } catch (error) {
+          if (attempt === 0 && !budgetExpired() && erroDeTransporte(error)) {
+            await new Promise((resolve) => setTimeout(resolve, AUTH_READ_RETRY_DELAY_MS + Math.floor(Math.random() * 25)));
+            continue;
+          }
+          // No raw SDK errors, tokens, URLs or identity in the log.
+          console.warn("[auth] Validação de acesso temporariamente indisponível");
+          return { estado: "INDISPONIVEL" };
+        }
+      }
+      return { estado: "INDISPONIVEL" };
+    } finally {
+      // A timed-out observer cannot create unlimited work behind the adapter mutex.
+      pendingReads--;
+      clearTimeout(timer);
+    }
+  })();
+  // Late outcomes are consumed, not used to authorize a request already denied.
+  // Transport aborts independently when the queued SDK call reaches fetch.
+  return Promise.race([query, deadline]);
 });
 
 export async function usuarioPodeAcessarPainel(userId: unknown): Promise<boolean> {
   const estado = await obterEstadoAcessoPainel(userId);
-  return statusPermiteAcessoPainel(estado?.status);
+  if (estado.estado === "INDISPONIVEL") throw new AcessoTemporariamenteIndisponivel();
+  return estado.estado === "PERMITIDO";
 }
 
 export function bloquearTokenAcesso<T extends TokenAcessoPainel>(token: T): T {
@@ -58,29 +109,28 @@ export function bloquearTokenAcesso<T extends TokenAcessoPainel>(token: T): T {
     permissoes: undefined,
     authSessionVersion: undefined,
     acessoBloqueado: true,
+    estadoAcesso: "NEGADO",
   };
 }
 
-export async function revalidarTokenAcesso<T extends TokenAcessoPainel>(
-  token: T,
-): Promise<T> {
-  if (token.acessoBloqueado) {
+export async function revalidarTokenAcesso<T extends TokenAcessoPainel>(token: T): Promise<T & TokenAcessoPainel> {
+  if (token.acessoBloqueado || !idValido(token.id) ||
+      typeof token.authSessionVersion !== "number" || !Number.isSafeInteger(token.authSessionVersion) || token.authSessionVersion < 0) {
     return bloquearTokenAcesso(token);
   }
-
   const estado = await obterEstadoAcessoPainel(token.id);
-  const tokenVersion = Number(token.authSessionVersion ?? 0);
-  if (
-    !estado ||
-    !statusPermiteAcessoPainel(estado.status) ||
-    !Number.isSafeInteger(tokenVersion) ||
-    tokenVersion !== estado.authSessionVersion
-  ) return bloquearTokenAcesso(token);
-
+  if (estado.estado === "INDISPONIVEL") {
+    // Preserve encrypted claims, but never expose them as an authorized public user.
+    return { ...token, acessoBloqueado: false, estadoAcesso: "INDISPONIVEL" };
+  }
+  if (estado.estado === "NEGADO" || token.authSessionVersion !== estado.authSessionVersion) {
+    return bloquearTokenAcesso(token);
+  }
   return {
     ...token,
     statusUsuario: STATUS_USUARIO_ATIVO,
     authSessionVersion: estado.authSessionVersion,
     acessoBloqueado: false,
+    estadoAcesso: "PERMITIDO",
   };
 }

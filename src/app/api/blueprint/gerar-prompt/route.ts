@@ -1,3 +1,4 @@
+import { mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { auth } from "../../../../../auth";
@@ -29,6 +30,7 @@ function montarSystemPrompt(): string {
 }
 
 export async function POST(req: NextRequest) {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return new Response(JSON.stringify({ success: false, error: "Não autorizado" }), { status: 401 });
@@ -104,4 +106,10 @@ export async function POST(req: NextRequest) {
   return new Response(stream, {
     headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" },
   });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

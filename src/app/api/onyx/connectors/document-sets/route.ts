@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import {
   listDocumentSets,
@@ -17,12 +18,20 @@ function fail(err: unknown) {
 
 // GET /api/onyx/connectors/document-sets — lista document sets.
 export async function GET() {
+  try {
   const authz = await authorizeConnectors();
   if (!authz.ok) return NextResponse.json({ error: authz.error }, { status: authz.status });
   try {
     return NextResponse.json({ documentSets: await listDocumentSets() });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     return fail(err);
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }
 
@@ -35,6 +44,7 @@ interface CreateBody {
 
 // POST /api/onyx/connectors/document-sets — cria document set.
 export async function POST(req: NextRequest) {
+  try {
   const authz = await authorizeConnectors();
   if (!authz.ok) return NextResponse.json({ error: authz.error }, { status: authz.status });
 
@@ -51,7 +61,14 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ success: true, id });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     return fail(err);
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }
 
@@ -64,6 +81,7 @@ interface PatchBody {
 
 // PATCH /api/onyx/connectors/document-sets — atualiza document set.
 export async function PATCH(req: NextRequest) {
+  try {
   const authz = await authorizeConnectors();
   if (!authz.ok) return NextResponse.json({ error: authz.error }, { status: authz.status });
 
@@ -80,12 +98,20 @@ export async function PATCH(req: NextRequest) {
     });
     return NextResponse.json({ success: true });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     return fail(err);
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }
 
 // DELETE /api/onyx/connectors/document-sets?id=N — exclui document set.
 export async function DELETE(req: NextRequest) {
+  try {
   const authz = await authorizeConnectors();
   if (!authz.ok) return NextResponse.json({ error: authz.error }, { status: authz.status });
 
@@ -95,6 +121,13 @@ export async function DELETE(req: NextRequest) {
     await deleteDocumentSet(id);
     return NextResponse.json({ success: true });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     return fail(err);
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

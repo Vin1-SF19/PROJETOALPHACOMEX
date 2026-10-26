@@ -1,3 +1,4 @@
+import { mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from "next/server";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
@@ -39,6 +40,7 @@ async function writeCache(cache: Cache): Promise<void> {
 // ── Route ────────────────────────────────────────────────────────────────────
 
 export async function GET() {
+  try {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const cache = await readCache();
@@ -61,4 +63,10 @@ export async function GET() {
   void writeCache(cache); // non-blocking
 
   return NextResponse.json({ piada: PIADAS_BANK[idx] });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

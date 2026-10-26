@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { randomUUID } from "node:crypto";
 import { SignJWT } from "jose";
 import { NextResponse } from "next/server";
@@ -57,6 +58,7 @@ async function userCanOpenChatbotx(session: Awaited<ReturnType<typeof auth>>) {
 }
 
 export async function GET() {
+  try {
   const session = await auth();
   if (!session?.user) {
     return errorPage("Sua sessão do Painel Alpha não está ativa.", 401);
@@ -96,7 +98,8 @@ export async function GET() {
       body: JSON.stringify({ assertion }),
       cache: "no-store",
     });
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return errorPage("Não foi possível conectar ao ChatbotX. Tente novamente.", 502);
   }
 
@@ -117,4 +120,10 @@ export async function GET() {
   }
 
   return NextResponse.redirect(result.loginUrl, 303);
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

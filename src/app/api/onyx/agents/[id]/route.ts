@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../../auth";
 import { getAgent, updateAgent, deleteAgent, getImageGenToolId, OnyxError, type CreateAgentInput } from "@/lib/onyx/client";
@@ -38,6 +39,7 @@ async function ensureCanManage(
 
 // GET /api/onyx/agents/[id] — detalhe de um agente
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -53,13 +55,21 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const agent = await getAgent(id, userToken);
     return NextResponse.json({ agent });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     const status = err instanceof OnyxError ? err.status : 500;
     return NextResponse.json({ error: "Não foi possível carregar o agente Onyx" }, { status });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }
 
 // PATCH /api/onyx/agents/[id] — atualiza um agente
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -112,13 +122,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     await recordAgentOwner(id, Number(session.user.id), agent.name, isPublic).catch(() => {});
     return NextResponse.json({ agent });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     const status = err instanceof OnyxError ? err.status : 500;
     return NextResponse.json({ error: (err as Error).message }, { status });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }
 
 // DELETE /api/onyx/agents/[id] — remove um agente
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -139,7 +157,14 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     await removeAgentOwner(id).catch(() => {});
     return NextResponse.json({ success: true });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     const status = err instanceof OnyxError ? err.status : 500;
     return NextResponse.json({ error: (err as Error).message }, { status });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

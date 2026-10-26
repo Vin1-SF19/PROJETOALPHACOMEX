@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import { gerarFichaServer } from "@/lib/bibble/gerar-ficha-server";
@@ -14,6 +15,7 @@ interface GerarFichaInput {
 }
 
 export async function POST(req: NextRequest) {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -35,8 +37,15 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json(result);
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     const msg = err instanceof Error ? err.message : "Erro interno";
     const status = msg === "CNPJ inválido" ? 400 : msg.includes("não encontrada") ? 404 : 500;
     return NextResponse.json({ error: msg }, { status });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import { get } from "@vercel/blob";
 import { auth } from "../../../../../../auth";
@@ -17,6 +18,7 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  try {
   const { id } = await params;
 
   const session = await auth();
@@ -31,6 +33,7 @@ export async function GET(
     const ctx = await exigirAcessoModulo(userId, role);
     documento = await exigirOwnershipDocumento(id, ctx, "visualizar");
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     if (error instanceof Error && error.message === "Documento não encontrado") {
       return NextResponse.json({ success: false, error: "Documento não encontrado" }, { status: 404 });
     }
@@ -56,7 +59,14 @@ export async function GET(
         "Content-Length": String(resultado.blob.size),
       },
     });
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return NextResponse.json({ success: false, error: "Falha ao baixar o PDF" }, { status: 500 });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }
