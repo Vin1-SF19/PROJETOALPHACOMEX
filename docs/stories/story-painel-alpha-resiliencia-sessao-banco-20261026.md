@@ -1,6 +1,6 @@
 # Story — Resiliência da sessão e carregamento durante falha temporária do banco
 
-**Status:** In Progress — integração local de staging concluída; reteste Sage focal/Chrome PASS; gates globais/revisões/publicação pendentes
+**Status:** In Progress — Forge/Sage/Probe/Anubis/Lens aprovados localmente; publicação e validação staging pendentes
 **Data:** 2026-10-26
 **Base original:** origin/staging b115dd3802485e9b0a049f2a45a5010db77338b5; integrado localmente o avanço fb0e8546d75e95f96e780f2049b43d75f6466e15
 **Pedido:** “realize as melhorias necessarias”, após diagnóstico de intermitência do banco, falso logout e carregamento prolongado. Autoriza desenvolvimento, testes e staging; produção exige promoção explícita.
@@ -23,7 +23,7 @@ Usuário válido mantém sua identidade durante indisponibilidade temporária, r
 - [x] AC4 — Transporte HTTP tem prazo curto com cancelamento real inclusive body e signal existente; retry no máximo limitado à leitura segura de revalidação. Nenhum replay automático de writes/transações.
 - [x] AC5 — Heartbeat tem uma tentativa ativa, deadline/backoff/cleanup e logout só definitivo. Iframe em `/` confirma estado antes de logout; indisponibilidade preserva shell/rascunhos e timeout15s existente.
 - [x] AC6 — Confirmação de login termina em prazo e ignora respostas atrasadas; estado desconhecido nunca vira AUTH_SUCCESS. Recuperação não exige novo login da sessão válida existente.
-- [ ] AC7 — Testes causais comprovam cookies reais Auth.js, guards servidor/REST/action/RSC, abort do body, timers/no overlap e revogação. Gates lint/typecheck/test/build executados e revisão Forge→Probe/Anubis/Lens concluída.
+- [x] AC7 — Testes causais comprovam cookies reais Auth.js, guards servidor/REST/action/RSC, abort do body, timers/no overlap e revogação. Gates globais Forge e revisões Probe/Anubis/Lens concluídos; lint adotado com delta focal e CodeRabbitSKIPPED explicitamente registrados.
 - [ ] AC8 — Publicar e validar primeiro staging com ambiente/banco conferidos; preservar alterações concorrentes. Sem schema, migration, cópia de dados/credenciais ou mudança em produção.
 
 ## Tarefas e ownership (sequencial)
@@ -33,8 +33,8 @@ Usuário válido mantém sua identidade durante indisponibilidade temporária, r
 - [x] Echo: estados/DTO/facade, transporte, HTTP mapper e pontos de servidor; File List atualizada.
 - [x] Nova: heartbeat, login e shell/fallback de recuperação; manter rascunhos e15s.
 - [x] Sage: auditoria causal independente e regressões executadas; três achados reparados por Nova e reteste focal/Chrome PASS em 26/10/2026.
-- [ ] Forge: lint, typecheck, npm test e build reais; registrar evidências e limitações.
-- [ ] Probe/Anubis/Lens: integração, fronteiras de auth e qualidade; fechar achados.
+- [x] Forge: typecheck final, lintglobal adotado com delta focal, npmtestglobal final, build e smoke anônimo compilado PASS; evidências e limites registrados.
+- [x] Probe/Anubis/Lens: revisão focal sequencial PASS, fonte igualForge, nenhum bloqueante; limites e CodeRabbitSKIPPED registrados.
 - [ ] DevOps: preservar staging mais recente, publicar e validar staging; nenhuma promoção implícita.
 - [ ] Scribe/Kowalski: consolidar memória e story com evidência final.
 
@@ -326,3 +326,48 @@ Artefatos privados600: `forge-preflight.md/json` e `forge-preflight-source.json`
 - [ ] Forge deve executar lint/typecheck/npm test/build globais e smoke compilado sobre esta fonte integrada; evidências focais anteriores não aprovam a integração global. Probe/Anubis/Lens e publicação/validação em staging continuam pendentes. Produção não autorizada.
 
 File List desta estação: esta story (status, checklist e registro de integração). Demais arquivos da tarefa já listados acima; alterações recebidas de upstream pertencem ao histórico preservado de staging. Evidências privadas600 `devops-before.json`, `devops-precommit.json`, `devops-before.patch`, `devops-merge-verification.json` e `devops-integration.md/json` em `/home/ialpha/.config/painel-alpha/sessao-resiliencia-20261026/`. Nenhum banco, schema, env real, cloud, push ou deploy acessado nesta estação.
+
+
+## Forge global após integração — checkpoint 26/10/2026
+
+- [x] Fonte integrada25c909be, SHA256e7db281341bdbb56e759a6af92c381c94b116c77efff368b7a2f4cf2cd988f43(3307paths), intacta nos três gates executados. Node24/ambiente sanitizado, sem dotenvreal/DBreal/cloud.
+- [x] npm run typecheck exit0/34,688s; npm run lint exit0/48,922s (0erros/1172avisos).
+- [ ] npmtest exit1/162,069s:802arquivosPASS/1FAIL;6671PASS/15FAIL/4skipped/1todo. Única fixture tests/layout/painel-frame-guards-composition.test.tsx:107 monta shell sem novo contexto de recuperação; falha antes das asserções dos guards. Completar fixture por Sage sem enfraquecer guards/assertions e revalidar testes.
+- [ ] Build novo e smoke compilado ainda NOT_STARTED neste checkpoint; Forge global não aprovado. Revisões/staging continuam pendentes.
+
+Artefatos600: forge-report.md/json, forge-checkpoint-tests.json e logs/métricas forge-typecheck/lint/tests em `/home/ialpha/.config/painel-alpha/sessao-resiliencia-20261026/`. Ownership deste checkpoint: execução/harness privado e esta story; nenhum appcode/teste alterado porForge.
+
+
+## Sage — integração estreita da fixture upstream, 26/10/2026
+
+- [x] Adicionado somente mock da fronteira useRecuperacaoSessao ao teste de composição do shell. Root real provê contexto; fixture isolada precisava explicitá-lo. Nenhum guard/rascunho/navegação/componente real foi mockado por esta correção.
+- [x] 15cenários e todas as chamadasexpect originais preservadas; remover bloco novo de5linhas recupera arquivo byte-idêntico aHEAD. Diff/contagens em sage-fixture-integration.json/sage-fixture-exact.diff.
+- [x] Focal5arquivos/48testesPASS (composição15 + auth/iframe/provider/portais relevantes); lint do teste exit0/0erros/0avisos; gitdiffcheckPASS.
+- [ ] Forge: rerun npmtestGLOBAL e executar build/smoke compilado ainda pendentes. TC/lintglobal prévios e delta focal registrados com hashes separados.
+
+FileList adicional desta rodada: `tests/layout/painel-frame-guards-composition.test.tsx` e esta story. App/package/lock/schema intactos. Evidências600 em `/home/ialpha/.config/painel-alpha/sessao-resiliencia-20261026/sage-fixture-integration.md/json`, `sage-fixture-source.json`, `sage-fixture-focal.log`, `sage-fixture-eslint.log`, `sage-fixture-exact.diff`. Sem banco/envreal/cloud/Gitremote/produção.
+
+
+## Forge final após fixture — 26/10/2026
+
+- [x] Fonte3307paths SHA256c2b325e5aa06ee852e7c079546d54022aa557bdcfbe97b5594ac181780ffe740 (HEAD25c909be+testeauthfixture5linhas), runtime/package/lock/schema intactos.
+- [x] Typecheck final exit0/8,178s; lintglobal anterior exit0/48,922s (0erros/1172avisos) adotado explicitamente com lintfocal do único teste modificado0erros/0avisos.
+- [x] npmtestGLOBAL final4workers exit0/96,293s:803arquivosPASS,6686testesPASS/0FAIL/4skipped/1todo; primeira falha15cenários preservada e resolvida pela fixture estreita.
+- [x] npmrunbuild literal exit0/145,644s; Prisma/client privado/sourcepróprio e playerbundle gerados. Artefato `.next-forge-sessao-20261026`, BUILD_ID`akJWPhMHlRa7-rln3RPsb`, preservado paraProbe. Avisos de require/workerPDF documentados, sem reparo fora de escopo.
+- [x] Dois includes de tsconfig auto-adicionados porNext restaurados somente por efeito gerado; arquivo byte-idêntico ao original e hashfinal c2b325 preservado. Nenhum apppatch intencional.
+- [x] nextstart compilado127.0.0.1/envfake: login200, sessãoHTTP200null, painel307para`/?acesso=bloqueado`, heartbeat401; próprioPID encerrado. Semdevserver/sessãoreal/DBreal.
+- [ ] Probe/Anubis/Lens e publicação/validação staging pendentes. AC7 parcial até revisões, AC8/DoDglobais abertos. Produção não autorizada.
+
+Relatório canônico600 `/home/ialpha/.config/painel-alpha/sessao-resiliencia-20261026/forge-report.md/json`, logs/metadata/recursos forge-typecheck-final/lint/tests-final/build, forge-smoke.json/forge-runtime.log, forge-tsconfig-restore.json e forge-source-final.json. FileList desta estação: esta story; harness e output gerados privados/ignorados, nenhum appcode/teste adicional alterado porForge.
+
+
+## Revisão final Probe → Anubis → Lens — 26/10/2026
+
+- [x] ProbePASS: root/provider/fallback/SSR e rawreaderrestrito, mappersREST/helpers e actionsfailclosed, heartbeat/iframe/loginwired, upstream/4overlaps/guards/drafts preservados. Categorias menu/atalho/CRUDnovo N/A.
+- [x] AnubisPASS: TEMPprivateJWT/publicDTOsemuser/facadeforaJWT, revogação/updateforjado, CSRFsameorigin/broadcastserverread, deadlines/admissão/semreplay, modalnativo/cleanup e continuidadevisual semautorizarwrites.
+- [x] LensPASS: revisão apósForge, geração/cleanup/retornosatrasados/slots/opaqueerrors coerentes. Nenhuma issuevermelha/amarela; dívida de tipagemuserobrigatóriovsDTOsemuser documentada com sugestãofutura, sem bloqueio.
+- [x] Fonte3307hashc2b325e5aa06ee852e7c079546d54022aa557bdcfbe97b5594ac181780ffe740 e BUILD_IDakJWPhMHlRa7-rln3RPsb iguais aoForge. AST111routes/148mappercatches:0ausentes e mappersempreprimeiro; limite estrutural documentado. Nenhum novo teste/gate/appcode nesta revisão.
+- [x] CodeRabbitSKIPPED: CLI ausente noPATHdisponível, não instalado/executado. Não há alegação de aprovaçãoCodeRabbit ou E2Eautenticadostaging.
+- [ ] DevOps: commitfinal/publicação e validação staging; AC8 eDoDoperacional ainda pendentes. Nenhuma promoção de produção.
+
+Evidências privadas600: `/home/ialpha/.config/painel-alpha/sessao-resiliencia-20261026/qa-final.md/json` e `qa-route-mapper-structural.json`. FileList desta revisão: esta story; relatórios privados. Semalteração runtime/testes/schema/envreal/DBreal/cloud/Gitremote.

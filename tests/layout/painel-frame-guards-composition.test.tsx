@@ -9,6 +9,11 @@ import { removePainelFrameState, retryPainelFrame } from '@/lib/painel-embedded'
 
 // Only unrelated UI/notification boundaries are stubbed: the shell and BOTH leave
 // hooks run unchanged, receive real messages, and control real iframe DOM nodes.
+// Root provides recovery in the application. This leave-guard composition fixture
+// isolates that auth boundary; protocol/session behavior has separate real tests.
+vi.mock('@/components/auth/SessaoResilienteProvider', () => ({
+  useRecuperacaoSessao: () => ({ confirmar: vi.fn(async () => null), sinalizarIndisponibilidade: vi.fn() }),
+}));
 vi.mock('next/navigation', () => ({ usePathname: () => '/PainelAlpha' }));
 vi.mock('next-auth/react', () => ({ signOut: vi.fn() }));
 vi.mock('sonner', () => ({ toast: { error: vi.fn() } }));
