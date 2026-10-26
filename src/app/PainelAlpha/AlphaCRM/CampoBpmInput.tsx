@@ -18,6 +18,8 @@ import { CAMPO_CHECKLIST_EXCEL, planilhaChecklistValida } from "@/lib/bpm/checkl
 import { campoEhOrigemCliente } from "@/lib/bpm/origem-cliente";
 import { CampoOrigemCliente } from "@/app/PainelAlpha/AlphaCRM/CampoOrigemCliente";
 import { idUsuarioCampoBpm, nomeUsuarioCampoBpm, type OpcaoUsuarioCampoBpm } from "@/lib/bpm/usuarios-campos";
+import { campoEhMesProtocolar } from "@/lib/bpm/mes-protocolar";
+import { MesProtocolarSelect } from "@/components/bpm/MesProtocolarSelect";
 
 const TIPOS_ANEXO_ACEITOS = ".pdf,.png,.jpg,.jpeg,.webp,.docx,.xlsx,.xls,.csv";
 const TEMPO_LIMITE_UPLOAD_MS = 10 * 60_000;
@@ -130,6 +132,12 @@ export function CampoBpmInput({
     : lerOpcoes(campo.opcoesJson);
 
   const referenciaUsuarioAutomatica = campoEhReferenciaAutomaticaUsuarioBpm(campo);
+  if (campoEhMesProtocolar(campo)) {
+    return <MesProtocolarSelect id={`campo-bpm-${campo.id}`} value={value} onChange={onChange} onBlur={onBlur}
+      className={className} required={campo.obrigatorio} disabled={disabled}
+      readOnly={readOnly || campo.somenteLeitura === true || campo.editavel === false}
+      invalid={invalid} describedBy={describedBy} />;
+  }
   if (referenciaUsuarioAutomatica) {
     return <input id={`campo-bpm-${campo.id}`} className={className} type="text"
       value={value.trim() ? campo.valorExibicao?.trim() || "Usuário não encontrado" : "Não informado"}

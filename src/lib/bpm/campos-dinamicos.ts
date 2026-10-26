@@ -1,6 +1,7 @@
 import { cnpjEhValido, normalizarCNPJ } from "@/lib/format-cnpj";
 import { campoEhOrigemCliente, origemClienteValida } from "@/lib/bpm/origem-cliente";
 import { campoCadastralTextoLivre } from "@/lib/bpm/cadastro-campos";
+import { campoEhMesProtocolar, normalizarMesProtocolar } from "@/lib/bpm/mes-protocolar";
 
 export type CampoDinamicoBpm = {
   id: string;
@@ -83,6 +84,13 @@ export function validarValoresCamposBpm(
     const valor = valorOriginal.trim();
     if (!valor) {
       validados[campoId] = "";
+      continue;
+    }
+
+    if (campoEhMesProtocolar(campo)) {
+      const mes = normalizarMesProtocolar(valor);
+      if (!mes) return { success: false, error: `Selecione um mês válido para "${campo.nome}".` };
+      validados[campoId] = mes;
       continue;
     }
 

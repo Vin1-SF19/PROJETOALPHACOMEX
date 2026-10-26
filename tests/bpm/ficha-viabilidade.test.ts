@@ -65,7 +65,7 @@ describe("ficha de viabilidade", () => {
     expect(dados.rfb?.dados?.natureza_juridica).toBe("Sociedade Limitada");
     expect(dados.extra).toMatchObject({
       nomeResponsavel: "Ana", email: "ana@example.com", dataSituacao: "28/09/2026",
-      horaSituacao: "10:00", mesProtocolo: "01/10/2026", origemLead: "Google",
+      horaSituacao: "10:00", mesProtocolo: "Outubro", origemLead: "Google",
       observacoes: "Resumo registrado",
     });
     expect(dados.viabilidade).toMatchObject({ radarPretendido: "Revisão de Radar Limitado a USD150k", transcricaoRegistrada: true });
@@ -73,6 +73,15 @@ describe("ficha de viabilidade", () => {
     const diferente = montarFichaAlphaDoCard({ card, campos, consulta: { ...consulta, cnpj: "99999999000199" } });
     expect(diferente.dados.rfb?.dados?.natureza_juridica).toBe("");
     expect(diferente.dados.extra?.origemLead).toBe("");
+  });
+
+  it("prioriza o mês canônico e usa o alias global quando o canônico está vazio", () => {
+    const campoGlobal = { id: "mes-global", chave: "alpha.mes.de.protocolo", nome: "Mês de protocolo" };
+    const duplicados = [campoGlobal, ...campos];
+    const cardComGlobal = { ...card, campoValores: [{ campoId: campoGlobal.id, valor: "Março" }, ...card.campoValores] };
+    expect(montarFichaAlphaDoCard({ card: cardComGlobal, campos: duplicados, consulta: null }).dados.extra?.mesProtocolo).toBe("Outubro");
+    const canonicoVazio = { ...cardComGlobal, campoValores: cardComGlobal.campoValores.filter((item) => item.campoId !== "mes") };
+    expect(montarFichaAlphaDoCard({ card: canonicoVazio, campos: duplicados, consulta: null }).dados.extra?.mesProtocolo).toBe("Março");
   });
 
   it("recusa card de outra etapa antes de consultar campos", async () => {

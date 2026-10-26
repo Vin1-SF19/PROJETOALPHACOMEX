@@ -1,5 +1,6 @@
 import type { FichaAlphaDados, FichaAlphaViabilidade } from "@/components/GerarFicha";
 import { transcricaoRealRegistrada } from "@/lib/bpm/reuniao-agendada";
+import { campoEhMesProtocolar, normalizarMesProtocolar } from "@/lib/bpm/mes-protocolar";
 
 type PessoaFicha = { principal: boolean; pessoa: { nome: string; celular: string; email: string | null; telefoneExtra: string | null } };
 type CampoFicha = { id: string; chave: string | null; nome: string };
@@ -83,6 +84,10 @@ export function montarFichaAlphaDoCard(params: {
   const formatadorData = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric" });
   const formatadorHora = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hour12: false });
   const resumo = valor("resumo_reuniao", "Resumo da reunião");
+  const prioridadeMes = (campo: CampoFicha) => campo.chave === "alpha.radar.viabilidade.mes_protocolar" ? 0
+    : campo.chave === "alpha.mes.de.protocolo" ? 1 : 2;
+  const camposMes = campos.filter(campoEhMesProtocolar).sort((a, b) => prioridadeMes(a) - prioridadeMes(b));
+  const mesProtocolo = primeiro(...camposMes.map((campo) => valores.get(campo.id)), extra.mesProtocolo);
   const valorAcordado = valor("valor_acordado", "Valor acordado no contrato");
   const valorNumerico = Number(valorAcordado.replace(",", "."));
   const viabilidade: FichaAlphaViabilidade = {
@@ -124,7 +129,7 @@ export function montarFichaAlphaDoCard(params: {
       email: primeiro(pessoa?.email, card.reunioes[0]?.emailCliente, extra.email),
       dataSituacao: dataReuniao ? formatadorData.format(dataReuniao) : primeiro(extra.dataSituacao),
       horaSituacao: dataReuniao ? formatadorHora.format(dataReuniao) : primeiro(extra.horaSituacao),
-      mesProtocolo: dataBr(primeiro(valor("mes_protocolar", "Mês para protocolar"), extra.mesProtocolo)),
+      mesProtocolo: normalizarMesProtocolar(mesProtocolo) ?? mesProtocolo,
       origemLead: primeiro(valorPorNome("Canal de origem", "Canal/origem do cliente", "Origem do cliente"), extra.origemLead),
       origemLeadDetalhe: texto(extra.origemLeadDetalhe),
       observacoes: primeiro(resumo, extra.observacoes, consulta?.observacoes),

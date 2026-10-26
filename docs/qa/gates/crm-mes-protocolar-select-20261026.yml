@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "story": "crm-mes-protocolar-select-20261026",
+  "story_title": "Seleção apenas do mês para protocolar no CRM",
+  "gate": "PASS",
+  "verdict": "APPROVED",
+  "scope": "local-ready-for-staging-only",
+  "reviewer": "Quinn / QA",
+  "updated": "2026-10-26T20:40:20.270283+00:00",
+  "status_reason": "Domínio de12meses, renderer compartilhado, validação específica, legado sem mutação no render e complemento CRM cobertos. Quatro gates globais reais PASS sobre fonte congelada; aceite autenticado remoto obrigatório permanece pendente após deploy staging.",
+  "top_issues": [],
+  "waiver": {
+    "active": false
+  },
+  "evidence": {
+    "base_sha": "ca156313eec5e484e3efe64d64abc477ab3fc769",
+    "worktree": "crm-mes-protocolar-select-20261026",
+    "gates": {
+      "lint": {
+        "command": "npm run lint",
+        "exit_code": 0,
+        "duration_s": 87.62,
+        "purpose": "final frozen source after priority refinement"
+      },
+      "typecheck": {
+        "command": "npm run typecheck",
+        "exit_code": 0,
+        "duration_s": 17.06,
+        "client": "isolated",
+        "extenso": "3.0.0 from existing installed package",
+        "player": "npm run build:player"
+      },
+      "tests": {
+        "command": "npm test -- --maxWorkers=1",
+        "exit_code": 0,
+        "duration_s": 346.75,
+        "coverage": true,
+        "environment": "fictitious AUTH_SECRET, trusted staging URL; no remote database credentials",
+        "timeouts_assertions_sources_unchanged": true
+      },
+      "build": {
+        "command": "NEXT_DIST_DIR=.next-mes-protocolar-validation npm run build",
+        "exit_code": 0,
+        "duration_s": 106.95,
+        "environment": "no DB env; fictitious QA Auth config; isolated Prisma client"
+      }
+    },
+    "lint_errors": 0,
+    "lint_warnings": 1172,
+    "test_files_passed": 806,
+    "tests_passed": 6738,
+    "tests_skipped": 4,
+    "tests_todo": 1,
+    "tests_failures": 0,
+    "full_repository_single_execution_exit_zero": true,
+    "coverage_enabled": true,
+    "source_guard_files": 3134,
+    "source_guard_unchanged": true,
+    "tsconfig_restored_exact": true,
+    "generated_next_env_absence_restored": true,
+    "private_report_directory": "/var/tmp/alpha-crm-mes-protocolar-20261026/qa",
+    "coderabbit": "Indisponível em PATH e ~/.local/bin; revisão manual executada conforme graceful_degradation configurado.",
+    "metadata_readonly": "/var/tmp/alpha-crm-mes-protocolar-20261026/release/month-fields-readonly.json",
+    "metadata_scope": "2campos ativos CARD, fonte nula,19stageLinks e19formLinks;0escritas; seleção explícita de CLI staging. URL runtime exata indisponível nessa leitura, aceite UI pós-deploy pendente."
+  },
+  "diagnostics_resolved": [
+    "Client Prisma compartilhado desatualizado gerou322erros TS na primeira tentativa; dependências foram isoladas e client correto gerado sem alterar o compartilhado.",
+    "Extenso3.0.0 ausente e bundle player ainda não gerado causaram falhas de ambiente; versão exata já declarada no lock foi copiada de instalação existente e npm run build:player executado, sem alterar manifests.",
+    "Primeira full4 sem AUTH_SECRET de teste não validava Auth.js. Reexecuções usaram apenas segredo fictício e URLs staging, sem credenciais de banco remoto.",
+    "Full4 corrigida sofreu timeouts de fixtures/CLI sob carga. Full1 completa aprovou806arquivos/6738testes sem modificar fontes, timeouts ou assertions."
+  ],
+  "review_findings_closed": [
+    {
+      "id": "QA-MONTH-01",
+      "description": "Prioridade do campo canônico da ficha frente a aliases.",
+      "resolution": "Chave Radar, depois global e nomes; primeiro valor não vazio, com teste de regressão."
+    }
+  ],
+  "nfr_validation": {
+    "security": {
+      "status": "PASS",
+      "notes": "Metadados do servidor continuam autoritativos; readonly/editável e validação dos demais tipos preservados; nenhum auth/ACL ampliado."
+    },
+    "reliability": {
+      "status": "PASS",
+      "notes": "Sem onChange/effect no render. Editor submete somente campos alterados. Legado desconhecido permanece visível; seleção válida é nome de mês."
+    },
+    "performance": {
+      "status": "PASS",
+      "notes": "12opções e helper puro; sem novas consultas em render, sem dependência nova e sem backfill."
+    },
+    "maintainability": {
+      "status": "PASS",
+      "notes": "Seletor compartilhado entre campo dinâmico e complemento, helpers e testes de domínio/integração React."
+    }
+  },
+  "ac_trace": {
+    "AC1": "PASS local: select12meses sem dia/ano. Metadata comprova uso do campo na etapa alvo; etapa alvo vazia e UI autenticada pendente.",
+    "AC2": "PASS local: chaves Radar/global e aliases estritos testados; mesmo renderer nos campos da etapa e requisitos de transição.",
+    "AC3": "PASS local: nome PT canônico, entrada/validação/reabertura em React e servidor compartilham domínio; round-trip remoto pendente.",
+    "AC4": "PASS local: leitura não emite mudança, legado desconhecido preservado, outro campo não submete nem converte mês; modal preserva extra legado.",
+    "AC5": "PASS local: mês semanticamente identificado antecede tiposdata/texto/selecao; datas comuns, vazio e readonly preservados.",
+    "AC6": "PASS local: ficha projeta mês, mantém prioridade canônica; complemento usa select; Pré-Análise mantém geração padrão. Não altera sincronismo global ou snapshots independentes.",
+    "AC7": "PASS local: selectnativo, labels e ARIA/required/readonly preservados, contraste de classes conferido. Keyboard/visual autenticado remoto pendente.",
+    "AC8": "PASS: nenhum schema/configDB/migration/seed/backfill/bulk ou produção alterados. Fixtures locais e build de cliente Prisma não alteram banco remoto.",
+    "AC9": "PASS local: lint/typecheck/test/build globais executados; checklist/filelist pelo desenvolvedor. DevOps commit/push e aceite remoto staging pendentes."
+  },
+  "remote_acceptance": {
+    "status": "PENDING",
+    "required": "Após READY: Operacional sintético já existente salva/reabre mês, outra ocorrência do CRM, seleções12, URL/commit/deployment exatos; preservar/restaurar valores do teste. Alvo Envio do Check List Atualizado está sem cards; não alegar teste visual nele sem evidência.",
+    "baseline_network_limitation": "Chrome registrou net::ERR_NETWORK_CHANGED antes desta publicação; eventual transporte estático com retry deve preservar bytes/status/headers upstream e ser documentado."
+  },
+  "deployment_constraints": {
+    "staging_only": true,
+    "production_authorized": false,
+    "database_changes_authorized_or_executed": false
+  }
+}

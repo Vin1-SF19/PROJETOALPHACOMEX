@@ -60,10 +60,24 @@ it("Salva uma vez, mantém erro e rascunho em conflito e fecha somente após con
 it("modo padrão continua usando consulta, modelo pre-analise e visualização PDF", async () => {
   const open = vi.spyOn(window, "open").mockImplementation(() => null);
   const createURL = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:fixture");
-  await render({ modo: "gerar", dadosManuaisIniciais: undefined }); await alterar("Nome do Responsável", "Pré-Análise"); await salvar();
+  await render({ modo: "gerar", dadosManuaisIniciais: undefined });
+  expect(input("Mês de Protocolo")).not.toBeNull();
+  await alterar("Nome do Responsável", "Pré-Análise"); await salvar();
   expect(api.consulta).toHaveBeenCalledOnce(); expect(api.consulta.mock.calls[0][0].extra.nomeResponsavel).toBe("Pré-Análise");
   const doc = api.pdf.mock.calls[0][0]; expect(doc.props.finalidade).toBe("pre-analise"); expect(doc.props.dados.viabilidade).toBeUndefined();
   expect(open).toHaveBeenCalledWith("blob:fixture", "_blank"); expect(createURL).toHaveBeenCalled();
+});
+it("complemento usa só mês e não regrava a data legada quando outro campo é editado", async () => {
+  const save = vi.fn().mockResolvedValue(undefined);
+  await render({ dadosManuaisIniciais: { ...iniciais, mesProtocolo: "2026-10-31" }, onSalvar: save });
+  const select = document.querySelector<HTMLSelectElement>('select[aria-label="Mês de Protocolo"]')!;
+  expect(select.value).toBe("Outubro"); expect(select.options).toHaveLength(13);
+  await alterar("Nome do Responsável", "Complementado"); await salvar();
+  expect(save.mock.calls[0][0].mesProtocolo).toBe("2026-10-31");
+  await act(async () => { select.value = "Março"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+  await salvar();
+  expect(save.mock.calls[1][0].mesProtocolo).toBe("Março");
+  expect(api.consulta).not.toHaveBeenCalled();
 });
 it("mantém uma origem de cadastro fora da grade original visível e sem substituir seu valor", async () => {
   const save = vi.fn().mockResolvedValue(undefined);

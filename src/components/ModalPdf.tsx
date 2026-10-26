@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 import { DetalhesEmpresaFicha } from "@/components/DetalhesEmpresaFicha";
 import { upsertConsulta } from "@/actions/PreAnalise";
 import { X, FileText, Loader2 } from "lucide-react";
+import { MesProtocolarSelect } from "@/components/bpm/MesProtocolarSelect";
 
 interface Props {
     dados: unknown;
@@ -194,13 +195,17 @@ function ModalPDFConteudo({ dados: dadosEntrada, radarDados: radarEntrada, user,
 
                             <div className="sm:col-span-2">
                                 <label className={labelClass}>Mês de Protocolo</label>
-                                <input
+                                {modo === "complementar" ? <MesProtocolarSelect
+                                    label="Mês de Protocolo" value={dadosManuais.mesProtocolo ?? ""}
+                                    onChange={(valor) => setValue("mesProtocolo", valor, { shouldDirty: true, shouldValidate: true })}
+                                    className={campoClass}
+                                /> : <input
                                     type="text"
                                     placeholder="Ex: Maio"
                                     {...register("mesProtocolo")}
                                     aria-label="Mês de Protocolo"
                                     className={campoClass}
-                                />
+                                />}
                             </div>
                         </div>
 
