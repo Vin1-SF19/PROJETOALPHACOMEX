@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pin, Star, Archive, Trash2, Tag as TagIcon, Link2, Share2, History, MessageSquare, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { FixarNota, FavoritarNota } from "@/actions/NotasBusca";
@@ -8,6 +8,7 @@ import { ArquivarNota, MoverNotaParaLixeira, ExcluirNotaDefinitivamente } from "
 import { FecharAbaNota } from "@/actions/NotasWorkspace";
 import { useNotasWorkspace } from "@/store/useNotasWorkspace";
 import { useNotasNotificacoes } from "@/store/useNotasNotificacoes";
+import { salvarNotaAbertaAntesDeEncerrar } from "@/lib/notas/salvamento-client";
 import { limparRascunhoLocalDaNota } from "@/lib/notas-tabs";
 import {
   AlertDialog,
@@ -39,6 +40,7 @@ interface PainelPropriedadesProps {
 
 export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent }: PainelPropriedadesProps) {
   const [processando, setProcessando] = useState(false);
+  const processandoRef = useRef(false);
   const tabs = useNotasWorkspace((state) => state.tabs);
   const removerAbaPorNota = useNotasWorkspace((state) => state.removerAbaPorNota);
   const abrirAba = useNotasWorkspace((state) => state.abrirAba);
@@ -46,73 +48,63 @@ export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent 
   const removerNotificacoesDaNota = useNotasNotificacoes((state) => state.removerNotificacoesDaNota);
 
   // Chamado ao arquivar/excluir a partir da Central — a nota pode estar aberta como aba na
-  // barra global ao mesmo tempo; sem isso a aba fica "pendurada" apontando para uma nota que
-  // não está mais ativa, e notificações/rascunhos antigos continuam referenciando-a.
-  function limparResquiciosDaNota(noteId: string) {
+  // barra global ao mesmo tempo. Rascunhos posteriores ao flush são preservados para
+  // recuperação; somente a exclusão definitiva limpa também essa cópia local.
+  function limparResquiciosDaNota(noteId: string, preservarRascunho = false) {
     const tabAberta = tabs.find((tab) => tab.noteId === noteId);
     if (tabAberta) {
       removerAbaPorNota(noteId);
       void FecharAbaNota(noteId);
     }
     removerNotificacoesDaNota(noteId);
-    limparRascunhoLocalDaNota(noteId);
+    if (!preservarRascunho) limparRascunhoLocalDaNota(noteId, usuarioAtualId);
     notificarWorkspaceNotasAtualizado();
   }
 
+  async function executarAcao(acao: () => Promise<{success: boolean; error?: string}>, confirmar: () => void, mensagemErro: string) {
+    if (processandoRef.current) return;
+    processandoRef.current = true;
+    setProcessando(true);
+    try {
+      const result = await acao();
+      if (!result.success) { toast.error(result.error ?? mensagemErro); return; }
+      confirmar();
+    } catch { toast.error(mensagemErro); }
+    finally { processandoRef.current = false; setProcessando(false); }
+  }
   async function toggleFixar() {
     const fixada = !nota.isPinned;
-    setProcessando(true);
-    const res = await FixarNota({ noteId: nota.id, fixada });
-    setProcessando(false);
-    if (!res.success) {
-      toast.error(res.error ?? "Não foi possível fixar a nota");
-      return;
-    }
-    if (fixada && !tabs.some((tab) => tab.noteId === nota.id)) {
-      abrirAba(nota.id, nota.title, { pinned: true, color: nota.color });
-    }
-    definirPinnedAba(nota.id, fixada);
-    notificarWorkspaceNotasAtualizado();
-    toast.success(fixada ? "Nota fixada na barra de tarefas" : "Nota desafixada");
-    onAtualizado();
+    return executarAcao(() => FixarNota({ noteId: nota.id, fixada }), () => {
+      if (fixada && !tabs.some((tab) => tab.noteId === nota.id)) abrirAba(nota.id, nota.title, { pinned: true, color: nota.color });
+      definirPinnedAba(nota.id, fixada);
+      notificarWorkspaceNotasAtualizado();
+      toast.success(fixada ? "Nota fixada na barra de tarefas" : "Nota desafixada");
+      onAtualizado();
+    }, "Não foi possível fixar a nota");
   }
-
   async function toggleFavorito() {
-    setProcessando(true);
-    await FavoritarNota({ noteId: nota.id, favorita: !nota.isFavorite });
-    setProcessando(false);
-    onAtualizado();
+    return executarAcao(() => FavoritarNota({noteId: nota.id, favorita: !nota.isFavorite}), onAtualizado, "Não foi possível atualizar o favorito");
   }
-
   async function arquivar() {
-    setProcessando(true);
-    await ArquivarNota(nota.id);
-    setProcessando(false);
-    limparResquiciosDaNota(nota.id);
-    toast.success("Nota arquivada");
-    onAtualizado();
+    return executarAcao(async () => {
+      if (!await salvarNotaAbertaAntesDeEncerrar(nota.id)) return {success:false,error:"Salve ou resolva o rascunho antes de arquivar a nota."};
+      return ArquivarNota(nota.id);
+    }, () => {
+      limparResquiciosDaNota(nota.id, true); toast.success("Nota arquivada"); onAtualizado();
+    }, "Não foi possível arquivar a nota");
   }
-
   async function moverParaLixeira() {
-    setProcessando(true);
-    await MoverNotaParaLixeira(nota.id);
-    setProcessando(false);
-    limparResquiciosDaNota(nota.id);
-    toast.success("Nota movida para a lixeira");
-    onAtualizado();
+    return executarAcao(async () => {
+      if (!await salvarNotaAbertaAntesDeEncerrar(nota.id)) return {success:false,error:"Salve ou resolva o rascunho antes de mover a nota para a lixeira."};
+      return MoverNotaParaLixeira(nota.id);
+    }, () => {
+      limparResquiciosDaNota(nota.id, true); toast.success("Nota movida para a lixeira"); onAtualizado();
+    }, "Não foi possível mover a nota para a lixeira");
   }
-
   async function excluirDefinitivamente() {
-    setProcessando(true);
-    const res = await ExcluirNotaDefinitivamente(nota.id);
-    setProcessando(false);
-    if (!res.success) {
-      toast.error(res.error ?? "Não foi possível excluir a nota");
-      return;
-    }
-    limparResquiciosDaNota(nota.id);
-    toast.success("Nota excluída definitivamente");
-    onAtualizado();
+    return executarAcao(() => ExcluirNotaDefinitivamente(nota.id), () => {
+      limparResquiciosDaNota(nota.id); toast.success("Nota excluída definitivamente"); onAtualizado();
+    }, "Não foi possível excluir a nota");
   }
 
   return (

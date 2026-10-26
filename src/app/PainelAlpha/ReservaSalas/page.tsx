@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from "next-auth/react";
 import { Calendar as CalendarIcon, Clock, User as UserIcon, LayoutDashboard, Edit3, Trash2, ArrowRight, XCircle, AlertCircle, Coffee } from 'lucide-react';
 import { toast } from 'sonner';
@@ -9,6 +9,7 @@ import { ptBR } from 'date-fns/locale';
 import 'react-day-picker/dist/style.css';
 import { agendarSala, buscarReservasAtivas, cancelarReserva, buscarHistoricoReservas, editarReserva as editarReservaAction } from '@/actions/Reservas';
 
+import { validarIntervaloReserva } from '@/lib/reservas/intervalo';
 import { getTema } from '@/lib/temas';
 import { isAdminRole } from '@/lib/roles';
 
@@ -23,6 +24,7 @@ export default function ReservaSalas() {
   const [reservaEditando, setReservaEditando] = useState<ReservaEditando | null>(null);
   const [erros, setErros] = useState<string[]>([]);
   const [isPending, setIsPending] = useState(false);
+  const salvandoRef = useRef(false);
 
   const temaNome = session?.user?.tema_interface || "blue";
   const style = getTema(temaNome);
@@ -71,50 +73,48 @@ export default function ReservaSalas() {
 
   const handleAgendar = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (salvandoRef.current) return;
+    const novosErros = [!form.sala && 'sala', !form.tipo && 'tipo', !form.motivo && 'motivo'].filter((value): value is string => Boolean(value));
+    if (novosErros.length) { setErros(novosErros); toast.error("Preencha todos os campos obrigatórios"); return; }
+    if (!selectedDate) { toast.error("Selecione uma data"); return; }
+    const data = selectedDate.toLocaleDateString('en-CA');
+    const intervalo = validarIntervaloReserva(data, form.inicio, form.fim);
+    if (!intervalo.success) { toast.error(intervalo.error); setErros(['inicio', 'fim']); return; }
+    salvandoRef.current = true;
     setIsPending(true);
-    const novosErros = [];
-    if (!form.sala) novosErros.push('sala');
-    if (!form.tipo) novosErros.push('tipo');
-    if (!form.motivo) novosErros.push('motivo');
-
-    if (novosErros.length > 0) {
-      setErros(novosErros);
-      toast.error("Preencha todos os campos obrigatórios");
-
-      setIsPending(false);
-      return;
-    }
-
     setErros([]);
-
-    if (!selectedDate) return toast.error("Selecione uma data");
-
-    const dataAjustada = selectedDate.toLocaleDateString('en-CA');
-    const res = await agendarSala({
-      ...form,
-      data: dataAjustada,
-    });
-
-    if (res.success) {
+    try {
+      const res = await agendarSala({ ...form, data });
+      if (!res.success) { toast.error(res.error || "Erro ao agendar"); return; }
       toast.success("Protocolo de Reserva Confirmado!");
-      setForm({ ...form, tipo: "", motivo: "" });
-
-      setIsPending(false);
-      atualizar();
-    } else {
-      toast.error(res.error || "Erro ao agendar");
-      setErros(['inicio', 'fim']);
-    }
+      setForm((atual) => ({ ...atual, tipo: "", motivo: "" }));
+      await atualizar();
+    } catch { toast.error("Falha de conexão. Confira a agenda antes de repetir; seu formulário foi mantido."); }
+    finally { salvandoRef.current = false; setIsPending(false); }
   };
 
+  async function salvarEdicaoReserva() {
+    if (!reservaEditando || salvandoRef.current) return;
+    const intervalo = validarIntervaloReserva(reservaEditando.dataStr, reservaEditando.inicioStr, reservaEditando.fimStr);
+    if (!intervalo.success) { toast.error(intervalo.error); return; }
+    salvandoRef.current = true; setIsPending(true);
+    try {
+      const res = await editarReservaAction(reservaEditando.id, { data: reservaEditando.dataStr, inicio: reservaEditando.inicioStr, fim: reservaEditando.fimStr, sala: reservaEditando.sala });
+      if (!res.success) { toast.error(res.error); return; }
+      toast.success("Protocolo Atualizado!"); setReservaEditando(null); await atualizar();
+    } catch { toast.error("Falha de conexão. Os dados da edição foram mantidos."); }
+    finally { salvandoRef.current = false; setIsPending(false); }
+  }
+
   const handleExcluir = async (id: number) => {
-    if (!confirm("Deseja cancelar esta reserva?")) return;
-    const res = await cancelarReserva(id);
-    if (res.success) {
-      setReservaEditando(null);
-      toast.success("Reserva Removida!");
-      atualizar();
-    }
+    if (salvandoRef.current || !confirm("Deseja cancelar esta reserva?")) return;
+    salvandoRef.current = true; setIsPending(true);
+    try {
+      const res = await cancelarReserva(id);
+      if (!res.success) { toast.error(res.error); return; }
+      setReservaEditando(null); toast.success("Reserva Removida!"); await atualizar();
+    } catch { toast.error("Falha de conexão ao cancelar a reserva. Tente novamente."); }
+    finally { salvandoRef.current = false; setIsPending(false); }
   };
 
   const formatarHora = (dataStr: Date | string | null) => {
@@ -184,7 +184,7 @@ export default function ReservaSalas() {
 
                 <div className="group">
                   <label className={`text-[9px] uppercase font-black ml-1 tracking-widest ${erros.includes('sala') ? 'text-rose-500' : 'text-slate-500'}`}>Ambiente</label>
-                  <select
+                  <select disabled={isPending}
                     className={`w-full h-14 bg-black/40 border ${erros.includes('sala') ? 'border-rose-500/50 shadow-[0_0_10px_rgba(244,63,94,0.1)]' : 'border-white/5'} rounded-2xl px-4 text-[10px] font-black uppercase text-white focus:border-alpha outline-none transition-all mt-1 appearance-none cursor-pointer`}
                     value={form.sala}
                     onChange={e => {
@@ -201,7 +201,7 @@ export default function ReservaSalas() {
 
                 <div className="group">
                   <label className={`text-[9px] uppercase font-black ml-1 tracking-widest ${erros.includes('tipo') ? 'text-rose-500' : 'text-slate-500'}`}>Tipo de Reserva</label>
-                  <select
+                  <select disabled={isPending}
                     className={`w-full h-14 bg-black/40 border ${erros.includes('tipo') ? 'border-rose-500/50 shadow-[0_0_10px_rgba(244,63,94,0.1)]' : 'border-white/5'} rounded-2xl px-4 text-[10px] font-black uppercase text-white focus:border-alpha outline-none transition-all mt-1 appearance-none cursor-pointer`}
                     value={form.tipo}
                     onChange={e => {
@@ -246,7 +246,7 @@ export default function ReservaSalas() {
                   <div className={`absolute left-5 ${erros.includes('motivo') ? 'text-rose-500' : 'text-slate-500 group-focus-within:text-indigo-500'}`}>
                     <Edit3 size={16} />
                   </div>
-                  <input
+                  <input disabled={isPending}
                     type="text"
                     placeholder={erros.includes('motivo') ? "ESTE CAMPO É OBRIGATÓRIO" : "EX: REUNIÃO DE ALINHAMENTO..."}
                     value={form.motivo}
@@ -262,7 +262,7 @@ export default function ReservaSalas() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="group">
                   <label className={`text-[10px] uppercase font-black ml-1 tracking-widest ${erros.includes('inicio') ? 'text-rose-500' : 'text-slate-600'}`}>Início</label>
-                  <input
+                  <input disabled={isPending}
                     type="time"
                     value={form.inicio}
                     onChange={handleInicioChange}
@@ -271,7 +271,7 @@ export default function ReservaSalas() {
                 </div>
                 <div className="group">
                   <label className={`text-[10px] uppercase font-black ml-1 tracking-widest ${erros.includes('fim') ? 'text-rose-500' : 'text-slate-600'}`}>Término</label>
-                  <input
+                  <input disabled={isPending}
                     type="time"
                     value={form.fim}
                     onChange={e => setForm({ ...form, fim: e.target.value })}
@@ -408,7 +408,7 @@ export default function ReservaSalas() {
             <div className="space-y-5">
               <div className="group">
                 <label className="text-[10px] uppercase font-black text-slate-600 ml-1 tracking-widest">Ambiente</label>
-                <select
+                <select disabled={isPending}
                   value={reservaEditando.sala}
                   onChange={e => setReservaEditando({ ...reservaEditando, sala: e.target.value })}
                   className="w-full h-14 bg-black/40 border border-white/5 rounded-2xl px-5 text-[11px] font-black uppercase text-white mt-2 outline-none focus:border-alpha transition-all"
@@ -422,24 +422,23 @@ export default function ReservaSalas() {
               <div className="grid grid-cols-1 gap-5">
                 <div className="group">
                   <label className="text-[10px] uppercase font-black text-slate-600 ml-1 tracking-widest">Data do Evento</label>
-                  <input type="date" value={reservaEditando.dataStr} onChange={e => setReservaEditando({ ...reservaEditando, dataStr: e.target.value })} className="w-full h-14 bg-black/40 border border-white/5 rounded-2xl px-5 text-[11px] font-black text-white mt-2 outline-none focus:border-alpha" />
+                  <input disabled={isPending} type="date" value={reservaEditando.dataStr} onChange={e => setReservaEditando({ ...reservaEditando, dataStr: e.target.value })} className="w-full h-14 bg-black/40 border border-white/5 rounded-2xl px-5 text-[11px] font-black text-white mt-2 outline-none focus:border-alpha" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="group">
                     <label className="text-[10px] uppercase font-black text-slate-600 ml-1 tracking-widest">Início</label>
-                    <input type="time" value={reservaEditando.inicioStr} onChange={handleEditInicioChange} className="w-full h-14 bg-black/40 border border-white/5 rounded-2xl px-5 text-[11px] font-black text-white mt-2 outline-none focus:border-alpha" />
+                    <input disabled={isPending} type="time" value={reservaEditando.inicioStr} onChange={handleEditInicioChange} className="w-full h-14 bg-black/40 border border-white/5 rounded-2xl px-5 text-[11px] font-black text-white mt-2 outline-none focus:border-alpha" />
                   </div>
                   <div className="group">
                     <label className="text-[10px] uppercase font-black text-slate-600 ml-1 tracking-widest">Término</label>
-                    <input type="time" value={reservaEditando.fimStr} onChange={e => setReservaEditando({ ...reservaEditando, fimStr: e.target.value })} className="w-full h-14 bg-black/40 border border-white/5 rounded-2xl px-5 text-[11px] font-black text-white mt-2 outline-none focus:border-alpha" />
+                    <input disabled={isPending} type="time" value={reservaEditando.fimStr} onChange={e => setReservaEditando({ ...reservaEditando, fimStr: e.target.value })} className="w-full h-14 bg-black/40 border border-white/5 rounded-2xl px-5 text-[11px] font-black text-white mt-2 outline-none focus:border-alpha" />
                   </div>
                 </div>
               </div>
               <div className="flex flex-col gap-3 pt-6">
                 <button
-                  onClick={() => editarReservaAction(reservaEditando.id, { data: reservaEditando.dataStr, inicio: reservaEditando.inicioStr, fim: reservaEditando.fimStr, sala: reservaEditando.sala }).then((res) => {
-                    if (res.success) { toast.success("Protocolo Atualizado!"); setReservaEditando(null); atualizar(); } else { toast.error(res.error); }
-                  })}
+                  onClick={() => void salvarEdicaoReserva()}
+                  disabled={isPending}
                   className={`cursor-pointer w-full h-14 ${style.bg} text-white rounded-2xl font-black uppercase text-[10px] tracking-[0.3em] hover:brightness-110 transition-all shadow-lg shadow-black/40`}
                 >
                   Salvar Alterações

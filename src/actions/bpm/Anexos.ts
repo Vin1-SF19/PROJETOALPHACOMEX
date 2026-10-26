@@ -17,6 +17,7 @@ import { criarReferenciaAnexoBpm, extrairPathnamePrivadoAnexoBpm, validarReciboU
 import { ACAO_LIMPEZA_ANEXO_PENDENTE, limparBlobAnexoPendente } from "@/lib/bpm/anexos-lifecycle";
 
 import { carregarCamposAplicaveisCardEtapa } from "@/lib/bpm/requisitos-etapa-server";
+import { carregarCamposRegistradosSemFormulario } from "@/lib/bpm/campos-registrados-sem-formulario-server";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 import {
   CAMPO_CHECKLIST_EXCEL, PIPELINE_OPERACIONAL_CHECKLIST_ID, TITULO_TAREFA_CHECKLIST,
@@ -57,12 +58,14 @@ export async function RegistrarAnexoBpm(dados: unknown) {
       let dataReuniaoChecklist: Date | null = null;
       let pipelineIdCard: string | null = null;
       if (campoId) {
-        const card = await tx.bpmCard.findUnique({ where: { id: cardId }, select: { pipelineId: true, etapaId: true, dataReuniao: true } });
+        const card = await tx.bpmCard.findUnique({ where: { id: cardId }, select: { pipelineId: true, etapaId: true, dataReuniao: true, etapa: { select: { formulario: { select: { id: true } }, campoConfiguracoes: { select: { id: true }, take: 1 } } } } });
         if (!card) throw new Error("CAMPO_ARQUIVO_INVALIDO");
         pipelineIdCard = card.pipelineId;
         const perfil = acesso.isAdminGlobal || acesso.role === "ADMINISTRADOR"
           ? "ADMIN" : acesso.role === "RESPONSAVEL" ? "RESPONSAVEL" : "MEMBRO";
-        const campos = await carregarCamposAplicaveisCardEtapa(cardId, card.pipelineId, card.etapaId, tx, perfil);
+        const campos = card.etapa?.formulario === null && card.etapa.campoConfiguracoes.length === 0
+          ? await carregarCamposRegistradosSemFormulario(cardId, card.pipelineId, card.etapaId, tx, perfil)
+          : await carregarCamposAplicaveisCardEtapa(cardId, card.pipelineId, card.etapaId, tx, perfil);
         const campo = campos.find((item) => item.id === campoId && (item.tipo === "arquivo" || item.tipo === "url_ou_arquivo"));
         if (!campo || !validarValoresCamposBpm([campo], { [campoId]: "" }).success) {
           throw new Error("CAMPO_ARQUIVO_INVALIDO");

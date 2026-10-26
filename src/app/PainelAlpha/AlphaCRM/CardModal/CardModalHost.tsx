@@ -17,8 +17,8 @@ const CardModalHostContext = createContext<Host | null>(null);
 export const useCardModalHost = () => useContext(CardModalHostContext);
 
 /** O card pertence ao layout: uma troca de rota não desmonta seu rascunho. */
-export function PainelCardState({ children }: { children: ReactNode }) {
-  return <CardSaveProvider><CardModalHostProvider>{children}</CardModalHostProvider></CardSaveProvider>;
+export function PainelCardState({ children, userId }: { children: ReactNode; userId?: string | number | null }) {
+  return <CardSaveProvider key={userId ?? "anonymous"} userId={userId}><CardModalHostProvider>{children}</CardModalHostProvider></CardSaveProvider>;
 }
 
 export function CardModalHostProvider({ children }: { children: ReactNode }) {

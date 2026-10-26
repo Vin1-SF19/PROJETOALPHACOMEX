@@ -100,32 +100,36 @@ export default function ModalEditarPreCadastro({
     setRepresentantesExtra((prev) => prev.filter((_, idx) => idx !== i));
 
   async function handleSalvar() {
+    if (salvando) return;
     setSalvando(true);
+    try {
     const res = await atualizarPreCadastro(preCadastro.id, {
       nomeCompleto,
-      cpf: cpf || undefined,
-      dataNascimento: dataNascimento || undefined,
-      whatsapp: whatsapp || undefined,
-      cep: cep || undefined,
-      logradouro: logradouro || undefined,
-      numero: numero || undefined,
-      complemento: complemento || undefined,
-      bairro: bairro || undefined,
-      cidade: cidade || undefined,
-      uf: uf || undefined,
+      cpf: cpf,
+      dataNascimento: dataNascimento,
+      whatsapp: whatsapp,
+      cep: cep,
+      logradouro: logradouro,
+      numero: numero,
+      complemento: complemento,
+      bairro: bairro,
+      cidade: cidade,
+      uf,
       souRepresentante: tipo === "PJ" ? souRepresentante : undefined,
       representantesExtra: tipo === "PJ" && !souRepresentante ? representantesExtra : undefined,
-      razaoSocial: razaoSocial || undefined,
-      nomeFantasia: nomeFantasia || undefined,
-      cnpj: cnpj || undefined,
+      razaoSocial: tipo === "PJ" ? razaoSocial : undefined,
+      nomeFantasia: tipo === "PJ" ? nomeFantasia : undefined,
+      cnpj: tipo === "PJ" ? cnpj : undefined,
     });
-    setSalvando(false);
     if (res.success) {
       toast.success("Pré-cadastro atualizado");
       onSalvo();
     } else {
       toast.error(res.error ?? "Falha ao salvar");
     }
+    } catch {
+      toast.error("Falha de conexão ao salvar. As alterações foram mantidas.");
+    } finally { setSalvando(false); }
   }
 
   return (

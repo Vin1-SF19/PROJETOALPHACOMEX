@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { auth } from "../../auth";
 import { salvarDocumentoSchema } from "@/lib/validations/blueprint";
 import { exigirAcessoBlueprint } from "@/lib/blueprint/ownership";
+import { persistirDocumentoBlueprint } from "@/lib/blueprint/documento-persistencia";
+import { erroSqliteBusy, repetirTransacaoOcupada } from "@/lib/bpm/sqlite-busy-retry";
 
 export async function ListarDocumentosBlueprint(projectId: string) {
   try {
@@ -27,45 +29,39 @@ export async function ListarDocumentosBlueprint(projectId: string) {
 export async function SalvarDocumentoBlueprint(dados: unknown) {
   try {
     const session = await auth();
-    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+    if (!session?.user?.id) return { success: false as const, error: "Não autorizado" };
     const userId = Number(session.user.id);
-
     const parsed = salvarDocumentoSchema.safeParse(dados);
-    if (!parsed.success) return { success: false, error: parsed.error.flatten() };
-    const { projectId, documentId, title, contentJson, contentText } = parsed.data;
+    if (!parsed.success) return { success: false as const, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+    const input = parsed.data;
+    await exigirAcessoBlueprint(input.projectId, userId, session.user.role ?? null, "editarDocumento");
 
-    await exigirAcessoBlueprint(projectId, userId, session.user.role ?? null, "editarDocumento");
-
-    if (documentId) {
-      const existente = await db.blueprintDocument.findUnique({ where: { id: documentId }, select: { projectId: true } });
-      if (!existente || existente.projectId !== projectId) return { success: false, error: "Documento não encontrado" };
-    }
-
-    const documento = documentId
-      ? await db.blueprintDocument.update({
-          where: { id: documentId },
-          data: { title, contentJson, contentText, updatedById: userId },
-        })
-      : await db.blueprintDocument.create({
-          data: { projectId, title, contentJson, contentText, createdById: userId },
-        });
-
-    await db.blueprintActivity.create({
-      data: {
-        projectId,
-        userId,
-        action: documentId ? "ATUALIZACAO" : "CRIACAO",
-        entityType: "DOCUMENTO",
-        entityId: documento.id,
-      },
+    const executar = () => db.$transaction(async (tx) => {
+      await exigirAcessoBlueprint(input.projectId, userId, session.user.role ?? null, "editarDocumento", tx);
+      return persistirDocumentoBlueprint(tx, input, userId);
     });
-
-    revalidatePath(`/PainelAlpha/AlphaBlueprint/${projectId}`);
-    return { success: true, data: documento };
+    let resultado;
+    try {
+      resultado = await repetirTransacaoOcupada(executar);
+    } catch (error) {
+      // Duas primeiras tentativas com a mesma PK podem disputar a criação.
+      // O erro de unicidade reverte a transação; a nova leitura resolve a intenção.
+      const codigo = error && typeof error === "object" && "code" in error ? error.code : null;
+      if (input.documentId || codigo !== "P2002") throw error;
+      resultado = await repetirTransacaoOcupada(executar);
+    }
+    if (!resultado.success) return resultado;
+    try { revalidatePath(`/PainelAlpha/AlphaBlueprint/${input.projectId}`); }
+    catch (error) { console.error("[SalvarDocumentoBlueprint/cache]", error); }
+    return resultado;
   } catch (error) {
     console.error("[SalvarDocumentoBlueprint]", error);
-    const msg = error instanceof Error && error.message === "Não autorizado" ? "Não autorizado" : "Erro ao salvar documento";
-    return { success: false, error: msg };
+    const mensagem = error instanceof Error ? error.message : "";
+    return {
+      success: false as const,
+      error: ["Não autorizado", "Documento não encontrado", "CONFLITO_DOCUMENTO"].includes(mensagem)
+        ? mensagem : erroSqliteBusy(error) ? "O banco está ocupado. Seu rascunho foi preservado; tente novamente." : "Erro ao salvar documento",
+    };
   }
 }
 

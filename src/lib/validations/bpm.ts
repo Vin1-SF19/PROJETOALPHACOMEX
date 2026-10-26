@@ -481,6 +481,7 @@ export const criarVinculoCardSchema = z.object({
 
 export const criarInteracaoCardSchema = z.object({
   cardId: bpmCardIdSchema,
+  idempotencyKey: z.string().uuid().optional(),
   tipo: z.enum(["LIGACAO", "ANOTACAO", "EMAIL", "REUNIAO", "WHATSAPP"]).default("LIGACAO"),
   agendadoEm: z.coerce.date().optional(),
   agendaLink: z.string().trim().url().max(500).optional(),

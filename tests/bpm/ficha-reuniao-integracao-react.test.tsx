@@ -9,7 +9,7 @@ vi.mock("@/actions/bpm/GoogleMeet", () => ({ AgendarReuniaoGoogleMeetBpm: api.ag
 vi.mock("@/actions/bpm/FichaViabilidade", () => ({ GarantirFichaViabilidadeBpm: api.garantir, GerarFichaViabilidadeBpm: api.legado }));
 vi.mock("@/actions/bpm/TranscricaoMeet", () => ({ SalvarResumoReuniaoBpm: vi.fn(), SincronizarTranscricaoReuniaoBpm: vi.fn(), ObterArtefatosMeetBpm: vi.fn() }));
 vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/BpmDateTimeField", () => ({ BpmDateTimeField: () => h("div", null, "Data") }));
-vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext", () => ({ useCardSave: () => ({ registerSave: vi.fn(), scheduleSave: vi.fn(), getVersion: vi.fn(), confirmVersion: vi.fn(), getDraft: vi.fn(), setDraft: vi.fn(), setPendingFields: vi.fn() }) }));
+vi.mock("@/app/PainelAlpha/AlphaCRM/CardModal/CardSaveContext", () => ({ useCardSave: () => ({ registerSave: vi.fn(), scheduleSave: vi.fn(), getVersion: vi.fn(), confirmVersion: vi.fn(), getDraft: vi.fn(), getDraftBase: vi.fn(), setDraft: vi.fn(), setPendingFields: vi.fn(), registerManualSave: vi.fn(() => () => {}) }) }));
 import { PainelReuniao } from "@/app/PainelAlpha/AlphaCRM/CardModal/PainelReuniao";
 import { BPM_PIPELINE_KEYS } from "@/lib/bpm/ontology";
 let root: Root, host: HTMLDivElement;

@@ -307,13 +307,12 @@ export default function PainelTarefas() {
                 toast.success(modalConfirmacao.tarefa.feita ? "Estornado!" : "Concluído!");
                 setModalConfirmacao({ show: false, tarefa: null });
                 window.location.reload();
-            }
+            } else { toast.error(res.error || "Não foi possível salvar a tarefa."); }
 
 
-            setIsPending(false);
         } catch (error) {
-            toast.error("Erro ao processar.");
-        }
+            toast.error("Erro ao processar. A alteração não foi confirmada.");
+        } finally { setIsPending(false); }
     };
 
     useEffect(() => {

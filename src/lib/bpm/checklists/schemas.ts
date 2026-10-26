@@ -58,6 +58,7 @@ export const adicionarItemExclusivoChecklistSchema = z.object({
 });
 export const atualizarItemChecklistCardSchema = z.object({
   itemId: idSchema,
+  versaoEsperadaEm: z.coerce.date().optional(),
   status: z.enum(["PENDENTE", "CONCLUIDO"]).optional(),
   observacao: textoOpcional(4000),
   responsavelId: z.number().int().positive().nullable().optional(),

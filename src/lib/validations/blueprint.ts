@@ -110,9 +110,21 @@ const MAX_CONTENT_JSON_BYTES = 2 * 1024 * 1024; // 2MB
 export const salvarDocumentoSchema = z.object({
   projectId: z.string().cuid(),
   documentId: z.string().cuid().optional(),
+  creationKey: z.string().uuid().optional(),
+  baseUpdatedAt: z.coerce.date().optional(),
   title: z.string().trim().min(1).max(200).default("Especificação"),
-  contentJson: z.string().max(MAX_CONTENT_JSON_BYTES, "Documento excede o tamanho máximo permitido"),
+  contentJson: z.string().max(MAX_CONTENT_JSON_BYTES, "Documento excede o tamanho máximo permitido").refine((value) => {
+    try { const json: unknown = JSON.parse(value); return json !== null && typeof json === "object" && !Array.isArray(json); }
+    catch { return false; }
+  }, "O conteúdo do documento é inválido."),
   contentText: z.string().max(500_000).optional(),
+}).superRefine((dados, contexto) => {
+  if (dados.documentId && !dados.baseUpdatedAt) {
+    contexto.addIssue({ code: "custom", path: ["baseUpdatedAt"], message: "A versão-base do documento é obrigatória." });
+  }
+  if (!dados.documentId && !dados.creationKey) {
+    contexto.addIssue({ code: "custom", path: ["creationKey"], message: "A identidade de criação do documento é obrigatória." });
+  }
 });
 
 // ── Board / Canvas ───────────────────────────────────────────────────────────

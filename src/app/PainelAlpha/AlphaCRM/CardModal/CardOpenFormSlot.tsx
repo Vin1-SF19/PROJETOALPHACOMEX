@@ -31,6 +31,17 @@ export function CardOpenFormSlot({
   onAtualizado,
   onEstadoFollowUpChange = () => {},
 }: CardOpenFormSlotProps) {
+  if (card.formularioEtapa.status === "MISSING") {
+    return <section className="space-y-3">
+      <p role="status" className="rounded-xl border border-sky-400/20 bg-sky-400/5 p-3 text-sm text-sky-100">
+        Esta etapa não possui formulário próprio. {card.camposEtapa.length
+          ? "Você pode revisar os dados já registrados neste card. Campos automáticos e permissões de acesso continuam sendo respeitados."
+          : "Este card ainda não possui campos registrados disponíveis para edição. Anotações e tarefas continuam nos seus painéis."}
+      </p>
+      {card.camposEtapa.length > 0 && <PainelCamposEtapaAtual card={card} campoIds={card.camposEtapa.map((campo) => campo.id)} instanceKey="campos-registrados"
+        titulo="Dados já registrados no card" accent={accent} podeEditar={podeEditar} realtimeRevision={realtimeRevision} onAtualizado={onAtualizado} />}
+    </section>;
+  }
   const formulario = {
     ...card.formularioEtapa,
     secoes: card.formularioEtapa.secoes

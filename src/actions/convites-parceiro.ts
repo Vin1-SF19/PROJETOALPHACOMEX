@@ -389,7 +389,7 @@ const EdicaoPreCadastroSchema = z.object({
   complemento: z.string().max(30).optional(),
   bairro: z.string().max(150).optional(),
   cidade: z.string().max(150).optional(),
-  uf: z.string().length(2).optional(),
+  uf: z.string().length(2).or(z.literal("")).optional(),
   tipoRecebimento: z.enum(["PF", "PJ"]).optional(),
   souRepresentante: z.boolean().optional(),
   representantesExtra: z.array(RepresentanteEdicaoSchema).max(10).optional(),
@@ -428,7 +428,7 @@ export async function atualizarPreCadastro(preCadastroId: number, input: z.infer
       ...(d.complemento !== undefined && { complemento: d.complemento.trim() || null }),
       ...(d.bairro !== undefined && { bairro: d.bairro.trim() || null }),
       ...(d.cidade !== undefined && { cidade: d.cidade.trim() || null }),
-      ...(d.uf !== undefined && { uf: d.uf.toUpperCase() }),
+      ...(d.uf !== undefined && { uf: d.uf.trim().toUpperCase() }),
       ...(d.tipoRecebimento !== undefined && { tipoRecebimento: d.tipoRecebimento }),
       ...(d.souRepresentante !== undefined && { souRepresentante: d.souRepresentante }),
       ...(d.representantesExtra !== undefined && {

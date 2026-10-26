@@ -15,7 +15,7 @@ import { horizontalListSortingStrategy, SortableContext, sortableKeyboardCoordin
 import { Plus, LayoutGrid, Search, Loader2, StickyNote, FileText, Pin, X } from "lucide-react";
 import { toast } from "sonner";
 import type { JSONContent } from "@tiptap/react";
-import { CriarNota, ObterNota, ArquivarNota, MoverNotaParaLixeira } from "@/actions/Notas";
+import { AtualizarNota, CriarNota, ObterNota, ArquivarNota, MoverNotaParaLixeira } from "@/actions/Notas";
 import { FixarNota, DefinirCorNota } from "@/actions/NotasBusca";
 import {
   AbrirAbaNota,
@@ -28,7 +28,7 @@ import {
 import { useNotasWorkspace } from "@/store/useNotasWorkspace";
 import { useNotasNotificacoes } from "@/store/useNotasNotificacoes";
 import { useNotasAtalhos } from "@/hooks/useNotasAtalhos";
-import { getNotasTabsStorageKey, parseStoredNotasTabsState, limparRascunhoLocalDaNota } from "@/lib/notas-tabs";
+import { getNotaRascunhoStorageKey, getNotasTabsStorageKey, parseStoredNotasTabsState, limparRascunhoLocalDaNota } from "@/lib/notas-tabs";
 import { Z_INDEX } from "@/lib/z-index";
 import { NoteTab } from "./NoteTab";
 import { NoteViewer } from "./NoteViewer";
@@ -39,6 +39,7 @@ import { NoteColorPicker } from "./NoteColorPicker";
 import { Dock, DockItem, DockIcon, DockLabel } from "@/components/ui/dock";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { SalvamentoNota, renomearNotaPreservandoRascunho, salvarNotaAbertaAntesDeEncerrar } from "@/lib/notas/salvamento-client";
 import { isNotasWorkspaceAtualizadoMessage } from "@/lib/notas-workspace-messages";
 
 interface NotesGlobalTaskbarProps {
@@ -79,14 +80,14 @@ export function NotesGlobalTaskbar({ userId, onOpenCentral, sidebarWidth = 0 }: 
   const removerNotificacoesDaNota = useNotasNotificacoes((state) => state.removerNotificacoesDaNota);
 
   // Chamado sempre que uma nota é arquivada ou movida para a lixeira — garante que nenhum
-  // resquício de estado em memória/localStorage (notificação já recebida, rascunho não
-  // salvo) sobreviva referenciando uma nota que não está mais ativa.
+  // aviso de uma nota encerrada continue na interface. Um rascunho não confirmado
+  // permanece disponível para recuperação quando a nota for restaurada.
   const limparResquiciosDaNota = useCallback(
-    (noteId: string) => {
+    (noteId: string, preservarRascunho = false) => {
       removerNotificacoesDaNota(noteId);
-      limparRascunhoLocalDaNota(noteId);
+      if (!preservarRascunho) limparRascunhoLocalDaNota(noteId, userId);
     },
-    [removerNotificacoesDaNota],
+    [removerNotificacoesDaNota, userId],
   );
 
   const [notaAtiva, setNotaAtiva] = useState<NotaAtivaCarregada | null>(null);
@@ -218,6 +219,40 @@ export function NotesGlobalTaskbar({ userId, onOpenCentral, sidebarWidth = 0 }: 
     [ativarAba, setViewerMode, viewerMode],
   );
 
+  const operacoesNotaRef = useRef(new Set<string>());
+  async function executarMutacaoNota(noteId: string, action: () => Promise<{success: boolean; error?: string}>, confirm: () => void) {
+    if (operacoesNotaRef.current.has(noteId)) return;
+    operacoesNotaRef.current.add(noteId);
+    try {
+      const result = await action();
+      if (!result.success) { toast.error(result.error ?? "Não foi possível atualizar a nota"); return; }
+      confirm();
+    } catch { toast.error("Não foi possível atualizar a nota. Seu rascunho foi mantido."); }
+    finally { operacoesNotaRef.current.delete(noteId); }
+  }
+  async function renomearNota(tabId: string, noteId: string, tituloAtual: string) {
+    const titulo = window.prompt("Renomear nota", tituloAtual)?.trim();
+    if (!titulo) return;
+    await executarMutacaoNota(noteId, async () => {
+      const success = await renomearNotaPreservandoRascunho(noteId, titulo, async () => {
+        const atual = await ObterNota(noteId);
+        if (!atual.success || atual.somenteLeitura) return false;
+        const session = new SalvamentoNota({
+          noteId, version: atual.data.currentVersion,
+          content: {title: atual.data.title, contentJson: atual.data.contentJson ?? {}, plainText: atual.data.plainText},
+          storageKey: getNotaRascunhoStorageKey(noteId, userId), storage: () => localStorage,
+          online: () => navigator.onLine, update: AtualizarNota,
+        });
+        session.restore();
+        session.change({...session.currentContent, title:titulo});
+        const saved = await session.save();
+        if (saved) useNotasWorkspace.getState().renomearAba(tabId, titulo);
+        return saved;
+      });
+      return {success, error:"Não foi possível renomear. O rascunho foi mantido; reabra a nota para revisar possíveis conflitos."};
+    }, () => { toast.success("Nota renomeada"); });
+  }
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -248,6 +283,7 @@ export function NotesGlobalTaskbar({ userId, onOpenCentral, sidebarWidth = 0 }: 
     <>
       {isTaskbarVisible && notaAtiva && (
         <NoteViewer
+          usuarioAtualId={userId}
           noteId={notaAtiva.noteId}
           initialTitle={notaAtiva.title}
           initialContentJson={notaAtiva.contentJson}
@@ -352,11 +388,7 @@ export function NotesGlobalTaskbar({ userId, onOpenCentral, sidebarWidth = 0 }: 
                       syncState={syncState[tab.noteId]}
                       onActivate={() => ativarAbaHandler(tab.id, tab.noteId)}
                       onClose={() => fecharAbaHandler(tab.id, tab.noteId)}
-                      onRenomear={() => {
-                        /* renomear via prompt simples nesta fase — refinamento de UI fica para fases seguintes */
-                        const novoTitulo = window.prompt("Renomear nota", tab.title);
-                        if (novoTitulo) useNotasWorkspace.getState().renomearAba(tab.id, novoTitulo);
-                      }}
+                      onRenomear={() => { void renomearNota(tab.id, tab.noteId, tab.title); }}
                       onFixar={async () => {
                         const novoValor = !tab.pinned;
                         const res = await FixarNota({ noteId: tab.noteId, fixada: novoValor });
@@ -382,18 +414,22 @@ export function NotesGlobalTaskbar({ userId, onOpenCentral, sidebarWidth = 0 }: 
                         const idx = tabs.findIndex((t) => t.id === tab.id);
                         tabs.slice(idx + 1).forEach((t) => fecharAbaHandler(t.id, t.noteId));
                       }}
-                      onArquivar={async () => {
-                        await ArquivarNota(tab.noteId);
+                      onArquivar={() => executarMutacaoNota(tab.noteId, async () => {
+                        if (!await salvarNotaAbertaAntesDeEncerrar(tab.noteId)) return {success:false,error:"Salve ou resolva o rascunho antes de arquivar a nota."};
+                        return ArquivarNota(tab.noteId);
+                      }, () => {
                         fecharAbaHandler(tab.id, tab.noteId);
-                        limparResquiciosDaNota(tab.noteId);
+                        limparResquiciosDaNota(tab.noteId, true);
                         toast.success("Nota arquivada");
-                      }}
-                      onExcluir={async () => {
-                        await MoverNotaParaLixeira(tab.noteId);
+                      })}
+                      onExcluir={() => executarMutacaoNota(tab.noteId, async () => {
+                        if (!await salvarNotaAbertaAntesDeEncerrar(tab.noteId)) return {success:false,error:"Salve ou resolva o rascunho antes de mover a nota para a lixeira."};
+                        return MoverNotaParaLixeira(tab.noteId);
+                      }, () => {
                         fecharAbaHandler(tab.id, tab.noteId);
-                        limparResquiciosDaNota(tab.noteId);
+                        limparResquiciosDaNota(tab.noteId, true);
                         toast.success("Nota movida para a lixeira");
-                      }}
+                      })}
                     />
                   ))}
                 </div>

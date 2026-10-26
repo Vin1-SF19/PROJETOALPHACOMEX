@@ -159,7 +159,7 @@ describe("Checklists.ts — operações robustas no card", () => {
       where: { cardId_userId: { cardId: "card-1", userId: 9 } },
     }));
     expect(mocks.itemUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
-      data: { responsavelId: 9 },
+      data: { responsavelId: 9, updatedAt: expect.any(Date) },
     }));
     expect(mocks.historico).toHaveBeenCalledWith(expect.objectContaining({
       valorAnteriorJson: expect.stringContaining('"responsavelId":null'),
@@ -186,7 +186,7 @@ describe("Checklists.ts — operações robustas no card", () => {
 
     expect(resposta.success).toBe(true);
     expect(mocks.membroFindUnique).not.toHaveBeenCalled();
-    expect(mocks.itemUpdateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { responsavelId: 7 } }));
+    expect(mocks.itemUpdateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { responsavelId: 7, updatedAt: expect.any(Date) } }));
   });
 
   it("persiste a transferência para Sem responsável", async () => {
@@ -205,7 +205,7 @@ describe("Checklists.ts — operações robustas no card", () => {
     const resposta = await AtualizarItemChecklistCardBpm({ itemId: ITEM_ID, responsavelId: null });
 
     expect(resposta.success).toBe(true);
-    expect(mocks.itemUpdateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { responsavelId: null } }));
+    expect(mocks.itemUpdateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { responsavelId: null, updatedAt: expect.any(Date) } }));
     expect(mocks.historico).toHaveBeenCalledTimes(1);
     expect(mocks.reconciliar).toHaveBeenCalledTimes(1);
     expect(mocks.realtime).toHaveBeenCalledTimes(1);

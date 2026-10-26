@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useEditor, type JSONContent } from "@tiptap/react";
 import { Lock, ChevronLeft, SlidersHorizontal } from "lucide-react";
-import { AtualizarNota } from "@/actions/Notas";
+import { AtualizarNota, ObterNota } from "@/actions/Notas";
 import { useNotasWorkspace } from "@/store/useNotasWorkspace";
 import { getNotaRascunhoStorageKey } from "@/lib/notas-tabs";
 import { cn } from "@/lib/utils";
+import { SalvamentoNota, registrarRenomeacaoEditor, type EstadoSalvamentoNota } from "@/lib/notas/salvamento-client";
 import {
   criarExtensoesEditorNote,
   NoteEditorContent,
@@ -17,6 +18,7 @@ const AUTOSAVE_DEBOUNCE_MS = 1500;
 
 interface NoteEditorProps {
   noteId: string;
+  usuarioAtualId?: number;
   initialTitle: string;
   initialContentJson: JSONContent;
   initialVersion: number;
@@ -29,10 +31,11 @@ interface NoteEditorProps {
   onAbrirAcoesMobile?: () => void;
 }
 
-type StatusSalvamento = "salvo" | "pendente" | "salvando" | "erro" | "conflito" | "offline";
+type StatusSalvamento = EstadoSalvamentoNota;
 
 export function NoteEditor({
   noteId,
+  usuarioAtualId = 0,
   initialTitle,
   initialContentJson,
   initialVersion,
@@ -46,155 +49,115 @@ export function NoteEditor({
     initialTitle.trim().length > 0 && initialTitle !== "Sem título",
   );
   const [status, setStatus] = useState<StatusSalvamento>("salvo");
-  const versaoRef = useRef(initialVersion);
   const titleRef = useRef(initialTitle);
   const onPreviewChangeRef = useRef(onPreviewChange);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const carregouRef = useRef(false);
+  const [erroRecuperacao, setErroRecuperacao] = useState<string | null>(null);
+  const [resolvendoConflito, setResolvendoConflito] = useState(false);
   const setSyncState = useNotasWorkspace((state) => state.setSyncState);
   const renomearAba = useNotasWorkspace((state) => state.renomearAba);
   const tabs = useNotasWorkspace((state) => state.tabs);
-
-  const rascunhoKey = getNotaRascunhoStorageKey(noteId);
+  const [session] = useState(() => new SalvamentoNota({
+    noteId, version: initialVersion,
+    content: { title: initialTitle, contentJson: initialContentJson, plainText: "" },
+    storageKey: getNotaRascunhoStorageKey(noteId, usuarioAtualId),
+    storage: () => usuarioAtualId > 0 ? localStorage : { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+    online: () => navigator.onLine,
+    update: AtualizarNota,
+  }));
 
   const editor = useEditor({
     immediatelyRender: false,
     editable: !somenteLeitura,
-    extensions: criarExtensoesEditorNote(
-      somenteLeitura ? "" : "Escreva sua nota... use / para comandos",
-    ),
+    extensions: criarExtensoesEditorNote(somenteLeitura ? "" : "Escreva sua nota... use / para comandos"),
     content: initialContentJson ?? "",
-    editorProps: {
-      attributes: {
-        class: "prose prose-invert prose-sm max-w-none focus:outline-none min-h-[200px] px-4 py-3",
-      },
-    },
+    editorProps: { attributes: { class: "prose prose-invert prose-sm max-w-none focus:outline-none min-h-[200px] px-4 py-3" } },
     onUpdate: ({ editor }) => {
-      // Defesa em profundidade: com editable=false o Tiptap não deveria disparar onUpdate por
-      // digitação, mas o autosave nunca pode rodar para quem só tem permissão de leitura —
-      // o servidor já recusa (AtualizarNota → podeEditarNota), isto apenas evita o round-trip.
-      if (somenteLeitura) return;
-      if (!carregouRef.current) return;
-
-      let tituloAtual = titleRef.current;
-      if (!tituloEditadoManualmente && tituloAtual.trim().length === 0) {
-        const textoInicial = editor.getText().trim().slice(0, 60);
-        if (textoInicial) {
-          tituloAtual = textoInicial;
-          titleRef.current = textoInicial;
-          setTitle(textoInicial);
-        }
+      if (somenteLeitura || !carregouRef.current) return;
+      if (!tituloEditadoManualmente && !titleRef.current.trim()) {
+        const titulo = editor.getText().trim().slice(0, 60);
+        if (titulo) { titleRef.current = titulo; setTitle(titulo); }
       }
-
-      onPreviewChangeRef.current?.({ noteId, title: tituloAtual, plainText: editor.getText() });
-      setStatus("pendente");
-      salvarRascunhoLocal(editor.getJSON(), editor.getText());
-
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(salvar, AUTOSAVE_DEBOUNCE_MS);
+      session.change({ title: titleRef.current, contentJson: editor.getJSON(), plainText: editor.getText() });
+      onPreviewChangeRef.current?.({ noteId, title: titleRef.current, plainText: editor.getText() });
+      agendarSalvamento();
     },
   });
 
-  function salvarRascunhoLocal(contentJson: unknown, plainText: string) {
-    try {
-      localStorage.setItem(
-        rascunhoKey,
-        JSON.stringify({ title: titleRef.current, contentJson, plainText, baseVersion: versaoRef.current, savedAt: Date.now() }),
-      );
-    } catch {
-      /* localStorage indisponível — rascunho local é best-effort */
-    }
+  function agendarSalvamento() {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => { void session.save(); }, AUTOSAVE_DEBOUNCE_MS);
   }
-
-  function limparRascunhoLocal() {
-    try {
-      localStorage.removeItem(rascunhoKey);
-    } catch {
-      /* ignore */
-    }
+  function editarTitulo(novoTitulo: string) {
+    if (somenteLeitura || !editor) return;
+    setTitle(novoTitulo); titleRef.current = novoTitulo; setTituloEditadoManualmente(true);
+    session.change({ title: novoTitulo, contentJson: editor.getJSON(), plainText: editor.getText() });
+    onPreviewChangeRef.current?.({ noteId, title: novoTitulo, plainText: editor.getText() });
+    for (const tab of tabs) if (tab.noteId === noteId) renomearAba(tab.id, novoTitulo);
   }
-
-  async function salvar() {
-    if (!editor) return;
-    setStatus("salvando");
-    setSyncState(noteId, "salvando");
-
-    const contentJson = editor.getJSON();
-    const plainText = editor.getText();
-
-    if (!navigator.onLine) {
-      setStatus("offline");
-      setSyncState(noteId, "offline");
-      return;
-    }
-
-    const res = await AtualizarNota({
-      id: noteId,
-      title: titleRef.current,
-      contentJson,
-      plainText,
-      baseVersion: versaoRef.current,
-    });
-
-    if (res.success) {
-      versaoRef.current = res.data.currentVersion;
-      setStatus("salvo");
-      setSyncState(noteId, "salvo");
-      limparRascunhoLocal();
-      return;
-    }
-
-    if (res.error === "CONFLITO_VERSAO") {
-      setStatus("conflito");
-      setSyncState(noteId, "conflito");
-      return;
-    }
-
-    setStatus("erro");
-    setSyncState(noteId, "erro");
-  }
-
-  useEffect(() => {
-    onPreviewChangeRef.current = onPreviewChange;
-  }, [onPreviewChange]);
-
-  useEffect(() => {
-    editor?.setEditable(!somenteLeitura);
-  }, [editor, somenteLeitura]);
-
-  useEffect(() => {
-    if (!editor) return;
-    // Rascunho local pode ter sido salvo enquanto o usuário ainda tinha permissão de edição —
-    // restaurar por cima do conteúdo servido agora que ele é somente-leitura mostraria uma
-    // versão que nunca chegou a ser gravada no servidor.
-    if (somenteLeitura) {
-      carregouRef.current = true;
-      return;
-    }
-
+  async function resolverConflito(manterRascunho: boolean) {
+    if (resolvendoConflito) return;
+    setResolvendoConflito(true); setErroRecuperacao(null);
     try {
-      const rascunhoRaw = localStorage.getItem(rascunhoKey);
-      if (rascunhoRaw) {
-        const rascunho = JSON.parse(rascunhoRaw) as {
-          title: string;
-          contentJson: JSONContent;
-          baseVersion: number;
-        };
-        if (rascunho.baseVersion === initialVersion) {
-          editor.commands.setContent(rascunho.contentJson);
-          // eslint-disable-next-line react-hooks/set-state-in-effect -- leitura síncrona de localStorage ao montar, sem Promise para usar void
-          setTitle(rascunho.title);
-          titleRef.current = rascunho.title;
-          setStatus("pendente");
-        }
+      const result = await ObterNota(noteId);
+      if (!result.success || !result.data || result.somenteLeitura) {
+        setErroRecuperacao(!result.success ? result.error : "Você não tem permissão para editar esta nota.");
+        return;
+      }
+      if (manterRascunho) {
+        session.keepDraftOnVersion(result.data.currentVersion);
+        await session.save();
+      } else {
+        const conteudo = (result.data.contentJson ?? {}) as JSONContent;
+        carregouRef.current = false;
+        editor?.commands.setContent(conteudo);
+        carregouRef.current = true;
+        setTitle(result.data.title); titleRef.current = result.data.title;
+        session.useRemote({ title: result.data.title, contentJson: conteudo, plainText: result.data.plainText }, result.data.currentVersion);
+        onPreviewChangeRef.current?.({noteId, title: result.data.title, plainText: result.data.plainText});
+        for (const tab of tabs) if (tab.noteId === noteId) renomearAba(tab.id, result.data.title);
       }
     } catch {
-      /* ignore */
-    }
+      setErroRecuperacao("Não foi possível consultar a versão salva. Seu rascunho foi mantido.");
+    } finally { setResolvendoConflito(false); }
+  }
 
+  useEffect(() => { onPreviewChangeRef.current = onPreviewChange; }, [onPreviewChange]);
+  useEffect(() => { editor?.setEditable(!somenteLeitura); }, [editor, somenteLeitura]);
+  useEffect(() => session.subscribe((next) => { setStatus(next); setSyncState(noteId, next); }), [session, noteId, setSyncState]);
+  useEffect(() => {
+    if (!editor) return;
+    carregouRef.current = false;
+    if (!somenteLeitura) {
+      const draft = session.restore();
+      if (draft) {
+        editor.commands.setContent(draft.contentJson as JSONContent);
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- restaura estado a partir do armazenamento externo ao montar
+        setTitle(draft.title);
+        titleRef.current = draft.title;
+        onPreviewChangeRef.current?.({noteId, title:draft.title, plainText:draft.plainText});
+        if (!session.hasConflict) agendarSalvamento();
+      }
+    }
     carregouRef.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => { carregouRef.current = false; if (debounceRef.current) clearTimeout(debounceRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a restauração ocorre uma vez por editor/nota
   }, [editor]);
+  useEffect(() => {
+    if (somenteLeitura) return;
+    const online = () => { if (session.pending) void session.save(); };
+    const beforeUnload = (event: BeforeUnloadEvent) => { if (session.pending) { event.preventDefault(); event.returnValue = ""; } };
+    window.addEventListener("online", online);
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => { window.removeEventListener("online", online); window.removeEventListener("beforeunload", beforeUnload); };
+  }, [session, somenteLeitura]);
+  useEffect(() => registrarRenomeacaoEditor(noteId, async (titulo) => {
+    if (somenteLeitura || !editor) return false;
+    editarTitulo(titulo);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    return session.save();
+  }, () => somenteLeitura ? Promise.resolve(!session.pending) : session.save()));
 
   if (!editor) return null;
 
@@ -233,31 +196,7 @@ export function NoteEditor({
       <input
         value={title}
         readOnly={somenteLeitura}
-        onChange={(event) => {
-          if (somenteLeitura) return;
-          const novoTitulo = event.target.value;
-          setTitle(novoTitulo);
-          titleRef.current = novoTitulo;
-          setTituloEditadoManualmente(true);
-          setStatus("pendente");
-          onPreviewChangeRef.current?.({
-            noteId,
-            title: novoTitulo,
-            plainText: editor?.getText() ?? "",
-          });
-
-          // Reflete no rótulo da aba na barra de tarefas em tempo real — a aba não sabe do
-          // título até a nota ser salva, então sem isso o usuário vê o valor antigo ali.
-          if (tabs.some((tab) => tab.noteId === noteId)) {
-            const tab = tabs.find((t) => t.noteId === noteId);
-            if (tab) renomearAba(tab.id, novoTitulo);
-          }
-
-          if (editor) salvarRascunhoLocal(editor.getJSON(), editor.getText());
-
-          if (debounceRef.current) clearTimeout(debounceRef.current);
-          debounceRef.current = setTimeout(salvar, AUTOSAVE_DEBOUNCE_MS);
-        }}
+        onChange={(event) => { editarTitulo(event.target.value); agendarSalvamento(); }}
         placeholder="Sem título"
         className={cn(
           "w-full border-b border-white/5 bg-transparent px-4 py-2 text-sm font-semibold text-white outline-none placeholder:text-slate-600",
@@ -265,6 +204,22 @@ export function NoteEditor({
         )}
       />
 
+      {!somenteLeitura && ["erro", "offline"].includes(status) && (
+        <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-2 text-xs text-amber-300" role="alert">
+          <span>O conteúdo continua pendente. Mantenha esta nota aberta ou reabra para recuperar o rascunho.</span>
+          <button type="button" onClick={() => void session.save()} className="shrink-0 rounded border border-white/20 px-2 py-1">Tentar novamente</button>
+        </div>
+      )}
+      {!somenteLeitura && status === "conflito" && (
+        <div className="space-y-2 border-b border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200" role="alert">
+          <p>Há outra versão salva. O texto exibido é seu rascunho. Escolha qual versão manter antes de salvar.</p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" disabled={resolvendoConflito} onClick={() => void resolverConflito(false)} className="rounded border border-white/20 px-2 py-1">Descartar rascunho e carregar versão salva</button>
+            <button type="button" disabled={resolvendoConflito} onClick={() => void resolverConflito(true)} className="rounded border border-white/20 px-2 py-1">Salvar meu rascunho sobre a versão atual</button>
+          </div>
+          {erroRecuperacao && <p>{erroRecuperacao}</p>}
+        </div>
+      )}
       <NoteEditorContent editor={editor} />
     </div>
   );
@@ -277,7 +232,7 @@ function StatusIndicador({ status }: { status: StatusSalvamento }) {
     salvando: "Salvando...",
     erro: "Falha ao salvar",
     conflito: "Conflito de versão",
-    offline: "Sem conexão — salvo localmente",
+    offline: "Sem conexão — alterações pendentes",
   };
 
   const cores: Record<StatusSalvamento, string> = {

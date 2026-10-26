@@ -10,6 +10,7 @@ import type { NotaListada } from "./ListaNotas";
 import { notificarWorkspaceNotasAtualizado } from "@/lib/notas-workspace-messages";
 
 interface UseLixeiraNotasParams {
+  usuarioAtualId?: number;
   notas: NotaListada[];
   onRecarregar: () => void;
   onLimparNotaAberta: () => void;
@@ -17,6 +18,7 @@ interface UseLixeiraNotasParams {
 }
 
 export function useLixeiraNotas({
+  usuarioAtualId,
   notas,
   onRecarregar,
   onLimparNotaAberta,
@@ -33,7 +35,7 @@ export function useLixeiraNotas({
     for (const noteId of noteIds) {
       removerAbaPorNota(noteId);
       removerNotificacoesDaNota(noteId);
-      limparRascunhoLocalDaNota(noteId);
+      limparRascunhoLocalDaNota(noteId, usuarioAtualId);
     }
   }
 

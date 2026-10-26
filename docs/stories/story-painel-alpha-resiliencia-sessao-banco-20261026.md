@@ -1,8 +1,8 @@
 # Story — Resiliência da sessão e carregamento durante falha temporária do banco
 
-**Status:** In Progress — reteste Sage focal/Chrome PASS; integração local e gates globais/staging pendentes
+**Status:** In Progress — integração local de staging concluída; reteste Sage focal/Chrome PASS; gates globais/revisões/publicação pendentes
 **Data:** 2026-10-26
-**Base:** origin/staging b115dd3802485e9b0a049f2a45a5010db77338b5
+**Base original:** origin/staging b115dd3802485e9b0a049f2a45a5010db77338b5; integrado localmente o avanço fb0e8546d75e95f96e780f2049b43d75f6466e15
 **Pedido:** “realize as melhorias necessarias”, após diagnóstico de intermitência do banco, falso logout e carregamento prolongado. Autoriza desenvolvimento, testes e staging; produção exige promoção explícita.
 
 ## Resultado esperado
@@ -310,7 +310,19 @@ Evidências privadas600: `/home/ialpha/.config/painel-alpha/sessao-resiliencia-2
 ## Forge preflight interrompido antes dos gates — 26/10/2026
 
 - [x] Skill/known-errors, ambiente sanitizado planejado, recursos e isolamento de Prisma conferidos por leitura. Nenhum gate ou build iniciado.
-- [ ] Integrar localmente staging que avançou para `fb0e8546d75e95f96e780f2049b43d75f6466e15`; candidato permanece na base `b115dd38`. DevOps é a próxima estação, sem push/deploy.
+- [x] DevOps integrou localmente staging `fb0e8546d75e95f96e780f2049b43d75f6466e15` após commit de preparação `213b801d`, preservando ambos os históricos; sem push/deploy. Evidência na seção seguinte.
 - [ ] Executar todos os gates globais reais e smoke compilado sobre a fonte integrada. Nenhum PASS Forge declarado; reteste Sage focal anterior permanece evidência histórica.
 
 Artefatos privados600: `forge-preflight.md/json` e `forge-preflight-source.json` em `/home/ialpha/.config/painel-alpha/sessao-resiliencia-20261026/`. FileList desta estação: esta story; sem alteração em appcode/testes/dependências/schema/DB/envreal/cloud/produção.
+
+
+## DevOps — integração Git local antes dos gates — 26/10/2026
+
+- [x] Snapshot privado600 dos 157 caminhos próprios, hashes de conteúdo/blob, patch e status do Root antes da preparação; nenhum arquivo de ambiente, dependência ou output gerado incluído. Commit local `213b801d`: `fix(auth): preservar sessao durante indisponibilidade temporaria`.
+- [x] Merge local preservando ambos os históricos com staging `fb0e8546d75e95f96e780f2049b43d75f6466e15` (90 caminhos upstream). Sem rebase, force, reset, stash, clean ou operação no checkout original.
+- [x] Quatro sobreposições mescladas automaticamente, sem conflitos: `src/actions/bpm/Anexos.ts`, `src/app/PainelAlpha/layout.tsx`, `src/app/PainelAlpha/PainelTarefas/PainelTarefaC/page.tsx` e `src/app/PainelAlpha/PainelTarefas/painelTarefaSG/page.tsx`. Comparação byte a byte com merge de três vias e blobs dos demais arquivos confirma preservação de ambos os lados. Helpers de salvamento/rascunhos/Blueprint/Notas/LegacyWriteAccess recebidos integralmente de upstream.
+- [x] Verificados nos arquivos combinados: campos registrados sem formulário + rethrow TEMP; `PainelCardState` com key/userId nas duas instâncias + auth reader/orçamento SSR; finally/toast de salvamento + acessos opcionais de usuário nas duas páginas legadas. Nenhuma resolução manual de appcode necessária.
+- [x] `git diff --cached --check` e `git diff --check` PASS. Removidos três espaços finais da story e atualizado status documental. Remoto staging conferido e permanece no SHA integrado.
+- [ ] Forge deve executar lint/typecheck/npm test/build globais e smoke compilado sobre esta fonte integrada; evidências focais anteriores não aprovam a integração global. Probe/Anubis/Lens e publicação/validação em staging continuam pendentes. Produção não autorizada.
+
+File List desta estação: esta story (status, checklist e registro de integração). Demais arquivos da tarefa já listados acima; alterações recebidas de upstream pertencem ao histórico preservado de staging. Evidências privadas600 `devops-before.json`, `devops-precommit.json`, `devops-before.patch`, `devops-merge-verification.json` e `devops-integration.md/json` em `/home/ialpha/.config/painel-alpha/sessao-resiliencia-20261026/`. Nenhum banco, schema, env real, cloud, push ou deploy acessado nesta estação.

@@ -60,7 +60,7 @@ export function PainelCamposEtapaAtual({
   realtimeRevision,
   onAtualizado,
 }: Props) {
-  const { registerSave, registerManualSave, getPendingUpload, setPendingUpload, setPendingFields, getVersion, confirmVersion, getDraft, setDraft, subscribeConfirmation, getFailedSaveKeys, clearFailedSave } = useCardSave();
+  const { registerSave, registerManualSave, getPendingUpload, setPendingUpload, setPendingFields, getVersion, confirmVersion, getDraft, getDraftBase, setDraft, subscribeConfirmation, getFailedSaveKeys, clearFailedSave } = useCardSave();
   const idInstancia = `${card.id}-${instanceKey}`;
   const prefixoChaveSaveCampos = `${card.id}:campo:`;
   const chaveSaveCampos = `${card.id}:campo:${idInstancia}`;
@@ -72,14 +72,14 @@ export function PainelCamposEtapaAtual({
     getDraft(idInstancia) ?? Object.fromEntries(camposDoComponente.map((campo) => [campo.id, valorInicialCampo(campo)])),
   );
   const [valoresConfirmados, setBaseCamposAtuais] = useState<Record<string, string>>(() =>
-    Object.fromEntries(camposDoComponente.map((campo) => [campo.id, valorInicialCampo(campo)])),
+    getDraftBase(idInstancia)?.valores ?? Object.fromEntries(camposDoComponente.map((campo) => [campo.id, valorInicialCampo(campo)])),
   );
   const [camposEtapaBase, setCamposEtapaBase] = useState(camposDoComponente);
-  const [versaoBaseCampos, setVersaoBaseCampos] = useState(() => new Date(card.updatedAt).toISOString());
+  const [versaoBaseCampos, setVersaoBaseCampos] = useState(() => getDraftBase(idInstancia)?.versao ?? new Date(card.updatedAt).toISOString());
   const versaoBaseCamposRef = useRef(versaoBaseCampos);
   const snapshotAtivoRef = useRef<SnapshotCamposRealtime>({
-    valores: Object.fromEntries(camposDoComponente.map((campo) => [campo.id, valorInicialCampo(campo)])),
-    versao: new Date(card.updatedAt).toISOString(),
+    valores: valoresConfirmados,
+    versao: versaoBaseCampos,
   });
   const [snapshotRemotoPendente, setSnapshotRemotoPendente] = useState<SnapshotCamposRealtime | null>(null);
   const [camposRemotosPendentes, setCamposRemotosPendentes] = useState<CamposEtapaCard | null>(null);
@@ -129,7 +129,7 @@ export function PainelCamposEtapaAtual({
     };
     versaoBaseCamposRef.current = snapshotAtivoRef.current.versao;
     const draft = getDraft(idInstancia);
-    if (draft) setDraft(idInstancia, { ...draft, [campoId]: valor });
+    if (draft) setDraft(idInstancia, { ...draft, [campoId]: valor }, snapshotAtivoRef.current, "sync");
     setValoresCamposAtuais(valoresRef.current);
     setBaseCamposAtuais(snapshotAtivoRef.current.valores);
   }), [card.id, idInstancia, getDraft, setDraft, subscribeConfirmation]);
@@ -142,7 +142,7 @@ export function PainelCamposEtapaAtual({
     const pendentes = camposEtapaBase.filter((campo) =>
       valorComparavel(campo.tipo, valoresRef.current[campo.id]) !== valorComparavel(campo.tipo, snapshotAtivoRef.current.valores[campo.id]));
     camposAtuaisSujosRef.current = pendentes.length > 0;
-    setDraft(idInstancia, pendentes.length ? { ...valoresRef.current } : undefined);
+    setDraft(idInstancia, pendentes.length ? { ...valoresRef.current } : undefined, snapshotAtivoRef.current, antesDaConfirmacao ? "sync" : "edit");
     setPendingFields(`${card.id}:${idInstancia}`, pendentes.map((campo) => ({
       label: campoLabels[campo.id] ?? campo.nome,
       before: campo.tipo === "usuario"
@@ -227,7 +227,7 @@ export function PainelCamposEtapaAtual({
       setValoresCamposAtuais(resolucao.valoresEditados);
       const sujo = Object.entries(resolucao.valoresEditados).some(([id, valor]) => valor !== resolucao.snapshotAtivo.valores[id]);
       camposAtuaisSujosRef.current = sujo;
-      setDraft(idInstancia, sujo ? resolucao.valoresEditados : undefined);
+      setDraft(idInstancia, sujo ? resolucao.valoresEditados : undefined, resolucao.snapshotAtivo, "sync");
       setPendingFields(`${card.id}:${idInstancia}`, camposRemotos.flatMap((campo) => {
         const antes = resolucao.snapshotAtivo.valores[campo.id] ?? "";
         const depois = resolucao.valoresEditados[campo.id] ?? "";
@@ -263,6 +263,19 @@ export function PainelCamposEtapaAtual({
     setCamposRemotosPendentes(null);
     camposAtuaisSujosRef.current = false;
     setConflitoCamposAtuais(false);
+  }
+  function manterRascunhoCampos() {
+    if (!snapshotRemotoPendente || !camposRemotosPendentes) return;
+    snapshotAtivoRef.current = snapshotRemotoPendente;
+    versaoBaseCamposRef.current = snapshotRemotoPendente.versao;
+    setBaseCamposAtuais(snapshotRemotoPendente.valores);
+    setVersaoBaseCampos(snapshotRemotoPendente.versao);
+    setCamposEtapaBase(camposRemotosPendentes);
+    setDraft(idInstancia, { ...valoresRef.current }, snapshotRemotoPendente);
+    setSnapshotRemotoPendente(null);
+    setCamposRemotosPendentes(null);
+    setConflitoCamposAtuais(false);
+    setEstadoSave("pendente");
   }
   async function salvarCamposAtuais(campoIds: string[]): Promise<boolean> {
     if (!podeEditar || conflitoCamposAtuais) return false;
@@ -610,6 +623,9 @@ export function PainelCamposEtapaAtual({
               <p>Os campos receberam uma atualização externa. Seu rascunho e a versão-base foram preservados; aceite os dados atualizados antes de continuar.</p>
               <button type="button" onClick={usarDadosAtualizadosCampos} className="mt-2 rounded-lg border border-sky-300/30 px-2 py-1 font-semibold hover:bg-sky-200/10">
                 Usar dados atualizados
+              </button>
+              <button type="button" onClick={manterRascunhoCampos} className="ml-2 mt-2 rounded-lg border border-sky-300/30 px-2 py-1 font-semibold hover:bg-sky-200/10">
+                Manter meus valores para revisão
               </button>
             </div>
           )}

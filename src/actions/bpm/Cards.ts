@@ -77,6 +77,7 @@ import { cardApareceNoQuadro, etapasComSaidaDoQuadro } from "@/lib/bpm/cards-no-
 import { paraExibicaoTelefone } from "@/lib/validations/cs-nps";
 import { iniciarLigacaoCallix, normalizarTelefoneCallix } from "@/lib/callix/click-to-call";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
+import { carregarCamposRegistradosSemFormulario } from "@/lib/bpm/campos-registrados-sem-formulario-server";
 import { resolverParceiroOrigem, validarParceiroOrigem, salvarParceiroOrigem } from "@/lib/bpm/origem-cliente-server";
 import type { ParceiroOrigemBpm } from "@/lib/bpm/origem-cliente";
 import { avaliarTransicaoBpm, executarTransicaoBpm } from "@/lib/bpm/transicao-command";
@@ -673,6 +674,7 @@ export async function ObterCardBpm(cardId: string) {
         pipeline: { select: { id: true, chave: true, nome: true } },
         etapa: {
           include: {
+            campoConfiguracoes: { select: { id: true }, take: 1 },
             formulario: {
               include: {
                 secoes: {
@@ -776,7 +778,11 @@ export async function ObterCardBpm(cardId: string) {
       resolverPerfilAcessoCampo(acessoCard),
       { incluirRestritosAoPerfil: true },
     );
-    const camposEtapa = await carregarCamposAplicaveisCardEtapa(
+    const somenteCamposRegistrados = card.etapa.formulario === null
+      && card.etapa.campoConfiguracoes.length === 0;
+    const camposEtapa = somenteCamposRegistrados
+      ? await carregarCamposRegistradosSemFormulario(card.id, card.pipelineId, card.etapaId, db, resolverPerfilAcessoCampo(acessoCard))
+      : await carregarCamposAplicaveisCardEtapa(
       card.id,
       card.pipelineId,
       card.etapaId,
@@ -901,6 +907,7 @@ export async function ObterCardBpm(cardId: string) {
         anexos: card.anexos.map((anexo) => ({ ...anexo, url: `/api/bpm/anexos/${anexo.id}` })),
         camposEtapa: camposEtapa.map((campo) => ({ ...campo,
           valorExibicao: campo.tipo === "usuario" ? nomeUsuarioCampoBpm(campo.valor, usuariosCampos) : campo.valor })),
+        camposRegistradosSemFormulario: somenteCamposRegistrados,
         camposCorrigidosFinanceiro: [...camposCorrigidosFinanceiro],
         formularioEtapa,
         encaminhado: acessoCard.bloqueadoPorEncaminhamento === true,
@@ -1315,7 +1322,7 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
       );
       const cardAtual = await tx.bpmCard.findUnique({
         where: { id: cardId },
-        include: { etapa: { select: { nome: true } }, pipeline: { select: { chave: true, nome: true } }, empresa: { select: { razaoSocial: true } } },
+        include: { etapa: { select: { nome: true, formulario: { select: { id: true } }, campoConfiguracoes: { select: { id: true }, take: 1 } } }, pipeline: { select: { chave: true, nome: true } }, empresa: { select: { razaoSocial: true } } },
       });
       if (
         !cardAtual
@@ -1375,11 +1382,15 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
         if (erroContato) throw new Error(`PROXIMO_CONTATO_INVALIDO:${erroContato}`);
       }
 
+      const somenteCamposRegistrados = cardAtual.etapa.formulario === null
+        && cardAtual.etapa.campoConfiguracoes.length === 0;
       let valoresValidados: Record<string, string> = {};
       let valoresAnteriores: Record<string, string | null> = {};
       let selecaoParceiroOrigem: ParceiroOrigemBpm | undefined;
       if (camposValores && Object.keys(camposValores).length > 0) {
-        const camposAplicaveis = await carregarCamposAplicaveisCardEtapa(
+        const camposAplicaveis = somenteCamposRegistrados
+          ? await carregarCamposRegistradosSemFormulario(cardId, cardAtual.pipelineId, cardAtual.etapaId, tx, resolverPerfilAcessoCampo(acessoCardAtual))
+          : await carregarCamposAplicaveisCardEtapa(
           cardId,
           cardAtual.pipelineId,
           cardAtual.etapaId,
@@ -1425,6 +1436,12 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
             client: tx,
             atorId: userId,
           });
+          if (somenteCamposRegistrados) {
+            const idsPermitidos = new Set(camposAplicaveis.map((campo) => campo.id));
+            if (Object.keys(valoresValidados).some((id) => !idsPermitidos.has(id))) {
+              throw new Error("CAMPO_INVALIDO:Esta etapa permite editar apenas dados já registrados neste card.");
+            }
+          }
           const ids = Object.keys(valoresValidados);
           const [camposDefinidos, valoresPersistidos] = await Promise.all([
             tx.bpmCampo.findMany({
@@ -1509,7 +1526,7 @@ export async function AtualizarCardBpm(dados: unknown): Promise<ResultadoAtualiz
 
       if (camposValores) {
         const idsGlobais = await salvarValoresGlobaisPersonalizadosCampos(cardId, valoresValidados, tx);
-        const snapshots = typeof carregarSnapshotsCopiaCamposCard === "function"
+        const snapshots = !somenteCamposRegistrados && typeof carregarSnapshotsCopiaCamposCard === "function"
           ? await carregarSnapshotsCopiaCamposCard(cardId, cardAtual.pipelineId, cardAtual.etapaId, tx)
           : {};
         for (const [campoId, valor] of Object.entries(snapshots)) {

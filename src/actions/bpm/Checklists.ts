@@ -616,6 +616,7 @@ export async function AtualizarItemChecklistCardBpm(payload: unknown) {
       },
     });
     if (!existente) throw new Error("Item não encontrado");
+    if (dados.versaoEsperadaEm && existente.updatedAt.getTime() !== dados.versaoEsperadaEm.getTime()) throw new Error("CONFLITO_CHECKLIST_ITEM");
     await exigirAcessoBpmCard(existente.cardChecklist.cardId, userId, role, "editarCard");
     const atualizado = await db.$transaction(async (tx) => {
       await exigirAcessoBpmCard(existente.cardChecklist.cardId, userId, role, "editarCard", tx);
@@ -636,6 +637,7 @@ export async function AtualizarItemChecklistCardBpm(payload: unknown) {
       const gravacao = await tx.bpmCardChecklistItem.updateMany({
         where: { id: dados.itemId, updatedAt: existente.updatedAt },
         data: {
+          updatedAt: new Date(Math.max(Date.now(), existente.updatedAt.getTime() + 1)),
           ...(dados.status !== undefined ? { status: dados.status, concluidoEm: dados.status === "CONCLUIDO" ? new Date() : null } : {}),
           ...(dados.observacao !== undefined ? { observacao: nuloSeVazio(dados.observacao) } : {}),
           ...(dados.responsavelId !== undefined ? { responsavelId: dados.responsavelId } : {}),
@@ -675,7 +677,8 @@ export async function AtualizarItemChecklistCardBpm(payload: unknown) {
       }, tx);
       return { item, sinalEmitido: true };
     });
-    revalidatePath(ROTA_CRM);
+    try { revalidatePath(ROTA_CRM); }
+    catch (error) { console.error("[AtualizarItemChecklistCardBpm/cache]", error); }
     if (atualizado.sinalEmitido) {
       await notificarPipelineBpm({ pipelineId: existente.cardChecklist.card.pipelineId, cardId: existente.cardChecklist.cardId, tipo: "TAREFA_ALTERADA" });
     }

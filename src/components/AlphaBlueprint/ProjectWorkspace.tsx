@@ -41,7 +41,7 @@ export function ProjectWorkspace({ projeto, temaName, userId }: ProjectWorkspace
           {aba === "visao-geral" && (
             <ProjectOverview projeto={projeto} accent={accent} userId={userId} onNavegar={setAba} />
           )}
-          {aba === "especificacao" && <SpecificationEditor projectId={projeto.id} accent={accent} />}
+          {aba === "especificacao" && <SpecificationEditor key={`${projeto.id}:${userId}`} projectId={projeto.id} userId={userId} accent={accent} />}
           {aba === "canvas" && <BlueprintCanvas projectId={projeto.id} accent={accent} />}
           {aba === "arquivos" && <ProjectFiles projectId={projeto.id} accent={accent} />}
           {aba === "requisitos" && <RequirementsPanel projectId={projeto.id} accent={accent} />}

@@ -70,7 +70,7 @@ describe("CRM - persistência antes da movimentação", () => {
   });
 
   it("mantém o provider de salvamento no layout", () => {
-    expect(ler("src/app/PainelAlpha/AlphaCRM/layout.tsx")).toContain("<CardSaveProvider>");
+    expect(ler("src/app/PainelAlpha/AlphaCRM/layout.tsx")).toMatch(/<CardSaveProvider\b[^>]*userId=/);
   });
 
   it("PainelStatusPosFechamento registra save via CardSaveContext", () => {
