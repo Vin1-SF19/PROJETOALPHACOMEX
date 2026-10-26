@@ -2,11 +2,14 @@ import db from "@/lib/prisma";
 import { cache } from "react";
 import { AcessoTemporariamenteIndisponivel } from "./indisponibilidade";
 import type { EstadoAcessoSessao } from "./estado-acesso";
+import { prazosBanco } from "@/lib/db-resilience-config";
+import { registrarMetricaBanco } from "@/lib/db-observability";
+import { erroTransporteBanco } from "@/lib/db-transport-error";
 
 export const STATUS_USUARIO_ATIVO = "ATIVO";
 // Transport and authorization observation are separate deadlines. An expired
 // observer never releases its pending-query slot until the SDK actually settles.
-export const AUTH_VALIDATION_BUDGET_MS = 5_000;
+export const AUTH_VALIDATION_BUDGET_MS = prazosBanco.authMs;
 export const AUTH_PENDING_READ_LIMIT = 8;
 export const AUTH_READ_RETRY_DELAY_MS = 50;
 let pendingReads = 0;
@@ -32,19 +35,16 @@ function idValido(value: unknown): boolean {
     Number.isSafeInteger(Number(value)) && Number(value) > 0;
 }
 
-function erroDeTransporte(error: unknown): boolean {
-  if (error instanceof TypeError && error.message === "fetch failed") return true;
-  if (!error || typeof error !== "object") return false;
-  const code = "code" in error ? String(error.code) : "";
-  if (/^(UND_ERR_(SOCKET|CONNECT_TIMEOUT|HEADERS_TIMEOUT|BODY_TIMEOUT)|ECONNRESET|ETIMEDOUT)$/.test(code)) return true;
-  return "name" in error && error.name === "TimeoutError";
-}
-
 // React cache shares only the current render, never a stale authorization decision.
 const obterEstadoAcessoPainel = cache(async (userId: unknown): Promise<EstadoAcessoPainel> => {
   if (!idValido(userId)) return { estado: "NEGADO" };
-  if (pendingReads >= AUTH_PENDING_READ_LIMIT) return { estado: "INDISPONIVEL" };
+  if (pendingReads >= AUTH_PENDING_READ_LIMIT) {
+    registrarMetricaBanco({ component: "auth", phase: "admission", outcome: "saturated", pending: pendingReads, limit: AUTH_PENDING_READ_LIMIT });
+    return { estado: "INDISPONIVEL" };
+  }
   pendingReads++;
+  const startedAt = Date.now();
+  let outcome: "ok" | "denied" | "unavailable" = "unavailable";
   let expired = false;
   const expiresAt = Date.now() + AUTH_VALIDATION_BUDGET_MS;
   const budgetExpired = () => expired || Date.now() >= expiresAt;
@@ -52,6 +52,7 @@ const obterEstadoAcessoPainel = cache(async (userId: unknown): Promise<EstadoAce
   const deadline = new Promise<EstadoAcessoPainel>((resolve) => {
     timer = setTimeout(() => {
       expired = true;
+      registrarMetricaBanco({ component: "auth", phase: "observer", outcome: "deadline", totalMs: Date.now() - startedAt, pending: pendingReads, observerExpired: true });
       resolve({ estado: "INDISPONIVEL" });
     }, AUTH_VALIDATION_BUDGET_MS);
   });
@@ -66,16 +67,16 @@ const obterEstadoAcessoPainel = cache(async (userId: unknown): Promise<EstadoAce
           if (budgetExpired()) return { estado: "INDISPONIVEL" };
           if (!usuario || !statusPermiteAcessoPainel(usuario.status) ||
               !Number.isSafeInteger(usuario.authSessionVersion) || usuario.authSessionVersion < 0) {
+            outcome = "denied";
             return { estado: "NEGADO" };
           }
+          outcome = "ok";
           return { estado: "PERMITIDO", authSessionVersion: usuario.authSessionVersion };
         } catch (error) {
-          if (attempt === 0 && !budgetExpired() && erroDeTransporte(error)) {
+          if (attempt === 0 && expiresAt - Date.now() > AUTH_READ_RETRY_DELAY_MS + 25 && erroTransporteBanco(error)) {
             await new Promise((resolve) => setTimeout(resolve, AUTH_READ_RETRY_DELAY_MS + Math.floor(Math.random() * 25)));
             continue;
           }
-          // No raw SDK errors, tokens, URLs or identity in the log.
-          console.warn("[auth] Validação de acesso temporariamente indisponível");
           return { estado: "INDISPONIVEL" };
         }
       }
@@ -83,6 +84,7 @@ const obterEstadoAcessoPainel = cache(async (userId: unknown): Promise<EstadoAce
     } finally {
       // A timed-out observer cannot create unlimited work behind the adapter mutex.
       pendingReads--;
+      registrarMetricaBanco({ component: "auth", phase: "sdk", outcome, totalMs: Date.now() - startedAt, pending: pendingReads, observerExpired: expired });
       clearTimeout(timer);
     }
   })();

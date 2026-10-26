@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const prismaMock = vi.hoisted(() => ({
   usuarios: {
@@ -16,6 +16,7 @@ import {
 } from "@/lib/auth/acesso-painel";
 
 describe("política de acesso ao Painel Alpha", () => {
+  afterEach(() => vi.useRealTimers());
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -36,6 +37,24 @@ describe("política de acesso ao Painel Alpha", () => {
       where: { id: 42 },
       select: { status: true, authSessionVersion: true },
     });
+  });
+
+  it("accepts an active read that takes the observed5.502s, before the12s observer", async () => {
+    vi.useFakeTimers();
+    prismaMock.usuarios.findUnique.mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve({ status: "ATIVO", authSessionVersion: 0 }), 5_502)));
+    const pending = usuarioPodeAcessarPainel(7);
+    await vi.advanceTimersByTimeAsync(5_502);
+    expect(await pending).toBe(true);
+    expect(prismaMock.usuarios.findUnique).toHaveBeenCalledOnce();
+  });
+
+  it("does not retry a read without enough budget for the retry delay", async () => {
+    vi.useFakeTimers();
+    prismaMock.usuarios.findUnique.mockImplementation(() => new Promise((_, reject) => setTimeout(() => reject(new TypeError("fetch failed")), 11_990)));
+    const rejected = expect(usuarioPodeAcessarPainel(7)).rejects.toMatchObject({ code: "AUTH_UNAVAILABLE" });
+    await vi.advanceTimersByTimeAsync(11_990);
+    await rejected;
+    expect(prismaMock.usuarios.findUnique).toHaveBeenCalledOnce();
   });
 
   it.each(["INATIVO", "AFASTADO", "FÉRIAS", "FERIAS"])(
@@ -63,7 +82,9 @@ describe("política de acesso ao Painel Alpha", () => {
     prismaMock.usuarios.findUnique.mockRejectedValue(new Error("database unavailable"));
 
     await expect(usuarioPodeAcessarPainel(7)).rejects.toMatchObject({ code: "AUTH_UNAVAILABLE" });
-    expect(consoleError).toHaveBeenCalledOnce();
+    // Repeated failures are aggregated across this runtime instance.
+    expect(consoleError.mock.calls.length).toBeLessThanOrEqual(1);
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain("database unavailable");
 
     consoleError.mockRestore();
   });

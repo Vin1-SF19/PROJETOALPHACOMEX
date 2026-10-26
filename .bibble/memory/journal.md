@@ -7688,3 +7688,35 @@ Root reproduziu erro genérico no navegador Admin com rascunho preservado (~1.18
 Dois ajustes pedidos pelo usuário implementados sobre staging8378358f: e-mail com wrapping focal preserva todos os caracteres sem hifenização; fechar dispensa UI imediatamente enquanto autosave/provider e drafts continuam seguros. PDF baseline RED5falhas1pass; focal24PASS/4arquivos6,02s e prova privada original72 exata PDF.js+Ghostscript/fonte10/A4; extremo sintético320 largo ocupa2A4 sem cortar. UI focal71PASS/7suites cobre11casos novos e isolamento de owner/card, sem retirar guards gerais. WorkerTC4GiB OOM não é aprovação; QA8GiB TC54,89sPASS. Gates finais/build/revisão e LIVE Root após deploy ainda pendentes; sem PII versionada, schema/banco remoto direto/env/produção.
 
 **Fechamento LOCAL e-mail PDF/close (2026-10-23, River):** QA LOCAL APPROVED/GO STAGING; typecheck oficial8GiB54,89s, lint global49,76s zero erros, 52 arquivos afetados/417 testes25,52s e build literal115,96s PASS. Tentativa anterior4GiB OOM preservada e não considerada PASS; não é execução da suíte global inteira. 3.085 hashes intactos/configuração Next restaurada; File List15 inclui gate YAML. Ready for Review local, DevOps pode publicar. **LIVE Root pós-deploy ainda pendente:** PDF72 estrito e X/Escape <=100ms com resposta real de follow-up retida, sem fake/código especial no app. Sem schema/mutação direta de banco/env/produção ou PII versionada.
+
+
+---
+
+## [2026-10-26 22:15] — Estabilidade de conexão aprovada localmente
+
+**Tags:** #bugfix #decision #nextjs #prisma #nextauth #auth #integration
+**Agentes envolvidos:** Bibble, Scout, Aria, River, Pax, Echo, Nova, Forge, Probe, Anubis, Lens, Sage, Scribe, Kowalski, DevOps
+**Arquivos tocados:** `src/lib/db-{fetch,resilience-config,observability,transport-error}.ts`, `src/lib/auth/{acesso-painel,cliente-sessao}.ts`, `src/lib/painel-leituras-ssr.ts`, `src/hooks/useNotasWorkspaceSync.ts`, shell/pollers/rotas IA e versão; file list completa na story estabilidade20261026.
+
+### Contexto
+Usuário pediu corrigir lentidão, falhas de banco e erros do console, em staging e produção. Diagnóstico separou deadlines locais5s, carga recorrente, rejeições e falhas IA; base concorrente20f310 preservada.
+
+### O que foi feito
+- Implementados budgets DB10/auth12/SSR20/cliente30/frame45s, métricas sanitizadas e retry estrito de leitura; fail-closed/pools/ACL preservados, sem replay de writes.
+- Pollers principal/identidade/cooldown, notesync sem perder drafts, codes IA seguros, geo sem relaxar política e aviso de versão orientativo.
+- Forge local PASS:814arquivos/6.801testes na rodada integral e63direcionados no delta, TC/lint/build/runtime; Probe79, Anubis103, LensdeltaPASS, Sage94+TC/lint. Subconjuntos não somados como testes distintos; apphash86f8d179 informado pelo lead.
+
+### Decisões tomadas
+- Heartbeat20s mantém semântica de presença; versão apenas orienta salvar todas abas e atualizar manualmente.
+- Limites finitos/slots reais preservam disponibilidade sem autorizar sessão indisponível.
+
+### Problemas encontrados / resolvidos
+- Callback de polling avaliado em SSR: guarda document e renderToString Node. Refetch cancelava somente observador de Server Action: cancelRefetch:false e regressões de concorrência.
+- CLI CodeRabbit ausente: fallback de revisão manual documentado; não declarado PASS automatizado.
+
+### Pendências
+- DevOps publicar/homologar staging autenticado, depois produção autorizada com bindings separados, recibos e observação10–15min. Nenhum deploy concluído nesta consolidação. Saúde real de Turso/upstreams não comprovada por mocks/gates locais.
+
+### Refletido também em
+- `decisions.md`, `architecture.md`, `patterns.md`, `known-errors.md`: budgets e aprendizados.
+- `components.md`, `codebase-map.md`, `integration-points.md`: helpers/wiring reais; session-draft anterior preservado.

@@ -1,8 +1,14 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useCallback, useSyncExternalStore } from "react";
+import { useSession } from "next-auth/react";
+import { sessaoPermiteOperacao } from "@/lib/auth/estado-acesso";
+import { comPrazoHttp } from "@/lib/http-deadline";
+import { codigoPublicoIA } from "@/lib/ai-availability-client";
+import { esperaRetryAfter } from "@/lib/painel-polling";
 
 export interface VoiceStatus {
+  unavailableCode?: string;
   stt_enabled: boolean;
   tts_enabled: boolean;
   loaded: boolean;
@@ -29,6 +35,8 @@ const EMPTY_STATUS: VoiceStatus = {
 };
 
 let cache: VoiceStatus | null = null;
+let knownIdentity: string | null | undefined;
+let identityAllowed = true;
 let cacheTs = 0;
 let refreshAfterMs = STATUS_TTL_MS;
 let consecutiveFailures = 0;
@@ -40,22 +48,13 @@ let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<VoiceStatusListener>();
 
 class VoiceStatusError extends Error {
-  constructor(readonly retryAfterMs: number) {
+  constructor(readonly retryAfterMs: number, readonly code: string) {
     super("Voz temporariamente indisponível");
   }
 }
 
-function retryAfterMs(response: Response): number {
-  const value = response.headers.get("Retry-After");
-  if (!value) return 0;
-  const seconds = Number(value);
-  const delay = Number.isFinite(seconds) ? seconds * 1_000 : Date.parse(value) - Date.now();
-  // setTimeout aceita no máximo um inteiro de 32 bits, mesmo para datas HTTP.
-  return Number.isFinite(delay) ? Math.min(2_147_483_647, Math.max(0, delay)) : 0;
-}
-
 function canPoll(): boolean {
-  return (typeof document === "undefined" || document.visibilityState !== "hidden")
+  return identityAllowed && (typeof document === "undefined" || document.visibilityState !== "hidden")
     && (typeof navigator === "undefined" || navigator.onLine !== false);
 }
 
@@ -71,9 +70,13 @@ async function fetchJson(
   timeoutMs: number,
   signal: AbortSignal,
 ): Promise<Record<string, unknown>> {
-  const response = await fetchStatus(url, { signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) });
-  if (!response.ok) throw new VoiceStatusError(retryAfterMs(response));
-  return response.json() as Promise<Record<string, unknown>>;
+  return comPrazoHttp(timeoutMs, signal, async (bounded) => {
+    const response = await fetchStatus(url, { signal: bounded });
+    const body: unknown = await response.json();
+    if (!response.ok) throw new VoiceStatusError(esperaRetryAfter(response.headers.get("Retry-After")), codigoPublicoIA(body));
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new VoiceStatusError(0, "AI_UPSTREAM_UNAVAILABLE");
+    return body as Record<string, unknown>;
+  });
 }
 
 function notify(): void {
@@ -114,15 +117,20 @@ function refreshVoiceStatus(fetchStatus: FetchVoiceStatus, now: number, backgrou
   inFlightController = controller;
   hasManualConsumer = !background;
   inFlight = Promise.allSettled([
-    fetchJson(fetchStatus, "/api/onyx/voice/status", 5_000, controller.signal),
-    fetchJson(fetchStatus, "/api/bibble/voice", 5_000, controller.signal),
+    fetchJson(fetchStatus, "/api/onyx/voice/status", 30_000, controller.signal),
+    fetchJson(fetchStatus, "/api/bibble/voice", 30_000, controller.signal),
   ]).then(([sttResult, ttsResult]) => {
     if (controller.signal.aborted || generation !== requestGeneration) return cache ?? EMPTY_STATUS;
     const onyxStt = sttResult.status === "fulfilled" && sttResult.value.stt_enabled === true;
     const voiceData = ttsResult.status === "fulfilled"
       ? ttsResult.value.data as { status?: unknown; cuda?: unknown; device?: unknown; modelLoaded?: unknown; referenceConfigured?: unknown } | undefined
       : undefined;
+    const failedCheck = [sttResult, ttsResult].find((check) => check.status === "rejected");
+    const unavailableCode = failedCheck?.status === "rejected"
+      ? failedCheck.reason instanceof VoiceStatusError ? failedCheck.reason.code : "AI_UPSTREAM_UNAVAILABLE"
+      : undefined;
     const result: VoiceStatus = {
+      unavailableCode,
       stt_enabled: onyxStt || nativeStt,
       tts_enabled: voiceData?.status === "ok"
         && (voiceData.device === "cpu" || (voiceData.device === "cuda" && voiceData.cuda === true))
@@ -195,10 +203,25 @@ function getSnapshot(): VoiceStatus {
 
 /** Consulta apenas endpoints de status; nunca gera áudio para testar disponibilidade. */
 export function useVoiceStatus(): VoiceStatus {
-  return useSyncExternalStore(subscribe, getSnapshot, () => EMPTY_STATUS);
+  const { data: session } = useSession();
+  const identity = sessaoPermiteOperacao(session) ? session?.user?.id ?? null : null;
+  const subscribeForUser = useCallback((listener: VoiceStatusListener) => {
+    if (knownIdentity !== identity) {
+      requestGeneration++;
+      inFlightController?.abort();
+      inFlight = null; inFlightController = null;
+      cache = null; cacheTs = 0; consecutiveFailures = 0; refreshAfterMs = STATUS_TTL_MS;
+      knownIdentity = identity; identityAllowed = !!identity;
+      notify();
+    }
+    return subscribe(listener);
+  }, [identity]);
+  const status = useSyncExternalStore(subscribeForUser, getSnapshot, () => EMPTY_STATUS);
+  return identity && knownIdentity === identity ? status : EMPTY_STATUS;
 }
 
 export function resetVoiceStatusCacheForTests(): void {
+  knownIdentity = undefined; identityAllowed = true;
   requestGeneration++;
   inFlightController?.abort();
   inFlightController = null;

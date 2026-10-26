@@ -860,3 +860,13 @@ Typecheck inicial encontrou TS2698 em três spreads de valores unknown do harnes
 **Causa:** o `earlyoom` da máquina (`/usr/bin/earlyoom`) mata o worker de webpack quando a memória disponível cai abaixo de 10% e o swap está 0% livre — confirmar com `journalctl --since "15 min ago" | grep earlyoom` (worker com VmRSS ~28 GB). Pressão vem de swap cheio + `/tmp` tmpfs (RAM) cheio + dev servers. Os `Retrying 1/3...` são do `next/font/google` (gstatic com timeout IPv4/ENETUNREACH IPv6 na primeira tentativa) e são só ruído: passam na retentativa. Já houve `ENOSPC` em `/tmp` (tmpfs 16 GB) no mesmo cenário.
 **Fix:** não é erro de código. Liberar memória (fechar dev servers ociosos, limpar artefatos próprios em `/tmp`, `.next-*` isolados) e rodar o build quando `free -g` mostrar swap livre. Builds isolados: `NEXT_DIST_DIR=.next-<nome>` (o `.next/cache/webpack` e `.next/dev` compartilhados apontam para symlinks quebrados em `/tmp` de outro usuário). Apagar o `.next-<nome>` ao final (≈2,5 GB).
 **Adicionado em:** 2026-10-23 (Forge, tema claro/escuro do Alpha CRM)
+
+
+## 2026-10-26 — Callback React Query avaliado em SSR (Scribe)
+`enabled:false` não impede avaliação de refetchInterval durante SSR. Broadcast acessando document.hidden causou500 público; corrigido com guarda typeof document e regressão renderToString em Node sem DOM. Não mover guarda apenas para queryFn.
+
+## 2026-10-26 — Request obrigatório no Route Handler Next (Scribe/Forge)
+`GET(request?: Request)` em api/bibble/models passou typecheck sem tipos gerados, mas o validador Next produziu ParamCheck<Request|NextRequest> incompatível com Request|undefined. Corrigido para Request obrigatório, preservando request.signal; testes usam Request concreto. Não remover validadores .next/types, mudar tsconfig ou inserir cast para mascarar incompatibilidade. Typecheck pós-build com tipos gerados é obrigatório.
+
+## 2026-10-26 — refetch duplica Server Action não abortável (Scribe/Lens)
+Com cache preenchido, refetch padrão cancela observador e reinicia query; a Server Action anterior continua executando. Hook workspace e botão de nota usam refetch({cancelRefetch:false}); regressões reais provam active1/peak1 com eventos/cliques repetidos, preservando rascunhos. Cancelar observador não cancela write/read no servidor.

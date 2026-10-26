@@ -11,6 +11,7 @@ import { removePainelFrameState, retryPainelFrame } from '@/lib/painel-embedded'
 // hooks run unchanged, receive real messages, and control real iframe DOM nodes.
 // Root provides recovery in the application. This leave-guard composition fixture
 // isolates that auth boundary; protocol/session behavior has separate real tests.
+vi.mock("@/components/layout/PainelVersionNotice", () => ({ PainelVersionNotice: () => null }));
 vi.mock('@/components/auth/SessaoResilienteProvider', () => ({
   useRecuperacaoSessao: () => ({ confirmar: vi.fn(async () => null), sinalizarIndisponibilidade: vi.fn() }),
 }));

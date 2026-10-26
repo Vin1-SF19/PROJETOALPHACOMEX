@@ -14,6 +14,10 @@ describe("recuperação restrita da leitura de alertas", () => {
     }
     const ciclo: { cause?: unknown } = {}; ciclo.cause = ciclo;
     expect(erroTimeoutConexaoAlertas(ciclo)).toBe(false);
+    expect(erroTimeoutConexaoAlertas({ code: 23 })).toBe(false);
+    expect(erroTimeoutConexaoAlertas({ code: 23, cause: new DOMException("Database transport deadline exceeded", "TimeoutError") })).toBe(true);
+    expect(erroTimeoutConexaoAlertas({ meta: { driverAdapterError: { originalMessage: "Database transport deadline exceeded" } } })).toBe(true);
+    expect(erroTimeoutConexaoAlertas(new DOMException("Business wait ended", "TimeoutError"))).toBe(false);
   });
 
   it("aguarda 250ms e recupera em uma única repetição", async () => {

@@ -1,4 +1,5 @@
 import { applyGlobalRule } from "@/lib/onyx/rule";
+import { comPrazoHttp } from "@/lib/http-deadline";
 
 /**
  * Client server-side do Onyx (http://<servidor>:3000).
@@ -37,10 +38,12 @@ function authHeaders(extra?: Record<string, string>, userToken?: string | null):
 
 export class OnyxError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  code: "AI_CONFIGURATION_UNAVAILABLE" | "AI_UPSTREAM_UNAVAILABLE" | "AI_UPSTREAM_TIMEOUT" | "AI_RATE_LIMITED";
+  constructor(message: string, status: number, code?: OnyxError["code"]) {
     super(message);
     this.name = "OnyxError";
     this.status = status;
+    this.code = code ?? (status === 504 ? "AI_UPSTREAM_TIMEOUT" : status === 429 ? "AI_RATE_LIMITED" : "AI_UPSTREAM_UNAVAILABLE");
   }
 }
 
@@ -53,20 +56,24 @@ async function onyxFetch(
   init: OnyxFetchInit = {},
 ): Promise<Response> {
   if (!isOnyxConfigured(init.userToken)) {
-    throw new OnyxError("Onyx indisponível para este usuário.", 503);
+    throw new OnyxError("Onyx indisponível para este usuário.", 503, "AI_CONFIGURATION_UNAVAILABLE");
   }
   const { timeoutMs = 30_000, headers, userToken, ...rest } = init;
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  const timer = setTimeout(() => ctrl.abort(new DOMException("Onyx headers deadline exceeded", "TimeoutError")), timeoutMs);
+  const signal = rest.signal ? AbortSignal.any([rest.signal, ctrl.signal]) : ctrl.signal;
   try {
+    signal.throwIfAborted();
     const res = await fetch(`${ONYX_BASE}/api${path}`, {
       ...rest,
-      signal: rest.signal ?? ctrl.signal,
+      signal,
+      cache: "no-store",
       headers: authHeaders(headers as Record<string, string> | undefined, userToken),
     });
     return res;
   } catch (err) {
-    if ((err as Error).name === "AbortError") {
+    if (rest.signal?.aborted) throw rest.signal.reason;
+    if (ctrl.signal.aborted || err instanceof Error && (err.name === "AbortError" || err.name === "TimeoutError")) {
       throw new OnyxError("Tempo limite ao falar com o Onyx.", 504);
     }
     throw new OnyxError("Falha de conexão com o Onyx.", 502);
@@ -76,13 +83,21 @@ async function onyxFetch(
 }
 
 async function onyxJson<T>(path: string, init: OnyxFetchInit = {}): Promise<T> {
-  const res = await onyxFetch(path, init);
+  try {
+  return await comPrazoHttp(init.timeoutMs ?? 30_000, init.signal, async (signal) => {
+  const res = await onyxFetch(path, { ...init, signal });
   if (!res.ok) {
     await res.body?.cancel().catch(() => undefined);
-    throw new OnyxError(`Onyx respondeu ${res.status}`, res.status);
+    throw new OnyxError("Serviço Onyx temporariamente indisponível", res.status);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
+  });
+  } catch (error) {
+    if (error instanceof OnyxError) throw error;
+    if (init.signal?.aborted) throw init.signal.reason;
+    throw new OnyxError("Serviço Onyx temporariamente indisponível", error instanceof Error && error.name === "TimeoutError" ? 504 : 502);
+  }
 }
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────────
@@ -598,8 +613,8 @@ export interface VoiceStatus {
 }
 
 /** Status do serviço de voz (TTS/STT habilitados ou não). */
-export function getVoiceStatus(): Promise<VoiceStatus> {
-  return onyxJson<VoiceStatus>("/voice/status", { method: "GET", timeoutMs: 8_000 });
+export function getVoiceStatus(userToken?: string | null): Promise<VoiceStatus> {
+  return onyxJson<VoiceStatus>("/voice/status", { method: "GET", timeoutMs: 8_000, userToken });
 }
 
 /**

@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import GlobalSidebar, { SidebarMobileToggle } from './GlobalSidebar';
+import { PainelVersionNotice } from './PainelVersionNotice';
 import { TabBar } from './TabBar';
 import { arrayMove } from '@dnd-kit/sortable';
 import { useSidebarState } from '@/hooks/useSidebarState';
@@ -85,6 +86,7 @@ function getLabelForUrl(url: string): string {
 
 interface PainelLayoutClientProps {
   children: React.ReactNode;
+  deployedCommitSha?: string;
   permissoes: string[];
   role: string;
   userId: number;
@@ -100,6 +102,7 @@ interface PainelLayoutClientProps {
 
 export default function PainelLayoutClient({
   children,
+  deployedCommitSha,
   permissoes,
   role,
   userId,
@@ -450,6 +453,7 @@ export default function PainelLayoutClient({
 
   return (
     <>
+      <PainelVersionNotice deployedCommitSha={deployedCommitSha} />
       <NotificationToast onAbrirChamados={abrirChamadosPorNotificacao} />
       <ChamadoFinalizadoFeedbackDialog accent={chamadosAccent} />
       <ChecklistNotificationToast onAbrir={abrirModuloPorNotificacao} />
@@ -552,7 +556,6 @@ export default function PainelLayoutClient({
                 name={createPainelFrameName(frameId)}
                 title={tab.label}
                 allow="autoplay; fullscreen"
-                allowFullScreen
                 className={`absolute inset-0 h-full w-full border-none ${
                   !isActive
                     ? 'hidden'

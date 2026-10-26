@@ -62,6 +62,9 @@ export function resolveBibbleVoiceConfig(env: Partial<Record<string, string | un
   baseUrl: URL;
   token: string | null;
 } {
+  if (env.VERCEL === "1" && !env.BIBBLE_VOICE_URL?.trim()) {
+    throw new BibbleVoiceProxyError(503, "VOICE_MISCONFIGURED", "Serviço de voz não configurado neste ambiente");
+  }
   const raw = env.BIBBLE_VOICE_URL?.trim() || "http://127.0.0.1:8787";
   let baseUrl: URL;
   try {

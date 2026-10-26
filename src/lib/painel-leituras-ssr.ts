@@ -1,6 +1,8 @@
 import "server-only";
+import { prazosBanco } from "./db-resilience-config";
+import { registrarMetricaBanco } from "./db-observability";
 
-export const PAINEL_SSR_READ_BUDGET_MS = 5_000;
+export const PAINEL_SSR_READ_BUDGET_MS = prazosBanco.ssrMs;
 // Four admitted render groups, not four SQL statements. Auth has its own pool.
 // A group owns all three reads and optional onboarding until actual settlement.
 export const PAINEL_SSR_PENDING_GROUP_LIMIT = 4;
@@ -29,8 +31,13 @@ type ResultadoLeiturasPainel<Permissoes, Usuario, Links, Onboarding> =
 export async function lerDadosLayoutPainel<Permissoes, Usuario, Links, Onboarding>(
   leituras: LeiturasPainel<Permissoes, Usuario, Links, Onboarding>,
 ): Promise<ResultadoLeiturasPainel<Permissoes, Usuario, Links, Onboarding>> {
-  if (pendingGroups >= PAINEL_SSR_PENDING_GROUP_LIMIT) return { estado: "INDISPONIVEL" };
+  if (pendingGroups >= PAINEL_SSR_PENDING_GROUP_LIMIT) {
+    registrarMetricaBanco({ component: "ssr", phase: "admission", outcome: "saturated", pending: pendingGroups, limit: PAINEL_SSR_PENDING_GROUP_LIMIT });
+    return { estado: "INDISPONIVEL" };
+  }
   pendingGroups++;
+  const startedAt = Date.now();
+  let observerExpired = false;
   const expiresAt = Date.now() + PAINEL_SSR_READ_BUDGET_MS;
   let closed = false;
   let readFailed = false;
@@ -41,6 +48,8 @@ export async function lerDadosLayoutPainel<Permissoes, Usuario, Links, Onboardin
       if (closed) return;
       closed = true;
       clearTimeout(timer);
+      observerExpired = Date.now() >= expiresAt;
+      registrarMetricaBanco({ component: "ssr", phase: "observer", outcome: observerExpired ? "deadline" : result.estado === "PERMITIDO" ? "ok" : result.estado === "NEGADO" ? "denied" : "unavailable", totalMs: Date.now() - startedAt, pending: pendingGroups, observerExpired });
       resolve(Date.now() >= expiresAt ? { estado: "INDISPONIVEL" } : result);
     };
     timer = setTimeout(() => decide({ estado: "INDISPONIVEL" }), PAINEL_SSR_READ_BUDGET_MS);
@@ -75,6 +84,7 @@ export async function lerDadosLayoutPainel<Permissoes, Usuario, Links, Onboardin
     } else decide({ estado: "INDISPONIVEL" });
   }).finally(() => {
     pendingGroups--;
+    registrarMetricaBanco({ component: "ssr", phase: "sdk", outcome: readFailed ? "unavailable" : "ok", totalMs: Date.now() - startedAt, pending: pendingGroups, observerExpired });
     clearTimeout(timer);
   });
   return observation;

@@ -6,7 +6,7 @@ export const PAINEL_FRAME_ID_HEADER = "x-alpha-frame-id";
 export const ALPHA_EMBED_READY = "ALPHA_EMBED_READY";
 export const ALPHA_EMBED_LOADING = "ALPHA_EMBED_LOADING";
 export const ALPHA_EMBED_PROTOCOL_VERSION = 1;
-export const PAINEL_EMBED_READY_TIMEOUT_MS = 15_000;
+export const PAINEL_EMBED_READY_TIMEOUT_MS = 45_000;
 
 const PAINEL_BASE_URL = "https://painel-alpha.internal";
 const FRAME_ID_PATTERN = /^[a-zA-Z0-9:_-]{1,160}$/;

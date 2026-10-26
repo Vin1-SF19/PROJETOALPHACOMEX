@@ -206,13 +206,21 @@ describe("deadlines and heartbeat", () => {
       return {status:200, json:()=>new Promise(()=>undefined)} as Response;
     });
     await mount(allowed, true);
-    await act(async () => { await vi.advanceTimersByTimeAsync(7_999); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(29_999); });
     expect(signals).toHaveLength(1);
     expect(signals[0].aborted).toBe(false);
     await act(async () => { await vi.advanceTimersByTimeAsync(2); });
     expect(signals[0].aborted).toBe(true);
     expect(signals).toHaveLength(1);
     await act(async () => { await vi.advanceTimersByTimeAsync(40_000); });
+    expect(signals).toHaveLength(1); // TEMP has no public identity and cannot issue protected heartbeats.
+    fetcher.mockImplementation(async (url, init) => {
+      if (String(url) !== "/api/heartbeat") return json(allowed);
+      signals.push(init!.signal!);
+      return {status:200, json:()=>new Promise(()=>undefined)} as Response;
+    });
+    await act(async () => { await recovery.confirmar(); });
+    await flush();
     expect(signals).toHaveLength(2);
     expect(signals[1].aborted).toBe(false);
     await act(async () => root.unmount());
@@ -259,7 +267,7 @@ describe("deadlines and heartbeat", () => {
     fetcher.mockImplementation((_url, init) => { if (init?.signal) signals.push(init.signal); return new Promise(() => undefined); });
     await mount(allowed, true);
     expect(fetcher).toHaveBeenCalledTimes(1);
-    await act(async () => { await vi.advanceTimersByTimeAsync(8_001); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_001); });
     expect(signals[0].aborted).toBe(true);
     expect(fetcher.mock.calls.filter(([url]) => url === "/api/heartbeat")).toHaveLength(1);
     await act(async () => root.unmount());

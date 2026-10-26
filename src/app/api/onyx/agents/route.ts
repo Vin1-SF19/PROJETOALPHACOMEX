@@ -4,6 +4,15 @@ import { auth } from "../../../../../auth";
 import { listAgents, createAgent, getImageGenToolId, OnyxError, type CreateAgentInput } from "@/lib/onyx/client";
 import { isAdminRole, recordAgentOwner, getOwnerInfoMap } from "@/lib/onyx/ownership";
 import { getUserOnyxToken } from "@/lib/onyx/user-token";
+import { respostaIndisponibilidadeIA } from "@/lib/ai-unavailability";
+
+function publicError(error: unknown) {
+  if (error instanceof OnyxError) {
+    const status = [401, 403, 429, 503, 504].includes(error.status) ? error.status : 502;
+    return respostaIndisponibilidadeIA(error.code ?? "AI_UPSTREAM_UNAVAILABLE", status);
+  }
+  return respostaIndisponibilidadeIA("AI_METADATA_UNAVAILABLE", 503);
+}
 
 /** Remove a skill de geração de imagem dos tool_ids quando o usuário não é admin. */
 async function sanitizeToolIds(
@@ -51,11 +60,10 @@ export async function GET() {
         };
       });
 
-    return NextResponse.json({ agents });
+    return NextResponse.json({ agents }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (err) {
     if (acessoEstaIndisponivel(err)) throw err;
-    const status = err instanceof OnyxError ? err.status : 500;
-    return NextResponse.json({ error: (err as Error).message }, { status });
+    return publicError(err);
   }
 
   } catch (authError) {
@@ -110,8 +118,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ agent }, { status: 201 });
   } catch (err) {
     if (acessoEstaIndisponivel(err)) throw err;
-    const status = err instanceof OnyxError ? err.status : 500;
-    return NextResponse.json({ error: (err as Error).message }, { status });
+    return publicError(err);
   }
 
   } catch (authError) {

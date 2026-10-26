@@ -1,7 +1,7 @@
 import type { Session } from "next-auth";
 import { sessaoEstaIndisponivel, sessaoPermiteOperacao } from "./estado-acesso";
 
-export const PRAZO_SESSAO_MS = 8_000;
+export const PRAZO_SESSAO_MS = 30_000;
 
 export class ConsultaSessaoIndisponivel extends Error {
   constructor() { super("Não foi possível verificar a conexão. Tente novamente."); }
@@ -12,7 +12,7 @@ export async function consultarJsonSessao(
   url: string,
   init: RequestInit = {},
   prazo = PRAZO_SESSAO_MS,
-): Promise<{ status: number; body: unknown }> {
+): Promise<{ status: number; body: unknown; retryAfter: string | null }> {
   const controller = new AbortController();
   const abort = () => controller.abort(init.signal?.reason);
   if (init.signal?.aborted) abort();
@@ -31,7 +31,7 @@ export async function consultarJsonSessao(
         const response = await fetch(url, { ...init, credentials: "same-origin", cache: "no-store", signal: controller.signal });
         const body: unknown = await response.json();
         if (controller.signal.aborted) throw new ConsultaSessaoIndisponivel();
-        return { status: response.status, body };
+        return { status: response.status, body, retryAfter: response.headers.get("Retry-After") };
       })(),
       stopped,
     ]);

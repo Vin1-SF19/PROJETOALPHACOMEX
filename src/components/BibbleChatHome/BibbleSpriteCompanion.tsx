@@ -1,5 +1,7 @@
 "use client";
 
+import { geolocalizacaoPermitida } from "@/lib/geolocation-policy";
+
 import { useEffect, useRef, useState, useCallback } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
@@ -150,6 +152,7 @@ async function fetchCtx(): Promise<Ctx> {
       const { temperature, ts } = JSON.parse(raw) as { temperature: number; ts: number };
       if (Date.now() - ts < WEATHER_TTL) return { temp: temperature, hour, timeSlot, isWeekend };
     }
+    if (!geolocalizacaoPermitida()) return { temp, hour, timeSlot, isWeekend };
     const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
       navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000, maximumAge: WEATHER_TTL }),
     );

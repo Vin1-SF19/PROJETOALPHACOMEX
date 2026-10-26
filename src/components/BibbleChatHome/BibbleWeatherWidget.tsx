@@ -1,5 +1,7 @@
 "use client";
 
+import { geolocalizacaoPermitida } from "@/lib/geolocation-policy";
+
 import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -72,7 +74,7 @@ export default function BibbleWeatherWidget() {
   }, []);
 
   useEffect(() => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
+    if (typeof navigator === "undefined" || !navigator.geolocation || !geolocalizacaoPermitida()) {
       // Adia para fora do corpo do effect para evitar cascading renders
       const t = setTimeout(() => {
         setError(true);

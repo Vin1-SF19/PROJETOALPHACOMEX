@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import { readRequestTextWithLimit } from "@/lib/bibble/attachment-security";
 import { acquireBibbleVoiceLease } from "@/lib/bibble/voice-admission";
+import { codigoFalhaUpstream, respostaIndisponibilidadeIA } from "@/lib/ai-unavailability";
+import { comPrazoHttp } from "@/lib/http-deadline";
 import {
   BIBBLE_VOICE_REQUEST_MAX_BYTES,
   BIBBLE_VOICE_TIMEOUT_MS,
@@ -22,8 +24,8 @@ export const maxDuration = 600;
 function publicError(error: unknown): NextResponse {
   if (error instanceof BibbleVoiceProxyError) {
     return NextResponse.json(
-      { success: false, error: error.message, code: error.code },
-      { status: error.status },
+      { success: false, error: error.message, code: error.code, retryable: error.status >= 500 || error.status === 429 },
+      { status: error.status, headers: { "Cache-Control": "private, no-store", ...(error.status >= 500 || error.status === 429 ? { "Retry-After": "30" } : {}) } },
     );
   }
   if (error instanceof Error && error.name === "BibblePayloadTooLargeError") {
@@ -32,10 +34,8 @@ function publicError(error: unknown): NextResponse {
       { status: 413 },
     );
   }
-  return NextResponse.json(
-    { success: false, error: "Voz do Bibble temporariamente indisponível", code: "VOICE_UNAVAILABLE" },
-    { status: 503 },
-  );
+  const code = codigoFalhaUpstream(error);
+  return respostaIndisponibilidadeIA(code, code === "AI_UPSTREAM_TIMEOUT" ? 504 : 502);
 }
 
 function exactArrayBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -60,12 +60,16 @@ export async function GET(request: Request) {
     const { baseUrl, token } = resolveBibbleVoiceConfig();
     const detail = new URL(request.url).searchParams.get("detail");
     const endpoint = detail === "model" ? "/v1/model/status" : "/health";
+    return await comPrazoHttp(5_000, request.signal, async (signal) => {
     const upstream = await fetch(resolveBibbleVoiceEndpoint(baseUrl, endpoint), {
       headers: bibbleVoiceHeaders(token, "application/json"),
       cache: "no-store",
-      signal: AbortSignal.timeout(5_000),
+      signal, redirect: "error",
     });
-    if (!upstream.ok) throw new Error("voice health failed");
+    if (!upstream.ok) {
+      await upstream.body?.cancel().catch(() => undefined);
+      return respostaIndisponibilidadeIA(upstream.status === 429 ? "AI_RATE_LIMITED" : "AI_UPSTREAM_UNAVAILABLE", upstream.status === 429 || upstream.status === 503 ? upstream.status : 502);
+    }
     const status = await upstream.json() as Record<string, unknown>;
     return NextResponse.json({
       success: true,
@@ -86,6 +90,7 @@ export async function GET(request: Request) {
             modelLoaded: status.modelLoaded === true,
             referenceConfigured: status.referenceConfigured === true,
           },
+    }, { headers: { "Cache-Control": "private, no-store" } });
     });
   } catch (error) {
     if (acessoEstaIndisponivel(error)) throw error;
@@ -130,7 +135,7 @@ export async function POST(request: Request) {
         },
         body: JSON.stringify(parsed.data),
         redirect: "error",
-        signal: AbortSignal.timeout(BIBBLE_VOICE_TIMEOUT_MS),
+        signal: AbortSignal.any([request.signal, AbortSignal.timeout(BIBBLE_VOICE_TIMEOUT_MS)]),
       });
       if (!upstream.ok) {
         const status = upstream.status === 400 || upstream.status === 404 || upstream.status === 413

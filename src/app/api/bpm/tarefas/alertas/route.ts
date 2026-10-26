@@ -65,11 +65,11 @@ export async function GET(request: Request) {
     const authUnavailableResponse = mapearIndisponibilidadeAuth(error);
     if (authUnavailableResponse) return authUnavailableResponse;
     if (erroTimeoutConexaoAlertas(error)) {
-      console.warn("[BpmTarefas/alertas] Conexão temporariamente indisponível", { code: "UND_ERR_CONNECT_TIMEOUT" });
+      console.warn("[BpmTarefas/alertas] Conexão temporariamente indisponível", { code: "DB_TRANSPORT_UNAVAILABLE" });
       return NextResponse.json({ error: "Alertas temporariamente indisponíveis. Tente novamente em instantes." },
         { status: 503, headers: { ...headers, "Retry-After": "30" } });
     }
-    console.error("[BpmTarefas/alertas]", error);
+    console.error("[BpmTarefas/alertas] Leitura indisponível");
     return NextResponse.json({ error: "Não foi possível carregar os alertas" }, { status: 500, headers });
   }
 }

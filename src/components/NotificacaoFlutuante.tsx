@@ -1,6 +1,8 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
+import { sessaoPermiteOperacao } from "@/lib/auth/estado-acesso";
+import { consultarJsonPainel, ConsultaPainelIndisponivel, janelaPrincipal } from "@/lib/painel-polling";
 import { z } from "zod";
 import { checklistPaginaEventosSchema } from "@/lib/checklist/client/notificacoes";
 import { useChecklistNotificacoes } from "@/store/useChecklistNotificacoes";
@@ -14,38 +16,42 @@ interface Resposta {
 /** Poller global existente: agrega chamados e checklist, sem timer no widget. */
 export function NotificacaoFlutuante() {
   const { data: session, status } = useSession();
-  const usuarioId = Number(session?.user?.id ?? 0);
+  const usuarioId = sessaoPermiteOperacao(session) ? Number(session?.user?.id ?? 0) : 0;
+  const lastIdentity = useRef<number | null>(null);
   useEffect(() => {
-    if (status !== "authenticated" || !usuarioId || window !== window.top) return;
+    if (!janelaPrincipal()) return;
+    if (status === "unauthenticated" || (usuarioId && lastIdentity.current !== usuarioId)) {
+      useChamadoNotificacoes.setState({ notificacoes: [], feedbacksPendentes: [] });
+      useChecklistNotificacoes.getState().iniciar(usuarioId);
+      lastIdentity.current = usuarioId;
+    }
+    if (status !== "authenticated" || !usuarioId) return;
     let stopped = false,
       running = false,
+      failures = 0,
+      next = 0,
       timer: ReturnType<typeof setTimeout> | undefined;
     const delivered = new Set<number>(),
       controller = new AbortController();
     async function poll() {
       if (stopped || running) return;
+      if (Date.now() < next) { clearTimeout(timer); timer = setTimeout(() => void poll(), next - Date.now()); return; }
       running = true;
       try {
-        const response = await fetch(`/api/notificacoes?v=${Date.now()}`, {
-          cache: "no-store",
-          signal: controller.signal,
-          headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
-        });
-        if (!response.ok) throw new Error("Notificações indisponíveis");
-        const data: Resposta = await response.json();
+        const data = await consultarJsonPainel("/api/notificacoes", controller.signal) as Resposta;
         if (stopped) return;
         let page = checklistPaginaEventosSchema.safeParse(data.checklist);
         while (page.success && !stopped) {
           useChecklistNotificacoes.getState().receber(usuarioId, page.data.items);
           if (!page.data.nextCursor || useChecklistNotificacoes.getState().usuarioId !== usuarioId) break;
           const url = `/api/checklist/eventos?naoLidos=true&limit=100&cursor=${encodeURIComponent(JSON.stringify(page.data.nextCursor))}`;
-          const recovery = await fetch(url, { cache: "no-store", signal: controller.signal });
-          if (!recovery.ok) break;
-          const envelope = z.object({ ok: z.boolean(), data: z.unknown().optional() }).safeParse(await recovery.json());
+          const envelope = z.object({ ok: z.boolean(), data: z.unknown().optional() }).safeParse(await consultarJsonPainel(url, controller.signal));
           if (!envelope.success || !envelope.data.ok) break;
           page = checklistPaginaEventosSchema.safeParse(envelope.data.data);
         }
         if (stopped) return;
+        failures = 0;
+        next = 0;
         const chamados = useChamadoNotificacoes.getState();
         chamados.sincronizarFeedbacksPendentes(data.feedbacksPendentes ?? []);
         for (const msg of [...(data.notificacoes ?? [])].reverse()) {
@@ -61,11 +67,16 @@ export function NotificacaoFlutuante() {
             createdAt: msg.createdAt,
           });
         }
-      } catch {
-        /* Existing global recovery retries without clearing a confirmed collection. */
+      } catch (error) {
+        if (!stopped) {
+          failures++;
+          next = Date.now() + Math.max(Math.min(60_000, 6000 * 2 ** Math.min(failures - 1, 4)),
+            error instanceof ConsultaPainelIndisponivel ? error.retryAfterMs : 0);
+        }
+        /* Keep the confirmed collection and cursor during temporary failure. */
       } finally {
         running = false;
-        if (!stopped) timer = setTimeout(() => void poll(), document.hidden ? 30000 : 6000);
+        if (!stopped) timer = setTimeout(() => void poll(), Math.max(document.hidden ? 30000 : 6000, next - Date.now()));
       }
     }
     const recover = () => {
@@ -77,6 +88,8 @@ export function NotificacaoFlutuante() {
     };
     window.addEventListener("alpha-checklist-recovery", recover);
     window.addEventListener("focus", focus);
+    window.addEventListener("online", focus);
+    document.addEventListener("visibilitychange", focus);
     void poll();
     return () => {
       stopped = true;
@@ -84,6 +97,8 @@ export function NotificacaoFlutuante() {
       clearTimeout(timer);
       window.removeEventListener("alpha-checklist-recovery", recover);
       window.removeEventListener("focus", focus);
+      window.removeEventListener("online", focus);
+      document.removeEventListener("visibilitychange", focus);
     };
   }, [usuarioId, status]);
   return null;

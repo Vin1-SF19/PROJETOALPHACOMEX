@@ -1,6 +1,11 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useSession } from "next-auth/react";
+import { sessaoPermiteOperacao } from "@/lib/auth/estado-acesso";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { consultarIntegracaoIA, mensagemIndisponibilidadeIA, esperaRecuperacaoIA } from "@/lib/ai-availability-client";
+import { useVoiceStatus } from "./useVoiceStatus";
 import { AnimatePresence, motion } from "framer-motion";
 import BibbleSidebarPanel, { type SessionSummary, type ProjectSummary } from "./BibbleSidebarPanel";
 import BibbleChatWindow from "./BibbleChatWindow";
@@ -33,6 +38,10 @@ import {
   shouldAutoPlayBibbleVoice,
   type BibbleVoicePreferences,
 } from "@/lib/bibble/voice-preferences";
+
+interface BibbleModelsResponse {
+  capabilities?: { contextWindow?: number };
+}
 
 interface BibbleChatLayoutProps {
   userId: number;
@@ -149,17 +158,16 @@ export default function BibbleChatLayout({
   const selectedAgentRef = useRef<OnyxAgent | null>(null);
 
   // Agentes fixados (máx. 3, do banco). Lista enriquecida com nome/avatar via fetchAgents.
-  const [fixados, setFixados] = useState<AgenteFixado[]>([]);
-  const [agentesCache, setAgentesCache] = useState<OnyxAgent[]>([]);
-  const fixadosIds = fixados.map(f => f.onyxAgentId);
+  const queryClient = useQueryClient();
+  const { data: publicSession } = useSession();
+  const canReadIntegrations = sessaoPermiteOperacao(publicSession) && publicSession?.user?.id === String(userId);
 
-  useEffect(() => {
-    let ativo = true;
-    Promise.all([fetchFixados(), fetchAgents()])
-      .then(([fx, ags]) => { if (ativo) { setFixados(fx); setAgentesCache(ags); } })
-      .catch(() => {});
-    return () => { ativo = false; };
-  }, []);
+  const agentsQuery = useQuery({ queryKey: ["onyx-agents", userId], enabled: canReadIntegrations, queryFn: ({ signal }) => fetchAgents(signal), retry: false, refetchOnWindowFocus: false, refetchInterval: (query) => query.state.error ? esperaRecuperacaoIA(query.state.error, query.state.errorUpdateCount) : false });
+  const pinsQuery = useQuery({ queryKey: ["onyx-pins", userId], enabled: canReadIntegrations, queryFn: ({ signal }) => fetchFixados(signal), retry: false, refetchOnWindowFocus: false, refetchInterval: (query) => query.state.error ? esperaRecuperacaoIA(query.state.error, query.state.errorUpdateCount) : false });
+  const voiceStatus = useVoiceStatus();
+  const agentesCache = useMemo(() => agentsQuery.data ?? [], [agentsQuery.data]);
+  const fixados = useMemo(() => pinsQuery.data ?? [], [pinsQuery.data]);
+  const fixadosIds = fixados.map(f => f.onyxAgentId);
 
   useEffect(() => {
     const receive = (event: MessageEvent) => {
@@ -178,11 +186,11 @@ export default function BibbleChatLayout({
     const jaFixado = fixados.some(f => f.onyxAgentId === agent.id);
     try {
       const novos = await toggleFixarAgente(agent.id, jaFixado ? "desfixar" : "fixar", agent.name);
-      setFixados(novos);
+      queryClient.setQueryData<AgenteFixado[]>(["onyx-pins", userId], novos);
     } catch {
       /* limite de 3 ou erro — silencioso (o modal já valida via fixadosIds) */
     }
-  }, [fixados]);
+  }, [fixados, queryClient, userId]);
 
   // Lista de fixados enriquecida com nome/imagem (busca no cache de agentes)
   const fixadosSidebar = fixados.slice(0, 3).map(f => {
@@ -209,20 +217,25 @@ export default function BibbleChatLayout({
     if (typeof window === "undefined") return false;
     return localStorage.getItem("bibble-computer-access") === "true";
   });
-  const [contextWindow, setContextWindow] = useState<number>(() => {
+  const [requestedContextWindow, setContextWindow] = useState<number>(() => {
     if (typeof window === "undefined") return DEFAULT_CONTEXT_WINDOW;
     const stored = Number(localStorage.getItem("bibble-context-window"));
     return Number.isFinite(stored) && stored > 4_096
       ? Math.min(stored, 131_072)
       : DEFAULT_CONTEXT_WINDOW;
   });
-  const [contextCeiling, setContextCeiling] = useState(DEFAULT_CONTEXT_WINDOW);
+  const modelsQuery = useQuery<BibbleModelsResponse>({
+    queryKey: ["bibble-models", userId], enabled: canReadIntegrations, retry: false, refetchOnWindowFocus: false,
+    refetchInterval: (query) => query.state.error ? esperaRecuperacaoIA(query.state.error, query.state.errorUpdateCount) : false,
+    queryFn: ({ signal }) => consultarIntegracaoIA<BibbleModelsResponse>("/api/bibble/models", signal),
+  });
+  const reportedCeiling = Number(modelsQuery.data?.capabilities?.contextWindow);
+  const contextCeiling = Number.isFinite(reportedCeiling) && reportedCeiling >= 4096 ? reportedCeiling : DEFAULT_CONTEXT_WINDOW;
+  const contextWindow = Math.min(requestedContextWindow, contextCeiling);
   useEffect(() => {
-    fetch("/api/bibble/models").then(response => response.ok ? response.json() : Promise.reject()).then((data: {capabilities?: {contextWindow?: number}}) => {
-      const ceiling = Number(data.capabilities?.contextWindow);
-      if (Number.isFinite(ceiling) && ceiling >= 4096) { setContextCeiling(ceiling); setContextWindow(current => Math.min(current, ceiling)); }
-    }).catch(() => {});
-  }, []);
+    if (canReadIntegrations) return;
+    for (const key of ["onyx-agents", "onyx-pins", "bibble-models"]) void queryClient.cancelQueries({ queryKey: [key, userId] }).catch(() => {});
+  }, [canReadIntegrations, queryClient, userId]);
   const abortRef                              = useRef<AbortController | null>(null);
   const messagesRef                           = useRef<Message[]>([]);
   // Texto e arquivos do último envio — restaurados na caixa se o usuário interromper.
@@ -967,6 +980,15 @@ export default function BibbleChatLayout({
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-background relative">
+      {(agentsQuery.isError || pinsQuery.isError || modelsQuery.isError || voiceStatus.unavailableCode) && (
+        <div role="status" className="absolute left-4 right-4 top-16 z-30 rounded-xl border border-border bg-background p-3 text-xs text-foreground">
+          {agentsQuery.isError && <p>Agentes: {mensagemIndisponibilidadeIA(agentsQuery.error)}</p>}
+          {pinsQuery.isError && <p>Agentes fixados indisponíveis; os itens já carregados foram mantidos.</p>}
+          {modelsQuery.isError && <p>Modelos: {mensagemIndisponibilidadeIA(modelsQuery.error)}</p>}
+          {voiceStatus.unavailableCode && <p>Voz temporariamente indisponível ({voiceStatus.unavailableCode}). O microfone do navegador continua disponível quando suportado.</p>}
+          <p>A conversa e o texto digitado foram mantidos.</p>
+        </div>
+      )}
       <BibbleChatWindow
         sessionId={activeSessionId}
         sessionTitle={activeSession?.title ?? "Nova conversa"}

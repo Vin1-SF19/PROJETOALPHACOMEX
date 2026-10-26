@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
-vi.mock("next-auth/react", () => ({ useSession: () => ({ status: "authenticated", data: { user: { id: "7" } } }) }));
+vi.mock("next-auth/react", () => ({ useSession: () => ({ status: "authenticated", data: { estadoAcesso: "PERMITIDO", user: { id: "7" } } }) }));
 vi.mock("@/actions/checklist/eventos", () => ({ marcarEventoChecklistLido: vi.fn(), listarEventosChecklist: vi.fn() }));
 import { montarPollerChamados } from "../helpers/notificacoes-poller";
 
@@ -69,7 +69,7 @@ describe("central geral de notificações do Painel Alpha", () => {
       expect(poller.store.getState().notificacoes.map((item) => item.id)).toEqual(["mensagem-2", "mensagem-1"]);
       await poller.recover({ notificacoes: [mensagem(4), mensagem(3), mensagem(2)] });
       expect(poller.store.getState().notificacoes.map((item) => item.id)).toEqual(["mensagem-4", "mensagem-2", "mensagem-1"]);
-      expect(polling).toContain("window !== window.top");
+      expect(polling).toContain("if (!janelaPrincipal()) return;");
       expect(polling).not.toContain("router.push");
       expect(toastChamados).toContain("Nova mensagem no chamado");
     } finally { await poller.close(); }

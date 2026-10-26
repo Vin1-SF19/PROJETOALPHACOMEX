@@ -25,4 +25,13 @@ describe("versão implantada para reconciliação do roadmap", () => {
     vi.stubEnv("VERCEL_GIT_COMMIT_SHA", "invalid");
     expect((await GET()).status).toBe(503);
   });
+  it("allows the explicitly identified Vercel staging, never an arbitrary preview", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("VERCEL_GIT_COMMIT_SHA", "b".repeat(40));
+    vi.stubEnv("VERCEL_TARGET_ENV", "staging");
+    vi.stubEnv("VERCEL", "1");
+    expect((await GET()).status).toBe(200);
+    vi.stubEnv("VERCEL", "");
+    expect((await GET()).status).toBe(503);
+  });
 });

@@ -1,10 +1,39 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { criarFetchBanco } from "@/lib/db-fetch";
+import { criarFetchBanco, DB_ROUNDTRIP_TIMEOUT_MS } from "@/lib/db-fetch";
 import { PrismaLibSQL } from "@prisma/adapter-libsql/web";
 
 afterEach(() => vi.useRealTimers());
 
 describe("bounded DB transport, no replay", () => {
+  it.each(["headers", "body"])("accepts the observed 5.502s delay in %s with the real default", async (phase) => {
+    vi.useFakeTimers();
+    const transport = vi.fn<typeof fetch>().mockImplementation(async () => {
+      if (phase === "headers") await new Promise((resolve) => setTimeout(resolve, 5_502));
+      return phase === "body" ? new Response(new ReadableStream({ start(stream) {
+        setTimeout(() => { stream.enqueue(new TextEncoder().encode("SELECT-result")); stream.close(); }, 5_502);
+      } })) : new Response("SELECT-result");
+    });
+    const pending = criarFetchBanco(transport)("https://db.invalid").then((response) => response.text());
+    await vi.advanceTimersByTimeAsync(5_502);
+    expect(await pending).toBe("SELECT-result");
+    expect(DB_ROUNDTRIP_TIMEOUT_MS).toBe(10_000);
+    expect(transport).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("aborts stalled headers at 10s without replaying a POST", async () => {
+    vi.useFakeTimers();
+    const transport = vi.fn<typeof fetch>().mockImplementation((_, init) => new Promise((_, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true });
+    }));
+    const assertion = expect(criarFetchBanco(transport)("https://db.invalid", { method: "POST", body: "write" })).rejects.toMatchObject({ name: "TimeoutError" });
+    await vi.advanceTimersByTimeAsync(9_999);
+    expect(transport.mock.calls[0][1]?.signal?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await assertion;
+    expect(transport).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+  });
   it("preserves response and keeps deadline through a body that never finishes", async () => {
     vi.useFakeTimers();
     const cancel = vi.fn();

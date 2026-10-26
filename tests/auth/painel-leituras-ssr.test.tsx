@@ -48,6 +48,13 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe("read-only SSR aggregation and protected layout", () => {
+  it("accepts initial reads slower than5s within the20s observer", async () => {
+    mocks.links.mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve(["link"]), 5_502)));
+    const pending = lerDadosLayoutPainel(reads());
+    await vi.advanceTimersByTimeAsync(5_502);
+    expect(await pending).toMatchObject({ estado: "PERMITIDO", links: ["link"] });
+    expect(PAINEL_SSR_READ_BUDGET_MS).toBe(20_000);
+  });
   it("starts only admitted groups, bounds waiting and holds capacity until every queued read settles", async () => {
     const permissions = deferred<string[]>(), user = deferred<Usuario | null>(), links = deferred<string[]>();
     mocks.permissions.mockReturnValue(permissions.promise);

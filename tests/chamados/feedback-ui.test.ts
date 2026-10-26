@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
-vi.mock("next-auth/react", () => ({ useSession: () => ({ status: "authenticated", data: { user: { id: "7" } } }) }));
+vi.mock("next-auth/react", () => ({ useSession: () => ({ status: "authenticated", data: { estadoAcesso: "PERMITIDO", user: { id: "7" } } }) }));
 vi.mock("@/actions/checklist/eventos", () => ({ marcarEventoChecklistLido: vi.fn(), listarEventosChecklist: vi.fn() }));
 import { montarPollerChamados } from "../helpers/notificacoes-poller";
 

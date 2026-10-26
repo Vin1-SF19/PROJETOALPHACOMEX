@@ -1662,3 +1662,11 @@ Pedido confirmado escolhe preencher valor/forma pelo formulário atual de Em tra
 - **Origem por negociação:** destino explícito, inclusive branco, prevalece; depois mapeamento, depois aliases concordantes do próprio card. Parceiro herda apenas vínculos da mesma empresa, mantendo uma indicação comercial sem duplicar comissão.
 - **UX fiel à persistência:** conflito depende de base/local/remoto, card e contadores compartilham movimento otimista/rollback, detalhe mantém contexto e abertura; saúde de voz tem backoff/cancelamento e medição contém só fases.
 - **Limite de homologação:** gates locais aprovados não aprovam o E2E remoto. Publicar/testar primeiro staging; produção requer nova autorização específica. Reteste Admin em `02788143` aprovado até a entrada Operacional: três cards/duas execuções/três vínculos e repetições sem duplicata. O relatório histórico foi preservado; detalhes/limites em `docs/reports/validacao-correcoes-crm-2026-10-21.md`.
+
+
+### 2026-10-26 — Estabilidade: prazos, integridade e rollout (Scribe)
+- Defaults DB10/auth12/SSR20/cliente30/frame45 segundos com clamps; pools8/4 mantidos. Leitura5,502s deve concluir, espera permanece finita. Aumentar timeout não comprova normalização externa.
+- Heartbeat saudável20s preservado porque UsuariosOnline usa cutoff20s; reduzir pressão via principal/autorização/anti-overlap/backoff dos demais pollers.
+- Auth fail-closed, Onyx token individual/owner ACL e rascunhos preservados; nenhum replay genérico de POST/write.
+- Aviso de versão somente orientativo: não há preservação universal verificável de drafts de frames legados que justifique botão/reload/remount. Geolocation=() permanece.
+- Usuário autorizou staging e produção nesta sessão; primeiro homologar staging com bindings separados, depois promover. Gates locais não são aprovação ambiental; nenhum schema/migration necessário.

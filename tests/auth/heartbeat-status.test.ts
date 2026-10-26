@@ -76,4 +76,14 @@ describe("heartbeat da sessão por status", () => {
 
     expect(response.status).toBe(403);
   });
+
+  it("returns a recoverable503 for transport deadline and never repeats a presence write", async () => {
+    mocks.authComEstadoAcesso.mockResolvedValue({ user: { email: "active@alpha.test" } });
+    mocks.updateMany.mockRejectedValue({ code: 23, cause: new DOMException("Database transport deadline exceeded", "TimeoutError") });
+    const response = await POST();
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Retry-After")).toBe("30");
+    expect(await response.json()).toMatchObject({ code: "HEARTBEAT_UNAVAILABLE", retryable: true });
+    expect(mocks.updateMany).toHaveBeenCalledOnce();
+  });
 });

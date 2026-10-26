@@ -98,6 +98,7 @@ export default async function PainelLayout({
     <div className="min-h-dvh bg-[#020617]">
       <Toaster richColors position="top-right" />
       <PainelLayoutClient
+        deployedCommitSha={/^[a-f0-9]{40}$/.test(process.env.VERCEL_GIT_COMMIT_SHA ?? "") ? process.env.VERCEL_GIT_COMMIT_SHA : undefined}
         permissoes={permissoes}
         role={role}
         userId={userId}

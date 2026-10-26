@@ -2,8 +2,8 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-const api = vi.hoisted(() => ({ actor: 7, read: vi.fn(), list: vi.fn() }));
-vi.mock("next-auth/react", () => ({ useSession: () => ({ status: "authenticated", data: { user: { id: String(api.actor) } } }) }));
+const api = vi.hoisted(() => ({ actor: 7, allowed: true, read: vi.fn(), list: vi.fn() }));
+vi.mock("next-auth/react", () => ({ useSession: () => ({ status: "authenticated", data: api.allowed ? { estadoAcesso: "PERMITIDO", acessoBloqueado: false, user: { id: String(api.actor) } } : { estadoAcesso: "INDISPONIVEL", acessoBloqueado: false } }) }));
 vi.mock("@/actions/checklist/eventos", () => ({ marcarEventoChecklistLido: api.read, listarEventosChecklist: api.list }));
 import type { ChecklistEvento } from "@/lib/checklist/client/notificacoes";
 import { NotificacaoFlutuante } from "@/components/NotificacaoFlutuante";
@@ -42,6 +42,7 @@ async function recover() {
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   vi.clearAllMocks();
+  api.allowed = true;
   api.actor = 7;
   useChecklistNotificacoes.getState().iniciar(0);
   useChecklistNotificacoes.getState().iniciar(7);
@@ -56,8 +57,16 @@ afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 describe("poller real — recovery JSON, cursor e leitura", () => {
+  it("sessão INDISPONIVEL não consulta mesmo após evento de recuperação", async () => {
+    api.allowed = false;
+    await render();
+    await recover();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it("ingere duas páginas61JSON/null, preserva leitura e replay não duplica toast", async () => {
     const read = new Set([60]);
     const cursor = { createdAt: event(12).createdAt, id: event(12).eventId };
@@ -117,6 +126,12 @@ describe("poller real — recovery JSON, cursor e leitura", () => {
     await render();
     expect(useChecklistNotificacoes.getState().vistos.size).toBe(2);
     fail = false;
+    const callsBeforeCooldown = fetcher.mock.calls.length;
+    await recover();
+    expect(fetcher).toHaveBeenCalledTimes(callsBeforeCooldown);
+    expect(useChecklistNotificacoes.getState().vistos.size).toBe(2);
+    // Recovery events must respect the new six-second failure cooldown.
+    vi.spyOn(Date, "now").mockReturnValue(Date.now() + 6000);
     await recover();
     expect(useChecklistNotificacoes.getState().vistos.size).toBe(3);
     expect(useChecklistNotificacoes.getState().notificacoes).toHaveLength(3);

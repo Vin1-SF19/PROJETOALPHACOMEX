@@ -7,7 +7,7 @@ const realtime = vi.hoisted(() => ({
   connectionBind: vi.fn(), connectionUnbind: vi.fn(), unsubscribe: vi.fn(), trigger: vi.fn(),
 }));
 const pusherModule = vi.hoisted(() => ({ loaded: false }));
-const api = vi.hoisted(() => ({ actor: 1, read: vi.fn(), list: vi.fn() }));
+const api = vi.hoisted(() => ({ actor: 1, allowed: true, read: vi.fn(), list: vi.fn() }));
 vi.mock("@/lib/pusher", () => {
   pusherModule.loaded = true;
   return { pusherClient: {
@@ -15,7 +15,7 @@ vi.mock("@/lib/pusher", () => {
     connection: { bind: realtime.connectionBind, unbind: realtime.connectionUnbind },
   } };
 });
-vi.mock("next-auth/react", () => ({ useSession: () => ({ status: "authenticated", data: { user: { id: String(api.actor) } } }) }));
+vi.mock("next-auth/react", () => ({ useSession: () => ({ status: "authenticated", data: api.allowed ? { estadoAcesso: "PERMITIDO", acessoBloqueado: false, user: { id: String(api.actor) } } : { estadoAcesso: "INDISPONIVEL", acessoBloqueado: false } }) }));
 vi.mock("@/actions/checklist/eventos", () => ({ marcarEventoChecklistLido: api.read, listarEventosChecklist: api.list }));
 import { useChecklistNotifications } from "@/hooks/useChecklistNotifications";
 import { NotificacaoFlutuante } from "@/components/NotificacaoFlutuante";
@@ -59,6 +59,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("NEXT_PUBLIC_CHECKLIST_REALTIME_MODE", undefined);
   vi.spyOn(document, "hidden", "get").mockReturnValue(false);
+  api.allowed = true;
   api.actor = 1;
   useChecklistNotificacoes.getState().iniciar(0);
   fetcher = vi.fn().mockImplementation(async () => response());
@@ -78,6 +79,18 @@ afterEach(async () => {
 });
 
 describe("CheckList exclusivamente no poller global", () => {
+  it("sessão INDISPONIVEL sem identidade pública não emite consulta nem inicia timer", async () => {
+    api.allowed = false;
+    await render({ toast: false });
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      window.dispatchEvent(new Event("alpha-checklist-recovery"));
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it.each([undefined, "polling", "invalid", "pusher"])("configuração %s não carrega Pusher nem bloqueia hidratação/polling", async (mode) => {
     vi.stubEnv("NEXT_PUBLIC_CHECKLIST_REALTIME_MODE", mode);
     await render();

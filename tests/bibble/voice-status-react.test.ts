@@ -8,6 +8,8 @@ import { BotaoMicrofone } from "@/components/BibbleChatHome/BotaoMicrofone";
 import { refreshBibbleVoiceStatus, resetVoiceStatusCacheForTests, useVoiceStatus } from "@/components/BibbleChatHome/useVoiceStatus";
 import { requestBibbleSpeech } from "@/lib/bibble/voice-client";
 
+const sessionState = vi.hoisted(() => ({ id: "7" }));
+vi.mock("next-auth/react", () => ({ useSession: () => ({ data: { estadoAcesso: "PERMITIDO", user: { id: sessionState.id } } }) }));
 vi.mock("@/lib/bibble/voice-client", () => ({
   cleanBibbleSpeechText: (text: string) => text,
   requestBibbleSpeech: vi.fn(async () => new Blob(["audio"])),
@@ -62,6 +64,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-10-21T14:00:00Z"));
   resetVoiceStatusCacheForTests();
+  sessionState.id = "7";
   healthy = false;
   retryAfter = null;
   transportFailure = true;
@@ -116,10 +119,10 @@ describe("shared voice availability", () => {
     expect(fetchStatus).toHaveBeenCalledTimes(6);
   });
 
-  it.each(["900", "Wed, 21 Oct 2026 14:15:00 GMT"])("honors Retry-After %s", async (header) => {
+  it.each(["900", "Wed, 21 Oct 2026 14:15:00 GMT"])("bounds Retry-After %s to five minutes", async (header) => {
     retryAfter = header;
     await act(async () => root.render(h(Probe)));
-    await tick(899_999);
+    await tick(299_999);
     expect(fetchStatus).toHaveBeenCalledTimes(2);
     await tick(1);
     expect(fetchStatus).toHaveBeenCalledTimes(4);
@@ -237,4 +240,16 @@ describe("shared voice availability", () => {
     expect(start).toHaveBeenCalledOnce();
     expect(fetchStatus).toHaveBeenCalledTimes(2);
   });
+});
+
+it("switching users aborts old health checks and does not restore the old capabilities", async () => {
+  const old = holdNextChecks();
+  await act(async () => root.render(h(Probe)));
+  expect(fetchStatus).toHaveBeenCalledTimes(2);
+  sessionState.id = "8";
+  await act(async () => root.render(h(Probe)));
+  expect(old.every((check) => check.signal?.aborted)).toBe(true);
+  expect(fetchStatus).toHaveBeenCalledTimes(4);
+  await act(async () => completeChecks(old));
+  expect(container.textContent).toBe("unavailable");
 });

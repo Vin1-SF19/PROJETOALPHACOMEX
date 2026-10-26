@@ -9,6 +9,7 @@ import { SessaoProtegida } from "@/components/auth/SessaoIndisponivel";
 import PainelLayoutClient from "@/components/layout/PainelLayoutClient";
 import { getTabsStorageKey } from "@/lib/painel-tabs";
 import { ALPHA_EMBED_READY, ALPHA_EMBED_PROTOCOL_VERSION } from "@/lib/painel-embedded";
+vi.mock("@/components/layout/PainelVersionNotice", () => ({ PainelVersionNotice: () => null }));
 vi.mock("next/navigation", () => ({ usePathname: () => "/PainelAlpha/AlphaCRM", useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("next-auth/react", async original => ({ ...await original<typeof import("next-auth/react")>(), signOut: vi.fn(async () => undefined) }));
 vi.mock("@/components/layout/GlobalSidebar", () => ({default:()=>null,SidebarMobileToggle:()=>null}));
@@ -67,7 +68,7 @@ describe("actual shell iframe session confirmation",()=>{
   const data={type:ALPHA_EMBED_READY,version:ALPHA_EMBED_PROTOCOL_VERSION,frameId:"tab-crm:0"};
   await act(async()=>{window.dispatchEvent(new MessageEvent("message",{origin:"https://external.invalid",source:frame.contentWindow,data}));window.dispatchEvent(new MessageEvent("message",{origin:window.location.origin,source:window,data}));window.dispatchEvent(new MessageEvent("message",{origin:window.location.origin,source:frame.contentWindow,data:{...data,frameId:"tab-crm:8"}}))});
   expect(frame.className).toContain("invisible");
-  await act(async()=>{await vi.advanceTimersByTimeAsync(14_999)});expect(host.textContent).not.toContain("Tentar novamente");
+  await act(async()=>{await vi.advanceTimersByTimeAsync(44_999)});expect(host.textContent).not.toContain("Tentar novamente");
   await act(async()=>{await vi.advanceTimersByTimeAsync(1)});expect(host.textContent).toContain("Tentar novamente");expect(fetcher).not.toHaveBeenCalled();
  });
  it("deduplicates concurrent iframe revocation hints into one server check and one logout",async()=>{

@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   deleteAgent: vi.fn(),
   createCustomTool: vi.fn(),
   getImageGenToolId: vi.fn(),
+  getVoiceStatus: vi.fn(),
   getOwnerInfoMap: vi.fn(),
   recordAgentOwner: vi.fn(),
   userOwnsAgent: vi.fn(),
@@ -34,6 +35,7 @@ vi.mock("@/lib/onyx/client", () => ({
   deleteAgent: mocks.deleteAgent,
   createCustomTool: mocks.createCustomTool,
   getImageGenToolId: mocks.getImageGenToolId,
+  getVoiceStatus: mocks.getVoiceStatus,
   OnyxError: class OnyxError extends Error {
     status: number;
     constructor(message: string, status: number) {
@@ -55,6 +57,9 @@ vi.mock("@/lib/onyx/ownership", () => ({
 import { GET as getAgents, POST as createAgent } from "@/app/api/onyx/agents/route";
 import { GET as getAgent } from "@/app/api/onyx/agents/[id]/route";
 import { GET as getTools } from "@/app/api/onyx/tools/route";
+import { GET as getVoiceStatus } from "@/app/api/onyx/voice/status/route";
+import { OnyxError } from "@/lib/onyx/client";
+import { AcessoTemporariamenteIndisponivel } from "@/lib/auth/indisponibilidade";
 
 describe("rotas Onyx com token individual", () => {
   beforeEach(() => {
@@ -65,6 +70,7 @@ describe("rotas Onyx com token individual", () => {
     mocks.listTools.mockResolvedValue([]);
     mocks.getAgent.mockResolvedValue({ id: 42, name: "Agente" });
     mocks.getImageGenToolId.mockResolvedValue(99);
+    mocks.getVoiceStatus.mockResolvedValue({ stt_enabled: true, tts_enabled: true });
     mocks.getOwnerInfoMap.mockResolvedValue(new Map());
     mocks.userCanUseAgent.mockResolvedValue(true);
     mocks.createAgent.mockResolvedValue({ id: 43, name: "Novo agente" });
@@ -78,6 +84,22 @@ describe("rotas Onyx com token individual", () => {
     expect(mocks.getUserOnyxToken).toHaveBeenCalledWith("7");
     expect(mocks.listAgents).toHaveBeenCalledWith("user-token");
   });
+  it("distinguishes auth, private metadata and upstream errors without exposing SDK details", async () => {
+    mocks.auth.mockRejectedValueOnce(new AcessoTemporariamenteIndisponivel());
+    const auth = await getAgents();
+    expect(auth.status).toBe(503);
+    expect(await auth.json()).toMatchObject({ code: "AUTH_UNAVAILABLE" });
+    mocks.getUserOnyxToken.mockRejectedValueOnce(new Error("private-sql-private-token"));
+    const metadata = await getAgents();
+    expect(metadata.status).toBe(503);
+    expect(await metadata.json()).toMatchObject({ code: "AI_METADATA_UNAVAILABLE" });
+    mocks.listAgents.mockRejectedValueOnce(new OnyxError("private-upstream-private-token", 502));
+    const upstream = await getAgents();
+    expect(upstream.status).toBe(502);
+    const body = await upstream.text();
+    expect(body).toContain("AI_UPSTREAM_UNAVAILABLE");
+    expect(body).not.toContain("private-");
+  });
 
   it("resolve o token da sessao para listar tools", async () => {
     const response = await getTools();
@@ -85,6 +107,14 @@ describe("rotas Onyx com token individual", () => {
     expect(response.status).toBe(200);
     expect(mocks.getUserOnyxToken).toHaveBeenCalledWith("7");
     expect(mocks.listTools).toHaveBeenCalledWith("user-token");
+  });
+  it("resolves voice status only with the caller's individual token", async () => {
+    const response = await getVoiceStatus();
+    expect(response.status).toBe(200);
+    expect(mocks.getVoiceStatus).toHaveBeenCalledWith("user-token");
+    mocks.auth.mockResolvedValueOnce(null);
+    expect((await getVoiceStatus()).status).toBe(401);
+    expect(mocks.getVoiceStatus).toHaveBeenCalledOnce();
   });
 
   it("resolve o token da sessao para consultar o detalhe de um agente", async () => {

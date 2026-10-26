@@ -1,3 +1,4 @@
+import { consultarIntegracaoIA } from "@/lib/ai-availability-client";
 // Helpers de cliente (browser) para as rotas proxy /api/onyx/*.
 // Seguro para importar em componentes client — NUNCA toca no token.
 
@@ -58,10 +59,9 @@ async function parseError(res: Response): Promise<string> {
   }
 }
 
-export async function fetchAgents(): Promise<OnyxAgent[]> {
-  const res = await fetch("/api/onyx/agents");
-  if (!res.ok) throw new Error(await parseError(res));
-  const data = (await res.json()) as { agents: OnyxAgent[] };
+export async function fetchAgents(signal?: AbortSignal): Promise<OnyxAgent[]> {
+  const data = await consultarIntegracaoIA<{ agents: OnyxAgent[] }>("/api/onyx/agents", signal);
+  if (!Array.isArray(data.agents)) throw new Error("Agentes indisponíveis");
   return data.agents;
 }
 
@@ -73,10 +73,9 @@ export interface AgenteFixado {
   ordem: number;
 }
 
-export async function fetchFixados(): Promise<AgenteFixado[]> {
-  const res = await fetch("/api/onyx/agentes-fixados");
-  if (!res.ok) throw new Error(await parseError(res));
-  const data = (await res.json()) as { fixados: AgenteFixado[] };
+export async function fetchFixados(signal?: AbortSignal): Promise<AgenteFixado[]> {
+  const data = await consultarIntegracaoIA<{ fixados: AgenteFixado[] }>("/api/onyx/agentes-fixados", signal);
+  if (!Array.isArray(data.fixados)) throw new Error("Agentes fixados indisponíveis");
   return data.fixados;
 }
 

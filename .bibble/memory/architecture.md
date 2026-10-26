@@ -2565,3 +2565,7 @@ O módulo preserva a página/tabela e formulário atuais. `src/lib/chamados/aces
 ### 2026-10-15 — Chamados: migração autorizada aplicada
 
 A migração do Chamados foi aplicada no Turso `banco-alpha` após consentimento específico do usuário e gate Vault; estado APPLIED_VERIFIED. Catálogo real 13 destinos/53 categorias disponível. Os 224 legados mantêm destino nulo; não houve backfill. Smoke Prisma/catálogo/autorização e integridade aprovados. Publicação do código e E2E autenticado não executados.
+
+
+### 2026-10-26 — Resiliência operacional do shell (Scribe)
+Sobre20f310, preservando CRM concorrente, implementados helpers de configuração server, métricas sanitizadas, classificador de transporte e deadlines client/IA. DB10s/auth12s/SSR20s e cliente30/frame45 eliminam a antiga assimetria5s sem retirar pools8/4 ou fail-closed. Shell principal concentra pollers existentes; notas usam hook de reconciliação com geração/identidade, hidratação e coalescing sem replay de resultado desconhecido. IA distingue auth/config/metadata/upstream por status/code seguro, com JSON/SSE separados. Versão é aviso apenas; geo continua bloqueada. Ver arquitetura/story estabilidade20261026. Forge/Probe/Anubis/Lens/Sage locais aprovados; rollout staging/produção e medição de saúde externa continuam pendentes. Nenhum schema ou env alterado nesta entrega documental.

@@ -134,3 +134,7 @@ Quando um módulo possui background animado próprio (`CrmSpaceBackground`, `Che
 
 **Referência visual:** `design-tokens.md` → "Sidebar sobre background vivo".
 **Precedente de hover em sidebar:** `PopSidebarPastas.tsx` (DocsAlpha).
+
+
+### 2026-10-26 — Deadlines e leitura compartilhada (Scribe)
+Timeout de observação não libera vaga de SDK ainda pendente nem torna resultado tardio autorização. Transporte Hrana POST executa uma vez; retry só leitura estritamente classificada com saldo. Separar duração observer/SDK/headers/body, sem chamar diferença não correlacionada de mutex medido. React Query pode avaliar refetchInterval em SSR mesmo enabled:false: callbacks devem tolerar ausência de document/window. Reconsulta de Server Action não abortável com cache já preenchido usa cancelRefetch:false para não multiplicar trabalho abandonado no servidor. Falha de escrita mantém intenção e aviso sem replay automático.

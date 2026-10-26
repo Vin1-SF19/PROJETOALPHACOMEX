@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import { getOllamaHeaders } from "@/lib/bibble/client";
 import { getBibbleRuntimeConfig } from "@/lib/bibble/runtime-config";
+import { codigoFalhaUpstream, respostaIndisponibilidadeIA } from "@/lib/ai-unavailability";
+import { comPrazoHttp } from "@/lib/http-deadline";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +13,7 @@ interface OpenAICompatModel {
   meta?: { size?: number; n_params?: number; ftype?: string };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
   const session = await auth();
   if (!session?.user?.id) {
@@ -23,19 +25,21 @@ export async function GET() {
     ollamaUrl = getBibbleRuntimeConfig().endpoint.toString().replace(/\/$/, "");
   } catch (authError) {
     if (acessoEstaIndisponivel(authError)) throw authError;
-    return NextResponse.json({ models: [], error: "Configuração do servidor local inválida" }, { status: 503 });
+    return respostaIndisponibilidadeIA("AI_CONFIGURATION_UNAVAILABLE", 503, { models: [] });
   }
 
   try {
     // llama.cpp (substituiu o Ollama) não implementa `/api/tags` — usa o
     // endpoint OpenAI-compat `/v1/models`.
+    return await comPrazoHttp(5_000, request.signal, async (signal) => {
     const res = await fetch(`${ollamaUrl}/v1/models`, {
-      signal: AbortSignal.timeout(5000),
+      signal, cache: "no-store", redirect: "error",
       headers: getOllamaHeaders({ Accept: "application/json" }),
     });
 
     if (!res.ok) {
-      return NextResponse.json({ models: [], error: `Servidor local retornou ${res.status}` });
+      await res.body?.cancel().catch(() => undefined);
+      return respostaIndisponibilidadeIA(res.status === 429 ? "AI_RATE_LIMITED" : "AI_UPSTREAM_UNAVAILABLE", res.status === 429 || res.status === 503 ? res.status : 502, { models: [] });
     }
 
     const data = await res.json() as { data: OpenAICompatModel[] };
@@ -51,10 +55,12 @@ export async function GET() {
       })),
       configured: true,
       capabilities: { contextWindow: runtime.contextWindow, outputTokenLimit: runtime.outputTokenLimit },
+    }, { headers: { "Cache-Control": "private, no-store" } });
     });
   } catch (authError) {
     if (acessoEstaIndisponivel(authError)) throw authError;
-    return NextResponse.json({ models: [], error: "Servidor local indisponível" });
+    const code = codigoFalhaUpstream(authError);
+    return respostaIndisponibilidadeIA(code, code === "AI_UPSTREAM_TIMEOUT" ? 504 : 502, { models: [] });
   }
 
   } catch (authError) {
