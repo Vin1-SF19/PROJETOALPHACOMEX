@@ -189,7 +189,11 @@ export async function finalizarComProtocolo(
     return { success: true };
   } catch (e: unknown) {
     if (e instanceof ErroConclusaoChamado) return { success: false, error: e.message };
-    return { success: false, error: e instanceof Error ? e.message : "Erro ao finalizar chamado." };
+    console.error("[chamados] Falha ao finalizar chamado com protocolo", {
+      chamadoId,
+      message: e instanceof Error ? e.message : "erro desconhecido",
+    });
+    return { success: false, error: "Erro ao finalizar chamado." };
   }
 }
 

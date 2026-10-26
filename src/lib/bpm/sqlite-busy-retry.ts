@@ -1,8 +1,21 @@
 export function erroSqliteBusy(errorValue: unknown): boolean {
-  if (!errorValue || typeof errorValue !== "object") return false;
-  const erro = errorValue as { message?: unknown; cause?: { message?: unknown; originalMessage?: unknown } };
-  return [erro.message, erro.cause?.message, erro.cause?.originalMessage]
-    .some((mensagem) => typeof mensagem === "string" && mensagem.includes("SQLITE_BUSY"));
+  const pendentes: unknown[] = [errorValue];
+  const visitados = new Set<object>();
+  while (pendentes.length > 0) {
+    const valor = pendentes.pop();
+    if (!valor || typeof valor !== "object" || visitados.has(valor)) continue;
+    visitados.add(valor);
+    const erro = valor as {
+      message?: unknown; originalMessage?: unknown; code?: unknown; cause?: unknown;
+      meta?: { driverAdapterError?: unknown };
+    };
+    if ([erro.message, erro.originalMessage, erro.code]
+      .some((mensagem) => typeof mensagem === "string" && /\bSQLITE_BUSY(?:_[A-Z]+)*\b/.test(mensagem))) return true;
+    // Prisma também encapsula o erro libSQL em meta.driverAdapterError.
+    // P1008/SocketTimeout isolados não comprovam uma transação revertida.
+    pendentes.push(erro.cause, erro.meta?.driverAdapterError);
+  }
+  return false;
 }
 
 /** Reinicia apenas transações revertidas integralmente por disputa de escrita. */

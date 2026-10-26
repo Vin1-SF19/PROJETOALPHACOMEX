@@ -4,6 +4,20 @@ import { erroSqliteBusy, repetirTransacaoOcupada } from "@/lib/bpm/sqlite-busy-r
 describe("disputa de escrita durante transição BPM", () => {
   afterEach(() => vi.useRealTimers());
 
+  it("reconhece o lock encapsulado pelo Prisma sem repetir timeout genérico", () => {
+    expect(erroSqliteBusy({ code: "P1008", meta: { driverAdapterError: {
+      cause: { originalCode: "5", originalMessage: "SQLITE_BUSY: database is locked", kind: "SocketTimeout" },
+    } } })).toBe(true);
+    expect(erroSqliteBusy({ code: "P1008", message: "Operation has timed out", meta: {
+      driverAdapterError: { cause: { kind: "SocketTimeout" } },
+    } })).toBe(false);
+    expect(erroSqliteBusy({ code: "SQLITE_BUSY_SNAPSHOT" })).toBe(true);
+    expect(erroSqliteBusy({ code: "SQLITE_CONSTRAINT" })).toBe(false);
+    const circular: { cause?: unknown } = {};
+    circular.cause = circular;
+    expect(erroSqliteBusy(circular)).toBe(false);
+  });
+
   it("repete a transação inteira quando o libSQL devolve SQLITE_BUSY", async () => {
     vi.useFakeTimers();
     const executar = vi.fn()

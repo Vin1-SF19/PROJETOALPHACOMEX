@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   transaction: vi.fn(),
@@ -31,8 +31,10 @@ import {
 const CONCLUIDO_EM = new Date("2026-09-11T13:00:00.000Z");
 
 describe("concluirChamadoComFeedback", () => {
+  afterEach(() => vi.useRealTimers());
   beforeEach(() => {
     vi.clearAllMocks();
+    tx.usuarios.findUnique.mockReset().mockResolvedValue({ id: 3, nome: "Carlos", role: "TI", status: "ATIVO" });
     mocks.transaction.mockImplementation(async (callback) => callback(tx));
     mocks.findUnique.mockResolvedValue({
       id: 10,
@@ -140,6 +142,50 @@ describe("concluirChamadoComFeedback", () => {
     expect(resultado.id).toBe(10);
     expect(mocks.updateMany).toHaveBeenCalledOnce();
     expect(mocks.feedbackCreate).not.toHaveBeenCalled();
+  });
+
+  it("reinicia a transação e reconsulta o chamado após lock transitório", async () => {
+    vi.useFakeTimers();
+    mocks.updateMany.mockRejectedValueOnce({ cause: { originalMessage: "SQLITE_BUSY: database is locked" } });
+    const resultado = concluirChamadoComFeedback({ chamadoId: 10, tecnicoId: 3, concluidoEm: CONCLUIDO_EM });
+    const resolucao = expect(resultado).resolves.toMatchObject({ id: 10 });
+    await vi.advanceTimersByTimeAsync(200);
+    await resolucao;
+    expect(mocks.transaction).toHaveBeenCalledTimes(2);
+    expect(mocks.findUnique).toHaveBeenCalledTimes(2);
+    expect(mocks.feedbackCreate).toHaveBeenCalledOnce();
+  });
+
+  it("limita contenção persistente a quatro tentativas e retorna erro seguro", async () => {
+    vi.useFakeTimers();
+    mocks.transaction.mockRejectedValue(new Error("SQLITE_BUSY: database is locked"));
+    const resultado = concluirChamadoComFeedback({ chamadoId: 10, tecnicoId: 3, concluidoEm: CONCLUIDO_EM });
+    const rejeicao = expect(resultado).rejects.toMatchObject({ code: "BANCO_OCUPADO", message: expect.not.stringContaining("SQLITE") });
+    await vi.advanceTimersByTimeAsync(1_400);
+    await rejeicao;
+    expect(mocks.transaction).toHaveBeenCalledTimes(4);
+    expect(mocks.feedbackCreate).not.toHaveBeenCalled();
+  });
+
+  it("revalida autorização após lock em vez de reutilizar a primeira leitura", async () => {
+    vi.useFakeTimers();
+    mocks.updateMany.mockRejectedValueOnce(new Error("SQLITE_BUSY: database is locked"));
+    tx.usuarios.findUnique.mockResolvedValueOnce({ id: 3, nome: "Carlos", role: "TI", status: "ATIVO" })
+      .mockResolvedValueOnce(null);
+    const resultado = concluirChamadoComFeedback({ chamadoId: 10, tecnicoId: 3, concluidoEm: CONCLUIDO_EM });
+    const rejeicao = expect(resultado).rejects.toMatchObject({ code: "SEM_PERMISSAO" });
+    await vi.advanceTimersByTimeAsync(200);
+    await rejeicao;
+    expect(mocks.transaction).toHaveBeenCalledTimes(2);
+    expect(mocks.updateMany).toHaveBeenCalledOnce();
+    expect(mocks.feedbackCreate).not.toHaveBeenCalled();
+  });
+
+  it("não repete falhas de integridade nem erros de negócio", async () => {
+    mocks.feedbackCreate.mockRejectedValueOnce(new Error("SQLITE_CONSTRAINT: UNIQUE constraint failed"));
+    await expect(concluirChamadoComFeedback({ chamadoId: 10, tecnicoId: 3, concluidoEm: CONCLUIDO_EM }))
+      .rejects.toThrow("SQLITE_CONSTRAINT");
+    expect(mocks.transaction).toHaveBeenCalledOnce();
   });
 
 });
