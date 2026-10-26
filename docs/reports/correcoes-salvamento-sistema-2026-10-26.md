@@ -13,7 +13,7 @@ Entrega autorizada em 26/10/2026, a partir da [auditoria de salvamento](auditori
 | S06 | Anotação simples participa da fila, das pendências e da recuperação. Chave estável na operação impede duplicação no retry; anotação e histórico são transacionais. |
 | S07 | Rascunhos locais do CRM são separados por usuário, conservam base, exigem revisão após recuperação e avisam sobre saída. Token por edição protege rascunhos de outra aba contra confirmações/limpezas antigas. |
 | S08 | Notas retomam pendências ao reconectar, oferecem nova tentativa e resolução explícita de conflito. Versão e histórico são confirmados na mesma transação. |
-| S09 | Tarefas verificam resultados, inclusive na recorrência; falhas mantêm formulário. Opcionais omitidos são preservados; consultas recebem parâmetros e alterações conferem registros afetados. |
+| S09 | Tarefas verificam resultados, inclusive na recorrência; falhas mantêm formulário. Opcionais omitidos são preservados; consultas recebem parâmetros e alterações conferem registros afetados. A leitura normaliza as flags SQLite para booleanos, mantendo a edição compatível entre drivers. |
 | S10 | Escritas legadas validam sessão, usuário ativo, permissões atuais e acesso ao alvo no servidor. As regras legítimas dos módulos foram mantidas. |
 | S11 | Reservas validam intervalo no cliente e servidor; teste de sobreposição e escrita são um único comando parametrizado, evitando a janela entre consultar e gravar. |
 | S12 | Cadastro mestre e histórico são transacionais; o modal libera o estado ocupado em exceções e continua identificando resultados parciais do conjunto. |
@@ -38,13 +38,17 @@ O build foi executado com as duas variáveis Turso de staging verificadas e depe
 
 O audit de dependências registra débito anterior: 114 achados, incluindo 10 críticos, com manifesto e lock idênticos à base remota. Isso não constitui aprovação do audit; a entrega não alterou o grafo. A revisão independente não mantém achados de código abertos.
 
-A publicação e os percursos autenticados do novo SHA ainda serão registrados após READY em staging.
+A primeira versão de código foi publicada como `fb0e8546d75e95f96e780f2049b43d75f6466e15`, deployment `dpl_BCXiMgDkxmJ7Sda528NqvEH3e7ek`, READY no alias staging. Foram homologados os percursos de [Notas e Blueprint](../qa/homologacao-notas-blueprint-salvamento-staging-20261026.md), [CRM](../qa/homologacao-crm-salvamento-staging-20261026.md) e [Reservas](../qa/homologacao-reservas-salvamento-staging-20261026.md), com releitura independente e limpeza dos registros próprios pela UI. O card próprio foi arquivado; os cards anteriores permaneceram intactos. A [leitura das cinco etapas sem formulário](../qa/homologacao-c01-salvamento-staging-20261026.md) encontrou todas vazias: salvar nesses formulários permanece sem comprovação visual por ausência de fixture.
+
+A homologação real de Tarefas identificou um problema adicional: a criação e reabertura funcionavam, mas a edição era recusada porque as flags de uma leitura SQL do Turso chegavam como `0/1` e o contrato de edição exige booleanos. A correção mantém a validação estrita e normaliza a resposta de leitura. O adaptador reproduziu dois casos falhos antes do ajuste; depois passaram 30 casos focados e o ciclo criar → buscar → editar → concluir em SQLite real.
+
+A segunda rodada aprovou **795 arquivos e 6.635 testes**, com os mesmos quatro ignorados e um pendente, além de lint, tipos e build de 86 páginas. A [evidência da correção adicional](../qa/evidencias/correcoes-salvamento-20261026/gates-pos-homologacao-tarefas.json) separa esse resultado da primeira versão. Publicação da correção e reteste visual da mesma tarefa ainda pendentes nesta revisão; não há alegação de aprovação da edição visual antes desse reteste.
 
 Nenhuma migration, mudança estrutural de banco, backfill ou publicação em produção integra esta entrega.
 
 ## Limites do modelo existente
 
 - Reservas identificam o autor pelo nome porque o modelo atual não possui FK de usuário. A correção aplica a regra de autoria no servidor e bloqueia alterações por não administradores quando o nome identifica zero ou mais de uma conta. Alteração ou reutilização futura de nomes continua uma limitação estrutural. Uma mudança desse vínculo exige proposta própria sob Vault.
-- A estrutura atual de tarefas não possui o armazenamento de alerta usado pelo formulário legado. A tarefa pode ser salva com aviso explícito de que o alerta não foi persistido; não há migration implícita para criar a coluna.
+- Alertas de tarefas não possuem armazenamento no schema atual. `CriarTarefa` pode avisar que o alerta não foi configurado; `EditarTarefa` não inclui alerta no contrato, embora a UI ainda exiba o seletor. Persistência e edição de alertas não foram homologadas e exigem definição própria. Esta entrega não implementa esse recurso nem cria coluna por migration.
 - Recuperação de arquivo local ainda não enviado exige selecionar o arquivo novamente. Conteúdo de `File` não é convertido em rascunho textual persistente.
 - Testes aprovados não substituem a homologação de cada combinação de campo, perfil e integração externa; os percursos efetivamente exercitados devem ser identificados na evidência final.

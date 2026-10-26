@@ -1,0 +1,66 @@
+{
+  "status": "PASS nos cenários exercitados",
+  "release": "fb0e8546d75e95f96e780f2049b43d75f6466e15",
+  "origin": "https://staging.alpha-comex.com",
+  "profile": "Conta fictícia Admin com login normal e menu/iframe oficiais",
+  "checks": [
+    {
+      "name": "criar card próprio Novo Lead selecionando empresa fictícia interna e responsável da sessão",
+      "pass": true
+    },
+    {
+      "name": "fechar e reabrir card conserva rascunho da anotação sem enviar",
+      "pass": true
+    },
+    {
+      "name": "salvar anotação confirma uma única interação e limpa somente o texto enviado",
+      "pass": true
+    },
+    {
+      "name": "nova leitura independente e novo contexto exibem a anotação uma única vez",
+      "pass": true
+    },
+    {
+      "name": "limpeza normal arquiva somente o card fictício e remove do board",
+      "pass": true
+    },
+    {
+      "name": "cards preexistentes da empresa fictícia permanecem intactos",
+      "pass": true
+    }
+  ],
+  "procedures": {
+    "uiStatus": "NOT_EXERCISED",
+    "visibleObservationInputs": 0,
+    "reason": "Nenhum procedimento configurado aplicável foi apresentado ao novo card; não houve criação de template/campo para fabricar cenário.",
+    "regressionCoverage": "Preservação de observação pendente, fila, CAS e recuperação cobertos pelas regressões comportamentais."
+  },
+  "cleanup": {
+    "method": "Exclusão individual normal da interface, que arquiva o card",
+    "ownedCardArchived": true,
+    "existingCardsUnchangedInCheckedControlFields": true,
+    "controlFields": [
+      "status",
+      "etapaId",
+      "updatedAt"
+    ]
+  },
+  "safety": {
+    "newFieldsOrTemplatesOrPermissionsCreated": false,
+    "financialStagesOrTransitionsUsed": false,
+    "existingInternalFictionalCompanySelected": true,
+    "publicFixtureIdsOrMarkersOrCredentialsIncluded": false,
+    "writeActionsCalledDirectlyOutsideUI": false,
+    "independentRead": "SELECT restrito a staging com fingerprint conferido e novo contexto de navegador"
+  },
+  "limits": [
+    "Somente o perfil fictício Admin foi exercitado por navegador; perfis comuns e negativas permanecem nas regressões.",
+    "Nenhum procedimento aplicável apareceu no novo card; não foi criado template ou campo para fabricar homologação.",
+    "A limpeza normal é arquivamento; a identificação e o rastreio do próprio registro arquivado permanecem privados."
+  ],
+  "automationNotes": [
+    "Interrupções antes da criação ocorreram em locators de autocomplete, que exibe nome fantasia quando disponível. Nenhum Criar Card foi repetido.",
+    "Depois da criação, o mesmo card foi retomado após aguardar o refresh do board e selecionar a aba Histórico para a leitura da anotação.",
+    "Os resultados positivos foram consolidados somente após as observações concluídas; tentativas interrompidas permanecem privadas."
+  ]
+}

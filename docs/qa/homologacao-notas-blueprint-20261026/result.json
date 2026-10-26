@@ -1,0 +1,145 @@
+{
+  "status": "PASS nos cenários exercitados",
+  "release": {
+    "commit": "fb0e8546d75e95f96e780f2049b43d75f6466e15",
+    "deploymentId": "dpl_BCXiMgDkxmJ7Sda528NqvEH3e7ek",
+    "origin": "https://staging.alpha-comex.com"
+  },
+  "authentication": {
+    "method": "Login normal preservado em estado privado; Chromium e menu/iframe oficial",
+    "profile": "Conta fictícia Admin de staging",
+    "credentialsOrSessionIncluded": false
+  },
+  "functionalChecks": {
+    "Notas": [
+      {
+        "name": "criar e salvar nota pela interface",
+        "pass": true
+      },
+      {
+        "name": "nova leitura sem rascunho confirma edição",
+        "pass": true
+      },
+      {
+        "name": "falha de transporte preserva texto e rascunho",
+        "pass": true
+      },
+      {
+        "name": "recarregar recupera texto ainda não confirmado",
+        "pass": true
+      },
+      {
+        "name": "retentativa confirma e remove rascunho próprio",
+        "pass": true
+      },
+      {
+        "name": "nova leitura confirma texto recuperado",
+        "pass": true
+      },
+      {
+        "name": "renomear pela aba persiste título e preserva texto em nova leitura",
+        "pass": true
+      }
+    ],
+    "Blueprint": [
+      {
+        "name": "criar projeto fictício e salvar documento",
+        "pass": true
+      },
+      {
+        "name": "reabrir documento em contexto novo confirma persistência",
+        "pass": true
+      },
+      {
+        "name": "erro de transporte conserva rascunho Blueprint",
+        "pass": true
+      },
+      {
+        "name": "remontar editor recupera documento não confirmado",
+        "pass": true
+      },
+      {
+        "name": "retry Blueprint confirma e limpa rascunho próprio",
+        "pass": true
+      },
+      {
+        "name": "nova leitura sem rascunho confirma especificação recuperada e salva",
+        "pass": true
+      }
+    ]
+  },
+  "cleanup": {
+    "Notas": {
+      "status": "PASS",
+      "checks": [
+        {
+          "name": "limpeza individual move apenas fixture à lixeira",
+          "pass": true
+        },
+        {
+          "name": "limpeza individual exclui definitivamente somente nota fictícia",
+          "pass": true
+        },
+        {
+          "name": "nova leitura da lixeira não encontra fixture excluída",
+          "pass": true
+        }
+      ]
+    },
+    "Blueprint": {
+      "status": "PASS",
+      "checks": [
+        {
+          "name": "filtro identifica exatamente um projeto sintético próprio",
+          "pass": true
+        },
+        {
+          "name": "identidade do projeto selecionado confere com fixture criada",
+          "pass": true
+        },
+        {
+          "name": "nenhum projeto estava previamente selecionado",
+          "pass": true
+        },
+        {
+          "name": "confirmação contém somente o projeto fictício",
+          "pass": true
+        },
+        {
+          "name": "limpeza normal exclui um único projeto próprio e documentos fictícios",
+          "pass": true
+        },
+        {
+          "name": "nova leitura não encontra o projeto fictício excluído",
+          "pass": true
+        }
+      ]
+    }
+  },
+  "safety": {
+    "existingBusinessRecordsChanged": false,
+    "productionChanged": false,
+    "schemaOrBusinessConfigurationOrPermissionsChanged": false,
+    "directActionOrDatabaseCallsUsed": false,
+    "uncontrolledBulkSelectionUsed": false,
+    "allCreatedFixturesRemoved": true,
+    "privateArtifactsExcludedFromRepository": true
+  },
+  "method": {
+    "independentRead": "Novos contextos autenticados sem rascunho local da execução anterior",
+    "transportFailure": "Abort controlado somente do POST de salvamento da própria fixture; leituras continuaram permitidas",
+    "recovery": "Notas após recarga; Blueprint após desmontar/remontar o editor",
+    "cleanup": "Rotina normal de interface. Cada alvo foi conferido; projeto único selecionado e confirmado com senha mantida somente em memória."
+  },
+  "automationNotes": [
+    "Percursos retomados nos mesmos registros; não houve repetição da criação após timeout.",
+    "Foram corrigidas esperas de tutorial/iframe e ambiguidades de locators por DOM inativo/toasts duplicados.",
+    "O detector de rascunho Blueprint foi alinhado ao nome real da chave local antes da verificação final; a tentativa anterior não foi declarada PASS.",
+    "Tentativas interrompidas e rastreio detalhado permanecem privados. As verificações abaixo consolidam apenas observações positivas realmente concluídas."
+  ],
+  "limits": [
+    "Não foi executado percurso de navegador com usuário comum; autorização e negação desses perfis permanecem verificadas nas regressões.",
+    "UI não substitui os testes de concorrência, CAS, idempotência e rollback em SQLite temporário.",
+    "Nenhuma conclusão de homologação de produção ou de todos os campos possíveis decorre destes percursos."
+  ]
+}

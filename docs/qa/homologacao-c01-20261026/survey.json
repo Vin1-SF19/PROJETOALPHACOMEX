@@ -1,0 +1,54 @@
+{
+  "environment": "staging",
+  "sha": "fb0e8546d75e95f96e780f2049b43d75f6466e15",
+  "readOnly": true,
+  "stages": [
+    {
+      "pipeline": "Revisão de Radar",
+      "stage": "Sem viabilidade",
+      "visible": true,
+      "total": 0,
+      "renderedCards": 0,
+      "fakePrefixMatches": 0,
+      "screenshot": "/tmp/alpha-salvamento-stage-20261026/c01-ui/radar-sem-viabilidade.png"
+    },
+    {
+      "pipeline": "Financeiro",
+      "stage": "Stand By",
+      "visible": true,
+      "total": 0,
+      "renderedCards": 0,
+      "fakePrefixMatches": 0,
+      "screenshot": "/tmp/alpha-salvamento-stage-20261026/c01-ui/financeiro-stand-by.png"
+    },
+    {
+      "pipeline": "Financeiro",
+      "stage": "Cancelado",
+      "visible": true,
+      "total": 0,
+      "renderedCards": 0,
+      "fakePrefixMatches": 0,
+      "screenshot": "/tmp/alpha-salvamento-stage-20261026/c01-ui/financeiro-cancelado.png"
+    },
+    {
+      "pipeline": "Financeiro",
+      "stage": "Processos 2x1",
+      "visible": true,
+      "total": 0,
+      "renderedCards": 0,
+      "fakePrefixMatches": 0,
+      "screenshot": "/tmp/alpha-salvamento-stage-20261026/c01-ui/financeiro-processos-2x1.png"
+    },
+    {
+      "pipeline": "Operacional",
+      "stage": "Cliente cancelado",
+      "visible": true,
+      "total": 0,
+      "renderedCards": 0,
+      "fakePrefixMatches": 0,
+      "screenshot": "/tmp/alpha-salvamento-stage-20261026/c01-ui/operacional-cliente-cancelado.png"
+    }
+  ],
+  "scope": "Somente leitura de colunas na UI autenticada; zero CRUD/transições; não comprova salvamento UI.",
+  "uiSaveStatus": "BLOCKED_NO_FIXTURE"
+}

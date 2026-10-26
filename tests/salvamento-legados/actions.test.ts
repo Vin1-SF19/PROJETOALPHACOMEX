@@ -66,6 +66,15 @@ describe("autorização e resultado de tarefas",()=>{
     m.query.mockResolvedValue([]);await BuscarTarefasPorUsuario("2","Admin");expect(m.query.mock.calls[0][1]).toBe(2);
     m.query.mockClear();await BuscarTarefasPorUsuario("2 OR 1=1","Admin");expect(m.query).not.toHaveBeenCalled();
   });
+  it.each([0, 1])("normaliza flags numéricas do adaptador Turso antes de preencher a edição (%s)", async flag => {
+    m.query.mockResolvedValue([{ id: "task-1", texto: "Tarefa existente", descricao: "Antes", fixa: flag, feita: flag,
+      prioridade: "media", diaSemana: null, intervaloDias: null, horario: null, dataInicio: null, createdAt: "2030-01-15", concluidaEm: null, userId: 2 }]);
+    const [loaded] = await BuscarTarefasPorUsuario("2", "");
+    expect(await EditarTarefa(loaded.id, { texto: loaded.texto, descricao: "Depois", fixa: loaded.fixa, prioridade: loaded.prioridade }))
+      .toMatchObject({ success: true });
+    expect(loaded).toMatchObject({ fixa: flag === 1, feita: flag === 1 });
+    expect(m.taskUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ fixa: flag === 1, descricao: "Depois" }) }));
+  });
   it("papel da sessão não concede acesso de gestor",async()=>{
     m.auth.mockResolvedValue({user:{id:"1",role:"Admin"}});m.permissions.mockResolvedValue([]);
     expect((await CriarTarefa(task)).success).toBe(false);expect(m.taskCreate).not.toHaveBeenCalled();

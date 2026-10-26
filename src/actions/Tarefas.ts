@@ -11,6 +11,9 @@ type TarefaBusca = Pick<Tarefa,
   "diaSemana" | "intervaloDias" | "horario" | "userId"
 > & { dataInicio: string | null; createdAt: string; concluidaEm: string | null };
 
+// $queryRaw não aplica a conversão de Boolean do modelo de forma uniforme entre SQLite e Turso.
+type TarefaBuscaSql = Omit<TarefaBusca, "feita" | "fixa"> & { feita: number | bigint; fixa: number | bigint };
+
 const idSchema = z.string().trim().min(1).max(200);
 const payloadSchema = z.object({
   texto: z.string().trim().min(1, "Informe o texto da tarefa.").max(2000),
@@ -79,12 +82,12 @@ export async function BuscarTarefasPorUsuario(userId: string, role: string) {
     const id = z.coerce.number().int().positive().parse(userId);
     await taskAccess(id);
     // Datas históricas são lidas como texto para não depender da codificação legada do SQLite.
-    const rows = await db.$queryRaw<TarefaBusca[]>`
-      SELECT id, texto, descricao, feita, fixa, prioridade, "diaSemana", "intervaloDias", horario,
+    const rows = await db.$queryRaw<TarefaBuscaSql[]>`
+      SELECT id, texto, descricao, CAST("feita" AS INTEGER) AS "feita", CAST("fixa" AS INTEGER) AS "fixa", prioridade, "diaSemana", "intervaloDias", horario,
         CAST("dataInicio" AS TEXT) AS "dataInicio", "userId", CAST("createdAt" AS TEXT) AS "createdAt", CAST("concluidaEm" AS TEXT) AS "concluidaEm"
       FROM "Tarefa" WHERE "userId" = ${id} AND LOWER(COALESCE("descricao", '')) NOT LIKE '%equipe%'
       ORDER BY "feita" ASC, "horario" ASC`;
-    return Array.isArray(rows) ? rows : [];
+    return Array.isArray(rows) ? rows.map((row): TarefaBusca => ({ ...row, feita: Number(row.feita) === 1, fixa: Number(row.fixa) === 1 })) : [];
   } catch (error) { console.error("[BuscarTarefasPorUsuario]", error); return []; }
 }
 

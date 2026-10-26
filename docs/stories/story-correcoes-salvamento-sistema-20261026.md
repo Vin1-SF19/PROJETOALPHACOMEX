@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — correções integradas à base staging vigente; quatro gates aprovados. Publicação e homologação autenticada de staging pendentes.
+Ready for Review — primeira versão homologada nos percursos disponíveis; correção adicional de flags de Tarefas com quatro gates aprovados. Novo deploy e reteste da mesma tarefa pendentes.
 
 ## Executor Assignment
 
@@ -177,7 +177,16 @@ Relatório de tratamento por achado: [correções de salvamento](../reports/corr
 - `docs/qa/evidencias/auditoria-salvamento-20261026/suite-geral.log.gz`
 - `docs/qa/evidencias/auditoria-salvamento-20261026/typecheck.log.gz`
 - `docs/qa/evidencias/auditoria-salvamento-20261026/vitest.config.ts`
+- `docs/qa/evidencias/correcoes-salvamento-20261026/gates-pos-homologacao-tarefas.json`
 - `docs/qa/evidencias/correcoes-salvamento-20261026/gates.json`
+- `docs/qa/homologacao-c01-20261026/survey.json`
+- `docs/qa/homologacao-c01-salvamento-staging-20261026.md`
+- `docs/qa/homologacao-crm-salvamento-20261026/result.json`
+- `docs/qa/homologacao-crm-salvamento-staging-20261026.md`
+- `docs/qa/homologacao-notas-blueprint-20261026/result.json`
+- `docs/qa/homologacao-notas-blueprint-salvamento-staging-20261026.md`
+- `docs/qa/homologacao-reservas-20261026/result.json`
+- `docs/qa/homologacao-reservas-salvamento-staging-20261026.md`
 - `docs/reports/auditoria-salvamento-sistema-2026-10-26.html`
 - `docs/reports/auditoria-salvamento-sistema-2026-10-26.md`
 - `docs/reports/correcoes-salvamento-sistema-2026-10-26.md`
@@ -258,7 +267,7 @@ Relatório de tratamento por achado: [correções de salvamento](../reports/corr
 
 ### Revisão independente do candidato — Quinn, 26/10/2026
 
-**APPROVED — código e gates para publicação em staging.** A revisão do candidato sobre `b115dd3802485e9b0a049f2a45a5010db77338b5` fechou os achados reproduzidos e confirmou os quatro gates abaixo. A aprovação é limitada ao pacote de código e à publicação autorizada em staging; a homologação autenticada do novo release continua pendente e a story ainda não comprova essa etapa. Produção permanece fora do escopo.
+**APPROVED — código e quatro gates da correção de Tarefas para publicação em staging.** O delta posterior ao release `fb0e8546d75e95f96e780f2049b43d75f6466e15` foi revisado e passou integralmente nos gates abaixo. O P1 detectado na UI permanece aberto até READY/alias e reteste da mesma tarefa no novo release; esta aprovação pré-publicação não substitui essa confirmação. Produção permanece fora do escopo.
 
 - **P1 — CRM, isolamento entre instâncias — corrigido:** `persistDrafts`/`setDraft` regravava o mapa local inteiro na chave do usuário. Reproduzido com dois providers da mesma conta: A mantém um envio antigo, B grava um rascunho novo na mesma chave, a confirmação de A removia também o rascunho de B. Evidência inicial: `/tmp/alpha-qa-cross-provider-repro.log`. Executor adicionou token por edição, merge por chave, remoção por ownership e modo `sync` para confirmações/metadados. Regressão permanente em `tests/bpm/rascunhos-crm-abas-react.test.ts`; revisão independente com dois outros arquivos de CRM: **3 arquivos/27 casos aprovados**, `/tmp/alpha-qa-s07-independent.log`. Correção verificada também no provider integrado do candidato.
 - **P1 — Blueprint, resposta antiga regravava rascunho de outra instância:** corrigido pelo executor com token por edição e comparação de token/revisão/conteúdo/identidade/base antes de regravar metadados ou remover a cópia local. Regressões incluem A → A2 → B, sucesso de A e conflito de A2, além de colisões de conteúdo/revisão com token ou versão distintos. Correção revisada na raiz e confirmada no código e nos testes do candidato integrado.
@@ -270,24 +279,65 @@ Relatório de tratamento por achado: [correções de salvamento](../reports/corr
 - No candidato integrado, a QA executou ainda **8 arquivos/66 casos aprovados** de Notas, Blueprint e CRM, `/tmp/alpha-qa-candidate-focused.log`. C01 foi refinado depois dessa rodada para usar fallback somente quando não há formulário nem composição canônica; revisão do diff confirmou preservação de configurações existentes, inclusive ocultas, e neutralização da obrigatoriedade condicional apenas no fallback. Os gates finais abaixo incorporam esse último delta C01.
 - **P2 — Reservas, autoria por nome — mitigação conservadora verificada:** candidato adicionou `requireReservationOwner` em edição, exclusão e conclusão. Para não administradores, `usuarios.count({ where: { nome: actor.nome } })` deve retornar exatamente 1 antes de qualquer escrita; zero/homônimos retornam falha e orientação ao administrador. Administrador mantém autorização explícita e criação não recebe restrição indevida. QA revisou o delta e executou `tests/salvamento-legados/actions.test.ts`: **21 casos aprovados**, `/tmp/alpha-qa-reservas-owner-independent.log`; inclui contagens 0/2 em todos os três caminhos e ausência de chamadas de escrita, além de Admin/criação. O relatório declara a limitação remanescente de renomeação/reutilização histórica: o modelo continua sem FK, portanto a mitigação não fornece identidade durável de autoria. Não houve migration.
 - **Dependências — débito preexistente, separado das regressões desta entrega:** o `npm audit` do candidato registrou 114 achados (10 critical, 45 high, 58 moderate, 1 low), evidência `/tmp/alpha-salvamento-stage-20261026/npm-audit.json`. A QA conferiu igualdade byte a byte de `package.json` e `package-lock.json` com a base remota inicial `aca95ddb402da03a5d58b7833a04bd99b018e537` e com a final `b115dd3802485e9b0a049f2a45a5010db77338b5`: nenhum delta no manifesto/lock da entrega. Os achados pertencem ao grafo já existente e não foram introduzidos por atualização de dependências desta correção. Isso não elimina o débito nem aprova sua segurança/explorabilidade; tratamento deve ter escopo e validação próprios. O gate desta story continua condicionado aos resultados finais de código/UI.
-- CodeRabbit indisponível no ambiente; revisão manual e regressões executadas como alternativa prevista. Os quatro gates finais passaram; a homologação autenticada do release em staging continua obrigatória. Não há aprovação de produção.
+- CodeRabbit indisponível no ambiente; revisão manual e regressões executadas como alternativa prevista. Os quatro gates finais passaram; os resultados autenticados de staging estão sendo consolidados por módulo abaixo. Não há aprovação de produção.
 
 - **Escopo e evidências:** manifesto final contém **89 caminhos**, todos com SHA-256 conferido; a File List da story coincide exatamente. Varredura dos caminhos e padrões de credenciais não encontrou arquivos de ambiente, backups, dumps, chaves privadas, sessões de navegador, JWTs ou atribuições de tokens no pacote. Isso é uma verificação delimitada do artefato, não uma garantia de ausência universal de segredos. As duas reproduções históricas arquivadas como `.test.ts.txt` foram comparadas byte a byte com os originais da raiz: conteúdo preservado, sem relaxar asserts ou `tsconfig`.
 
 - **Suíte completa final:** `npm test -- --maxWorkers=1 --testTimeout=15000`, com coverage V8, sobre a base final `b115dd3802485e9b0a049f2a45a5010db77338b5`: **795 arquivos/6.631 casos aprovados; 4 skipped e 1 todo**, duração 374,71 s; statements 70,93%, branches 64,53%, functions 78,48%, lines 74,47%. Evidência `/tmp/alpha-salvamento-stage-20261026/final-test-budgeted.log`. O watchdog padrão de 5 s falhou antes no caso remoto de validação de reader, que restaura/verifica quatro backups SQLite sequencialmente; isolado com o padrão de 5 s passou em 974 ms (`hashreader-isolated-default.log`). O orçamento CLI de 15 s é ajuste de infraestrutura do runner, mantendo hooks de 30 s, asserts, fontes/configuração dos testes e deadlines do produto. A rodada anterior também falhou com `ENOSPC` e continua registrada como falha de infraestrutura (`final-test-current-staging.log`); ela não é apresentada como PASS. Os dois mocks de reunião foram completados com os métodos novos do contexto, sem relaxar expectativas.
 
-### Gate pré-publicação — candidato final b115
+### Gate pré-publicação — release inicial sobre b115
 
 | Gate | Comando/ambiente | Resultado final | Evidência |
 | --- | --- | --- | --- |
-| Lint | `npm run lint` | Exit 0; 0 erros, 1.172 avisos preexistentes | `/tmp/alpha-salvamento-stage-20261026/final-lint-current-staging.log` |
+| Lint | `npm run lint` | Exit 0; 0 erros, 1.172 avisos registrados | `/tmp/alpha-salvamento-stage-20261026/final-lint-current-staging.log` |
 | Typecheck | `npm run typecheck`, depois do build e restauração dos arquivos gerados | Exit 0 | `/tmp/alpha-salvamento-stage-20261026/final-typecheck-current-staging.log` |
 | Suíte completa | `npm test -- --maxWorkers=1 --testTimeout=15000`, coverage V8, fixtures locais sem credenciais remotas | Exit 0; 795 arquivos, 6.631 aprovados, 4 skipped, 1 todo | `/tmp/alpha-salvamento-stage-20261026/final-test-budgeted.log` |
 | Build | `node build-staging.mjs` executando `npm run build`, somente ambiente staging conferido | Exit 0; 86 páginas | `/tmp/alpha-salvamento-stage-20261026/build.log`, `build-status.json` |
 
 A primeira tentativa de build falhou no prerender de `_global-error` por duas resoluções de Next/React no diretório externo de saída. DevOps corrigiu o contêiner de saída para resolver a mesma árvore isolada e repetiu o build; não houve alteração de fonte/configuração para ocultar a falha. A tentativa com exit 1 permanece em `build-first-external.log`/`build-first-external-status.json`. QA conferiu o resultado final e confirmou diff vazio em `tsconfig.json`, `next-env.d.ts`, `package.json`, `package-lock.json` e `prisma/schema.prisma`. Manifesto final: 89 caminhos, sem alteração de hashes do runtime após os gates; somente esta seção documental muda para registrar o gate.
 
-O percurso de navegador está preparado para a conta fictícia Admin, apenas com dados próprios `QA-SALVAMENTO-NOTAS`, `QA-SALVAMENTO-BLUEPRINT` e fixtures CRM/legadas coordenadas pelo DevOps. Será executado depois de READY do novo commit. Não há fixture comum autorizada disponível para esse percurso: autorização/negação de usuário comum foi coberta nas regressões, e não será declarada homologação de UI desse perfil nem alteradas permissões para fabricá-la.
+O percurso de navegador de Notas/Blueprint foi executado pela conta fictícia Admin, apenas com dados próprios de teste; fixtures CRM/legadas são coordenadas pelos outros executores. A execução começou somente após READY e alias do novo commit conferidos. Não há fixture comum autorizada disponível para esse percurso: autorização/negação de usuário comum foi coberta nas regressões, e não será declarada homologação de UI desse perfil nem alteradas permissões para fabricá-la.
+
+### Homologação autenticada — Notas e Blueprint
+
+Release exercitado: `fb0e8546d75e95f96e780f2049b43d75f6466e15`, deployment `dpl_BCXiMgDkxmJ7Sda528NqvEH3e7ek`, alias `https://staging.alpha-comex.com`. Chromium com login normal da conta fictícia Admin, menu e iframes oficiais; sem forging de sessão, chamadas diretas de actions/API ou banco.
+
+**PASS — 13 verificações funcionais e 2 percursos de limpeza.** Notas: criar/salvar, editar e reler em contexto novo sem rascunho, abortar somente o POST de salvamento próprio e preservar texto/cópia local, recarregar e recuperar, retentar e limpar o rascunho confirmado, reler o texto recuperado e renomear pela aba global preservando o conteúdo em nova leitura. Blueprint: criar projeto/documento, reler em contexto novo, preservar texto/rascunho após abort do próprio POST, desmontar/remontar e recuperar, retentar/limpar e confirmar o texto recuperado por outra leitura sem rascunho local.
+
+A nota fictícia foi movida à lixeira e excluída individualmente; a nova leitura não a encontrou. O projeto fictício foi aberto para conferir sua identidade, voltou ao filtro com exatamente um card visível, começou sem seleção e confirmou somente esse alvo; a senha normal da conta foi preenchida apenas em memória. A exclusão e uma nova leitura confirmaram a remoção do projeto/documentos próprios. Nenhum registro preexistente, seleção global, permissão, estrutura ou configuração de negócio foi alterado. Não restaram fixtures de Notas/Blueprint criadas por esta QA.
+
+As execuções retomaram os mesmos registros após fricções de tutorial, iframe e locators com DOM inativo/toasts duplicados; não houve repetição cega de criação. O detector de chave de rascunho Blueprint foi corrigido no harness e o cenário foi repetido no mesmo projeto; a tentativa interrompida não foi declarada PASS. Sem falha de salvamento confirmada nesses percursos. IDs, títulos de fixtures, credenciais, cookies e screenshots permanecem privados fora do Git.
+
+Evidência pública sanitizada: [homologação de Notas/Blueprint](../qa/homologacao-notas-blueprint-salvamento-staging-20261026.md) e [checks curados](../qa/homologacao-notas-blueprint-20261026/result.json). Não foi executado percurso de navegador com perfil comum; autorização/negação desse perfil continua coberta por regressões, sem alegar homologação de UI. Concorrência/CAS/rollback permanecem sustentados pelos testes isolados/SQLite e não por estes percursos únicos.
+
+### Homologação autenticada — CRM
+
+**PASS nos cenários exercitados no mesmo release `fb0e8546...`.** Foram concluídos seis checks: criação normal de um novo card em Novo Lead vinculado a empresa fictícia interna, com responsável da própria sessão; anotação pendente preservada ao fechar/reabrir sem envio; salvamento de exatamente uma interação e limpeza do texto confirmado; leitura em novo contexto pela aba Histórico e SELECT independente confirmando a interação única; arquivamento individual do próprio card pela UI; preservação dos campos de controle dos três cards preexistentes da empresa fictícia.
+
+A criação não foi repetida após interrupções do harness: o mesmo card foi retomado. O autocomplete foi localizado pelo nome exibido e a leitura do histórico exigiu selecionar sua aba. Não houve consulta externa de CNPJ, uso de Financeiro/Operacional, transição, campo/template/permissão nova nem escrita direta de action/API/banco. O cleanup normal de card é arquivamento; seu status foi confirmado e o rastreio do próprio card/anotação arquivados permanece privado.
+
+Não apareceu input de observação de procedimentos aplicável à fixture: **S05 não homologado por UI neste card**, mantendo a evidência das regressões, sem fabricar template. Evidências públicas sanitizadas: [homologação CRM](../qa/homologacao-crm-salvamento-staging-20261026.md) e [checks curados](../qa/homologacao-crm-salvamento-20261026/result.json). Browser e escritor foram encerrados antes da nova rodada de gates de Tarefas.
+
+### P1 adicional de homologação — booleanos de Tarefas
+
+A UI real criou/leu a tarefa fictícia, mas sua edição permaneceu aberta sem persistir a descrição. O adaptador da consulta raw devolvia `fixa`/`feita` como 0/1 e o formulário repassava esse valor ao contrato estrito `z.boolean()`, impedindo salvar tarefas carregadas. **Regressão da entrega, não dívida de dependências nem simples erro de automação.** A hipótese de data foi descartada: a própria fixture possui ISO válido.
+
+Correção revisada: `BuscarTarefasPorUsuario` faz `CAST(... AS INTEGER)` das duas flags e normaliza a resposta com `Number(valor) === 1`. A validação estrita, parâmetros SQL e autorização permanecem. O único arquivo de runtime alterado depois do release inicial é `src/actions/Tarefas.ts`. Os testes novos reproduziram duas falhas antes (`/tmp/alpha-tarefas-adapter-before.log`) e, depois, **3 arquivos/30 casos passaram** (`/tmp/alpha-tarefas-roundtrip-after.log`). A regressão em SQLite real percorre criar → consultar → editar → concluir, com `fixa` false/true e frequência/horário preenchidos no caso recorrente.
+
+**Pendente para fechar P1:** novo READY/alias de staging e edição/releitura da mesma tarefa fictícia pela UI. Os quatro gates do delta congelado passaram, conforme o gate abaixo. Nenhuma alteração estrutural de banco foi necessária. O achado não está fechado apenas por teste focado ou revisão estática.
+
+### Gate pré-publicação — correção posterior de Tarefas
+
+**APPROVED para publicar o fix em staging**, com o reteste UI ainda pendente. QA conferiu o diff: o único runtime posterior ao release inicial é `src/actions/Tarefas.ts`; os outros dois arquivos são regressões. Nenhuma alteração de schema, dependências, `tsconfig.json` ou `next-env.d.ts` acompanha a correção. Os hashes dos três arquivos congelados estão em `post-ui-fix-gates-status.json`.
+
+| Gate | Comando | Resultado | Evidência |
+| --- | --- | --- | --- |
+| Lint final | `npm run lint` | Exit 0, 0 erros, 1.172 avisos | `post-ui-fix-final-lint.log` |
+| Typecheck final depois do build | `npm run typecheck` | Exit 0 | `post-ui-fix-final-typecheck.log` |
+| Suíte completa | `npm test -- --maxWorkers=1 --testTimeout=15000` | Exit 0; 795 arquivos, **6.635 aprovados**, 4 skipped, 1 todo; 336,84 s | `post-ui-fix-test.log` |
+| Build staging | `npm run build` via loader de staging conferido | Exit 0, 86 páginas; configuração gerada restaurada | `post-ui-fix-build.log`, `post-ui-fix-build-status.json` |
+
+Os logs acima ficam em `/tmp/alpha-salvamento-stage-20261026/`. O orçamento de infraestrutura do runner e as falhas ambientais anteriores continuam documentados; não houve relaxamento de assert/configuração para aprovar a correção. A revisão considera o fix de baixo alcance: transforma o resultado raw da consulta no contrato Boolean já esperado pelos componentes e pelo validador estrito. Não foram encontrados novos bloqueadores de código nesse delta.
 
 ## Change Log
 

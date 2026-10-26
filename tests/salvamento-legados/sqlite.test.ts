@@ -23,6 +23,7 @@ vi.mock("@/lib/prisma",()=>({default:new Proxy({}, {get:(_target,key)=>{
 
 import { agendarSala, editarReserva, buscarReservasAtivas } from "@/actions/Reservas";
 import { salvarAlteracoesCliente } from "@/actions/Clientes";
+import { AlternarStatusTarefa, BuscarTarefasPorUsuario, CriarTarefa, EditarTarefa } from "@/actions/Tarefas";
 const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite") as {DatabaseSync:new(path:string)=>{exec(sql:string):void;close():void}};
 let ddl:string;
 let directory:string;
@@ -72,4 +73,33 @@ it("duas edições concorrentes não movem reservas distintas para o mesmo inter
   const patch={sala:"Sala fictícia",data:"2026-11-02",inicio:"10:00",fim:"11:00"};
   const results=await Promise.all([editarReserva(first.id,patch),editarReserva(second.id,patch)]);
   expect(results.filter(r=>r.success)).toHaveLength(1);expect(await m.client!.reservas.count({where:{inicio:new Date("2026-11-02T13:00:00Z")}})).toBe(1);
+});
+
+it.each([false, true])("tarefa fixa=%s percorre criação, leitura SQLite, edição e conclusão com booleanos do contrato", async fixa => {
+  const created = await CriarTarefa({
+    texto: "Tarefa de ida e volta", descricao: "Descrição inicial", userId: 1,
+    fixa, diaSemana: fixa ? 2 : null, intervaloDias: fixa ? 7 : null, horario: fixa ? "09:30" : null,
+    prioridade: "media", dataInicio: new Date("2030-01-15T12:00:00Z"),
+  });
+  expect(created).toMatchObject({ success: true });
+  if (!created.success) throw new Error("Criação da fixture falhou");
+  const [loaded] = await BuscarTarefasPorUsuario("1", "");
+  expect(loaded.id).toBe(created.id);
+  // A interface preenche o formulário de edição com os valores retornados pela leitura.
+  const result = await EditarTarefa(loaded.id, {
+    texto: loaded.texto, descricao: "Descrição editada e confirmada", fixa: loaded.fixa,
+    prioridade: loaded.prioridade, horario: loaded.horario, intervaloDias: loaded.intervaloDias,
+    diasSemana: loaded.diaSemana === null ? [] : [loaded.diaSemana],
+    dataInicio: loaded.dataInicio ? new Date(loaded.dataInicio) : undefined,
+  });
+  expect(result).toMatchObject({ success: true });
+  expect(loaded).toMatchObject({ fixa, feita: false, diaSemana: fixa ? 2 : null, intervaloDias: fixa ? 7 : null, horario: fixa ? "09:30" : null });
+  expect(typeof loaded.fixa).toBe("boolean");
+  expect(typeof loaded.feita).toBe("boolean");
+  expect(await m.client!.tarefa.findUnique({ where: { id: created.id }, select: { descricao: true, fixa: true, feita: true } }))
+    .toEqual({ descricao: "Descrição editada e confirmada", fixa, feita: false });
+  expect(await AlternarStatusTarefa(created.id, true)).toMatchObject({ success: true });
+  const [completed] = await BuscarTarefasPorUsuario("1", "");
+  expect(completed).toMatchObject({ fixa, feita: true });
+  expect(typeof completed.feita).toBe("boolean");
 });

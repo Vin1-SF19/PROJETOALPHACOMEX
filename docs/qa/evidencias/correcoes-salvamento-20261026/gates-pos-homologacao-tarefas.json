@@ -1,0 +1,66 @@
+{
+  "at": "2026-10-26T18:58:50.742284+00:00",
+  "phase": "Correction after authenticated Task edit failure",
+  "testedParent": "fb0e8546d75e95f96e780f2049b43d75f6466e15",
+  "environment": "staging",
+  "origin": "https://staging.alpha-comex.com",
+  "databaseFingerprint": "7fdd160737ba",
+  "runtimePatchSha256": "fab6215370d5a644e235acdb10dde5e4797875ad537eff93ba195231208582e0",
+  "changedRuntimeAndTests": {
+    "src/actions/Tarefas.ts": "07acc969be17734ab4d7d6e53df4cc2fa0503a1801aa9d56d55d092405f8e39f",
+    "tests/salvamento-legados/actions.test.ts": "4aa8c0d80b2fae761652ba6870bb4f7c4add92fa4b7bbf11e6601fdfa9e4193f",
+    "tests/salvamento-legados/sqlite.test.ts": "d97f7c306b0ac8dfbcc473283735ef41cb6f7cbddefea2520f7d6da0b64b42ba"
+  },
+  "issue": "Turso raw-query flags could arrive as numeric 0/1; the editor forwarded them to a strict boolean contract and the normal edit was refused. Reads now CAST the flags to INTEGER and return explicit booleans. Validation and authorization remain strict.",
+  "regression": {
+    "before": "2 adapter cases reproduced the failure",
+    "after": {
+      "files": 3,
+      "passed": 30,
+      "includes": "Real disposable SQLite create/read/edit/complete roundtrip for false and true, including weekday/interval/time fields."
+    }
+  },
+  "gates": {
+    "lint": {
+      "command": "npm run lint",
+      "exit": 0,
+      "errors": 0,
+      "warnings": 1172
+    },
+    "test": {
+      "command": "npm test -- --maxWorkers=1 --testTimeout=15000",
+      "exit": 0,
+      "files": 795,
+      "passed": 6635,
+      "skipped": 4,
+      "todo": 1,
+      "durationSeconds": 336.84
+    },
+    "build": {
+      "command": "npm run build through verified staging loader",
+      "exit": 0,
+      "pages": 86,
+      "generatedConfigurationRestored": true
+    },
+    "typecheck": {
+      "command": "npm run typecheck",
+      "exit": 0,
+      "run": "after build and final fixture refinement"
+    }
+  },
+  "review": "Code and gates approved for staging publication; authenticated retest of the same Task fixture pending new READY.",
+  "unchanged": {
+    "schema": true,
+    "dependencyManifestAndLock": true,
+    "environmentConfiguration": true,
+    "allOtherRuntimeModules": true,
+    "production": true
+  },
+  "logsSha256": {
+    "post-ui-fix-final-lint.log": "77164e0f73e5575811cdf7b23151f252dd53ef8613656215e6662665f29ed3fd",
+    "post-ui-fix-test.log": "2470fa4bace978434746ae2b8b53dd6ad7b1e47c1c30ed14cf28bcd53ae36492",
+    "post-ui-fix-build.log": "e9a0ecc220fccbd739366d3f3de7c695d46ddde268d13ce01ba7e1ed1c38e965",
+    "post-ui-fix-final-typecheck.log": "7412387dd2026ca5a87bc3b44ef93640c4d058883d004c507cb43e13c63a7c5c"
+  },
+  "publication": "Pending new code commit and staging READY; no claim of Task UI PASS before retest."
+}

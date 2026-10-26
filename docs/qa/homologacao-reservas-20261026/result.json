@@ -1,0 +1,85 @@
+{
+  "environment": "staging",
+  "sha": "fb0e8546d75e95f96e780f2049b43d75f6466e15",
+  "marker": "QA-SALVAMENTO-RESERVAS-20261026-1793037286385",
+  "steps": [
+    {
+      "name": "data-futura-selecionada",
+      "status": "PASS",
+      "date": "2030-01-15"
+    },
+    {
+      "name": "fim-igual-inicio",
+      "status": "PASS",
+      "postRequests": 0,
+      "created": false
+    },
+    {
+      "name": "criar-reserva-ficticia",
+      "status": "PASS",
+      "room": "Sala Xangai",
+      "date": "2030-01-15",
+      "start": "09:00",
+      "end": "10:00",
+      "tipo": "Equipe",
+      "paoDeQueijo": false
+    },
+    {
+      "name": "releitura-criacao-outro-contexto",
+      "status": "PASS"
+    },
+    {
+      "name": "editar-dia-horario-sala",
+      "status": "PASS",
+      "date": "2030-01-16",
+      "room": "Sala Los Angeles",
+      "start": "11:00",
+      "end": "12:00"
+    },
+    {
+      "name": "releitura-edicao-outro-contexto",
+      "status": "PASS"
+    },
+    {
+      "name": "sobreposicao-recusada",
+      "status": "PASS",
+      "draftPreserved": true
+    },
+    {
+      "name": "concluir-pela-ui",
+      "status": "BLOCKED_NO_UI_AFFORDANCE"
+    },
+    {
+      "name": "cancelar-propria-reserva",
+      "status": "PASS"
+    },
+    {
+      "name": "releitura-limpeza-outro-contexto",
+      "status": "PASS",
+      "remainingOwnRowsVisible": 0
+    },
+    {
+      "name": "fim-anterior-inicio",
+      "status": "PASS",
+      "postRequests": 0,
+      "created": false
+    }
+  ],
+  "created": true,
+  "cleaned": true,
+  "dates": [
+    "2030-01-15",
+    "2030-01-16"
+  ],
+  "screenshots": [
+    "/tmp/alpha-salvamento-stage-20261026/reservas-ui/01-intervalo-invalido.png",
+    "/tmp/alpha-salvamento-stage-20261026/reservas-ui/02-criacao.png",
+    "/tmp/alpha-salvamento-stage-20261026/reservas-ui/03-edicao.png",
+    "/tmp/alpha-salvamento-stage-20261026/reservas-ui/04-sobreposicao-formulario-preservado.png",
+    "/tmp/alpha-salvamento-stage-20261026/reservas-ui/05-fim-anterior-validacao.png"
+  ],
+  "uiConcluirButtonCount": 0,
+  "scope": "UI autenticada normal; apenas reserva fictícia própria; sem payload de action injetado, sessão forjada ou leitura de banco real.",
+  "overall": "PASS_EXPOSED_UI_FLOWS_WITH_CONCLUIR_LIMIT",
+  "concluirLimit": "Nenhum botão Concluir/Liberar disponível no módulo ReservaSalas ou no modal Gerenciar Reserva; função não invocada fora da UI."
+}
