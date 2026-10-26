@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ClipboardCheck, Loader2, X } from "lucide-react";
 import { BuscarEmpresaPorCnpjBpm, BuscarEmpresasBpm, ListarUsuariosResponsavelBpm } from "@/actions/bpm/Cards";
 import { ConsultarDadosCnpjNovoLeadBpm } from "@/actions/bpm/CardsConsultas";
+import { LerAtribuicaoClosersBpm } from "@/actions/bpm/AtribuicaoClosers";
 import { cnpjEhValido, formatCNPJ, formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";
 import { SeletorCanalOrigemLead } from "./SeletorCanalOrigemLead";
 import { extrairPayloadOrigem } from "@/lib/bpm/origem-cliente";
@@ -77,6 +78,8 @@ export default function NovoCardModal({
   const [dropdownAberto, setDropdownAberto] = useState(false);
   const [usuarios, setUsuarios] = useState<UsuarioOpcao[]>([]);
   const [responsavelId, setResponsavelId] = useState<number | null>(currentUserId);
+  const [distribuicaoAutomaticaAtiva, setDistribuicaoAutomaticaAtiva] = useState(false);
+  const [closersSelecionados, setClosersSelecionados] = useState<string[]>([]);
   const [radarPretendido, setRadarPretendido] = useState("");
   const [canalOrigem, setCanalOrigem] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -110,6 +113,21 @@ export default function NovoCardModal({
         );
       }
     });
+  }, [pipelineId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void LerAtribuicaoClosersBpm(pipelineId).then((resultado) => {
+      if (cancelled || !resultado.success) return;
+      setDistribuicaoAutomaticaAtiva(resultado.data.ativa);
+      setClosersSelecionados(resultado.data.usuarios
+        .filter((usuario) => resultado.data.usuariosIds.includes(usuario.id))
+        .map((usuario) => usuario.nome));
+      if (resultado.data.ativa && resultado.data.usuariosIds[0]) {
+        setResponsavelId(resultado.data.usuariosIds[0]);
+      }
+    }).catch(() => { /* A validação server-side mantém a atribuição autoritativa. */ });
+    return () => { cancelled = true; };
   }, [pipelineId]);
 
   // Autocomplete de Razão Social → busca empresas existentes
@@ -241,8 +259,12 @@ export default function NovoCardModal({
         return;
       }
     }
-    if (!responsavelId) {
+    if (!distribuicaoAutomaticaAtiva && !responsavelId) {
       setErro("Selecione um responsável.");
+      return;
+    }
+    if (distribuicaoAutomaticaAtiva && !responsavelId && !usuarios[0]?.id) {
+      setErro("Não há closers elegíveis para receber o lead. Avise o administrador do CRM.");
       return;
     }
 
@@ -265,7 +287,7 @@ export default function NovoCardModal({
             }),
         pipelineId,
         etapaId,
-        responsavelId,
+        responsavelId: responsavelId ?? usuarios[0]?.id ?? currentUserId,
         radarPretendido: radarPretendido || undefined,
         canalOrigem: origem.camposValores.origem.trim() || undefined,
         parceiroOrigemId: origem.parceiroOrigem?.parceiroId ?? undefined,
@@ -397,12 +419,16 @@ export default function NovoCardModal({
             </div>
           </FieldRow>
 
-          <FieldRow label="Nome do responsável *" htmlFor="novo-card-responsavel">
+          {distribuicaoAutomaticaAtiva ? <div className="space-y-1">
+            <p className="text-[11px] text-slate-400">Responsável</p>
+            <p className="rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-sm text-slate-200">Atribuição automática pelo rodízio de closers</p>
+            <p className="text-[11px] text-slate-500">{closersSelecionados.length ? `Selecionados: ${closersSelecionados.join(", ")}` : "Os closers serão escolhidos conforme a configuração do pipeline."}</p>
+          </div> : <FieldRow label="Nome do responsável *" htmlFor="novo-card-responsavel">
             <select id="novo-card-responsavel" className={inputCls} value={responsavelId ?? ""} onChange={(e) => setResponsavelId(e.target.value ? Number(e.target.value) : null)}>
               <option value="">Selecione...</option>
               {usuarios.map((usuario) => <option key={usuario.id} value={usuario.id}>{usuario.nome}</option>)}
             </select>
-          </FieldRow>
+          </FieldRow>}
 
           <FieldRow label="Radar pretendido (opcional)" htmlFor="novo-card-radar">
             <select id="novo-card-radar" className={inputCls} value={radarPretendido} onChange={(e) => setRadarPretendido(e.target.value)} disabled={radarOpcoes.length === 0 || salvando}>

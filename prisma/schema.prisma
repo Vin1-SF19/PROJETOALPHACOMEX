@@ -147,6 +147,7 @@ model usuarios {
   notaWorkspace           UserNotesWorkspace? @relation("UserNotesWorkspaceUser")
 
   bpmCardsResponsavel          BpmCard[]                     @relation("BpmCardResponsavel")
+  bpmCloserAtribuicoes         BpmCloserAtribuicao[]
   bpmEventosExternosCorrigidos BpmEventoExternoCorrecao[]
   bpmCardMembros               BpmCardMembro[]
   bpmTarefas                   BpmTarefa[]
@@ -4391,6 +4392,7 @@ model BpmPipeline {
   camposAssociados   BpmCampoPipeline[]
   requisitos         BpmRequisito[]
   cardViewConfigs    BpmEtapaCardViewConfig[]
+  closerAtribuicoes  BpmCloserAtribuicao[]
 
   @@index([ativo])
   @@index([ordem])
@@ -5210,6 +5212,7 @@ model BpmCard {
 
   campoValores        BpmCardCampoValor[]
   membros             BpmCardMembro[]
+  atribuicaoCloser    BpmCloserAtribuicao?
   tarefas             BpmTarefa[]
   historico           BpmCardHistorico[]
   anexos              BpmCardAnexo[]
@@ -5874,6 +5877,29 @@ model BpmPipelineConfigAuditoria {
 
   @@index([pipelineId])
   @@index([createdAt])
+}
+
+/// Registro idempotente do rodízio de closers. Origens virtuais permanecem
+/// vinculadas ao mesmo responsável quando convertidas em BpmCard.
+model BpmCloserAtribuicao {
+  id             String   @id @default(cuid())
+  pipelineId     String
+  origemTipo     String // "CARD" | "NOLOSS" | "INSTAGRAM"
+  origemId       String
+  cardId         String?  @unique
+  responsavelId  Int?
+  onlineNaEscolha Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  pipeline   BpmPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  card       BpmCard?    @relation(fields: [cardId], references: [id], onDelete: SetNull)
+  responsavel usuarios?  @relation(fields: [responsavelId], references: [id], onDelete: SetNull)
+
+  @@unique([pipelineId, origemTipo, origemId])
+  @@index([pipelineId, responsavelId, createdAt])
+  @@index([responsavelId])
+  @@index([origemTipo, origemId])
 }
 
 // Base de Conhecimento aplicada ao processo (RM-2026-D6D970). Não duplica o

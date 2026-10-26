@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const prismaMock = vi.hoisted(() => ({
   nolossLead: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
+  bpmPipeline: { findFirst: vi.fn() },
+  $transaction: vi.fn(),
 }));
 
 vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
@@ -23,6 +25,8 @@ describe("POST /api/bpm/noloss-leads/ingest", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.NOLOSS_WEBHOOK_SECRET = "segredo-correto";
+    prismaMock.bpmPipeline.findFirst.mockResolvedValue(null);
+    prismaMock.$transaction.mockImplementation(async (callback: (tx: typeof prismaMock) => unknown) => callback(prismaMock));
   });
 
   afterEach(() => {

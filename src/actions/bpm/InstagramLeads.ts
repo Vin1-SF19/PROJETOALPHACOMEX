@@ -18,6 +18,12 @@ import { criarSlaInstancia } from "@/lib/bpm/sla";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { processarCadenciasImediatasDoCardBpm } from "@/lib/bpm/cadencias/executor";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import {
+  buscarAtribuicaoOrigemCloserBpm,
+  executarComRetryDeAtribuicao,
+  resolverAtribuicaoParaPromocaoCloserBpm,
+  vincularAtribuicaoPromovidaCloserBpm,
+} from "@/lib/bpm/atribuicao-closers-server";
 
 const schema = z.object({
   leadId: z.string().cuid(), etapaDestinoId: etapaIdCardSchema, responsavelId: z.number().int().positive(),
@@ -33,7 +39,7 @@ export async function AssumirLeadInstagram(input: unknown) {
   if (!parsed.success) return { success: false as const, error: "Dados inválidos para assumir o lead." };
   const userId = Number(session.user.id);
   try {
-    const resultado = await db.$transaction(async (tx) => {
+    const resultado = await executarComRetryDeAtribuicao(() => db.$transaction(async (tx) => {
       const endpoint = await carregarEndpointInstagram(tx);
       if (!endpoint?.pipelineId) throw new Error("Integração Instagram indisponível.");
       const pipelineId = endpoint.pipelineId;
@@ -61,7 +67,6 @@ export async function AssumirLeadInstagram(input: unknown) {
         if (!["agendar reunião", "stand by", "standby", "standby - follow up", "stand-by — follow-up semanal"].includes(destino.nome.trim().toLocaleLowerCase("pt-BR"))
           || !(await verificarTransicaoPermitidaBpm(origem.id, destino.id, "MANUAL", tx)).permitida) throw new Error("Transição de Novo Lead não permitida.");
       }
-      if (!await usuarioElegivelResponsavelBpm(pipelineId, parsed.data.responsavelId, tx)) throw new Error("Responsável inválido para este pipeline.");
       const cnpjInformado = parsed.data.cnpj ?? dados.cnpj;
       if (cnpjInformado && !cnpjEhValido(cnpjInformado)) throw new Error("Confira um CNPJ válido ou deixe o campo vazio.");
       const cnpj = cnpjInformado ? normalizarCNPJ(cnpjInformado) : null;
@@ -80,10 +85,32 @@ export async function AssumirLeadInstagram(input: unknown) {
       const campoQualificacao = campos.find((c) => c.nome === "Qualificação");
       if (parsed.data.qualificacao && !campoQualificacao) throw new Error("Configure o campo Qualificação no Novo Lead.");
 
+      const atribuicaoAtual = await buscarAtribuicaoOrigemCloserBpm({
+        pipelineId,
+        origemTipo: "INSTAGRAM",
+        origemId: entrada.id,
+        client: tx,
+      });
+      if (!atribuicaoAtual && !await usuarioElegivelResponsavelBpm(pipelineId, parsed.data.responsavelId, tx)) {
+        throw new Error("Responsável inválido para este pipeline.");
+      }
+      if (atribuicaoAtual?.responsavelId !== null && atribuicaoAtual?.responsavelId !== undefined
+        && !await usuarioElegivelResponsavelBpm(pipelineId, atribuicaoAtual.responsavelId, tx)) {
+        throw new Error("O closer atribuído não está mais elegível. Solicite revisão administrativa.");
+      }
+
       // A reserva e todos os efeitos vivem na mesma transação: rollback libera o lead.
       const reservado = await tx.bpmWebhookEntrada.updateMany({ where: { id: entrada.id, endpointId: endpoint.id,
         statusRecebimento: "AUTENTICADO", eventoId: null }, data: { statusRecebimento: "PROCESSADO" } });
       if (reservado.count !== 1) throw new Error("Este lead já foi assumido. Atualize o quadro.");
+      const atribuicao = await resolverAtribuicaoParaPromocaoCloserBpm({
+        pipelineId,
+        origemTipo: "INSTAGRAM",
+        origemId: entrada.id,
+        responsavelInformadoId: parsed.data.responsavelId,
+        client: tx,
+      });
+      const responsavelEfetivoId = atribuicao.responsavelId;
       const empresa = (cnpj ? await tx.cliente.findUnique({ where: { cnpj }, select: { id: true } }) : null)
         ?? await tx.cliente.create({ data: { cnpj, razaoSocial: dados.nome, status: "ATIVO" }, select: { id: true } });
       const pessoa = dados.telefone
@@ -92,8 +119,9 @@ export async function AssumirLeadInstagram(input: unknown) {
       await tx.pessoaClienteVinculo.upsert({ where: { pessoaId_clienteId: { pessoaId: pessoa.id, clienteId: empresa.id } },
         create: { pessoaId: pessoa.id, clienteId: empresa.id, ativo: true }, update: { ativo: true } });
       const card = await tx.bpmCard.create({ data: { empresaId: empresa.id, pipelineId, etapaId: destino.id,
-        responsavelId: parsed.data.responsavelId, servico: "Revisão de Radar", status: "ATIVO" }, select: { id: true, createdAt: true } });
-      await tx.bpmCardMembro.create({ data: { cardId: card.id, userId: parsed.data.responsavelId, role: "RESPONSAVEL" } });
+        responsavelId: responsavelEfetivoId, servico: "Revisão de Radar", status: "ATIVO" }, select: { id: true, createdAt: true } });
+      await tx.bpmCardMembro.create({ data: { cardId: card.id, userId: responsavelEfetivoId, role: "RESPONSAVEL" } });
+      await vincularAtribuicaoPromovidaCloserBpm({ atribuicaoId: atribuicao.atribuicaoId, cardId: card.id, client: tx });
       await tx.bpmCardCampoValor.create({ data: { cardId: card.id, campoId: campoRadar.id, valor: radar } });
       await tx.bpmCardCampoValor.create({ data: { cardId: card.id, campoId: campoCanal.id, valor: "Instagram" } });
       if (parsed.data.qualificacao && campoQualificacao) await tx.bpmCardCampoValor.create({ data: {
@@ -104,9 +132,9 @@ export async function AssumirLeadInstagram(input: unknown) {
       await tx.bpmInteracaoCard.create({ data: { cardId: card.id, tipo: "ANOTACAO", registradoPorId: userId,
         resumo: "Dados recebidos do Instagram", observacoes: anotacaoLeadInstagram(dados) } });
       await tx.bpmCardHistorico.create({ data: { cardId: card.id, acao: "CARD_CRIADO", usuarioId: userId,
-        valorNovoJson: JSON.stringify({ empresaId: empresa.id, pipelineId, etapaId: destino.id, responsavelId: parsed.data.responsavelId, origem: "INSTAGRAM", leadId: entrada.id }) } });
+        valorNovoJson: JSON.stringify({ empresaId: empresa.id, pipelineId, etapaId: destino.id, responsavelId: responsavelEfetivoId, origem: "INSTAGRAM", leadId: entrada.id }) } });
       const evento = await publicarEventoBpm({ tipo: "CARD_CRIADO", entidadeTipo: "CARD", entidadeId: card.id,
-        cardId: card.id, pipelineId, valorNovo: { etapaId: destino.id, responsavelId: parsed.data.responsavelId, origem: "INSTAGRAM" },
+        cardId: card.id, pipelineId, valorNovo: { etapaId: destino.id, responsavelId: responsavelEfetivoId, origem: "INSTAGRAM" },
         atorTipo: "USUARIO", atorUserId: userId, correlationId: randomUUID(), idempotencyKey: `instagram-assumido:${entrada.id}` }, tx);
       if (!evento) throw new Error("Não foi possível registrar o evento de criação.");
       await tx.bpmWebhookEntrada.update({ where: { id: entrada.id }, data: { eventoId: evento.id } });
@@ -116,7 +144,7 @@ export async function AssumirLeadInstagram(input: unknown) {
       await ativarCadenciasNaEntradaBpm({ cardId: card.id, pipelineAnteriorId: null, etapaAnteriorId: null,
         pipelineDestinoId: pipelineId, etapaDestinoId: destino.id, evento: "CARD_CRIADO", usuarioId: userId, agora: card.createdAt }, tx);
       return { cardId: card.id, pipelineId, duplicate: false };
-    });
+    }));
     if (!resultado.duplicate) {
       await notificarPipelineBpm({ pipelineId: resultado.pipelineId, cardId: resultado.cardId, tipo: "CARD_CRIADO" });
       try { await processarCadenciasImediatasDoCardBpm(resultado.cardId); }
@@ -126,7 +154,7 @@ export async function AssumirLeadInstagram(input: unknown) {
   } catch (error) {
     // Mensagens de domínio são controladas; não devolver mensagens do banco/PII.
     const mensagem = error instanceof Error ? error.message : "";
-    const dominio = /^(Não autorizado|Integração Instagram|Lead não encontrado|Dados do lead|Seu perfil|Transição de Novo Lead|Responsável inválido|Confira um CNPJ|Selecione um Radar|Configure |Este lead já foi|Não foi possível registrar)/.test(mensagem);
+    const dominio = /^(Não autorizado|Integração Instagram|Lead não encontrado|Dados do lead|Seu perfil|Transição de Novo Lead|Responsável inválido|O closer atribuído|Nenhum closer selecionado|Confira um CNPJ|Selecione um Radar|Configure |Este lead já foi|Não foi possível registrar)/.test(mensagem);
     return { success: false as const, error: dominio ? mensagem : "Não foi possível assumir o lead. Atualize o quadro e tente novamente." };
   }
 }

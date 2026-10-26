@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import db from "@/lib/prisma";
+import { executarComRetryDeAtribuicao, registrarAtribuicaoDeOrigemCloserBpm } from "@/lib/bpm/atribuicao-closers-server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -56,20 +57,22 @@ export async function POST(req: NextRequest) {
   const nome = [firstName, lastName].filter((parte) => parte?.trim()).join(" ").trim() || null;
 
   try {
-    const existente = await db.nolossLead.findUnique({
-      where: { nolossContactId: id },
-      select: { id: true },
-    });
-
-    if (existente) {
-      // Idempotência a retry do NoLoss — nunca reverte um lead já promovido/descartado
-      // de volta para pending, só atualiza os dados de contato.
-      await db.nolossLead.update({
-        where: { id: existente.id },
-        data: { nome, email: email ?? null, telefone: phone ?? null },
+    await executarComRetryDeAtribuicao(() => db.$transaction(async (tx) => {
+      const existente = await tx.nolossLead.findUnique({
+        where: { nolossContactId: id },
+        select: { id: true },
       });
-    } else {
-      await db.nolossLead.create({
+
+      if (existente) {
+        // Retry não consome outro turno nem reabre lead já promovido/descartado.
+        await tx.nolossLead.update({
+          where: { id: existente.id },
+          data: { nome, email: email ?? null, telefone: phone ?? null },
+        });
+        return;
+      }
+
+      const lead = await tx.nolossLead.create({
         data: {
           nolossContactId: id,
           nome,
@@ -78,10 +81,27 @@ export async function POST(req: NextRequest) {
           status: "pending",
         },
       });
-    }
+      const pipeline = await tx.bpmPipeline.findFirst({
+        where: { nome: "Revisão de Radar", ativo: true },
+        select: { id: true },
+      });
+      if (pipeline) await registrarAtribuicaoDeOrigemCloserBpm({
+        pipelineId: pipeline.id,
+        origemTipo: "NOLOSS",
+        origemId: lead.id,
+        client: tx,
+      });
+    }));
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002") {
+      const existente = await db.nolossLead.findUnique({ where: { nolossContactId: id }, select: { id: true } });
+      if (existente) {
+        await db.nolossLead.update({ where: { id: existente.id }, data: { nome, email: email ?? null, telefone: phone ?? null } });
+        return NextResponse.json({ success: true }, { status: 200 });
+      }
+    }
     console.error("[POST /api/bpm/noloss-leads/ingest]", error);
     return NextResponse.json({ success: false, error: "Erro interno" }, { status: 500 });
   }

@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
     bpmEtapa: { findFirst: vi.fn() }, usuarios: { findUnique: vi.fn() }, bpmCampo: { findMany: vi.fn() },
     cliente: { findUnique: vi.fn(), create: vi.fn() }, pessoa: { upsert: vi.fn(), create: vi.fn() }, pessoaClienteVinculo: { upsert: vi.fn() },
     bpmCard: { create: vi.fn() }, bpmCardMembro: { create: vi.fn() }, bpmCardCampoValor: { create: vi.fn(), upsert: vi.fn() },
+    bpmCloserAtribuicao: { findUnique: vi.fn(), update: vi.fn() },
     bpmInteracaoCard: { create: vi.fn() }, bpmCardHistorico: { create: vi.fn() },
   },
 }));
@@ -37,6 +38,7 @@ beforeEach(() => {
   mocks.etapa.mockResolvedValue({ id: input.etapaDestinoId, nome: "Novo Lead", visibilidades: [] });
   mocks.tx.bpmEtapa.findFirst.mockResolvedValue({ id: input.etapaDestinoId, nome: "Novo Lead", visibilidades: [] });
   mocks.tx.usuarios.findUnique.mockResolvedValue({ role: "COMERCIAL" });
+  mocks.tx.bpmCloserAtribuicao.findUnique.mockResolvedValue(null);
   mocks.tx.bpmWebhookEntrada.findFirst.mockResolvedValue({ id: input.leadId, statusRecebimento: "AUTENTICADO", payloadSanitizadoJson: JSON.stringify(dados), evento: null });
   mocks.tx.bpmWebhookEntrada.updateMany.mockResolvedValue({ count: 1 });
   mocks.tx.bpmCampo.findMany.mockResolvedValue([

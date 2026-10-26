@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { hash } from "bcryptjs";
 import { INSTAGRAM_ENDPOINT_SLUG, prepararLeadInstagram } from "@/lib/bpm/instagram-leads";
-const db = vi.hoisted(() => ({ bpmWebhookEndpoint: { findUnique: vi.fn() }, bpmWebhookEntrada: { findUnique: vi.fn(), create: vi.fn(), findMany: vi.fn() }, bpmEtapa: { findMany: vi.fn() } }));
+const db = vi.hoisted(() => ({
+  bpmWebhookEndpoint: { findUnique: vi.fn() },
+  bpmWebhookEntrada: { findUnique: vi.fn(), create: vi.fn(), findMany: vi.fn() },
+  bpmEtapa: { findMany: vi.fn() },
+  bpmPipeline: { findUnique: vi.fn() },
+  bpmCloserAtribuicao: { findUnique: vi.fn(), create: vi.fn() },
+  $transaction: vi.fn(),
+}));
 vi.mock("@/lib/prisma", () => ({ default: db }));
 import { autenticarInstagram, buscarInstagramLeadsPendentes, receberInstagramLead } from "@/lib/bpm/instagram-leads-server";
 
@@ -9,7 +16,13 @@ const token = "a".repeat(43);
 const endpoint = { id: "endpoint", ativo: true, caminhoSlug: INSTAGRAM_ENDPOINT_SLUG, automacaoId: null, pipelineId: "canonical",
   pipeline: { nome: "Revisão de Radar", ativo: true }, segredoHash: await hash(token, 4) };
 const lead = { id: "l:example", full_name: "Contato Exemplo", created_time: "2026-10-21T12:00:00Z" };
-beforeEach(() => { vi.clearAllMocks(); vi.stubEnv("INSTAGRAM_LEADS_ENDPOINT_ID", "endpoint"); db.bpmWebhookEndpoint.findUnique.mockResolvedValue(endpoint); });
+beforeEach(() => {
+  vi.clearAllMocks(); vi.stubEnv("INSTAGRAM_LEADS_ENDPOINT_ID", "endpoint");
+  db.bpmWebhookEndpoint.findUnique.mockResolvedValue(endpoint);
+  db.bpmPipeline.findUnique.mockResolvedValue({ ativo: true, nome: "Revisão de Radar", visualizacaoConfigJson: null });
+  db.bpmCloserAtribuicao.findUnique.mockResolvedValue(null);
+  db.$transaction.mockImplementation(async (callback: (tx: typeof db) => unknown) => callback(db));
+});
 afterEach(() => vi.unstubAllEnvs());
 
 describe("inbox Instagram", () => {

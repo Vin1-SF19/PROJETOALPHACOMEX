@@ -13,6 +13,8 @@ const prismaMock = vi.hoisted(() => ({
   nolossLead: { findUnique: vi.fn(), updateMany: vi.fn(), update: vi.fn() },
   cliente: { create: vi.fn(), findUnique: vi.fn(), updateMany: vi.fn() },
   bpmCard: { create: vi.fn(), findUnique: vi.fn() },
+  bpmCardMembro: { create: vi.fn() },
+  bpmCloserAtribuicao: { findUnique: vi.fn(), update: vi.fn() },
   bpmCardHistorico: { create: vi.fn() },
   bpmCampo: { findMany: vi.fn() },
   bpmCardCampoValor: { create: vi.fn() },
@@ -57,6 +59,7 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
       { id: "qualificacao", nome: "Qualificação", tipo: "selecao", opcoesJson: null, opcoes: [] },
     ]);
     prismaMock.usuarios.findUnique.mockResolvedValue({ role: "COMERCIAL" });
+    prismaMock.bpmCloserAtribuicao.findUnique.mockResolvedValue(null);
     mockTransacaoFeliz();
   });
 

@@ -6,9 +6,11 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ default: {
   bpmPipeline: { findUnique: m.pipeline }, usuarios: { findUnique: m.usuario },
   bpmCard: { findMany: m.cards }, nolossLead: { findMany: m.leads },
+  bpmCloserAtribuicao: { findMany: async () => [] },
   bpmEtapaCardViewConfig: { findMany: async () => [] }, bpmInteracaoCard: { findMany: async () => [] },
 } }));
 vi.mock("@/lib/bpm/visao-equipe-server", () => ({ carregarEscopoLeituraBpm: async () => ({ where: {}, setores: [], responsaveis: [] }) }));
+vi.mock("@/lib/bpm/instagram-leads-server", () => ({ buscarInstagramLeadsPendentes: async () => [] }));
 vi.mock("@/lib/bpm/ownership", () => ({
   exigirAcessoBpmPipeline: m.acesso, exigirAcessoBpmCard: vi.fn(), exigirAcessoModuloBpm: vi.fn(),
   checarAcessoConfigPipeline: async () => true, isAdminRole: () => true, usuarioElegivelResponsavelBpm: vi.fn(),

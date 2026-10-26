@@ -2,6 +2,7 @@ import "server-only";
 import { compare } from "bcryptjs";
 import type { Prisma } from "@prisma/client";
 import db from "@/lib/prisma";
+import { executarComRetryDeAtribuicao, registrarAtribuicaoDeOrigemCloserBpm } from "@/lib/bpm/atribuicao-closers-server";
 import { INSTAGRAM_ENDPOINT_SLUG, chaveLeadInstagram, lerLeadInstagram, prepararLeadInstagram, type InstagramLinha } from "@/lib/bpm/instagram-leads";
 
 type ClienteInbox = Pick<Prisma.TransactionClient, "bpmWebhookEndpoint" | "bpmWebhookEntrada" | "bpmEtapa">;
@@ -73,9 +74,19 @@ export async function receberInstagramLead(endpointId: string, linha: InstagramL
   if (existente) return duplicadoSeguro(existente);
   try {
     const dados = prepararLeadInstagram(linha);
-    const entrada = await db.bpmWebhookEntrada.create({ data: {
-      endpointId, idempotencyKey, statusRecebimento: "AUTENTICADO", payloadSanitizadoJson: JSON.stringify(dados),
-    }, select: { id: true } });
+    const endpoint = await db.bpmWebhookEndpoint.findUnique({ where: { id: endpointId }, select: { pipelineId: true } });
+    const entrada = await executarComRetryDeAtribuicao(() => db.$transaction(async (tx) => {
+      const novaEntrada = await tx.bpmWebhookEntrada.create({ data: {
+        endpointId, idempotencyKey, statusRecebimento: "AUTENTICADO", payloadSanitizadoJson: JSON.stringify(dados),
+      }, select: { id: true } });
+      if (endpoint?.pipelineId) await registrarAtribuicaoDeOrigemCloserBpm({
+        pipelineId: endpoint.pipelineId,
+        origemTipo: "INSTAGRAM",
+        origemId: novaEntrada.id,
+        client: tx,
+      });
+      return novaEntrada;
+    }));
     return { leadId: entrada.id, duplicate: false, status: "pending", cardId: null };
   } catch (error) {
     if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002") {

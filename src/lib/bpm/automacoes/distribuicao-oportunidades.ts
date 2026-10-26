@@ -5,6 +5,7 @@ import type { Prisma } from "@prisma/client";
 import db from "@/lib/prisma";
 import { criarSlaInstancia } from "@/lib/bpm/sla";
 import { usuarioElegivelResponsavelBpm } from "@/lib/bpm/ownership";
+import { alocarProximoCloserBpm, registrarAtribuicaoDeCardCloserBpm } from "@/lib/bpm/atribuicao-closers-server";
 import { montarContextoAvaliacaoDoCard } from "@/lib/bpm/regras/contexto";
 import {
   condicaoDistribuicaoAtendida,
@@ -409,7 +410,12 @@ export async function executarOportunidadeBpm(params: {
         where: { id: acao.etapaId, pipelineId: acao.pipelineId, ativo: true },
         select: { id: true },
       });
-      if (!etapa || !(await usuarioElegivelResponsavelBpm(acao.pipelineId, acao.responsavelId, tx))) {
+      const alocacaoCloser = await alocarProximoCloserBpm(acao.pipelineId, tx);
+      const responsavelEfetivoId = alocacaoCloser.distribuicaoAtiva
+        ? alocacaoCloser.responsavelId
+        : acao.responsavelId;
+      if (!etapa || responsavelEfetivoId === null
+        || !(await usuarioElegivelResponsavelBpm(acao.pipelineId, responsavelEfetivoId, tx))) {
         throw new Error("Destino ou responsável comercial inválido");
       }
       const novo = await tx.bpmCard.create({
@@ -417,11 +423,18 @@ export async function executarOportunidadeBpm(params: {
           empresaId: card.empresaId,
           pipelineId: acao.pipelineId,
           etapaId: acao.etapaId,
-          responsavelId: acao.responsavelId,
+          responsavelId: responsavelEfetivoId,
           servico: servico.nome,
         },
       });
-      await tx.bpmCardMembro.create({ data: { cardId: novo.id, userId: acao.responsavelId, role: "RESPONSAVEL" } });
+      await tx.bpmCardMembro.create({ data: { cardId: novo.id, userId: responsavelEfetivoId, role: "RESPONSAVEL" } });
+      if (alocacaoCloser.distribuicaoAtiva) await registrarAtribuicaoDeCardCloserBpm({
+        pipelineId: novo.pipelineId,
+        cardId: novo.id,
+        responsavelId: responsavelEfetivoId,
+        onlineNaEscolha: alocacaoCloser.onlineNaEscolha,
+        client: tx,
+      });
       await tx.bpmCardVinculo.create({ data: { cardOrigemId: card.id, cardDestinoId: novo.id } });
       await tx.bpmCardHistorico.create({
         data: {

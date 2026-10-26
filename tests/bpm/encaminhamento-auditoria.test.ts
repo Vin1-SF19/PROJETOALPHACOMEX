@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   db: {
     bpmAutomacaoExecucao: { findUnique: vi.fn() },
     bpmCard: { findUnique: vi.fn(), updateMany: vi.fn(), create: vi.fn(), findFirst: vi.fn() },
-    bpmPipeline: { findFirst: vi.fn() }, bpmEtapa: { findFirst: vi.fn() },
+    bpmPipeline: { findFirst: vi.fn(), findUnique: vi.fn() }, bpmEtapa: { findFirst: vi.fn() },
     bpmCardVinculo: { findFirst: vi.fn(), create: vi.fn(), upsert: vi.fn() },
     bpmCardHistorico: { findFirst: vi.fn(), create: vi.fn() },
     bpmCampo: { findMany: vi.fn() }, usuarios: { findUnique: vi.fn() },
@@ -48,6 +48,7 @@ beforeEach(() => {
   mocks.db.bpmCard.create.mockResolvedValue({ id: "destino", createdAt: new Date() });
   mocks.db.bpmCard.findFirst.mockResolvedValue(null);
   mocks.db.bpmPipeline.findFirst.mockResolvedValue({ id: pipelineId, chave: "operacional" });
+  mocks.db.bpmPipeline.findUnique.mockResolvedValue({ ativo: true, nome: "Operacional", visualizacaoConfigJson: null });
   mocks.db.bpmEtapa.findFirst.mockResolvedValue({ id: etapaId });
   mocks.db.bpmCardVinculo.findFirst.mockResolvedValue(null);
   mocks.db.bpmCampo.findMany.mockResolvedValue([]);

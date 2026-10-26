@@ -2,9 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const m = vi.hoisted(() => ({ auth: vi.fn(), acesso: vi.fn(), pipeline: vi.fn(), usuario: vi.fn(), cards: vi.fn(), resumos: vi.fn(), leads: vi.fn(), setores: vi.fn(), usuarios: vi.fn(), permissoes: vi.fn(), overrides: vi.fn() }));
 vi.mock("../../auth", () => ({ auth: m.auth }));
 vi.mock("@/lib/bpm/ownership", async (importOriginal) => ({ ...await importOriginal<typeof import("@/lib/bpm/ownership")>(), exigirAcessoBpmPipeline: m.acesso }));
-vi.mock("@/lib/prisma", () => ({ default: { bpmPipeline: { findUnique: m.pipeline }, usuarios: { findUnique: m.usuario, findMany: m.usuarios }, setor: { findMany: m.setores }, setorPermissao: { findMany: m.permissoes }, usuarioPermissaoOverride: { findMany: m.overrides }, bpmCard: { findMany: m.cards } } }));
+vi.mock("@/lib/prisma", () => ({ default: { bpmPipeline: { findUnique: m.pipeline }, usuarios: { findUnique: m.usuario, findMany: m.usuarios }, setor: { findMany: m.setores }, setorPermissao: { findMany: m.permissoes }, usuarioPermissaoOverride: { findMany: m.overrides }, bpmCard: { findMany: m.cards }, bpmCloserAtribuicao: { findMany: async () => [] } } }));
 vi.mock("@/actions/bpm/Cards", () => ({ ListarCardsPipelineBpm: m.resumos }));
 vi.mock("@/lib/bpm/noloss-leads", () => ({ buscarNolossLeadsPendentes: m.leads }));
+vi.mock("@/lib/bpm/instagram-leads-server", () => ({ buscarInstagramLeadsPendentes: async () => [] }));
 import { SincronizarQuadroBpm } from "@/actions/bpm/Quadro";
 const card = { id: "c1", etapaId: "stage", createdAt: new Date("2026-10-14"), updatedAt: new Date("2026-10-14"), servico: "Radar", status: "ATIVO", empresa: { razaoSocial: "Empresa", nomeFantasia: null, cnpj: null }, responsavel: { id: 7, nome: "Responsável" }, membros: [], vinculosOrigem: [] };
 beforeEach(() => {

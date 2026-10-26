@@ -8,6 +8,12 @@ import {
   exigirAcessoBpmPipeline,
   usuarioElegivelResponsavelBpm,
 } from "@/lib/bpm/ownership";
+import {
+  buscarAtribuicaoOrigemCloserBpm,
+  executarComRetryDeAtribuicao,
+  resolverAtribuicaoParaPromocaoCloserBpm,
+  vincularAtribuicaoPromovidaCloserBpm,
+} from "@/lib/bpm/atribuicao-closers-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
@@ -74,8 +80,13 @@ export async function PromoverNolossLead(dados: unknown) {
       return { success: false, error: "A transição de Novo Lead para esta etapa não está permitida." };
     }
 
-
-    if (!(await usuarioElegivelResponsavelBpm(pipeline.id, responsavelId))) {
+    const atribuicaoPrevia = await buscarAtribuicaoOrigemCloserBpm({
+      pipelineId: pipeline.id,
+      origemTipo: "NOLOSS",
+      origemId: nolossLeadId,
+      client: db,
+    });
+    if (!atribuicaoPrevia && !await usuarioElegivelResponsavelBpm(pipeline.id, responsavelId)) {
       return { success: false, error: "Responsável inválido para este pipeline." };
     }
 
@@ -87,7 +98,7 @@ export async function PromoverNolossLead(dados: unknown) {
       return { success: false, error: "Lead não encontrado ou já processado" };
     }
 
-    const resultado = await db.$transaction(async (tx) => {
+    const resultado = await executarComRetryDeAtribuicao(() => db.$transaction(async (tx) => {
       const [destinoAtual, perfilAtual, origemAtual] = await Promise.all([
         tx.bpmEtapa.findFirst({
           where: { id: etapaDestinoId, pipelineId: pipeline.id, ativo: true },
@@ -125,12 +136,35 @@ export async function PromoverNolossLead(dados: unknown) {
         : Array.isArray(opcoesLegadas) ? opcoesLegadas.filter((opcao): opcao is string => typeof opcao === "string") : [];
       if (!radarPretendido || !opcoesRadar.includes(radarPretendido)) throw new Error("RADAR_OPCAO_INVALIDA");
 
+      const atribuicaoAtual = await buscarAtribuicaoOrigemCloserBpm({
+        pipelineId: pipeline.id,
+        origemTipo: "NOLOSS",
+        origemId: nolossLeadId,
+        client: tx,
+      });
+      if (!atribuicaoAtual && !await usuarioElegivelResponsavelBpm(pipeline.id, responsavelId, tx)) {
+        throw new Error("Responsável inválido para este pipeline.");
+      }
+      if (atribuicaoAtual?.responsavelId !== null && atribuicaoAtual?.responsavelId !== undefined
+        && !await usuarioElegivelResponsavelBpm(pipeline.id, atribuicaoAtual.responsavelId, tx)) {
+        throw new Error("O closer atribuído não está mais elegível. Solicite revisão administrativa.");
+      }
+
       // CAS: garante que nenhuma outra promoção concorrente já consumiu este lead.
       const reservado = await tx.nolossLead.updateMany({
         where: { id: nolossLeadId, status: "pending" },
         data: { status: "promoted" },
       });
       if (reservado.count !== 1) return null;
+
+      const atribuicao = await resolverAtribuicaoParaPromocaoCloserBpm({
+        pipelineId: pipeline.id,
+        origemTipo: "NOLOSS",
+        origemId: nolossLeadId,
+        responsavelInformadoId: responsavelId,
+        client: tx,
+      });
+      const responsavelEfetivoId = atribuicao.responsavelId;
 
       const razaoSocial = nolossLead.nome?.trim() || nolossLead.email?.trim() || "Lead sem nome";
       const clienteExistente = cnpj
@@ -146,11 +180,16 @@ export async function PromoverNolossLead(dados: unknown) {
           empresaId: cliente.id,
           pipelineId: pipeline.id,
           etapaId: etapaDestino.id,
-          responsavelId,
+          responsavelId: responsavelEfetivoId,
           status: "ATIVO",
         },
         select: { id: true, createdAt: true },
       });
+
+      await tx.bpmCardMembro.create({
+        data: { cardId: card.id, userId: responsavelEfetivoId, role: "RESPONSAVEL" },
+      });
+      await vincularAtribuicaoPromovidaCloserBpm({ atribuicaoId: atribuicao.atribuicaoId, cardId: card.id, client: tx });
 
       const canalOrigem = nolossLead.utmSource?.trim() || nolossLead.utmMedium?.trim() || "NoLoss";
       for (const [nome, valor] of [
@@ -186,7 +225,7 @@ export async function PromoverNolossLead(dados: unknown) {
       }, tx);
 
       return { cardId: card.id };
-    });
+    }));
 
     if (!resultado) {
       return { success: false, error: "Lead não encontrado ou já processado" };

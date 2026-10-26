@@ -24,6 +24,8 @@ import {
 import { PublicarConfiguracaoPipelineBpm } from "@/actions/bpm/ConfiguracaoPipeline";
 import type { TemaAlpha } from "@/lib/temas";
 import { VisibilidadePipelineSection } from "./VisibilidadePipelineSection";
+import { AtribuicaoClosersSection } from "./AtribuicaoClosersSection";
+import { pipelineEhRevisaoRadar } from "@/lib/bpm/proximo-contato";
 import { VisibilidadeEtapasSection } from "./VisibilidadeEtapasSection";
 import {
   EtapaAvancadaSection,
@@ -871,7 +873,10 @@ export default function AdminPipelineClient({
         <TabsContent value="permissions">
           <Tabs defaultValue="columns">
             <TabsList><TabsTrigger value="columns">Visibilidade por coluna</TabsTrigger><TabsTrigger value="pipeline">Visibilidade do pipeline</TabsTrigger></TabsList>
-            <TabsContent value="pipeline"><VisibilidadePipelineSection key={pipeline.id} pipelineId={pipeline.id} publicationBlocked={alteracoesPendentes > 0} onPublished={() => router.refresh()} /></TabsContent>
+            <TabsContent value="pipeline">
+              <VisibilidadePipelineSection key={pipeline.id} pipelineId={pipeline.id} publicationBlocked={alteracoesPendentes > 0} onPublished={() => router.refresh()} />
+              {pipelineEhRevisaoRadar(pipeline.nome) && <AtribuicaoClosersSection pipelineId={pipeline.id} publicationBlocked={alteracoesPendentes > 0} />}
+            </TabsContent>
             <TabsContent value="columns">
           <VisibilidadeEtapasSection
             pipelineId={pipeline.id}

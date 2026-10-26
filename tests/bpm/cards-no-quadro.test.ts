@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  pipeline: vi.fn(), cards: vi.fn(), noloss: vi.fn(),
+  pipeline: vi.fn(), cards: vi.fn(), noloss: vi.fn(), instagram: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ default: {
   bpmPipeline: { findUnique: mocks.pipeline }, bpmCard: { findMany: mocks.cards },
 } }));
 vi.mock("@/lib/bpm/noloss-leads", () => ({ buscarNolossLeadsPendentes: mocks.noloss }));
+vi.mock("@/lib/bpm/instagram-leads-server", () => ({ buscarInstagramLeadsPendentes: mocks.instagram }));
 
 import { cardApareceNoQuadro, contarCardsVisiveisNoQuadro, etapasComSaidaDoQuadro } from "@/lib/bpm/cards-no-quadro";
 
@@ -46,6 +47,7 @@ describe("contagem do quadro", () => {
       { ...etapas[0], nome: "Novos leads" }, etapas[1], etapas[2],
     ] });
     mocks.noloss.mockResolvedValue([]);
+    mocks.instagram.mockResolvedValue([]);
   });
   it("exclui o arquivado do caso 4 no banco e 3 no quadro", async () => {
     mocks.cards.mockResolvedValue([

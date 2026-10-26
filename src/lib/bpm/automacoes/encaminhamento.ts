@@ -8,6 +8,7 @@ import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automa
 import { copiarCamposCardVinculado } from "@/lib/bpm/copiar-campos-card-vinculado";
 import { carregarCamposFaltantesCardEtapa } from "@/lib/bpm/requisitos-etapa-server";
 import { ehPipelineOperacional } from "@/lib/bpm/financeiro-config.client";
+import { alocarProximoCloserBpm, registrarAtribuicaoDeCardCloserBpm } from "@/lib/bpm/atribuicao-closers-server";
 import { publicarEventoBpm } from "./eventos";
 import { parametrosEncaminhamentoSchema } from "./schemas";
 
@@ -169,7 +170,19 @@ export async function executarEncaminhamentoBpm(input: {
         return { cardId: existente.id, existente: true, versao: card.versao + 1 };
       }
     }
-      const criado = await tx.bpmCard.create({ data: { empresaId: card.empresaId, pipelineId, etapaId, responsavelId: Number(parametros.responsavelId ?? card.responsavelId), servico: parametros.servico ? String(parametros.servico) : card.servico, membros: { create: { userId: Number(parametros.responsavelId ?? card.responsavelId), role: "RESPONSAVEL" } } } });
+      const alocacaoCloser = await alocarProximoCloserBpm(pipelineId, tx);
+      const responsavelEfetivoId = alocacaoCloser.distribuicaoAtiva
+        ? alocacaoCloser.responsavelId
+        : Number(parametros.responsavelId ?? card.responsavelId);
+      if (responsavelEfetivoId === null) throw new Error("Nenhum closer selecionado está elegível no momento.");
+      const criado = await tx.bpmCard.create({ data: { empresaId: card.empresaId, pipelineId, etapaId, responsavelId: responsavelEfetivoId, servico: parametros.servico ? String(parametros.servico) : card.servico, membros: { create: { userId: responsavelEfetivoId, role: "RESPONSAVEL" } } } });
+      if (alocacaoCloser.distribuicaoAtiva) await registrarAtribuicaoDeCardCloserBpm({
+        pipelineId,
+        cardId: criado.id,
+        responsavelId: responsavelEfetivoId,
+        onlineNaEscolha: alocacaoCloser.onlineNaEscolha,
+        client: tx,
+      });
       if (vincular) await tx.bpmCardVinculo.create({ data: { cardOrigemId: card.id, cardDestinoId: criado.id } });
       if (!handoffOperacional) await copiarCamposCardVinculado(tx, card.id, criado.id, pipelineId, etapaId);
       if (handoffOperacional) {

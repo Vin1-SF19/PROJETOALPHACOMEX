@@ -65,6 +65,13 @@ import {
   META_LIGACOES_NOVOS_LEADS,
 } from "@/lib/bpm/novos-leads";
 import { pipelineEhRevisaoRadar } from "@/lib/bpm/proximo-contato";
+import { lerConfiguracaoDistribuicaoClosers } from "@/lib/bpm/closer-distribution";
+import {
+  alocarProximoCloserBpm,
+  carregarResponsaveisAtribuidosCloserBpm,
+  executarComRetryDeAtribuicao,
+  registrarAtribuicaoDeCardCloserBpm,
+} from "@/lib/bpm/atribuicao-closers-server";
 import { sincronizarProximoContatoAgenda } from "@/lib/bpm/proximo-contato-agenda";
 import { etapaEhEmTratativa, etapaEhSemViabilidade, obterErroProximoContatoParaEntrada } from "@/lib/bpm/em-tratativa";
 import { obterErroProximoContatoParaMovimento } from "@/lib/bpm/proximo-contato";
@@ -561,7 +568,12 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
       && permissaoNovosLeads?.podeVer
       && pipelineEhRevisaoRadar(pipelineInfo?.nome)
     )
-      ? (await buscarNolossLeadsPendentes()).map((lead) => ({
+      ? await (async () => {
+        const leads = await buscarNolossLeadsPendentes();
+        const responsaveis = await carregarResponsaveisAtribuidosCloserBpm(pipelineId, "NOLOSS", leads.map((lead) => lead.id));
+        return leads.map((lead) => {
+          const responsavel = responsaveis.get(lead.id) ?? { id: 0, nome: "Sem responsável" };
+          return ({
           id: lead.id,
           etapaId: etapaNovosLeads.id,
           servico: null,
@@ -583,8 +595,8 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
             cnpj: null,
             nomeFantasia: null,
           },
-          responsavel: { id: 0, nome: "Sem responsável" },
-          membros: [],
+          responsavel,
+          membros: responsavel.id > 0 ? [{ userId: responsavel.id, role: "RESPONSAVEL", usuario: { ...responsavel, imagemUrl: null } }] : [],
           _count: { tarefas: 0, anexos: 0 },
           tarefas: [],
           campoValores: [],
@@ -613,21 +625,30 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
                 telefoneVirtual: lead.telefone,
                 campoValores: [],
               })
-            : undefined,
-        }))
+          : undefined,
+        });
+        });
+      })()
       : [];
 
     const cardsInstagram = etapaNovosLeads && permissaoNovosLeads?.podeVer && pipelineEhRevisaoRadar(pipelineInfo?.nome)
-      ? (await buscarInstagramLeadsPendentes(pipelineId)).map((lead) => ({
+      ? await (async () => {
+        const leads = await buscarInstagramLeadsPendentes(pipelineId);
+        const responsaveis = await carregarResponsaveisAtribuidosCloserBpm(pipelineId, "INSTAGRAM", leads.map((lead) => lead.id));
+        return leads.map((lead) => {
+          const responsavel = responsaveis.get(lead.id) ?? { id: 0, nome: "Sem responsável" };
+          return ({
           id: lead.id, etapaId: etapaNovosLeads.id, servico: null, status: "ATIVO", createdAt: lead.recebidoEm,
           primeiraVisualizacaoEm: null, proximoContatoEm: null, dataReuniao: null, googleMeetLink: null, statusPosFechamento: null,
           empresa: { id: 0, razaoSocial: lead.dados.nome, cnpj: lead.dados.cnpj, nomeFantasia: null },
-          responsavel: { id: 0, nome: "Sem responsável" }, membros: [], _count: { tarefas: 0, anexos: 0 }, tarefas: [],
+          responsavel, membros: responsavel.id > 0 ? [{ userId: responsavel.id, role: "RESPONSAVEL", usuario: { ...responsavel, imagemUrl: null } }] : [], _count: { tarefas: 0, anexos: 0 }, tarefas: [],
           campoValores: [], sla: null, origem: "instagram" as const, importadoRd: false, podeMoverLivremente: false,
           nolossLeadId: null, instagramLeadId: lead.id, instagramDados: lead.dados,
           ligacoesHoje: 0, metaLigacoesDia: META_LIGACOES_NOVOS_LEADS, diasUteisDecorridos: 0, diaCiclo: 1,
           podeAgirEtapa: permissaoNovosLeads.podeAgir,
-        })) : [];
+        });
+        });
+      })() : [];
     return {
       success: true,
       data: ordenarCardsMaisRecentesPrimeiro([...cardsReais, ...cardsVirtuais, ...cardsInstagram].filter((card) => !cardIds || cardIds.includes(card.id))),
@@ -996,7 +1017,13 @@ export async function CriarCardBpm(dados: unknown) {
     if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos para criar o card" };
     const { empresaId, novaEmpresa, pipelineId, etapaId, responsavelId, servico, radarPretendido, canalOrigem, parceiroOrigemId, qualificacao } = parsed.data;
     await exigirAcessoBpmPipeline(pipelineId, userId);
-    if (!(await usuarioElegivelResponsavelBpm(pipelineId, responsavelId))) {
+    const pipelineParaAtribuicao = await db.bpmPipeline.findUnique({
+      where: { id: pipelineId },
+      select: { nome: true, visualizacaoConfigJson: true },
+    });
+    const distribuicaoSolicitada = pipelineEhRevisaoRadar(pipelineParaAtribuicao?.nome)
+      && lerConfiguracaoDistribuicaoClosers(pipelineParaAtribuicao?.visualizacaoConfigJson).ativa;
+    if (!distribuicaoSolicitada && !(await usuarioElegivelResponsavelBpm(pipelineId, responsavelId))) {
       return { success: false, error: "Responsável inválido para este pipeline." };
     }
     if (!(await destinoEhEtapaCanonicaNovosLeads(pipelineId, etapaId))) {
@@ -1023,14 +1050,21 @@ export async function CriarCardBpm(dados: unknown) {
       }
     }
 
-    const card = await db.$transaction(async (tx) => {
+    const card = await executarComRetryDeAtribuicao(() => db.$transaction(async (tx) => {
       await exigirAcessoBpmPipeline(pipelineId, userId, tx);
 
       if (!(await destinoEhEtapaCanonicaNovosLeads(pipelineId, etapaId, tx))) {
         throw new Error("CRIACAO_CARD_CONTEXTO_ALTERADO");
       }
-      if (!(await usuarioElegivelResponsavelBpm(pipelineId, responsavelId, tx))) {
-        throw new Error("CRIACAO_CARD_INVALIDA");
+      const alocacao = await alocarProximoCloserBpm(pipelineId, tx);
+      const responsavelEfetivoId = alocacao.distribuicaoAtiva
+        ? alocacao.responsavelId
+        : responsavelId;
+      if (responsavelEfetivoId === null || responsavelEfetivoId === undefined
+        || !await usuarioElegivelResponsavelBpm(pipelineId, responsavelEfetivoId, tx)) {
+        throw new Error(alocacao.distribuicaoAtiva
+          ? "Nenhum closer selecionado está elegível no momento."
+          : "CRIACAO_CARD_INVALIDA");
       }
 
       let empresaIdResolvido = empresaId;
@@ -1089,12 +1123,22 @@ export async function CriarCardBpm(dados: unknown) {
           empresaId: empresaIdResolvido,
           pipelineId,
           etapaId,
-          responsavelId,
+          responsavelId: responsavelEfetivoId,
           // Fase 3 (RM-2026-54DC86): fallback é o nome do pipeline de destino. RM-2026-97934A:
           // caller pode informar o serviço de origem explicitamente (ex: indicação de parceiro).
           servico: servico ?? (await tx.bpmPipeline.findUnique({ where: { id: pipelineId }, select: { nome: true } }))?.nome ?? null,
         },
       });
+
+      if (alocacao.distribuicaoAtiva) {
+        await registrarAtribuicaoDeCardCloserBpm({
+          pipelineId,
+          cardId: novoCard.id,
+          responsavelId: responsavelEfetivoId,
+          onlineNaEscolha: alocacao.onlineNaEscolha,
+          client: tx,
+        });
+      }
 
       for (const [nome, valor] of [
         ["Radar pretendido", radarPretendido],
@@ -1116,7 +1160,7 @@ export async function CriarCardBpm(dados: unknown) {
 
       // D-041: responsável principal também é registrado como membro RESPONSAVEL.
       await tx.bpmCardMembro.create({
-        data: { cardId: novoCard.id, userId: responsavelId, role: "RESPONSAVEL" },
+        data: { cardId: novoCard.id, userId: responsavelEfetivoId, role: "RESPONSAVEL" },
       });
 
       if (typeof carregarSnapshotsCopiaCamposCard === "function") {
@@ -1139,7 +1183,7 @@ export async function CriarCardBpm(dados: unknown) {
             empresaId: empresaIdResolvido,
             pipelineId,
             etapaId,
-            responsavelId,
+            responsavelId: responsavelEfetivoId,
             empresaCriada: !!novaEmpresa,
           }),
         },
@@ -1147,7 +1191,7 @@ export async function CriarCardBpm(dados: unknown) {
 
       await publicarEventoBpm({
         tipo: "CARD_CRIADO", entidadeTipo: "CARD", entidadeId: novoCard.id,
-        cardId: novoCard.id, pipelineId, valorNovo: { etapaId, responsavelId, servico: novoCard.servico },
+        cardId: novoCard.id, pipelineId, valorNovo: { etapaId, responsavelId: responsavelEfetivoId, servico: novoCard.servico },
         atorTipo: "USUARIO", atorUserId: userId, correlationId: randomUUID(),
         idempotencyKey: `card-criado:${novoCard.id}`,
       }, tx);
@@ -1173,7 +1217,7 @@ export async function CriarCardBpm(dados: unknown) {
       }, tx);
 
       return novoCard;
-    });
+    }));
     revalidatePath(`${ROTA_BASE}/pipeline/${pipelineId}`);
     await notificarPipelineBpm({ pipelineId, cardId: card.id, tipo: "CARD_CRIADO" });
     try {
@@ -1186,6 +1230,8 @@ export async function CriarCardBpm(dados: unknown) {
     console.error("[CriarCardBpm]", error);
     const msg = error instanceof Error && error.message === "Não autorizado"
       ? "Não autorizado"
+      : error instanceof Error && error.message === "Nenhum closer selecionado está elegível no momento."
+        ? error.message
       : error instanceof Error && error.message === "CNPJ_JA_CADASTRADO"
         ? "Já existe uma empresa cadastrada com este CNPJ — busque e selecione-a."
         : error instanceof Error && error.message === "CNPJ_NOVO_LEAD_INVALIDO"

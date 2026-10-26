@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => {
     bpmAutomacaoLease: { create: vi.fn(), deleteMany: vi.fn() },
     bpmAutomacaoPassoExecucao: { upsert: vi.fn(), update: vi.fn() },
     bpmCardHistorico: { create: vi.fn(), findFirst: vi.fn() },
-    bpmPipeline: { findFirst: vi.fn() },
+    bpmPipeline: { findFirst: vi.fn(), findUnique: vi.fn() },
     bpmEtapa: { findFirst: vi.fn() },
     bpmCardVinculo: { findFirst: vi.fn(), upsert: vi.fn(), create: vi.fn() },
     bpmCard: { findUnique: vi.fn(), updateMany: vi.fn(), findFirst: vi.fn(), create: vi.fn() },
@@ -82,6 +82,7 @@ beforeEach(() => {
   mocks.db.bpmAutomacaoPassoExecucao.upsert.mockResolvedValue({ id: "passo" });
   // O pipeline Operacional ativo possui chave técnica nula no banco publicado.
   mocks.db.bpmPipeline.findFirst.mockResolvedValue({ id: "cmuih4tnh000409gm5z34jvss", chave: null });
+  mocks.db.bpmPipeline.findUnique.mockResolvedValue({ ativo: true, nome: "Operacional", visualizacaoConfigJson: null });
   mocks.db.bpmEtapa.findFirst.mockResolvedValue({ id: etapaId });
   mocks.db.bpmCardVinculo.findFirst.mockImplementation(async ({ where }) => where.cardDestinoId
     ? { cardOrigemId: comercial, cardOrigem: { responsavelId: 29, indicacaoOrigem: { parceiroId: 31 } } }

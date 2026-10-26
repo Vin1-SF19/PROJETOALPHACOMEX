@@ -85,6 +85,7 @@ export type ComandoTransicaoBpm = {
   camposValores?: Record<string, string>;
   parceiroOrigem?: ParceiroOrigemBpm;
   proximoContatoEm?: Date | null;
+  dataReuniao?: Date;
   responsavelId?: number;
   confirmacaoPendenciasRd?: ConfirmacaoPendenciasRd;
 };
@@ -241,6 +242,13 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     erro("STALE_VERSION", "O card foi alterado por outra operação. Recarregue e tente novamente.");
   }
   if (card.etapaId === input.etapaDestinoId) erro("SAME_STAGE", "O card já está nesta etapa.");
+  if (input.dataReuniao !== undefined) {
+    if (input.ator.tipo !== "INTEGRACAO" || !Number.isFinite(input.dataReuniao.getTime())) {
+      erro("FORMAT_INVALID", "Data de reunião inválida para esta solicitação.");
+    }
+    // Os validadores usam a data submetida; sua persistência acompanha o CAS abaixo.
+    card.dataReuniao = input.dataReuniao;
+  }
 
   if ((manualRd || movimentoLivre) && (!card.etapa.ativo || card.etapa.pipelineId !== card.pipelineId || !card.pipeline.ativo)) {
     erro("INVALID_ORIGIN", "A etapa atual ou o pipeline está inativo ou possui vínculo inválido.");
@@ -996,6 +1004,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
           updatedAt: agora,
           ...(statusPosFechamentoInicial ? { statusPosFechamento: statusPosFechamentoInicial } : {}),
           ...(input.proximoContatoEm !== undefined ? { proximoContatoEm: input.proximoContatoEm } : {}),
+          ...(input.dataReuniao !== undefined ? { dataReuniao: input.dataReuniao } : {}),
           ...(prepared.responsavelId ? { responsavelId: prepared.responsavelId } : {}),
         },
       });
@@ -1057,6 +1066,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
           automacaoOrigem: input.ator.automacaoId,
           valorAnteriorJson: JSON.stringify({ etapaId: card.etapaId, lifecycle: card.status, outcome: card.estadoOntologico?.outcome ?? null, versao: card.versao }),
           valorNovoJson: JSON.stringify({ etapaId: destino.id, lifecycle, outcome, subStatusId, statusPosFechamento: statusPosFechamentoInicial ?? card.statusPosFechamento, versao: card.versao + 1, responsavelId: prepared.responsavelId ?? card.responsavelId, camposPreenchidos: Object.keys(prepared.valoresValidados),
+            ...(input.dataReuniao !== undefined ? { dataReuniao: input.dataReuniao.toISOString() } : {}),
             ...(prepared.movimentoLivre ? { movimentoLivre: prepared.movimentoLivre, obrigatoriedadesDispensadas: true } : {}),
             ...(prepared.confirmacaoRd ? { confirmacaoPendenciasRd: prepared.confirmacaoRd, pendenciasConfirmadas: prepared.avisosRd } : {}) }),
         },

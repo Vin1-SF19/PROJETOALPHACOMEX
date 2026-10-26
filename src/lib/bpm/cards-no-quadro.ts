@@ -4,6 +4,7 @@ import "server-only";
 import db from "@/lib/prisma";
 import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
 import { buscarNolossLeadsPendentes } from "@/lib/bpm/noloss-leads";
+import { buscarInstagramLeadsPendentes } from "@/lib/bpm/instagram-leads-server";
 import { pipelineEhRevisaoRadar } from "@/lib/bpm/proximo-contato";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 
@@ -88,7 +89,9 @@ export async function contarCardsVisiveisPorEtapaNoQuadro(
   }
   const mostraNoloss = pipelineEhRevisaoRadar(pipeline.nome)
     && etapasVisiveis.some((etapa) => etapaEhNovosLeads(etapa.nome));
-  const virtuais = mostraNoloss ? (await buscarNolossLeadsPendentes()).length : 0;
+  const virtuais = mostraNoloss
+    ? (await buscarNolossLeadsPendentes()).length + (await buscarInstagramLeadsPendentes(pipelineId)).length
+    : 0;
   const etapaNovosLeads = etapasVisiveis.find((etapa) => etapaEhNovosLeads(etapa.nome));
   if (etapaNovosLeads) contagens.set(etapaNovosLeads.id, (contagens.get(etapaNovosLeads.id) ?? 0) + virtuais);
   return [...contagens].map(([etapaId, quantidade]) => ({ etapaId, quantidade }));

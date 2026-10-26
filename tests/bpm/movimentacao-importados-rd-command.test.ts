@@ -86,6 +86,42 @@ import { avaliarTransicaoBpm, executarTransicaoBpm, type ComandoTransicaoBpm } f
 import { possuiOrigemImportadaRd } from "@/lib/bpm/movimento-importado-rd";
 const input = (): ComandoTransicaoBpm => ({ cardId: "card", etapaOrigemEsperadaId: "origem", etapaDestinoId: "destino", versaoEsperada: 3,
   idempotencyKey: "solicitacao-unica", ator: { tipo: "MANUAL", userId: 7, userRole: "ADMINISTRADOR" } });
+
+describe("data de reunião na transição de integração", () => {
+  const dataReuniao = new Date("2026-11-10T17:30:00Z");
+  const comando = (): ComandoTransicaoBpm => ({ ...input(), ator: { tipo: "INTEGRACAO" },
+    dataReuniao, camposValores: { campo: "Documento preenchido" } });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.assign(f.state, structuredClone(f.base));
+    f.state.card.origemExterna = null;
+    f.state.transicao = { id: "transicao", permitida: true, origem: "AMBOS", limparSubStatus: false,
+      lifecycleDestino: "ATIVO", outcomeDestino: null };
+  });
+
+  it("persiste a data junto com a etapa e registra no histórico", async () => {
+    expect(await executarTransicaoBpm(comando())).toMatchObject({ success: true });
+    expect(f.tx.bpmCard.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ etapaId: "destino", dataReuniao }),
+    }));
+    expect(JSON.parse(f.state.historicos[0].valorNovoJson)).toMatchObject({ dataReuniao: dataReuniao.toISOString() });
+  });
+
+  it("não salva a data nem move quando falta um campo obrigatório", async () => {
+    expect(await executarTransicaoBpm({ ...comando(), camposValores: {} })).toMatchObject({ success: false, code: "REQUIREMENTS_PENDING" });
+    expect(f.tx.bpmCard.updateMany).not.toHaveBeenCalled();
+    expect(f.state.card).toMatchObject({ etapaId: "origem", dataReuniao: null });
+  });
+
+  it("reverte a transição se a auditoria falhar depois do update", async () => {
+    f.state.falhaOutbox = true;
+    expect(await executarTransicaoBpm(comando())).toMatchObject({ success: false });
+    expect(f.tx.bpmCard.updateMany).toHaveBeenCalled();
+    expect(f.state.card).toMatchObject({ etapaId: "origem", dataReuniao: null });
+    expect(f.state.valores).toEqual([]);
+  });
+});
 const confirmation = async () => {
   const result = await avaliarTransicaoBpm(input());
   expect(result).toMatchObject({ success: false, code: "RD_MOVE_CONFIRMATION_REQUIRED" });
