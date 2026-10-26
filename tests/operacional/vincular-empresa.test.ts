@@ -8,7 +8,8 @@ vi.mock("../../auth", () => ({ auth: state.auth }));
 vi.mock("@/lib/prisma", () => ({ get default() { return state.db; } }));
 import { buscarClienteParaVincularOperacional, vincularEmpresaAoCliente } from "@/actions/ClientesOperacional";
 let fixture: Awaited<ReturnType<typeof criarFixtureChecklist>>;
-beforeAll(async () => { fixture = await criarFixtureChecklist(); state.db = fixture.db; }, 30000);
+// Preparar/aplicar o schema SQLite sintético sob cobertura exige orçamento próprio de infraestrutura.
+beforeAll(async () => { fixture = await criarFixtureChecklist(); state.db = fixture.db; }, 60000);
 afterAll(async () => { await fixture?.close(); });
 beforeEach(() => { state.auth.mockResolvedValue({ user: { id: "3", authSessionVersion: 0 } }); });
 
