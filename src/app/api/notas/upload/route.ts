@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { auth } from "../../../../../auth";
@@ -40,6 +41,7 @@ function verificarRateLimit(userId: string): boolean {
 }
 
 export async function POST(request: Request) {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ success: false, error: "Não autenticado" }, { status: 401 });
@@ -107,7 +109,14 @@ export async function POST(request: Request) {
       storageKey: blob.url,
     });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     console.error("[notas/upload] userId=" + userId, error);
     return NextResponse.json({ success: false, error: "Erro ao salvar arquivo" }, { status: 500 });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

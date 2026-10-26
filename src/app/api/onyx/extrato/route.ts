@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import { processarExtratoPorAgentes } from "@/lib/onyx/extrato-agents";
@@ -38,6 +39,7 @@ function temExtensaoAceita(nomeArquivo: string): boolean {
  * internamente — são preservados para compatibilidade com o ModalUploadExtrato.
  */
 export async function POST(req: NextRequest) {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -46,7 +48,8 @@ export async function POST(req: NextRequest) {
   let form: FormData;
   try {
     form = await req.formData();
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return NextResponse.json(
       { error: "Envio inválido (multipart esperado)." },
       { status: 400 },
@@ -96,9 +99,16 @@ export async function POST(req: NextRequest) {
       ...(paginasComErro.length > 0 ? { paginasComErro } : {}),
     });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     const status = err instanceof OnyxError ? err.status : 500;
     const message = (err as Error).message || "Erro ao processar extrato.";
     console.error("[POST /api/onyx/extrato]", message);
     return NextResponse.json({ success: false, error: message }, { status });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

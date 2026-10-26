@@ -3,6 +3,7 @@ import { PrismaLibSQL as PrismaLibSqlNode } from '@prisma/adapter-libsql'
 // Variante /web usa @libsql/client/web (HTTP puro, sem binário nativo)
 // Necessário no Windows/Node 24 onde @libsql/win32-x64-msvc não carrega
 import { PrismaLibSQL as PrismaLibSql } from '@prisma/adapter-libsql/web'
+import { criarFetchBanco } from '@/lib/db-fetch'
 
 // Configuração administrativa só é carregada com select explícito no servidor.
 export const camposPrivadosPrisma: Prisma.GlobalOmitConfig = { bpmPipeline: { visualizacaoConfigJson: true } };
@@ -18,6 +19,7 @@ const adapter = configuredUrl.startsWith('file:')
   : new PrismaLibSql({
       url: tursoUrl,
       authToken: process.env.TURSO_AUTH_TOKEN,
+      fetch: criarFetchBanco(),
     })
 
 const prismaClientSingleton = () => {

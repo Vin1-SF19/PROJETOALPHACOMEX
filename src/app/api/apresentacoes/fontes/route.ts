@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
@@ -22,6 +23,7 @@ import { excluirBlobMotion, obterTokenMotion } from "@/lib/apresentacoes/blob";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ success: false, error: "Não autorizado" }, { status: 401 });
@@ -30,7 +32,8 @@ export async function POST(request: NextRequest) {
   let formData: FormData;
   try {
     formData = await request.formData();
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return NextResponse.json({ success: false, error: "Formulário inválido" }, { status: 400 });
   }
 
@@ -67,6 +70,7 @@ export async function POST(request: NextRequest) {
   try {
     fontesGlobais = await listarFontesGlobais();
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     console.error("[POST /api/apresentacoes/fontes] catálogo global indisponível", error);
     return NextResponse.json({ success: false, error: "O catálogo global de fontes está indisponível no momento." }, { status: 503 });
   }
@@ -104,10 +108,17 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, fonte });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     if (urlEnviada) {
       await excluirBlobMotion(urlEnviada).catch(() => undefined);
     }
     console.error("[POST /api/apresentacoes/fontes]", error);
     return NextResponse.json({ success: false, error: "Não foi possível adicionar a fonte." }, { status: 500 });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

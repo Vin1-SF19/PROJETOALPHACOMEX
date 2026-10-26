@@ -1,3 +1,4 @@
+import { mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { auth } from "../../../../../auth";
@@ -33,6 +34,7 @@ async function checarOwnershipApresentacao(apresentacaoId: string, userId: numbe
 }
 
 export async function POST(req: NextRequest) {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return new Response(JSON.stringify({ success: false, error: "Não autorizado" }), { status: 401 });
@@ -87,4 +89,10 @@ export async function POST(req: NextRequest) {
       Connection: "keep-alive",
     },
   });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

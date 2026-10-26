@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import { listAgents, createAgent, getImageGenToolId, OnyxError, type CreateAgentInput } from "@/lib/onyx/client";
@@ -20,6 +21,7 @@ export const dynamic = "force-dynamic";
 // GET /api/onyx/agents — lista agentes visíveis ao usuário, com info do criador.
 // Regra: vê os PRÓPRIOS (público ou privado) + os PÚBLICOS de outros. Admin vê todos.
 export async function GET() {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -51,13 +53,21 @@ export async function GET() {
 
     return NextResponse.json({ agents });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     const status = err instanceof OnyxError ? err.status : 500;
     return NextResponse.json({ error: (err as Error).message }, { status });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }
 
 // POST /api/onyx/agents — cria um novo agente
 export async function POST(req: NextRequest) {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -99,7 +109,14 @@ export async function POST(req: NextRequest) {
     await recordAgentOwner(agent.id, userId, agent.name, body.is_public ?? false).catch(() => {});
     return NextResponse.json({ agent }, { status: 201 });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     const status = err instanceof OnyxError ? err.status : 500;
     return NextResponse.json({ error: (err as Error).message }, { status });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

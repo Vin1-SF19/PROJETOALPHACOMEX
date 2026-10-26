@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { auth } from "../../../../../../auth";
 import db from "@/lib/prisma";
 import { podeVisualizarNota } from "@/lib/notas/permissoes";
@@ -6,6 +7,7 @@ import { registrarAuditoriaNotaBestEffort } from "@/lib/notas/auditoria";
 export const dynamic = "force-dynamic";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
+  try {
   const session = await auth();
   if (!session?.user?.id) return new Response("Não autenticado", { status: 401 });
 
@@ -28,7 +30,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   let urlBlob: URL;
   try {
     urlBlob = new URL(anexo.storageKey);
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return new Response("Anexo com referência inválida", { status: 422 });
   }
   if (urlBlob.protocol !== "https:" || !urlBlob.hostname.endsWith(".blob.vercel-storage.com")) {
@@ -50,4 +53,10 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     "X-Content-Type-Options": "nosniff",
   };
   return new Response(respostaBlob.body, { status: 200, headers });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

@@ -1,4 +1,5 @@
 export type ErrorCode =
+  | "AUTH_UNAVAILABLE"
   | "UNAUTHENTICATED"
   | "FORBIDDEN"
   | "NOT_FOUND"

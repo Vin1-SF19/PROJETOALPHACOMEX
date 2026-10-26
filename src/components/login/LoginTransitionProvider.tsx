@@ -2,6 +2,8 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { sessaoPermiteOperacao } from "@/lib/auth/estado-acesso";
+import { useRecuperacaoSessao } from "@/components/auth/SessaoResilienteProvider";
 import dynamic from "next/dynamic";
 import { Component, createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import { useMotionValue } from "framer-motion";
@@ -56,6 +58,7 @@ const LoginTransitionContext = createContext<LoginTransitionContextValue | null>
 const DESTINATION = "/PainelAlpha";
 const HARD_NAVIGATION_TIMEOUT_MS = 8_000;
 const TRANSITION_LOAD_TIMEOUT_MS = 5_000;
+const SESSION_CONFIRMATION_TIMEOUT_MS = 8_500;
 
 export function LoginTransitionProvider({ children }: LoginTransitionProviderProps) {
   const [phase, dispatch] = useReducer(reduceLoginTransition, "idle");
@@ -64,6 +67,7 @@ export function LoginTransitionProvider({ children }: LoginTransitionProviderPro
   const pathname = usePathname();
   const router = useRouter();
   const { update } = useSession();
+  const { iniciarConfirmacao } = useRecuperacaoSessao();
   const reducedMotion = useReducedMotion();
   const voyage = useMotionValue(0);
   const authenticationHandledRef = useRef(false);
@@ -71,6 +75,8 @@ export function LoginTransitionProvider({ children }: LoginTransitionProviderPro
   const hardNavigationTimerRef = useRef<number | null>(null);
   const transitionLoadTimerRef = useRef<number | null>(null);
   const resetTimerRef = useRef<number | null>(null);
+  const confirmationTimerRef = useRef<number | null>(null);
+  const confirmationGenerationRef = useRef(0);
 
   const clearHardNavigationTimer = useCallback(() => {
     if (!hardNavigationTimerRef.current) return;
@@ -79,6 +85,10 @@ export function LoginTransitionProvider({ children }: LoginTransitionProviderPro
   }, []);
 
   const clearTransitionTimers = useCallback(() => {
+    if (confirmationTimerRef.current !== null) {
+      window.clearTimeout(confirmationTimerRef.current);
+      confirmationTimerRef.current = null;
+    }
     if (transitionLoadTimerRef.current !== null) {
       window.clearTimeout(transitionLoadTimerRef.current);
       transitionLoadTimerRef.current = null;
@@ -94,6 +104,9 @@ export function LoginTransitionProvider({ children }: LoginTransitionProviderPro
   }, []);
 
   const beginValidation = useCallback(() => {
+    iniciarConfirmacao();
+    confirmationGenerationRef.current++;
+    clearHardNavigationTimer();
     clearTransitionTimers();
     authenticationHandledRef.current = false;
     navigationStartedRef.current = false;
@@ -102,9 +115,10 @@ export function LoginTransitionProvider({ children }: LoginTransitionProviderPro
     voyage.set(0);
     dispatch({ type: "SUBMIT" });
     void loadLoginSuccessTransition().catch(() => undefined);
-  }, [clearTransitionTimers, voyage]);
+  }, [clearHardNavigationTimer, clearTransitionTimers, iniciarConfirmacao, voyage]);
 
   const reportAuthFailure = useCallback((message: string) => {
+    confirmationGenerationRef.current++;
     clearTransitionTimers();
     authenticationHandledRef.current = false;
     setVisualReady(false);
@@ -115,20 +129,31 @@ export function LoginTransitionProvider({ children }: LoginTransitionProviderPro
   const confirmAuthenticated = useCallback(async () => {
     if (authenticationHandledRef.current) return;
     authenticationHandledRef.current = true;
+    const attempt = confirmationGenerationRef.current;
+    // Arm before any await. The session bridge independently aborts the request
+    // (including its body) at8s; this watchdog also bounds a broken consumer.
+    confirmationTimerRef.current = window.setTimeout(() => {
+      if (attempt !== confirmationGenerationRef.current) return;
+      reportAuthFailure("A conexão demorou a responder. Tente novamente.");
+    }, SESSION_CONFIRMATION_TIMEOUT_MS);
 
     try {
       const refreshedSession = await update();
-      if (!refreshedSession?.user) {
+      if (attempt !== confirmationGenerationRef.current) return;
+      if (!sessaoPermiteOperacao(refreshedSession)) {
         authenticationHandledRef.current = false;
         reportAuthFailure("Não foi possível confirmar sua sessão. Tente novamente.");
         return;
       }
+      if (confirmationTimerRef.current !== null) window.clearTimeout(confirmationTimerRef.current);
+      confirmationTimerRef.current = null;
       dispatch({ type: "AUTH_SUCCESS" });
       transitionLoadTimerRef.current = window.setTimeout(
         navigateWithoutTransition,
         TRANSITION_LOAD_TIMEOUT_MS,
       );
     } catch {
+      if (attempt !== confirmationGenerationRef.current) return;
       authenticationHandledRef.current = false;
       reportAuthFailure("Não foi possível confirmar sua sessão. Tente novamente.");
     }
@@ -160,6 +185,7 @@ export function LoginTransitionProvider({ children }: LoginTransitionProviderPro
   }, [clearHardNavigationTimer, pathname, phase]);
 
   useEffect(() => () => {
+    confirmationGenerationRef.current++;
     clearHardNavigationTimer();
     clearTransitionTimers();
   }, [clearHardNavigationTimer, clearTransitionTimers]);

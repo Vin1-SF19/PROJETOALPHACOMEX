@@ -6,13 +6,14 @@ import {
 } from "@/lib/auth/navegacao-sessao";
 
 describe("navegação após expiração da sessão", () => {
-  it("encerra uma sessão revogada ao receber 403", () => {
-    expect(deveEncerrarSessaoPorHeartbeat(403, false)).toBe(true);
+  it("encerra apenas com revogação explicitamente confirmada pelo protocolo", () => {
+    expect(deveEncerrarSessaoPorHeartbeat(403, false)).toBe(false);
+    expect(deveEncerrarSessaoPorHeartbeat(403, false, {estadoAcesso: "NEGADO", acessoBloqueado: true})).toBe(true);
   });
 
   it("encerra no 401 somente quando a janela já esteve autenticada", () => {
-    expect(deveEncerrarSessaoPorHeartbeat(401, true)).toBe(true);
-    expect(deveEncerrarSessaoPorHeartbeat(401, false)).toBe(false);
+    expect(deveEncerrarSessaoPorHeartbeat(401, true, null)).toBe(true);
+    expect(deveEncerrarSessaoPorHeartbeat(401, false, null)).toBe(false);
   });
 
   it("não encerra a sessão por respostas sem relação com autenticação", () => {

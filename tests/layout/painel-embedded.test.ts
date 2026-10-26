@@ -137,7 +137,7 @@ describe('wiring server-side e segurança do handshake', () => {
     const shell = readFileSync(join(root, 'src/components/layout/PainelLayoutClient.tsx'), 'utf8');
     const middleware = readFileSync(join(root, 'middleware.ts'), 'utf8');
 
-    expect(layout.indexOf('await auth()')).toBeLessThan(layout.indexOf('if (isEmbedded)'));
+    expect(layout.indexOf('await authComEstadoAcesso()')).toBeLessThan(layout.indexOf('if (isEmbedded)'));
     expect(layout.indexOf('!statusPermiteAcessoPainel(userRecord.status)')).toBeLessThan(
       layout.indexOf('if (isEmbedded)'),
     );

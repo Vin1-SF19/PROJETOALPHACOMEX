@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../../auth";
@@ -28,6 +29,7 @@ function assinaturaPngValida(bytes: Uint8Array): boolean {
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ success: false, error: "Não autorizado" }, { status: 401 });
 
@@ -72,8 +74,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     return NextResponse.json({ success: true, thumbnailUrl: blob.url });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     if (urlEnviada) excluirBlobMotion(urlEnviada).catch(() => undefined);
     console.error("[POST /api/apresentacoes/[id]/miniatura]", error);
     return NextResponse.json({ success: false, error: "Não foi possível salvar a miniatura" }, { status: 500 });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

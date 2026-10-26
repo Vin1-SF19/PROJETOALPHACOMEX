@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from "next/server";
 import { requirePreAnaliseAccess } from "@/lib/pre-analise/access";
 import { validarCnpj } from "@/lib/gerador-documentos/cnpj";
@@ -6,6 +7,7 @@ import { consultarRadar, ErroConsultaRadar } from "@/lib/radar/consulta";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
+  try {
   const denied = await requirePreAnaliseAccess("tributario");
   if (denied) return denied;
   const cnpj = (new URL(req.url).searchParams.get("cnpj") || "").replace(/\D/g, "");
@@ -16,9 +18,16 @@ export async function GET(req: Request) {
   try {
     return NextResponse.json(await consultarRadar(cnpj));
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     if (error instanceof ErroConsultaRadar) {
       return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
     }
     return NextResponse.json({ error: "Não foi possível consultar o RADAR" }, { status: 502 });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

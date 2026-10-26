@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { auth } from "../../../../../auth";
 import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
@@ -18,6 +19,7 @@ function verificarRateLimit(userId: string): boolean {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+  try {
     const session = await auth();
     const user = session?.user as { id?: string; role?: string } | undefined;
 
@@ -77,7 +79,14 @@ export async function POST(request: Request): Promise<NextResponse> {
 
         return NextResponse.json({ url: blob.url });
     } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
         console.error("contratos/upload:", err);
         return NextResponse.json({ error: "Erro ao fazer upload" }, { status: 500 });
     }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

@@ -1,3 +1,4 @@
+import { mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { z } from "zod";
 import { auth } from "../../../../../../../auth";
 import db from "@/lib/prisma";
@@ -52,7 +53,9 @@ export async function GET() {
       },
     });
     return Response.json({ rows }, { headers: { "Cache-Control": "no-store" } });
-  } catch {
+  } catch (authError) {
+    const authUnavailableResponse = mapearIndisponibilidadeAuth(authError);
+    if (authUnavailableResponse) return authUnavailableResponse;
     return Response.json({ error: "UNAUTHENTICATED" }, { status: 401 });
   }
 }
@@ -87,7 +90,9 @@ export async function POST(request: Request) {
       { ...row, key },
       { status: 201, headers: { "Cache-Control": "no-store" } },
     );
-  } catch {
+  } catch (authError) {
+    const authUnavailableResponse = mapearIndisponibilidadeAuth(authError);
+    if (authUnavailableResponse) return authUnavailableResponse;
     return Response.json({ error: "API_KEY_CREATE_FAILED" }, { status: 400 });
   }
 }
@@ -108,7 +113,9 @@ export async function DELETE(request: Request) {
       { revoked: result.count === 1 },
       { headers: { "Cache-Control": "no-store" } },
     );
-  } catch {
+  } catch (authError) {
+    const authUnavailableResponse = mapearIndisponibilidadeAuth(authError);
+    if (authUnavailableResponse) return authUnavailableResponse;
     return Response.json({ error: "UNAUTHENTICATED" }, { status: 401 });
   }
 }

@@ -1,3 +1,5 @@
+import { AcessoTemporariamenteIndisponivel } from "@/lib/auth/indisponibilidade";
+import { sessaoEstaIndisponivel } from "@/lib/auth/estado-acesso";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { findUserByCredentials } from "@/lib/user";
@@ -97,6 +99,7 @@ const nextAuth = NextAuth({
         token.authSessionVersion = Number(user.authSessionVersion ?? 0);
         token.statusUsuario = STATUS_USUARIO_ATIVO;
         token.acessoBloqueado = false;
+        token.estadoAcesso = "PERMITIDO";
       } else {
         token = await revalidarTokenAcesso(token);
       }
@@ -118,9 +121,17 @@ const nextAuth = NextAuth({
     },
 
     async session({ session, token }) {
+      if (token.estadoAcesso === "INDISPONIVEL" && !token.acessoBloqueado) {
+        // Return an explicit public DTO, without any stale identity/role/permissions.
+        session.user = undefined as never;
+        session.estadoAcesso = "INDISPONIVEL";
+        session.acessoBloqueado = false;
+        return session;
+      }
       if (token.acessoBloqueado || !token.id) {
         session.user = undefined as never;
         session.acessoBloqueado = true;
+        session.estadoAcesso = "NEGADO";
         return session;
       }
 
@@ -144,6 +155,7 @@ const nextAuth = NextAuth({
         session.user.senhaTemporaria = !!token.senhaTemporaria;
         session.user.authSessionVersion = Number(token.authSessionVersion ?? 0);
         session.acessoBloqueado = false;
+        session.estadoAcesso = "PERMITIDO";
       }
 
       return session;
@@ -160,7 +172,10 @@ export async function authComEstadoAcesso() {
 export async function auth() {
   const session = await authComEstadoAcesso();
 
-  if (session?.acessoBloqueado) {
+  // Deliberately outside callbacks: Auth.js must not delete a valid cookie.
+  if (sessaoEstaIndisponivel(session)) throw new AcessoTemporariamenteIndisponivel();
+
+  if (session?.acessoBloqueado || !session?.user?.id) {
     return null;
   }
 

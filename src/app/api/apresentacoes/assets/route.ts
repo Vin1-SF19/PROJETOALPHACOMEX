@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
@@ -22,6 +23,7 @@ async function podeEditar(apresentacaoId: string, userId: number, role?: string)
 }
 
 export async function POST(request: NextRequest) {
+  try {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ success: false, error: "Não autorizado" }, { status: 401 });
 
@@ -66,10 +68,17 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, asset: { ...asset, createdAt: asset.createdAt.toISOString() } });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     if (urlEnviada) {
       await excluirBlobMotion(urlEnviada).catch(() => undefined);
     }
     console.error("[POST /api/apresentacoes/assets]", error);
     return NextResponse.json({ success: false, error: "Não foi possível enviar o arquivo" }, { status: 500 });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

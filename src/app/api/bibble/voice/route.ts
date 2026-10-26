@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from "next/server";
 
 import { auth } from "../../../../../auth";
@@ -51,6 +52,7 @@ async function requireUser(): Promise<{ userId: string } | { response: NextRespo
 }
 
 export async function GET(request: Request) {
+  try {
   const identity = await requireUser();
   if ("response" in identity) return identity.response;
 
@@ -86,11 +88,19 @@ export async function GET(request: Request) {
           },
     });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     return publicError(error);
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }
 
 export async function POST(request: Request) {
+  try {
   const identity = await requireUser();
   if ("response" in identity) return identity.response;
 
@@ -142,6 +152,13 @@ export async function POST(request: Request) {
       lease.release();
     }
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     return publicError(error);
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

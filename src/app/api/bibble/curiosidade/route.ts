@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from "next/server";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
@@ -39,13 +40,15 @@ async function writeCache(cache: Cache): Promise<void> {
 // ── Route ────────────────────────────────────────────────────────────────────
 
 export async function GET() {
+  try {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   // ── Lê tópicos (aceita "- " e "* ") ─────────────────────────────────────
   let content: string;
   try {
     content = await readFile(path.join(process.cwd(), "bibble-topicos.md"), "utf-8");
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return NextResponse.json({ error: "bibble-topicos.md não encontrado" }, { status: 404 });
   }
 
@@ -106,7 +109,8 @@ export async function GET() {
       }),
       signal: AbortSignal.timeout(28_000),
     });
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     console.error("[BIBBLE/CURIOSIDADE] provider-unavailable");
     lease.release();
     return NextResponse.json({ error: "Ollama indisponível" }, { status: 502 });
@@ -142,4 +146,10 @@ export async function GET() {
   void writeCache(cache);
 
   return NextResponse.json({ curiosidade, topic });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

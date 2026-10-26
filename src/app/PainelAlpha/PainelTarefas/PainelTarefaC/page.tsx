@@ -387,7 +387,7 @@ export default function PainelTarefas() {
                             <div className="flex items-center gap-4">
                                 <div className="relative group">
                                     <img
-                                        src={session?.user.imagemUrl || '/panda.png'}
+                                        src={session?.user?.imagemUrl || '/panda.png'}
                                         alt='Avatar'
                                         className="w-14 h-14 object-cover rounded-[1.3rem] border-2 border-indigo-500/20 shadow-lg"
                                     />
@@ -396,10 +396,10 @@ export default function PainelTarefas() {
                                 <div>
                                     <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Operador(a):</p>
                                     <h1 className="text-xl font-black text-white uppercase italic tracking-tighter leading-none">
-                                        {session?.user.nome || "Usuário"}
+                                        {session?.user?.nome || "Usuário"}
                                     </h1>
                                     <span className='text-indigo-400 font-bold text-[12px] uppercase tracking-widest'>
-                                        {session?.user.role}
+                                        {session?.user?.role}
                                     </span>
                                 </div>
                             </div>

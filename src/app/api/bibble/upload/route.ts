@@ -1,3 +1,4 @@
+import { mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '../../../../../auth';
@@ -60,6 +61,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(jsonResponse);
   } catch (error) {
+    const authUnavailableResponse = mapearIndisponibilidadeAuth(error);
+    if (authUnavailableResponse) return authUnavailableResponse;
     console.error('[BIBBLE UPLOAD] Error:', error);
     return NextResponse.json(
       { error: 'Failed to generate upload token' },
@@ -120,6 +123,8 @@ export async function PUT(request: NextRequest) {
       },
     });
   } catch (error) {
+    const authUnavailableResponse = mapearIndisponibilidadeAuth(error);
+    if (authUnavailableResponse) return authUnavailableResponse;
     console.error('[BIBBLE UPLOAD DIRECT] Error:', error);
     return NextResponse.json(
       { error: 'File upload failed' },

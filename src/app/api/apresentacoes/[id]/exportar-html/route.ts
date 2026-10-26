@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { auth } from "../../../../../../auth";
 import db from "@/lib/prisma";
 import { checarOwnershipApresentacao } from "@/lib/apresentacoes/ownership";
@@ -26,6 +27,7 @@ function escaparTextoHtml(texto: string): string {
  * (`PlayerStandalone.tsx`).
  */
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
+  try {
   const session = await auth();
   if (!session?.user?.id) return new Response("Não autenticado", { status: 401 });
 
@@ -70,6 +72,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     const fontesDisponiveis = mesclarFontesPersonalizadas(await listarFontesGlobais(), fontesHospedadas);
     fontesPersonalizadas = await embutirFontesPersonalizadas(filtrarFontesUsadas(fontesDisponiveis, slidesBase));
   } catch (erro) {
+    if (acessoEstaIndisponivel(erro)) throw erro;
     if (erro instanceof OrcamentoAssetsExcedidoError || erro instanceof OrcamentoFontesExcedidoError) {
       return new Response(erro.message, { status: 413 });
     }
@@ -112,4 +115,10 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       "Cache-Control": "no-store",
     },
   });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -30,6 +31,7 @@ function jsonError(error: string, status: number, code: string) {
 }
 
 export async function POST(request: NextRequest) {
+  try {
   let userId: number | null = null;
   let liberarLimite: (() => void) | null = null;
   try {
@@ -64,10 +66,17 @@ export async function POST(request: NextRequest) {
     );
     return NextResponse.json({ success: true, data: resultado }, { headers: MESCLAGEM_NO_STORE_HEADERS });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     if (error instanceof ErroMesclagem) return jsonError(error.message, error.status, error.code);
     if (userId !== null) await registrarAuditoriaMesclagemBestEffort(userId, "MESCLAGEM_SUGERIR_FALHA", "Falha técnica na sugestão; sucesso=false");
     return jsonError("Não foi possível sugerir o mapeamento", 500, "SUGGESTION_FAILED");
   } finally {
     liberarLimite?.();
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../../auth";
 import { transcribeAudio, OnyxError } from "@/lib/onyx/client";
@@ -11,6 +12,7 @@ const ALLOWED = ["audio/webm", "audio/ogg", "audio/mpeg", "audio/mp4", "audio/wa
 
 // POST /api/onyx/voice/transcribe — STT: áudio do microfone → texto.
 export async function POST(req: NextRequest) {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -43,7 +45,14 @@ export async function POST(req: NextRequest) {
     const text = data.text ?? data.transcription ?? data.transcript ?? Object.values(data)[0] ?? "";
     return NextResponse.json({ text });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     const code = err instanceof OnyxError ? err.status : 500;
     return NextResponse.json({ error: (err as Error).message }, { status: code });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

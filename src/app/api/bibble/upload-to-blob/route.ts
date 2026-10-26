@@ -1,3 +1,4 @@
+import { mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import { acquireBibbleLease } from "@/lib/bibble/admission-control";
@@ -6,6 +7,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 export async function POST() {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -19,5 +21,11 @@ export async function POST() {
     );
   } finally {
     lease.release();
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

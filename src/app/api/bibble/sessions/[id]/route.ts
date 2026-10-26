@@ -1,3 +1,4 @@
+import { mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../../auth";
 import db from "@/lib/prisma";
@@ -26,6 +27,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -47,12 +49,19 @@ export async function GET(
   });
   const hasMore = descending.length > query.data.limit;
   return NextResponse.json({ ...bibbleSession, messages: descending.slice(0, query.data.limit).reverse(), pagination: { page: query.data.page, limit: query.data.limit, hasMore } });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!sameOrigin(req)) return NextResponse.json({ error: "Origem não permitida" }, { status: 403 });
@@ -74,12 +83,19 @@ export async function PATCH(
   });
 
   return NextResponse.json(updated);
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }
 
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -92,4 +108,10 @@ export async function DELETE(
   await db.bibbleSession.delete({ where: { id } });
 
   return new NextResponse(null, { status: 204 });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

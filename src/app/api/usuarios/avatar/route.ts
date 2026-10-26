@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 
@@ -17,6 +18,7 @@ function filenameSeguro(value: string | null): string {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
@@ -55,7 +57,14 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     return NextResponse.json({ url: blob.url });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     console.error("[AVATAR_UPLOAD]", error);
     return NextResponse.json({ error: "Não foi possível enviar a foto." }, { status: 500 });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

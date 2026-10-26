@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import {
   getCCPair,
@@ -24,6 +25,7 @@ function parseId(raw: string): number | null {
 
 // GET /api/onyx/connectors/:ccPairId — detalhe completo da fonte.
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ ccPairId: string }> }) {
+  try {
   const authz = await authorizeConnectors();
   if (!authz.ok) return NextResponse.json({ error: authz.error }, { status: authz.status });
 
@@ -35,7 +37,14 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ ccPairId: 
     const cc = await getCCPair(id);
     return NextResponse.json(cc);
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     return fail(err);
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }
 
@@ -47,6 +56,7 @@ interface PatchBody {
 
 // PATCH /api/onyx/connectors/:ccPairId — pausar / reativar / renomear / reindexar.
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ ccPairId: string }> }) {
+  try {
   const authz = await authorizeConnectors();
   if (!authz.ok) return NextResponse.json({ error: authz.error }, { status: authz.status });
 
@@ -86,12 +96,20 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ ccPairId:
     }
     return NextResponse.json({ success: true });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     return fail(err);
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }
 
 // DELETE /api/onyx/connectors/:ccPairId — agenda exclusão da fonte.
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ ccPairId: string }> }) {
+  try {
   const authz = await authorizeConnectors();
   if (!authz.ok) return NextResponse.json({ error: authz.error }, { status: authz.status });
 
@@ -108,6 +126,13 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ ccPairI
     await deleteCCPair(cc.connector.id, credId);
     return NextResponse.json({ success: true });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     return fail(err);
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

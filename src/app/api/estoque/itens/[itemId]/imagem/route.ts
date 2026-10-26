@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { del, put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import db from "@/lib/prisma";
@@ -47,6 +48,7 @@ function isValidItemId(itemId: string): boolean {
 }
 
 export async function POST(request: Request, { params }: RouteContext): Promise<NextResponse> {
+  try {
   const actor = await getInventoryActor();
   if (!actor?.canManage) return responseError("Sem permissão para alterar fotos do estoque.", 403);
 
@@ -74,7 +76,8 @@ export async function POST(request: Request, { params }: RouteContext): Promise<
     if (!encodedFilename) return responseError("Informe o nome original do arquivo.", 400);
     try {
       filename = decodeURIComponent(encodedFilename);
-    } catch {
+    } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
       return responseError("Nome de arquivo inválido.", 400);
     }
     const metadataError = validateInventoryImageMetadata(
@@ -151,6 +154,7 @@ export async function POST(request: Request, { params }: RouteContext): Promise<
     }
     return NextResponse.json({ success: true, url: uploaded.url });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     if (uploadedUrl) {
       await removeManagedBlob(uploadedUrl).catch(() => undefined);
     }
@@ -158,9 +162,16 @@ export async function POST(request: Request, { params }: RouteContext): Promise<
     console.error("[POST_ESTOQUE_IMAGEM]", error instanceof Error ? error.message : "Falha desconhecida");
     return responseError("Não foi possível salvar a foto. O cadastro anterior foi preservado.", 500);
   }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }
 
 export async function DELETE(_request: Request, { params }: RouteContext): Promise<NextResponse> {
+  try {
   const actor = await getInventoryActor();
   if (!actor?.canManage) return responseError("Sem permissão para alterar fotos do estoque.", 403);
 
@@ -203,8 +214,15 @@ export async function DELETE(_request: Request, { params }: RouteContext): Promi
     }
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     if (error instanceof Error && error.message === "ITEM_NOT_FOUND") return responseError("Item não encontrado ou arquivado.", 404);
     console.error("[DELETE_ESTOQUE_IMAGEM]", error instanceof Error ? error.message : "Falha desconhecida");
     return responseError("Não foi possível remover a foto. O cadastro anterior foi preservado.", 500);
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

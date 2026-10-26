@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from "next/server";
 
 import {
@@ -18,6 +19,7 @@ function jsonError(error: string, status: number, code: string) {
 }
 
 export async function GET() {
+  try {
   let authenticatedUserId: number | null = null;
 
   try {
@@ -65,7 +67,8 @@ export async function GET() {
         "X-Robots-Tag": "noindex, nofollow, noarchive",
       },
     });
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     if (authenticatedUserId !== null) {
       await registrarAuditoriaCsNpsBestEffort(
         authenticatedUserId,
@@ -74,5 +77,11 @@ export async function GET() {
       );
     }
     return jsonError("Não foi possível gerar a exportação", 500, "EXPORT_FAILED");
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

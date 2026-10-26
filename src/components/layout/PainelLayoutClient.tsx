@@ -42,7 +42,7 @@ import {
   AGENDA_ALPHA_URL,
   type IntencaoAgendaAlpha,
 } from '@/lib/google-calendar/navegacao';
-import { signOut } from 'next-auth/react';
+import { useRecuperacaoSessao } from '@/components/auth/SessaoResilienteProvider';
 import { urlRepresentaLoginDoPainel } from '@/lib/auth/navegacao-sessao';
 import {
   ensurePinnedHome,
@@ -168,7 +168,7 @@ export default function PainelLayoutClient({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [tabsHydrated, setTabsHydrated] = useState(false);
   const [frameRuntime, setFrameRuntime] = useState<PainelFrameRuntimeByTab>({});
-  const encerrandoSessaoRef = useRef(false);
+  const { confirmar: confirmarSessao, sinalizarIndisponibilidade } = useRecuperacaoSessao();
   const iframesRef = useRef(new Map<string, HTMLIFrameElement>());
   const tabsAtuaisRef = useRef(tabs);
   useEffect(() => { tabsAtuaisRef.current = tabs; }, [tabs]);
@@ -597,11 +597,12 @@ export default function PainelLayoutClient({
                     const href = event.currentTarget.contentWindow?.location.href;
                     if (
                       href &&
-                      urlRepresentaLoginDoPainel(href, window.location.origin) &&
-                      !encerrandoSessaoRef.current
+                      urlRepresentaLoginDoPainel(href, window.location.origin)
                     ) {
-                      encerrandoSessaoRef.current = true;
-                      void signOut({ redirectTo: '/' });
+                      // A login URL is not evidence of revocation. Keep other tabs
+                      // mounted while the shared, bounded session read confirms it.
+                      setFrameRuntime(prev => setPainelFrameStatus(prev, tab.id, runtime.attempt, 'error'));
+                      void confirmarSessao().catch(() => sinalizarIndisponibilidade());
                     }
                   } catch {
                     // Um iframe cross-origin não participa da autenticação do painel.

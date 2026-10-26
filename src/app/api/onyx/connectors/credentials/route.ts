@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import {
   listCredentials,
@@ -17,17 +18,26 @@ function fail(err: unknown) {
 
 // GET /api/onyx/connectors/credentials — lista credenciais.
 export async function GET() {
+  try {
   const authz = await authorizeConnectors();
   if (!authz.ok) return NextResponse.json({ error: authz.error }, { status: authz.status });
   try {
     return NextResponse.json({ credentials: await listCredentials() });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     return fail(err);
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }
 
 // POST /api/onyx/connectors/credentials — cria credencial.
 export async function POST(req: NextRequest) {
+  try {
   const authz = await authorizeConnectors();
   if (!authz.ok) return NextResponse.json({ error: authz.error }, { status: authz.status });
 
@@ -39,12 +49,20 @@ export async function POST(req: NextRequest) {
     const cred = await createCredential(body);
     return NextResponse.json({ success: true, credential: cred });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     return fail(err);
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }
 
 // DELETE /api/onyx/connectors/credentials?id=N — exclui credencial.
 export async function DELETE(req: NextRequest) {
+  try {
   const authz = await authorizeConnectors();
   if (!authz.ok) return NextResponse.json({ error: authz.error }, { status: authz.status });
 
@@ -54,6 +72,13 @@ export async function DELETE(req: NextRequest) {
     await deleteCredential(id);
     return NextResponse.json({ success: true });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     return fail(err);
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

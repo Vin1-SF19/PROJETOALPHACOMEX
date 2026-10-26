@@ -1,3 +1,4 @@
+import { mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../../auth";
@@ -58,6 +59,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     });
     return NextResponse.json(jsonResponse);
   } catch (error) {
+    const authUnavailableResponse = mapearIndisponibilidadeAuth(error);
+    if (authUnavailableResponse) return authUnavailableResponse;
     console.error("[POST pptx-upload]", error);
     return NextResponse.json({ success: false, error: "Não foi possível autorizar o upload do PowerPoint." }, { status: 400 });
   }
@@ -88,6 +91,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (temporarias.length > 0) await excluirBlobMotion(temporarias);
     return NextResponse.json({ success: true, removidos: temporarias.length });
   } catch (error) {
+    const authUnavailableResponse = mapearIndisponibilidadeAuth(error);
+    if (authUnavailableResponse) return authUnavailableResponse;
     console.error("[DELETE pptx-upload]", error);
     return NextResponse.json({ success: false, error: "Não foi possível limpar os arquivos temporários." }, { status: 500 });
   }

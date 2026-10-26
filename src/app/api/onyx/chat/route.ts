@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest } from "next/server";
 import { auth } from "../../../../../auth";
 import {
@@ -159,6 +160,7 @@ interface OnyxPacket {
 }
 
 export async function POST(req: NextRequest) {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return new Response(JSON.stringify({ error: "Não autorizado" }), { status: 401 });
@@ -170,7 +172,8 @@ export async function POST(req: NextRequest) {
     const parsed = onyxChatSchema.safeParse(JSON.parse(raw));
     if (!parsed.success) return new Response(JSON.stringify({ error: "Payload Onyx inválido" }), { status: 400 });
     input = parsed.data;
-  } catch {
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return new Response(JSON.stringify({ error: "Payload Onyx inválido ou excede o limite" }), { status: 413 });
   }
   const message = (input.message ?? "").trim();
@@ -228,6 +231,7 @@ export async function POST(req: NextRequest) {
       );
       fileDescriptors = await uploadChatFiles(blobs, userToken);
     } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
       void err;
       console.error("[ONYX_ATTACHMENT_UPLOAD_FAILED]");
     }
@@ -437,4 +441,10 @@ export async function POST(req: NextRequest) {
       Connection: "keep-alive",
     },
   });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

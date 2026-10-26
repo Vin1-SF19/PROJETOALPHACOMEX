@@ -1,3 +1,5 @@
+import { acessoEstaIndisponivel } from "@/lib/auth/indisponibilidade";
+import { AUTH_UNAVAILABLE, AUTH_UNAVAILABLE_MESSAGE } from "@/lib/auth/estado-acesso";
 import { randomUUID, createHash } from "node:crypto";
 import { z } from "zod";
 import type { ErrorCode, Result } from "./types";
@@ -17,6 +19,11 @@ export async function resultado<T>(fn: () => Promise<T>): Promise<Result<T>> {
   try {
     return { ok: true, data: await fn(), requestId };
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) return {
+      ok: false,
+      error: { code: AUTH_UNAVAILABLE, message: AUTH_UNAVAILABLE_MESSAGE },
+      requestId,
+    };
     if (error instanceof z.ZodError)
       return {
         ok: false,

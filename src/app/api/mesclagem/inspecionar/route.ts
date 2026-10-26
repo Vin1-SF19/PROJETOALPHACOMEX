@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 
 import {
@@ -30,6 +31,7 @@ function jsonError(error: string, status: number, code: string) {
 }
 
 export async function POST(request: NextRequest) {
+  try {
   let userId: number | null = null;
   let liberarLimite: (() => void) | null = null;
   try {
@@ -69,6 +71,7 @@ export async function POST(request: NextRequest) {
     );
     return NextResponse.json({ success: true, data: inspecao }, { status: 200, headers: MESCLAGEM_NO_STORE_HEADERS });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     if (error instanceof ErroMesclagem) {
       return jsonError(error.message, error.status, error.code);
     }
@@ -78,5 +81,11 @@ export async function POST(request: NextRequest) {
     return jsonError("Não foi possível inspecionar a planilha", 500, "INSPECT_FAILED");
   } finally {
     liberarLimite?.();
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

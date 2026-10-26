@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { auth } from "../../../../../../auth";
 import { podeGerenciarMetas } from "@/lib/metas-permissoes";
 import { put } from "@vercel/blob";
@@ -21,6 +22,7 @@ function verificarRateLimit(userId: string): boolean {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+  try {
   const session = await auth();
   const user = session?.user as { id?: string; role?: string } | undefined;
   if (!user?.id) {
@@ -92,8 +94,15 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     return NextResponse.json({ success: true, url: blob.url, size: bytes.length });
   } catch (e) {
+    if (acessoEstaIndisponivel(e)) throw e;
     const err = e as Error;
     console.error("[metas/justificativas/upload] userId=" + user.id, err.message);
     return NextResponse.json({ success: false, error: "Erro ao salvar arquivo" }, { status: 500 });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

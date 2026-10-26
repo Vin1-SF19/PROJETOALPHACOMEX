@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from 'next/server';
 import { encaminharWorkerCatcher } from '@/lib/alpha-catcher/worker-client';
 import { acessoCatcher } from '@/lib/alpha-catcher/access';
@@ -8,6 +9,7 @@ import { z } from 'zod';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export async function GET(req: Request) {
+  try {
   const acesso = await acessoCatcher();
   if (acesso.status !== 200) return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: acesso.status });
   const id = new URL(req.url).searchParams.get('id') || '';
@@ -18,14 +20,22 @@ export async function GET(req: Request) {
   if (remoto) return remoto;
   const job = lerColetaResposta(id, acesso.userId!, desde);
   return job ? NextResponse.json(job, { headers: { 'Cache-Control': 'no-store' } }) : NextResponse.json({ error: 'Execução não encontrada.' }, { status: 404 });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }
 export async function POST(req: Request) {
+  try {
   const acesso = await acessoCatcher();
   if (acesso.status !== 200) return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: acesso.status });
   try {
     const origin = req.headers.get('origin');
     if (!origin || new URL(origin).host !== req.headers.get('host') || req.headers.get('sec-fetch-site') === 'cross-site') return NextResponse.json({ error: 'Origem inválida.' }, { status: 403 });
-  } catch { return NextResponse.json({ error: 'Origem inválida.' }, { status: 403 }); }
+  } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError; return NextResponse.json({ error: 'Origem inválida.' }, { status: 403 }); }
   if (!req.headers.get('content-type')?.startsWith('application/json')) return NextResponse.json({ error: 'Envie JSON.' }, { status: 415 });
   const reader = req.body?.getReader(); const partes: Uint8Array[] = []; let size = 0;
   if (reader) for (;;) {
@@ -34,14 +44,16 @@ export async function POST(req: Request) {
     partes.push(value);
   }
   let data;
-  try { data = JSON.parse(Buffer.concat(partes).toString('utf8')); } catch { return NextResponse.json({ error: 'JSON inválido.' }, { status: 400 }); }
+  try { data = JSON.parse(Buffer.concat(partes).toString('utf8')); } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError; return NextResponse.json({ error: 'JSON inválido.' }, { status: 400 }); }
   if (data?.acao === 'retomar') {
     const id = z.string().uuid().safeParse(data.id);
     if (!id.success) return NextResponse.json({ error: 'Importação inválida.' }, { status: 400 });
     const remoto = await encaminharWorkerCatcher('retomar', acesso.userId!, id.data);
     if (remoto) return remoto;
     try { return NextResponse.json(await retomarColeta(id.data, acesso.userId!), { status: 202 }); }
-    catch { return NextResponse.json({ error: 'Não foi possível retomar. Confira autoria, estado e execução ativa.' }, { status: 409 }); }
+    catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError; return NextResponse.json({ error: 'Não foi possível retomar. Confira autoria, estado e execução ativa.' }, { status: 409 }); }
   }
   if (data?.acao === 'cancelar' && typeof data.id === 'string') {
     const remoto = await encaminharWorkerCatcher('cancelar', acesso.userId!, data.id);
@@ -58,5 +70,12 @@ export async function POST(req: Request) {
   const remoto = await encaminharWorkerCatcher('iniciar', acesso.userId!, parsed.data);
   if (remoto) return remoto;
   try { return NextResponse.json(await iniciarColeta(acesso.userId!, parsed.data), { status: 202 }); }
-  catch { return NextResponse.json({ error: 'Não foi possível iniciar. Confira a disponibilidade do banco e se há outra coleta em andamento.' }, { status: 409 }); }
+  catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError; return NextResponse.json({ error: 'Não foi possível iniciar. Confira a disponibilidade do banco e se há outra coleta em andamento.' }, { status: 409 }); }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

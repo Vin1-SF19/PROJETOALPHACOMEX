@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { get, head } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -21,6 +22,7 @@ const finalizarSchema = z.object({
 
 /** Confere o arquivo já gravado no store privado antes de assinar o recibo. */
 export async function POST(request: NextRequest) {
+  try {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ success: false, error: "Não autorizado" }, { status: 401 });
   const token = obterTokenBlobPrivadoAnexoBpm();
@@ -28,7 +30,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Armazenamento privado indisponível" }, { status: 503 });
   }
   let body: unknown;
-  try { body = await request.json(); } catch {
+  try { body = await request.json(); } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
     return NextResponse.json({ success: false, error: "Dados inválidos" }, { status: 400 });
   }
   const parsed = finalizarSchema.safeParse(body);
@@ -42,7 +45,8 @@ export async function POST(request: NextRequest) {
   }
   const userId = Number(session.user.id);
   try { await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "enviarArquivo"); }
-  catch { return NextResponse.json({ success: false, error: "Não autorizado" }, { status: 403 }); }
+  catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError; return NextResponse.json({ success: false, error: "Não autorizado" }, { status: 403 }); }
   const referencia = criarReferenciaAnexoBpm(pathname);
   // O callback assinado do Blob pode chegar pouco depois da resposta do
   // upload ao navegador. Aguardar brevemente evita uma falha espúria.
@@ -70,7 +74,14 @@ export async function POST(request: NextRequest) {
     const recibo = criarReciboUploadAnexoBpm({ cardId, pathname, nome: originalName, tipo, tamanho: size });
     return NextResponse.json({ success: true, file: { originalName, mimeType: tipo, size, recibo } });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     console.error("[POST /api/bpm/upload/finalize]", { error: error instanceof Error ? error.name : "unknown" });
     return NextResponse.json({ success: false, error: "Não foi possível conferir o arquivo enviado. Tente novamente." }, { status: 502 });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

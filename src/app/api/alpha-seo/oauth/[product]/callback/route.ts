@@ -1,3 +1,4 @@
+import { mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAlphaSeoProjectAccess } from "@/lib/alpha-seo/project-access";
@@ -49,6 +50,8 @@ export async function GET(
       303,
     );
   } catch (error) {
+    const authUnavailableResponse = mapearIndisponibilidadeAuth(error);
+    if (authUnavailableResponse) return authUnavailableResponse;
     const safe = String(
       redactSecrets(error instanceof Error ? error.message : "Erro interno"),
     );

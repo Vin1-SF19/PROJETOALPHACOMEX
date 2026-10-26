@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 
 import {
@@ -41,14 +42,22 @@ function respostaXlsx(buffer: Buffer, historicoId: string, nome: string): Respon
 }
 
 export async function GET() {
+  try {
   return NextResponse.json(
     { success: false, error: "Use POST para gerar e registrar a exportação", code: "METHOD_NOT_ALLOWED" },
     { status: 405, headers: { ...MESCLAGEM_NO_STORE_HEADERS, Allow: "POST" } },
   );
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }
 
 /** Reprocessa o payload atual, persiste os três artefatos privados e devolve o resultado. */
 export async function POST(request: NextRequest) {
+  try {
   let userId: number | null = null;
   let liberarLimite: (() => void) | null = null;
   try {
@@ -85,10 +94,17 @@ export async function POST(request: NextRequest) {
     await registrarAuditoriaMesclagemBestEffort(userId, "MESCLAGEM_EXPORTAR", `Exportação persistida; historicoId=${historico.id}; totalLinhas=${resultado.resultado.resumo.totalLinhas}; sucesso=true`);
     return respostaXlsx(buffer, historico.id, nome);
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     if (error instanceof ErroMesclagem) return jsonError(error.message, error.status, error.code);
     if (userId !== null) await registrarAuditoriaMesclagemBestEffort(userId, "MESCLAGEM_EXPORTAR_FALHA", "Falha técnica na exportação stateless; sucesso=false");
     return jsonError("Não foi possível exportar a planilha", 500, "EXPORT_FAILED");
   } finally {
     liberarLimite?.();
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

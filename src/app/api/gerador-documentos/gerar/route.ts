@@ -1,3 +1,4 @@
+import { mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 
 import { GerarDocumento } from "@/actions/gerador-documentos";
@@ -9,6 +10,7 @@ import { GerarDocumento } from "@/actions/gerador-documentos";
  * lógica duplicada aqui.
  */
 export async function POST(request: NextRequest) {
+  try {
   const body = await request.json().catch(() => null);
   if (!body) {
     return NextResponse.json({ success: false, error: "Corpo da requisição inválido" }, { status: 400 });
@@ -21,4 +23,10 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json(resultado, { status: 201 });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

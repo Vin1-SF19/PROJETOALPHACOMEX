@@ -1,8 +1,10 @@
+import type { EstadoAcessoSessao } from "@/lib/auth/estado-acesso";
 import "next-auth";
 
 declare module "next-auth" {
   interface Session {
     acessoBloqueado?: boolean;
+    estadoAcesso?: EstadoAcessoSessao;
     authenticatedAt?: number;
     user: {
       id: string;
@@ -35,6 +37,7 @@ declare module "next-auth" {
     atalhos?: string | null;
     statusUsuario?: string;
     acessoBloqueado?: boolean;
+    estadoAcesso?: EstadoAcessoSessao;
     senhaTemporaria?: boolean;
     authSessionVersion?: number;
     imagemUrl?: string | null;
@@ -57,6 +60,7 @@ declare module "next-auth/jwt" {
     permissoes?: string[];
     statusUsuario?: string;
     acessoBloqueado?: boolean;
+    estadoAcesso?: EstadoAcessoSessao;
     senhaTemporaria?: boolean;
     authSessionVersion?: number;
     imagemUrl?: string | null;

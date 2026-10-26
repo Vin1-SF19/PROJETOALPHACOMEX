@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -59,6 +60,7 @@ function validarRequisicaoJson(request: NextRequest): void {
 }
 
 export async function POST(request: NextRequest) {
+  try {
   let userId: number | null = null;
   try {
     const acesso = await verificarAcessoAdministrativoCsNps();
@@ -103,6 +105,7 @@ export async function POST(request: NextRequest) {
       { status: 201, headers: CS_NPS_NO_STORE_HEADERS },
     );
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     if (error instanceof ErroImportacao) {
       if (userId !== null) {
         await registrarAuditoriaCsNpsBestEffort(
@@ -121,5 +124,11 @@ export async function POST(request: NextRequest) {
       );
     }
     return jsonError("Não foi possível salvar a importação", 500, "SAVE_FAILED");
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

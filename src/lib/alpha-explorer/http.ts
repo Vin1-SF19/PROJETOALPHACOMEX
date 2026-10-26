@@ -1,3 +1,4 @@
+import { mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import "server-only";
 
 import { NextResponse } from "next/server";
@@ -60,6 +61,8 @@ export function assertExplorerMutationRequest(request: Request, allowedOrigins?:
 export { resolveExplorerRequestOrigin } from "./request-origin";
 
 export function explorerErrorResponse(error: unknown, action: string): NextResponse {
+  const unavailable = mapearIndisponibilidadeAuth(error);
+  if (unavailable) return unavailable;
   const supportId = createSupportId();
   if (error instanceof ExplorerError) {
     writeExplorerLog({ correlationId: supportId, action, result: error.status < 500 ? "denied" : "failure", errorCode: error.code });

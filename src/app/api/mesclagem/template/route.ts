@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from "next/server";
 
 import {
@@ -18,6 +19,7 @@ function jsonError(error: string, status: number, code: string) {
 }
 
 export async function GET() {
+  try {
   let userId: number | null = null;
   try {
     const acesso = await verificarAcessoMesclagem();
@@ -44,6 +46,7 @@ export async function GET() {
       },
     });
   } catch (error) {
+    if (acessoEstaIndisponivel(error)) throw error;
     if (error instanceof ErroMesclagem) {
       return jsonError(error.message, error.status, error.code);
     }
@@ -51,5 +54,11 @@ export async function GET() {
       await registrarAuditoriaMesclagemBestEffort(userId, "MESCLAGEM_TEMPLATE_FALHA", "Falha técnica ao baixar template; sucesso=false");
     }
     return jsonError("Não foi possível baixar o template", 500, "TEMPLATE_FAILED");
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

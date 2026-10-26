@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import { listOnyxLlmProviders, setOnyxDefaultModel, OnyxError } from "@/lib/onyx/client";
@@ -7,6 +8,7 @@ export const dynamic = "force-dynamic";
 
 // GET /api/onyx/llm-models — lista providers e modelos visíveis. Acessível para todos.
 export async function GET() {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -15,13 +17,21 @@ export async function GET() {
     const providers = await listOnyxLlmProviders();
     return NextResponse.json({ providers });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     const status = err instanceof OnyxError ? err.status : 500;
     return NextResponse.json({ error: (err as Error).message }, { status });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }
 
 // POST /api/onyx/llm-models — define o modelo padrão global. Admin only.
 export async function POST(req: NextRequest) {
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -53,7 +63,14 @@ export async function POST(req: NextRequest) {
     await setOnyxDefaultModel(provider, body.modelName!.trim());
     return NextResponse.json({ success: true, modelName: body.modelName });
   } catch (err) {
+    if (acessoEstaIndisponivel(err)) throw err;
     const status = err instanceof OnyxError ? err.status : 500;
     return NextResponse.json({ error: (err as Error).message }, { status });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

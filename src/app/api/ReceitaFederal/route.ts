@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from "next/server";
 import { getReceitaData } from "@/lib/cnpj/receita-federal";
 import { requirePreAnaliseAccess } from "@/lib/pre-analise/access";
@@ -6,6 +7,7 @@ import { validarCnpj } from "@/lib/gerador-documentos/cnpj";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
+  try {
     const denied = await requirePreAnaliseAccess("cadastro");
     if (denied) return denied;
     try {
@@ -35,11 +37,18 @@ export async function GET(req: Request) {
             }
         });
 
-    } catch {
+    } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
         console.error("[ReceitaFederal] Falha na consulta cadastral");
         return NextResponse.json(
             { error: "Não foi possível consultar o CNPJ" },
             { status: 502 }
         );
     }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

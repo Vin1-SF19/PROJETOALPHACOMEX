@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { auth } from "../../../../../../auth";
 import db from "@/lib/prisma";
 import { NextResponse } from "next/server";
@@ -9,6 +10,7 @@ export async function GET(
   _request: Request,
   props: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  try {
   // Auth obrigatória
   const session = await auth();
   const user = session?.user as { id?: string; role?: string } | undefined;
@@ -58,9 +60,16 @@ export async function GET(
       },
     });
   } catch (e) {
+    if (acessoEstaIndisponivel(e)) throw e;
     const err = e as Error;
     // Log sem PII
     console.error("[holerites/download] holeriteId=" + id, err.message);
     return NextResponse.json({ error: "Erro ao obter arquivo" }, { status: 500 });
+  }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
   }
 }

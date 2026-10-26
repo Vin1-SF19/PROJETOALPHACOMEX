@@ -1,3 +1,4 @@
+import { mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import db from "@/lib/prisma";
@@ -7,6 +8,7 @@ export const dynamic = "force-dynamic";
 const createProjectSchema = z.object({ title: z.string().trim().min(1).max(120), systemPrompt: z.string().max(30_000).optional() }).strict();
 
 export async function GET() {
+  try {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -26,9 +28,16 @@ export async function GET() {
   });
 
   return NextResponse.json(projects);
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }
 
 export async function POST(req: NextRequest) {
+  try {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -57,4 +66,10 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json(project, { status: 201 });
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }

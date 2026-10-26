@@ -10,6 +10,7 @@ import MeusHoleritesView from "./MeusHoleritesView";
 import GestaoHoleritesView from "./GestaoHoleritesView";
 import { HoleriteAlertButtons } from "./HoleriteAlertButtons";
 import { isAdminRole } from "@/lib/roles";
+import { sessaoEstaIndisponivel, sessaoPermiteOperacao } from "@/lib/auth/estado-acesso";
 
 const ROLES_GESTAO = ["FINANCEIRO", "RECURSOS HUMANOS"];
 
@@ -19,21 +20,27 @@ export default function HoleritesPage() {
   const { data: session, status } = useSession();
   const [tab, setTab] = useState<Tab>("gestao");
 
-  if (status === "loading") {
-    return (
-      <div className="flex items-center justify-center min-h-[50vh] text-slate-500 text-xs font-black uppercase">
-        Carregando...
-      </div>
-    );
-  }
-
   const user = session?.user as
     | { id: string; role: string; nome?: string; imagemUrl?: string }
     | undefined;
 
   const role = user?.role ?? "";
-  const isGestao = isAdminRole(role) || ROLES_GESTAO.includes(role);
-  const userId = Number(user?.id ?? 0);
+  const gestaoAtual = isAdminRole(role) || ROLES_GESTAO.includes(role);
+  const usuarioAtualId = Number(user?.id ?? 0);
+  // Presentation continuity only: do not replace the public session or use this
+  // snapshot as permission for actions. The recovery layer pauses this mounted
+  // tree, and every operation remains protected by current server auth/ACL.
+  const [apresentacao, setApresentacao] = useState({ gestao: gestaoAtual, usuarioId: usuarioAtualId });
+  if (sessaoPermiteOperacao(session) && (apresentacao.gestao !== gestaoAtual || apresentacao.usuarioId !== usuarioAtualId)) {
+    setApresentacao({ gestao: gestaoAtual, usuarioId: usuarioAtualId });
+  }
+  const temporario = sessaoEstaIndisponivel(session);
+  const isGestao = temporario ? apresentacao.gestao : gestaoAtual;
+  const userId = temporario ? apresentacao.usuarioId : usuarioAtualId;
+
+  if (status === "loading") {
+    return <div className="flex min-h-[50vh] items-center justify-center text-xs font-black uppercase text-slate-500">Carregando...</div>;
+  }
 
   return (
     <div className="flex flex-col gap-8 max-w-6xl mx-auto p-6">

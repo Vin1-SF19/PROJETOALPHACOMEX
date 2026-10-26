@@ -1,3 +1,4 @@
+import { mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import "server-only";
 
 import { NextResponse } from "next/server";
@@ -9,6 +10,8 @@ export function ok(data: unknown, status = 200) {
 }
 
 export function handleRoadmapApiError(error: unknown) {
+  const unavailable = mapearIndisponibilidadeAuth(error);
+  if (unavailable) return unavailable;
   if (error instanceof RoadmapProductionApiError) {
     return NextResponse.json(
       { success: false, error: error.message, code: error.code },

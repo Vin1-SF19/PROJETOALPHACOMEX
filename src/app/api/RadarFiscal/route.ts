@@ -1,3 +1,4 @@
+import { acessoEstaIndisponivel, mapearIndisponibilidadeAuth } from "@/lib/auth/indisponibilidade";
 import { NextResponse } from "next/server";
 import { getReceitaData } from "@/lib/cnpj/receita-federal";
 import { getEmpresaAquiData } from "@/lib/cnpj/empresa-aqui";
@@ -7,6 +8,7 @@ import { validarCnpj } from "@/lib/gerador-documentos/cnpj";
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
+  try {
     const denied = await requirePreAnaliseAccess("tributario");
     if (denied) return denied;
     try {
@@ -22,7 +24,8 @@ export async function GET(req: Request) {
         try {
             ea = await getEmpresaAquiData(cnpj);
             eaStatus = "disponivel";
-        } catch {
+        } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
             console.warn("[RadarFiscal] EmpresaAqui indisponível");
         }
 
@@ -178,8 +181,15 @@ export async function GET(req: Request) {
             }
         });
 
-    } catch {
+    } catch (authError) {
+    if (acessoEstaIndisponivel(authError)) throw authError;
         console.error("[RadarFiscal] Falha na consulta cadastral");
         return NextResponse.json({ error: "Não foi possível consultar o cadastro da empresa", consultaStatus: "erro", fontes: { receita: "indisponivel", empresaAqui: "nao_consultada" } }, { status: 502 });
     }
+
+  } catch (authError) {
+    const unavailable = mapearIndisponibilidadeAuth(authError);
+    if (unavailable) return unavailable;
+    throw authError;
+  }
 }
