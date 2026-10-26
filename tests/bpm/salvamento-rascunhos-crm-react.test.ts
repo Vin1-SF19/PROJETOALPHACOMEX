@@ -116,3 +116,44 @@ it('recuperação de formato anterior normaliza pendência de formulário e desc
   await remount('campos');await act(async()=>context.discardPending('card'));
   expect(context.getPendingFields()).toEqual([]);expect(await context.flushSaves()).toBe(true);
 });
+
+it('editar anotação reaberta durante envio gera outra intenção e permite salvar o texto novo', async () => {
+  let release!: (value: unknown) => void;
+  const accepted = new Map<string, string>();
+  api.anotar.mockImplementation((payload: { idempotencyKey: string; observacoes: string }) => {
+    const existing = accepted.get(payload.idempotencyKey);
+    if (existing && existing !== payload.observacoes) return Promise.resolve({ success: false, error: 'A intenção de registro mudou.' });
+    accepted.set(payload.idempotencyKey, payload.observacoes);
+    if (payload.observacoes === 'A enviado') return new Promise(resolve => { release = resolve; });
+    return Promise.resolve({ success: true, data: { id: 'nota-B', observacoes: payload.observacoes } });
+  });
+  await mount();
+  await input(host.querySelector('textarea')!, 'A enviado');
+  await act(async () => host.querySelector('button')!.click());
+  const intentA = api.anotar.mock.calls[0][0].idempotencyKey;
+  await mount('anotacao', '7', false);
+  await mount();
+  await input(host.querySelector('textarea')!, 'B editado após reabrir');
+  await act(async () => { release({ success: true, data: { id: 'nota-A' } }); });
+  expect(host.querySelector('textarea')?.value).toBe('B editado após reabrir');
+  await act(async () => host.querySelector('button')!.click());
+  expect(api.anotar).toHaveBeenCalledTimes(2);
+  expect(api.anotar.mock.calls[1][0]).toMatchObject({ observacoes: 'B editado após reabrir', idempotencyKey: expect.any(String) });
+  expect(api.anotar.mock.calls[1][0].idempotencyKey).not.toBe(intentA);
+  expect(host.querySelector('textarea')?.value).toBe('');
+  expect(localStorage.getItem(chaveRascunhosCrm('7')!)).toBeNull();
+});
+
+it('remontar e repetir anotação sem editar preserva a identidade da tentativa anterior', async () => {
+  api.anotar.mockResolvedValueOnce({ success: false, error: 'Falha de transporte' });
+  await mount();
+  await input(host.querySelector('textarea')!, 'Repetir a mesma intenção');
+  await act(async () => { expect(await context.retryFailedSaves('card')).toBe(false); });
+  const intentA = api.anotar.mock.calls[0][0].idempotencyKey;
+  await remount();
+  await act(async () => context.acknowledgeRecoveredDrafts('card'));
+  await act(async () => { expect(await context.retryFailedSaves('card')).toBe(true); });
+  expect(api.anotar).toHaveBeenCalledTimes(2);
+  expect(api.anotar.mock.calls[1][0].idempotencyKey).toBe(intentA);
+  expect(host.querySelector('textarea')?.value).toBe('');
+});

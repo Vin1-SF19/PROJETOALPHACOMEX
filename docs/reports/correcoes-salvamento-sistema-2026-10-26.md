@@ -6,11 +6,11 @@ Entrega autorizada em 26/10/2026, a partir da [auditoria de salvamento](auditori
 
 | Achado | Tratamento |
 | --- | --- |
-| S01 | Autosave de Notas serializado por revisão. Respostas antigas não limpam texto posterior nem rascunhos de outra instância. |
+| S01 | Autosave de Notas serializado por revisão. Identidade UUID por sessão e comparação de token, snapshot e base protegem rascunhos de outra instância contra respostas antigas. |
 | S02 e S03 | O CheckList reformulado já publicado em staging usa patch parcial, revisão, identidade da operação, transação e confirmação da interface. Essa implementação foi preservada no candidato, com testes próprios; o código legado do checkout antigo não foi reintroduzido. |
 | S04 | Arquivar/lixeira aguardam o salvamento do editor e só encerram a nota após confirmação positiva. Negativa e exceção preservam conteúdo e rascunho. |
 | S05 | Procedimentos do CRM preservam observações dos outros itens, controlam versão e integram rascunhos e salvamento de saída ao contexto do card. |
-| S06 | Anotação simples participa da fila, das pendências e da recuperação. Chave estável na operação impede duplicação no retry; anotação e histórico são transacionais. |
+| S06 | Anotação simples participa da fila, das pendências e da recuperação. A chave muda quando o texto realmente muda e permanece no retry sem edição, inclusive após remontagem; anotação e histórico são transacionais. |
 | S07 | Rascunhos locais do CRM são separados por usuário, conservam base, exigem revisão após recuperação e avisam sobre saída. Token por edição protege rascunhos de outra aba contra confirmações/limpezas antigas. |
 | S08 | Notas retomam pendências ao reconectar, oferecem nova tentativa e resolução explícita de conflito. Versão e histórico são confirmados na mesma transação. |
 | S09 | Tarefas verificam resultados, inclusive na recorrência; falhas mantêm formulário. Opcionais omitidos são preservados; consultas recebem parâmetros e alterações conferem registros afetados. A leitura normaliza as flags SQLite para booleanos, mantendo a edição compatível entre drivers. |
@@ -42,7 +42,11 @@ A primeira versão de código foi publicada como `fb0e8546d75e95f96e780f2049b43d
 
 A homologação real de Tarefas identificou um problema adicional: a criação e reabertura funcionavam, mas a edição era recusada porque as flags de uma leitura SQL do Turso chegavam como `0/1` e o contrato de edição exige booleanos. A correção mantém a validação estrita e normaliza a resposta de leitura. O adaptador reproduziu dois casos falhos antes do ajuste; depois passaram 30 casos focados e o ciclo criar → buscar → editar → concluir em SQLite real.
 
-A segunda rodada aprovou **795 arquivos e 6.635 testes**, com os mesmos quatro ignorados e um pendente, além de lint, tipos e build de 86 páginas. A [evidência da correção adicional](../qa/evidencias/correcoes-salvamento-20261026/gates-pos-homologacao-tarefas.json) separa esse resultado da primeira versão. Publicação da correção e reteste visual da mesma tarefa ainda pendentes nesta revisão; não há alegação de aprovação da edição visual antes desse reteste.
+A segunda rodada aprovou **795 arquivos e 6.635 testes**, com os mesmos quatro ignorados e um pendente, além de lint, tipos e build de 86 páginas. A [evidência da correção adicional](../qa/evidencias/correcoes-salvamento-20261026/gates-pos-homologacao-tarefas.json) separa esse resultado da primeira versão. Essa rodada foi preservada como histórico do candidato, antes da revisão conjunta final.
+
+A revisão final reproduziu ainda dois casos entre instâncias: colisão de identificador de sessão de Notas e reaproveitamento da chave de uma anotação em voo depois de remontar e editar seu texto. As correções adotam UUID por sessão, verificação completa da propriedade do rascunho e chave nova somente quando há mudança real do texto; retry sem edição mantém sua identidade. As regressões foram reproduzidas antes do ajuste e o conjunto focado aprovou 13 arquivos/87 casos.
+
+A rodada conjunta final aprovou **796 arquivos e 6.645 testes**, com quatro ignorados e um pendente preexistentes. Lint: zero erros/1.172 avisos; tipos: exit 0 antes e depois do build; build: exit 0, 86 páginas, ambiente staging verificado. Os [gates conjuntos](../qa/evidencias/correcoes-salvamento-20261026/gates-conjunto-final.json) registram os sete arquivos congelados, comandos, exits e hashes. A publicação conjunta e os três retestes dirigidos ainda serão registrados após o novo READY; não há alegação de aprovação visual dos novos fixes antes desses percursos.
 
 Nenhuma migration, mudança estrutural de banco, backfill ou publicação em produção integra esta entrega.
 

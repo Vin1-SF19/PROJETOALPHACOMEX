@@ -1,0 +1,110 @@
+{
+  "at": "2026-10-26T19:24:21.960133+00:00",
+  "phase": "Final joint release after authenticated and cross-instance findings",
+  "environment": "staging",
+  "origin": "https://staging.alpha-comex.com",
+  "deployedParent": "fb0e8546d75e95f96e780f2049b43d75f6466e15",
+  "localTaskFixCommit": "977b8b39c846f6aceeefa5fc029ed5004b0aff26",
+  "frozenRuntimeAndTests": {
+    "src/actions/Tarefas.ts": "07acc969be17734ab4d7d6e53df4cc2fa0503a1801aa9d56d55d092405f8e39f",
+    "src/app/PainelAlpha/AlphaCRM/CardModal/EditorAnotacaoCard.tsx": "917c6c8e79842aad893cf52edc626b4fc2bd1c95093c7ec4e0784270401e36cb",
+    "src/lib/notas/salvamento-client.ts": "dcc6bedc8a0df578ee1bc72b1c1f451d9fa16cf05c2aaa28aff69e0e64089880",
+    "tests/bpm/salvamento-rascunhos-crm-react.test.ts": "f2818714fa51ac1ad0f00d7023970ce36cef8884d681f34393817cfb376a9d1d",
+    "tests/notas/salvamento-realm-rascunhos.test.ts": "5208ebbf900ea77062c615583e7591a7f9d8525e156d98f4366b2b1311d3c985",
+    "tests/salvamento-legados/actions.test.ts": "4aa8c0d80b2fae761652ba6870bb4f7c4add92fa4b7bbf11e6601fdfa9e4193f",
+    "tests/salvamento-legados/sqlite.test.ts": "d97f7c306b0ac8dfbcc473283735ef41cb6f7cbddefea2520f7d6da0b64b42ba"
+  },
+  "result": "PASS",
+  "gates": [
+    {
+      "name": "lint",
+      "command": "npm run lint",
+      "startedAt": "2026-10-26T19:14:02.219Z",
+      "finishedAt": "2026-10-26T19:14:49.964Z",
+      "exit": 0,
+      "signal": null,
+      "log": "final-combined-lint.log"
+    },
+    {
+      "name": "typecheck",
+      "command": "npm run typecheck",
+      "startedAt": "2026-10-26T19:14:49.965Z",
+      "finishedAt": "2026-10-26T19:15:02.183Z",
+      "exit": 0,
+      "signal": null,
+      "log": "final-combined-typecheck.log"
+    },
+    {
+      "name": "test",
+      "command": "npm test -- --maxWorkers=1 --testTimeout=15000",
+      "startedAt": "2026-10-26T19:15:02.183Z",
+      "finishedAt": "2026-10-26T19:19:49.138Z",
+      "exit": 0,
+      "signal": null,
+      "log": "final-combined-test.log"
+    },
+    {
+      "name": "build",
+      "command": "npm run build through verified staging loader",
+      "startedAt": "2026-10-26T19:19:49.138Z",
+      "finishedAt": "2026-10-26T19:20:40.137Z",
+      "exit": 0,
+      "signal": null,
+      "log": "final-combined-build.log"
+    },
+    {
+      "name": "typecheck-final",
+      "command": "npm run typecheck",
+      "startedAt": "2026-10-26T19:20:40.138Z",
+      "finishedAt": "2026-10-26T19:20:49.431Z",
+      "exit": 0,
+      "signal": null,
+      "log": "final-combined-typecheck-final.log"
+    }
+  ],
+  "suiteSummary": {
+    "files": 796,
+    "passed": 6645,
+    "skipped": 4,
+    "todo": 1,
+    "durationSeconds": 286.62
+  },
+  "lintSummary": {
+    "errors": 0,
+    "warnings": 1172
+  },
+  "buildSummary": {
+    "pages": 86,
+    "databaseFingerprint": "7fdd160737ba6f9cf84d0ac2fb1c3cf1084311e7fccea454f7bac368f9e4d42b",
+    "generatedConfigurationRestored": [
+      "tsconfig.json",
+      "next-env.d.ts"
+    ]
+  },
+  "scopeCorrections": [
+    "SQLite raw-query task flags are normalized to booleans before editing.",
+    "Notes use a unique session UUID; clear/rebase require matching token, snapshot and base.",
+    "CRM annotation keys rotate on a real text change; unchanged retries retain their key, including after remount."
+  ],
+  "focusedRegression": {
+    "files": 13,
+    "passed": 87,
+    "notesBefore": "7 failed / 1 passed in 8 new realm cases",
+    "annotationBefore": "1 failed / 13 passed before rotating the remounted draft key"
+  },
+  "unchanged": [
+    "Database schema",
+    "Dependency manifest and lock",
+    "Environment configuration",
+    "Production",
+    "Unrelated runtime modules"
+  ],
+  "uiRetests": "Task edit/complete/cleanup and directed Notes/annotation checks await the new immutable staging SHA. Prior UI reports explicitly identify release fb0.",
+  "rawLogSha256": {
+    "final-combined-lint.log": "77164e0f73e5575811cdf7b23151f252dd53ef8613656215e6662665f29ed3fd",
+    "final-combined-typecheck.log": "7412387dd2026ca5a87bc3b44ef93640c4d058883d004c507cb43e13c63a7c5c",
+    "final-combined-test.log": "67e782da0aae17b690c7a8d32fddb673c6b7430f0b2a1cb1d730e710f82284c3",
+    "final-combined-build.log": "5b99112ef8f007fdf0f2c4ac523866ce2cafd9464612884c5c24f3d782bdedef",
+    "final-combined-typecheck-final.log": "7412387dd2026ca5a87bc3b44ef93640c4d058883d004c507cb43e13c63a7c5c"
+  }
+}

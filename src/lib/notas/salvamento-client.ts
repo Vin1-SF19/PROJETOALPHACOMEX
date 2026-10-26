@@ -5,7 +5,6 @@ export type RascunhoNota = ConteudoNotaEditado & { baseVersion: number; savedAt:
 export type EstadoSalvamentoNota = 'salvo' | 'pendente' | 'salvando' | 'erro' | 'conflito' | 'offline';
 type Resultado = { success: true; data: { currentVersion: number } } | { success: false; error: string; versaoAtual?: number };
 type StorageNota = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
-let nextSession = 0;
 
 /** Uma revisão só é confirmada pela resposta correspondente. Rascunhos de outra
  * instância/aba nunca são removidos pela confirmação desta sessão. */
@@ -15,7 +14,7 @@ export class SalvamentoNota {
   private version: number;
   private content: ConteudoNotaEditado;
   private token = '';
-  private readonly session = `${Date.now()}:${++nextSession}`;
+  private readonly session = crypto.randomUUID();
   private inFlight: Promise<boolean> | null = null;
   private conflict = false;
   private listeners = new Set<(status: EstadoSalvamentoNota) => void>();
@@ -41,16 +40,23 @@ export class SalvamentoNota {
     this.state = status;
     for (const listener of this.listeners) listener(status);
   }
-  private store(onlyIfOwned = false) {
+  private ownsStoredDraft(token: string, content: ConteudoNotaEditado, baseVersion: number) {
+    const stored = this.read();
+    if (!stored) return false;
+    return stored.token === token && stored.baseVersion === baseVersion
+      && stored.title === content.title && stored.plainText === content.plainText
+      && JSON.stringify(stored.contentJson) === JSON.stringify(content.contentJson);
+  }
+  private store(onlyIfOwned = false, expectedBaseVersion = this.version) {
     try {
       const storage = this.options.storage();
-      if (onlyIfOwned && this.read()?.token !== this.token) return;
+      if (onlyIfOwned && !this.ownsStoredDraft(this.token, this.content, expectedBaseVersion)) return;
       storage.setItem(this.options.storageKey, JSON.stringify({ ...this.content, baseVersion: this.version, savedAt: Date.now(), token: this.token }));
     } catch { /* Navegadores sem armazenamento mantêm o conteúdo em memória. */ }
   }
-  private clearConfirmed(token: string) {
+  private clearConfirmed(token: string, content: ConteudoNotaEditado, baseVersion: number) {
     try {
-      if (this.read()?.token === token) this.options.storage().removeItem(this.options.storageKey);
+      if (this.ownsStoredDraft(token, content, baseVersion)) this.options.storage().removeItem(this.options.storageKey);
     } catch { /* Conteúdo confirmado no servidor; limpeza local é best effort. */ }
   }
   read(): RascunhoNota | null {
@@ -87,18 +93,21 @@ export class SalvamentoNota {
   }
   useRemote(content: ConteudoNotaEditado, version: number) {
     const token = this.token;
+    const previousContent = this.content;
+    const previousVersion = this.version;
     this.content = content;
     this.version = version;
     this.confirmedRevision = this.revision;
     this.conflict = false;
-    this.clearConfirmed(token);
+    this.clearConfirmed(token, previousContent, previousVersion);
     this.emit('salvo');
   }
   /** Chamado apenas após escolha explícita do usuário de reaplicar o rascunho. */
   keepDraftOnVersion(version: number) {
+    const previousVersion = this.version;
     this.version = version;
     this.conflict = false;
-    this.store(true);
+    this.store(true, previousVersion);
     this.emit('pendente');
   }
   save(): Promise<boolean> {
@@ -114,10 +123,11 @@ export class SalvamentoNota {
       if (!this.options.online()) { this.emit('offline'); return false; }
       const revision = this.revision;
       const token = this.token;
+      const baseVersion = this.version;
       this.emit('salvando');
       try {
         const content = JSON.parse(JSON.stringify(this.content)) as ConteudoNotaEditado;
-        const result = await this.options.update({ id: this.options.noteId, ...content, baseVersion: this.version });
+        const result = await this.options.update({ id: this.options.noteId, ...content, baseVersion });
         if (!result.success) {
           this.conflict = result.error === 'CONFLITO_VERSAO';
           this.emit(this.conflict ? 'conflito' : 'erro');
@@ -126,10 +136,10 @@ export class SalvamentoNota {
         this.version = result.data.currentVersion;
         this.confirmedRevision = revision;
         if (this.revision === revision) {
-          this.clearConfirmed(token);
+          this.clearConfirmed(token, content, baseVersion);
           this.emit('salvo');
         } else {
-          this.store(true);
+          this.store(true, baseVersion);
           this.emit('pendente');
         }
       } catch {

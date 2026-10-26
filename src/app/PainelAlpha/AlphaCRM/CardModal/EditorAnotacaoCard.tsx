@@ -31,14 +31,12 @@ export function EditorAnotacaoCard({
   const [anotacao, setAnotacao] = useState(() => getDraft(draftKey)?.texto ?? "");
   const textoRef = useRef(anotacao);
   const requestId = useRef(getDraft(draftKey)?.requestId ?? crypto.randomUUID());
-  const ultimoEnvio = useRef<{ texto: string; requestId: string } | null>(null);
   const enviandoRef = useRef<Promise<boolean> | null>(null);
   const [salvandoAnotacao, setSalvandoAnotacao] = useState(false);
 
   function alterarAnotacao(texto: string) {
-    if (ultimoEnvio.current && ultimoEnvio.current.texto !== texto && !enviandoRef.current) {
+    if (textoRef.current !== texto) {
       requestId.current = crypto.randomUUID();
-      ultimoEnvio.current = null;
     }
     textoRef.current = texto;
     setAnotacao(texto);
@@ -51,7 +49,6 @@ export function EditorAnotacaoCard({
     if (!podeEditar) return Promise.resolve(false);
     const texto = textoRef.current;
     const intencao = requestId.current;
-    ultimoEnvio.current = { texto, requestId: intencao };
     setSalvandoAnotacao(true);
     const promise = registerSave(async () => {
       try {

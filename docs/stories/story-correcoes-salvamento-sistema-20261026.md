@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review — primeira versão homologada nos percursos disponíveis; correção adicional de flags de Tarefas com quatro gates aprovados. Novo deploy e reteste da mesma tarefa pendentes.
+Ready for Review — conjunto final Tarefas/Notas/anotação com quatro gates aprovados e revisão de código concluída. Publicação conjunta e três retestes dirigidos pendentes.
 
 ## Executor Assignment
 
@@ -177,6 +177,7 @@ Relatório de tratamento por achado: [correções de salvamento](../reports/corr
 - `docs/qa/evidencias/auditoria-salvamento-20261026/suite-geral.log.gz`
 - `docs/qa/evidencias/auditoria-salvamento-20261026/typecheck.log.gz`
 - `docs/qa/evidencias/auditoria-salvamento-20261026/vitest.config.ts`
+- `docs/qa/evidencias/correcoes-salvamento-20261026/gates-conjunto-final.json`
 - `docs/qa/evidencias/correcoes-salvamento-20261026/gates-pos-homologacao-tarefas.json`
 - `docs/qa/evidencias/correcoes-salvamento-20261026/gates.json`
 - `docs/qa/homologacao-c01-20261026/survey.json`
@@ -259,6 +260,7 @@ Relatório de tratamento por achado: [correções de salvamento](../reports/corr
 - `tests/notas/editor-salvamento-react.test.ts`
 - `tests/notas/salvamento-actions.test.ts`
 - `tests/notas/salvamento-concorrente.test.ts`
+- `tests/notas/salvamento-realm-rascunhos.test.ts`
 - `tests/salvamento-legados/actions.test.ts`
 - `tests/salvamento-legados/sqlite.test.ts`
 - `tests/salvamento-legados/ui.test.ts`
@@ -267,7 +269,7 @@ Relatório de tratamento por achado: [correções de salvamento](../reports/corr
 
 ### Revisão independente do candidato — Quinn, 26/10/2026
 
-**APPROVED — código e quatro gates da correção de Tarefas para publicação em staging.** O delta posterior ao release `fb0e8546d75e95f96e780f2049b43d75f6466e15` foi revisado e passou integralmente nos gates abaixo. O P1 detectado na UI permanece aberto até READY/alias e reteste da mesma tarefa no novo release; esta aprovação pré-publicação não substitui essa confirmação. Produção permanece fora do escopo.
+**APPROVED — código e gates conjuntos para publicação em staging.** Os sete arquivos congelados das correções de Tarefas, identidade de Notas e intenção de anotação CRM foram revistos e passaram em lint, typecheck, suíte completa, build e typecheck pós-build. QA conferiu todos os hashes do ledger sem divergência. Os três achados permanecem aguardando os retestes dirigidos no novo READY/alias; não se infere essa homologação dos percursos antigos. Produção permanece fora do escopo.
 
 - **P1 — CRM, isolamento entre instâncias — corrigido:** `persistDrafts`/`setDraft` regravava o mapa local inteiro na chave do usuário. Reproduzido com dois providers da mesma conta: A mantém um envio antigo, B grava um rascunho novo na mesma chave, a confirmação de A removia também o rascunho de B. Evidência inicial: `/tmp/alpha-qa-cross-provider-repro.log`. Executor adicionou token por edição, merge por chave, remoção por ownership e modo `sync` para confirmações/metadados. Regressão permanente em `tests/bpm/rascunhos-crm-abas-react.test.ts`; revisão independente com dois outros arquivos de CRM: **3 arquivos/27 casos aprovados**, `/tmp/alpha-qa-s07-independent.log`. Correção verificada também no provider integrado do candidato.
 - **P1 — Blueprint, resposta antiga regravava rascunho de outra instância:** corrigido pelo executor com token por edição e comparação de token/revisão/conteúdo/identidade/base antes de regravar metadados ou remover a cópia local. Regressões incluem A → A2 → B, sucesso de A e conflito de A2, além de colisões de conteúdo/revisão com token ou versão distintos. Correção revisada na raiz e confirmada no código e nos testes do candidato integrado.
@@ -338,6 +340,34 @@ Correção revisada: `BuscarTarefasPorUsuario` faz `CAST(... AS INTEGER)` das du
 | Build staging | `npm run build` via loader de staging conferido | Exit 0, 86 páginas; configuração gerada restaurada | `post-ui-fix-build.log`, `post-ui-fix-build-status.json` |
 
 Os logs acima ficam em `/tmp/alpha-salvamento-stage-20261026/`. O orçamento de infraestrutura do runner e as falhas ambientais anteriores continuam documentados; não houve relaxamento de assert/configuração para aprovar a correção. A revisão considera o fix de baixo alcance: transforma o resultado raw da consulta no contrato Boolean já esperado pelos componentes e pelo validador estrito. Não foram encontrados novos bloqueadores de código nesse delta.
+
+### P2 adicional S01 — identidade de rascunho entre realms de Notas
+
+A sessão usava timestamp e contador de módulo. Duas instâncias em abas/iframes, inicializadas no mesmo milissegundo, começavam com o mesmo contador e produziam o mesmo token. A resposta de A conseguia remover a cópia B de conteúdo diferente. Reprodução executou **duas cópias independentes do módulo real**, transpiladas em Node com relógio controlado e storage sintético compartilhado; não é incidente em dados reais. A origem imutável do release `fb0e8546...` mostrou `draftLost: true` em `qa-notas-realm-collision-before.log`; a árvore corrigida preservou B (`draftLost: false`) em `qa-notas-realm-collision-after.log`.
+
+Correção revisada: UUID por sessão, comparação de token + título/plainText/contentJson + base esperada para limpar/atualizar, `useRemote` captura o estado próprio antes de trocá-lo pelo remoto e `store(true)` compara a base **anterior** antes de aplicar o rebase confirmado. Isso protege também tokens legados compartilhados após restauração. O novo `tests/notas/salvamento-realm-rascunhos.test.ts` cobre oito cenários; sete falhavam antes. Depois, **9 arquivos/60 casos de Notas passaram** (`/tmp/alpha-notas-realm-after.log`). QA reviu as comparações e executou a reprodução independente sobre a árvore corrigida. Fix de código revisado; aguarda gate conjunto/publicação.
+
+### P2 adicional S06 — nova edição após reabrir anotação em envio
+
+O componente remontado recuperava a chave da intenção A, mas perdia o ref local `ultimoEnvio`. Ao editar B enquanto A estava em andamento, B conservava a chave de A; o backend corretamente recusava a mesma chave com texto diferente e a tentativa manual sem redigitar continuava bloqueada. Reprodução do componente real com backend simulado fiel falhou no contrato de identidade (`qa-annotation-remount-before.log`), sem browser ou banco real.
+
+Correção revisada: toda mudança real `textoRef.current !== texto` cria uma nova chave UUID; retentar sem editar conserva a chave anterior. A reprodução está integrada ao teste permanente de rascunhos CRM, com o servidor simulado recusando chave reaproveitada/texto diferente e exigindo que B seja salvo e o editor limpo. Um segundo caso confirma a preservação da chave ao remontar/retentar sem edição. O teste temporário duplicado foi removido. O conjunto focado final **13 arquivos/87 casos passou** (`/tmp/alpha-salvamento-final-focused.log`). QA revisou o delta sem novos achados.
+
+**Análise do escopo encerrada para esta rodada:** os dois P2 acima e o P1 Boolean de Tarefas são os únicos achados reproduzidos ainda em fechamento. Os fixes anteriores de Blueprint/CRM/recuperação/Reservas/C01 estão revistos. Nenhum browser ou escritor de QA ficou ativo para competir com os quatro gates conjuntos. Os resultados de UI anteriores continuam vinculados ao release `fb0e8546...`; os novos fixes não recebem alegação de homologação de UI apenas por esses resultados antigos.
+
+### Gate conjunto final — Tarefas, Notas e S06
+
+**APPROVED para publicação staging dos sete arquivos congelados.** Ledger `/tmp/alpha-salvamento-stage-20261026/final-combined-gates-status.json`, `result: PASS`, sem processo ativo. QA conferiu SHA-256 de todos os sete arquivos: nenhuma divergência em relação ao código/testes revisados. Em relação ao release publicado `fb0e8546...`, `package.json`, lock, schema, `tsconfig.json` e `next-env.d.ts` não apresentam delta.
+
+| Verificação conjunta | Resultado final | Log |
+| --- | --- | --- |
+| `npm run lint` | Exit 0 | `final-combined-lint.log` |
+| `npm run typecheck` | Exit 0 | `final-combined-typecheck.log` |
+| `npm test -- --maxWorkers=1 --testTimeout=15000` | Exit 0; **796 arquivos/6.645 aprovados**, 4 skipped, 1 todo; 286,62 s | `final-combined-test.log` |
+| Build por loader de staging conferido | Exit 0 | `final-combined-build.log` |
+| Typecheck final depois do build/restauração | Exit 0 | `final-combined-typecheck-final.log` |
+
+Esta aprovação de código/gates permite publicar o pacote no staging autorizado. O fechamento funcional dos três achados ainda depende do novo READY e dos retestes dirigidos: mesma tarefa fictícia, smoke de Nota com UUID/limpeza de rascunho e cenário de anotação A pausada → fechar/reabrir → editar B → liberar A → salvar B → nova leitura. Nenhum browser/teste de QA será iniciado antes da liberação do novo release.
 
 ## Change Log
 
