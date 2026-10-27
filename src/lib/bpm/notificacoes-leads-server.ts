@@ -3,8 +3,9 @@ import "server-only";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import db from "@/lib/prisma";
-import { normalizeRole } from "@/lib/roles";
-import { checarAcessoBpmCard, listarUsuariosComAcessoCrmBpm, podeAcessarPipelineBpm } from "@/lib/bpm/ownership";
+import { isAdminRole, normalizeRole } from "@/lib/roles";
+import { checarAcessoBpmCard, listarUsuariosComAcessoCrmBpm } from "@/lib/bpm/ownership";
+import { resolverNivelAcessoPipeline } from "@/lib/bpm/acesso-pipeline";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { carregarEndpointInstagram, etapaEntradaInstagram, ErroInstagram } from "@/lib/bpm/instagram-leads-server";
 import { lerLeadInstagram } from "@/lib/bpm/instagram-leads";
@@ -46,7 +47,7 @@ export async function listarDestinatariosFilaLeadsBpm(pipelineId: string, etapaI
   const [usuarios, pipeline] = await Promise.all([
     listarUsuariosComAcessoCrmBpm(client),
     client.bpmPipeline.findUnique({ where: { id: pipelineId }, select: { id: true, chave: true, nome: true, ativo: true,
-      visualizacaoConfigJson: true, setores: { select: { setor: { select: { nome: true, ativo: true } } } },
+      visualizacaoConfigJson: true, setores: { select: { setor: { select: { id: true, nome: true, ativo: true } } } },
       etapas: { where: { id: etapaId, ativo: true }, select: { visibilidades: { select: { perfil: true, podeVer: true, podeAgir: true } } } },
     } }),
   ]);
@@ -56,13 +57,14 @@ export async function listarDestinatariosFilaLeadsBpm(pipelineId: string, etapaI
   if (!setor) return [];
   return usuarios.flatMap((usuario) => {
     const observador = ehObservadorTiAlertasLeadsBpm(usuario.role);
-    if (!observador && setorUsuarioFilaBpm(usuario.role) !== setor) return [];
-    const visibilidade = resolverVisibilidadeEtapa(usuario.role, pipeline.etapas[0].visibilidades);
-    const permitido = visibilidade.podeVer && (observador || setor !== "COMERCIAL" || visibilidade.podeAgir) && podeAcessarPipelineBpm({
-      role: usuario.role, permissoes: ["crm"], usuarioId: usuario.id, visualizacaoConfigJson: pipeline.visualizacaoConfigJson,
-      setoresPipeline: pipeline.setores.filter(({ setor }) => setor.ativo).map(({ setor }) => setor.nome), ehMembroPipeline: false,
-    });
-    return permitido ? [{ ...usuario, podeAgir: !observador && visibilidade.podeAgir }] : [];
+    const nivel = resolverNivelAcessoPipeline({ usuarioId: usuario.id, role: usuario.role,
+      visualizacaoConfigJson: pipeline.visualizacaoConfigJson, setoresPipeline: pipeline.setores.map(({ setor }) => setor) });
+    const administradorPipeline = !isAdminRole(usuario.role) && nivel === "ADMINISTRATIVO";
+    if (!observador && !administradorPipeline && setorUsuarioFilaBpm(usuario.role) !== setor) return [];
+    const visibilidade = administradorPipeline ? { podeVer: true, podeAgir: true }
+      : resolverVisibilidadeEtapa(usuario.role, pipeline.etapas[0].visibilidades);
+    const permitido = nivel !== null && visibilidade.podeVer && (observador || setor !== "COMERCIAL" || visibilidade.podeAgir);
+    return permitido ? [{ ...usuario, podeAgir: !observador && visibilidade.podeAgir, administradorPipeline }] : [];
   });
 }
 

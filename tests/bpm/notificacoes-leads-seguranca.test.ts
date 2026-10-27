@@ -46,7 +46,7 @@ function fixture() {
     { perfil: "Lider Financeiro", podeVer: true, podeAgir: true },
   ];
   const pipeline = { id: pipelineId, chave: "financeiro" as string | null, nome: "Financeiro", ativo: true,
-    visualizacaoConfigJson: null as string | null, setores: [{ setor: { nome: "Financeiro", ativo: true } }],
+    visualizacaoConfigJson: null as string | null, setores: [{ setor: { nome: "Financeiro", ativo: true } }, { setor: { nome: "Lider Financeiro", ativo: true } }],
     etapas: [{ visibilidades: rules }] };
   const marker = { versao: 1, cardDestinoId: cardId, pipelineDestinoId: pipelineId,
     cardOrigemId: sourceId, pipelineOrigemId: sourcePipelineId, execucaoId: executionId,
@@ -296,7 +296,7 @@ describe("audiência independente usa ownership e visibilidade reais", () => {
     ["operacional", "Operacional", "Operacional", "Líder Operacional"],
   ])("famílias reais %s incluem liderança sem converter observador Admin em ator setorial", async (chave, nome, role, lider) => {
     const f = fixture(); f.pipeline.chave = chave; f.pipeline.nome = nome;
-    f.pipeline.setores = [{ setor: { nome: role, ativo: true } }];
+    f.pipeline.setores = [{ setor: { nome: role, ativo: true } }, { setor: { nome: lider, ativo: true } }];
     f.users.splice(0, f.users.length,
       { id: 71, nome: "Integrante Fictício", role, status: "ATIVO", permissoes: "crm", imagemUrl: null },
       { id: 72, nome: "Liderança Fictícia", role: lider, status: "ATIVO", permissoes: "crm", imagemUrl: null },
@@ -449,5 +449,33 @@ describe("consulta e transporte não transferem autoridade nem conteúdo privado
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(f.io.bpmCardHistorico.findMany).not.toHaveBeenCalled();
     for (const spy of f.writeSpies) expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("audiência segue concessões explícitas por funil", () => {
+  it("setor usa ID ativo e revogação não depende de vínculo anterior", async () => {
+    const f = fixture(); Object.assign(f.pipeline.setores[0].setor, { id: 1 });
+    f.pipeline.visualizacaoConfigJson = JSON.stringify({ permissoesPipeline: { version: 2,
+      regras: [{ tipo: "SETOR", id: 1, nivel: "PADRAO" }] } });
+    expect((await listarDestinatariosFilaLeadsBpm(pipelineId, stageId, f.client)).map((u) => u.id)).toEqual([21, 30, 32]);
+    f.pipeline.setores[0].setor.ativo = false;
+    expect((await listarDestinatariosFilaLeadsBpm(pipelineId, stageId, f.client)).map((u) => u.id)).toEqual([30, 32]);
+  });
+  it("administração individual ultrapassa setor/coluna e perde efeito após revogação", async () => {
+    const f = fixture(); f.rules.splice(0, f.rules.length, { perfil: "Financeiro", podeVer: false, podeAgir: false });
+    f.pipeline.visualizacaoConfigJson = JSON.stringify({ permissoesPipeline: { version: 2,
+      regras: [{ tipo: "USUARIO", id: 33, nivel: "ADMINISTRATIVO" }] } });
+    expect((await listarDestinatariosFilaLeadsBpm(pipelineId, stageId, f.client)).find((u) => u.id === 33))
+      .toMatchObject({ podeAgir: true, administradorPipeline: true });
+    f.pipeline.visualizacaoConfigJson = JSON.stringify({ permissoesPipeline: { version: 2, regras: [] } });
+    expect((await listarDestinatariosFilaLeadsBpm(pipelineId, stageId, f.client)).some((u) => u.id === 33)).toBe(false);
+  });
+  it("administração scoped não transforma observador TI em ator e não inscreve CEO", async () => {
+    const f = fixture(); f.pipeline.visualizacaoConfigJson = JSON.stringify({ permissoesPipeline: { version: 2,
+      regras: [{ tipo: "USUARIO", id: 32, nivel: "ADMINISTRATIVO" }] } });
+    const audiencia = await listarDestinatariosFilaLeadsBpm(pipelineId, stageId, f.client);
+    expect(audiencia.find((u) => u.id === 32)).toMatchObject({ podeAgir: false, administradorPipeline: false });
+    expect(audiencia.some((u) => u.id === 31)).toBe(false);
   });
 });

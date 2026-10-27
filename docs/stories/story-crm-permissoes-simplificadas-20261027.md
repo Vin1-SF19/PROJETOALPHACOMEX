@@ -5,7 +5,7 @@
 
 ## Status
 
-Ready for Review — implementação, revisão e todos os gates locais concluídos na branch `staging`; sem publicação.
+Ready for Review — implementação validada em `staging`; integração seletiva em `main` e push de `main` autorizados posteriormente pelo usuário, conforme registro ao final.
 
 executor: "@dev"
 quality_gate: "@architect"
@@ -24,7 +24,7 @@ O pedido exige substituir o estilo de configuração anterior, eliminar código 
 - Contexto anterior: autorização individual de entrada complementava os setores e não concedia edição de terceiros. Esta story acrescenta o nível administrativo explícito por funil.
 - Não foi identificado epic específico ou `accumulated-context.md` aplicável. A story é independente e não cria epic ou requisitos adicionais.
 - Ambiente de desenvolvimento: branch `staging`; preservar alterações alheias presentes no workspace.
-- Restrição expressa: **não executar commit nem push**. Não executar deploy, alterações em produção ou mutações em banco remoto nesta implementação.
+- Restrição inicial: **não executar commit nem push**; substituída pelo pedido posterior de commit em staging/main e push somente de main. Nenhuma alteração de configuração ou mutação em banco remoto foi autorizada nem executada.
 
 ## Acceptance Criteria
 
@@ -121,7 +121,7 @@ Primary: @dev e @architect. Supporting: @ux-design-expert para acessibilidade/co
 
 ### Quality Gate Tasks
 
-- [x] Revisão local de qualidade, integração e autorização concluída: Lens/Anubis/Probe aprovaram sem achados bloqueantes ou importantes. CodeRabbit indisponível; não foi declarado executado. Commit e push permanecem proibidos.
+- [x] Revisão local de qualidade, integração e autorização concluída: Lens/Anubis/Probe aprovaram sem achados bloqueantes ou importantes. CodeRabbit indisponível; não foi declarado executado. A autorização posterior de commit/push consta no registro de integração ao final.
 - Pre-PR e Pre-Deployment: não aplicáveis nesta entrega, sem PR/deploy autorizado; não marcar como executados.
 
 ### Self-Healing Configuration
@@ -264,3 +264,45 @@ Lista restrita às mudanças desta entrega; diversos caminhos já tinham altera�
 | 2026-10-27 | 1.2 | Lint/typecheck/build/revisão locais aprovados e file list final consolidada; suite global sequencial pendente | Scribe/Kowalski |
 
 | 2026-10-27 | 1.3 | Suite global final aprovada: 729 arquivos e 5.607 testes; todos os gates locais concluídos, temporários removidos, sem commit/push/publicação | Bibble |
+
+| 2026-10-27 | 1.4 | Integração seletiva de main autorizada; consumidores publicados adaptados, gates e 6.840 testes aprovados, push somente main preparado | Gage (@devops) |
+
+## Integração autorizada em main — 2026-10-27
+
+Pedido posterior do usuário: registrar a entrega em staging/main locais e fazer push somente de main. O commit seletivo staging é `a8d52057`; a integração parte de `origin/main` `552f28a8`, preservando seus 99 commits exclusivos e sem transportar os três commits exclusivos da base staging. Os conflitos foram resolvidos por intenção de acesso, preservando o salvamento em background, o drawer ativo, os documentos de contratação e a execução de minuta configurada já publicados em main. A UI de distribuição de closers e seu mock, ausentes em main, não foram introduzidos.
+
+### Adaptações de consumidores exclusivos de main
+
+- Alertas usam IDs/atividade dos setores e nível canônico. Usuários com administração explícita do funil podem agir fora de seu setor/coluna; Admin/TI continuam observadores de alertas sem poder de assunção e a exceção não inscreve CEO.
+- A capacidade de administração da fila é derivada somente no servidor; a assunção revalida a audiência e a elegibilidade dentro da transação, preservando CAS, proveniência, idempotência e rollback.
+- A atribuição no encaminhamento manual reconhece administração do funil de destino após conferir conta ativa, CRM e acesso ao destino; nenhuma autoridade da origem é transferida.
+- Automações de minuta e financeiro reconhecem `ADMIN_PIPELINE`, mantendo prova causal persistida e revalidação atual. Marcador anterior de liderança não cria autorização.
+- Fixtures privadas usam disco em `~/work-tmp`, com WAL e `synchronous=OFF` exclusivamente na conexão de montagem. A conexão runtime mantém suas configurações e os testes continuam exercitando rollback/concorrência.
+
+### File List adicional da integração
+
+- `src/lib/bpm/notificacoes-leads-server.ts`
+- `src/lib/bpm/recebimentos-card-server.ts`
+- `src/lib/bpm/encaminhamento-manual-server.ts`
+- `src/lib/bpm/automacoes/minuta-movimento-livre-server.ts`
+- `src/lib/bpm/automacoes/financeiro-movimento-livre-server.ts`
+- `tests/bpm/notificacoes-leads-seguranca.test.ts`
+- `tests/bpm/notificacoes-leads-sqlite.test.ts`
+- `tests/bpm/encaminhamento-manual-sqlite.test.ts`
+- `tests/bpm/minuta-movimento-livre-seguranca.test.ts`
+- `tests/bpm/minuta-movimento-livre-sqlite.test.ts`
+- `tests/bpm/financeiro-movimento-livre-seguranca.test.ts`
+
+### Gates do snapshot integrado
+
+- Instalação e cliente Prisma isolados da worktree original, pois o schema de main diverge da base staging. Nenhuma conexão ou alteração em banco remoto.
+- `npm run typecheck`: exit 0; `npm run lint`: exit 0, 1.165 avisos do repositório. Focais: 341 testes cobertos; a repetição de 40 testes SQLite em disco passou após otimizar somente a montagem, sem ampliar timeouts globais.
+- `package.json`/`package-lock.json` permanecem byte-idênticos a `552f28a8`. Blob do lockfile: `8d55a395274c4b8f41b7bc8a481d2e2d8fcb97c9`. `npm audit` identificou baseline já existente de 10 critical e 48 high; não foram introduzidas nem atualizadas dependências nesta entrega. O diagnóstico é registrado sem incluir upgrade amplo fora do escopo.
+- `npm run build`: exit 0 no snapshot integrado, em escopo de sistema com MemoryHigh 17 GiB, MemoryMax 18 GiB, swap 4 GiB e CPU 200%; pico observado 7,72 GiB. Avisos existentes de pdfjs não impediram a compilação.
+- Typecheck repetido e lint da fixture final: exit 0. Nenhuma fonte runtime mudou depois do build.
+- Smoke local com ambiente staging e segredo de autenticação sintético somente no processo: `/` 200, rota administrativa anônima 307 para `/?acesso=bloqueado`, `/api/auth/session` 200 com `null`. Sem sessão autenticada de navegador.
+- Lens/Anubis/Probe independentes aprovaram após Forge, sem achados bloqueantes ou importantes; CodeRabbit indisponível, sem afirmar execução. Patch sem padrões de segredo, sem schema/migration/env/dependências.
+- `npm test -- --maxWorkers=1`: exit 0, 816 arquivos aprovados, 6.840 testes aprovados, 4 ignorados e 1 todo; duração 338,41 s. Cobertura: statements 71,69%, linhas 75,31%. Rodadas anteriores expuseram configuração sintética de auth ausente e timeouts de fixtures sob concorrência; o ambiente de teste foi corrigido sem tocar auth/Checklist de produção nem ampliar limites de timeout. A rodada final passou integralmente.
+- [x] Gates do snapshot integrado aprovados; revisão independente concluída.
+- [x] Escopo seletivo conferido, mudanças alheias preservadas e `origin/main` rechecado em `552f28a8` após os gates.
+- [x] Preparação de promoção autorizada: commits locais de staging/main e envio somente de main, sem force push, sem envio de staging e sem operação de banco remoto.

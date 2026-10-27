@@ -122,9 +122,9 @@ export async function obterRecebimentoPipelineBpm(cardId: string, usuarioId: num
   const candidato = !claim && card.status === "ATIVO" && card.pipeline.ativo && card.etapa.ativo
     ? (await listarDestinatariosFilaLeadsBpm(card.pipelineId, card.etapaId, client)).find((usuario) => usuario.id === usuarioId) : null;
   const permitidoBoasVindas = !ehPipelineOperacional({ id: card.pipelineId, chave: card.pipeline.chave }) || !etapaEhBoasVindas(card.etapa.nome)
-    || Boolean(candidato && podeAgirBoasVindasOperacional(usuarioId, candidato.role));
+    || Boolean(candidato && (candidato.administradorPipeline || podeAgirBoasVindasOperacional(usuarioId, candidato.role)));
   const podeAssumir = Boolean(candidato?.podeAgir && permitidoBoasVindas
-    && setorUsuarioFilaBpm(candidato.role) === setorPipeline(card.pipeline.chave, card.pipeline.nome, card.pipelineId));
+    && (candidato.administradorPipeline || setorUsuarioFilaBpm(candidato.role) === setorPipeline(card.pipeline.chave, card.pipeline.nome, card.pipelineId)));
   return { recepcaoId: registro.id, status: claim ? "ASSUMIDO" : "PENDENTE", recebidoEm: registro.createdAt.toISOString(),
     podeAssumir, assumidoEm: assumidoEm?.toISOString() ?? null,
     motivoImpedimentoAssuncao: claim || podeAssumir ? null : "Seu perfil não pode assumir este card na etapa atual.",
@@ -138,7 +138,7 @@ export async function assumirRecebimentoPipelineBpm(input: { cardId: string; rec
     const { card, claim, marker } = recebimento;
     const candidato = (await listarDestinatariosFilaLeadsBpm(card.pipelineId, card.etapaId, tx)).find((usuario) => usuario.id === usuarioId);
     if (!candidato?.podeAgir
-      || setorUsuarioFilaBpm(candidato.role) !== setorPipeline(card.pipeline.chave, card.pipeline.nome, card.pipelineId)
+      || (!candidato.administradorPipeline && setorUsuarioFilaBpm(candidato.role) !== setorPipeline(card.pipeline.chave, card.pipeline.nome, card.pipelineId))
       || !await usuarioElegivelResponsavelBpm(card.pipelineId, usuarioId, tx)) throw new Error("Não autorizado");
     if (claim) {
       if (claim.usuarioId !== usuarioId) throw new Error("Este card já foi assumido por outra pessoa");
@@ -146,7 +146,7 @@ export async function assumirRecebimentoPipelineBpm(input: { cardId: string; rec
     }
     if (card.status !== "ATIVO" || !card.pipeline.ativo || !card.etapa.ativo) throw new Error("Card indisponível para assunção");
     if (ehPipelineOperacional({ id: card.pipelineId, chave: card.pipeline.chave }) && etapaEhBoasVindas(card.etapa.nome)
-      && !podeAgirBoasVindasOperacional(usuarioId, candidato.role)) throw new Error("Seu perfil não pode assumir nesta etapa");
+      && !candidato.administradorPipeline && !podeAgirBoasVindasOperacional(usuarioId, candidato.role)) throw new Error("Seu perfil não pode assumir nesta etapa");
     if (card.versao !== input.versaoEsperada) throw new Error("O card mudou. Recarregue e tente novamente");
     const updatedAt = new Date(Math.max(Date.now(), card.updatedAt.getTime() + 1));
     const cas = await tx.bpmCard.updateMany({ where: { id: card.id, versao: input.versaoEsperada, updatedAt: card.updatedAt,

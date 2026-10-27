@@ -1,5 +1,6 @@
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { PrismaClient } from "@prisma/client";
 import { PrismaLibSQL } from "@prisma/adapter-libsql";
@@ -123,8 +124,8 @@ async function registrarPromocaoFixture(destino: Awaited<ReturnType<typeof fonte
 beforeEach(async () => {
   estado.falhaEvento = false; estado.userId = 1; vi.clearAllMocks();
   vi.stubEnv("INSTAGRAM_LEADS_ENDPOINT_ID", "fixture-instagram"); vi.stubEnv("NOLOSS_WEBHOOK_SECRET", "segredo-sintetico");
-  dir = mkdtempSync("/dev/shm/alpha-leads-"); const filename = join(dir, "privado.sqlite");
-  const sqlite = new DatabaseSync(filename); try { schemaPrivado(sqlite); } finally { sqlite.close(); }
+  dir = mkdtempSync(join(tmpdir(), "alpha-leads-")); const filename = join(dir, "privado.sqlite");
+  const sqlite = new DatabaseSync(filename); try { sqlite.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = OFF;"); schemaPrivado(sqlite); } finally { sqlite.close(); }
   const recorded = new PrismaClient({ adapter: new PrismaLibSQL({ url: `file:${filename}` }), log: [{ emit: "event", level: "query" }] });
   recorded.$on("query", (event) => queries.push(event.query)); db = recorded; estado.db = db;
   for (const [id, nome, role] of [[1, "Closer A", "Comercial"], [2, "Financeiro B", "Financeiro"], [3, "Operacional C", "Operacional"],
@@ -394,4 +395,20 @@ describe("pendências compartilhadas com Prisma/SQLite privado", () => {
     expect((await db.bpmCardHistorico.findUniqueOrThrow({ where: { id: idRecepcaoPipeline(opId) } })).valorNovoJson).toBe(antes.valorNovoJson);
     expect((await obterRecebimentoPipelineBpm(opId, 3, db))?.responsaveisAnteriores).toHaveLength(1);
   });
+});
+
+
+it("administrador explícito de outro setor assume a recepção e revogação é rechecada na transação", async () => {
+  const fin = await handoff(origem);
+  const config = (regras: object[]) => JSON.stringify({ permissoesPipeline: { version: 2, regras } });
+  const regras = [{ tipo: "USUARIO", id: 1, nivel: "ADMINISTRATIVO" }];
+  await db.bpmPipeline.update({ where: { id: financeiro }, data: { visualizacaoConfigJson: config(regras) } });
+  await db.bpmEtapaVisibilidade.create({ data: { etapaId: etapaFin, perfil: "Financeiro", podeVer: false, podeAgir: false } });
+  expect(await obterRecebimentoPipelineBpm(fin.cardId, 1, db)).toMatchObject({ podeAssumir: true });
+  await db.bpmPipeline.update({ where: { id: financeiro }, data: { visualizacaoConfigJson: config([]) } });
+  expect(await obterRecebimentoPipelineBpm(fin.cardId, 1, db)).toMatchObject({ podeAssumir: false });
+  await expect(claim(fin.cardId, 1)).rejects.toThrow("Não autorizado");
+  await db.bpmPipeline.update({ where: { id: financeiro }, data: { visualizacaoConfigJson: config(regras) } });
+  expect(await claim(fin.cardId, 1)).toMatchObject({ idempotente: false });
+  expect(await db.bpmCard.findUnique({ where: { id: fin.cardId } })).toMatchObject({ responsavelId: 1 });
 });

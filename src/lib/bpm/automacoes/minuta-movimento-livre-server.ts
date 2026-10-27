@@ -27,7 +27,7 @@ export async function motivoBloqueioMinutaMovimentoLivre(
     || evento.atorExecucaoId !== null || evento.profundidade !== 0
     || novo.automacoesSuprimidas !== true || novo.permitirMinutaConfigurada !== true
     || !autoridade || typeof autoridade !== "object" || !("tipo" in autoridade)
-    || (autoridade.tipo !== "ADMIN" && autoridade.tipo !== "LIDER_SETOR")) return "MOVIMENTO_LIVRE_SEM_AUTORIZACAO_DOCUMENTAL";
+    || (autoridade.tipo !== "ADMIN" && autoridade.tipo !== "ADMIN_PIPELINE")) return "MOVIMENTO_LIVRE_SEM_AUTORIZACAO_DOCUMENTAL";
   if (!versao.automacao.ativa || versao.status !== "ATIVA" || versao.gatilhoTipo !== "ENTRAR_COLUNA") return "REGRA_DOCUMENTAL_INATIVA";
   if (!evento.causationId || !evento.idempotencyKey.startsWith("transition:")) return "ORIGEM_DOCUMENTAL_NAO_COMPROVADA";
   const historico = await client.bpmCardHistorico.findFirst({

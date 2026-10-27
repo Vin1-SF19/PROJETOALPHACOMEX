@@ -18,6 +18,7 @@ import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 
 import PainelRegistrar from "./PainelRegistrar";
 import { PainelNotaFiscalConcluida } from "./PainelNotaFiscalConcluida";
+import { useDadosEmpresaDrawer } from "./DadosEmpresaDrawer";
 
 
 
@@ -76,6 +77,7 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
   const [etapas, setEtapas] = useState<EtapaOpcao[]>([]);
   const [interacoes, setInteracoes] = useState<Interacao[]>([]);
   const [erro, setErro] = useState<string | null>(null);
+  const dadosEmpresaDrawer = useDadosEmpresaDrawer(cardId);
   const acessoRevogadoRef = useRef(false);
   const checklistInicialAbertoRef = useRef<string | null>(null);
   const agendamentoInicialFocadoRef = useRef<string | null>(null);

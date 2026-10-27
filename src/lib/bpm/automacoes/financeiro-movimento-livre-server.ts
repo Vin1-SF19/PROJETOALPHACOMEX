@@ -28,7 +28,7 @@ export async function motivoBloqueioFinanceiroMovimentoLivre(
     || evento.atorExecucaoId !== null || evento.profundidade !== 0
     || novo.automacoesSuprimidas !== true || novo.permitirEncaminhamentoFinanceiroConfigurado !== true
     || !autoridade || typeof autoridade !== "object" || !("tipo" in autoridade)
-    || (autoridade.tipo !== "ADMIN" && autoridade.tipo !== "LIDER_SETOR")) return "MOVIMENTO_LIVRE_SEM_AUTORIZACAO_FINANCEIRO";
+    || (autoridade.tipo !== "ADMIN" && autoridade.tipo !== "ADMIN_PIPELINE")) return "MOVIMENTO_LIVRE_SEM_AUTORIZACAO_FINANCEIRO";
   if (!versao.automacao.ativa || versao.status !== "ATIVA" || versao.gatilhoTipo !== "ENTRAR_COLUNA") return "REGRA_FINANCEIRO_INATIVA";
   if (!evento.causationId || !evento.idempotencyKey.startsWith("transition:")) return "ORIGEM_FINANCEIRO_NAO_COMPROVADA";
   const historico = await client.bpmCardHistorico.findFirst({

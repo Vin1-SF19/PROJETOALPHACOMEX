@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import db from "@/lib/prisma";
 import { checarAcessoBpmCard, usuarioElegivelResponsavelBpm } from "@/lib/bpm/ownership";
+import { resolverNivelAcessoPipeline } from "@/lib/bpm/acesso-pipeline";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { etapaEhBoasVindas, PIPELINE_OPERACIONAL_ATIVO_ID, podeAgirBoasVindasOperacional } from "@/lib/bpm/boas-vindas";
 import { executarTransicaoBpm } from "@/lib/bpm/transicao-command";
@@ -27,7 +28,7 @@ export async function autorizarEncaminhamentoManual(cardId: string, usuarioId: n
 
 async function carregarEtapaDestino(pipelineId: string, etapaId: string, client: Cliente) {
   const etapa = await client.bpmEtapa.findFirst({ where: { id: etapaId, pipelineId, ativo: true, pipeline: { ativo: true } },
-    select: { id: true, nome: true, pipelineId: true, visibilidades: { select: { perfil: true, podeVer: true, podeAgir: true } } } });
+    select: { id: true, nome: true, pipelineId: true, pipeline: { select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { id: true, nome: true, ativo: true } } } } } }, visibilidades: { select: { perfil: true, podeVer: true, podeAgir: true } } } });
   if (!etapa) falhar("Escolha um pipeline e uma etapa ativos e compatíveis.");
   return etapa;
 }
@@ -38,6 +39,9 @@ export async function responsavelElegivelEncaminhamentoManual(pipelineId: string
     client.usuarios.findUnique({ where: { id: usuarioId }, select: { id: true, role: true, status: true } }),
   ]);
   if (!usuario || usuario.status !== "ATIVO" || !await usuarioElegivelResponsavelBpm(pipelineId, usuarioId, client)) return false;
+  if (resolverNivelAcessoPipeline({ usuarioId, role: usuario.role,
+    visualizacaoConfigJson: etapa.pipeline.visualizacaoConfigJson,
+    setoresPipeline: etapa.pipeline.setores.map(({ setor }) => setor) }) === "ADMINISTRATIVO") return true;
   if (!resolverVisibilidadeEtapa(usuario.role, etapa.visibilidades).podeAgir) return false;
   return pipelineId !== PIPELINE_OPERACIONAL_ATIVO_ID || !etapaEhBoasVindas(etapa.nome)
     || podeAgirBoasVindasOperacional(usuarioId, usuario.role);

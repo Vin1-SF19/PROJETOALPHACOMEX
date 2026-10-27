@@ -1,6 +1,8 @@
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { PIPELINE_OPERACIONAL_ATIVO_ID } from "@/lib/bpm/boas-vindas";
 import { PrismaClient } from "@prisma/client";
 import { PrismaLibSQL } from "@prisma/adapter-libsql";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,7 +24,7 @@ vi.mock("@/lib/bpm/automacoes/eventos", async original => {
     return real.publicarEventoBpm(...args);
   } };
 });
-import { encaminharCardManualmente, obterCatalogoEncaminhamentoManual, obterResponsaveisEncaminhamentoManual } from "@/lib/bpm/encaminhamento-manual-server";
+import { encaminharCardManualmente, obterCatalogoEncaminhamentoManual, obterResponsaveisEncaminhamentoManual, responsavelElegivelEncaminhamentoManual } from "@/lib/bpm/encaminhamento-manual-server";
 import { checarAcessoBpmCard } from "@/lib/bpm/ownership";
 import { EncaminharCardManualmenteBpm, ObterOpcoesEncaminhamentoManualBpm } from "@/actions/bpm/EncaminhamentoManual";
 const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite") as { DatabaseSync: new (filename: string) => { exec(sql: string): void; close(): void } };
@@ -55,17 +57,17 @@ function tabelas(sqlite: InstanceType<typeof DatabaseSync>) {
 beforeEach(async () => {
   vi.clearAllMocks(); estado.falharOutbox = false; estado.auth.mockResolvedValue({ user: { id: "3" } });
   estado.mover.mockResolvedValue({ success: true, data: { idempotente: false } });
-  diretorio = mkdtempSync("/dev/shm/alpha-manual-"); const filename = join(diretorio, "privado.sqlite");
-  const sqlite = new DatabaseSync(filename); try { tabelas(sqlite); } finally { sqlite.close(); }
+  diretorio = mkdtempSync(join(tmpdir(), "alpha-manual-")); const filename = join(diretorio, "privado.sqlite");
+  const sqlite = new DatabaseSync(filename); try { sqlite.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = OFF;"); tabelas(sqlite); } finally { sqlite.close(); }
   db = new PrismaClient({ adapter: new PrismaLibSQL({ url: `file:${filename}` }) }); estado.client = db;
   for (const [id, role] of [[1, "Admin"], [2, "TI"], [3, "LIDER COMERCIAL"], [4, "COMERCIAL"], [5, "FINANCEIRO"], [6, "LIDER FINANCEIRO"]] as const) {
     await db.$executeRaw`INSERT INTO usuarios(id,nome,usuario,email,status,role,permissoes) VALUES(${id},${'Pessoa fictícia '+id},${'fixture-'+id},${'fixture-'+id+'@example.invalid'},'ATIVO',${role},'crm')`;
   }
   await db.cliente.create({ data: { id: 5, razaoSocial: "Empresa fictícia" } });
   await db.setor.create({ data: { id: 1, nome: "COMERCIAL" } }); await db.setor.create({ data: { id: 2, nome: "FINANCEIRO" } });
-  await db.bpmPipeline.create({ data: { id: origem, nome: "Comercial fictício", chave: "comercial", setores: { create: { setorId: 1 } } } });
+  await db.bpmPipeline.create({ data: { id: origem, nome: "Comercial fictício", chave: "comercial", visualizacaoConfigJson: JSON.stringify({ permissoesPipeline: { version: 2, regras: [{ tipo: "SETOR", id: 1, nivel: "PADRAO" }, { tipo: "USUARIO", id: 3, nivel: "ADMINISTRATIVO" }] } }), setores: { create: { setorId: 1 } } } });
   await db.bpmEtapa.create({ data: { id: etapaOrigem, pipelineId: origem, nome: "Em tratativa", ordem: 1 } });
-  await db.bpmPipeline.create({ data: { id: financeiro, nome: "Financeiro fictício", chave: "financeiro", setores: { create: { setorId: 2 } } } });
+  await db.bpmPipeline.create({ data: { id: financeiro, nome: "Financeiro fictício", chave: "financeiro", visualizacaoConfigJson: JSON.stringify({ permissoesPipeline: { version: 2, regras: [{ tipo: "SETOR", id: 2, nivel: "PADRAO" }, { tipo: "USUARIO", id: 6, nivel: "PADRAO" }] } }), setores: { create: { setorId: 2 } } } });
   await db.bpmEtapa.create({ data: { id: etapaFinanceiro, pipelineId: financeiro, nome: "Novo contrato", ordem: 0 } });
   await db.bpmCard.create({ data: { id: card, pipelineId: origem, etapaId: etapaOrigem, empresaId: 5, responsavelId: 4, membros: { create: { userId: 4, role: "RESPONSAVEL" } } } });
 });
@@ -114,7 +116,7 @@ describe("encaminhamento manual canônico em SQLite privado", () => {
     if (caso === "etapa inativa") await db.bpmEtapa.update({ where: { id: etapaFinanceiro }, data: { ativo: false } });
     if (caso === "pipeline inativo") await db.bpmPipeline.update({ where: { id: financeiro }, data: { ativo: false } });
     if (caso === "versão") dados.versaoEsperada = 4;
-    if (caso === "autoridade revogada") await db.usuarios.update({ where: { id: 3 }, data: { role: "COMERCIAL" } });
+    if (caso === "autoridade revogada") await db.bpmPipeline.update({ where: { id: origem }, data: { visualizacaoConfigJson: JSON.stringify({ permissoesPipeline: { version: 2, regras: [{ tipo: "SETOR", id: 1, nivel: "PADRAO" }] } }) } });
     await expect(encaminharCardManualmente(dados, 3)).rejects.toThrow(); expect(await db.bpmCard.count()).toBe(1);
   });
   it("replay converge sem duplicar; alteração de payload não reutiliza a solicitação", async () => {
@@ -155,5 +157,29 @@ describe("encaminhamento manual canônico em SQLite privado", () => {
     estado.auth.mockResolvedValue({ user: { id: "4" } }); expect(await ObterOpcoesEncaminhamentoManualBpm(card)).toMatchObject({ success: true, data: { permitido: false } });
     expect(await EncaminharCardManualmenteBpm({ ...input(), role: "Admin" } as never)).toMatchObject({ success: false });
     expect(await db.bpmCard.count()).toBe(1);
+  });
+});
+
+
+describe("responsável administrativo explícito no funil de destino", () => {
+  it("ultrapassa coluna restrita sem transferir a autoridade da origem e perde acesso quando revogado", async () => {
+    const config = (nivel: "PADRAO" | "ADMINISTRATIVO") => JSON.stringify({ permissoesPipeline: { version: 2,
+      regras: [{ tipo: "USUARIO", id: 3, nivel }] } });
+    await db.bpmPipeline.update({ where: { id: financeiro }, data: { visualizacaoConfigJson: config("ADMINISTRATIVO") } });
+    await db.bpmEtapaVisibilidade.create({ data: { etapaId: etapaFinanceiro, perfil: "COMERCIAL", podeVer: false, podeAgir: false } });
+    expect(await responsavelElegivelEncaminhamentoManual(financeiro, etapaFinanceiro, 3)).toBe(true);
+    await db.bpmPipeline.update({ where: { id: financeiro }, data: { visualizacaoConfigJson: config("PADRAO") } });
+    expect(await responsavelElegivelEncaminhamentoManual(financeiro, etapaFinanceiro, 3)).toBe(false);
+    expect((await checarAcessoBpmCard(card, 3, null, "moverEtapa")).autorizado).toBe(true);
+  });
+  it("Boas-vindas aceita o administrador do destino sem cargo especial", async () => {
+    const etapaId = "c999999999999999999999999";
+    const config = (nivel: "PADRAO" | "ADMINISTRATIVO") => JSON.stringify({ permissoesPipeline: { version: 2,
+      regras: [{ tipo: "USUARIO", id: 3, nivel }] } });
+    await db.bpmPipeline.create({ data: { id: PIPELINE_OPERACIONAL_ATIVO_ID, nome: "Operacional fictício",
+      visualizacaoConfigJson: config("ADMINISTRATIVO"), etapas: { create: { id: etapaId, nome: "Boas-vindas", ordem: 0 } } } });
+    expect(await responsavelElegivelEncaminhamentoManual(PIPELINE_OPERACIONAL_ATIVO_ID, etapaId, 3)).toBe(true);
+    await db.bpmPipeline.update({ where: { id: PIPELINE_OPERACIONAL_ATIVO_ID }, data: { visualizacaoConfigJson: config("PADRAO") } });
+    expect(await responsavelElegivelEncaminhamentoManual(PIPELINE_OPERACIONAL_ATIVO_ID, etapaId, 3)).toBe(false);
   });
 });

@@ -185,3 +185,24 @@ describe("limites do encaminhamento financeiro", () => {
     expect(parametrosFinanceiroMovimentoLivre(input)).toBeNull();
   });
 });
+
+
+describe("autoridade administrativa explícita do funil", () => {
+  it.each(["regra", "CRM", "conta"])("aceita a prova scoped e revalida revogação de %s", async (revogacao) => {
+    const f = fixture(); f.usuario.role = "Financeiro";
+    Object.assign(f.card.pipeline, { visualizacaoConfigJson: JSON.stringify({ permissoesPipeline: { version: 2,
+      regras: [{ tipo: "USUARIO", id: 7, nivel: "ADMINISTRATIVO" }] } }) });
+    f.novo.movimentoLivre.tipo = "ADMIN_PIPELINE";
+    f.evento.valorNovoJson = JSON.stringify(f.novo); f.historico.valorNovoJson = JSON.stringify(f.novo);
+    expect(await f.validar()).toBeNull();
+    if (revogacao === "regra") Object.assign(f.card.pipeline, { visualizacaoConfigJson: JSON.stringify({ permissoesPipeline: { version: 2, regras: [] } }) });
+    if (revogacao === "CRM") f.usuario.permissoes = "";
+    if (revogacao === "conta") f.usuario.status = "INATIVO";
+    expect(await f.validar()).toBe("AUTORIDADE_MOVIMENTO_LIVRE_REVOGADA");
+  });
+  it("marcador de liderança anterior não concede a autoridade nova", async () => {
+    const f = fixture(); f.novo.movimentoLivre.tipo = "LIDER_SETOR";
+    f.evento.valorNovoJson = JSON.stringify(f.novo); f.historico.valorNovoJson = JSON.stringify(f.novo);
+    expect(await f.validar()).not.toBeNull();
+  });
+});

@@ -1,6 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { PrismaClient } from "@prisma/client";
 import { PrismaLibSQL } from "@prisma/adapter-libsql";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -71,13 +72,13 @@ function tabelas(sqlite: InstanceType<typeof DatabaseSync>) {
 }
 
 async function evento(alteracoes: Record<string, unknown> = {}, novo: Record<string, unknown> = {}) {
-  const autoridade = { tipo: "ADMIN", setor: null };
+  const autoridade = novo.movimentoLivre ?? { tipo: "ADMIN", setor: null };
   const historico = await db.bpmCardHistorico.create({ data: { cardId: card, acao: "CARD_MOVIDO", usuarioId: 7,
     valorAnteriorJson: JSON.stringify({ etapaId: "origem", versao: 0 }),
     valorNovoJson: JSON.stringify({ etapaId: etapa, versao: 1, movimentoLivre: autoridade }) } });
   return publicarEventoBpm({ tipo: "CARD_MOVIDO", entidadeTipo: "CARD", entidadeId: card, cardId: card, pipelineId: pipeline,
     atorTipo: "USUARIO", atorUserId: 7, correlationId: "movimento", idempotencyKey: "transition:novo-movimento", profundidade: 0, causationId: historico.id,
-    valorAnterior: { etapaId: "origem", versao: 0 }, valorNovo: { etapaId: etapa, versao: 1, automacoesSuprimidas: true, permitirMinutaConfigurada: true, movimentoLivre: { tipo: "ADMIN", setor: null }, ...novo }, ...alteracoes }, db);
+    valorAnterior: { etapaId: "origem", versao: 0 }, valorNovo: { etapaId: etapa, versao: 1, automacoesSuprimidas: true, permitirMinutaConfigurada: true, movimentoLivre: autoridade, ...novo }, ...alteracoes }, db);
 }
 async function materializar() { return materializarExecucoesEventosBpm(100, db, { cardId: card }); }
 async function executar() { return processarFilaAutomacoesCentraisBpm(20, { cardId: card }); }
@@ -89,10 +90,10 @@ async function semEfeitos() {
 beforeEach(async () => {
   vi.clearAllMocks();
   vi.stubEnv("BLOB_READ_WRITE_TOKEN", "");
-  diretorio = mkdtempSync("/dev/shm/alpha-minuta-livre-");
+  diretorio = mkdtempSync(join(tmpdir(), "alpha-minuta-livre-"));
   const filename = join(diretorio, "privado.sqlite");
   const sqlite = new DatabaseSync(filename);
-  try { tabelas(sqlite); } finally { sqlite.close(); }
+  try { sqlite.exec("PRAGMA journal_mode=WAL; PRAGMA synchronous=OFF;"); tabelas(sqlite); } finally { sqlite.close(); }
   db = new PrismaClient({ adapter: new PrismaLibSQL({ url: `file:${filename}` }) });
   estado.client = db;
   await db.$executeRaw`INSERT INTO usuarios(id,nome,status,role) VALUES(7,'Admin fictício','ATIVO','Admin')`;
@@ -117,8 +118,11 @@ describe("minuta de movimento livre em Prisma/SQLite privado", () => {
       await db.usuarios.update({ where: { id: 7 }, data: { role, permissoes: "crm" } });
       await db.setor.create({ data: { id: 1, nome: "FINANCEIRO", ativo: true } });
       await db.bpmPipelineSetor.create({ data: { pipelineId: pipeline, setorId: 1 } });
+      await db.bpmPipeline.update({ where: { id: pipeline }, data: { visualizacaoConfigJson: JSON.stringify({
+        permissoesPipeline: { version: 2, regras: [{ tipo: "USUARIO", id: 7, nivel: "ADMINISTRATIVO" }] },
+      }) } });
     }
-    await evento();
+    await evento({}, role.startsWith("LIDER") ? { movimentoLivre: { tipo: "ADMIN_PIPELINE", setor: null } } : {});
     const materializacao = await materializar();
     expect((await db.bpmAutomacaoExecucao.findFirst())?.resultadoJson).toBeNull();
     expect(materializacao).toMatchObject({ criadas: 1 });
