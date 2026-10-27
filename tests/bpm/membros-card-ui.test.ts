@@ -33,7 +33,7 @@ describe("CRM - pessoas vinculadas ao card na interface", () => {
 
   it("monta o seletor no cabeçalho do card aberto com edição condicionada à permissão", () => {
     expect(modal).toContain('import { SeletorMembrosCard } from "./SeletorMembrosCard"');
-    expect(modal).toContain("const podeGerenciarMembros = permitidoBoasVindas && (isAdminRole(currentUserRole)");
+    expect(modal).toContain("const podeGerenciarMembros = card.capacidades?.gerenciarMembros ?? false");
     expect(modal).not.toContain("vinculoBoasVindasRestrito");
     expect(modal).toContain("<SeletorMembrosCard");
     expect(modal).toContain("podeGerenciar={podeGerenciarMembros}");
@@ -41,13 +41,11 @@ describe("CRM - pessoas vinculadas ao card na interface", () => {
   });
 
   it("permite que participante vinculado trabalhe no card, mantendo a gestão de membros restrita", () => {
-    expect(modal).toContain("|| (Boolean(meuVinculo) && podeAgirNaEtapa)");
-    expect(modal).toContain("const podeMoverEtapa = Boolean(card?.podeMoverLivremente) || podeTrabalharNoCard");
-    expect(modal).toContain("const podeEditar = podeTrabalharNoCard");
-    expect(modal).toContain("const podeTrabalharTarefas = podeTrabalharNoCard");
+    expect(modal).not.toContain("Boolean(meuVinculo)");
+    expect(modal).toContain("const podeMoverEtapa = card.capacidades?.moverEtapa ?? false");
+    expect(modal).toContain("const podeEditar = card.capacidades?.editarCard ?? false");
+    expect(modal).toContain("const podeTrabalharTarefas = card.capacidades?.editarCard ?? false");
     expect(modal).toContain("podeTrabalharTarefas={podeTrabalharTarefas}");
-    expect(modal).toContain("meuVinculo?.role === \"RESPONSAVEL\"");
-    expect(modal).toContain("meuVinculo?.role === \"ADMINISTRADOR\"");
   });
 
   it("mostra o grupo compacto de avatares no card fechado sem interromper o realtime do board", () => {

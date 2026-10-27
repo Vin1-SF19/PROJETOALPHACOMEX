@@ -50,6 +50,17 @@ describe("consulta de colegas não concede mutações por ações de leitura", (
     expect(await ObterNotaFiscalFinanceiroBpm("cm12345678901234567890123")).toMatchObject({ success: true, data: { podeEditar: true } });
     expect(await SalvarNotaFiscalFinanceiroBpm(nota)).toMatchObject({ success: true });
   });
+  it("administrador individual do funil edita NF concluída mesmo com coluna restrita ao Financeiro", async () => {
+    m.usuario.mockResolvedValue({ id: 7, role: "Comercial", status: "ATIVO", permissoes: "crm" });
+    m.card.mockResolvedValue({ ...card,
+      pipeline: { ...card.pipeline, visualizacaoConfigJson: JSON.stringify({ permissoesPipeline: {
+        version: 2, regras: [{ tipo: "USUARIO", id: 7, nivel: "ADMINISTRATIVO" }],
+      } }) },
+      etapa: { ...card.etapa, visibilidades: [{ perfil: "Financeiro", podeVer: true, podeAgir: true }] },
+    });
+    expect(await ObterNotaFiscalFinanceiroBpm(nota.cardId)).toMatchObject({ success: true, data: { podeEditar: true } });
+    expect(await SalvarNotaFiscalFinanceiroBpm(nota)).toMatchObject({ success: true });
+  });
   it("visualizador recebe somente checklists existentes sem materialização nem histórico", async () => {
     m.card.mockResolvedValue({ ...card, status: "ATIVO", etapa: { ...card.etapa, ehFinal: false } });
     expect(await ListarChecklistsCardBpm({ cardId: "cm12345678901234567890123" })).toMatchObject({ success: true, data: [{ id: "existente" }], materializados: 0 });

@@ -30,8 +30,8 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
 async function render(anexos: Card["anexos"] = [], onAtualizado = vi.fn(), documentosContratacao: DocumentosContratacaoComercial | null = null, admin = false) {
-  const card = { id: "rdcard_0123456789abcdef0123456789ab", pipelineId: "pipeline", pipeline: { nome: "Comercial" }, etapa: { id: "etapa" }, membros: [], tarefas: [], campoValores: [], historico: [], anexos, documentosContratacao } as unknown as Card;
-  await act(async () => root.render(h(PainelHistorico, { card, accent: "1,2,3", currentUserId: 7, currentUserRole: admin ? "ADMIN" : "COMERCIAL", onAtualizado, etapas: [], podeTrabalharTarefas: false, podeEditar: false, realtimeRevision: 0, onInteracaoCriada: vi.fn(), anotacoes: [], onAbrirCard: vi.fn() })));
+  const card = { id: "rdcard_0123456789abcdef0123456789ab", pipelineId: "pipeline", pipeline: { nome: "Comercial" }, etapa: { id: "etapa" }, membros: [], tarefas: [], campoValores: [], historico: [], anexos, documentosContratacao, capacidades: { editarCard: admin, gerenciarMembros: admin, moverEtapa: admin, administrarPipeline: admin } } as unknown as Card;
+  await act(async () => root.render(h(PainelHistorico, { card, accent: "1,2,3", onAtualizado, etapas: [], podeTrabalharTarefas: false, podeEditar: false, realtimeRevision: 0, onInteracaoCriada: vi.fn(), anotacoes: [], onAbrirCard: vi.fn() })));
   const aba = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(t => t.textContent?.includes("Anexos"))!;
   await act(async () => aba.dispatchEvent(new MouseEvent("mousedown", { button: 0, bubbles: true })));
 }

@@ -3,3 +3,7 @@
 - Nova etapa exclusivamente visual: o card real é reduzido para dentro de `containernavio.png`, portas recortadas abrem para fora e fecham com pulso de selamento; o container segue ao navio, a buzina toca no início da partida e a rota real continua sendo revelada na travessia. Testes direcionados agora somam 26 casos.
 
 - 2026-10-26 — Estabilidade implementada sobre20f310, apphash86f8d179 informado pelo lead; budgets10/12/20/30/45s, pollers/notesync/codes IA/geo/versionnotice orientativo. Gates locais Forge/Probe/Anubis/Lens/Sage aprovados; staging e produção ainda pendentes DevOps. Draft anterior preservado integralmente.
+
+<!-- crm-acessos-20261027:session-draft:start -->
+2026-10-27 — CRM: setor/usuário → funil → acesso comum/administrativo implementado e revisado localmente na branch staging; código antigo substituído, colunas preservadas. Lint FINAL (1.175 avisos), typecheck FINAL, build FINAL e Lens/Anubis/Probe aprovados; smoke anônimo HTTP 200/307. Suite global final aprovada: 729 arquivos, 5.607 testes, 4 ignorados e 1 todo; evidências na story-crm-permissoes-simplificadas-20261027.md. Sem commit/push/deploy/banco remoto ou navegação autenticada. Rascunhos alheios preservados.
+<!-- crm-acessos-20261027:session-draft:end -->

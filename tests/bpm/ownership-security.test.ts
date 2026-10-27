@@ -29,26 +29,22 @@ describe("permissão CRM normalizada", () => {
       role: "Comercial",
       permissoes: ["metas"],
       setoresPipeline: ["COMERCIAL"],
-      ehMembroPipeline: false,
     })).toBe(false);
   });
 
-  it("permite pipeline aberto ou setor compatível; vínculo não contorna restrição de pipeline", () => {
+  it("permite pipeline anterior aberto ou setor compatível e nega setor diferente", () => {
     const base = { role: "Comercial", permissoes: ["CRM"] };
     expect(podeAcessarPipelineBpm({
       ...base,
       setoresPipeline: [],
-      ehMembroPipeline: false,
     })).toBe(true);
     expect(podeAcessarPipelineBpm({
       ...base,
       setoresPipeline: ["COMERCIAL"],
-      ehMembroPipeline: false,
     })).toBe(true);
     expect(podeAcessarPipelineBpm({
       ...base,
       setoresPipeline: ["OPERACIONAL"],
-      ehMembroPipeline: true,
     })).toBe(false);
   });
 
@@ -57,7 +53,6 @@ describe("permissão CRM normalizada", () => {
       role: "Comercial",
       permissoes: ["crm"],
       setoresPipeline: ["Operacional"],
-      ehMembroPipeline: false,
     })).toBe(false);
   });
 
@@ -66,7 +61,6 @@ describe("permissão CRM normalizada", () => {
       role: "TI",
       permissoes: [],
       setoresPipeline: ["Operacional"],
-      ehMembroPipeline: false,
     })).toBe(true);
   });
 

@@ -76,4 +76,16 @@ describe("contagem do quadro", () => {
     expect(await contarCardsVisiveisNoQuadro("radar", 10, "COMERCIAL", false)).toBe(0);
     expect(mocks.noloss).not.toHaveBeenCalled();
   });
+  it("contagem do administrador do funil inclui a coluna restrita e leads virtuais", async () => {
+    mocks.pipeline.mockResolvedValue({ nome: "Revisão de Radar", setores: [{ setor: { id: 3, nome: "Comercial" } }],
+      visualizacaoConfigJson: JSON.stringify({ permissoesPipeline: { version: 2, regras: [
+        { tipo: "USUARIO", id: 10, nivel: "ADMINISTRATIVO" },
+      ] } }),
+      etapas: [{ ...etapas[0], nome: "Novos leads", visibilidades: [{ perfil: "Financeiro", podeVer: true, podeAgir: true }] }],
+    });
+    mocks.cards.mockResolvedValue([{ status: "ATIVO", etapaId: "novo", vinculosOrigem: [] }]);
+    mocks.noloss.mockResolvedValue([{ id: "n1" }]);
+    expect(await contarCardsVisiveisNoQuadro("radar", 10, "COMERCIAL", false)).toBe(2);
+    expect(mocks.cards).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ etapaId: { in: ["novo"] } }) }));
+  });
 });

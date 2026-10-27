@@ -90,7 +90,7 @@ it("usuário comum seleciona colegas sem cards e todos inclui responsáveis lega
   m.cards.mockResolvedValue([card, { ...card, id: "c2", responsavel: { id: 9, nome: "Equipe" } }, { ...card, id: "ti", responsavel: { id: 99, nome: "TI legado" } }]);
   m.usuarios.mockResolvedValue([{ id: 9, nome: "Equipe", role: "Comercial", status: "ATIVO", permissoes: "crm" }, { id: 10, nome: "Sem cards", role: "Comercial", status: "ATIVO", permissoes: "crm" }, { id: 99, nome: "TI legado", role: "TI", status: "ATIVO", permissoes: null }]);
   m.resumos.mockImplementation(async (_pipeline, ids: string[]) => ({ success: true, data: ids.map((id) => ({ id })) }));
-  expect(await SincronizarQuadroBpm("pipeline", { visao: "TODOS" })).toMatchObject({ success: true, ids: ["ti", "c2", "c1"], manifesto: { acesso: { responsaveis: [{ id: 9, nome: "Equipe" }, { id: 10, nome: "Sem cards" }] } } });
+  expect(await SincronizarQuadroBpm("pipeline", { visao: "TODOS" })).toMatchObject({ success: true, ids: ["ti", "c2", "c1"], manifesto: { acesso: { responsaveis: [{ id: 9, nome: "Equipe" }, { id: 10, nome: "Sem cards" }, { id: 99, nome: "TI legado" }] } } });
   expect(await SincronizarQuadroBpm("pipeline", { visao: "TODOS", responsavelId: 9 })).toMatchObject({ success: true, ids: ["c2"] });
   expect(await SincronizarQuadroBpm("pipeline", { visao: "TODOS", responsavelId: 10 })).toMatchObject({ success: true, ids: [] });
   m.overrides.mockResolvedValue([{ usuarioId: 9, modulo: "crm", acao: "REMOVE" }]);
@@ -101,6 +101,27 @@ it("oculta colunas sem permissão também em Todos", async () => {
   m.pipeline.mockResolvedValue({ ...pipeline, etapas: [{ ...pipeline.etapas[0], visibilidades: [{ perfil: "Comercial", podeVer: false, podeAgir: false }] }] });
   await SincronizarQuadroBpm("pipeline", { visao: "TODOS" });
   expect(m.cards).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ pipelineId: "pipeline", etapaId: { in: [] } }) }));
+});
+
+it.each(["USUARIO", "SETOR"])("admin concedido por %s consulta coluna restrita e perde privilégio após revogação", async (tipo) => {
+  const pipeline = await m.pipeline();
+  const regra = { tipo, id: tipo === "USUARIO" ? 7 : 3, nivel: "ADMINISTRATIVO" };
+  const restrito = { ...pipeline,
+    visualizacaoConfigJson: JSON.stringify({ permissoesPipeline: { version: 2, regras: [regra] } }),
+    etapas: [{ ...pipeline.etapas[0], visibilidades: [{ perfil: "Financeiro", podeVer: true, podeAgir: true }] }],
+  };
+  m.pipeline.mockResolvedValue(restrito);
+  expect(await SincronizarQuadroBpm("pipeline", { visao: "TODOS" })).toMatchObject({
+    success: true, ids: ["c1"], manifesto: { acesso: { admin: true } },
+  });
+  expect(m.cards.mock.lastCall?.[0]).toMatchObject({ where: { etapaId: { in: ["stage"] } } });
+  m.pipeline.mockResolvedValue({ ...restrito,
+    visualizacaoConfigJson: JSON.stringify({ permissoesPipeline: { version: 2, regras: [{ ...regra, nivel: "PADRAO" }] } }),
+  });
+  expect(await SincronizarQuadroBpm("pipeline", { visao: "TODOS" })).toMatchObject({
+    success: true, manifesto: { acesso: { admin: false } },
+  });
+  expect(m.cards.mock.lastCall?.[0]).toMatchObject({ where: { etapaId: { in: [] } } });
 });
 
 it.each([

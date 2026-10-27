@@ -10,8 +10,7 @@ import { Loader2, XIcon } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 import { medirFaseCrm } from "@/lib/bpm/medicao-ui";
-import { isAdminRole } from "@/lib/roles";
-import { etapaEhBoasVindas, PIPELINE_OPERACIONAL_ATIVO_ID, podeAgirBoasVindasOperacional } from "@/lib/bpm/boas-vindas";
+import { etapaEhBoasVindas, PIPELINE_OPERACIONAL_ATIVO_ID } from "@/lib/bpm/boas-vindas";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { ObterPipelineBpm } from "@/actions/bpm/Pipelines";
 import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
@@ -20,11 +19,6 @@ import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 import PainelRegistrar from "./PainelRegistrar";
 import { PainelNotaFiscalConcluida } from "./PainelNotaFiscalConcluida";
 
-import {
-  DadosEmpresaDrawer,
-  DadosEmpresaToggle,
-  useDadosEmpresaDrawer,
-} from "./DadosEmpresaDrawer";
 
 
 
@@ -82,11 +76,9 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
   const [etapas, setEtapas] = useState<EtapaOpcao[]>([]);
   const [interacoes, setInteracoes] = useState<Interacao[]>([]);
   const [erro, setErro] = useState<string | null>(null);
-  const [abaAtiva, setAbaAtiva] = useState<string>("card");
   const acessoRevogadoRef = useRef(false);
   const checklistInicialAbertoRef = useRef<string | null>(null);
   const agendamentoInicialFocadoRef = useRef<string | null>(null);
-  const dadosEmpresaDrawer = useDadosEmpresaDrawer(cardId);
   const fecharPorAcessoRevogado = useCallback(() => {
     if (acessoRevogadoRef.current) return;
     acessoRevogadoRef.current = true;
@@ -191,19 +183,9 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
     onAtualizado();
   }, [onAtualizado, recarregar]);
 
-  const meuVinculo = card?.membros.find((m) => m.userId === currentUserId);
-  const podeAgirNaEtapa = card?.permissaoEtapa?.podeAgir ?? true;
   const restritoBoasVindas = card?.pipelineId === PIPELINE_OPERACIONAL_ATIVO_ID
     && etapaEhBoasVindas(card.etapa.nome);
-  const permitidoBoasVindas = !restritoBoasVindas
-    || (currentUserId !== null && podeAgirBoasVindasOperacional(currentUserId, currentUserRole));
-  const podeTrabalharNoCard = permitidoBoasVindas && !card?.encaminhado && (isAdminRole(currentUserRole)
-    || (Boolean(meuVinculo) && podeAgirNaEtapa));
-  const podeMoverEtapa = Boolean(card?.podeMoverLivremente) || podeTrabalharNoCard;
-  const podeEditar = podeTrabalharNoCard;
-  const podeTrabalharTarefas = podeTrabalharNoCard;
-  const podeGerenciarMembros = permitidoBoasVindas && !card?.encaminhado && (isAdminRole(currentUserRole)
-    || meuVinculo?.role === "RESPONSAVEL" || meuVinculo?.role === "ADMINISTRADOR");
+  const podeEditar = card?.capacidades?.editarCard ?? false;
   const etapaAtual = card ? etapas.find((e) => e.id === card.etapa.id) ?? null : null;
 
   function solicitarFechamento(aoConcluir: () => void = onClose) {
@@ -263,7 +245,7 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
                 focoTarefa={focoTarefa}
                 focoAnexos={focoAnexos}
                 card={card} etapas={etapas} interacoes={interacoes}
-                accent={accent} currentUserId={currentUserId} currentUserRole={currentUserRole}
+                accent={accent} currentUserId={currentUserId}
                 realtimeRevision={realtimeRevision} onClose={solicitarFechamento}
                 onAtualizado={handleAtualizado}
                 onCardExcluido={onCardExcluido}

@@ -1,5 +1,5 @@
 "use server";
-import { resolverAutoridadeMovimentoLivre } from "@/lib/bpm/lideranca-setor";
+import { resolverAutoridadeAdministrativaPipeline } from "@/lib/bpm/acesso-pipeline";
 
 import { createHash } from "node:crypto";
 import { z } from "zod";
@@ -42,7 +42,7 @@ export async function SincronizarQuadroBpm(pipelineId: string, input: unknown = 
     const [pipeline, usuario] = await Promise.all([
       db.bpmPipeline.findUnique({ where: { id: pipelineId }, select: {
         nome: true, configVersion: true, visualizacaoConfigJson: true,
-        setores: { select: { setor: { select: { nome: true, ativo: true } } } },
+        setores: { select: { setor: { select: { id: true, nome: true, ativo: true } } } },
         etapas: { where: { ativo: true }, select: { id: true, nome: true, ehFinal: true,
           visibilidades: { select: { perfil: true, podeVer: true, podeAgir: true } },
           automacoes: { where: { ativa: true }, select: { versoes: { where: { status: "ATIVA" }, select: { grafoJson: true } } } },
@@ -51,10 +51,13 @@ export async function SincronizarQuadroBpm(pipelineId: string, input: unknown = 
       db.usuarios.findUnique({ where: { id: userId }, select: { role: true } }),
     ]);
     if (!pipeline || !usuario) return { success: false as const, error: "Pipeline indisponível", acessoNegado: true };
-    const etapas = pipeline.etapas.filter((e) => resolverVisibilidadeEtapa(usuario.role, e.visibilidades).podeVer);
     const admin = isAdminRole(usuario.role);
-    const leituraAmpliada = admin || Boolean(resolverAutoridadeMovimentoLivre(
-      { id: userId, role: usuario.role }, pipeline.setores?.map(({ setor }) => setor) ?? []));
+    const leituraAmpliada = admin || Boolean(resolverAutoridadeAdministrativaPipeline({
+      usuarioId: userId, role: usuario.role,
+      setoresPipeline: pipeline.setores?.map(({ setor }) => setor) ?? [],
+      visualizacaoConfigJson: pipeline.visualizacaoConfigJson,
+    }));
+    const etapas = pipeline.etapas.filter((e) => leituraAmpliada || resolverVisibilidadeEtapa(usuario.role, e.visibilidades).podeVer);
     const escopo = await carregarEscopoLeituraBpm(userId, leituraAmpliada, pipelineId, pipeline.visualizacaoConfigJson ?? null, db, true);
     const acesso = { userId, admin: leituraAmpliada, setores: escopo.setores, responsaveis: escopo.responsaveis };
     if ((parsed.data.visao === "SETOR" && !escopo.setores.some((s) => s.id === parsed.data.setorId)) || (parsed.data.visao === "EQUIPE" && !escopo.setores.length) || (parsed.data.responsavelId != null && !escopo.responsaveis.some((pessoa) => pessoa.id === parsed.data.responsavelId))) {

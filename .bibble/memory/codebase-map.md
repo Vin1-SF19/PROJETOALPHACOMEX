@@ -1967,3 +1967,13 @@ Bug da ficha: lease persistido era recriado antes da recuperação; adapter Turs
 - `src/lib/ai-unavailability.ts`, `ai-availability-client.ts`: códigos públicos IA seguros; JSON Onyx30s inclui corpo, SSE separado e token individual.
 - `src/lib/geolocation-policy.ts` mantém geolocation bloqueada/desconhecida sem chamada; `src/components/layout/PainelVersionNotice.tsx` apenas orienta salvar todas abas e atualizar manualmente, sem reload ou botão destrutivo.
 - Referências: `docs/architecture/estabilidade-painel-20261026.md` e `docs/stories/story-estabilidade-painel-conexao-20261026.md`; base20f310 preservada. Nenhum módulo/menu/atalho/schema novo.
+
+## 2026-10-27 — CRM: acesso explícito aos funis [crm-acessos-20261027]
+
+Implementação local na branch `staging`, sem publicação. Contrato central em `src/lib/bpm/acesso-pipeline.ts`; leitura/gravação administrativa em `src/actions/bpm/AcessosPipeline.ts`; UI compartilhada em `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/AcessosPipelineSection.tsx`.
+
+A central `admin/AdminPipelinesListClient.tsx` abre em Configurações com seleção setor/usuário → destinatário → funil → nível; Funis mantém o cadastro dos pipelines sem edição paralela de setores. O editor por pipeline usa o mesmo componente com funil fixo e mantém `VisibilidadeEtapasSection` e distribuição de closers.
+
+Ownership, quadro/cards, agregados, arquivados, jornada, Meet, membros, notas fiscais e comandos de transição compõem o acesso pelo contrato novo. DTO de card expõe capacidades do servidor; DTO público de pipeline filtra colunas/transições visíveis e omite regras de ACL. Removidos `VisibilidadePipeline.ts`, `VisibilidadePipelineSection.tsx`, `acesso-individual-pipeline.ts` e `lideranca-setor.ts`; trechos anteriores desta memória sobre esses caminhos descrevem histórico, não o mapa atual. `visao-equipe.ts` permanece apenas com tipos/filtros do quadro ainda consumidos.
+
+Registro: Scribe. File list e evidências duráveis: `docs/stories/story-crm-permissoes-simplificadas-20261027.md`.

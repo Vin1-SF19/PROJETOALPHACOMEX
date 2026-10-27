@@ -1,5 +1,4 @@
-import { resolverAutoridadeMovimentoLivre, type AutoridadeMovimentoLivre } from "@/lib/bpm/lideranca-setor";
-import { lerUsuariosAutorizadosPipeline } from "@/lib/bpm/acesso-individual-pipeline";
+import { resolverNivelAcessoPipeline, resolverAutoridadeAdministrativaPipeline, type AutoridadeMovimentoLivre, type SetorAcessoPipeline } from "@/lib/bpm/acesso-pipeline";
 import db from "@/lib/prisma";
 
 import { isAdminRole, isSameRole } from "@/lib/roles";
@@ -68,27 +67,27 @@ export function possuiPermissaoCrm(permissoes: readonly string[]): boolean {
 export function podeAcessarPipelineBpm(params: {
   role: string;
   permissoes: readonly string[];
-  setoresPipeline: readonly string[];
+  setoresPipeline: readonly (string | SetorAcessoPipeline)[];
   usuarioId?: number;
   visualizacaoConfigJson?: string | null;
-  ehMembroPipeline: boolean;
 }): boolean {
   if (isAdminRole(params.role)) return true;
   if (!possuiPermissaoCrm(params.permissoes)) return false;
-  return Boolean(resolverAutoridadeMovimentoLivre({ id: params.usuarioId ?? -1, role: params.role }, params.setoresPipeline.map((nome) => ({ nome }))))
-    || (params.usuarioId != null && lerUsuariosAutorizadosPipeline(params.visualizacaoConfigJson).includes(params.usuarioId))
-    || params.setoresPipeline.length === 0
-    || params.setoresPipeline.some((setor) => isSameRole(setor, params.role));
+  return resolverNivelAcessoPipeline({
+    usuarioId: params.usuarioId ?? -1, role: params.role,
+    setoresPipeline: params.setoresPipeline.map((setor) => typeof setor === "string" ? { nome: setor } : setor),
+    visualizacaoConfigJson: params.visualizacaoConfigJson,
+  }) !== null;
 }
 
 export function podeSerResponsavelPipelineBpm(params: {
   role: string;
   permissoes: readonly string[];
-  setoresPipeline: readonly string[];
+  setoresPipeline: readonly (string | SetorAcessoPipeline)[];
   usuarioId?: number;
   visualizacaoConfigJson?: string | null;
 }): boolean {
-  return podeAcessarPipelineBpm({ ...params, ehMembroPipeline: false });
+  return podeAcessarPipelineBpm(params);
 }
 
 async function carregarUsuarioEPermissoesBpm(
@@ -204,15 +203,14 @@ export async function checarAcessoBpmPipeline(
 
   const pipeline = await client.bpmPipeline.findUnique({
     where: { id: pipelineId },
-    select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { nome: true } } } } },
+    select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { id: true, nome: true, ativo: true } } } } },
   });
   if (!pipeline) return false;
   return podeAcessarPipelineBpm({
     role: acesso.usuario.role,
     permissoes: acesso.permissoes,
     usuarioId: acesso.usuario.id, visualizacaoConfigJson: pipeline.visualizacaoConfigJson,
-    setoresPipeline: pipeline.setores.map(({ setor }) => setor.nome),
-    ehMembroPipeline: false,
+    setoresPipeline: pipeline.setores.map(({ setor }) => setor),
   });
 }
 
@@ -238,14 +236,14 @@ export async function usuarioElegivelResponsavelBpm(
 
   const pipeline = await client.bpmPipeline.findUnique({
     where: { id: pipelineId },
-    select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { nome: true } } } } },
+    select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { id: true, nome: true, ativo: true } } } } },
   });
   if (!pipeline) return false;
   return podeSerResponsavelPipelineBpm({
     role: acesso.usuario.role,
     permissoes: acesso.permissoes,
     usuarioId: acesso.usuario.id, visualizacaoConfigJson: pipeline.visualizacaoConfigJson,
-    setoresPipeline: pipeline.setores.map(({ setor }) => setor.nome),
+    setoresPipeline: pipeline.setores.map(({ setor }) => setor),
   });
 }
 
@@ -267,10 +265,10 @@ export async function resolverResponsavelAutomaticoBpm(
 
   const pipeline = await client.bpmPipeline.findUnique({
     where: { id: pipelineId },
-    select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { nome: true } } } } },
+    select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { id: true, nome: true, ativo: true } } } } },
   });
   if (!pipeline) return null;
-  const setoresPipeline = pipeline.setores.map(({ setor }) => setor.nome);
+  const setoresPipeline = pipeline.setores.map(({ setor }) => setor);
 
   const [usuarios, permissoesSetorTodas] = await Promise.all([
     client.usuarios.findMany({
@@ -349,6 +347,7 @@ const PERMISSOES_POR_ROLE: Record<string, BpmAcao[]> = {
 export interface AcessoBpmCard {
   autorizado: boolean;
   isAdminGlobal: boolean;
+  isAdminPipeline?: boolean;
   role: string | null;
   perfilGlobal: string | null;
   podeAgirEtapa: boolean;
@@ -359,7 +358,8 @@ export interface AcessoBpmCard {
 /**
  * Fonte única de ownership do módulo Alpha BPM. Nunca confia em role/permissão
  * vinda do cliente — sempre resolve do banco a partir de userId + cardId.
- * Admin/CEO globais têm acesso pleno a qualquer card (mesmo padrão do Blueprint).
+ * Administradores globais (incluindo TI/CEO) e administradores do funil podem
+ * operar seus cards sem vínculo; o segundo grupo não ganha administração global.
  *
  * Pessoas vinculadas podem executar o trabalho do card, inclusive editar e
  * mover etapa. A gestão da composição (`adicionarParticipantes`) e a exclusão
@@ -380,7 +380,7 @@ export async function checarAcessoBpmCard(
       select: {
         pipelineId: true,
         responsavelId: true,
-        pipeline: { select: { ativo: true, visualizacaoConfigJson: true, setores: { select: { setor: { select: { nome: true, ativo: true } } } } } },
+        pipeline: { select: { ativo: true, visualizacaoConfigJson: true, setores: { select: { setor: { select: { id: true, nome: true, ativo: true } } } } } },
         status: true,
         etapa: {
           select: {
@@ -404,28 +404,32 @@ export async function checarAcessoBpmCard(
   const acessoPipeline = isAdminRole(acessoModulo.usuario.role) || Boolean(card.pipeline && podeAcessarPipelineBpm({
     role: acessoModulo.usuario.role, permissoes: acessoModulo.permissoes,
     usuarioId: userId, visualizacaoConfigJson: card.pipeline.visualizacaoConfigJson,
-    setoresPipeline: card.pipeline.setores.map(({ setor }) => setor.nome), ehMembroPipeline: false,
+    setoresPipeline: card.pipeline.setores.map(({ setor }) => setor),
   }));
+  const isAdminGlobal = isAdminRole(acessoModulo.usuario.role);
+  const nivelPipeline = acessoPipeline && possuiPermissaoCrm(acessoModulo.permissoes)
+    ? resolverNivelAcessoPipeline({ usuarioId: userId, role: acessoModulo.usuario.role,
+      setoresPipeline: card.pipeline?.setores.map(({ setor }) => setor) ?? [],
+      visualizacaoConfigJson: card.pipeline?.visualizacaoConfigJson }) : null;
+  const isAdminPipeline = !isAdminGlobal && nivelPipeline === "ADMINISTRATIVO";
   const autoridadeMovimentoLivre = acessoPipeline && possuiPermissaoCrm(acessoModulo.permissoes) && card.pipeline?.ativo !== false
-    ? resolverAutoridadeMovimentoLivre(acessoModulo.usuario, card.pipeline?.setores.map(({ setor }) => setor) ?? []) : null;
-  if (acao === "moverEtapa" && autoridadeMovimentoLivre) {
-    return { autorizado: true, isAdminGlobal: isAdminRole(acessoModulo.usuario.role),
-      role: isAdminRole(acessoModulo.usuario.role) ? "ADMINISTRADOR" : null,
-      perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false, autoridadeMovimentoLivre };
-  }
+    ? resolverAutoridadeAdministrativaPipeline({ usuarioId: userId, role: acessoModulo.usuario.role,
+      setoresPipeline: card.pipeline?.setores.map(({ setor }) => setor) ?? [],
+      visualizacaoConfigJson: card.pipeline?.visualizacaoConfigJson }) : null;
   const bloqueadoPorEncaminhamento = card.etapa.ehFinal
     && (card.status === "CONCLUIDO" || Boolean(card.vinculosOrigem?.length));
   const apenasVisualizacao = acaoBpmExigeSomenteVisualizacao(acao);
-  if (!apenasVisualizacao && card.pipelineId === PIPELINE_OPERACIONAL_ATIVO_ID
+  if (isAdminGlobal || isAdminPipeline) {
+    return { autorizado: apenasVisualizacao || !bloqueadoPorEncaminhamento || (acao === "moverEtapa" && Boolean(autoridadeMovimentoLivre)),
+      isAdminGlobal, isAdminPipeline, role: "ADMINISTRADOR", perfilGlobal: acessoModulo.usuario.role,
+      podeAgirEtapa: !bloqueadoPorEncaminhamento, bloqueadoPorEncaminhamento, autoridadeMovimentoLivre };
+  }
+  const restritoBoasVindas = card.pipelineId === PIPELINE_OPERACIONAL_ATIVO_ID
     && etapaEhBoasVindas(card.etapa.nome)
-    && !podeAgirBoasVindasOperacional(userId, acessoModulo.usuario.role)) {
+    && !podeAgirBoasVindasOperacional(userId, acessoModulo.usuario.role);
+  if (!apenasVisualizacao && restritoBoasVindas) {
     return { autorizado: false, isAdminGlobal: false, role: null,
       perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false };
-  }
-  if (isAdminRole(acessoModulo.usuario.role)) {
-    return { autorizado: apenasVisualizacao || !bloqueadoPorEncaminhamento, isAdminGlobal: true,
-      role: "ADMINISTRADOR", perfilGlobal: acessoModulo.usuario.role,
-      podeAgirEtapa: !bloqueadoPorEncaminhamento, bloqueadoPorEncaminhamento, autoridadeMovimentoLivre };
   }
   if (!possuiPermissaoCrm(acessoModulo.permissoes)) {
     return { autorizado: false, isAdminGlobal: false, role: null, perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false };
@@ -435,8 +439,7 @@ export async function checarAcessoBpmCard(
     role: acessoModulo.usuario.role,
     permissoes: acessoModulo.permissoes,
     usuarioId: acessoModulo.usuario.id, visualizacaoConfigJson: card.pipeline.visualizacaoConfigJson,
-    setoresPipeline: card.pipeline.setores.map(({ setor }) => setor.nome),
-    ehMembroPipeline: false,
+    setoresPipeline: card.pipeline.setores.map(({ setor }) => setor),
   })) return { autorizado: false, isAdminGlobal: false, role: null, perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false };
 
   const permissaoEtapa = resolverVisibilidadeEtapa(
@@ -476,7 +479,7 @@ export async function checarAcessoBpmCard(
     isAdminGlobal: false,
     role: membro.role,
     perfilGlobal: acessoModulo.usuario.role,
-    podeAgirEtapa: permissaoEtapa.podeAgir && !bloqueadoPorEncaminhamento,
+    podeAgirEtapa: permissaoEtapa.podeAgir && !bloqueadoPorEncaminhamento && !restritoBoasVindas,
     bloqueadoPorEncaminhamento,
     autoridadeMovimentoLivre,
   };

@@ -1,4 +1,6 @@
 "use server";
+
+import { gravarRegrasAcessoPipeline, resolverAutoridadeAdministrativaPipeline } from "@/lib/bpm/acesso-pipeline";
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
@@ -19,6 +21,7 @@ import {
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import { avancarConfigVersionBpm } from "@/lib/bpm/config-version";
 import { contarCardsVisiveisNoQuadro } from "@/lib/bpm/cards-no-quadro";
+import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -129,32 +132,10 @@ export async function ListarPipelinesBpm(incluirInativos = false) {
   }
 }
 
-/** Popula seletor de setores na criação/edição de pipeline (Fase 3 — central de configurações). */
-export async function ListarSetoresParaPipelineBpm() {
-  try {
-    const session = await auth();
-    // Resolve permission server-side; a valid session alone cannot enumerate sectors.
-    if (session?.user?.id) await exigirAcessoModuloBpm(Number(session.user.id));
-    if (!session?.user?.id)
-      return { success: false, error: "Não autorizado", data: [] };
-
-    const setores = await db.setor.findMany({
-      select: { id: true, nome: true },
-      orderBy: { nome: "asc" },
-    });
-
-    return { success: true, data: setores };
-  } catch (error) {
-    console.error("[ListarSetoresParaPipelineBpm]", error);
-    return { success: false, error: "Erro ao buscar setores", data: [] };
-  }
-}
-
 /**
  * `incluirInativas` traz também etapas desativadas e o cadastro de substatus — usado
  * pela tela admin (Fase 3) para permitir reativar etapas e gerir substatus. O board
- * (`incluirInativas=false`, padrão) continua vendo só etapas ativas, sem mudança de
- * comportamento.
+ * (`incluirInativas=false`, padrão) recebe somente as etapas ativas e visíveis.
  */
 export async function ObterPipelineBpm(
   pipelineId: string,
@@ -171,11 +152,13 @@ export async function ObterPipelineBpm(
 
     const pipeline = await db.bpmPipeline.findUnique({
       where: { id: pipelineId },
+      omit: { visualizacaoConfigJson: false },
       include: {
         etapas: {
           where: incluirInativas ? undefined : { ativo: true },
           orderBy: { ordem: "asc" },
           include: {
+            visibilidades: { select: { perfil: true, podeVer: true, podeAgir: true } },
             transicoesEtapaOrigem: {
               where: { permitida: true, origem: { in: ["MANUAL", "AMBOS"] } },
               select: { etapaDestinoId: true },
@@ -215,7 +198,7 @@ export async function ObterPipelineBpm(
             mapeamentoDestino: true,
           },
         },
-        setores: { include: { setor: { select: { id: true, nome: true } } } },
+        setores: { include: { setor: { select: { id: true, nome: true, ativo: true } } } },
         automacoes: {
           orderBy: { nome: "asc" },
           select: {
@@ -272,9 +255,18 @@ export async function ObterPipelineBpm(
         mapeamentoDestino: true,
       },
     });
+    const usuario = await db.usuarios.findUnique({ where: { id: userId }, select: { role: true } });
+    if (!usuario) return { success: false, error: "Não autorizado" };
+    const administradorPipeline = Boolean(resolverAutoridadeAdministrativaPipeline({
+      usuarioId: userId, role: usuario.role, visualizacaoConfigJson: pipeline.visualizacaoConfigJson,
+      setoresPipeline: pipeline.setores.map(({ setor }) => setor),
+    }));
+    const etapasPermitidas = pipeline.etapas.filter((etapa) => incluirInativas || administradorPipeline
+      || resolverVisibilidadeEtapa(usuario.role, etapa.visibilidades).podeVer);
+    const etapasVisiveis = new Set(etapasPermitidas.map((etapa) => etapa.id));
     const automacoes = pipeline.automacoes.map(projetarAutomacaoNoBoard);
-    const { automacoes: _definicoes, ...dadosPipeline } = pipeline;
-    void _definicoes;
+    const { automacoes: _definicoes, visualizacaoConfigJson: _acessos, ...dadosPipeline } = pipeline;
+    void _definicoes; void _acessos;
     return {
       success: true,
       data: {
@@ -285,12 +277,15 @@ export async function ObterPipelineBpm(
         automacoesGlobais: automacoes.filter(
           (automacao) => automacao.escopo === "GLOBAL_PIPELINE",
         ),
-        etapas: pipeline.etapas.map((etapa) => ({
-          ...etapa,
-          automacoes: automacoes.filter((automacao) =>
-            automacao.etapasIds.includes(etapa.id),
-          ),
-        })),
+        etapas: etapasPermitidas.map((etapa) => {
+          const { visibilidades: _regras, ...dadosEtapa } = etapa;
+          void _regras;
+          return {
+            ...dadosEtapa,
+            transicoesEtapaOrigem: etapa.transicoesEtapaOrigem.filter((transicao) => etapasVisiveis.has(transicao.etapaDestinoId)),
+            automacoes: automacoes.filter((automacao) => automacao.etapasIds.includes(etapa.id)),
+          };
+        }),
       },
     };
   } catch (error) {
@@ -310,12 +305,12 @@ export async function CriarPipelineBpm(dados: unknown) {
     const parsed = criarPipelineSchema.safeParse(dados);
     if (!parsed.success)
       return { success: false, error: parsed.error.flatten() };
-    const { nome, setorIds } = parsed.data;
+    const { nome } = parsed.data;
 
     const pipeline = await db.bpmPipeline.create({
       data: {
         nome,
-        setores: { create: setorIds.map((setorId) => ({ setorId })) },
+        visualizacaoConfigJson: gravarRegrasAcessoPipeline(null, []),
       },
       include: { setores: true },
     });
@@ -350,20 +345,13 @@ export async function AtualizarPipelineBpm(dados: unknown) {
     const parsed = atualizarPipelineSchema.safeParse(dados);
     if (!parsed.success)
       return { success: false, error: parsed.error.flatten() };
-    const { pipelineId, nome, ativo, setorIds } = parsed.data;
+    const { pipelineId, nome } = parsed.data;
 
     const pipeline = await db.$transaction(async (tx) => {
       const atualizado = await tx.bpmPipeline.update({
         where: { id: pipelineId },
-        data: { nome, ativo },
+        data: { nome },
       });
-
-      if (setorIds) {
-        await tx.bpmPipelineSetor.deleteMany({ where: { pipelineId } });
-        await tx.bpmPipelineSetor.createMany({
-          data: setorIds.map((setorId) => ({ pipelineId, setorId })),
-        });
-      }
 
       await avancarConfigVersionBpm(tx, pipelineId);
 

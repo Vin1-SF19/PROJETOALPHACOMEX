@@ -1670,3 +1670,15 @@ Pedido confirmado escolhe preencher valor/forma pelo formulário atual de Em tra
 - Auth fail-closed, Onyx token individual/owner ACL e rascunhos preservados; nenhum replay genérico de POST/write.
 - Aviso de versão somente orientativo: não há preservação universal verificável de drafts de frames legados que justifique botão/reload/remount. Geolocation=() permanece.
 - Usuário autorizou staging e produção nesta sessão; primeiro homologar staging com bindings separados, depois promover. Gates locais não são aprovação ambiental; nenhum schema/migration necessário.
+
+## 2026-10-27 — Acesso administrativo explícito por funil [crm-acessos-20261027]
+
+- Pedido do usuário: substituir a configuração confusa por liberação setor/usuário + funil, com nível comum ou administrativo, mantendo colunas e removendo código morto. Sem commit nem push.
+- Contrato único em `acesso-pipeline.ts`, salvo no JSON existente `permissoesPipeline` version 2; relação de setores apenas espelha as concessões. Sem schema/migration/backfill remoto.
+- Administração de funil é explícita, isolada e revogável. Não torna a pessoa administradora global nem permite gerir acessos. Setores/liderança não concedem movimentação livre implicitamente no novo contrato; prevalece o maior nível das concessões aplicáveis.
+- Escritores e UI antigos foram removidos. Um leitor mínimo de transição conserva somente entrada base dos dados existentes até a primeira publicação, sem converter supervisão em administração. UI sinaliza funil anterior aberto. Depois de salvar, a lista passa a ser exclusiva; lista vazia restringe a administradores globais.
+- Visibilidade de colunas segue no fluxo comum; administração explícita do funil habilita o acesso/ação administrativa nos consumidores. Cards encaminhados mantêm sua integridade; movimentação livre usa reposicionamento próprio.
+- Capacidade de card vem do servidor (`editarCard`, `gerenciarMembros`, `moverEtapa`, `administrarPipeline`); componentes não a deduzem de role do navegador. JSON de ACL não integra o DTO público.
+- Trabalho e validações locais na branch `staging`; publicação em staging/produção e homologação autenticada não ocorreram. Logs grandes temporários ficam em `~/work-tmp`, sem persistir credenciais ou dados reais. Registro: Scribe/Kowalski.
+
+Validação local final desta entrega: lint/typecheck/build aprovados; revisão Lens/Anubis/Probe sem bloqueantes/importantes e CodeRabbit indisponível. Suite global sequencial aprovada (729 arquivos, 5.607 testes, 4 ignorados e 1 todo); smoke anônimo não equivale a navegação autenticada. Sem publicação ou commit/push.

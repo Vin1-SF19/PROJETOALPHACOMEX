@@ -143,8 +143,8 @@ describe("Alpha CRM - seleção assistida de data e hora", () => {
     const contato = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximoContato.tsx");
     const reuniao = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelReuniao.tsx");
 
-    expect(modal).toContain("const podeAgirNaEtapa = card?.permissaoEtapa?.podeAgir ?? true");
-    expect(modal).toContain("(Boolean(meuVinculo) && podeAgirNaEtapa)");
+    expect(modal).toContain("const podeEditar = card?.capacidades?.editarCard ?? false");
+    expect(modal).not.toContain("Boolean(meuVinculo)");
     expect(modal).toContain("podeEditar={podeEditar}");
     expect(contato).toContain("disabled={!podeEditar}");
     expect(reuniao).toContain("disabled={!podeEditar || salvando");

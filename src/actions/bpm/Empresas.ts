@@ -4,12 +4,11 @@ import db from "@/lib/prisma";
 import { auth } from "../../../auth";
 import {
   checarAcessoConfigPipeline,
-  podeAcessarPipelineBpm,
   exigirAcessoBpmCard,
   exigirAcessoModuloBpm,
 } from "@/lib/bpm/ownership";
 import { carregarDadosEmpresaCard } from "@/lib/bpm/dados-empresa-server";
-import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
+import { podeVerEtapaPipeline } from "@/lib/bpm/acesso-pipeline";
 
 /**
  * Consolida, sem mutações, os dados da empresa usados por Pré-Análise, CS&NPS,
@@ -39,8 +38,8 @@ export async function ObterDadosEmpresaCardBpm(cardId: string) {
  * Perfil consolidado de uma empresa (Empresa = `Cliente`, Cliente Master): todos os
  * BpmCard dela em qualquer pipeline, agrupados, + histórico consolidado de
  * todos esses cards. Não há ownership check restritivo por card individual
- * aqui — é uma visão agregada por empresa, exige apenas sessão autenticada,
- * igual ao padrão de outras consultas agregadas do painel (ex.: buscarClientes).
+ * aqui — é uma visão agregada por empresa que exige acesso efetivo ao CRM,
+ * ao funil e à coluna de cada card retornado.
  */
 export async function ObterPerfilEmpresaBpm(empresaId: number) {
   try {
@@ -52,12 +51,16 @@ export async function ObterPerfilEmpresaBpm(empresaId: number) {
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
     const [usuarioAtual, etapas] = await Promise.all([
       db.usuarios.findUnique({ where: { id: userId }, select: { role: true } }),
-      db.bpmEtapa.findMany({ select: { id: true, pipeline: { select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { nome: true } } } } } }, visibilidades: {
+      db.bpmEtapa.findMany({ select: { id: true, pipeline: { select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { id: true, nome: true, ativo: true } } } } } }, visibilidades: {
         select: { perfil: true, podeVer: true, podeAgir: true },
       } } }),
     ]);
-    const etapaIdsVisiveis = etapas.filter((etapa) =>
-      resolverVisibilidadeEtapa(usuarioAtual?.role, etapa.visibilidades).podeVer && podeAcessarPipelineBpm({ role: usuarioAtual?.role ?? "", permissoes: ["crm"], usuarioId: userId, visualizacaoConfigJson: etapa.pipeline.visualizacaoConfigJson, setoresPipeline: etapa.pipeline.setores.map(({ setor }) => setor.nome), ehMembroPipeline: false })).map((etapa) => etapa.id);
+    const etapaIdsVisiveis = etapas.filter((etapa) => {
+      const entrada = { usuarioId: userId, role: usuarioAtual?.role ?? "",
+        visualizacaoConfigJson: etapa.pipeline.visualizacaoConfigJson,
+        setoresPipeline: etapa.pipeline.setores.map(({ setor }) => setor) };
+      return podeVerEtapaPipeline(entrada, etapa.visibilidades);
+    }).map((etapa) => etapa.id);
 
     const empresa = await db.cliente.findUnique({
       where: { id: empresaId },

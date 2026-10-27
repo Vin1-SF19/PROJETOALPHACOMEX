@@ -98,7 +98,7 @@ describe("integração da visibilidade por coluna no CRM/BPM", () => {
     );
     expect(admin).toContain("<VisibilidadeEtapasSection");
     expect(board).toContain("arrastoDesabilitado || (!c.podeAgirEtapa && !c.podeMoverLivremente)");
-    expect(modal).toContain("card.permissaoEtapa?.podeAgir ?? true");
+    expect(modal).toContain("card.capacidades?.editarCard ?? false");
   });
 
   it("aplica a visibilidade no dashboard e na promoção de leads NoLoss", () => {

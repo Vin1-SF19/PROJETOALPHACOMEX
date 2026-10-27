@@ -52,6 +52,19 @@ beforeEach(() => {
 });
 
 describe("assunção Instagram", () => {
+  it("administrador do funil assume lead em coluna restrita sem elevar a role global", async () => {
+    const pipeline = { setores: [{ setor: { id: 3, nome: "Financeiro" } }],
+      visualizacaoConfigJson: JSON.stringify({ permissoesPipeline: { version: 2, regras: [
+        { tipo: "USUARIO", id: 7, nivel: "ADMINISTRATIVO" },
+      ] } }),
+    };
+    const visibilidades = [{ perfil: "Financeiro", podeVer: true, podeAgir: true }];
+    mocks.etapa.mockResolvedValue({ id: input.etapaDestinoId, nome: "Novo Lead", visibilidades });
+    mocks.tx.bpmEtapa.findFirst.mockResolvedValue({ id: input.etapaDestinoId, nome: "Novo Lead", visibilidades, pipeline });
+    expect(await AssumirLeadInstagram(input)).toEqual({ success: true, data: { cardId: "card" } });
+    expect(mocks.acesso).toHaveBeenCalledWith("pipeline", 7, mocks.tx);
+    expect(mocks.tx.bpmCard.create).toHaveBeenCalledOnce();
+  });
   it("preserva contato/Qs, usa CNPJ existente e cria todos efeitos na mesma transação", async () => {
     expect(await AssumirLeadInstagram(input)).toEqual({ success: true, data: { cardId: "card" } });
     expect(mocks.tx.cliente.findUnique).toHaveBeenCalledWith({ where: { cnpj: "11222333000181" }, select: { id: true } });

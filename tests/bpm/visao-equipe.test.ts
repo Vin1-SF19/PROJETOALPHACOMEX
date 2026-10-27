@@ -2,7 +2,6 @@ import { beforeEach, expect, it, vi } from "vitest";
 const m = vi.hoisted(() => ({ pipeline: vi.fn(), usuarios: vi.fn(), permissoes: vi.fn(), overrides: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ default: { bpmPipeline: { findUnique: m.pipeline }, usuarios: { findMany: m.usuarios }, setorPermissao: { findMany: m.permissoes }, usuarioPermissaoOverride: { findMany: m.overrides } } }));
 import { carregarEscopoLeituraBpm } from "@/lib/bpm/visao-equipe-server";
-import { configuracaoVisaoEquipeSchema, lerConfiguracaoVisaoEquipe } from "@/lib/bpm/visao-equipe";
 import { selecionarPaginaQuadro } from "@/lib/bpm/quadro-paginado";
 beforeEach(() => {
   vi.clearAllMocks();
@@ -18,17 +17,15 @@ beforeEach(() => {
   m.permissoes.mockResolvedValue([]);
   m.overrides.mockResolvedValue([{ usuarioId: 12, modulo: "crm", acao: "REMOVE" }]);
 });
-it("preserva validação da configuração legada sem depender dela para leitura", async () => {
+it("não consulta opções quando o chamador só precisa do escopo de leitura", async () => {
   for (const json of [null, "{", '{"version":2,"supervisores":[]}']) {
-    expect(lerConfiguracaoVisaoEquipe(json).supervisores).toEqual([]);
     expect((await carregarEscopoLeituraBpm(8, false, "p1", json)).where).toEqual({});
   }
-  expect(configuracaoVisaoEquipeSchema.safeParse({ version: 1, supervisores: [{ usuarioId: 7, setorIds: [3] }, { usuarioId: 7, setorIds: [4] }] }).success).toBe(false);
   expect(m.usuarios).not.toHaveBeenCalled();
 });
 it.each([false, true])("lista só usuários ativos com CRM dos setores do pipeline, admin=%s", async (admin) => {
   const scope = await carregarEscopoLeituraBpm(8, admin, "p1", null, undefined, true);
-  expect(scope).toMatchObject({ where: {}, usuarioIds: [9], responsaveis: [{ id: 9, nome: "Ana" }], setores: [{ id: 3, nome: "Comercial", usuarioIds: [9] }] });
+  expect(scope).toMatchObject({ where: {}, usuarioIds: [9, 14], responsaveis: [{ id: 9, nome: "Ana" }, { id: 14, nome: "TI" }], setores: [{ id: 3, nome: "Comercial", usuarioIds: [9] }] });
   expect(m.pipeline).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "p1" } }));
 });
 it("pipeline sem setores lista todas as contas ativas com CRM e atualiza revogação", async () => {
@@ -51,5 +48,16 @@ it("todos iniciam com próprios e livres e qualquer usuário pode consultar todo
 });
 it("inclui pessoa de outro setor autorizada individualmente, sem incluir contas revogadas", async () => {
   m.pipeline.mockResolvedValue({ setores: [{ setor: { id: 3, nome: "Comercial" } }], visualizacaoConfigJson: JSON.stringify({ version: 1, usuariosAutorizados: [10, 11, 12, 13] }) });
-  expect((await carregarEscopoLeituraBpm(8, false, "p1", null, undefined, true)).usuarioIds).toEqual([9, 10]);
+  expect((await carregarEscopoLeituraBpm(8, false, "p1", null, undefined, true)).usuarioIds).toEqual([9, 10, 14]);
+});
+
+it("novas regras fechadas não listam usuário comum e acesso individual inclui o administrador do funil", async () => {
+  m.pipeline.mockResolvedValue({ setores: [{ setor: { id: 3, nome: "Comercial" } }],
+    visualizacaoConfigJson: JSON.stringify({ permissoesPipeline: { version: 2, regras: [] } }) });
+  expect((await carregarEscopoLeituraBpm(8, false, "p1", null, undefined, true)).usuarioIds).toEqual([14]);
+  m.pipeline.mockResolvedValue({ setores: [{ setor: { id: 3, nome: "Comercial" } }],
+    visualizacaoConfigJson: JSON.stringify({ permissoesPipeline: { version: 2, regras: [
+      { tipo: "USUARIO", id: 10, nivel: "ADMINISTRATIVO" },
+    ] } }) });
+  expect((await carregarEscopoLeituraBpm(8, false, "p1", null, undefined, true)).usuarioIds).toEqual([10, 14]);
 });

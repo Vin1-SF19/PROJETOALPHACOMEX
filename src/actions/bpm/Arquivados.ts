@@ -9,6 +9,7 @@ import {
   exigirAcessoBpmCard,
   exigirAcessoModuloBpm,
 } from "@/lib/bpm/ownership";
+import { resolverNivelAcessoPipeline } from "@/lib/bpm/acesso-pipeline";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { carregarCamposAplicaveisCardEtapa } from "@/lib/bpm/requisitos-etapa-server";
 
@@ -40,10 +41,14 @@ async function contextoArquivo() {
   const [admin, usuario, pipelines] = await Promise.all([
     checarAcessoConfigPipeline(userId, "visualizarPipeline"),
     db.usuarios.findUnique({ where: { id: userId }, select: { role: true } }),
-    db.bpmPipeline.findMany({ select: { id: true } }),
+    db.bpmPipeline.findMany({ select: { id: true, visualizacaoConfigJson: true, setores: { select: { setor: { select: { id: true, nome: true, ativo: true } } } } } }),
   ]);
   const acessos = await Promise.all(pipelines.map((pipeline) => checarAcessoBpmPipeline(pipeline.id, userId)));
-  return { userId, admin, role: usuario?.role ?? null,
+  const pipelineIdsAdministrativos = pipelines.filter((pipeline) => resolverNivelAcessoPipeline({
+    usuarioId: userId, role: usuario?.role ?? "", visualizacaoConfigJson: pipeline.visualizacaoConfigJson,
+    setoresPipeline: pipeline.setores?.map(({ setor }) => setor) ?? [],
+  }) === "ADMINISTRATIVO").map((pipeline) => pipeline.id);
+  return { userId, admin, role: usuario?.role ?? null, pipelineIdsAdministrativos,
     pipelineIds: pipelines.filter((_, index) => acessos[index]).map((pipeline) => pipeline.id) };
 }
 
@@ -53,9 +58,9 @@ export async function ListarCardsArquivadosBpm(pagina = 1) {
     const paginaValidada = Number.isSafeInteger(pagina) && pagina > 0 ? Math.min(pagina, 100000) : 1;
     const etapas = await db.bpmEtapa.findMany({
       where: { pipelineId: { in: contexto.pipelineIds } },
-      select: { id: true, visibilidades: { select: { perfil: true, podeVer: true, podeAgir: true } } },
+      select: { id: true, pipelineId: true, visibilidades: { select: { perfil: true, podeVer: true, podeAgir: true } } },
     });
-    const etapaIds = etapas.filter((etapa) => resolverVisibilidadeEtapa(contexto.role, etapa.visibilidades).podeVer)
+    const etapaIds = etapas.filter((etapa) => contexto.admin || contexto.pipelineIdsAdministrativos.includes(etapa.pipelineId) || resolverVisibilidadeEtapa(contexto.role, etapa.visibilidades).podeVer)
       .map((etapa) => etapa.id);
     const escopoLeitura = await carregarEscopoLeituraBpm(contexto.userId, contexto.admin);
     const where = {
@@ -123,8 +128,8 @@ export async function ObterCardArquivadoBpm(cardId: string) {
     if (!card || card.status !== "ARQUIVADO" || !contexto.pipelineIds.includes(card.pipelineId)) {
       return { success: false as const, error: "Card não encontrado" };
     }
-    await exigirAcessoBpmCard(card.id, contexto.userId, contexto.role, "visualizar");
-    const acesso = await checarAcessoConfigPipeline(contexto.userId, "visualizarPipeline");
+    const acessoCard = await exigirAcessoBpmCard(card.id, contexto.userId, contexto.role, "visualizar");
+    const acesso = acessoCard.isAdminGlobal || acessoCard.isAdminPipeline === true;
     const membro = acesso ? null : await db.bpmCardMembro.findUnique({
       where: { cardId_userId: { cardId, userId: contexto.userId } }, select: { role: true },
     });

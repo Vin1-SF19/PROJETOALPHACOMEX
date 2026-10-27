@@ -9,6 +9,7 @@ import { etapaIdCardSchema } from "@/lib/validations/bpm";
 import { gerarTelefonePendente } from "@/lib/validations/cs-nps";
 import { exigirAcessoBpmCard, exigirAcessoBpmPipeline, usuarioElegivelResponsavelBpm } from "@/lib/bpm/ownership";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
+import { resolverAutoridadeAdministrativaPipeline } from "@/lib/bpm/acesso-pipeline";
 import { carregarSnapshotsCopiaCamposCard, verificarTransicaoPermitidaBpm } from "@/lib/bpm/requisitos-etapa-server";
 import { lerLeadInstagram } from "@/lib/bpm/instagram-leads";
 import { carregarEndpointInstagram, etapaEntradaInstagram } from "@/lib/bpm/instagram-leads-server";
@@ -53,11 +54,18 @@ export async function AssumirLeadInstagram(input: unknown) {
       const origem = await etapaEntradaInstagram(pipelineId, tx);
       const [destino, usuario] = await Promise.all([
         tx.bpmEtapa.findFirst({ where: { id: parsed.data.etapaDestinoId, pipelineId, ativo: true },
-          select: { id: true, nome: true, visibilidades: { select: { perfil: true, podeVer: true, podeAgir: true } } } }),
+          select: { id: true, nome: true,
+            pipeline: { select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { id: true, nome: true, ativo: true } } } } } },
+            visibilidades: { select: { perfil: true, podeVer: true, podeAgir: true } } } }),
         tx.usuarios.findUnique({ where: { id: userId }, select: { role: true } }),
       ]);
-      if (!usuario || !destino || !resolverVisibilidadeEtapa(usuario.role, origem.visibilidades).podeAgir
-        || !resolverVisibilidadeEtapa(usuario.role, destino.visibilidades).podeAgir) throw new Error("Seu perfil não pode assumir o lead nesta etapa.");
+      const administradorPipeline = Boolean(resolverAutoridadeAdministrativaPipeline({
+        usuarioId: userId, role: usuario?.role ?? "",
+        setoresPipeline: destino?.pipeline?.setores.map(({ setor }) => setor) ?? [],
+        visualizacaoConfigJson: destino?.pipeline?.visualizacaoConfigJson,
+      }));
+      if (!usuario || !destino || (!administradorPipeline && (!resolverVisibilidadeEtapa(usuario.role, origem.visibilidades).podeAgir
+        || !resolverVisibilidadeEtapa(usuario.role, destino.visibilidades).podeAgir))) throw new Error("Seu perfil não pode assumir o lead nesta etapa.");
       if (destino.id !== origem.id) {
         if (!["agendar reunião", "stand by", "standby", "standby - follow up", "stand-by — follow-up semanal"].includes(destino.nome.trim().toLocaleLowerCase("pt-BR"))
           || !(await verificarTransicaoPermitidaBpm(origem.id, destino.id, "MANUAL", tx)).permitida) throw new Error("Transição de Novo Lead não permitida.");

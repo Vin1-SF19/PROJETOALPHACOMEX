@@ -4,6 +4,7 @@ import db from "@/lib/prisma";
 import { auth } from "../../../auth";
 import { exigirAcessoBpmCard, exigirAcessoBpmPipeline } from "@/lib/bpm/ownership";
 import { ACOES_JORNADA_ETAPA, projetarPassagensCard } from "@/lib/bpm/jornada-card";
+import { resolverNivelAcessoPipeline } from "@/lib/bpm/acesso-pipeline";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 
 /** Lê apenas a componente de cards vinculados que o usuário pode percorrer. */
@@ -56,10 +57,14 @@ export async function ObterJornadaCardPipeline(cardId: string, pipelineId: strin
     const etapaIds = [...new Set(passagens.map((passagem) => passagem.etapaId))];
     const etapas = etapaIds.length ? await db.bpmEtapa.findMany({
       where: { id: { in: etapaIds }, pipelineId },
-      select: { id: true, nome: true, visibilidades: { select: { perfil: true, podeVer: true, podeAgir: true } } },
+      select: { id: true, nome: true, pipeline: { select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { id: true, nome: true, ativo: true } } } } } }, visibilidades: { select: { perfil: true, podeVer: true, podeAgir: true } } },
     }) : [];
     const nomes = new Map(etapas
-      .filter((etapa) => resolverVisibilidadeEtapa(acessoRaiz.perfilGlobal, etapa.visibilidades).podeVer)
+      .filter((etapa) => acessoRaiz.isAdminGlobal || resolverNivelAcessoPipeline({
+        usuarioId: userId, role: acessoRaiz.perfilGlobal ?? "",
+        visualizacaoConfigJson: etapa.pipeline?.visualizacaoConfigJson,
+        setoresPipeline: etapa.pipeline?.setores.map(({ setor }) => setor) ?? [],
+      }) === "ADMINISTRATIVO" || resolverVisibilidadeEtapa(acessoRaiz.perfilGlobal, etapa.visibilidades).podeVer)
       .map((etapa) => [etapa.id, etapa.nome]));
     const data = passagens
       .filter((passagem) => nomes.has(passagem.etapaId))

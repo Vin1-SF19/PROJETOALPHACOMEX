@@ -108,6 +108,25 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
     });
   });
 
+  it("administrador do funil promove sem bloqueio da coluna e revalida acesso na transação", async () => {
+    const pipeline = { id: PIPELINE_ID, setores: [{ setor: { id: 3, nome: "Financeiro" } }],
+      visualizacaoConfigJson: JSON.stringify({ permissoesPipeline: { version: 2, regras: [
+        { tipo: "USUARIO", id: 7, nivel: "ADMINISTRATIVO" },
+      ] } }),
+    };
+    prismaMock.bpmPipeline.findFirst.mockResolvedValue(pipeline);
+    prismaMock.bpmEtapa.findFirst.mockResolvedValue({ id: ETAPA_ID, nome: "Novo Lead", pipeline,
+      visibilidades: [{ perfil: "Financeiro", podeVer: true, podeAgir: true }],
+    });
+    prismaMock.nolossLead.findUnique.mockResolvedValue({ id: NOLOSS_LEAD_ID, status: "pending", nome: "Lead Teste" });
+    prismaMock.nolossLead.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.cliente.create.mockResolvedValue({ id: 501 });
+    prismaMock.bpmCard.create.mockResolvedValue({ id: "card-1" });
+    expect(await PromoverNolossLead({ nolossLeadId: NOLOSS_LEAD_ID, etapaDestinoId: ETAPA_ID,
+      responsavelId: 7, radarPretendido: "Revisão de Radar Ilimitado" })).toMatchObject({ success: true });
+    expect(exigirAcessoBpmPipelineMock).toHaveBeenCalledWith(PIPELINE_ID, 7, prismaMock);
+  });
+
   it("promove o lead para uma etapa criada pela UI", async () => {
     prismaMock.bpmEtapa.findFirst.mockImplementation(async ({ where }: { where: { id?: string; ehInicial?: boolean } }) => where.ehInicial || where.id === ETAPA_ID ? { id: ETAPA_ID, nome: "Novo Lead", visibilidades: [] } : { id: ETAPA_UI_ID, nome: "Agendar Reunião", visibilidades: [] });
     prismaMock.nolossLead.findUnique.mockResolvedValue({

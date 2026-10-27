@@ -51,10 +51,11 @@ const tarefa = { id: "task-1", tipo: "TAREFA", titulo: "Retornar contato", statu
 const card = {
   id: "card-1", pipelineId: "pipeline-1", etapaId: "etapa-1", pipeline: { id: "pipeline-1", nome: "Comercial" },
   etapa: { id: "etapa-1", nome: "Em tratativa" }, empresa: { id: 1, razaoSocial: "Empresa de teste", cnpj: null },
+  capacidades: { editarCard: true, gerenciarMembros: true, moverEtapa: true, administrarPipeline: false },
   responsavel: { id: 7, nome: "Responsável" }, membros: [], tarefas: [tarefa], historico: [], campoValores: [], anexos: [],
 };
 const props = {
-  card, etapas: [], interacoes: [], accent: "1,2,3", currentUserId: 7, currentUserRole: "ADMIN", realtimeRevision: 0,
+  card, etapas: [], interacoes: [], accent: "1,2,3", currentUserId: 7, realtimeRevision: 0,
   onClose: vi.fn(), onAtualizado: vi.fn(), onAbrirCard: vi.fn(), onInteracaoCriada: vi.fn(), children: null,
 } as unknown as ComponentProps<typeof CardAbertoLayout>;
 

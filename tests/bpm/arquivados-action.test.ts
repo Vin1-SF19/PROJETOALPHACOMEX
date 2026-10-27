@@ -26,7 +26,7 @@ describe("consulta autorizada de cards arquivados", () => {
     vi.clearAllMocks();
     mocks.auth.mockResolvedValue({ user: { id: "10" } });
     mocks.config.mockResolvedValue(false);
-    mocks.card.mockResolvedValue(undefined);
+    mocks.card.mockResolvedValue({ isAdminGlobal: false, isAdminPipeline: false });
     mocks.usuarioFind.mockResolvedValue({ role: "COMERCIAL" });
     mocks.pipelineFind.mockResolvedValue([{ id: "permitido" }, { id: "oculto" }]);
     mocks.pipeline.mockImplementation((id: string) => Promise.resolve(id === "permitido"));
@@ -104,4 +104,15 @@ describe("consulta autorizada de cards arquivados", () => {
     expect(await ObterCardArquivadoBpm("card")).toMatchObject({ success: false });
     expect(mocks.campos).not.toHaveBeenCalled();
   });
+  it("administração do funil inclui coluna oculta e perfil de campos administrativo", async () => {
+    mocks.pipelineFind.mockResolvedValue([{ id: "permitido", setores: [], visualizacaoConfigJson: JSON.stringify({ permissoesPipeline: { version: 2, regras: [{ tipo: "USUARIO", id: 10, nivel: "ADMINISTRATIVO" }] } }) }]);
+    mocks.etapaFind.mockResolvedValue([{ id: "etapa", pipelineId: "permitido", visibilidades: [{ perfil: "FINANCEIRO", podeVer: true, podeAgir: true }] }]);
+    expect(await ListarCardsArquivadosBpm()).toMatchObject({ success: true });
+    expect(mocks.cardList.mock.calls.at(-1)?.[0].where.etapaId.in).toEqual(["etapa"]);
+    mocks.card.mockResolvedValue({ isAdminGlobal: false, isAdminPipeline: true });
+    mocks.cardFind.mockResolvedValue({ id: "card", status: "ARQUIVADO", pipelineId: "permitido", etapaId: "etapa", pipeline: { nome: "Radar" }, etapa: { nome: "Etapa" }, anexos: [], historico: [] });
+    expect(await ObterCardArquivadoBpm("card")).toMatchObject({ success: true });
+    expect(mocks.campos).toHaveBeenLastCalledWith("card", "permitido", "etapa", expect.anything(), "ADMIN");
+  });
+
 });

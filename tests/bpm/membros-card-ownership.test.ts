@@ -153,11 +153,13 @@ describe("consulta compartilhada no pipeline no guard real", () => {
     expect(prismaMock.bpmCard.findFirst).not.toHaveBeenCalled();
   });
   it("consulta não depende de configuração de supervisão nem do setor do responsável legado", async () => {
-    for (const json of [null, "{corrompido", JSON.stringify({ version: 1, supervisores: [] })]) {
+    for (const json of [null, JSON.stringify({ version: 1, supervisores: [] })]) {
       prismaMock.bpmCard.findUnique.mockResolvedValue(card("outro", json));
       await expect(checarAcessoBpmCard("outro-card", 9, "COMERCIAL", "visualizar")).resolves.toMatchObject({ autorizado: true, role: "VISUALIZADOR", podeAgirEtapa: false });
     }
     expect(prismaMock.bpmCard.findFirst).not.toHaveBeenCalled();
+    prismaMock.bpmCard.findUnique.mockResolvedValue(card("outro", "{corrompido"));
+    await expect(checarAcessoBpmCard("outro-card", 9, "COMERCIAL", "visualizar")).resolves.toMatchObject({ autorizado: false });
   });
   it("revoga consulta imediatamente quando CRM é removido ou conta desativada", async () => {
     prismaMock.usuarioPermissaoOverride.findMany.mockResolvedValue([{ modulo: "crm", acao: "REMOVE" }]);

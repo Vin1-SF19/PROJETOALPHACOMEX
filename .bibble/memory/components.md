@@ -839,3 +839,11 @@ Atualização de estado Chamados: banco migrado e catálogo real validado, 13 de
 
 ### 2026-10-26 — Consumidores resilientes (Scribe)
 `useNotasWorkspaceSync` centraliza reconciliação do workspace existente: hidratação, geração por usuário, preferências reais com debounce600ms/coalescing e uma escrita em voo. Reconsultas não abortáveis reutilizam promessa em andamento com cancelRefetch:false. NotesGlobalTaskbar trata rejeições e mantém abas/rascunhos/intenção. `PainelVersionNotice` recebe SHA40 do layout, consulta versão a cada5min no principal permitido e exibe aviso orientativo sem botão de reload. Heartbeat20s, BroadcastBanner e NotificacaoFlutuante preservam recursos anteriores com identidade/cancel/cooldown; geo widgets consultam geolocation-policy e não pedem localização bloqueada/desconhecida. Local aprovado; homologação remota pendente.
+
+## 2026-10-27 — AcessosPipelineSection (CRM) [crm-acessos-20261027]
+
+**Arquivo:** `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/AcessosPipelineSection.tsx`.
+**Uso:** `AdminPipelinesListClient` com lista de funis; `AdminPipelineClient` com `pipelineId` e `pipelineNome` fixos.
+**Responsabilidade:** escolher setor/usuário, destinatário, funil e opção administrativa; conceder, rebaixar, remover e restringir lista vazia. React Query local + RHF/Zod; loading/erro/recarregar/sucesso e bloqueio por rascunho; CAS preservado após cada gravação. Troca de funil conserva destinatário e nível. Aviso explícito para acesso anterior aberto e para o efeito de salvar a lista.
+**Tema:** classes da paleta CRM, compatíveis com o remapeamento claro/escuro existente. Mantém visibilidade de colunas no componente próprio.
+**Substitui:** `VisibilidadePipelineSection.tsx`, efetivamente removido, e seus controles antigos de setores/usuários. Cadastro/renomeação de funis não duplicam permissões. Registro: Scribe; validação remota não realizada.

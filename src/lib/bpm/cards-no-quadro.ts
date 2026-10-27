@@ -2,6 +2,7 @@ import { carregarEscopoLeituraBpm } from "@/lib/bpm/visao-equipe-server";
 import "server-only";
 
 import db from "@/lib/prisma";
+import { resolverAutoridadeAdministrativaPipeline } from "@/lib/bpm/acesso-pipeline";
 import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
 import { buscarNolossLeadsPendentes } from "@/lib/bpm/noloss-leads";
 import { pipelineEhRevisaoRadar } from "@/lib/bpm/proximo-contato";
@@ -48,6 +49,7 @@ export async function contarCardsVisiveisPorEtapaNoQuadro(
     select: {
       nome: true,
       visualizacaoConfigJson: true,
+      setores: { select: { setor: { select: { id: true, nome: true, ativo: true } } } },
       etapas: {
         where: { ativo: true },
         select: {
@@ -61,8 +63,13 @@ export async function contarCardsVisiveisPorEtapaNoQuadro(
     },
   });
   if (!pipeline) return [];
+  const administradorPipeline = Boolean(resolverAutoridadeAdministrativaPipeline({
+    usuarioId: userId, role: role ?? "",
+    setoresPipeline: pipeline.setores?.map(({ setor }) => setor) ?? [],
+    visualizacaoConfigJson: pipeline.visualizacaoConfigJson,
+  }));
   const etapasVisiveis = pipeline.etapas.filter((etapa) =>
-    resolverVisibilidadeEtapa(role, etapa.visibilidades).podeVer);
+    administradorPipeline || resolverVisibilidadeEtapa(role, etapa.visibilidades).podeVer);
   const etapaIdsVisiveis = etapasVisiveis.map((etapa) => etapa.id);
   const escopo = await carregarEscopoLeituraBpm(userId, admin, pipelineId, pipeline.visualizacaoConfigJson ?? null);
   const cards = etapaIdsVisiveis.length ? await db.bpmCard.findMany({

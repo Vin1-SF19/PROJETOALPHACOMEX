@@ -3,7 +3,7 @@
 import { exigirCompatibilidadeMasterDossie } from "@/lib/bpm/checklist-documental";
 import { carregarUsuariosCamposBpm } from "@/lib/bpm/usuarios-campos-server";
 import { nomeUsuarioCampoBpm } from "@/lib/bpm/usuarios-campos";
-import { resolverAutoridadeMovimentoLivre } from "@/lib/bpm/lideranca-setor";
+import { resolverAutoridadeAdministrativaPipeline } from "@/lib/bpm/acesso-pipeline";
 import { carregarEscopoLeituraBpm } from "@/lib/bpm/visao-equipe-server";
 import { randomUUID } from "node:crypto";
 import { BuscarEmpresasBpm as buscarEmpresas, BuscarEmpresaPorCnpjBpm as buscarEmpresaPorCnpj, ListarUsuariosResponsavelBpm as listarResponsaveis } from "./CardsConsultas";
@@ -153,7 +153,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
           nome: true,
           chave: true,
           visualizacaoConfigJson: true,
-          setores: { select: { setor: { select: { nome: true, ativo: true } } } },
+          setores: { select: { setor: { select: { id: true, nome: true, ativo: true } } } },
           etapas: {
             where: { ativo: true },
             select: {
@@ -175,12 +175,18 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
         select: { role: true },
       }),
     ]);
-    const movimentoLivre = usuarioAtual && resolverAutoridadeMovimentoLivre(
-      { id: userId, role: usuarioAtual.role }, pipelineInfo?.setores?.map(({ setor }) => setor) ?? []);
+    const movimentoLivre = usuarioAtual && resolverAutoridadeAdministrativaPipeline({
+      usuarioId: userId, role: usuarioAtual.role,
+      setoresPipeline: pipelineInfo?.setores?.map(({ setor }) => setor) ?? [],
+      visualizacaoConfigJson: pipelineInfo?.visualizacaoConfigJson,
+    });
+    const administradorPipeline = Boolean(movimentoLivre);
     const visibilidadePorEtapa = new Map(
       (pipelineInfo?.etapas ?? []).map((etapa) => [
         etapa.id,
-        resolverVisibilidadeEtapa(usuarioAtual?.role, etapa.visibilidades),
+        administradorPipeline
+          ? { podeVer: true, podeAgir: true, restrita: false }
+          : resolverVisibilidadeEtapa(usuarioAtual?.role, etapa.visibilidades),
       ]),
     );
     const etapasComSaida = etapasComSaidaDoQuadro(pipelineInfo?.etapas ?? []);
@@ -370,7 +376,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
     });
 
     const agora = new Date();
-    const somenteLeituraIds = new Set(cards.filter((card) => !admin && card.responsavel.id !== userId && !card.membros.some((m) => m.userId === userId)).map((card) => card.id));
+    const somenteLeituraIds = new Set(cards.filter((card) => !administradorPipeline && card.responsavel.id !== userId && !card.membros.some((m) => m.userId === userId)).map((card) => card.id));
     const slaPorCard = await obterStatusSlaCards(cards.map((card) => card.id), agora, somenteLeituraIds);
     if ([...slaPorCard.values()].some((itens) => itens.some((item) => item.statusAlterado))) {
       await notificarPipelineBpm({ pipelineId, tipo: "SLA_STATUS_ALTERADO" });
@@ -538,7 +544,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string, cardIds?: strin
           ? calcularDiaCicloNovosLeads(card.createdAt, agora)
           : 1,
         podeAgirEtapa:
-          (admin || card.responsavel.id === userId || card.membros.some((m) => m.userId === userId))
+          (administradorPipeline || card.responsavel.id === userId || card.membros.some((m) => m.userId === userId))
           && (visibilidadePorEtapa.get(card.etapaId)?.podeAgir ?? false) && encaminhamentos.length === 0
             && !(etapaFinal && card.status === "CONCLUIDO"),
         encaminhamentos,
@@ -899,6 +905,12 @@ export async function ObterCardBpm(cardId: string) {
         })),
         importadoRd: possuiOrigemImportadaRd(card.origemExterna),
         podeMoverLivremente: Boolean(acessoCard.autoridadeMovimentoLivre),
+        capacidades: {
+          editarCard: acessoCard.podeAgirEtapa && acessoCard.role !== null && acessoCard.role !== "VISUALIZADOR",
+          gerenciarMembros: acessoCard.podeAgirEtapa && (acessoCard.role === "RESPONSAVEL" || acessoCard.role === "ADMINISTRADOR"),
+          moverEtapa: Boolean(acessoCard.autoridadeMovimentoLivre) || (acessoCard.podeAgirEtapa && acessoCard.role !== null && acessoCard.role !== "VISUALIZADOR"),
+          administrarPipeline: acessoCard.isAdminPipeline === true,
+        },
         dataPerdaEm,
         resumoContratacao,
         documentosContratacao: card.pipeline.nome === "Revisão de Radar" && etapaEhFechado(card.etapa.nome, card.etapa.chave)

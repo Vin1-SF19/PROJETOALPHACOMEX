@@ -1,5 +1,5 @@
 "use server";
-import { lerUsuariosAutorizadosPipeline } from "@/lib/bpm/acesso-individual-pipeline";
+import { resolverAutoridadeAdministrativaPipeline } from "@/lib/bpm/acesso-pipeline";
 import { carregarEscopoLeituraBpm } from "@/lib/bpm/visao-equipe-server";
 import db from "@/lib/prisma";
 import { auth } from "../../../auth";
@@ -10,7 +10,6 @@ import {
 } from "@/lib/bpm/ownership";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { contarCardsVisiveisPorEtapaNoQuadro } from "@/lib/bpm/cards-no-quadro";
-import { isAdminRole, isSameRole } from "@/lib/roles";
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 
@@ -38,13 +37,13 @@ export async function ObterDashboardBpm() {
     const userId = Number(session.user.id);
     await exigirAcessoModuloBpm(userId);
     const admin = await checarAcessoConfigPipeline(userId, "visualizarPipeline");
-    const papelConsolidado = isAdminRole(session.user.role ?? null);
     const [usuarioAtual, etapas] = await Promise.all([
       db.usuarios.findUnique({ where: { id: userId }, select: { role: true } }),
       db.bpmEtapa.findMany({
         where: { pipeline: { ativo: true } },
         select: {
           id: true,
+          pipeline: { select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { id: true, nome: true, ativo: true } } } } } },
           visibilidades: {
             select: { perfil: true, podeVer: true, podeAgir: true },
           },
@@ -52,10 +51,11 @@ export async function ObterDashboardBpm() {
       }),
     ]);
     const etapaIdsVisiveis = etapas
-      .filter((etapa) => resolverVisibilidadeEtapa(
-        usuarioAtual?.role,
-        etapa.visibilidades,
-      ).podeVer)
+      .filter((etapa) => Boolean(resolverAutoridadeAdministrativaPipeline({
+        usuarioId: userId, role: usuarioAtual?.role ?? "",
+        setoresPipeline: etapa.pipeline?.setores.map(({ setor }) => setor) ?? [],
+        visualizacaoConfigJson: etapa.pipeline?.visualizacaoConfigJson,
+      })) || resolverVisibilidadeEtapa(usuarioAtual?.role, etapa.visibilidades).podeVer)
       .map((etapa) => etapa.id);
     const filtroEtapasVisiveis = { etapaId: { in: etapaIdsVisiveis } };
     const filtroCardVisivel = filtroEtapasVisiveis;
@@ -67,7 +67,7 @@ export async function ObterDashboardBpm() {
           id: true,
           nome: true,
           visualizacaoConfigJson: true,
-          setores: { select: { setor: { select: { nome: true } } } },
+          setores: { select: { setor: { select: { id: true, nome: true, ativo: true } } } },
           etapas: {
             where: { ativo: true },
             select: {
@@ -91,10 +91,7 @@ export async function ObterDashboardBpm() {
     const acessoPipelines = await Promise.all(
       pipelines.map((pipeline) => checarAcessoBpmPipeline(pipeline.id, userId)),
     );
-    const pipelinesVisiveis = pipelines.filter((pipeline, index) =>
-      acessoPipelines[index]
-      && (papelConsolidado || lerUsuariosAutorizadosPipeline(pipeline.visualizacaoConfigJson).includes(userId) || pipeline.setores.some(({ setor }) => isSameRole(setor.nome, usuarioAtual?.role))),
-    );
+    const pipelinesVisiveis = pipelines.filter((_, index) => acessoPipelines[index]);
     const pipelineIdsVisiveis = pipelinesVisiveis.map((pipeline) => pipeline.id);
 
     const escopoLeitura = await carregarEscopoLeituraBpm(userId, admin);
@@ -221,7 +218,12 @@ export async function ObterDashboardBpm() {
     const contagensQuadro = contagensPorEtapaNoQuadro.map((contagens) =>
       contagens.reduce((total, etapa) => total + etapa.quantidade, 0));
     const pipelinesComContagemVisivel = pipelinesVisiveis.map((pipeline, index) => {
-      const etapasVisiveis = pipeline.etapas.filter((etapa) => resolverVisibilidadeEtapa(
+      const administradorPipeline = Boolean(resolverAutoridadeAdministrativaPipeline({
+        usuarioId: userId, role: usuarioAtual?.role ?? "",
+        setoresPipeline: pipeline.setores.map(({ setor }) => setor),
+        visualizacaoConfigJson: pipeline.visualizacaoConfigJson,
+      }));
+      const etapasVisiveis = pipeline.etapas.filter((etapa) => administradorPipeline || resolverVisibilidadeEtapa(
         usuarioAtual?.role,
         etapa.visibilidades,
       ).podeVer);

@@ -7,7 +7,6 @@ import { auth } from "../../../auth";
 import { criarTarefaSchema, concluirTarefaSchema, criarTarefaPresetSchema } from "@/lib/validations/bpm";
 import {
   checarAcessoConfigPipeline,
-  podeAcessarPipelineBpm,
   exigirAcessoBpmCard,
   exigirAcessoBpmPipeline,
   exigirAcessoConfigPipeline,
@@ -21,7 +20,7 @@ import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { criarSlaInstancia } from "@/lib/bpm/sla";
 import { exigirNotaFiscalParaConcluirTarefa } from "@/lib/bpm/financeiro-nota-fiscal-server";
 import { CAMPO_CHECKLIST_EXCEL, PIPELINE_OPERACIONAL_CHECKLIST_ID, TITULO_TAREFA_CHECKLIST } from "@/lib/bpm/checklist-envio-operacional";
-import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
+import { podeVerEtapaPipeline } from "@/lib/bpm/acesso-pipeline";
 import {
   MENSAGEM_TAREFA_CHECKLIST_PENDENTE,
   reconciliarTarefaChecklist,
@@ -370,8 +369,8 @@ export async function CriarTarefaPresetBpm(dados: unknown) {
 
 /**
  * Central de tarefas (Fase 3, DOMAIN.md/FEATURES.md): visão agregada cross-card.
- * Admin vê todas as tarefas; usuário comum só vê tarefas de cards onde é
- * responsável, membro ou supervisor configurado (somente leitura).
+ * Consulta somente tarefas de funis e colunas acessíveis. As ações de trabalho
+ * continuam exigindo vínculo ao card ou acesso administrativo ao seu funil.
  */
 export async function ListarTarefasGlobaisBpm(filtros?: { status?: string; responsavelId?: number }) {
   try {
@@ -382,12 +381,16 @@ export async function ListarTarefasGlobaisBpm(filtros?: { status?: string; respo
     const admin = await checarAcessoConfigPipeline(userId, "visualizarPipeline");
     const [usuarioAtual, etapas] = await Promise.all([
       db.usuarios.findUnique({ where: { id: userId }, select: { role: true } }),
-      db.bpmEtapa.findMany({ select: { id: true, pipeline: { select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { nome: true } } } } } }, visibilidades: {
+      db.bpmEtapa.findMany({ select: { id: true, pipeline: { select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { id: true, nome: true, ativo: true } } } } } }, visibilidades: {
         select: { perfil: true, podeVer: true, podeAgir: true },
       } } }),
     ]);
-    const etapaIdsVisiveis = etapas.filter((etapa) =>
-      resolverVisibilidadeEtapa(usuarioAtual?.role, etapa.visibilidades).podeVer && podeAcessarPipelineBpm({ role: usuarioAtual?.role ?? "", permissoes: ["crm"], usuarioId: userId, visualizacaoConfigJson: etapa.pipeline.visualizacaoConfigJson, setoresPipeline: etapa.pipeline.setores.map(({ setor }) => setor.nome), ehMembroPipeline: false })).map((etapa) => etapa.id);
+    const etapaIdsVisiveis = etapas.filter((etapa) => {
+      const entrada = { usuarioId: userId, role: usuarioAtual?.role ?? "",
+        visualizacaoConfigJson: etapa.pipeline.visualizacaoConfigJson,
+        setoresPipeline: etapa.pipeline.setores.map(({ setor }) => setor) };
+      return podeVerEtapaPipeline(entrada, etapa.visibilidades);
+    }).map((etapa) => etapa.id);
 
     const escopoLeitura = await carregarEscopoLeituraBpm(userId, admin);
 

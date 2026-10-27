@@ -92,4 +92,13 @@ describe("leitura autorizada da jornada entre pipelines", () => {
     expect(mocks.cards.mock.calls.at(-1)?.[0].select.historico.where.acao.in).toContain("CARD_MOVIDO_POR_AUTOMACAO");
     expect(resolverVisibilidadeEtapa("COMERCIAL", [{ perfil: "FINANCEIRO", podeVer: true, podeAgir: true }]).podeVer).toBe(false);
   });
+  it("administração da origem não libera coluna histórica de outro funil", async () => {
+    mocks.acessoCard.mockResolvedValue({ perfilGlobal: "COMERCIAL", isAdminGlobal: false, isAdminPipeline: true });
+    const etapa = { id: "e3", nome: "Restrita", visibilidades: [{ perfil: "FINANCEIRO", podeVer: true, podeAgir: true }] };
+    mocks.etapas.mockResolvedValue([{ ...etapa, pipeline: { setores: [], visualizacaoConfigJson: JSON.stringify({ permissoesPipeline: { version: 2, regras: [{ tipo: "USUARIO", id: 7, nivel: "PADRAO" }] } }) } }]);
+    expect(await ObterJornadaCardPipeline("comercial", "p3")).toMatchObject({ success: true, data: [] });
+    mocks.etapas.mockResolvedValue([{ ...etapa, pipeline: { setores: [], visualizacaoConfigJson: JSON.stringify({ permissoesPipeline: { version: 2, regras: [{ tipo: "USUARIO", id: 7, nivel: "ADMINISTRATIVO" }] } }) } }]);
+    expect(await ObterJornadaCardPipeline("comercial", "p3")).toMatchObject({ success: true, data: [{ etapaId: "e3" }] });
+  });
+
 });

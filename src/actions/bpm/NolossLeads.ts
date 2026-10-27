@@ -11,6 +11,7 @@ import {
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import { notificarPendenciasLeadsBpm } from "@/lib/bpm/notificacoes-leads-server";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
+import { resolverAutoridadeAdministrativaPipeline } from "@/lib/bpm/acesso-pipeline";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { cnpjEhValido, normalizarCNPJ } from "@/lib/format-cnpj";
 import { erroEhCnpjDuplicado } from "@/lib/cnpj/erro-unicidade";
@@ -23,7 +24,7 @@ import { verificarTransicaoPermitidaBpm } from "@/lib/bpm/requisitos-etapa-serve
 async function obterPipelineRevisaoRadar() {
   return db.bpmPipeline.findFirst({
     where: { nome: "Revisão de Radar", ativo: true },
-    select: { id: true },
+    select: { id: true, visualizacaoConfigJson: true, setores: { select: { setor: { select: { id: true, nome: true, ativo: true } } } } },
   });
 }
 
@@ -60,7 +61,12 @@ export async function PromoverNolossLead(dados: unknown) {
       && !["agendar reunião", "standby", "stand by", "standby - follow up", "stand-by — follow-up semanal"].includes(normalizarNomeEtapa(etapaDestino.nome))) {
       return { success: false, error: "Novo Lead só pode avançar para Agendar reunião ou Standby." };
     }
-    if (!resolverVisibilidadeEtapa(
+    const administradorPipeline = Boolean(resolverAutoridadeAdministrativaPipeline({
+      usuarioId: userId, role: usuarioAtual?.role ?? "",
+      setoresPipeline: pipeline.setores?.map(({ setor }) => setor) ?? [],
+      visualizacaoConfigJson: pipeline.visualizacaoConfigJson,
+    }));
+    if (!administradorPipeline && !resolverVisibilidadeEtapa(
       usuarioAtual?.role,
       etapaDestino.visibilidades,
     ).podeAgir) {
@@ -71,7 +77,7 @@ export async function PromoverNolossLead(dados: unknown) {
       select: { id: true, nome: true, visibilidades: { select: { perfil: true, podeVer: true, podeAgir: true } } },
     });
     const acessoOrigem = etapaInicial && resolverVisibilidadeEtapa(usuarioAtual?.role, etapaInicial.visibilidades);
-    if (!etapaInicial || !etapaEhNovosLeads(etapaInicial.nome) || !acessoOrigem?.podeVer || !acessoOrigem.podeAgir) {
+    if (!etapaInicial || !etapaEhNovosLeads(etapaInicial.nome) || (!administradorPipeline && (!acessoOrigem?.podeVer || !acessoOrigem.podeAgir))) {
       return { success: false, error: "Seu perfil não pode agir na coluna de novos leads." };
     }
     if (etapaInicial.id !== etapaDestinoId && !(await verificarTransicaoPermitidaBpm(etapaInicial.id, etapaDestinoId, "MANUAL")).permitida) {
@@ -92,10 +98,12 @@ export async function PromoverNolossLead(dados: unknown) {
     }
 
     const resultado = await db.$transaction(async (tx) => {
+      await exigirAcessoBpmPipeline(pipeline.id, userId, tx);
       const [destinoAtual, perfilAtual, origemAtual] = await Promise.all([
         tx.bpmEtapa.findFirst({
           where: { id: etapaDestinoId, pipelineId: pipeline.id, ativo: true },
           select: {
+            pipeline: { select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { id: true, nome: true, ativo: true } } } } } },
             visibilidades: {
               select: { perfil: true, podeVer: true, podeAgir: true },
             },
@@ -106,10 +114,15 @@ export async function PromoverNolossLead(dados: unknown) {
           select: { visibilidades: { select: { perfil: true, podeVer: true, podeAgir: true } } } }),
       ]);
       const origemPermitida = origemAtual && resolverVisibilidadeEtapa(perfilAtual?.role, origemAtual.visibilidades);
-      if (!origemPermitida?.podeVer || !origemPermitida.podeAgir || !destinoAtual || !resolverVisibilidadeEtapa(
+      const administradorAtual = Boolean(resolverAutoridadeAdministrativaPipeline({
+        usuarioId: userId, role: perfilAtual?.role ?? "",
+        setoresPipeline: destinoAtual?.pipeline?.setores.map(({ setor }) => setor) ?? [],
+        visualizacaoConfigJson: destinoAtual?.pipeline?.visualizacaoConfigJson,
+      }));
+      if (!origemAtual || !destinoAtual || (!administradorAtual && (!origemPermitida?.podeVer || !origemPermitida.podeAgir || !resolverVisibilidadeEtapa(
         perfilAtual?.role,
         destinoAtual.visibilidades,
-      ).podeAgir) {
+      ).podeAgir))) {
         throw new Error("VISIBILIDADE_ETAPA_NEGADA");
       }
 

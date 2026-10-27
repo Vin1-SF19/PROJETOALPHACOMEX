@@ -15,7 +15,7 @@ const f = vi.hoisted(() => {
     etapaConfiguracoes: [{ etapaId: "destino", visivel: true, obrigatorio: false, obrigatorioEntrada: true, obrigatorioSaida: false,
       editavel: true, somenteLeitura: false, condicaoObrigatoriedadeJson: null as string | null, condicaoVisibilidadeJson: null as string | null }] };
   const base = {
-    autoridade: null as null | { tipo: "ADMIN" | "LIDER_SETOR"; setor: string | null },
+    autoridade: null as null | { tipo: "ADMIN" | "ADMIN_PIPELINE"; setor: null },
     podeEditar: true,
     card, campos: [campo], valores: [] as Array<{ campoId: string; valor: string }>,
     canonicos: {} as Record<string, string | null>,
@@ -280,8 +280,8 @@ describe("comando transacional de movimento manual RD", () => {
   });
 });
 
-describe("movimentação livre administrativa e de liderança", () => {
-  beforeEach(() => { f.state.autoridade = { tipo: "LIDER_SETOR", setor: "OPERACIONAL" }; });
+describe("movimentação livre por administração do funil", () => {
+  beforeEach(() => { f.state.autoridade = { tipo: "ADMIN_PIPELINE", setor: null }; });
 
   it.each([null, { id: "origem-rd", sourceDealId: "rd-deal", provider: "RD_STATION_CRM_V1" }])("move card nativo/RD sem preencher pendências nem confirmar: %j", async (origem) => {
     f.state.card.origemExterna = origem;
@@ -291,7 +291,7 @@ describe("movimentação livre administrativa e de liderança", () => {
     expect(result).toMatchObject({ success: true, data: { movimentoLivre: true, lifecycle: "ATIVO", outcome: null } });
     expect(f.state.card.etapaId).toBe("destino");
     expect(f.state.valores).toEqual([]);
-    expect(JSON.parse(f.state.historicos[0].valorNovoJson)).toMatchObject({ movimentoLivre: { tipo: "LIDER_SETOR", setor: "OPERACIONAL" } });
+    expect(JSON.parse(f.state.historicos[0].valorNovoJson)).toMatchObject({ movimentoLivre: { tipo: "ADMIN_PIPELINE", setor: null } });
     expect(JSON.parse(f.state.eventos[0].valorNovoJson)).toMatchObject({ automacoesSuprimidas: true });
     const { enfileirarAutomacoesMovimentoBpm } = await import("@/lib/bpm/automacoes/fila");
     const { ativarCadenciasNaEntradaBpm } = await import("@/lib/bpm/cadencias/ativacao-automatica");
@@ -302,7 +302,7 @@ describe("movimentação livre administrativa e de liderança", () => {
     expect(f.state.eventos).toHaveLength(1);
   });
 
-  it("liderança de movimento não autoriza edição por payload", async () => {
+  it("autoridade de movimento isolada não substitui o guard de edição do payload", async () => {
     f.state.podeEditar = false;
     const result = await executarTransicaoBpm({ ...input(), camposValores: { campo: "Texto forjado" } });
     expect(result.success).toBe(false);
@@ -320,13 +320,13 @@ describe("movimentação livre administrativa e de liderança", () => {
     expect(f.state.historicos).toHaveLength(0);
   });
 
-  it("automação não herda a liderança nem aceita flag forjada", async () => {
+  it("automação não herda a administração do ator nem aceita flag forjada", async () => {
     f.state.card.origemExterna = null;
     const result = await executarTransicaoBpm({ ...input(), ator: { tipo: "AUTOMACAO", userId: 7 }, movimentoLivre: true } as ComandoTransicaoBpm);
     expect(result).toMatchObject({ success: false, code: "TRANSITION_NOT_DEFINED" });
   });
 
-  it("revogação de liderança entre prévia e execução volta a exigir regras", async () => {
+  it("revogação da administração entre prévia e execução volta a exigir regras", async () => {
     f.state.card.origemExterna = null;
     expect((await avaliarTransicaoBpm(input())).success).toBe(true);
     f.state.autoridade = null;

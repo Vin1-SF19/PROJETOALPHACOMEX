@@ -1,4 +1,4 @@
-import type { AutoridadeMovimentoLivre } from "@/lib/bpm/lideranca-setor";
+import type { AutoridadeMovimentoLivre } from "@/lib/bpm/acesso-pipeline";
 import "server-only";
 
 import { randomUUID } from "node:crypto";

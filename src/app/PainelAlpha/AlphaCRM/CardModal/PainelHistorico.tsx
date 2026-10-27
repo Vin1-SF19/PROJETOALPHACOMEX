@@ -17,7 +17,6 @@ import { fmtDateTime } from "@/lib/format-date";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { RegistrarAnexoBpm, ExcluirAnexoBpm } from "@/actions/bpm/Anexos";
 import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
-import { isAdminRole } from "@/lib/roles";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { combinarHistoricosRd } from "@/lib/bpm/rd-station-display";
 import { montarFeedTimelineCard, type ItemTimelineCard } from "@/lib/bpm/timeline";
@@ -55,8 +54,6 @@ function linkNotaFiscalNoHistorico(item: ItemTimelineCard, anexos: CardDetalhe["
 interface Props {
   card: CardDetalhe;
   accent: string;
-  currentUserId: number | null;
-  currentUserRole: string | null;
   onAtualizado: () => void;
 
   etapas: { id: string; nome: string; ordem: number }[];
@@ -75,8 +72,6 @@ interface Props {
 export default function PainelHistorico({
   card,
   accent,
-  currentUserId,
-  currentUserRole,
   onAtualizado,
   etapas,
   podeTrabalharTarefas,
@@ -156,8 +151,7 @@ export default function PainelHistorico({
     ].filter((usuario, indice, todos) => todos.findIndex(({ id }) => id === usuario.id) === indice),
   };
 
-  const meuVinculo = card.membros.find((m) => m.userId === currentUserId);
-  const podeExcluirAnexo = isAdminRole(currentUserRole) || Boolean(meuVinculo);
+  const podeExcluirAnexo = card.capacidades?.editarCard ?? false;
   async function enviarAnexo(file: File) {
     const erroValidacao = validarUploadAnexo({ size: file.size, type: file.type, name: file.name });
     if (erroValidacao) { toast.error(erroValidacao); return; }

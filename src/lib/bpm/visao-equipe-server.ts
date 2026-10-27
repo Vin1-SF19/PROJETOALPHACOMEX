@@ -1,4 +1,4 @@
-import { lerUsuariosAutorizadosPipeline } from "@/lib/bpm/acesso-individual-pipeline";
+import { resolverNivelAcessoPipeline } from "@/lib/bpm/acesso-pipeline";
 import db from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { isSameRole } from "@/lib/roles";
@@ -10,7 +10,6 @@ type Cliente = Pick<typeof db, "bpmPipeline" | "usuarios" | "setorPermissao" | "
 /**
  * Leitura é compartilhada no pipeline. Cada chamador exige módulo, pipeline e
  * coluna antes de aplicar este escopo; filtros pessoais são apenas seleção do quadro.
- * O JSON legado de supervisores não restringe mais a consulta dos colegas.
  */
 export async function carregarEscopoLeituraBpm(
   _userId: number, _admin: boolean, pipelineId?: string, _configJson?: string | null,
@@ -22,14 +21,15 @@ export async function carregarEscopoLeituraBpm(
 
   const pipeline = await client.bpmPipeline.findUnique({
     where: { id: pipelineId },
-    select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { id: true, nome: true } } } } },
+    select: { visualizacaoConfigJson: true, setores: { select: { setor: { select: { id: true, nome: true, ativo: true } } } } },
   });
   if (!pipeline) return vazio;
   const usuarios = await listarUsuariosComAcessoCrmBpm(client);
   const setores = pipeline.setores.map(({ setor }) => setor);
-  const autorizados = lerUsuariosAutorizadosPipeline(pipeline.visualizacaoConfigJson);
-  const elegiveis = usuarios.filter((usuario) => autorizados.includes(usuario.id) || setores.length === 0
-    || setores.some((setor) => isSameRole(usuario.role, setor.nome)));
+  const elegiveis = usuarios.filter((usuario) => resolverNivelAcessoPipeline({
+    usuarioId: usuario.id, role: usuario.role, setoresPipeline: setores,
+    visualizacaoConfigJson: pipeline.visualizacaoConfigJson,
+  }) !== null);
   const opcoes = setores.map((setor) => ({ ...setor,
     usuarioIds: elegiveis.filter((usuario) => isSameRole(usuario.role, setor.nome)).map((usuario) => usuario.id),
   }));

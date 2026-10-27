@@ -3498,3 +3498,17 @@ X/Escape/onOpenChange não aguardam leitura/validação de follow-up nem promise
 **Arquivos:** `src/lib/{ai-unavailability,ai-availability-client}.ts`, rotas `api/bibble`/`api/onyx`. **Propósito:** distinguir AUTH_UNAVAILABLE/config/metadata/upstream sem URL/token; preservar token individual e owner ACL. **Exemplo:** falha models retorna HTTP de erro+code público, mantendo conversa/pins no cliente.
 
 **Arquivos:** `src/app/PainelAlpha/layout.tsx` → `PainelLayoutClient.tsx` → `PainelVersionNotice.tsx` → `/api/health/version`. **Propósito:** SHA40 público validado, health no-store somente produção/Vercel staging explícito. **Exemplo:** SHA diferente mostra orientação acessível, sem navegação/reload/remount; drafts/guardas existentes permanecem. **Última atualização:** 2026-10-26, Scribe.
+
+## 2026-10-27 — Permissões por destinatário/funil [crm-acessos-20261027]
+
+**Arquivos:** `src/lib/bpm/acesso-pipeline.ts`, `src/actions/bpm/AcessosPipeline.ts`, `src/lib/bpm/ownership.ts` e `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/AcessosPipelineSection.tsx`.
+
+**Propósito:** uma concessão tem `tipo: SETOR|USUARIO`, `id` positivo e `nivel: PADRAO|ADMINISTRATIVO`, limitada ao funil. Exemplo de uso: liberar o setor Comercial com acesso comum e uma pessoa de outro setor com acesso administrativo no mesmo funil; o maior nível aplicável prevalece.
+
+**Ao alterar:** atualizar resolvedor central, actions com CAS/auditoria, espelho `BpmPipelineSetor`, filtragem de colunas/listagens e capacidades de card. Consumidores não devem inferir autoridade administrativa por nome do setor, papel da sessão ou vínculo com o card. `isAdminPipeline` não substitui `isAdminGlobal`; somente este último autoriza configuração global e gestão dos acessos.
+
+**Persistência:** JSON existente `permissoesPipeline: { version: 2, regras: [...] }`. `LerAcessosPipelineBpm` retorna catálogos/regras/versão e `acessoAnteriorAberto`; `SalvarAcessosPipelineBpm` publica `{pipelineId, versao, regras}` atomicamente. Escrita remove chaves antigas de autorização, preservando configurações de negócio no mesmo JSON. Lista nova vazia fecha o funil para usuários sem administração global.
+
+**Integração visual:** central Configurações e editor fixo por funil reutilizam a mesma UI. Visibilidade de colunas e closers continuam nos componentes próprios. Funil novo começa com regras vazias; renomear não altera concessões.
+
+Última atualização: Scribe, implementação local em `staging`; sem deploy ou alteração remota.

@@ -11,9 +11,10 @@ import {
   AtualizarPipelineBpm,
   AtivarDesativarPipelineBpm,
   ReordenarPipelinesBpm,
-  ListarSetoresParaPipelineBpm,
 } from "@/actions/bpm/Pipelines";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AcessosPipelineSection } from "./pipelines/[pipelineId]/AcessosPipelineSection";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,11 +43,8 @@ type Pipeline = {
   _count: { cards: number; etapas: number };
 };
 
-type Setor = Awaited<ReturnType<typeof ListarSetoresParaPipelineBpm>>["data"][number];
-
 interface Props {
   pipelines: Pipeline[];
-  setores: Setor[];
   visual: TemaAlpha;
 }
 
@@ -56,37 +54,36 @@ function mensagemErro(error: unknown, fallback: string): string {
 
 const inputCls = "bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 outline-none focus:border-white/20";
 
-export default function AdminPipelinesListClient({ pipelines: pipelinesIniciais, setores, visual }: Props) {
+export default function AdminPipelinesListClient({ pipelines: pipelinesIniciais, visual }: Props) {
   const accent = visual.accent;
   const router = useRouter();
   const [pipelines, setPipelines] = useState(
     pipelinesIniciais.slice().sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome)),
   );
   const [mostrarForm, setMostrarForm] = useState(false);
+  const [aba, setAba] = useState("settings");
   const [nome, setNome] = useState("");
-  const [setorIds, setSetorIds] = useState<number[]>([]);
   const [salvando, setSalvando] = useState(false);
   const [editando, setEditando] = useState<Pipeline | null>(null);
   const [editNome, setEditNome] = useState("");
-  const [editSetorIds, setEditSetorIds] = useState<number[]>([]);
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
-
-  function toggleSetor(id: number) {
-    setSetorIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
+  const [fonte, setFonte] = useState(pipelinesIniciais);
+  if (fonte !== pipelinesIniciais) {
+    setFonte(pipelinesIniciais);
+    setPipelines(pipelinesIniciais.slice().sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome)));
   }
 
   async function handleCriar() {
-    if (!nome.trim() || setorIds.length === 0) {
-      toast.error("Informe o nome e selecione ao menos um setor");
+    if (!nome.trim()) {
+      toast.error("Informe o nome do funil");
       return;
     }
     setSalvando(true);
-    const res = await CriarPipelineBpm({ nome: nome.trim(), setorIds });
+    const res = await CriarPipelineBpm({ nome: nome.trim() });
     setSalvando(false);
     if (res.success) {
       toast.success("Pipeline criado");
       setNome("");
-      setSetorIds([]);
       setMostrarForm(false);
       router.refresh();
     } else {
@@ -97,24 +94,18 @@ export default function AdminPipelinesListClient({ pipelines: pipelinesIniciais,
   function abrirEdicao(pipeline: Pipeline) {
     setEditando(pipeline);
     setEditNome(pipeline.nome);
-    setEditSetorIds(pipeline.setores.map((s) => s.setor.id));
-  }
-
-  function toggleEditSetor(id: number) {
-    setEditSetorIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
   }
 
   async function salvarEdicao() {
     if (!editando) return;
-    if (!editNome.trim() || editSetorIds.length === 0) {
-      toast.error("Informe o nome e selecione ao menos um setor");
+    if (!editNome.trim()) {
+      toast.error("Informe o nome do funil");
       return;
     }
     setSalvandoEdicao(true);
     const res = await AtualizarPipelineBpm({
       pipelineId: editando.id,
       nome: editNome.trim(),
-      setorIds: editSetorIds,
     });
     setSalvandoEdicao(false);
     if (res.success) {
@@ -157,14 +148,14 @@ export default function AdminPipelinesListClient({ pipelines: pipelinesIniciais,
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl">
+    <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-black text-white mb-1">Configurações</h1>
-          <p className="text-sm text-slate-400">Administração central de pipelines.</p>
+          <p className="text-sm text-slate-400">Gerencie os acessos e os funis do CRM.</p>
         </div>
         <button
-          onClick={() => setMostrarForm((prev) => !prev)}
+          onClick={() => { setAba("pipelines"); setMostrarForm((prev) => !prev); }}
           className="crm-tema-fixo flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white"
           style={{ background: `rgba(${accent},0.85)` }}
         >
@@ -172,6 +163,12 @@ export default function AdminPipelinesListClient({ pipelines: pipelinesIniciais,
         </button>
       </div>
 
+      <Tabs value={aba} onValueChange={setAba}>
+        <TabsList aria-label="Configurações do CRM"><TabsTrigger value="settings">Configurações</TabsTrigger><TabsTrigger value="pipelines">Funis</TabsTrigger></TabsList>
+        <TabsContent value="settings" className="mt-5">
+          <AcessosPipelineSection pipelines={pipelines} onPublished={() => router.refresh()} />
+        </TabsContent>
+        <TabsContent value="pipelines" className="mt-5 space-y-5">
       <div className="max-w-sm">
         <Link
           href="/PainelAlpha/AlphaCRM/admin/regras"
@@ -194,30 +191,12 @@ export default function AdminPipelinesListClient({ pipelines: pipelinesIniciais,
         <div className="bg-slate-900/60 border border-white/5 rounded-2xl p-5 space-y-3">
           <input
             className={`${inputCls} w-full`}
-            placeholder="Nome do pipeline"
+            aria-label="Nome do novo funil"
+            placeholder="Nome do funil"
             value={nome}
             onChange={(e) => setNome(e.target.value)}
           />
-          <div>
-            <p className="text-xs text-slate-400 mb-1.5">Setores</p>
-            <div className="flex flex-wrap gap-1.5">
-              {setores.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => toggleSetor(s.id)}
-                  className="px-3 py-1.5 rounded-full text-xs font-semibold transition-colors"
-                  style={
-                    setorIds.includes(s.id)
-                      ? { background: `rgba(${accent},0.2)`, color: `rgb(${accent})` }
-                      : { background: "color-mix(in oklab, var(--color-white) 5%, transparent)", color: "var(--color-slate-400)" }
-                  }
-                >
-                  {s.nome}
-                </button>
-              ))}
-              {setores.length === 0 && <p className="text-xs text-slate-600">Nenhum setor cadastrado.</p>}
-            </div>
-          </div>
+          <p className="text-xs text-slate-400">O funil começa sem liberações. Configure os setores e usuários na aba Configurações.</p>
           <button
             onClick={handleCriar}
             disabled={salvando}
@@ -285,7 +264,7 @@ export default function AdminPipelinesListClient({ pipelines: pipelinesIniciais,
               <button
                 onClick={() => abrirEdicao(pipeline)}
                 aria-label={`Editar pipeline ${pipeline.nome}`}
-                title="Editar nome e setores"
+                title="Editar nome do funil"
                 className="p-1.5 rounded text-slate-400 hover:text-white"
               >
                 <Pencil size={14} />
@@ -338,6 +317,9 @@ export default function AdminPipelinesListClient({ pipelines: pipelinesIniciais,
         {pipelines.length === 0 && <p className="text-sm text-slate-600">Nenhum pipeline configurado ainda.</p>}
       </div>
 
+        </TabsContent>
+      </Tabs>
+
       <Dialog open={editando !== null} onOpenChange={(open) => !open && setEditando(null)}>
         <DialogContent>
           <DialogHeader>
@@ -346,29 +328,11 @@ export default function AdminPipelinesListClient({ pipelines: pipelinesIniciais,
           <div className="space-y-3">
             <input
               className={`${inputCls} w-full`}
-              placeholder="Nome do pipeline"
+              aria-label="Nome do funil"
+              placeholder="Nome do funil"
               value={editNome}
               onChange={(e) => setEditNome(e.target.value)}
             />
-            <div>
-              <p className="text-xs text-slate-400 mb-1.5">Setores</p>
-              <div className="flex flex-wrap gap-1.5">
-                {setores.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => toggleEditSetor(s.id)}
-                    className="px-3 py-1.5 rounded-full text-xs font-semibold transition-colors"
-                    style={
-                      editSetorIds.includes(s.id)
-                        ? { background: `rgba(${accent},0.2)`, color: `rgb(${accent})` }
-                        : { background: "color-mix(in oklab, var(--color-white) 5%, transparent)", color: "var(--color-slate-400)" }
-                    }
-                  >
-                    {s.nome}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
           <DialogFooter>
             <button

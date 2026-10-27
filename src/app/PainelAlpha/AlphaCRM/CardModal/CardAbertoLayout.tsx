@@ -20,8 +20,6 @@ import { ExcluirCardBpm } from "@/actions/bpm/Cards";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 import { ListarPipelinesBpm } from "@/actions/bpm/Pipelines";
-import { isAdminRole } from "@/lib/roles";
-import { etapaEhBoasVindas, PIPELINE_OPERACIONAL_ATIVO_ID, podeAgirBoasVindasOperacional } from "@/lib/bpm/boas-vindas";
 import { formatCNPJ } from "@/lib/format-cnpj";
 import PainelHistorico from "./PainelHistorico";
 import PainelHistoricoPipeline from "./PainelHistoricoPipeline";
@@ -49,7 +47,6 @@ export interface CardAbertoLayoutProps {
   interacoes: Interacao[];
   accent: string;
   currentUserId: number | null;
-  currentUserRole: string | null;
   realtimeRevision: number;
   onClose: () => void;
   onAtualizado: () => void;
@@ -81,7 +78,6 @@ export function CardAbertoLayout({
   interacoes,
   accent,
   currentUserId,
-  currentUserRole,
   realtimeRevision,
   onClose,
   onAtualizado,
@@ -120,20 +116,10 @@ export function CardAbertoLayout({
     return () => { cancelado = true; };
   }, [card.pipelineId]);
 
-  const meuVinculo = card.membros.find((m) => m.userId === currentUserId);
-  const podeAgirNaEtapa = card.permissaoEtapa?.podeAgir ?? true;
-  const restritoBoasVindas = card.pipelineId === PIPELINE_OPERACIONAL_ATIVO_ID
-    && etapaEhBoasVindas(card.etapa.nome);
-  const permitidoBoasVindas = !restritoBoasVindas
-    || (currentUserId !== null && podeAgirBoasVindasOperacional(currentUserId, currentUserRole));
-  const podeTrabalharNoCard = permitidoBoasVindas && (isAdminRole(currentUserRole)
-    || (Boolean(meuVinculo) && podeAgirNaEtapa));
-  const podeMoverEtapa = Boolean(card?.podeMoverLivremente) || podeTrabalharNoCard;
-  const podeEditar = podeTrabalharNoCard;
-  const podeTrabalharTarefas = podeTrabalharNoCard;
-  const podeGerenciarMembros = permitidoBoasVindas && (isAdminRole(currentUserRole) || (podeAgirNaEtapa && (
-      meuVinculo?.role === "RESPONSAVEL" || meuVinculo?.role === "ADMINISTRADOR"
-    )));
+  const podeMoverEtapa = card.capacidades?.moverEtapa ?? false;
+  const podeEditar = card.capacidades?.editarCard ?? false;
+  const podeTrabalharTarefas = card.capacidades?.editarCard ?? false;
+  const podeGerenciarMembros = card.capacidades?.gerenciarMembros ?? false;
   const transicoesDaEtapaAtual = card.etapa.transicoesEtapaOrigem ?? [];
   const etapasParaMover = etapas.filter(
     (e) => e.id === card.etapa.id || card.podeMoverLivremente || transicoesDaEtapaAtual.some((t) => t.etapaDestinoId === e.id),
@@ -337,8 +323,6 @@ export function CardAbertoLayout({
                 focoTarefa={focoTarefa}
                 focoAnexos={focoAnexos}
                 accent={accent}
-                currentUserId={currentUserId}
-                currentUserRole={currentUserRole}
                 onAtualizado={() => { onAtualizado(); }}
                 etapas={etapas}
                 podeTrabalharTarefas={podeTrabalharTarefas}

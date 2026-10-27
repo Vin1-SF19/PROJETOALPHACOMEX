@@ -23,12 +23,12 @@ Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
 const container = document.createElement("div");
 let root: ReturnType<typeof createRoot>;
 afterEach(async () => { if (root) await act(async () => root.unmount()); container.remove(); vi.clearAllMocks(); });
-async function montar(role = "RESPONSAVEL", podeAgir = true) {
+async function montar(role = "RESPONSAVEL", podeAgir = true, administradorPipeline = false) {
  document.body.append(container); root = createRoot(container);
  const onClose = vi.fn(), onAtualizado = vi.fn();
  // Fixture parcial: os painéis dependentes estão isolados por mocks acima.
- const card = { id: "card", pipelineId: "pipeline", pipeline: { id: "pipeline", nome: "CRM" }, etapa: { id: "etapa", transicoesEtapaOrigem: [] }, empresa: { id: 1, razaoSocial: "Empresa", cnpj: "" }, membros: [{ userId: 1, role }], permissaoEtapa: { podeAgir } } as unknown as CardAbertoLayoutProps["card"];
- await act(async () => root.render(h(CardAbertoLayout, { card, etapas: [], interacoes: [], accent: "1,2,3", currentUserId: 1, currentUserRole: "COMERCIAL", realtimeRevision: 0, onClose, onAtualizado, onAbrirCard: vi.fn(), onInteracaoCriada: vi.fn(), children: null })));
+ const card = { id: "card", pipelineId: "pipeline", pipeline: { id: "pipeline", nome: "CRM" }, etapa: { id: "etapa", transicoesEtapaOrigem: [] }, empresa: { id: 1, razaoSocial: "Empresa", cnpj: "" }, membros: administradorPipeline ? [] : [{ userId: 1, role }], permissaoEtapa: { podeAgir }, capacidades: { editarCard: podeAgir, gerenciarMembros: podeAgir && (administradorPipeline || role !== "PARTICIPANTE"), moverEtapa: podeAgir, administrarPipeline: administradorPipeline } } as unknown as CardAbertoLayoutProps["card"];
+ await act(async () => root.render(h(CardAbertoLayout, { card, etapas: [], interacoes: [], accent: "1,2,3", currentUserId: 1, realtimeRevision: 0, onClose, onAtualizado, onAbrirCard: vi.fn(), onInteracaoCriada: vi.fn(), children: null })));
  return { onClose, onAtualizado };
 }
 it.each([["PARTICIPANTE", true], ["RESPONSAVEL", false]])("oculta remoção para %s/podeAgir=%s", async (role, podeAgir) => {
@@ -51,4 +51,9 @@ it.each(["sucesso", "negado", "rejeitado"])("confirmação real, loading e resul
  expect(container.querySelector<HTMLButtonElement>('[aria-label="Excluir card"]')!.disabled).toBe(false);
  if (caso === "sucesso") { expect(callbacks.onAtualizado).toHaveBeenCalledOnce(); expect(callbacks.onClose).toHaveBeenCalledOnce(); expect(toast.success).toHaveBeenCalled(); }
  else { expect(callbacks.onAtualizado).not.toHaveBeenCalled(); expect(callbacks.onClose).not.toHaveBeenCalled(); expect(toast.error).toHaveBeenCalledWith(caso === "negado" ? "Não autorizado" : "Não foi possível arquivar o card. Tente novamente."); }
+});
+
+it("administrador do funil sem vínculo recebe controles concedidos pelo servidor", async () => {
+ await montar("VISUALIZADOR", true, true);
+ expect(container.querySelector('[aria-label="Excluir card"]')).not.toBeNull();
 });

@@ -1,7 +1,7 @@
 import { auth } from "../../../../../auth";
 import { redirect } from "next/navigation";
 import { getTema } from "@/lib/temas";
-import { ListarPipelinesBpm, ListarSetoresParaPipelineBpm } from "@/actions/bpm/Pipelines";
+import { ListarPipelinesBpm } from "@/actions/bpm/Pipelines";
 import { isAdminRole } from "@/lib/bpm/ownership";
 import AdminPipelinesListClient from "./AdminPipelinesListClient";
 
@@ -17,15 +17,11 @@ export default async function AdminPipelinesPage() {
   const temaNome = (session.user as { tema_interface?: string })?.tema_interface || "blue";
   const visual = getTema(temaNome);
 
-  const [pipelinesResult, setoresResult] = await Promise.all([
-    ListarPipelinesBpm(true),
-    ListarSetoresParaPipelineBpm(),
-  ]);
+  const pipelinesResult = await ListarPipelinesBpm(true);
 
   return (
     <AdminPipelinesListClient
       pipelines={pipelinesResult.data ?? []}
-      setores={setoresResult.data ?? []}
       visual={visual}
     />
   );

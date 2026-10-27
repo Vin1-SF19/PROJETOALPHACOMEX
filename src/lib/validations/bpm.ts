@@ -79,15 +79,12 @@ const camposValoresBpmSchema = z
 
 export const criarPipelineSchema = z.object({
   nome: z.string().trim().min(1, "Nome do pipeline é obrigatório").max(MAX_NOME),
-  setorIds: z.array(z.number().int().positive()).min(1, "Selecione ao menos um setor"),
-});
+}).strict();
 
 export const atualizarPipelineSchema = z.object({
   pipelineId: z.string().cuid(),
-  nome: z.string().trim().min(1).max(MAX_NOME).optional(),
-  ativo: z.boolean().optional(),
-  setorIds: z.array(z.number().int().positive()).optional(),
-});
+  nome: z.string().trim().min(1).max(MAX_NOME),
+}).strict();
 
 const corBpmSchema = z
   .string()

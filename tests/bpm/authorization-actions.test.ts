@@ -32,7 +32,8 @@ describe("CRM/BPM authorization regression guards", () => {
     expect(dashboard).toContain("await exigirAcessoModuloBpm(userId)");
     expect(empresas).toContain("await exigirAcessoModuloBpm(userId)");
     expect(tarefas).toContain("await exigirAcessoModuloBpm(userId)");
-    expect(pipelines).toContain("await exigirAcessoModuloBpm(Number(session.user.id))");
+    expect(pipelines).toContain("await exigirAcessoModuloBpm(userId)");
+    expect(pipelines.indexOf("await exigirAcessoModuloBpm(userId)")).toBeLessThan(pipelines.indexOf("db.bpmPipeline.findMany"));
     expect(empresas).toContain("cardIds.length === 0");
     expect(tarefas).toContain("await exigirAcessoBpmPipeline(pipelineId, userId)");
   });

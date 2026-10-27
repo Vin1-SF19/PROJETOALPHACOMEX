@@ -108,10 +108,20 @@ describe("início de Boas-vindas com Google Meet", () => {
 
   it("recusa outro operador antes de chamar o Google", async () => {
     authMock.mockResolvedValue({ user: { id: "42", role: "OPERACIONAL" } });
+    acessoMock.mockRejectedValueOnce(new Error("Não autorizado"));
     expect((await IniciarBoasVindasOperacionalBpm({ cardId: CARD, analistaId: 23,
       dataHora: DATA, emailCliente: "cliente@example.com" })).success).toBe(false);
     expect(criarEventoMock).not.toHaveBeenCalled();
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("permite o administrador do funil autorizado no servidor sem cargo especial", async () => {
+    authMock.mockResolvedValue({ user: { id: "42", role: "COMERCIAL" } });
+    acessoMock.mockResolvedValue({ autorizado: true, isAdminGlobal: false, isAdminPipeline: true, role: "ADMINISTRADOR" });
+    expect(await IniciarBoasVindasOperacionalBpm({ cardId: CARD, analistaId: 23,
+      dataHora: DATA, emailCliente: "cliente@example.com" })).toMatchObject({ success: true });
+    expect(acessoMock).toHaveBeenCalledWith(CARD, 42, "COMERCIAL", "editarCard");
+    expect(criarEventoMock).toHaveBeenCalledOnce();
   });
 
   it("compensa o evento quando o card muda antes da atribuição", async () => {

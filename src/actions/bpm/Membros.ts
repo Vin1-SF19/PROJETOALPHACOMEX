@@ -214,8 +214,6 @@ export async function AtualizarMembrosCardBpm(dados: unknown) {
     console.error("[AtualizarMembrosCardBpm]", error);
     const mensagem = error instanceof Error && error.message === "Não autorizado"
       ? "Não autorizado"
-      : error instanceof Error && error.message === "VINCULO_BOAS_VINDAS_DIRETORIA"
-        ? "Somente Diretor ou Admin podem vincular pessoas aos cards de Boas-vindas."
       : error instanceof Error && error.message === "MEMBRO_CARD_INELEGIVEL"
         ? "Uma ou mais pessoas não estão ativas ou não possuem acesso ao CRM."
         : error instanceof Error && error.message === "CONFLITO_MEMBROS_CARD"

@@ -5,7 +5,7 @@ import { auth } from "../../../auth";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { exigirAcessoBpmCard, usuarioElegivelResponsavelBpm } from "@/lib/bpm/ownership";
-import { DIRETOR_OPERACIONAL_VITOR_ID, PIPELINE_OPERACIONAL_ATIVO_ID, etapaEhBoasVindas, podeAgirBoasVindasOperacional } from "@/lib/bpm/boas-vindas";
+import { DIRETOR_OPERACIONAL_VITOR_ID, PIPELINE_OPERACIONAL_ATIVO_ID, etapaEhBoasVindas } from "@/lib/bpm/boas-vindas";
 import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import {
   criarEventoNoCalendario,
@@ -94,9 +94,6 @@ export async function ListarAnalistasBoasVindasBpm(cardId: string) {
     const session = await auth();
     if (!session?.user?.id || !cardId.trim()) return { success: false as const, error: "Não autorizado" };
     const userId = Number(session.user.id);
-    if (!podeAgirBoasVindasOperacional(userId, session.user.role)) {
-      return { success: false as const, error: "Não autorizado" };
-    }
     await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
     const card = await db.bpmCard.findUnique({ where: { id: cardId }, select: {
       pipelineId: true, etapa: { select: { nome: true } },
@@ -131,9 +128,6 @@ export async function IniciarBoasVindasOperacionalBpm(dados: unknown) {
     if (dataHora.getTime() <= Date.now()) return { success: false as const, error: "Escolha um horário futuro para a reunião." };
     if (analistaId === DIRETOR_OPERACIONAL_VITOR_ID) {
       return { success: false as const, error: "Escolha uma analista diferente do Diretor Operacional." };
-    }
-    if (!podeAgirBoasVindasOperacional(userId, session.user.role)) {
-      return { success: false as const, error: "Somente Admin ou Vitor podem iniciar Boas-vindas." };
     }
     await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
     const [card, analista] = await Promise.all([

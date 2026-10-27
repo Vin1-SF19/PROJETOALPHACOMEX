@@ -7720,3 +7720,36 @@ Usuário pediu corrigir lentidão, falhas de banco e erros do console, em stagin
 ### Refletido também em
 - `decisions.md`, `architecture.md`, `patterns.md`, `known-errors.md`: budgets e aprendizados.
 - `components.md`, `codebase-map.md`, `integration-points.md`: helpers/wiring reais; session-draft anterior preservado.
+
+## [2026-10-27 12:59 UTC] — Permissões simples e administração de funil no CRM
+
+**Tags:** #feature #refactor #security #auth #nextjs #crm-acessos-20261027
+**Agentes envolvidos:** Bibble, Scout, Arquiteto/Echo, Nova, Lens/Anubis/Probe e Scribe/Kowalski; revisão local aprovada.
+**Arquivos tocados:** contrato `acesso-pipeline.ts`, actions `AcessosPipeline.ts`/ownership e consumidores CRM, UI `AcessosPipelineSection.tsx`/central/admin, testes e story; lista completa em `docs/stories/story-crm-permissoes-simplificadas-20261027.md`.
+
+### Contexto
+
+Usuário pediu substituir o estilo de permissões por liberação de setor ou usuário em um funil, opção administrativa para mover/editar/atribuir, manter colunas e remover código morto. Proibiu commit e push.
+
+### O que foi feito
+
+- Contrato único de concessões e UI compartilhada na central e por funil; gravação versionada/auditada, alteração/revogação, lista vazia explícita e aviso de acesso anterior aberto.
+- Administração limitada ao funil integrada a guards/capacidades/consumidores. Colunas preservadas; DTO público filtra etapas e omite ACL. Escritores/UI/helpers antigos removidos, sem caminhos paralelos de edição de setores no cadastro do funil.
+
+### Decisões tomadas
+
+- JSON existente com `permissoesPipeline` version 2 e espelho de setores; sem migration/backfill remoto. Leitor mínimo mantém entrada anterior até publicar, sem administração implícita.
+- `isAdminPipeline` separado de `isAdminGlobal`; preservar integridade de cards encaminhados e usar capacidades do servidor.
+
+### Problemas encontrados / resolvidos
+
+- Fixtures de capacidades, asserts do contrato antigo, mock ausente de closers e contexto de salvamento incompleto foram atualizados; sem contorno no código da aplicação. Lint FINAL passou com 1.175 avisos do repositório; typecheck FINAL e build FINAL passaram. Revisão local Lens/Anubis/Probe aprovada, sem achados bloqueantes/importantes; CodeRabbit indisponível. Testes dirigidos passaram. Smoke local: login HTTP 200 e CRM admin anônimo HTTP 307; servidor encerrado.
+
+### Pendências
+
+- **Suite global final aprovada:** 729 arquivos e 5.607 testes aprovados, 4 ignorados e 1 todo, exit 0. Todos os gates locais concluídos. Sem commit/push/deploy, navegação autenticada ou validação remota. Logs/artefatos temporários removidos, configurações temporárias de build restauradas.
+
+### Refletido também em
+
+- `decisions.md`, `components.md`, `codebase-map.md` e `integration-points.md`: apêndices `[crm-acessos-20261027]`.
+- `session-draft.md`: anotação desta entrega; rascunhos anteriores preservados.

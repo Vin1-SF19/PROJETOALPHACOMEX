@@ -25,7 +25,7 @@ export async function acessoAcompanhamentoComercial(cardId: string, userId: numb
   const card = await tx.bpmCard.findUnique({ where: { id: cardId }, select: {
     etapa: { select: { visibilidades: { select: { perfil: true, podeVer: true, podeAgir: true } } } },
   } });
-  return acesso.isAdminGlobal || Boolean(acesso.role && acesso.role !== "VISUALIZADOR" && card
+  return acesso.isAdminGlobal || acesso.isAdminPipeline === true || Boolean(acesso.role && acesso.role !== "VISUALIZADOR" && card
     && resolverVisibilidadeEtapa(acesso.perfilGlobal, card.etapa.visibilidades).podeAgir);
 }
 
