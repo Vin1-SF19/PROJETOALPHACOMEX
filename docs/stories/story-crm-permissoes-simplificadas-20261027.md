@@ -306,3 +306,32 @@ Pedido posterior do usuário: registrar a entrega em staging/main locais e fazer
 - [x] Gates do snapshot integrado aprovados; revisão independente concluída.
 - [x] Escopo seletivo conferido, mudanças alheias preservadas e `origin/main` rechecado em `552f28a8` após os gates.
 - [x] Preparação de promoção autorizada: commits locais de staging/main e envio somente de main, sem force push, sem envio de staging e sem operação de banco remoto.
+
+
+## Follow-up Virtus — falha de build Vercel (2026-10-27)
+
+O deployment `dpl_C6fc9xQiuKDAiVUa8eGVwrCs4GJP`, commit `0ed15bb8`, falhou no builder padrão de 4 CPUs/8 GiB. A API e o relatório do provedor registram `out_of_memory` e encerramento do worker Next.js por `SIGKILL` durante a compilação. O último artefato READY `dpl_GQhBrWMXvCPzDEYGc8eCFivcT8yy` foi gerado por CLI a partir de `552f28a8`, com override de máquina turbo de 30 CPUs/60 GiB; portanto não comprovava compatibilidade com o builder Git padrão.
+
+Correção mínima candidata: reduzir somente o heap V8 do script de build de 4096 para 3072 MiB, preservando Webpack, `RAYON_NUM_THREADS=1`, `UV_THREADPOOL_SIZE=1`, as otimizações existentes e o comportamento do aplicativo. Nenhuma dependência, schema, credencial, configuração de produção ou plano/custo do provedor alterado.
+
+- [x] Confirmar causa nos logs reais e identificar último artefato saudável.
+- [x] Preparar patch isolado de configuração de build.
+- [x] Validar build frio e com cache com limite real de 7 GiB e sem swap: ambos exit 0, picos 6,056 e 6,002 GiB, zero OOM/kill.
+- [x] Typecheck exit 0 e lint exit 0, preservando os 1.165 avisos da baseline.
+- [x] Executar a suíte global com autenticação sintética coerente: **CONCERNS**, 814 arquivos aprovados e 2 com timeouts de fixtures SQLite (6.831 testes aprovados, 2 falhas, 11 ignorados, 1 todo; 441,56 s). O reteste isolado dos 2 arquivos passou integralmente: 20/20 em 9,30 s, sem modificar fontes nem ampliar timeouts. O focal de autenticação passou 17/17 após corrigir apenas o wrapper para origem HTTPS e secrets sintéticos coerentes. A rodada global anterior com origem HTTP inadequada foi preservada como falha de ambiente, não como aprovação. O runtime e os testes permanecem idênticos ao `0ed15bb8`, cuja baseline global havia passado 816/6.840.
+- [x] Revisão independente do diff pelo fluxo principal: somente heap de build e documentação; nenhuma alteração de runtime ou dependências. Publicação ainda pendente de acompanhamento do preview e coordenação final.
+- [x] Preview isolado `dpl_AzyZdLAaegRGAexCGSvt9ABFVhSr` chegou a READY com builder padrão de 4 CPUs/8 GiB, build frio e heap 3072 MiB confirmados nos logs reais. Compilação em 4,8 min, sem OOM; build concluído e cache novo gerado.
+- [x] Smoke do preview em 2026-10-27 14:51 UTC: `/` 200, `/PainelAlpha/AlphaCRM/admin` anônimo 307 para `/`, `/api/auth/session` 200 com `null`, asset JavaScript 200. Consulta contemporânea ao deployment registrou zero logs runtime e requests 200/307, sem erro novo observado.
+
+Rollback de aplicação não foi executado: o deployment falho não substituiu o alias público saudável. Plano de recuperação é manter o último READY enquanto a correção é validada; qualquer promoção/redeploy será coordenada com o fluxo principal.
+
+### Limitações e integridade da pré-produção
+
+O preview recebeu somente overrides de ambiente por deployment, em runtime e build, com URL/token do banco de staging carregados de `.env.staging.local` e secrets de auth sintéticos coerentes. Nenhum arquivo de ambiente foi enviado. A origem sintética `https://virtus-auth.invalid` limita o teste a fluxos anônimos; login autenticado e escrita remota não foram executados. Configuração de projeto, proteções, plano e variáveis persistentes permaneceram intactos. Os aliases compartilhados de produção e staging continuaram associados, respectivamente, aos READY `552f28a8` e `90222449`. Este preview não substitui nem declara validação do alias staging compartilhado.
+
+O snapshot CLI excluiu somente os cinco artefatos históricos `.next-*` já versionados na base, pois symlinks absolutos de builds antigos impediam a validação do archive pelo provedor. Nenhuma remoção desses arquivos alheios foi incluída no patch Git. Os arquivos do aplicativo e o `package.json` do preview correspondem ao candidato; diferença de código é exclusivamente o heap de build. Produção ainda será acompanhada pelo fluxo principal após a publicação autorizada.
+
+### File list do follow-up
+
+- `package.json` — teto do heap de compilação.
+- `docs/stories/story-crm-permissoes-simplificadas-20261027.md` — causa, evidências e validação.
